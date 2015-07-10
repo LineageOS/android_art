@@ -2,6 +2,29 @@
   "comments": [
     {
       "key": {
+        "uuid": "1f013ff3_fbdb8f7a",
+        "filename": "runtime/gc/space/image_space.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 13108
+      },
+      "writtenOn": "2015-07-10T10:42:44Z",
+      "side": 1,
+      "message": "I think I\u0027d try to adjust the comment to keep in\nsync with the new failed boot count you added.",
+      "range": {
+        "startLine": 124,
+        "startChar": 27,
+        "endLine": 124,
+        "endChar": 28
+      },
+      "revId": "98e9e3648c70e66aaffb9f240ee38302eb6f23b5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5ff73747_d701c4b1",
         "filename": "runtime/gc/space/image_space.cc",
         "patchSetId": 1
@@ -13,6 +36,24 @@
       "writtenOn": "2015-07-10T00:44:15Z",
       "side": 1,
       "message": "Do we want to make this configurable (via a property?) or is hardcoding fine?",
+      "revId": "98e9e3648c70e66aaffb9f240ee38302eb6f23b5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f013ff3_1bf75bf8",
+        "filename": "runtime/gc/space/image_space.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 482,
+      "author": {
+        "id": 13108
+      },
+      "writtenOn": "2015-07-10T10:42:44Z",
+      "side": 1,
+      "message": "My guess is that it\u0027s fine to leave it a constant;\nat least for starters.",
+      "parentUuid": "5ff73747_d701c4b1",
       "revId": "98e9e3648c70e66aaffb9f240ee38302eb6f23b5",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
