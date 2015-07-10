@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5ff73747_d701c4b1",
+        "filename": "runtime/gc/space/image_space.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 482,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2015-07-10T00:44:15Z",
+      "side": 1,
+      "message": "Do we want to make this configurable (via a property?) or is hardcoding fine?",
+      "revId": "98e9e3648c70e66aaffb9f240ee38302eb6f23b5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
