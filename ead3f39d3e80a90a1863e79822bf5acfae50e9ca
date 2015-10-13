@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f287b81_76567209",
+        "filename": "runtime/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 479,
+      "author": {
+        "id": 848
+      },
+      "writtenOn": "2015-10-13T04:22:27Z",
+      "side": 1,
+      "message": "tab",
+      "range": {
+        "startLine": 479,
+        "startChar": 0,
+        "endLine": 479,
+        "endChar": 3
+      },
+      "revId": "ead3f39d3e80a90a1863e79822bf5acfae50e9ca",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
