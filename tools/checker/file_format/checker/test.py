@@ -17,7 +17,7 @@
 from common.archs               import archs_list
 from common.testing             import ToUnicode
 from file_format.checker.parser import ParseCheckerStream
-from file_format.checker.struct import CheckerFile, TestCase, TestAssertion, TestExpression
+from file_format.checker.struct import CheckerFile, TestCase, TestStatement, TestExpression
 
 import io
 import unittest
@@ -33,12 +33,12 @@ class CheckerParser_PrefixTest(unittest.TestCase):
   def assertParses(self, string):
     checkFile = self.tryParse(string)
     self.assertEqual(len(checkFile.testCases), 1)
-    self.assertNotEqual(len(checkFile.testCases[0].assertions), 0)
+    self.assertNotEqual(len(checkFile.testCases[0].statements), 0)
 
   def assertIgnored(self, string):
     checkFile = self.tryParse(string)
     self.assertEqual(len(checkFile.testCases), 1)
-    self.assertEqual(len(checkFile.testCases[0].assertions), 0)
+    self.assertEqual(len(checkFile.testCases[0].statements), 0)
 
   def assertInvalid(self, string):
     with self.assertRaises(CheckerException):
@@ -75,22 +75,22 @@ class CheckerParser_PrefixTest(unittest.TestCase):
 
 class CheckerParser_TestExpressionTest(unittest.TestCase):
 
-  def parseAssertion(self, string, variant=""):
+  def parseStatement(self, string, variant=""):
     checkerText = (u"/// CHECK-START: pass\n" +
                    u"/// CHECK" + ToUnicode(variant) + u": " + ToUnicode(string))
     checkerFile = ParseCheckerStream("<test-file>", "CHECK", io.StringIO(checkerText))
     self.assertEqual(len(checkerFile.testCases), 1)
     testCase = checkerFile.testCases[0]
-    self.assertEqual(len(testCase.assertions), 1)
-    return testCase.assertions[0]
+    self.assertEqual(len(testCase.statements), 1)
+    return testCase.statements[0]
 
   def parseExpression(self, string):
-    line = self.parseAssertion(string)
+    line = self.parseStatement(string)
     self.assertEqual(1, len(line.expressions))
     return line.expressions[0]
 
   def assertEqualsRegex(self, string, expected):
-    self.assertEqual(expected, self.parseAssertion(string).toRegex())
+    self.assertEqual(expected, self.parseStatement(string).toRegex())
 
   def assertEqualsText(self, string, text):
     self.assertEqual(self.parseExpression(string), TestExpression.createPatternFromPlainText(text))
@@ -185,7 +185,7 @@ class CheckerParser_TestExpressionTest(unittest.TestCase):
 
   def test_NoVarDefsInNotChecks(self):
     with self.assertRaises(CheckerException):
-      self.parseAssertion("<<ABC:abc>>", "-NOT")
+      self.parseStatement("<<ABC:abc>>", "-NOT")
 
 
 class CheckerParser_FileLayoutTest(unittest.TestCase):
@@ -197,12 +197,12 @@ class CheckerParser_FileLayoutTest(unittest.TestCase):
     for caseEntry in caseList:
       caseName = caseEntry[0]
       testCase = TestCase(testFile, caseName, 0)
-      assertionList = caseEntry[1]
-      for assertionEntry in assertionList:
-        content = assertionEntry[0]
-        variant = assertionEntry[1]
-        assertion = TestAssertion(testCase, variant, content, 0)
-        assertion.addExpression(TestExpression.createPatternFromPlainText(content))
+      statementList = caseEntry[1]
+      for statementEntry in statementList:
+        content = statementEntry[0]
+        variant = statementEntry[1]
+        statement = TestStatement(testCase, variant, content, 0)
+        statement.addExpression(TestExpression.createPatternFromPlainText(content))
     return testFile
 
   def assertParsesTo(self, checkerText, expectedData):
@@ -223,8 +223,8 @@ class CheckerParser_FileLayoutTest(unittest.TestCase):
         /// CHECK:  foo
         /// CHECK:    bar
       """,
-      [ ( "Example Group", [ ("foo", TestAssertion.Variant.InOrder),
-                             ("bar", TestAssertion.Variant.InOrder) ] ) ])
+      [ ( "Example Group", [ ("foo", TestStatement.Variant.InOrder),
+                             ("bar", TestStatement.Variant.InOrder) ] ) ])
 
   def test_MultipleGroups(self):
     self.assertParsesTo(
@@ -236,12 +236,12 @@ class CheckerParser_FileLayoutTest(unittest.TestCase):
         /// CHECK: abc
         /// CHECK: def
       """,
-      [ ( "Example Group1", [ ("foo", TestAssertion.Variant.InOrder),
-                              ("bar", TestAssertion.Variant.InOrder) ] ),
-        ( "Example Group2", [ ("abc", TestAssertion.Variant.InOrder),
-                              ("def", TestAssertion.Variant.InOrder) ] ) ])
+      [ ( "Example Group1", [ ("foo", TestStatement.Variant.InOrder),
+                              ("bar", TestStatement.Variant.InOrder) ] ),
+        ( "Example Group2", [ ("abc", TestStatement.Variant.InOrder),
+                              ("def", TestStatement.Variant.InOrder) ] ) ])
 
-  def test_AssertionVariants(self):
+  def test_StatementVariants(self):
     self.assertParsesTo(
       """
         /// CHECK-START: Example Group
@@ -253,13 +253,13 @@ class CheckerParser_FileLayoutTest(unittest.TestCase):
         /// CHECK-DAG:  abc
         /// CHECK-DAG:  def
       """,
-      [ ( "Example Group", [ ("foo1", TestAssertion.Variant.InOrder),
-                             ("foo2", TestAssertion.Variant.InOrder),
-                             ("foo3", TestAssertion.Variant.NextLine),
-                             ("foo4", TestAssertion.Variant.NextLine),
-                             ("bar", TestAssertion.Variant.Not),
-                             ("abc", TestAssertion.Variant.DAG),
-                             ("def", TestAssertion.Variant.DAG) ] ) ])
+      [ ( "Example Group", [ ("foo1", TestStatement.Variant.InOrder),
+                             ("foo2", TestStatement.Variant.InOrder),
+                             ("foo3", TestStatement.Variant.NextLine),
+                             ("foo4", TestStatement.Variant.NextLine),
+                             ("bar", TestStatement.Variant.Not),
+                             ("abc", TestStatement.Variant.DAG),
+                             ("def", TestStatement.Variant.DAG) ] ) ])
 
   def test_MisplacedNext(self):
     with self.assertRaises(CheckerException):
@@ -315,7 +315,7 @@ class CheckerParser_SuffixTests(unittest.TestCase):
     for arch in [None] + archs_list:
       checkerFile = self.parse(self.noarch_block)
       self.assertEqual(len(checkerFile.testCases), 1)
-      self.assertEqual(len(checkerFile.testCases[0].assertions), 4)
+      self.assertEqual(len(checkerFile.testCases[0].statements), 4)
 
   def test_IgnoreNonTargetArch(self):
     for targetArch in archs_list:
@@ -332,7 +332,7 @@ class CheckerParser_SuffixTests(unittest.TestCase):
       checkerFile = self.parse(checkerText)
       self.assertEqual(len(checkerFile.testCases), 1)
       self.assertEqual(len(checkerFile.testCasesForArch(arch)), 1)
-      self.assertEqual(len(checkerFile.testCases[0].assertions), 4)
+      self.assertEqual(len(checkerFile.testCases[0].statements), 4)
 
   def test_NoDebugAndArch(self):
     testCase = self.parse("""
@@ -375,20 +375,20 @@ class CheckerParser_EvalTests(unittest.TestCase):
 
   def parseExpressions(self, string):
     testCase = self.parseTestCase("/// CHECK-EVAL: " + string)
-    self.assertEqual(len(testCase.assertions), 1)
-    assertion = testCase.assertions[0]
-    self.assertEqual(assertion.variant, TestAssertion.Variant.Eval)
-    self.assertEqual(assertion.originalText, string)
-    return assertion.expressions
+    self.assertEqual(len(testCase.statements), 1)
+    statement = testCase.statements[0]
+    self.assertEqual(statement.variant, TestStatement.Variant.Eval)
+    self.assertEqual(statement.originalText, string)
+    return statement.expressions
 
   def assertParsesToPlainText(self, text):
     testCase = self.parseTestCase("/// CHECK-EVAL: " + text)
-    self.assertEqual(len(testCase.assertions), 1)
-    assertion = testCase.assertions[0]
-    self.assertEqual(assertion.variant, TestAssertion.Variant.Eval)
-    self.assertEqual(assertion.originalText, text)
-    self.assertEqual(len(assertion.expressions), 1)
-    expression = assertion.expressions[0]
+    self.assertEqual(len(testCase.statements), 1)
+    statement = testCase.statements[0]
+    self.assertEqual(statement.variant, TestStatement.Variant.Eval)
+    self.assertEqual(statement.originalText, text)
+    self.assertEqual(len(statement.expressions), 1)
+    expression = statement.expressions[0]
     self.assertEqual(expression.variant, TestExpression.Variant.PlainText)
     self.assertEqual(expression.text, text)
 
