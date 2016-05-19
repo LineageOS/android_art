@@ -14,7 +14,7 @@ name must exactly match one of the groups recognized in the output (they can
 be listed with the '--list-passes' command-line flag).
 
 Matching of check lines is carried out in the order of appearance in the
-source file. There are three types of check lines:
+source file. There are five types of check lines:
  - CHECK:      Must match an output line which appears in the output group
                later than lines matched against any preceeding checks. Output
                lines must therefore match the check lines in the same order.
@@ -29,8 +29,8 @@ source file. There are three types of check lines:
                Surrounding non-negative checks (or boundaries of the group)
                therefore create a scope within which the statement is verified.
  - CHECK-NEXT: Must match the output line which comes right after the line which
-               matched the previous check. Cannot be used after any but the
-               in-order CHECK.
+               matched the previous check. Can only be used after a CHECK or
+               another CHECK-NEXT.
  - CHECK-EVAL: Specifies a Python expression which must evaluate to 'True'.
 
 Check-line patterns are treated as plain text rather than regular expressions
