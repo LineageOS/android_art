@@ -14,7 +14,8 @@ name must exactly match one of the groups recognized in the output (they can
 be listed with the '--list-passes' command-line flag).
 
 Matching of check lines is carried out in the order of appearance in the
-source file. There are five types of check lines:
+source file. There are five types of check lines. Branching instructions are
+also supported and documented later in this file.
  - CHECK:      Must match an output line which appears in the output group
                later than lines matched against any preceeding checks. Output
                lines must therefore match the check lines in the same order.
@@ -83,3 +84,53 @@ thereby avoiding to repeat the check lines if some, but not all architectures
 match. An example line looks like:
 
   /// CHECK-START-{X86_64,ARM,ARM64}: int MyClass.MyMethod() constant_folding (after)
+
+
+Branching is possible thanks to the following statements:
+ - CHECK-IF:
+ - CHECK-ELIF:
+ - CHECK-ELSE:
+ - CHECK-FI:
+
+CHECK-IF and CHECK-ELIF take a Python expression as input that will be evaluated by `eval`.
+Like CHECK-EVAL, they support only referencing of variables, defining new variables as part
+of the statement input is not allowed. Any other surrounding text will be passed to Python's `eval`
+as is. CHECK-ELSE and CHECK-FI must not have any input.
+
+Example:
+  /// CHECK-START: int MyClass.MyMethod() constant_folding (after)
+  /// CHECK:        {{i\d+}} IntConstant <<MyConst:(0|1|2)>>
+  /// CHECK-IF:     <<MyConst>> == 0
+  ///               CHECK-NEXT:            FooBar01
+  /// CHECK-ELIF:   <<MyConst>> == 1
+  ///               CHECK-NOT:             FooBar01
+  /// CHECK-FI:
+
+Branch blocks can contain any statement, including CHECK-NEXT and CHECK-DAG.
+Notice the CHECK-NEXT statement within the IF branch. When a CHECK-NEXT is encountered,
+Checker expects that the previously executed statement was either a CHECK or a CHECK-NEXT.
+This condition is enforced at runtime, and an error is thrown if it's not respected.
+
+Statements inside branches can define new variables. If a new variable gets defined inside a branch
+(of any depth, since nested branching is allowed), that variable will become global within the scope
+of the defining group. In other words, it will be valid everywhere after its definition within the
+block defined by the CHECK-START statement. The absence of lexical scoping for Checker variables
+seems a bit inelegant at first, but is probably more practical.
+
+Example:
+  /// CHECK-START: void MyClass.FooBar() liveness (after)
+  /// CHECK-IF:     os.environ.get('ART_READ_BARRIER_TYPE') != 'TABLELOOKUP'
+  ///               CHECK:                 <<MyID:i\d+>> IntConstant 3
+  /// CHECK-ELSE:
+  ///               CHECK:                 <<MyID:i\d+>> IntConstant 5
+  /// CHECK-FI:
+  /// CHECK-NEXT:   Return [<<MyID>>]
+
+Notice that the variable MyID remained valid outside the branch where it was defined.
+Furthermore, in this example, the definition of MyID depends on which branch gets selected at
+runtime. Attempting to re-define a variable or referencing an undefined variable is not allowed,
+Checker will throw a runtime error.
+The example above also shows how we can use environment variables to perform custom checks.
+
+It is possible to combine IF, (multiple) ELIF and ELSE statements together. Nested branching is
+also supported.
