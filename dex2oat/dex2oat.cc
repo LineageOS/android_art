@@ -80,6 +80,13 @@
 #include "well_known_classes.h"
 #include "zip_archive.h"
 
+#if !defined(__APPLE__)
+// Apple doesn't have CLOCK_MONOTONIC
+#define WATCHDOG_CLOCK  CLOCK_MONOTONIC
+#else
+#define WATCHDOG_CLOCK  CLOCK_REALTIME
+#endif
+
 namespace art {
 
 static constexpr size_t kDefaultMinDexFilesForSwap = 2;
@@ -413,7 +420,13 @@ class WatchDog {
     shutting_down_ = false;
     const char* reason = "dex2oat watch dog thread startup";
     CHECK_WATCH_DOG_PTHREAD_CALL(pthread_mutex_init, (&mutex_, nullptr), reason);
-    CHECK_WATCH_DOG_PTHREAD_CALL(pthread_cond_init, (&cond_, nullptr), reason);
+    CHECK_WATCH_DOG_PTHREAD_CALL(pthread_condattr_init, (&condattr_), reason);
+#if !defined(__APPLE__)
+    // Apple doesn't have CLOCK_MONOTONIC or pthread_condattr_setclock.
+    CHECK_WATCH_DOG_PTHREAD_CALL(pthread_condattr_setclock, (&condattr_, WATCHDOG_CLOCK), reason);
+#endif
+    CHECK_WATCH_DOG_PTHREAD_CALL(pthread_cond_init, (&cond_, &condattr_), reason);
+    CHECK_WATCH_DOG_PTHREAD_CALL(pthread_condattr_destroy, (&condattr_), reason);
     CHECK_WATCH_DOG_PTHREAD_CALL(pthread_attr_init, (&attr_), reason);
     CHECK_WATCH_DOG_PTHREAD_CALL(pthread_create, (&pthread_, &attr_, &CallBack, this), reason);
     CHECK_WATCH_DOG_PTHREAD_CALL(pthread_attr_destroy, (&attr_), reason);
@@ -456,7 +469,7 @@ class WatchDog {
     //       large.
     constexpr int64_t multiplier = kVerifyObjectSupport > kVerifyObjectModeFast ? 100 : 1;
     timespec timeout_ts;
-    InitTimeSpec(true, CLOCK_REALTIME, multiplier * kWatchDogTimeoutSeconds * 1000, 0, &timeout_ts);
+    InitTimeSpec(true, WATCHDOG_CLOCK, multiplier * kWatchDogTimeoutSeconds * 1000, 0, &timeout_ts);
     const char* reason = "dex2oat watch dog thread waiting";
     CHECK_WATCH_DOG_PTHREAD_CALL(pthread_mutex_lock, (&mutex_), reason);
     while (!shutting_down_) {
@@ -486,6 +499,7 @@ class WatchDog {
   bool shutting_down_;
   // TODO: Switch to Mutex when we can guarantee it won't prevent shutdown in error cases.
   pthread_mutex_t mutex_;
+  pthread_condattr_t condattr_;
   pthread_cond_t cond_;
   pthread_attr_t attr_;
   pthread_t pthread_;
