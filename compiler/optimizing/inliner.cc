@@ -649,8 +649,8 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(HInvoke* invoke_instruction,
     }
     ArtMethod* new_method = nullptr;
     if (invoke_instruction->IsInvokeInterface()) {
-      new_method = ic.GetTypeAt(i)->GetEmbeddedImTableEntry(
-          method_index % mirror::Class::kImtSize, pointer_size);
+      new_method = ic.GetTypeAt(i)->GetImt(pointer_size)->Get(
+          method_index % ImTable::kSize, pointer_size);
       if (new_method->IsRuntimeMethod()) {
         // Bail out as soon as we see a conflict trampoline in one of the target's
         // interface table.
@@ -1035,8 +1035,11 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
   uint32_t method_index = resolved_method->GetDexMethodIndex();
   ClassLinker* class_linker = caller_compilation_unit_.GetClassLinker();
   Handle<mirror::DexCache> dex_cache(handles_->NewHandle(resolved_method->GetDexCache()));
+  Handle<mirror::ClassLoader> class_loader(handles_->NewHandle(
+      resolved_method->GetDeclaringClass()->GetClassLoader()));
+
   DexCompilationUnit dex_compilation_unit(
-      caller_compilation_unit_.GetClassLoader(),
+      class_loader.ToJObject(),
       class_linker,
       callee_dex_file,
       code_item,

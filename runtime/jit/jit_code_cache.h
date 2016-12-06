@@ -146,7 +146,6 @@ class JitCodeCache {
   // Remove all methods in our cache that were allocated by 'alloc'.
   void RemoveMethodsIn(Thread* self, const LinearAlloc& alloc)
       REQUIRES(!lock_)
-      REQUIRES(Locks::classlinker_classes_lock_)
       SHARED_REQUIRES(Locks::mutator_lock_);
 
   void ClearGcRootsInInlineCaches(Thread* self) REQUIRES(!lock_);
@@ -255,8 +254,7 @@ class JitCodeCache {
       SHARED_REQUIRES(Locks::mutator_lock_);
 
   bool CheckLiveCompiledCodeHasProfilingInfo()
-      REQUIRES(lock_)
-      SHARED_REQUIRES(Locks::mutator_lock_);
+      REQUIRES(lock_);
 
   void FreeCode(uint8_t* code) REQUIRES(lock_);
   uint8_t* AllocateCode(size_t code_size) REQUIRES(lock_);
