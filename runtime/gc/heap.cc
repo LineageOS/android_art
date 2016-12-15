@@ -316,9 +316,9 @@ Heap::Heap(size_t initial_size,
             continue;
           }
 
-          space::ImageSpace::CreateMultiImageLocations(image_file_name,
-                                                       boot_classpath,
-                                                       &image_file_names);
+          space::ImageSpace::ExtractMultiImageLocations(image_file_name,
+                                                        boot_classpath,
+                                                        &image_file_names);
         }
       } else {
         LOG(ERROR) << "Could not create image space with image file '" << image_file_name << "'. "
@@ -2709,7 +2709,8 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
   }
 
   // It's time to clear all inline caches, in case some classes can be unloaded.
-  if ((gc_type == collector::kGcTypeFull) && (runtime->GetJit() != nullptr)) {
+  if (((gc_type == collector::kGcTypeFull) || (gc_type == collector::kGcTypePartial)) &&
+      (runtime->GetJit() != nullptr)) {
     runtime->GetJit()->GetCodeCache()->ClearGcRootsInInlineCaches(self);
   }
 

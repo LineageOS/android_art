@@ -40,7 +40,13 @@ class ScratchFile {
  public:
   ScratchFile();
 
+  explicit ScratchFile(const std::string& filename);
+
   ScratchFile(const ScratchFile& other, const char* suffix);
+
+  explicit ScratchFile(ScratchFile&& other);
+
+  ScratchFile& operator=(ScratchFile&& other);
 
   explicit ScratchFile(File* file);
 
@@ -111,10 +117,9 @@ class CommonRuntimeTestImpl {
 
   std::string GetTestAndroidRoot();
 
-  std::string GetTestDexFileName(const char* name);
+  std::string GetTestDexFileName(const char* name) const;
 
-  std::vector<std::unique_ptr<const DexFile>> OpenTestDexFiles(const char* name)
-      SHARED_REQUIRES(Locks::mutator_lock_);
+  std::vector<std::unique_ptr<const DexFile>> OpenTestDexFiles(const char* name);
 
   std::unique_ptr<const DexFile> OpenTestDexFile(const char* name)
       SHARED_REQUIRES(Locks::mutator_lock_);
