@@ -28,7 +28,7 @@
 #include "base/macros.h"
 #include "globals.h"
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__LXSS__)
 #define ART_USE_FUTEXES 0
 #else
 #define ART_USE_FUTEXES 1
