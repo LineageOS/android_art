@@ -1848,7 +1848,7 @@ void ClassLinker::VisitClassRoots(RootVisitor* visitor, VisitRootFlags flags) {
     boot_class_table_.VisitRoots(buffered_visitor);
 
     // If tracing is enabled, then mark all the class loaders to prevent unloading.
-    if (tracing_enabled) {
+    if ((flags & kVisitRootFlagClassLoader) != 0 || tracing_enabled) {
       for (const ClassLoaderData& data : class_loaders_) {
         GcRoot<mirror::Object> root(GcRoot<mirror::Object>(self->DecodeJObject(data.weak_root)));
         root.VisitRoot(visitor, RootInfo(kRootVMInternal));
@@ -2409,6 +2409,14 @@ mirror::Class* ClassLinker::FindClass(Thread* self,
 
       // We'll let the Java-side rediscover all this and throw the exception with the right stack
       // trace.
+      if (!self->CanCallIntoJava()) {
+        // Oops, we can't call into java so we can't run actual class-loader code.
+        // This is true for e.g. for the compiler (jit or aot).
+        mirror::Throwable* pre_allocated =
+            Runtime::Current()->GetPreAllocatedNoClassDefFoundError();
+        self->SetException(pre_allocated);
+        return nullptr;
+      }
     }
 
     if (Runtime::Current()->IsAotCompiler()) {
