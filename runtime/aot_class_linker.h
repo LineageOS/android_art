@@ -37,6 +37,13 @@ class AotClassLinker : public ClassLinker {
       override
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Override AllocClass because aot compiler will need to perform a transaction check to determine
+  // can we allocate class from heap.
+  bool CanAllocClass()
+      override
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Roles::uninterruptible_);
+
   bool InitializeClass(Thread *self,
                        Handle<mirror::Class> klass,
                        bool can_run_clinit,
