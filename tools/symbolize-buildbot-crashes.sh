@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Copyright (C) 2016 The Android Open Source Project
 #
@@ -17,7 +17,7 @@
 # We push art and its dependencies to '/data/local/tmp', but the 'stack'
 # script expect things to be in '/'. So we just remove the
 # '/data/local/tmp' prefix.
-adb logcat -d | sed 's,/data/local/tmp,,g' | development/scripts/stack
+adb logcat -d | sed -e's,/data/local/tmp,,g' | development/scripts/stack
 
 # Always return 0 to avoid having the buildbot complain about wrong stacks.
 exit 0
