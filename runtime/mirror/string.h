@@ -27,6 +27,7 @@ namespace art {
 
 template<class T> class Handle;
 template<class MirrorType> class ObjPtr;
+class StringBuilderAppend;
 struct StringOffsets;
 class StubTest_ReadBarrierForRoot_Test;
 
@@ -269,6 +270,7 @@ class MANAGED String final : public Object {
     uint8_t value_compressed_[0];
   };
 
+  friend class art::StringBuilderAppend;
   friend struct art::StringOffsets;  // for verifying offset information
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(String);
