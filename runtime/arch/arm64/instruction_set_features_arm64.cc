@@ -55,7 +55,8 @@ Arm64FeaturesUniquePtr Arm64InstructionSetFeatures::FromVariant(
         "exynos-m1",
         "exynos-m2",
         "denver64",
-        "kryo"
+        "kryo",
+        "kryo300"
     };
     if (!FindVariantInArray(arm64_known_variants, arraysize(arm64_known_variants), variant)) {
       std::ostringstream os;
