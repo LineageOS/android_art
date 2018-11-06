@@ -99,8 +99,8 @@ art_global_defaults {
                 // method InstructionSetFeatures::FromCppDefines(). Since invoking dex2oat directly
                 // does not pick up these flags, cross-compiling from a x86/x86_64 host to a
                 // x86/x86_64 target should not be affected.
-                "-msse4.2",
-                "-mpopcnt",
+                // "-msse4.2",
+                // "-mpopcnt",
             ],
         },
     },
