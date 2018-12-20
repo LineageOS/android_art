@@ -472,6 +472,7 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
     // We found a stack map, now fill the frame with dex register values from the interpreter's
     // shadow frame.
     DexRegisterMap vreg_map = code_info.GetDexRegisterMapOf(stack_map);
+    DCHECK_EQ(vreg_map.size(), number_of_vregs);
 
     frame_size = osr_method->GetFrameSizeInBytes();
 
@@ -491,7 +492,6 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
       // If we don't have a dex register map, then there are no live dex registers at
       // this dex pc.
     } else {
-      DCHECK_EQ(vreg_map.size(), number_of_vregs);
       for (uint16_t vreg = 0; vreg < number_of_vregs; ++vreg) {
         DexRegisterLocation::Kind location = vreg_map[vreg].GetKind();
         if (location == DexRegisterLocation::Kind::kNone) {

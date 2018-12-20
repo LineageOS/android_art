@@ -17,6 +17,7 @@
 #include "arch/context.h"
 #include "art_method-inl.h"
 #include "jni.h"
+#include "oat_quick_method_header.h"
 #include "scoped_thread_state_change-inl.h"
 #include "stack.h"
 #include "thread.h"
@@ -24,6 +25,29 @@
 namespace art {
 
 namespace {
+
+bool IsFrameCompiledAndNonDebuggable(const art::StackVisitor* sv) {
+  return sv->GetCurrentShadowFrame() == nullptr &&
+         sv->GetCurrentOatQuickMethodHeader()->IsOptimized() &&
+         !Runtime::Current()->IsJavaDebuggable();
+}
+
+void CheckOptimizedOutRegLiveness(const art::StackVisitor* sv,
+                                  ArtMethod* m,
+                                  uint32_t dex_reg,
+                                  VRegKind vreg_kind,
+                                  bool check_val = false,
+                                  uint32_t expected = 0) REQUIRES_SHARED(Locks::mutator_lock_) {
+  uint32_t value = 0;
+  if (IsFrameCompiledAndNonDebuggable(sv)) {
+    CHECK_EQ(sv->GetVReg(m, dex_reg, vreg_kind, &value), false);
+  } else {
+    CHECK(sv->GetVReg(m, dex_reg, vreg_kind, &value));
+    if (check_val) {
+      CHECK_EQ(value, expected);
+    }
+  }
+}
 
 jint FindMethodIndex(jobject this_value_jobj) {
   ScopedObjectAccess soa(Thread::Current());
@@ -38,21 +62,22 @@ jint FindMethodIndex(jobject this_value_jobj) {
         if (m_name.compare("$noinline$testThisWithInstanceCall") == 0) {
           found_method_index = 1;
           uint32_t value = 0;
-          CHECK(stack_visitor->GetVReg(m, 1, kReferenceVReg, &value));
-          CHECK_EQ(reinterpret_cast<mirror::Object*>(value), this_value);
-          CHECK_EQ(stack_visitor->GetThisObject(), this_value);
+          if (IsFrameCompiledAndNonDebuggable(stack_visitor)) {
+            CheckOptimizedOutRegLiveness(stack_visitor, m, 1, kReferenceVReg);
+          } else {
+            CHECK(stack_visitor->GetVReg(m, 1, kReferenceVReg, &value));
+            CHECK_EQ(reinterpret_cast<mirror::Object*>(value), this_value);
+            CHECK_EQ(stack_visitor->GetThisObject(), this_value);
+          }
         } else if (m_name.compare("$noinline$testThisWithStaticCall") == 0) {
           found_method_index = 2;
-          uint32_t value = 0;
-          CHECK(stack_visitor->GetVReg(m, 1, kReferenceVReg, &value));
+          CheckOptimizedOutRegLiveness(stack_visitor, m, 1, kReferenceVReg);
         } else if (m_name.compare("$noinline$testParameter") == 0) {
           found_method_index = 3;
-          uint32_t value = 0;
-          CHECK(stack_visitor->GetVReg(m, 1, kReferenceVReg, &value));
+          CheckOptimizedOutRegLiveness(stack_visitor, m, 1, kReferenceVReg);
         } else if (m_name.compare("$noinline$testObjectInScope") == 0) {
           found_method_index = 4;
-          uint32_t value = 0;
-          CHECK(stack_visitor->GetVReg(m, 0, kReferenceVReg, &value));
+          CheckOptimizedOutRegLiveness(stack_visitor, m, 0, kReferenceVReg);
         }
 
         return true;

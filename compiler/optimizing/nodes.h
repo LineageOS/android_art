@@ -334,6 +334,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         temporaries_vreg_slots_(0),
         has_bounds_checks_(false),
         has_try_catch_(false),
+        has_monitor_operations_(false),
         has_simd_(false),
         has_loops_(false),
         has_irreducible_loops_(false),
@@ -600,6 +601,9 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   bool HasTryCatch() const { return has_try_catch_; }
   void SetHasTryCatch(bool value) { has_try_catch_ = value; }
 
+  bool HasMonitorOperations() const { return has_monitor_operations_; }
+  void SetHasMonitorOperations(bool value) { has_monitor_operations_ = value; }
+
   bool HasSIMD() const { return has_simd_; }
   void SetHasSIMD(bool value) { has_simd_ = value; }
 
@@ -695,6 +699,10 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   // it up to date in the presence of code elimination so there might be
   // false positives.
   bool has_try_catch_;
+
+  // Flag whether there are any HMonitorOperation in the graph. If yes this will mandate
+  // DexRegisterMap to be present to allow deadlock analysis for non-debuggable code.
+  bool has_monitor_operations_;
 
   // Flag whether SIMD instructions appear in the graph. If true, the
   // code generators may have to be more careful spilling the wider

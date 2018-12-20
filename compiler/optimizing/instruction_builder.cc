@@ -3090,6 +3090,7 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
           LoadLocal(instruction.VRegA_11x(), DataType::Type::kReference),
           HMonitorOperation::OperationKind::kEnter,
           dex_pc));
+      graph_->SetHasMonitorOperations(true);
       break;
     }
 
@@ -3098,6 +3099,7 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
           LoadLocal(instruction.VRegA_11x(), DataType::Type::kReference),
           HMonitorOperation::OperationKind::kExit,
           dex_pc));
+      graph_->SetHasMonitorOperations(true);
       break;
     }
 
