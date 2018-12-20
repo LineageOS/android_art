@@ -68,7 +68,8 @@ class StackMapStream : public DeletableArenaObject<kArenaAllocStackMapStream> {
                           uint32_t native_pc_offset,
                           uint32_t register_mask = 0,
                           BitVector* sp_mask = nullptr,
-                          StackMap::Kind kind = StackMap::Kind::Default);
+                          StackMap::Kind kind = StackMap::Kind::Default,
+                          bool needs_vreg_info = true);
   void EndStackMapEntry();
 
   void AddDexRegisterEntry(DexRegisterLocation::Kind kind, int32_t value) {

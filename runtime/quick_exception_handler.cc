@@ -301,10 +301,11 @@ void QuickExceptionHandler::SetCatchEnvironmentForOptimizedHandler(StackVisitor*
   StackMap catch_stack_map = code_info.GetCatchStackMapForDexPc(GetHandlerDexPc());
   DCHECK(catch_stack_map.IsValid());
   DexRegisterMap catch_vreg_map = code_info.GetDexRegisterMapOf(catch_stack_map);
+  DCHECK_EQ(catch_vreg_map.size(), number_of_vregs);
+
   if (!catch_vreg_map.HasAnyLiveDexRegisters()) {
     return;
   }
-  DCHECK_EQ(catch_vreg_map.size(), number_of_vregs);
 
   // Find stack map of the throwing instruction.
   StackMap throw_stack_map =
@@ -478,10 +479,11 @@ class DeoptimizeStackVisitor final : public StackVisitor {
     DexRegisterMap vreg_map = IsInInlinedFrame()
         ? code_info.GetInlineDexRegisterMapOf(stack_map, GetCurrentInlinedFrame())
         : code_info.GetDexRegisterMapOf(stack_map);
+
+    DCHECK_EQ(vreg_map.size(), number_of_vregs);
     if (vreg_map.empty()) {
       return;
     }
-    DCHECK_EQ(vreg_map.size(), number_of_vregs);
 
     for (uint16_t vreg = 0; vreg < number_of_vregs; ++vreg) {
       if (updated_vregs != nullptr && updated_vregs[vreg]) {

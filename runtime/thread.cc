@@ -3889,6 +3889,7 @@ class ReferenceMapVisitor : public StackVisitor {
             code_info(_code_info),
             dex_register_map(code_info.GetDexRegisterMapOf(map)),
             visitor(_visitor) {
+        DCHECK_EQ(dex_register_map.size(), number_of_dex_registers);
       }
 
       // TODO: If necessary, we should consider caching a reverse map instead of the linear
