@@ -1441,6 +1441,7 @@ class Heap {
   friend class collector::ConcurrentCopying;
   friend class collector::MarkSweep;
   friend class collector::SemiSpace;
+  friend class GCCriticalSection;
   friend class ReferenceQueue;
   friend class ScopedGCCriticalSection;
   friend class VerifyReferenceCardVisitor;
