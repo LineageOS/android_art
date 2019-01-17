@@ -2718,16 +2718,59 @@ void LocationsBuilderARM64::VisitBoundsCheck(HBoundsCheck* instruction) {
   caller_saves.Add(Location::RegisterLocation(calling_convention.GetRegisterAt(0).GetCode()));
   caller_saves.Add(Location::RegisterLocation(calling_convention.GetRegisterAt(1).GetCode()));
   LocationSummary* locations = codegen_->CreateThrowingSlowPathLocations(instruction, caller_saves);
-  locations->SetInAt(0, Location::RequiresRegister());
-  locations->SetInAt(1, ARM64EncodableConstantOrRegister(instruction->InputAt(1), instruction));
+
+  // If both index and length are constant, we can check the bounds statically and
+  // generate code accordingly. We want to make sure we generate constant locations
+  // in that case, regardless of whether they are encodable in the comparison or not.
+  HInstruction* index = instruction->InputAt(0);
+  HInstruction* length = instruction->InputAt(1);
+  bool both_const = index->IsConstant() && length->IsConstant();
+  locations->SetInAt(0, both_const
+      ? Location::ConstantLocation(index->AsConstant())
+      : ARM64EncodableConstantOrRegister(index, instruction));
+  locations->SetInAt(1, both_const
+      ? Location::ConstantLocation(length->AsConstant())
+      : ARM64EncodableConstantOrRegister(length, instruction));
 }
 
 void InstructionCodeGeneratorARM64::VisitBoundsCheck(HBoundsCheck* instruction) {
+  LocationSummary* locations = instruction->GetLocations();
+  Location index_loc = locations->InAt(0);
+  Location length_loc = locations->InAt(1);
+
+  int cmp_first_input = 0;
+  int cmp_second_input = 1;
+  Condition cond = hs;
+
+  if (index_loc.IsConstant()) {
+    int64_t index = Int64FromLocation(index_loc);
+    if (length_loc.IsConstant()) {
+      int64_t length = Int64FromLocation(length_loc);
+      if (index < 0 || index >= length) {
+        BoundsCheckSlowPathARM64* slow_path =
+            new (codegen_->GetScopedAllocator()) BoundsCheckSlowPathARM64(instruction);
+        codegen_->AddSlowPath(slow_path);
+        __ B(slow_path->GetEntryLabel());
+      } else {
+        // BCE will remove the bounds check if we are guaranteed to pass.
+        // However, some optimization after BCE may have generated this, and we should not
+        // generate a bounds check if it is a valid range.
+      }
+      return;
+    }
+    // Only the index is constant: change the order of the operands and commute the condition
+    // so we can use an immediate constant for the index (only the second input to a cmp
+    // instruction can be an immediate).
+    cmp_first_input = 1;
+    cmp_second_input = 0;
+    cond = ls;
+  }
   BoundsCheckSlowPathARM64* slow_path =
       new (codegen_->GetScopedAllocator()) BoundsCheckSlowPathARM64(instruction);
+  __ Cmp(InputRegisterAt(instruction, cmp_first_input),
+         InputOperandAt(instruction, cmp_second_input));
   codegen_->AddSlowPath(slow_path);
-  __ Cmp(InputRegisterAt(instruction, 0), InputOperandAt(instruction, 1));
-  __ B(slow_path->GetEntryLabel(), hs);
+  __ B(slow_path->GetEntryLabel(), cond);
 }
 
 void LocationsBuilderARM64::VisitClinitCheck(HClinitCheck* check) {
