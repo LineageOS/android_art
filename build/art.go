@@ -167,6 +167,11 @@ func hostFlags(ctx android.LoadHookContext) []string {
 	clang_path := filepath.Join(config.ClangDefaultBase, ctx.Config().PrebuiltOS(), config.ClangDefaultVersion)
 	cflags = append(cflags, "-DART_CLANG_PATH=\""+clang_path+"\"")
 
+	if !ctx.Config().IsEnvFalse("CPU_SSE42") {
+		cflags = append(cflags, "-msse4.2")
+		cflags = append(cflags, "-mpopcnt")
+	}
+
 	return cflags
 }
 
