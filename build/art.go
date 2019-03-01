@@ -169,6 +169,11 @@ func hostFlags(ctx android.LoadHookContext) []string {
 		cflags = append(cflags, "-DART_ENABLE_ADDRESS_SANITIZER=1")
 	}
 
+	if !ctx.Config().IsEnvFalse("CPU_SSE42") {
+		cflags = append(cflags, "-msse4.2")
+		cflags = append(cflags, "-mpopcnt")
+	}
+
 	return cflags
 }
 
