@@ -28,22 +28,56 @@ if [[ "$@" == *"--interpreter"* ]]; then
   patch -s expected.txt <interpreter-expected.patch
 fi
 
+# Provide additional runtime options when running on device.
+extra_runtime_options=
+if  [[ "$@" != *"--host"* ]]; then
+  if [[ -z "$ANDROID_BUILD_TOP" ]]; then
+    echo 'ANDROID_BUILD_TOP environment variable is empty; did you forget to run `lunch`?'
+    exit 1
+  fi
+
+  bitness_flag=--32
+  if  [[ "$@" == *"--64"* ]]; then
+    bitness_flag=--64
+  fi
+
+  # Path to native libraries installed on the device for testing purposes.
+  test_native_lib_path=$("$ANDROID_BUILD_TOP/art/test/utils/get-device-test-native-lib-path" \
+    "$bitness_flag")
+
+  # The linker configuration used for dalvikvm(64) in the Runtime APEX
+  # requires us to pass the full path to the agent to the runtime when
+  # running on device.
+  agent=${test_native_lib_path}/${agent}
+
+  # The above agent path is an absolute one; append the root directory to the
+  # library path so that the agent can be found via the `java.library.path`
+  # system property (see method `Main.find` in
+  # test/909-attach-agent/src-art/Main.java).
+  extra_runtime_options="--runtime-option -Djava.library.path=${test_native_lib_path}:/"
+fi
+
 export ANDROID_LOG_TAGS='*:f'
 ./default-run "$@" --android-runtime-option -Xplugin:${plugin} \
                    --android-runtime-option -Xcompiler-option \
                    --android-runtime-option --debuggable \
+                   $extra_runtime_options \
                    --args agent:${agent}=909-attach-agent
 return_status1=$?
 
 ./default-run "$@" --android-runtime-option -Xcompiler-option \
                    --android-runtime-option --debuggable \
+                   $extra_runtime_options \
                    --args agent:${agent}=909-attach-agent
 return_status2=$?
 
-./default-run "$@" --args agent:${agent}=909-attach-agent --external-log-tags
+./default-run "$@" $extra_runtime_options \
+                   --args agent:${agent}=909-attach-agent \
+                   --external-log-tags
 return_status3=$?
 
-./default-run "$@" --args agent:${agent}=909-attach-agent \
+./default-run "$@" $extra_runtime_options \
+                   --args agent:${agent}=909-attach-agent \
                    --args disallow-debugging \
                    --external-log-tags
 return_status4=$?

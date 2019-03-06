@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 #
 # Copyright (C) 2019 The Android Open Source Project
 #
@@ -15,6 +15,11 @@
 # limitations under the License.
 
 # Script to run all gtests located under $ART_TEST_CHROOT/data/nativetest{64}
+
+if [[ -z "$ART_TEST_CHROOT" ]]; then
+  echo 'ART_TEST_CHROOT environment variable is empty; please set it before running this script.'
+  exit 1
+fi
 
 ADB="${ADB:-adb}"
 all_tests=
@@ -34,8 +39,8 @@ add_tests "/data/nativetest"
 add_tests "/data/nativetest64"
 
 for i in $all_tests; do
-  echo $i
-  ${ADB} shell "chroot $ART_TEST_CHROOT env LD_LIBRARY_PATH= ANDROID_ROOT='/system' ANDROID_RUNTIME_ROOT='/system' ANDROID_TZDATA_ROOT='/system/etc/tzdata_module' $i" || fail $i
+  echo "$i"
+  ${ADB} shell "chroot $ART_TEST_CHROOT env ANDROID_TZDATA_ROOT='/system/etc/tzdata_module' $i" || fail $i
 done
 
 if [ -n "$failing_tests" ]; then
