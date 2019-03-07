@@ -141,6 +141,7 @@ dev_mode="no"
 create_runner="no"
 update_mode="no"
 debug_mode="no"
+simulator_mode="no"
 relocate="no"
 runtime="art"
 usage="no"
@@ -180,6 +181,9 @@ while true; do
         target_mode="no"
         DEX_LOCATION=$tmp_dir
         run_args+=(--host)
+        shift
+    elif [ "x$1" = "x--simulate-arm64" ]; then
+        simulator_mode="yes"
         shift
     elif [ "x$1" = "x--quiet" ]; then
         quiet="yes"
@@ -674,9 +678,13 @@ if [ "$runtime" = "dalvik" ]; then
         true # defaults to using target BOOTCLASSPATH
     fi
 elif [ "$runtime" = "art" ]; then
-    if [ "$target_mode" = "no" ]; then
+    if [ "$target_mode" = "no" ] && [ "$simulator_mode" = "no" ]; then
         guess_host_arch_name
         run_args+=(--boot "${ANDROID_HOST_OUT}/apex/com.android.art/javalib/boot.art")
+        run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
+    elif [ "$simulator_mode" = "yes" ]; then
+        run_args+=(--simulate-isa "arm64")
+        run_args+=(--boot "${ANDROID_PRODUCT_OUT}/system/apex/com.android.art.testing/javalib/boot.art")
         run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
@@ -915,7 +923,10 @@ if [[ "$TEST_NAME" =~ ^[0-9]+-checker- ]]; then
     if [ "$prebuild_mode" = "yes" -a "$have_image" = "yes" ]; then
       run_checker="yes"
 
-      if [ "$target_mode" = "no" ]; then
+      if [ "$simulator_mode" = "yes" ]; then
+        cfg_output_dir="$tmp_dir"
+        checker_args="--arch=ARM64"
+      elif [ "$target_mode" = "no" ]; then
         cfg_output_dir="$tmp_dir"
         checker_args="--arch=${host_arch_name^^}"
       else
