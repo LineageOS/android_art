@@ -1,0 +1,195 @@
+Test stopped using breakpoint
+NORMAL RUN: Single call with no interference on (ID: 0) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 0) StandardTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 1) StandardTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 0 }
+result for (ID: 1) StandardTestObject { cnt: 1 } is OveriddenReturnValue { id: 0 }
+Test stopped using breakpoint with declared synchronized function
+NORMAL RUN: Single call with no interference on (ID: 2) SynchronizedFunctionTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 2) SynchronizedFunctionTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 3) SynchronizedFunctionTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 1 }
+result for (ID: 3) SynchronizedFunctionTestObject { cnt: 1 } is OveriddenReturnValue { id: 1 }
+Test stopped using breakpoint with synchronized block
+NORMAL RUN: Single call with no interference on (ID: 4) SynchronizedTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 4) SynchronizedTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 5) SynchronizedTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 2 }
+result for (ID: 5) SynchronizedTestObject { cnt: 1 } is OveriddenReturnValue { id: 2 }
+Test stopped on single step
+NORMAL RUN: Single call with no interference on (ID: 6) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 6) StandardTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 7) StandardTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 3 }
+result for (ID: 7) StandardTestObject { cnt: 1 } is OveriddenReturnValue { id: 3 }
+Test stopped on field access
+NORMAL RUN: Single call with no interference on (ID: 8) FieldBasedTestObject { TARGET_FIELD: 0 }
+NORMAL RUN: result for (ID: 8) FieldBasedTestObject { TARGET_FIELD: 10 } is IntContainer { value: 10 }
+Single call with force-early-return on (ID: 9) FieldBasedTestObject { TARGET_FIELD: 0 }
+Will force return of OveriddenReturnValue { id: 4 }
+result for (ID: 9) FieldBasedTestObject { TARGET_FIELD: 0 } is OveriddenReturnValue { id: 4 }
+Test stopped on field modification
+NORMAL RUN: Single call with no interference on (ID: 10) FieldBasedTestObject { TARGET_FIELD: 0 }
+NORMAL RUN: result for (ID: 10) FieldBasedTestObject { TARGET_FIELD: 10 } is IntContainer { value: 10 }
+Single call with force-early-return on (ID: 11) FieldBasedTestObject { TARGET_FIELD: 0 }
+Will force return of OveriddenReturnValue { id: 5 }
+result for (ID: 11) FieldBasedTestObject { TARGET_FIELD: 0 } is OveriddenReturnValue { id: 5 }
+Test stopped during Method Exit of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 12) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 12) StandardTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 13) StandardTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 6 }
+result for (ID: 13) StandardTestObject { cnt: 2 } is OveriddenReturnValue { id: 6 }
+Test stopped during Method Enter of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 14) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 14) StandardTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 15) StandardTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 7 }
+result for (ID: 15) StandardTestObject { cnt: 0 } is OveriddenReturnValue { id: 7 }
+Test stopped during Method Exit due to exception thrown in same function
+NORMAL RUN: Single call with no interference on (ID: 16) ExceptionOnceObject { cnt: 0, throwInSub: false }
+Uncaught exception in thread Thread[Test1968 target thread - 16,5,main] - art.Test1968$ExceptionOnceObject$TestError: null
+	art.Test1968$ExceptionOnceObject.calledFunction(Test1968.java)
+	art.Test1968$AbstractTestObject.run(Test1968.java)
+	art.Test1968$2.run(Test1968.java)
+	java.lang.Thread.run(Thread.java)
+
+NORMAL RUN: result for (ID: 16) ExceptionOnceObject { cnt: 1, throwInSub: false } is null
+Single call with force-early-return on (ID: 17) ExceptionOnceObject { cnt: 0, throwInSub: false }
+Will force return of OveriddenReturnValue { id: 8 }
+result for (ID: 17) ExceptionOnceObject { cnt: 1, throwInSub: false } is OveriddenReturnValue { id: 8 }
+Test stopped during Method Exit due to exception thrown in subroutine
+NORMAL RUN: Single call with no interference on (ID: 18) ExceptionOnceObject { cnt: 0, throwInSub: true }
+Uncaught exception in thread Thread[Test1968 target thread - 18,5,main] - art.Test1968$ExceptionOnceObject$TestError: null
+	art.Test1968$ExceptionOnceObject.doThrow(Test1968.java)
+	art.Test1968$ExceptionOnceObject.calledFunction(Test1968.java)
+	art.Test1968$AbstractTestObject.run(Test1968.java)
+	art.Test1968$2.run(Test1968.java)
+	java.lang.Thread.run(Thread.java)
+
+NORMAL RUN: result for (ID: 18) ExceptionOnceObject { cnt: 1, throwInSub: true } is null
+Single call with force-early-return on (ID: 19) ExceptionOnceObject { cnt: 0, throwInSub: true }
+Will force return of OveriddenReturnValue { id: 9 }
+result for (ID: 19) ExceptionOnceObject { cnt: 1, throwInSub: true } is OveriddenReturnValue { id: 9 }
+Test stopped during notifyFramePop with exception on pop of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 20) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 20) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } is null
+Single call with force-early-return on (ID: 21) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 10 }
+result for (ID: 21) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } is OveriddenReturnValue { id: 10 }
+Test stopped during notifyFramePop with exception on pop of doThrow
+NORMAL RUN: Single call with no interference on (ID: 22) ExceptionCatchTestObject { cnt: 0 }
+art.Test1968$ExceptionCatchTestObject$TestError caught in called function.
+NORMAL RUN: result for (ID: 22) ExceptionCatchTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 23) ExceptionCatchTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 11 }
+result for (ID: 23) ExceptionCatchTestObject { cnt: 101 } is IntContainer { value: 1 }
+Test stopped during ExceptionCatch event of calledFunction (catch in called function, throw in called function)
+NORMAL RUN: Single call with no interference on (ID: 24) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 24) ExceptionThrowTestObject { cnt: 111, baseCnt: 2 } is IntContainer { value: 11 }
+Single call with force-early-return on (ID: 25) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 12 }
+result for (ID: 25) ExceptionThrowTestObject { cnt: 11, baseCnt: 2 } is OveriddenReturnValue { id: 12 }
+Test stopped during ExceptionCatch event of calledFunction (catch in called function, throw in subroutine)
+NORMAL RUN: Single call with no interference on (ID: 26) ExceptionCatchTestObject { cnt: 0 }
+art.Test1968$ExceptionCatchTestObject$TestError caught in called function.
+NORMAL RUN: result for (ID: 26) ExceptionCatchTestObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 27) ExceptionCatchTestObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 13 }
+result for (ID: 27) ExceptionCatchTestObject { cnt: 1 } is OveriddenReturnValue { id: 13 }
+Test stopped during Exception event of calledFunction (catch in calling function)
+NORMAL RUN: Single call with no interference on (ID: 28) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 28) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } is null
+Single call with force-early-return on (ID: 29) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 14 }
+result for (ID: 29) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } is OveriddenReturnValue { id: 14 }
+Test stopped during Exception event of calledFunction (catch in called function)
+NORMAL RUN: Single call with no interference on (ID: 30) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 30) ExceptionThrowTestObject { cnt: 111, baseCnt: 2 } is IntContainer { value: 11 }
+Single call with force-early-return on (ID: 31) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 15 }
+result for (ID: 31) ExceptionThrowTestObject { cnt: 11, baseCnt: 2 } is OveriddenReturnValue { id: 15 }
+Test stopped during Exception event of calledFunction (catch in parent of calling function)
+NORMAL RUN: Single call with no interference on (ID: 32) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowFarTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 32) ExceptionThrowFarTestObject { cnt: 2, baseCnt: 2 } is null
+Single call with force-early-return on (ID: 33) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 16 }
+result for (ID: 33) ExceptionThrowFarTestObject { cnt: 2, baseCnt: 2 } is OveriddenReturnValue { id: 16 }
+Test stopped during Exception event of calledFunction (catch in called function)
+NORMAL RUN: Single call with no interference on (ID: 34) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+art.Test1968$ExceptionThrowFarTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 34) ExceptionThrowFarTestObject { cnt: 111, baseCnt: 2 } is IntContainer { value: 101 }
+Single call with force-early-return on (ID: 35) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+Will force return of OveriddenReturnValue { id: 17 }
+result for (ID: 35) ExceptionThrowFarTestObject { cnt: 101, baseCnt: 2 } is OveriddenReturnValue { id: 17 }
+Test stopped during random Suspend.
+NORMAL RUN: Single call with no interference on (ID: 36) SuspendSuddenlyObject { cnt: 0, spun: false }
+NORMAL RUN: result for (ID: 36) SuspendSuddenlyObject { cnt: 2, spun: true } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 37) SuspendSuddenlyObject { cnt: 0, spun: false }
+Will force return of OveriddenReturnValue { id: 18 }
+result for (ID: 37) SuspendSuddenlyObject { cnt: 1, spun: true } is OveriddenReturnValue { id: 18 }
+Test stopped during a native method fails
+NORMAL RUN: Single call with no interference on (ID: 38) NativeCalledObject { cnt: 0 }
+NORMAL RUN: result for (ID: 38) NativeCalledObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 39) NativeCalledObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 19 }
+Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_OPAQUE_FRAME
+	art.NonStandardExit.forceEarlyReturnObject(Native Method)
+	art.NonStandardExit.forceEarlyReturn(NonStandardExit.java)
+	art.Test1968$TestSuspender.performForceReturn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTests(Test1968.java)
+	<Additional frames hidden>
+
+result for (ID: 39) NativeCalledObject { cnt: 2 } is IntContainer { value: 1 }
+Test stopped in a method called by native succeeds
+NORMAL RUN: Single call with no interference on (ID: 40) NativeCallerObject { cnt: 0 }
+NORMAL RUN: result for (ID: 40) NativeCallerObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 41) NativeCallerObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 20 }
+result for (ID: 41) NativeCallerObject { cnt: 2 } is OveriddenReturnValue { id: 20 }
+Test stopped in a static method
+NORMAL RUN: Single call with no interference on (ID: 42) StaticMethodObject { cnt: 0 }
+NORMAL RUN: result for (ID: 42) StaticMethodObject { cnt: 2 } is IntContainer { value: 1 }
+Single call with force-early-return on (ID: 43) StaticMethodObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 21 }
+result for (ID: 43) StaticMethodObject { cnt: 1 } is OveriddenReturnValue { id: 21 }
+Test force-return of void function fails!
+NORMAL RUN: Single call with no interference on (ID: 44) BadForceVoidObject { cnt: 0 }
+NORMAL RUN: result for (ID: 44) BadForceVoidObject { cnt: 2 } is null
+Single call with force-early-return on (ID: 45) BadForceVoidObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 22 }
+Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_TYPE_MISMATCH
+	art.NonStandardExit.forceEarlyReturnObject(Native Method)
+	art.NonStandardExit.forceEarlyReturn(NonStandardExit.java)
+	art.Test1968$TestSuspender.performForceReturn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTests(Test1968.java)
+	<Additional frames hidden>
+
+result for (ID: 45) BadForceVoidObject { cnt: 2 } is null
+Test force-return of int function fails!
+NORMAL RUN: Single call with no interference on (ID: 46) BadForceIntObject { cnt: 0 }
+NORMAL RUN: result for (ID: 46) BadForceIntObject { cnt: 2 } is 1
+Single call with force-early-return on (ID: 47) BadForceIntObject { cnt: 0 }
+Will force return of OveriddenReturnValue { id: 23 }
+Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_TYPE_MISMATCH
+	art.NonStandardExit.forceEarlyReturnObject(Native Method)
+	art.NonStandardExit.forceEarlyReturn(NonStandardExit.java)
+	art.Test1968$TestSuspender.performForceReturn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTestOn(Test1968.java)
+	art.Test1968.runTests(Test1968.java)
+	<Additional frames hidden>
+
+result for (ID: 47) BadForceIntObject { cnt: 2 } is 1

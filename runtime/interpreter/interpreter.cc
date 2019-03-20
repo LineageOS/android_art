@@ -275,17 +275,38 @@ static inline JValue Execute(
                                         method,
                                         0);
       if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
-        // The caller will retry this invoke. Just return immediately without any value.
+        // The caller will retry this invoke or ignore the result. Just return immediately without
+        // any value.
         DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-        DCHECK(PrevFrameWillRetry(self, shadow_frame));
-        return JValue();
+        JValue ret = JValue();
+        bool res = PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
+            self,
+            shadow_frame,
+            ret,
+            instrumentation,
+            accessor.InsSize(),
+            0);
+        DCHECK(res) << "Expected to perform non-standard return!";
+        return ret;
       }
       if (UNLIKELY(self->IsExceptionPending())) {
         instrumentation->MethodUnwindEvent(self,
                                            shadow_frame.GetThisObject(accessor.InsSize()),
                                            method,
                                            0);
-        return JValue();
+        JValue ret = JValue();
+        if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
+          DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
+          bool res = PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
+              self,
+              shadow_frame,
+              ret,
+              instrumentation,
+              accessor.InsSize(),
+              0);
+          DCHECK(res) << "Expected to perform non-standard return!";
+        }
+        return ret;
       }
     }
 

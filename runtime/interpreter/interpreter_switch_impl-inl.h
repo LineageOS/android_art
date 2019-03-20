@@ -33,6 +33,7 @@
 #include "jvalue-inl.h"
 #include "mirror/string-alloc-inl.h"
 #include "mirror/throwable.h"
+#include "monitor.h"
 #include "nth_caller_visitor.h"
 #include "safe_math.h"
 #include "shadow_frame-inl.h"
@@ -54,56 +55,14 @@ namespace interpreter {
 template<bool do_access_check, bool transaction_active, Instruction::Format kFormat>
 class InstructionHandler {
  public:
-  template <bool kMonitorCounting>
-  static NO_INLINE void UnlockHeldMonitors(Thread* self, ShadowFrame* shadow_frame)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(shadow_frame->GetForcePopFrame());
-    // Unlock all monitors.
-    if (kMonitorCounting && shadow_frame->GetMethod()->MustCountLocks()) {
-      // Get the monitors from the shadow-frame monitor-count data.
-      shadow_frame->GetLockCountData().VisitMonitors(
-        [&](mirror::Object** obj) REQUIRES_SHARED(Locks::mutator_lock_) {
-          // Since we don't use the 'obj' pointer after the DoMonitorExit everything should be fine
-          // WRT suspension.
-          DoMonitorExit<do_assignability_check>(self, shadow_frame, *obj);
-        });
-    } else {
-      std::vector<verifier::MethodVerifier::DexLockInfo> locks;
-      verifier::MethodVerifier::FindLocksAtDexPc(shadow_frame->GetMethod(),
-                                                  shadow_frame->GetDexPC(),
-                                                  &locks,
-                                                  Runtime::Current()->GetTargetSdkVersion());
-      for (const auto& reg : locks) {
-        if (UNLIKELY(reg.dex_registers.empty())) {
-          LOG(ERROR) << "Unable to determine reference locked by "
-                      << shadow_frame->GetMethod()->PrettyMethod() << " at pc "
-                      << shadow_frame->GetDexPC();
-        } else {
-          DoMonitorExit<do_assignability_check>(
-              self, shadow_frame, shadow_frame->GetVRegReference(*reg.dex_registers.begin()));
-        }
-      }
-    }
-  }
-
   ALWAYS_INLINE WARN_UNUSED bool CheckForceReturn()
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
-      DCHECK(PrevFrameWillRetry(self, shadow_frame))
-          << "Pop frame forced without previous frame ready to retry instruction!";
-      DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-      UnlockHeldMonitors<do_assignability_check>(self, &shadow_frame);
-      DoMonitorCheckOnExit<do_assignability_check>(self, &shadow_frame);
-      if (UNLIKELY(NeedsMethodExitEvent(instrumentation))) {
-        SendMethodExitEvents(self,
-                             instrumentation,
-                             shadow_frame,
-                             shadow_frame.GetThisObject(Accessor().InsSize()),
-                             shadow_frame.GetMethod(),
-                             inst->GetDexPc(Insns()),
-                             JValue());
-      }
-      ctx->result = JValue(); /* Handled in caller. */
+    if (PerformNonStandardReturn<kMonitorState>(self,
+                                                shadow_frame,
+                                                ctx->result,
+                                                instrumentation,
+                                                Accessor().InsSize(),
+                                                inst->GetDexPc(Insns()))) {
       exit_interpreter_loop = true;
       return false;
     }
@@ -335,39 +294,6 @@ class InstructionHandler {
       if (UNLIKELY(!thr.IsNull())) {
         self->SetException(thr.Get());
       }
-      return true;
-    }
-  }
-
-  static bool NeedsMethodExitEvent(const instrumentation::Instrumentation* ins)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    return ins->HasMethodExitListeners() || ins->HasWatchedFramePopListeners();
-  }
-
-  // Sends the normal method exit event.
-  // Returns true if the events succeeded and false if there is a pending exception.
-  NO_INLINE static bool SendMethodExitEvents(
-      Thread* self,
-      const instrumentation::Instrumentation* instrumentation,
-      const ShadowFrame& frame,
-      ObjPtr<mirror::Object> thiz,
-      ArtMethod* method,
-      uint32_t dex_pc,
-      const JValue& result)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool had_event = false;
-    // We don't send method-exit if it's a pop-frame. We still send frame_popped though.
-    if (UNLIKELY(instrumentation->HasMethodExitListeners() && !frame.GetForcePopFrame())) {
-      had_event = true;
-      instrumentation->MethodExitEvent(self, thiz, method, dex_pc, result);
-    }
-    if (UNLIKELY(frame.NeedsNotifyPop() && instrumentation->HasWatchedFramePopListeners())) {
-      had_event = true;
-      instrumentation->WatchedFramePopped(self, frame);
-    }
-    if (UNLIKELY(had_event)) {
-      return !self->IsExceptionPending();
-    } else {
       return true;
     }
   }
@@ -700,6 +626,8 @@ class InstructionHandler {
         HANDLE_PENDING_EXCEPTION();
       }
     }
+    StackHandleScope<1> hs(self);
+    MutableHandle<mirror::Object> h_result(hs.NewHandle(obj_result));
     result.SetL(obj_result);
     if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
                  !SendMethodExitEvents(self,
@@ -708,13 +636,13 @@ class InstructionHandler {
                                        shadow_frame.GetThisObject(Accessor().InsSize()),
                                        shadow_frame.GetMethod(),
                                        inst->GetDexPc(Insns()),
-                                       result))) {
+                                       h_result))) {
       if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
         return false;
       }
     }
-    // Re-load since it might have moved during the MethodExitEvent.
-    result.SetL(GetVRegReference(ref_idx));
+    // Re-load since it might have moved or been replaced during the MethodExitEvent.
+    result.SetL(h_result.Get());
     if (ctx->interpret_one_instruction) {
       /* Signal mterp to return to caller */
       shadow_frame.SetDexPC(dex::kDexNoIndex);
@@ -2198,6 +2126,8 @@ class InstructionHandler {
 
  private:
   static constexpr bool do_assignability_check = do_access_check;
+  static constexpr MonitorState kMonitorState =
+      do_assignability_check ? MonitorState::kCountingMonitors : MonitorState::kNormalMonitors;
 
   const CodeItemDataAccessor& Accessor() { return ctx->accessor; }
   const uint16_t* Insns() { return ctx->accessor.Insns(); }

@@ -18,14 +18,17 @@
 #define ART_OPENJDKJVMTI_EVENTS_H_
 
 #include <bitset>
+#include <unordered_map>
 #include <vector>
 
 #include <android-base/logging.h>
 #include <android-base/thread_annotations.h>
 
+#include "android-base/thread_annotations.h"
 #include "base/macros.h"
 #include "base/mutex.h"
 #include "jvmti.h"
+#include "managed_stack.h"
 #include "thread.h"
 
 namespace openjdkjvmti {
@@ -73,16 +76,42 @@ enum class ArtJvmtiEvent : jint {
     kGarbageCollectionFinish = JVMTI_EVENT_GARBAGE_COLLECTION_FINISH,
     kObjectFree = JVMTI_EVENT_OBJECT_FREE,
     kVmObjectAlloc = JVMTI_EVENT_VM_OBJECT_ALLOC,
+    // Internal event to mark a ClassFileLoadHook as one created with the can_retransform_classes
+    // capability.
     kClassFileLoadHookRetransformable = JVMTI_MAX_EVENT_TYPE_VAL + 1,
     kDdmPublishChunk = JVMTI_MAX_EVENT_TYPE_VAL + 2,
-    kMaxEventTypeVal = kDdmPublishChunk,
+    kMaxNormalEventTypeVal = kDdmPublishChunk,
+
+    // All that follow are events used to implement internal JVMTI functions. They are not settable
+    // directly by agents.
+    kMinInternalEventTypeVal = kMaxNormalEventTypeVal + 1,
+
+    // Internal event we use to implement the ForceEarlyReturn functions.
+    kForceEarlyReturnUpdateReturnValue = kMinInternalEventTypeVal,
+    kMaxInternalEventTypeVal = kForceEarlyReturnUpdateReturnValue,
+
+    kMaxEventTypeVal = kMaxInternalEventTypeVal,
 };
+
+constexpr jint kInternalEventCount = static_cast<jint>(ArtJvmtiEvent::kMaxInternalEventTypeVal) -
+                                     static_cast<jint>(ArtJvmtiEvent::kMinInternalEventTypeVal) + 1;
 
 using ArtJvmtiEventDdmPublishChunk = void (*)(jvmtiEnv *jvmti_env,
                                               JNIEnv* jni_env,
                                               jint data_type,
                                               jint data_len,
                                               const jbyte* data);
+
+// It is not enough to store a Thread pointer, as these may be reused. Use the pointer and the
+// thread id.
+// Note: We could just use the tid like tracing does.
+using UniqueThread = std::pair<art::Thread*, uint32_t>;
+
+struct UniqueThreadHasher {
+  std::size_t operator()(const UniqueThread& k) const {
+    return std::hash<uint32_t>{}(k.second) ^ (std::hash<void*>{}(k.first) << 1);
+  }
+};
 
 struct ArtJvmtiEventCallbacks : jvmtiEventCallbacks {
   ArtJvmtiEventCallbacks() : DdmPublishChunk(nullptr) {
@@ -141,10 +170,6 @@ struct EventMasks {
 
   // The per-thread enabled events.
 
-  // It is not enough to store a Thread pointer, as these may be reused. Use the pointer and the
-  // thread id.
-  // Note: We could just use the tid like tracing does.
-  using UniqueThread = std::pair<art::Thread*, uint32_t>;
   // TODO: Native thread objects are immovable, so we can use them as keys in an (unordered) map,
   //       if necessary.
   std::vector<std::pair<UniqueThread, EventMask>> thread_event_masks;
@@ -198,6 +223,16 @@ class EventHandler {
     return global_mask.Test(event);
   }
 
+  // Sets an internal event. Unlike normal JVMTI events internal events are not associated with any
+  // particular jvmtiEnv and are refcounted. This refcounting is done to allow us to easily enable
+  // events during functions and disable them during the requested event callback. Since these are
+  // used to implement various JVMTI functions these events always have a single target thread. If
+  // target is null the current thread is used.
+  jvmtiError SetInternalEvent(jthread target,
+                              ArtJvmtiEvent event,
+                              jvmtiEventMode mode)
+      REQUIRES(!envs_lock_, !art::Locks::mutator_lock_);
+
   jvmtiError SetEvent(ArtJvmTiEnv* env,
                       jthread thread,
                       ArtJvmtiEvent event,
@@ -246,8 +281,14 @@ class EventHandler {
   inline void DispatchEventOnEnv(ArtJvmTiEnv* env, art::Thread* thread, Args... args) const
       REQUIRES(!envs_lock_);
 
+  void AddDelayedNonStandardExitEvent(const art::ShadowFrame* frame, bool is_object, jvalue val)
+      REQUIRES_SHARED(art::Locks::mutator_lock_)
+      REQUIRES(art::Locks::user_code_suspension_lock_, art::Locks::thread_list_lock_);
+
  private:
   void SetupTraceListener(JvmtiMethodTraceListener* listener, ArtJvmtiEvent event, bool enable);
+
+  uint32_t GetInstrumentationEventsFor(ArtJvmtiEvent event);
 
   // Specifically handle the FramePop event which it might not always be possible to turn off.
   void SetupFramePopTraceListener(bool enable);
@@ -325,6 +366,21 @@ class EventHandler {
 
   bool OtherMonitorEventsEnabledAnywhere(ArtJvmtiEvent event);
 
+  int32_t GetInternalEventRefcount(ArtJvmtiEvent event) const REQUIRES(envs_lock_);
+  // Increment internal event refcount for the given event and return the new count.
+  int32_t IncrInternalEventRefcount(ArtJvmtiEvent event) REQUIRES(envs_lock_);
+  // Decrement internal event refcount for the given event and return the new count.
+  int32_t DecrInternalEventRefcount(ArtJvmtiEvent event) REQUIRES(envs_lock_);
+
+  int32_t& GetInternalEventThreadRefcount(ArtJvmtiEvent event, art::Thread* target)
+      REQUIRES(envs_lock_, art::Locks::thread_list_lock_);
+  // Increment internal event refcount for the given event and return the new count.
+  int32_t IncrInternalEventThreadRefcount(ArtJvmtiEvent event, art::Thread* target)
+      REQUIRES(envs_lock_, art::Locks::thread_list_lock_);
+  // Decrement internal event refcount for the given event and return the new count.
+  int32_t DecrInternalEventThreadRefcount(ArtJvmtiEvent event, art::Thread* target)
+      REQUIRES(envs_lock_, art::Locks::thread_list_lock_);
+
   // List of all JvmTiEnv objects that have been created, in their creation order. It is a std::list
   // since we mostly access it by iterating over the entire thing, only ever append to the end, and
   // need to be able to remove arbitrary elements from it.
@@ -348,6 +404,16 @@ class EventHandler {
   // continue to listen to this event even if it has been disabled.
   // TODO We could remove the listeners once all jvmtiEnvs have drained their shadow-frame vectors.
   bool frame_pop_enabled;
+
+  // The overall refcount for each internal event across all threads.
+  std::array<int32_t, kInternalEventCount> internal_event_refcount_ GUARDED_BY(envs_lock_);
+  // The refcount for each thread for each internal event.
+  // TODO We should clean both this and the normal EventMask lists up when threads end.
+  std::array<std::unordered_map<UniqueThread, int32_t, UniqueThreadHasher>, kInternalEventCount>
+      internal_event_thread_refcount_
+          GUARDED_BY(envs_lock_) GUARDED_BY(art::Locks::thread_list_lock_);
+
+  friend class JvmtiMethodTraceListener;
 };
 
 }  // namespace openjdkjvmti

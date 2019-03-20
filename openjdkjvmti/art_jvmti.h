@@ -278,7 +278,7 @@ const jvmtiCapabilities kPotentialCapabilities = {
     .can_generate_native_method_bind_events          = 1,
     .can_generate_garbage_collection_events          = 1,
     .can_generate_object_free_events                 = 1,
-    .can_force_early_return                          = 0,
+    .can_force_early_return                          = 1,
     .can_get_owned_monitor_stack_depth_info          = 1,
     .can_get_constant_pool                           = 0,
     .can_set_native_method_prefix                    = 0,
@@ -296,6 +296,7 @@ const jvmtiCapabilities kPotentialCapabilities = {
 //   can_redefine_any_class:
 //   can_redefine_classes:
 //   can_pop_frame:
+//   can_force_early_return:
 //     We need to ensure that inlined code is either not present or can always be deoptimized. This
 //     is not guaranteed for non-debuggable processes since we might have inlined bootclasspath code
 //     on a threads stack.
@@ -333,7 +334,7 @@ const jvmtiCapabilities kNonDebuggableUnsupportedCapabilities = {
     .can_generate_native_method_bind_events          = 0,
     .can_generate_garbage_collection_events          = 0,
     .can_generate_object_free_events                 = 0,
-    .can_force_early_return                          = 0,
+    .can_force_early_return                          = 1,
     .can_get_owned_monitor_stack_depth_info          = 0,
     .can_get_constant_pool                           = 0,
     .can_set_native_method_prefix                    = 0,

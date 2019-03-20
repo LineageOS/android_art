@@ -1,0 +1,4 @@
+Test JVMTI ForceEarlyReturnObject functionality
+
+Checks that we can call the ForceEarlyReturn functions successfully and force
+returns of objects. It also checks some of the basic error modes.

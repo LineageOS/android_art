@@ -179,7 +179,6 @@ ALWAYS_INLINE bool DoFieldPutCommon(Thread* self,
       // actual field write. If one pops the stack we should not modify the field.  The next
       // instruction will force a pop. Return true.
       DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-      DCHECK(interpreter::PrevFrameWillRetry(self, shadow_frame));
       return true;
     }
   }
