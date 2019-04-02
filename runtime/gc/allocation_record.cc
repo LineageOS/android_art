@@ -39,58 +39,11 @@ const char* AllocRecord::GetClassDescriptor(std::string* storage) const {
   return klass_.IsNull() ? "null" : klass_.Read()->GetDescriptor(storage);
 }
 
-void AllocRecordObjectMap::SetProperties() {
-#ifdef ART_TARGET_ANDROID
-  // Check whether there's a system property overriding the max number of records.
-  const char* propertyName = "dalvik.vm.allocTrackerMax";
-  std::string allocMaxString = android::base::GetProperty(propertyName, "");
-  if (!allocMaxString.empty()) {
-    char* end;
-    size_t value = strtoul(allocMaxString.c_str(), &end, 10);
-    if (*end != '\0') {
-      LOG(ERROR) << "Ignoring  " << propertyName << " '" << allocMaxString
-                 << "' --- invalid";
-    } else {
-      alloc_record_max_ = value;
-      if (recent_record_max_ > value) {
-        recent_record_max_ = value;
-      }
-    }
-  }
-  // Check whether there's a system property overriding the number of recent records.
-  propertyName = "dalvik.vm.recentAllocMax";
-  std::string recentAllocMaxString = android::base::GetProperty(propertyName, "");
-  if (!recentAllocMaxString.empty()) {
-    char* end;
-    size_t value = strtoul(recentAllocMaxString.c_str(), &end, 10);
-    if (*end != '\0') {
-      LOG(ERROR) << "Ignoring  " << propertyName << " '" << recentAllocMaxString
-                 << "' --- invalid";
-    } else if (value > alloc_record_max_) {
-      LOG(ERROR) << "Ignoring  " << propertyName << " '" << recentAllocMaxString
-                 << "' --- should be less than " << alloc_record_max_;
-    } else {
-      recent_record_max_ = value;
-    }
-  }
-  // Check whether there's a system property overriding the max depth of stack trace.
-  propertyName = "debug.allocTracker.stackDepth";
-  std::string stackDepthString = android::base::GetProperty(propertyName, "");
-  if (!stackDepthString.empty()) {
-    char* end;
-    size_t value = strtoul(stackDepthString.c_str(), &end, 10);
-    if (*end != '\0') {
-      LOG(ERROR) << "Ignoring  " << propertyName << " '" << stackDepthString
-                 << "' --- invalid";
-    } else if (value > kMaxSupportedStackDepth) {
-      LOG(WARNING) << propertyName << " '" << stackDepthString << "' too large, using "
-                   << kMaxSupportedStackDepth;
-      max_stack_depth_ = kMaxSupportedStackDepth;
-    } else {
-      max_stack_depth_ = value;
-    }
-  }
-#endif  // ART_TARGET_ANDROID
+void AllocRecordObjectMap::SetMaxStackDepth(size_t max_stack_depth) {
+  // Log fatal since this should already be checked when calling VMDebug.setAllocTrackerStackDepth.
+  CHECK_LE(max_stack_depth, kMaxSupportedStackDepth)
+      << "Allocation record max stack depth is too large";
+  max_stack_depth_ = max_stack_depth;
 }
 
 AllocRecordObjectMap::~AllocRecordObjectMap() {
@@ -199,7 +152,7 @@ void AllocRecordObjectMap::SetAllocTrackingEnabled(bool enable) {
         heap->SetAllocationRecords(records);
       }
       CHECK(records != nullptr);
-      records->SetProperties();
+      records->SetMaxStackDepth(heap->GetAllocTrackerStackDepth());
       std::string self_name;
       self->GetThreadName(self_name);
       if (self_name == "JDWP") {

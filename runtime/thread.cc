@@ -1347,7 +1347,7 @@ void Thread::Dump(std::ostream& os, bool dump_native_stack, BacktraceMap* backtr
   DumpStack(os, dump_native_stack, backtrace_map, force_dump_stack);
 }
 
-mirror::String* Thread::GetThreadName() const {
+ObjPtr<mirror::String> Thread::GetThreadName() const {
   ArtField* f = jni::DecodeArtField(WellKnownClasses::java_lang_Thread_name);
   if (tlsPtr_.opeer == nullptr) {
     return nullptr;
@@ -2014,17 +2014,17 @@ struct StackDumpVisitor : public MonitorObjectsStackVisitor {
     return VisitMethodResult::kContinueMethod;
   }
 
-  void VisitWaitingObject(mirror::Object* obj, ThreadState state ATTRIBUTE_UNUSED)
+  void VisitWaitingObject(ObjPtr<mirror::Object> obj, ThreadState state ATTRIBUTE_UNUSED)
       override
       REQUIRES_SHARED(Locks::mutator_lock_) {
     PrintObject(obj, "  - waiting on ", ThreadList::kInvalidThreadId);
   }
-  void VisitSleepingObject(mirror::Object* obj)
+  void VisitSleepingObject(ObjPtr<mirror::Object> obj)
       override
       REQUIRES_SHARED(Locks::mutator_lock_) {
     PrintObject(obj, "  - sleeping on ", ThreadList::kInvalidThreadId);
   }
-  void VisitBlockedOnObject(mirror::Object* obj,
+  void VisitBlockedOnObject(ObjPtr<mirror::Object> obj,
                             ThreadState state,
                             uint32_t owner_tid)
       override
@@ -2045,13 +2045,13 @@ struct StackDumpVisitor : public MonitorObjectsStackVisitor {
     }
     PrintObject(obj, msg, owner_tid);
   }
-  void VisitLockedObject(mirror::Object* obj)
+  void VisitLockedObject(ObjPtr<mirror::Object> obj)
       override
       REQUIRES_SHARED(Locks::mutator_lock_) {
     PrintObject(obj, "  - locked ", ThreadList::kInvalidThreadId);
   }
 
-  void PrintObject(mirror::Object* obj,
+  void PrintObject(ObjPtr<mirror::Object> obj,
                    const char* msg,
                    uint32_t owner_tid) REQUIRES_SHARED(Locks::mutator_lock_) {
     if (obj == nullptr) {
@@ -2062,7 +2062,7 @@ struct StackDumpVisitor : public MonitorObjectsStackVisitor {
         // Getting the identity hashcode here would result in lock inflation and suspension of the
         // current thread, which isn't safe if this is the only runnable thread.
         os << msg << StringPrintf("<@addr=0x%" PRIxPTR "> (a %s)",
-                                  reinterpret_cast<intptr_t>(obj),
+                                  reinterpret_cast<intptr_t>(obj.Ptr()),
                                   obj->PrettyTypeOf().c_str());
       } else {
         // - waiting on <0x6008c468> (a java.lang.Class<java.lang.ref.ReferenceQueue>)
@@ -2766,7 +2766,7 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
   }
 
   ObjPtr<mirror::PointerArray> GetTraceMethodsAndPCs() const REQUIRES_SHARED(Locks::mutator_lock_) {
-    return ObjPtr<mirror::PointerArray>::DownCast(MakeObjPtr(trace_->Get(0)));
+    return ObjPtr<mirror::PointerArray>::DownCast(trace_->Get(0));
   }
 
   mirror::ObjectArray<mirror::Object>* GetInternalStackTrace() const {
@@ -2938,13 +2938,13 @@ jobjectArray Thread::InternalStackTraceToStackTraceElementArray(
         soa.Decode<mirror::Object>(internal)->AsObjectArray<mirror::Object>();
     // Methods and dex PC trace is element 0.
     DCHECK(decoded_traces->Get(0)->IsIntArray() || decoded_traces->Get(0)->IsLongArray());
-    ObjPtr<mirror::PointerArray> const method_trace =
-        ObjPtr<mirror::PointerArray>::DownCast(MakeObjPtr(decoded_traces->Get(0)));
+    const ObjPtr<mirror::PointerArray> method_trace =
+        ObjPtr<mirror::PointerArray>::DownCast(decoded_traces->Get(0));
     // Prepare parameters for StackTraceElement(String cls, String method, String file, int line)
     ArtMethod* method = method_trace->GetElementPtrSize<ArtMethod*>(i, kRuntimePointerSize);
     uint32_t dex_pc = method_trace->GetElementPtrSize<uint32_t>(
         i + method_trace->GetLength() / 2, kRuntimePointerSize);
-    ObjPtr<mirror::StackTraceElement> obj = CreateStackTraceElement(soa, method, dex_pc);
+    const ObjPtr<mirror::StackTraceElement> obj = CreateStackTraceElement(soa, method, dex_pc);
     if (obj == nullptr) {
       return nullptr;
     }
@@ -3006,24 +3006,24 @@ jobjectArray Thread::CreateAnnotatedStackTrace(const ScopedObjectAccessAlreadyRu
       return VisitMethodResult::kContinueMethod;
     }
 
-    void VisitWaitingObject(mirror::Object* obj, ThreadState state ATTRIBUTE_UNUSED)
+    void VisitWaitingObject(ObjPtr<mirror::Object> obj, ThreadState state ATTRIBUTE_UNUSED)
         override
         REQUIRES_SHARED(Locks::mutator_lock_) {
       wait_jobject_.reset(soaa_.AddLocalReference<jobject>(obj));
     }
-    void VisitSleepingObject(mirror::Object* obj)
+    void VisitSleepingObject(ObjPtr<mirror::Object> obj)
         override
         REQUIRES_SHARED(Locks::mutator_lock_) {
       wait_jobject_.reset(soaa_.AddLocalReference<jobject>(obj));
     }
-    void VisitBlockedOnObject(mirror::Object* obj,
+    void VisitBlockedOnObject(ObjPtr<mirror::Object> obj,
                               ThreadState state ATTRIBUTE_UNUSED,
                               uint32_t owner_tid ATTRIBUTE_UNUSED)
         override
         REQUIRES_SHARED(Locks::mutator_lock_) {
       block_jobject_.reset(soaa_.AddLocalReference<jobject>(obj));
     }
-    void VisitLockedObject(mirror::Object* obj)
+    void VisitLockedObject(ObjPtr<mirror::Object> obj)
         override
         REQUIRES_SHARED(Locks::mutator_lock_) {
       frame_lock_objects_.emplace_back(soaa_.Env(), soaa_.AddLocalReference<jobject>(obj));
@@ -4235,7 +4235,7 @@ void Thread::SetReadBarrierEntrypoints() {
 
 void Thread::ClearAllInterpreterCaches() {
   static struct ClearInterpreterCacheClosure : Closure {
-    virtual void Run(Thread* thread) {
+    void Run(Thread* thread) override {
       thread->GetInterpreterCache()->Clear(thread);
     }
   } closure;

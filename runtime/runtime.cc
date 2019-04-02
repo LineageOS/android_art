@@ -585,9 +585,12 @@ void Runtime::Abort(const char* msg) {
 #endif
   }
 
-  // Ensure that we don't have multiple threads trying to abort at once,
-  // which would result in significantly worse diagnostics.
-  MutexLock mu(Thread::Current(), *Locks::abort_lock_);
+  {
+    // Ensure that we don't have multiple threads trying to abort at once,
+    // which would result in significantly worse diagnostics.
+    ScopedThreadStateChange tsc(Thread::Current(), kNativeForAbort);
+    Locks::abort_lock_->ExclusiveLock(Thread::Current());
+  }
 
   // Get any pending output out of the way.
   fflush(nullptr);
@@ -1208,6 +1211,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   }
   image_compiler_options_ = runtime_options.ReleaseOrDefault(Opt::ImageCompilerOptions);
 
+  finalizer_timeout_ms_ = runtime_options.GetOrDefault(Opt::FinalizerTimeoutMs);
   max_spins_before_thin_lock_inflation_ =
       runtime_options.GetOrDefault(Opt::MaxSpinsBeforeThinLockInflation);
 
@@ -1693,8 +1697,9 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   VLOG(startup) << "Runtime::Init exiting";
 
   // Set OnlyUseSystemOatFiles only after boot classpath has been set up.
-  if (runtime_options.Exists(Opt::OnlyUseSystemOatFiles)) {
-    oat_file_manager_->SetOnlyUseSystemOatFiles(/*assert_no_files_loaded=*/ true);
+  if (is_zygote_ || runtime_options.Exists(Opt::OnlyUseSystemOatFiles)) {
+    oat_file_manager_->SetOnlyUseSystemOatFiles(/*enforce=*/ true,
+                                                /*assert_no_files_loaded=*/ true);
   }
 
   return true;

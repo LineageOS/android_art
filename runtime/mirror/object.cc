@@ -57,7 +57,7 @@ class CopyReferenceFieldsWithReadBarrierVisitor {
     dest_obj_->SetFieldObjectWithoutWriteBarrier<false, false>(offset, ref);
   }
 
-  void operator()(ObjPtr<mirror::Class> klass, mirror::Reference* ref) const
+  void operator()(ObjPtr<mirror::Class> klass, ObjPtr<mirror::Reference> ref) const
       ALWAYS_INLINE REQUIRES_SHARED(Locks::mutator_lock_) {
     // Copy java.lang.ref.Reference.referent which isn't visited in
     // Object::VisitReferences().
@@ -71,12 +71,12 @@ class CopyReferenceFieldsWithReadBarrierVisitor {
   void VisitRoot(mirror::CompressedReference<mirror::Object>* root ATTRIBUTE_UNUSED) const {}
 
  private:
-  ObjPtr<Object> const dest_obj_;
+  const ObjPtr<Object> dest_obj_;
 };
 
-Object* Object::CopyObject(ObjPtr<mirror::Object> dest,
-                           ObjPtr<mirror::Object> src,
-                           size_t num_bytes) {
+ObjPtr<Object> Object::CopyObject(ObjPtr<mirror::Object> dest,
+                                  ObjPtr<mirror::Object> src,
+                                  size_t num_bytes) {
   // Copy instance data.  Don't assume memcpy copies by words (b/32012820).
   {
     const size_t offset = sizeof(Object);
@@ -125,13 +125,13 @@ Object* Object::CopyObject(ObjPtr<mirror::Object> dest,
   ObjPtr<Class> c = src->GetClass();
   if (c->IsArrayClass()) {
     if (!c->GetComponentType()->IsPrimitive()) {
-      ObjectArray<Object>* array = dest->AsObjectArray<Object>();
+      ObjPtr<ObjectArray<Object>> array = dest->AsObjectArray<Object>();
       WriteBarrier::ForArrayWrite(dest, 0, array->GetLength());
     }
   } else {
     WriteBarrier::ForEveryFieldWrite(dest);
   }
-  return dest.Ptr();
+  return dest;
 }
 
 // An allocation pre-fence visitor that copies the object.
@@ -151,7 +151,7 @@ class CopyObjectVisitor {
   DISALLOW_COPY_AND_ASSIGN(CopyObjectVisitor);
 };
 
-Object* Object::Clone(Thread* self) {
+ObjPtr<Object> Object::Clone(Thread* self) {
   CHECK(!IsClass()) << "Can't clone classes.";
   // Object::SizeOf gets the right size even if we're an array. Using c->AllocObject() here would
   // be wrong.
@@ -169,7 +169,7 @@ Object* Object::Clone(Thread* self) {
   if (this_object->GetClass()->IsFinalizable()) {
     heap->AddFinalizerReference(self, &copy);
   }
-  return copy.Ptr();
+  return copy;
 }
 
 uint32_t Object::GenerateIdentityHashCode() {

@@ -12,24 +12,38 @@ art_runtime_base_binaries_prefer32 = [
     "profman",
 ]
 // - Base requirements (libraries).
+//
+// Note: ART on-device chroot-based testing and benchmarking is not yet using
+// the Runtime APEX, meaning that copies of some of these libraries have to be
+// installed in `/system` for the ART Buildbot set-up to work properly. This is
+// done by the `standalone-apex-files` Make phony target, used by the ART
+// Buildbot and Golem (see `art/Android.mk`). If you add libraries to this list,
+// you may have to also add them to `PRIVATE_RUNTIME_DEPENDENCY_LIBS` in
+// `art/Android.mk`.
+// TODO(b/121117762): Remove this note when both the ART Buildbot and Golem use
+// the Runtime APEX.
 art_runtime_base_native_shared_libs = [
-    "libadbconnection",
-    "libart",
-    "libart-compiler",
+    // External API (having APEX stubs).
     "libdexfile_external",
     "libnativebridge",
     "libnativehelper",
     "libnativeloader",
-    "libopenjdkjvm",
-    "libopenjdkjvmti",
-    // TODO(b/124439236): Clean up the following libraries once "required"
+    // libadbconnection is internal and loaded with dlopen(), but it cannot use
+    // "required" because of cyclic dependency (b/124505714).
+    "libadbconnection",
+    // TODO(b/124476339): Clean up the following libraries once "required"
     // dependencies work with APEX libraries.
+    "libart",
+    "libart-compiler",
     "libdt_fd_forward",
     "libdt_socket",
     "libjdwp",
     "libnpt",
+    "libopenjdkjvm",
+    "libopenjdkjvmti",
 ]
 bionic_native_shared_libs = [
+    // External API (having APEX stubs).
     "libc",
     "libm",
     "libdl",
@@ -57,9 +71,6 @@ art_runtime_debug_native_shared_libs = [
     "libopenjdkjvmd",
     "libopenjdkjvmtid",
 ]
-libcore_debug_native_shared_libs = [
-    "libopenjdkd",
-]
 
 // Data files associated with bionic / managed core library APIs.
 art_runtime_data_file_prebuilts = [
@@ -69,14 +80,14 @@ art_runtime_data_file_prebuilts = [
     "apex_icu.dat",
 ]
 
-// Modules listed in LOCAL_REQUIRED_MODULES for module art-tools in art/Android.mk.
+// Tools common to both device APEX and host APEX. Derived from art-tools in art/Android.mk.
 art_tools_common_binaries = [
     "dexdiag",
     "dexdump",
     "dexlist",
 ]
 
-// Device-only modules listed in LOCAL_REQUIRED_MODULES for module art-tools in art/Android.mk.
+// Tools exclusively for the device APEX derived from art-tools in art/Android.mk.
 art_tools_device_only_binaries = [
     // oatdump cannot link with host linux_bionic due to not using clang lld;
     // TODO: Make it work with clang lld.
@@ -89,13 +100,12 @@ art_tools_debug_device_only_binaries = [
     "oatdumpd",
 ]
 
-// Host-only modules listed in LOCAL_REQUIRED_MODULES for module art-tools in art/Android.mk.
+// Tools exclusively for the host APEX derived from art-tools in art/Android.mk.
 art_tools_host_only_binaries = [
     // FIXME: Does not work as-is, because `ahat` is defined in tools/ahat/Android.mk
     // (same issue as for `libart_fake` above).
     //"ahat",
     "hprof-conv",
-    // ...
 ]
 
 art_tools_device_binaries = art_tools_common_binaries + art_tools_device_only_binaries
@@ -116,18 +126,33 @@ libcore_java_libs = [
 ]
 
 // Native libraries that support the core Java libraries.
+//
+// Note: ART on-device chroot-based testing and benchmarking is not yet using
+// the Runtime APEX, meaning that copies of some of these libraries have to be
+// installed in `/system` for the ART Buildbot set-up to work properly. This is
+// done by the `standalone-apex-files` Make phony target, used by the ART
+// Buildbot and Golem (see `art/Android.mk`). If you add libraries to this list,
+// you may have to also add them to `PRIVATE_RUNTIME_DEPENDENCY_LIBS` in
+// `art/Android.mk`.
+// TODO(b/121117762): Remove this note when both the ART Buildbot and Golem use
+// the Runtime APEX.
 libcore_native_shared_libs = [
+    // External API (having APEX stubs).
     "libandroidicu",
+    "libandroidio",
+    // TODO(b/124476339): Clean up the following libraries once "required"
+    // dependencies work with APEX libraries.
     "libexpat",
     "libicui18n",
     "libicuuc",
     "libjavacore",
     "libopenjdk",
-    "libz",
-    "libziparchive",
+]
+libcore_debug_native_shared_libs = [
+    "libopenjdkd",
 ]
 
-libcore_native_device_only_shared_libs = libcore_native_shared_libs + [
+libcore_native_device_only_shared_libs = [
     // TODO(b/122876336): Remove libpac.so once it's migrated to Webview.
     // libpac is used by frameworks, not by ART host.
     "libpac",
@@ -171,7 +196,8 @@ apex_defaults {
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs
         + bionic_native_shared_libs
-        + libcore_native_device_only_shared_libs,
+        + libcore_native_device_only_shared_libs
+        + libcore_native_shared_libs,
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both

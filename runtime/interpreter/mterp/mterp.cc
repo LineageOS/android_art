@@ -773,7 +773,7 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
     }
     ObjPtr<mirror::Object> obj = kIsStatic
         ? reinterpret_cast<ArtField*>(tls_value)->GetDeclaringClass()
-        : MakeObjPtr(shadow_frame->GetVRegReference(inst->VRegB_22c(inst_data)));
+        : ObjPtr<mirror::Object>(shadow_frame->GetVRegReference(inst->VRegB_22c(inst_data)));
     if (LIKELY(obj != nullptr)) {
       MterpFieldAccess<PrimType, kAccessType>(
           inst, inst_data, shadow_frame, obj, MemberOffset(offset), /* is_volatile= */ false);
@@ -787,7 +787,8 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
     // Avoid read barriers, since we need only the pointer to the native (non-movable)
     // DexCache field array which we can get even through from-space objects.
     ObjPtr<mirror::Class> klass = referrer->GetDeclaringClass<kWithoutReadBarrier>();
-    mirror::DexCache* dex_cache = klass->GetDexCache<kDefaultVerifyFlags, kWithoutReadBarrier>();
+    ObjPtr<mirror::DexCache> dex_cache =
+        klass->GetDexCache<kDefaultVerifyFlags, kWithoutReadBarrier>();
 
     // Try to find the desired field in DexCache.
     uint32_t field_idx = kIsStatic ? inst->VRegB_21c() : inst->VRegC_22c();
@@ -856,9 +857,9 @@ extern "C" mirror::Object* artAGetObjectFromMterp(mirror::Object* arr,
     ThrowNullPointerExceptionFromInterpreter();
     return nullptr;
   }
-  mirror::ObjectArray<mirror::Object>* array = arr->AsObjectArray<mirror::Object>();
+  ObjPtr<mirror::ObjectArray<mirror::Object>> array = arr->AsObjectArray<mirror::Object>();
   if (LIKELY(array->CheckIsValidIndex(index))) {
-    return array->GetWithoutChecks(index);
+    return array->GetWithoutChecks(index).Ptr();
   } else {
     return nullptr;
   }

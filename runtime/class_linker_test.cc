@@ -46,7 +46,7 @@
 #include "mirror/field.h"
 #include "mirror/method_handle_impl.h"
 #include "mirror/method_handles_lookup.h"
-#include "mirror/method_type.h"
+#include "mirror/method_type-inl.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-alloc-inl.h"
 #include "mirror/object_array-inl.h"
@@ -85,7 +85,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
       REQUIRES_SHARED(Locks::mutator_lock_) {
     ASSERT_TRUE(primitive != nullptr);
     ASSERT_TRUE(primitive->GetClass() != nullptr);
-    ASSERT_EQ(primitive->GetClass(), primitive->GetClass()->GetClass());
+    ASSERT_OBJ_PTR_EQ(primitive->GetClass(), primitive->GetClass()->GetClass());
     EXPECT_TRUE(primitive->GetClass()->GetSuperClass() != nullptr);
     std::string temp;
     ASSERT_STREQ(descriptor.c_str(), primitive->GetDescriptor(&temp));
@@ -124,8 +124,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
       REQUIRES_SHARED(Locks::mutator_lock_) {
     ASSERT_TRUE(JavaLangObject != nullptr);
     ASSERT_TRUE(JavaLangObject->GetClass() != nullptr);
-    ASSERT_EQ(JavaLangObject->GetClass(),
-              JavaLangObject->GetClass()->GetClass());
+    ASSERT_OBJ_PTR_EQ(JavaLangObject->GetClass(), JavaLangObject->GetClass()->GetClass());
     EXPECT_OBJ_PTR_EQ(JavaLangObject, JavaLangObject->GetClass()->GetSuperClass());
     std::string temp;
     ASSERT_STREQ(JavaLangObject->GetDescriptor(&temp), "Ljava/lang/Object;");
@@ -197,7 +196,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
       REQUIRES_SHARED(Locks::mutator_lock_) {
     ASSERT_TRUE(array != nullptr);
     ASSERT_TRUE(array->GetClass() != nullptr);
-    ASSERT_EQ(array->GetClass(), array->GetClass()->GetClass());
+    ASSERT_OBJ_PTR_EQ(array->GetClass(), array->GetClass()->GetClass());
     EXPECT_TRUE(array->GetClass()->GetSuperClass() != nullptr);
     std::string temp;
     ASSERT_STREQ(array_descriptor.c_str(), array->GetDescriptor(&temp));
@@ -274,7 +273,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
       EXPECT_TRUE(klass->GetSuperClass() != nullptr);
     }
     EXPECT_TRUE(klass->GetClass() != nullptr);
-    EXPECT_EQ(klass->GetClass(), klass->GetClass()->GetClass());
+    EXPECT_OBJ_PTR_EQ(klass->GetClass(), klass->GetClass()->GetClass());
     EXPECT_TRUE(klass->GetDexCache() != nullptr);
     EXPECT_TRUE(klass->IsLoaded());
     EXPECT_TRUE(klass->IsResolved());
@@ -927,7 +926,7 @@ TEST_F(ClassLinkerTest, FindClass) {
   ObjPtr<mirror::Class> MyClass = class_linker_->FindClass(soa.Self(), "LMyClass;", class_loader);
   ASSERT_TRUE(MyClass != nullptr);
   ASSERT_TRUE(MyClass->GetClass() != nullptr);
-  ASSERT_EQ(MyClass->GetClass(), MyClass->GetClass()->GetClass());
+  ASSERT_OBJ_PTR_EQ(MyClass->GetClass(), MyClass->GetClass()->GetClass());
   EXPECT_OBJ_PTR_EQ(JavaLangObject.Get(), MyClass->GetClass()->GetSuperClass());
   std::string temp;
   ASSERT_STREQ(MyClass->GetDescriptor(&temp), "LMyClass;");
@@ -955,7 +954,7 @@ TEST_F(ClassLinkerTest, FindClass) {
   EXPECT_EQ(0U, MyClass->NumStaticFields());
   EXPECT_EQ(0U, MyClass->NumDirectInterfaces());
 
-  EXPECT_EQ(JavaLangObject->GetClass()->GetClass(), MyClass->GetClass()->GetClass());
+  EXPECT_OBJ_PTR_EQ(JavaLangObject->GetClass()->GetClass(), MyClass->GetClass()->GetClass());
 
   // created by class_linker
   AssertArrayClass("[C", "C", nullptr);
@@ -995,7 +994,7 @@ TEST_F(ClassLinkerTest, LookupResolvedTypeArray) {
   // Get the AllFields class for the dex cache and dex file.
   ObjPtr<mirror::Class> all_fields_klass
       = class_linker_->FindClass(soa.Self(), "LAllFields;", class_loader);
-  ASSERT_OBJ_PTR_NE(all_fields_klass, ObjPtr<mirror::Class>(nullptr));
+  ASSERT_TRUE(all_fields_klass != nullptr);
   Handle<mirror::DexCache> dex_cache = hs.NewHandle(all_fields_klass->GetDexCache());
   const DexFile& dex_file = *dex_cache->GetDexFile();
   // Get the index of the array class we want to test.
@@ -1003,13 +1002,12 @@ TEST_F(ClassLinkerTest, LookupResolvedTypeArray) {
   ASSERT_TRUE(array_id != nullptr);
   dex::TypeIndex array_idx = dex_file.GetIndexForTypeId(*array_id);
   // Check that the array class wasn't resolved yet.
-  EXPECT_OBJ_PTR_EQ(
-      class_linker_->LookupResolvedType(array_idx, dex_cache.Get(), class_loader.Get()),
-      ObjPtr<mirror::Class>(nullptr));
+  EXPECT_TRUE(
+      class_linker_->LookupResolvedType(array_idx, dex_cache.Get(), class_loader.Get()) == nullptr);
   // Resolve the array class we want to test.
   ObjPtr<mirror::Class> array_klass
       = class_linker_->FindClass(soa.Self(), "[Ljava/lang/Object;", class_loader);
-  ASSERT_OBJ_PTR_NE(array_klass, ObjPtr<mirror::Class>(nullptr));
+  ASSERT_TRUE(array_klass != nullptr);
   // Test that LookupResolvedType() finds the array class.
   EXPECT_OBJ_PTR_EQ(
       class_linker_->LookupResolvedType(array_idx, dex_cache.Get(), class_loader.Get()),
@@ -1030,7 +1028,7 @@ TEST_F(ClassLinkerTest, LookupResolvedTypeErroneousInit) {
   AssertNonExistentClass("LErroneousInit;");
   Handle<mirror::Class> klass =
       hs.NewHandle(class_linker_->FindClass(soa.Self(), "LErroneousInit;", class_loader));
-  ASSERT_OBJ_PTR_NE(klass.Get(), ObjPtr<mirror::Class>(nullptr));
+  ASSERT_TRUE(klass != nullptr);
   dex::TypeIndex type_idx = klass->GetClassDef()->class_idx_;
   Handle<mirror::DexCache> dex_cache = hs.NewHandle(klass->GetDexCache());
   EXPECT_OBJ_PTR_EQ(

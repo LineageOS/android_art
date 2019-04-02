@@ -31,7 +31,7 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_annotations.h"
 #include "dex/signature-inl.h"
-#include "dex_cache.h"
+#include "dex_cache-inl.h"
 #include "gc/accounting/card_table-inl.h"
 #include "gc/heap-inl.h"
 #include "handle_scope-inl.h"
@@ -94,10 +94,10 @@ ObjPtr<mirror::Class> Class::GetPrimitiveClass(ObjPtr<mirror::String> name) {
   }
 }
 
-ClassExt* Class::EnsureExtDataPresent(Thread* self) {
+ObjPtr<ClassExt> Class::EnsureExtDataPresent(Thread* self) {
   ObjPtr<ClassExt> existing(GetExtData());
   if (!existing.IsNull()) {
-    return existing.Ptr();
+    return existing;
   }
   StackHandleScope<3> hs(self);
   // Handlerize 'this' since we are allocating here.
@@ -136,7 +136,7 @@ ClassExt* Class::EnsureExtDataPresent(Thread* self) {
     if (throwable != nullptr) {
       self->SetException(throwable.Get());
     }
-    return ret.Ptr();
+    return ret;
   }
 }
 
@@ -1123,7 +1123,7 @@ const dex::TypeList* Class::GetInterfaceTypeList() {
 }
 
 void Class::PopulateEmbeddedVTable(PointerSize pointer_size) {
-  PointerArray* table = GetVTableDuringLinking();
+  ObjPtr<PointerArray> table = GetVTableDuringLinking();
   CHECK(table != nullptr) << PrettyClass();
   const size_t table_length = table->GetLength();
   SetEmbeddedVTableLength(table_length);
@@ -1189,8 +1189,7 @@ class CopyClassVisitor {
     h_new_class_obj->SetClassSize(new_length_);
     // Visit all of the references to make sure there is no from space references in the native
     // roots.
-    ObjPtr<Object>(h_new_class_obj.Get())->VisitReferences(
-        ReadBarrierOnNativeRootsVisitor(), VoidFunctor());
+    h_new_class_obj->Object::VisitReferences(ReadBarrierOnNativeRootsVisitor(), VoidFunctor());
   }
 
  private:
@@ -1203,7 +1202,8 @@ class CopyClassVisitor {
   DISALLOW_COPY_AND_ASSIGN(CopyClassVisitor);
 };
 
-Class* Class::CopyOf(Thread* self, int32_t new_length, ImTable* imt, PointerSize pointer_size) {
+ObjPtr<Class> Class::CopyOf(
+    Thread* self, int32_t new_length, ImTable* imt, PointerSize pointer_size) {
   DCHECK_GE(new_length, static_cast<int32_t>(sizeof(Class)));
   // We may get copied by a compacting GC.
   StackHandleScope<1> hs(self);

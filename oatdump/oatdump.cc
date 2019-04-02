@@ -1819,7 +1819,7 @@ class ImageDumper {
               = image_root_object->AsObjectArray<mirror::Object>();
           ScopedIndentation indent2(&vios_);
           for (int j = 0; j < image_root_object_array->GetLength(); j++) {
-            mirror::Object* value = image_root_object_array->Get(j);
+            ObjPtr<mirror::Object> value = image_root_object_array->Get(j);
             size_t run = 0;
             for (int32_t k = j + 1; k < image_root_object_array->GetLength(); k++) {
               if (value == image_root_object_array->Get(k)) {
@@ -2033,12 +2033,15 @@ class ImageDumper {
     if (value == nullptr) {
       os << StringPrintf("null   %s\n", type->PrettyDescriptor().c_str());
     } else if (type->IsStringClass()) {
-      mirror::String* string = value->AsString();
-      os << StringPrintf("%p   String: %s\n", string,
+      ObjPtr<mirror::String> string = value->AsString();
+      os << StringPrintf("%p   String: %s\n",
+                         string.Ptr(),
                          PrintableString(string->ToModifiedUtf8().c_str()).c_str());
     } else if (type->IsClassClass()) {
-      mirror::Class* klass = value->AsClass();
-      os << StringPrintf("%p   Class: %s\n", klass, mirror::Class::PrettyDescriptor(klass).c_str());
+      ObjPtr<mirror::Class> klass = value->AsClass();
+      os << StringPrintf("%p   Class: %s\n",
+                         klass.Ptr(),
+                         mirror::Class::PrettyDescriptor(klass).c_str());
     } else {
       os << StringPrintf("%p   %s\n", value.Ptr(), type->PrettyDescriptor().c_str());
     }
@@ -2156,17 +2159,19 @@ class ImageDumper {
 
     std::ostream& os = vios_.Stream();
 
-    mirror::Class* obj_class = obj->GetClass();
+    ObjPtr<mirror::Class> obj_class = obj->GetClass();
     if (obj_class->IsArrayClass()) {
       os << StringPrintf("%p: %s length:%d\n", obj, obj_class->PrettyDescriptor().c_str(),
                          obj->AsArray()->GetLength());
     } else if (obj->IsClass()) {
-      mirror::Class* klass = obj->AsClass();
-      os << StringPrintf("%p: java.lang.Class \"%s\" (", obj,
+      ObjPtr<mirror::Class> klass = obj->AsClass();
+      os << StringPrintf("%p: java.lang.Class \"%s\" (",
+                         obj,
                          mirror::Class::PrettyDescriptor(klass).c_str())
          << klass->GetStatus() << ")\n";
     } else if (obj_class->IsStringClass()) {
-      os << StringPrintf("%p: java.lang.String %s\n", obj,
+      os << StringPrintf("%p: java.lang.String %s\n",
+                         obj,
                          PrintableString(obj->AsString()->ToModifiedUtf8().c_str()).c_str());
     } else {
       os << StringPrintf("%p: %s\n", obj, obj_class->PrettyDescriptor().c_str());
@@ -2175,9 +2180,9 @@ class ImageDumper {
     DumpFields(os, obj, obj_class);
     const PointerSize image_pointer_size = image_header_.GetPointerSize();
     if (obj->IsObjectArray()) {
-      auto* obj_array = obj->AsObjectArray<mirror::Object>();
+      ObjPtr<mirror::ObjectArray<mirror::Object>> obj_array = obj->AsObjectArray<mirror::Object>();
       for (int32_t i = 0, length = obj_array->GetLength(); i < length; i++) {
-        mirror::Object* value = obj_array->Get(i);
+        ObjPtr<mirror::Object> value = obj_array->Get(i);
         size_t run = 0;
         for (int32_t j = i + 1; j < length; j++) {
           if (value == obj_array->Get(j)) {
@@ -2192,7 +2197,7 @@ class ImageDumper {
           os << StringPrintf("%d to %zd: ", i, i + run);
           i = i + run;
         }
-        mirror::Class* value_class =
+        ObjPtr<mirror::Class> value_class =
             (value == nullptr) ? obj_class->GetComponentType() : value->GetClass();
         PrettyObjectValue(os, value_class, value);
       }
@@ -3202,9 +3207,9 @@ class IMTDumper {
 
     std::cerr << " Interfaces:" << std::endl;
     // Run through iftable, find methods that slot here, see if they fit.
-    mirror::IfTable* if_table = klass->GetIfTable();
+    ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
     for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
-      mirror::Class* iface = if_table->GetInterface(i);
+      ObjPtr<mirror::Class> iface = if_table->GetInterface(i);
       std::string iface_name;
       std::cerr << "  " << iface->GetDescriptor(&iface_name) << std::endl;
 
@@ -3283,9 +3288,9 @@ class IMTDumper {
           std::cerr << "    " << p_name << std::endl;
         } else {
           // Run through iftable, find methods that slot here, see if they fit.
-          mirror::IfTable* if_table = klass->GetIfTable();
+          ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
           for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
-            mirror::Class* iface = if_table->GetInterface(i);
+            ObjPtr<mirror::Class> iface = if_table->GetInterface(i);
             size_t num_methods = iface->NumDeclaredVirtualMethods();
             if (num_methods > 0) {
               for (ArtMethod& iface_method : iface->GetMethods(pointer_size)) {
