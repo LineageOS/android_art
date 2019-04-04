@@ -35,7 +35,7 @@ namespace space {
 // An image space is a space backed with a memory mapped image.
 class ImageSpace : public MemMapSpace {
  public:
-  SpaceType GetType() const {
+  SpaceType GetType() const override {
     return kSpaceTypeImageSpace;
   }
 
@@ -107,7 +107,7 @@ class ImageSpace : public MemMapSpace {
     return live_bitmap_.get();
   }
 
-  void Dump(std::ostream& os) const;
+  void Dump(std::ostream& os) const override;
 
   // Sweeping image spaces is a NOP.
   void Sweep(bool /* swap_bitmaps */, size_t* /* freed_objects */, size_t* /* freed_bytes */) {
@@ -135,7 +135,7 @@ class ImageSpace : public MemMapSpace {
   // Returns the checksums for the boot image and extra boot class path dex files,
   // based on the boot class path, image location and ISA (may differ from the ISA of an
   // initialized Runtime). The boot image and dex files do not need to be loaded in memory.
-  static std::string GetBootClassPathChecksums(const std::vector<std::string>& boot_class_path,
+  static std::string GetBootClassPathChecksums(ArrayRef<const std::string> boot_class_path,
                                                const std::string& image_location,
                                                InstructionSet image_isa,
                                                ImageSpaceLoadingOrder order,

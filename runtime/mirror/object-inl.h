@@ -79,11 +79,11 @@ inline uint32_t Object::GetLockOwnerThreadId() {
   return Monitor::GetLockOwnerThreadId(this);
 }
 
-inline mirror::Object* Object::MonitorEnter(Thread* self) {
+inline ObjPtr<mirror::Object> Object::MonitorEnter(Thread* self) {
   return Monitor::MonitorEnter(self, this, /*trylock=*/false);
 }
 
-inline mirror::Object* Object::MonitorTryEnter(Thread* self) {
+inline ObjPtr<mirror::Object> Object::MonitorTryEnter(Thread* self) {
   return Monitor::MonitorEnter(self, this, /*trylock=*/true);
 }
 
@@ -148,9 +148,9 @@ inline bool Object::IsClass() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline Class* Object::AsClass() {
+inline ObjPtr<Class> Object::AsClass() {
   DCHECK((IsClass<kVerifyFlags>()));
-  return down_cast<Class*>(this);
+  return ObjPtr<Class>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -164,9 +164,9 @@ inline bool Object::IsObjectArray() {
 }
 
 template<class T, VerifyObjectFlags kVerifyFlags>
-inline ObjectArray<T>* Object::AsObjectArray() {
+inline ObjPtr<ObjectArray<T>> Object::AsObjectArray() {
   DCHECK((IsObjectArray<kVerifyFlags>()));
-  return down_cast<ObjectArray<T>*>(this);
+  return ObjPtr<ObjectArray<T>>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -182,24 +182,24 @@ inline bool Object::IsReferenceInstance() {
 }
 
 template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline Reference* Object::AsReference() {
+inline ObjPtr<Reference> Object::AsReference() {
   DCHECK((IsReferenceInstance<kVerifyFlags, kReadBarrierOption>()));
-  return down_cast<Reference*>(this);
+  return ObjPtr<Reference>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline Array* Object::AsArray() {
+inline ObjPtr<Array> Object::AsArray() {
   DCHECK((IsArrayInstance<kVerifyFlags>()));
-  return down_cast<Array*>(this);
+  return ObjPtr<Array>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags, Primitive::Type kType>
 ALWAYS_INLINE bool Object::IsSpecificPrimitiveArray() {
   // We do not need a read barrier here as the primitive type is constant, both from-space
   // and to-space component type classes shall yield the same result. See ReadBarrierOption.
-  ObjPtr<Class> klass = GetClass<kVerifyFlags, kWithoutReadBarrier>();
+  const ObjPtr<Class> klass = GetClass<kVerifyFlags, kWithoutReadBarrier>();
   constexpr VerifyObjectFlags kNewFlags = RemoveThisFlags(kVerifyFlags);
-  ObjPtr<Class> const component_type = klass->GetComponentType<kNewFlags, kWithoutReadBarrier>();
+  const ObjPtr<Class> component_type = klass->GetComponentType<kNewFlags, kWithoutReadBarrier>();
   return component_type != nullptr &&
          component_type->GetPrimitiveType<kNewFlags>() == kType;
 }
@@ -210,9 +210,9 @@ inline bool Object::IsBooleanArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline BooleanArray* Object::AsBooleanArray() {
+inline ObjPtr<BooleanArray> Object::AsBooleanArray() {
   DCHECK(IsBooleanArray<kVerifyFlags>());
-  return down_cast<BooleanArray*>(this);
+  return ObjPtr<BooleanArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -221,9 +221,9 @@ inline bool Object::IsByteArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline ByteArray* Object::AsByteArray() {
+inline ObjPtr<ByteArray> Object::AsByteArray() {
   DCHECK(IsByteArray<kVerifyFlags>());
-  return down_cast<ByteArray*>(this);
+  return ObjPtr<ByteArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -232,9 +232,9 @@ inline bool Object::IsCharArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline CharArray* Object::AsCharArray() {
+inline ObjPtr<CharArray> Object::AsCharArray() {
   DCHECK(IsCharArray<kVerifyFlags>());
-  return down_cast<CharArray*>(this);
+  return ObjPtr<CharArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -243,9 +243,9 @@ inline bool Object::IsShortArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline ShortArray* Object::AsShortArray() {
+inline ObjPtr<ShortArray> Object::AsShortArray() {
   DCHECK(IsShortArray<kVerifyFlags>());
-  return down_cast<ShortArray*>(this);
+  return ObjPtr<ShortArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -254,11 +254,11 @@ inline bool Object::IsIntArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline IntArray* Object::AsIntArrayUnchecked() {
-  return down_cast<IntArray*>(this);
+inline ObjPtr<IntArray> Object::AsIntArrayUnchecked() {
+  return ObjPtr<IntArray>::DownCast(this);
 }
 template<VerifyObjectFlags kVerifyFlags>
-inline IntArray* Object::AsIntArray() {
+inline ObjPtr<IntArray> Object::AsIntArray() {
   DCHECK((IsIntArray<kVerifyFlags>()));
   return AsIntArrayUnchecked<kVerifyFlags>();
 }
@@ -269,11 +269,11 @@ inline bool Object::IsLongArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline LongArray* Object::AsLongArrayUnchecked() {
-  return down_cast<LongArray*>(this);
+inline ObjPtr<LongArray> Object::AsLongArrayUnchecked() {
+  return ObjPtr<LongArray>::DownCast(this);
 }
 template<VerifyObjectFlags kVerifyFlags>
-inline LongArray* Object::AsLongArray() {
+inline ObjPtr<LongArray> Object::AsLongArray() {
   DCHECK((IsLongArray<kVerifyFlags>()));
   return AsLongArrayUnchecked<kVerifyFlags>();
 }
@@ -284,9 +284,9 @@ inline bool Object::IsFloatArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline FloatArray* Object::AsFloatArray() {
+inline ObjPtr<FloatArray> Object::AsFloatArray() {
   DCHECK(IsFloatArray<kVerifyFlags>());
-  return down_cast<FloatArray*>(this);
+  return ObjPtr<FloatArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -295,26 +295,28 @@ inline bool Object::IsDoubleArray() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline DoubleArray* Object::AsDoubleArray() {
+inline ObjPtr<DoubleArray> Object::AsDoubleArray() {
   DCHECK(IsDoubleArray<kVerifyFlags>());
-  return down_cast<DoubleArray*>(this);
-}
-
-template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline bool Object::IsString() {
-  return GetClass<kVerifyFlags, kReadBarrierOption>()->IsStringClass();
-}
-
-template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline String* Object::AsString() {
-  DCHECK((IsString<kVerifyFlags, kReadBarrierOption>()));
-  return down_cast<String*>(this);
+  return ObjPtr<DoubleArray>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline Throwable* Object::AsThrowable() {
+inline bool Object::IsString() {
+  // No read barrier is needed for reading a constant primitive field through
+  // constant reference field. See ReadBarrierOption.
+  return GetClass<kVerifyFlags, kWithoutReadBarrier>()->IsStringClass();
+}
+
+template<VerifyObjectFlags kVerifyFlags>
+inline ObjPtr<String> Object::AsString() {
+  DCHECK((IsString<kVerifyFlags>()));
+  return ObjPtr<String>::DownCast(this);
+}
+
+template<VerifyObjectFlags kVerifyFlags>
+inline ObjPtr<Throwable> Object::AsThrowable() {
   DCHECK(GetClass<kVerifyFlags>()->IsThrowableClass());
-  return down_cast<Throwable*>(this);
+  return ObjPtr<Throwable>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -333,9 +335,9 @@ inline bool Object::IsFinalizerReferenceInstance() {
 }
 
 template<VerifyObjectFlags kVerifyFlags>
-inline FinalizerReference* Object::AsFinalizerReference() {
+inline ObjPtr<FinalizerReference> Object::AsFinalizerReference() {
   DCHECK(IsFinalizerReferenceInstance<kVerifyFlags>());
-  return down_cast<FinalizerReference*>(this);
+  return ObjPtr<FinalizerReference>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -347,19 +349,24 @@ template<VerifyObjectFlags kVerifyFlags>
 inline size_t Object::SizeOf() {
   // Read barrier is never required for SizeOf since objects sizes are constant. Reading from-space
   // values is OK because of that.
-  static constexpr ReadBarrierOption kRBO = kWithoutReadBarrier;
   size_t result;
   constexpr VerifyObjectFlags kNewFlags = RemoveThisFlags(kVerifyFlags);
   if (IsArrayInstance<kVerifyFlags>()) {
-    result = AsArray<kNewFlags>()->template SizeOf<kNewFlags, kRBO>();
+    result = AsArray<kNewFlags>()->template SizeOf<kNewFlags>();
   } else if (IsClass<kNewFlags>()) {
-    result = AsClass<kNewFlags>()->template SizeOf<kNewFlags, kRBO>();
-  } else if (GetClass<kNewFlags, kRBO>()->IsStringClass()) {
-    result = AsString<kNewFlags, kRBO>()->template SizeOf<kNewFlags>();
+    result = AsClass<kNewFlags>()->template SizeOf<kNewFlags>();
+  } else if (IsString<kNewFlags>()) {
+    result = AsString<kNewFlags>()->template SizeOf<kNewFlags>();
   } else {
-    result = GetClass<kNewFlags, kRBO>()->template GetObjectSize<kNewFlags>();
+    result = GetClass<kNewFlags, kWithoutReadBarrier>()->template GetObjectSize<kNewFlags>();
   }
-  DCHECK_GE(result, sizeof(Object)) << " class=" << Class::PrettyClass(GetClass<kNewFlags, kRBO>());
+  DCHECK_GE(result, sizeof(Object)) << " class="
+      // Note: Class::PrettyClass() is reading constant reference fields to get to constant
+      // primitive fields and safely avoids read barriers, so it is safe to call on a Class
+      // reference read without read barrier from a constant reference field.
+      // See ReadBarrierOption. And, for correctness, we actually have to avoid the read
+      // barrier here if Object::SizeOf() is called on a from-space reference.
+      << GetClass<kNewFlags, kWithoutReadBarrier>()->PrettyClass();
   return result;
 }
 
@@ -918,9 +925,9 @@ inline bool Object::IsClassLoader() {
 }
 
 template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline mirror::ClassLoader* Object::AsClassLoader() {
+inline ObjPtr<ClassLoader> Object::AsClassLoader() {
   DCHECK((IsClassLoader<kVerifyFlags, kReadBarrierOption>()));
-  return down_cast<mirror::ClassLoader*>(this);
+  return ObjPtr<ClassLoader>::DownCast(this);
 }
 
 template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
@@ -929,9 +936,9 @@ inline bool Object::IsDexCache() {
 }
 
 template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline mirror::DexCache* Object::AsDexCache() {
+inline ObjPtr<mirror::DexCache> Object::AsDexCache() {
   DCHECK((IsDexCache<kVerifyFlags, kReadBarrierOption>()));
-  return down_cast<mirror::DexCache*>(this);
+  return ObjPtr<DexCache>::DownCast(this);
 }
 
 template<bool kTransactionActive, bool kCheckTransaction>

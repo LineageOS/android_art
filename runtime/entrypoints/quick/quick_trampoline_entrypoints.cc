@@ -2476,6 +2476,11 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
   }
 #endif
 
+  VLOG(third_party_jni) << "GenericJNI: "
+                        << called->PrettyMethod()
+                        << " -> "
+                        << std::hex << reinterpret_cast<uintptr_t>(nativeCode);
+
   // Return native code addr(lo) and bottom of alloca address(hi).
   return GetTwoWordSuccessValue(reinterpret_cast<uintptr_t>(visitor.GetBottomOfUsedArea()),
                                 reinterpret_cast<uintptr_t>(nativeCode));
@@ -2814,7 +2819,7 @@ extern "C" uint64_t artInvokePolymorphic(mirror::Object* raw_receiver, Thread* s
   bool success = false;
   if (resolved_method->GetDeclaringClass() == GetClassRoot<mirror::MethodHandle>(linker)) {
     Handle<mirror::MethodHandle> method_handle(hs.NewHandle(
-        ObjPtr<mirror::MethodHandle>::DownCast(MakeObjPtr(receiver_handle.Get()))));
+        ObjPtr<mirror::MethodHandle>::DownCast(receiver_handle.Get())));
     if (intrinsic == Intrinsics::kMethodHandleInvokeExact) {
       success = MethodHandleInvokeExact(self,
                                         *shadow_frame,
@@ -2835,7 +2840,7 @@ extern "C" uint64_t artInvokePolymorphic(mirror::Object* raw_receiver, Thread* s
   } else {
     DCHECK_EQ(GetClassRoot<mirror::VarHandle>(linker), resolved_method->GetDeclaringClass());
     Handle<mirror::VarHandle> var_handle(hs.NewHandle(
-        ObjPtr<mirror::VarHandle>::DownCast(MakeObjPtr(receiver_handle.Get()))));
+        ObjPtr<mirror::VarHandle>::DownCast(receiver_handle.Get())));
     mirror::VarHandle::AccessMode access_mode =
         mirror::VarHandle::GetAccessModeByIntrinsic(intrinsic);
     success = VarHandleInvokeAccessor(self,

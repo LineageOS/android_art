@@ -375,7 +375,8 @@
         "tests": ["530-checker-lse",
                   "530-checker-lse2",
                   "030-bad-finalizer",
-                  "080-oom-throw"],
+                  "080-oom-throw",
+                  "1336-short-finalizer-timeout"],
         "bug": "http://b/36377828",
         "variant": "interp-ac"
     },
@@ -558,6 +559,8 @@
             "674-hiddenapi",
             "690-hiddenapi-same-name-methods",
             "691-hiddenapi-proxy",
+            "692-vdex-inmem-loader",
+            "693-vdex-inmem-loader-evict",
             "944-transform-classloaders",
             "999-redefine-hiddenapi"
         ],
@@ -1064,6 +1067,7 @@
           "993-breakpoints",
           "1002-notify-startup",
           "1003-metadata-section-strings",
+          "1336-short-finalizer-timeout",
           "1900-track-alloc",
           "1906-suspend-list-me-first",
           "1914-get-local-instance",
@@ -1092,6 +1096,8 @@
                   "688-shared-library",
                   "690-hiddenapi-same-name-methods",
                   "691-hiddenapi-proxy",
+                  "692-vdex-inmem-loader",
+                  "693-vdex-inmem-loader-evict",
                   "999-redefine-hiddenapi",
                   "1000-non-moving-space-stress",
                   "1001-app-image-regions",
@@ -1149,6 +1155,12 @@
         "description": ["Test timing out under gcstress possibly due to slower unwinding by libbacktrace"]
     },
     {
+        "tests": ["1336-short-finalizer-timeout"],
+        "variant": "gcstress",
+        "bug": "b/68792448",
+        "description": ["Timing margins are too tight for gcstress"]
+    },
+    {
         "tests": ["021-string2"],
         "variant": "jit & debuggable",
         "bug": "b/109791792",
@@ -1175,6 +1187,15 @@
         "description": ["Timeout with ASan and interp-ac on 32-bit host (x86)."]
     },
     {
+        "tests": ["980-redefine-object"],
+        "description": ["This test appears to be unusally flaky on no-image + jit. The cause of ",
+                        "this flakiness is unknown but appears to be related to the ",
+                        "jit-compilation of JNI bridges. Until more investigation is done we skip ",
+                        "this test."],
+        "bug": "http://b/73333076",
+        "variant": "no-image & jit"
+    },
+    {
         "tests": ["454-get-vreg", "457-regs"],
         "variant": "baseline",
         "description": ["Tests are expected to fail with baseline."]
@@ -1197,5 +1218,14 @@
                         "Doesn't work with profiles because the run-test is not setup to",
                         "support both. It also needs full verification, so no interp-ac.",
                         "Requires zip, which isn't available on device"]
+    },
+    {
+        "tests": ["004-ReferenceMap",
+                  "449-checker-bce",
+                  "466-get-live-vreg",
+                  "563-checker-fakestring",
+                  "575-checker-string-init-alias"],
+        "variant": "baseline",
+        "description": [ "Working as intended tests that don't pass with baseline." ]
     }
 ]

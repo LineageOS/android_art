@@ -361,17 +361,6 @@ endif
 
 LOCAL_MODULE := com.android.runtime
 LOCAL_REQUIRED_MODULES := $(TARGET_RUNTIME_APEX)
-# Create canonical name -> file name symlink in the symbol directory
-# The symbol files for the debug or release variant are installed to
-# $(TARGET_OUT_UNSTRIPPED)/$(TARGET_RUNTIME_APEX) directory. However,
-# since they are available via /apex/com.android.runtime at runtime
-# regardless of which variant is installed, create a symlink so that
-# $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime is linked to
-# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_RUNTIME_APEX).
-LOCAL_POST_INSTALL_CMD := ln -sf $(TARGET_RUNTIME_APEX) $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime
-ifneq ($(HOST_OS),darwin)
-  LOCAL_REQUIRED_MODULES += $(APEX_TEST_MODULE)
-endif
 LOCAL_REQUIRED_MODULES += art_apex_boot_integrity
 
 # Clear locally used variable.
@@ -379,6 +368,35 @@ art_target_include_debug_build :=
 
 include $(BUILD_PHONY_PACKAGE)
 
+include $(CLEAR_VARS)
+LOCAL_MODULE := com.android.runtime
+LOCAL_IS_HOST_MODULE := true
+ifneq ($(HOST_OS),darwin)
+  LOCAL_REQUIRED_MODULES += $(APEX_TEST_MODULE)
+endif
+include $(BUILD_PHONY_PACKAGE)
+
+# Create canonical name -> file name symlink in the symbol directory
+# The symbol files for the debug or release variant are installed to
+# $(TARGET_OUT_UNSTRIPPED)/$(TARGET_RUNTIME_APEX) directory. However,
+# since they are available via /apex/com.android.runtime at runtime
+# regardless of which variant is installed, create a symlink so that
+# $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime is linked to
+# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_RUNTIME_APEX).
+# Note that installation of the symlink is triggered by the apex_manifest.json
+# file which is the file that is guaranteed to be created regardless of the
+# value of TARGET_FLATTEN_APEX.
+ifeq ($(TARGET_FLATTEN_APEX),true)
+runtime_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
+else
+runtime_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
+endif
+
+$(runtime_apex_manifest_file): $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime
+$(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime :
+	$(hide) ln -sf $(TARGET_RUNTIME_APEX) $@
+
+runtime_apex_manifest_file :=
 
 #######################
 # Fake packages for ART
@@ -428,18 +446,27 @@ endif
 
 include $(BUILD_PHONY_PACKAGE)
 
-# The art-tools package depends on helpers and tools that are useful for developers and on-device
-# investigations.
+# The art-tools package depends on helpers and tools that are useful for developers. Similar
+# dependencies exist for the APEX builds for these tools (see build/apex/Android.bp).
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := art-tools
+LOCAL_IS_HOST_MODULE := true
 LOCAL_REQUIRED_MODULES := \
     ahat \
-    dexdiag \
     dexdump \
-    dexlist \
     hprof-conv \
+
+# A subset of the tools are disabled when HOST_PREFER_32_BIT is defined as make reports that
+# they are not supported on host (b/129323791). This is likely due to art_apex disabling host
+# APEX builds when HOST_PREFER_32_BIT is set (b/120617876).
+ifneq ($(HOST_PREFER_32_BIT),true)
+LOCAL_REQUIRED_MODULES += \
+    dexdiag \
+    dexlist \
     oatdump \
+
+endif
 
 include $(BUILD_PHONY_PACKAGE)
 
@@ -507,15 +534,39 @@ PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
   lib64/libdexfile_external.so \
   lib/libnativeloader.so \
   lib64/libnativeloader.so \
+  lib/libandroidio.so \
+  lib64/libandroidio.so \
 
+# Copy some libraries into `$(TARGET_OUT)/lib(64)` (the
+# `/system/lib(64)` directory to be sync'd to the target) for ART testing
+# purposes:
+# - Bionic bootstrap libraries, copied from
+#   `$(TARGET_OUT)/lib(64)/bootstrap` (the `/system/lib(64)/bootstrap`
+#   directory to be sync'd to the target);
+# - Some libraries which are part of the Runtime APEX; if the product
+#   to build uses flattened APEXes, these libraries are copied from
+#   `$(TARGET_OUT)/apex/com.android.runtime.debug` (the flattened
+#   (Debug) Runtime APEX directory to be sync'd to the target);
+#   otherwise, they are copied from
+#   `$(TARGET_OUT)/../apex/com.android.runtime.debug` (the local
+#   directory under the build tree containing the (Debug) Runtime APEX
+#   artifacts, which is not sync'd to the target).
+#
+# TODO(b/121117762): Remove this when the ART Buildbot and Golem have
+# full support for the Runtime APEX.
 .PHONY: standalone-apex-files
 standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker com.android.runtime.debug
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
 	done
+	if [ "x$(TARGET_FLATTEN_APEX)" = xtrue ]; then \
+	  runtime_apex_orig_dir=$(TARGET_OUT)/apex/com.android.runtime.debug; \
+	else \
+	  runtime_apex_orig_dir=$(TARGET_OUT)/../apex/com.android.runtime.debug; \
+	fi; \
 	for f in $(PRIVATE_RUNTIME_DEPENDENCY_LIBS); do \
-	  tf=$(TARGET_OUT)/../apex/com.android.runtime.debug/$$f; \
+	  tf="$$runtime_apex_orig_dir/$$f"; \
 	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
 	done
 
@@ -682,11 +733,11 @@ TEST_ART_TARGET_SYNC_DEPS :=
 # Can be used, for example, to dump initialization failures:
 #   m art-boot-image ART_BOOT_IMAGE_EXTRA_ARGS=--dump-init-failures=fails.txt
 .PHONY: art-boot-image
-art-boot-image: $(DEFAULT_DEX_PREOPT_BUILT_IMAGE_FILENAME)
+art-boot-image:  $(DEXPREOPT_IMAGE_boot_$(TARGET_ARCH))
 
 .PHONY: art-job-images
 art-job-images: \
-  $(DEFAULT_DEX_PREOPT_BUILT_IMAGE_FILENAME) \
+  art-boot-image \
   $(2ND_DEFAULT_DEX_PREOPT_BUILT_IMAGE_FILENAME) \
   $(HOST_OUT_EXECUTABLES)/dex2oats \
   $(HOST_OUT_EXECUTABLES)/dex2oatds \

@@ -705,7 +705,7 @@ class ConcurrentCopying::VerifyNoMissingCardMarkVisitor {
 
  private:
   ConcurrentCopying* const cc_;
-  ObjPtr<mirror::Object> const holder_;
+  const ObjPtr<mirror::Object> holder_;
 };
 
 void ConcurrentCopying::VerifyNoMissingCardMarks() {
@@ -1865,7 +1865,7 @@ class ConcurrentCopying::VerifyNoFromSpaceRefsFieldVisitor {
                   ObjPtr<mirror::Reference> ref) const
       REQUIRES_SHARED(Locks::mutator_lock_) ALWAYS_INLINE {
     CHECK(klass->IsTypeOfReferenceClass());
-    this->operator()(ObjPtr<mirror::Object>(ref), mirror::Reference::ReferentOffset(), false);
+    this->operator()(ref, mirror::Reference::ReferentOffset(), false);
   }
 
   void VisitRootIfNonNull(mirror::CompressedReference<mirror::Object>* root) const
@@ -3220,7 +3220,7 @@ void ConcurrentCopying::FillWithDummyObject(Thread* const self,
   if (ReadBarrier::kEnableToSpaceInvariantChecks) {
     AssertToSpaceInvariant(nullptr, MemberOffset(0), int_array_class);
   }
-  size_t component_size = int_array_class->GetComponentSize<kWithoutReadBarrier>();
+  size_t component_size = int_array_class->GetComponentSize();
   CHECK_EQ(component_size, sizeof(int32_t));
   size_t data_offset = mirror::Array::DataOffset(component_size).SizeValue();
   if (data_offset > byte_size) {
@@ -3237,7 +3237,7 @@ void ConcurrentCopying::FillWithDummyObject(Thread* const self,
     dummy_obj->SetClass(int_array_class);
     CHECK(dummy_obj->IsArrayInstance<kVerifyNone>());
     int32_t length = (byte_size - data_offset) / component_size;
-    mirror::Array* dummy_arr = dummy_obj->AsArray<kVerifyNone>();
+    ObjPtr<mirror::Array> dummy_arr = dummy_obj->AsArray<kVerifyNone>();
     dummy_arr->SetLength(length);
     CHECK_EQ(dummy_arr->GetLength(), length)
         << "byte_size=" << byte_size << " length=" << length

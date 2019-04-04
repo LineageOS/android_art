@@ -41,12 +41,6 @@ namespace art {
 using LogSeverity = android::base::LogSeverity;
 using ScopedLogSeverity = android::base::ScopedLogSeverity;
 
-// OBJ pointer helpers to avoid needing .Decode everywhere.
-#define EXPECT_OBJ_PTR_EQ(a, b) EXPECT_EQ(MakeObjPtr(a).Ptr(), MakeObjPtr(b).Ptr());
-#define ASSERT_OBJ_PTR_EQ(a, b) ASSERT_EQ(MakeObjPtr(a).Ptr(), MakeObjPtr(b).Ptr());
-#define EXPECT_OBJ_PTR_NE(a, b) EXPECT_NE(MakeObjPtr(a).Ptr(), MakeObjPtr(b).Ptr());
-#define ASSERT_OBJ_PTR_NE(a, b) ASSERT_NE(MakeObjPtr(a).Ptr(), MakeObjPtr(b).Ptr());
-
 class ClassLinker;
 class CompilerCallbacks;
 class DexFile;
@@ -100,8 +94,8 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   void MakeInterpreted(ObjPtr<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  static bool StartDex2OatCommandLine(/*out*/std::vector<std::string>* argv,
-                                      /*out*/std::string* error_msg);
+  bool StartDex2OatCommandLine(/*out*/std::vector<std::string>* argv,
+                               /*out*/std::string* error_msg);
 
  protected:
   // Allow subclases such as CommonCompilerTest to add extra options.
@@ -125,6 +119,7 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
                                    jobject parent_loader,
                                    jobject shared_libraries = nullptr);
   jobject LoadDexInDelegateLastClassLoader(const std::string& dex_name, jobject parent_loader);
+  jobject LoadDexInInMemoryDexClassLoader(const std::string& dex_name, jobject parent_loader);
   jobject LoadDexInWellKnownClassLoader(const std::string& dex_name,
                                         jclass loader_class,
                                         jobject parent_loader,

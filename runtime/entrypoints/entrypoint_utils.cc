@@ -56,8 +56,10 @@ void CheckReferenceResult(Handle<mirror::Object> o, Thread* self) {
   }
 }
 
-JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa, const char* shorty,
-                                    jobject rcvr_jobj, jobject interface_method_jobj,
+JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa,
+                                    const char* shorty,
+                                    jobject rcvr_jobj,
+                                    jobject interface_method_jobj,
                                     std::vector<jvalue>& args) {
   DCHECK(soa.Env()->IsInstanceOf(rcvr_jobj, WellKnownClasses::java_lang_reflect_Proxy));
 
@@ -80,7 +82,7 @@ JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa, cons
       } else {
         JValue jv;
         jv.SetJ(args[i].j);
-        mirror::Object* val = BoxPrimitive(Primitive::GetType(shorty[i + 1]), jv).Ptr();
+        ObjPtr<mirror::Object> val = BoxPrimitive(Primitive::GetType(shorty[i + 1]), jv);
         if (val == nullptr) {
           CHECK(soa.Self()->IsExceptionPending());
           return zero;
@@ -112,7 +114,7 @@ JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa, cons
       ObjPtr<mirror::Class> result_type = interface_method->ResolveReturnType();
       ObjPtr<mirror::Object> result_ref = soa.Decode<mirror::Object>(result);
       JValue result_unboxed;
-      if (!UnboxPrimitiveForResult(result_ref.Ptr(), result_type, &result_unboxed)) {
+      if (!UnboxPrimitiveForResult(result_ref, result_type, &result_unboxed)) {
         DCHECK(soa.Self()->IsExceptionPending());
         return zero;
       }
@@ -121,13 +123,13 @@ JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa, cons
   } else {
     // In the case of checked exceptions that aren't declared, the exception must be wrapped by
     // a UndeclaredThrowableException.
-    mirror::Throwable* exception = soa.Self()->GetException();
+    ObjPtr<mirror::Throwable> exception = soa.Self()->GetException();
     if (exception->IsCheckedException()) {
       bool declares_exception = false;
       {
         ScopedAssertNoThreadSuspension ants(__FUNCTION__);
         ObjPtr<mirror::Object> rcvr = soa.Decode<mirror::Object>(rcvr_jobj);
-        mirror::Class* proxy_class = rcvr->GetClass();
+        ObjPtr<mirror::Class> proxy_class = rcvr->GetClass();
         ObjPtr<mirror::Method> interface_method = soa.Decode<mirror::Method>(interface_method_jobj);
         ArtMethod* proxy_method = rcvr->GetClass()->FindVirtualMethodForInterface(
             interface_method->GetArtMethod(), kRuntimePointerSize);
@@ -139,11 +141,11 @@ JValue InvokeProxyInvocationHandler(ScopedObjectAccessAlreadyRunnable& soa, cons
         int throws_index = (reinterpret_cast<uintptr_t>(proxy_method) -
             reinterpret_cast<uintptr_t>(&virtual_methods[0])) / method_size;
         CHECK_LT(throws_index, static_cast<int>(num_virtuals));
-        mirror::ObjectArray<mirror::Class>* declared_exceptions =
+        ObjPtr<mirror::ObjectArray<mirror::Class>> declared_exceptions =
             proxy_class->GetProxyThrows()->Get(throws_index);
-        mirror::Class* exception_class = exception->GetClass();
+        ObjPtr<mirror::Class> exception_class = exception->GetClass();
         for (int32_t i = 0; i < declared_exceptions->GetLength() && !declares_exception; i++) {
-          mirror::Class* declared_exception = declared_exceptions->Get(i);
+          ObjPtr<mirror::Class> declared_exception = declared_exceptions->Get(i);
           declares_exception = declared_exception->IsAssignableFrom(exception_class);
         }
       }
@@ -162,7 +164,7 @@ bool FillArrayData(ObjPtr<mirror::Object> obj, const Instruction::ArrayDataPaylo
     ThrowNullPointerException("null array in FILL_ARRAY_DATA");
     return false;
   }
-  mirror::Array* array = obj->AsArray();
+  ObjPtr<mirror::Array> array = obj->AsArray();
   DCHECK(!array->IsObjectArray());
   if (UNLIKELY(static_cast<int32_t>(payload->element_count) > array->GetLength())) {
     Thread* self = Thread::Current();

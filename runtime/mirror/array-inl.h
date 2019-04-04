@@ -22,7 +22,6 @@
 #include <android-base/logging.h>
 
 #include "base/bit_utils.h"
-#include "base/casts.h"
 #include "class.h"
 #include "obj_ptr-inl.h"
 #include "runtime.h"
@@ -36,14 +35,16 @@ inline uint32_t Array::ClassSize(PointerSize pointer_size) {
   return Class::ComputeClassSize(true, vtable_entries, 0, 0, 0, 0, 0, pointer_size);
 }
 
-template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
+template<VerifyObjectFlags kVerifyFlags>
 inline size_t Array::SizeOf() {
-  // This is safe from overflow because the array was already allocated, so we know it's sane.
-  size_t component_size_shift = GetClass<kVerifyFlags, kReadBarrierOption>()->
-      template GetComponentSizeShift<kReadBarrierOption>();
+  // No read barrier is needed for reading a constant primitive field through
+  // constant reference field chain. See ReadBarrierOption.
+  size_t component_size_shift =
+      GetClass<kVerifyFlags, kWithoutReadBarrier>()->GetComponentSizeShift();
   // Don't need to check this since we already check this in GetClass.
   int32_t component_count =
       GetLength<static_cast<VerifyObjectFlags>(kVerifyFlags & ~kVerifyThis)>();
+  // This is safe from overflow because the array was already allocated, so we know it's sane.
   size_t header_size = DataOffset(1U << component_size_shift).SizeValue();
   size_t data_size = component_count << component_size_shift;
   return header_size + data_size;
@@ -253,11 +254,11 @@ inline T PointerArray::GetElementPtrSize(uint32_t idx, PointerSize ptr_size) {
 template<bool kTransactionActive, bool kUnchecked>
 inline void PointerArray::SetElementPtrSize(uint32_t idx, uint64_t element, PointerSize ptr_size) {
   if (ptr_size == PointerSize::k64) {
-    (kUnchecked ? down_cast<LongArray*>(static_cast<Object*>(this)) : AsLongArray())->
+    (kUnchecked ? ObjPtr<LongArray>::DownCast(ObjPtr<Object>(this)) : AsLongArray())->
         SetWithoutChecks<kTransactionActive>(idx, element);
   } else {
     DCHECK_LE(element, static_cast<uint64_t>(0xFFFFFFFFu));
-    (kUnchecked ? down_cast<IntArray*>(static_cast<Object*>(this)) : AsIntArray())
+    (kUnchecked ? ObjPtr<IntArray>::DownCast(ObjPtr<Object>(this)) : AsIntArray())
         ->SetWithoutChecks<kTransactionActive>(idx, static_cast<uint32_t>(element));
   }
 }
@@ -270,7 +271,7 @@ inline void PointerArray::SetElementPtrSize(uint32_t idx, T* element, PointerSiz
 }
 
 template <VerifyObjectFlags kVerifyFlags, typename Visitor>
-inline void PointerArray::Fixup(mirror::PointerArray* dest,
+inline void PointerArray::Fixup(ObjPtr<mirror::PointerArray> dest,
                                 PointerSize pointer_size,
                                 const Visitor& visitor) {
   for (size_t i = 0, count = GetLength(); i < count; ++i) {
@@ -291,16 +292,16 @@ void PointerArray::Memcpy(int32_t dst_pos,
   DCHECK(!Runtime::Current()->IsActiveTransaction());
   DCHECK(!src.IsNull());
   if (ptr_size == PointerSize::k64) {
-    LongArray* l_this = (kUnchecked ? down_cast<LongArray*>(static_cast<Object*>(this))
-                                    : AsLongArray());
-    LongArray* l_src = (kUnchecked ? down_cast<LongArray*>(static_cast<Object*>(src.Ptr()))
-                                   : src->AsLongArray());
+    ObjPtr<LongArray> l_this = (kUnchecked ? ObjPtr<LongArray>::DownCast(ObjPtr<Object>(this))
+                                           : AsLongArray());
+    ObjPtr<LongArray> l_src = (kUnchecked ? ObjPtr<LongArray>::DownCast(ObjPtr<Object>(src))
+                                          : src->AsLongArray());
     l_this->Memcpy(dst_pos, l_src, src_pos, count);
   } else {
-    IntArray* i_this = (kUnchecked ? down_cast<IntArray*>(static_cast<Object*>(this))
-                                   : AsIntArray());
-    IntArray* i_src = (kUnchecked ? down_cast<IntArray*>(static_cast<Object*>(src.Ptr()))
-                                  : src->AsIntArray());
+    ObjPtr<IntArray> i_this = (kUnchecked ? ObjPtr<IntArray>::DownCast(ObjPtr<Object>(this))
+                                          : AsIntArray());
+    ObjPtr<IntArray> i_src = (kUnchecked ? ObjPtr<IntArray>::DownCast(ObjPtr<Object>(src.Ptr()))
+                                         : src->AsIntArray());
     i_this->Memcpy(dst_pos, i_src, src_pos, count);
   }
 }

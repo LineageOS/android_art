@@ -38,6 +38,7 @@
 #include "jni_internal.h"
 #include "mirror/class-inl.h"
 #include "mirror/class_loader.h"
+#include "mirror/dex_cache-inl.h"
 #include "nativebridge/native_bridge.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "nativehelper/scoped_utf_chars.h"
@@ -161,8 +162,8 @@ class SharedLibrary {
   void* FindSymbol(const std::string& symbol_name, const char* shorty = nullptr)
       REQUIRES(!Locks::mutator_lock_) {
     return NeedsNativeBridge()
-        ? FindSymbolWithNativeBridge(symbol_name.c_str(), shorty)
-        : FindSymbolWithoutNativeBridge(symbol_name.c_str());
+        ? FindSymbolWithNativeBridge(symbol_name, shorty)
+        : FindSymbolWithoutNativeBridge(symbol_name);
   }
 
   // No mutator lock since dlsym may block for a while if another thread is doing dlopen.
@@ -224,15 +225,15 @@ class Libraries {
     STLDeleteValues(&libraries_);
   }
 
-  void UnloadBootNativeLibraries(JavaVM* vm) {
+  // NO_THREAD_SAFETY_ANALYSIS as this is during runtime shutdown, and we have
+  // no thread to lock this with.
+  void UnloadBootNativeLibraries(JavaVM* vm) const NO_THREAD_SAFETY_ANALYSIS {
+    CHECK(Thread::Current() == nullptr);
     std::vector<SharedLibrary*> unload_libraries;
-    {
-      MutexLock mu(Thread::Current(), *Locks::jni_libraries_lock_);
-      for (auto it = libraries_.begin(); it != libraries_.end(); ++it) {
-        SharedLibrary* const library = it->second;
-        if (library->GetClassLoader() == nullptr) {
-          unload_libraries.push_back(library);
-        }
+    for (auto it = libraries_.begin(); it != libraries_.end(); ++it) {
+      SharedLibrary* const library = it->second;
+      if (library->GetClassLoader() == nullptr) {
+        unload_libraries.push_back(library);
       }
     }
     UnloadLibraries(vm, unload_libraries);
@@ -272,7 +273,8 @@ class Libraries {
       REQUIRES_SHARED(Locks::mutator_lock_) {
     std::string jni_short_name(m->JniShortName());
     std::string jni_long_name(m->JniLongName());
-    mirror::ClassLoader* const declaring_class_loader = m->GetDeclaringClass()->GetClassLoader();
+    const ObjPtr<mirror::ClassLoader> declaring_class_loader =
+        m->GetDeclaringClass()->GetClassLoader();
     ScopedObjectAccessUnchecked soa(Thread::Current());
     void* const declaring_class_loader_allocator =
         Runtime::Current()->GetClassLinker()->GetAllocatorForClassLoader(declaring_class_loader);
@@ -508,6 +510,7 @@ JavaVMExt::JavaVMExt(Runtime* runtime,
 }
 
 JavaVMExt::~JavaVMExt() {
+  UnloadBootNativeLibraries();
 }
 
 // Checking "globals" and "weak_globals" usually requires locks, but we

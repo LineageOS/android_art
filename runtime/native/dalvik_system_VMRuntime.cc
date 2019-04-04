@@ -308,6 +308,10 @@ static void VMRuntime_notifyNativeAllocationsInternal(JNIEnv* env, jobject) {
   Runtime::Current()->GetHeap()->NotifyNativeAllocations(env);
 }
 
+static jlong VMRuntime_getFinalizerTimeoutMs(JNIEnv*, jobject) {
+  return Runtime::Current()->GetFinalizerTimeoutMs();
+}
+
 static void VMRuntime_registerSensitiveThread(JNIEnv*, jobject) {
   Runtime::Current()->RegisterSensitiveThread();
 }
@@ -519,7 +523,7 @@ static void PreloadDexCachesStatsFilled(DexCacheStats* filled)
     if (!class_linker->IsDexFileRegistered(self, *dex_file)) {
       continue;
     }
-    ObjPtr<mirror::DexCache> const dex_cache = class_linker->FindDexCache(self, *dex_file);
+    const ObjPtr<mirror::DexCache> dex_cache = class_linker->FindDexCache(self, *dex_file);
     DCHECK(dex_cache != nullptr);  // Boot class path dex caches are never unloaded.
     for (size_t j = 0, num_strings = dex_cache->NumStrings(); j < num_strings; ++j) {
       auto pair = dex_cache->GetStrings()[j].load(std::memory_order_relaxed);
@@ -709,6 +713,11 @@ static void VMRuntime_setProcessPackageName(JNIEnv* env,
   Runtime::Current()->SetProcessPackageName(package_name.c_str());
 }
 
+static void VMRuntime_setProcessDataDirectory(JNIEnv* env, jclass, jstring java_data_dir) {
+  ScopedUtfChars data_dir(env, java_data_dir);
+  Runtime::Current()->SetProcessDataDirectory(data_dir.c_str());
+}
+
 static jboolean VMRuntime_hasBootImageSpaces(JNIEnv* env ATTRIBUTE_UNUSED,
                                              jclass klass ATTRIBUTE_UNUSED) {
   return Runtime::Current()->GetHeap()->HasBootImageSpace() ? JNI_TRUE : JNI_FALSE;
@@ -737,6 +746,7 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMRuntime, registerNativeAllocation, "(J)V"),
   NATIVE_METHOD(VMRuntime, registerNativeFree, "(J)V"),
   NATIVE_METHOD(VMRuntime, getNotifyNativeInterval, "()I"),
+  NATIVE_METHOD(VMRuntime, getFinalizerTimeoutMs, "()J"),
   NATIVE_METHOD(VMRuntime, notifyNativeAllocationsInternal, "()V"),
   NATIVE_METHOD(VMRuntime, notifyStartupCompleted, "()V"),
   NATIVE_METHOD(VMRuntime, registerSensitiveThread, "()V"),
@@ -761,6 +771,7 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMRuntime, setSystemDaemonThreadPriority, "()V"),
   NATIVE_METHOD(VMRuntime, setDedupeHiddenApiWarnings, "(Z)V"),
   NATIVE_METHOD(VMRuntime, setProcessPackageName, "(Ljava/lang/String;)V"),
+  NATIVE_METHOD(VMRuntime, setProcessDataDirectory, "(Ljava/lang/String;)V"),
 };
 
 void register_dalvik_system_VMRuntime(JNIEnv* env) {

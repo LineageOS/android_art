@@ -272,6 +272,10 @@ class Runtime {
     return default_stack_size_;
   }
 
+  unsigned int GetFinalizerTimeoutMs() const {
+    return finalizer_timeout_ms_;
+  }
+
   gc::Heap* GetHeap() const {
     return heap_;
   }
@@ -586,6 +590,18 @@ class Runtime {
       process_package_name_.clear();
     } else {
       process_package_name_ = package_name;
+    }
+  }
+
+  const std::string& GetProcessDataDirectory() const {
+    return process_data_directory_;
+  }
+
+  void SetProcessDataDirectory(const char* data_dir) {
+    if (data_dir == nullptr) {
+      process_data_directory_.clear();
+    } else {
+      process_data_directory_ = data_dir;
     }
   }
 
@@ -944,6 +960,9 @@ class Runtime {
   // The default stack size for managed threads created by the runtime.
   size_t default_stack_size_;
 
+  // Finalizers running for longer than this many milliseconds abort the runtime.
+  unsigned int finalizer_timeout_ms_;
+
   gc::Heap* heap_;
 
   std::unique_ptr<ArenaPool> jit_arena_pool_;
@@ -1130,6 +1149,9 @@ class Runtime {
 
   // The package of the app running in this process.
   std::string process_package_name_;
+
+  // The data directory of the app running in this process.
+  std::string process_data_directory_;
 
   // Whether threads should dump their native stack on SIGQUIT.
   bool dump_native_stack_on_sig_quit_;

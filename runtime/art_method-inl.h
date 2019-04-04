@@ -298,13 +298,13 @@ inline const char* ArtMethod::GetTypeDescriptorFromTypeIdx(dex::TypeIndex type_i
   return dex_file->GetTypeDescriptor(dex_file->GetTypeId(type_idx));
 }
 
-inline mirror::ClassLoader* ArtMethod::GetClassLoader() {
+inline ObjPtr<mirror::ClassLoader> ArtMethod::GetClassLoader() {
   DCHECK(!IsProxyMethod());
   return GetDeclaringClass()->GetClassLoader();
 }
 
 template <ReadBarrierOption kReadBarrierOption>
-inline mirror::DexCache* ArtMethod::GetDexCache() {
+inline ObjPtr<mirror::DexCache> ArtMethod::GetDexCache() {
   if (LIKELY(!IsObsolete())) {
     ObjPtr<mirror::Class> klass = GetDeclaringClass<kReadBarrierOption>();
     return klass->GetDexCache<kDefaultVerifyFlags, kReadBarrierOption>();
@@ -316,8 +316,8 @@ inline mirror::DexCache* ArtMethod::GetDexCache() {
 
 inline bool ArtMethod::IsProxyMethod() {
   DCHECK(!IsRuntimeMethod()) << "ArtMethod::IsProxyMethod called on a runtime method";
-  // Avoid read barrier since the from-space version of the class will have the correct proxy class
-  // flags since they are constant for the lifetime of the class.
+  // No read barrier needed, we're reading the constant declaring class only to read
+  // the constant proxy flag. See ReadBarrierOption.
   return GetDeclaringClass<kWithoutReadBarrier>()->IsProxyClass();
 }
 

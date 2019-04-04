@@ -130,7 +130,7 @@ class MANAGED LOCKABLE Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   size_t SizeOf() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  Object* Clone(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_)
+  ObjPtr<Object> Clone(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 
   int32_t IdentityHashCode()
@@ -153,11 +153,11 @@ class MANAGED LOCKABLE Object {
   uint32_t GetLockOwnerThreadId();
 
   // Try to enter the monitor, returns non null if we succeeded.
-  mirror::Object* MonitorTryEnter(Thread* self)
+  ObjPtr<mirror::Object> MonitorTryEnter(Thread* self)
       EXCLUSIVE_LOCK_FUNCTION()
       REQUIRES(!Roles::uninterruptible_)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  mirror::Object* MonitorEnter(Thread* self)
+  ObjPtr<mirror::Object> MonitorEnter(Thread* self)
       EXCLUSIVE_LOCK_FUNCTION()
       REQUIRES(!Roles::uninterruptible_)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -172,93 +172,91 @@ class MANAGED LOCKABLE Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsClass() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  Class* AsClass() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<Class> AsClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsObjectArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<class T, VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  ObjectArray<T>* AsObjectArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<ObjectArray<T>> AsObjectArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   bool IsClassLoader() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ClassLoader* AsClassLoader() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<ClassLoader> AsClassLoader() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   bool IsDexCache() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  DexCache* AsDexCache() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<DexCache> AsDexCache() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsArrayInstance() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  Array* AsArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<Array> AsArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsBooleanArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  BooleanArray* AsBooleanArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<BooleanArray> AsBooleanArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsByteArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  ByteArray* AsByteArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<ByteArray> AsByteArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsCharArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  CharArray* AsCharArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<CharArray> AsCharArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsShortArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  ShortArray* AsShortArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<ShortArray> AsShortArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsIntArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  IntArray* AsIntArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<IntArray> AsIntArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  IntArray* AsIntArrayUnchecked() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<IntArray> AsIntArrayUnchecked() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsLongArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  LongArray* AsLongArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<LongArray> AsLongArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  LongArray* AsLongArrayUnchecked() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<LongArray> AsLongArrayUnchecked() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsFloatArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  FloatArray* AsFloatArray() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<FloatArray> AsFloatArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsDoubleArray() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  DoubleArray* AsDoubleArray() REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool IsString() REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  String* AsString() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<DoubleArray> AsDoubleArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  Throwable* AsThrowable() REQUIRES_SHARED(Locks::mutator_lock_);
+  bool IsString() REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  ObjPtr<String> AsString() REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  ObjPtr<Throwable> AsThrowable() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   bool IsReferenceInstance() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  Reference* AsReference() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<Reference> AsReference() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsWeakReferenceInstance() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
@@ -266,7 +264,7 @@ class MANAGED LOCKABLE Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsFinalizerReferenceInstance() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  FinalizerReference* AsFinalizerReference() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<FinalizerReference> AsFinalizerReference() REQUIRES_SHARED(Locks::mutator_lock_);
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsPhantomReferenceInstance() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -758,9 +756,9 @@ class MANAGED LOCKABLE Object {
   // A utility function that copies an object in a read barrier and write barrier-aware way.
   // This is internally used by Clone() and Class::CopyOf(). If the object is finalizable,
   // it is the callers job to call Heap::AddFinalizerReference.
-  static Object* CopyObject(ObjPtr<mirror::Object> dest,
-                            ObjPtr<mirror::Object> src,
-                            size_t num_bytes)
+  static ObjPtr<Object> CopyObject(ObjPtr<mirror::Object> dest,
+                                   ObjPtr<mirror::Object> src,
+                                   size_t num_bytes)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags, Primitive::Type kType>

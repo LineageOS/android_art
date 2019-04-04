@@ -23,9 +23,9 @@
 #include "interpreter/shadow_frame-inl.h"
 #include "jvalue-inl.h"
 #include "mirror/class-inl.h"
-#include "mirror/emulated_stack_frame.h"
+#include "mirror/emulated_stack_frame-inl.h"
 #include "mirror/method_handle_impl-inl.h"
-#include "mirror/method_type.h"
+#include "mirror/method_type-inl.h"
 #include "mirror/var_handle.h"
 #include "reflection-inl.h"
 #include "reflection.h"
@@ -478,7 +478,7 @@ static inline bool MethodHandleInvokeMethod(ArtMethod* called_method,
         // through from a transformer.
         size_t first_arg_register = operands->GetOperand(0);
         ObjPtr<mirror::EmulatedStackFrame> emulated_stack_frame(
-            reinterpret_cast<mirror::EmulatedStackFrame*>(
+            ObjPtr<mirror::EmulatedStackFrame>::DownCast(
                 shadow_frame.GetVRegReference(first_arg_register)));
         if (!emulated_stack_frame->WriteToShadowFrame(self,
                                                       target_type,
@@ -527,7 +527,7 @@ static inline bool MethodHandleInvokeMethod(ArtMethod* called_method,
     StackHandleScope<2> hs(self);
     size_t first_callee_register = operands->GetOperand(0);
     Handle<mirror::EmulatedStackFrame> emulated_stack_frame(
-        hs.NewHandle(reinterpret_cast<mirror::EmulatedStackFrame*>(
+        hs.NewHandle(ObjPtr<mirror::EmulatedStackFrame>::DownCast(
             shadow_frame.GetVRegReference(first_callee_register))));
     Handle<mirror::MethodType> emulated_stack_type(hs.NewHandle(emulated_stack_frame->GetType()));
     JValue local_result;
@@ -580,7 +580,7 @@ static inline bool MethodHandleInvokeTransform(ArtMethod* called_method,
     // through the handle directly to the callee, instead of having to
     // instantiate a new stack frame based on the shadow frame.
     size_t first_callee_register = operands->GetOperand(0);
-    sf.Assign(reinterpret_cast<mirror::EmulatedStackFrame*>(
+    sf.Assign(ObjPtr<mirror::EmulatedStackFrame>::DownCast(
         shadow_frame.GetVRegReference(first_callee_register)));
   } else {
     sf.Assign(mirror::EmulatedStackFrame::CreateFromShadowFrameAndArgs(self,
@@ -1030,14 +1030,14 @@ bool DoVarHandleInvokeTranslation(Thread* self,
   }
 
   // Get the receiver
-  mirror::Object* receiver = shadow_frame.GetVRegReference(operands->GetOperand(0));
+  ObjPtr<mirror::Object> receiver = shadow_frame.GetVRegReference(operands->GetOperand(0));
   if (receiver == nullptr) {
     ThrowNullPointerException("Expected argument 1 to be a non-null VarHandle");
     return false;
   }
 
   // Cast to VarHandle instance
-  Handle<mirror::VarHandle> vh(hs.NewHandle(down_cast<mirror::VarHandle*>(receiver)));
+  Handle<mirror::VarHandle> vh(hs.NewHandle(ObjPtr<mirror::VarHandle>::DownCast(receiver)));
   DCHECK(GetClassRoot<mirror::VarHandle>()->IsAssignableFrom(vh->GetClass()));
 
   // Determine the accessor kind to dispatch

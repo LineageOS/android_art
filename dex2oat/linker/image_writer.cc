@@ -40,8 +40,8 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_types.h"
 #include "driver/compiler_options.h"
+#include "elf/elf_utils.h"
 #include "elf_file.h"
-#include "elf_utils.h"
 #include "gc/accounting/card_table-inl.h"
 #include "gc/accounting/heap_bitmap.h"
 #include "gc/accounting/space_bitmap-inl.h"
@@ -61,7 +61,7 @@
 #include "lock_word.h"
 #include "mirror/array-inl.h"
 #include "mirror/class-inl.h"
-#include "mirror/class_ext.h"
+#include "mirror/class_ext-inl.h"
 #include "mirror/class_loader.h"
 #include "mirror/dex_cache-inl.h"
 #include "mirror/dex_cache.h"
@@ -1075,7 +1075,7 @@ void ImageWriter::AddDexCacheArrayRelocation(void* array,
   }
 }
 
-void ImageWriter::AddMethodPointerArray(mirror::PointerArray* arr) {
+void ImageWriter::AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr) {
   DCHECK(arr != nullptr);
   if (kIsDebugBuild) {
     for (size_t i = 0, len = arr->GetLength(); i < len; i++) {
@@ -1089,7 +1089,7 @@ void ImageWriter::AddMethodPointerArray(mirror::PointerArray* arr) {
   }
   // kBinArtMethodClean picked arbitrarily, just required to differentiate between ArtFields and
   // ArtMethods.
-  pointer_arrays_.emplace(arr, Bin::kArtMethodClean);
+  pointer_arrays_.emplace(arr.Ptr(), Bin::kArtMethodClean);
 }
 
 void ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
@@ -1140,14 +1140,14 @@ void ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
     //
     if (object->IsClass()) {
       bin = Bin::kClassVerified;
-      mirror::Class* klass = object->AsClass();
+      ObjPtr<mirror::Class> klass = object->AsClass();
 
       // Add non-embedded vtable to the pointer array table if there is one.
-      auto* vtable = klass->GetVTable();
+      ObjPtr<mirror::PointerArray> vtable = klass->GetVTable();
       if (vtable != nullptr) {
         AddMethodPointerArray(vtable);
       }
-      auto* iftable = klass->GetIfTable();
+      ObjPtr<mirror::IfTable> iftable = klass->GetIfTable();
       if (iftable != nullptr) {
         for (int32_t i = 0; i < klass->GetIfTableCount(); ++i) {
           if (iftable->GetMethodArrayCount(i) > 0) {
@@ -1411,7 +1411,7 @@ bool ImageWriter::PruneAppImageClassInternal(
   }
   if (!result) {
     // Check interfaces since these wont be visited through VisitReferences.)
-    mirror::IfTable* if_table = klass->GetIfTable();
+    ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
     for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
       result = result || PruneAppImageClassInternal(if_table->GetInterface(i),
                                                     &my_early_exit,
@@ -1461,7 +1461,7 @@ bool ImageWriter::PruneAppImageClassInternal(
                                                 visited);
   // Remove the class if the dex file is not in the set of dex files. This happens for classes that
   // are from uses-library if there is no profile. b/30688277
-  mirror::DexCache* dex_cache = klass->GetDexCache();
+  ObjPtr<mirror::DexCache> dex_cache = klass->GetDexCache();
   if (dex_cache != nullptr) {
     result = result ||
         dex_file_oat_index_map_.find(dex_cache->GetDexFile()) == dex_file_oat_index_map_.end();
@@ -1810,7 +1810,7 @@ std::vector<ObjPtr<mirror::DexCache>> ImageWriter::FindDexCaches(Thread* self) {
 void ImageWriter::CheckNonImageClassesRemoved() {
   auto visitor = [&](Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
     if (obj->IsClass() && !IsInBootImage(obj)) {
-      Class* klass = obj->AsClass();
+      ObjPtr<Class> klass = obj->AsClass();
       if (!KeepClass(klass)) {
         DumpImageClasses();
         CHECK(KeepClass(klass))
@@ -1831,7 +1831,7 @@ void ImageWriter::DumpImageClasses() {
 mirror::String* ImageWriter::FindInternedString(mirror::String* string) {
   Thread* const self = Thread::Current();
   for (const ImageInfo& image_info : image_infos_) {
-    ObjPtr<mirror::String> const found = image_info.intern_table_->LookupStrong(self, string);
+    const ObjPtr<mirror::String> found = image_info.intern_table_->LookupStrong(self, string);
     DCHECK(image_info.intern_table_->LookupWeak(self, string) == nullptr)
         << string->ToModifiedUtf8();
     if (found != nullptr) {
@@ -1978,7 +1978,7 @@ mirror::Object* ImageWriter::TryAssignBinSlot(WorkStack& work_stack,
     if (obj->IsString()) {
       // Need to check if the string is already interned in another image info so that we don't have
       // the intern tables of two different images contain the same string.
-      mirror::String* interned = FindInternedString(obj->AsString());
+      mirror::String* interned = FindInternedString(obj->AsString().Ptr());
       if (interned == nullptr) {
         // Not in another image space, insert to our table.
         interned =
@@ -1989,8 +1989,8 @@ mirror::Object* ImageWriter::TryAssignBinSlot(WorkStack& work_stack,
       oat_index = GetOatIndexForDexCache(obj->AsDexCache());
     } else if (obj->IsClass()) {
       // Visit and assign offsets for fields and field arrays.
-      mirror::Class* as_klass = obj->AsClass();
-      mirror::DexCache* dex_cache = as_klass->GetDexCache();
+      ObjPtr<mirror::Class> as_klass = obj->AsClass();
+      ObjPtr<mirror::DexCache> dex_cache = as_klass->GetDexCache();
       DCHECK(!as_klass->IsErroneous()) << as_klass->GetStatus();
       if (compiler_options_.IsAppImage()) {
         // Extra sanity, no boot loader classes should be left!
@@ -2103,7 +2103,7 @@ mirror::Object* ImageWriter::TryAssignBinSlot(WorkStack& work_stack,
     } else if (obj->IsClassLoader()) {
       // Register the class loader if it has a class table.
       // The fake boot class loader should not get registered.
-      mirror::ClassLoader* class_loader = obj->AsClassLoader();
+      ObjPtr<mirror::ClassLoader> class_loader = obj->AsClassLoader();
       if (class_loader->GetClassTable() != nullptr) {
         DCHECK(compiler_options_.IsAppImage());
         if (class_loader == GetAppClassLoader()) {
@@ -2120,7 +2120,7 @@ mirror::Object* ImageWriter::TryAssignBinSlot(WorkStack& work_stack,
   }
   if (obj->IsString()) {
     // Always return the interned string if there exists one.
-    mirror::String* interned = FindInternedString(obj->AsString());
+    mirror::String* interned = FindInternedString(obj->AsString().Ptr());
     if (interned != nullptr) {
       return interned;
     }
@@ -3188,7 +3188,7 @@ void ImageWriter::FixupObject(Object* orig, Object* copy) {
     }
   }
   if (orig->IsClass()) {
-    FixupClass(orig->AsClass<kVerifyNone>(), down_cast<mirror::Class*>(copy));
+    FixupClass(orig->AsClass<kVerifyNone>().Ptr(), down_cast<mirror::Class*>(copy));
   } else {
     ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
         Runtime::Current()->GetClassLinker()->GetClassRoots();

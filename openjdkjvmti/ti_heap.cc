@@ -1073,7 +1073,7 @@ class FollowReferencesHelper final {
       REQUIRES_SHARED(art::Locks::mutator_lock_)
       REQUIRES(!*tag_table_->GetAllowDisallowLock()) {
     if (obj->IsClass()) {
-      VisitClass(obj->AsClass());
+      VisitClass(obj->AsClass().Ptr());
       return;
     }
     if (obj->IsArrayInstance()) {
@@ -1138,18 +1138,18 @@ class FollowReferencesHelper final {
     }
 
     if (array->IsObjectArray()) {
-      art::mirror::ObjectArray<art::mirror::Object>* obj_array =
+      art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> obj_array =
           array->AsObjectArray<art::mirror::Object>();
       int32_t length = obj_array->GetLength();
       for (int32_t i = 0; i != length; ++i) {
-        art::mirror::Object* elem = obj_array->GetWithoutChecks(i);
+        art::ObjPtr<art::mirror::Object> elem = obj_array->GetWithoutChecks(i);
         if (elem != nullptr) {
           jvmtiHeapReferenceInfo reference_info;
           reference_info.array.index = i;
           stop_reports_ = !ReportReferenceMaybeEnqueue(JVMTI_HEAP_REFERENCE_ARRAY_ELEMENT,
                                                        &reference_info,
                                                        array,
-                                                       elem);
+                                                       elem.Ptr());
           if (stop_reports_) {
             break;
           }
@@ -1209,7 +1209,7 @@ class FollowReferencesHelper final {
       stop_reports_ = !ReportReferenceMaybeEnqueue(JVMTI_HEAP_REFERENCE_CLASS_LOADER,
                                                    nullptr,
                                                    klass,
-                                                   klass->GetClassLoader());
+                                                   klass->GetClassLoader().Ptr());
       if (stop_reports_) {
         return;
       }

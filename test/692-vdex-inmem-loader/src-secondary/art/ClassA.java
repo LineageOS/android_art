@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,10 @@
  * limitations under the License.
  */
 
-#include "call_site.h"
+package art;
 
-#include "class-alloc-inl.h"
-#include "class_root.h"
-#include "obj_ptr-inl.h"
-
-namespace art {
-namespace mirror {
-
-mirror::CallSite* CallSite::Create(Thread* const self, Handle<MethodHandle> target) {
-  ObjPtr<mirror::CallSite> cs =
-      ObjPtr<CallSite>::DownCast(GetClassRoot<CallSite>()->AllocObject(self));
-  CHECK(!Runtime::Current()->IsActiveTransaction());
-  cs->SetFieldObject<false>(TargetOffset(), target.Get());
-  return cs.Ptr();
+public class ClassA {
+  public static String getHello() {
+    return "Hello";
+  }
 }
-
-}  // namespace mirror
-}  // namespace art

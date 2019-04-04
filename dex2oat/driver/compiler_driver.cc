@@ -667,6 +667,11 @@ void CompilerDriver::Resolve(jobject class_loader,
 void CompilerDriver::ResolveConstStrings(const std::vector<const DexFile*>& dex_files,
                                          bool only_startup_strings,
                                          TimingLogger* timings) {
+  if (only_startup_strings && GetCompilerOptions().GetProfileCompilationInfo() == nullptr) {
+    // If there is no profile, don't resolve any strings. Resolving all of the strings in the image
+    // will cause a bloated app image and slow down startup.
+    return;
+  }
   ScopedObjectAccess soa(Thread::Current());
   StackHandleScope<1> hs(soa.Self());
   ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
@@ -689,6 +694,12 @@ void CompilerDriver::ResolveConstStrings(const std::vector<const DexFile*>& dex_
       const bool is_startup_class =
           profile_compilation_info != nullptr &&
           profile_compilation_info->ContainsClass(*dex_file, accessor.GetClassIdx());
+
+      // Skip methods that failed to verify since they may contain invalid Dex code.
+      if (GetClassStatus(ClassReference(dex_file, accessor.GetClassDefIndex())) <
+          ClassStatus::kRetryVerificationAtRuntime) {
+        continue;
+      }
 
       for (const ClassAccessor::Method& method : accessor.GetMethods()) {
         const bool is_clinit = (method.GetAccessFlags() & kAccConstructor) != 0 &&
@@ -873,6 +884,9 @@ void CompilerDriver::PreCompile(jobject class_loader,
     return;
   }
 
+  Verify(class_loader, dex_files, timings, verification_results);
+  VLOG(compiler) << "Verify: " << GetMemoryUsageString(false);
+
   if (GetCompilerOptions().IsForceDeterminism() && GetCompilerOptions().IsBootImage()) {
     // Resolve strings from const-string. Do this now to have a deterministic image.
     ResolveConstStrings(dex_files, /*only_startup_strings=*/ false, timings);
@@ -880,9 +894,6 @@ void CompilerDriver::PreCompile(jobject class_loader,
   } else if (GetCompilerOptions().ResolveStartupConstStrings()) {
     ResolveConstStrings(dex_files, /*only_startup_strings=*/ true, timings);
   }
-
-  Verify(class_loader, dex_files, timings, verification_results);
-  VLOG(compiler) << "Verify: " << GetMemoryUsageString(false);
 
   if (had_hard_verifier_failure_ && GetCompilerOptions().AbortOnHardVerifierFailure()) {
     // Avoid dumping threads. Even if we shut down the thread pools, there will still be three

@@ -203,7 +203,9 @@ class DumpCheckpoint final : public Closure {
  public:
   DumpCheckpoint(std::ostream* os, bool dump_native_stack)
       : os_(os),
-        barrier_(0),
+        // Avoid verifying count in case a thread doesn't end up passing through the barrier.
+        // This avoids a SIGABRT that would otherwise happen in the destructor.
+        barrier_(0, /*verify_count_on_shutdown=*/false),
         backtrace_map_(dump_native_stack ? BacktraceMap::Create(getpid()) : nullptr),
         dump_native_stack_(dump_native_stack) {
     if (backtrace_map_ != nullptr) {
@@ -505,34 +507,6 @@ void ThreadList::RunEmptyCheckpoint() {
       }
     }
   }
-}
-
-// Request that a checkpoint function be run on all active (non-suspended)
-// threads.  Returns the number of successful requests.
-size_t ThreadList::RunCheckpointOnRunnableThreads(Closure* checkpoint_function) {
-  Thread* self = Thread::Current();
-  Locks::mutator_lock_->AssertNotExclusiveHeld(self);
-  Locks::thread_list_lock_->AssertNotHeld(self);
-  Locks::thread_suspend_count_lock_->AssertNotHeld(self);
-  CHECK_NE(self->GetState(), kRunnable);
-
-  size_t count = 0;
-  {
-    // Call a checkpoint function for each non-suspended thread.
-    MutexLock mu(self, *Locks::thread_list_lock_);
-    MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
-    for (const auto& thread : list_) {
-      if (thread != self) {
-        if (thread->RequestCheckpoint(checkpoint_function)) {
-          // This thread will run its checkpoint some time in the near future.
-          count++;
-        }
-      }
-    }
-  }
-
-  // Return the number of threads that will run the checkpoint function.
-  return count;
 }
 
 // A checkpoint/suspend-all hybrid to switch thread roots from
