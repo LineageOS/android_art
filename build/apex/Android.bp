@@ -47,9 +47,6 @@ bionic_native_shared_libs = [
     "libc",
     "libm",
     "libdl",
-    // ...and their internal dependencies
-    "libc_malloc_debug",
-    "libc_malloc_hooks",
 ]
 bionic_binaries_both = [
     "linker",
