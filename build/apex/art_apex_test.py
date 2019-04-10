@@ -450,7 +450,7 @@ class ReleaseChecker:
     self._checker.check_optional_native_library('libclang_rt.hwasan*')
     self._checker.check_optional_native_library('libclang_rt.ubsan*')
 
-    # TODO(b/124293228): Figure out why we get this.
+    # TODO(b/130025619): Get rid of this dependency.
     self._checker.check_native_library('libcutils')
 
 
@@ -483,6 +483,9 @@ class ReleaseTargetChecker:
     self._checker.check_native_library('bionic/libc')
     self._checker.check_native_library('bionic/libdl')
     self._checker.check_native_library('bionic/libm')
+    # ... and its internal dependencies
+    self._checker.check_native_library('libc_malloc_hooks')
+    self._checker.check_native_library('libc_malloc_debug')
 
     # Check exported native libraries for Managed Core Library.
     self._checker.check_native_library('libandroidicu')

@@ -523,6 +523,7 @@ void SemiSpace::Sweep(bool swap_bitmaps) {
       RecordFree(alloc_space->Sweep(swap_bitmaps));
     }
   }
+  SweepLargeObjects(swap_bitmaps);
 }
 
 void SemiSpace::SweepLargeObjects(bool swap_bitmaps) {
