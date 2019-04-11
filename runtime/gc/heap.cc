@@ -1346,7 +1346,7 @@ void Heap::DoPendingCollectorTransition() {
       VLOG(gc) << "CC background compaction ignored due to jank perceptible process state";
     }
   } else {
-    LOG(FATAL) << "Unsupported";
+    CHECK_EQ(desired_collector_type, collector_type_) << "Unsupported collector transition";
   }
 }
 
