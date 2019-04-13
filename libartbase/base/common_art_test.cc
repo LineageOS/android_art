@@ -322,14 +322,7 @@ void CommonArtTestImpl::TearDown() {
 }
 
 static std::string GetDexFileName(const std::string& jar_prefix, bool host) {
-  std::string path;
-  if (host) {
-    const char* host_dir = getenv("ANDROID_HOST_OUT");
-    CHECK(host_dir != nullptr);
-    path = host_dir;
-  } else {
-    path = GetAndroidRoot();
-  }
+  std::string path = GetAndroidRoot();
 
   std::string suffix = host
       ? "-hostdex"                 // The host version.
@@ -400,15 +393,6 @@ std::string CommonArtTestImpl::GetClassPathOption(const char* option,
   return option + android::base::Join(class_path, ':');
 }
 
-std::string CommonArtTestImpl::GetTestAndroidRoot() {
-  if (IsHost()) {
-    const char* host_dir = getenv("ANDROID_HOST_OUT");
-    CHECK(host_dir != nullptr);
-    return host_dir;
-  }
-  return GetAndroidRoot();
-}
-
 // Check that for target builds we have ART_TARGET_NATIVETEST_DIR set.
 #ifdef ART_TARGET
 #ifndef ART_TARGET_NATIVETEST_DIR
@@ -424,8 +408,7 @@ std::string CommonArtTestImpl::GetTestDexFileName(const char* name) const {
   CHECK(name != nullptr);
   std::string filename;
   if (IsHost()) {
-    filename += getenv("ANDROID_HOST_OUT");
-    filename += "/framework/";
+    filename += GetAndroidRoot() + "/framework/";
   } else {
     filename += ART_TARGET_NATIVETEST_DIR_STRING;
   }
@@ -475,9 +458,8 @@ std::string CommonArtTestImpl::GetCoreFileLocation(const char* suffix) {
 
   std::string location;
   if (IsHost()) {
-    const char* host_dir = getenv("ANDROID_HOST_OUT");
-    CHECK(host_dir != nullptr);
-    location = StringPrintf("%s/framework/core.%s", host_dir, suffix);
+    std::string host_dir = GetAndroidRoot();
+    location = StringPrintf("%s/framework/core.%s", host_dir.c_str(), suffix);
   } else {
     location = StringPrintf("/data/art-test/core.%s", suffix);
   }

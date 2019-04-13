@@ -35,6 +35,7 @@
 #include "base/histogram-inl.h"
 #include "base/logging.h"  // For VLOG.
 #include "base/memory_tool.h"
+#include "base/mutex.h"
 #include "base/os.h"
 #include "base/stl_util.h"
 #include "base/systrace.h"
@@ -312,9 +313,10 @@ Heap::Heap(size_t initial_size,
   if (kUseReadBarrier) {
     CHECK_EQ(foreground_collector_type_, kCollectorTypeCC);
     CHECK_EQ(background_collector_type_, kCollectorTypeCCBackground);
-  } else {
+  } else if (background_collector_type_ != gc::kCollectorTypeHomogeneousSpaceCompact) {
     CHECK_EQ(IsMovingGc(foreground_collector_type_), IsMovingGc(background_collector_type_))
-        << "Changing from moving to non-moving GC (or visa versa) is not supported.";
+        << "Changing from " << foreground_collector_type_ << " to "
+        << background_collector_type_ << " (or visa versa) is not supported.";
   }
   verification_.reset(new Verification(this));
   CHECK_GE(large_object_threshold, kMinLargeObjectThreshold);
@@ -841,6 +843,7 @@ void Heap::IncrementDisableThreadFlip(Thread* self) {
   }
   ScopedThreadStateChange tsc(self, kWaitingForGcThreadFlip);
   MutexLock mu(self, *thread_flip_lock_);
+  thread_flip_cond_->CheckSafeToWait(self);
   bool has_waited = false;
   uint64_t wait_start = NanoTime();
   if (thread_flip_running_) {
@@ -886,6 +889,7 @@ void Heap::ThreadFlipBegin(Thread* self) {
   CHECK(kUseReadBarrier);
   ScopedThreadStateChange tsc(self, kWaitingForGcThreadFlip);
   MutexLock mu(self, *thread_flip_lock_);
+  thread_flip_cond_->CheckSafeToWait(self);
   bool has_waited = false;
   uint64_t wait_start = NanoTime();
   CHECK(!thread_flip_running_);
@@ -2250,8 +2254,10 @@ void Heap::PreZygoteFork() {
     if (temp_space_ != nullptr) {
       CHECK(temp_space_->IsEmpty());
     }
-    total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects();
-    total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes();
+    total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects() +
+        GetCurrentGcIteration()->GetFreedLargeObjects();
+    total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes() +
+        GetCurrentGcIteration()->GetFreedLargeObjectBytes();
     // Update the end and write out image.
     non_moving_space_->SetEnd(target_space.End());
     non_moving_space_->SetLimit(target_space.Limit());
@@ -2529,8 +2535,10 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
       << "Could not find garbage collector with collector_type="
       << static_cast<size_t>(collector_type_) << " and gc_type=" << gc_type;
   collector->Run(gc_cause, clear_soft_references || runtime->IsZygote());
-  total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects();
-  total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes();
+  total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects() +
+      GetCurrentGcIteration()->GetFreedLargeObjects();
+  total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes() +
+      GetCurrentGcIteration()->GetFreedLargeObjectBytes();
   RequestTrim(self);
   // Enqueue cleared references.
   reference_processor_->EnqueueClearedReferences(self);
@@ -3278,6 +3286,7 @@ collector::GcType Heap::WaitForGcToComplete(GcCause cause, Thread* self) {
 }
 
 collector::GcType Heap::WaitForGcToCompleteLocked(GcCause cause, Thread* self) {
+  gc_complete_cond_->CheckSafeToWait(self);
   collector::GcType last_gc_type = collector::kGcTypeNone;
   GcCause last_gc_cause = kGcCauseNone;
   uint64_t wait_start = NanoTime();

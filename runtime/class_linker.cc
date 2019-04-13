@@ -1077,6 +1077,14 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
                        error_msg)) {
       return false;
     }
+    // Assert that if absolute boot classpath locations were provided, they were
+    // assigned to the loaded dex files.
+    if (kIsDebugBuild && IsAbsoluteLocation(boot_class_path_locations[i])) {
+      for (const auto& dex_file : dex_files) {
+        DCHECK_EQ(DexFileLoader::GetBaseLocation(dex_file->GetLocation()),
+                  boot_class_path_locations[i]);
+      }
+    }
     // Append opened dex files at the end.
     boot_dex_files_.insert(boot_dex_files_.end(),
                            std::make_move_iterator(dex_files.begin()),
@@ -2027,10 +2035,8 @@ bool ClassLinker::AddImageSpace(
 
   for (int32_t i = 0; i < dex_caches->GetLength(); i++) {
     ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
-    std::string dex_file_location(dex_cache->GetLocation()->ToModifiedUtf8());
-    // TODO: Only store qualified paths.
-    // If non qualified, qualify it.
-    dex_file_location = OatFile::ResolveRelativeEncodedDexLocation(dex_location, dex_file_location);
+    std::string dex_file_location = dex_cache->GetLocation()->ToModifiedUtf8();
+    DCHECK_EQ(dex_location, DexFileLoader::GetBaseLocation(dex_file_location));
     std::unique_ptr<const DexFile> dex_file = OpenOatDexFile(oat_file,
                                                              dex_file_location.c_str(),
                                                              error_msg);
@@ -3374,6 +3380,10 @@ void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
       OatFile::OatMethod oat_method = oat_class.GetOatMethod(method_index);
       quick_code = oat_method.GetQuickCode();
     }
+    // Check if we have JIT compiled code for it.
+    if (quick_code == nullptr && Runtime::Current()->GetJit() != nullptr) {
+      quick_code = Runtime::Current()->GetJit()->GetCodeCache()->GetZygoteSavedEntryPoint(method);
+    }
     // Check whether the method is native, in which case it's generic JNI.
     if (quick_code == nullptr && method->IsNative()) {
       quick_code = GetQuickGenericJniStub();
@@ -3447,6 +3457,15 @@ static void LinkCode(ClassLinker* class_linker,
       const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
       DCHECK(class_linker->IsQuickGenericJniStub(entry_point) ||
              class_linker->IsQuickResolutionStub(entry_point));
+    }
+
+    // For the jitzygote configuration we want JNI stubs to be compiled, just like boot classpath
+    // AOT where we compile all native entries.
+    if (!Runtime::Current()->IsUsingDefaultBootImageLocation() &&
+        method->GetDeclaringClass()->GetClassLoader() == nullptr &&
+        Runtime::Current()->GetJit() != nullptr) {
+      Runtime::Current()->GetJit()->CompileMethod(
+          method, Thread::Current(), /* baseline= */ false, /* osr= */ false);
     }
   }
 }
