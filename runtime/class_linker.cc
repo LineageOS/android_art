@@ -402,7 +402,7 @@ static void ShuffleForward(size_t* current_field_idx,
   }
 }
 
-ClassLinker::ClassLinker(InternTable* intern_table)
+ClassLinker::ClassLinker(InternTable* intern_table, bool fast_class_not_found_exceptions)
     : boot_class_table_(new ClassTable()),
       failed_dex_cache_class_lookups_(0),
       class_roots_(nullptr),
@@ -410,6 +410,7 @@ ClassLinker::ClassLinker(InternTable* intern_table)
       init_done_(false),
       log_new_roots_(false),
       intern_table_(intern_table),
+      fast_class_not_found_exceptions_(fast_class_not_found_exceptions),
       quick_resolution_trampoline_(nullptr),
       quick_imt_conflict_trampoline_(nullptr),
       quick_generic_jni_trampoline_(nullptr),
@@ -2744,7 +2745,7 @@ bool ClassLinker::FindClassInBaseDexClassLoader(ScopedObjectAccessAlreadyRunnabl
 
     // Search the current class loader classpath.
     *result = FindClassInBaseDexClassLoaderClassPath(soa, descriptor, hash, class_loader);
-    return true;
+    return !soa.Self()->IsExceptionPending();
   }
 
   if (IsDelegateLastClassLoader(soa, class_loader)) {
@@ -2757,6 +2758,11 @@ bool ClassLinker::FindClassInBaseDexClassLoader(ScopedObjectAccessAlreadyRunnabl
     if (*result != nullptr) {
       return true;  // The class is part of the boot class path.
     }
+    if (self->IsExceptionPending()) {
+      // Pending exception means there was an error other than ClassNotFound that must be returned
+      // to the caller.
+      return false;
+    }
 
     if (!FindClassInSharedLibraries(soa, self, descriptor, hash, class_loader, result)) {
       return false;  // One of the shared library loader is not supported.
@@ -2768,6 +2774,11 @@ bool ClassLinker::FindClassInBaseDexClassLoader(ScopedObjectAccessAlreadyRunnabl
     *result = FindClassInBaseDexClassLoaderClassPath(soa, descriptor, hash, class_loader);
     if (*result != nullptr) {
       return true;  // Found the class in the current class loader
+    }
+    if (self->IsExceptionPending()) {
+      // Pending exception means there was an error other than ClassNotFound that must be returned
+      // to the caller.
+      return false;
     }
 
     // Handles as RegisterDexFile may allocate dex caches (and cause thread suspension).
@@ -2802,7 +2813,6 @@ ObjPtr<mirror::Class> ClassLinker::FindClassInBootClassLoaderClassPath(Thread* s
     }
     if (result == nullptr) {
       CHECK(self->IsExceptionPending()) << descriptor;
-      self->ClearException();
     }
   }
   return result;
@@ -2830,8 +2840,9 @@ ObjPtr<mirror::Class> ClassLinker::FindClassInBaseDexClassLoaderClassPath(
                                                 *dex_class_def);
       if (klass == nullptr) {
         CHECK(soa.Self()->IsExceptionPending()) << descriptor;
-        soa.Self()->ClearException();
         // TODO: Is it really right to break here, and not check the other dex files?
+      } else {
+        DCHECK(!soa.Self()->IsExceptionPending());
       }
       ret = klass;
       return false;  // Found a Class (or error == nullptr), stop visit.
@@ -2900,8 +2911,10 @@ ObjPtr<mirror::Class> ClassLinker::FindClass(Thread* self,
       DCHECK(known_hierarchy);
       DCHECK(result_ptr->DescriptorEquals(descriptor));
       descriptor_equals = true;
-    } else {
+    } else if (!self->IsExceptionPending()) {
       // Either the chain wasn't understood or the class wasn't found.
+      // If there is a pending exception we didn't clear, it is a not a ClassNotFoundException and
+      // we should return it instead of silently clearing and retrying.
       //
       // If the chain was understood but we did not find the class, let the Java-side
       // rediscover all this and throw the exception with the right stack trace. Note that
@@ -2932,34 +2945,48 @@ ObjPtr<mirror::Class> ClassLinker::FindClass(Thread* self,
         ThrowNoClassDefFoundError("Invalid descriptor: %s.", descriptor);
         return nullptr;
       }
+
       std::string class_name_string(descriptor + 1, descriptor_length - 2);
       std::replace(class_name_string.begin(), class_name_string.end(), '/', '.');
-
-      ScopedLocalRef<jobject> class_loader_object(
-          soa.Env(), soa.AddLocalReference<jobject>(class_loader.Get()));
-      ScopedLocalRef<jobject> result(soa.Env(), nullptr);
-      {
-        ScopedThreadStateChange tsc(self, kNative);
-        ScopedLocalRef<jobject> class_name_object(
-            soa.Env(), soa.Env()->NewStringUTF(class_name_string.c_str()));
-        if (class_name_object.get() == nullptr) {
-          DCHECK(self->IsExceptionPending());  // OOME.
+      if (known_hierarchy &&
+          fast_class_not_found_exceptions_ &&
+          !Runtime::Current()->IsJavaDebuggable()) {
+        // For known hierarchy, we know that the class is going to throw an exception. If we aren't
+        // debuggable, optimize this path by throwing directly here without going back to Java
+        // language. This reduces how many ClassNotFoundExceptions happen.
+        self->ThrowNewExceptionF("Ljava/lang/ClassNotFoundException;",
+                                 "%s",
+                                 class_name_string.c_str());
+      } else {
+        ScopedLocalRef<jobject> class_loader_object(
+            soa.Env(), soa.AddLocalReference<jobject>(class_loader.Get()));
+        ScopedLocalRef<jobject> result(soa.Env(), nullptr);
+        {
+          ScopedThreadStateChange tsc(self, kNative);
+          ScopedLocalRef<jobject> class_name_object(
+              soa.Env(), soa.Env()->NewStringUTF(class_name_string.c_str()));
+          if (class_name_object.get() == nullptr) {
+            DCHECK(self->IsExceptionPending());  // OOME.
+            return nullptr;
+          }
+          CHECK(class_loader_object.get() != nullptr);
+          result.reset(soa.Env()->CallObjectMethod(class_loader_object.get(),
+                                                   WellKnownClasses::java_lang_ClassLoader_loadClass,
+                                                   class_name_object.get()));
+        }
+        if (result.get() == nullptr && !self->IsExceptionPending()) {
+          // broken loader - throw NPE to be compatible with Dalvik
+          ThrowNullPointerException(StringPrintf("ClassLoader.loadClass returned null for %s",
+                                                 class_name_string.c_str()).c_str());
           return nullptr;
         }
-        CHECK(class_loader_object.get() != nullptr);
-        result.reset(soa.Env()->CallObjectMethod(class_loader_object.get(),
-                                                 WellKnownClasses::java_lang_ClassLoader_loadClass,
-                                                 class_name_object.get()));
+        result_ptr = soa.Decode<mirror::Class>(result.get());
+        // Check the name of the returned class.
+        descriptor_equals = (result_ptr != nullptr) && result_ptr->DescriptorEquals(descriptor);
       }
-      if (result.get() == nullptr && !self->IsExceptionPending()) {
-        // broken loader - throw NPE to be compatible with Dalvik
-        ThrowNullPointerException(StringPrintf("ClassLoader.loadClass returned null for %s",
-                                               class_name_string.c_str()).c_str());
-        return nullptr;
-      }
-      result_ptr = soa.Decode<mirror::Class>(result.get());
-      // Check the name of the returned class.
-      descriptor_equals = (result_ptr != nullptr) && result_ptr->DescriptorEquals(descriptor);
+    } else {
+      DCHECK(!self->GetException()->InstanceOf(
+          GetClassRoot(ClassRoot::kJavaLangClassNotFoundException, this)));
     }
   }
 
