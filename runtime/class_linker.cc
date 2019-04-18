@@ -3490,6 +3490,7 @@ static void LinkCode(ClassLinker* class_linker,
     // AOT where we compile all native entries.
     if (!Runtime::Current()->IsUsingDefaultBootImageLocation() &&
         method->GetDeclaringClass()->GetClassLoader() == nullptr &&
+        method->GetDeclaringClass()->IsResolved() &&
         Runtime::Current()->GetJit() != nullptr) {
       Runtime::Current()->GetJit()->CompileMethod(
           method, Thread::Current(), /* baseline= */ false, /* osr= */ false);
