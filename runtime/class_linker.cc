@@ -117,6 +117,7 @@
 #include "mirror/reference-inl.h"
 #include "mirror/stack_trace_element.h"
 #include "mirror/string-inl.h"
+#include "mirror/throwable.h"
 #include "mirror/var_handle.h"
 #include "native/dalvik_system_DexFile.h"
 #include "nativehelper/scoped_local_ref.h"
@@ -2037,7 +2038,10 @@ bool ClassLinker::AddImageSpace(
   for (int32_t i = 0; i < dex_caches->GetLength(); i++) {
     ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
     std::string dex_file_location = dex_cache->GetLocation()->ToModifiedUtf8();
-    DCHECK_EQ(dex_location, DexFileLoader::GetBaseLocation(dex_file_location));
+    if (class_loader == nullptr) {
+      // For app images, we'll see the relative location. b/130666977.
+      DCHECK_EQ(dex_location, DexFileLoader::GetBaseLocation(dex_file_location));
+    }
     std::unique_ptr<const DexFile> dex_file = OpenOatDexFile(oat_file,
                                                              dex_file_location.c_str(),
                                                              error_msg);
@@ -2792,6 +2796,31 @@ bool ClassLinker::FindClassInBaseDexClassLoader(ScopedObjectAccessAlreadyRunnabl
   return false;
 }
 
+namespace {
+
+// Matches exceptions caught in DexFile.defineClass.
+ALWAYS_INLINE bool MatchesDexFileCaughtExceptions(ObjPtr<mirror::Throwable> throwable,
+                                                  ClassLinker* class_linker)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  return
+      // ClassNotFoundException.
+      throwable->InstanceOf(GetClassRoot(ClassRoot::kJavaLangClassNotFoundException,
+                                         class_linker))
+      ||
+      // NoClassDefFoundError. TODO: Reconsider this. b/130746382.
+      throwable->InstanceOf(Runtime::Current()->GetPreAllocatedNoClassDefFoundError()->GetClass());
+}
+
+// Clear exceptions caught in DexFile.defineClass.
+ALWAYS_INLINE void FilterDexFileCaughtExceptions(Thread* self, ClassLinker* class_linker)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  if (MatchesDexFileCaughtExceptions(self->GetException(), class_linker)) {
+    self->ClearException();
+  }
+}
+
+}  // namespace
+
 // Finds the class in the boot class loader.
 // If the class is found the method returns the resolved class. Otherwise it returns null.
 ObjPtr<mirror::Class> ClassLinker::FindClassInBootClassLoaderClassPath(Thread* self,
@@ -2813,6 +2842,7 @@ ObjPtr<mirror::Class> ClassLinker::FindClassInBootClassLoaderClassPath(Thread* s
     }
     if (result == nullptr) {
       CHECK(self->IsExceptionPending()) << descriptor;
+      FilterDexFileCaughtExceptions(self, this);
     }
   }
   return result;
@@ -2840,6 +2870,7 @@ ObjPtr<mirror::Class> ClassLinker::FindClassInBaseDexClassLoaderClassPath(
                                                 *dex_class_def);
       if (klass == nullptr) {
         CHECK(soa.Self()->IsExceptionPending()) << descriptor;
+        FilterDexFileCaughtExceptions(soa.Self(), this);
         // TODO: Is it really right to break here, and not check the other dex files?
       } else {
         DCHECK(!soa.Self()->IsExceptionPending());
@@ -2985,8 +3016,7 @@ ObjPtr<mirror::Class> ClassLinker::FindClass(Thread* self,
         descriptor_equals = (result_ptr != nullptr) && result_ptr->DescriptorEquals(descriptor);
       }
     } else {
-      DCHECK(!self->GetException()->InstanceOf(
-          GetClassRoot(ClassRoot::kJavaLangClassNotFoundException, this)));
+      DCHECK(!MatchesDexFileCaughtExceptions(self->GetException(), this));
     }
   }
 

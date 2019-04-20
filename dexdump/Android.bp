@@ -48,6 +48,9 @@ art_cc_binary {
                 "libziparchive",
             ],
         },
+        darwin: {
+            enabled: true,
+        },
     }
 }
 
