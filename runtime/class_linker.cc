@@ -3515,16 +3515,6 @@ static void LinkCode(ClassLinker* class_linker,
       DCHECK(class_linker->IsQuickGenericJniStub(entry_point) ||
              class_linker->IsQuickResolutionStub(entry_point));
     }
-
-    // For the jitzygote configuration we want JNI stubs to be compiled, just like boot classpath
-    // AOT where we compile all native entries.
-    if (!Runtime::Current()->IsUsingDefaultBootImageLocation() &&
-        method->GetDeclaringClass()->GetClassLoader() == nullptr &&
-        method->GetDeclaringClass()->IsResolved() &&
-        Runtime::Current()->GetJit() != nullptr) {
-      Runtime::Current()->GetJit()->CompileMethod(
-          method, Thread::Current(), /* baseline= */ false, /* osr= */ false);
-    }
   }
 }
 
@@ -4740,7 +4730,7 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
       // 1) updatable boot classpath classes, and
       // 2) classes in /system referencing updatable classes
       // will be verified at runtime.
-      if (!Runtime::Current()->IsUsingDefaultBootImageLocation()) {
+      if (Runtime::Current()->IsUsingApexBootImageLocation()) {
         oat_file_class_status = ClassStatus::kVerified;
         return true;
       }
