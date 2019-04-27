@@ -197,7 +197,7 @@ class DexMember {
 
  private:
   inline uint32_t GetAccessFlags() const { return item_.GetAccessFlags(); }
-  inline uint32_t HasAccessFlags(uint32_t mask) const { return (GetAccessFlags() & mask) == mask; }
+  inline bool HasAccessFlags(uint32_t mask) const { return (GetAccessFlags() & mask) == mask; }
 
   inline std::string_view GetName() const {
     return IsMethod() ? item_.GetDexFile().GetMethodName(GetMethodId())
@@ -526,7 +526,11 @@ class Hierarchy final {
       }
 
       HierarchyClass* superclass = FindClass(dex_klass.GetSuperclassDescriptor());
-      CHECK(superclass != nullptr);
+      CHECK(superclass != nullptr)
+          << "Superclass " << dex_klass.GetSuperclassDescriptor()
+          << " of class " << dex_klass.GetDescriptor() << " from dex file \""
+          << dex_klass.GetDexFile().GetLocation() << "\" was not found. "
+          << "Either the superclass is missing or it appears later in the classpath spec.";
       klass.AddExtends(*superclass);
 
       for (const std::string_view& iface_desc : dex_klass.GetInterfaceDescriptors()) {
