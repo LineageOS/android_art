@@ -14,26 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_TYPES_H_
-#define ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_TYPES_H_
-
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
-// Return values for palette functions.
-enum PaletteStatus {
-  kOkay = 0,
-  kCheckErrno = 1,
-  kInvalidArgument = 2,
-  kNotSupported = 3,
-  kFailedCheckLog = 4,
-};
-
-#ifdef __cplusplus
+public class Main {
+  public static void main(String[] args) throws Exception {
+    art.Test1962.run();
+  }
 }
-#endif  // __cplusplus
-
-#endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_TYPES_H_
