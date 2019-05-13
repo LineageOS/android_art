@@ -68,6 +68,9 @@ namespace.platform.links = runtime
 namespace.platform.link.runtime.shared_libs  = libandroidicu.so
 namespace.platform.link.runtime.shared_libs += libdexfile_external.so
 namespace.platform.link.runtime.shared_libs += libdexfiled_external.so
+# libicuuc.so and libicui18n.so are kept for app compat reason. http://b/130788466
+namespace.platform.link.runtime.shared_libs += libicui18n.so
+namespace.platform.link.runtime.shared_libs += libicuuc.so
 namespace.platform.link.runtime.shared_libs += libnativebridge.so
 namespace.platform.link.runtime.shared_libs += libnativehelper.so
 namespace.platform.link.runtime.shared_libs += libnativeloader.so
