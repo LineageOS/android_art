@@ -23,6 +23,10 @@ namespace art {
 // check for safety on older kernels (b/116769556)..
 int memfd_create(const char* name, unsigned int flags);
 
+// Call memfd(2) if available on platform and return result. Try to give us an unlinked FD in some
+// other way if memfd fails or isn't supported.
+int memfd_create_compat(const char* name, unsigned int flags);
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_MEMFD_H_
