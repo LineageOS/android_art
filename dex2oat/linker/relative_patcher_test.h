@@ -174,8 +174,10 @@ class RelativePatcherTest : public testing::Test {
             auto result = method_offset_map_.FindMethodOffset(patch.TargetMethod());
             uint32_t target_offset =
                 result.first ? result.second : kTrampolineOffset + compiled_method->CodeDelta();
-            patcher_->PatchCall(&patched_code_, patch.LiteralOffset(),
-                                offset + patch.LiteralOffset(), target_offset);
+            patcher_->PatchCall(&patched_code_,
+                                patch.LiteralOffset(),
+                                offset + patch.LiteralOffset(),
+                                target_offset);
           } else if (patch.GetType() == LinkerPatch::Type::kStringBssEntry) {
             uint32_t target_offset =
                 bss_begin_ + string_index_to_offset_map_.Get(patch.TargetStringIndex().index_);
@@ -190,6 +192,10 @@ class RelativePatcherTest : public testing::Test {
                                                patch,
                                                offset + patch.LiteralOffset(),
                                                target_offset);
+          } else if (patch.GetType() == LinkerPatch::Type::kCallEntrypoint) {
+            patcher_->PatchEntrypointCall(&patched_code_,
+                                          patch,
+                                          offset + patch.LiteralOffset());
           } else if (patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch) {
             patcher_->PatchBakerReadBarrierBranch(&patched_code_,
                                                   patch,
@@ -300,11 +306,10 @@ class RelativePatcherTest : public testing::Test {
      public:
       explicit ThunkKey(const LinkerPatch& patch)
           : type_(patch.GetType()),
-            custom_value1_(patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch
-                               ? patch.GetBakerCustomValue1() : 0u),
-            custom_value2_(patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch
-                               ? patch.GetBakerCustomValue2() : 0u) {
-        CHECK(patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
+            custom_value1_(CustomValue1(patch)),
+            custom_value2_(CustomValue2(patch)) {
+        CHECK(patch.GetType() == LinkerPatch::Type::kCallEntrypoint ||
+              patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
               patch.GetType() == LinkerPatch::Type::kCallRelative);
       }
 
@@ -319,6 +324,26 @@ class RelativePatcherTest : public testing::Test {
       }
 
      private:
+      static uint32_t CustomValue1(const LinkerPatch& patch) {
+        switch (patch.GetType()) {
+          case LinkerPatch::Type::kCallEntrypoint:
+            return patch.EntrypointOffset();
+          case LinkerPatch::Type::kBakerReadBarrierBranch:
+            return patch.GetBakerCustomValue1();
+          default:
+            return 0;
+        }
+      }
+
+      static uint32_t CustomValue2(const LinkerPatch& patch) {
+        switch (patch.GetType()) {
+          case LinkerPatch::Type::kBakerReadBarrierBranch:
+            return patch.GetBakerCustomValue2();
+          default:
+            return 0;
+        }
+      }
+
       const LinkerPatch::Type type_;
       const uint32_t custom_value1_;
       const uint32_t custom_value2_;

@@ -42,6 +42,9 @@ class Thumb2RelativePatcher final : public ArmBaseRelativePatcher {
                                 const LinkerPatch& patch,
                                 uint32_t patch_offset,
                                 uint32_t target_offset) override;
+  void PatchEntrypointCall(std::vector<uint8_t>* code,
+                           const LinkerPatch& patch,
+                           uint32_t patch_offset) override;
   void PatchBakerReadBarrierBranch(std::vector<uint8_t>* code,
                                    const LinkerPatch& patch,
                                    uint32_t patch_offset) override;
@@ -51,7 +54,9 @@ class Thumb2RelativePatcher final : public ArmBaseRelativePatcher {
   uint32_t MaxNegativeDisplacement(const ThunkKey& key) override;
 
  private:
-  void SetInsn32(std::vector<uint8_t>* code, uint32_t offset, uint32_t value);
+  static void PatchBl(std::vector<uint8_t>* code, uint32_t literal_offset, uint32_t displacement);
+
+  static void SetInsn32(std::vector<uint8_t>* code, uint32_t offset, uint32_t value);
   static uint32_t GetInsn32(ArrayRef<const uint8_t> code, uint32_t offset);
 
   template <typename Vector>

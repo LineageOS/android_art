@@ -30,6 +30,9 @@ class X86_64RelativePatcher final : public X86BaseRelativePatcher {
                                 const LinkerPatch& patch,
                                 uint32_t patch_offset,
                                 uint32_t target_offset) override;
+  void PatchEntrypointCall(std::vector<uint8_t>* code,
+                           const LinkerPatch& patch,
+                           uint32_t patch_offset) override;
   void PatchBakerReadBarrierBranch(std::vector<uint8_t>* code,
                                    const LinkerPatch& patch,
                                    uint32_t patch_offset) override;
