@@ -57,6 +57,10 @@ art_cc_library {
 
 cc_library {
     name: "libadbconnection_server",
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//system/core/adb",
+    ],
     srcs: ["adbconnection_server.cc"],
     export_include_dirs: ["include"],
     shared_libs: ["libbase"],

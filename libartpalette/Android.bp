@@ -63,6 +63,11 @@ art_cc_library {
 art_cc_library {
     name: "libartpalette",
     defaults: ["libartpalette_defaults"],
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/startop/view_compiler",
+        "//system/extras/simpleperf",
+    ],
     required: ["libartpalette-system"], // libartpalette.so dlopen()'s libartpalette-system.
     header_libs: ["libbase_headers"],
     target: {

@@ -166,6 +166,15 @@ gensrcs {
 art_cc_library {
     name: "libartbase",
     defaults: ["libartbase_defaults"],
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//cts/tests/tests/appop",
+        "//frameworks/base/startop/view_compiler",
+        "//frameworks/base/tests/net:__subpackages__",
+        "//packages/modules/NetworkStack/tests:__subpackages__",
+        "//system/extras/simpleperf",
+    ],
+
     // Leave the symbols in the shared library so that stack unwinders can
     // produce meaningful name resolution.
     strip: {

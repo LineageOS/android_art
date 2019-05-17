@@ -33,6 +33,9 @@ droiddoc_host {
 // --- ahat.jar ----------------
 java_binary_host {
     name: "ahat",
+    visibility: [
+        "//libcore/metrictests/memory/host",
+    ],
     wrapper: "ahat",
     srcs: ["src/main/**/*.java"],
     manifest: "etc/ahat.mf",
