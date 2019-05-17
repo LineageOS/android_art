@@ -94,6 +94,12 @@ class MultiOatRelativePatcherTest : public testing::Test {
       last_target_offset_ = target_offset;
     }
 
+    void PatchEntrypointCall(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
+                             const LinkerPatch& patch ATTRIBUTE_UNUSED,
+                             uint32_t patch_offset ATTRIBUTE_UNUSED) override {
+      LOG(FATAL) << "UNIMPLEMENTED";
+    }
+
     void PatchBakerReadBarrierBranch(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
                                      const LinkerPatch& patch ATTRIBUTE_UNUSED,
                                      uint32_t patch_offset ATTRIBUTE_UNUSED) override {

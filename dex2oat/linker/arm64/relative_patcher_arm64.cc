@@ -58,6 +58,7 @@ constexpr uint32_t kAdrpThunkSize = 8u;
 inline bool IsAdrpPatch(const LinkerPatch& patch) {
   switch (patch.GetType()) {
     case LinkerPatch::Type::kCallRelative:
+    case LinkerPatch::Type::kCallEntrypoint:
     case LinkerPatch::Type::kBakerReadBarrierBranch:
       return false;
     case LinkerPatch::Type::kIntrinsicReference:
@@ -189,30 +190,21 @@ uint32_t Arm64RelativePatcher::WriteThunks(OutputStream* out, uint32_t offset) {
 
 void Arm64RelativePatcher::PatchCall(std::vector<uint8_t>* code,
                                      uint32_t literal_offset,
-                                     uint32_t patch_offset, uint32_t
-                                     target_offset) {
-  DCHECK_LE(literal_offset + 4u, code->size());
-  DCHECK_EQ(literal_offset & 3u, 0u);
-  DCHECK_EQ(patch_offset & 3u, 0u);
-  DCHECK_EQ(target_offset & 3u, 0u);
+                                     uint32_t patch_offset,
+                                     uint32_t target_offset) {
+  DCHECK_ALIGNED(literal_offset, 4u);
+  DCHECK_ALIGNED(patch_offset, 4u);
+  DCHECK_ALIGNED(target_offset, 4u);
   uint32_t displacement = CalculateMethodCallDisplacement(patch_offset, target_offset & ~1u);
-  DCHECK_EQ(displacement & 3u, 0u);
-  DCHECK((displacement >> 27) == 0u || (displacement >> 27) == 31u);  // 28-bit signed.
-  uint32_t insn = (displacement & 0x0fffffffu) >> 2;
-  insn |= 0x94000000;  // BL
-
-  // Check that we're just overwriting an existing BL.
-  DCHECK_EQ(GetInsn(code, literal_offset) & 0xfc000000u, 0x94000000u);
-  // Write the new BL.
-  SetInsn(code, literal_offset, insn);
+  PatchBl(code, literal_offset, displacement);
 }
 
 void Arm64RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
                                                     const LinkerPatch& patch,
                                                     uint32_t patch_offset,
                                                     uint32_t target_offset) {
-  DCHECK_EQ(patch_offset & 3u, 0u);
-  DCHECK_EQ(target_offset & 3u, 0u);
+  DCHECK_ALIGNED(patch_offset, 4u);
+  DCHECK_ALIGNED(target_offset, 4u);
   uint32_t literal_offset = patch.LiteralOffset();
   uint32_t insn = GetInsn(code, literal_offset);
   uint32_t pc_insn_offset = patch.PcInsnOffset();
@@ -307,13 +299,21 @@ void Arm64RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
   }
 }
 
+void Arm64RelativePatcher::PatchEntrypointCall(std::vector<uint8_t>* code,
+                                               const LinkerPatch& patch,
+                                               uint32_t patch_offset) {
+  DCHECK_ALIGNED(patch_offset, 4u);
+  ThunkKey key = GetEntrypointCallKey(patch);
+  uint32_t target_offset = GetThunkTargetOffset(key, patch_offset);
+  uint32_t displacement = target_offset - patch_offset;
+  PatchBl(code, patch.LiteralOffset(), displacement);
+}
+
 void Arm64RelativePatcher::PatchBakerReadBarrierBranch(std::vector<uint8_t>* code,
                                                        const LinkerPatch& patch,
                                                        uint32_t patch_offset) {
   DCHECK_ALIGNED(patch_offset, 4u);
   uint32_t literal_offset = patch.LiteralOffset();
-  DCHECK_ALIGNED(literal_offset, 4u);
-  DCHECK_LT(literal_offset, code->size());
   uint32_t insn = GetInsn(code, literal_offset);
   DCHECK_EQ(insn & 0xffffffe0u, 0xb5000000);  // CBNZ Xt, +0 (unpatched)
   ThunkKey key = GetBakerThunkKey(patch);
@@ -328,6 +328,7 @@ void Arm64RelativePatcher::PatchBakerReadBarrierBranch(std::vector<uint8_t>* cod
 uint32_t Arm64RelativePatcher::MaxPositiveDisplacement(const ThunkKey& key) {
   switch (key.GetType()) {
     case ThunkType::kMethodCall:
+    case ThunkType::kEntrypointCall:
       return kMaxMethodCallPositiveDisplacement;
     case ThunkType::kBakerReadBarrier:
       return kMaxBcondPositiveDisplacement;
@@ -337,6 +338,7 @@ uint32_t Arm64RelativePatcher::MaxPositiveDisplacement(const ThunkKey& key) {
 uint32_t Arm64RelativePatcher::MaxNegativeDisplacement(const ThunkKey& key) {
   switch (key.GetType()) {
     case ThunkType::kMethodCall:
+    case ThunkType::kEntrypointCall:
       return kMaxMethodCallNegativeDisplacement;
     case ThunkType::kBakerReadBarrier:
       return kMaxBcondNegativeDisplacement;
@@ -355,6 +357,20 @@ uint32_t Arm64RelativePatcher::PatchAdrp(uint32_t adrp, uint32_t disp) {
       // to +-2GiB (rather than the maximim +-4GiB) and determine the sign bit from
       // the highest bit of the displacement. This is encoded in bit 23.
       ((disp & 0x80000000u) >> (31 - 23));
+}
+
+void Arm64RelativePatcher::PatchBl(std::vector<uint8_t>* code,
+                                   uint32_t literal_offset,
+                                   uint32_t displacement) {
+  DCHECK_ALIGNED(displacement, 4u);
+  DCHECK((displacement >> 27) == 0u || (displacement >> 27) == 31u);  // 28-bit signed.
+  uint32_t insn = (displacement & 0x0fffffffu) >> 2;
+  insn |= 0x94000000;  // BL
+
+  // Check that we're just overwriting an existing BL.
+  DCHECK_EQ(GetInsn(code, literal_offset) & 0xfc000000u, 0x94000000u);
+  // Write the new BL.
+  SetInsn(code, literal_offset, insn);
 }
 
 bool Arm64RelativePatcher::NeedsErratum843419Thunk(ArrayRef<const uint8_t> code,
@@ -409,7 +425,7 @@ bool Arm64RelativePatcher::NeedsErratum843419Thunk(ArrayRef<const uint8_t> code,
 
 void Arm64RelativePatcher::SetInsn(std::vector<uint8_t>* code, uint32_t offset, uint32_t value) {
   DCHECK_LE(offset + 4u, code->size());
-  DCHECK_EQ(offset & 3u, 0u);
+  DCHECK_ALIGNED(offset, 4u);
   uint8_t* addr = &(*code)[offset];
   addr[0] = (value >> 0) & 0xff;
   addr[1] = (value >> 8) & 0xff;
@@ -419,7 +435,7 @@ void Arm64RelativePatcher::SetInsn(std::vector<uint8_t>* code, uint32_t offset, 
 
 uint32_t Arm64RelativePatcher::GetInsn(ArrayRef<const uint8_t> code, uint32_t offset) {
   DCHECK_LE(offset + 4u, code.size());
-  DCHECK_EQ(offset & 3u, 0u);
+  DCHECK_ALIGNED(offset, 4u);
   const uint8_t* addr = &code[offset];
   return
       (static_cast<uint32_t>(addr[0]) << 0) +

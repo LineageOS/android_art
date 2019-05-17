@@ -86,6 +86,12 @@ void MipsRelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
   }
 }
 
+void MipsRelativePatcher::PatchEntrypointCall(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
+                                              const LinkerPatch& patch ATTRIBUTE_UNUSED,
+                                              uint32_t patch_offset ATTRIBUTE_UNUSED) {
+  LOG(FATAL) << "UNIMPLEMENTED";
+}
+
 void MipsRelativePatcher::PatchBakerReadBarrierBranch(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
                                                       const LinkerPatch& patch ATTRIBUTE_UNUSED,
                                                       uint32_t patch_offset ATTRIBUTE_UNUSED) {

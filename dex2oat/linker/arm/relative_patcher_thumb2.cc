@@ -58,28 +58,10 @@ void Thumb2RelativePatcher::PatchCall(std::vector<uint8_t>* code,
                                       uint32_t literal_offset,
                                       uint32_t patch_offset,
                                       uint32_t target_offset) {
-  DCHECK_LE(literal_offset + 4u, code->size());
-  DCHECK_EQ(literal_offset & 1u, 0u);
-  DCHECK_EQ(patch_offset & 1u, 0u);
+  DCHECK_ALIGNED(patch_offset, 2u);
   DCHECK_EQ(target_offset & 1u, 1u);  // Thumb2 mode bit.
   uint32_t displacement = CalculateMethodCallDisplacement(patch_offset, target_offset & ~1u);
-  displacement -= kPcDisplacement;  // The base PC is at the end of the 4-byte patch.
-  DCHECK_EQ(displacement & 1u, 0u);
-  DCHECK((displacement >> 24) == 0u || (displacement >> 24) == 255u);  // 25-bit signed.
-  uint32_t signbit = (displacement >> 31) & 0x1;
-  uint32_t i1 = (displacement >> 23) & 0x1;
-  uint32_t i2 = (displacement >> 22) & 0x1;
-  uint32_t imm10 = (displacement >> 12) & 0x03ff;
-  uint32_t imm11 = (displacement >> 1) & 0x07ff;
-  uint32_t j1 = i1 ^ (signbit ^ 1);
-  uint32_t j2 = i2 ^ (signbit ^ 1);
-  uint32_t value = (signbit << 26) | (j1 << 13) | (j2 << 11) | (imm10 << 16) | imm11;
-  value |= 0xf000d000;  // BL
-
-  // Check that we're just overwriting an existing BL.
-  DCHECK_EQ(GetInsn32(code, literal_offset) & 0xf800d000, 0xf000d000);
-  // Write the new BL.
-  SetInsn32(code, literal_offset, value);
+  PatchBl(code, literal_offset, displacement);
 }
 
 void Thumb2RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
@@ -100,6 +82,17 @@ void Thumb2RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
   uint32_t imm8 = diff16 & 0xffu;
   insn = (insn & 0xfbf08f00u) | (imm << 26) | (imm4 << 16) | (imm3 << 12) | imm8;
   SetInsn32(code, literal_offset, insn);
+}
+
+void Thumb2RelativePatcher::PatchEntrypointCall(std::vector<uint8_t>* code,
+                                                const LinkerPatch& patch,
+                                                uint32_t patch_offset) {
+  DCHECK_ALIGNED(patch_offset, 2u);
+  ThunkKey key = GetEntrypointCallKey(patch);
+  uint32_t target_offset = GetThunkTargetOffset(key, patch_offset);
+  DCHECK_ALIGNED(target_offset, 4u);
+  uint32_t displacement = target_offset - patch_offset;
+  PatchBl(code, patch.LiteralOffset(), displacement);
 }
 
 void Thumb2RelativePatcher::PatchBakerReadBarrierBranch(std::vector<uint8_t>* code,
@@ -127,6 +120,7 @@ void Thumb2RelativePatcher::PatchBakerReadBarrierBranch(std::vector<uint8_t>* co
 uint32_t Thumb2RelativePatcher::MaxPositiveDisplacement(const ThunkKey& key) {
   switch (key.GetType()) {
     case ThunkType::kMethodCall:
+    case ThunkType::kEntrypointCall:
       return kMaxMethodCallPositiveDisplacement;
     case ThunkType::kBakerReadBarrier:
       return kMaxBcondPositiveDisplacement;
@@ -136,10 +130,33 @@ uint32_t Thumb2RelativePatcher::MaxPositiveDisplacement(const ThunkKey& key) {
 uint32_t Thumb2RelativePatcher::MaxNegativeDisplacement(const ThunkKey& key) {
   switch (key.GetType()) {
     case ThunkType::kMethodCall:
+    case ThunkType::kEntrypointCall:
       return kMaxMethodCallNegativeDisplacement;
     case ThunkType::kBakerReadBarrier:
       return kMaxBcondNegativeDisplacement;
   }
+}
+
+void Thumb2RelativePatcher::PatchBl(std::vector<uint8_t>* code,
+                                    uint32_t literal_offset,
+                                    uint32_t displacement) {
+  displacement -= kPcDisplacement;  // The base PC is at the end of the 4-byte patch.
+  DCHECK_EQ(displacement & 1u, 0u);
+  DCHECK((displacement >> 24) == 0u || (displacement >> 24) == 255u);  // 25-bit signed.
+  uint32_t signbit = (displacement >> 31) & 0x1;
+  uint32_t i1 = (displacement >> 23) & 0x1;
+  uint32_t i2 = (displacement >> 22) & 0x1;
+  uint32_t imm10 = (displacement >> 12) & 0x03ff;
+  uint32_t imm11 = (displacement >> 1) & 0x07ff;
+  uint32_t j1 = i1 ^ (signbit ^ 1);
+  uint32_t j2 = i2 ^ (signbit ^ 1);
+  uint32_t value = (signbit << 26) | (j1 << 13) | (j2 << 11) | (imm10 << 16) | imm11;
+  value |= 0xf000d000;  // BL
+
+  // Check that we're just overwriting an existing BL.
+  DCHECK_EQ(GetInsn32(code, literal_offset) & 0xf800d000, 0xf000d000);
+  // Write the new BL.
+  SetInsn32(code, literal_offset, value);
 }
 
 void Thumb2RelativePatcher::SetInsn32(std::vector<uint8_t>* code, uint32_t offset, uint32_t value) {

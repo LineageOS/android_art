@@ -225,7 +225,8 @@ class Thumb2RelativePatcherTest : public RelativePatcherTest {
 
     // Make sure the ThunkProvider has all the necessary thunks.
     for (const LinkerPatch& patch : patches) {
-      if (patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
+      if (patch.GetType() == LinkerPatch::Type::kCallEntrypoint ||
+          patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
           patch.GetType() == LinkerPatch::Type::kCallRelative) {
         std::string debug_name;
         std::vector<uint8_t> thunk_code = CompileThunk(patch, &debug_name);
@@ -660,6 +661,35 @@ TEST_F(Thumb2RelativePatcherTest, StringReference3) {
 TEST_F(Thumb2RelativePatcherTest, StringReference4) {
   TestStringReference(0xd0ff60fcu);
   ASSERT_LT(GetMethodOffset(1u), 0xfcu);
+}
+
+TEST_F(Thumb2RelativePatcherTest, EntrypointCall) {
+  constexpr uint32_t kEntrypointOffset = 512;
+  const LinkerPatch patches[] = {
+      LinkerPatch::CallEntrypointPatch(0u, kEntrypointOffset),
+  };
+  AddCompiledMethod(MethodRef(1u), kCallCode, ArrayRef<const LinkerPatch>(patches));
+  Link();
+
+  uint32_t method_offset = GetMethodOffset(1u);
+  uint32_t thunk_offset = CompiledCode::AlignCode(method_offset + kCallCode.size(),
+                                                  InstructionSet::kThumb2);
+  uint32_t diff = thunk_offset - method_offset - kPcAdjustment;
+  ASSERT_TRUE(IsAligned<2u>(diff));
+  ASSERT_LT(diff >> 1, 1u << 8);  // Simple encoding, (diff >> 1) fits into 8 bits.
+  auto expected_code = GenNopsAndBl(0u, kBlPlus0 | ((diff >> 1) & 0xffu));
+  EXPECT_TRUE(CheckLinkedMethod(MethodRef(1u), ArrayRef<const uint8_t>(expected_code)));
+
+  // Verify the thunk.
+  uint32_t ldr_pc_tr_offset =
+      0xf8d00000 |                        // LDR Rt, [Rn, #<imm12>]
+      (/* tr */ 9 << 16) |                // Rn = TR
+      (/* pc */ 15 << 12) |               // Rt = PC
+      kEntrypointOffset;                  // imm12
+  uint16_t bkpt = 0xbe00;
+  ASSERT_LE(6u, output_.size() - thunk_offset);
+  EXPECT_EQ(ldr_pc_tr_offset, GetOutputInsn32(thunk_offset));
+  EXPECT_EQ(bkpt, GetOutputInsn16(thunk_offset + 4u));
 }
 
 const uint32_t kBakerValidRegs[] = {
