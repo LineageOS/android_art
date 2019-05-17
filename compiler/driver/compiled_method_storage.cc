@@ -216,6 +216,9 @@ CompiledMethodStorage::ThunkMapKey CompiledMethodStorage::GetThunkMapKey(
   uint32_t custom_value1 = 0u;
   uint32_t custom_value2 = 0u;
   switch (linker_patch.GetType()) {
+    case linker::LinkerPatch::Type::kCallEntrypoint:
+      custom_value1 = linker_patch.EntrypointOffset();
+      break;
     case linker::LinkerPatch::Type::kBakerReadBarrierBranch:
       custom_value1 = linker_patch.GetBakerCustomValue1();
       custom_value2 = linker_patch.GetBakerCustomValue2();

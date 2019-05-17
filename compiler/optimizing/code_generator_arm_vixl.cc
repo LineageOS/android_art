@@ -1855,8 +1855,6 @@ CodeGeneratorARMVIXL::CodeGeneratorARMVIXL(HGraph* graph,
       instruction_visitor_(graph, this),
       move_resolver_(graph->GetAllocator(), this),
       assembler_(graph->GetAllocator()),
-      uint32_literals_(std::less<uint32_t>(),
-                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_method_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       method_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_type_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
@@ -1864,7 +1862,10 @@ CodeGeneratorARMVIXL::CodeGeneratorARMVIXL(HGraph* graph,
       boot_image_string_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       string_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_intrinsic_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      call_entrypoint_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       baker_read_barrier_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      uint32_literals_(std::less<uint32_t>(),
+                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       jit_string_patches_(StringReferenceValueComparator(),
                           graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       jit_class_patches_(TypeReferenceValueComparator(),
@@ -2444,15 +2445,31 @@ void CodeGeneratorARMVIXL::InvokeRuntime(QuickEntrypointEnum entrypoint,
                                          uint32_t dex_pc,
                                          SlowPathCode* slow_path) {
   ValidateInvokeRuntime(entrypoint, instruction, slow_path);
-  __ Ldr(lr, MemOperand(tr, GetThreadOffset<kArmPointerSize>(entrypoint).Int32Value()));
-  // Ensure the pc position is recorded immediately after the `blx` instruction.
-  // blx in T32 has only 16bit encoding that's why a stricter check for the scope is used.
-  ExactAssemblyScope aas(GetVIXLAssembler(),
-                         vixl32::k16BitT32InstructionSizeInBytes,
-                         CodeBufferCheckScope::kExactSize);
-  __ blx(lr);
-  if (EntrypointRequiresStackMap(entrypoint)) {
-    RecordPcInfo(instruction, dex_pc, slow_path);
+
+  ThreadOffset32 entrypoint_offset = GetThreadOffset<kArmPointerSize>(entrypoint);
+  // Reduce code size for AOT by using shared trampolines for slow path runtime calls across the
+  // entire oat file. This adds an extra branch and we do not want to slow down the main path.
+  // For JIT, thunk sharing is per-method, so the gains would be smaller or even negative.
+  if (slow_path == nullptr || Runtime::Current()->UseJitCompilation()) {
+    __ Ldr(lr, MemOperand(tr, entrypoint_offset.Int32Value()));
+    // Ensure the pc position is recorded immediately after the `blx` instruction.
+    // blx in T32 has only 16bit encoding that's why a stricter check for the scope is used.
+    ExactAssemblyScope aas(GetVIXLAssembler(),
+                           vixl32::k16BitT32InstructionSizeInBytes,
+                           CodeBufferCheckScope::kExactSize);
+    __ blx(lr);
+    if (EntrypointRequiresStackMap(entrypoint)) {
+      RecordPcInfo(instruction, dex_pc, slow_path);
+    }
+  } else {
+    // Ensure the pc position is recorded immediately after the `bl` instruction.
+    ExactAssemblyScope aas(GetVIXLAssembler(),
+                           vixl32::k32BitT32InstructionSizeInBytes,
+                           CodeBufferCheckScope::kExactSize);
+    EmitEntrypointThunkCall(entrypoint_offset);
+    if (EntrypointRequiresStackMap(entrypoint)) {
+      RecordPcInfo(instruction, dex_pc, slow_path);
+    }
   }
 }
 
@@ -8919,6 +8936,17 @@ CodeGeneratorARMVIXL::PcRelativePatchInfo* CodeGeneratorARMVIXL::NewPcRelativePa
   return &patches->back();
 }
 
+void CodeGeneratorARMVIXL::EmitEntrypointThunkCall(ThreadOffset32 entrypoint_offset) {
+  DCHECK(!__ AllowMacroInstructions());  // In ExactAssemblyScope.
+  DCHECK(!Runtime::Current()->UseJitCompilation());
+  call_entrypoint_patches_.emplace_back(/*dex_file*/ nullptr, entrypoint_offset.Uint32Value());
+  vixl::aarch32::Label* bl_label = &call_entrypoint_patches_.back().label;
+  __ bind(bl_label);
+  vixl32::Label placeholder_label;
+  __ bl(&placeholder_label);  // Placeholder, patched at link-time.
+  __ bind(&placeholder_label);
+}
+
 void CodeGeneratorARMVIXL::EmitBakerReadBarrierBne(uint32_t custom_data) {
   DCHECK(!__ AllowMacroInstructions());  // In ExactAssemblyScope.
   if (Runtime::Current()->UseJitCompilation()) {
@@ -9041,6 +9069,7 @@ void CodeGeneratorARMVIXL::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* l
       /* MOVW+MOVT for each entry */ 2u * boot_image_string_patches_.size() +
       /* MOVW+MOVT for each entry */ 2u * string_bss_entry_patches_.size() +
       /* MOVW+MOVT for each entry */ 2u * boot_image_intrinsic_patches_.size() +
+      call_entrypoint_patches_.size() +
       baker_read_barrier_patches_.size();
   linker_patches->reserve(size);
   if (GetCompilerOptions().IsBootImage()) {
@@ -9065,6 +9094,11 @@ void CodeGeneratorARMVIXL::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* l
       type_bss_entry_patches_, linker_patches);
   EmitPcRelativeLinkerPatches<linker::LinkerPatch::StringBssEntryPatch>(
       string_bss_entry_patches_, linker_patches);
+  for (const PatchInfo<vixl32::Label>& info : call_entrypoint_patches_) {
+    DCHECK(info.target_dex_file == nullptr);
+    linker_patches->push_back(linker::LinkerPatch::CallEntrypointPatch(
+        info.label.GetLocation(), info.offset_or_index));
+  }
   for (const BakerReadBarrierPatchInfo& info : baker_read_barrier_patches_) {
     linker_patches->push_back(linker::LinkerPatch::BakerReadBarrierBranchPatch(
         info.label.GetLocation(), info.custom_data));
@@ -9073,7 +9107,8 @@ void CodeGeneratorARMVIXL::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* l
 }
 
 bool CodeGeneratorARMVIXL::NeedsThunkCode(const linker::LinkerPatch& patch) const {
-  return patch.GetType() == linker::LinkerPatch::Type::kBakerReadBarrierBranch ||
+  return patch.GetType() == linker::LinkerPatch::Type::kCallEntrypoint ||
+         patch.GetType() == linker::LinkerPatch::Type::kBakerReadBarrierBranch ||
          patch.GetType() == linker::LinkerPatch::Type::kCallRelative;
 }
 
@@ -9082,23 +9117,30 @@ void CodeGeneratorARMVIXL::EmitThunkCode(const linker::LinkerPatch& patch,
                                          /*out*/ std::string* debug_name) {
   arm::ArmVIXLAssembler assembler(GetGraph()->GetAllocator());
   switch (patch.GetType()) {
-    case linker::LinkerPatch::Type::kCallRelative:
+    case linker::LinkerPatch::Type::kCallRelative: {
       // The thunk just uses the entry point in the ArtMethod. This works even for calls
       // to the generic JNI and interpreter trampolines.
-      assembler.LoadFromOffset(
-          arm::kLoadWord,
-          vixl32::pc,
-          vixl32::r0,
-          ArtMethod::EntryPointFromQuickCompiledCodeOffset(kArmPointerSize).Int32Value());
+      MemberOffset offset = ArtMethod::EntryPointFromQuickCompiledCodeOffset(kArmPointerSize);
+      assembler.LoadFromOffset(arm::kLoadWord, vixl32::pc, vixl32::r0, offset.Int32Value());
       assembler.GetVIXLAssembler()->Bkpt(0);
       if (GetCompilerOptions().GenerateAnyDebugInfo()) {
         *debug_name = "MethodCallThunk";
       }
       break;
-    case linker::LinkerPatch::Type::kBakerReadBarrierBranch:
+    }
+    case linker::LinkerPatch::Type::kCallEntrypoint: {
+      assembler.LoadFromOffset(arm::kLoadWord, vixl32::pc, tr, patch.EntrypointOffset());
+      assembler.GetVIXLAssembler()->Bkpt(0);
+      if (GetCompilerOptions().GenerateAnyDebugInfo()) {
+        *debug_name = "EntrypointCallThunk_" + std::to_string(patch.EntrypointOffset());
+      }
+      break;
+    }
+    case linker::LinkerPatch::Type::kBakerReadBarrierBranch: {
       DCHECK_EQ(patch.GetBakerCustomValue2(), 0u);
       CompileBakerReadBarrierThunk(assembler, patch.GetBakerCustomValue1(), debug_name);
       break;
+    }
     default:
       LOG(FATAL) << "Unexpected patch type " << patch.GetType();
       UNREACHABLE();

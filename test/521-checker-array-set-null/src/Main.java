@@ -22,19 +22,19 @@ public class Main {
   }
 
   /// CHECK-START: void Main.testWithNull(java.lang.Object[]) disassembly (after)
-  /// CHECK-NOT:      pAputObject
+  /// CHECK:          ArraySet needs_type_check:false
   public static void testWithNull(Object[] o) {
     o[0] = null;
   }
 
   /// CHECK-START: void Main.testWithUnknown(java.lang.Object[], java.lang.Object) disassembly (after)
-  /// CHECK:          pAputObject
+  /// CHECK:          ArraySet needs_type_check:true
   public static void testWithUnknown(Object[] o, Object obj) {
     o[0] = obj;
   }
 
   /// CHECK-START: void Main.testWithSame(java.lang.Object[]) disassembly (after)
-  /// CHECK-NOT:      pAputObject
+  /// CHECK:          ArraySet needs_type_check:false
   public static void testWithSame(Object[] o) {
     o[0] = o[1];
   }

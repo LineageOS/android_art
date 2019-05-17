@@ -198,7 +198,8 @@ class Arm64RelativePatcherTest : public RelativePatcherTest {
 
     // Make sure the ThunkProvider has all the necessary thunks.
     for (const LinkerPatch& patch : patches) {
-      if (patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
+      if (patch.GetType() == LinkerPatch::Type::kCallEntrypoint ||
+          patch.GetType() == LinkerPatch::Type::kBakerReadBarrierBranch ||
           patch.GetType() == LinkerPatch::Type::kCallRelative) {
         std::string debug_name;
         std::vector<uint8_t> thunk_code = CompileThunk(patch, &debug_name);
@@ -1003,6 +1004,36 @@ TEST_F(Arm64RelativePatcherTestDefault, StringReferenceXSpRel) {
                             /*string_offset=*/ 0x12345678u);
       },
       { 0u, 8u });
+}
+
+TEST_F(Arm64RelativePatcherTestDefault, EntrypointCall) {
+  constexpr uint32_t kEntrypointOffset = 512;
+  const LinkerPatch patches[] = {
+      LinkerPatch::CallEntrypointPatch(0u, kEntrypointOffset),
+  };
+  AddCompiledMethod(MethodRef(1u), kCallCode, ArrayRef<const LinkerPatch>(patches));
+  Link();
+
+  uint32_t method_offset = GetMethodOffset(1u);
+  uint32_t thunk_offset = CompiledCode::AlignCode(method_offset + kCallCode.size(),
+                                                  InstructionSet::kArm64);
+  uint32_t diff = thunk_offset - method_offset;
+  ASSERT_TRUE(IsAligned<4u>(diff));
+  ASSERT_LT(diff, 128 * MB);
+  auto expected_code = RawCode({kBlPlus0 | (diff >> 2)});
+  EXPECT_TRUE(CheckLinkedMethod(MethodRef(1u), ArrayRef<const uint8_t>(expected_code)));
+
+  // Verify the thunk.
+  uint32_t ldr_ip0_tr_offset =
+      0xf9400000 |                        // LDR Xt, [Xn, #<simm>]
+      ((kEntrypointOffset >> 3) << 10) |  // imm12 = (simm >> scale), scale = 3
+      (/* tr */ 19 << 5) |                // Xn = TR
+      /* ip0 */ 16;                       // Xt = ip0
+  uint32_t br_ip0 = 0xd61f0000 | (/* ip0 */ 16 << 5);
+  auto expected_thunk = RawCode({ ldr_ip0_tr_offset, br_ip0 });
+  ASSERT_LE(8u, output_.size() - thunk_offset);
+  EXPECT_EQ(ldr_ip0_tr_offset, GetOutputInsn(thunk_offset));
+  EXPECT_EQ(br_ip0, GetOutputInsn(thunk_offset + 4u));
 }
 
 void Arm64RelativePatcherTest::TestBakerField(uint32_t offset, uint32_t ref_reg) {

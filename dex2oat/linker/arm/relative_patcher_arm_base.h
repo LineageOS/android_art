@@ -44,6 +44,7 @@ class ArmBaseRelativePatcher : public RelativePatcher {
 
   enum class ThunkType {
     kMethodCall,              // Method call thunk.
+    kEntrypointCall,          // Entrypoint call.
     kBakerReadBarrier,        // Baker read barrier.
   };
 
@@ -84,6 +85,7 @@ class ArmBaseRelativePatcher : public RelativePatcher {
   };
 
   static ThunkKey GetMethodCallKey();
+  static ThunkKey GetEntrypointCallKey(const LinkerPatch& patch);
   static ThunkKey GetBakerThunkKey(const LinkerPatch& patch);
 
   uint32_t ReserveSpaceInternal(uint32_t offset,

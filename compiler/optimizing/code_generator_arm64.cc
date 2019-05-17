@@ -887,10 +887,6 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
       move_resolver_(graph->GetAllocator(), this),
       assembler_(graph->GetAllocator(),
                  compiler_options.GetInstructionSetFeatures()->AsArm64InstructionSetFeatures()),
-      uint32_literals_(std::less<uint32_t>(),
-                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
-      uint64_literals_(std::less<uint64_t>(),
-                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_method_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       method_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_type_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
@@ -898,7 +894,12 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
       boot_image_string_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       string_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_intrinsic_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      call_entrypoint_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       baker_read_barrier_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      uint32_literals_(std::less<uint32_t>(),
+                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      uint64_literals_(std::less<uint64_t>(),
+                       graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       jit_string_patches_(StringReferenceValueComparator(),
                           graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       jit_class_patches_(TypeReferenceValueComparator(),
@@ -1720,11 +1721,22 @@ void CodeGeneratorARM64::InvokeRuntime(QuickEntrypointEnum entrypoint,
                                        SlowPathCode* slow_path) {
   ValidateInvokeRuntime(entrypoint, instruction, slow_path);
 
-  __ Ldr(lr, MemOperand(tr, GetThreadOffset<kArm64PointerSize>(entrypoint).Int32Value()));
-  {
+  ThreadOffset64 entrypoint_offset = GetThreadOffset<kArm64PointerSize>(entrypoint);
+  // Reduce code size for AOT by using shared trampolines for slow path runtime calls across the
+  // entire oat file. This adds an extra branch and we do not want to slow down the main path.
+  // For JIT, thunk sharing is per-method, so the gains would be smaller or even negative.
+  if (slow_path == nullptr || Runtime::Current()->UseJitCompilation()) {
+    __ Ldr(lr, MemOperand(tr, entrypoint_offset.Int32Value()));
     // Ensure the pc position is recorded immediately after the `blr` instruction.
     ExactAssemblyScope eas(GetVIXLAssembler(), kInstructionSize, CodeBufferCheckScope::kExactSize);
     __ blr(lr);
+    if (EntrypointRequiresStackMap(entrypoint)) {
+      RecordPcInfo(instruction, dex_pc, slow_path);
+    }
+  } else {
+    // Ensure the pc position is recorded immediately after the `bl` instruction.
+    ExactAssemblyScope eas(GetVIXLAssembler(), kInstructionSize, CodeBufferCheckScope::kExactSize);
+    EmitEntrypointThunkCall(entrypoint_offset);
     if (EntrypointRequiresStackMap(entrypoint)) {
       RecordPcInfo(instruction, dex_pc, slow_path);
     }
@@ -4386,6 +4398,15 @@ vixl::aarch64::Label* CodeGeneratorARM64::NewStringBssEntryPatch(
   return NewPcRelativePatch(&dex_file, string_index.index_, adrp_label, &string_bss_entry_patches_);
 }
 
+void CodeGeneratorARM64::EmitEntrypointThunkCall(ThreadOffset64 entrypoint_offset) {
+  DCHECK(!__ AllowMacroInstructions());  // In ExactAssemblyScope.
+  DCHECK(!Runtime::Current()->UseJitCompilation());
+  call_entrypoint_patches_.emplace_back(/*dex_file*/ nullptr, entrypoint_offset.Uint32Value());
+  vixl::aarch64::Label* bl_label = &call_entrypoint_patches_.back().label;
+  __ bind(bl_label);
+  __ bl(static_cast<int64_t>(0));  // Placeholder, patched at link-time.
+}
+
 void CodeGeneratorARM64::EmitBakerReadBarrierCbnz(uint32_t custom_data) {
   DCHECK(!__ AllowMacroInstructions());  // In ExactAssemblyScope.
   if (Runtime::Current()->UseJitCompilation()) {
@@ -4542,6 +4563,7 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
       boot_image_string_patches_.size() +
       string_bss_entry_patches_.size() +
       boot_image_intrinsic_patches_.size() +
+      call_entrypoint_patches_.size() +
       baker_read_barrier_patches_.size();
   linker_patches->reserve(size);
   if (GetCompilerOptions().IsBootImage()) {
@@ -4566,6 +4588,11 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
       type_bss_entry_patches_, linker_patches);
   EmitPcRelativeLinkerPatches<linker::LinkerPatch::StringBssEntryPatch>(
       string_bss_entry_patches_, linker_patches);
+  for (const PatchInfo<vixl::aarch64::Label>& info : call_entrypoint_patches_) {
+    DCHECK(info.target_dex_file == nullptr);
+    linker_patches->push_back(linker::LinkerPatch::CallEntrypointPatch(
+        info.label.GetLocation(), info.offset_or_index));
+  }
   for (const BakerReadBarrierPatchInfo& info : baker_read_barrier_patches_) {
     linker_patches->push_back(linker::LinkerPatch::BakerReadBarrierBranchPatch(
         info.label.GetLocation(), info.custom_data));
@@ -4574,7 +4601,8 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
 }
 
 bool CodeGeneratorARM64::NeedsThunkCode(const linker::LinkerPatch& patch) const {
-  return patch.GetType() == linker::LinkerPatch::Type::kBakerReadBarrierBranch ||
+  return patch.GetType() == linker::LinkerPatch::Type::kCallEntrypoint ||
+         patch.GetType() == linker::LinkerPatch::Type::kBakerReadBarrierBranch ||
          patch.GetType() == linker::LinkerPatch::Type::kCallRelative;
 }
 
@@ -4591,6 +4619,14 @@ void CodeGeneratorARM64::EmitThunkCode(const linker::LinkerPatch& patch,
       assembler.JumpTo(ManagedRegister(arm64::X0), offset, ManagedRegister(arm64::IP0));
       if (GetCompilerOptions().GenerateAnyDebugInfo()) {
         *debug_name = "MethodCallThunk";
+      }
+      break;
+    }
+    case linker::LinkerPatch::Type::kCallEntrypoint: {
+      Offset offset(patch.EntrypointOffset());
+      assembler.JumpTo(ManagedRegister(arm64::TR), offset, ManagedRegister(arm64::IP0));
+      if (GetCompilerOptions().GenerateAnyDebugInfo()) {
+        *debug_name = "EntrypointCallThunk_" + std::to_string(offset.Uint32Value());
       }
       break;
     }

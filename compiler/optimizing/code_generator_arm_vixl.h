@@ -591,6 +591,9 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
   PcRelativePatchInfo* NewStringBssEntryPatch(const DexFile& dex_file,
                                               dex::StringIndex string_index);
 
+  // Emit the BL instruction for entrypoint thunk call and record the associated patch for AOT.
+  void EmitEntrypointThunkCall(ThreadOffset32 entrypoint_offset);
+
   // Emit the BNE instruction for baker read barrier and record
   // the associated patch for AOT or slow path for JIT.
   void EmitBakerReadBarrierBne(uint32_t custom_data);
@@ -871,8 +874,6 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
 
   ArmVIXLAssembler assembler_;
 
-  // Deduplication map for 32-bit literals, used for non-patchable boot image addresses.
-  Uint32ToLiteralMap uint32_literals_;
   // PC-relative method patch info for kBootImageLinkTimePcRelative/kBootImageRelRo.
   // Also used for type/string patches for kBootImageRelRo (same linker patch as for methods).
   ArenaDeque<PcRelativePatchInfo> boot_image_method_patches_;
@@ -888,9 +889,13 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
   ArenaDeque<PcRelativePatchInfo> string_bss_entry_patches_;
   // PC-relative patch info for IntrinsicObjects.
   ArenaDeque<PcRelativePatchInfo> boot_image_intrinsic_patches_;
+  // Patch info for calls to entrypoint dispatch thunks. Used for slow paths.
+  ArenaDeque<PatchInfo<vixl::aarch32::Label>> call_entrypoint_patches_;
   // Baker read barrier patch info.
   ArenaDeque<BakerReadBarrierPatchInfo> baker_read_barrier_patches_;
 
+  // Deduplication map for 32-bit literals, used for JIT for boot image addresses.
+  Uint32ToLiteralMap uint32_literals_;
   // Patches for string literals in JIT compiled code.
   StringToLiteralMap jit_string_patches_;
   // Patches for class literals in JIT compiled code.

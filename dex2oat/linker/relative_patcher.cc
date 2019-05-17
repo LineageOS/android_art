@@ -77,6 +77,12 @@ std::unique_ptr<RelativePatcher> RelativePatcher::Create(
       LOG(FATAL) << "Unexpected relative dex cache array patch.";
     }
 
+    void PatchEntrypointCall(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
+                             const LinkerPatch& patch ATTRIBUTE_UNUSED,
+                             uint32_t patch_offset ATTRIBUTE_UNUSED) override {
+      LOG(FATAL) << "Unexpected entrypoint call patch.";
+    }
+
     void PatchBakerReadBarrierBranch(std::vector<uint8_t>* code ATTRIBUTE_UNUSED,
                                      const LinkerPatch& patch ATTRIBUTE_UNUSED,
                                      uint32_t patch_offset ATTRIBUTE_UNUSED) override {
