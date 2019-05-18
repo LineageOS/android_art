@@ -19,11 +19,14 @@
 
 #include "base/bit_utils.h"
 #include "base/enums.h"
-#include "gc/allocator_type.h"
 #include "obj_ptr.h"
 #include "object.h"
 
 namespace art {
+
+namespace gc {
+enum AllocatorType : char;
+}  // namespace gc
 
 template<class T> class Handle;
 class Thread;
@@ -40,7 +43,7 @@ class MANAGED Array : public Object {
   // Allocates an array with the given properties, if kFillUsable is true the array will be of at
   // least component_count size, however, if there's usable space at the end of the allocation the
   // array will fill it.
-  template <bool kIsInstrumented, bool kFillUsable = false>
+  template <bool kIsInstrumented = true, bool kFillUsable = false>
   ALWAYS_INLINE static ObjPtr<Array> Alloc(Thread* self,
                                            ObjPtr<Class> array_class,
                                            int32_t component_count,

@@ -26,7 +26,6 @@
 #include "dex/dex_file_types.h"
 #include "dex/modifiers.h"
 #include "dex/primitive.h"
-#include "gc/allocator_type.h"
 #include "object.h"
 #include "object_array.h"
 #include "read_barrier_option.h"
@@ -37,6 +36,10 @@ namespace dex {
 struct ClassDef;
 class TypeList;
 }  // namespace dex
+
+namespace gc {
+enum AllocatorType : char;
+}  // namespace gc
 
 namespace hiddenapi {
 class AccessContext;
@@ -464,7 +467,7 @@ class MANAGED Class final : public Object {
   bool IsPrimitiveArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Creates a raw object instance but does not invoke the default constructor.
-  template<bool kIsInstrumented, bool kCheckAddFinalizer = true>
+  template<bool kIsInstrumented = true, bool kCheckAddFinalizer = true>
   ALWAYS_INLINE ObjPtr<Object> Alloc(Thread* self, gc::AllocatorType allocator_type)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 

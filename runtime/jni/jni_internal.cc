@@ -29,6 +29,7 @@
 #include "base/atomic.h"
 #include "base/bit_utils.h"
 #include "base/enums.h"
+#include "base/file_utils.h"
 #include "base/logging.h"  // For VLOG.
 #include "base/memory_type_table.h"
 #include "base/mutex.h"
@@ -907,8 +908,8 @@ class JNI {
     }
     if (c->IsStringClass()) {
       gc::AllocatorType allocator_type = Runtime::Current()->GetHeap()->GetCurrentAllocator();
-      return soa.AddLocalReference<jobject>(mirror::String::AllocEmptyString<true>(soa.Self(),
-                                                                              allocator_type));
+      return soa.AddLocalReference<jobject>(
+          mirror::String::AllocEmptyString(soa.Self(), allocator_type));
     }
     return soa.AddLocalReference<jobject>(c->AllocObject(soa.Self()));
   }
