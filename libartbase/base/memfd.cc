@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stdio.h>
 #if !defined(_WIN32)
+#include <fcntl.h>
 #include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -66,5 +67,28 @@ int memfd_create(const char* name ATTRIBUTE_UNUSED, unsigned int flags ATTRIBUTE
 }
 
 #endif  // __NR_memfd_create
+
+// This is a wrapper that will attempt to simulate memfd_create if normal running fails.
+int memfd_create_compat(const char* name, unsigned int flags) {
+  int res = memfd_create(name, flags);
+  if (res >= 0) {
+    return res;
+  }
+#if !defined(_WIN32)
+  // Try to create an anonymous file with tmpfile that we can use instead.
+  if (flags == 0) {
+    FILE* file = tmpfile();
+    if (file != nullptr) {
+      // We want the normal 'dup' semantics since memfd_create without any flags isn't CLOEXEC.
+      // Unfortunately on some android targets we will compiler error if we use dup directly and so
+      // need to use fcntl.
+      int nfd = fcntl(fileno(file), F_DUPFD);
+      fclose(file);
+      return nfd;
+    }
+  }
+#endif
+  return res;
+}
 
 }  // namespace art
