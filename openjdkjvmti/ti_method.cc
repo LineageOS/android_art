@@ -548,7 +548,7 @@ class CommonLocalVariableClosure : public art::Closure {
         // TODO It might be useful to fake up support for get at least on proxy frames.
         result_ = ERR(OPAQUE_FRAME);
         return;
-      } else if (method->DexInstructionData().RegistersSize() <= slot_) {
+      } else if (slot_ >= method->DexInstructionData().RegistersSize() || slot_ < 0) {
         result_ = ERR(INVALID_SLOT);
         return;
       }
