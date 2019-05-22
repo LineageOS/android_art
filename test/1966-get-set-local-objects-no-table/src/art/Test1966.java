@@ -27,10 +27,11 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-public class Test1913 {
+public class Test1966 {
   public static final String TARGET_VAR = "TARGET";
 
   public static interface TestInterface {
@@ -43,6 +44,16 @@ public class Test1913 {
     }
     public String toString() {
       return String.format("TestClass1(\"%s\")", id);
+    }
+
+    public static TestInterface createInterface(String id) {
+      return new TestClass1(id);
+    }
+    public static TestClass1 createExact(String id) {
+      return new TestClass1(id);
+    }
+    public static Object create(String id) {
+      return new TestClass1(id);
     }
   }
 
@@ -77,57 +88,8 @@ public class Test1913 {
                        "' (class: " + (val != null ? val.getClass() : "NULL") + ")");
   }
 
-  public static void PrimitiveMethod(Runnable safepoint) {
-    int TARGET = 42;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  // b/64115302: Needed to make sure that DX doesn't change the type of TARGET to TestClass1.
-  private static Object AsObject(Object o) {
-    return o;
-  }
-
-  public static void NullObjectMethod(Runnable safepoint) {
-    Object TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void NullInterfaceMethod(Runnable safepoint) {
-    TestInterface TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void NullSpecificClassMethod(Runnable safepoint) {
-    TestClass1 TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void ObjectMethod(Runnable safepoint) {
-    Object TARGET = AsObject(new TestClass1("ObjectMethod"));
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void InterfaceMethod(Runnable safepoint) {
-    TestInterface TARGET = new TestClass1("InterfaceMethod");
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void SpecificClassMethod(Runnable safepoint) {
-    TestClass1 TARGET = new TestClass1("SpecificClassMethod");
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
   public static interface SafepointFunction {
-    public void
-    invoke(Thread thread, Method target, Locals.VariableDescription TARGET_desc, int depth)
-        throws Exception;
+    public void invoke(Thread thread, Method target, int slot, int depth) throws Exception;
   }
 
   public static interface SetterFunction {
@@ -139,9 +101,9 @@ public class Test1913 {
   public static SafepointFunction
   NamedSet(final String type, final SetterFunction get, final Object v) {
     return new SafepointFunction() {
-      public void invoke(Thread t, Method method, Locals.VariableDescription desc, int depth) {
+      public void invoke(Thread t, Method method, int slot, int depth) {
         try {
-          get.SetVar(t, depth, desc.slot, v);
+          get.SetVar(t, depth, slot, v);
           System.out.println(this + " on " + method + " set value: " + v);
         } catch (Exception e) {
           System.out.println(this + " on " + method + " failed to set value " + v + " due to " +
@@ -156,9 +118,9 @@ public class Test1913 {
 
   public static SafepointFunction NamedGet(final String type, final GetterFunction get) {
     return new SafepointFunction() {
-      public void invoke(Thread t, Method method, Locals.VariableDescription desc, int depth) {
+      public void invoke(Thread t, Method method, int slot, int depth) {
         try {
-          Object res = get.GetVar(t, depth, desc.slot);
+          Object res = get.GetVar(t, depth, slot);
           System.out.println(this + " on " + method + " got value: " + res);
         } catch (Exception e) {
           System.out.println(this + " on " + method + " failed due to " + e.getMessage());
@@ -177,17 +139,19 @@ public class Test1913 {
       this.target = target;
     }
 
-    public static class ThreadPauser implements Runnable {
+    public static class ThreadPauser implements IntConsumer {
       public final Semaphore sem_wakeup_main;
       public final Semaphore sem_wait;
+      public int slot = -1;
 
       public ThreadPauser() {
         sem_wakeup_main = new Semaphore(0);
         sem_wait = new Semaphore(0);
       }
 
-      public void run() {
+      public void accept(int i) {
         try {
+          slot = i;
           sem_wakeup_main.release();
           sem_wait.acquire();
         } catch (Exception e) {
@@ -219,23 +183,12 @@ public class Test1913 {
       try {
         Suspension.suspend(remote);
         StackTrace.StackFrameData frame = findStackFrame(remote);
-        Locals.VariableDescription desc = findTargetVar(frame.current_location);
-        safepoint.invoke(remote, target, desc, frame.depth);
+        safepoint.invoke(remote, target, pause.slot, frame.depth);
       } finally {
         Suspension.resume(remote);
         pause.wakeupOtherThread();
         remote.join();
       }
-    }
-
-    private Locals.VariableDescription findTargetVar(long loc) {
-      for (Locals.VariableDescription var : Locals.GetLocalVariableTable(target)) {
-        if (var.start_location <= loc && var.length + var.start_location > loc &&
-            var.name.equals(TARGET_VAR)) {
-          return var;
-        }
-      }
-      throw new Error("Unable to find variable " + TARGET_VAR + " in " + target + " at loc " + loc);
     }
 
     private StackTrace.StackFrameData findStackFrame(Thread thr) {
@@ -248,17 +201,21 @@ public class Test1913 {
     }
   }
   public static Method getMethod(String name) throws Exception {
-    return Test1913.class.getDeclaredMethod(name, Runnable.class);
+    return Class.forName("art_test.TestCases1966").getDeclaredMethod(name, IntConsumer.class);
   }
 
   public static void run() throws Exception {
     Locals.EnableLocalVariableAccess();
     final TestCase[] MAIN_TEST_CASES = new TestCase[] {
-      new TestCase(getMethod("ObjectMethod")),        new TestCase(getMethod("InterfaceMethod")),
-      new TestCase(getMethod("SpecificClassMethod")), new TestCase(getMethod("PrimitiveMethod")),
-      new TestCase(getMethod("NullObjectMethod")),
-      new TestCase(getMethod("NullInterfaceMethod")),
-      new TestCase(getMethod("NullSpecificClassMethod")),
+      new TestCase(getMethod("ObjectMethod")),
+      new TestCase(getMethod("CastInterfaceMethod")),
+      new TestCase(getMethod("CastExactMethod")),
+      new TestCase(getMethod("InterfaceMethod")),
+      new TestCase(getMethod("ExactClassMethod")),
+      new TestCase(getMethod("PrimitiveMethod")),
+      new TestCase(getMethod("NullMethod")),
+      new TestCase(getMethod("CastExactNullMethod")),
+      new TestCase(getMethod("CastInterfaceNullMethod")),
     };
 
     final SetterFunction set_obj = Locals::SetLocalVariableObject;
