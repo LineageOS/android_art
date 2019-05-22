@@ -1,0 +1,210 @@
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 42
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 5.9E-44
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 2147483647
+	Value is '2147483647' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9223372036854775807 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 9.2
+	Value is '1091777331' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 12.4 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value NEW_VALUE_FOR_SET due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.IntMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value null due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 9001
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 4.447E-320
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 2147483647 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 9223372036854775807
+	Value is '9223372036854775807' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9.2 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 12.4
+	Value is '4623170197477182669' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value NEW_VALUE_FOR_SET due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.LongMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value null due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 1070537376
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 1.618
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 2147483647
+	Value is 'NaN' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9223372036854775807 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 9.2
+	Value is '9.2' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 12.4 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value NEW_VALUE_FOR_SET due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.FloatMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value null due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '1.618' (class: class java.lang.Float)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 4614256447914709615
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 3.1415
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 2147483647 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 9223372036854775807
+	Value is 'NaN' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9.2 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 12.4
+	Value is '12.4' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value NEW_VALUE_FOR_SET due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.DoubleMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value null due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is '3.1415' (class: class java.lang.Double)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: TARGET_VALUE
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 2147483647 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9223372036854775807 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9.2 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 12.4 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'TARGET_VALUE' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: NEW_VALUE_FOR_SET
+	Value is 'NEW_VALUE_FOR_SET' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.ObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: null
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetInt" on remote thread.
+"GetInt" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 0
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetLong" on remote thread.
+"GetLong" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetFloat" on remote thread.
+"GetFloat" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: 0.0
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetDouble" on remote thread.
+"GetDouble" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "GetObject" on remote thread.
+"GetObject" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) got value: null
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetInt" on remote thread.
+"SetInt" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 2147483647 due to JVMTI_ERROR_INTERNAL
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetLong" on remote thread.
+"SetLong" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9223372036854775807 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetFloat" on remote thread.
+"SetFloat" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 9.2 due to JVMTI_ERROR_INTERNAL
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetDouble" on remote thread.
+"SetDouble" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 12.4 due to JVMTI_ERROR_TYPE_MISMATCH
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetObject" on remote thread.
+"SetObject" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value NEW_VALUE_FOR_SET due to JVMTI_ERROR_INTERNAL
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetNullObject" on remote thread.
+"SetNullObject" on public static void art_test.TestCases1965.NullObjectMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: null
+	Value is 'null' (class: null)
+Running public static void art_test.TestCases1965.BooleanMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetIntBoolSize" on remote thread.
+"SetIntBoolSize" on public static void art_test.TestCases1965.BooleanMethod(java.util.function.IntConsumer,java.util.function.Consumer) failed to set value 1 due to JVMTI_ERROR_INTERNAL
+	Value is 'false' (class: class java.lang.Boolean)
+Running public static void art_test.TestCases1965.ByteMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetIntByteSize" on remote thread.
+"SetIntByteSize" on public static void art_test.TestCases1965.ByteMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 126
+	Value is '126' (class: class java.lang.Byte)
+Running public static void art_test.TestCases1965.CharMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetIntCharSize" on remote thread.
+"SetIntCharSize" on public static void art_test.TestCases1965.CharMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 65534
+	Value is '<Char: -1>' (class: class java.lang.String)
+Running public static void art_test.TestCases1965.ShortMethod(java.util.function.IntConsumer,java.util.function.Consumer) with "SetIntShortSize" on remote thread.
+"SetIntShortSize" on public static void art_test.TestCases1965.ShortMethod(java.util.function.IntConsumer,java.util.function.Consumer) set value: 32766
+	Value is '32766' (class: class java.lang.Short)
