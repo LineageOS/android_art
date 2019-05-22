@@ -157,6 +157,11 @@ while true; do
         fi
         ARGS="${ARGS} $1"
         shift
+    elif [ "x$1" = "x--compiler-only-option" ]; then
+        shift
+        option="$1"
+        COMPILE_FLAGS="${COMPILE_FLAGS} $option"
+        shift
     elif [ "x$1" = "x-Xcompiler-option" ]; then
         shift
         option="$1"
