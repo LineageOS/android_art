@@ -118,16 +118,6 @@ class MethodVerifier {
                                              uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Calculates the verification information for every instruction of the given method. The given
-  // dex-cache and class-loader will be used for lookups. No classes will be loaded. If verification
-  // fails hard nullptr will be returned. This should only be used if one needs to examine what the
-  // verifier believes about the registers of a given method.
-  static MethodVerifier* CalculateVerificationInfo(Thread* self,
-                                                   ArtMethod* method,
-                                                   Handle<mirror::DexCache> dex_cache,
-                                                   Handle<mirror::ClassLoader> class_loader)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   const DexFile& GetDexFile() const {
     DCHECK(dex_file_ != nullptr);
     return *dex_file_;
