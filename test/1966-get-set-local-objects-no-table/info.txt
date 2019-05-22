@@ -1,2 +1,0 @@
-Tests for jvmti get and set local variable object.
-
