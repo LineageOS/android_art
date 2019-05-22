@@ -63,7 +63,6 @@
 #include "scoped_thread_state_change-inl.h"
 #include "stack.h"
 #include "vdex_file.h"
-#include "verifier/method_verifier.h"
 #include "verifier_compiler_binding.h"
 #include "verifier_deps.h"
 
@@ -153,7 +152,6 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
                  bool need_precise_constants,
                  bool verify_to_dump,
                  bool allow_thread_suspension,
-                 bool fill_register_lines_,
                  uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -632,9 +630,6 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   // Note: this flag is only valid once Verify() has started.
   bool is_constructor_;
 
-  // Whether to attempt to fill all register lines for (ex) debugger use.
-  bool fill_register_lines_;
-
   // API level, for dependent checks. Note: we do not use '0' for unset here, to simplify checks.
   // Instead, unset level should correspond to max().
   const uint32_t api_level_;
@@ -700,7 +695,6 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
                                                bool need_precise_constants,
                                                bool verify_to_dump,
                                                bool allow_thread_suspension,
-                                               bool fill_register_lines,
                                                uint32_t api_level)
     : art::verifier::MethodVerifier(self,
                                     dex_file,
@@ -722,7 +716,6 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
       verify_to_dump_(verify_to_dump),
       allow_thread_suspension_(allow_thread_suspension),
       is_constructor_(false),
-      fill_register_lines_(fill_register_lines),
       api_level_(api_level == 0 ? std::numeric_limits<uint32_t>::max() : api_level) {
 }
 
@@ -1585,7 +1578,7 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   const uint16_t registers_size = code_item_accessor_.RegistersSize();
 
   /* Create and initialize table holding register status */
-  reg_table_.Init(fill_register_lines_ ? kTrackRegsAll : kTrackCompilerInterestPoints,
+  reg_table_.Init(kTrackCompilerInterestPoints,
                   insn_flags_.get(),
                   code_item_accessor_.InsnsSizeInCodeUnits(),
                   registers_size,
@@ -5207,7 +5200,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 need_precise_constants,
                                                 /* verify to dump */ false,
                                                 /* allow_thread_suspension= */ true,
-                                                /* fill_register_lines= */ false,
                                                 api_level);
   if (verifier.Verify()) {
     // Verification completed, however failures may be pending that didn't cause the verification
@@ -5330,41 +5322,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
   return result;
 }
 
-MethodVerifier* MethodVerifier::CalculateVerificationInfo(
-      Thread* self,
-      ArtMethod* method,
-      Handle<mirror::DexCache> dex_cache,
-      Handle<mirror::ClassLoader> class_loader) {
-  std::unique_ptr<impl::MethodVerifier<false>> verifier(
-      new impl::MethodVerifier<false>(self,
-                                      method->GetDexFile(),
-                                      dex_cache,
-                                      class_loader,
-                                      *method->GetDeclaringClass()->GetClassDef(),
-                                      method->GetCodeItem(),
-                                      method->GetDexMethodIndex(),
-                                      method,
-                                      method->GetAccessFlags(),
-                                      /* can_load_classes= */ false,
-                                      /* allow_soft_failures= */ true,
-                                      /* need_precise_constants= */ true,
-                                      /* verify_to_dump= */ false,
-                                      /* allow_thread_suspension= */ false,
-                                      /* fill_register_lines= */ true,
-                                      /* api_level = */ 0));
-  verifier->Verify();
-  if (VLOG_IS_ON(verifier)) {
-    verifier->DumpFailures(VLOG_STREAM(verifier));
-    VLOG(verifier) << verifier->info_messages_.str();
-    verifier->Dump(VLOG_STREAM(verifier));
-  }
-  if (verifier->have_pending_hard_failure_) {
-    return nullptr;
-  } else {
-    return verifier.release();
-  }
-}
-
 MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
                                                     VariableIndentationOutputStream* vios,
                                                     uint32_t dex_method_idx,
@@ -5391,7 +5348,6 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
       /* need_precise_constants= */ true,
       /* verify_to_dump= */ true,
       /* allow_thread_suspension= */ true,
-      /* fill_register_lines= */ false,
       api_level);
   verifier->Verify();
   verifier->DumpFailures(vios->Stream());
@@ -5429,7 +5385,6 @@ void MethodVerifier::FindLocksAtDexPc(
                                        /* need_precise_constants= */ false,
                                        /* verify_to_dump= */ false,
                                        /* allow_thread_suspension= */ false,
-                                       /* fill_register_lines= */ false,
                                        api_level);
   verifier.interesting_dex_pc_ = dex_pc;
   verifier.monitor_enter_dex_pcs_ = monitor_enter_dex_pcs;
@@ -5465,7 +5420,6 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                          need_precise_constants,
                                          verify_to_dump,
                                          allow_thread_suspension,
-                                         /* fill_register_lines= */ false,
                                          api_level);
 }
 
