@@ -57,6 +57,7 @@ host_out=$(get_build_var HOST_OUT)
 # There is no good way to force soong to generate host-bionic builds currently
 # so this is a hacky workaround.
 tmp_soong_var=$(mktemp --tmpdir soong.variables.bak.XXXXXX)
+tmp_build_number=$(cat ${out_dir}/build_number.txt)
 
 cat $out_dir/soong/soong.variables > ${tmp_soong_var}
 
@@ -87,5 +88,8 @@ json.dump(x, open(sys.argv[2], mode='w'))
 END
 
 rm $tmp_soong_var
+
+# Write a new build-number
+echo ${tmp_build_number}_SOONG_ONLY_BUILD > ${out_dir}/build_number.txt
 
 build/soong/soong_ui.bash --make-mode --skip-make $@
