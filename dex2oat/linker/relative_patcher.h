@@ -137,6 +137,11 @@ class RelativePatcher {
                                         uint32_t patch_offset,
                                         uint32_t target_offset) = 0;
 
+  // Patch a call to an entrypoint trampoline.
+  virtual void PatchEntrypointCall(std::vector<uint8_t>* code,
+                                   const LinkerPatch& patch,
+                                   uint32_t patch_offset) = 0;
+
   // Patch a branch to a Baker read barrier thunk.
   virtual void PatchBakerReadBarrierBranch(std::vector<uint8_t>* code,
                                            const LinkerPatch& patch,
