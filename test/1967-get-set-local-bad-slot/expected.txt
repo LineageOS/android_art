@@ -1,0 +1,108 @@
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetInt_at_too_high" on remote thread.
+"GetInt_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetLong_at_too_high" on remote thread.
+"GetLong_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetObject_at_too_high" on remote thread.
+"GetObject_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetInt_at_too_high" on remote thread.
+"SetInt_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetLong_at_too_high" on remote thread.
+"SetLong_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetObject_at_too_high" on remote thread.
+"SetObject_at_too_high" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetInt_at_negative" on remote thread.
+"GetInt_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetLong_at_negative" on remote thread.
+"GetLong_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "GetObject_at_negative" on remote thread.
+"GetObject_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetInt_at_negative" on remote thread.
+"SetInt_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetLong_at_negative" on remote thread.
+"SetLong_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.IntMethod(java.lang.Runnable) with "SetObject_at_negative" on remote thread.
+"SetObject_at_negative" on public static void art.Test1967.IntMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is '42' (class: class java.lang.Integer)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetInt_at_too_high" on remote thread.
+"GetInt_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetLong_at_too_high" on remote thread.
+"GetLong_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetObject_at_too_high" on remote thread.
+"GetObject_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetInt_at_too_high" on remote thread.
+"SetInt_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetLong_at_too_high" on remote thread.
+"SetLong_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetObject_at_too_high" on remote thread.
+"SetObject_at_too_high" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetInt_at_negative" on remote thread.
+"GetInt_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetLong_at_negative" on remote thread.
+"GetLong_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "GetObject_at_negative" on remote thread.
+"GetObject_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetInt_at_negative" on remote thread.
+"SetInt_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetLong_at_negative" on remote thread.
+"SetLong_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.LongMethod(java.lang.Runnable) with "SetObject_at_negative" on remote thread.
+"SetObject_at_negative" on public static void art.Test1967.LongMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is '9001' (class: class java.lang.Long)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetInt_at_too_high" on remote thread.
+"GetInt_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetLong_at_too_high" on remote thread.
+"GetLong_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetObject_at_too_high" on remote thread.
+"GetObject_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetInt_at_too_high" on remote thread.
+"SetInt_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetLong_at_too_high" on remote thread.
+"SetLong_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetObject_at_too_high" on remote thread.
+"SetObject_at_too_high" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetInt_at_negative" on remote thread.
+"GetInt_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetLong_at_negative" on remote thread.
+"GetLong_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "GetObject_at_negative" on remote thread.
+"GetObject_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetInt_at_negative" on remote thread.
+"SetInt_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value 2147483647 due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetLong_at_negative" on remote thread.
+"SetLong_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value 9223372036854775807 due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
+Running public static void art.Test1967.ObjectMethod(java.lang.Runnable) with "SetObject_at_negative" on remote thread.
+"SetObject_at_negative" on public static void art.Test1967.ObjectMethod(java.lang.Runnable) failed to set value NEW_FOR_SET due to JVMTI_ERROR_INVALID_SLOT
+	Value is 'TARGET OBJECT' (class: class java.lang.String)
