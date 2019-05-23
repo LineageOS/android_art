@@ -51,9 +51,11 @@ class BitTableBase {
     // Decode row count and column sizes from the table header.
     num_rows_ = reader.ReadVarint();
     if (num_rows_ != 0) {
+      uint32_t column_bits[kNumColumns];
+      reader.ReadVarints(column_bits);
       column_offset_[0] = 0;
       for (uint32_t i = 0; i < kNumColumns; i++) {
-        size_t column_end = column_offset_[i] + reader.ReadVarint();
+        size_t column_end = column_offset_[i] + column_bits[i];
         column_offset_[i + 1] = dchecked_integral_cast<uint16_t>(column_end);
       }
     }

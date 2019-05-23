@@ -52,6 +52,15 @@ void StackMapStream::BeginMethod(size_t frame_size_in_bytes,
   core_spill_mask_ = core_spill_mask;
   fp_spill_mask_ = fp_spill_mask;
   num_dex_registers_ = num_dex_registers;
+
+  if (kVerifyStackMaps) {
+    dchecks_.emplace_back([=](const CodeInfo& code_info) {
+      DCHECK_EQ(code_info.packed_frame_size_, frame_size_in_bytes / kStackAlignment);
+      DCHECK_EQ(code_info.core_spill_mask_, core_spill_mask);
+      DCHECK_EQ(code_info.fp_spill_mask_, fp_spill_mask);
+      DCHECK_EQ(code_info.number_of_dex_registers_, num_dex_registers);
+    });
+  }
 }
 
 void StackMapStream::EndMethod() {
