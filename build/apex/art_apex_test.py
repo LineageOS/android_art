@@ -501,7 +501,7 @@ class ReleaseTargetChecker:
     # TODO(b/131155689): These are unused - fix the build rules to avoid
     # creating them.
     self._checker.ignore_path('lib/arm')
-    self._checker.ignore_path('lib/arm64')
+    self._checker.ignore_path('lib64/arm64')
 
 
 class ReleaseHostChecker:
