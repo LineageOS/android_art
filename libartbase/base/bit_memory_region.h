@@ -252,6 +252,27 @@ class BitMemoryReader {
     return x;
   }
 
+  // Optimized version to read several consecutive varints.
+  // It reads all the headers at once in a single bit read.
+  template<int N>  // Inference works only with ref-arrays.
+  ALWAYS_INLINE void ReadVarints(uint32_t (&varints)[N]) {
+    static_assert(N * kVarintHeaderBits <= sizeof(uint32_t) * kBitsPerByte, "N too big");
+    uint32_t headers = ReadBits(N * kVarintHeaderBits);
+    uint32_t* out = varints;
+    for (int i = 0; i < N; out++) {
+      uint32_t header = BitFieldExtract(headers, (i++) * kVarintHeaderBits, kVarintHeaderBits);
+      if (LIKELY(header <= kVarintSmallValue)) {
+        // Fast-path: consume one of the headers and continue to the next varint.
+        *out = header;
+      } else {
+        // Slow-path: rollback reader, read large value, and read remaning headers.
+        finished_region_.Resize(finished_region_.size_in_bits() - (N-i) * kVarintHeaderBits);
+        *out = ReadBits((header - kVarintSmallValue) * kBitsPerByte);
+        headers = ReadBits((N-i) * kVarintHeaderBits) << (i * kVarintHeaderBits);
+      }
+    }
+  }
+
  private:
   // Represents all of the bits which were read so far. There is no upper bound.
   // Therefore, by definition, the "cursor" is always at the end of the region.
