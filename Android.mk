@@ -58,7 +58,6 @@ include $(art_path)/build/Android.cpplint.mk
 # product rules
 
 include $(art_path)/oatdump/Android.mk
-include $(art_path)/tools/Android.mk
 include $(art_path)/tools/ahat/Android.mk
 include $(art_path)/tools/dexfuzz/Android.mk
 include $(art_path)/tools/veridex/Android.mk
