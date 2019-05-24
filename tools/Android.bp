@@ -28,3 +28,11 @@ python_binary_host {
         },
     },
 }
+
+// Copy the art shell script to the host and target's bin directory
+sh_binary {
+    name: "art-script",
+    host_supported: true,
+    src: "art",
+    filename_from_src: true,
+}
