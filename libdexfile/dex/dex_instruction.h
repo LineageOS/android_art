@@ -123,6 +123,7 @@ class Instruction {
     k4rcc,  // op {VCCCC .. v(CCCC+AA-1)}, meth@BBBB, proto@HHHH (AA: count)
 
     k51l,  // op vAA, #+BBBBBBBBBBBBBBBB
+    kInvalidFormat,
   };
 
   enum IndexType : uint8_t {
@@ -291,6 +292,7 @@ class Instruction {
   // VRegA
   bool HasVRegA() const;
   ALWAYS_INLINE int32_t VRegA() const;
+  ALWAYS_INLINE int32_t VRegA(Format format, uint16_t inst_data) const;
 
   int8_t VRegA_10t() const {
     return VRegA_10t(Fetch16(0));
@@ -393,7 +395,8 @@ class Instruction {
 
   // VRegB
   bool HasVRegB() const;
-  int32_t VRegB() const;
+  ALWAYS_INLINE int32_t VRegB() const;
+  ALWAYS_INLINE int32_t VRegB(Format format, uint16_t inst_data) const;
 
   bool HasWideVRegB() const;
   uint64_t WideVRegB() const;
@@ -441,7 +444,8 @@ class Instruction {
 
   // VRegC
   bool HasVRegC() const;
-  int32_t VRegC() const;
+  ALWAYS_INLINE int32_t VRegC() const;
+  ALWAYS_INLINE int32_t VRegC(Format format) const;
 
   int8_t VRegC_22b() const;
   uint16_t VRegC_22c() const;
