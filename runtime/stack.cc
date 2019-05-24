@@ -112,7 +112,7 @@ uint32_t StackVisitor::GetDexPc(bool abort_on_failure) const {
 extern "C" mirror::Object* artQuickGetProxyThisObject(ArtMethod** sp)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-mirror::Object* StackVisitor::GetThisObject() const {
+ObjPtr<mirror::Object> StackVisitor::GetThisObject() const {
   DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
   ArtMethod* m = GetMethod();
   if (m->IsStatic()) {
