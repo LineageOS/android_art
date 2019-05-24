@@ -16,22 +16,6 @@
 
 LOCAL_PATH := $(call my-dir)
 
-# --- dexfuzz.jar ----------------
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES := $(call all-java-files-under, src)
-LOCAL_JAR_MANIFEST := manifest.txt
-LOCAL_IS_HOST_MODULE := true
-LOCAL_MODULE := dexfuzz
-include $(BUILD_HOST_JAVA_LIBRARY)
-
-# --- dexfuzz script ----------------
-include $(CLEAR_VARS)
-LOCAL_IS_HOST_MODULE := true
-LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_MODULE := dexfuzz
-LOCAL_SRC_FILES := dexfuzz
-include $(BUILD_PREBUILT)
-
 # --- dexfuzz script with core image dependencies ----------------
 .PHONY: fuzzer
-fuzzer: $(LOCAL_BUILT_MODULE) $(HOST_CORE_IMG_OUTS)
+fuzzer: dexfuzz-script $(HOST_CORE_IMG_OUTS)
