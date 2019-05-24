@@ -20,15 +20,15 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Semaphore;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 public class Test1913 {
   public static final String TARGET_VAR = "TARGET";
@@ -38,43 +38,27 @@ public class Test1913 {
   }
   public static class TestClass1 implements TestInterface {
     public String id;
-    public TestClass1(String id) {
-      this.id = id;
-    }
-    public String toString() {
-      return String.format("TestClass1(\"%s\")", id);
-    }
+    public TestClass1(String id) { this.id = id; }
+    public String toString() { return String.format("TestClass1(\"%s\")", id); }
   }
 
   public static class TestClass1ext extends TestClass1 {
-    public TestClass1ext(String id) {
-      super(id);
-    }
-    public String toString() {
-      return String.format("TestClass1ext(\"%s\")", super.toString());
-    }
+    public TestClass1ext(String id) { super(id); }
+    public String toString() { return String.format("TestClass1ext(\"%s\")", super.toString()); }
   }
   public static class TestClass2 {
     public String id;
-    public TestClass2(String id) {
-      this.id = id;
-    }
-    public String toString() {
-      return String.format("TestClass2(\"%s\")", id);
-    }
+    public TestClass2(String id) { this.id = id; }
+    public String toString() { return String.format("TestClass2(\"%s\")", id); }
   }
   public static class TestClass2impl extends TestClass2 implements TestInterface {
-    public TestClass2impl(String id) {
-      super(id);
-    }
-    public String toString() {
-      return String.format("TestClass2impl(\"%s\")", super.toString());
-    }
+    public TestClass2impl(String id) { super(id); }
+    public String toString() { return String.format("TestClass2impl(\"%s\")", super.toString()); }
   }
 
   public static void reportValue(Object val) {
-    System.out.println("\tValue is '" + val +
-                       "' (class: " + (val != null ? val.getClass() : "NULL") + ")");
+    System.out.println("\tValue is '" + val + "' (class: "
+        + (val != null ? val.getClass() : "NULL") + ")");
   }
 
   public static void PrimitiveMethod(Runnable safepoint) {
@@ -84,28 +68,7 @@ public class Test1913 {
   }
 
   // b/64115302: Needed to make sure that DX doesn't change the type of TARGET to TestClass1.
-  private static Object AsObject(Object o) {
-    return o;
-  }
-
-  public static void NullObjectMethod(Runnable safepoint) {
-    Object TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void NullInterfaceMethod(Runnable safepoint) {
-    TestInterface TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
-  public static void NullSpecificClassMethod(Runnable safepoint) {
-    TestClass1 TARGET = null;
-    safepoint.run();
-    reportValue(TARGET);
-  }
-
+  private static Object AsObject(Object o) { return o; }
   public static void ObjectMethod(Runnable safepoint) {
     Object TARGET = AsObject(new TestClass1("ObjectMethod"));
     safepoint.run();
@@ -125,27 +88,31 @@ public class Test1913 {
   }
 
   public static interface SafepointFunction {
-    public void
-    invoke(Thread thread, Method target, Locals.VariableDescription TARGET_desc, int depth)
-        throws Exception;
+    public void invoke(
+        Thread thread,
+        Method target,
+        Locals.VariableDescription TARGET_desc,
+        int depth) throws Exception;
   }
 
   public static interface SetterFunction {
     public void SetVar(Thread t, int depth, int slot, Object v);
   }
 
-  public static interface GetterFunction { public Object GetVar(Thread t, int depth, int slot); }
+  public static interface GetterFunction {
+    public Object GetVar(Thread t, int depth, int slot);
+  }
 
-  public static SafepointFunction
-  NamedSet(final String type, final SetterFunction get, final Object v) {
+  public static SafepointFunction NamedSet(
+      final String type, final SetterFunction get, final Object v) {
     return new SafepointFunction() {
       public void invoke(Thread t, Method method, Locals.VariableDescription desc, int depth) {
         try {
           get.SetVar(t, depth, desc.slot, v);
           System.out.println(this + " on " + method + " set value: " + v);
         } catch (Exception e) {
-          System.out.println(this + " on " + method + " failed to set value " + v + " due to " +
-                             e.getMessage());
+          System.out.println(
+              this + " on " + method + " failed to set value " + v + " due to " + e.getMessage());
         }
       }
       public String toString() {
@@ -207,13 +174,15 @@ public class Test1913 {
     public void exec(final SafepointFunction safepoint) throws Exception {
       System.out.println("Running " + target + " with " + safepoint + " on remote thread.");
       final ThreadPauser pause = new ThreadPauser();
-      Thread remote = new Thread(() -> {
-        try {
-          target.invoke(null, pause);
-        } catch (Exception e) {
-          throw new Error("Error invoking remote thread " + Thread.currentThread(), e);
-        }
-      }, "remote thread for " + target + " with " + safepoint);
+      Thread remote = new Thread(
+          () -> {
+            try {
+              target.invoke(null, pause);
+            } catch (Exception e) {
+              throw new Error("Error invoking remote thread " + Thread.currentThread(), e);
+            }
+          },
+          "remote thread for " + target + " with " + safepoint);
       remote.start();
       pause.waitForOtherThreadToPause();
       try {
@@ -230,12 +199,14 @@ public class Test1913 {
 
     private Locals.VariableDescription findTargetVar(long loc) {
       for (Locals.VariableDescription var : Locals.GetLocalVariableTable(target)) {
-        if (var.start_location <= loc && var.length + var.start_location > loc &&
+        if (var.start_location <= loc &&
+            var.length + var.start_location > loc &&
             var.name.equals(TARGET_VAR)) {
           return var;
         }
       }
-      throw new Error("Unable to find variable " + TARGET_VAR + " in " + target + " at loc " + loc);
+      throw new Error(
+          "Unable to find variable " + TARGET_VAR + " in " + target + " at loc " + loc);
     }
 
     private StackTrace.StackFrameData findStackFrame(Thread thr) {
@@ -254,27 +225,27 @@ public class Test1913 {
   public static void run() throws Exception {
     Locals.EnableLocalVariableAccess();
     final TestCase[] MAIN_TEST_CASES = new TestCase[] {
-      new TestCase(getMethod("ObjectMethod")),        new TestCase(getMethod("InterfaceMethod")),
-      new TestCase(getMethod("SpecificClassMethod")), new TestCase(getMethod("PrimitiveMethod")),
-      new TestCase(getMethod("NullObjectMethod")),
-      new TestCase(getMethod("NullInterfaceMethod")),
-      new TestCase(getMethod("NullSpecificClassMethod")),
+      new TestCase(getMethod("ObjectMethod")),
+      new TestCase(getMethod("InterfaceMethod")),
+      new TestCase(getMethod("SpecificClassMethod")),
+      new TestCase(getMethod("PrimitiveMethod")),
     };
 
     final SetterFunction set_obj = Locals::SetLocalVariableObject;
     final SafepointFunction[] SAFEPOINTS = new SafepointFunction[] {
-      NamedGet("GetObject", Locals::GetLocalVariableObject),
-      NamedSet("Null", set_obj, null),
-      NamedSet("TestClass1", set_obj, new TestClass1("Set TestClass1")),
-      NamedSet("TestClass1ext", set_obj, new TestClass1ext("Set TestClass1ext")),
-      NamedSet("TestClass2", set_obj, new TestClass2("Set TestClass2")),
+      NamedGet("GetObject",      Locals::GetLocalVariableObject),
+      NamedSet("Null",           set_obj, null),
+      NamedSet("TestClass1",     set_obj, new TestClass1("Set TestClass1")),
+      NamedSet("TestClass1ext",  set_obj, new TestClass1ext("Set TestClass1ext")),
+      NamedSet("TestClass2",     set_obj, new TestClass2("Set TestClass2")),
       NamedSet("TestClass2impl", set_obj, new TestClass2impl("Set TestClass2impl")),
     };
 
-    for (TestCase t : MAIN_TEST_CASES) {
+    for (TestCase t: MAIN_TEST_CASES) {
       for (SafepointFunction s : SAFEPOINTS) {
         t.exec(s);
       }
     }
   }
 }
+
