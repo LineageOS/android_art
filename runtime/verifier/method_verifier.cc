@@ -5351,7 +5351,10 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
                                       /* verify_to_dump= */ false,
                                       /* allow_thread_suspension= */ false,
                                       /* fill_register_lines= */ true,
-                                      /* api_level = */ 0));
+                                      // Just use the verifier at the current skd-version.
+                                      // This might affect what soft-verifier errors are reported.
+                                      // Callers can then filter out relevant errors if needed.
+                                      Runtime::Current()->GetTargetSdkVersion()));
   verifier->Verify();
   if (VLOG_IS_ON(verifier)) {
     verifier->DumpFailures(VLOG_STREAM(verifier));
