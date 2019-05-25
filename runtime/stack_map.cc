@@ -35,7 +35,7 @@ CodeInfo::CodeInfo(const OatQuickMethodHeader* header, DecodeFlags flags)
 template<typename Accessor>
 ALWAYS_INLINE static bool DecodeTable(BitTable<Accessor>& table, BitMemoryReader& reader) {
   bool is_deduped = reader.ReadBit();
-  if (is_deduped) {
+  if (UNLIKELY(is_deduped)) {
     ssize_t bit_offset = reader.NumberOfReadBits() - reader.ReadVarint();
     BitMemoryReader reader2(reader.data(), bit_offset);  // The offset is negative.
     table.Decode(reader2);
@@ -47,9 +47,12 @@ ALWAYS_INLINE static bool DecodeTable(BitTable<Accessor>& table, BitMemoryReader
 
 void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
   BitMemoryReader reader(data);
-  ForEachHeaderField([this, &reader](auto member_pointer) {
-    this->*member_pointer = reader.ReadVarint();
-  });
+  uint32_t header[4];
+  reader.ReadVarints(header);
+  packed_frame_size_ = header[0];
+  core_spill_mask_ = header[1];
+  fp_spill_mask_ = header[2];
+  number_of_dex_registers_ = header[3];
   ForEachBitTableField([this, &reader](auto member_pointer) {
     DecodeTable(this->*member_pointer, reader);
   }, flags);

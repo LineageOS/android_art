@@ -440,10 +440,9 @@ class CodeInfo {
 
   ALWAYS_INLINE static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* data) {
     BitMemoryReader reader(data);
-    return QuickMethodFrameInfo(
-        reader.ReadVarint() * kStackAlignment,  // Decode packed_frame_size_ and unpack.
-        reader.ReadVarint(),  // core_spill_mask_.
-        reader.ReadVarint());  // fp_spill_mask_.
+    uint32_t args[3];  // packed_frame_size, core_spill_mask, fp_spill_mask.
+    reader.ReadVarints(args);
+    return QuickMethodFrameInfo(args[0] * kStackAlignment, args[1], args[2]);
   }
 
  private:
@@ -499,6 +498,8 @@ class CodeInfo {
   BitTable<DexRegisterMapInfo> dex_register_maps_;
   BitTable<DexRegisterInfo> dex_register_catalog_;
   uint32_t size_in_bits_ = 0;
+
+  friend class StackMapStream;
 };
 
 #undef ELEMENT_BYTE_OFFSET_AFTER
