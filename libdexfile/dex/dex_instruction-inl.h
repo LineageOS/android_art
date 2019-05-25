@@ -57,33 +57,38 @@ inline bool Instruction::HasVRegA() const {
 }
 
 inline int32_t Instruction::VRegA() const {
-  switch (FormatOf(Opcode())) {
-    case k10t: return VRegA_10t();
-    case k10x: return VRegA_10x();
-    case k11n: return VRegA_11n();
-    case k11x: return VRegA_11x();
-    case k12x: return VRegA_12x();
+  return VRegA(FormatOf(Opcode()), Fetch16(0));
+}
+
+inline int32_t Instruction::VRegA(Format format, uint16_t inst_data) const {
+  DCHECK_EQ(format, FormatOf(Opcode()));
+  switch (format) {
+    case k10t: return VRegA_10t(inst_data);
+    case k10x: return VRegA_10x(inst_data);
+    case k11n: return VRegA_11n(inst_data);
+    case k11x: return VRegA_11x(inst_data);
+    case k12x: return VRegA_12x(inst_data);
     case k20t: return VRegA_20t();
-    case k21c: return VRegA_21c();
-    case k21h: return VRegA_21h();
-    case k21s: return VRegA_21s();
-    case k21t: return VRegA_21t();
-    case k22b: return VRegA_22b();
-    case k22c: return VRegA_22c();
-    case k22s: return VRegA_22s();
-    case k22t: return VRegA_22t();
-    case k22x: return VRegA_22x();
-    case k23x: return VRegA_23x();
+    case k21c: return VRegA_21c(inst_data);
+    case k21h: return VRegA_21h(inst_data);
+    case k21s: return VRegA_21s(inst_data);
+    case k21t: return VRegA_21t(inst_data);
+    case k22b: return VRegA_22b(inst_data);
+    case k22c: return VRegA_22c(inst_data);
+    case k22s: return VRegA_22s(inst_data);
+    case k22t: return VRegA_22t(inst_data);
+    case k22x: return VRegA_22x(inst_data);
+    case k23x: return VRegA_23x(inst_data);
     case k30t: return VRegA_30t();
-    case k31c: return VRegA_31c();
-    case k31i: return VRegA_31i();
-    case k31t: return VRegA_31t();
+    case k31c: return VRegA_31c(inst_data);
+    case k31i: return VRegA_31i(inst_data);
+    case k31t: return VRegA_31t(inst_data);
     case k32x: return VRegA_32x();
-    case k35c: return VRegA_35c();
-    case k3rc: return VRegA_3rc();
-    case k45cc: return VRegA_45cc();
-    case k4rcc: return VRegA_4rcc();
-    case k51l: return VRegA_51l();
+    case k35c: return VRegA_35c(inst_data);
+    case k3rc: return VRegA_3rc(inst_data);
+    case k45cc: return VRegA_45cc(inst_data);
+    case k4rcc: return VRegA_4rcc(inst_data);
+    case k51l: return VRegA_51l(inst_data);
     default:
       LOG(FATAL) << "Tried to access vA of instruction " << Name() << " which has no A operand.";
       exit(EXIT_FAILURE);
@@ -255,17 +260,22 @@ inline bool Instruction::HasWideVRegB() const {
 }
 
 inline int32_t Instruction::VRegB() const {
-  switch (FormatOf(Opcode())) {
-    case k11n: return VRegB_11n();
-    case k12x: return VRegB_12x();
+  return VRegB(FormatOf(Opcode()), Fetch16(0));
+}
+
+inline int32_t Instruction::VRegB(Format format, uint16_t inst_data) const {
+  DCHECK_EQ(format, FormatOf(Opcode()));
+  switch (format) {
+    case k11n: return VRegB_11n(inst_data);
+    case k12x: return VRegB_12x(inst_data);
     case k21c: return VRegB_21c();
     case k21h: return VRegB_21h();
     case k21s: return VRegB_21s();
     case k21t: return VRegB_21t();
     case k22b: return VRegB_22b();
-    case k22c: return VRegB_22c();
-    case k22s: return VRegB_22s();
-    case k22t: return VRegB_22t();
+    case k22c: return VRegB_22c(inst_data);
+    case k22s: return VRegB_22s(inst_data);
+    case k22t: return VRegB_22t(inst_data);
     case k22x: return VRegB_22x();
     case k23x: return VRegB_23x();
     case k31c: return VRegB_31c();
@@ -412,7 +422,12 @@ inline bool Instruction::HasVRegC() const {
 }
 
 inline int32_t Instruction::VRegC() const {
-  switch (FormatOf(Opcode())) {
+  return VRegC(FormatOf(Opcode()));
+}
+
+inline int32_t Instruction::VRegC(Format format) const {
+  DCHECK_EQ(format, FormatOf(Opcode()));
+  switch (format) {
     case k22b: return VRegC_22b();
     case k22c: return VRegC_22c();
     case k22s: return VRegC_22s();

@@ -288,7 +288,10 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
       }
       if (GetCurrentQuickFrame() == nullptr) {
         bool interpreter_frame = true;
-        InstrumentationStackFrame instrumentation_frame(GetThisObject(), m, 0, GetFrameId(),
+        InstrumentationStackFrame instrumentation_frame(GetThisObject().Ptr(),
+                                                        m,
+                                                        /*return_pc=*/ 0,
+                                                        GetFrameId(),
                                                         interpreter_frame);
         if (kVerboseInstrumentation) {
           LOG(INFO) << "Pushing shadow frame " << instrumentation_frame.Dump();
@@ -352,7 +355,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
           UNREACHABLE();
         }
         InstrumentationStackFrame instrumentation_frame(
-            m->IsRuntimeMethod() ? nullptr : GetThisObject(),
+            m->IsRuntimeMethod() ? nullptr : GetThisObject().Ptr(),
             m,
             return_pc,
             GetFrameId(),    // A runtime method still gets a frame id.

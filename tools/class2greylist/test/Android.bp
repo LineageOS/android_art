@@ -1,4 +1,3 @@
-//
 // Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,27 +11,21 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-python_binary_host {
-    name: "generate_operator_out",
-    srcs: [
-        "generate_operator_out.py",
+java_test_host {
+    name: "class2greylisttest",
+
+    // Only compile source java files in this apk.
+    srcs: ["src/**/*.java"],
+
+    static_libs: [
+        "class2greylistlib",
+        "truth-host-prebuilt",
+        "mockito-host",
+        "junit-host",
+        "objenesis",
     ],
-    version: {
-        py2: {
-            enabled: true,
-        },
-        py3: {
-            enabled: false,
-        },
-    },
-}
 
-// Copy the art shell script to the host and target's bin directory
-sh_binary {
-    name: "art-script",
-    host_supported: true,
-    src: "art",
-    filename_from_src: true,
+    // tag this module as a cts test artifact
+    test_suites: ["general-tests"],
 }

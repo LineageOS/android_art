@@ -105,7 +105,7 @@ class PACKED(4) HandleScope : public BaseHandleScope {
   // Returns the size of a HandleScope containing num_references handles.
   static size_t SizeOf(PointerSize pointer_size, uint32_t num_references);
 
-  ALWAYS_INLINE mirror::Object* GetReference(size_t i) const
+  ALWAYS_INLINE ObjPtr<mirror::Object> GetReference(size_t i) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   ALWAYS_INLINE Handle<mirror::Object> GetHandle(size_t i);
@@ -113,7 +113,7 @@ class PACKED(4) HandleScope : public BaseHandleScope {
   ALWAYS_INLINE MutableHandle<mirror::Object> GetMutableHandle(size_t i)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ALWAYS_INLINE void SetReference(size_t i, mirror::Object* object)
+  ALWAYS_INLINE void SetReference(size_t i, ObjPtr<mirror::Object> object)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   ALWAYS_INLINE bool Contains(StackReference<mirror::Object>* handle_scope_entry) const;
@@ -187,7 +187,7 @@ class PACKED(4) FixedSizeHandleScope : public HandleScope {
   ALWAYS_INLINE MutableHandle<MirrorType> NewHandle(ObjPtr<MirrorType> object)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ALWAYS_INLINE void SetReference(size_t i, mirror::Object* object)
+  ALWAYS_INLINE void SetReference(size_t i, ObjPtr<mirror::Object> object)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   size_t RemainingSlots() const {
@@ -196,7 +196,7 @@ class PACKED(4) FixedSizeHandleScope : public HandleScope {
 
  private:
   explicit ALWAYS_INLINE FixedSizeHandleScope(BaseHandleScope* link,
-                                              mirror::Object* fill_value = nullptr);
+                                              ObjPtr<mirror::Object> fill_value = nullptr);
   ALWAYS_INLINE ~FixedSizeHandleScope() {}
 
   template<class T>
@@ -219,7 +219,8 @@ class PACKED(4) FixedSizeHandleScope : public HandleScope {
 template<size_t kNumReferences>
 class PACKED(4) StackHandleScope final : public FixedSizeHandleScope<kNumReferences> {
  public:
-  explicit ALWAYS_INLINE StackHandleScope(Thread* self, mirror::Object* fill_value = nullptr);
+  explicit ALWAYS_INLINE StackHandleScope(Thread* self,
+                                          ObjPtr<mirror::Object> fill_value = nullptr);
   ALWAYS_INLINE ~StackHandleScope();
 
   Thread* Self() const {

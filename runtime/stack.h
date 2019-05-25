@@ -194,7 +194,7 @@ class StackVisitor {
 
   uint32_t GetDexPc(bool abort_on_failure = true) const REQUIRES_SHARED(Locks::mutator_lock_);
 
-  mirror::Object* GetThisObject() const REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<mirror::Object> GetThisObject() const REQUIRES_SHARED(Locks::mutator_lock_);
 
   size_t GetNativePcOffset() const REQUIRES_SHARED(Locks::mutator_lock_);
 

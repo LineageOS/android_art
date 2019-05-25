@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2018 The Android Open Source Project
+// Copyright (C) 2014 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,25 +14,16 @@
 // limitations under the License.
 //
 
-python_binary_host {
-    name: "generate_operator_out",
-    srcs: [
-        "generate_operator_out.py",
-    ],
-    version: {
-        py2: {
-            enabled: true,
-        },
-        py3: {
-            enabled: false,
-        },
-    },
+// --- dexfuzz.jar ----------------
+java_library_host {
+    name: "dexfuzz",
+    srcs: ["src/**/*.java"],
+    manifest: "manifest.txt",
 }
 
-// Copy the art shell script to the host and target's bin directory
-sh_binary {
-    name: "art-script",
-    host_supported: true,
-    src: "art",
+// --- dexfuzz script ----------------
+sh_binary_host {
+    name: "dexfuzz-script",
+    src: "dexfuzz",
     filename_from_src: true,
 }
