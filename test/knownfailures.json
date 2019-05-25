@@ -777,6 +777,18 @@
         "description": ["Requires zip, which isn't available on device"]
     },
     {
+        "tests": [
+          "1965-get-set-local-primitive-no-tables",
+          "1966-get-set-local-objects-no-table"
+        ],
+        "variant": "jvm",
+        "bug": "133241695",
+        "description": [
+          "The RI is wildly inconsistent about how it handles Get/SetLocalVariable when classes ",
+          "lack debug info."
+        ]
+    },
+    {
         "tests": ["683-clinit-inline-static-invoke"],
         "variant": "jvm",
         "description": ["Uses android-specific boot image class."]
