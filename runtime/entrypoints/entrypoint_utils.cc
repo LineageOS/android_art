@@ -203,13 +203,15 @@ static inline ArtMethod* DoGetCalleeSaveMethodCaller(ArtMethod* outer_method,
       const OatQuickMethodHeader* current_code = outer_method->GetOatQuickMethodHeader(caller_pc);
       DCHECK(current_code != nullptr);
       DCHECK(current_code->IsOptimized());
-      uintptr_t native_pc_offset = current_code->NativeQuickPcOffset(caller_pc);
-      CodeInfo code_info(current_code, CodeInfo::DecodeFlags::InlineInfoOnly);
-      StackMap stack_map = code_info.GetStackMapForNativePcOffset(native_pc_offset);
-      DCHECK(stack_map.IsValid());
-      BitTableRange<InlineInfo> inline_infos = code_info.GetInlineInfosOf(stack_map);
-      if (!inline_infos.empty()) {
-        caller = GetResolvedMethod(outer_method, code_info, inline_infos);
+      if (CodeInfo::HasInlineInfo(current_code->GetOptimizedCodeInfoPtr())) {
+        uintptr_t native_pc_offset = current_code->NativeQuickPcOffset(caller_pc);
+        CodeInfo code_info(current_code, CodeInfo::DecodeFlags::InlineInfoOnly);
+        StackMap stack_map = code_info.GetStackMapForNativePcOffset(native_pc_offset);
+        DCHECK(stack_map.IsValid());
+        BitTableRange<InlineInfo> inline_infos = code_info.GetInlineInfosOf(stack_map);
+        if (!inline_infos.empty()) {
+          caller = GetResolvedMethod(outer_method, code_info, inline_infos);
+        }
       }
     }
     if (kIsDebugBuild && do_caller_check) {

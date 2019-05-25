@@ -47,16 +47,20 @@ ALWAYS_INLINE static bool DecodeTable(BitTable<Accessor>& table, BitMemoryReader
 
 void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
   BitMemoryReader reader(data);
-  uint32_t header[4];
+  uint32_t header[5];
   reader.ReadVarints(header);
-  packed_frame_size_ = header[0];
-  core_spill_mask_ = header[1];
-  fp_spill_mask_ = header[2];
-  number_of_dex_registers_ = header[3];
+  flags_ = header[0];
+  packed_frame_size_ = header[1];
+  core_spill_mask_ = header[2];
+  fp_spill_mask_ = header[3];
+  number_of_dex_registers_ = header[4];
   ForEachBitTableField([this, &reader](auto member_pointer) {
     DecodeTable(this->*member_pointer, reader);
   }, flags);
   size_in_bits_ = reader.NumberOfReadBits();
+  if (flags == AllTables) {
+    DCHECK_EQ(HasInlineInfo(data), HasInlineInfo());
+  }
 }
 
 size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
@@ -230,6 +234,7 @@ void CodeInfo::Dump(VariableIndentationOutputStream* vios,
                     bool verbose,
                     InstructionSet instruction_set) const {
   vios->Stream() << "CodeInfo BitSize=" << size_in_bits_
+    << " Flags:" << flags_
     << " FrameSize:" << packed_frame_size_ * kStackAlignment
     << " CoreSpillMask:" << std::hex << core_spill_mask_
     << " FpSpillMask:" << std::hex << fp_spill_mask_
