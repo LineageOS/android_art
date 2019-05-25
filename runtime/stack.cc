@@ -813,8 +813,8 @@ void StackVisitor::WalkStack(bool include_transitions) {
         if ((walk_kind_ == StackWalkKind::kIncludeInlinedFrames)
             && (cur_oat_quick_method_header_ != nullptr)
             && cur_oat_quick_method_header_->IsOptimized()
-            // JNI methods cannot have any inlined frames.
-            && !method->IsNative()) {
+            && !method->IsNative()  // JNI methods cannot have any inlined frames.
+            && CodeInfo::HasInlineInfo(cur_oat_quick_method_header_->GetOptimizedCodeInfoPtr())) {
           DCHECK_NE(cur_quick_frame_pc_, 0u);
           current_code_info_ = CodeInfo(cur_oat_quick_method_header_,
                                         CodeInfo::DecodeFlags::InlineInfoOnly);

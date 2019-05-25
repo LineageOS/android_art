@@ -184,6 +184,7 @@ void StackMapStream::BeginInlineInfoEntry(ArtMethod* method,
   in_inline_info_ = true;
   DCHECK_EQ(expected_num_dex_registers_, current_dex_registers_.size());
 
+  flags_ |= CodeInfo::kHasInlineInfo;
   expected_num_dex_registers_ += num_dex_registers;
 
   BitTableBuilder<InlineInfo>::Entry entry;
@@ -305,6 +306,7 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
 
   ScopedArenaVector<uint8_t> buffer(allocator_->Adapter(kArenaAllocStackMapStream));
   BitMemoryWriter<ScopedArenaVector<uint8_t>> out(&buffer);
+  out.WriteVarint(flags_);
   out.WriteVarint(packed_frame_size_);
   out.WriteVarint(core_spill_mask_);
   out.WriteVarint(fp_spill_mask_);
