@@ -510,6 +510,7 @@ std::string Instruction::DumpString(const DexFile* file) const {
       }
       break;
     case k51l: os << StringPrintf("%s v%d, #%+" PRId64, opcode, VRegA_51l(), VRegB_51l()); break;
+    case kInvalidFormat: os << "<invalid-opcode-format>";
   }
   return os.str();
 }
