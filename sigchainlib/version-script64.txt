@@ -3,6 +3,7 @@ global:
   EnsureFrontOfChain;
   AddSpecialSignalHandlerFn;
   RemoveSpecialSignalHandlerFn;
+  SkipAddSignalHandler;
   sigaction;
   sigaction64;
   signal;
