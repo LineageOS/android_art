@@ -692,6 +692,8 @@ class Runtime {
     is_native_debuggable_ = value;
   }
 
+  void SetSignalHookDebuggable(bool value);
+
   bool AreNonStandardExitsEnabled() const {
     return non_standard_exits_enabled_;
   }
