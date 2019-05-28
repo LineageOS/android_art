@@ -261,8 +261,13 @@ class BitMemoryReader {
     // StackMap BitTable uses over 8 varints in the header, so we need uint64_t.
     uint64_t data = ReadBits<uint64_t>(N * kVarintBits);
     for (size_t i = 0; i < N; i++) {
-      uint32_t x = BitFieldExtract(data, i * kVarintBits, kVarintBits);
-      values[i] = LIKELY(x <= kVarintMax) ? x : ReadBits((x - kVarintMax) * kBitsPerByte);
+      values[i] = BitFieldExtract(data, i * kVarintBits, kVarintBits);
+    }
+    // Do the second part in its own loop as that seems to produce better code in clang.
+    for (size_t i = 0; i < N; i++) {
+      if (UNLIKELY(values[i] > kVarintMax)) {
+        values[i] = ReadBits((values[i] - kVarintMax) * kBitsPerByte);
+      }
     }
     return values;
   }
