@@ -323,18 +323,16 @@ int32_t String::CompareTo(ObjPtr<String> rhs) {
   return count_diff;
 }
 
-ObjPtr<CharArray> String::ToCharArray(Thread* self) {
-  StackHandleScope<1> hs(self);
-  Handle<String> string(hs.NewHandle(this));
-  ObjPtr<CharArray> result = CharArray::Alloc(self, GetLength());
+ObjPtr<CharArray> String::ToCharArray(Handle<String> h_this, Thread* self) {
+  ObjPtr<CharArray> result = CharArray::Alloc(self, h_this->GetLength());
   if (result != nullptr) {
-    if (string->IsCompressed()) {
-      int32_t length = string->GetLength();
+    if (h_this->IsCompressed()) {
+      int32_t length = h_this->GetLength();
       for (int i = 0; i < length; ++i) {
-        result->GetData()[i] = string->CharAt(i);
+        result->GetData()[i] = h_this->CharAt(i);
       }
     } else {
-      memcpy(result->GetData(), string->GetValue(), string->GetLength() * sizeof(uint16_t));
+      memcpy(result->GetData(), h_this->GetValue(), h_this->GetLength() * sizeof(uint16_t));
     }
   } else {
     self->AssertPendingOOMException();

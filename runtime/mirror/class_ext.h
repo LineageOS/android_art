@@ -72,7 +72,7 @@ class MANAGED ClassExt : public Object {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Extend the obsolete arrays by the given amount.
-  bool ExtendObsoleteArrays(Thread* self, uint32_t increase)
+  static bool ExtendObsoleteArrays(Handle<ClassExt> h_this, Thread* self, uint32_t increase)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, class Visitor>
