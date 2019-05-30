@@ -81,7 +81,7 @@ CodeInfo* StackVisitor::GetCurrentInlineInfo() const {
   DCHECK(!(*cur_quick_frame_)->IsNative());
   const OatQuickMethodHeader* header = GetCurrentOatQuickMethodHeader();
   if (cur_inline_info_.first != header) {
-    cur_inline_info_ = std::make_pair(header, CodeInfo(header, CodeInfo::InlineInfoOnly));
+    cur_inline_info_ = std::make_pair(header, CodeInfo::DecodeInlineInfoOnly(header));
   }
   return &cur_inline_info_.second;
 }

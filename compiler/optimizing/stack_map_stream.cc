@@ -323,8 +323,9 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
   });
 
   // Verify that we can load the CodeInfo and check some essentials.
-  CodeInfo code_info(buffer.data());
-  CHECK_EQ(code_info.Size(), buffer.size());
+  size_t number_of_read_bits;
+  CodeInfo code_info(buffer.data(), &number_of_read_bits);
+  CHECK_EQ(number_of_read_bits, out.NumberOfWrittenBits());
   CHECK_EQ(code_info.GetNumberOfStackMaps(), stack_maps_.size());
 
   // Verify all written data (usually only in debug builds).

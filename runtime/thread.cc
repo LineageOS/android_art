@@ -3781,9 +3781,9 @@ class ReferenceMapVisitor : public StackVisitor {
       StackReference<mirror::Object>* vreg_base =
           reinterpret_cast<StackReference<mirror::Object>*>(cur_quick_frame);
       uintptr_t native_pc_offset = method_header->NativeQuickPcOffset(GetCurrentQuickFramePc());
-      CodeInfo code_info(method_header, kPrecise
-          ? CodeInfo::DecodeFlags::AllTables  // We will need dex register maps.
-          : CodeInfo::DecodeFlags::GcMasksOnly);
+      CodeInfo code_info = kPrecise
+          ? CodeInfo(method_header)  // We will need dex register maps.
+          : CodeInfo::DecodeGcMasksOnly(method_header);
       StackMap map = code_info.GetStackMapForNativePcOffset(native_pc_offset);
       DCHECK(map.IsValid());
 
