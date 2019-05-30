@@ -40,7 +40,8 @@
           "jsr166.StampedLockTest#testReadLockInterruptibly_Interruptible",
           "jsr166.StampedLockTest#testReadLockInterruptibly",
           "jsr166.StampedLockTest#testWriteLockInterruptibly",
-          "org.apache.harmony.tests.java.lang.ProcessManagerTest#testSleep"
+          "org.apache.harmony.tests.java.lang.ProcessManagerTest#testSleep",
+          "libcore.java.lang.StringTest#testFastPathString_wellFormedUtf8Sequence"
   ]
 },
 {
