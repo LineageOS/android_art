@@ -62,6 +62,10 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 
+# Clean up duplicate compiles between static and shared compiles of libart and libartd
+$(call add-clean-step, rm -rf $(OUT_DIR)/soong/.intermediates/art/runtime/libart/*shared*/obj)
+$(call add-clean-step, rm -rf $(OUT_DIR)/soong/.intermediates/art/runtime/libartd/*shared*/obj)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
