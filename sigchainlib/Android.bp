@@ -37,6 +37,8 @@ cc_library {
             whole_static_libs: ["libasync_safe"],
         },
     },
+
+    export_include_dirs: ["."],
 }
 
 // Create a dummy version of libsigchain which expose the necessary symbols
@@ -52,6 +54,8 @@ cc_library_static {
             whole_static_libs: ["libasync_safe"],
         },
     },
+
+    export_include_dirs: ["."],
 }
 
 art_cc_test {
