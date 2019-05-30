@@ -288,11 +288,17 @@ jvmtiError SearchUtil::AddToDexClassLoaderInMemory(jvmtiEnv* jvmti_env,
   if (file.Fd() < 0) {
     char* reason = strerror(errno);
     JVMTI_LOG(ERROR, jvmti_env) << "Unable to create memfd due to " << reason;
+    if (file.FlushClose() < 0) {
+      PLOG(WARNING) << "Failed to close file!";
+    }
     return ERR(INTERNAL);
   }
   // Fill it with the buffer.
   if (!file.WriteFully(dex_bytes, dex_bytes_length) || file.Flush() != 0) {
     JVMTI_LOG(ERROR, jvmti_env) << "Failed to write to memfd!";
+    if (file.FlushClose() < 0) {
+      PLOG(WARNING) << "Failed to close file!";
+    }
     return ERR(INTERNAL);
   }
   // Get the filename in procfs.
