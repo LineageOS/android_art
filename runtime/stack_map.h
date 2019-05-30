@@ -291,26 +291,14 @@ class CodeInfo {
     std::map<BitMemoryRegion, uint32_t, BitMemoryRegion::Less> dedupe_map_;
   };
 
-  enum DecodeFlags {
-    AllTables = 0,
-    // Limits the decoding only to the data needed by GC.
-    GcMasksOnly = 1,
-    // Limits the decoding only to the main stack map table and inline info table.
-    // This is sufficient for many use cases and makes the header decoding faster.
-    InlineInfoOnly = 2,
-  };
+  ALWAYS_INLINE CodeInfo() {}
+  ALWAYS_INLINE explicit CodeInfo(const uint8_t* data, size_t* num_read_bits = nullptr);
+  ALWAYS_INLINE explicit CodeInfo(const OatQuickMethodHeader* header);
 
-  CodeInfo() {}
-
-  explicit CodeInfo(const uint8_t* data, DecodeFlags flags = AllTables) {
-    Decode(reinterpret_cast<const uint8_t*>(data), flags);
-  }
-
-  explicit CodeInfo(const OatQuickMethodHeader* header, DecodeFlags flags = AllTables);
-
-  size_t Size() const {
-    return BitsToBytesRoundUp(size_in_bits_);
-  }
+  // The following methods decode only part of the data.
+  static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* data);
+  static CodeInfo DecodeGcMasksOnly(const OatQuickMethodHeader* header);
+  static CodeInfo DecodeInlineInfoOnly(const OatQuickMethodHeader* header);
 
   ALWAYS_INLINE const BitTable<StackMap>& GetStackMaps() const {
     return stack_maps_;
@@ -441,23 +429,14 @@ class CodeInfo {
     return (*code_info_data & kHasInlineInfo) != 0;
   }
 
-  ALWAYS_INLINE static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* code_info_data) {
-    BitMemoryReader reader(code_info_data);
-    std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
-    return QuickMethodFrameInfo(header[1] * kStackAlignment, header[2], header[3]);
-  }
-
  private:
-  // Returns lower bound (fist stack map which has pc greater or equal than the desired one).
-  // It ignores catch stack maps at the end (it is the same as if they had maximum pc value).
-  ALWAYS_INLINE BitTable<StackMap>::const_iterator BinarySearchNativePc(uint32_t packed_pc) const;
-
   // Scan backward to determine dex register locations at given stack map.
   void DecodeDexRegisterMap(uint32_t stack_map_index,
                             uint32_t first_dex_register,
                             /*out*/ DexRegisterMap* map) const;
 
-  void Decode(const uint8_t* data, DecodeFlags flags);
+  template<typename DecodeCallback>  // (size_t index, BitTable<...>*, BitMemoryRegion).
+  ALWAYS_INLINE CodeInfo(const uint8_t* data, size_t* num_read_bits, DecodeCallback callback);
 
   // Invokes the callback with index and member pointer of each header field.
   template<typename Callback>
@@ -474,19 +453,13 @@ class CodeInfo {
 
   // Invokes the callback with index and member pointer of each BitTable field.
   template<typename Callback>
-  ALWAYS_INLINE static void ForEachBitTableField(Callback callback, DecodeFlags flags = AllTables) {
+  ALWAYS_INLINE static void ForEachBitTableField(Callback callback) {
     size_t index = 0;
     callback(index++, &CodeInfo::stack_maps_);
     callback(index++, &CodeInfo::register_masks_);
     callback(index++, &CodeInfo::stack_masks_);
-    if (flags & DecodeFlags::GcMasksOnly) {
-      return;
-    }
     callback(index++, &CodeInfo::inline_infos_);
     callback(index++, &CodeInfo::method_infos_);
-    if (flags & DecodeFlags::InlineInfoOnly) {
-      return;
-    }
     callback(index++, &CodeInfo::dex_register_masks_);
     callback(index++, &CodeInfo::dex_register_maps_);
     callback(index++, &CodeInfo::dex_register_catalog_);
@@ -521,8 +494,6 @@ class CodeInfo {
   BitTable<DexRegisterMask> dex_register_masks_;
   BitTable<DexRegisterMapInfo> dex_register_maps_;
   BitTable<DexRegisterInfo> dex_register_catalog_;
-
-  uint32_t size_in_bits_ = 0;
 
   friend class StackMapStream;
 };
