@@ -417,6 +417,11 @@ class X86Assembler final : public Assembler {
   void mulps(XmmRegister dst, XmmRegister src);
   void divps(XmmRegister dst, XmmRegister src);
 
+  void vaddps(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+  void vsubps(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+  void vsubpd(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+  void vaddpd(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+
   void movapd(XmmRegister dst, XmmRegister src);     // move
   void movapd(XmmRegister dst, const Address& src);  // load aligned
   void movupd(XmmRegister dst, const Address& src);  // load unaligned
@@ -465,16 +470,28 @@ class X86Assembler final : public Assembler {
   void paddb(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
   void psubb(XmmRegister dst, XmmRegister src);
 
+  void vpaddb(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+  void vpaddw(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+
   void paddw(XmmRegister dst, XmmRegister src);
   void psubw(XmmRegister dst, XmmRegister src);
   void pmullw(XmmRegister dst, XmmRegister src);
+
+  void vpsubb(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vpsubw(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vpsubd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void paddd(XmmRegister dst, XmmRegister src);
   void psubd(XmmRegister dst, XmmRegister src);
   void pmulld(XmmRegister dst, XmmRegister src);
 
+  void vpaddd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+
   void paddq(XmmRegister dst, XmmRegister src);
   void psubq(XmmRegister dst, XmmRegister src);
+
+  void vpaddq(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
+  void vpsubq(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
 
   void paddusb(XmmRegister dst, XmmRegister src);
   void paddsb(XmmRegister dst, XmmRegister src);
