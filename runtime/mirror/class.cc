@@ -1218,8 +1218,8 @@ ObjPtr<Class> Class::CopyOf(
   CopyClassVisitor visitor(self, &h_this, new_length, sizeof(Class), imt, pointer_size);
   ObjPtr<mirror::Class> java_lang_Class = GetClassRoot<mirror::Class>(runtime->GetClassLinker());
   ObjPtr<Object> new_class = kMovingClasses ?
-      heap->AllocObject<true>(self, java_lang_Class, new_length, visitor) :
-      heap->AllocNonMovableObject<true>(self, java_lang_Class, new_length, visitor);
+      heap->AllocObject(self, java_lang_Class, new_length, visitor) :
+      heap->AllocNonMovableObject(self, java_lang_Class, new_length, visitor);
   if (UNLIKELY(new_class == nullptr)) {
     self->AssertPendingOOMException();
     return nullptr;
