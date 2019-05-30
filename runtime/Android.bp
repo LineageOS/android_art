@@ -383,9 +383,6 @@ libart_cc_defaults {
     generated_headers: ["cpp-define-generator-asm-support"],
     // export our headers so the libart-gtest targets can use it as well.
     export_generated_headers: ["cpp-define-generator-asm-support"],
-    include_dirs: [
-        "art/sigchainlib",
-    ],
     header_libs: [
         "art_cmdlineparser_headers",
         "cpp-define-generator-definitions",
@@ -402,13 +399,8 @@ libart_cc_defaults {
         // For common macros.
         "libbase",
         "libunwindstack",
+        "libsigchain",
     ],
-    static: {
-        static_libs: ["libsigchain_dummy"],
-    },
-    shared: {
-        shared_libs: ["libsigchain"],
-    },
     export_include_dirs: ["."],
     // ART's macros.h depends on libbase's macros.h.
     // Note: runtime_options.h depends on cmdline. But we don't really want to export this
