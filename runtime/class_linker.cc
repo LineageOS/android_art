@@ -466,7 +466,7 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
   // Allocate the object as non-movable so that there are no cases where Object::IsClass returns
   // the incorrect result when comparing to-space vs from-space.
   Handle<mirror::Class> java_lang_Class(hs.NewHandle(ObjPtr<mirror::Class>::DownCast(
-      heap->AllocNonMovableObject<true>(self, nullptr, class_class_size, VoidFunctor()))));
+      heap->AllocNonMovableObject(self, nullptr, class_class_size, VoidFunctor()))));
   CHECK(java_lang_Class != nullptr);
   java_lang_Class->SetClassFlags(mirror::kClassFlagClass);
   java_lang_Class->SetClass(java_lang_Class.Get());
@@ -495,10 +495,10 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
   java_lang_Object->SetObjectSize(sizeof(mirror::Object));
   // Allocate in non-movable so that it's possible to check if a JNI weak global ref has been
   // cleared without triggering the read barrier and unintentionally mark the sentinel alive.
-  runtime->SetSentinel(heap->AllocNonMovableObject<true>(self,
-                                                         java_lang_Object.Get(),
-                                                         java_lang_Object->GetObjectSize(),
-                                                         VoidFunctor()));
+  runtime->SetSentinel(heap->AllocNonMovableObject(self,
+                                                   java_lang_Object.Get(),
+                                                   java_lang_Object->GetObjectSize(),
+                                                   VoidFunctor()));
 
   // Initialize the SubtypeCheck bitstring for java.lang.Object and java.lang.Class.
   if (kBitstringSubtypeCheckEnabled) {
@@ -1063,7 +1063,7 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
   java_lang_Object->SetObjectSize(sizeof(mirror::Object));
   // Allocate in non-movable so that it's possible to check if a JNI weak global ref has been
   // cleared without triggering the read barrier and unintentionally mark the sentinel alive.
-  runtime->SetSentinel(heap->AllocNonMovableObject<true>(
+  runtime->SetSentinel(heap->AllocNonMovableObject(
       self, java_lang_Object, java_lang_Object->GetObjectSize(), VoidFunctor()));
 
   const std::vector<std::string>& boot_class_path_locations = runtime->GetBootClassPathLocations();
@@ -2569,8 +2569,8 @@ ObjPtr<mirror::Class> ClassLinker::AllocClass(Thread* self,
   gc::Heap* heap = Runtime::Current()->GetHeap();
   mirror::Class::InitializeClassVisitor visitor(class_size);
   ObjPtr<mirror::Object> k = (kMovingClasses && kMovable) ?
-      heap->AllocObject<true>(self, java_lang_Class, class_size, visitor) :
-      heap->AllocNonMovableObject<true>(self, java_lang_Class, class_size, visitor);
+      heap->AllocObject(self, java_lang_Class, class_size, visitor) :
+      heap->AllocNonMovableObject(self, java_lang_Class, class_size, visitor);
   if (UNLIKELY(k == nullptr)) {
     self->AssertPendingOOMException();
     return nullptr;

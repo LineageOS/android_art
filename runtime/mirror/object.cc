@@ -159,13 +159,10 @@ ObjPtr<Object> Object::Clone(Thread* self) {
   size_t num_bytes = SizeOf();
   StackHandleScope<1> hs(self);
   Handle<Object> this_object(hs.NewHandle(this));
-  ObjPtr<Object> copy;
   CopyObjectVisitor visitor(&this_object, num_bytes);
-  if (heap->IsMovableObject(this)) {
-    copy = heap->AllocObject<true>(self, GetClass(), num_bytes, visitor);
-  } else {
-    copy = heap->AllocNonMovableObject<true>(self, GetClass(), num_bytes, visitor);
-  }
+  ObjPtr<Object> copy = heap->IsMovableObject(this)
+      ? heap->AllocObject(self, GetClass(), num_bytes, visitor)
+      : heap->AllocNonMovableObject(self, GetClass(), num_bytes, visitor);
   if (this_object->GetClass()->IsFinalizable()) {
     heap->AddFinalizerReference(self, &copy);
   }
