@@ -134,6 +134,7 @@ class InstructionHandler {
     }
     int32_t displacement =
         static_cast<int32_t>(shadow_frame.GetDexPC()) - static_cast<int32_t>(dex_pc);
+    SetNextInstruction(inst->RelativeAt(displacement));
     inst = inst->RelativeAt(displacement);
     return false;  // Stop executing this opcode and continue in the exception handler.
   }
@@ -147,13 +148,15 @@ class InstructionHandler {
     //    address (for 'this' argument). Make a copy of the handler just for the slow path.
     //  * The modifiable fields should also be in registers, so we don't want to store their
     //    address even in the handler copy. Make a copy of them just for the call as well.
-    const Instruction* inst_copy = inst;
-    bool exit_loop_copy = exit_interpreter_loop;
+    const Instruction* inst2 = inst;
+    const Instruction* next2 = next;
+    bool exit2 = exit_interpreter_loop;
     InstructionHandler<do_access_check, transaction_active, kFormat> handler_copy(
-        ctx, instrumentation, self, shadow_frame, dex_pc, inst_copy, inst_data, exit_loop_copy);
+        ctx, instrumentation, self, shadow_frame, dex_pc, inst2, inst_data, next2, exit2);
     bool result = handler_copy.HandlePendingExceptionWithInstrumentationImpl(instr);
-    inst = inst_copy;
-    exit_interpreter_loop = exit_loop_copy;
+    inst = inst2;
+    next = next2;
+    exit_interpreter_loop = exit2;
     return result;
   }
 
@@ -179,6 +182,7 @@ class InstructionHandler {
         }
         self->ClearException();
       }
+      SetNextInstruction(inst);
     } else if (UNLIKELY(is_exception_pending)) {
       /* Should have succeeded. */
       DCHECK(!shadow_frame.GetForceRetryInstruction());
@@ -186,6 +190,7 @@ class InstructionHandler {
         return false;
       }
     } else {
+      SetNextInstruction(next_inst);
       inst = next_inst;
     }
     return true;
@@ -202,6 +207,7 @@ class InstructionHandler {
         return false;
       }
     } else {
+      SetNextInstruction(next_inst);
       inst = next_inst;
     }
     return true;
@@ -422,6 +428,7 @@ class InstructionHandler {
       return false;
     }
     BRANCH_INSTRUMENTATION(offset);
+    SetNextInstruction(inst->RelativeAt(offset));
     inst = inst->RelativeAt(offset);
     HandleBackwardBranch(offset);
     return true;
@@ -467,6 +474,7 @@ class InstructionHandler {
       REQUIRES_SHARED(Locks::mutator_lock_) {
     if (cond) {
       BRANCH_INSTRUMENTATION(offset);
+      SetNextInstruction(inst->RelativeAt(offset));
       inst = inst->RelativeAt(offset);
       HandleBackwardBranch(offset);
     } else {
@@ -1043,6 +1051,7 @@ class InstructionHandler {
   ALWAYS_INLINE bool PACKED_SWITCH() REQUIRES_SHARED(Locks::mutator_lock_) {
     int32_t offset = DoPackedSwitch(inst, shadow_frame, inst_data);
     BRANCH_INSTRUMENTATION(offset);
+    SetNextInstruction(inst->RelativeAt(offset));
     inst = inst->RelativeAt(offset);
     HandleBackwardBranch(offset);
     return true;
@@ -1051,6 +1060,7 @@ class InstructionHandler {
   ALWAYS_INLINE bool SPARSE_SWITCH() REQUIRES_SHARED(Locks::mutator_lock_) {
     int32_t offset = DoSparseSwitch(inst, shadow_frame, inst_data);
     BRANCH_INSTRUMENTATION(offset);
+    SetNextInstruction(inst->RelativeAt(offset));
     inst = inst->RelativeAt(offset);
     HandleBackwardBranch(offset);
     return true;
@@ -2173,6 +2183,7 @@ class InstructionHandler {
                                    uint16_t dex_pc,
                                    const Instruction*& inst,
                                    uint16_t inst_data,
+                                   const Instruction*& next,
                                    bool& exit_interpreter_loop)
     : ctx(ctx),
       instrumentation(instrumentation),
@@ -2181,6 +2192,7 @@ class InstructionHandler {
       dex_pc(dex_pc),
       inst(inst),
       inst_data(inst_data),
+      next(next),
       exit_interpreter_loop(exit_interpreter_loop) {
   }
 
@@ -2212,6 +2224,12 @@ class InstructionHandler {
     shadow_frame.SetVRegReference(i, val);
   }
 
+  // Set the next instruction to be executed.  It is the 'fall-through' instruction by default.
+  ALWAYS_INLINE void SetNextInstruction(const Instruction* next_inst) {
+    DCHECK_LT(next_inst->GetDexPc(Insns()), Accessor().InsnsSizeInCodeUnits());
+    next = next_inst;
+  }
+
   SwitchImplContext* const ctx;
   const instrumentation::Instrumentation* const instrumentation;
   Thread* const self;
@@ -2219,6 +2237,8 @@ class InstructionHandler {
   uint32_t const dex_pc;
   const Instruction*& inst;
   uint16_t const inst_data;
+  const Instruction*& next;
+
   bool& exit_interpreter_loop;
 };
 
@@ -2259,9 +2279,10 @@ ATTRIBUTE_NO_SANITIZE_ADDRESS void ExecuteSwitchImplCpp(SwitchImplContext* ctx) 
     TraceExecution(shadow_frame, inst, dex_pc);
     inst_data = inst->Fetch16(0);
     {
+      const Instruction* next = nullptr;
       bool exit_loop = false;
       InstructionHandler<do_access_check, transaction_active, Instruction::kInvalidFormat> handler(
-          ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, exit_loop);
+          ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, next, exit_loop);
       if (!handler.Preamble()) {
         if (UNLIKELY(exit_loop)) {
           return;
@@ -2273,16 +2294,18 @@ ATTRIBUTE_NO_SANITIZE_ADDRESS void ExecuteSwitchImplCpp(SwitchImplContext* ctx) 
       }
     }
     switch (inst->Opcode(inst_data)) {
-#define OPCODE_CASE(OPCODE, OPCODE_NAME, pname, FORMAT, i, a, e, v)                               \
+#define OPCODE_CASE(OPCODE, OPCODE_NAME, NAME, FORMAT, i, a, e, v)                                \
       case OPCODE: {                                                                              \
+        size_t inst_size = Instruction::SizeInCodeUnits(Instruction::FORMAT);                     \
+        const Instruction* next = inst->RelativeAt(inst_size);                                    \
         bool exit_loop = false;                                                                   \
         InstructionHandler<do_access_check, transaction_active, Instruction::FORMAT> handler(     \
-            ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, exit_loop);        \
+            ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, next, exit_loop);  \
         handler.OPCODE_NAME();                                                                    \
-        /* TODO: Advance 'inst' here, instead of explicitly in each handler */                    \
         if (UNLIKELY(exit_loop)) {                                                                \
           return;                                                                                 \
         }                                                                                         \
+        DCHECK_EQ(next, inst) << NAME;                                                            \
         break;                                                                                    \
       }
 DEX_INSTRUCTION_LIST(OPCODE_CASE)
