@@ -187,7 +187,8 @@ class MANAGED String final : public Object {
 
   int32_t CompareTo(ObjPtr<String> other) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ObjPtr<CharArray> ToCharArray(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_)
+  static ObjPtr<CharArray> ToCharArray(Handle<String> h_this, Thread* self)
+      REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 
   void GetChars(int32_t start, int32_t end, Handle<CharArray> array, int32_t index)

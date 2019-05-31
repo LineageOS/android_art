@@ -125,8 +125,8 @@ class MANAGED Array : public Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   ALWAYS_INLINE bool CheckIsValidIndex(int32_t index) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ObjPtr<Array> CopyOf(Thread* self, int32_t new_length) REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Roles::uninterruptible_);
+  static ObjPtr<Array> CopyOf(Handle<Array> h_this, Thread* self, int32_t new_length)
+      REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
  protected:
   void ThrowArrayStoreException(ObjPtr<Object> object) REQUIRES_SHARED(Locks::mutator_lock_)

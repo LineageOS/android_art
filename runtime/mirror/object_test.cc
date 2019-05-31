@@ -111,7 +111,7 @@ TEST_F(ObjectTest, Clone) {
   StackHandleScope<2> hs(soa.Self());
   Handle<ObjectArray<Object>> a1(hs.NewHandle(AllocObjectArray<Object>(soa.Self(), 256)));
   size_t s1 = a1->SizeOf();
-  ObjPtr<Object> clone = a1->Clone(soa.Self());
+  ObjPtr<Object> clone = Object::Clone(a1, soa.Self());
   EXPECT_EQ(s1, clone->SizeOf());
   EXPECT_TRUE(clone->GetClass() == a1->GetClass());
 }

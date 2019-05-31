@@ -47,6 +47,11 @@ class Handle : public ValueObject {
 
   ALWAYS_INLINE Handle<T>& operator=(const Handle<T>& handle) = default;
 
+  template <typename Type,
+            typename = typename std::enable_if_t<std::is_base_of_v<T, Type>>>
+  ALWAYS_INLINE Handle(const Handle<Type>& other) : reference_(other.reference_) {
+  }
+
   ALWAYS_INLINE explicit Handle(StackReference<T>* reference) : reference_(reference) {
   }
 

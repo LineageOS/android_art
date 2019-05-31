@@ -151,19 +151,17 @@ class CopyObjectVisitor {
   DISALLOW_COPY_AND_ASSIGN(CopyObjectVisitor);
 };
 
-ObjPtr<Object> Object::Clone(Thread* self) {
-  CHECK(!IsClass()) << "Can't clone classes.";
+ObjPtr<Object> Object::Clone(Handle<Object> h_this, Thread* self) {
+  CHECK(!h_this->IsClass()) << "Can't clone classes.";
   // Object::SizeOf gets the right size even if we're an array. Using c->AllocObject() here would
   // be wrong.
   gc::Heap* heap = Runtime::Current()->GetHeap();
-  size_t num_bytes = SizeOf();
-  StackHandleScope<1> hs(self);
-  Handle<Object> this_object(hs.NewHandle(this));
-  CopyObjectVisitor visitor(&this_object, num_bytes);
-  ObjPtr<Object> copy = heap->IsMovableObject(this)
-      ? heap->AllocObject(self, GetClass(), num_bytes, visitor)
-      : heap->AllocNonMovableObject(self, GetClass(), num_bytes, visitor);
-  if (this_object->GetClass()->IsFinalizable()) {
+  size_t num_bytes = h_this->SizeOf();
+  CopyObjectVisitor visitor(&h_this, num_bytes);
+  ObjPtr<Object> copy = heap->IsMovableObject(h_this.Get())
+      ? heap->AllocObject(self, h_this->GetClass(), num_bytes, visitor)
+      : heap->AllocNonMovableObject(self, h_this->GetClass(), num_bytes, visitor);
+  if (h_this->GetClass()->IsFinalizable()) {
     heap->AddFinalizerReference(self, &copy);
   }
   return copy;

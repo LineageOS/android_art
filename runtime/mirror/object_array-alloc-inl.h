@@ -61,15 +61,15 @@ inline ObjPtr<ObjectArray<T>> ObjectArray<T>::Alloc(Thread* self,
 }
 
 template<class T>
-inline ObjPtr<ObjectArray<T>> ObjectArray<T>::CopyOf(Thread* self, int32_t new_length) {
+inline ObjPtr<ObjectArray<T>> ObjectArray<T>::CopyOf(Handle<ObjectArray<T>> h_this,
+                                                     Thread* self,
+                                                     int32_t new_length) {
   DCHECK_GE(new_length, 0);
-  // We may get copied by a compacting GC.
-  StackHandleScope<1> hs(self);
-  Handle<ObjectArray<T>> h_this(hs.NewHandle(this));
   gc::Heap* heap = Runtime::Current()->GetHeap();
-  gc::AllocatorType allocator_type = heap->IsMovableObject(this) ? heap->GetCurrentAllocator() :
-      heap->GetCurrentNonMovingAllocator();
-  ObjPtr<ObjectArray<T>> new_array = Alloc(self, GetClass(), new_length, allocator_type);
+  gc::AllocatorType allocator_type = heap->IsMovableObject(h_this.Get())
+      ? heap->GetCurrentAllocator()
+      : heap->GetCurrentNonMovingAllocator();
+  ObjPtr<ObjectArray<T>> new_array = Alloc(self, h_this->GetClass(), new_length, allocator_type);
   if (LIKELY(new_array != nullptr)) {
     new_array->AssignableMemcpy(0, h_this.Get(), 0, std::min(h_this->GetLength(), new_length));
   }
