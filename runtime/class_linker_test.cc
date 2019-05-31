@@ -1522,7 +1522,7 @@ TEST_F(ClassLinkerTest, RegisterDexFileName) {
     ASSERT_TRUE(dex_cache != nullptr);
   }
   // Make a copy of the dex cache and change the name.
-  dex_cache.Assign(dex_cache->Clone(soa.Self())->AsDexCache());
+  dex_cache.Assign(mirror::Object::Clone(dex_cache, soa.Self())->AsDexCache());
   const uint16_t data[] = { 0x20AC, 0x20A1 };
   Handle<mirror::String> location(hs.NewHandle(mirror::String::AllocFromUtf16(soa.Self(),
                                                                               arraysize(data),

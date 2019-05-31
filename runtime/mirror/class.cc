@@ -94,14 +94,12 @@ ObjPtr<mirror::Class> Class::GetPrimitiveClass(ObjPtr<mirror::String> name) {
   }
 }
 
-ObjPtr<ClassExt> Class::EnsureExtDataPresent(Thread* self) {
-  ObjPtr<ClassExt> existing(GetExtData());
+ObjPtr<ClassExt> Class::EnsureExtDataPresent(Handle<Class> h_this, Thread* self) {
+  ObjPtr<ClassExt> existing(h_this->GetExtData());
   if (!existing.IsNull()) {
     return existing;
   }
-  StackHandleScope<3> hs(self);
-  // Handlerize 'this' since we are allocating here.
-  Handle<Class> h_this(hs.NewHandle(this));
+  StackHandleScope<2> hs(self);
   // Clear exception so we can allocate.
   Handle<Throwable> throwable(hs.NewHandle(self->GetException()));
   self->ClearException();
@@ -172,7 +170,7 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
       }
     }
 
-    ObjPtr<ClassExt> ext(h_this->EnsureExtDataPresent(self));
+    ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
     if (!ext.IsNull()) {
       self->AssertPendingException();
       ext->SetVerifyError(self->GetException());
@@ -1205,12 +1203,13 @@ class CopyClassVisitor {
   DISALLOW_COPY_AND_ASSIGN(CopyClassVisitor);
 };
 
-ObjPtr<Class> Class::CopyOf(
-    Thread* self, int32_t new_length, ImTable* imt, PointerSize pointer_size) {
+ObjPtr<Class> Class::CopyOf(Handle<Class> h_this,
+                            Thread* self,
+                            int32_t new_length,
+                            ImTable* imt,
+                            PointerSize pointer_size) {
   DCHECK_GE(new_length, static_cast<int32_t>(sizeof(Class)));
   // We may get copied by a compacting GC.
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
   Runtime* runtime = Runtime::Current();
   gc::Heap* heap = runtime->GetHeap();
   // The num_bytes (3rd param) is sizeof(Class) as opposed to SizeOf()
