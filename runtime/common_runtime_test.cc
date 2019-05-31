@@ -463,7 +463,6 @@ void CheckJniAbortCatcher::Hook(void* data, const std::string& reason) {
 extern "C"
 __attribute__((visibility("default"))) __attribute__((weak))
 void ArtTestGlobalInit() {
-  LOG(ERROR) << "ArtTestGlobalInit in common_runtime_test";
 }
 
 int main(int argc, char **argv) {
