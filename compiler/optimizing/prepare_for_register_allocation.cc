@@ -160,8 +160,8 @@ void PrepareForRegisterAllocation::VisitClinitCheck(HClinitCheck* check) {
   if (implicit_clinit != nullptr) {
     // Remove the check from the graph. It has been merged into the invoke or new-instance.
     check->GetBlock()->RemoveInstruction(check);
-    // Check if we can merge the load class as well.
-    if (can_merge_with_load_class && !load_class->HasUses()) {
+    // Check if we can merge the load class as well, or whether the LoadClass is now dead.
+    if ((can_merge_with_load_class || !load_class->CanThrow()) && !load_class->HasUses()) {
       load_class->GetBlock()->RemoveInstruction(load_class);
     }
   } else if (can_merge_with_load_class &&

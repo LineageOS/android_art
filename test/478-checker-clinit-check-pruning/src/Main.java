@@ -225,6 +225,19 @@ public class Main {
   /// CHECK-DAG:                           ClinitCheck
   /// CHECK-DAG:                           InvokeStaticOrDirect
 
+  // The following checks ensure the clinit check and load class
+  // instructions added by the builder are pruned by the
+  // PrepareForRegisterAllocation.  As the control flow graph is not
+  // dumped after (nor before) this step, we check the CFG as it is
+  // before the next pass (liveness analysis) instead.
+
+  /// CHECK-START: void Main$ClassWithClinit4Instance.invokeStaticNotInlined() liveness (before)
+  /// CHECK:                               InvokeStaticOrDirect clinit_check:implicit
+
+  /// CHECK-START: void Main$ClassWithClinit4Instance.invokeStaticNotInlined() liveness (before)
+  /// CHECK-NOT:                           LoadClass
+  /// CHECK-NOT:                           ClinitCheck
+
   static class ClassWithClinit4Instance {
     void invokeStaticNotInlined() {
       // ClinitCheck required.
