@@ -138,16 +138,14 @@ void Array::ThrowArrayStoreException(ObjPtr<Object> object) {
   art::ThrowArrayStoreException(object->GetClass(), this->GetClass());
 }
 
-ObjPtr<Array> Array::CopyOf(Thread* self, int32_t new_length) {
-  ObjPtr<Class> klass = GetClass();
+ObjPtr<Array> Array::CopyOf(Handle<Array> h_this, Thread* self, int32_t new_length) {
+  ObjPtr<Class> klass = h_this->GetClass();
   CHECK(klass->IsPrimitiveArray()) << "Will miss write barriers";
   DCHECK_GE(new_length, 0);
-  // We may get copied by a compacting GC.
-  StackHandleScope<1> hs(self);
-  auto h_this(hs.NewHandle(this));
   auto* heap = Runtime::Current()->GetHeap();
-  gc::AllocatorType allocator_type = heap->IsMovableObject(this) ? heap->GetCurrentAllocator() :
-      heap->GetCurrentNonMovingAllocator();
+  gc::AllocatorType allocator_type = heap->IsMovableObject(h_this.Get())
+      ? heap->GetCurrentAllocator()
+      : heap->GetCurrentNonMovingAllocator();
   const auto component_size = klass->GetComponentSize();
   const auto component_shift = klass->GetComponentSizeShift();
   ObjPtr<Array> new_array =

@@ -52,10 +52,9 @@ void ClassExt::SetObsoleteArrays(ObjPtr<PointerArray> methods,
 // We really need to be careful how we update this. If we ever in the future make it so that
 // these arrays are written into without all threads being suspended we have a race condition! This
 // race could cause obsolete methods to be missed.
-bool ClassExt::ExtendObsoleteArrays(Thread* self, uint32_t increase) {
+bool ClassExt::ExtendObsoleteArrays(Handle<ClassExt> h_this, Thread* self, uint32_t increase) {
   // TODO It would be good to check that we have locked the class associated with this ClassExt.
-  StackHandleScope<5> hs(self);
-  Handle<ClassExt> h_this(hs.NewHandle(this));
+  StackHandleScope<4> hs(self);
   Handle<PointerArray> old_methods(hs.NewHandle(h_this->GetObsoleteMethods()));
   Handle<ObjectArray<DexCache>> old_dex_caches(hs.NewHandle(h_this->GetObsoleteDexCaches()));
   ClassLinker* cl = Runtime::Current()->GetClassLinker();

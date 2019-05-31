@@ -1398,12 +1398,14 @@ void UnstartedRuntime::UnstartedStringFastSubstring(
 void UnstartedRuntime::UnstartedStringToCharArray(
     Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::String> string = shadow_frame->GetVRegReference(arg_offset)->AsString();
+  StackHandleScope<1> hs(self);
+  Handle<mirror::String> string =
+      hs.NewHandle(shadow_frame->GetVRegReference(arg_offset)->AsString());
   if (string == nullptr) {
     AbortTransactionOrFail(self, "String.charAt with null object");
     return;
   }
-  result->SetL(string->ToCharArray(self));
+  result->SetL(mirror::String::ToCharArray(string, self));
 }
 
 // This allows statically initializing ConcurrentHashMap and SynchronousQueue.
@@ -1797,7 +1799,9 @@ void UnstartedRuntime::UnstartedJNIFloatIntBitsToFloat(
 void UnstartedRuntime::UnstartedJNIObjectInternalClone(
     Thread* self, ArtMethod* method ATTRIBUTE_UNUSED, mirror::Object* receiver,
     uint32_t* args ATTRIBUTE_UNUSED, JValue* result) {
-  result->SetL(receiver->Clone(self));
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Object> h_receiver = hs.NewHandle(receiver);
+  result->SetL(mirror::Object::Clone(h_receiver, self));
 }
 
 void UnstartedRuntime::UnstartedJNIObjectNotifyAll(
