@@ -17,6 +17,7 @@
 package art;
 
 import java.util.*;
+import java.util.function.*;
 import java.lang.reflect.*;
 import java.nio.ByteBuffer;
 import dalvik.system.InMemoryDexClassLoader;
@@ -49,22 +50,24 @@ public class Test1946 {
   public class TMP2 {}
   public class TMP3 extends ArrayList {}
 
-  private static void check(boolean b, String msg) {
+  private static void check(boolean b, Supplier<String> msg) {
     if (!b) {
-      throw new Error("Test failed! " + msg);
+      throw new Error("Test failed! " + msg.get());
     }
   }
 
-  private static <T> void checkEq(T[] full, T[] sub, String msg) {
+  private static <T> void checkEq(T[] full, T[] sub, final String msg) {
     List<T> f = Arrays.asList(full);
-    check(full.length == sub.length, "not equal length");
-    msg = Arrays.toString(full) + " is not same as " + Arrays.toString(sub) + ": " + msg;
-    check(Arrays.asList(full).containsAll(Arrays.asList(sub)), msg);
+    check(full.length == sub.length, () -> "not equal length");
+    Supplier<String> msgGen =
+      () -> Arrays.toString(full) + " is not same as " + Arrays.toString(sub) + ": " + msg;
+    check(new HashSet<T>(Arrays.asList(full)).containsAll(Arrays.asList(sub)), msgGen);
   }
 
-  private static <T> void checkSubset(T[] full, T[] sub, String msg) {
-    msg = Arrays.toString(full) + " does not contain all of " + Arrays.toString(sub) + ": " + msg;
-    check(Arrays.asList(full).containsAll(Arrays.asList(sub)), msg);
+  private static <T> void checkSubset(T[] full, T[] sub, final String msg) {
+    Supplier<String> msgGen =
+      () -> Arrays.toString(full) + " does not contain all of " + Arrays.toString(sub) + ": " + msg;
+    check(new HashSet<T>(Arrays.asList(full)).containsAll(Arrays.asList(sub)), msgGen);
   }
 
   public static void run() throws Exception {
