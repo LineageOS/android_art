@@ -104,7 +104,6 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
       region_space_inter_region_bitmap_(nullptr),
       non_moving_space_inter_region_bitmap_(nullptr),
       reclaimed_bytes_ratio_sum_(0.f),
-      skipped_blocks_lock_("concurrent copying bytes blocks lock", kMarkSweepMarkStackLock),
       measure_read_barrier_slow_path_(measure_read_barrier_slow_path),
       mark_from_read_barrier_measurements_(false),
       rb_slow_path_ns_(0),
@@ -378,6 +377,8 @@ void ConcurrentCopying::InitializePhase() {
               << reinterpret_cast<void*>(region_space_->Limit());
   }
   CheckEmptyMarkStack();
+  // currently_marking_ mght still contain an obsolete value.
+  currently_copying_.store(nullptr, std::memory_order_relaxed);
   rb_mark_bit_stack_full_ = false;
   mark_from_read_barrier_measurements_ = measure_read_barrier_slow_path_;
   if (measure_read_barrier_slow_path_) {
@@ -3249,65 +3250,6 @@ void ConcurrentCopying::FillWithDummyObject(Thread* const self,
   }
 }
 
-// Reuse the memory blocks that were copy of objects that were lost in race.
-mirror::Object* ConcurrentCopying::AllocateInSkippedBlock(Thread* const self, size_t alloc_size) {
-  // Try to reuse the blocks that were unused due to CAS failures.
-  CHECK_ALIGNED(alloc_size, space::RegionSpace::kAlignment);
-  size_t min_object_size = RoundUp(sizeof(mirror::Object), space::RegionSpace::kAlignment);
-  size_t byte_size;
-  uint8_t* addr;
-  {
-    MutexLock mu(self, skipped_blocks_lock_);
-    auto it = skipped_blocks_map_.lower_bound(alloc_size);
-    if (it == skipped_blocks_map_.end()) {
-      // Not found.
-      return nullptr;
-    }
-    byte_size = it->first;
-    CHECK_GE(byte_size, alloc_size);
-    if (byte_size > alloc_size && byte_size - alloc_size < min_object_size) {
-      // If remainder would be too small for a dummy object, retry with a larger request size.
-      it = skipped_blocks_map_.lower_bound(alloc_size + min_object_size);
-      if (it == skipped_blocks_map_.end()) {
-        // Not found.
-        return nullptr;
-      }
-      CHECK_ALIGNED(it->first - alloc_size, space::RegionSpace::kAlignment);
-      CHECK_GE(it->first - alloc_size, min_object_size)
-          << "byte_size=" << byte_size << " it->first=" << it->first << " alloc_size=" << alloc_size;
-    }
-    // Found a block.
-    CHECK(it != skipped_blocks_map_.end());
-    byte_size = it->first;
-    addr = it->second;
-    CHECK_GE(byte_size, alloc_size);
-    CHECK(region_space_->IsInToSpace(reinterpret_cast<mirror::Object*>(addr)));
-    CHECK_ALIGNED(byte_size, space::RegionSpace::kAlignment);
-    if (kVerboseMode) {
-      LOG(INFO) << "Reusing skipped bytes : " << reinterpret_cast<void*>(addr) << ", " << byte_size;
-    }
-    skipped_blocks_map_.erase(it);
-  }
-  memset(addr, 0, byte_size);
-  if (byte_size > alloc_size) {
-    // Return the remainder to the map.
-    CHECK_ALIGNED(byte_size - alloc_size, space::RegionSpace::kAlignment);
-    CHECK_GE(byte_size - alloc_size, min_object_size);
-    // FillWithDummyObject may mark an object, avoid holding skipped_blocks_lock_ to prevent lock
-    // violation and possible deadlock. The deadlock case is a recursive case:
-    // FillWithDummyObject -> Mark(IntArray.class) -> Copy -> AllocateInSkippedBlock.
-    FillWithDummyObject(self,
-                        reinterpret_cast<mirror::Object*>(addr + alloc_size),
-                        byte_size - alloc_size);
-    CHECK(region_space_->IsInToSpace(reinterpret_cast<mirror::Object*>(addr + alloc_size)));
-    {
-      MutexLock mu(self, skipped_blocks_lock_);
-      skipped_blocks_map_.insert(std::make_pair(byte_size - alloc_size, addr + alloc_size));
-    }
-  }
-  return reinterpret_cast<mirror::Object*>(addr);
-}
-
 mirror::Object* ConcurrentCopying::Copy(Thread* const self,
                                         mirror::Object* from_ref,
                                         mirror::Object* holder,
@@ -3325,6 +3267,27 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
   // Note that from_ref is a from space ref so the SizeOf() call will access the from-space meta
   // objects, but it's ok and necessary.
   size_t obj_size = from_ref->SizeOf<kDefaultVerifyFlags>();
+  mirror::Object* old_currently_copying = nullptr;
+  if (obj_size >= kCurrentlyCopyingMin) {
+    old_currently_copying = currently_copying_.exchange(from_ref, std::memory_order_relaxed);
+    if (old_currently_copying == from_ref) {
+      VLOG(gc) << "GC: Waiting for another thread to copy, size = " << obj_size;
+      // Somebody is already working on the copy. Just wait.
+      LockWord old_lock_word(LockWord::Default());
+      do {
+        if (UNLIKELY(obj_size >= 1'000'000)) {
+          // The copy will take on the order of a millisecond or longer.
+          usleep(1'000);
+        } else {
+          sched_yield();
+        }
+        old_lock_word = from_ref->GetLockWord(false);
+      } while (old_lock_word.GetState() != LockWord::kForwardingAddress);
+      mirror::Object* to_ref = reinterpret_cast<mirror::Object*>(old_lock_word.ForwardingAddress());
+      DCHECK(to_ref != nullptr);
+      return to_ref;
+    }
+  }
   size_t region_space_alloc_size = (obj_size <= space::RegionSpace::kRegionSize)
       ? RoundUp(obj_size, space::RegionSpace::kAlignment)
       : RoundUp(obj_size, space::RegionSpace::kRegionSize);
@@ -3332,44 +3295,27 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
   size_t non_moving_space_bytes_allocated = 0U;
   size_t bytes_allocated = 0U;
   size_t dummy;
-  bool fall_back_to_non_moving = false;
+  bool fell_back_to_non_moving = false;
   mirror::Object* to_ref = region_space_->AllocNonvirtual</*kForEvac=*/ true>(
       region_space_alloc_size, &region_space_bytes_allocated, nullptr, &dummy);
   bytes_allocated = region_space_bytes_allocated;
   if (LIKELY(to_ref != nullptr)) {
     DCHECK_EQ(region_space_alloc_size, region_space_bytes_allocated);
   } else {
-    // Failed to allocate in the region space. Try the skipped blocks.
-    to_ref = AllocateInSkippedBlock(self, region_space_alloc_size);
-    if (to_ref != nullptr) {
-      // Succeeded to allocate in a skipped block.
-      if (heap_->use_tlab_) {
-        // This is necessary for the tlab case as it's not accounted in the space.
-        region_space_->RecordAlloc(to_ref);
-      }
-      bytes_allocated = region_space_alloc_size;
-      heap_->num_bytes_allocated_.fetch_sub(bytes_allocated, std::memory_order_relaxed);
-      to_space_bytes_skipped_.fetch_sub(bytes_allocated, std::memory_order_relaxed);
-      to_space_objects_skipped_.fetch_sub(1, std::memory_order_relaxed);
-    } else {
-      // Fall back to the non-moving space.
-      fall_back_to_non_moving = true;
-      if (kVerboseMode) {
-        LOG(INFO) << "Out of memory in the to-space. Fall back to non-moving. skipped_bytes="
-                  << to_space_bytes_skipped_.load(std::memory_order_relaxed)
-                  << " skipped_objects="
-                  << to_space_objects_skipped_.load(std::memory_order_relaxed);
-      }
-      to_ref = heap_->non_moving_space_->Alloc(self, obj_size,
-                                               &non_moving_space_bytes_allocated, nullptr, &dummy);
-      if (UNLIKELY(to_ref == nullptr)) {
-        LOG(FATAL_WITHOUT_ABORT) << "Fall-back non-moving space allocation failed for a "
-                                 << obj_size << " byte object in region type "
-                                 << region_space_->GetRegionType(from_ref);
-        LOG(FATAL) << "Object address=" << from_ref << " type=" << from_ref->PrettyTypeOf();
-      }
-      bytes_allocated = non_moving_space_bytes_allocated;
+    // Fall back to the non-moving space.
+    fell_back_to_non_moving = true;
+    if (kVerboseMode) {
+      LOG(INFO) << "Out of memory in the to-space. Fell back to non-moving.";
     }
+    to_ref = heap_->non_moving_space_->Alloc(self, obj_size,
+                                             &non_moving_space_bytes_allocated, nullptr, &dummy);
+    if (UNLIKELY(to_ref == nullptr)) {
+      LOG(FATAL_WITHOUT_ABORT) << "Fall-back non-moving space allocation failed for a "
+                               << obj_size << " byte object in region type "
+                               << region_space_->GetRegionType(from_ref);
+      LOG(FATAL) << "Object address=" << from_ref << " type=" << from_ref->PrettyTypeOf();
+    }
+    bytes_allocated = non_moving_space_bytes_allocated;
   }
   DCHECK(to_ref != nullptr);
 
@@ -3396,26 +3342,22 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
       // the forwarding pointer first. Make the lost copy (to_ref)
       // look like a valid but dead (dummy) object and keep it for
       // future reuse.
-      FillWithDummyObject(self, to_ref, bytes_allocated);
-      if (!fall_back_to_non_moving) {
+      VLOG(gc) << "GC: Lost copying race, size = " << obj_size;
+      if (fell_back_to_non_moving) {
+        DCHECK(heap_->non_moving_space_->HasAddress(to_ref));
+        DCHECK_EQ(bytes_allocated, non_moving_space_bytes_allocated);
+        // Free the non-moving-space chunk.
+        heap_->non_moving_space_->Free(self, to_ref);
+      } else {
         DCHECK(region_space_->IsInToSpace(to_ref));
         if (bytes_allocated > space::RegionSpace::kRegionSize) {
           // Free the large alloc.
           region_space_->FreeLarge</*kForEvac=*/ true>(to_ref, bytes_allocated);
         } else {
-          // Record the lost copy for later reuse.
+          // Make it look legitimate, record the object allocation, and then drop the object.
+          FillWithDummyObject(self, to_ref, bytes_allocated);
           heap_->num_bytes_allocated_.fetch_add(bytes_allocated, std::memory_order_relaxed);
-          to_space_bytes_skipped_.fetch_add(bytes_allocated, std::memory_order_relaxed);
-          to_space_objects_skipped_.fetch_add(1, std::memory_order_relaxed);
-          MutexLock mu(self, skipped_blocks_lock_);
-          skipped_blocks_map_.insert(std::make_pair(bytes_allocated,
-                                                    reinterpret_cast<uint8_t*>(to_ref)));
         }
-      } else {
-        DCHECK(heap_->non_moving_space_->HasAddress(to_ref));
-        DCHECK_EQ(bytes_allocated, non_moving_space_bytes_allocated);
-        // Free the non-moving-space chunk.
-        heap_->non_moving_space_->Free(self, to_ref);
       }
 
       // Get the winner's forward ptr.
@@ -3437,7 +3379,10 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
     }
 
     // Do a fence to prevent the field CAS in ConcurrentCopying::Process from possibly reordering
-    // before the object copy.
+    // before the object copy. This serves the same purpose as the constructor fence in a new
+    // object allocation. Another thread can get a pointer to this object either via the
+    // forwarding address or via the returned to_ref. But it must read the to_space data via an
+    // address dependency on one of those. Thus it cannot see old values in the copied object.
     std::atomic_thread_fence(std::memory_order_release);
 
     LockWord new_lock_word = LockWord::FromForwardingAddress(reinterpret_cast<size_t>(to_ref));
@@ -3449,6 +3394,12 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
                                          std::memory_order_relaxed);
     if (LIKELY(success)) {
       // The CAS succeeded.
+      if (obj_size >= kCurrentlyCopyingMin) {
+        // If someone else has since over-written currently_copying_, leave it alone.  Otherwise
+        // restore the old one. If the old one was already copied, the forwarding address will
+        // already be there, and nobody will care. If not, then it's useful to put it back.
+        currently_copying_.CompareAndSetStrongRelaxed(from_ref, old_currently_copying);
+      }
       DCHECK(thread_running_gc_ != nullptr);
       if (LIKELY(self == thread_running_gc_)) {
         objects_moved_gc_thread_ += 1;
@@ -3458,9 +3409,7 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
         bytes_moved_.fetch_add(bytes_allocated, std::memory_order_relaxed);
       }
 
-      if (LIKELY(!fall_back_to_non_moving)) {
-        DCHECK(region_space_->IsInToSpace(to_ref));
-      } else {
+      if (UNLIKELY(fell_back_to_non_moving)) {
         DCHECK(heap_->non_moving_space_->HasAddress(to_ref));
         DCHECK_EQ(bytes_allocated, non_moving_space_bytes_allocated);
         if (!use_generational_cc_ || !young_gen_) {
@@ -3471,6 +3420,8 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
           // Mark it in the mark bitmap.
           CHECK(!heap_->non_moving_space_->GetMarkBitmap()->AtomicTestAndSet(to_ref));
         }
+      } else {
+        DCHECK(region_space_->IsInToSpace(to_ref));
       }
       if (kUseBakerReadBarrier) {
         DCHECK(to_ref->GetReadBarrierState() == ReadBarrier::GrayState());
@@ -3635,10 +3586,6 @@ void ConcurrentCopying::FinishPhase() {
   } else if (use_generational_cc_ && !young_gen_) {
     region_space_inter_region_bitmap_->Clear();
     non_moving_space_inter_region_bitmap_->Clear();
-  }
-  {
-    MutexLock mu(self, skipped_blocks_lock_);
-    skipped_blocks_map_.clear();
   }
   {
     ReaderMutexLock mu(self, *Locks::mutator_lock_);
