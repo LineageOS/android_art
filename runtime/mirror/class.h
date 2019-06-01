@@ -1067,7 +1067,7 @@ class MANAGED Class final : public Object {
   // Returns the ExtData for this class, allocating one if necessary. This should be the only way
   // to force ext_data_ to be set. No functions are available for changing an already set ext_data_
   // since doing so is not allowed.
-  ObjPtr<ClassExt> EnsureExtDataPresent(Thread* self)
+  static ObjPtr<ClassExt> EnsureExtDataPresent(Handle<Class> h_this, Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
   uint16_t GetDexClassDefIndex() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -1140,7 +1140,11 @@ class MANAGED Class final : public Object {
   void AssertInitializedOrInitializingInThread(Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ObjPtr<Class> CopyOf(Thread* self, int32_t new_length, ImTable* imt, PointerSize pointer_size)
+  static ObjPtr<Class> CopyOf(Handle<Class> h_this,
+                              Thread* self,
+                              int32_t new_length,
+                              ImTable* imt,
+                              PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
   // For proxy class only.

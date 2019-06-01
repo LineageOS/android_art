@@ -18,6 +18,7 @@
 
 #include "nativehelper/jni_macros.h"
 
+#include "handle_scope-inl.h"
 #include "jni/jni_internal.h"
 #include "mirror/object-inl.h"
 #include "native_util.h"
@@ -27,8 +28,9 @@ namespace art {
 
 static jobject Object_internalClone(JNIEnv* env, jobject java_this) {
   ScopedFastNativeObjectAccess soa(env);
-  ObjPtr<mirror::Object> o = soa.Decode<mirror::Object>(java_this);
-  return soa.AddLocalReference<jobject>(o->Clone(soa.Self()));
+  StackHandleScope<1u> hs(soa.Self());
+  Handle<mirror::Object> o = hs.NewHandle(soa.Decode<mirror::Object>(java_this));
+  return soa.AddLocalReference<jobject>(mirror::Class::Clone(o, soa.Self()));
 }
 
 static void Object_notify(JNIEnv* env, jobject java_this) {

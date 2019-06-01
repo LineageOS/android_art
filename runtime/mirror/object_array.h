@@ -99,7 +99,9 @@ class MANAGED ObjectArray: public Array {
                                 bool throw_exception)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ObjPtr<ObjectArray<T>> CopyOf(Thread* self, int32_t new_length)
+  static ObjPtr<ObjectArray<T>> CopyOf(Handle<ObjectArray<T>> h_this,
+                                       Thread* self,
+                                       int32_t new_length)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 

@@ -220,7 +220,11 @@ static jobjectArray Class_getInterfacesInternal(JNIEnv* env, jobject javaThis) {
   Handle<mirror::Class> klass = hs.NewHandle(DecodeClass(soa, javaThis));
 
   if (klass->IsProxyClass()) {
-    return soa.AddLocalReference<jobjectArray>(klass->GetProxyInterfaces()->Clone(soa.Self()));
+    StackHandleScope<1> hs2(soa.Self());
+    Handle<mirror::ObjectArray<mirror::Class>> interfaces =
+        hs2.NewHandle(klass->GetProxyInterfaces());
+    return soa.AddLocalReference<jobjectArray>(
+        mirror::ObjectArray<mirror::Class>::Clone(interfaces, soa.Self()));
   }
 
   const dex::TypeList* iface_list = klass->GetInterfaceTypeList();
