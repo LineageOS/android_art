@@ -641,8 +641,9 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         error_msgs->push_back("Fallback mode disabled, skipping dex files.");
       }
     } else {
-      error_msgs->push_back("No original dex files found for dex location "
-          + std::string(dex_location));
+      std::string msg = StringPrintf("No original dex files found for dex location (%s) %s",
+          GetInstructionSetString(kRuntimeISA), dex_location);
+      error_msgs->push_back(msg);
     }
   }
 
