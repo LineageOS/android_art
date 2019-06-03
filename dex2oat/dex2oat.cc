@@ -863,7 +863,11 @@ class Dex2Oat final {
 
     if (boot_image_filename_.empty()) {
       if (image_base_ == 0) {
-        Usage("Non-zero --base not specified");
+        Usage("Non-zero --base not specified for boot image");
+      }
+    } else {
+      if (image_base_ != 0) {
+        Usage("Non-zero --base specified for app image or boot image extension");
       }
     }
 
@@ -1923,23 +1927,12 @@ class Dex2Oat final {
     }
 
     if (IsImage()) {
-      if (IsAppImage() && image_base_ == 0) {
+      if (!IsBootImage()) {
+        DCHECK_EQ(image_base_, 0u);
         gc::Heap* const heap = Runtime::Current()->GetHeap();
-        for (ImageSpace* image_space : heap->GetBootImageSpaces()) {
-          image_base_ = std::max(image_base_, RoundUp(
-              reinterpret_cast<uintptr_t>(image_space->GetImageHeader().GetOatFileEnd()),
-              kPageSize));
-        }
-        // The non moving space is right after the oat file. Put the preferred app image location
-        // right after the non moving space so that we ideally get a continuous immune region for
-        // the GC.
-        // Use the default non moving space capacity since dex2oat does not have a separate non-
-        // moving space. This means the runtime's non moving space space size will be as large
-        // as the growth limit for dex2oat, but smaller in the zygote.
-        const size_t non_moving_space_capacity = gc::Heap::kDefaultNonMovingSpaceCapacity;
-        image_base_ += non_moving_space_capacity;
-        VLOG(compiler) << "App image base=" << reinterpret_cast<void*>(image_base_);
+        image_base_ = heap->GetBootImagesStartAddress() + heap->GetBootImagesSize();
       }
+      VLOG(compiler) << "Image base=" << reinterpret_cast<void*>(image_base_);
 
       image_writer_.reset(new linker::ImageWriter(*compiler_options_,
                                                   image_base_,
