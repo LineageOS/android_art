@@ -330,6 +330,9 @@ class StackVisitor {
 
   void SanityCheckFrame() const REQUIRES_SHARED(Locks::mutator_lock_);
 
+  ALWAYS_INLINE CodeInfo* GetCurrentInlineInfo() const;
+  ALWAYS_INLINE StackMap* GetCurrentStackMap() const;
+
   Thread* const thread_;
   const StackWalkKind walk_kind_;
   ShadowFrame* cur_shadow_frame_;
@@ -342,8 +345,13 @@ class StackVisitor {
   size_t cur_depth_;
   // Current inlined frames of the method we are currently at.
   // We keep poping frames from the end as we visit the frames.
-  CodeInfo current_code_info_;
   BitTableRange<InlineInfo> current_inline_frames_;
+
+  // Cache the most recently decoded inline info data.
+  // The 'current_inline_frames_' refers to this data, so we need to keep it alive anyway.
+  // Marked mutable since the cache fields are updated from const getters.
+  mutable std::pair<const OatQuickMethodHeader*, CodeInfo> cur_inline_info_;
+  mutable std::pair<uintptr_t, StackMap> cur_stack_map_;
 
  protected:
   Context* const context_;

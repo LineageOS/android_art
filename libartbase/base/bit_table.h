@@ -108,6 +108,7 @@ class BitTableAccessor {
   static constexpr uint32_t kNumColumns = NumColumns;
   static constexpr uint32_t kNoValue = BitTableBase<kNumColumns>::kNoValue;
 
+  BitTableAccessor() = default;
   BitTableAccessor(const BitTableBase<kNumColumns>* table, uint32_t row)
       : table_(table), row_(row) {
     DCHECK(table_ != nullptr);
