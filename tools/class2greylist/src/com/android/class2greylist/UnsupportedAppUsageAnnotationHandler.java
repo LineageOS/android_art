@@ -32,11 +32,14 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
     private static final String EXPECTED_SIGNATURE_PROPERTY = "expectedSignature";
     private static final String MAX_TARGET_SDK_PROPERTY = "maxTargetSdk";
     private static final String IMPLICIT_MEMBER_PROPERTY = "implicitMember";
+    private static final String PUBLIC_ALTERNATIVES_PROPERTY = "publicAlternatives";
 
     private final Status mStatus;
     private final Predicate<ClassMember> mClassMemberFilter;
     private final Map<Integer, String> mSdkVersionToFlagMap;
     private final AnnotationConsumer mAnnotationConsumer;
+
+    private ApiResolver mApiResolver;
 
     /**
      * Represents a member of a class file (a field or method).
@@ -66,6 +69,7 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
         this(status, annotationConsumer,
                 member -> !(member.isBridgeMethod && publicApis.contains(member.signature)),
                 sdkVersionToFlagMap);
+        mApiResolver = new ApiResolver(publicApis);
     }
 
     @VisibleForTesting
@@ -76,6 +80,7 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
         mAnnotationConsumer = annotationConsumer;
         mClassMemberFilter = memberFilter;
         mSdkVersionToFlagMap = sdkVersionToFlagMap;
+        mApiResolver = new ApiResolver();
     }
 
     @Override
@@ -85,7 +90,7 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
             AnnotatedMemberContext memberContext = (AnnotatedMemberContext) context;
             FieldOrMethod member = memberContext.member;
             isBridgeMethod = (member instanceof Method) &&
-                (member.getAccessFlags() & Const.ACC_BRIDGE) != 0;
+                    (member.getAccessFlags() & Const.ACC_BRIDGE) != 0;
             if (isBridgeMethod) {
                 mStatus.debug("Member is a bridge method");
             }
@@ -94,6 +99,7 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
         String signature = context.getMemberDescriptor();
         Integer maxTargetSdk = null;
         String implicitMemberSignature = null;
+        String publicAlternativesString = null;
 
         for (ElementValuePair property : annotation.getElementValuePairs()) {
             switch (property.getNameString()) {
@@ -102,8 +108,8 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
                     // Don't enforce for bridge methods; they're generated so won't match.
                     if (!isBridgeMethod && !signature.equals(expected)) {
                         context.reportError("Expected signature does not match generated:\n"
-                                        + "Expected:  %s\n"
-                                        + "Generated: %s", expected, signature);
+                                + "Expected:  %s\n"
+                                + "Generated: %s", expected, signature);
                         return;
                     }
                     break;
@@ -121,23 +127,27 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
                     implicitMemberSignature = property.getValue().stringifyValue();
                     if (context instanceof AnnotatedClassContext) {
                         signature = String.format("L%s;->%s",
-                            context.getClassDescriptor(), implicitMemberSignature);
+                                context.getClassDescriptor(), implicitMemberSignature);
                     } else {
                         context.reportError(
-                            "Expected annotation with an %s property to be on a class but is on %s",
-                            IMPLICIT_MEMBER_PROPERTY,
-                            signature);
+                                "Expected annotation with an %s property to be on a class but is "
+                                        + "on %s",
+                                IMPLICIT_MEMBER_PROPERTY,
+                                signature);
                         return;
                     }
+                    break;
+                case PUBLIC_ALTERNATIVES_PROPERTY:
+                    publicAlternativesString = property.getValue().stringifyValue();
                     break;
             }
         }
 
         if (context instanceof AnnotatedClassContext && implicitMemberSignature == null) {
             context.reportError(
-                "Missing property %s on annotation on class %s",
-                IMPLICIT_MEMBER_PROPERTY,
-                signature);
+                    "Missing property %s on annotation on class %s",
+                    IMPLICIT_MEMBER_PROPERTY,
+                    signature);
             return;
         }
 
@@ -148,6 +158,11 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
                     maxTargetSdk,
                     mSdkVersionToFlagMap.keySet());
             return;
+        }
+        try {
+            mApiResolver.resolvePublicAlternatives(publicAlternativesString, signature);
+        } catch (JavadocLinkSyntaxError | AlternativeNotFoundError e) {
+            context.reportError(e.toString());
         }
 
         // Consume this annotation if it matches the predicate.
