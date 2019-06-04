@@ -86,12 +86,16 @@ class MANAGED Class final : public Object {
   static constexpr uint32_t kPrimitiveTypeSizeShiftShift = 16;
   static constexpr uint32_t kPrimitiveTypeMask = (1u << kPrimitiveTypeSizeShiftShift) - 1;
 
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
+           bool kWithSynchronizationBarrier = true>
   ClassStatus GetStatus() REQUIRES_SHARED(Locks::mutator_lock_) {
+    // Reading the field without barrier is used exclusively for IsVisiblyInitialized().
+    int32_t field_value = kWithSynchronizationBarrier
+        ? GetField32Volatile<kVerifyFlags>(StatusOffset())
+        : GetField32<kVerifyFlags>(StatusOffset());
     // Avoid including "subtype_check_bits_and_status.h" to get the field.
     // The ClassStatus is always in the 4 most-significant bits of status_.
-    return enum_cast<ClassStatus>(
-        static_cast<uint32_t>(GetField32Volatile<kVerifyFlags>(StatusOffset())) >> (32 - 4));
+    return enum_cast<ClassStatus>(static_cast<uint32_t>(field_value) >> (32 - 4));
   }
 
   // This is static because 'this' may be moved by GC.
@@ -173,7 +177,15 @@ class MANAGED Class final : public Object {
   // Returns true if the class is initialized.
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsInitialized() REQUIRES_SHARED(Locks::mutator_lock_) {
-    return GetStatus<kVerifyFlags>() == ClassStatus::kInitialized;
+    return GetStatus<kVerifyFlags>() >= ClassStatus::kInitialized;
+  }
+
+  // Returns true if the class is visibly initialized.
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  bool IsVisiblyInitialized() REQUIRES_SHARED(Locks::mutator_lock_) {
+    // Note: Avoiding the synchronization barrier for the visibly initialized check.
+    ClassStatus status = GetStatus<kVerifyFlags, /*kWithSynchronizationBarrier=*/ false>();
+    return status == ClassStatus::kVisiblyInitialized;
   }
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>

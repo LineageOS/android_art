@@ -1220,6 +1220,15 @@ class Thread {
     return tls32_.force_interpreter_count != 0;
   }
 
+  bool IncrementMakeVisiblyInitializedCounter() {
+    tls32_.make_visibly_initialized_counter += 1u;
+    return tls32_.make_visibly_initialized_counter == kMakeVisiblyInitializedCounterTriggerCount;
+  }
+
+  void ClearMakeVisiblyInitializedCounter() {
+    tls32_.make_visibly_initialized_counter = 0u;
+  }
+
   void PushVerifier(verifier::MethodVerifier* verifier);
   void PopVerifier(verifier::MethodVerifier* verifier);
 
@@ -1464,6 +1473,8 @@ class Thread {
   // Stores the jit sensitive thread (which for now is the UI thread).
   static Thread* jit_sensitive_thread_;
 
+  static constexpr uint32_t kMakeVisiblyInitializedCounterTriggerCount = 1024;
+
   /***********************************************************************************************/
   // Thread local storage. Fields are grouped by size to enable 32 <-> 64 searching to account for
   // pointer size differences. To encourage shorter encoding, more frequently used values appear
@@ -1475,14 +1486,26 @@ class Thread {
     // to be 4-byte quantities.
     typedef uint32_t bool32_t;
 
-    explicit tls_32bit_sized_values(bool is_daemon) :
-      suspend_count(0), debug_suspend_count(0), thin_lock_thread_id(0), tid(0),
-      daemon(is_daemon), throwing_OutOfMemoryError(false), no_thread_suspension(0),
-      thread_exit_check_count(0), handling_signal_(false),
-      is_transitioning_to_runnable(false), ready_for_debug_invoke(false),
-      debug_method_entry_(false), is_gc_marking(false), weak_ref_access_enabled(true),
-      disable_thread_flip_count(0), user_code_suspend_count(0), force_interpreter_count(0) {
-    }
+    explicit tls_32bit_sized_values(bool is_daemon)
+        : suspend_count(0),
+          debug_suspend_count(0),
+          thin_lock_thread_id(0),
+          tid(0),
+          daemon(is_daemon),
+          throwing_OutOfMemoryError(false),
+          no_thread_suspension(0),
+          thread_exit_check_count(0),
+          handling_signal_(false),
+          is_transitioning_to_runnable(false),
+          ready_for_debug_invoke(false),
+          debug_method_entry_(false),
+          is_gc_marking(false),
+          weak_ref_access_enabled(true),
+          disable_thread_flip_count(0),
+          user_code_suspend_count(0),
+          force_interpreter_count(0),
+          use_mterp(0),
+          make_visibly_initialized_counter(0) {}
 
     union StateAndFlags state_and_flags;
     static_assert(sizeof(union StateAndFlags) == sizeof(int32_t),
@@ -1572,6 +1595,14 @@ class Thread {
     // True if everything is in the ideal state for fast interpretation.
     // False if we need to switch to the C++ interpreter to handle special cases.
     std::atomic<bool32_t> use_mterp;
+
+    // Counter for calls to initialize a class that's initialized but not visibly initialized.
+    // When this reaches kMakeVisiblyInitializedCounterTriggerCount, we call the runtime to
+    // make initialized classes visibly initialized. This is needed because we usually make
+    // classes visibly initialized in batches but we do not want to be stuck with a class
+    // initialized but not visibly initialized for a long time even if no more classes are
+    // being initialized anymore.
+    uint32_t make_visibly_initialized_counter;
   } tls32_;
 
   struct PACKED(8) tls_64bit_sized_values {

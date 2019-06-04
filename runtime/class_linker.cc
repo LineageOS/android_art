@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <forward_list>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -35,10 +36,12 @@
 
 #include "art_field-inl.h"
 #include "art_method-inl.h"
+#include "barrier.h"
 #include "base/arena_allocator.h"
 #include "base/casts.h"
 #include "base/leb128.h"
 #include "base/logging.h"
+#include "base/mutex-inl.h"
 #include "base/os.h"
 #include "base/quasi_atomic.h"
 #include "base/scoped_arena_containers.h"
@@ -232,6 +235,189 @@ static void EnsureSkipAccessChecksMethods(Handle<mirror::Class> klass, PointerSi
   }
 }
 
+// Callback responsible for making a batch of classes visibly initialized
+// after all threads have called it from a checkpoint, ensuring visibility.
+class ClassLinker::VisiblyInitializedCallback final
+    : public Closure, public IntrusiveForwardListNode<VisiblyInitializedCallback> {
+ public:
+  explicit VisiblyInitializedCallback(ClassLinker* class_linker)
+      : class_linker_(class_linker),
+        num_classes_(0u),
+        thread_visibility_counter_(0),
+        barriers_() {
+    std::fill_n(classes_, kMaxClasses, nullptr);
+  }
+
+  bool IsEmpty() const {
+    DCHECK_LE(num_classes_, kMaxClasses);
+    return num_classes_ == 0u;
+  }
+
+  bool IsFull() const {
+    DCHECK_LE(num_classes_, kMaxClasses);
+    return num_classes_ == kMaxClasses;
+  }
+
+  void AddClass(Thread* self, ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK_EQ(klass->GetStatus(), ClassStatus::kInitialized);
+    DCHECK(!IsFull());
+    classes_[num_classes_] = self->GetJniEnv()->GetVm()->AddWeakGlobalRef(self, klass);
+    ++num_classes_;
+  }
+
+  void AddBarrier(Barrier* barrier) {
+    barriers_.push_front(barrier);
+  }
+
+  std::forward_list<Barrier*> GetAndClearBarriers() {
+    std::forward_list<Barrier*> result;
+    result.swap(barriers_);
+    result.reverse();  // Return barriers in insertion order.
+    return result;
+  }
+
+  void MakeVisible(Thread* self) {
+    DCHECK_EQ(thread_visibility_counter_.load(std::memory_order_relaxed), 0);
+    size_t count = Runtime::Current()->GetThreadList()->RunCheckpoint(this);
+    AdjustThreadVisibilityCounter(self, count);
+  }
+
+  void Run(Thread* self) override {
+    self->ClearMakeVisiblyInitializedCounter();
+    AdjustThreadVisibilityCounter(self, -1);
+  }
+
+ private:
+  void AdjustThreadVisibilityCounter(Thread* self, ssize_t adjustment) {
+    ssize_t old = thread_visibility_counter_.fetch_add(adjustment, std::memory_order_relaxed);
+    if (old + adjustment == 0) {
+      // All threads passed the checkpoint. Mark classes as visibly initialized.
+      {
+        ScopedObjectAccess soa(self);
+        StackHandleScope<1u> hs(self);
+        MutableHandle<mirror::Class> klass = hs.NewHandle<mirror::Class>(nullptr);
+        JavaVMExt* vm = self->GetJniEnv()->GetVm();
+        for (size_t i = 0, num = num_classes_; i != num; ++i) {
+          klass.Assign(ObjPtr<mirror::Class>::DownCast(self->DecodeJObject(classes_[i])));
+          vm->DeleteWeakGlobalRef(self, classes_[i]);
+          if (klass != nullptr) {
+            ObjectLock<mirror::Class> lock(self, klass);
+            mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+          }
+        }
+        num_classes_ = 0u;
+      }
+      class_linker_->VisiblyInitializedCallbackDone(self, this);
+    }
+  }
+
+  static constexpr size_t kMaxClasses = 32;
+
+  ClassLinker* const class_linker_;
+  size_t num_classes_;
+  jweak classes_[kMaxClasses];
+
+  // The thread visibility counter starts at 0 and it is incremented by the number of
+  // threads that need to run this callback (by the thread that request the callback
+  // to be run) and decremented once for each `Run()` execution. When it reaches 0,
+  // whether after the increment or after a decrement, we know that `Run()` was executed
+  // for all threads and therefore we can mark the classes as visibly initialized.
+  std::atomic<ssize_t> thread_visibility_counter_;
+
+  // List of barries to `Pass()` for threads that wait for the callback to complete.
+  std::forward_list<Barrier*> barriers_;
+};
+
+void ClassLinker::MakeInitializedClassesVisiblyInitialized(Thread* self, bool wait) {
+  if (kRuntimeISA == InstructionSet::kX86 || kRuntimeISA == InstructionSet::kX86_64) {
+    return;  // Nothing to do. Thanks to the x86 memory model classes skip the initialized status.
+  }
+  std::optional<Barrier> maybe_barrier;  // Avoid constructing the Barrier for `wait == false`.
+  if (wait) {
+    maybe_barrier.emplace(0);
+  }
+  int wait_count = 0;
+  VisiblyInitializedCallback* callback = nullptr;
+  {
+    MutexLock lock(self, visibly_initialized_callback_lock_);
+    if (visibly_initialized_callback_ != nullptr && !visibly_initialized_callback_->IsEmpty()) {
+      callback = visibly_initialized_callback_.release();
+      running_visibly_initialized_callbacks_.push_front(*callback);
+    }
+    if (wait) {
+      DCHECK(maybe_barrier.has_value());
+      Barrier* barrier = std::addressof(*maybe_barrier);
+      for (VisiblyInitializedCallback& cb : running_visibly_initialized_callbacks_) {
+        cb.AddBarrier(barrier);
+        ++wait_count;
+      }
+    }
+  }
+  if (callback != nullptr) {
+    callback->MakeVisible(self);
+  }
+  if (wait_count != 0) {
+    DCHECK(maybe_barrier.has_value());
+    maybe_barrier->Increment(self, wait_count);
+  }
+}
+
+void ClassLinker::VisiblyInitializedCallbackDone(Thread* self,
+                                                 VisiblyInitializedCallback* callback) {
+  MutexLock lock(self, visibly_initialized_callback_lock_);
+  // Pass the barriers if requested.
+  for (Barrier* barrier : callback->GetAndClearBarriers()) {
+    barrier->Pass(self);
+  }
+  // Remove the callback from the list of running callbacks.
+  auto before = running_visibly_initialized_callbacks_.before_begin();
+  auto it = running_visibly_initialized_callbacks_.begin();
+  DCHECK(it != running_visibly_initialized_callbacks_.end());
+  while (std::addressof(*it) != callback) {
+    before = it;
+    ++it;
+    DCHECK(it != running_visibly_initialized_callbacks_.end());
+  }
+  running_visibly_initialized_callbacks_.erase_after(before);
+  // Reuse or destroy the callback object.
+  if (visibly_initialized_callback_ == nullptr) {
+    visibly_initialized_callback_.reset(callback);
+  } else {
+    delete callback;
+  }
+}
+
+ClassLinker::VisiblyInitializedCallback* ClassLinker::MarkClassInitialized(
+    Thread* self, Handle<mirror::Class> klass) {
+  if (kRuntimeISA == InstructionSet::kX86 || kRuntimeISA == InstructionSet::kX86_64) {
+    // Thanks to the x86 memory model, we do not need any memory fences and
+    // we can immediately mark the class as visibly initialized.
+    mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+    return nullptr;
+  }
+  if (Runtime::Current()->IsActiveTransaction()) {
+    // Transactions are single-threaded, so we can mark the class as visibly intialized.
+    // (Otherwise we'd need to track the callback's entry in the transaction for rollback.)
+    mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+    return nullptr;
+  }
+  mirror::Class::SetStatus(klass, ClassStatus::kInitialized, self);
+  MutexLock lock(self, visibly_initialized_callback_lock_);
+  if (visibly_initialized_callback_ == nullptr) {
+    visibly_initialized_callback_.reset(new VisiblyInitializedCallback(this));
+  }
+  DCHECK(!visibly_initialized_callback_->IsFull());
+  visibly_initialized_callback_->AddClass(self, klass.Get());
+
+  if (visibly_initialized_callback_->IsFull()) {
+    VisiblyInitializedCallback* callback = visibly_initialized_callback_.release();
+    running_visibly_initialized_callbacks_.push_front(*callback);
+    return callback;
+  } else {
+    return nullptr;
+  }
+}
+
 void ClassLinker::ThrowEarlierClassFailure(ObjPtr<mirror::Class> c,
                                            bool wrap_in_no_class_def,
                                            bool log) {
@@ -417,6 +603,8 @@ ClassLinker::ClassLinker(InternTable* intern_table, bool fast_class_not_found_ex
       quick_generic_jni_trampoline_(nullptr),
       quick_to_interpreter_bridge_trampoline_(nullptr),
       image_pointer_size_(kRuntimePointerSize),
+      visibly_initialized_callback_lock_("visibly initialized callback lock"),
+      visibly_initialized_callback_(nullptr),
       cha_(Runtime::Current()->IsAotCompiler() ? nullptr : new ClassHierarchyAnalysis()) {
   // For CHA disabled during Aot, see b/34193647.
 
@@ -2475,6 +2663,11 @@ ClassLinker::~ClassLinker() {
     DeleteClassLoader(self, data, /*cleanup_cha=*/ false);
   }
   class_loaders_.clear();
+  while (!running_visibly_initialized_callbacks_.empty()) {
+    std::unique_ptr<VisiblyInitializedCallback> callback(
+        std::addressof(running_visibly_initialized_callbacks_.front()));
+    running_visibly_initialized_callbacks_.pop_front();
+  }
 }
 
 void ClassLinker::DeleteClassLoader(Thread* self, const ClassLoaderData& data, bool cleanup_cha) {
@@ -2640,7 +2833,9 @@ void ClassLinker::FinishArrayClassSetup(ObjPtr<mirror::Class> array_class) {
 
   array_class->SetAccessFlags(access_flags);
 
-  array_class->SetStatusForPrimitiveOrArray(ClassStatus::kInitialized);
+  // Array classes are fully initialized either during single threaded startup,
+  // or from a pre-fence visitor, so visibly initialized.
+  array_class->SetStatusForPrimitiveOrArray(ClassStatus::kVisiblyInitialized);
 }
 
 void ClassLinker::FinishCoreArrayClassSetup(ClassRoot array_root) {
@@ -4139,7 +4334,8 @@ void ClassLinker::CreatePrimitiveClass(Thread* self,
   // the kAccVerificationAttempted flag was added above, and there are no
   // methods that need the kAccSkipAccessChecks flag.
   DCHECK_EQ(primitive_class->NumMethods(), 0u);
-  primitive_class->SetStatusForPrimitiveOrArray(ClassStatus::kInitialized);
+  // Primitive classes are initialized during single threaded startup, so visibly initialized.
+  primitive_class->SetStatusForPrimitiveOrArray(ClassStatus::kVisiblyInitialized);
   const char* descriptor = Primitive::Descriptor(type);
   ObjPtr<mirror::Class> existing = InsertClass(descriptor,
                                                primitive_class,
@@ -4983,11 +5179,16 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     // TODO: Avoid taking subtype_check_lock_ if SubtypeCheck for j.l.r.Proxy is already assigned.
   }
 
+  VisiblyInitializedCallback* callback = nullptr;
   {
     // Lock on klass is released. Lock new class object.
     ObjectLock<mirror::Class> initialization_lock(self, klass);
     EnsureSkipAccessChecksMethods(klass, image_pointer_size_);
-    mirror::Class::SetStatus(klass, ClassStatus::kInitialized, self);
+    // Conservatively go through the ClassStatus::kInitialized state.
+    callback = MarkClassInitialized(self, klass);
+  }
+  if (callback != nullptr) {
+    callback->MakeVisible(self);
   }
 
   // sanity checks
@@ -5393,6 +5594,7 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
   self->AllowThreadSuspension();
   uint64_t t1 = NanoTime();
 
+  VisiblyInitializedCallback* callback = nullptr;
   bool success = true;
   {
     ObjectLock<mirror::Class> lock(self, klass);
@@ -5418,7 +5620,7 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
       global_stats->class_init_time_ns += (t1 - t0);
       thread_stats->class_init_time_ns += (t1 - t0);
       // Set the class as initialized except if failed to initialize static fields.
-      mirror::Class::SetStatus(klass, ClassStatus::kInitialized, self);
+      callback = MarkClassInitialized(self, klass);
       if (VLOG_IS_ON(class_linker)) {
         std::string temp;
         LOG(INFO) << "Initialized class " << klass->GetDescriptor(&temp) << " from " <<
@@ -5427,6 +5629,9 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
       // Opportunistically set static method trampolines to their destination.
       FixupStaticTrampolines(klass.Get());
     }
+  }
+  if (callback != nullptr) {
+    callback->MakeVisible(self);
   }
   return success;
 }

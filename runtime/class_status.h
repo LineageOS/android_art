@@ -87,7 +87,8 @@ enum class ClassStatus : uint8_t {
   kSuperclassValidated = 12,  // Superclass validation part of init done.
   kInitializing = 13,  // Class init in progress.
   kInitialized = 14,  // Ready to go.
-  kLast = kInitialized
+  kVisiblyInitialized = 15,  // Initialized and visible to all threads.
+  kLast = kVisiblyInitialized
 };
 
 std::ostream& operator<<(std::ostream& os, const ClassStatus& rhs);

@@ -354,7 +354,8 @@ TEST_F(CompilerDriverVerifyTest, RetryVerifcationStatusCheckVerified) {
     const ClassStatus expected_status = enum_cast<ClassStatus>(i);
     // Skip unsupported status that are not supposed to be ever recorded.
     if (expected_status == ClassStatus::kVerifyingAtRuntime ||
-        expected_status == ClassStatus::kInitializing) {
+        expected_status == ClassStatus::kInitializing ||
+        expected_status == ClassStatus::kInitialized) {
       continue;
     }
     compiler_driver_->RecordClassStatus(ref, expected_status);

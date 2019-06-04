@@ -26,6 +26,8 @@
 #include <vector>
 
 #include "base/enums.h"
+#include "base/mutex.h"
+#include "base/intrusive_forward_list.h"
 #include "base/locks.h"
 #include "base/macros.h"
 #include "dex/class_accessor.h"
@@ -719,6 +721,8 @@ class ClassLinker {
     return cha_.get();
   }
 
+  void MakeInitializedClassesVisiblyInitialized(Thread* self, bool wait);
+
   struct DexCacheData {
     // Construct an invalid data object.
     DexCacheData()
@@ -760,12 +764,17 @@ class ClassLinker {
 
  private:
   class LinkInterfaceMethodsHelper;
+  class VisiblyInitializedCallback;
 
   struct ClassLoaderData {
     jweak weak_root;  // Weak root to enable class unloading.
     ClassTable* class_table;
     LinearAlloc* allocator;
   };
+
+  void VisiblyInitializedCallbackDone(Thread* self, VisiblyInitializedCallback* callback);
+  VisiblyInitializedCallback* MarkClassInitialized(Thread* self, Handle<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Ensures that the supertype of 'klass' ('supertype') is verified. Returns false and throws
   // appropriate exceptions if verification failed hard. Returns true for successful verification or
@@ -1387,6 +1396,13 @@ class ClassLinker {
 
   // Image pointer size.
   PointerSize image_pointer_size_;
+
+  // Classes to transition from ClassStatus::kInitialized to ClassStatus::kVisiblyInitialized.
+  Mutex visibly_initialized_callback_lock_;
+  std::unique_ptr<VisiblyInitializedCallback> visibly_initialized_callback_
+      GUARDED_BY(visibly_initialized_callback_lock_);
+  IntrusiveForwardList<VisiblyInitializedCallback> running_visibly_initialized_callbacks_
+      GUARDED_BY(visibly_initialized_callback_lock_);
 
   std::unique_ptr<ClassHierarchyAnalysis> cha_;
 

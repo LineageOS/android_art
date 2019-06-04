@@ -1961,7 +1961,12 @@ class VerifyClassVisitor : public CompilationVisitor {
 
       // Class has a meaningful status for the compiler now, record it.
       ClassReference ref(manager_->GetDexFile(), class_def_index);
-      manager_->GetCompiler()->RecordClassStatus(ref, klass->GetStatus());
+      ClassStatus status = klass->GetStatus();
+      if (status == ClassStatus::kInitialized) {
+        // Initialized classes shall be visibly initialized when loaded from the image.
+        status = ClassStatus::kVisiblyInitialized;
+      }
+      manager_->GetCompiler()->RecordClassStatus(ref, status);
 
       // It is *very* problematic if there are resolution errors in the boot classpath.
       //
@@ -2017,6 +2022,9 @@ void CompilerDriver::VerifyDexFile(jobject class_loader,
                               : verifier::HardFailLogMode::kLogWarning;
   VerifyClassVisitor visitor(&context, log_level);
   context.ForAll(0, dex_file.NumClassDefs(), &visitor, thread_count);
+
+  // Make initialized classes visibly initialized.
+  class_linker->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
 }
 
 class SetVerifiedClassVisitor : public CompilationVisitor {
@@ -2266,6 +2274,10 @@ class InitializeClassVisitor : public CompilationVisitor {
         soa.Self()->AssertNoPendingException();
       }
     }
+    if (old_status == ClassStatus::kInitialized) {
+      // Initialized classes shall be visibly initialized when loaded from the image.
+      old_status = ClassStatus::kVisiblyInitialized;
+    }
     // Record the final class status if necessary.
     ClassReference ref(&dex_file, klass->GetDexClassDefIndex());
     // Back up the status before doing initialization for static encoded fields,
@@ -2477,6 +2489,9 @@ void CompilerDriver::InitializeClasses(jobject jni_class_loader,
   }
   InitializeClassVisitor visitor(&context);
   context.ForAll(0, dex_file.NumClassDefs(), &visitor, init_thread_count);
+
+  // Make initialized classes visibly initialized.
+  class_linker->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
 }
 
 class InitializeArrayClassesAndCreateConflictTablesVisitor : public ClassVisitor {
@@ -2740,7 +2755,7 @@ void CompilerDriver::RecordClassStatus(const ClassReference& ref, ClassStatus st
     case ClassStatus::kRetryVerificationAtRuntime:
     case ClassStatus::kVerified:
     case ClassStatus::kSuperclassValidated:
-    case ClassStatus::kInitialized:
+    case ClassStatus::kVisiblyInitialized:
       break;  // Expected states.
     default:
       LOG(FATAL) << "Unexpected class status for class "

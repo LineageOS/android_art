@@ -2351,6 +2351,10 @@ bool Runtime::IsActiveTransaction() const {
 void Runtime::EnterTransactionMode() {
   DCHECK(IsAotCompiler());
   DCHECK(!IsActiveTransaction());
+  // Make initialized classes visibly initialized now. If that happened during the transaction
+  // and then the transaction was aborted, we would roll back the status update but not the
+  // ClassLinker's bookkeeping structures, so these classes would never be visibly initialized.
+  GetClassLinker()->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
   preinitialization_transactions_.push_back(std::make_unique<Transaction>());
 }
 

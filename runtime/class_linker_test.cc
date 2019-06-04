@@ -92,7 +92,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
     EXPECT_TRUE(primitive->GetSuperClass() == nullptr);
     EXPECT_FALSE(primitive->HasSuperClass());
     EXPECT_TRUE(primitive->GetClassLoader() == nullptr);
-    EXPECT_EQ(ClassStatus::kInitialized, primitive->GetStatus());
+    EXPECT_EQ(ClassStatus::kVisiblyInitialized, primitive->GetStatus());
     EXPECT_FALSE(primitive->IsErroneous());
     EXPECT_TRUE(primitive->IsLoaded());
     EXPECT_TRUE(primitive->IsResolved());
@@ -131,7 +131,8 @@ class ClassLinkerTest : public CommonRuntimeTest {
     EXPECT_TRUE(JavaLangObject->GetSuperClass() == nullptr);
     EXPECT_FALSE(JavaLangObject->HasSuperClass());
     EXPECT_TRUE(JavaLangObject->GetClassLoader() == nullptr);
-    EXPECT_EQ(ClassStatus::kInitialized, JavaLangObject->GetStatus());
+    class_linker_->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
+    EXPECT_EQ(ClassStatus::kVisiblyInitialized, JavaLangObject->GetStatus());
     EXPECT_FALSE(JavaLangObject->IsErroneous());
     EXPECT_TRUE(JavaLangObject->IsLoaded());
     EXPECT_TRUE(JavaLangObject->IsResolved());
@@ -207,7 +208,7 @@ class ClassLinkerTest : public CommonRuntimeTest {
     EXPECT_TRUE(array->HasSuperClass());
     ASSERT_TRUE(array->GetComponentType() != nullptr);
     ASSERT_GT(strlen(array->GetComponentType()->GetDescriptor(&temp)), 0U);
-    EXPECT_EQ(ClassStatus::kInitialized, array->GetStatus());
+    EXPECT_EQ(ClassStatus::kVisiblyInitialized, array->GetStatus());
     EXPECT_FALSE(array->IsErroneous());
     EXPECT_TRUE(array->IsLoaded());
     EXPECT_TRUE(array->IsResolved());
