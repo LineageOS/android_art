@@ -170,7 +170,7 @@ class Jit {
   // Create JIT itself.
   static Jit* Create(JitCodeCache* code_cache, JitOptions* options);
 
-  bool CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr)
+  bool CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr, bool prejit)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   const JitCodeCache* GetCodeCache() const {
