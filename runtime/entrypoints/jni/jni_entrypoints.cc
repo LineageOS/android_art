@@ -26,13 +26,8 @@
 namespace art {
 
 // Used by the JNI dlsym stub to find the native method to invoke if none is registered.
-#if defined(__arm__) || defined(__aarch64__)
-extern "C" const void* artFindNativeMethod() {
-  Thread* self = Thread::Current();
-#else
 extern "C" const void* artFindNativeMethod(Thread* self) {
   DCHECK_EQ(self, Thread::Current());
-#endif
   Locks::mutator_lock_->AssertNotHeld(self);  // We come here as Native.
   ScopedObjectAccess soa(self);
 

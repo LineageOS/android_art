@@ -45,6 +45,7 @@ ENTRY art_jni_dlsym_lookup_stub
   stp   x0, x1,   [sp, #-16]!
   .cfi_adjust_cfa_offset 16
 
+  mov x0, xSELF   // pass Thread::Current()
   bl  artFindNativeMethod
   mov  x17, x0    // store result in scratch reg.
 
