@@ -396,78 +396,69 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void MOVE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()));
+    SetVReg(A(), GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()));
+    SetVReg(A(), GetVReg(B()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MOVE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()));
+    SetVReg(A(), GetVReg(B()));
     inst = inst->Next_3xx();
   }
 
   ALWAYS_INLINE void MOVE_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_WIDE_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(B()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MOVE_WIDE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(B()));
     inst = inst->Next_3xx();
   }
 
   ALWAYS_INLINE void MOVE_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegReference(A(),
-                                  shadow_frame.GetVRegReference(B()));
+    SetVRegReference(A(), GetVRegReference(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_OBJECT_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegReference(A(),
-                                  shadow_frame.GetVRegReference(B()));
+    SetVRegReference(A(), GetVRegReference(B()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MOVE_OBJECT_16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegReference(A(),
-                                  shadow_frame.GetVRegReference(B()));
+    SetVRegReference(A(), GetVRegReference(B()));
     inst = inst->Next_3xx();
   }
 
   ALWAYS_INLINE void MOVE_RESULT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(), ResultRegister()->GetI());
+    SetVReg(A(), ResultRegister()->GetI());
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_RESULT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(), ResultRegister()->GetJ());
+    SetVRegLong(A(), ResultRegister()->GetJ());
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_RESULT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegReference(A(), ResultRegister()->GetL());
+    SetVRegReference(A(), ResultRegister()->GetL());
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MOVE_EXCEPTION() REQUIRES_SHARED(Locks::mutator_lock_) {
     ObjPtr<mirror::Throwable> exception = self->GetException();
     DCHECK(exception != nullptr) << "No pending exception on MOVE_EXCEPTION instruction";
-    shadow_frame.SetVRegReference(A(), exception);
+    SetVRegReference(A(), exception);
     self->ClearException();
     inst = inst->Next_1xx();
   }
@@ -528,7 +519,7 @@ class InstructionHandler {
   ALWAYS_INLINE void RETURN() REQUIRES_SHARED(Locks::mutator_lock_) {
     JValue result;
     result.SetJ(0);
-    result.SetI(shadow_frame.GetVReg(A()));
+    result.SetI(GetVReg(A()));
     self->AllowThreadSuspension();
     if (!HandleMonitorChecks()) {
       return;
@@ -555,7 +546,7 @@ class InstructionHandler {
 
   ALWAYS_INLINE void RETURN_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
     JValue result;
-    result.SetJ(shadow_frame.GetVRegLong(A()));
+    result.SetJ(GetVRegLong(A()));
     self->AllowThreadSuspension();
     if (!HandleMonitorChecks()) {
       return;
@@ -587,11 +578,11 @@ class InstructionHandler {
       return;
     }
     const size_t ref_idx = A();
-    ObjPtr<mirror::Object> obj_result = shadow_frame.GetVRegReference(ref_idx);
+    ObjPtr<mirror::Object> obj_result = GetVRegReference(ref_idx);
     if (do_assignability_check && obj_result != nullptr) {
       ObjPtr<mirror::Class> return_type = shadow_frame.GetMethod()->ResolveReturnType();
       // Re-load since it might have moved.
-      obj_result = shadow_frame.GetVRegReference(ref_idx);
+      obj_result = GetVRegReference(ref_idx);
       if (return_type == nullptr) {
         // Return the pending exception.
         HANDLE_PENDING_EXCEPTION();
@@ -620,7 +611,7 @@ class InstructionHandler {
       }
     }
     // Re-load since it might have moved during the MethodExitEvent.
-    result.SetL(shadow_frame.GetVRegReference(ref_idx));
+    result.SetL(GetVRegReference(ref_idx));
     if (ctx->interpret_one_instruction) {
       /* Signal mterp to return to caller */
       shadow_frame.SetDexPC(dex::kDexNoIndex);
@@ -632,9 +623,9 @@ class InstructionHandler {
   ALWAYS_INLINE void CONST_4() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t dst = inst->VRegA_11n(inst_data);
     int4_t val = inst->VRegB_11n(inst_data);
-    shadow_frame.SetVReg(dst, val);
+    SetVReg(dst, val);
     if (val == 0) {
-      shadow_frame.SetVRegReference(dst, nullptr);
+      SetVRegReference(dst, nullptr);
     }
     inst = inst->Next_1xx();
   }
@@ -642,9 +633,9 @@ class InstructionHandler {
   ALWAYS_INLINE void CONST_16() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint8_t dst = A();
     int16_t val = B();
-    shadow_frame.SetVReg(dst, val);
+    SetVReg(dst, val);
     if (val == 0) {
-      shadow_frame.SetVRegReference(dst, nullptr);
+      SetVRegReference(dst, nullptr);
     }
     inst = inst->Next_2xx();
   }
@@ -652,9 +643,9 @@ class InstructionHandler {
   ALWAYS_INLINE void CONST() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint8_t dst = A();
     int32_t val = B();
-    shadow_frame.SetVReg(dst, val);
+    SetVReg(dst, val);
     if (val == 0) {
-      shadow_frame.SetVRegReference(dst, nullptr);
+      SetVRegReference(dst, nullptr);
     }
     inst = inst->Next_3xx();
   }
@@ -662,54 +653,49 @@ class InstructionHandler {
   ALWAYS_INLINE void CONST_HIGH16() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint8_t dst = A();
     int32_t val = static_cast<int32_t>(B() << 16);
-    shadow_frame.SetVReg(dst, val);
+    SetVReg(dst, val);
     if (val == 0) {
-      shadow_frame.SetVRegReference(dst, nullptr);
+      SetVRegReference(dst, nullptr);
     }
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void CONST_WIDE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(), B());
+    SetVRegLong(A(), B());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void CONST_WIDE_32() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(), B());
+    SetVRegLong(A(), B());
     inst = inst->Next_3xx();
   }
 
   ALWAYS_INLINE void CONST_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(), inst->WideVRegB());
+    SetVRegLong(A(), inst->WideVRegB());
     inst = inst->Next_51l();
   }
 
   ALWAYS_INLINE void CONST_WIDE_HIGH16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             static_cast<uint64_t>(B()) << 48);
+    SetVRegLong(A(), static_cast<uint64_t>(B()) << 48);
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void CONST_STRING() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::String> s = ResolveString(self,
-                                             shadow_frame,
-                                             dex::StringIndex(B()));
+    ObjPtr<mirror::String> s = ResolveString(self, shadow_frame, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), s);
+      SetVRegReference(A(), s);
       inst = inst->Next_2xx();
     }
   }
 
   ALWAYS_INLINE void CONST_STRING_JUMBO() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::String> s = ResolveString(self,
-                                             shadow_frame,
-                                             dex::StringIndex(B()));
+    ObjPtr<mirror::String> s = ResolveString(self, shadow_frame, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), s);
+      SetVRegReference(A(), s);
       inst = inst->Next_3xx();
     }
   }
@@ -723,7 +709,7 @@ class InstructionHandler {
     if (UNLIKELY(c == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), c);
+      SetVRegReference(A(), c);
       inst = inst->Next_2xx();
     }
   }
@@ -736,7 +722,7 @@ class InstructionHandler {
     if (UNLIKELY(mh == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), mh);
+      SetVRegReference(A(), mh);
       inst = inst->Next_2xx();
     }
   }
@@ -749,7 +735,7 @@ class InstructionHandler {
     if (UNLIKELY(mt == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), mt);
+      SetVRegReference(A(), mt);
       inst = inst->Next_2xx();
     }
   }
@@ -758,7 +744,7 @@ class InstructionHandler {
     if (!HandleAsyncException()) {
       return;
     }
-    ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(A());
+    ObjPtr<mirror::Object> obj = GetVRegReference(A());
     if (UNLIKELY(obj == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
@@ -772,7 +758,7 @@ class InstructionHandler {
     if (!HandleAsyncException()) {
       return;
     }
-    ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(A());
+    ObjPtr<mirror::Object> obj = GetVRegReference(A());
     if (UNLIKELY(obj == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
@@ -791,7 +777,7 @@ class InstructionHandler {
     if (UNLIKELY(c == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(A());
+      ObjPtr<mirror::Object> obj = GetVRegReference(A());
       if (UNLIKELY(obj != nullptr && !obj->InstanceOf(c))) {
         ThrowClassCastException(c, obj->GetClass());
         HANDLE_PENDING_EXCEPTION();
@@ -810,20 +796,19 @@ class InstructionHandler {
     if (UNLIKELY(c == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(B());
-      shadow_frame.SetVReg(A(),
-                           (obj != nullptr && obj->InstanceOf(c)) ? 1 : 0);
+      ObjPtr<mirror::Object> obj = GetVRegReference(B());
+      SetVReg(A(), (obj != nullptr && obj->InstanceOf(c)) ? 1 : 0);
       inst = inst->Next_2xx();
     }
   }
 
   ALWAYS_INLINE void ARRAY_LENGTH() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> array = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> array = GetVRegReference(B());
     if (UNLIKELY(array == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVReg(A(), array->AsArray()->GetLength());
+      SetVReg(A(), array->AsArray()->GetLength());
       inst = inst->Next_1xx();
     }
   }
@@ -854,13 +839,13 @@ class InstructionHandler {
                           obj->PrettyTypeOf().c_str());
         HANDLE_PENDING_EXCEPTION();
       }
-      shadow_frame.SetVRegReference(A(), obj);
+      SetVRegReference(A(), obj);
       inst = inst->Next_2xx();
     }
   }
 
   ALWAYS_INLINE void NEW_ARRAY() REQUIRES_SHARED(Locks::mutator_lock_) {
-    int32_t length = shadow_frame.GetVReg(B());
+    int32_t length = GetVReg(B());
     ObjPtr<mirror::Object> obj = AllocArrayFromCode<do_access_check>(
         dex::TypeIndex(C()),
         length,
@@ -870,7 +855,7 @@ class InstructionHandler {
     if (UNLIKELY(obj == nullptr)) {
       HANDLE_PENDING_EXCEPTION();
     } else {
-      shadow_frame.SetVRegReference(A(), obj);
+      SetVRegReference(A(), obj);
       inst = inst->Next_2xx();
     }
   }
@@ -893,7 +878,7 @@ class InstructionHandler {
     const uint16_t* payload_addr = reinterpret_cast<const uint16_t*>(inst) + B();
     const Instruction::ArrayDataPayload* payload =
         reinterpret_cast<const Instruction::ArrayDataPayload*>(payload_addr);
-    ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(A());
+    ObjPtr<mirror::Object> obj = GetVRegReference(A());
     bool success = FillArrayData(obj, payload);
     if (!success) {
       HANDLE_PENDING_EXCEPTION();
@@ -908,8 +893,7 @@ class InstructionHandler {
     if (!HandleAsyncException()) {
       return;
     }
-    ObjPtr<mirror::Object> exception =
-        shadow_frame.GetVRegReference(A());
+    ObjPtr<mirror::Object> exception = GetVRegReference(A());
     if (UNLIKELY(exception == nullptr)) {
       ThrowNullPointerException("throw with null exception");
     } else if (do_assignability_check && !exception->GetClass()->IsThrowableClass()) {
@@ -971,10 +955,9 @@ class InstructionHandler {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
 
-
   ALWAYS_INLINE void CMPL_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val1 = shadow_frame.GetVRegFloat(B());
-    float val2 = shadow_frame.GetVRegFloat(C());
+    float val1 = GetVRegFloat(B());
+    float val2 = GetVRegFloat(C());
     int32_t result;
     if (val1 > val2) {
       result = 1;
@@ -983,13 +966,13 @@ class InstructionHandler {
     } else {
       result = -1;
     }
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void CMPG_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val1 = shadow_frame.GetVRegFloat(B());
-    float val2 = shadow_frame.GetVRegFloat(C());
+    float val1 = GetVRegFloat(B());
+    float val2 = GetVRegFloat(C());
     int32_t result;
     if (val1 < val2) {
       result = -1;
@@ -998,13 +981,13 @@ class InstructionHandler {
     } else {
       result = 1;
     }
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void CMPL_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val1 = shadow_frame.GetVRegDouble(B());
-    double val2 = shadow_frame.GetVRegDouble(C());
+    double val1 = GetVRegDouble(B());
+    double val2 = GetVRegDouble(C());
     int32_t result;
     if (val1 > val2) {
       result = 1;
@@ -1013,14 +996,13 @@ class InstructionHandler {
     } else {
       result = -1;
     }
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_2xx();
   }
 
-
   ALWAYS_INLINE void CMPG_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val1 = shadow_frame.GetVRegDouble(B());
-    double val2 = shadow_frame.GetVRegDouble(C());
+    double val1 = GetVRegDouble(B());
+    double val2 = GetVRegDouble(C());
     int32_t result;
     if (val1 < val2) {
       result = -1;
@@ -1029,16 +1011,15 @@ class InstructionHandler {
     } else {
       result = 1;
     }
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_2xx();
   }
 
 #pragma clang diagnostic pop
 
-
   ALWAYS_INLINE void CMP_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    int64_t val1 = shadow_frame.GetVRegLong(B());
-    int64_t val2 = shadow_frame.GetVRegLong(C());
+    int64_t val1 = GetVRegLong(B());
+    int64_t val2 = GetVRegLong(C());
     int32_t result;
     if (val1 > val2) {
       result = 1;
@@ -1047,13 +1028,12 @@ class InstructionHandler {
     } else {
       result = -1;
     }
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void IF_EQ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) ==
-        shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) == GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1065,8 +1045,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_NE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) !=
-        shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) != GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1078,8 +1057,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_LT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) <
-        shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) < GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1091,8 +1069,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_GE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) >=
-        shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) >= GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1104,8 +1081,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_GT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) >
-    shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) > GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1117,8 +1093,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_LE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) <=
-        shadow_frame.GetVReg(B())) {
+    if (GetVReg(A()) <= GetVReg(B())) {
       int16_t offset = C();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1130,7 +1105,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_EQZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) == 0) {
+    if (GetVReg(A()) == 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1142,7 +1117,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_NEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) != 0) {
+    if (GetVReg(A()) != 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1154,7 +1129,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_LTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) < 0) {
+    if (GetVReg(A()) < 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1166,7 +1141,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_GEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) >= 0) {
+    if (GetVReg(A()) >= 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1178,7 +1153,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_GTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) > 0) {
+    if (GetVReg(A()) > 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1190,7 +1165,7 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void IF_LEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (shadow_frame.GetVReg(A()) <= 0) {
+    if (GetVReg(A()) <= 0) {
       int16_t offset = B();
       BRANCH_INSTRUMENTATION(offset);
       inst = inst->RelativeAt(offset);
@@ -1202,15 +1177,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::BooleanArray> array = a->AsBooleanArray();
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVReg(A(), array->GetWithoutChecks(index));
+      SetVReg(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1218,15 +1193,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::ByteArray> array = a->AsByteArray();
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVReg(A(), array->GetWithoutChecks(index));
+      SetVReg(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1234,15 +1209,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::CharArray> array = a->AsCharArray();
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVReg(A(), array->GetWithoutChecks(index));
+      SetVReg(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1250,15 +1225,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::ShortArray> array = a->AsShortArray();
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVReg(A(), array->GetWithoutChecks(index));
+      SetVReg(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1266,16 +1241,16 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     DCHECK(a->IsIntArray() || a->IsFloatArray()) << a->PrettyTypeOf();
     ObjPtr<mirror::IntArray> array = ObjPtr<mirror::IntArray>::DownCast(a);
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVReg(A(), array->GetWithoutChecks(index));
+      SetVReg(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1283,16 +1258,16 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     DCHECK(a->IsLongArray() || a->IsDoubleArray()) << a->PrettyTypeOf();
     ObjPtr<mirror::LongArray> array = ObjPtr<mirror::LongArray>::DownCast(a);
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVRegLong(A(), array->GetWithoutChecks(index));
+      SetVRegLong(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1300,15 +1275,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void AGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::ObjectArray<mirror::Object>> array = a->AsObjectArray<mirror::Object>();
     if (array->CheckIsValidIndex(index)) {
-      shadow_frame.SetVRegReference(A(), array->GetWithoutChecks(index));
+      SetVRegReference(A(), array->GetWithoutChecks(index));
       inst = inst->Next_2xx();
     } else {
       HANDLE_PENDING_EXCEPTION();
@@ -1316,13 +1291,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    uint8_t val = shadow_frame.GetVReg(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    uint8_t val = GetVReg(A());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::BooleanArray> array = a->AsBooleanArray();
     if (array->CheckIsValidIndex(index)) {
       array->SetWithoutChecks<transaction_active>(index, val);
@@ -1333,13 +1308,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int8_t val = shadow_frame.GetVReg(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    int8_t val = GetVReg(A());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::ByteArray> array = a->AsByteArray();
     if (array->CheckIsValidIndex(index)) {
       array->SetWithoutChecks<transaction_active>(index, val);
@@ -1350,13 +1325,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    uint16_t val = shadow_frame.GetVReg(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    uint16_t val = GetVReg(A());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::CharArray> array = a->AsCharArray();
     if (array->CheckIsValidIndex(index)) {
       array->SetWithoutChecks<transaction_active>(index, val);
@@ -1367,13 +1342,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int16_t val = shadow_frame.GetVReg(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    int16_t val = GetVReg(A());
+    int32_t index = GetVReg(C());
     ObjPtr<mirror::ShortArray> array = a->AsShortArray();
     if (array->CheckIsValidIndex(index)) {
       array->SetWithoutChecks<transaction_active>(index, val);
@@ -1384,13 +1359,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t val = shadow_frame.GetVReg(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    int32_t val = GetVReg(A());
+    int32_t index = GetVReg(C());
     DCHECK(a->IsIntArray() || a->IsFloatArray()) << a->PrettyTypeOf();
     ObjPtr<mirror::IntArray> array = ObjPtr<mirror::IntArray>::DownCast(a);
     if (array->CheckIsValidIndex(index)) {
@@ -1402,13 +1377,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int64_t val = shadow_frame.GetVRegLong(A());
-    int32_t index = shadow_frame.GetVReg(C());
+    int64_t val = GetVRegLong(A());
+    int32_t index = GetVReg(C());
     DCHECK(a->IsLongArray() || a->IsDoubleArray()) << a->PrettyTypeOf();
     ObjPtr<mirror::LongArray> array = ObjPtr<mirror::LongArray>::DownCast(a);
     if (array->CheckIsValidIndex(index)) {
@@ -1420,13 +1395,13 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void APUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = shadow_frame.GetVRegReference(B());
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       HANDLE_PENDING_EXCEPTION();
     }
-    int32_t index = shadow_frame.GetVReg(C());
-    ObjPtr<mirror::Object> val = shadow_frame.GetVRegReference(A());
+    int32_t index = GetVReg(C());
+    ObjPtr<mirror::Object> val = GetVRegReference(A());
     ObjPtr<mirror::ObjectArray<mirror::Object>> array = a->AsObjectArray<mirror::Object>();
     if (array->CheckIsValidIndex(index) && array->CheckAssignable(val)) {
       array->SetWithoutChecks<transaction_active>(index, val);
@@ -1782,735 +1757,562 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE void NEG_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(
-        A(), -shadow_frame.GetVReg(B()));
+    SetVReg(A(), -GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void NOT_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(
-        A(), ~shadow_frame.GetVReg(B()));
+    SetVReg(A(), ~GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void NEG_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(
-        A(), -shadow_frame.GetVRegLong(B()));
+    SetVRegLong(A(), -GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void NOT_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(
-        A(), ~shadow_frame.GetVRegLong(B()));
+    SetVRegLong(A(), ~GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void NEG_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(
-        A(), -shadow_frame.GetVRegFloat(B()));
+    SetVRegFloat(A(), -GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void NEG_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(
-        A(), -shadow_frame.GetVRegDouble(B()));
+    SetVRegDouble(A(), -GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVReg(B()));
+    SetVRegLong(A(), GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVReg(B()));
+    SetVRegFloat(A(), GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVReg(B()));
+    SetVRegDouble(A(), GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void LONG_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVRegLong(B()));
+    SetVReg(A(), GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void LONG_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegLong(B()));
+    SetVRegFloat(A(), GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void LONG_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegLong(B()));
+    SetVRegDouble(A(), GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void FLOAT_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val = shadow_frame.GetVRegFloat(B());
+    float val = GetVRegFloat(B());
     int32_t result = art_float_to_integral<int32_t, float>(val);
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void FLOAT_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val = shadow_frame.GetVRegFloat(B());
+    float val = GetVRegFloat(B());
     int64_t result = art_float_to_integral<int64_t, float>(val);
-    shadow_frame.SetVRegLong(A(), result);
+    SetVRegLong(A(), result);
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void FLOAT_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegFloat(B()));
+    SetVRegDouble(A(), GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DOUBLE_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val = shadow_frame.GetVRegDouble(B());
+    double val = GetVRegDouble(B());
     int32_t result = art_float_to_integral<int32_t, double>(val);
-    shadow_frame.SetVReg(A(), result);
+    SetVReg(A(), result);
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DOUBLE_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val = shadow_frame.GetVRegDouble(B());
+    double val = GetVRegDouble(B());
     int64_t result = art_float_to_integral<int64_t, double>(val);
-    shadow_frame.SetVRegLong(A(), result);
+    SetVRegLong(A(), result);
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DOUBLE_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegDouble(B()));
+    SetVRegFloat(A(), GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(), static_cast<int8_t>(
-        shadow_frame.GetVReg(B())));
+    SetVReg(A(), static_cast<int8_t>(GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(), static_cast<uint16_t>(
-        shadow_frame.GetVReg(B())));
+    SetVReg(A(), static_cast<uint16_t>(GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void INT_TO_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(), static_cast<int16_t>(
-        shadow_frame.GetVReg(B())));
+    SetVReg(A(), static_cast<int16_t>(GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void ADD_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeAdd(shadow_frame.GetVReg(B()),
-                                 shadow_frame.GetVReg(C())));
+    SetVReg(A(), SafeAdd(GetVReg(B()), GetVReg(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SUB_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeSub(shadow_frame.GetVReg(B()),
-                                 shadow_frame.GetVReg(C())));
+    SetVReg(A(), SafeSub(GetVReg(B()), GetVReg(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeMul(shadow_frame.GetVReg(B()),
-                                 shadow_frame.GetVReg(C())));
+    SetVReg(A(), SafeMul(GetVReg(B()), GetVReg(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntDivide(shadow_frame, A(),
-                               shadow_frame.GetVReg(B()),
-                               shadow_frame.GetVReg(C()));
+    bool success = DoIntDivide(shadow_frame, A(), GetVReg(B()), GetVReg(C()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void REM_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntRemainder(shadow_frame, A(),
-                                  shadow_frame.GetVReg(B()),
-                                  shadow_frame.GetVReg(C()));
+    bool success = DoIntRemainder(shadow_frame, A(), GetVReg(B()), GetVReg(C()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void SHL_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) <<
-                         (shadow_frame.GetVReg(C()) & 0x1f));
+    SetVReg(A(), GetVReg(B()) << (GetVReg(C()) & 0x1f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SHR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) >>
-                         (shadow_frame.GetVReg(C()) & 0x1f));
+    SetVReg(A(), GetVReg(B()) >> (GetVReg(C()) & 0x1f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void USHR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         static_cast<uint32_t>(shadow_frame.GetVReg(B())) >>
-                         (shadow_frame.GetVReg(C()) & 0x1f));
+    SetVReg(A(), static_cast<uint32_t>(GetVReg(B())) >> (GetVReg(C()) & 0x1f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void AND_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) &
-                         shadow_frame.GetVReg(C()));
+    SetVReg(A(), GetVReg(B()) & GetVReg(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void OR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) |
-                         shadow_frame.GetVReg(C()));
+    SetVReg(A(), GetVReg(B()) | GetVReg(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void XOR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) ^
-                         shadow_frame.GetVReg(C()));
+    SetVReg(A(), GetVReg(B()) ^ GetVReg(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void ADD_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             SafeAdd(shadow_frame.GetVRegLong(B()),
-                                     shadow_frame.GetVRegLong(C())));
+    SetVRegLong(A(), SafeAdd(GetVRegLong(B()), GetVRegLong(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SUB_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             SafeSub(shadow_frame.GetVRegLong(B()),
-                                     shadow_frame.GetVRegLong(C())));
+    SetVRegLong(A(), SafeSub(GetVRegLong(B()), GetVRegLong(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             SafeMul(shadow_frame.GetVRegLong(B()),
-                                     shadow_frame.GetVRegLong(C())));
+    SetVRegLong(A(), SafeMul(GetVRegLong(B()), GetVRegLong(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    DoLongDivide(shadow_frame, A(),
-                 shadow_frame.GetVRegLong(B()),
-                 shadow_frame.GetVRegLong(C()));
+    DoLongDivide(shadow_frame, A(), GetVRegLong(B()), GetVRegLong(C()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(self->IsExceptionPending(), Next_2xx);
   }
 
   ALWAYS_INLINE void REM_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    DoLongRemainder(shadow_frame, A(),
-                    shadow_frame.GetVRegLong(B()),
-                    shadow_frame.GetVRegLong(C()));
+    DoLongRemainder(shadow_frame, A(), GetVRegLong(B()), GetVRegLong(C()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(self->IsExceptionPending(), Next_2xx);
   }
 
   ALWAYS_INLINE void AND_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()) &
-                             shadow_frame.GetVRegLong(C()));
+    SetVRegLong(A(), GetVRegLong(B()) & GetVRegLong(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void OR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()) |
-                             shadow_frame.GetVRegLong(C()));
+    SetVRegLong(A(), GetVRegLong(B()) | GetVRegLong(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void XOR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()) ^
-                             shadow_frame.GetVRegLong(C()));
+    SetVRegLong(A(), GetVRegLong(B()) ^ GetVRegLong(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SHL_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()) <<
-                             (shadow_frame.GetVReg(C()) & 0x3f));
+    SetVRegLong(A(), GetVRegLong(B()) << (GetVReg(C()) & 0x3f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SHR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             shadow_frame.GetVRegLong(B()) >>
-                             (shadow_frame.GetVReg(C()) & 0x3f));
+    SetVRegLong(A(), GetVRegLong(B()) >> (GetVReg(C()) & 0x3f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void USHR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegLong(A(),
-                             static_cast<uint64_t>(shadow_frame.GetVRegLong(B())) >>
-                             (shadow_frame.GetVReg(C()) & 0x3f));
+    SetVRegLong(A(), static_cast<uint64_t>(GetVRegLong(B())) >> (GetVReg(C()) & 0x3f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void ADD_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegFloat(B()) +
-                              shadow_frame.GetVRegFloat(C()));
+    SetVRegFloat(A(), GetVRegFloat(B()) + GetVRegFloat(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SUB_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegFloat(B()) -
-                              shadow_frame.GetVRegFloat(C()));
+    SetVRegFloat(A(), GetVRegFloat(B()) - GetVRegFloat(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegFloat(B()) *
-                              shadow_frame.GetVRegFloat(C()));
+    SetVRegFloat(A(), GetVRegFloat(B()) * GetVRegFloat(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              shadow_frame.GetVRegFloat(B()) /
-                              shadow_frame.GetVRegFloat(C()));
+    SetVRegFloat(A(), GetVRegFloat(B()) / GetVRegFloat(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void REM_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegFloat(A(),
-                              fmodf(shadow_frame.GetVRegFloat(B()),
-                                    shadow_frame.GetVRegFloat(C())));
+    SetVRegFloat(A(), fmodf(GetVRegFloat(B()), GetVRegFloat(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void ADD_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegDouble(B()) +
-                               shadow_frame.GetVRegDouble(C()));
+    SetVRegDouble(A(), GetVRegDouble(B()) + GetVRegDouble(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SUB_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegDouble(B()) -
-                               shadow_frame.GetVRegDouble(C()));
+    SetVRegDouble(A(), GetVRegDouble(B()) - GetVRegDouble(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegDouble(B()) *
-                               shadow_frame.GetVRegDouble(C()));
+    SetVRegDouble(A(), GetVRegDouble(B()) * GetVRegDouble(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               shadow_frame.GetVRegDouble(B()) /
-                               shadow_frame.GetVRegDouble(C()));
+    SetVRegDouble(A(), GetVRegDouble(B()) / GetVRegDouble(C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void REM_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVRegDouble(A(),
-                               fmod(shadow_frame.GetVRegDouble(B()),
-                                    shadow_frame.GetVRegDouble(C())));
+    SetVRegDouble(A(), fmod(GetVRegDouble(B()), GetVRegDouble(C())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void ADD_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA, SafeAdd(shadow_frame.GetVReg(vregA),
-                                        shadow_frame.GetVReg(B())));
+    SetVReg(vregA, SafeAdd(GetVReg(vregA), GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SUB_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         SafeSub(shadow_frame.GetVReg(vregA),
-                                 shadow_frame.GetVReg(B())));
+    SetVReg(vregA, SafeSub(GetVReg(vregA), GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MUL_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         SafeMul(shadow_frame.GetVReg(vregA),
-                                 shadow_frame.GetVReg(B())));
+    SetVReg(vregA, SafeMul(GetVReg(vregA), GetVReg(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DIV_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    bool success = DoIntDivide(shadow_frame, vregA, shadow_frame.GetVReg(vregA),
-                               shadow_frame.GetVReg(B()));
+    bool success = DoIntDivide(shadow_frame, vregA, GetVReg(vregA), GetVReg(B()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_1xx);
   }
 
   ALWAYS_INLINE void REM_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    bool success = DoIntRemainder(shadow_frame, vregA, shadow_frame.GetVReg(vregA),
-                                  shadow_frame.GetVReg(B()));
+    bool success = DoIntRemainder(shadow_frame, vregA, GetVReg(vregA), GetVReg(B()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_1xx);
   }
 
   ALWAYS_INLINE void SHL_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         shadow_frame.GetVReg(vregA) <<
-                         (shadow_frame.GetVReg(B()) & 0x1f));
+    SetVReg(vregA, GetVReg(vregA) << (GetVReg(B()) & 0x1f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SHR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         shadow_frame.GetVReg(vregA) >>
-                         (shadow_frame.GetVReg(B()) & 0x1f));
+    SetVReg(vregA, GetVReg(vregA) >> (GetVReg(B()) & 0x1f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void USHR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         static_cast<uint32_t>(shadow_frame.GetVReg(vregA)) >>
-                         (shadow_frame.GetVReg(B()) & 0x1f));
+    SetVReg(vregA, static_cast<uint32_t>(GetVReg(vregA)) >> (GetVReg(B()) & 0x1f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void AND_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         shadow_frame.GetVReg(vregA) &
-                         shadow_frame.GetVReg(B()));
+    SetVReg(vregA, GetVReg(vregA) & GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void OR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         shadow_frame.GetVReg(vregA) |
-                         shadow_frame.GetVReg(B()));
+    SetVReg(vregA, GetVReg(vregA) | GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void XOR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVReg(vregA,
-                         shadow_frame.GetVReg(vregA) ^
-                         shadow_frame.GetVReg(B()));
+    SetVReg(vregA, GetVReg(vregA) ^ GetVReg(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void ADD_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             SafeAdd(shadow_frame.GetVRegLong(vregA),
-                                     shadow_frame.GetVRegLong(B())));
+    SetVRegLong(vregA, SafeAdd(GetVRegLong(vregA), GetVRegLong(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SUB_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             SafeSub(shadow_frame.GetVRegLong(vregA),
-                                     shadow_frame.GetVRegLong(B())));
+    SetVRegLong(vregA, SafeSub(GetVRegLong(vregA), GetVRegLong(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MUL_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             SafeMul(shadow_frame.GetVRegLong(vregA),
-                                     shadow_frame.GetVRegLong(B())));
+    SetVRegLong(vregA, SafeMul(GetVRegLong(vregA), GetVRegLong(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DIV_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    DoLongDivide(shadow_frame, vregA, shadow_frame.GetVRegLong(vregA),
-                shadow_frame.GetVRegLong(B()));
+    DoLongDivide(shadow_frame, vregA, GetVRegLong(vregA), GetVRegLong(B()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(self->IsExceptionPending(), Next_1xx);
   }
 
   ALWAYS_INLINE void REM_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    DoLongRemainder(shadow_frame, vregA, shadow_frame.GetVRegLong(vregA),
-                    shadow_frame.GetVRegLong(B()));
+    DoLongRemainder(shadow_frame, vregA, GetVRegLong(vregA), GetVRegLong(B()));
     POSSIBLY_HANDLE_PENDING_EXCEPTION(self->IsExceptionPending(), Next_1xx);
   }
 
   ALWAYS_INLINE void AND_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             shadow_frame.GetVRegLong(vregA) &
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(vregA, GetVRegLong(vregA) & GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void OR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             shadow_frame.GetVRegLong(vregA) |
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(vregA, GetVRegLong(vregA) | GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void XOR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             shadow_frame.GetVRegLong(vregA) ^
-                             shadow_frame.GetVRegLong(B()));
+    SetVRegLong(vregA, GetVRegLong(vregA) ^ GetVRegLong(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SHL_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             shadow_frame.GetVRegLong(vregA) <<
-                             (shadow_frame.GetVReg(B()) & 0x3f));
+    SetVRegLong(vregA, GetVRegLong(vregA) << (GetVReg(B()) & 0x3f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SHR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             shadow_frame.GetVRegLong(vregA) >>
-                             (shadow_frame.GetVReg(B()) & 0x3f));
+    SetVRegLong(vregA, GetVRegLong(vregA) >> (GetVReg(B()) & 0x3f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void USHR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegLong(vregA,
-                             static_cast<uint64_t>(shadow_frame.GetVRegLong(vregA)) >>
-                             (shadow_frame.GetVReg(B()) & 0x3f));
+    SetVRegLong(vregA, static_cast<uint64_t>(GetVRegLong(vregA)) >> (GetVReg(B()) & 0x3f));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void ADD_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegFloat(vregA,
-                              shadow_frame.GetVRegFloat(vregA) +
-                              shadow_frame.GetVRegFloat(B()));
+    SetVRegFloat(vregA, GetVRegFloat(vregA) + GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SUB_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegFloat(vregA,
-                              shadow_frame.GetVRegFloat(vregA) -
-                              shadow_frame.GetVRegFloat(B()));
+    SetVRegFloat(vregA, GetVRegFloat(vregA) - GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MUL_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegFloat(vregA,
-                              shadow_frame.GetVRegFloat(vregA) *
-                              shadow_frame.GetVRegFloat(B()));
+    SetVRegFloat(vregA, GetVRegFloat(vregA) * GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DIV_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegFloat(vregA,
-                              shadow_frame.GetVRegFloat(vregA) /
-                              shadow_frame.GetVRegFloat(B()));
+    SetVRegFloat(vregA, GetVRegFloat(vregA) / GetVRegFloat(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void REM_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegFloat(vregA,
-                              fmodf(shadow_frame.GetVRegFloat(vregA),
-                                    shadow_frame.GetVRegFloat(B())));
+    SetVRegFloat(vregA, fmodf(GetVRegFloat(vregA), GetVRegFloat(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void ADD_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegDouble(vregA,
-                               shadow_frame.GetVRegDouble(vregA) +
-                               shadow_frame.GetVRegDouble(B()));
+    SetVRegDouble(vregA, GetVRegDouble(vregA) + GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void SUB_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegDouble(vregA,
-                               shadow_frame.GetVRegDouble(vregA) -
-                               shadow_frame.GetVRegDouble(B()));
+    SetVRegDouble(vregA, GetVRegDouble(vregA) - GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void MUL_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegDouble(vregA,
-                               shadow_frame.GetVRegDouble(vregA) *
-                               shadow_frame.GetVRegDouble(B()));
+    SetVRegDouble(vregA, GetVRegDouble(vregA) * GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void DIV_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegDouble(vregA,
-                               shadow_frame.GetVRegDouble(vregA) /
-                               shadow_frame.GetVRegDouble(B()));
+    SetVRegDouble(vregA, GetVRegDouble(vregA) / GetVRegDouble(B()));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void REM_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
     uint4_t vregA = A();
-    shadow_frame.SetVRegDouble(vregA,
-                               fmod(shadow_frame.GetVRegDouble(vregA),
-                                    shadow_frame.GetVRegDouble(B())));
+    SetVRegDouble(vregA, fmod(GetVRegDouble(vregA), GetVRegDouble(B())));
     inst = inst->Next_1xx();
   }
 
   ALWAYS_INLINE void ADD_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeAdd(shadow_frame.GetVReg(B()),
-                                 C()));
+    SetVReg(A(), SafeAdd(GetVReg(B()), C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void RSUB_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeSub(C(),
-                                 shadow_frame.GetVReg(B())));
+    SetVReg(A(), SafeSub(C(), GetVReg(B())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeMul(shadow_frame.GetVReg(B()),
-                                 C()));
+    SetVReg(A(), SafeMul(GetVReg(B()), C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntDivide(shadow_frame, A(),
-                               shadow_frame.GetVReg(B()),
-                               C());
+    bool success = DoIntDivide(shadow_frame, A(), GetVReg(B()), C());
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void REM_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntRemainder(shadow_frame, A(),
-                                  shadow_frame.GetVReg(B()),
-                                  C());
+    bool success = DoIntRemainder(shadow_frame, A(), GetVReg(B()), C());
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void AND_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) &
-                         C());
+    SetVReg(A(), GetVReg(B()) & C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void OR_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) |
-                         C());
+    SetVReg(A(), GetVReg(B()) | C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void XOR_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) ^
-                         C());
+    SetVReg(A(), GetVReg(B()) ^ C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void ADD_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeAdd(shadow_frame.GetVReg(B()), C()));
+    SetVReg(A(), SafeAdd(GetVReg(B()), C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void RSUB_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeSub(C(), shadow_frame.GetVReg(B())));
+    SetVReg(A(), SafeSub(C(), GetVReg(B())));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void MUL_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         SafeMul(shadow_frame.GetVReg(B()), C()));
+    SetVReg(A(), SafeMul(GetVReg(B()), C()));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void DIV_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntDivide(shadow_frame, A(),
-                               shadow_frame.GetVReg(B()), C());
+    bool success = DoIntDivide(shadow_frame, A(), GetVReg(B()), C());
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void REM_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIntRemainder(shadow_frame, A(),
-                                  shadow_frame.GetVReg(B()), C());
+    bool success = DoIntRemainder(shadow_frame, A(), GetVReg(B()), C());
     POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
   }
 
   ALWAYS_INLINE void AND_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) &
-                         C());
+    SetVReg(A(), GetVReg(B()) & C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void OR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) |
-                         C());
+    SetVReg(A(), GetVReg(B()) | C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void XOR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) ^
-                         C());
+    SetVReg(A(), GetVReg(B()) ^ C());
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SHL_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) <<
-                         (C() & 0x1f));
+    SetVReg(A(), GetVReg(B()) << (C() & 0x1f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void SHR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         shadow_frame.GetVReg(B()) >>
-                         (C() & 0x1f));
+    SetVReg(A(), GetVReg(B()) >> (C() & 0x1f));
     inst = inst->Next_2xx();
   }
 
   ALWAYS_INLINE void USHR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    shadow_frame.SetVReg(A(),
-                         static_cast<uint32_t>(shadow_frame.GetVReg(B())) >>
-                         (C() & 0x1f));
+    SetVReg(A(), static_cast<uint32_t>(GetVReg(B())) >> (C() & 0x1f));
     inst = inst->Next_2xx();
   }
 
@@ -2602,6 +2404,23 @@ class InstructionHandler {
   ALWAYS_INLINE int32_t A() { return inst->VRegA(kFormat, inst_data); }
   ALWAYS_INLINE int32_t B() { return inst->VRegB(kFormat, inst_data); }
   ALWAYS_INLINE int32_t C() { return inst->VRegC(kFormat); }
+
+  int32_t GetVReg(size_t i) const { return shadow_frame.GetVReg(i); }
+  int64_t GetVRegLong(size_t i) const { return shadow_frame.GetVRegLong(i); }
+  float GetVRegFloat(size_t i) const { return shadow_frame.GetVRegFloat(i); }
+  double GetVRegDouble(size_t i) const { return shadow_frame.GetVRegDouble(i); }
+  ObjPtr<mirror::Object> GetVRegReference(size_t i) const REQUIRES_SHARED(Locks::mutator_lock_) {
+    return shadow_frame.GetVRegReference(i);
+  }
+
+  void SetVReg(size_t i, int32_t val) { shadow_frame.SetVReg(i, val); }
+  void SetVRegLong(size_t i, int64_t val) { shadow_frame.SetVRegLong(i, val); }
+  void SetVRegFloat(size_t i, float val) { shadow_frame.SetVRegFloat(i, val); }
+  void SetVRegDouble(size_t i, double val) { shadow_frame.SetVRegDouble(i, val); }
+  void SetVRegReference(size_t i, ObjPtr<mirror::Object> val)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    shadow_frame.SetVRegReference(i, val);
+  }
 
   SwitchImplContext* const ctx;
   const instrumentation::Instrumentation* const instrumentation;
