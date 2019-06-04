@@ -476,6 +476,42 @@ class InstructionHandler {
     return true;
   }
 
+  template<typename ArrayType, typename SetVRegFn>
+  ALWAYS_INLINE bool HandleAGet(SetVRegFn setVReg) REQUIRES_SHARED(Locks::mutator_lock_) {
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
+    if (UNLIKELY(a == nullptr)) {
+      ThrowNullPointerExceptionFromInterpreter();
+      HANDLE_PENDING_EXCEPTION();
+    }
+    int32_t index = GetVReg(C());
+    ObjPtr<ArrayType> array = ObjPtr<ArrayType>::DownCast(a);
+    if (UNLIKELY(!array->CheckIsValidIndex(index))) {
+      HANDLE_PENDING_EXCEPTION();
+    } else {
+      (this->*setVReg)(A(), array->GetWithoutChecks(index));
+      inst = inst->Next_2xx();
+    }
+    return true;
+  }
+
+  template<typename ArrayType, typename T>
+  ALWAYS_INLINE bool HandleAPut(T value) REQUIRES_SHARED(Locks::mutator_lock_) {
+    ObjPtr<mirror::Object> a = GetVRegReference(B());
+    if (UNLIKELY(a == nullptr)) {
+      ThrowNullPointerExceptionFromInterpreter();
+      HANDLE_PENDING_EXCEPTION();
+    }
+    int32_t index = GetVReg(C());
+    ObjPtr<ArrayType> array = ObjPtr<ArrayType>::DownCast(a);
+    if (UNLIKELY(!array->CheckIsValidIndex(index))) {
+      HANDLE_PENDING_EXCEPTION();
+    } else {
+      array->template SetWithoutChecks<transaction_active>(index, value);
+      inst = inst->Next_2xx();
+    }
+    return true;
+  }
+
   template<FindFieldType find_type, Primitive::Type field_type>
   ALWAYS_INLINE WARN_UNUSED bool HandleGet() REQUIRES_SHARED(Locks::mutator_lock_) {
     bool success = DoFieldGet<find_type, field_type, do_access_check, transaction_active>(
@@ -1089,234 +1125,55 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE bool AGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::BooleanArray> array = a->AsBooleanArray();
-    if (array->CheckIsValidIndex(index)) {
-      SetVReg(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::BooleanArray>(&InstructionHandler::SetVReg);
   }
 
   ALWAYS_INLINE bool AGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::ByteArray> array = a->AsByteArray();
-    if (array->CheckIsValidIndex(index)) {
-      SetVReg(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::ByteArray>(&InstructionHandler::SetVReg);
   }
 
   ALWAYS_INLINE bool AGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::CharArray> array = a->AsCharArray();
-    if (array->CheckIsValidIndex(index)) {
-      SetVReg(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::CharArray>(&InstructionHandler::SetVReg);
   }
 
   ALWAYS_INLINE bool AGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::ShortArray> array = a->AsShortArray();
-    if (array->CheckIsValidIndex(index)) {
-      SetVReg(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::ShortArray>(&InstructionHandler::SetVReg);
   }
 
   ALWAYS_INLINE bool AGET() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    DCHECK(a->IsIntArray() || a->IsFloatArray()) << a->PrettyTypeOf();
-    ObjPtr<mirror::IntArray> array = ObjPtr<mirror::IntArray>::DownCast(a);
-    if (array->CheckIsValidIndex(index)) {
-      SetVReg(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::IntArray>(&InstructionHandler::SetVReg);
   }
 
   ALWAYS_INLINE bool AGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    DCHECK(a->IsLongArray() || a->IsDoubleArray()) << a->PrettyTypeOf();
-    ObjPtr<mirror::LongArray> array = ObjPtr<mirror::LongArray>::DownCast(a);
-    if (array->CheckIsValidIndex(index)) {
-      SetVRegLong(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::LongArray>(&InstructionHandler::SetVRegLong);
   }
 
   ALWAYS_INLINE bool AGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::ObjectArray<mirror::Object>> array = a->AsObjectArray<mirror::Object>();
-    if (array->CheckIsValidIndex(index)) {
-      SetVRegReference(A(), array->GetWithoutChecks(index));
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAGet<mirror::ObjectArray<mirror::Object>>(&InstructionHandler::SetVRegReference);
   }
 
   ALWAYS_INLINE bool APUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    uint8_t val = GetVReg(A());
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::BooleanArray> array = a->AsBooleanArray();
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::BooleanArray>(GetVReg(A()));
   }
 
   ALWAYS_INLINE bool APUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int8_t val = GetVReg(A());
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::ByteArray> array = a->AsByteArray();
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::ByteArray>(GetVReg(A()));
   }
 
   ALWAYS_INLINE bool APUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    uint16_t val = GetVReg(A());
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::CharArray> array = a->AsCharArray();
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::CharArray>(GetVReg(A()));
   }
 
   ALWAYS_INLINE bool APUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int16_t val = GetVReg(A());
-    int32_t index = GetVReg(C());
-    ObjPtr<mirror::ShortArray> array = a->AsShortArray();
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::ShortArray>(GetVReg(A()));
   }
 
   ALWAYS_INLINE bool APUT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int32_t val = GetVReg(A());
-    int32_t index = GetVReg(C());
-    DCHECK(a->IsIntArray() || a->IsFloatArray()) << a->PrettyTypeOf();
-    ObjPtr<mirror::IntArray> array = ObjPtr<mirror::IntArray>::DownCast(a);
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::IntArray>(GetVReg(A()));
   }
 
   ALWAYS_INLINE bool APUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> a = GetVRegReference(B());
-    if (UNLIKELY(a == nullptr)) {
-      ThrowNullPointerExceptionFromInterpreter();
-      HANDLE_PENDING_EXCEPTION();
-    }
-    int64_t val = GetVRegLong(A());
-    int32_t index = GetVReg(C());
-    DCHECK(a->IsLongArray() || a->IsDoubleArray()) << a->PrettyTypeOf();
-    ObjPtr<mirror::LongArray> array = ObjPtr<mirror::LongArray>::DownCast(a);
-    if (array->CheckIsValidIndex(index)) {
-      array->SetWithoutChecks<transaction_active>(index, val);
-      inst = inst->Next_2xx();
-    } else {
-      HANDLE_PENDING_EXCEPTION();
-    }
-    return true;
+    return HandleAPut<mirror::LongArray>(GetVRegLong(A()));
   }
 
   ALWAYS_INLINE bool APUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
