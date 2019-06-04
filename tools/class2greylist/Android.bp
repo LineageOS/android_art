@@ -21,6 +21,8 @@ java_library_host {
         "commons-cli-1.2",
         "apache-bcel",
         "guava",
+        "testng",
+        "hamcrest-library",
     ],
 }
 
