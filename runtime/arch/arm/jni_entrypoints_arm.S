@@ -30,6 +30,7 @@ ENTRY art_jni_dlsym_lookup_stub
     .cfi_rel_offset lr, 16
     sub    sp, #12                        @ pad stack pointer to align frame
     .cfi_adjust_cfa_offset 12
+    mov    r0, rSELF                      @ pass Thread::Current()
     blx    artFindNativeMethod
     mov    r12, r0                        @ save result in r12
     add    sp, #12                        @ restore stack pointer
