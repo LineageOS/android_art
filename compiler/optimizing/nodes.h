@@ -1521,8 +1521,10 @@ class HLoopInformationOutwardIterator : public ValueObject {
 
 #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
 #define FOR_EACH_CONCRETE_INSTRUCTION_X86_COMMON(M)                     \
-  M(X86AndNot, Instruction)                                                \
-  M(X86MaskOrResetLeastSetBit, Instruction)
+  M(X86AndNot, Instruction)                                             \
+  M(X86MaskOrResetLeastSetBit, Instruction)                             \
+  M(VecAvxSub, VecOperation)                                            \
+  M(VecAvxAdd, VecOperation)
 #else
 #define FOR_EACH_CONCRETE_INSTRUCTION_X86_COMMON(M)
 #endif
@@ -7853,6 +7855,7 @@ class HIntermediateAddress final : public HExpression<2> {
 #endif
 #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
 #include "nodes_x86.h"
+#include "nodes_vector_x86.h"
 #endif
 
 namespace art {
