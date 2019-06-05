@@ -437,6 +437,10 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("      the default behavior). This option is only meaningful when used with");
   UsageError("      --dump-cfg.");
   UsageError("");
+  UsageError("  --verbose-methods=<method-names>: Restrict dumped CFG data to methods whose name");
+  UsageError("      contain one of the method names passed as argument");
+  UsageError("      Example: --verbose-methods=toString,hashCode");
+  UsageError("");
   UsageError("  --classpath-dir=<directory-path>: directory used to resolve relative class paths.");
   UsageError("");
   UsageError("  --class-loader-context=<string spec>: a string specifying the intended");
