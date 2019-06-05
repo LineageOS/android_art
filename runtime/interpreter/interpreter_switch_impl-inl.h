@@ -391,6 +391,135 @@ class InstructionHandler {
     return false;                                                                                 \
   }
 
+  ALWAYS_INLINE WARN_UNUSED bool HandleReturn(JValue result) REQUIRES_SHARED(Locks::mutator_lock_) {
+    self->AllowThreadSuspension();
+    if (!HandleMonitorChecks()) {
+      return false;
+    }
+    if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
+                 !SendMethodExitEvents(self,
+                                       instrumentation,
+                                       shadow_frame,
+                                       shadow_frame.GetThisObject(Accessor().InsSize()),
+                                       shadow_frame.GetMethod(),
+                                       inst->GetDexPc(Insns()),
+                                       result))) {
+      if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
+        return false;
+      }
+    }
+    if (ctx->interpret_one_instruction) {
+      /* Signal mterp to return to caller */
+      shadow_frame.SetDexPC(dex::kDexNoIndex);
+    }
+    ctx->result = result;
+    exit_interpreter_loop = true;
+    return true;
+  }
+
+  ALWAYS_INLINE WARN_UNUSED bool HandleGoto(int32_t offset) REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (!HandleAsyncException()) {
+      return false;
+    }
+    BRANCH_INSTRUMENTATION(offset);
+    inst = inst->RelativeAt(offset);
+    HandleBackwardBranch(offset);
+    return true;
+  }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+
+  template<typename T>
+  ALWAYS_INLINE WARN_UNUSED bool HandleCmpl(T val1, T val2) REQUIRES_SHARED(Locks::mutator_lock_) {
+    int32_t result;
+    if (val1 > val2) {
+      result = 1;
+    } else if (val1 == val2) {
+      result = 0;
+    } else {
+      result = -1;
+    }
+    SetVReg(A(), result);
+    inst = inst->Next_2xx();
+    return true;
+  }
+
+  // Returns the same result as the function above. It only differs for NaN values.
+  template<typename T>
+  ALWAYS_INLINE WARN_UNUSED bool HandleCmpg(T val1, T val2) REQUIRES_SHARED(Locks::mutator_lock_) {
+    int32_t result;
+    if (val1 < val2) {
+      result = -1;
+    } else if (val1 == val2) {
+      result = 0;
+    } else {
+      result = 1;
+    }
+    SetVReg(A(), result);
+    inst = inst->Next_2xx();
+    return true;
+  }
+
+#pragma clang diagnostic pop
+
+  ALWAYS_INLINE WARN_UNUSED bool HandleIf(bool cond, int32_t offset)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (cond) {
+      BRANCH_INSTRUMENTATION(offset);
+      inst = inst->RelativeAt(offset);
+      HandleBackwardBranch(offset);
+    } else {
+      BRANCH_INSTRUMENTATION(2);
+      inst = inst->Next_2xx();
+    }
+    return true;
+  }
+
+  template<FindFieldType find_type, Primitive::Type field_type>
+  ALWAYS_INLINE WARN_UNUSED bool HandleGet() REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool success = DoFieldGet<find_type, field_type, do_access_check, transaction_active>(
+        self, shadow_frame, inst, inst_data);
+    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
+    return true;
+  }
+
+  template<Primitive::Type field_type>
+  ALWAYS_INLINE WARN_UNUSED bool HandleGetQuick() REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool success = DoIGetQuick<field_type>(shadow_frame, inst, inst_data);
+    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
+    return true;
+  }
+
+  template<FindFieldType find_type, Primitive::Type field_type>
+  ALWAYS_INLINE WARN_UNUSED bool HandlePut() REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool success = DoFieldPut<find_type, field_type, do_access_check, transaction_active>(
+        self, shadow_frame, inst, inst_data);
+    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
+    return true;
+  }
+
+  template<Primitive::Type field_type>
+  ALWAYS_INLINE WARN_UNUSED bool HandlePutQuick() REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool success = DoIPutQuick<field_type, transaction_active>(
+        shadow_frame, inst, inst_data);
+    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
+    return true;
+  }
+
+  template<InvokeType type, bool is_range, bool is_quick = false>
+  ALWAYS_INLINE WARN_UNUSED bool HandleInvoke() REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool success = DoInvoke<type, is_range, do_access_check, /*is_mterp=*/ false, is_quick>(
+        self, shadow_frame, inst, inst_data, ResultRegister());
+    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
+    return true;
+  }
+
+  ALWAYS_INLINE WARN_UNUSED bool HandleUnused() REQUIRES_SHARED(Locks::mutator_lock_) {
+    UnexpectedOpcode(inst, shadow_frame);
+    return true;
+  }
+
   ALWAYS_INLINE bool NOP() REQUIRES_SHARED(Locks::mutator_lock_) {
     inst = inst->Next_1xx();
     return true;
@@ -479,114 +608,26 @@ class InstructionHandler {
 
   ALWAYS_INLINE bool RETURN_VOID_NO_BARRIER() REQUIRES_SHARED(Locks::mutator_lock_) {
     JValue result;
-    self->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
-      return false;
-    }
-    if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
-                 !SendMethodExitEvents(self,
-                                       instrumentation,
-                                       shadow_frame,
-                                       shadow_frame.GetThisObject(Accessor().InsSize()),
-                                       shadow_frame.GetMethod(),
-                                       inst->GetDexPc(Insns()),
-                                       result))) {
-      if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
-        return false;
-      }
-    }
-    if (ctx->interpret_one_instruction) {
-      /* Signal mterp to return to caller */
-      shadow_frame.SetDexPC(dex::kDexNoIndex);
-    }
-    ctx->result = result;
-    exit_interpreter_loop = true;
-    return true;
+    return HandleReturn(result);
   }
 
   ALWAYS_INLINE bool RETURN_VOID() REQUIRES_SHARED(Locks::mutator_lock_) {
     QuasiAtomic::ThreadFenceForConstructor();
     JValue result;
-    self->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
-      return false;
-    }
-    if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
-                 !SendMethodExitEvents(self,
-                                       instrumentation,
-                                       shadow_frame,
-                                       shadow_frame.GetThisObject(Accessor().InsSize()),
-                                       shadow_frame.GetMethod(),
-                                       inst->GetDexPc(Insns()),
-                                       result))) {
-      if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
-        return false;
-      }
-    }
-    if (ctx->interpret_one_instruction) {
-      /* Signal mterp to return to caller */
-      shadow_frame.SetDexPC(dex::kDexNoIndex);
-    }
-    ctx->result = result;
-    exit_interpreter_loop = true;
-    return true;
+    return HandleReturn(result);
   }
 
   ALWAYS_INLINE bool RETURN() REQUIRES_SHARED(Locks::mutator_lock_) {
     JValue result;
     result.SetJ(0);
     result.SetI(GetVReg(A()));
-    self->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
-      return false;
-    }
-    if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
-                 !SendMethodExitEvents(self,
-                                       instrumentation,
-                                       shadow_frame,
-                                       shadow_frame.GetThisObject(Accessor().InsSize()),
-                                       shadow_frame.GetMethod(),
-                                       inst->GetDexPc(Insns()),
-                                       result))) {
-      if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
-        return false;
-      }
-    }
-    if (ctx->interpret_one_instruction) {
-      /* Signal mterp to return to caller */
-      shadow_frame.SetDexPC(dex::kDexNoIndex);
-    }
-    ctx->result = result;
-    exit_interpreter_loop = true;
-    return true;
+    return HandleReturn(result);
   }
 
   ALWAYS_INLINE bool RETURN_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
     JValue result;
     result.SetJ(GetVRegLong(A()));
-    self->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
-      return false;
-    }
-    if (UNLIKELY(NeedsMethodExitEvent(instrumentation) &&
-                 !SendMethodExitEvents(self,
-                                       instrumentation,
-                                       shadow_frame,
-                                       shadow_frame.GetThisObject(Accessor().InsSize()),
-                                       shadow_frame.GetMethod(),
-                                       inst->GetDexPc(Insns()),
-                                       result))) {
-      if (!HandlePendingExceptionWithInstrumentation(nullptr)) {
-        return false;
-      }
-    }
-    if (ctx->interpret_one_instruction) {
-      /* Signal mterp to return to caller */
-      shadow_frame.SetDexPC(dex::kDexNoIndex);
-    }
-    ctx->result = result;
-    exit_interpreter_loop = true;
-    return true;
+    return HandleReturn(result);
   }
 
   ALWAYS_INLINE bool RETURN_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -952,36 +993,15 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE bool GOTO() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!HandleAsyncException()) {
-      return false;
-    }
-    int8_t offset = A();
-    BRANCH_INSTRUMENTATION(offset);
-    inst = inst->RelativeAt(offset);
-    HandleBackwardBranch(offset);
-    return true;
+    return HandleGoto(A());
   }
 
   ALWAYS_INLINE bool GOTO_16() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!HandleAsyncException()) {
-      return false;
-    }
-    int16_t offset = A();
-    BRANCH_INSTRUMENTATION(offset);
-    inst = inst->RelativeAt(offset);
-    HandleBackwardBranch(offset);
-    return true;
+    return HandleGoto(A());
   }
 
   ALWAYS_INLINE bool GOTO_32() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!HandleAsyncException()) {
-      return false;
-    }
-    int32_t offset = A();
-    BRANCH_INSTRUMENTATION(offset);
-    inst = inst->RelativeAt(offset);
-    HandleBackwardBranch(offset);
-    return true;
+    return HandleGoto(A());
   }
 
   ALWAYS_INLINE bool PACKED_SWITCH() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -1000,245 +1020,72 @@ class InstructionHandler {
     return true;
   }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-
   ALWAYS_INLINE bool CMPL_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val1 = GetVRegFloat(B());
-    float val2 = GetVRegFloat(C());
-    int32_t result;
-    if (val1 > val2) {
-      result = 1;
-    } else if (val1 == val2) {
-      result = 0;
-    } else {
-      result = -1;
-    }
-    SetVReg(A(), result);
-    inst = inst->Next_2xx();
-    return true;
+    return HandleCmpl<float>(GetVRegFloat(B()), GetVRegFloat(C()));
   }
 
   ALWAYS_INLINE bool CMPG_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    float val1 = GetVRegFloat(B());
-    float val2 = GetVRegFloat(C());
-    int32_t result;
-    if (val1 < val2) {
-      result = -1;
-    } else if (val1 == val2) {
-      result = 0;
-    } else {
-      result = 1;
-    }
-    SetVReg(A(), result);
-    inst = inst->Next_2xx();
-    return true;
+    return HandleCmpg<float>(GetVRegFloat(B()), GetVRegFloat(C()));
   }
 
   ALWAYS_INLINE bool CMPL_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val1 = GetVRegDouble(B());
-    double val2 = GetVRegDouble(C());
-    int32_t result;
-    if (val1 > val2) {
-      result = 1;
-    } else if (val1 == val2) {
-      result = 0;
-    } else {
-      result = -1;
-    }
-    SetVReg(A(), result);
-    inst = inst->Next_2xx();
-    return true;
+    return HandleCmpl<double>(GetVRegDouble(B()), GetVRegDouble(C()));
   }
 
   ALWAYS_INLINE bool CMPG_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    double val1 = GetVRegDouble(B());
-    double val2 = GetVRegDouble(C());
-    int32_t result;
-    if (val1 < val2) {
-      result = -1;
-    } else if (val1 == val2) {
-      result = 0;
-    } else {
-      result = 1;
-    }
-    SetVReg(A(), result);
-    inst = inst->Next_2xx();
-    return true;
+    return HandleCmpg<double>(GetVRegDouble(B()), GetVRegDouble(C()));
   }
 
-#pragma clang diagnostic pop
-
   ALWAYS_INLINE bool CMP_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
-    int64_t val1 = GetVRegLong(B());
-    int64_t val2 = GetVRegLong(C());
-    int32_t result;
-    if (val1 > val2) {
-      result = 1;
-    } else if (val1 == val2) {
-      result = 0;
-    } else {
-      result = -1;
-    }
-    SetVReg(A(), result);
-    inst = inst->Next_2xx();
-    return true;
+    return HandleCmpl<int64_t>(GetVRegLong(B()), GetVRegLong(C()));
   }
 
   ALWAYS_INLINE bool IF_EQ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) == GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) == GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_NE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) != GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) != GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_LT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) < GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) < GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_GE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) >= GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) >= GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_GT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) > GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) > GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_LE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) <= GetVReg(B())) {
-      int16_t offset = C();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) <= GetVReg(B()), C());
   }
 
   ALWAYS_INLINE bool IF_EQZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) == 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) == 0, B());
   }
 
   ALWAYS_INLINE bool IF_NEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) != 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) != 0, B());
   }
 
   ALWAYS_INLINE bool IF_LTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) < 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) < 0, B());
   }
 
   ALWAYS_INLINE bool IF_GEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) >= 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) >= 0, B());
   }
 
   ALWAYS_INLINE bool IF_GTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) > 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) > 0, B());
   }
 
   ALWAYS_INLINE bool IF_LEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (GetVReg(A()) <= 0) {
-      int16_t offset = B();
-      BRANCH_INSTRUMENTATION(offset);
-      inst = inst->RelativeAt(offset);
-      HandleBackwardBranch(offset);
-    } else {
-      BRANCH_INSTRUMENTATION(2);
-      inst = inst->Next_2xx();
-    }
-    return true;
+    return HandleIf(GetVReg(A()) <= 0, B());
   }
 
   ALWAYS_INLINE bool AGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -1491,374 +1338,219 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE bool IGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimBoolean, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool IGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimByte, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool IGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimChar, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool IGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimShort, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool IGET() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimInt, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool IGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstancePrimitiveRead, Primitive::kPrimLong, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstancePrimitiveRead, Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool IGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<InstanceObjectRead, Primitive::kPrimNot, do_access_check>(
-        self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<InstanceObjectRead, Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool IGET_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimInt>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool IGET_WIDE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimLong>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool IGET_OBJECT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimNot>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool IGET_BOOLEAN_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimBoolean>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool IGET_BYTE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimByte>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool IGET_CHAR_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimChar>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool IGET_SHORT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIGetQuick<Primitive::kPrimShort>(shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGetQuick<Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool SGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimBoolean, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool SGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimByte, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool SGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimChar, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool SGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimShort, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool SGET() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimInt, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool SGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticPrimitiveRead, Primitive::kPrimLong, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticPrimitiveRead, Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool SGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldGet<StaticObjectRead, Primitive::kPrimNot, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandleGet<StaticObjectRead, Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool IPUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimBoolean, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool IPUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimByte, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool IPUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimChar, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool IPUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimShort, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool IPUT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimInt, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool IPUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstancePrimitiveWrite, Primitive::kPrimLong, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstancePrimitiveWrite, Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool IPUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<InstanceObjectWrite, Primitive::kPrimNot, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<InstanceObjectWrite, Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool IPUT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimInt, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool IPUT_BOOLEAN_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimBoolean, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool IPUT_BYTE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimByte, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool IPUT_CHAR_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimChar, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool IPUT_SHORT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimShort, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool IPUT_WIDE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimLong, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool IPUT_OBJECT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoIPutQuick<Primitive::kPrimNot, transaction_active>(
-        shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePutQuick<Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool SPUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimBoolean, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimBoolean>();
   }
 
   ALWAYS_INLINE bool SPUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimByte, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimByte>();
   }
 
   ALWAYS_INLINE bool SPUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimChar, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimChar>();
   }
 
   ALWAYS_INLINE bool SPUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimShort, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimShort>();
   }
 
   ALWAYS_INLINE bool SPUT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimInt, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimInt>();
   }
 
   ALWAYS_INLINE bool SPUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticPrimitiveWrite, Primitive::kPrimLong, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticPrimitiveWrite, Primitive::kPrimLong>();
   }
 
   ALWAYS_INLINE bool SPUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoFieldPut<StaticObjectWrite, Primitive::kPrimNot, do_access_check,
-        transaction_active>(self, shadow_frame, inst, inst_data);
-    POSSIBLY_HANDLE_PENDING_EXCEPTION(!success, Next_2xx);
-    return true;
+    return HandlePut<StaticObjectWrite, Primitive::kPrimNot>();
   }
 
   ALWAYS_INLINE bool INVOKE_VIRTUAL() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kVirtual, false, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kVirtual, /*is_range=*/ false>();
   }
 
   ALWAYS_INLINE bool INVOKE_VIRTUAL_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kVirtual, true, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kVirtual, /*is_range=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_SUPER() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kSuper, false, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kSuper, /*is_range=*/ false>();
   }
 
   ALWAYS_INLINE bool INVOKE_SUPER_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kSuper, true, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kSuper, /*is_range=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_DIRECT() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kDirect, false, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kDirect, /*is_range=*/ false>();
   }
 
   ALWAYS_INLINE bool INVOKE_DIRECT_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kDirect, true, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kDirect, /*is_range=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_INTERFACE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kInterface, false, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kInterface, /*is_range=*/ false>();
   }
 
   ALWAYS_INLINE bool INVOKE_INTERFACE_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kInterface, true, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kInterface, /*is_range=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_STATIC() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kStatic, false, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kStatic, /*is_range=*/ false>();
   }
 
   ALWAYS_INLINE bool INVOKE_STATIC_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kStatic, true, do_access_check, /*is_mterp=*/ false>(
-        self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kStatic, /*is_range=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_VIRTUAL_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kVirtual, false, do_access_check, /*is_mterp=*/ false,
-        /*is_quick=*/ true>(self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kVirtual, /*is_range=*/ false, /*is_quick=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_VIRTUAL_RANGE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
-    bool success = DoInvoke<kVirtual, true, do_access_check, /*is_mterp=*/ false,
-        /*is_quick=*/ true>(self, shadow_frame, inst, inst_data, ResultRegister());
-    POSSIBLY_HANDLE_PENDING_EXCEPTION_ON_INVOKE(!success);
-    return true;
+    return HandleInvoke<kVirtual, /*is_range=*/ true, /*is_quick=*/ true>();
   }
 
   ALWAYS_INLINE bool INVOKE_POLYMORPHIC() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -2558,78 +2250,63 @@ class InstructionHandler {
   }
 
   ALWAYS_INLINE bool UNUSED_3E() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_3F() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_40() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_41() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_42() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_43() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_79() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_7A() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F3() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F4() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F5() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F6() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F7() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F8() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE bool UNUSED_F9() REQUIRES_SHARED(Locks::mutator_lock_) {
-    UnexpectedOpcode(inst, shadow_frame);
-    return true;
+    return HandleUnused();
   }
 
   ALWAYS_INLINE InstructionHandler(SwitchImplContext* ctx,
