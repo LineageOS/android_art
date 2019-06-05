@@ -7,7 +7,7 @@ important.
 
 # Usage
 ### Build
->    `make libfieldnull`
+>    `make libfieldnull libfieldnulls`
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.
@@ -26,9 +26,9 @@ following format:
 
 >    `adb shell setenforce 0`
 >
->    `adb push $ANDROID_PRODUCT_OUT/system/lib64/libfieldnull.so /data/local/tmp/`
+>    `adb push $ANDROID_PRODUCT_OUT/system/lib64/libfieldnulls.so /data/local/tmp/`
 >
->    `adb shell am start-activity --attach-agent '/data/local/tmp/libfieldnull.so=Ljava/lang/Class;.name:Ljava/lang/String;' some.debuggable.apps/.the.app.MainActivity`
+>    `adb shell am start-activity --attach-agent '/data/local/tmp/libfieldnulls.so=Ljava/lang/Class;.name:Ljava/lang/String;' some.debuggable.apps/.the.app.MainActivity`
 
 #### RI
 >    `java '-agentpath:libfieldnull.so=Lname/of/class;.nameOfField:Ltype/of/field;' -cp tmp/helloworld/classes helloworld`
