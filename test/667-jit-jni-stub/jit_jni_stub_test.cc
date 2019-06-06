@@ -31,7 +31,7 @@ class JitJniStubTestHelper {
   static bool isNextJitGcFull(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_) {
     CHECK(Runtime::Current()->GetJit() != nullptr);
     jit::JitCodeCache* cache = Runtime::Current()->GetJit()->GetCodeCache();
-    MutexLock mu(self, cache->lock_);
+    MutexLock mu(self, *Locks::jit_lock_);
     return cache->ShouldDoFullCollection();
   }
 };

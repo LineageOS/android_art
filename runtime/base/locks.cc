@@ -63,6 +63,7 @@ Mutex* Locks::reference_queue_weak_references_lock_ = nullptr;
 Mutex* Locks::runtime_shutdown_lock_ = nullptr;
 Mutex* Locks::runtime_thread_pool_lock_ = nullptr;
 Mutex* Locks::cha_lock_ = nullptr;
+Mutex* Locks::jit_lock_ = nullptr;
 Mutex* Locks::subtype_check_lock_ = nullptr;
 Mutex* Locks::thread_list_lock_ = nullptr;
 ConditionVariable* Locks::thread_exit_cond_ = nullptr;
@@ -147,6 +148,7 @@ void Locks::Init() {
     DCHECK(mutator_lock_ != nullptr);
     DCHECK(profiler_lock_ != nullptr);
     DCHECK(cha_lock_ != nullptr);
+    DCHECK(jit_lock_ != nullptr);
     DCHECK(subtype_check_lock_ != nullptr);
     DCHECK(thread_list_lock_ != nullptr);
     DCHECK(thread_suspend_count_lock_ != nullptr);
@@ -302,6 +304,10 @@ void Locks::Init() {
     UPDATE_CURRENT_LOCK_LEVEL(kCustomTlsLock);
     DCHECK(custom_tls_lock_ == nullptr);
     custom_tls_lock_ = new Mutex("Thread::custom_tls_ lock", current_lock_level);
+
+    UPDATE_CURRENT_LOCK_LEVEL(kJitCodeCacheLock);
+    DCHECK(jit_lock_ == nullptr);
+    jit_lock_ = new Mutex("Jit code cache", current_lock_level);
 
     UPDATE_CURRENT_LOCK_LEVEL(kCHALock);
     DCHECK(cha_lock_ == nullptr);
