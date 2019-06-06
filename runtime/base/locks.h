@@ -328,8 +328,11 @@ class Locks {
   // GetThreadLocalStorage.
   static Mutex* custom_tls_lock_ ACQUIRED_AFTER(jni_function_table_lock_);
 
+  // Guard access to any JIT data structure.
+  static Mutex* jit_lock_ ACQUIRED_AFTER(custom_tls_lock_);
+
   // Guards Class Hierarchy Analysis (CHA).
-  static Mutex* cha_lock_ ACQUIRED_AFTER(custom_tls_lock_);
+  static Mutex* cha_lock_ ACQUIRED_AFTER(jit_lock_);
 
   // When declaring any Mutex add BOTTOM_MUTEX_ACQUIRED_AFTER to use annotalysis to check the code
   // doesn't try to acquire a higher level Mutex. NB Due to the way the annotalysis works this
