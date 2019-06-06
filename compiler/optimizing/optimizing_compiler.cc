@@ -295,6 +295,7 @@ class OptimizingCompiler final : public Compiler {
 
   bool JitCompile(Thread* self,
                   jit::JitCodeCache* code_cache,
+                  jit::JitMemoryRegion* region,
                   ArtMethod* method,
                   bool baseline,
                   bool osr,
@@ -1248,6 +1249,7 @@ bool EncodeArtMethodInInlineInfo(ArtMethod* method ATTRIBUTE_UNUSED) {
 
 bool OptimizingCompiler::JitCompile(Thread* self,
                                     jit::JitCodeCache* code_cache,
+                                    jit::JitMemoryRegion* region,
                                     ArtMethod* method,
                                     bool baseline,
                                     bool osr,
@@ -1282,6 +1284,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     uint8_t* stack_map_data = nullptr;
     uint8_t* roots_data = nullptr;
     uint32_t data_size = code_cache->ReserveData(self,
+                                                 region,
                                                  stack_map.size(),
                                                  /* number_of_roots= */ 0,
                                                  method,
@@ -1295,6 +1298,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
     const void* code = code_cache->CommitCode(
         self,
+        region,
         method,
         stack_map_data,
         roots_data,
@@ -1306,6 +1310,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
         /* has_should_deoptimize_flag= */ false,
         cha_single_implementation_list);
     if (code == nullptr) {
+      code_cache->ClearData(self, region, stack_map_data, roots_data);
       return false;
     }
 
@@ -1379,6 +1384,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
   uint8_t* stack_map_data = nullptr;
   uint8_t* roots_data = nullptr;
   uint32_t data_size = code_cache->ReserveData(self,
+                                               region,
                                                stack_map.size(),
                                                number_of_roots,
                                                method,
@@ -1400,6 +1406,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   const void* code = code_cache->CommitCode(
       self,
+      region,
       method,
       stack_map_data,
       roots_data,
@@ -1413,7 +1420,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   if (code == nullptr) {
     MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
-    code_cache->ClearData(self, stack_map_data, roots_data);
+    code_cache->ClearData(self, region, stack_map_data, roots_data);
     return false;
   }
 
