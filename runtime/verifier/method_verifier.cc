@@ -112,8 +112,9 @@ namespace impl {
 namespace {
 
 enum class CheckAccess {
-  kYes,
   kNo,
+  kOnResolvedClass,
+  kYes,
 };
 
 enum class FieldAccessType {
@@ -591,6 +592,8 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
     Dump(&vios);
   }
   void Dump(VariableIndentationOutputStream* vios) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  bool HandleMoveException(const Instruction* inst) REQUIRES_SHARED(Locks::mutator_lock_);
 
   ArtMethod* method_being_verified_;  // Its ArtMethod representation if known.
   const uint32_t method_access_flags_;  // Method's access flags.
@@ -2065,6 +2068,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
     saved_line_->FillWithGarbage();
   }
   DCHECK(!have_pending_runtime_throw_failure_);  // Per-instruction flag, should not be set here.
+  bool exc_handler_unreachable = false;
 
 
   // We need to ensure the work line is consistent while performing validation. When we spot a
@@ -2134,21 +2138,12 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
       work_line_->CopyResultRegister1(this, inst->VRegA_11x(), true);
       break;
 
-    case Instruction::MOVE_EXCEPTION: {
-      // We do not allow MOVE_EXCEPTION as the first instruction in a method. This is a simple case
-      // where one entrypoint to the catch block is not actually an exception path.
-      if (work_insn_idx_ == 0) {
-        Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "move-exception at pc 0x0";
-        break;
+    case Instruction::MOVE_EXCEPTION:
+      if (!HandleMoveException(inst)) {
+        exc_handler_unreachable = true;
       }
-      /*
-       * This statement can only appear as the first instruction in an exception handler. We verify
-       * that as part of extracting the exception type from the catch block list.
-       */
-      const RegType& res_type = GetCaughtExceptionType();
-      work_line_->SetRegisterType<LockOp::kClear>(this, inst->VRegA_11x(), res_type);
       break;
-    }
+
     case Instruction::RETURN_VOID:
       if (!IsInstanceConstructor() || work_line_->CheckConstructorReturn(this)) {
         if (!GetMethodReturnType().IsConflict()) {
@@ -3490,6 +3485,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
     info_messages_ << "Rejecting opcode " << inst->DumpString(dex_file_);
     return false;
   } else if (have_pending_runtime_throw_failure_) {
+    LogVerifyInfo() << "Elevating opcode flags from " << opcode_flags << " to Throw";
     /* checking interpreter will throw, mark following code as unreachable */
     opcode_flags = Instruction::kThrow;
     // Note: the flag must be reset as it is only global to decouple Fail and is semantically per
@@ -3649,7 +3645,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
    *        because it changes work_line_ when performing peephole optimization
    *        and this change should not be used in those cases.
    */
-  if ((opcode_flags & Instruction::kContinue) != 0) {
+  if ((opcode_flags & Instruction::kContinue) != 0 && !exc_handler_unreachable) {
     DCHECK_EQ(&code_item_accessor_.InstructionAt(work_insn_idx_), inst);
     uint32_t next_insn_idx = work_insn_idx_ + inst->SizeInCodeUnits();
     if (next_insn_idx >= code_item_accessor_.InsnsSizeInCodeUnits()) {
@@ -3762,9 +3758,10 @@ const RegType& MethodVerifier<kVerifierDebug>::ResolveClass(dex::TypeIndex class
   // the access-checks interpreter. If result is primitive, skip the access check.
   //
   // Note: we do this for unresolved classes to trigger re-verification at runtime.
-  if (C == CheckAccess::kYes &&
+  if (C != CheckAccess::kNo &&
       result->IsNonZeroReferenceTypes() &&
-      (IsSdkVersionSetAndAtLeast(api_level_, SdkVersion::kP) || !result->IsUnresolvedTypes())) {
+      ((C == CheckAccess::kYes && IsSdkVersionSetAndAtLeast(api_level_, SdkVersion::kP))
+          || !result->IsUnresolvedTypes())) {
     const RegType& referrer = GetDeclaringClass();
     if ((IsSdkVersionSetAndAtLeast(api_level_, SdkVersion::kP) || !referrer.IsUnresolvedTypes()) &&
         !referrer.CanAccess(*result)) {
@@ -3776,55 +3773,88 @@ const RegType& MethodVerifier<kVerifierDebug>::ResolveClass(dex::TypeIndex class
 }
 
 template <bool kVerifierDebug>
-const RegType& MethodVerifier<kVerifierDebug>::GetCaughtExceptionType() {
-  const RegType* common_super = nullptr;
-  if (code_item_accessor_.TriesSize() != 0) {
-    const uint8_t* handlers_ptr = code_item_accessor_.GetCatchHandlerData();
-    uint32_t handlers_size = DecodeUnsignedLeb128(&handlers_ptr);
-    for (uint32_t i = 0; i < handlers_size; i++) {
-      CatchHandlerIterator iterator(handlers_ptr);
-      for (; iterator.HasNext(); iterator.Next()) {
-        if (iterator.GetHandlerAddress() == (uint32_t) work_insn_idx_) {
-          if (!iterator.GetHandlerTypeIndex().IsValid()) {
-            common_super = &reg_types_.JavaLangThrowable(false);
-          } else {
-            const RegType& exception =
-                ResolveClass<CheckAccess::kYes>(iterator.GetHandlerTypeIndex());
-            if (!reg_types_.JavaLangThrowable(false).IsAssignableFrom(exception, this)) {
-              DCHECK(!exception.IsUninitializedTypes());  // Comes from dex, shouldn't be uninit.
-              if (exception.IsUnresolvedTypes()) {
-                // We don't know enough about the type. Fail here and let runtime handle it.
-                Fail(VERIFY_ERROR_NO_CLASS) << "unresolved exception class " << exception;
-                return exception;
-              } else {
-                Fail(VERIFY_ERROR_BAD_CLASS_SOFT) << "unexpected non-exception class " << exception;
-                return reg_types_.Conflict();
-              }
-            } else if (common_super == nullptr) {
-              common_super = &exception;
-            } else if (common_super->Equals(exception)) {
-              // odd case, but nothing to do
+bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst)  {
+  // We do not allow MOVE_EXCEPTION as the first instruction in a method. This is a simple case
+  // where one entrypoint to the catch block is not actually an exception path.
+  if (work_insn_idx_ == 0) {
+    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "move-exception at pc 0x0";
+    return true;
+  }
+  /*
+   * This statement can only appear as the first instruction in an exception handler. We verify
+   * that as part of extracting the exception type from the catch block list.
+   */
+  auto caught_exc_type_fn = [&]() REQUIRES_SHARED(Locks::mutator_lock_) ->
+      std::pair<bool, const RegType*> {
+    const RegType* common_super = nullptr;
+    if (code_item_accessor_.TriesSize() != 0) {
+      const uint8_t* handlers_ptr = code_item_accessor_.GetCatchHandlerData();
+      uint32_t handlers_size = DecodeUnsignedLeb128(&handlers_ptr);
+      const RegType* unresolved = nullptr;
+      for (uint32_t i = 0; i < handlers_size; i++) {
+        CatchHandlerIterator iterator(handlers_ptr);
+        for (; iterator.HasNext(); iterator.Next()) {
+          if (iterator.GetHandlerAddress() == (uint32_t) work_insn_idx_) {
+            if (!iterator.GetHandlerTypeIndex().IsValid()) {
+              common_super = &reg_types_.JavaLangThrowable(false);
             } else {
-              common_super = &common_super->Merge(exception, &reg_types_, this);
-              if (FailOrAbort(reg_types_.JavaLangThrowable(false).IsAssignableFrom(
-                                  *common_super, this),
-                              "java.lang.Throwable is not assignable-from common_super at ",
-                              work_insn_idx_)) {
-                break;
+              // Do access checks only on resolved exception classes.
+              const RegType& exception =
+                  ResolveClass<CheckAccess::kOnResolvedClass>(iterator.GetHandlerTypeIndex());
+              if (!reg_types_.JavaLangThrowable(false).IsAssignableFrom(exception, this)) {
+                DCHECK(!exception.IsUninitializedTypes());  // Comes from dex, shouldn't be uninit.
+                if (exception.IsUnresolvedTypes()) {
+                  if (unresolved == nullptr) {
+                    unresolved = &exception;
+                  } else {
+                    unresolved = &unresolved->SafeMerge(exception, &reg_types_, this);
+                  }
+                } else {
+                  Fail(VERIFY_ERROR_BAD_CLASS_SOFT) << "unexpected non-exception class "
+                                                    << exception;
+                  return std::make_pair(true, &reg_types_.Conflict());
+                }
+              } else if (common_super == nullptr) {
+                common_super = &exception;
+              } else if (common_super->Equals(exception)) {
+                // odd case, but nothing to do
+              } else {
+                common_super = &common_super->Merge(exception, &reg_types_, this);
+                if (FailOrAbort(reg_types_.JavaLangThrowable(false).IsAssignableFrom(
+                    *common_super, this),
+                    "java.lang.Throwable is not assignable-from common_super at ",
+                    work_insn_idx_)) {
+                  break;
+                }
               }
             }
           }
         }
+        handlers_ptr = iterator.EndDataPointer();
       }
-      handlers_ptr = iterator.EndDataPointer();
+      if (unresolved != nullptr) {
+        if (!Runtime::Current()->IsAotCompiler() && common_super == nullptr) {
+          // This is an unreachable handler.
+          return std::make_pair(false, unresolved);
+        }
+        // Soft-fail, but do not handle this with a synthetic throw.
+        Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler";
+        if (common_super != nullptr) {
+          unresolved = &unresolved->Merge(*common_super, &reg_types_, this);
+        }
+        return std::make_pair(true, unresolved);
+      }
     }
-  }
-  if (common_super == nullptr) {
-    /* no catch blocks, or no catches with classes we can find */
-    Fail(VERIFY_ERROR_BAD_CLASS_SOFT) << "unable to find exception handler";
-    return reg_types_.Conflict();
-  }
-  return *common_super;
+    if (common_super == nullptr) {
+      /* no catch blocks, or no catches with classes we can find */
+      Fail(VERIFY_ERROR_BAD_CLASS_SOFT) << "unable to find exception handler";
+      return std::make_pair(true, &reg_types_.Conflict());
+    }
+    return std::make_pair(true, common_super);
+  };
+  auto result = caught_exc_type_fn();
+  work_line_->SetRegisterType<LockOp::kClear>(this, inst->VRegA_11x(), *result.second);
+  return result.first;
 }
 
 template <bool kVerifierDebug>
@@ -5547,6 +5577,10 @@ std::ostream& MethodVerifier::Fail(VerifyError error) {
       have_pending_hard_failure_ = true;
       break;
     }
+
+    case VERIFY_ERROR_UNRESOLVED_CATCH:
+      // Nothing to do, just remember the failure type.
+      break;
   }
   failures_.push_back(error);
   std::string location(StringPrintf("%s: [0x%X] ", dex_file_->PrettyMethod(dex_method_idx_).c_str(),
