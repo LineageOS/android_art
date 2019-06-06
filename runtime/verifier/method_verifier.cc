@@ -3835,6 +3835,11 @@ bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst
       if (unresolved != nullptr) {
         if (!Runtime::Current()->IsAotCompiler() && common_super == nullptr) {
           // This is an unreachable handler.
+
+          // We need to post a failure. The compiler currently does not handle unreachable
+          // code correctly.
+          Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler, fail for compiler";
+
           return std::make_pair(false, unresolved);
         }
         // Soft-fail, but do not handle this with a synthetic throw.
