@@ -934,7 +934,13 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
   if (UNLIKELY(runtime->UseJitCompilation() && runtime->GetJit()->JitAtFirstUse())) {
     ArtMethod* np_method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
     if (np_method->IsCompilable()) {
-      JitCompileTask compile_task(method, JitCompileTask::TaskKind::kPreCompile);
+      if (!np_method->IsNative()) {
+        // The compiler requires a ProfilingInfo object for non-native methods.
+        ProfilingInfo::Create(thread, np_method, /* retry_allocation= */ true);
+      }
+      // TODO(ngeoffray): For JIT at first use, use kPreCompile. Currently we don't due to
+      // conflicts with jitzygote optimizations.
+      JitCompileTask compile_task(method, JitCompileTask::TaskKind::kCompile);
       // Fake being in a runtime thread so that class-load behavior will be the same as normal jit.
       ScopedSetRuntimeThread ssrt(thread);
       compile_task.Run(thread);
