@@ -246,7 +246,7 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
         ProfilingInfo::Create(self, method, /* retry_allocation */ true);
       }
       // Will either ensure it's compiled or do the compilation itself.
-      jit->CompileMethod(method, self, /*baseline=*/ false, /*osr=*/ false);
+      jit->CompileMethod(method, self, /*baseline=*/ false, /*osr=*/ false, /*prejit=*/ false);
     }
   }
 }

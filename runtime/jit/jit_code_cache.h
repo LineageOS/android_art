@@ -101,7 +101,7 @@ class JitCodeCache {
                               std::string* error_msg);
   ~JitCodeCache();
 
-  bool NotifyCompilationOf(ArtMethod* method, Thread* self, bool osr)
+  bool NotifyCompilationOf(ArtMethod* method, Thread* self, bool osr, bool prejit)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!lock_);
 
@@ -379,10 +379,6 @@ class JitCodeCache {
 
   void MarkCompiledCodeOnThreadStacks(Thread* self)
       REQUIRES(!lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  bool CheckLiveCompiledCodeHasProfilingInfo()
-      REQUIRES(lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   CodeCacheBitmap* GetLiveBitmap() const {
