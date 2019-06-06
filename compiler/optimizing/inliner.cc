@@ -604,9 +604,8 @@ bool HInliner::TryInlineFromInlineCache(const DexFile& caller_dex_file,
   switch (inline_cache_type) {
     case kInlineCacheNoData: {
       LOG_FAIL_NO_STAT()
-          << "Interface or virtual call to "
-          << caller_dex_file.PrettyMethod(invoke_instruction->GetDexMethodIndex())
-          << " could not be statically determined";
+          << "No inline cache information for call to "
+          << caller_dex_file.PrettyMethod(invoke_instruction->GetDexMethodIndex());
       return false;
     }
 

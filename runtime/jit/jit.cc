@@ -246,7 +246,7 @@ bool Jit::LoadCompilerLibrary(std::string* error_msg) {
   return true;
 }
 
-bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr) {
+bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr, bool prejit) {
   DCHECK(Runtime::Current()->UseJitCompilation());
   DCHECK(!method->IsRuntimeMethod());
 
@@ -269,7 +269,7 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
   ArtMethod* method_to_compile = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
-  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr)) {
+  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit)) {
     return false;
   }
 
@@ -561,6 +561,7 @@ class JitCompileTask final : public Task {
     kCompile,
     kCompileBaseline,
     kCompileOsr,
+    kPreCompile,
   };
 
   JitCompileTask(ArtMethod* method, TaskKind kind) : method_(method), kind_(kind), klass_(nullptr) {
@@ -583,6 +584,7 @@ class JitCompileTask final : public Task {
   void Run(Thread* self) override {
     ScopedObjectAccess soa(self);
     switch (kind_) {
+      case TaskKind::kPreCompile:
       case TaskKind::kCompile:
       case TaskKind::kCompileBaseline:
       case TaskKind::kCompileOsr: {
@@ -590,7 +592,8 @@ class JitCompileTask final : public Task {
             method_,
             self,
             /* baseline= */ (kind_ == TaskKind::kCompileBaseline),
-            /* osr= */ (kind_ == TaskKind::kCompileOsr));
+            /* osr= */ (kind_ == TaskKind::kCompileOsr),
+            /* prejit= */ (kind_ == TaskKind::kPreCompile));
         break;
       }
       case TaskKind::kAllocateProfile: {
@@ -796,19 +799,15 @@ void Jit::CompileMethodsFromProfile(
       if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
           class_linker->IsQuickGenericJniStub(entry_point) ||
           class_linker->IsQuickResolutionStub(entry_point)) {
-        if (!method->IsNative()) {
-          // The compiler requires a ProfilingInfo object for non-native methods.
-          ProfilingInfo::Create(self, method, /* retry_allocation= */ true);
-        }
         // Special case ZygoteServer class so that it gets compiled before the
         // zygote enters it. This avoids needing to do OSR during app startup.
         // TODO: have a profile instead.
         if (!add_to_queue || method->GetDeclaringClass()->DescriptorEquals(
                 "Lcom/android/internal/os/ZygoteServer;")) {
-          CompileMethod(method, self, /* baseline= */ false, /* osr= */ false);
+          CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
         } else {
           thread_pool_->AddTask(self,
-              new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+              new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile));
         }
       }
     }
@@ -890,7 +889,7 @@ bool Jit::MaybeCompileMethod(Thread* self,
         method->IsNative() &&
         Runtime::Current()->IsUsingApexBootImageLocation()) {
       // jitzygote: Compile JNI stub on first use to avoid the expensive generic stub.
-      CompileMethod(method, self, /* baseline= */ false, /* osr= */ false);
+      CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ false);
       return true;
     }
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
@@ -935,11 +934,7 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
   if (UNLIKELY(runtime->UseJitCompilation() && runtime->GetJit()->JitAtFirstUse())) {
     ArtMethod* np_method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
     if (np_method->IsCompilable()) {
-      if (!np_method->IsNative()) {
-        // The compiler requires a ProfilingInfo object for non-native methods.
-        ProfilingInfo::Create(thread, np_method, /* retry_allocation= */ true);
-      }
-      JitCompileTask compile_task(method, JitCompileTask::TaskKind::kCompile);
+      JitCompileTask compile_task(method, JitCompileTask::TaskKind::kPreCompile);
       // Fake being in a runtime thread so that class-load behavior will be the same as normal jit.
       ScopedSetRuntimeThread ssrt(thread);
       compile_task.Run(thread);
