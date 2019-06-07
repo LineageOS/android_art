@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ART_COMPILER_UTILS_INTRUSIVE_FORWARD_LIST_H_
-#define ART_COMPILER_UTILS_INTRUSIVE_FORWARD_LIST_H_
+#ifndef ART_LIBARTBASE_BASE_INTRUSIVE_FORWARD_LIST_H_
+#define ART_LIBARTBASE_BASE_INTRUSIVE_FORWARD_LIST_H_
 
 #include <stdint.h>
 #include <functional>
@@ -474,4 +474,4 @@ class IntrusiveForwardListBaseHookTraits {
 
 }  // namespace art
 
-#endif  // ART_COMPILER_UTILS_INTRUSIVE_FORWARD_LIST_H_
+#endif  // ART_LIBARTBASE_BASE_INTRUSIVE_FORWARD_LIST_H_
