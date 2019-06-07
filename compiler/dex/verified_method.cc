@@ -76,6 +76,7 @@ void VerifiedMethod::GenerateSafeCastSet(verifier::MethodVerifier* method_verifi
         continue;
       }
       const verifier::RegisterLine* line = method_verifier->GetRegLine(dex_pc);
+      DCHECK(line != nullptr) << "Did not have line for dex pc 0x" << std::hex << dex_pc;
       const verifier::RegType& reg_type(line->GetRegisterType(method_verifier,
                                                               inst.VRegA_21c()));
       const verifier::RegType& cast_type =
