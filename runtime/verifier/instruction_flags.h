@@ -102,11 +102,6 @@ class InstructionFlags final {
     return (flags_ & (1 << kReturn)) != 0;
   }
 
-  void SetCompileTimeInfoPointAndReturn() {
-    SetCompileTimeInfoPoint();
-    SetReturn();
-  }
-
   std::string ToString() const;
 
  private:
