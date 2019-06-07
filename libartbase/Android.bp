@@ -243,6 +243,7 @@ art_cc_test {
         "base/hex_dump_test.cc",
         "base/histogram_test.cc",
         "base/indenter_test.cc",
+        "base/intrusive_forward_list_test.cc",
         "base/leb128_test.cc",
         "base/logging_test.cc",
         "base/memfd_test.cc",

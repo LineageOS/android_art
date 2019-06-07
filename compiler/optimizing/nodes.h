@@ -25,6 +25,7 @@
 #include "base/arena_containers.h"
 #include "base/arena_object.h"
 #include "base/array_ref.h"
+#include "base/intrusive_forward_list.h"
 #include "base/iteration_range.h"
 #include "base/mutex.h"
 #include "base/quasi_atomic.h"
@@ -45,7 +46,6 @@
 #include "mirror/class.h"
 #include "mirror/method_type.h"
 #include "offsets.h"
-#include "utils/intrusive_forward_list.h"
 
 namespace art {
 

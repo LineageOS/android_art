@@ -19,11 +19,11 @@
 
 #include <iostream>
 
+#include "base/intrusive_forward_list.h"
 #include "base/iteration_range.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "nodes.h"
-#include "utils/intrusive_forward_list.h"
 
 namespace art {
 

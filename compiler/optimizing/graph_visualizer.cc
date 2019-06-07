@@ -22,6 +22,7 @@
 #include <sstream>
 
 #include "art_method.h"
+#include "base/intrusive_forward_list.h"
 #include "bounds_check_elimination.h"
 #include "builder.h"
 #include "code_generator.h"
@@ -38,7 +39,6 @@
 #include "scoped_thread_state_change-inl.h"
 #include "ssa_liveness_analysis.h"
 #include "utils/assembler.h"
-#include "utils/intrusive_forward_list.h"
 
 namespace art {
 
