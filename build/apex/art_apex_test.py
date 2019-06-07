@@ -615,10 +615,13 @@ class List:
     if '..' in apex_map:
       del apex_map['..']
     for (_, val) in sorted(apex_map.items()):
-      self._path = os.path.join(self._path, val.name)
-      print(self._path)
+      val_path = os.path.join(self._path, val.name)
+      print(val_path)
       if val.is_dir:
+        saved_dir = self._path
+        self._path = val_path
         self.print_list()
+        self._path = saved_dir
 
 
 class Tree:
