@@ -227,6 +227,9 @@ class Instruction {
     }
   }
 
+  // Returns the size (in 2 byte code units) of the given instruction format.
+  ALWAYS_INLINE static constexpr size_t SizeInCodeUnits(Format format);
+
   // Code units required to calculate the size of the instruction.
   size_t CodeUnitsRequiredForSizeComputation() const {
     const int8_t result = kInstructionDescriptors[Opcode()].size_in_code_units;
