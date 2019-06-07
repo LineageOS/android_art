@@ -603,32 +603,31 @@ class NoSuperfluousLibrariesChecker:
 class List:
   def __init__(self, provider):
     self._provider = provider
-    self._path = ''
 
   def print_list(self):
-    apex_map = self._provider.read_dir(self._path)
-    if apex_map is None:
-      return
-    apex_map = dict(apex_map)
-    if '.' in apex_map:
-      del apex_map['.']
-    if '..' in apex_map:
-      del apex_map['..']
-    for (_, val) in sorted(apex_map.items()):
-      val_path = os.path.join(self._path, val.name)
-      print(val_path)
-      if val.is_dir:
-        saved_dir = self._path
-        self._path = val_path
-        self.print_list()
-        self._path = saved_dir
+
+    def print_list_rec(path):
+      apex_map = self._provider.read_dir(path)
+      if apex_map is None:
+        return
+      apex_map = dict(apex_map)
+      if '.' in apex_map:
+        del apex_map['.']
+      if '..' in apex_map:
+        del apex_map['..']
+      for (_, val) in sorted(apex_map.items()):
+        val_path = os.path.join(path, val.name)
+        print(val_path)
+        if val.is_dir:
+          print_list_rec(val_path)
+
+    print_list_rec('')
 
 
 class Tree:
   def __init__(self, provider, title):
     print('%s' % title)
     self._provider = provider
-    self._path = ''
     self._has_next_list = []
 
   @staticmethod
@@ -643,27 +642,29 @@ class Tree:
     return '└── ' if last else '├── '
 
   def print_tree(self):
-    apex_map = self._provider.read_dir(self._path)
-    if apex_map is None:
-      return
-    apex_map = dict(apex_map)
-    if '.' in apex_map:
-      del apex_map['.']
-    if '..' in apex_map:
-      del apex_map['..']
-    key_list = list(sorted(apex_map.keys()))
-    for i, key in enumerate(key_list):
-      prev = self.get_vertical(self._has_next_list)
-      last = self.get_last_vertical(i == len(key_list) - 1)
-      val = apex_map[key]
-      print('%s%s%s' % (prev, last, val.name))
-      if val.is_dir:
-        self._has_next_list.append(i < len(key_list) - 1)
-        saved_dir = self._path
-        self._path = os.path.join(self._path, val.name)
-        self.print_tree()
-        self._path = saved_dir
-        self._has_next_list.pop()
+
+    def print_tree_rec(path):
+      apex_map = self._provider.read_dir(path)
+      if apex_map is None:
+        return
+      apex_map = dict(apex_map)
+      if '.' in apex_map:
+        del apex_map['.']
+      if '..' in apex_map:
+        del apex_map['..']
+      key_list = list(sorted(apex_map.keys()))
+      for i, key in enumerate(key_list):
+        prev = self.get_vertical(self._has_next_list)
+        last = self.get_last_vertical(i == len(key_list) - 1)
+        val = apex_map[key]
+        print('%s%s%s' % (prev, last, val.name))
+        if val.is_dir:
+          self._has_next_list.append(i < len(key_list) - 1)
+          val_path = os.path.join(path, val.name)
+          print_tree_rec(val_path)
+          self._has_next_list.pop()
+
+    print_tree_rec('')
 
 
 # Note: do not sys.exit early, for __del__ cleanup.
