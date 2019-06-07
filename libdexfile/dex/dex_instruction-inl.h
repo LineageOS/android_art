@@ -21,6 +21,38 @@
 
 namespace art {
 
+inline constexpr size_t Instruction::SizeInCodeUnits(Format format) {
+  switch (format) {
+    case k10x:
+    case k12x:
+    case k11n:
+    case k11x:
+    case k10t: return 1;
+    case k20t:
+    case k22x:
+    case k21t:
+    case k21s:
+    case k21h:
+    case k21c:
+    case k23x:
+    case k22b:
+    case k22t:
+    case k22s:
+    case k22c: return 2;
+    case k32x:
+    case k30t:
+    case k31t:
+    case k31i:
+    case k31c:
+    case k35c:
+    case k3rc: return 3;
+    case k45cc:
+    case k4rcc: return 4;
+    case k51l: return 5;
+    case kInvalidFormat: return 0;
+  }
+}
+
 //------------------------------------------------------------------------------
 // VRegA
 //------------------------------------------------------------------------------
