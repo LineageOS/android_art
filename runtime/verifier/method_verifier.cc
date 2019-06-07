@@ -97,8 +97,6 @@ void PcToRegisterLineTable::Init(RegisterTrackingMode mode,
       case kTrackRegsBranches:
         interesting = flags[i].IsBranchTarget();
         break;
-      default:
-        break;
     }
     if (interesting) {
       register_lines_[i].reset(RegisterLine::Create(registers_size, allocator, reg_types));
@@ -1031,31 +1029,20 @@ bool MethodVerifier<kVerifierDebug>::ScanTryCatchBlocks() {
 template <bool kVerifierDebug>
 template <bool kAllowRuntimeOnlyInstructions>
 bool MethodVerifier<kVerifierDebug>::VerifyInstructions() {
-  /* Flag the start of the method as a branch target, and a GC point due to stack overflow errors */
+  // Flag the start of the method as a branch target.
   GetModifiableInstructionFlags(0).SetBranchTarget();
-  GetModifiableInstructionFlags(0).SetCompileTimeInfoPoint();
   for (const DexInstructionPcPair& inst : code_item_accessor_) {
     const uint32_t dex_pc = inst.DexPc();
     if (!VerifyInstruction<kAllowRuntimeOnlyInstructions>(&inst.Inst(), dex_pc)) {
       DCHECK_NE(failures_.size(), 0U);
       return false;
     }
-    /* Flag instructions that are garbage collection points */
-    // All invoke points are marked as "Throw" points already.
-    // We are relying on this to also count all the invokes as interesting.
-    if (inst->IsBranch()) {
+    // Flag some interesting instructions.
+    if (inst->IsReturn()) {
+      GetModifiableInstructionFlags(dex_pc).SetReturn();
+    } else if (inst->Opcode() == Instruction::CHECK_CAST) {
+      // The dex-to-dex compiler wants type information to elide check-casts.
       GetModifiableInstructionFlags(dex_pc).SetCompileTimeInfoPoint();
-      // The compiler also needs safepoints for fall-through to loop heads.
-      // Such a loop head must be a target of a branch.
-      int32_t offset = 0;
-      bool cond, self_ok;
-      bool target_ok = GetBranchOffset(dex_pc, &offset, &cond, &self_ok);
-      DCHECK(target_ok);
-      GetModifiableInstructionFlags(dex_pc + offset).SetCompileTimeInfoPoint();
-    } else if (inst->IsSwitch() || inst->IsThrow()) {
-      GetModifiableInstructionFlags(dex_pc).SetCompileTimeInfoPoint();
-    } else if (inst->IsReturn()) {
-      GetModifiableInstructionFlags(dex_pc).SetCompileTimeInfoPointAndReturn();
     }
   }
   return true;
@@ -1588,7 +1575,10 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   const uint16_t registers_size = code_item_accessor_.RegistersSize();
 
   /* Create and initialize table holding register status */
-  reg_table_.Init(fill_register_lines_ ? kTrackRegsAll : kTrackCompilerInterestPoints,
+  RegisterTrackingMode base_mode = Runtime::Current()->IsAotCompiler()
+                                       ? kTrackCompilerInterestPoints
+                                       : kTrackRegsBranches;
+  reg_table_.Init(fill_register_lines_ ? kTrackRegsAll : base_mode,
                   insn_flags_.get(),
                   code_item_accessor_.InsnsSizeInCodeUnits(),
                   registers_size,
