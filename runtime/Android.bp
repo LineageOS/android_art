@@ -115,6 +115,7 @@ libart_cc_defaults {
         "jit/debugger_interface.cc",
         "jit/jit.cc",
         "jit/jit_code_cache.cc",
+        "jit/jit_memory_region.cc",
         "jit/profiling_info.cc",
         "jit/profile_saver.cc",
         "jni/check_jni.cc",

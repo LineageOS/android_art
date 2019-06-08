@@ -351,8 +351,11 @@ static bool HasReductionFormat(HInstruction* reduction, HInstruction* phi) {
 
 // Translates vector operation to reduction kind.
 static HVecReduce::ReductionKind GetReductionKind(HVecOperation* reduction) {
-  if (reduction->IsVecAdd() ||
+  if (reduction->IsVecAdd()  ||
       reduction->IsVecSub() ||
+      #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
+      reduction->IsVecAvxSub() || reduction->IsVecAvxAdd() ||
+      #endif
       reduction->IsVecSADAccumulate() ||
       reduction->IsVecDotProd()) {
     return HVecReduce::kSum;
@@ -1940,10 +1943,34 @@ void HLoopOptimization::GenerateVecOp(HInstruction* org,
         new (global_allocator_) HVecCnv(global_allocator_, opa, type, vector_length_, dex_pc),
         new (global_allocator_) HTypeConversion(org_type, opa, dex_pc));
     case HInstruction::kAdd:
+      #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
+      if ((compiler_options_->GetInstructionSet() == InstructionSet::kX86 ||
+           compiler_options_->GetInstructionSet() == InstructionSet::kX86_64) &&
+           compiler_options_->GetInstructionSetFeatures()->AsX86InstructionSetFeatures()
+               ->HasAVX2()) {
+        GENERATE_VEC(
+          new (global_allocator_) HVecAvxAdd(
+                                      global_allocator_, opa, opb, type, vector_length_, dex_pc),
+          new (global_allocator_) HAdd(org_type, opa, opb, dex_pc));
+        UNREACHABLE();  // GENERATE_VEC ends with a "break".
+      }
+      #endif
       GENERATE_VEC(
         new (global_allocator_) HVecAdd(global_allocator_, opa, opb, type, vector_length_, dex_pc),
         new (global_allocator_) HAdd(org_type, opa, opb, dex_pc));
     case HInstruction::kSub:
+      #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
+      if ((compiler_options_->GetInstructionSet() == InstructionSet::kX86 ||
+           compiler_options_->GetInstructionSet() == InstructionSet::kX86_64) &&
+           compiler_options_->GetInstructionSetFeatures()->AsX86InstructionSetFeatures()
+               ->HasAVX2()) {
+        GENERATE_VEC(
+          new (global_allocator_) HVecAvxSub(
+                                      global_allocator_, opa, opb, type, vector_length_, dex_pc),
+          new (global_allocator_) HSub(org_type, opa, opb, dex_pc));
+        UNREACHABLE();  // GENERATE_VEC ends with a "break".
+      }
+      #endif
       GENERATE_VEC(
         new (global_allocator_) HVecSub(global_allocator_, opa, opb, type, vector_length_, dex_pc),
         new (global_allocator_) HSub(org_type, opa, opb, dex_pc));

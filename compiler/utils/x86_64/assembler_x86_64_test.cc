@@ -1323,8 +1323,18 @@ TEST_F(AssemblerX86_64Test, Addps) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::addps, "addps %{reg2}, %{reg1}"), "addps");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VAddps) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vaddps, "vaddps %{reg3}, %{reg2}, %{reg1}"), "vaddps");
+}
+
 TEST_F(AssemblerX86_64Test, Addpd) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::addpd, "addpd %{reg2}, %{reg1}"), "addpd");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VAddpd) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vaddpd, "vaddpd %{reg3}, %{reg2}, %{reg1}"), "vaddpd");
 }
 
 TEST_F(AssemblerX86_64Test, Subss) {
@@ -1339,8 +1349,18 @@ TEST_F(AssemblerX86_64Test, Subps) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::subps, "subps %{reg2}, %{reg1}"), "subps");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VSubps) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vsubps, "vsubps %{reg3},%{reg2}, %{reg1}"), "vsubps");
+}
+
 TEST_F(AssemblerX86_64Test, Subpd) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::subpd, "subpd %{reg2}, %{reg1}"), "subpd");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VSubpd) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vsubpd, "vsubpd %{reg3}, %{reg2}, %{reg1}"), "vsubpd");
 }
 
 TEST_F(AssemblerX86_64Test, Mulss) {
@@ -1379,13 +1399,34 @@ TEST_F(AssemblerX86_64Test, Paddb) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::paddb, "paddb %{reg2}, %{reg1}"), "paddb");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VPaddb) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpaddb, "vpaddb %{reg3}, %{reg2}, %{reg1}"), "vpaddb");
+}
+
 TEST_F(AssemblerX86_64Test, Psubb) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::psubb, "psubb %{reg2}, %{reg1}"), "psubb");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VPsubb) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpsubb, "vpsubb %{reg3},%{reg2}, %{reg1}"), "vpsubb");
 }
 
 TEST_F(AssemblerX86_64Test, Paddw) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::paddw, "paddw %{reg2}, %{reg1}"), "paddw");
 }
+
+TEST_F(AssemblerX86_64AVXTest, VPsubw) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpsubw, "vpsubw %{reg3}, %{reg2}, %{reg1}"), "vpsubw");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VPaddw) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpaddw, "vpaddw %{reg3}, %{reg2}, %{reg1}"), "vpaddw");
+}
+
 
 TEST_F(AssemblerX86_64Test, Psubw) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::psubw, "psubw %{reg2}, %{reg1}"), "psubw");
@@ -1399,8 +1440,18 @@ TEST_F(AssemblerX86_64Test, Paddd) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::paddd, "paddd %{reg2}, %{reg1}"), "paddd");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VPaddd) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpaddd, "vpaddd %{reg3}, %{reg2}, %{reg1}"), "vpaddd");
+}
+
 TEST_F(AssemblerX86_64Test, Psubd) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::psubd, "psubd %{reg2}, %{reg1}"), "psubd");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VPsubd) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpsubd, "vpsubd %{reg3}, %{reg2}, %{reg1}"), "vpsubd");
 }
 
 TEST_F(AssemblerX86_64Test, Pmulld) {
@@ -1411,8 +1462,18 @@ TEST_F(AssemblerX86_64Test, Paddq) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::paddq, "paddq %{reg2}, %{reg1}"), "paddq");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VPaddq) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpaddq, "vpaddq %{reg3}, %{reg2}, %{reg1}"), "vpaddq");
+}
+
 TEST_F(AssemblerX86_64Test, Psubq) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::psubq, "psubq %{reg2}, %{reg1}"), "psubq");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VPsubq) {
+  DriverStr(
+      RepeatFFF(&x86_64::X86_64Assembler::vpsubq, "vpsubq %{reg3}, %{reg2}, %{reg1}"), "vpsubq");
 }
 
 TEST_F(AssemblerX86_64Test, Paddusb) {
