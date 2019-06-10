@@ -163,6 +163,10 @@ class Runtime {
     return is_zygote_;
   }
 
+  bool IsPrimaryZygote() const {
+    return is_primary_zygote_;
+  }
+
   bool IsSystemServer() const {
     return is_system_server_;
   }
@@ -944,6 +948,7 @@ class Runtime {
 
   CompilerCallbacks* compiler_callbacks_;
   bool is_zygote_;
+  bool is_primary_zygote_;
   bool is_system_server_;
   bool must_relocate_;
   bool is_concurrent_gc_enabled_;
