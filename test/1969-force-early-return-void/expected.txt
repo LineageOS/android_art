@@ -1,0 +1,178 @@
+Test stopped using breakpoint
+NORMAL RUN: Single call with no interference on (ID: 0) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 0) StandardTestObject { cnt: 2 } on Test1969 target thread - 0
+Single call with force-early-return on (ID: 1) StandardTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 1
+result for (ID: 1) StandardTestObject { cnt: 1 } on Test1969 target thread - 1
+Test stopped using breakpoint with declared synchronized function
+NORMAL RUN: Single call with no interference on (ID: 2) SynchronizedFunctionTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 2) SynchronizedFunctionTestObject { cnt: 2 } on Test1969 target thread - 2
+Single call with force-early-return on (ID: 3) SynchronizedFunctionTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 3
+result for (ID: 3) SynchronizedFunctionTestObject { cnt: 1 } on Test1969 target thread - 3
+Test stopped using breakpoint with synchronized block
+NORMAL RUN: Single call with no interference on (ID: 4) SynchronizedTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 4) SynchronizedTestObject { cnt: 2 } on Test1969 target thread - 4
+Single call with force-early-return on (ID: 5) SynchronizedTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 5
+result for (ID: 5) SynchronizedTestObject { cnt: 1 } on Test1969 target thread - 5
+Test stopped on single step
+NORMAL RUN: Single call with no interference on (ID: 6) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 6) StandardTestObject { cnt: 2 } on Test1969 target thread - 6
+Single call with force-early-return on (ID: 7) StandardTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 7
+result for (ID: 7) StandardTestObject { cnt: 1 } on Test1969 target thread - 7
+Test stopped on field access
+NORMAL RUN: Single call with no interference on (ID: 8) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 0 }
+NORMAL RUN: result for (ID: 8) FieldBasedTestObject { TARGET_FIELD: 10, cnt: 2 } on Test1969 target thread - 8
+Single call with force-early-return on (ID: 9) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 0 }
+Will force return of Test1969 target thread - 9
+result for (ID: 9) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 1 } on Test1969 target thread - 9
+Test stopped on field modification
+NORMAL RUN: Single call with no interference on (ID: 10) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 0 }
+NORMAL RUN: result for (ID: 10) FieldBasedTestObject { TARGET_FIELD: 10, cnt: 2 } on Test1969 target thread - 10
+Single call with force-early-return on (ID: 11) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 0 }
+Will force return of Test1969 target thread - 11
+result for (ID: 11) FieldBasedTestObject { TARGET_FIELD: 0, cnt: 1 } on Test1969 target thread - 11
+Test stopped during Method Exit of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 12) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 12) StandardTestObject { cnt: 2 } on Test1969 target thread - 12
+Single call with force-early-return on (ID: 13) StandardTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 13
+result for (ID: 13) StandardTestObject { cnt: 2 } on Test1969 target thread - 13
+Test stopped during Method Enter of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 14) StandardTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 14) StandardTestObject { cnt: 2 } on Test1969 target thread - 14
+Single call with force-early-return on (ID: 15) StandardTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 15
+result for (ID: 15) StandardTestObject { cnt: 0 } on Test1969 target thread - 15
+Test stopped during Method Exit due to exception thrown in same function
+NORMAL RUN: Single call with no interference on (ID: 16) ExceptionOnceObject { cnt: 0, throwInSub: false }
+Uncaught exception in thread Thread[Test1969 target thread - 16,5,main] - art.Test1969$ExceptionOnceObject$TestError: null
+	art.Test1969$ExceptionOnceObject.calledFunction(Test1969.java)
+	art.Test1969$AbstractTestObject.run(Test1969.java)
+	art.Test1969$2.run(Test1969.java)
+	java.lang.Thread.run(Thread.java)
+
+NORMAL RUN: result for (ID: 16) ExceptionOnceObject { cnt: 1, throwInSub: false } on Test1969 target thread - 16
+Single call with force-early-return on (ID: 17) ExceptionOnceObject { cnt: 0, throwInSub: false }
+Will force return of Test1969 target thread - 17
+result for (ID: 17) ExceptionOnceObject { cnt: 1, throwInSub: false } on Test1969 target thread - 17
+Test stopped during Method Exit due to exception thrown in subroutine
+NORMAL RUN: Single call with no interference on (ID: 18) ExceptionOnceObject { cnt: 0, throwInSub: true }
+Uncaught exception in thread Thread[Test1969 target thread - 18,5,main] - art.Test1969$ExceptionOnceObject$TestError: null
+	art.Test1969$ExceptionOnceObject.doThrow(Test1969.java)
+	art.Test1969$ExceptionOnceObject.calledFunction(Test1969.java)
+	art.Test1969$AbstractTestObject.run(Test1969.java)
+	art.Test1969$2.run(Test1969.java)
+	java.lang.Thread.run(Thread.java)
+
+NORMAL RUN: result for (ID: 18) ExceptionOnceObject { cnt: 1, throwInSub: true } on Test1969 target thread - 18
+Single call with force-early-return on (ID: 19) ExceptionOnceObject { cnt: 0, throwInSub: true }
+Will force return of Test1969 target thread - 19
+result for (ID: 19) ExceptionOnceObject { cnt: 1, throwInSub: true } on Test1969 target thread - 19
+Test stopped during notifyFramePop with exception on pop of calledFunction
+NORMAL RUN: Single call with no interference on (ID: 20) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 20) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 20
+Single call with force-early-return on (ID: 21) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 21
+result for (ID: 21) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 21
+Test stopped during notifyFramePop with exception on pop of doThrow
+NORMAL RUN: Single call with no interference on (ID: 22) ExceptionCatchTestObject { cnt: 0 }
+art.Test1969$ExceptionCatchTestObject$TestError caught in called function.
+NORMAL RUN: result for (ID: 22) ExceptionCatchTestObject { cnt: 2 } on Test1969 target thread - 22
+Single call with force-early-return on (ID: 23) ExceptionCatchTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 23
+Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_TYPE_MISMATCH
+	art.NonStandardExit.forceEarlyReturnVoid(Native Method)
+	art.Test1969$TestSuspender.performForceReturn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTests(Test1969.java)
+	<Additional frames hidden>
+
+art.Test1969$ExceptionCatchTestObject$TestError caught in called function.
+result for (ID: 23) ExceptionCatchTestObject { cnt: 2 } on Test1969 target thread - 23
+Test stopped during ExceptionCatch event of calledFunction (catch in called function, throw in called function)
+NORMAL RUN: Single call with no interference on (ID: 24) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 24) ExceptionThrowTestObject { cnt: 111, baseCnt: 2 } on Test1969 target thread - 24
+Single call with force-early-return on (ID: 25) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 25
+result for (ID: 25) ExceptionThrowTestObject { cnt: 11, baseCnt: 2 } on Test1969 target thread - 25
+Test stopped during ExceptionCatch event of calledFunction (catch in called function, throw in subroutine)
+NORMAL RUN: Single call with no interference on (ID: 26) ExceptionCatchTestObject { cnt: 0 }
+art.Test1969$ExceptionCatchTestObject$TestError caught in called function.
+NORMAL RUN: result for (ID: 26) ExceptionCatchTestObject { cnt: 2 } on Test1969 target thread - 26
+Single call with force-early-return on (ID: 27) ExceptionCatchTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 27
+result for (ID: 27) ExceptionCatchTestObject { cnt: 1 } on Test1969 target thread - 27
+Test stopped during Exception event of calledFunction (catch in calling function)
+NORMAL RUN: Single call with no interference on (ID: 28) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 28) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 28
+Single call with force-early-return on (ID: 29) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 29
+result for (ID: 29) ExceptionThrowTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 29
+Test stopped during Exception event of calledFunction (catch in called function)
+NORMAL RUN: Single call with no interference on (ID: 30) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 30) ExceptionThrowTestObject { cnt: 111, baseCnt: 2 } on Test1969 target thread - 30
+Single call with force-early-return on (ID: 31) ExceptionThrowTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 31
+result for (ID: 31) ExceptionThrowTestObject { cnt: 11, baseCnt: 2 } on Test1969 target thread - 31
+Test stopped during Exception event of calledFunction (catch in parent of calling function)
+NORMAL RUN: Single call with no interference on (ID: 32) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowFarTestObject$TestError thrown and caught!
+NORMAL RUN: result for (ID: 32) ExceptionThrowFarTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 32
+Single call with force-early-return on (ID: 33) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 33
+result for (ID: 33) ExceptionThrowFarTestObject { cnt: 2, baseCnt: 2 } on Test1969 target thread - 33
+Test stopped during Exception event of calledFunction (catch in called function)
+NORMAL RUN: Single call with no interference on (ID: 34) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+art.Test1969$ExceptionThrowFarTestObject$TestError caught in same function.
+NORMAL RUN: result for (ID: 34) ExceptionThrowFarTestObject { cnt: 111, baseCnt: 2 } on Test1969 target thread - 34
+Single call with force-early-return on (ID: 35) ExceptionThrowFarTestObject { cnt: 0, baseCnt: 0 }
+Will force return of Test1969 target thread - 35
+result for (ID: 35) ExceptionThrowFarTestObject { cnt: 101, baseCnt: 2 } on Test1969 target thread - 35
+Test stopped during random Suspend.
+NORMAL RUN: Single call with no interference on (ID: 36) SuspendSuddenlyObject { cnt: 0, spun: false }
+NORMAL RUN: result for (ID: 36) SuspendSuddenlyObject { cnt: 2, spun: true } on Test1969 target thread - 36
+Single call with force-early-return on (ID: 37) SuspendSuddenlyObject { cnt: 0, spun: false }
+Will force return of Test1969 target thread - 37
+result for (ID: 37) SuspendSuddenlyObject { cnt: 1, spun: true } on Test1969 target thread - 37
+Test stopped during a native method fails
+NORMAL RUN: Single call with no interference on (ID: 38) NativeCalledObject { cnt: 0 }
+NORMAL RUN: result for (ID: 38) NativeCalledObject { cnt: 2 } on Test1969 target thread - 38
+Single call with force-early-return on (ID: 39) NativeCalledObject { cnt: 0 }
+Will force return of Test1969 target thread - 39
+Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_OPAQUE_FRAME
+	art.NonStandardExit.forceEarlyReturnVoid(Native Method)
+	art.Test1969$TestSuspender.performForceReturn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTestOn(Test1969.java)
+	art.Test1969.runTests(Test1969.java)
+	<Additional frames hidden>
+
+result for (ID: 39) NativeCalledObject { cnt: 2 } on Test1969 target thread - 39
+Test stopped in a method called by native succeeds
+NORMAL RUN: Single call with no interference on (ID: 40) NativeCallerObject { cnt: 0 }
+NORMAL RUN: result for (ID: 40) NativeCallerObject { cnt: 2 } on Test1969 target thread - 40
+Single call with force-early-return on (ID: 41) NativeCallerObject { cnt: 0 }
+Will force return of Test1969 target thread - 41
+result for (ID: 41) NativeCallerObject { cnt: 2 } on Test1969 target thread - 41
+Test stopped in a static method
+NORMAL RUN: Single call with no interference on (ID: 42) StaticMethodObject { cnt: 0 }
+NORMAL RUN: result for (ID: 42) StaticMethodObject { cnt: 2 } on Test1969 target thread - 42
+Single call with force-early-return on (ID: 43) StaticMethodObject { cnt: 0 }
+Will force return of Test1969 target thread - 43
+result for (ID: 43) StaticMethodObject { cnt: 1 } on Test1969 target thread - 43
+Test stopped in a Object <init> method
+NORMAL RUN: Single call with no interference on (ID: 44) ObjectInitTestObject { cnt: 0 }
+NORMAL RUN: result for (ID: 44) ObjectInitTestObject { cnt: 2 } on Test1969 target thread - 44
+Single call with force-early-return on (ID: 45) ObjectInitTestObject { cnt: 0 }
+Will force return of Test1969 target thread - 45
+result for (ID: 45) ObjectInitTestObject { cnt: 1 } on Test1969 target thread - 45
