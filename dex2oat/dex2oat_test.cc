@@ -1013,7 +1013,7 @@ TEST_F(Dex2oatWatchdogTest, TestWatchdogOK) {
 }
 
 TEST_F(Dex2oatWatchdogTest, TestWatchdogTrigger) {
-  // This test is frequently interrupted by timeout_dumper on host (x86);
+  // This test is frequently interrupted by signal_dumper on host (x86);
   // disable it while we investigate (b/121352534).
   TEST_DISABLED_FOR_X86();
 
