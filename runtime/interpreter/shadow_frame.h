@@ -57,6 +57,9 @@ class ShadowFrame {
     kForcePopFrame  = 1 << 1,
     // We have been asked to re-execute the last instruction.
     kForceRetryInst = 1 << 2,
+    // Mark that we expect the next frame to retry the last instruction (used by instrumentation and
+    // debuggers to keep track of required events)
+    kSkipMethodExitEvents = 1 << 3,
   };
 
  public:
@@ -372,6 +375,14 @@ class ShadowFrame {
 
   void SetForceRetryInstruction(bool enable) {
     UpdateFrameFlag(enable, FrameFlags::kForceRetryInst);
+  }
+
+  bool GetSkipMethodExitEvents() const {
+    return GetFrameFlag(FrameFlags::kSkipMethodExitEvents);
+  }
+
+  void SetSkipMethodExitEvents(bool enable) {
+    UpdateFrameFlag(enable, FrameFlags::kSkipMethodExitEvents);
   }
 
   void CheckConsistentVRegs() const {

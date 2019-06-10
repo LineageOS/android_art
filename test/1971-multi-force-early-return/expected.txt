@@ -1,0 +1,3 @@
+Thread 0: Thread: Test1971 - Thread 0 method returned: art.Test1971$NormalExit { thread: Test1971 - Thread 0, creator: Test1971 - Thread 0 }
+Thread 1: Thread: Test1971 - Thread 1 method returned: art.Test1971$ForcedExit { thread: Test1971 - Thread 1, creator: Concurrent thread force-returner - 1 }
+Thread 2: Thread: Test1971 - Thread 2 method returned: art.Test1971$ForcedExit { thread: Test1971 - Thread 2, creator: Concurrent thread force-returner - 2 }

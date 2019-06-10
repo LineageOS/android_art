@@ -1,0 +1,35 @@
+178a179,212
+> Test stopped during class-load.
+> NORMAL RUN: Single call with no interference on (ID: 46) ClassLoadObject { cnt: 0, curClass: 0}
+> TC0.foo == 100
+> NORMAL RUN: result for (ID: 46) ClassLoadObject { cnt: 1, curClass: 1} on Test1969 target thread - 46
+> Single call with force-early-return on (ID: 47) ClassLoadObject { cnt: 0, curClass: 1}
+> Will force return of Test1969 target thread - 47
+> Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_OPAQUE_FRAME
+> 	art.NonStandardExit.forceEarlyReturnVoid(Native Method)
+> 	art.Test1969$TestSuspender.performForceReturn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTests(Test1969.java)
+> 	<Additional frames hidden>
+> 
+> TC1.foo == 201
+> result for (ID: 47) ClassLoadObject { cnt: 1, curClass: 2} on Test1969 target thread - 47
+> Test stopped during class-load.
+> NORMAL RUN: Single call with no interference on (ID: 48) ClassLoadObject { cnt: 0, curClass: 2}
+> TC2.foo == 302
+> NORMAL RUN: result for (ID: 48) ClassLoadObject { cnt: 1, curClass: 3} on Test1969 target thread - 48
+> Single call with force-early-return on (ID: 49) ClassLoadObject { cnt: 0, curClass: 3}
+> Will force return of Test1969 target thread - 49
+> Failed to force-return due to java.lang.RuntimeException: JVMTI_ERROR_OPAQUE_FRAME
+> 	art.NonStandardExit.forceEarlyReturnVoid(Native Method)
+> 	art.Test1969$TestSuspender.performForceReturn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTestOn(Test1969.java)
+> 	art.Test1969.runTests(Test1969.java)
+> 	<Additional frames hidden>
+> 
+> TC3.foo == 403
+> result for (ID: 49) ClassLoadObject { cnt: 1, curClass: 4} on Test1969 target thread - 49

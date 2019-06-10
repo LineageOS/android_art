@@ -16,6 +16,8 @@
 
 #include "instrumentation.h"
 
+#include <functional>
+#include <optional>
 #include <sstream>
 
 #include <android-base/logging.h>
@@ -39,6 +41,7 @@
 #include "jit/jit.h"
 #include "jit/jit_code_cache.h"
 #include "jvalue-inl.h"
+#include "jvalue.h"
 #include "mirror/class-inl.h"
 #include "mirror/dex_cache.h"
 #include "mirror/object-inl.h"
@@ -54,16 +57,20 @@ namespace instrumentation {
 
 constexpr bool kVerboseInstrumentation = false;
 
-void InstrumentationListener::MethodExited(Thread* thread,
-                                           Handle<mirror::Object> this_object,
-                                           ArtMethod* method,
-                                           uint32_t dex_pc,
-                                           Handle<mirror::Object> return_value) {
+void InstrumentationListener::MethodExited(
+    Thread* thread,
+    Handle<mirror::Object> this_object,
+    ArtMethod* method,
+    uint32_t dex_pc,
+    OptionalFrame frame,
+    MutableHandle<mirror::Object>& return_value) {
   DCHECK_EQ(method->GetInterfaceMethodIfProxy(kRuntimePointerSize)->GetReturnTypePrimitive(),
             Primitive::kPrimNot);
+  const void* original_ret = return_value.Get();
   JValue v;
   v.SetL(return_value.Get());
-  MethodExited(thread, this_object, method, dex_pc, v);
+  MethodExited(thread, this_object, method, dex_pc, frame, v);
+  DCHECK(original_ret == v.GetL()) << "Return value changed";
 }
 
 void InstrumentationListener::FieldWritten(Thread* thread,
@@ -485,8 +492,9 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
               !m->IsRuntimeMethod()) {
             // Create the method exit events. As the methods didn't really exit the result is 0.
             // We only do this if no debugger is attached to prevent from posting events twice.
+            JValue val;
             instrumentation_->MethodExitEvent(thread_, instrumentation_frame.this_object_, m,
-                                              GetDexPc(), JValue());
+                                              GetDexPc(), OptionalFrame{}, val);
           }
           frames_removed_++;
           removed_stub = true;
@@ -1167,29 +1175,46 @@ void Instrumentation::MethodEnterEventImpl(Thread* thread,
   }
 }
 
+template <>
 void Instrumentation::MethodExitEventImpl(Thread* thread,
                                           ObjPtr<mirror::Object> this_object,
                                           ArtMethod* method,
                                           uint32_t dex_pc,
-                                          const JValue& return_value) const {
+                                          OptionalFrame frame,
+                                          MutableHandle<mirror::Object>& return_value) const {
+  if (HasMethodExitListeners()) {
+    Thread* self = Thread::Current();
+    StackHandleScope<1> hs(self);
+    Handle<mirror::Object> thiz(hs.NewHandle(this_object));
+    for (InstrumentationListener* listener : method_exit_listeners_) {
+      if (listener != nullptr) {
+        listener->MethodExited(thread, thiz, method, dex_pc, frame, return_value);
+      }
+    }
+  }
+}
+
+template<> void Instrumentation::MethodExitEventImpl(Thread* thread,
+                                                     ObjPtr<mirror::Object> this_object,
+                                                     ArtMethod* method,
+                                                     uint32_t dex_pc,
+                                                     OptionalFrame frame,
+                                                     JValue& return_value) const {
   if (HasMethodExitListeners()) {
     Thread* self = Thread::Current();
     StackHandleScope<2> hs(self);
     Handle<mirror::Object> thiz(hs.NewHandle(this_object));
-    if (method->GetInterfaceMethodIfProxy(kRuntimePointerSize)
-              ->GetReturnTypePrimitive() != Primitive::kPrimNot) {
+    if (method->GetInterfaceMethodIfProxy(kRuntimePointerSize)->GetReturnTypePrimitive() !=
+        Primitive::kPrimNot) {
       for (InstrumentationListener* listener : method_exit_listeners_) {
         if (listener != nullptr) {
-          listener->MethodExited(thread, thiz, method, dex_pc, return_value);
+          listener->MethodExited(thread, thiz, method, dex_pc, frame, return_value);
         }
       }
     } else {
-      Handle<mirror::Object> ret(hs.NewHandle(return_value.GetL()));
-      for (InstrumentationListener* listener : method_exit_listeners_) {
-        if (listener != nullptr) {
-          listener->MethodExited(thread, thiz, method, dex_pc, ret);
-        }
-      }
+      MutableHandle<mirror::Object> ret(hs.NewHandle(return_value.GetL()));
+      MethodExitEventImpl(thread, thiz.Get(), method, dex_pc, frame, ret);
+      return_value.SetL(ret.Get());
     }
   }
 }
@@ -1518,7 +1543,8 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self,
   uint32_t dex_pc = dex::kDexNoIndex;
   if (!method->IsRuntimeMethod() && !instrumentation_frame.interpreter_entry_) {
     ObjPtr<mirror::Object> this_object = instrumentation_frame.this_object_;
-    MethodExitEvent(self, this_object, instrumentation_frame.method_, dex_pc, return_value);
+    MethodExitEvent(
+        self, this_object, instrumentation_frame.method_, dex_pc, OptionalFrame{}, return_value);
   }
 
   // Deoptimize if the caller needs to continue execution in the interpreter. Do nothing if we get
