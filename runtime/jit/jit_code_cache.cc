@@ -835,9 +835,8 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
       } else if (class_linker->IsQuickResolutionStub(
           method->GetEntryPointFromQuickCompiledCode())) {
         // This situation currently only occurs in the jit-zygote mode.
-        DCHECK(Runtime::Current()->IsZygote());
         DCHECK(Runtime::Current()->IsUsingApexBootImageLocation());
-        DCHECK(method->GetDeclaringClass()->GetClassLoader() == nullptr);
+        DCHECK(!garbage_collect_code_);
         // TODO(ngeoffray): In most cases, the zygote will not have a profiling
         // info for a compiled method. Use a map instead.
         if (method->GetProfilingInfo(kRuntimePointerSize) != nullptr) {
