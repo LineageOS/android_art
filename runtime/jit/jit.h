@@ -320,7 +320,7 @@ class Jit {
   // Register the dex files to the JIT. This is to perform any compilation/optimization
   // at the point of loading the dex files.
   void RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                        ObjPtr<mirror::ClassLoader> class_loader);
+                        jobject class_loader);
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);
