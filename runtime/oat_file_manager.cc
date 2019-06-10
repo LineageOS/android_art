@@ -648,9 +648,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
   }
 
   if (Runtime::Current()->GetJit() != nullptr) {
-    ScopedObjectAccess soa(self);
-    Runtime::Current()->GetJit()->RegisterDexFiles(
-        dex_files, soa.Decode<mirror::ClassLoader>(class_loader));
+    Runtime::Current()->GetJit()->RegisterDexFiles(dex_files, class_loader);
   }
 
   return dex_files;
