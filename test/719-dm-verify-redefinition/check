@@ -16,10 +16,7 @@
 
 # Search for the redefinition line and remove unnecessary tags.
 sed -e 's/^dex2oat[d]\?\(\|32\|64\)\ W.*\] \(Fast verification failed: Class L[^;]*; redefines a class in the classpath\).*/\2/g' "$2" > "$2.tmp1"
-# Remove all other dex2oat/dalvikvm logs.
-sed 's/dex2oat.*//g' "$2.tmp1" > "$2.tmp2"
-sed 's/dalvikvm.*//g' "$2.tmp2" > "$2.tmp3"
-# Remove empty lines.
-sed '/^$/d' "$2.tmp3" > "$2.tmp4"
+# Remove all other dex2oat/dalvikvm log lines.
+grep -v dex2oat "$2.tmp1" | grep -v dalvikvm >> "$2.tmp2"
 
-./default-check "$1" "$2.tmp4"
+./default-check "$1" "$2.tmp2"
