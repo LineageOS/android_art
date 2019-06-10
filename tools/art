@@ -408,8 +408,10 @@ ANDROID_ROOT="$(cd $PROG_DIR/..; pwd -P)"
 if [ -z "$ANDROID_RUNTIME_ROOT" ]; then
   # This script is used on host and target (device). However, the (expected)
   # default value `ANDROID_RUNTIME_ROOT` is not the same on host and target:
-  # - on host, `ANDROID_RUNTIME_ROOT` is expected to be "$ANDROID_ROOT/com.android.apex";
-  # - on target, `ANDROID_RUNTIME_ROOT` is expected to be "$ANDROID_ROOT/../apex/com.android.apex".
+  # - on host, `ANDROID_RUNTIME_ROOT` is expected to be
+  #   "$ANDROID_ROOT/com.android.runtime";
+  # - on target, `ANDROID_RUNTIME_ROOT` is expected to be
+  #   "$ANDROID_ROOT/../apex/com.android.runtime".
   #
   # We use the presence/absence of the `$ANDROID_ROOT/../apex` directory to
   # determine whether we are on target or host (this is brittle, but simple).
@@ -419,7 +421,7 @@ if [ -z "$ANDROID_RUNTIME_ROOT" ]; then
     # We should be setting `ANDROID_RUNTIME_ROOT` to
     # "$ANDROID_ROOT/../apex/com.android.runtime" here. However, the Runtime APEX
     # is not (yet) supported by the ART Buildbot setup (see b/121117762); and yet
-    # ICU code depends on `ANDROID_RUNTIME_ROOT` to find ICU .dat files.
+    # libcore / ICU code depends on `ANDROID_RUNTIME_ROOT` to find data files.
     #
     # As a temporary workaround, we:
     # - make the ART Buildbot build script (art/tools/buildbot-build.sh) also
@@ -437,11 +439,43 @@ if [ -z "$ANDROID_RUNTIME_ROOT" ]; then
   fi
 fi
 
-# If ANDROID_TZDATA_ROOT is not set point it to somewhere safe. Android code
-# currently treats the module as optional so it does not require the path exists.
+# If ANDROID_TZDATA_ROOT is not set, try to detect whether we are running on
+# target or host and set that environment variable to the usual default value.
 if [ -z "$ANDROID_TZDATA_ROOT" ]; then
-  # Safe stubbed location that we don't need to exist.
-  ANDROID_TZDATA_ROOT="$ANDROID_ROOT/com.android.tzdata_doesnotexist"
+  # This script is used on host and target (device). However, the (expected)
+  # default value `ANDROID_TZDATA_ROOT` is not the same on host and target:
+  # - on host, `ANDROID_TZDATA_ROOT` is expected to be
+  #   "$ANDROID_ROOT/com.android.tzdata";
+  # - on target, `ANDROID_TZDATA_ROOT` is expected to be
+  #   "$ANDROID_ROOT/../apex/com.android.tzdata".
+  #
+  # We use the presence/absence of the `$ANDROID_ROOT/../apex` directory to
+  # determine whether we are on target or host (this is brittle, but simple).
+  if [ -d "$ANDROID_ROOT/../apex" ]; then
+    # Target case.
+    #
+    # We should be setting `ANDROID_TZDATA_ROOT` to
+    # "$ANDROID_ROOT/../apex/com.android.tzdata" here. However, the Time Zone
+    # Data APEX is not (yet) supported by the ART Buildbot setup (see
+    # b/121117762); and yet libcore / ICU code depends on `ANDROID_TZDATA_ROOT`
+    # to find data files.
+    #
+    # As a temporary workaround, we:
+    # - make the ART Buildbot build script (art/tools/buildbot-build.sh) also
+    #   generate the data files in `/system/etc/tzdata_module` on
+    #   device (these files are normally only put in the Time Zone Data APEX
+    #   on device);
+    # - set `ANDROID_TZDATA_ROOT` to `$ANDROID_ROOT/etc/tzdata_module` (i.e.
+    #   "/system/etc/tzdata_module") here.
+    #
+    # TODO(b/121117762): Set `ANDROID_TZDATA_ROOT` to
+    # "$ANDROID_ROOT/../apex/com.android.tzdata" when the Time Zone Data APEX
+    # is fully supported on the ART Buildbot and Golem.
+    ANDROID_TZDATA_ROOT=$ANDROID_ROOT/etc/tzdata_module
+  else
+    # Host case.
+    ANDROID_TZDATA_ROOT="$ANDROID_ROOT/com.android.tzdata"
+  fi
 fi
 
 ART_BINARY_PATH=$ANDROID_ROOT/bin/$ART_BINARY
