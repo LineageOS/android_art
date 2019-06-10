@@ -44,6 +44,7 @@ class ClassLoader;
 namespace jit {
 
 class JitCodeCache;
+class JitMemoryRegion;
 class JitOptions;
 
 static constexpr int16_t kJitCheckForOSR = -1;
@@ -340,7 +341,7 @@ class Jit {
   static void* jit_compiler_handle_;
   static void* (*jit_load_)(void);
   static void (*jit_unload_)(void*);
-  static bool (*jit_compile_method_)(void*, ArtMethod*, Thread*, bool, bool);
+  static bool (*jit_compile_method_)(void*, JitMemoryRegion*, ArtMethod*, Thread*, bool, bool);
   static void (*jit_types_loaded_)(void*, mirror::Class**, size_t count);
   static void (*jit_update_options_)(void*);
   static bool (*jit_generate_debug_info_)(void*);

@@ -322,6 +322,7 @@ const void* JitCodeCache::GetZygoteSavedEntryPoint(ArtMethod* method) {
 }
 
 uint8_t* JitCodeCache::CommitCode(Thread* self,
+                                  JitMemoryRegion* region,
                                   ArtMethod* method,
                                   uint8_t* stack_map,
                                   uint8_t* roots_data,
@@ -333,6 +334,7 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
                                   bool has_should_deoptimize_flag,
                                   const ArenaSet<ArtMethod*>& cha_single_implementation_list) {
   uint8_t* result = CommitCodeInternal(self,
+                                       region,
                                        method,
                                        stack_map,
                                        roots_data,
@@ -347,6 +349,7 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
     // Retry.
     GarbageCollectCache(self);
     result = CommitCodeInternal(self,
+                                region,
                                 method,
                                 stack_map,
                                 roots_data,
@@ -671,6 +674,7 @@ void JitCodeCache::WaitForPotentialCollectionToCompleteRunnable(Thread* self) {
 }
 
 uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
+                                          JitMemoryRegion* region,
                                           ArtMethod* method,
                                           uint8_t* stack_map,
                                           uint8_t* roots_data,
@@ -698,7 +702,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   // finish.
   WaitForPotentialCollectionToCompleteRunnable(self);
   {
-    ScopedCodeCacheWrite scc(private_region_);
+    ScopedCodeCacheWrite scc(*region);
 
     size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
     // Ensure the header ends up at expected instruction alignment.
@@ -707,7 +711,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
 
     // AllocateCode allocates memory in non-executable region for alignment header and code. The
     // header size may include alignment padding.
-    uint8_t* nox_memory = private_region_.AllocateCode(total_size);
+    uint8_t* nox_memory = region->AllocateCode(total_size);
     if (nox_memory == nullptr) {
       return nullptr;
     }
@@ -718,7 +722,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
 
     // From here code_ptr points to executable code.
-    code_ptr = private_region_.GetExecutableAddress(code_ptr);
+    code_ptr = region->GetExecutableAddress(code_ptr);
 
     new (method_header) OatQuickMethodHeader(
         (stack_map != nullptr) ? code_ptr - stack_map : 0u,
@@ -730,7 +734,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     }
 
     // Update method_header pointer to executable code region.
-    method_header = private_region_.GetExecutableAddress(method_header);
+    method_header = region->GetExecutableAddress(method_header);
 
     // Both instruction and data caches need flushing to the point of unification where both share
     // a common view of memory. Flushing the data cache ensures the dirty cachelines from the
@@ -747,7 +751,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     // For reference, this behavior is caused by this commit:
     // https://android.googlesource.com/kernel/msm/+/3fbe6bc28a6b9939d0650f2f17eb5216c719950c
     //
-    if (private_region_.HasDualCodeMapping()) {
+    if (region->HasDualCodeMapping()) {
       // Flush the data cache lines associated with the non-executable copy of the code just added.
       FlushDataCache(nox_memory, nox_memory + total_size);
     }
@@ -1025,14 +1029,16 @@ size_t JitCodeCache::DataCacheSizeLocked() {
 }
 
 void JitCodeCache::ClearData(Thread* self,
+                             JitMemoryRegion* region,
                              uint8_t* stack_map_data,
                              uint8_t* roots_data) {
   DCHECK_EQ(FromStackMapToRoots(stack_map_data), roots_data);
   MutexLock mu(self, *Locks::jit_lock_);
-  private_region_.FreeData(reinterpret_cast<uint8_t*>(roots_data));
+  region->FreeData(reinterpret_cast<uint8_t*>(roots_data));
 }
 
 size_t JitCodeCache::ReserveData(Thread* self,
+                                 JitMemoryRegion* region,
                                  size_t stack_map_size,
                                  size_t number_of_roots,
                                  ArtMethod* method,
@@ -1046,7 +1052,7 @@ size_t JitCodeCache::ReserveData(Thread* self,
     ScopedThreadSuspension sts(self, kSuspended);
     MutexLock mu(self, *Locks::jit_lock_);
     WaitForPotentialCollectionToComplete(self);
-    result = private_region_.AllocateData(size);
+    result = region->AllocateData(size);
   }
 
   if (result == nullptr) {
@@ -1055,7 +1061,7 @@ size_t JitCodeCache::ReserveData(Thread* self,
     ScopedThreadSuspension sts(self, kSuspended);
     MutexLock mu(self, *Locks::jit_lock_);
     WaitForPotentialCollectionToComplete(self);
-    result = private_region_.AllocateData(size);
+    result = region->AllocateData(size);
   }
 
   MutexLock mu(self, *Locks::jit_lock_);
