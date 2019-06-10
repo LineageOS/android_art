@@ -344,50 +344,40 @@ class JvmtiFunctions {
     return StackUtil::NotifyFramePop(env, thread, depth);
   }
 
-  static jvmtiError ForceEarlyReturnObject(jvmtiEnv* env,
-                                           jthread thread ATTRIBUTE_UNUSED,
-                                           jobject value ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnObject(jvmtiEnv* env, jthread thread, jobject value) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn(env, gEventHandler, thread, value);
   }
 
-  static jvmtiError ForceEarlyReturnInt(jvmtiEnv* env,
-                                        jthread thread ATTRIBUTE_UNUSED,
-                                        jint value ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnInt(jvmtiEnv* env, jthread thread, jint value) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn(env, gEventHandler, thread, value);
   }
 
-  static jvmtiError ForceEarlyReturnLong(jvmtiEnv* env,
-                                         jthread thread ATTRIBUTE_UNUSED,
-                                         jlong value ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnLong(jvmtiEnv* env, jthread thread, jlong value) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn(env, gEventHandler, thread, value);
   }
 
-  static jvmtiError ForceEarlyReturnFloat(jvmtiEnv* env,
-                                          jthread thread ATTRIBUTE_UNUSED,
-                                          jfloat value ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnFloat(jvmtiEnv* env, jthread thread, jfloat value) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn(env, gEventHandler, thread, value);
   }
 
-  static jvmtiError ForceEarlyReturnDouble(jvmtiEnv* env,
-                                           jthread thread ATTRIBUTE_UNUSED,
-                                           jdouble value ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnDouble(jvmtiEnv* env, jthread thread, jdouble value) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn(env, gEventHandler, thread, value);
   }
 
-  static jvmtiError ForceEarlyReturnVoid(jvmtiEnv* env, jthread thread ATTRIBUTE_UNUSED) {
+  static jvmtiError ForceEarlyReturnVoid(jvmtiEnv* env, jthread thread) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_force_early_return);
-    return ERR(NOT_IMPLEMENTED);
+    return StackUtil::ForceEarlyReturn<nullptr_t>(env, gEventHandler, thread, nullptr);
   }
 
   static jvmtiError FollowReferences(jvmtiEnv* env,

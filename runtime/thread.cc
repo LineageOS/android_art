@@ -2141,20 +2141,7 @@ void Thread::DumpJavaStack(std::ostream& os, bool check_suspended, bool dump_loc
   // assumption that there is no exception pending on entry. Thus, stash any pending exception.
   // Thread::Current() instead of this in case a thread is dumping the stack of another suspended
   // thread.
-  struct ScopedExceptionStorage {
-    ScopedExceptionStorage() : scope(Thread::Current()) {
-      exc = scope.NewHandle(scope.Self()->GetException());
-      scope.Self()->ClearException();
-    }
-    ~ScopedExceptionStorage() {
-      if (exc != nullptr) {
-        scope.Self()->SetException(exc.Get());
-      }
-    }
-    StackHandleScope<1> scope;
-    Handle<mirror::Throwable> exc;
-  };
-  ScopedExceptionStorage ses;
+  ScopedExceptionStorage ses(Thread::Current());
 
   std::unique_ptr<Context> context(Context::Create());
   StackDumpVisitor dumper(os, const_cast<Thread*>(this), context.get(),
@@ -3578,10 +3565,6 @@ void Thread::QuickDeliverException() {
       if (penultimate_frame == nullptr) {
         penultimate_frame = FindDebuggerShadowFrame(penultimate_visitor.GetFrameId());
       }
-      DCHECK(penultimate_frame != nullptr &&
-             penultimate_frame->GetForceRetryInstruction())
-          << "Force pop frame without retry instruction found. penultimate frame is null: "
-          << (penultimate_frame == nullptr ? "true" : "false");
     }
     force_deopt = force_frame_pop || force_retry_instr;
   }
@@ -4290,6 +4273,18 @@ bool Thread::IsSystemDaemon() const {
   }
   return jni::DecodeArtField(
       WellKnownClasses::java_lang_Thread_systemDaemon)->GetBoolean(GetPeer());
+}
+
+ScopedExceptionStorage::ScopedExceptionStorage(art::Thread* self)
+    : self_(self), hs_(self_), excp_(hs_.NewHandle<art::mirror::Throwable>(self_->GetException())) {
+  self_->ClearException();
+}
+
+ScopedExceptionStorage::~ScopedExceptionStorage() {
+  CHECK(!self_->IsExceptionPending()) << self_;
+  if (!excp_.IsNull()) {
+    self_->SetException(excp_.Get());
+  }
 }
 
 }  // namespace art

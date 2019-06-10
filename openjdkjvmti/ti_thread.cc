@@ -229,6 +229,7 @@ bool ThreadUtil::GetNativeThread(jthread thread,
                                  const art::ScopedObjectAccessAlreadyRunnable& soa,
                                  /*out*/ art::Thread** thr,
                                  /*out*/ jvmtiError* err) {
+  art::ScopedExceptionStorage sse(soa.Self());
   if (thread == nullptr) {
     *thr = art::Thread::Current();
     return true;
