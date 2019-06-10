@@ -1326,14 +1326,16 @@ class CHAOnDeleteUpdateClassVisitor {
 };
 
 /*
- * A class used to ensure that all strings in an AppImage have been properly
- * interned, and is only ever run in debug mode.
+ * A class used to ensure that all references to strings interned in an AppImage have been
+ * properly recorded in the interned references list, and is only ever run in debug mode.
  */
-class VerifyStringInterningVisitor {
+class CountInternedStringReferencesVisitor {
  public:
-  explicit VerifyStringInterningVisitor(const gc::space::ImageSpace& space) :
-      space_(space),
-      intern_table_(*Runtime::Current()->GetInternTable()) {}
+  CountInternedStringReferencesVisitor(const gc::space::ImageSpace& space,
+                                       const InternTable::UnorderedSet& image_interns)
+      : space_(space),
+        image_interns_(image_interns),
+        count_(0u) {}
 
   void TestObject(ObjPtr<mirror::Object> referred_obj) const
       REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -1341,15 +1343,9 @@ class VerifyStringInterningVisitor {
         space_.HasAddress(referred_obj.Ptr()) &&
         referred_obj->IsString()) {
       ObjPtr<mirror::String> referred_str = referred_obj->AsString();
-
-      if (kIsDebugBuild) {
-        // Saved to temporary variables to aid in debugging.
-        ObjPtr<mirror::String> strong_lookup_result =
-            intern_table_.LookupStrong(Thread::Current(), referred_str);
-        ObjPtr<mirror::String> weak_lookup_result =
-            intern_table_.LookupWeak(Thread::Current(), referred_str);
-
-        DCHECK((strong_lookup_result == referred_str) || (weak_lookup_result == referred_str));
+      auto it = image_interns_.find(GcRoot<mirror::String>(referred_str));
+      if (it != image_interns_.end() && it->Read() == referred_str) {
+        ++count_;
       }
     }
   }
@@ -1372,33 +1368,35 @@ class VerifyStringInterningVisitor {
                   MemberOffset offset,
                   bool is_static ATTRIBUTE_UNUSED) const
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    // There could be overlap between ranges, we must avoid visiting the same reference twice.
-    // Avoid the class field since we already fixed it up in FixupClassVisitor.
-    if (offset.Uint32Value() != mirror::Object::ClassOffset().Uint32Value()) {
-      // Updating images, don't do a read barrier.
-      ObjPtr<mirror::Object> referred_obj =
-          obj->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(offset);
-
-      TestObject(referred_obj);
-    }
+    // References within image or across images don't need a read barrier.
+    ObjPtr<mirror::Object> referred_obj =
+        obj->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(offset);
+    TestObject(referred_obj);
   }
 
   void operator()(ObjPtr<mirror::Class> klass ATTRIBUTE_UNUSED,
                   ObjPtr<mirror::Reference> ref) const
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(Locks::heap_bitmap_lock_) {
-    operator()(ref, mirror::Reference::ReferentOffset(), false);
+    operator()(ref, mirror::Reference::ReferentOffset(), /*is_static=*/ false);
   }
 
+  size_t GetCount() const {
+    return count_;
+  }
+
+ private:
   const gc::space::ImageSpace& space_;
-  InternTable& intern_table_;
+  const InternTable::UnorderedSet& image_interns_;
+  mutable size_t count_;  // Modified from the `const` callbacks.
 };
 
 /*
- * This function verifies that string references in the AppImage have been
- * properly interned.  To be considered properly interned a reference must
- * point to the same version of the string that the intern table does.
+ * This function counts references to strings interned in the AppImage.
+ * This is used in debug build to check against the number of the recorded references.
  */
-void VerifyStringInterning(gc::space::ImageSpace& space) REQUIRES_SHARED(Locks::mutator_lock_) {
+size_t CountInternedStringReferences(gc::space::ImageSpace& space,
+                                     const InternTable::UnorderedSet& image_interns)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
   const gc::accounting::ContinuousSpaceBitmap* bitmap = space.GetMarkBitmap();
   const ImageHeader& image_header = space.GetImageHeader();
   const uint8_t* target_base = space.GetMemMap()->Begin();
@@ -1407,7 +1405,7 @@ void VerifyStringInterning(gc::space::ImageSpace& space) REQUIRES_SHARED(Locks::
   auto objects_begin = reinterpret_cast<uintptr_t>(target_base + objects_section.Offset());
   auto objects_end = reinterpret_cast<uintptr_t>(target_base + objects_section.End());
 
-  VerifyStringInterningVisitor visitor(space);
+  CountInternedStringReferencesVisitor visitor(space, image_interns);
   bitmap->VisitMarkedRange(objects_begin,
                            objects_end,
                            [&space, &visitor](mirror::Object* obj)
@@ -1427,6 +1425,119 @@ void VerifyStringInterning(gc::space::ImageSpace& space) REQUIRES_SHARED(Locks::
       }
     }
   });
+  return visitor.GetCount();
+}
+
+template <typename Visitor>
+static void VisitInternedStringReferences(
+    gc::space::ImageSpace* space,
+    bool use_preresolved_strings,
+    const Visitor& visitor) REQUIRES_SHARED(Locks::mutator_lock_) {
+  const uint8_t* target_base = space->Begin();
+  const ImageSection& sro_section =
+      space->GetImageHeader().GetImageStringReferenceOffsetsSection();
+  const size_t num_string_offsets = sro_section.Size() / sizeof(AppImageReferenceOffsetInfo);
+
+  VLOG(image)
+      << "ClassLinker:AppImage:InternStrings:imageStringReferenceOffsetCount = "
+      << num_string_offsets;
+
+  const auto* sro_base =
+      reinterpret_cast<const AppImageReferenceOffsetInfo*>(target_base + sro_section.Offset());
+
+  for (size_t offset_index = 0; offset_index < num_string_offsets; ++offset_index) {
+    uint32_t base_offset = sro_base[offset_index].first;
+
+    if (HasDexCacheStringNativeRefTag(base_offset)) {
+      base_offset = ClearDexCacheNativeRefTags(base_offset);
+      DCHECK_ALIGNED(base_offset, 2);
+
+      ObjPtr<mirror::DexCache> dex_cache =
+          reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
+      uint32_t string_slot_index = sro_base[offset_index].second;
+
+      mirror::StringDexCachePair source =
+          dex_cache->GetStrings()[string_slot_index].load(std::memory_order_relaxed);
+      ObjPtr<mirror::String> referred_string = source.object.Read();
+      DCHECK(referred_string != nullptr);
+
+      ObjPtr<mirror::String> visited = visitor(referred_string);
+      if (visited != referred_string) {
+        // Because we are not using a helper function we need to mark the GC card manually.
+        WriteBarrier::ForEveryFieldWrite(dex_cache);
+        dex_cache->GetStrings()[string_slot_index].store(
+            mirror::StringDexCachePair(visited, source.index), std::memory_order_relaxed);
+      }
+    } else if (HasDexCachePreResolvedStringNativeRefTag(base_offset)) {
+      if (use_preresolved_strings) {
+        base_offset = ClearDexCacheNativeRefTags(base_offset);
+        DCHECK_ALIGNED(base_offset, 2);
+
+        ObjPtr<mirror::DexCache> dex_cache =
+            reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
+        uint32_t string_index = sro_base[offset_index].second;
+
+        ObjPtr<mirror::String> referred_string =
+            dex_cache->GetPreResolvedStrings()[string_index].Read();
+        DCHECK(referred_string != nullptr);
+
+        ObjPtr<mirror::String> visited = visitor(referred_string);
+        if (visited != referred_string) {
+          // Because we are not using a helper function we need to mark the GC card manually.
+          WriteBarrier::ForEveryFieldWrite(dex_cache);
+          dex_cache->GetPreResolvedStrings()[string_index] = GcRoot<mirror::String>(visited);
+        }
+      }
+    } else {
+      uint32_t raw_member_offset = sro_base[offset_index].second;
+      DCHECK_ALIGNED(base_offset, 2);
+      DCHECK_ALIGNED(raw_member_offset, 2);
+
+      ObjPtr<mirror::Object> obj_ptr =
+          reinterpret_cast<mirror::Object*>(space->Begin() + base_offset);
+      MemberOffset member_offset(raw_member_offset);
+      ObjPtr<mirror::String> referred_string =
+          obj_ptr->GetFieldObject<mirror::String,
+                                  kVerifyNone,
+                                  kWithoutReadBarrier,
+                                  /* kIsVolatile= */ false>(member_offset);
+      DCHECK(referred_string != nullptr);
+
+      ObjPtr<mirror::String> visited = visitor(referred_string);
+      if (visited != referred_string) {
+        obj_ptr->SetFieldObject</* kTransactionActive= */ false,
+                                /* kCheckTransaction= */ false,
+                                kVerifyNone,
+                                /* kIsVolatile= */ false>(member_offset, visited);
+      }
+    }
+  }
+}
+
+static void VerifyInternedStringReferences(gc::space::ImageSpace* space)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  InternTable::UnorderedSet image_interns;
+  const ImageSection& section = space->GetImageHeader().GetInternedStringsSection();
+  if (section.Size() > 0) {
+    size_t read_count;
+    const uint8_t* data = space->Begin() + section.Offset();
+    InternTable::UnorderedSet image_set(data, /*make_copy_of_data=*/ false, &read_count);
+    image_set.swap(image_interns);
+  }
+  size_t num_recorded_refs = 0u;
+  VisitInternedStringReferences(
+      space,
+      /*use_preresolved_strings=*/ true,
+      [&image_interns, &num_recorded_refs](ObjPtr<mirror::String> str)
+          REQUIRES_SHARED(Locks::mutator_lock_) {
+        auto it = image_interns.find(GcRoot<mirror::String>(str));
+        CHECK(it != image_interns.end());
+        CHECK(it->Read() == str);
+        ++num_recorded_refs;
+        return str;
+      });
+  size_t num_found_refs = CountInternedStringReferences(*space, image_interns);
+  CHECK_EQ(num_recorded_refs, num_found_refs);
 }
 
 // new_class_set is the set of classes that were read from the class table section in the image.
@@ -1445,12 +1556,6 @@ class AppImageLoadingHelper {
 
   static void HandleAppImageStrings(gc::space::ImageSpace* space)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  static void UpdateInternStrings(
-      gc::space::ImageSpace* space,
-      bool use_preresolved_strings,
-      const SafeMap<mirror::String*, mirror::String*>& intern_remap)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 };
 
 void AppImageLoadingHelper::Update(
@@ -1462,6 +1567,12 @@ void AppImageLoadingHelper::Update(
     REQUIRES(!Locks::dex_lock_)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ScopedTrace app_image_timing("AppImage:Updating");
+
+  if (kIsDebugBuild && ClassLinker::kAppImageMayContainStrings) {
+    // In debug build, verify the string references before applying
+    // the Runtime::LoadAppImageStartupCache() option.
+    VerifyInternedStringReferences(space);
+  }
 
   Thread* const self = Thread::Current();
   Runtime* const runtime = Runtime::Current();
@@ -1535,10 +1646,6 @@ void AppImageLoadingHelper::Update(
 
   if (ClassLinker::kAppImageMayContainStrings) {
     HandleAppImageStrings(space);
-
-    if (kIsDebugBuild) {
-      VerifyStringInterning(*space);
-    }
   }
 
   if (kVerifyArtMethodDeclaringClasses) {
@@ -1552,104 +1659,6 @@ void AppImageLoadingHelper::Update(
         CHECK(live_bitmap->Test(klass.Ptr())) << "Image method has unmarked declaring class";
       }
     }, space->Begin(), kRuntimePointerSize);
-  }
-}
-
-void AppImageLoadingHelper::UpdateInternStrings(
-    gc::space::ImageSpace* space,
-    bool use_preresolved_strings,
-    const SafeMap<mirror::String*, mirror::String*>& intern_remap) {
-  const uint8_t* target_base = space->Begin();
-  const ImageSection& sro_section =
-      space->GetImageHeader().GetImageStringReferenceOffsetsSection();
-  const size_t num_string_offsets = sro_section.Size() / sizeof(AppImageReferenceOffsetInfo);
-  InternTable* const intern_table = Runtime::Current()->GetInternTable();
-
-  VLOG(image)
-      << "ClassLinker:AppImage:InternStrings:imageStringReferenceOffsetCount = "
-      << num_string_offsets;
-
-  const auto* sro_base =
-      reinterpret_cast<const AppImageReferenceOffsetInfo*>(target_base + sro_section.Offset());
-
-  for (size_t offset_index = 0; offset_index < num_string_offsets; ++offset_index) {
-    uint32_t base_offset = sro_base[offset_index].first;
-
-    if (HasDexCacheStringNativeRefTag(base_offset)) {
-      base_offset = ClearDexCacheNativeRefTags(base_offset);
-      DCHECK_ALIGNED(base_offset, 2);
-
-      ObjPtr<mirror::DexCache> dex_cache =
-          reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
-      uint32_t string_index = sro_base[offset_index].second;
-
-      mirror::StringDexCachePair source = dex_cache->GetStrings()[string_index].load();
-      ObjPtr<mirror::String> referred_string = source.object.Read();
-      DCHECK(referred_string != nullptr);
-
-      auto it = intern_remap.find(referred_string.Ptr());
-      if (it != intern_remap.end()) {
-        // This doesn't use SetResolvedString to maintain consistency with how
-        // we load the string.  The index from the source string must be
-        // re-used due to the circular nature of the cache.  Because we are not
-        // using a helper function we need to mark the GC card manually.
-        WriteBarrier::ForEveryFieldWrite(dex_cache);
-        dex_cache->GetStrings()[string_index].store(
-            mirror::StringDexCachePair(it->second, source.index));
-      } else if (!use_preresolved_strings) {
-        dex_cache->GetStrings()[string_index].store(
-            mirror::StringDexCachePair(intern_table->InternStrong(referred_string), source.index));
-      }
-    } else if (HasDexCachePreResolvedStringNativeRefTag(base_offset)) {
-      if (use_preresolved_strings) {
-        base_offset = ClearDexCacheNativeRefTags(base_offset);
-        DCHECK_ALIGNED(base_offset, 2);
-
-        ObjPtr<mirror::DexCache> dex_cache =
-            reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
-        uint32_t string_index = sro_base[offset_index].second;
-
-        ObjPtr<mirror::String> referred_string =
-            dex_cache->GetPreResolvedStrings()[string_index].Read();
-        DCHECK(referred_string != nullptr);
-
-        auto it = intern_remap.find(referred_string.Ptr());
-        if (it != intern_remap.end()) {
-          // Because we are not using a helper function we need to mark the GC card manually.
-          WriteBarrier::ForEveryFieldWrite(dex_cache);
-          dex_cache->GetPreResolvedStrings()[string_index] = GcRoot<mirror::String>(it->second);
-        }
-      }
-    } else {
-      uint32_t raw_member_offset = sro_base[offset_index].second;
-      DCHECK_ALIGNED(base_offset, 2);
-      DCHECK_ALIGNED(raw_member_offset, 2);
-
-      ObjPtr<mirror::Object> obj_ptr =
-          reinterpret_cast<mirror::Object*>(space->Begin() + base_offset);
-      MemberOffset member_offset(raw_member_offset);
-      ObjPtr<mirror::String> referred_string =
-          obj_ptr->GetFieldObject<mirror::String,
-                                  kVerifyNone,
-                                  kWithoutReadBarrier,
-                                  /* kIsVolatile= */ false>(member_offset);
-      DCHECK(referred_string != nullptr);
-
-      auto it = intern_remap.find(referred_string.Ptr());
-      if (it != intern_remap.end()) {
-        obj_ptr->SetFieldObject</* kTransactionActive= */ false,
-                                /* kCheckTransaction= */ false,
-                                kVerifyNone,
-                                /* kIsVolatile= */ false>(member_offset, it->second);
-      } else if (!use_preresolved_strings) {
-        obj_ptr->SetFieldObject</* kTransactionActive= */ false,
-                                /* kCheckTransaction= */ false,
-                                kVerifyNone,
-                                /* kIsVolatile= */ false>(
-            member_offset,
-            intern_table->InternStrong(referred_string));
-      }
-    }
   }
 }
 
@@ -1711,23 +1720,19 @@ void AppImageLoadingHelper::HandleAppImageStrings(gc::space::ImageSpace* space) 
       }
     }
   };
-
-  bool update_intern_strings;
-  if (load_startup_cache) {
-    VLOG(image) << "AppImage:load_startup_cache";
-    // Only add the intern table if we are using the startup cache. Otherwise,
-    // UpdateInternStrings adds the strings to the intern table.
-    intern_table->AddImageStringsToTable(space, func);
-    update_intern_strings = kIsDebugBuild || !intern_remap.empty();
+  intern_table->AddImageStringsToTable(space, func);
+  if (!intern_remap.empty()) {
     VLOG(image) << "AppImage:conflictingInternStrings = " << intern_remap.size();
-  } else {
-    update_intern_strings = true;
-  }
-
-  // For debug builds, always run the code below to get coverage.
-  if (update_intern_strings) {
-    // Slow path case is when there are conflicting intern strings to fix up.
-    UpdateInternStrings(space, /*use_preresolved_strings=*/ load_startup_cache, intern_remap);
+    VisitInternedStringReferences(
+        space,
+        load_startup_cache,
+        [&intern_remap](ObjPtr<mirror::String> str) REQUIRES_SHARED(Locks::mutator_lock_) {
+          auto it = intern_remap.find(str.Ptr());
+          if (it != intern_remap.end()) {
+            return ObjPtr<mirror::String>(it->second);
+          }
+          return str;
+        });
   }
 }
 
