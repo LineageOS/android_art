@@ -17,6 +17,8 @@
 #ifndef ART_RUNTIME_INTERPRETER_INTERPRETER_COMMON_H_
 #define ART_RUNTIME_INTERPRETER_INTERPRETER_COMMON_H_
 
+#include "android-base/macros.h"
+#include "instrumentation.h"
 #include "interpreter.h"
 #include "interpreter_intrinsics.h"
 
@@ -59,6 +61,7 @@
 #include "stack.h"
 #include "thread.h"
 #include "unstarted_runtime.h"
+#include "verifier/method_verifier.h"
 #include "well_known_classes.h"
 
 namespace art {
@@ -131,6 +134,96 @@ bool UseFastInterpreterToInterpreterInvoke(ArtMethod* method)
 // Throws exception if we are getting close to the end of the stack.
 NO_INLINE bool CheckStackOverflow(Thread* self, size_t frame_size)
     REQUIRES_SHARED(Locks::mutator_lock_);
+
+
+// Sends the normal method exit event.
+// Returns true if the events succeeded and false if there is a pending exception.
+template <typename T> bool SendMethodExitEvents(
+    Thread* self,
+    const instrumentation::Instrumentation* instrumentation,
+    ShadowFrame& frame,
+    ObjPtr<mirror::Object> thiz,
+    ArtMethod* method,
+    uint32_t dex_pc,
+    T& result) REQUIRES_SHARED(Locks::mutator_lock_);
+
+static inline ALWAYS_INLINE WARN_UNUSED bool
+NeedsMethodExitEvent(const instrumentation::Instrumentation* ins)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  return ins->HasMethodExitListeners() || ins->HasWatchedFramePopListeners();
+}
+
+// NO_INLINE so we won't bloat the interpreter with this very cold lock-release code.
+template <bool kMonitorCounting>
+static NO_INLINE void UnlockHeldMonitors(Thread* self, ShadowFrame* shadow_frame)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  DCHECK(shadow_frame->GetForcePopFrame());
+  // Unlock all monitors.
+  if (kMonitorCounting && shadow_frame->GetMethod()->MustCountLocks()) {
+    // Get the monitors from the shadow-frame monitor-count data.
+    shadow_frame->GetLockCountData().VisitMonitors(
+      [&](mirror::Object** obj) REQUIRES_SHARED(Locks::mutator_lock_) {
+        // Since we don't use the 'obj' pointer after the DoMonitorExit everything should be fine
+        // WRT suspension.
+        DoMonitorExit<kMonitorCounting>(self, shadow_frame, *obj);
+      });
+  } else {
+    std::vector<verifier::MethodVerifier::DexLockInfo> locks;
+    verifier::MethodVerifier::FindLocksAtDexPc(shadow_frame->GetMethod(),
+                                                shadow_frame->GetDexPC(),
+                                                &locks,
+                                                Runtime::Current()->GetTargetSdkVersion());
+    for (const auto& reg : locks) {
+      if (UNLIKELY(reg.dex_registers.empty())) {
+        LOG(ERROR) << "Unable to determine reference locked by "
+                    << shadow_frame->GetMethod()->PrettyMethod() << " at pc "
+                    << shadow_frame->GetDexPC();
+      } else {
+        DoMonitorExit<kMonitorCounting>(
+            self, shadow_frame, shadow_frame->GetVRegReference(*reg.dex_registers.begin()));
+      }
+    }
+  }
+}
+
+enum class MonitorState {
+  kNoMonitorsLocked,
+  kCountingMonitors,
+  kNormalMonitors,
+};
+
+template<MonitorState kMonitorState>
+static inline ALWAYS_INLINE WARN_UNUSED bool PerformNonStandardReturn(
+      Thread* self,
+      ShadowFrame& frame,
+      JValue& result,
+      const instrumentation::Instrumentation* instrumentation,
+      uint16_t num_dex_inst,
+      uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_) {
+  static constexpr bool kMonitorCounting = (kMonitorState == MonitorState::kCountingMonitors);
+  ObjPtr<mirror::Object> thiz(frame.GetThisObject(num_dex_inst));
+  if (UNLIKELY(frame.GetForcePopFrame())) {
+    StackHandleScope<1> hs(self);
+    Handle<mirror::Object> h_thiz(hs.NewHandle(thiz));
+    DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
+    if (UNLIKELY(self->IsExceptionPending())) {
+      LOG(WARNING) << "Suppressing exception for non-standard method exit: "
+                   << self->GetException()->Dump();
+      self->ClearException();
+    }
+    if (kMonitorState != MonitorState::kNoMonitorsLocked) {
+      UnlockHeldMonitors<kMonitorCounting>(self, &frame);
+    }
+    DoMonitorCheckOnExit<kMonitorCounting>(self, &frame);
+    result = JValue();
+    if (UNLIKELY(NeedsMethodExitEvent(instrumentation))) {
+      SendMethodExitEvents(
+          self, instrumentation, frame, h_thiz.Get(), frame.GetMethod(), dex_pc, result);
+    }
+    return true;
+  }
+  return false;
+}
 
 // Handles all invoke-XXX/range instructions except for invoke-polymorphic[/range].
 // Returns true on success, otherwise throws an exception and returns false.

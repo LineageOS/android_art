@@ -37,6 +37,7 @@
 
 #include "art_method.h"
 #include "base/mutex.h"
+#include "events.h"
 #include "stack.h"
 
 namespace openjdkjvmti {
@@ -83,6 +84,10 @@ class StackUtil {
   static jvmtiError NotifyFramePop(jvmtiEnv* env, jthread thread, jint depth);
 
   static jvmtiError PopFrame(jvmtiEnv* env, jthread thread);
+
+  template <typename T>
+  static jvmtiError ForceEarlyReturn(
+      jvmtiEnv* env, EventHandler* event_handler, jthread thread, T value);
 };
 
 struct FindFrameAtDepthVisitor : art::StackVisitor {

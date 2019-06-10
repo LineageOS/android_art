@@ -965,6 +965,7 @@ extern "C" uint64_t artQuickProxyInvokeHandler(
                            soa.Decode<mirror::Object>(rcvr_jobj),
                            proxy_method,
                            0,
+                           {},
                            result);
   }
   return result.GetJ();

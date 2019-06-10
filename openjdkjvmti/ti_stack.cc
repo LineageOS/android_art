@@ -32,10 +32,13 @@
 #include "ti_stack.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <list>
 #include <unordered_map>
 #include <vector>
 
+#include "android-base/macros.h"
+#include "android-base/thread_annotations.h"
 #include "arch/context.h"
 #include "art_field-inl.h"
 #include "art_method-inl.h"
@@ -44,21 +47,35 @@
 #include "barrier.h"
 #include "base/bit_utils.h"
 #include "base/enums.h"
+#include "base/locks.h"
+#include "base/macros.h"
 #include "base/mutex.h"
 #include "deopt_manager.h"
 #include "dex/code_item_accessors-inl.h"
 #include "dex/dex_file.h"
 #include "dex/dex_file_annotations.h"
 #include "dex/dex_file_types.h"
+#include "dex/dex_instruction-inl.h"
+#include "dex/primitive.h"
+#include "events.h"
 #include "gc_root.h"
 #include "handle_scope-inl.h"
+#include "instrumentation.h"
+#include "interpreter/shadow_frame-inl.h"
+#include "interpreter/shadow_frame.h"
 #include "jni/jni_env_ext.h"
 #include "jni/jni_internal.h"
+#include "jvalue-inl.h"
+#include "jvalue.h"
+#include "jvmti.h"
 #include "mirror/class.h"
 #include "mirror/dex_cache.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "scoped_thread_state_change-inl.h"
+#include "scoped_thread_state_change.h"
 #include "stack.h"
+#include "thread.h"
+#include "thread_state.h"
 #include "ti_logging.h"
 #include "ti_thread.h"
 #include "thread-current-inl.h"
@@ -1087,96 +1104,333 @@ jvmtiError StackUtil::NotifyFramePop(jvmtiEnv* env, jthread thread, jint depth) 
   return OK;
 }
 
+namespace {
+
+enum class NonStandardExitType {
+  kPopFrame,
+  kForceReturn,
+};
+
+template<NonStandardExitType kExitType>
+class NonStandardExitFrames {
+ public:
+  NonStandardExitFrames(art::Thread* self, jvmtiEnv* env, jthread thread)
+      REQUIRES(!art::Locks::thread_suspend_count_lock_)
+      ACQUIRE_SHARED(art::Locks::mutator_lock_)
+      ACQUIRE(art::Locks::thread_list_lock_, art::Locks::user_code_suspension_lock_)
+      : snucs_(self) {
+    // We keep the user-code-suspend-count lock.
+    art::Locks::user_code_suspension_lock_->AssertExclusiveHeld(self);
+
+    // From now on we know we cannot get suspended by user-code.
+    // NB This does a SuspendCheck (during thread state change) so we need to make sure we don't
+    // have the 'suspend_lock' locked here.
+    old_state_ = self->TransitionFromSuspendedToRunnable();
+    art::ScopedObjectAccessUnchecked soau(self);
+
+    art::Locks::thread_list_lock_->ExclusiveLock(self);
+
+    if (!ThreadUtil::GetAliveNativeThread(thread, soau, &target_, &result_)) {
+      return;
+    }
+    {
+      art::MutexLock tscl_mu(self, *art::Locks::thread_suspend_count_lock_);
+      if (target_ != self && target_->GetUserCodeSuspendCount() == 0) {
+        // We cannot be the current thread for this function.
+        result_ = ERR(THREAD_NOT_SUSPENDED);
+        return;
+      }
+    }
+    JvmtiGlobalTLSData* tls_data = ThreadUtil::GetGlobalTLSData(target_);
+    constexpr art::StackVisitor::StackWalkKind kWalkKind =
+        art::StackVisitor::StackWalkKind::kIncludeInlinedFrames;
+    if (tls_data != nullptr &&
+        tls_data->disable_pop_frame_depth != JvmtiGlobalTLSData::kNoDisallowedPopFrame &&
+        tls_data->disable_pop_frame_depth ==
+            art::StackVisitor::ComputeNumFrames(target_, kWalkKind)) {
+      JVMTI_LOG(WARNING, env) << "Disallowing frame pop due to in-progress class-load/prepare. "
+                              << "Frame at depth " << tls_data->disable_pop_frame_depth << " was "
+                              << "marked as un-poppable by the jvmti plugin. See b/117615146 for "
+                              << "more information.";
+      result_ = ERR(OPAQUE_FRAME);
+      return;
+    }
+    // We hold the user_code_suspension_lock_ so the target thread is staying suspended until we are
+    // done.
+    std::unique_ptr<art::Context> context(art::Context::Create());
+    FindFrameAtDepthVisitor final_frame(target_, context.get(), 0);
+    FindFrameAtDepthVisitor penultimate_frame(target_, context.get(), 1);
+    final_frame.WalkStack();
+    penultimate_frame.WalkStack();
+
+    if (!final_frame.FoundFrame() || !penultimate_frame.FoundFrame()) {
+      // Cannot do it if there is only one frame!
+      JVMTI_LOG(INFO, env) << "Can not pop final frame off of a stack";
+      result_ = ERR(NO_MORE_FRAMES);
+      return;
+    }
+
+    art::ArtMethod* called_method = final_frame.GetMethod();
+    art::ArtMethod* calling_method = penultimate_frame.GetMethod();
+    if (!CheckFunctions(env, calling_method, called_method)) {
+      return;
+    }
+    DCHECK(!called_method->IsNative()) << called_method->PrettyMethod();
+
+    // From here we are sure to succeed.
+    result_ = OK;
+
+    // Get/create a shadow frame
+    final_frame_ = final_frame.GetOrCreateShadowFrame(&created_final_frame_);
+    penultimate_frame_ =
+        (calling_method->IsNative()
+             ? nullptr
+             : penultimate_frame.GetOrCreateShadowFrame(&created_penultimate_frame_));
+
+    final_frame_id_ = final_frame.GetFrameId();
+    penultimate_frame_id_ = penultimate_frame.GetFrameId();
+
+    CHECK_NE(final_frame_, penultimate_frame_) << "Frames at different depths not different!";
+  }
+
+  bool CheckFunctions(jvmtiEnv* env, art::ArtMethod* calling, art::ArtMethod* called)
+      REQUIRES(art::Locks::thread_list_lock_, art::Locks::user_code_suspension_lock_)
+      REQUIRES_SHARED(art::Locks::mutator_lock_);
+
+  ~NonStandardExitFrames() RELEASE_SHARED(art::Locks::mutator_lock_)
+      REQUIRES(!art::Locks::thread_list_lock_)
+      RELEASE(art::Locks::user_code_suspension_lock_) {
+    art::Thread* self = art::Thread::Current();
+    DCHECK_EQ(old_state_, art::ThreadState::kNative)
+        << "Unexpected thread state on entering PopFrame!";
+    self->TransitionFromRunnableToSuspended(old_state_);
+  }
+
+  ScopedNoUserCodeSuspension snucs_;
+  art::ShadowFrame* final_frame_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = nullptr;
+  art::ShadowFrame* penultimate_frame_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = nullptr;
+  bool created_final_frame_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = false;
+  bool created_penultimate_frame_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = false;
+  uint32_t final_frame_id_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = -1;
+  uint32_t penultimate_frame_id_ GUARDED_BY(art::Locks::user_code_suspension_lock_) = -1;
+  art::Thread* target_ GUARDED_BY(art::Locks::thread_list_lock_) = nullptr;
+  art::ThreadState old_state_ = art::ThreadState::kTerminated;
+  jvmtiError result_ = ERR(INTERNAL);
+};
+
+template <>
+bool NonStandardExitFrames<NonStandardExitType::kForceReturn>::CheckFunctions(
+    jvmtiEnv* env, art::ArtMethod* calling ATTRIBUTE_UNUSED, art::ArtMethod* called) {
+  if (UNLIKELY(called->IsNative())) {
+    result_ = ERR(OPAQUE_FRAME);
+    JVMTI_LOG(INFO, env) << "Cannot force early return from " << called->PrettyMethod()
+                         << " because it is native.";
+    return false;
+  } else {
+    return true;
+  }
+}
+
+template <>
+bool NonStandardExitFrames<NonStandardExitType::kPopFrame>::CheckFunctions(
+    jvmtiEnv* env, art::ArtMethod* calling, art::ArtMethod* called) {
+  if (UNLIKELY(calling->IsNative() || called->IsNative())) {
+    result_ = ERR(OPAQUE_FRAME);
+    JVMTI_LOG(INFO, env) << "Cannot force early return from " << called->PrettyMethod() << " to "
+                         << calling->PrettyMethod() << " because at least one of them is native.";
+    return false;
+  } else {
+    return true;
+  }
+}
+
+class SetupMethodExitEvents {
+ public:
+  SetupMethodExitEvents(art::Thread* self,
+                        EventHandler* event_handler,
+                        jthread target) REQUIRES(!art::Locks::mutator_lock_,
+                                                 !art::Locks::user_code_suspension_lock_,
+                                                 !art::Locks::thread_list_lock_)
+      : self_(self), event_handler_(event_handler), target_(target) {
+    DCHECK(target != nullptr);
+    art::Locks::mutator_lock_->AssertNotHeld(self_);
+    art::Locks::user_code_suspension_lock_->AssertNotHeld(self_);
+    art::Locks::thread_list_lock_->AssertNotHeld(self_);
+    event_handler_->SetInternalEvent(
+        target_, ArtJvmtiEvent::kForceEarlyReturnUpdateReturnValue, JVMTI_ENABLE);
+  }
+
+  ~SetupMethodExitEvents() REQUIRES(!art::Locks::mutator_lock_,
+                                    !art::Locks::user_code_suspension_lock_,
+                                    !art::Locks::thread_list_lock_) {
+    art::Locks::mutator_lock_->AssertNotHeld(self_);
+    art::Locks::user_code_suspension_lock_->AssertNotHeld(self_);
+    art::Locks::thread_list_lock_->AssertNotHeld(self_);
+    if (failed_) {
+      event_handler_->SetInternalEvent(
+          target_, ArtJvmtiEvent::kForceEarlyReturnUpdateReturnValue, JVMTI_DISABLE);
+    }
+  }
+
+  void NotifyFailure() {
+    failed_ = true;
+  }
+
+ private:
+  art::Thread* self_;
+  EventHandler* event_handler_;
+  jthread target_;
+  bool failed_ = false;
+};
+
+template <typename T>
+void AddDelayedMethodExitEvent(EventHandler* handler, art::ShadowFrame* frame, T value)
+    REQUIRES_SHARED(art::Locks::mutator_lock_)
+    REQUIRES(art::Locks::user_code_suspension_lock_, art::Locks::thread_list_lock_);
+
+template <typename T>
+void AddDelayedMethodExitEvent(EventHandler* handler, art::ShadowFrame* frame, T value) {
+  art::JValue val = art::JValue::FromPrimitive(value);
+  jvalue jval{ .j = val.GetJ() };
+  handler->AddDelayedNonStandardExitEvent(frame, false, jval);
+}
+
+template <>
+void AddDelayedMethodExitEvent<std::nullptr_t>(EventHandler* handler,
+                                               art::ShadowFrame* frame,
+                                               std::nullptr_t null_val ATTRIBUTE_UNUSED) {
+  jvalue jval;
+  memset(&jval, 0, sizeof(jval));
+  handler->AddDelayedNonStandardExitEvent(frame, false, jval);
+}
+
+template <>
+void AddDelayedMethodExitEvent<jobject>(EventHandler* handler,
+                                        art::ShadowFrame* frame,
+                                        jobject obj) {
+  jvalue jval{ .l = art::Thread::Current()->GetJniEnv()->NewGlobalRef(obj) };
+  handler->AddDelayedNonStandardExitEvent(frame, true, jval);
+}
+
+template <typename T>
+bool ValidReturnType(art::Thread* self, art::ObjPtr<art::mirror::Class> return_type, T value)
+    REQUIRES_SHARED(art::Locks::mutator_lock_)
+        REQUIRES(art::Locks::user_code_suspension_lock_, art::Locks::thread_list_lock_);
+
+#define SIMPLE_VALID_RETURN_TYPE(type, ...)                                                        \
+  template <>                                                                                      \
+  bool ValidReturnType<type>(art::Thread * self ATTRIBUTE_UNUSED,                                  \
+                             art::ObjPtr<art::mirror::Class> return_type,                          \
+                             type value ATTRIBUTE_UNUSED) {                                        \
+    static constexpr std::initializer_list<art::Primitive::Type> types{ __VA_ARGS__ };             \
+    return std::find(types.begin(), types.end(), return_type->GetPrimitiveType()) != types.end();  \
+  }
+
+SIMPLE_VALID_RETURN_TYPE(jlong, art::Primitive::kPrimLong);
+SIMPLE_VALID_RETURN_TYPE(jfloat, art::Primitive::kPrimFloat);
+SIMPLE_VALID_RETURN_TYPE(jdouble, art::Primitive::kPrimDouble);
+SIMPLE_VALID_RETURN_TYPE(nullptr_t, art::Primitive::kPrimVoid);
+SIMPLE_VALID_RETURN_TYPE(jint,
+                         art::Primitive::kPrimInt,
+                         art::Primitive::kPrimChar,
+                         art::Primitive::kPrimBoolean,
+                         art::Primitive::kPrimShort,
+                         art::Primitive::kPrimByte);
+#undef SIMPLE_VALID_RETURN_TYPE
+
+template <>
+bool ValidReturnType<jobject>(art::Thread* self,
+                              art::ObjPtr<art::mirror::Class> return_type,
+                              jobject return_value) {
+  if (return_type->IsPrimitive()) {
+    return false;
+  }
+  if (return_value == nullptr) {
+    // Null can be used for anything.
+    return true;
+  }
+  return return_type->IsAssignableFrom(self->DecodeJObject(return_value)->GetClass());
+}
+
+}  // namespace
+
 jvmtiError StackUtil::PopFrame(jvmtiEnv* env, jthread thread) {
   art::Thread* self = art::Thread::Current();
-  art::Thread* target;
-
-  ScopedNoUserCodeSuspension snucs(self);
-  // From now on we know we cannot get suspended by user-code.
-  // NB This does a SuspendCheck (during thread state change) so we need to make
-  // sure we don't have the 'suspend_lock' locked here.
-  art::ScopedObjectAccess soa(self);
-  art::Locks::thread_list_lock_->ExclusiveLock(self);
-  jvmtiError err = ERR(INTERNAL);
-  if (!ThreadUtil::GetAliveNativeThread(thread, soa, &target, &err)) {
+  NonStandardExitFrames<NonStandardExitType::kPopFrame> frames(self, env, thread);
+  if (frames.result_ != OK) {
     art::Locks::thread_list_lock_->ExclusiveUnlock(self);
-    return err;
+    return frames.result_;
   }
-  {
-    art::Locks::thread_suspend_count_lock_->ExclusiveLock(self);
-    if (target == self || target->GetUserCodeSuspendCount() == 0) {
-      // We cannot be the current thread for this function.
-      art::Locks::thread_suspend_count_lock_->ExclusiveUnlock(self);
-      art::Locks::thread_list_lock_->ExclusiveUnlock(self);
-      return ERR(THREAD_NOT_SUSPENDED);
-    }
-    art::Locks::thread_suspend_count_lock_->ExclusiveUnlock(self);
-  }
-  JvmtiGlobalTLSData* tls_data = ThreadUtil::GetGlobalTLSData(target);
-  constexpr art::StackVisitor::StackWalkKind kWalkKind =
-      art::StackVisitor::StackWalkKind::kIncludeInlinedFrames;
-  if (tls_data != nullptr &&
-      tls_data->disable_pop_frame_depth !=
-          JvmtiGlobalTLSData::kNoDisallowedPopFrame &&
-      tls_data->disable_pop_frame_depth ==
-          art::StackVisitor::ComputeNumFrames(target, kWalkKind)) {
-    JVMTI_LOG(WARNING, env)
-        << "Disallowing frame pop due to in-progress class-load/prepare. "
-        << "Frame at depth " << tls_data->disable_pop_frame_depth << " was "
-        << "marked as un-poppable by the jvmti plugin. See b/117615146 for "
-        << "more information.";
-    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
-    return ERR(OPAQUE_FRAME);
-  }
-  // We hold the user_code_suspension_lock_ so the target thread is staying
-  // suspended until we are done.
-  std::unique_ptr<art::Context> context(art::Context::Create());
-  FindFrameAtDepthVisitor final_frame(target, context.get(), 0);
-  FindFrameAtDepthVisitor penultimate_frame(target, context.get(), 1);
-  final_frame.WalkStack();
-  penultimate_frame.WalkStack();
-
-  if (!final_frame.FoundFrame() || !penultimate_frame.FoundFrame()) {
-    // Cannot do it if there is only one frame!
-    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
-    return ERR(NO_MORE_FRAMES);
-  }
-
-  art::ArtMethod* called_method = final_frame.GetMethod();
-  art::ArtMethod* calling_method = penultimate_frame.GetMethod();
-  if (calling_method->IsNative() || called_method->IsNative()) {
-    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
-    return ERR(OPAQUE_FRAME);
-  }
-  // From here we are sure to succeed.
-
-  // Get/create a shadow frame
-  bool created_final_frame = false;
-  bool created_penultimate_frame = false;
-  art::ShadowFrame* called_shadow_frame =
-      final_frame.GetOrCreateShadowFrame(&created_final_frame);
-  art::ShadowFrame* calling_shadow_frame =
-      penultimate_frame.GetOrCreateShadowFrame(&created_penultimate_frame);
-
-  CHECK_NE(called_shadow_frame, calling_shadow_frame)
-      << "Frames at different depths not different!";
-
   // Tell the shadow-frame to return immediately and skip all exit events.
-  called_shadow_frame->SetForcePopFrame(true);
-  calling_shadow_frame->SetForceRetryInstruction(true);
-
-  // Make sure can we will go to the interpreter and use the shadow frames. The
-  // early return for the final frame will force everything to the interpreter
-  // so we only need to instrument if it was not present.
-  if (created_final_frame) {
-    art::FunctionClosure fc([](art::Thread* self) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+  frames.penultimate_frame_->SetForceRetryInstruction(true);
+  frames.final_frame_->SetForcePopFrame(true);
+  frames.final_frame_->SetSkipMethodExitEvents(true);
+  if (frames.created_final_frame_ || frames.created_penultimate_frame_) {
+    art::FunctionClosure fc([](art::Thread* self) REQUIRES_SHARED(art::Locks::mutator_lock_){
       DeoptManager::Get()->DeoptimizeThread(self);
     });
-    target->RequestSynchronousCheckpoint(&fc);
+    frames.target_->RequestSynchronousCheckpoint(&fc);
   } else {
     art::Locks::thread_list_lock_->ExclusiveUnlock(self);
   }
   return OK;
 }
+
+template <typename T>
+jvmtiError
+StackUtil::ForceEarlyReturn(jvmtiEnv* env, EventHandler* event_handler, jthread thread, T value) {
+  art::Thread* self = art::Thread::Current();
+  // We don't want to use the null == current-thread idiom since for events (that we use internally
+  // to implement force-early-return) we instead have null == all threads. Instead just get the
+  // current jthread if needed.
+  ScopedLocalRef<jthread> cur_thread(self->GetJniEnv(), nullptr);
+  if (UNLIKELY(thread == nullptr)) {
+    art::ScopedObjectAccess soa(self);
+    cur_thread.reset(soa.AddLocalReference<jthread>(self->GetPeer()));
+    thread = cur_thread.get();
+  }
+  // This sets up the exit events we implement early return using before we have the locks and
+  // thanks to destructor ordering will tear them down if something goes wrong.
+  SetupMethodExitEvents smee(self, event_handler, thread);
+  NonStandardExitFrames<NonStandardExitType::kForceReturn> frames(self, env, thread);
+  if (frames.result_ != OK) {
+    smee.NotifyFailure();
+    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
+    return frames.result_;
+  } else if (!ValidReturnType<T>(
+                 self, frames.final_frame_->GetMethod()->ResolveReturnType(), value)) {
+    smee.NotifyFailure();
+    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
+    return ERR(TYPE_MISMATCH);
+  } else if (frames.final_frame_->GetForcePopFrame()) {
+    // TODO We should really support this.
+    smee.NotifyFailure();
+    std::string thread_name;
+    frames.target_->GetThreadName(thread_name);
+    JVMTI_LOG(WARNING, env) << "PopFrame or force-return already pending on thread " << thread_name;
+    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
+    return ERR(OPAQUE_FRAME);
+  }
+  // Tell the shadow-frame to return immediately and skip all exit events.
+  frames.final_frame_->SetForcePopFrame(true);
+  AddDelayedMethodExitEvent<T>(event_handler, frames.final_frame_, value);
+  if (frames.created_final_frame_ || frames.created_penultimate_frame_) {
+    art::FunctionClosure fc([](art::Thread* self) REQUIRES_SHARED(art::Locks::mutator_lock_){
+      DeoptManager::Get()->DeoptimizeThread(self);
+    });
+    frames.target_->RequestSynchronousCheckpoint(&fc);
+  } else {
+    art::Locks::thread_list_lock_->ExclusiveUnlock(self);
+  }
+  return OK;
+}
+
+// Instantiate the ForceEarlyReturn templates.
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, jint);
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, jlong);
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, jfloat);
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, jdouble);
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, jobject);
+template jvmtiError StackUtil::ForceEarlyReturn(jvmtiEnv*, EventHandler*, jthread, nullptr_t);
 
 }  // namespace openjdkjvmti

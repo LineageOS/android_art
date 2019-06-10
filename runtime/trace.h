@@ -185,7 +185,8 @@ class Trace final : public instrumentation::InstrumentationListener {
                     Handle<mirror::Object> this_object,
                     ArtMethod* method,
                     uint32_t dex_pc,
-                    const JValue& return_value)
+                    instrumentation::OptionalFrame frame,
+                    JValue& return_value)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!unique_methods_lock_, !streaming_lock_)
       override;
   void MethodUnwind(Thread* thread,

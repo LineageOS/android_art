@@ -23,12 +23,14 @@
 #include <set>
 #include <vector>
 
+#include "android-base/macros.h"
 #include "android-base/stringprintf.h"
 
 #include "arch/context.h"
 #include "art_field-inl.h"
 #include "art_method-inl.h"
 #include "base/enums.h"
+#include "base/memory_tool.h"
 #include "base/safe_map.h"
 #include "base/strlcpy.h"
 #include "base/time_utils.h"
@@ -49,6 +51,7 @@
 #include "gc/space/large_object_space.h"
 #include "gc/space/space-inl.h"
 #include "handle_scope-inl.h"
+#include "instrumentation.h"
 #include "jdwp/jdwp_priv.h"
 #include "jdwp/object_registry-inl.h"
 #include "jni/jni_internal.h"
@@ -179,7 +182,8 @@ class DebugInstrumentationListener final : public instrumentation::Instrumentati
                     Handle<mirror::Object> this_object,
                     ArtMethod* method,
                     uint32_t dex_pc,
-                    const JValue& return_value)
+                    instrumentation::OptionalFrame frame ATTRIBUTE_UNUSED,
+                    JValue& return_value)
       override REQUIRES_SHARED(Locks::mutator_lock_) {
     if (method->IsNative()) {
       // TODO: post location events is a suspension point and native method entry stubs aren't.

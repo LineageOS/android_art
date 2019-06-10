@@ -362,7 +362,7 @@ inline bool EventHandler::ShouldDispatch<ArtJvmtiEvent::kFramePop>(
   // have to deal with use-after-free or the frames being reallocated later.
   art::WriterMutexLock lk(art::Thread::Current(), env->event_info_mutex_);
   return env->notify_frames.erase(frame) != 0 &&
-      !frame->GetForcePopFrame() &&
+      !frame->GetSkipMethodExitEvents() &&
       ShouldDispatchOnThread<ArtJvmtiEvent::kFramePop>(env, thread);
 }
 
@@ -619,6 +619,7 @@ inline bool EventHandler::NeedsEventUpdate(ArtJvmTiEnv* env,
   return (added && caps.can_access_local_variables == 1) ||
       caps.can_generate_breakpoint_events == 1 ||
       caps.can_pop_frame == 1 ||
+      caps.can_force_early_return == 1 ||
       (caps.can_retransform_classes == 1 &&
        IsEventEnabledAnywhere(event) &&
        env->event_masks.IsEnabledAnywhere(event));
@@ -639,7 +640,7 @@ inline void EventHandler::HandleChangedCapabilities(ArtJvmTiEnv* env,
     if (caps.can_generate_breakpoint_events == 1) {
       HandleBreakpointEventsChanged(added);
     }
-    if (caps.can_pop_frame == 1 && added) {
+    if ((caps.can_pop_frame == 1 || caps.can_force_early_return == 1) && added) {
       // TODO We should keep track of how many of these have been enabled and remove it if there are
       // no more possible users. This isn't expected to be too common.
       art::Runtime::Current()->SetNonStandardExitsEnabled();
