@@ -129,11 +129,11 @@ extern "C" void jit_unload(void* handle) {
 }
 
 extern "C" bool jit_compile_method(
-    void* handle, ArtMethod* method, Thread* self, bool baseline, bool osr)
+    void* handle, JitMemoryRegion* region, ArtMethod* method, Thread* self, bool baseline, bool osr)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   auto* jit_compiler = reinterpret_cast<JitCompiler*>(handle);
   DCHECK(jit_compiler != nullptr);
-  return jit_compiler->CompileMethod(self, method, baseline, osr);
+  return jit_compiler->CompileMethod(self, region, method, baseline, osr);
 }
 
 extern "C" void jit_types_loaded(void* handle, mirror::Class** types, size_t count)
@@ -181,7 +181,8 @@ JitCompiler::~JitCompiler() {
   }
 }
 
-bool JitCompiler::CompileMethod(Thread* self, ArtMethod* method, bool baseline, bool osr) {
+bool JitCompiler::CompileMethod(
+    Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr) {
   SCOPED_TRACE << "JIT compiling " << method->PrettyMethod();
 
   DCHECK(!method->IsProxyMethod());
@@ -198,7 +199,8 @@ bool JitCompiler::CompileMethod(Thread* self, ArtMethod* method, bool baseline, 
     TimingLogger::ScopedTiming t2("Compiling", &logger);
     JitCodeCache* const code_cache = runtime->GetJit()->GetCodeCache();
     uint64_t start_ns = NanoTime();
-    success = compiler_->JitCompile(self, code_cache, method, baseline, osr, jit_logger_.get());
+    success = compiler_->JitCompile(
+        self, code_cache, region, method, baseline, osr, jit_logger_.get());
     uint64_t duration_ns = NanoTime() - start_ns;
     VLOG(jit) << "Compilation of "
               << method->PrettyMethod()
