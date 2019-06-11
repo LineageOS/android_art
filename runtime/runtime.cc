@@ -1398,7 +1398,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
     }
   }
   callbacks_->AddThreadLifecycleCallback(Dbg::GetThreadLifecycleCallback());
-  callbacks_->AddClassLoadCallback(Dbg::GetClassLoadCallback());
 
   jit_options_.reset(jit::JitOptions::CreateFromRuntimeArguments(runtime_options));
   if (IsAotCompiler()) {
