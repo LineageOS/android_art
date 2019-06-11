@@ -56,7 +56,7 @@ RELOCATE="n"
 STRIP_DEX="n"
 SECONDARY_DEX=""
 TIME_OUT="gdb"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
-TIMEOUT_DUMPER=timeout_dumper
+TIMEOUT_DUMPER=signal_dumper
 # Value in seconds
 if [ "$ART_USE_READ_BARRIER" != "false" ]; then
   TIME_OUT_VALUE=2400  # 40 minutes.
@@ -755,8 +755,8 @@ if [ "$BIONIC" = "y" ]; then
     echo "linux_bionic-x86 target doesn't seem to have been built!" >&2
     exit 1
   fi
-  # Set timeout_dumper manually so it works even with apex's
-  TIMEOUT_DUMPER=$OUT_DIR/soong/host/linux_bionic-x86/bin/timeout_dumper
+  # Set TIMEOUT_DUMPER manually so it works even with apex's
+  TIMEOUT_DUMPER=$OUT_DIR/soong/host/linux_bionic-x86/bin/signal_dumper
 fi
 
 # Prevent test from silently falling back to interpreter in no-prebuild mode. This happens
