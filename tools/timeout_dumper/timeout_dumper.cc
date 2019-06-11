@@ -34,6 +34,7 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/macros.h>
+#include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android-base/unique_fd.h>
@@ -83,10 +84,6 @@ class SignalSet {
  private:
   sigset_t set_;
 };
-
-int GetTimeoutSignal() {
-  return SIGRTMIN + 2;
-}
 
 }  // namespace timeout_signal
 
@@ -658,9 +655,9 @@ void WaitMainLoop(pid_t forked_pid, std::atomic<bool>* saw_wif_stopped_for_main)
 }
 
 [[noreturn]]
-void SetupAndWait(pid_t forked_pid) {
+void SetupAndWait(pid_t forked_pid, int signal) {
   timeout_signal::SignalSet signals;
-  signals.Add(timeout_signal::GetTimeoutSignal());
+  signals.Add(signal);
   signals.Block();
 
   std::atomic<bool> saw_wif_stopped_for_main(false);
@@ -668,7 +665,7 @@ void SetupAndWait(pid_t forked_pid) {
   std::thread signal_catcher([&]() {
     signals.Block();
     int sig = signals.Wait();
-    CHECK_EQ(sig, timeout_signal::GetTimeoutSignal());
+    CHECK_EQ(sig, signal);
 
     DumpProcess(forked_pid, saw_wif_stopped_for_main);
 
@@ -684,6 +681,20 @@ void SetupAndWait(pid_t forked_pid) {
 }  // namespace art
 
 int main(int argc ATTRIBUTE_UNUSED, char** argv) {
+  int signal = SIGRTMIN + 2;
+
+  size_t index = 1u;
+  CHECK(argv[index] != nullptr);
+  if (strcmp(argv[index], "-s") == 0) {
+    index++;
+    CHECK(argv[index] != nullptr);
+    uint32_t signal_uint;
+    CHECK(android::base::ParseUint(argv[index], &signal_uint)) << "Signal not a number.";
+    signal = signal_uint;
+    index++;
+    CHECK(argv[index] != nullptr);
+  }
+
   pid_t orig_ppid = getpid();
 
   pid_t pid = fork();
@@ -696,12 +707,12 @@ int main(int argc ATTRIBUTE_UNUSED, char** argv) {
       _exit(2);
     }
 
-    execvp(argv[1], &argv[1]);
+    execvp(argv[index], &argv[index]);
 
     _exit(3);
     __builtin_unreachable();
   }
 
-  art::SetupAndWait(pid);
+  art::SetupAndWait(pid, signal);
   __builtin_unreachable();
 }
