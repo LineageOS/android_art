@@ -125,6 +125,7 @@ class JitCodeCache {
   // even if `has_should_deoptimize_flag` is false, which can happen due to CHA
   // guard elimination.
   uint8_t* CommitCode(Thread* self,
+                      JitMemoryRegion* region,
                       ArtMethod* method,
                       uint8_t* stack_map,
                       uint8_t* roots_data,
@@ -155,6 +156,7 @@ class JitCodeCache {
   // for storing `number_of_roots` roots. Returns null if there is no more room.
   // Return the number of bytes allocated.
   size_t ReserveData(Thread* self,
+                     JitMemoryRegion* region,
                      size_t stack_map_size,
                      size_t number_of_roots,
                      ArtMethod* method,
@@ -164,7 +166,8 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_);
 
   // Clear data from the data portion of the code cache.
-  void ClearData(Thread* self, uint8_t* stack_map_data, uint8_t* roots_data)
+  void ClearData(
+      Thread* self, JitMemoryRegion* region, uint8_t* stack_map_data, uint8_t* roots_data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -273,12 +276,15 @@ class JitCodeCache {
   // is debuggable.
   void ClearEntryPointsInZygoteExecSpace() REQUIRES(!Locks::jit_lock_) REQUIRES(Locks::mutator_lock_);
 
+  JitMemoryRegion* GetPrivateRegion() { return &private_region_; }
+
  private:
   JitCodeCache();
 
   // Internal version of 'CommitCode' that will not retry if the
   // allocation fails. Return null if the allocation fails.
   uint8_t* CommitCodeInternal(Thread* self,
+                              JitMemoryRegion* region,
                               ArtMethod* method,
                               uint8_t* stack_map,
                               uint8_t* roots_data,

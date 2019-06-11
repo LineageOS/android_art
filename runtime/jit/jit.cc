@@ -63,7 +63,8 @@ void* Jit::jit_library_handle_ = nullptr;
 void* Jit::jit_compiler_handle_ = nullptr;
 void* (*Jit::jit_load_)(void) = nullptr;
 void (*Jit::jit_unload_)(void*) = nullptr;
-bool (*Jit::jit_compile_method_)(void*, ArtMethod*, Thread*, bool, bool) = nullptr;
+bool (*Jit::jit_compile_method_)(void*, JitMemoryRegion*, ArtMethod*, Thread*, bool, bool)
+    = nullptr;
 void (*Jit::jit_types_loaded_)(void*, mirror::Class**, size_t count) = nullptr;
 bool (*Jit::jit_generate_debug_info_)(void*) = nullptr;
 void (*Jit::jit_update_options_)(void*) = nullptr;
@@ -273,10 +274,13 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
     return false;
   }
 
+  JitMemoryRegion* region = GetCodeCache()->GetPrivateRegion();
+
   VLOG(jit) << "Compiling method "
             << ArtMethod::PrettyMethod(method_to_compile)
             << " osr=" << std::boolalpha << osr;
-  bool success = jit_compile_method_(jit_compiler_handle_, method_to_compile, self, baseline, osr);
+  bool success = jit_compile_method_(
+      jit_compiler_handle_, region, method_to_compile, self, baseline, osr);
   code_cache_->DoneCompiling(method_to_compile, self, osr);
   if (!success) {
     VLOG(jit) << "Failed to compile method "
@@ -660,16 +664,20 @@ static std::string GetProfileFile(const std::string& dex_location) {
 class JitProfileTask final : public Task {
  public:
   JitProfileTask(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                 ObjPtr<mirror::ClassLoader> class_loader) {
+                 jobject class_loader) {
+    ScopedObjectAccess soa(Thread::Current());
+    StackHandleScope<1> hs(soa.Self());
+    Handle<mirror::ClassLoader> h_loader(hs.NewHandle(
+        soa.Decode<mirror::ClassLoader>(class_loader)));
     ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
     for (const auto& dex_file : dex_files) {
       dex_files_.push_back(dex_file.get());
       // Register the dex file so that we can guarantee it doesn't get deleted
       // while reading it during the task.
-      class_linker->RegisterDexFile(*dex_file.get(), class_loader);
+      class_linker->RegisterDexFile(*dex_file.get(), h_loader.Get());
     }
-    ScopedObjectAccess soa(Thread::Current());
-    class_loader_ = soa.Vm()->AddGlobalRef(soa.Self(), class_loader.Ptr());
+    // We also create our own global ref to use this class loader later.
+    class_loader_ = soa.Vm()->AddGlobalRef(soa.Self(), h_loader.Get());
   }
 
   void Run(Thread* self) override {
@@ -716,7 +724,7 @@ void Jit::CreateThreadPool() {
 }
 
 void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                           ObjPtr<mirror::ClassLoader> class_loader) {
+                           jobject class_loader) {
   if (dex_files.empty()) {
     return;
   }

@@ -19,6 +19,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include "android-base/macros.h"
 #include "android-base/stringprintf.h"
 
 #include "art_method-inl.h"
@@ -746,12 +747,16 @@ void Trace::MethodExited(Thread* thread,
                          Handle<mirror::Object> this_object ATTRIBUTE_UNUSED,
                          ArtMethod* method,
                          uint32_t dex_pc ATTRIBUTE_UNUSED,
-                         const JValue& return_value ATTRIBUTE_UNUSED) {
+                         instrumentation::OptionalFrame frame ATTRIBUTE_UNUSED,
+                         JValue& return_value ATTRIBUTE_UNUSED) {
   uint32_t thread_clock_diff = 0;
   uint32_t wall_clock_diff = 0;
   ReadClocks(thread, &thread_clock_diff, &wall_clock_diff);
-  LogMethodTraceEvent(thread, method, instrumentation::Instrumentation::kMethodExited,
-                      thread_clock_diff, wall_clock_diff);
+  LogMethodTraceEvent(thread,
+                      method,
+                      instrumentation::Instrumentation::kMethodExited,
+                      thread_clock_diff,
+                      wall_clock_diff);
 }
 
 void Trace::MethodUnwind(Thread* thread,

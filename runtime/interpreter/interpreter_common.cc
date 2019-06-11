@@ -24,6 +24,7 @@
 #include "debugger.h"
 #include "dex/dex_file_types.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
+#include "handle.h"
 #include "intrinsics_enum.h"
 #include "jit/jit.h"
 #include "jvalue-inl.h"
@@ -416,7 +417,6 @@ bool DoIPutQuick(const ShadowFrame& shadow_frame, const Instruction* inst, uint1
     if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
       // Don't actually set the field. The next instruction will force us to pop.
       DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-      DCHECK(PrevFrameWillRetry(self, shadow_frame));
       return true;
     }
   }
@@ -470,6 +470,57 @@ EXPLICIT_DO_IPUT_QUICK_ALL_TEMPLATE_DECL(Primitive::kPrimNot)      // iput-objec
 #undef EXPLICIT_DO_IPUT_QUICK_ALL_TEMPLATE_DECL
 #undef EXPLICIT_DO_IPUT_QUICK_TEMPLATE_DECL
 
+template <typename T>
+bool SendMethodExitEvents(Thread* self,
+                          const instrumentation::Instrumentation* instrumentation,
+                          ShadowFrame& frame,
+                          ObjPtr<mirror::Object> thiz,
+                          ArtMethod* method,
+                          uint32_t dex_pc,
+                          T& result) {
+  bool had_event = false;
+  // We can get additional ForcePopFrame requests during handling of these events. We should
+  // respect these and send additional instrumentation events.
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Object> h_thiz(hs.NewHandle(thiz));
+  do {
+    frame.SetForcePopFrame(false);
+    if (UNLIKELY(instrumentation->HasMethodExitListeners() && !frame.GetSkipMethodExitEvents())) {
+      had_event = true;
+      instrumentation->MethodExitEvent(
+          self, h_thiz.Get(), method, dex_pc, instrumentation::OptionalFrame{ frame }, result);
+    }
+    // We don't send method-exit if it's a pop-frame. We still send frame_popped though.
+    if (UNLIKELY(frame.NeedsNotifyPop() && instrumentation->HasWatchedFramePopListeners())) {
+      had_event = true;
+      instrumentation->WatchedFramePopped(self, frame);
+    }
+  } while (UNLIKELY(frame.GetForcePopFrame()));
+  if (UNLIKELY(had_event)) {
+    return !self->IsExceptionPending();
+  } else {
+    return true;
+  }
+}
+
+template
+bool SendMethodExitEvents(Thread* self,
+                          const instrumentation::Instrumentation* instrumentation,
+                          ShadowFrame& frame,
+                          ObjPtr<mirror::Object> thiz,
+                          ArtMethod* method,
+                          uint32_t dex_pc,
+                          MutableHandle<mirror::Object>& result);
+
+template
+bool SendMethodExitEvents(Thread* self,
+                          const instrumentation::Instrumentation* instrumentation,
+                          ShadowFrame& frame,
+                          ObjPtr<mirror::Object> thiz,
+                          ArtMethod* method,
+                          uint32_t dex_pc,
+                          JValue& result);
+
 // We execute any instrumentation events that are triggered by this exception and change the
 // shadow_frame's dex_pc to that of the exception handler if there is one in the current method.
 // Return true if we should continue executing in the current method and false if we need to go up
@@ -501,6 +552,12 @@ bool MoveToExceptionHandler(Thread* self,
     if (instrumentation != nullptr) {
       if (shadow_frame.NeedsNotifyPop()) {
         instrumentation->WatchedFramePopped(self, shadow_frame);
+        if (shadow_frame.GetForcePopFrame()) {
+          // We will check in the caller for GetForcePopFrame again. We need to bail out early to
+          // prevent an ExceptionHandledEvent from also being sent before popping and to ensure we
+          // handle other types of non-standard-exits.
+          return true;
+        }
       }
       // Exception is not caught by the current method. We will unwind to the
       // caller. Notify any instrumentation listener.
@@ -509,7 +566,7 @@ bool MoveToExceptionHandler(Thread* self,
                                          shadow_frame.GetMethod(),
                                          shadow_frame.GetDexPC());
     }
-    return false;
+    return shadow_frame.GetForcePopFrame();
   } else {
     shadow_frame.SetDexPC(found_dex_pc);
     if (instrumentation != nullptr && instrumentation->HasExceptionHandledListeners()) {

@@ -286,6 +286,7 @@ extern "C" JNIEXPORT void JNICALL Java_art_SuspendEvents_setupTest(JNIEnv* env,
   memset(&caps, 0, sizeof(caps));
   // Most of these will already be there but might as well be complete.
   caps.can_pop_frame = 1;
+  caps.can_force_early_return = 1;
   caps.can_generate_single_step_events = 1;
   caps.can_generate_breakpoint_events = 1;
   caps.can_suspend = 1;

@@ -175,7 +175,7 @@ void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
 
     // Environment variable ANDROID_RUNTIME_ROOT is set on the device, but not
     // necessarily on the host. It needs to be set so that various libraries
-    // like icu4c can find their data files.
+    // like libcore / icu4j / icu4c can find their data files.
     const char* android_runtime_root_from_env = getenv("ANDROID_RUNTIME_ROOT");
     if (android_runtime_root_from_env == nullptr) {
       // Use ${ANDROID_HOST_OUT}/com.android.runtime for ANDROID_RUNTIME_ROOT.
@@ -186,7 +186,7 @@ void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
 
     // Environment variable ANDROID_TZDATA_ROOT is set on the device, but not
     // necessarily on the host. It needs to be set so that various libraries
-    // like icu4c can find their data files.
+    // like libcore / icu4j / icu4c can find their data files.
     const char* android_tzdata_root_from_env = getenv("ANDROID_TZDATA_ROOT");
     if (android_tzdata_root_from_env == nullptr) {
       // Use ${ANDROID_HOST_OUT}/com.android.tzdata for ANDROID_TZDATA_ROOT.
