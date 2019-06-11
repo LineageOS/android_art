@@ -55,7 +55,7 @@ ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += \
 ART_TEST_HOST_RUN_TEST_DEPENDENCIES := \
   $(ART_HOST_EXECUTABLES) \
   $(HOST_OUT_EXECUTABLES)/hprof-conv \
-  $(HOST_OUT_EXECUTABLES)/timeout_dumper \
+  $(HOST_OUT_EXECUTABLES)/signal_dumper \
   $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagent) \
   $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagentd) \
   $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtistress) \
