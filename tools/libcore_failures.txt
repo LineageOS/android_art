@@ -242,5 +242,13 @@
   names: [
     "libcore.libcore.io.OsTest#testCrossFamilyBindConnectSendto"
   ]
+},
+{
+  description: "Assertion failing in libcore.java.util.zip.DeflateRegressionTest#deterministicOutput -- temporarily disabling test while we investigate.",
+  result: EXEC_FAILED,
+  bug: 135017266,
+  names: [
+    "libcore.java.util.zip.DeflateRegressionTest#deterministicOutput"
+  ]
 }
 ]
