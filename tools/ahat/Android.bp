@@ -44,7 +44,7 @@ java_binary_host {
 java_test_helper_library {
     name: "ahat-test-dump",
     srcs: ["src/test-dump/**/*.java"],
-    no_framework_libs: true,
+    sdk_version: "core_platform",
     optimize: {
         obfuscate: true,
         enabled: true,
