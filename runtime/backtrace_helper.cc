@@ -21,8 +21,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "unwindstack/Unwinder.h"
+#include "unwindstack/Regs.h"
 #include "unwindstack/RegsGetLocal.h"
+#include "unwindstack/Memory.h"
+#include "unwindstack/Unwinder.h"
 
 #include "thread-inl.h"
 
@@ -35,7 +37,7 @@
 
 namespace art {
 
-// We only really support libbacktrace on linux which is unfortunate but since this is only for
+// We only really support libunwindstack on linux which is unfortunate but since this is only for
 // gcstress this isn't a huge deal.
 #if defined(__linux__)
 
@@ -43,7 +45,7 @@ struct UnwindHelper : public TLSData {
   static constexpr const char* kTlsKey = "UnwindHelper::kTlsKey";
 
   explicit UnwindHelper(size_t max_depth)
-      : memory_(new unwindstack::MemoryLocal()),
+      : memory_(unwindstack::Memory::CreateProcessMemory(getpid())),
         jit_(memory_),
         dex_(memory_),
         unwinder_(max_depth, &maps_, memory_) {
