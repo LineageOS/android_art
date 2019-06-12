@@ -698,7 +698,8 @@ void Dbg::GoActive() {
   }
   instrumentation_events_ = 0;
   Runtime::DoAndMaybeSwitchInterpreter([=](){ gDebuggerActive = true; });
-  Runtime::Current()->GetRuntimeCallbacks()->AddMethodInspectionCallback(&gDebugActiveCallback);
+  runtime->GetRuntimeCallbacks()->AddClassLoadCallback(Dbg::GetClassLoadCallback());
+  runtime->GetRuntimeCallbacks()->AddMethodInspectionCallback(&gDebugActiveCallback);
   LOG(INFO) << "Debugger is active";
 }
 
@@ -736,7 +737,8 @@ void Dbg::Disconnected() {
         runtime->GetInstrumentation()->DisableDeoptimization(kDbgInstrumentationKey);
       }
       Runtime::DoAndMaybeSwitchInterpreter([=](){ gDebuggerActive = false; });
-      Runtime::Current()->GetRuntimeCallbacks()->RemoveMethodInspectionCallback(
+      runtime->GetRuntimeCallbacks()->RemoveClassLoadCallback(Dbg::GetClassLoadCallback());
+      runtime->GetRuntimeCallbacks()->RemoveMethodInspectionCallback(
           &gDebugActiveCallback);
     }
   }
