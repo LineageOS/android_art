@@ -101,6 +101,8 @@ elif [[ $mode == "target" ]]; then
   # TODO(b/121117762, b/129332183): Remove this when the ART Buildbot and Golem
   # have full support for the Time Zone Data APEX.
   make_command+=" icu_overlay-art-test-tzdata tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata tz_version-art-test-tzdata"
+  # Build the Time Zone Data APEX.
+  make_command+=" com.android.tzdata"
   mode_suffix="-target"
 fi
 
