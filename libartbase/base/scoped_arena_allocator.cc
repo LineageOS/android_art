@@ -106,6 +106,15 @@ void* ArenaStack::AllocWithMemoryTool(size_t bytes, ArenaAllocKind kind) {
   return ptr;
 }
 
+size_t ArenaStack::ApproximatePeakBytes() {
+  UpdateBytesAllocated();
+  size_t sum = 0;
+  for (Arena* arena = bottom_arena_; arena != nullptr; arena = arena->next_) {
+    sum += arena->bytes_allocated_;
+  }
+  return sum;
+}
+
 ScopedArenaAllocator::ScopedArenaAllocator(ScopedArenaAllocator&& other) noexcept
     : DebugStackReference(std::move(other)),
       DebugStackRefCounter(),
@@ -156,6 +165,31 @@ void ScopedArenaAllocator::DoReset() {
     mark_ptr_ = arena_stack_->top_ptr_ = mark_arena_->Begin();
     mark_end_ = arena_stack_->top_end_ = mark_arena_->End();
   }
+}
+
+size_t ScopedArenaAllocator::ApproximatePeakBytes() {
+  size_t subtract;
+  Arena* start;
+  if (LIKELY(mark_arena_ != nullptr)) {
+    start = mark_arena_;
+    size_t mark_free = static_cast<size_t>(mark_end_ - mark_ptr_);
+    DCHECK_GE(mark_arena_->bytes_allocated_, mark_arena_->size_ - mark_free);
+    subtract = mark_arena_->bytes_allocated_ - (mark_arena_->size_ - mark_free);
+  } else {
+    start = arena_stack_->bottom_arena_;
+    subtract = 0;
+  }
+
+  size_t sum = 0;
+  for (Arena* arena = start; arena != nullptr; arena = arena->next_) {
+    if (arena == arena_stack_->top_arena_) {
+      sum += static_cast<size_t>(arena_stack_->top_ptr_ - arena->Begin());
+      break;
+    } else {
+      sum += arena->bytes_allocated_;
+    }
+  }
+  return sum - subtract;
 }
 
 }  // namespace art
