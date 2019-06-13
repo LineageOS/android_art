@@ -148,6 +148,56 @@ static ArrayRef<const uint8_t> MaybeCompressData(ArrayRef<const uint8_t> source,
 // Separate objects into multiple bins to optimize dirty memory use.
 static constexpr bool kBinObjects = true;
 
+ObjPtr<mirror::ObjectArray<mirror::Object>> AllocateBootImageLiveObjects(
+    Thread* self, Runtime* runtime) REQUIRES_SHARED(Locks::mutator_lock_) {
+  ClassLinker* class_linker = runtime->GetClassLinker();
+  // The objects used for the Integer.valueOf() intrinsic must remain live even if references
+  // to them are removed using reflection. Image roots are not accessible through reflection,
+  // so the array we construct here shall keep them alive.
+  StackHandleScope<1> hs(self);
+  Handle<mirror::ObjectArray<mirror::Object>> integer_cache =
+      hs.NewHandle(IntrinsicObjects::LookupIntegerCache(self, class_linker));
+  size_t live_objects_size =
+      enum_cast<size_t>(ImageHeader::kIntrinsicObjectsStart) +
+      ((integer_cache != nullptr) ? (/* cache */ 1u + integer_cache->GetLength()) : 0u);
+  ObjPtr<mirror::ObjectArray<mirror::Object>> live_objects =
+      mirror::ObjectArray<mirror::Object>::Alloc(
+          self, GetClassRoot<mirror::ObjectArray<mirror::Object>>(class_linker), live_objects_size);
+  int32_t index = 0u;
+  auto set_entry = [&](ImageHeader::BootImageLiveObjects entry,
+                       ObjPtr<mirror::Object> value) REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK_EQ(index, enum_cast<int32_t>(entry));
+    live_objects->Set</*kTransacrionActive=*/ false>(index, value);
+    ++index;
+  };
+  set_entry(ImageHeader::kOomeWhenThrowingException,
+            runtime->GetPreAllocatedOutOfMemoryErrorWhenThrowingException());
+  set_entry(ImageHeader::kOomeWhenThrowingOome,
+            runtime->GetPreAllocatedOutOfMemoryErrorWhenThrowingOOME());
+  set_entry(ImageHeader::kOomeWhenHandlingStackOverflow,
+            runtime->GetPreAllocatedOutOfMemoryErrorWhenHandlingStackOverflow());
+  set_entry(ImageHeader::kNoClassDefFoundError, runtime->GetPreAllocatedNoClassDefFoundError());
+  set_entry(ImageHeader::kClearedJniWeakSentinel, runtime->GetSentinel().Read());
+
+  DCHECK_EQ(index, enum_cast<int32_t>(ImageHeader::kIntrinsicObjectsStart));
+  if (integer_cache != nullptr) {
+    live_objects->Set(index++, integer_cache.Get());
+    for (int32_t i = 0, length = integer_cache->GetLength(); i != length; ++i) {
+      live_objects->Set(index++, integer_cache->Get(i));
+    }
+  }
+  CHECK_EQ(index, live_objects->GetLength());
+
+  if (kIsDebugBuild && integer_cache != nullptr) {
+    CHECK_EQ(integer_cache.Get(), IntrinsicObjects::GetIntegerValueOfCache(live_objects));
+    for (int32_t i = 0, len = integer_cache->GetLength(); i != len; ++i) {
+      CHECK_EQ(integer_cache->GetWithoutChecks(i),
+               IntrinsicObjects::GetIntegerValueOfObject(live_objects, i));
+    }
+  }
+  return live_objects;
+}
+
 ObjPtr<mirror::ClassLoader> ImageWriter::GetAppClassLoader() const
     REQUIRES_SHARED(Locks::mutator_lock_) {
   return compiler_options_.IsAppImage()
@@ -1921,14 +1971,6 @@ ObjPtr<ObjectArray<Object>> ImageWriter::CreateImageRoots(
       self, GetClassRoot<ObjectArray<Object>>(class_linker), image_roots_size)));
   image_roots->Set<false>(ImageHeader::kDexCaches, dex_caches.Get());
   image_roots->Set<false>(ImageHeader::kClassRoots, class_linker->GetClassRoots());
-  image_roots->Set<false>(ImageHeader::kOomeWhenThrowingException,
-                          runtime->GetPreAllocatedOutOfMemoryErrorWhenThrowingException());
-  image_roots->Set<false>(ImageHeader::kOomeWhenThrowingOome,
-                          runtime->GetPreAllocatedOutOfMemoryErrorWhenThrowingOOME());
-  image_roots->Set<false>(ImageHeader::kOomeWhenHandlingStackOverflow,
-                          runtime->GetPreAllocatedOutOfMemoryErrorWhenHandlingStackOverflow());
-  image_roots->Set<false>(ImageHeader::kNoClassDefFoundError,
-                          runtime->GetPreAllocatedNoClassDefFoundError());
   if (!compiler_options_.IsAppImage()) {
     DCHECK(boot_image_live_objects != nullptr);
     image_roots->Set<false>(ImageHeader::kBootImageLiveObjects, boot_image_live_objects.Get());
@@ -2260,7 +2302,7 @@ void ImageWriter::CalculateNewObjectOffsets() {
   MutableHandle<ObjectArray<Object>> boot_image_live_objects = handles.NewHandle(
       compiler_options_.IsAppImage()
           ? nullptr
-          : IntrinsicObjects::AllocateBootImageLiveObjects(self, runtime->GetClassLinker()));
+          : AllocateBootImageLiveObjects(self, runtime));
   std::vector<Handle<ObjectArray<Object>>> image_roots;
   for (size_t i = 0, size = oat_filenames_.size(); i != size; ++i) {
     image_roots.push_back(handles.NewHandle(CreateImageRoots(i, boot_image_live_objects)));
