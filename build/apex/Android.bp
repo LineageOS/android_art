@@ -83,9 +83,6 @@ art_runtime_debug_native_shared_libs = [
 
 // Data files associated with bionic / managed core library APIs.
 art_runtime_data_file_prebuilts = [
-    "apex_tz_version",
-    "apex_tzdata",
-    "apex_tzlookup.xml",
     "apex_icu.dat",
 ]
 
