@@ -275,6 +275,16 @@ ObjPtr<mirror::String> InternTable::InternStrongImageString(ObjPtr<mirror::Strin
   return Insert(s, true, true);
 }
 
+void InternTable::PromoteWeakToStrong() {
+  MutexLock mu(Thread::Current(), *Locks::intern_table_lock_);
+  DCHECK_EQ(weak_interns_.tables_.size(), 1u);
+  for (GcRoot<mirror::String>& entry : weak_interns_.tables_.front().set_) {
+    DCHECK(LookupStrongLocked(entry.Read()) == nullptr);
+    InsertStrong(entry.Read());
+  }
+  weak_interns_.tables_.front().set_.clear();
+}
+
 ObjPtr<mirror::String> InternTable::InternStrong(ObjPtr<mirror::String> s) {
   return Insert(s, true, false);
 }
