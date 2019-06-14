@@ -3,6 +3,7 @@ package com.android.class2greylist;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,6 +26,12 @@ public class AnnotationPropertyWriter implements AnnotationConsumer {
         mColumns = new HashSet<>();
     }
 
+    public AnnotationPropertyWriter(OutputStream output) {
+        mOutput = new PrintStream(output);
+        mContents = new ArrayList<>();
+        mColumns = new HashSet<>();
+    }
+
     public void consume(String apiSignature, Map<String, String> annotationProperties,
             Set<String> parsedFlags) {
         // Clone properties map.
@@ -38,6 +45,13 @@ public class AnnotationPropertyWriter implements AnnotationConsumer {
         mContents.add(contents);
     }
 
+    private static String escapeCsvColumn(String column) {
+        // Using '|' as a quote character, as in frameworks/base/tools/hiddenapi/merge_csv.py
+        // Escape '|' characters in the column, then wrap the column in '|' characters.
+        column = column.replace("|", "||");
+        return "|" + column + "|";
+    }
+
     public void close() {
         // Sort columns by name and print header row.
         List<String> columns = new ArrayList<>(mColumns);
@@ -47,6 +61,7 @@ public class AnnotationPropertyWriter implements AnnotationConsumer {
         // Sort contents according to columns and print.
         for (Map<String, String> row : mContents) {
             mOutput.println(columns.stream().map(column -> row.getOrDefault(column, ""))
+                    .map(column -> escapeCsvColumn(column))
                     .collect(Collectors.joining(",")));
         }
 
