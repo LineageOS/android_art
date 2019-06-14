@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+#include "common_runtime_test.h"
+
+#include <thread>
+
 #include "android-base/logging.h"
 #include "base/locks.h"
 #include "base/mutex.h"
-#include "common_runtime_test.h"
 #include "runtime.h"
 #include "thread-current-inl.h"
 
@@ -52,6 +55,24 @@ TEST_F(RuntimeTest, AbortWithThreadSuspendCountLockHeld) {
     MutexLock mu(Thread::Current(), *Locks::thread_suspend_count_lock_);
     Runtime::Abort("Attempt to abort");
   }, kDeathRegex);
+}
+
+TEST_F(RuntimeTest, AbortFromUnattachedThread) {
+  // This assumes the test is run single-threaded: do not start the runtime to avoid daemon threads.
+
+  constexpr const char* kDeathRegex = "Going down";
+  ASSERT_EXIT({
+    // The regex only works if we can ensure output goes to stderr.
+    android::base::SetLogger(android::base::StderrLogger);
+
+    Thread::Current()->TransitionFromSuspendedToRunnable();
+    runtime_->Start();
+
+    std::thread t([]() {
+      LOG(FATAL) << "Going down";
+    });
+    t.join();
+  }, ::testing::KilledBySignal(SIGABRT), kDeathRegex);
 }
 
 }  // namespace art

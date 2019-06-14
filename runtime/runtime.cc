@@ -610,6 +610,15 @@ void Runtime::Abort(const char* msg) {
 #endif
   }
 
+  // May be coming from an unattached thread.
+  if (Thread::Current() == nullptr) {
+    Runtime* current = Runtime::Current();
+    if (current != nullptr && current->IsStarted() && !current->IsShuttingDown(nullptr)) {
+      abort();
+      UNREACHABLE();
+    }
+  }
+
   {
     // Ensure that we don't have multiple threads trying to abort at once,
     // which would result in significantly worse diagnostics.
