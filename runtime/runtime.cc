@@ -229,6 +229,7 @@ Runtime::Runtime()
       instruction_set_(InstructionSet::kNone),
       compiler_callbacks_(nullptr),
       is_zygote_(false),
+      is_primary_zygote_(false),
       is_system_server_(false),
       must_relocate_(false),
       is_concurrent_gc_enabled_(true),
@@ -963,6 +964,7 @@ void Runtime::InitNonZygoteOrPostFork(
     const char* isa,
     bool profile_system_server) {
   is_zygote_ = false;
+  is_primary_zygote_ = false;
 
   if (is_native_bridge_loaded_) {
     switch (action) {
@@ -1218,6 +1220,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   compiler_callbacks_ = runtime_options.GetOrDefault(Opt::CompilerCallbacksPtr);
   must_relocate_ = runtime_options.GetOrDefault(Opt::Relocate);
   is_zygote_ = runtime_options.Exists(Opt::Zygote);
+  is_primary_zygote_ = runtime_options.Exists(Opt::PrimaryZygote);
   is_explicit_gc_disabled_ = runtime_options.Exists(Opt::DisableExplicitGC);
   image_dex2oat_enabled_ = runtime_options.GetOrDefault(Opt::ImageDex2Oat);
   dump_native_stack_on_sig_quit_ = runtime_options.GetOrDefault(Opt::DumpNativeStackOnSigQuit);
