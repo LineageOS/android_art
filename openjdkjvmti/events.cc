@@ -652,12 +652,12 @@ class JvmtiMethodTraceListener final : public art::instrumentation::Instrumentat
         const auto it = non_standard_exits_.find(sframe);
         if (it != non_standard_exits_.end()) {
           ret_val = it->second.return_val_obj_;
-          return_value.Assign(self->DecodeJObject(ret_val));
           non_standard_exits_.erase(it);
           has_return = true;
         }
       }
       if (has_return) {
+        return_value.Assign(self->DecodeJObject(ret_val));
         ScopedLocalRef<jthread> thr(self->GetJniEnv(),
                                     self->GetJniEnv()->NewLocalRef(self->GetPeer()));
         art::ScopedThreadSuspension sts(self, art::ThreadState::kNative);
