@@ -14,6 +14,32 @@
 // limitations under the License.
 //
 
+cc_defaults {
+  name: "signal_dumper_libbase_static_deps",
+  static_libs: ["liblog"],
+}
+cc_defaults {
+  name: "signal_dumper_libunwindstack_static_deps",
+  defaults: ["signal_dumper_libbase_static_deps"],
+  static_libs: [
+    "libbase",
+    "libdexfile_support",
+    "liblog",
+    "liblzma",
+  ],
+}
+cc_defaults {
+  name: "signal_dumper_libbacktrace_static_deps",
+  defaults: [
+    "signal_dumper_libbase_static_deps",
+    "signal_dumper_libunwindstack_static_deps",
+  ],
+  static_libs: [
+    "libbase",
+    "libunwindstack",
+  ],
+}
+
 art_cc_binary {
     name: "signal_dumper",
 
@@ -30,11 +56,16 @@ art_cc_binary {
     },
     device_supported: false,
 
-    defaults: ["art_defaults"],
+    defaults: [
+      "art_defaults",
+      "signal_dumper_libbacktrace_static_deps",
+      "signal_dumper_libbase_static_deps",
+    ],
 
     srcs: ["signal_dumper.cc"],
 
-    shared_libs: [
+    static_executable: true,
+    static_libs: [
         "libbacktrace",
         "libbase",
     ],
