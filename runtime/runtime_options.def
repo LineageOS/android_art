@@ -35,6 +35,7 @@
 
 // Parse-able keys from the command line.
 RUNTIME_OPTIONS_KEY (Unit,                Zygote)
+RUNTIME_OPTIONS_KEY (Unit,                PrimaryZygote)
 RUNTIME_OPTIONS_KEY (Unit,                Help)
 RUNTIME_OPTIONS_KEY (Unit,                ShowVersion)
 RUNTIME_OPTIONS_KEY (ParseStringList<':'>,BootClassPath)           // std::vector<std::string>
