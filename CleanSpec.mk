@@ -66,6 +66,10 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 $(call add-clean-step, rm -rf $(OUT_DIR)/soong/.intermediates/art/runtime/libart/*shared*/obj)
 $(call add-clean-step, rm -rf $(OUT_DIR)/soong/.intermediates/art/runtime/libartd/*shared*/obj)
 
+# Force regeneration of .apex files after removal of time zone data files from the runtime APEX
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex/com.android.runtime.*)
+
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
