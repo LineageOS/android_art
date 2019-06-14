@@ -150,6 +150,7 @@
 #include "quick/quick_method_frame_info.h"
 #include "reflection.h"
 #include "runtime_callbacks.h"
+#include "runtime_common.h"
 #include "runtime_intrinsics.h"
 #include "runtime_options.h"
 #include "scoped_thread_state_change-inl.h"
@@ -614,6 +615,7 @@ void Runtime::Abort(const char* msg) {
   if (Thread::Current() == nullptr) {
     Runtime* current = Runtime::Current();
     if (current != nullptr && current->IsStarted() && !current->IsShuttingDown(nullptr)) {
+      // We do not flag this to the unexpected-signal handler so that that may dump the stack.
       abort();
       UNREACHABLE();
     }
@@ -647,6 +649,8 @@ void Runtime::Abort(const char* msg) {
   if (msg != nullptr && strchr(msg, '\n') != nullptr) {
     LOG(FATAL_WITHOUT_ABORT) << msg;
   }
+
+  FlagRuntimeAbort();
 
   // Call the abort hook if we have one.
   if (Runtime::Current() != nullptr && Runtime::Current()->abort_ != nullptr) {
