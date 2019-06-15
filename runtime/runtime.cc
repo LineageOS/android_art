@@ -150,6 +150,7 @@
 #include "quick/quick_method_frame_info.h"
 #include "reflection.h"
 #include "runtime_callbacks.h"
+#include "runtime_common.h"
 #include "runtime_intrinsics.h"
 #include "runtime_options.h"
 #include "scoped_thread_state_change-inl.h"
@@ -229,6 +230,7 @@ Runtime::Runtime()
       instruction_set_(InstructionSet::kNone),
       compiler_callbacks_(nullptr),
       is_zygote_(false),
+      is_primary_zygote_(false),
       is_system_server_(false),
       must_relocate_(false),
       is_concurrent_gc_enabled_(true),
@@ -609,6 +611,16 @@ void Runtime::Abort(const char* msg) {
 #endif
   }
 
+  // May be coming from an unattached thread.
+  if (Thread::Current() == nullptr) {
+    Runtime* current = Runtime::Current();
+    if (current != nullptr && current->IsStarted() && !current->IsShuttingDown(nullptr)) {
+      // We do not flag this to the unexpected-signal handler so that that may dump the stack.
+      abort();
+      UNREACHABLE();
+    }
+  }
+
   {
     // Ensure that we don't have multiple threads trying to abort at once,
     // which would result in significantly worse diagnostics.
@@ -637,6 +649,8 @@ void Runtime::Abort(const char* msg) {
   if (msg != nullptr && strchr(msg, '\n') != nullptr) {
     LOG(FATAL_WITHOUT_ABORT) << msg;
   }
+
+  FlagRuntimeAbort();
 
   // Call the abort hook if we have one.
   if (Runtime::Current() != nullptr && Runtime::Current()->abort_ != nullptr) {
@@ -963,6 +977,7 @@ void Runtime::InitNonZygoteOrPostFork(
     const char* isa,
     bool profile_system_server) {
   is_zygote_ = false;
+  is_primary_zygote_ = false;
 
   if (is_native_bridge_loaded_) {
     switch (action) {
@@ -1218,6 +1233,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   compiler_callbacks_ = runtime_options.GetOrDefault(Opt::CompilerCallbacksPtr);
   must_relocate_ = runtime_options.GetOrDefault(Opt::Relocate);
   is_zygote_ = runtime_options.Exists(Opt::Zygote);
+  is_primary_zygote_ = runtime_options.Exists(Opt::PrimaryZygote);
   is_explicit_gc_disabled_ = runtime_options.Exists(Opt::DisableExplicitGC);
   image_dex2oat_enabled_ = runtime_options.GetOrDefault(Opt::ImageDex2Oat);
   dump_native_stack_on_sig_quit_ = runtime_options.GetOrDefault(Opt::DumpNativeStackOnSigQuit);
