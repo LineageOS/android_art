@@ -184,7 +184,6 @@ void StackMapStream::BeginInlineInfoEntry(ArtMethod* method,
   in_inline_info_ = true;
   DCHECK_EQ(expected_num_dex_registers_, current_dex_registers_.size());
 
-  flags_ |= CodeInfo::kHasInlineInfo;
   expected_num_dex_registers_ += num_dex_registers;
 
   BitTableBuilder<InlineInfo>::Entry entry;
@@ -294,31 +293,31 @@ void StackMapStream::CreateDexRegisterMap() {
   }
 }
 
-template<typename Writer, typename Builder>
-ALWAYS_INLINE static void EncodeTable(Writer& out, const Builder& bit_table) {
-  out.WriteBit(false);  // Is not deduped.
-  bit_table.Encode(out);
-}
-
 ScopedArenaVector<uint8_t> StackMapStream::Encode() {
   DCHECK(in_stack_map_ == false) << "Mismatched Begin/End calls";
   DCHECK(in_inline_info_ == false) << "Mismatched Begin/End calls";
 
+  uint32_t flags = (inline_infos_.size() > 0) ? CodeInfo::kHasInlineInfo : 0;
+  uint32_t bit_table_flags = 0;
+  ForEachBitTable([&bit_table_flags](size_t i, auto bit_table) {
+    if (bit_table->size() != 0) {  // Record which bit-tables are stored.
+      bit_table_flags |= 1 << i;
+    }
+  });
+
   ScopedArenaVector<uint8_t> buffer(allocator_->Adapter(kArenaAllocStackMapStream));
   BitMemoryWriter<ScopedArenaVector<uint8_t>> out(&buffer);
-  out.WriteVarint(flags_);
+  out.WriteVarint(flags);
   out.WriteVarint(packed_frame_size_);
   out.WriteVarint(core_spill_mask_);
   out.WriteVarint(fp_spill_mask_);
   out.WriteVarint(num_dex_registers_);
-  EncodeTable(out, stack_maps_);
-  EncodeTable(out, register_masks_);
-  EncodeTable(out, stack_masks_);
-  EncodeTable(out, inline_infos_);
-  EncodeTable(out, method_infos_);
-  EncodeTable(out, dex_register_masks_);
-  EncodeTable(out, dex_register_maps_);
-  EncodeTable(out, dex_register_catalog_);
+  out.WriteVarint(bit_table_flags);
+  ForEachBitTable([&out](size_t, auto bit_table) {
+    if (bit_table->size() != 0) {  // Skip empty bit-tables.
+      bit_table->Encode(out);
+    }
+  });
 
   // Verify that we can load the CodeInfo and check some essentials.
   CodeInfo code_info(buffer.data());
