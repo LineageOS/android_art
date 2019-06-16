@@ -254,22 +254,25 @@ class BitMemoryReader {
 
   // Optimized version to read several consecutive varints.
   // It reads all the headers at once in a single bit read.
-  template<int N>  // Inference works only with ref-arrays.
+  template<size_t N>  // Inference works only with ref-arrays.
   ALWAYS_INLINE void ReadVarints(uint32_t (&varints)[N]) {
-    static_assert(N * kVarintHeaderBits <= sizeof(uint32_t) * kBitsPerByte, "N too big");
-    uint32_t headers = ReadBits(N * kVarintHeaderBits);
+    constexpr size_t kBatch = std::min(N, sizeof(uint32_t) * kBitsPerByte / kVarintHeaderBits);
+    uint32_t headers = ReadBits(kBatch * kVarintHeaderBits);
     uint32_t* out = varints;
-    for (int i = 0; i < N; out++) {
+    for (size_t i = 0; i < kBatch; out++) {
       uint32_t header = BitFieldExtract(headers, (i++) * kVarintHeaderBits, kVarintHeaderBits);
       if (LIKELY(header <= kVarintSmallValue)) {
         // Fast-path: consume one of the headers and continue to the next varint.
         *out = header;
       } else {
         // Slow-path: rollback reader, read large value, and read remaning headers.
-        finished_region_.Resize(finished_region_.size_in_bits() - (N-i) * kVarintHeaderBits);
+        finished_region_.Resize(finished_region_.size_in_bits() - (kBatch-i) * kVarintHeaderBits);
         *out = ReadBits((header - kVarintSmallValue) * kBitsPerByte);
-        headers = ReadBits((N-i) * kVarintHeaderBits) << (i * kVarintHeaderBits);
+        headers = ReadBits((kBatch-i) * kVarintHeaderBits) << (i * kVarintHeaderBits);
       }
+    }
+    for (size_t i = kBatch; i < N; i++, out++) {
+      *out = ReadVarint();
     }
   }
 

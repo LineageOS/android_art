@@ -49,15 +49,13 @@ class BitTableBase {
 
   ALWAYS_INLINE void Decode(BitMemoryReader& reader) {
     // Decode row count and column sizes from the table header.
-    num_rows_ = reader.ReadVarint();
-    if (num_rows_ != 0) {
-      uint32_t column_bits[kNumColumns];
-      reader.ReadVarints(column_bits);
-      column_offset_[0] = 0;
-      for (uint32_t i = 0; i < kNumColumns; i++) {
-        size_t column_end = column_offset_[i] + column_bits[i];
-        column_offset_[i + 1] = dchecked_integral_cast<uint16_t>(column_end);
-      }
+    uint32_t header[1 + kNumColumns];
+    reader.ReadVarints(header);
+    num_rows_ = header[0];
+    column_offset_[0] = 0;
+    for (uint32_t i = 0; i < kNumColumns; i++) {
+      size_t column_end = column_offset_[i] + header[i + 1];
+      column_offset_[i + 1] = dchecked_integral_cast<uint16_t>(column_end);
     }
 
     // Record the region which contains the table data and skip past it.
@@ -357,18 +355,17 @@ class BitTableBuilderBase {
 
     std::array<uint32_t, kNumColumns> column_bits;
     Measure(&column_bits);
-    out.WriteVarint(size());
-    if (size() != 0) {
-      // Write table header.
-      for (uint32_t c = 0; c < kNumColumns; c++) {
-        out.WriteVarint(column_bits[c]);
-      }
 
-      // Write table data.
-      for (uint32_t r = 0; r < size(); r++) {
-        for (uint32_t c = 0; c < kNumColumns; c++) {
-          out.WriteBits(rows_[r][c] - kValueBias, column_bits[c]);
-        }
+    // Write table header.
+    out.WriteVarint(size());
+    for (uint32_t c = 0; c < kNumColumns; c++) {
+      out.WriteVarint(column_bits[c]);
+    }
+
+    // Write table data.
+    for (uint32_t r = 0; r < size(); r++) {
+      for (uint32_t c = 0; c < kNumColumns; c++) {
+        out.WriteBits(rows_[r][c] - kValueBias, column_bits[c]);
       }
     }
 
@@ -446,16 +443,15 @@ class BitmapTableBuilder {
   void Encode(BitMemoryWriter<Vector>& out) const {
     size_t initial_bit_offset = out.NumberOfWrittenBits();
 
+    // Write table header.
     out.WriteVarint(size());
-    if (size() != 0) {
-      out.WriteVarint(max_num_bits_);
+    out.WriteVarint(max_num_bits_);
 
-      // Write table data.
-      for (MemoryRegion row : rows_) {
-        BitMemoryRegion src(row);
-        BitMemoryRegion dst = out.Allocate(max_num_bits_);
-        dst.StoreBits(/* bit_offset */ 0, src, std::min(max_num_bits_, src.size_in_bits()));
-      }
+    // Write table data.
+    for (MemoryRegion row : rows_) {
+      BitMemoryRegion src(row);
+      BitMemoryRegion dst = out.Allocate(max_num_bits_);
+      dst.StoreBits(/* bit_offset */ 0, src, std::min(max_num_bits_, src.size_in_bits()));
     }
 
     // Verify the written data.
