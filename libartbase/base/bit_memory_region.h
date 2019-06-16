@@ -115,17 +115,22 @@ class BitMemoryRegion final : public ValueObject {
     if (bit_length == 0) {
       return 0;
     }
+    // Load naturally-aligned value which contains the least significant bit.
     Result* data = reinterpret_cast<Result*>(data_);
     size_t width = BitSizeOf<Result>();
-    Result clear = (std::numeric_limits<Result>::max() << 1) << (bit_length - 1);
     size_t index = (bit_start_ + bit_offset) / width;
     size_t shift = (bit_start_ + bit_offset) % width;
     Result value = data[index] >> shift;
-    size_t finished_bits = width - shift;
-    if (finished_bits < bit_length) {
-      value |= data[index + 1] << finished_bits;
-    }
-    return value & ~clear;
+    // Load extra value containing the most significant bit (it might be the same one).
+    // We can not just load the following value as that could potentially cause SIGSEGV.
+    Result extra = data[index + (shift + (bit_length - 1)) / width];
+    // Mask to clear unwanted bits (the 1s are needed to avoid avoid undefined shift).
+    Result clear = (std::numeric_limits<Result>::max() << 1) << (bit_length - 1);
+    // Prepend the extra value.  We add explicit '& (width - 1)' so that the shift is defined.
+    // It is a no-op for `shift != 0` and if `shift == 0` then `value == extra` because of
+    // bit_length <= width causing the `value` and `extra` to be read from the same location.
+    // The '& (width - 1)' is implied by the shift instruction on ARM and removed by compiler.
+    return (value | (extra << ((width - shift) & (width - 1)))) & ~clear;
   }
 
   // Store `bit_length` bits in `data` starting at given `bit_offset`.
