@@ -31,31 +31,24 @@ CodeInfo::CodeInfo(const OatQuickMethodHeader* header, DecodeFlags flags)
   : CodeInfo(header->GetOptimizedCodeInfoPtr(), flags) {
 }
 
-// Returns true if the decoded table was deduped.
-template<typename Accessor>
-ALWAYS_INLINE static bool DecodeTable(BitTable<Accessor>& table, BitMemoryReader& reader) {
-  bool is_deduped = reader.ReadBit();
-  if (UNLIKELY(is_deduped)) {
-    ssize_t bit_offset = reader.NumberOfReadBits() - reader.ReadVarint();
-    BitMemoryReader reader2(reader.data(), bit_offset);  // The offset is negative.
-    table.Decode(reader2);
-  } else {
-    table.Decode(reader);
-  }
-  return is_deduped;
-}
-
 void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
   BitMemoryReader reader(data);
-  uint32_t header[5];
+  uint32_t header[kNumHeaders];
   reader.ReadVarints(header);
-  flags_ = header[0];
-  packed_frame_size_ = header[1];
-  core_spill_mask_ = header[2];
-  fp_spill_mask_ = header[3];
-  number_of_dex_registers_ = header[4];
-  ForEachBitTableField([this, &reader](auto member_pointer) {
-    DecodeTable(this->*member_pointer, reader);
+  ForEachHeaderField([this, &header](size_t i, auto member_pointer) {
+    this->*member_pointer = header[i];
+  });
+  ForEachBitTableField([this, &reader](size_t i, auto member_pointer) {
+    auto& table = this->*member_pointer;
+    if (HasBitTable(i)) {
+      if (UNLIKELY(IsBitTableDeduped(i))) {
+        ssize_t bit_offset = reader.NumberOfReadBits() - reader.ReadVarint();
+        BitMemoryReader reader2(reader.data(), bit_offset);  // The offset is negative.
+        table.Decode(reader2);
+      } else {
+        table.Decode(reader);
+      }
+    }
   }, flags);
   size_in_bits_ = reader.NumberOfReadBits();
   if (flags == AllTables) {
@@ -66,37 +59,54 @@ void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
 size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
   writer_.ByteAlign();
   size_t deduped_offset = writer_.NumberOfWrittenBits() / kBitsPerByte;
+
+  // Read the existing code info and find (and keep) dedup-map iterator for each table.
+  // The iterator stores BitMemoryRegion and bit_offset of previous identical BitTable.
   BitMemoryReader reader(code_info_data);
   CodeInfo code_info;  // Temporary storage for decoded data.
-  ForEachHeaderField([this, &reader, &code_info](auto member_pointer) {
+  ForEachHeaderField([&reader, &code_info](size_t, auto member_pointer) {
     code_info.*member_pointer = reader.ReadVarint();
+  });
+  std::map<BitMemoryRegion, uint32_t, BitMemoryRegion::Less>::iterator it[kNumBitTables];
+  ForEachBitTableField([this, &reader, &code_info, &it](size_t i, auto member_pointer) {
+    DCHECK(!code_info.IsBitTableDeduped(i));
+    if (code_info.HasBitTable(i)) {
+      size_t bit_table_start = reader.NumberOfReadBits();
+      (code_info.*member_pointer).Decode(reader);
+      BitMemoryRegion region = reader.GetReadRegion().Subregion(bit_table_start);
+      it[i] = dedupe_map_.emplace(region, /* default bit_offset */ 0).first;
+      if (it[i]->second != 0 && region.size_in_bits() > 32) {  // Seen before and large?
+        code_info.SetBitTableDeduped(i);  // Mark as deduped before we write header.
+      }
+    }
+  });
+
+  // Write the code info back, but replace deduped tables with relative offsets.
+  ForEachHeaderField([this, &code_info](size_t, auto member_pointer) {
     writer_.WriteVarint(code_info.*member_pointer);
   });
-  ForEachBitTableField([this, &reader, &code_info](auto member_pointer) {
-    bool is_deduped = reader.ReadBit();
-    DCHECK(!is_deduped);
-    size_t bit_table_start = reader.NumberOfReadBits();
-    (code_info.*member_pointer).Decode(reader);
-    BitMemoryRegion region = reader.GetReadRegion().Subregion(bit_table_start);
-    auto it = dedupe_map_.insert(std::make_pair(region, /* placeholder */ 0));
-    if (it.second /* new bit table */ || region.size_in_bits() < 32) {
-      writer_.WriteBit(false);  // Is not deduped.
-      it.first->second = writer_.NumberOfWrittenBits();
-      writer_.WriteRegion(region);
-    } else {
-      writer_.WriteBit(true);  // Is deduped.
-      size_t bit_offset = writer_.NumberOfWrittenBits();
-      writer_.WriteVarint(bit_offset - it.first->second);
+  ForEachBitTableField([this, &code_info, &it](size_t i, auto) {
+    if (code_info.HasBitTable(i)) {
+      uint32_t& bit_offset = it[i]->second;
+      if (code_info.IsBitTableDeduped(i)) {
+        DCHECK_NE(bit_offset, 0u);
+        writer_.WriteVarint(writer_.NumberOfWrittenBits() - bit_offset);
+      } else {
+        bit_offset = writer_.NumberOfWrittenBits();  // Store offset in dedup map.
+        writer_.WriteRegion(it[i]->first);
+      }
     }
   });
 
   if (kIsDebugBuild) {
     CodeInfo old_code_info(code_info_data);
     CodeInfo new_code_info(writer_.data() + deduped_offset);
-    ForEachHeaderField([&old_code_info, &new_code_info](auto member_pointer) {
-      DCHECK_EQ(old_code_info.*member_pointer, new_code_info.*member_pointer);
+    ForEachHeaderField([&old_code_info, &new_code_info](size_t, auto member_pointer) {
+      if (member_pointer != &CodeInfo::bit_table_flags_) {  // Expected to differ.
+        DCHECK_EQ(old_code_info.*member_pointer, new_code_info.*member_pointer);
+      }
     });
-    ForEachBitTableField([&old_code_info, &new_code_info](auto member_pointer) {
+    ForEachBitTableField([&old_code_info, &new_code_info](size_t, auto member_pointer) {
       DCHECK((old_code_info.*member_pointer).Equals(new_code_info.*member_pointer));
     });
   }
@@ -192,23 +202,28 @@ void CodeInfo::DecodeDexRegisterMap(uint32_t stack_map_index,
 void CodeInfo::CollectSizeStats(const uint8_t* code_info_data, /*out*/ Stats* parent) {
   Stats* codeinfo_stats = parent->Child("CodeInfo");
   BitMemoryReader reader(code_info_data);
-  ForEachHeaderField([&reader](auto) { reader.ReadVarint(); });
-  codeinfo_stats->Child("Header")->AddBits(reader.NumberOfReadBits());
   CodeInfo code_info;  // Temporary storage for decoded tables.
-  ForEachBitTableField([codeinfo_stats, &reader, &code_info](auto member_pointer) {
+  ForEachHeaderField([&reader, &code_info](size_t, auto member_pointer) {
+    code_info.*member_pointer = reader.ReadVarint();
+  });
+  codeinfo_stats->Child("Header")->AddBits(reader.NumberOfReadBits());
+  ForEachBitTableField([codeinfo_stats, &reader, &code_info](size_t i, auto member_pointer) {
     auto& table = code_info.*member_pointer;
     size_t bit_offset = reader.NumberOfReadBits();
-    bool deduped = DecodeTable(table, reader);
-    if (deduped) {
-      codeinfo_stats->Child("DedupeOffset")->AddBits(reader.NumberOfReadBits() - bit_offset);
-    } else {
-      Stats* table_stats = codeinfo_stats->Child(table.GetName());
-      table_stats->AddBits(reader.NumberOfReadBits() - bit_offset);
-      const char* const* column_names = table.GetColumnNames();
-      for (size_t c = 0; c < table.NumColumns(); c++) {
-        if (table.NumColumnBits(c) > 0) {
-          Stats* column_stats = table_stats->Child(column_names[c]);
-          column_stats->AddBits(table.NumRows() * table.NumColumnBits(c), table.NumRows());
+    if (code_info.HasBitTable(i)) {
+      if (code_info.IsBitTableDeduped(i)) {
+        reader.ReadVarint();
+        codeinfo_stats->Child("DedupeOffset")->AddBits(reader.NumberOfReadBits() - bit_offset);
+      } else {
+        table.Decode(reader);
+        Stats* table_stats = codeinfo_stats->Child(table.GetName());
+        table_stats->AddBits(reader.NumberOfReadBits() - bit_offset);
+        const char* const* column_names = table.GetColumnNames();
+        for (size_t c = 0; c < table.NumColumns(); c++) {
+          if (table.NumColumnBits(c) > 0) {
+            Stats* column_stats = table_stats->Child(column_names[c]);
+            column_stats->AddBits(table.NumRows() * table.NumColumnBits(c), table.NumRows());
+          }
         }
       }
     }
@@ -234,14 +249,13 @@ void CodeInfo::Dump(VariableIndentationOutputStream* vios,
                     bool verbose,
                     InstructionSet instruction_set) const {
   vios->Stream() << "CodeInfo BitSize=" << size_in_bits_
-    << " Flags:" << flags_
     << " FrameSize:" << packed_frame_size_ * kStackAlignment
     << " CoreSpillMask:" << std::hex << core_spill_mask_
     << " FpSpillMask:" << std::hex << fp_spill_mask_
     << " NumberOfDexRegisters:" << std::dec << number_of_dex_registers_
     << "\n";
   ScopedIndentation indent1(vios);
-  ForEachBitTableField([this, &vios, verbose](auto member_pointer) {
+  ForEachBitTableField([this, &vios, verbose](size_t, auto member_pointer) {
     const auto& table = this->*member_pointer;
     if (table.NumRows() != 0) {
       vios->Stream() << table.GetName() << " BitSize=" << table.DataBitSize();

@@ -181,7 +181,6 @@ class InlineInfo : public BitTableAccessor<6> {
   BIT_TABLE_COLUMN(3, ArtMethodHi)  // High bits of ArtMethod*.
   BIT_TABLE_COLUMN(4, ArtMethodLo)  // Low bits of ArtMethod*.
   BIT_TABLE_COLUMN(5, NumberOfDexRegisters)  // Includes outer levels and the main method.
-  BIT_TABLE_COLUMN(6, DexRegisterMapIndex)
 
   static constexpr uint32_t kLast = -1;
   static constexpr uint32_t kMore = 0;
@@ -452,7 +451,7 @@ class CodeInfo {
  private:
   // Returns lower bound (fist stack map which has pc greater or equal than the desired one).
   // It ignores catch stack maps at the end (it is the same as if they had maximum pc value).
-  BitTable<StackMap>::const_iterator BinarySearchNativePc(uint32_t packed_pc) const;
+  ALWAYS_INLINE BitTable<StackMap>::const_iterator BinarySearchNativePc(uint32_t packed_pc) const;
 
   // Scan backward to determine dex register locations at given stack map.
   void DecodeDexRegisterMap(uint32_t stack_map_index,
@@ -461,44 +460,60 @@ class CodeInfo {
 
   void Decode(const uint8_t* data, DecodeFlags flags);
 
-  // Invokes the callback with member pointer of each header field.
+  // Invokes the callback with index and member pointer of each header field.
   template<typename Callback>
   ALWAYS_INLINE static void ForEachHeaderField(Callback callback) {
-    callback(&CodeInfo::flags_);
-    callback(&CodeInfo::packed_frame_size_);
-    callback(&CodeInfo::core_spill_mask_);
-    callback(&CodeInfo::fp_spill_mask_);
-    callback(&CodeInfo::number_of_dex_registers_);
+    size_t index = 0;
+    callback(index++, &CodeInfo::flags_);
+    callback(index++, &CodeInfo::packed_frame_size_);
+    callback(index++, &CodeInfo::core_spill_mask_);
+    callback(index++, &CodeInfo::fp_spill_mask_);
+    callback(index++, &CodeInfo::number_of_dex_registers_);
+    callback(index++, &CodeInfo::bit_table_flags_);
+    DCHECK_EQ(index, kNumHeaders);
   }
 
-  // Invokes the callback with member pointer of each BitTable field.
+  // Invokes the callback with index and member pointer of each BitTable field.
   template<typename Callback>
   ALWAYS_INLINE static void ForEachBitTableField(Callback callback, DecodeFlags flags = AllTables) {
-    callback(&CodeInfo::stack_maps_);
-    callback(&CodeInfo::register_masks_);
-    callback(&CodeInfo::stack_masks_);
+    size_t index = 0;
+    callback(index++, &CodeInfo::stack_maps_);
+    callback(index++, &CodeInfo::register_masks_);
+    callback(index++, &CodeInfo::stack_masks_);
     if (flags & DecodeFlags::GcMasksOnly) {
       return;
     }
-    callback(&CodeInfo::inline_infos_);
-    callback(&CodeInfo::method_infos_);
+    callback(index++, &CodeInfo::inline_infos_);
+    callback(index++, &CodeInfo::method_infos_);
     if (flags & DecodeFlags::InlineInfoOnly) {
       return;
     }
-    callback(&CodeInfo::dex_register_masks_);
-    callback(&CodeInfo::dex_register_maps_);
-    callback(&CodeInfo::dex_register_catalog_);
+    callback(index++, &CodeInfo::dex_register_masks_);
+    callback(index++, &CodeInfo::dex_register_maps_);
+    callback(index++, &CodeInfo::dex_register_catalog_);
+    DCHECK_EQ(index, kNumBitTables);
   }
+
+  bool HasBitTable(size_t i) { return ((bit_table_flags_ >> i) & 1) != 0; }
+  bool IsBitTableDeduped(size_t i) { return ((bit_table_flags_ >> (kNumBitTables + i)) & 1) != 0; }
+  void SetBitTableDeduped(size_t i) { bit_table_flags_ |= 1 << (kNumBitTables + i); }
 
   enum Flags {
     kHasInlineInfo = 1 << 0,
   };
 
+  // The CodeInfo starts with sequence of variable-length bit-encoded integers.
+  static constexpr size_t kNumHeaders = 6;
   uint32_t flags_ = 0;
   uint32_t packed_frame_size_ = 0;  // Frame size in kStackAlignment units.
   uint32_t core_spill_mask_ = 0;
   uint32_t fp_spill_mask_ = 0;
   uint32_t number_of_dex_registers_ = 0;
+  uint32_t bit_table_flags_ = 0;
+
+  // The encoded bit-tables follow the header.  Based on the above flags field,
+  // bit-tables might be omitted or replaced by relative bit-offset if deduped.
+  static constexpr size_t kNumBitTables = 8;
   BitTable<StackMap> stack_maps_;
   BitTable<RegisterMask> register_masks_;
   BitTable<StackMask> stack_masks_;
@@ -507,6 +522,7 @@ class CodeInfo {
   BitTable<DexRegisterMask> dex_register_masks_;
   BitTable<DexRegisterMapInfo> dex_register_maps_;
   BitTable<DexRegisterInfo> dex_register_catalog_;
+
   uint32_t size_in_bits_ = 0;
 
   friend class StackMapStream;
