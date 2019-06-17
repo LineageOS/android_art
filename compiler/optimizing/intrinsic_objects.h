@@ -55,11 +55,9 @@ class IntrinsicObjects {
     return IndexField::Decode(intrinsic_data);
   }
 
-  static ObjPtr<mirror::ObjectArray<mirror::Object>> AllocateBootImageLiveObjects(
-      Thread* self,
-      ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Functions for retrieving data for Integer.valueOf().
+  static ObjPtr<mirror::ObjectArray<mirror::Object>> LookupIntegerCache(
+      Thread* self, ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static ObjPtr<mirror::ObjectArray<mirror::Object>> GetIntegerValueOfCache(
       ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects)
       REQUIRES_SHARED(Locks::mutator_lock_);
