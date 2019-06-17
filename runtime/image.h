@@ -222,16 +222,21 @@ class PACKED(8) ImageHeader {
   enum ImageRoot {
     kDexCaches,
     kClassRoots,
-    kOomeWhenThrowingException,       // Pre-allocated OOME when throwing exception.
-    kOomeWhenThrowingOome,            // Pre-allocated OOME when throwing OOME.
-    kOomeWhenHandlingStackOverflow,   // Pre-allocated OOME when handling StackOverflowError.
-    kNoClassDefFoundError,            // Pre-allocated NoClassDefFoundError.
     kSpecialRoots,                    // Different for boot image and app image, see aliases below.
     kImageRootsMax,
 
     // Aliases.
     kAppImageClassLoader = kSpecialRoots,   // The class loader used to build the app image.
     kBootImageLiveObjects = kSpecialRoots,  // Array of boot image objects that must be kept live.
+  };
+
+  enum BootImageLiveObjects {
+    kOomeWhenThrowingException,       // Pre-allocated OOME when throwing exception.
+    kOomeWhenThrowingOome,            // Pre-allocated OOME when throwing OOME.
+    kOomeWhenHandlingStackOverflow,   // Pre-allocated OOME when handling StackOverflowError.
+    kNoClassDefFoundError,            // Pre-allocated NoClassDefFoundError.
+    kClearedJniWeakSentinel,          // Pre-allocated sentinel for cleared weak JNI references.
+    kIntrinsicObjectsStart
   };
 
   /*

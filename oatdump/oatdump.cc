@@ -110,10 +110,6 @@ const char* image_methods_descriptions_[] = {
 const char* image_roots_descriptions_[] = {
   "kDexCaches",
   "kClassRoots",
-  "kOomeWhenThrowingException",
-  "kOomeWhenThrowingOome",
-  "kOomeWhenHandlingStackOverflow",
-  "kNoClassDefFoundError",
   "kSpecialRoots",
 };
 
