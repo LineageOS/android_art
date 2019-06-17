@@ -2998,6 +2998,10 @@ bool DexFileVerifier::CheckInterSection() {
   const dex::MapItem* item = map->list_;
   uint32_t count = map->size_;
 
+  // Avoid allocations, reserve space ahead of time. At most the type-id limit number
+  // of type IDs can be added.
+  defined_classes_.reserve(std::min(header_->class_defs_size_, kTypeIdLimit) + 1);
+
   // Cross check the items listed in the map.
   for (; count != 0u; --count) {
     uint32_t section_offset = item->offset_;
