@@ -407,6 +407,15 @@ while true; do
         fi
         run_args="${run_args} --android-runtime-root $1"
         shift
+    elif [ "x$1" = "x--android-tzdata-root" ]; then
+        shift
+        if [ "x$1" = "x" ]; then
+            echo "$0 missing argument to --android-tzdata-root" 1>&2
+            usage="yes"
+            break
+        fi
+        run_args="${run_args} --android-tzdata-root $1"
+        shift
     elif [ "x$1" = "x--update" ]; then
         update_mode="yes"
         shift
@@ -799,6 +808,9 @@ if [ "$usage" = "yes" ]; then
         echo "    --android-runtime-root [path]"
         echo "                          The path on target for the Android Runtime root."
         echo "                          (/apex/com.android.runtime by default)."
+        echo "    --android-tzdata-root [path]"
+        echo "                          The path on target for the Android Time Zone Data root."
+        echo "                          (/apex/com.android.tzdata by default)."
         echo "    --dex2oat-swap        Use a dex2oat swap file."
         echo "    --instruction-set-features [string]"
         echo "                          Set instruction-set-features for compilation."
