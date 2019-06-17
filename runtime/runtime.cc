@@ -1094,7 +1094,7 @@ static size_t OpenBootDexFiles(ArrayRef<const std::string> dex_filenames,
   return failure_count;
 }
 
-void Runtime::SetSentinel(mirror::Object* sentinel) {
+void Runtime::SetSentinel(ObjPtr<mirror::Object> sentinel) {
   CHECK(sentinel_.Read() == nullptr);
   CHECK(sentinel != nullptr);
   CHECK(!heap_->IsMovableObject(sentinel));
@@ -1612,20 +1612,23 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   if (GetHeap()->HasBootImageSpace()) {
     const ImageHeader& image_header = GetHeap()->GetBootImageSpaces()[0]->GetImageHeader();
+    ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects =
+        ObjPtr<mirror::ObjectArray<mirror::Object>>::DownCast(
+            image_header.GetImageRoot(ImageHeader::kBootImageLiveObjects));
     pre_allocated_OutOfMemoryError_when_throwing_exception_ = GcRoot<mirror::Throwable>(
-        image_header.GetImageRoot(ImageHeader::kOomeWhenThrowingException)->AsThrowable());
+        boot_image_live_objects->Get(ImageHeader::kOomeWhenThrowingException)->AsThrowable());
     DCHECK(pre_allocated_OutOfMemoryError_when_throwing_exception_.Read()->GetClass()
                ->DescriptorEquals("Ljava/lang/OutOfMemoryError;"));
     pre_allocated_OutOfMemoryError_when_throwing_oome_ = GcRoot<mirror::Throwable>(
-        image_header.GetImageRoot(ImageHeader::kOomeWhenThrowingOome)->AsThrowable());
+        boot_image_live_objects->Get(ImageHeader::kOomeWhenThrowingOome)->AsThrowable());
     DCHECK(pre_allocated_OutOfMemoryError_when_throwing_oome_.Read()->GetClass()
                ->DescriptorEquals("Ljava/lang/OutOfMemoryError;"));
     pre_allocated_OutOfMemoryError_when_handling_stack_overflow_ = GcRoot<mirror::Throwable>(
-        image_header.GetImageRoot(ImageHeader::kOomeWhenHandlingStackOverflow)->AsThrowable());
+        boot_image_live_objects->Get(ImageHeader::kOomeWhenHandlingStackOverflow)->AsThrowable());
     DCHECK(pre_allocated_OutOfMemoryError_when_handling_stack_overflow_.Read()->GetClass()
                ->DescriptorEquals("Ljava/lang/OutOfMemoryError;"));
     pre_allocated_NoClassDefFoundError_ = GcRoot<mirror::Throwable>(
-        image_header.GetImageRoot(ImageHeader::kNoClassDefFoundError)->AsThrowable());
+        boot_image_live_objects->Get(ImageHeader::kNoClassDefFoundError)->AsThrowable());
     DCHECK(pre_allocated_NoClassDefFoundError_.Read()->GetClass()
                ->DescriptorEquals("Ljava/lang/NoClassDefFoundError;"));
   } else {

@@ -17,18 +17,18 @@
 #include "intrinsic_objects.h"
 
 #include "art_field-inl.h"
+#include "base/casts.h"
 #include "base/logging.h"
-#include "class_root.h"
-#include "handle.h"
+#include "image.h"
 #include "obj_ptr-inl.h"
-#include "mirror/object_array-alloc-inl.h"
-#include "mirror/object_array-inl.h"
 
 namespace art {
 
-static ObjPtr<mirror::ObjectArray<mirror::Object>> LookupIntegerCache(Thread* self,
-                                                                      ClassLinker* class_linker)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
+static constexpr size_t kIntrinsicObjectsOffset =
+    enum_cast<size_t>(ImageHeader::kIntrinsicObjectsStart);
+
+ObjPtr<mirror::ObjectArray<mirror::Object>> IntrinsicObjects::LookupIntegerCache(
+    Thread* self, ClassLinker* class_linker) {
   ObjPtr<mirror::Class> integer_cache_class = class_linker->LookupClass(
       self, "Ljava/lang/Integer$IntegerCache;", /* class_loader= */ nullptr);
   if (integer_cache_class == nullptr || !integer_cache_class->IsInitialized()) {
@@ -44,47 +44,24 @@ static ObjPtr<mirror::ObjectArray<mirror::Object>> LookupIntegerCache(Thread* se
   return integer_cache;
 }
 
-ObjPtr<mirror::ObjectArray<mirror::Object>> IntrinsicObjects::AllocateBootImageLiveObjects(
-    Thread* self,
-    ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_) {
-  // The objects used for the Integer.valueOf() intrinsic must remain live even if references
-  // to them are removed using reflection. Image roots are not accessible through reflection,
-  // so the array we construct here shall keep them alive.
-  StackHandleScope<1> hs(self);
-  Handle<mirror::ObjectArray<mirror::Object>> integer_cache =
-      hs.NewHandle(LookupIntegerCache(self, class_linker));
-  size_t live_objects_size =
-      (integer_cache != nullptr) ? (/* cache */ 1u + integer_cache->GetLength()) : 0u;
-  ObjPtr<mirror::ObjectArray<mirror::Object>> live_objects =
-      mirror::ObjectArray<mirror::Object>::Alloc(
-          self, GetClassRoot<mirror::ObjectArray<mirror::Object>>(class_linker), live_objects_size);
-  int32_t index = 0;
-  if (integer_cache != nullptr) {
-    live_objects->Set(index++, integer_cache.Get());
-    for (int32_t i = 0, length = integer_cache->GetLength(); i != length; ++i) {
-      live_objects->Set(index++, integer_cache->Get(i));
-    }
-  }
-  CHECK_EQ(index, live_objects->GetLength());
-
-  if (kIsDebugBuild && integer_cache != nullptr) {
-    CHECK_EQ(integer_cache.Get(), GetIntegerValueOfCache(live_objects));
-    for (int32_t i = 0, len = integer_cache->GetLength(); i != len; ++i) {
-      CHECK_EQ(integer_cache->GetWithoutChecks(i), GetIntegerValueOfObject(live_objects, i));
-    }
-  }
-  return live_objects;
+static bool HasIntrinsicObjects(
+    ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  DCHECK(boot_image_live_objects != nullptr);
+  uint32_t length = static_cast<uint32_t>(boot_image_live_objects->GetLength());
+  DCHECK_GE(length, kIntrinsicObjectsOffset);
+  return length != kIntrinsicObjectsOffset;
 }
 
 ObjPtr<mirror::ObjectArray<mirror::Object>> IntrinsicObjects::GetIntegerValueOfCache(
     ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects) {
-  DCHECK(boot_image_live_objects != nullptr);
-  if (boot_image_live_objects->GetLength() == 0u) {
+  if (!HasIntrinsicObjects(boot_image_live_objects)) {
     return nullptr;  // No intrinsic objects.
   }
   // No need for read barrier for boot image object or for verifying the value that was just stored.
   ObjPtr<mirror::Object> result =
-      boot_image_live_objects->GetWithoutChecks<kVerifyNone, kWithoutReadBarrier>(0);
+      boot_image_live_objects->GetWithoutChecks<kVerifyNone, kWithoutReadBarrier>(
+          kIntrinsicObjectsOffset);
   DCHECK(result != nullptr);
   DCHECK(result->IsObjectArray());
   DCHECK(result->GetClass()->DescriptorEquals("[Ljava/lang/Integer;"));
@@ -94,15 +71,14 @@ ObjPtr<mirror::ObjectArray<mirror::Object>> IntrinsicObjects::GetIntegerValueOfC
 ObjPtr<mirror::Object> IntrinsicObjects::GetIntegerValueOfObject(
     ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects,
     uint32_t index) {
-  DCHECK(boot_image_live_objects != nullptr);
-  DCHECK_NE(boot_image_live_objects->GetLength(), 0);
+  DCHECK(HasIntrinsicObjects(boot_image_live_objects));
   DCHECK_LT(index,
             static_cast<uint32_t>(GetIntegerValueOfCache(boot_image_live_objects)->GetLength()));
 
   // No need for read barrier for boot image object or for verifying the value that was just stored.
   ObjPtr<mirror::Object> result =
       boot_image_live_objects->GetWithoutChecks<kVerifyNone, kWithoutReadBarrier>(
-          /* skip the IntegerCache.cache */ 1u + index);
+          kIntrinsicObjectsOffset + /* skip the IntegerCache.cache */ 1u + index);
   DCHECK(result != nullptr);
   DCHECK(result->GetClass()->DescriptorEquals("Ljava/lang/Integer;"));
   return result;
@@ -110,8 +86,9 @@ ObjPtr<mirror::Object> IntrinsicObjects::GetIntegerValueOfObject(
 
 MemberOffset IntrinsicObjects::GetIntegerValueOfArrayDataOffset(
     ObjPtr<mirror::ObjectArray<mirror::Object>> boot_image_live_objects) {
-  DCHECK_NE(boot_image_live_objects->GetLength(), 0);
-  MemberOffset result = mirror::ObjectArray<mirror::Object>::OffsetOfElement(1u);
+  DCHECK(HasIntrinsicObjects(boot_image_live_objects));
+  MemberOffset result =
+      mirror::ObjectArray<mirror::Object>::OffsetOfElement(kIntrinsicObjectsOffset + 1u);
   DCHECK_EQ(GetIntegerValueOfObject(boot_image_live_objects, 0u),
             (boot_image_live_objects
                  ->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(result)));
