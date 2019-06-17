@@ -18,6 +18,7 @@
 
 #include <inttypes.h>
 
+#include <algorithm>
 #include <memory>
 
 #include "android-base/stringprintf.h"
@@ -1996,6 +1997,13 @@ bool DexFileVerifier::CheckIntraSection() {
   size_t offset = 0;
   uint32_t count = map->size_;
   ptr_ = begin_;
+
+  // Preallocate offset map to avoid some allocations. We can only guess from the list items,
+  // not derived things.
+  offset_to_type_map_.reserve(
+      std::min(header_->class_defs_size_, 65535u) +
+      std::min(header_->string_ids_size_, 65535u) +
+      2 * std::min(header_->method_ids_size_, 65535u));
 
   // Check the items listed in the map.
   for (; count != 0u; --count) {
