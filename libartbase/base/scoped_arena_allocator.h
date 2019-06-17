@@ -59,6 +59,8 @@ class ArenaStack : private DebugStackRefCounter, private ArenaAllocatorMemoryToo
     return PeakStats()->BytesAllocated();
   }
 
+  size_t ApproximatePeakBytes();
+
   MemStats GetPeakStats() const;
 
   // Return the arena tag associated with a pointer.
@@ -165,6 +167,8 @@ class ScopedArenaAllocator
 
   // Get adapter for use in STL containers. See scoped_arena_containers.h .
   ScopedArenaAllocatorAdapter<void> Adapter(ArenaAllocKind kind = kArenaAllocSTL);
+
+  size_t ApproximatePeakBytes();
 
   // Allow a delete-expression to destroy but not deallocate allocators created by Create().
   static void operator delete(void* ptr ATTRIBUTE_UNUSED) {}

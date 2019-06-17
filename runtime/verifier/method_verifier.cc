@@ -5348,7 +5348,9 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
       LOG(WARNING) << "Verification of " << dex_file->PrettyMethod(method_idx)
                    << " took " << PrettyDuration(duration_ns)
                    << (impl::IsLargeMethod(verifier.CodeItem()) ? " (large method)" : "")
-                   << " (" << StringPrintf("%.2f", bytecodes_per_second) << " bytecodes/s)";
+                   << " (" << StringPrintf("%.2f", bytecodes_per_second) << " bytecodes/s)"
+                   << " (" << verifier.allocator_.ApproximatePeakBytes()
+                   << "B approximate peak alloc)";
     }
   }
   result.types = verifier.encountered_failure_types_;
