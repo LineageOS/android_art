@@ -1477,15 +1477,22 @@ static void VisitInternedStringReferences(
             reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
         uint32_t string_index = sro_base[offset_index].second;
 
-        ObjPtr<mirror::String> referred_string =
-            dex_cache->GetPreResolvedStrings()[string_index].Read();
-        DCHECK(referred_string != nullptr);
-
-        ObjPtr<mirror::String> visited = visitor(referred_string);
-        if (visited != referred_string) {
-          // Because we are not using a helper function we need to mark the GC card manually.
-          WriteBarrier::ForEveryFieldWrite(dex_cache);
-          dex_cache->GetPreResolvedStrings()[string_index] = GcRoot<mirror::String>(visited);
+        GcRoot<mirror::String>* preresolved_strings =
+            dex_cache->GetPreResolvedStrings();
+        // Handle calls to ClearPreResolvedStrings that might occur concurrently by the profile
+        // saver that runs shortly after startup. In case the strings are cleared, there is nothing
+        // to fix up.
+        if (preresolved_strings != nullptr) {
+          ObjPtr<mirror::String> referred_string =
+              preresolved_strings[string_index].Read();
+          if (referred_string != nullptr) {
+            ObjPtr<mirror::String> visited = visitor(referred_string);
+            if (visited != referred_string) {
+              // Because we are not using a helper function we need to mark the GC card manually.
+              WriteBarrier::ForEveryFieldWrite(dex_cache);
+              preresolved_strings[string_index] = GcRoot<mirror::String>(visited);
+            }
+          }
         }
       }
     } else {
