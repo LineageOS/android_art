@@ -296,15 +296,14 @@ void* JitMemoryRegion::MoreCore(const void* mspace, intptr_t increment) NO_THREA
   }
 }
 
-uint8_t* JitMemoryRegion::AllocateCode(size_t code_size) {
+uint8_t* JitMemoryRegion::AllocateCode(size_t code_size, size_t alignment) {
   // Each allocation should be on its own set of cache lines.
   // `code_size` covers the OatQuickMethodHeader, the JIT generated machine code,
   // and any alignment padding.
-  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
   size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
   DCHECK_GT(code_size, header_size);
   uint8_t* result = reinterpret_cast<uint8_t*>(
-      mspace_memalign(exec_mspace_, kJitCodeAlignment, code_size));
+      mspace_memalign(exec_mspace_, alignment, code_size));
   // Ensure the header ends up at expected instruction alignment.
   DCHECK_ALIGNED_PARAM(reinterpret_cast<uintptr_t>(result + header_size), alignment);
   used_memory_for_code_ += mspace_usable_size(result);
