@@ -40,10 +40,21 @@ namespace jit {
 // TODO: Make this variable?
 static constexpr size_t kCodeAndDataCapacityDivider = 2;
 
-bool JitMemoryRegion::InitializeMappings(bool rwx_memory_allowed,
-                                         bool is_zygote,
-                                         std::string* error_msg) {
+bool JitMemoryRegion::Initialize(size_t initial_capacity,
+                                 size_t max_capacity,
+                                 bool rwx_memory_allowed,
+                                 bool is_zygote,
+                                 std::string* error_msg) {
   ScopedTrace trace(__PRETTY_FUNCTION__);
+
+  CHECK_GE(max_capacity, initial_capacity);
+  CHECK(max_capacity <= 1 * GB) << "The max supported size for JIT code cache is 1GB";
+  // Align both capacities to page size, as that's the unit mspaces use.
+  initial_capacity_ = RoundDown(initial_capacity, 2 * kPageSize);
+  max_capacity_ = RoundDown(max_capacity, 2 * kPageSize);
+  current_capacity_ = initial_capacity,
+  data_end_ = initial_capacity / kCodeAndDataCapacityDivider;
+  exec_end_ = initial_capacity - data_end_;
 
   const size_t capacity = max_capacity_;
   const size_t data_capacity = capacity / kCodeAndDataCapacityDivider;
@@ -202,21 +213,9 @@ bool JitMemoryRegion::InitializeMappings(bool rwx_memory_allowed,
   data_pages_ = std::move(data_pages);
   exec_pages_ = std::move(exec_pages);
   non_exec_pages_ = std::move(non_exec_pages);
-  return true;
-}
 
-void JitMemoryRegion::InitializeState(size_t initial_capacity, size_t max_capacity) {
-  CHECK_GE(max_capacity, initial_capacity);
-  CHECK(max_capacity <= 1 * GB) << "The max supported size for JIT code cache is 1GB";
-  // Align both capacities to page size, as that's the unit mspaces use.
-  initial_capacity_ = RoundDown(initial_capacity, 2 * kPageSize);
-  max_capacity_ = RoundDown(max_capacity, 2 * kPageSize);
-  current_capacity_ = initial_capacity,
-  data_end_ = initial_capacity / kCodeAndDataCapacityDivider;
-  exec_end_ = initial_capacity - data_end_;
-}
+  // Now that the pages are initialized, initialize the spaces.
 
-void JitMemoryRegion::InitializeSpaces() {
   // Initialize the data heap
   data_mspace_ = create_mspace_with_base(data_pages_.Begin(), data_end_, false /*locked*/);
   CHECK(data_mspace_ != nullptr) << "create_mspace_with_base (data) failed";
@@ -242,6 +241,8 @@ void JitMemoryRegion::InitializeSpaces() {
     exec_mspace_ = nullptr;
     SetFootprintLimit(initial_capacity_);
   }
+
+  return true;
 }
 
 void JitMemoryRegion::SetFootprintLimit(size_t new_footprint) {
