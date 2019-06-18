@@ -792,8 +792,11 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     }
 
     // Discard the code if any single-implementation assumptions are now invalid.
-    if (!single_impl_still_valid) {
+    if (UNLIKELY(!single_impl_still_valid)) {
       VLOG(jit) << "JIT discarded jitted code due to invalid single-implementation assumptions.";
+      ScopedCodeCacheWrite ccw(*region);
+      uintptr_t allocation = FromCodeToAllocation(code_ptr);
+      region->FreeCode(reinterpret_cast<uint8_t*>(allocation));
       return nullptr;
     }
     DCHECK(cha_single_implementation_list.empty() || !Runtime::Current()->IsJavaDebuggable())
