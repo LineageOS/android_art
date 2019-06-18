@@ -25,6 +25,8 @@ LIBARTPALETTE_1 {
     PaletteTraceBegin;
     PaletteTraceEnd;
     PaletteTraceIntegerValue;
+    PaletteAshmemCreateRegion;
+    PaletteAshmemSetProtRegion;
 
   local:
     *;
