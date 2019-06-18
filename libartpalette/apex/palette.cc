@@ -151,4 +151,16 @@ enum PaletteStatus PaletteTraceIntegerValue(/*in*/const char* name, int32_t valu
   return m(name, value);
 }
 
+enum PaletteStatus PaletteAshmemCreateRegion(const char* name, size_t size, int* fd) {
+  PaletteAshmemCreateRegionMethod m =
+      PaletteLoader::Instance().GetPaletteAshmemCreateRegionMethod();
+  return m(name, size, fd);
+}
+
+enum PaletteStatus PaletteAshmemSetProtRegion(int fd, int prot) {
+  PaletteAshmemSetProtRegionMethod m =
+      PaletteLoader::Instance().GetPaletteAshmemSetProtRegionMethod();
+  return m(fd, prot);
+}
+
 }  // extern "C"
