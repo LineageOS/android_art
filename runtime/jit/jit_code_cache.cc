@@ -178,6 +178,7 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
     }
   }
 
+  size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
   // Check whether the provided max capacity in options is below 1GB.
   size_t max_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheMaxCapacity();
   // We need to have 32 bit offsets from method headers in code cache which point to things
@@ -191,24 +192,22 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
     return nullptr;
   }
 
-  size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
-
-  std::unique_ptr<JitCodeCache> jit_code_cache(new JitCodeCache());
-
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  jit_code_cache->private_region_.InitializeState(initial_capacity, max_capacity);
-
-  // Zygote should never collect code to share the memory with the children.
-  if (is_zygote) {
-    jit_code_cache->garbage_collect_code_ = false;
-  }
-
-  if (!jit_code_cache->private_region_.InitializeMappings(
-        rwx_memory_allowed, is_zygote, error_msg)) {
+  JitMemoryRegion region;
+  if (!region.Initialize(initial_capacity,
+                         max_capacity,
+                         rwx_memory_allowed,
+                         is_zygote,
+                         error_msg)) {
     return nullptr;
   }
 
-  jit_code_cache->private_region_.InitializeSpaces();
+  std::unique_ptr<JitCodeCache> jit_code_cache(new JitCodeCache());
+  if (is_zygote) {
+    // Zygote should never collect code to share the memory with the children.
+    jit_code_cache->garbage_collect_code_ = false;
+  }
+  jit_code_cache->private_region_ = std::move(region);
 
   VLOG(jit) << "Created jit code cache: initial capacity="
             << PrettySize(initial_capacity)
@@ -1833,17 +1832,14 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
 
   size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
   size_t max_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheMaxCapacity();
-
-  private_region_.InitializeState(initial_capacity, max_capacity);
-
   std::string error_msg;
-  if (!private_region_.InitializeMappings(
-          /* rwx_memory_allowed= */ !is_system_server, is_zygote, &error_msg)) {
-    LOG(WARNING) << "Could not reset JIT state after zygote fork: " << error_msg;
-    return;
+  if (!private_region_.Initialize(initial_capacity,
+                                  max_capacity,
+                                  /* rwx_memory_allowed= */ !is_system_server,
+                                  is_zygote,
+                                  &error_msg)) {
+    LOG(WARNING) << "Could not create private region after zygote fork: " << error_msg;
   }
-
-  private_region_.InitializeSpaces();
 }
 
 }  // namespace jit
