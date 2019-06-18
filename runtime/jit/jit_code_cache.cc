@@ -372,8 +372,19 @@ bool JitCodeCache::WaitForPotentialCollectionToComplete(Thread* self) {
   return in_collection;
 }
 
+static size_t GetJitCodeAlignment() {
+  if (kRuntimeISA == InstructionSet::kArm || kRuntimeISA == InstructionSet::kThumb2) {
+    // Some devices with 32-bit ARM kernels need additional JIT code alignment when using dual
+    // view JIT (b/132205399). The alignment returned here coincides with the typical ARM d-cache
+    // line (though the value should be probed ideally). Both the method header and code in the
+    // cache are aligned to this size.
+    return 64;
+  }
+  return GetInstructionSetAlignment(kRuntimeISA);
+}
+
 static uintptr_t FromCodeToAllocation(const void* code) {
-  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
+  size_t alignment = GetJitCodeAlignment();
   return reinterpret_cast<uintptr_t>(code) - RoundUp(sizeof(OatQuickMethodHeader), alignment);
 }
 
@@ -703,14 +714,14 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   {
     ScopedCodeCacheWrite scc(*region);
 
-    size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
+    size_t alignment = GetJitCodeAlignment();
     // Ensure the header ends up at expected instruction alignment.
     size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
     size_t total_size = header_size + code_size;
 
     // AllocateCode allocates memory in non-executable region for alignment header and code. The
     // header size may include alignment padding.
-    uint8_t* nox_memory = region->AllocateCode(total_size);
+    uint8_t* nox_memory = region->AllocateCode(total_size, alignment);
     if (nox_memory == nullptr) {
       return nullptr;
     }
