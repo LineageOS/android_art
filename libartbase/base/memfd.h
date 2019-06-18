@@ -17,6 +17,10 @@
 #ifndef ART_LIBARTBASE_BASE_MEMFD_H_
 #define ART_LIBARTBASE_BASE_MEMFD_H_
 
+#if defined(__BIONIC__)
+#include <linux/memfd.h>  // To access memfd flags.
+#endif
+
 namespace art {
 
 // Call memfd(2) if available on platform and return result. This call also makes a kernel version
