@@ -26,6 +26,8 @@
 namespace art {
 namespace jit {
 
+class TestZygoteMemory;
+
 // Alignment in bytes that will suit all architectures for JIT code cache allocations.  The
 // allocated block is used for method header followed by generated code. Allocations should be
 // aligned to avoid sharing cache lines between different allocations. The alignment should be
@@ -131,6 +133,9 @@ class JitMemoryRegion {
     return reinterpret_cast<T*>(raw_src_ptr - src.Begin() + dst.Begin());
   }
 
+  static int CreateZygoteMemory(size_t capacity, std::string* error_msg);
+  static bool ProtectZygoteMemory(int fd, std::string* error_msg);
+
   // The initial capacity in bytes this code region starts with.
   size_t initial_capacity_ GUARDED_BY(Locks::jit_lock_);
 
@@ -167,6 +172,8 @@ class JitMemoryRegion {
 
   // The opaque mspace for allocating code.
   void* exec_mspace_ GUARDED_BY(Locks::jit_lock_);
+
+  friend class TestZygoteMemory;
 };
 
 }  // namespace jit
