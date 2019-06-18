@@ -74,7 +74,9 @@ namespace jit {
 
 class MarkCodeClosure;
 
-using CodeCacheBitmap = gc::accounting::MemoryRangeBitmap<kJitCodeAlignment>;
+// Type of bitmap used for tracking live functions in the JIT code cache for the purposes
+// of garbage collecting code.
+using CodeCacheBitmap = gc::accounting::MemoryRangeBitmap<kJitCodeAccountingBytes>;
 
 class JitCodeCache {
  public:
