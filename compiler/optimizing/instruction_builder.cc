@@ -29,6 +29,7 @@
 #include "driver/dex_compilation_unit.h"
 #include "driver/compiler_options.h"
 #include "imtable-inl.h"
+#include "jit/jit.h"
 #include "mirror/dex_cache.h"
 #include "oat_file.h"
 #include "optimizing_compiler_stats.h"
@@ -1290,15 +1291,20 @@ bool HInstructionBuilder::IsInitialized(Handle<mirror::Class> cls) const {
   // Check if the class will be initialized at runtime.
   if (cls->IsInitialized()) {
     Runtime* runtime = Runtime::Current();
-    if (!runtime->IsAotCompiler()) {
+    if (runtime->IsAotCompiler()) {
+      // Assume loaded only if klass is in the boot image. App classes cannot be assumed
+      // loaded because we don't even know what class loader will be used to load them.
+      if (IsInBootImage(cls.Get(), code_generator_->GetCompilerOptions())) {
+        return true;
+      }
+    } else {
       DCHECK(runtime->UseJitCompilation());
-      // For JIT, the class cannot revert to an uninitialized state.
-      return true;
-    }
-    // Assume loaded only if klass is in the boot image. App classes cannot be assumed
-    // loaded because we don't even know what class loader will be used to load them.
-    if (IsInBootImage(cls.Get(), code_generator_->GetCompilerOptions())) {
-      return true;
+      if (Runtime::Current()->GetJit()->CanAssumeInitialized(
+              cls.Get(),
+              graph_->IsCompilingForSharedJitCode())) {
+        // For JIT, the class cannot revert to an uninitialized state.
+        return true;
+      }
     }
   }
 
