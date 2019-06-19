@@ -75,3 +75,15 @@ enum PaletteStatus PaletteTraceIntegerValue(const char* name ATTRIBUTE_UNUSED,
                                             int32_t value ATTRIBUTE_UNUSED) {
   return PaletteStatus::kOkay;
 }
+
+enum PaletteStatus PaletteAshmemCreateRegion(const char* name ATTRIBUTE_UNUSED,
+                                             size_t size ATTRIBUTE_UNUSED,
+                                             int* fd) {
+  *fd = -1;
+  return PaletteStatus::kNotSupported;
+}
+
+enum PaletteStatus PaletteAshmemSetProtRegion(int fd ATTRIBUTE_UNUSED,
+                                              int prot ATTRIBUTE_UNUSED) {
+  return PaletteStatus::kNotSupported;
+}

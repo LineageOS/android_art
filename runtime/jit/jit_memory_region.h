@@ -26,28 +26,35 @@
 namespace art {
 namespace jit {
 
-// Alignment in bytes that will suit all architectures for JIT code cache allocations.  The
-// allocated block is used for method header followed by generated code. Allocations should be
-// aligned to avoid sharing cache lines between different allocations. The alignment should be
-// determined from the hardware, but this isn't readily exposed in userland plus some hardware
-// misreports.
-static constexpr int kJitCodeAlignment = 64;
+class TestZygoteMemory;
+
+// Number of bytes represented by a bit in the CodeCacheBitmap. Value is reasonable for all
+// architectures.
+static constexpr int kJitCodeAccountingBytes = 16;
 
 // Represents a memory region for the JIT, where code and data are stored. This class
 // provides allocation and deallocation primitives.
 class JitMemoryRegion {
  public:
   JitMemoryRegion()
-      : used_memory_for_code_(0),
-        used_memory_for_data_(0) {}
+      : initial_capacity_(0),
+        max_capacity_(0),
+        current_capacity_(0),
+        data_end_(0),
+        exec_end_(0),
+        used_memory_for_code_(0),
+        used_memory_for_data_(0),
+        exec_pages_(),
+        non_exec_pages_(),
+        data_mspace_(nullptr),
+        exec_mspace_(nullptr) {}
 
-  void InitializeState(size_t initial_capacity, size_t max_capacity)
+  bool Initialize(size_t initial_capacity,
+                  size_t max_capacity,
+                  bool rwx_memory_allowed,
+                  bool is_zygote,
+                  std::string* error_msg)
       REQUIRES(Locks::jit_lock_);
-
-  bool InitializeMappings(bool rwx_memory_allowed, bool is_zygote, std::string* error_msg)
-      REQUIRES(Locks::jit_lock_);
-
-  void InitializeSpaces() REQUIRES(Locks::jit_lock_);
 
   // Try to increase the current capacity of the code cache. Return whether we
   // succeeded at doing so.
@@ -55,7 +62,7 @@ class JitMemoryRegion {
 
   // Set the footprint limit of the code cache.
   void SetFootprintLimit(size_t new_footprint) REQUIRES(Locks::jit_lock_);
-  uint8_t* AllocateCode(size_t code_size) REQUIRES(Locks::jit_lock_);
+  uint8_t* AllocateCode(size_t code_size, size_t alignment) REQUIRES(Locks::jit_lock_);
   void FreeCode(uint8_t* code) REQUIRES(Locks::jit_lock_);
   uint8_t* AllocateData(size_t data_size) REQUIRES(Locks::jit_lock_);
   void FreeData(uint8_t* data) REQUIRES(Locks::jit_lock_);
@@ -131,6 +138,9 @@ class JitMemoryRegion {
     return reinterpret_cast<T*>(raw_src_ptr - src.Begin() + dst.Begin());
   }
 
+  static int CreateZygoteMemory(size_t capacity, std::string* error_msg);
+  static bool ProtectZygoteMemory(int fd, std::string* error_msg);
+
   // The initial capacity in bytes this code region starts with.
   size_t initial_capacity_ GUARDED_BY(Locks::jit_lock_);
 
@@ -167,6 +177,8 @@ class JitMemoryRegion {
 
   // The opaque mspace for allocating code.
   void* exec_mspace_ GUARDED_BY(Locks::jit_lock_);
+
+  friend class TestZygoteMemory;
 };
 
 }  // namespace jit

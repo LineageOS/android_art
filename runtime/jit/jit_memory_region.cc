@@ -16,6 +16,9 @@
 
 #include "jit_memory_region.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <android-base/unique_fd.h>
 #include "base/bit_utils.h"  // For RoundDown, RoundUp
 #include "base/globals.h"
@@ -25,6 +28,7 @@
 #include "gc/allocator/dlmalloc.h"
 #include "jit/jit_scoped_code_cache_write.h"
 #include "oat_quick_method_header.h"
+#include "palette/palette.h"
 
 using android::base::unique_fd;
 
@@ -36,10 +40,21 @@ namespace jit {
 // TODO: Make this variable?
 static constexpr size_t kCodeAndDataCapacityDivider = 2;
 
-bool JitMemoryRegion::InitializeMappings(bool rwx_memory_allowed,
-                                         bool is_zygote,
-                                         std::string* error_msg) {
+bool JitMemoryRegion::Initialize(size_t initial_capacity,
+                                 size_t max_capacity,
+                                 bool rwx_memory_allowed,
+                                 bool is_zygote,
+                                 std::string* error_msg) {
   ScopedTrace trace(__PRETTY_FUNCTION__);
+
+  CHECK_GE(max_capacity, initial_capacity);
+  CHECK(max_capacity <= 1 * GB) << "The max supported size for JIT code cache is 1GB";
+  // Align both capacities to page size, as that's the unit mspaces use.
+  initial_capacity_ = RoundDown(initial_capacity, 2 * kPageSize);
+  max_capacity_ = RoundDown(max_capacity, 2 * kPageSize);
+  current_capacity_ = initial_capacity,
+  data_end_ = initial_capacity / kCodeAndDataCapacityDivider;
+  exec_end_ = initial_capacity - data_end_;
 
   const size_t capacity = max_capacity_;
   const size_t data_capacity = capacity / kCodeAndDataCapacityDivider;
@@ -198,21 +213,9 @@ bool JitMemoryRegion::InitializeMappings(bool rwx_memory_allowed,
   data_pages_ = std::move(data_pages);
   exec_pages_ = std::move(exec_pages);
   non_exec_pages_ = std::move(non_exec_pages);
-  return true;
-}
 
-void JitMemoryRegion::InitializeState(size_t initial_capacity, size_t max_capacity) {
-  CHECK_GE(max_capacity, initial_capacity);
-  CHECK(max_capacity <= 1 * GB) << "The max supported size for JIT code cache is 1GB";
-  // Align both capacities to page size, as that's the unit mspaces use.
-  initial_capacity_ = RoundDown(initial_capacity, 2 * kPageSize);
-  max_capacity_ = RoundDown(max_capacity, 2 * kPageSize);
-  current_capacity_ = initial_capacity,
-  data_end_ = initial_capacity / kCodeAndDataCapacityDivider;
-  exec_end_ = initial_capacity - data_end_;
-}
+  // Now that the pages are initialized, initialize the spaces.
 
-void JitMemoryRegion::InitializeSpaces() {
   // Initialize the data heap
   data_mspace_ = create_mspace_with_base(data_pages_.Begin(), data_end_, false /*locked*/);
   CHECK(data_mspace_ != nullptr) << "create_mspace_with_base (data) failed";
@@ -238,6 +241,8 @@ void JitMemoryRegion::InitializeSpaces() {
     exec_mspace_ = nullptr;
     SetFootprintLimit(initial_capacity_);
   }
+
+  return true;
 }
 
 void JitMemoryRegion::SetFootprintLimit(size_t new_footprint) {
@@ -291,15 +296,14 @@ void* JitMemoryRegion::MoreCore(const void* mspace, intptr_t increment) NO_THREA
   }
 }
 
-uint8_t* JitMemoryRegion::AllocateCode(size_t code_size) {
+uint8_t* JitMemoryRegion::AllocateCode(size_t code_size, size_t alignment) {
   // Each allocation should be on its own set of cache lines.
   // `code_size` covers the OatQuickMethodHeader, the JIT generated machine code,
   // and any alignment padding.
-  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
   size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
   DCHECK_GT(code_size, header_size);
   uint8_t* result = reinterpret_cast<uint8_t*>(
-      mspace_memalign(exec_mspace_, kJitCodeAlignment, code_size));
+      mspace_memalign(exec_mspace_, alignment, code_size));
   // Ensure the header ends up at expected instruction alignment.
   DCHECK_ALIGNED_PARAM(reinterpret_cast<uintptr_t>(result + header_size), alignment);
   used_memory_for_code_ += mspace_usable_size(result);
@@ -322,6 +326,102 @@ void JitMemoryRegion::FreeData(uint8_t* data) {
   used_memory_for_data_ -= mspace_usable_size(data);
   mspace_free(data_mspace_, data);
 }
+
+#if defined(__BIONIC__)
+
+static bool IsSealFutureWriteSupportedInternal() {
+  unique_fd fd(art::memfd_create("test_android_memfd", MFD_ALLOW_SEALING));
+  if (fd == -1) {
+    LOG(INFO) << "memfd_create failed: " << strerror(errno) << ", no memfd support.";
+    return false;
+  }
+
+  if (fcntl(fd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE) == -1) {
+    LOG(INFO) << "fcntl(F_ADD_SEALS) failed: " << strerror(errno) << ", no memfd support.";
+    return false;
+  }
+
+  LOG(INFO) << "Using memfd for future sealing";
+  return true;
+}
+
+static bool IsSealFutureWriteSupported() {
+  static bool is_seal_future_write_supported = IsSealFutureWriteSupportedInternal();
+  return is_seal_future_write_supported;
+}
+
+int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg) {
+  /* Check if kernel support exists, otherwise fall back to ashmem */
+  static const char* kRegionName = "/jit-zygote-cache";
+  if (IsSealFutureWriteSupported()) {
+    int fd = art::memfd_create(kRegionName, MFD_ALLOW_SEALING);
+    if (fd == -1) {
+      std::ostringstream oss;
+      oss << "Failed to create zygote mapping: " << strerror(errno);
+      *error_msg = oss.str();
+      return -1;
+    }
+
+    if (ftruncate(fd, capacity) != 0) {
+      std::ostringstream oss;
+      oss << "Failed to create zygote mapping: " << strerror(errno);
+      *error_msg = oss.str();
+      return -1;
+    }
+
+    return fd;
+  }
+
+  LOG(INFO) << "Falling back to ashmem implementation for JIT zygote mapping";
+
+  int fd;
+  PaletteStatus status = PaletteAshmemCreateRegion(kRegionName, capacity, &fd);
+  if (status != PaletteStatus::kOkay) {
+    CHECK_EQ(status, PaletteStatus::kCheckErrno);
+    std::ostringstream oss;
+    oss << "Failed to create zygote mapping: " << strerror(errno);
+    *error_msg = oss.str();
+    return -1;
+  }
+  return fd;
+}
+
+bool JitMemoryRegion::ProtectZygoteMemory(int fd, std::string* error_msg) {
+  if (IsSealFutureWriteSupported()) {
+    if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL | F_SEAL_FUTURE_WRITE)
+            == -1) {
+      std::ostringstream oss;
+      oss << "Failed to protect zygote mapping: " << strerror(errno);
+      *error_msg = oss.str();
+      return false;
+    }
+  } else {
+    PaletteStatus status = PaletteAshmemSetProtRegion(fd, PROT_READ);
+    if (status != PaletteStatus::kOkay) {
+      CHECK_EQ(status, PaletteStatus::kCheckErrno);
+      std::ostringstream oss;
+      oss << "Failed to protect zygote mapping: " << strerror(errno);
+      *error_msg = oss.str();
+      return false;
+    }
+  }
+  return true;
+}
+
+#else
+
+// When running on non-bionic configuration, this is not supported.
+int JitMemoryRegion::CreateZygoteMemory(size_t capacity ATTRIBUTE_UNUSED,
+                                        std::string* error_msg ATTRIBUTE_UNUSED) {
+  return -1;
+}
+
+bool JitMemoryRegion::ProtectZygoteMemory(int fd ATTRIBUTE_UNUSED,
+                                          std::string* error_msg ATTRIBUTE_UNUSED) {
+  return true;
+}
+
+#endif
 
 }  // namespace jit
 }  // namespace art

@@ -178,6 +178,7 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
     }
   }
 
+  size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
   // Check whether the provided max capacity in options is below 1GB.
   size_t max_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheMaxCapacity();
   // We need to have 32 bit offsets from method headers in code cache which point to things
@@ -191,24 +192,22 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
     return nullptr;
   }
 
-  size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
-
-  std::unique_ptr<JitCodeCache> jit_code_cache(new JitCodeCache());
-
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  jit_code_cache->private_region_.InitializeState(initial_capacity, max_capacity);
-
-  // Zygote should never collect code to share the memory with the children.
-  if (is_zygote) {
-    jit_code_cache->garbage_collect_code_ = false;
-  }
-
-  if (!jit_code_cache->private_region_.InitializeMappings(
-        rwx_memory_allowed, is_zygote, error_msg)) {
+  JitMemoryRegion region;
+  if (!region.Initialize(initial_capacity,
+                         max_capacity,
+                         rwx_memory_allowed,
+                         is_zygote,
+                         error_msg)) {
     return nullptr;
   }
 
-  jit_code_cache->private_region_.InitializeSpaces();
+  std::unique_ptr<JitCodeCache> jit_code_cache(new JitCodeCache());
+  if (is_zygote) {
+    // Zygote should never collect code to share the memory with the children.
+    jit_code_cache->garbage_collect_code_ = false;
+  }
+  jit_code_cache->private_region_ = std::move(region);
 
   VLOG(jit) << "Created jit code cache: initial capacity="
             << PrettySize(initial_capacity)
@@ -373,8 +372,19 @@ bool JitCodeCache::WaitForPotentialCollectionToComplete(Thread* self) {
   return in_collection;
 }
 
+static size_t GetJitCodeAlignment() {
+  if (kRuntimeISA == InstructionSet::kArm || kRuntimeISA == InstructionSet::kThumb2) {
+    // Some devices with 32-bit ARM kernels need additional JIT code alignment when using dual
+    // view JIT (b/132205399). The alignment returned here coincides with the typical ARM d-cache
+    // line (though the value should be probed ideally). Both the method header and code in the
+    // cache are aligned to this size.
+    return 64;
+  }
+  return GetInstructionSetAlignment(kRuntimeISA);
+}
+
 static uintptr_t FromCodeToAllocation(const void* code) {
-  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
+  size_t alignment = GetJitCodeAlignment();
   return reinterpret_cast<uintptr_t>(code) - RoundUp(sizeof(OatQuickMethodHeader), alignment);
 }
 
@@ -704,14 +714,14 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   {
     ScopedCodeCacheWrite scc(*region);
 
-    size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
+    size_t alignment = GetJitCodeAlignment();
     // Ensure the header ends up at expected instruction alignment.
     size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
     size_t total_size = header_size + code_size;
 
     // AllocateCode allocates memory in non-executable region for alignment header and code. The
     // header size may include alignment padding.
-    uint8_t* nox_memory = region->AllocateCode(total_size);
+    uint8_t* nox_memory = region->AllocateCode(total_size, alignment);
     if (nox_memory == nullptr) {
       return nullptr;
     }
@@ -793,8 +803,11 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     }
 
     // Discard the code if any single-implementation assumptions are now invalid.
-    if (!single_impl_still_valid) {
+    if (UNLIKELY(!single_impl_still_valid)) {
       VLOG(jit) << "JIT discarded jitted code due to invalid single-implementation assumptions.";
+      ScopedCodeCacheWrite ccw(*region);
+      uintptr_t allocation = FromCodeToAllocation(code_ptr);
+      region->FreeCode(reinterpret_cast<uint8_t*>(allocation));
       return nullptr;
     }
     DCHECK(cha_single_implementation_list.empty() || !Runtime::Current()->IsJavaDebuggable())
@@ -1833,17 +1846,14 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
 
   size_t initial_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheInitialCapacity();
   size_t max_capacity = Runtime::Current()->GetJITOptions()->GetCodeCacheMaxCapacity();
-
-  private_region_.InitializeState(initial_capacity, max_capacity);
-
   std::string error_msg;
-  if (!private_region_.InitializeMappings(
-          /* rwx_memory_allowed= */ !is_system_server, is_zygote, &error_msg)) {
-    LOG(WARNING) << "Could not reset JIT state after zygote fork: " << error_msg;
-    return;
+  if (!private_region_.Initialize(initial_capacity,
+                                  max_capacity,
+                                  /* rwx_memory_allowed= */ !is_system_server,
+                                  is_zygote,
+                                  &error_msg)) {
+    LOG(WARNING) << "Could not create private region after zygote fork: " << error_msg;
   }
-
-  private_region_.InitializeSpaces();
 }
 
 }  // namespace jit
