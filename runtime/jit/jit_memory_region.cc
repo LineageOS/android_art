@@ -23,6 +23,7 @@
 #include "base/bit_utils.h"  // For RoundDown, RoundUp
 #include "base/globals.h"
 #include "base/logging.h"  // For VLOG.
+#include "base/membarrier.h"
 #include "base/memfd.h"
 #include "base/systrace.h"
 #include "gc/allocator/dlmalloc.h"
@@ -296,24 +297,87 @@ void* JitMemoryRegion::MoreCore(const void* mspace, intptr_t increment) NO_THREA
   }
 }
 
-uint8_t* JitMemoryRegion::AllocateCode(size_t code_size, size_t alignment) {
-  // Each allocation should be on its own set of cache lines.
-  // `code_size` covers the OatQuickMethodHeader, the JIT generated machine code,
-  // and any alignment padding.
-  size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
-  DCHECK_GT(code_size, header_size);
-  uint8_t* result = reinterpret_cast<uint8_t*>(
-      mspace_memalign(exec_mspace_, alignment, code_size));
+const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
+                                             size_t code_size,
+                                             const uint8_t* stack_map,
+                                             bool has_should_deoptimize_flag) {
+  ScopedCodeCacheWrite scc(*this);
+
+  size_t alignment = GetJitCodeAlignment();
   // Ensure the header ends up at expected instruction alignment.
-  DCHECK_ALIGNED_PARAM(reinterpret_cast<uintptr_t>(result + header_size), alignment);
-  used_memory_for_code_ += mspace_usable_size(result);
+  size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
+  size_t total_size = header_size + code_size;
+
+  // Each allocation should be on its own set of cache lines.
+  // `total_size` covers the OatQuickMethodHeader, the JIT generated machine code,
+  // and any alignment padding.
+  DCHECK_GT(total_size, header_size);
+  uint8_t* w_memory = reinterpret_cast<uint8_t*>(
+      mspace_memalign(exec_mspace_, alignment, total_size));
+  if (w_memory == nullptr) {
+    return nullptr;
+  }
+  uint8_t* x_memory = GetExecutableAddress(w_memory);
+  // Ensure the header ends up at expected instruction alignment.
+  DCHECK_ALIGNED_PARAM(reinterpret_cast<uintptr_t>(w_memory + header_size), alignment);
+  used_memory_for_code_ += mspace_usable_size(w_memory);
+  const uint8_t* result = x_memory + header_size;
+
+  // Write the code.
+  std::copy(code, code + code_size, w_memory + header_size);
+
+  // Write the header.
+  OatQuickMethodHeader* method_header =
+      OatQuickMethodHeader::FromCodePointer(w_memory + header_size);
+  new (method_header) OatQuickMethodHeader(
+      (stack_map != nullptr) ? result - stack_map : 0u,
+      code_size);
+  if (has_should_deoptimize_flag) {
+    method_header->SetHasShouldDeoptimizeFlag();
+  }
+
+  // Both instruction and data caches need flushing to the point of unification where both share
+  // a common view of memory. Flushing the data cache ensures the dirty cachelines from the
+  // newly added code are written out to the point of unification. Flushing the instruction
+  // cache ensures the newly written code will be fetched from the point of unification before
+  // use. Memory in the code cache is re-cycled as code is added and removed. The flushes
+  // prevent stale code from residing in the instruction cache.
+  //
+  // Caches are flushed before write permission is removed because some ARMv8 Qualcomm kernels
+  // may trigger a segfault if a page fault occurs when requesting a cache maintenance
+  // operation. This is a kernel bug that we need to work around until affected devices
+  // (e.g. Nexus 5X and 6P) stop being supported or their kernels are fixed.
+  //
+  // For reference, this behavior is caused by this commit:
+  // https://android.googlesource.com/kernel/msm/+/3fbe6bc28a6b9939d0650f2f17eb5216c719950c
+  //
+  if (HasDualCodeMapping()) {
+    // Flush the data cache lines associated with the non-executable copy of the code just added.
+    FlushDataCache(w_memory, w_memory + total_size);
+  }
+
+  // FlushInstructionCache() flushes both data and instruction caches lines. The cacheline range
+  // flushed is for the executable mapping of the code just added.
+  FlushInstructionCache(x_memory, x_memory + total_size);
+
+  // Ensure CPU instruction pipelines are flushed for all cores. This is necessary for
+  // correctness as code may still be in instruction pipelines despite the i-cache flush. It is
+  // not safe to assume that changing permissions with mprotect (RX->RWX->RX) will cause a TLB
+  // shootdown (incidentally invalidating the CPU pipelines by sending an IPI to all cores to
+  // notify them of the TLB invalidation). Some architectures, notably ARM and ARM64, have
+  // hardware support that broadcasts TLB invalidations and so their kernels have no software
+  // based TLB shootdown. The sync-core flavor of membarrier was introduced in Linux 4.16 to
+  // address this (see mbarrier(2)). The membarrier here will fail on prior kernels and on
+  // platforms lacking the appropriate support.
+  art::membarrier(art::MembarrierCommand::kPrivateExpeditedSyncCore);
+
   return result;
 }
 
-void JitMemoryRegion::FreeCode(uint8_t* code) {
+void JitMemoryRegion::FreeCode(const uint8_t* code) {
   code = GetNonExecutableAddress(code);
   used_memory_for_code_ -= mspace_usable_size(code);
-  mspace_free(exec_mspace_, code);
+  mspace_free(exec_mspace_, const_cast<uint8_t*>(code));
 }
 
 uint8_t* JitMemoryRegion::AllocateData(size_t data_size) {
