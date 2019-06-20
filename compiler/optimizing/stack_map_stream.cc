@@ -307,12 +307,14 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
 
   ScopedArenaVector<uint8_t> buffer(allocator_->Adapter(kArenaAllocStackMapStream));
   BitMemoryWriter<ScopedArenaVector<uint8_t>> out(&buffer);
-  out.WriteVarint(flags);
-  out.WriteVarint(packed_frame_size_);
-  out.WriteVarint(core_spill_mask_);
-  out.WriteVarint(fp_spill_mask_);
-  out.WriteVarint(num_dex_registers_);
-  out.WriteVarint(bit_table_flags);
+  out.WriteInterleavedVarints(std::array<uint32_t, CodeInfo::kNumHeaders>{
+    flags,
+    packed_frame_size_,
+    core_spill_mask_,
+    fp_spill_mask_,
+    num_dex_registers_,
+    bit_table_flags,
+  });
   ForEachBitTable([&out](size_t, auto bit_table) {
     if (bit_table->size() != 0) {  // Skip empty bit-tables.
       bit_table->Encode(out);
