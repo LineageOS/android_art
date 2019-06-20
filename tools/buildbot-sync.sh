@@ -33,5 +33,17 @@ adb push ${ANDROID_PRODUCT_OUT}/system ${ART_TEST_CHROOT}/
 adb push ${ANDROID_BUILD_TOP}/art/tools/public.libraries.buildbot.txt \
   ${ART_TEST_CHROOT}/system/etc/public.libraries.txt
 
+# Temporarily push a copy of the ICU data file into the Android Runtime Root
+# location ("/apex/com.android.runtime"). This step is required in the time
+# interval between:
+# 1. the moment we stop setting `ART_TEST_ANDROID_RUNTIME_ROOT` to "/system"
+#    (meaning Bionic will start looking for it in the default
+#    `ANDROID_RUNTIME_ROOT` location, which is "/apex/com.android.runtime"); and
+# 2. the moment we start installing and using the Runtime APEX (which includes
+#    the ICU data file) within the chroot directory on device for target
+#    testing.
+adb shell rm -rf ${ART_TEST_CHROOT}/apex/com.android.runtime
+adb push ${ANDROID_PRODUCT_OUT}/system/etc/icu ${ART_TEST_CHROOT}/apex/com.android.runtime/etc/icu
+
 # Sync the data directory to the chroot.
 adb push ${ANDROID_PRODUCT_OUT}/data ${ART_TEST_CHROOT}/
