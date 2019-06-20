@@ -43,7 +43,7 @@ TEST(BitMemoryRegion, TestVarint) {
 
       BitMemoryReader reader(buffer.data(), start_bit_offset);
       uint32_t result = reader.ReadVarint();
-      uint32_t upper_bound = RoundUp(MinimumBitsToStore(value), kBitsPerByte) + kVarintBits;
+      uint32_t upper_bound = RoundUp(MinimumBitsToStore(value), kBitsPerByte) + kVarintHeaderBits;
       EXPECT_EQ(writer.NumberOfWrittenBits(), reader.NumberOfReadBits());
       EXPECT_EQ(value, result);
       EXPECT_GE(upper_bound, writer.NumberOfWrittenBits());
