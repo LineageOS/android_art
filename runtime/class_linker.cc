@@ -9320,6 +9320,9 @@ void ClassLinker::DumpForSigQuit(std::ostream& os) {
     }
   }
   os << "Done dumping class loaders\n";
+  Runtime* runtime = Runtime::Current();
+  os << "Classes initialized: " << runtime->GetStat(KIND_GLOBAL_CLASS_INIT_COUNT) << " in "
+     << PrettyDuration(runtime->GetStat(KIND_GLOBAL_CLASS_INIT_TIME)) << "\n";
 }
 
 class CountClassesVisitor : public ClassLoaderVisitor {
