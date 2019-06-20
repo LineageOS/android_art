@@ -443,8 +443,7 @@ class CodeInfo {
 
   ALWAYS_INLINE static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* code_info_data) {
     BitMemoryReader reader(code_info_data);
-    uint32_t header[4];  // flags, packed_frame_size, core_spill_mask, fp_spill_mask.
-    reader.ReadVarints(header);
+    std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
     return QuickMethodFrameInfo(header[1] * kStackAlignment, header[2], header[3]);
   }
 

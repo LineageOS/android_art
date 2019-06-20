@@ -33,14 +33,13 @@ CodeInfo::CodeInfo(const OatQuickMethodHeader* header, DecodeFlags flags)
 
 void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
   BitMemoryReader reader(data);
-  uint32_t header[kNumHeaders];
-  reader.ReadVarints(header);
+  std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
   ForEachHeaderField([this, &header](size_t i, auto member_pointer) {
     this->*member_pointer = header[i];
   });
   ForEachBitTableField([this, &reader](size_t i, auto member_pointer) {
     auto& table = this->*member_pointer;
-    if (HasBitTable(i)) {
+    if (LIKELY(HasBitTable(i))) {
       if (UNLIKELY(IsBitTableDeduped(i))) {
         ssize_t bit_offset = reader.NumberOfReadBits() - reader.ReadVarint();
         BitMemoryReader reader2(reader.data(), bit_offset);  // The offset is negative.
@@ -60,12 +59,16 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
   writer_.ByteAlign();
   size_t deduped_offset = writer_.NumberOfWrittenBits() / kBitsPerByte;
 
+  // The back-reference offset takes space so dedupe is not worth it for tiny tables.
+  constexpr size_t kMinDedupSize = 32;  // Assume 32-bit offset on average.
+
   // Read the existing code info and find (and keep) dedup-map iterator for each table.
   // The iterator stores BitMemoryRegion and bit_offset of previous identical BitTable.
   BitMemoryReader reader(code_info_data);
   CodeInfo code_info;  // Temporary storage for decoded data.
-  ForEachHeaderField([&reader, &code_info](size_t, auto member_pointer) {
-    code_info.*member_pointer = reader.ReadVarint();
+  std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
+  ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
+    code_info.*member_pointer = header[i];
   });
   std::map<BitMemoryRegion, uint32_t, BitMemoryRegion::Less>::iterator it[kNumBitTables];
   ForEachBitTableField([this, &reader, &code_info, &it](size_t i, auto member_pointer) {
@@ -75,16 +78,17 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
       (code_info.*member_pointer).Decode(reader);
       BitMemoryRegion region = reader.GetReadRegion().Subregion(bit_table_start);
       it[i] = dedupe_map_.emplace(region, /* default bit_offset */ 0).first;
-      if (it[i]->second != 0 && region.size_in_bits() > 32) {  // Seen before and large?
+      if (it[i]->second != 0 && region.size_in_bits() > kMinDedupSize) {  // Seen before and large?
         code_info.SetBitTableDeduped(i);  // Mark as deduped before we write header.
       }
     }
   });
 
   // Write the code info back, but replace deduped tables with relative offsets.
-  ForEachHeaderField([this, &code_info](size_t, auto member_pointer) {
-    writer_.WriteVarint(code_info.*member_pointer);
+  ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
+    header[i] = code_info.*member_pointer;
   });
+  writer_.WriteInterleavedVarints(header);
   ForEachBitTableField([this, &code_info, &it](size_t i, auto) {
     if (code_info.HasBitTable(i)) {
       uint32_t& bit_offset = it[i]->second;
@@ -106,7 +110,8 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
         DCHECK_EQ(old_code_info.*member_pointer, new_code_info.*member_pointer);
       }
     });
-    ForEachBitTableField([&old_code_info, &new_code_info](size_t, auto member_pointer) {
+    ForEachBitTableField([&old_code_info, &new_code_info](size_t i, auto member_pointer) {
+      DCHECK_EQ(old_code_info.HasBitTable(i), new_code_info.HasBitTable(i));
       DCHECK((old_code_info.*member_pointer).Equals(new_code_info.*member_pointer));
     });
   }
@@ -203,8 +208,9 @@ void CodeInfo::CollectSizeStats(const uint8_t* code_info_data, /*out*/ Stats* pa
   Stats* codeinfo_stats = parent->Child("CodeInfo");
   BitMemoryReader reader(code_info_data);
   CodeInfo code_info;  // Temporary storage for decoded tables.
-  ForEachHeaderField([&reader, &code_info](size_t, auto member_pointer) {
-    code_info.*member_pointer = reader.ReadVarint();
+  std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
+  ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
+    code_info.*member_pointer = header[i];
   });
   codeinfo_stats->Child("Header")->AddBits(reader.NumberOfReadBits());
   ForEachBitTableField([codeinfo_stats, &reader, &code_info](size_t i, auto member_pointer) {
