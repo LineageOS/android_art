@@ -19,6 +19,7 @@
 
 #include <string>
 
+#include "arch/instruction_set.h"
 #include "base/globals.h"
 #include "base/locks.h"
 #include "base/mem_map.h"
@@ -31,6 +32,17 @@ class TestZygoteMemory;
 // Number of bytes represented by a bit in the CodeCacheBitmap. Value is reasonable for all
 // architectures.
 static constexpr int kJitCodeAccountingBytes = 16;
+
+size_t inline GetJitCodeAlignment() {
+  if (kRuntimeISA == InstructionSet::kArm || kRuntimeISA == InstructionSet::kThumb2) {
+    // Some devices with 32-bit ARM kernels need additional JIT code alignment when using dual
+    // view JIT (b/132205399). The alignment returned here coincides with the typical ARM d-cache
+    // line (though the value should be probed ideally). Both the method header and code in the
+    // cache are aligned to this size.
+    return 64;
+  }
+  return GetInstructionSetAlignment(kRuntimeISA);
+}
 
 // Represents a memory region for the JIT, where code and data are stored. This class
 // provides allocation and deallocation primitives.
@@ -62,8 +74,15 @@ class JitMemoryRegion {
 
   // Set the footprint limit of the code cache.
   void SetFootprintLimit(size_t new_footprint) REQUIRES(Locks::jit_lock_);
-  uint8_t* AllocateCode(size_t code_size, size_t alignment) REQUIRES(Locks::jit_lock_);
-  void FreeCode(uint8_t* code) REQUIRES(Locks::jit_lock_);
+
+  // Copy the code into the region, and allocate an OatQuickMethodHeader.
+  // Callers should not write into the returned memory, as it may be read-only.
+  const uint8_t* AllocateCode(const uint8_t* code,
+                              size_t code_size,
+                              const uint8_t* stack_map,
+                              bool has_should_deoptimize_flag)
+      REQUIRES(Locks::jit_lock_);
+  void FreeCode(const uint8_t* code) REQUIRES(Locks::jit_lock_);
   uint8_t* AllocateData(size_t data_size) REQUIRES(Locks::jit_lock_);
   void FreeData(uint8_t* data) REQUIRES(Locks::jit_lock_);
 
@@ -83,26 +102,8 @@ class JitMemoryRegion {
     return exec_pages_.HasAddress(ptr);
   }
 
-  const MemMap* GetUpdatableCodeMapping() const {
-    if (HasDualCodeMapping()) {
-      return &non_exec_pages_;
-    } else if (HasCodeMapping()) {
-      return &exec_pages_;
-    } else {
-      return nullptr;
-    }
-  }
-
   const MemMap* GetExecPages() const {
     return &exec_pages_;
-  }
-
-  template <typename T> T* GetExecutableAddress(T* src_ptr) {
-    return TranslateAddress(src_ptr, non_exec_pages_, exec_pages_);
-  }
-
-  template <typename T> T* GetNonExecutableAddress(T* src_ptr) {
-    return TranslateAddress(src_ptr, exec_pages_, non_exec_pages_);
   }
 
   void* MoreCore(const void* mspace, intptr_t increment);
@@ -133,9 +134,27 @@ class JitMemoryRegion {
     if (!HasDualCodeMapping()) {
       return src_ptr;
     }
-    CHECK(src.HasAddress(src_ptr));
-    uint8_t* const raw_src_ptr = reinterpret_cast<uint8_t*>(src_ptr);
+    CHECK(src.HasAddress(src_ptr)) << reinterpret_cast<const void*>(src_ptr);
+    const uint8_t* const raw_src_ptr = reinterpret_cast<const uint8_t*>(src_ptr);
     return reinterpret_cast<T*>(raw_src_ptr - src.Begin() + dst.Begin());
+  }
+
+  const MemMap* GetUpdatableCodeMapping() const {
+    if (HasDualCodeMapping()) {
+      return &non_exec_pages_;
+    } else if (HasCodeMapping()) {
+      return &exec_pages_;
+    } else {
+      return nullptr;
+    }
+  }
+
+  template <typename T> T* GetExecutableAddress(T* src_ptr) {
+    return TranslateAddress(src_ptr, non_exec_pages_, exec_pages_);
+  }
+
+  template <typename T> T* GetNonExecutableAddress(T* src_ptr) {
+    return TranslateAddress(src_ptr, exec_pages_, non_exec_pages_);
   }
 
   static int CreateZygoteMemory(size_t capacity, std::string* error_msg);
@@ -178,6 +197,7 @@ class JitMemoryRegion {
   // The opaque mspace for allocating code.
   void* exec_mspace_ GUARDED_BY(Locks::jit_lock_);
 
+  friend class ScopedCodeCacheWrite;  // For GetUpdatableCodeMapping
   friend class TestZygoteMemory;
 };
 
