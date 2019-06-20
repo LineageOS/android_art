@@ -61,7 +61,7 @@ class ScopedGlobalRef {
   }
 
   T Get(JNIEnv* env) const {
-    return env->NewLocalRef(obj_);
+    return reinterpret_cast<T>(env->NewLocalRef(obj_));
   }
 
  private:
@@ -75,7 +75,9 @@ class ScopedGlobalRef {
 };
 
 struct EventLog {
-  std::string msg_;
+  ScopedGlobalRef<jclass> object_klass;
+  ScopedGlobalRef<jclass> object_klass2;
+  jlong size;
   ScopedGlobalRef<jthread> thr_;
 };
 
@@ -88,15 +90,11 @@ static void JNICALL ObjectAllocated(jvmtiEnv* ti_env ATTRIBUTE_UNUSED,
                                     jobject object,
                                     jclass object_klass,
                                     jlong size) {
-  std::string object_klass_descriptor = GetClassName(jni_env, object_klass);
   ScopedLocalRef<jclass> object_klass2(jni_env, jni_env->GetObjectClass(object));
-  std::string object_klass_descriptor2 = GetClassName(jni_env, object_klass2.get());
-
   std::lock_guard<std::mutex> guard(gEventsMutex);
-  gEvents.push_back({android::base::StringPrintf("ObjectAllocated type %s/%s size %zu",
-                                                 object_klass_descriptor.c_str(),
-                                                 object_klass_descriptor2.c_str(),
-                                                 static_cast<size_t>(size)),
+  gEvents.push_back({ScopedGlobalRef<jclass>(jni_env, object_klass),
+                     ScopedGlobalRef<jclass>(jni_env, object_klass2.get()),
+                     size,
                      ScopedGlobalRef<jthread>(jni_env, thread)});
 }
 
@@ -135,7 +133,15 @@ extern "C" JNIEXPORT jobjectArray JNICALL Java_art_Test904_getTrackingEventMessa
       ScopedLocalRef<jthread> thr(env, ev.thr_.Get(env));
       for (jthread req_thread : thread_lst) {
         if (env->IsSameObject(req_thread, thr.get())) {
-          real_events.push_back(ev.msg_);
+          ScopedLocalRef<jclass> klass(env, ev.object_klass.Get(env));
+          ScopedLocalRef<jclass> klass2(env, ev.object_klass2.Get(env));
+          std::string object_klass_descriptor = GetClassName(env, klass.get());
+          std::string object_klass_descriptor2 = GetClassName(env, klass2.get());
+          std::string res(android::base::StringPrintf("ObjectAllocated type %s/%s size %zu",
+                                                      object_klass_descriptor.c_str(),
+                                                      object_klass_descriptor2.c_str(),
+                                                      static_cast<size_t>(ev.size)));
+          real_events.push_back(res);
           break;
         }
       }
