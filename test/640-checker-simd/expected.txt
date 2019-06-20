@@ -1,0 +1,7 @@
+SimdByte passed
+SimdShort passed
+SimdChar passed
+SimdInt passed
+SimdLong passed
+SimdDouble passed
+SimdFloat passed

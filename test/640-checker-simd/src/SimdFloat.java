@@ -18,71 +18,71 @@
  * Functional tests for SIMD vectorization. Note that this class provides a mere
  * functional test, not a precise numerical verifier.
  */
-public class Main {
+public class SimdFloat {
 
-  static double[] a;
+  static float[] a;
 
   //
   // Arithmetic operations.
   //
 
-  /// CHECK-START: void Main.add(double) loop_optimization (before)
+  /// CHECK-START: void SimdFloat.add(float) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.add(double) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.add(float) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecAdd   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
-  static void add(double x) {
+  static void add(float x) {
     for (int i = 0; i < 128; i++)
       a[i] += x;
   }
 
-  /// CHECK-START: void Main.sub(double) loop_optimization (before)
+  /// CHECK-START: void SimdFloat.sub(float) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.sub(double) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.sub(float) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecSub   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
-  static void sub(double x) {
+  static void sub(float x) {
     for (int i = 0; i < 128; i++)
       a[i] -= x;
   }
 
-  /// CHECK-START: void Main.mul(double) loop_optimization (before)
+  /// CHECK-START: void SimdFloat.mul(float) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.mul(double) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.mul(float) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecMul   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
-  static void mul(double x) {
+  static void mul(float x) {
     for (int i = 0; i < 128; i++)
       a[i] *= x;
   }
 
-  /// CHECK-START: void Main.div(double) loop_optimization (before)
+  /// CHECK-START: void SimdFloat.div(float) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.div(double) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.div(float) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecDiv   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
-  static void div(double x) {
+  static void div(float x) {
     for (int i = 0; i < 128; i++)
       a[i] /= x;
   }
 
-  /// CHECK-START: void Main.neg() loop_optimization (before)
+  /// CHECK-START: void SimdFloat.neg() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.neg() loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.neg() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecNeg   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -91,11 +91,11 @@ public class Main {
       a[i] = -a[i];
   }
 
-  /// CHECK-START: void Main.abs() loop_optimization (before)
+  /// CHECK-START: void SimdFloat.abs() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.abs() loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.abs() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecAbs   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -104,16 +104,15 @@ public class Main {
       a[i] = Math.abs(a[i]);
   }
 
-  /// CHECK-START: void Main.conv(long[]) loop_optimization (before)
+  /// CHECK-START: void SimdFloat.conv(int[]) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.conv(long[]) loop_optimization (after)
-  /// CHECK-NOT: VecLoad
-  /// CHECK-NOT: VecStore
-  //
-  // TODO: fill in when long2double is supported
-  static void conv(long[] b) {
+  /// CHECK-START-{ARM64,MIPS64}: void SimdFloat.conv(int[]) loop_optimization (after)
+  /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: VecCnv   loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  static void conv(int[] b) {
     for (int i = 0; i < 128; i++)
       a[i] = b[i];
   }
@@ -131,26 +130,26 @@ public class Main {
   // Test Driver.
   //
 
-  public static void main(String[] args) {
+  public static void main() {
     // Set up.
-    a = new double[128];
+    a = new float[128];
     for (int i = 0; i < 128; i++) {
       a[i] = i;
     }
     // Arithmetic operations.
-    add(2.0);
+    add(2.0f);
     for (int i = 0; i < 128; i++) {
       expectEquals(i + 2, a[i], "add");
     }
-    sub(2.0);
+    sub(2.0f);
     for (int i = 0; i < 128; i++) {
       expectEquals(i, a[i], "sub");
     }
-    mul(2.0);
+    mul(2.0f);
     for (int i = 0; i < 128; i++) {
       expectEquals(i + i, a[i], "mul");
     }
-    div(2.0);
+    div(2.0f);
     for (int i = 0; i < 128; i++) {
       expectEquals(i, a[i], "div");
     }
@@ -176,19 +175,19 @@ public class Main {
     }
     expectEquals(127, a[127], "abs127");
     // Conversion.
-    long[] b = new long[128];
+    int[] b = new int[128];
     for (int i = 0; i < 128; i++) {
       b[i] = 1000 * i;
     }
     conv(b);
     for (int i = 1; i < 127; i++) {
-      expectEquals(1000.0 * i, a[i], "conv");
+      expectEquals(1000.0f * i, a[i], "conv");
     }
     // Done.
-    System.out.println("passed");
+    System.out.println("SimdFloat passed");
   }
 
-  private static void expectEquals(double expected, double result, String action) {
+  private static void expectEquals(float expected, float result, String action) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result + " for " + action);
     }
