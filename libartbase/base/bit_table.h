@@ -49,8 +49,7 @@ class BitTableBase {
 
   ALWAYS_INLINE void Decode(BitMemoryReader& reader) {
     // Decode row count and column sizes from the table header.
-    uint32_t header[1 + kNumColumns];
-    reader.ReadVarints(header);
+    std::array<uint32_t, 1+kNumColumns> header = reader.ReadInterleavedVarints<1+kNumColumns>();
     num_rows_ = header[0];
     column_offset_[0] = 0;
     for (uint32_t i = 0; i < kNumColumns; i++) {
@@ -335,7 +334,7 @@ class BitTableBuilderBase {
   }
 
   // Calculate the column bit widths based on the current data.
-  void Measure(/*out*/ std::array<uint32_t, kNumColumns>* column_bits) const {
+  void Measure(/*out*/ uint32_t* column_bits) const {
     uint32_t max_column_value[kNumColumns];
     std::fill_n(max_column_value, kNumColumns, 0);
     for (uint32_t r = 0; r < size(); r++) {
@@ -344,7 +343,7 @@ class BitTableBuilderBase {
       }
     }
     for (uint32_t c = 0; c < kNumColumns; c++) {
-      (*column_bits)[c] = MinimumBitsToStore(max_column_value[c]);
+      column_bits[c] = MinimumBitsToStore(max_column_value[c]);
     }
   }
 
@@ -353,14 +352,12 @@ class BitTableBuilderBase {
   void Encode(BitMemoryWriter<Vector>& out) const {
     size_t initial_bit_offset = out.NumberOfWrittenBits();
 
-    std::array<uint32_t, kNumColumns> column_bits;
-    Measure(&column_bits);
-
     // Write table header.
-    out.WriteVarint(size());
-    for (uint32_t c = 0; c < kNumColumns; c++) {
-      out.WriteVarint(column_bits[c]);
-    }
+    std::array<uint32_t, 1 + kNumColumns> header;
+    header[0] = size();
+    uint32_t* column_bits = header.data() + 1;
+    Measure(column_bits);
+    out.WriteInterleavedVarints(header);
 
     // Write table data.
     for (uint32_t r = 0; r < size(); r++) {
@@ -444,8 +441,10 @@ class BitmapTableBuilder {
     size_t initial_bit_offset = out.NumberOfWrittenBits();
 
     // Write table header.
-    out.WriteVarint(size());
-    out.WriteVarint(max_num_bits_);
+    out.WriteInterleavedVarints(std::array<uint32_t, 2>{
+      dchecked_integral_cast<uint32_t>(size()),
+      dchecked_integral_cast<uint32_t>(max_num_bits_),
+    });
 
     // Write table data.
     for (MemoryRegion row : rows_) {
