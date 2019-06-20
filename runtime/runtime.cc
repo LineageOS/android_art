@@ -675,6 +675,8 @@ void Runtime::PostZygoteFork() {
   if (GetJit() != nullptr) {
     GetJit()->PostZygoteFork();
   }
+  // Reset all stats.
+  ResetStats(0xFFFFFFFF);
 }
 
 void Runtime::CallExitHook(jint status) {
