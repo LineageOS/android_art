@@ -17,19 +17,19 @@
 /**
  * Functional tests for SIMD vectorization.
  */
-public class Main {
+public class SimdChar {
 
-  static byte[] a;
+  static char[] a;
 
   //
   // Arithmetic operations.
   //
 
-  /// CHECK-START: void Main.add(int) loop_optimization (before)
+  /// CHECK-START: void SimdChar.add(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.add(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.add(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecAdd   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -38,11 +38,11 @@ public class Main {
       a[i] += x;
   }
 
-  /// CHECK-START: void Main.sub(int) loop_optimization (before)
+  /// CHECK-START: void SimdChar.sub(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.sub(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.sub(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecSub   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -51,11 +51,11 @@ public class Main {
       a[i] -= x;
   }
 
-  /// CHECK-START: void Main.mul(int) loop_optimization (before)
+  /// CHECK-START: void SimdChar.mul(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.mul(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.mul(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecMul   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -64,11 +64,12 @@ public class Main {
       a[i] *= x;
   }
 
-  /// CHECK-START: void Main.div(int) loop_optimization (before)
+  /// CHECK-START: void SimdChar.div(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.div(int) loop_optimization (after)
+  /// CHECK-START: void SimdChar.div(int) loop_optimization (after)
+  /// CHECK-NOT: VecDiv
   //
   //  Not supported on any architecture.
   //
@@ -77,37 +78,37 @@ public class Main {
       a[i] /= x;
   }
 
-  /// CHECK-START: void Main.neg() loop_optimization (before)
+  /// CHECK-START: void SimdChar.neg() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.neg() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.neg() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecNeg   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
   static void neg() {
     for (int i = 0; i < 128; i++)
-      a[i] = (byte) -a[i];
+      a[i] = (char) -a[i];
   }
 
-  /// CHECK-START: void Main.not() loop_optimization (before)
+  /// CHECK-START: void SimdChar.not() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.not() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.not() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecNot   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
   static void not() {
     for (int i = 0; i < 128; i++)
-      a[i] = (byte) ~a[i];
+      a[i] = (char) ~a[i];
   }
 
-  /// CHECK-START: void Main.shl4() loop_optimization (before)
+  /// CHECK-START: void SimdChar.shl4() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.shl4() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.shl4() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecShl   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -116,26 +117,26 @@ public class Main {
       a[i] <<= 4;
   }
 
-  /// CHECK-START: void Main.sar2() loop_optimization (before)
+  /// CHECK-START: void SimdChar.sar2() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.sar2() loop_optimization (after)
-  /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: VecShr   loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  // TODO: would need signess flip.
+  /// CHECK-START: void SimdChar.sar2() loop_optimization (after)
+  /// CHECK-NOT: VecShr
   static void sar2() {
     for (int i = 0; i < 128; i++)
       a[i] >>= 2;
   }
 
-  /// CHECK-START: void Main.shr2() loop_optimization (before)
+  /// CHECK-START: void SimdChar.shr2() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  // TODO: would need signess flip.
-  /// CHECK-START: void Main.shr2() loop_optimization (after)
-  /// CHECK-NOT: VecUShr
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdChar.shr2() loop_optimization (after)
+  /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: VecUShr  loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
   static void shr2() {
     for (int i = 0; i < 128; i++)
       a[i] >>>= 2;
@@ -165,11 +166,6 @@ public class Main {
       a[i] >>>= 33;  // 1, since & 31
   }
 
-  static void shl9() {
-    for (int i = 0; i < 128; i++)
-      a[i] <<= 9;  // yields all-zeros
-  }
-
   //
   // Loop bounds.
   //
@@ -183,16 +179,16 @@ public class Main {
   // Test Driver.
   //
 
-  public static void main(String[] args) {
+  public static void main() {
     // Set up.
-    a = new byte[128];
+    a = new char[128];
     for (int i = 0; i < 128; i++) {
-      a[i] = (byte) i;
+      a[i] = (char) i;
     }
     // Arithmetic operations.
     add(2);
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte)(i + 2), a[i], "add");
+      expectEquals(i + 2, a[i], "add");
     }
     sub(2);
     for (int i = 0; i < 128; i++) {
@@ -200,68 +196,65 @@ public class Main {
     }
     mul(2);
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte)(i + i), a[i], "mul");
+      expectEquals(i + i, a[i], "mul");
     }
     div(2);
     for (int i = 0; i < 128; i++) {
-      expectEquals(((byte)(i + i)) >> 1, a[i], "div");
-      a[i] = (byte) i;  // undo arithmetic wrap-around effects
+      expectEquals(i, a[i], "div");
     }
     neg();
     for (int i = 0; i < 128; i++) {
-      expectEquals(-i, a[i], "neg");
+      expectEquals((char)-i, a[i], "neg");
     }
     // Loop bounds.
     bounds();
     expectEquals(0, a[0], "bounds0");
     for (int i = 1; i < 127; i++) {
-      expectEquals(11 - i, a[i], "bounds");
+      expectEquals((char)(11 - i), a[i], "bounds");
     }
-    expectEquals(-127, a[127], "bounds127");
+    expectEquals((char)-127, a[127], "bounds127");
     // Shifts.
     for (int i = 0; i < 128; i++) {
-      a[i] = (byte) 0xff;
+      a[i] = (char) 0xffff;
     }
     shl4();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0xf0, a[i], "shl4");
+      expectEquals((char) 0xfff0, a[i], "shl4");
     }
     sar2();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0xfc, a[i], "sar2");
+      expectEquals((char) 0x3ffc, a[i], "sar2");
     }
     shr2();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0xff, a[i], "shr2");  // sic!
+      expectEquals((char) 0x0fff, a[i], "shr2");
+      a[i] = (char) 0xffff;  // reset
     }
     sar31();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0xff, a[i], "sar31");
+      expectEquals(0, a[i], "sar31");
+      a[i] = (char) 0xffff;  // reset
     }
     shr31();
     for (int i = 0; i < 128; i++) {
-      expectEquals(0x01, a[i], "shr31");
-      a[i] = (byte) 0x12;  // reset
+      expectEquals(0, a[i], "shr31");
+      a[i] = (char) 0x1200;  // reset
     }
     shr32();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0x12, a[i], "shr32");
+      expectEquals((char) 0x1200, a[i], "shr32");
     }
     shr33();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0x09, a[i], "shr33");
-    }
-    shl9();
-    for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0x00, a[i], "shl9");
-      a[i] = (byte) 0xf0;  // reset
+      expectEquals((char) 0x0900, a[i], "shr33");
+      a[i] = (char) 0xf1f0;  // reset
     }
     not();
     for (int i = 0; i < 128; i++) {
-      expectEquals((byte) 0x0f, a[i], "not");
+      expectEquals((char) 0x0e0f, a[i], "not");
     }
     // Done.
-    System.out.println("passed");
+    System.out.println("SimdChar passed");
   }
 
   private static void expectEquals(int expected, int result, String action) {

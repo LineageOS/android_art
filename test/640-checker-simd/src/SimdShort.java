@@ -17,7 +17,7 @@
 /**
  * Functional tests for SIMD vectorization.
  */
-public class Main {
+public class SimdShort {
 
   static short[] a;
 
@@ -25,11 +25,11 @@ public class Main {
   // Arithmetic operations.
   //
 
-  /// CHECK-START: void Main.add(int) loop_optimization (before)
+  /// CHECK-START: void SimdShort.add(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.add(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.add(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecAdd   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -38,11 +38,11 @@ public class Main {
       a[i] += x;
   }
 
-  /// CHECK-START: void Main.sub(int) loop_optimization (before)
+  /// CHECK-START: void SimdShort.sub(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.sub(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.sub(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecSub   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -51,11 +51,11 @@ public class Main {
       a[i] -= x;
   }
 
-  /// CHECK-START: void Main.mul(int) loop_optimization (before)
+  /// CHECK-START: void SimdShort.mul(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.mul(int) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.mul(int) loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecMul   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -64,11 +64,11 @@ public class Main {
       a[i] *= x;
   }
 
-  /// CHECK-START: void Main.div(int) loop_optimization (before)
+  /// CHECK-START: void SimdShort.div(int) loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.div(int) loop_optimization (after)
+  /// CHECK-START: void SimdShort.div(int) loop_optimization (after)
   /// CHECK-NOT: VecDiv
   //
   //  Not supported on any architecture.
@@ -78,11 +78,11 @@ public class Main {
       a[i] /= x;
   }
 
-  /// CHECK-START: void Main.neg() loop_optimization (before)
+  /// CHECK-START: void SimdShort.neg() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.neg() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.neg() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecNeg   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -91,11 +91,11 @@ public class Main {
       a[i] = (short) -a[i];
   }
 
-  /// CHECK-START: void Main.not() loop_optimization (before)
+  /// CHECK-START: void SimdShort.not() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.not() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.not() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecNot   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -104,11 +104,11 @@ public class Main {
       a[i] = (short) ~a[i];
   }
 
-  /// CHECK-START: void Main.shl4() loop_optimization (before)
+  /// CHECK-START: void SimdShort.shl4() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.shl4() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.shl4() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecShl   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -117,11 +117,11 @@ public class Main {
       a[i] <<= 4;
   }
 
-  /// CHECK-START: void Main.sar2() loop_optimization (before)
+  /// CHECK-START: void SimdShort.sar2() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.sar2() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void SimdShort.sar2() loop_optimization (after)
   /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: VecShr   loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
@@ -130,12 +130,12 @@ public class Main {
       a[i] >>= 2;
   }
 
-  /// CHECK-START: void Main.shr2() loop_optimization (before)
+  /// CHECK-START: void SimdShort.shr2() loop_optimization (before)
   /// CHECK-DAG: ArrayGet loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: ArraySet loop:<<Loop>>      outer_loop:none
   //
   // TODO: would need signess flip.
-  /// CHECK-START: void Main.shr2() loop_optimization (after)
+  /// CHECK-START: void SimdShort.shr2() loop_optimization (after)
   /// CHECK-NOT: VecUShr
   static void shr2() {
     for (int i = 0; i < 128; i++)
@@ -180,7 +180,7 @@ public class Main {
   // Test Driver.
   //
 
-  public static void main(String[] args) {
+  public static void main() {
     // Set up.
     a = new short[128];
     for (int i = 0; i < 128; i++) {
@@ -253,7 +253,7 @@ public class Main {
       expectEquals((short) 0x0f0e, a[i], "not");
     }
     // Done.
-    System.out.println("passed");
+    System.out.println("SimdShort passed");
   }
 
   private static void expectEquals(int expected, int result, String action) {
