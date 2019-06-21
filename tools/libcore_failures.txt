@@ -250,5 +250,11 @@
   names: [
     "libcore.java.util.zip.DeflateRegressionTest#deterministicOutput"
   ]
+},
+{
+  description: "Test fails on host with `socket failed: EACCES (Permission denied)`",
+  result: EXEC_FAILED,
+  modes: [host],
+  names: ["libcore.android.system.OsTest#test_socketPing"]
 }
 ]
