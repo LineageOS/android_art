@@ -17,9 +17,9 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class Main {
+public class SadInt {
 
-  /// CHECK-START: int Main.sadInt2Int(int[], int[]) loop_optimization (before)
+  /// CHECK-START: int SadInt.sadInt2Int(int[], int[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -31,7 +31,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.sadInt2Int(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: int SadInt.sadInt2Int(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}                        loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]                   loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]                     loop:<<Loop:B\d+>> outer_loop:none
@@ -48,7 +48,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: int Main.sadInt2IntAlt(int[], int[]) loop_optimization (before)
+  /// CHECK-START: int SadInt.sadInt2IntAlt(int[], int[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                       loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]            loop:<<Loop:B\d+>> outer_loop:none
@@ -63,7 +63,7 @@ public class Main {
   //
   // No ABS? No SAD!
   //
-  /// CHECK-START: int Main.sadInt2IntAlt(int[], int[]) loop_optimization (after)
+  /// CHECK-START: int SadInt.sadInt2IntAlt(int[], int[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static int sadInt2IntAlt(int[] x, int[] y) {
     int min_length = Math.min(x.length, y.length);
@@ -76,7 +76,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: int Main.sadInt2IntAlt2(int[], int[]) loop_optimization (before)
+  /// CHECK-START: int SadInt.sadInt2IntAlt2(int[], int[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -88,7 +88,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.sadInt2IntAlt2(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: int SadInt.sadInt2IntAlt2(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}                        loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]                   loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]                     loop:<<Loop:B\d+>> outer_loop:none
@@ -109,7 +109,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: long Main.sadInt2Long(int[], int[]) loop_optimization (before)
+  /// CHECK-START: long SadInt.sadInt2Long(int[], int[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -124,7 +124,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.sadInt2Long(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SadInt.sadInt2Long(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons4:i\d+>>  IntConstant 4                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -146,7 +146,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: long Main.sadInt2LongAt1(int[], int[]) loop_optimization (before)
+  /// CHECK-START: long SadInt.sadInt2LongAt1(int[], int[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -161,7 +161,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.sadInt2LongAt1(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SadInt.sadInt2LongAt1(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons4:i\d+>>  IntConstant 4                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -183,7 +183,7 @@ public class Main {
     return sad;
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Cross-test the two most extreme values individually.
     int[] x = { 0, Integer.MAX_VALUE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     int[] y = { 0, Integer.MIN_VALUE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -227,7 +227,7 @@ public class Main {
     expectEquals(2010030931928L, sadInt2Long(x, y));
     expectEquals(2010030931929L, sadInt2LongAt1(x, y));
 
-    System.out.println("passed");
+    System.out.println("SadInt passed");
   }
 
   private static void expectEquals(int expected, int result) {
