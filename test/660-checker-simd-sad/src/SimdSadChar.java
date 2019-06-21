@@ -17,7 +17,7 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class SadChar {
+public class SimdSadChar {
 
   // TODO: lower precision still coming, b/64091002
 
@@ -56,7 +56,7 @@ public class SadChar {
     return sad;
   }
 
-  /// CHECK-START: int SadChar.sadChar2Int(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadChar.sadChar2Int(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -68,7 +68,7 @@ public class SadChar {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int SadChar.sadChar2Int(char[], char[]) loop_optimization (after)
+  /// CHECK-START: int SimdSadChar.sadChar2Int(char[], char[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static int sadChar2Int(char[] s1, char[] s2) {
     int min_length = Math.min(s1.length, s2.length);
@@ -79,7 +79,7 @@ public class SadChar {
     return sad;
   }
 
-  /// CHECK-START: int SadChar.sadChar2IntAlt(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadChar.sadChar2IntAlt(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -91,7 +91,7 @@ public class SadChar {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int SadChar.sadChar2IntAlt(char[], char[]) loop_optimization (after)
+  /// CHECK-START: int SimdSadChar.sadChar2IntAlt(char[], char[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static int sadChar2IntAlt(char[] s1, char[] s2) {
     int min_length = Math.min(s1.length, s2.length);
@@ -104,7 +104,7 @@ public class SadChar {
     return sad;
   }
 
-  /// CHECK-START: int SadChar.sadChar2IntAlt2(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadChar.sadChar2IntAlt2(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -116,7 +116,7 @@ public class SadChar {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int SadChar.sadChar2IntAlt2(char[], char[]) loop_optimization (after)
+  /// CHECK-START: int SimdSadChar.sadChar2IntAlt2(char[], char[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static int sadChar2IntAlt2(char[] s1, char[] s2) {
     int min_length = Math.min(s1.length, s2.length);
@@ -131,7 +131,7 @@ public class SadChar {
     return sad;
   }
 
-  /// CHECK-START: long SadChar.sadChar2Long(char[], char[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadChar.sadChar2Long(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -146,7 +146,7 @@ public class SadChar {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: long SadChar.sadChar2Long(char[], char[]) loop_optimization (after)
+  /// CHECK-START: long SimdSadChar.sadChar2Long(char[], char[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static long sadChar2Long(char[] s1, char[] s2) {
     int min_length = Math.min(s1.length, s2.length);
@@ -159,7 +159,7 @@ public class SadChar {
     return sad;
   }
 
-  /// CHECK-START: long SadChar.sadChar2LongAt1(char[], char[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadChar.sadChar2LongAt1(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -174,7 +174,7 @@ public class SadChar {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: long SadChar.sadChar2LongAt1(char[], char[]) loop_optimization (after)
+  /// CHECK-START: long SimdSadChar.sadChar2LongAt1(char[], char[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static long sadChar2LongAt1(char[] s1, char[] s2) {
     int min_length = Math.min(s1.length, s2.length);
@@ -242,7 +242,7 @@ public class SadChar {
     expectEquals(1497988L, sadChar2Long(s1, s2));
     expectEquals(1497989L, sadChar2LongAt1(s1, s2));
 
-    System.out.println("SadChar passed");
+    System.out.println("SimdSadChar passed");
   }
 
   private static void expectEquals(int expected, int result) {

@@ -1,7 +1,7 @@
-SadByte passed
-SadShort passed
-SadShort2 passed
-SadShort3 passed
-SadChar passed
-SadInt passed
-SadLong passed
+SimdSadByte passed
+SimdSadShort passed
+SimdSadShort2 passed
+SimdSadShort3 passed
+SimdSadChar passed
+SimdSadInt passed
+SimdSadLong passed

@@ -17,7 +17,7 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class SadByte {
+public class SimdSadByte {
 
   // TODO: lower precision still coming, b/64091002
 
@@ -87,7 +87,7 @@ public class SadByte {
     return sad;
   }
 
-  /// CHECK-START: int SadByte.sadByte2Int(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadByte.sadByte2Int(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -99,7 +99,7 @@ public class SadByte {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SadByte.sadByte2Int(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SimdSadByte.sadByte2Int(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons16:i\d+>> IntConstant 16                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -118,7 +118,7 @@ public class SadByte {
     return sad;
   }
 
-  /// CHECK-START: int SadByte.sadByte2IntAlt(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadByte.sadByte2IntAlt(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -130,7 +130,7 @@ public class SadByte {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SadByte.sadByte2IntAlt(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SimdSadByte.sadByte2IntAlt(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons16:i\d+>> IntConstant 16                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -151,7 +151,7 @@ public class SadByte {
     return sad;
   }
 
-  /// CHECK-START: int SadByte.sadByte2IntAlt2(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: int SimdSadByte.sadByte2IntAlt2(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -163,7 +163,7 @@ public class SadByte {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SadByte.sadByte2IntAlt2(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SimdSadByte.sadByte2IntAlt2(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons16:i\d+>> IntConstant 16                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -186,7 +186,7 @@ public class SadByte {
     return sad;
   }
 
-  /// CHECK-START: long SadByte.sadByte2Long(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadByte.sadByte2Long(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -201,7 +201,7 @@ public class SadByte {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SadByte.sadByte2Long(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SimdSadByte.sadByte2Long(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons16:i\d+>> IntConstant 16                 loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -223,7 +223,7 @@ public class SadByte {
     return sad;
   }
 
-  /// CHECK-START: long SadByte.sadByte2LongAt1(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadByte.sadByte2LongAt1(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -238,7 +238,7 @@ public class SadByte {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SadByte.sadByte2LongAt1(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SimdSadByte.sadByte2LongAt1(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons16:i\d+>> IntConstant 16                 loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -315,7 +315,7 @@ public class SadByte {
     expectEquals(5592328L, sadByte2Long(b1, b2));
     expectEquals(5592329L, sadByte2LongAt1(b1, b2));
 
-    System.out.println("SadByte passed");
+    System.out.println("SimdSadByte passed");
   }
 
   private static void expectEquals(int expected, int result) {
