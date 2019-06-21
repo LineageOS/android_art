@@ -2246,12 +2246,21 @@ bool DexFileVerifier::CheckInterStringIdItem() {
 bool DexFileVerifier::CheckInterTypeIdItem() {
   const dex::TypeId* item = reinterpret_cast<const dex::TypeId*>(ptr_);
 
-  LOAD_STRING(descriptor, item->descriptor_idx_, "inter_type_id_item descriptor_idx")
-
-  // Check that the descriptor is a valid type.
-  if (UNLIKELY(!IsValidDescriptor(descriptor))) {
-    ErrorStringPrintf("Invalid type descriptor: '%s'", descriptor);
-    return false;
+  {
+    // Translate to index to potentially use cache.
+    ssize_t index = item - reinterpret_cast<const dex::TypeId*>(begin_ + header_->type_ids_off_);
+    if (UNLIKELY(index < 0 ||
+                 index > std::numeric_limits<decltype(dex::TypeIndex::index_)>::max())) {
+      ErrorStringPrintf("TypeIdItem not in TypeId table: %zd", index);
+      return false;
+    }
+    if (UNLIKELY(!VerifyTypeDescriptor(
+        dex::TypeIndex(static_cast<decltype(dex::TypeIndex::index_)>(index)),
+        "inter_type_id_item descriptor_idx",
+        "Invalid type descriptor",
+        [](char) { return true; }))) {
+      return false;
+    }
   }
 
   // Check ordering between items.
