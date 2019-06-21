@@ -555,7 +555,6 @@ void JitCodeCache::RemoveMethodsIn(Thread* self, const LinearAlloc& alloc) {
     // with the classlinker_classes_lock_ held, and suspending ourselves could
     // lead to a deadlock.
     {
-      ScopedCodeCacheWrite scc(private_region_);
       for (auto it = jni_stubs_map_.begin(); it != jni_stubs_map_.end();) {
         it->second.RemoveMethodsIn(alloc);
         if (it->second.GetMethods().empty()) {
@@ -1211,7 +1210,6 @@ void JitCodeCache::RemoveUnmarkedCode(Thread* self) {
   std::unordered_set<OatQuickMethodHeader*> method_headers;
   {
     MutexLock mu(self, *Locks::jit_lock_);
-    ScopedCodeCacheWrite scc(private_region_);
     // Iterate over all compiled code and remove entries that are not marked.
     for (auto it = jni_stubs_map_.begin(); it != jni_stubs_map_.end();) {
       JniStubData* data = &it->second;
