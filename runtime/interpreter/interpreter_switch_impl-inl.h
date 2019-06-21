@@ -828,6 +828,14 @@ class InstructionHandler {
                                                      false,
                                                      do_access_check);
     if (LIKELY(c != nullptr)) {
+      // Don't allow finalizable objects to be allocated during a transaction since these can't
+      // be finalized without a started runtime.
+      if (transaction_active && c->IsFinalizable()) {
+        AbortTransactionF(self,
+                          "Allocating finalizable object in transaction: %s",
+                          c->PrettyDescriptor().c_str());
+        HANDLE_PENDING_EXCEPTION();
+      }
       gc::AllocatorType allocator_type = Runtime::Current()->GetHeap()->GetCurrentAllocator();
       if (UNLIKELY(c->IsStringClass())) {
         obj = mirror::String::AllocEmptyString(self, allocator_type);
@@ -839,13 +847,6 @@ class InstructionHandler {
       HANDLE_PENDING_EXCEPTION();
     } else {
       obj->GetClass()->AssertInitializedOrInitializingInThread(self);
-      // Don't allow finalizable objects to be allocated during a transaction since these can't
-      // be finalized without a started runtime.
-      if (transaction_active && obj->GetClass()->IsFinalizable()) {
-        AbortTransactionF(self, "Allocating finalizable object in transaction: %s",
-                          obj->PrettyTypeOf().c_str());
-        HANDLE_PENDING_EXCEPTION();
-      }
       SetVRegReference(A(), obj);
     }
     return true;
