@@ -16,11 +16,8 @@
 
 /**
  * Tests for halving-add idiomatic vectorization.
- *
- * Alternative version expressed with logical shift right
- * in the higher precision (has no impact on idiom).
  */
-public class Main {
+public class HaddByte {
 
   private static final int N = 256;
   private static final int M = N * N + 15;
@@ -29,17 +26,17 @@ public class Main {
   static byte[] sB2 = new byte[M];
   static byte[] sBo = new byte[M];
 
-  /// CHECK-START: void Main.halving_add_signed(byte[], byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.halving_add_signed(byte[], byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:b\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:b\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<Get1>>,<<Get2>>]             loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.halving_add_signed(byte[], byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.halving_add_signed(byte[], byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Int8 rounded:false loop:<<Loop>> outer_loop:none
@@ -47,11 +44,11 @@ public class Main {
   private static void halving_add_signed(byte[] b1, byte[] b2, byte[] bo) {
     int min_length = Math.min(bo.length, Math.min(b1.length, b2.length));
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) ((b1[i] + b2[i]) >>> 1);
+      bo[i] = (byte) ((b1[i] + b2[i]) >> 1);
     }
   }
 
-  /// CHECK-START: void Main.halving_add_unsigned(byte[], byte[], byte[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddByte.halving_add_unsigned(byte[], byte[], byte[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<I255:i\d+>> IntConstant 255                     loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -60,21 +57,21 @@ public class Main {
   /// CHECK-DAG: <<And1:i\d+>> And [<<Get1>>,<<I255>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<And2:i\d+>> And [<<Get2>>,<<I255>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<And1>>,<<And2>>]             loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:a\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:a\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<Get1>>,<<Get2>>]             loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint8 rounded:false loop:<<Loop>> outer_loop:none
@@ -82,22 +79,22 @@ public class Main {
   private static void halving_add_unsigned(byte[] b1, byte[] b2, byte[] bo) {
     int min_length = Math.min(bo.length, Math.min(b1.length, b2.length));
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) (((b1[i] & 0xff) + (b2[i] & 0xff)) >>> 1);
+      bo[i] = (byte) (((b1[i] & 0xff) + (b2[i] & 0xff)) >> 1);
     }
   }
 
-  /// CHECK-START: void Main.rounding_halving_add_signed(byte[], byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.rounding_halving_add_signed(byte[], byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:b\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:b\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add1:i\d+>> Add [<<Get1>>,<<Get2>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add2:i\d+>> Add [<<Add1>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add2>>,<<I1>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add2>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.rounding_halving_add_signed(byte[], byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.rounding_halving_add_signed(byte[], byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Int8 rounded:true loop:<<Loop>> outer_loop:none
@@ -105,11 +102,11 @@ public class Main {
   private static void rounding_halving_add_signed(byte[] b1, byte[] b2, byte[] bo) {
     int min_length = Math.min(bo.length, Math.min(b1.length, b2.length));
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) ((b1[i] + b2[i] + 1) >>> 1);
+      bo[i] = (byte) ((b1[i] + b2[i] + 1) >> 1);
     }
   }
 
-  /// CHECK-START: void Main.rounding_halving_add_unsigned(byte[], byte[], byte[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddByte.rounding_halving_add_unsigned(byte[], byte[], byte[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<I255:i\d+>> IntConstant 255                     loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -119,22 +116,22 @@ public class Main {
   /// CHECK-DAG: <<And2:i\d+>> And [<<Get2>>,<<I255>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add1:i\d+>> Add [<<And1>>,<<And2>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add2:i\d+>> Add [<<Add1>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add2>>,<<I1>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add2>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.rounding_halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.rounding_halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:a\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:a\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add1:i\d+>> Add [<<Get1>>,<<Get2>>]             loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add2:i\d+>> Add [<<Add1>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add2>>,<<I1>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add2>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.rounding_halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.rounding_halving_add_unsigned(byte[], byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>]  packed_type:Uint8 rounded:true loop:<<Loop>> outer_loop:none
@@ -142,21 +139,21 @@ public class Main {
   private static void rounding_halving_add_unsigned(byte[] b1, byte[] b2, byte[] bo) {
     int min_length = Math.min(bo.length, Math.min(b1.length, b2.length));
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) (((b1[i] & 0xff) + (b2[i] & 0xff) + 1) >>> 1);
+      bo[i] = (byte) (((b1[i] & 0xff) + (b2[i] & 0xff) + 1) >> 1);
     }
   }
 
-  /// CHECK-START: void Main.halving_add_signed_constant(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.halving_add_signed_constant(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<I127:i\d+>> IntConstant 127                     loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get:b\d+>>  ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<Get>>,<<I127>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.halving_add_signed_constant(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.halving_add_signed_constant(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<I127:i\d+>> IntConstant 127                       loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<I127>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
@@ -165,32 +162,32 @@ public class Main {
   private static void halving_add_signed_constant(byte[] b1, byte[] bo) {
     int min_length = Math.min(bo.length, b1.length);
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) ((b1[i] + 0x7f) >>> 1);
+      bo[i] = (byte) ((b1[i] + 0x7f) >> 1);
     }
   }
 
-  /// CHECK-START: void Main.halving_add_unsigned_constant(byte[], byte[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddByte.halving_add_unsigned_constant(byte[], byte[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<I255:i\d+>> IntConstant 255                     loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get:b\d+>>  ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<And:i\d+>>  And [<<Get>>,<<I255>>]              loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<And>>,<<I255>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.halving_add_unsigned_constant(byte[], byte[]) loop_optimization (before)
+  /// CHECK-START: void HaddByte.halving_add_unsigned_constant(byte[], byte[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<I255:i\d+>> IntConstant 255                     loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get:a\d+>>  ArrayGet                            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add:i\d+>>  Add [<<Get>>,<<I255>>]              loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<UShr:i\d+>> UShr [<<Add>>,<<I1>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Shr:i\d+>>  Shr [<<Add>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void Main.halving_add_unsigned_constant(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddByte.halving_add_unsigned_constant(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<I255:i\d+>> IntConstant 255                       loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<I255>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
@@ -199,11 +196,11 @@ public class Main {
   private static void halving_add_unsigned_constant(byte[] b1, byte[] bo) {
     int min_length = Math.min(bo.length, b1.length);
     for (int i = 0; i < min_length; i++) {
-      bo[i] = (byte) (((b1[i] & 0xff) + 0xff) >>> 1);
+      bo[i] = (byte) (((b1[i] & 0xff) + 0xff) >> 1);
     }
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Initialize cross-values to test all cases, and also
     // set up some extra values to exercise the cleanup loop.
     int k = 0;
@@ -221,9 +218,7 @@ public class Main {
     }
     expectEquals(k, M);
 
-    // Test halving add idioms. Note that the expected result is computed
-    // with the arithmetic >> to demonstrate the computed narrower result
-    // does not depend on the wider >> or >>>.
+    // Test halving add idioms.
     halving_add_signed(sB1, sB2, sBo);
     for (int i = 0; i < M; i++) {
       byte e = (byte) ((sB1[i] + sB2[i]) >> 1);
@@ -255,7 +250,7 @@ public class Main {
       expectEquals(e, sBo[i]);
     }
 
-    System.out.println("passed");
+    System.out.println("HaddByte passed");
   }
 
   private static void expectEquals(int expected, int result) {

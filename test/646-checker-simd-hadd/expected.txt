@@ -1,0 +1,6 @@
+HaddAltByte passed
+HaddAltShort passed
+HaddAltChar passed
+HaddByte passed
+HaddShort passed
+HaddChar passed
