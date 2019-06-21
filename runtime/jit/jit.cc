@@ -697,6 +697,11 @@ class JitProfileTask final : public Task {
     delete this;
   }
 
+  ~JitProfileTask() {
+    ScopedObjectAccess soa(Thread::Current());
+    soa.Vm()->DeleteGlobalRef(soa.Self(), class_loader_);
+  }
+
  private:
   std::vector<const DexFile*> dex_files_;
   jobject class_loader_;
