@@ -17,7 +17,7 @@
 /**
  * Tests for halving-add idiomatic vectorization.
  */
-public class Main {
+public class HaddChar {
 
   private static final int N = 64 * 1024;
   private static final int M = N + 31;
@@ -26,7 +26,7 @@ public class Main {
   static char[] sB2 = new char[M];
   static char[] sBo = new char[M];
 
-  /// CHECK-START: void Main.halving_add_unsigned(char[], char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.halving_add_unsigned(char[], char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
@@ -36,19 +36,19 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
@@ -60,7 +60,7 @@ public class Main {
     }
   }
 
-  /// CHECK-START: void Main.halving_add_also_unsigned(char[], char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddChar.halving_add_also_unsigned(char[], char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<IMAX:i\d+>> IntConstant 65535                   loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -73,7 +73,7 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
@@ -83,19 +83,19 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
@@ -110,7 +110,7 @@ public class Main {
     }
   }
 
-  /// CHECK-START: void Main.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
@@ -121,19 +121,19 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.rounding_halving_add_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
@@ -145,7 +145,7 @@ public class Main {
     }
   }
 
-  /// CHECK-START: void Main.rounding_halving_add_also_unsigned(char[], char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddChar.rounding_halving_add_also_unsigned(char[], char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<IMAX:i\d+>> IntConstant 65535                   loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -159,7 +159,7 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>> ArrayGet                            loop:<<Loop>>      outer_loop:none
@@ -170,19 +170,19 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.rounding_halving_add_also_unsigned(char[], char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
@@ -197,7 +197,7 @@ public class Main {
     }
   }
 
-  /// CHECK-START: void Main.halving_add_unsigned_constant(char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.halving_add_unsigned_constant(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                   loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -207,20 +207,20 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get>>,<<Repl>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get>>,<<Repl>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.halving_add_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
@@ -232,7 +232,7 @@ public class Main {
     }
   }
 
-  /// CHECK-START: void Main.halving_add_also_unsigned_constant(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: void HaddChar.halving_add_also_unsigned_constant(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                   loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -243,7 +243,7 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},{{i\d+}},<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: void Main.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (before)
+  /// CHECK-START: void HaddChar.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<I1:i\d+>>   IntConstant 1                       loop:none
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                   loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                 loop:<<Loop:B\d+>> outer_loop:none
@@ -253,21 +253,21 @@ public class Main {
   /// CHECK-DAG: <<Cnv:c\d+>>  TypeConversion [<<Shr>>]            loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM: void Main.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddChar.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get>>,<<Repl>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-ARM64: void Main.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void HaddChar.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get>>,<<Repl>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
   /// CHECK-DAG:               VecStore [{{l\d+}},{{i\d+}},<<HAdd>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-MIPS64: void Main.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
+  /// CHECK-START-MIPS64: void HaddChar.halving_add_also_unsigned_constant(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
@@ -283,7 +283,7 @@ public class Main {
     }
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Some interesting values.
     char[] interesting = {
       (char) 0x0000,
@@ -334,7 +334,7 @@ public class Main {
       expectEquals(e, sBo[i]);
     }
 
-    System.out.println("passed");
+    System.out.println("HaddChar passed");
   }
 
   private static void expectEquals(int expected, int result) {
