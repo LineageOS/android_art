@@ -19,7 +19,7 @@
  *
  * Special case, char array that is first casted to short, forcing sign extension.
  */
-public class Main {
+public class SadShort2 {
 
   // TODO: lower precision still coming, b/64091002
 
@@ -56,7 +56,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: int Main.sadCastedChar2Int(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2Int(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -72,7 +72,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int Main.sadCastedChar2Int(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2Int(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -84,7 +84,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int Main.sadCastedChar2Int(char[], char[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SadShort2.sadCastedChar2Int(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -103,7 +103,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: int Main.sadCastedChar2IntAlt(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2IntAlt(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -120,7 +120,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Phi3>>]        loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int Main.sadCastedChar2IntAlt(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2IntAlt(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -132,7 +132,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int Main.sadCastedChar2IntAlt(char[], char[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SadShort2.sadCastedChar2IntAlt(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -153,7 +153,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: int Main.sadCastedChar2IntAlt2(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2IntAlt2(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -170,7 +170,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Phi3>>]        loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: int Main.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (before)
+  /// CHECK-START: int SadShort2.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
@@ -182,7 +182,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int Main.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: int SadShort2.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -205,7 +205,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: long Main.sadCastedChar2Long(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: long SadShort2.sadCastedChar2Long(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -224,7 +224,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: long Main.sadCastedChar2Long(char[], char[]) loop_optimization (before)
+  /// CHECK-START: long SadShort2.sadCastedChar2Long(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -239,7 +239,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.sadCastedChar2Long(char[], char[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SadShort2.sadCastedChar2Long(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -261,7 +261,7 @@ public class Main {
     return sad;
   }
 
-  /// CHECK-START: long Main.sadCastedChar2LongAt1(char[], char[]) instruction_simplifier (before)
+  /// CHECK-START: long SadShort2.sadCastedChar2LongAt1(char[], char[]) instruction_simplifier (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -280,7 +280,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START: long Main.sadCastedChar2LongAt1(char[], char[]) loop_optimization (before)
+  /// CHECK-START: long SadShort2.sadCastedChar2LongAt1(char[], char[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -295,7 +295,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.sadCastedChar2LongAt1(char[], char[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SadShort2.sadCastedChar2LongAt1(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -317,7 +317,7 @@ public class Main {
     return sad;
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Cross-test the two most extreme values individually.
     char[] s1 = { 0, 0x8000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     char[] s2 = { 0, 0x7fff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -372,7 +372,7 @@ public class Main {
     expectEquals(1291788L, sadCastedChar2Long(s1, s2));
     expectEquals(1291789L, sadCastedChar2LongAt1(s1, s2));
 
-    System.out.println("passed");
+    System.out.println("SadShort2 passed");
   }
 
   private static void expectEquals(int expected, int result) {
