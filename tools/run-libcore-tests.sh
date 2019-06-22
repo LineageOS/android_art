@@ -83,7 +83,8 @@ fi
 use_jit=true
 
 # Packages that currently work correctly with the expectation files.
-working_packages=("libcore.dalvik.system"
+working_packages=("libcore.android.system"
+                  "libcore.dalvik.system"
                   "libcore.java.lang"
                   "libcore.java.math"
                   "libcore.java.text"
@@ -96,6 +97,11 @@ working_packages=("libcore.dalvik.system"
                   "libcore.libcore.net"
                   "libcore.libcore.reflect"
                   "libcore.libcore.util"
+                  "libcore.sun.invoke"
+                  "libcore.sun.net"
+                  "libcore.sun.misc"
+                  "libcore.sun.security"
+                  "libcore.sun.util"
                   "org.apache.harmony.annotation"
                   "org.apache.harmony.crypto"
                   "org.apache.harmony.luni"

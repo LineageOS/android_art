@@ -24,6 +24,7 @@ import java.util.concurrent.Semaphore;
 public class Test1941 {
   public static final boolean PRINT_CNT = false;
   public static long CNT = 0;
+  public static final long MAX_ITERS = 100_000;
 
   // Method with multiple paths we can break on.
   public static long fib(long f) {
@@ -42,9 +43,14 @@ public class Test1941 {
     // Don't bother actually doing anything.
   }
 
-  public static void LoopAllocFreeEnv(Semaphore sem) {
+  public static void LoopAllocFreeEnv(Semaphore sem, Semaphore delay) {
     sem.release();
-    while (!Thread.interrupted()) {
+    try {
+      delay.acquire();
+    } catch (Exception e) {
+      throw new Error("exception occurred!", e);
+    }
+    while (!Thread.interrupted() && CNT < MAX_ITERS) {
       CNT++;
       long env = AllocEnv();
       FreeEnv(env);
@@ -59,7 +65,8 @@ public class Test1941 {
 
   public static void run() throws Exception {
     final Semaphore sem = new Semaphore(0);
-    Thread thr = new Thread(() -> { LoopAllocFreeEnv(sem); }, "LoopNative");
+    final Semaphore delay = new Semaphore(0);
+    Thread thr = new Thread(() -> { LoopAllocFreeEnv(sem, delay); }, "LoopNative");
     thr.start();
     // Make sure the other thread is actually started.
     sem.acquire();
@@ -68,6 +75,10 @@ public class Test1941 {
             "notifySingleStep", Thread.class, Executable.class, Long.TYPE),
         thr);
     setTracingOn(Thread.currentThread(), true);
+    // Don't let the other thread start actually running until we've started
+    // tracing this thread too in order to ensure that the (formerly) racy
+    // behavior can happen.
+    delay.release();
 
     System.out.println("fib(20) is " + fib(20));
 
