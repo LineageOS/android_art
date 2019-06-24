@@ -33,9 +33,14 @@ namespace.runtime.visible = true
 # Keep in sync with the "runtime" namespace in system/core/rootdir/etc/ld.config*.txt.
 namespace.runtime.search.paths = /apex/com.android.runtime/${LIB}
 namespace.runtime.asan.search.paths = /apex/com.android.runtime/${LIB}
+# JVMTI libraries used in ART testing are located under /data; dalvikvm
+# has to be able to dlopen them.
+# TODO(b/129534335): Move this to the linker configuration of the Test
+# Runtime APEX when it is available.
+namespace.runtime.permitted.paths = /data
 # odex files are in /system/framework. dalvikvm has to be able to dlopen the
 # files for CTS.
-namespace.runtime.permitted.paths = /system/framework
+namespace.runtime.permitted.paths += /system/framework
 namespace.runtime.links = platform
 # Need allow_all_shared_libs because libart.so can dlopen oat files in
 # /system/framework and /data.
