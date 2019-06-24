@@ -84,6 +84,7 @@ use_jit=true
 
 # Packages that currently work correctly with the expectation files.
 working_packages=("libcore.android.system"
+                  "libcore.build"
                   "libcore.dalvik.system"
                   "libcore.java.lang"
                   "libcore.java.math"
