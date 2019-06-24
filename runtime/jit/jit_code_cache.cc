@@ -323,25 +323,25 @@ const void* JitCodeCache::GetZygoteSavedEntryPoint(ArtMethod* method) {
 uint8_t* JitCodeCache::CommitCode(Thread* self,
                                   JitMemoryRegion* region,
                                   ArtMethod* method,
-                                  uint8_t* stack_map,
-                                  uint8_t* roots_data,
                                   const uint8_t* code,
                                   size_t code_size,
-                                  size_t data_size,
-                                  bool osr,
+                                  const uint8_t* stack_map,
+                                  size_t stack_map_size,
+                                  uint8_t* roots_data,
                                   const std::vector<Handle<mirror::Object>>& roots,
+                                  bool osr,
                                   bool has_should_deoptimize_flag,
                                   const ArenaSet<ArtMethod*>& cha_single_implementation_list) {
   uint8_t* result = CommitCodeInternal(self,
                                        region,
                                        method,
-                                       stack_map,
-                                       roots_data,
                                        code,
                                        code_size,
-                                       data_size,
-                                       osr,
+                                       stack_map,
+                                       stack_map_size,
+                                       roots_data,
                                        roots,
+                                       osr,
                                        has_should_deoptimize_flag,
                                        cha_single_implementation_list);
   if (result == nullptr) {
@@ -350,13 +350,13 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
     result = CommitCodeInternal(self,
                                 region,
                                 method,
-                                stack_map,
-                                roots_data,
                                 code,
                                 code_size,
-                                data_size,
-                                osr,
+                                stack_map,
+                                stack_map_size,
+                                roots_data,
                                 roots,
+                                osr,
                                 has_should_deoptimize_flag,
                                 cha_single_implementation_list);
   }
@@ -377,24 +377,10 @@ static uintptr_t FromCodeToAllocation(const void* code) {
   return reinterpret_cast<uintptr_t>(code) - RoundUp(sizeof(OatQuickMethodHeader), alignment);
 }
 
-static uint32_t ComputeRootTableSize(uint32_t number_of_roots) {
-  return sizeof(uint32_t) + number_of_roots * sizeof(GcRoot<mirror::Object>);
-}
-
 static uint32_t GetNumberOfRoots(const uint8_t* stack_map) {
   // The length of the table is stored just before the stack map (and therefore at the end of
   // the table itself), in order to be able to fetch it from a `stack_map` pointer.
   return reinterpret_cast<const uint32_t*>(stack_map)[-1];
-}
-
-static void FillRootTableLength(uint8_t* roots_data, uint32_t length) {
-  // Store the length of the table at the end. This will allow fetching it from a `stack_map`
-  // pointer.
-  reinterpret_cast<uint32_t*>(roots_data)[length] = length;
-}
-
-static const uint8_t* FromStackMapToRoots(const uint8_t* stack_map_data) {
-  return stack_map_data - ComputeRootTableSize(GetNumberOfRoots(stack_map_data));
 }
 
 static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots)
@@ -410,17 +396,6 @@ static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots
       ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
       CHECK(class_linker->GetInternTable()->LookupStrong(Thread::Current(), str) != nullptr);
     }
-  }
-}
-
-void JitCodeCache::FillRootTable(uint8_t* roots_data,
-                                 const std::vector<Handle<mirror::Object>>& roots) {
-  GcRoot<mirror::Object>* gc_roots = reinterpret_cast<GcRoot<mirror::Object>*>(roots_data);
-  const uint32_t length = roots.size();
-  // Put all roots in `roots_data`.
-  for (uint32_t i = 0; i < length; ++i) {
-    ObjPtr<mirror::Object> object = roots[i].Get();
-    gc_roots[i] = GcRoot<mirror::Object>(object);
   }
 }
 
@@ -674,13 +649,13 @@ void JitCodeCache::WaitForPotentialCollectionToCompleteRunnable(Thread* self) {
 uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
                                           JitMemoryRegion* region,
                                           ArtMethod* method,
-                                          uint8_t* stack_map,
-                                          uint8_t* roots_data,
                                           const uint8_t* code,
                                           size_t code_size,
-                                          size_t data_size,
-                                          bool osr,
+                                          const uint8_t* stack_map,
+                                          size_t stack_map_size,
+                                          uint8_t* roots_data,
                                           const std::vector<Handle<mirror::Object>>& roots,
+                                          bool osr,
                                           bool has_should_deoptimize_flag,
                                           const ArenaSet<ArtMethod*>&
                                               cha_single_implementation_list) {
@@ -692,16 +667,22 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
     DCheckRootsAreValid(roots);
   }
 
+  size_t root_table_size = ComputeRootTableSize(roots.size());
+  uint8_t* stack_map_data = roots_data + root_table_size;
+
   MutexLock mu(self, *Locks::jit_lock_);
   // We need to make sure that there will be no jit-gcs going on and wait for any ongoing one to
   // finish.
   WaitForPotentialCollectionToCompleteRunnable(self);
   const uint8_t* code_ptr = region->AllocateCode(
-      code, code_size, stack_map, has_should_deoptimize_flag);
+      code, code_size, stack_map_data, has_should_deoptimize_flag);
   if (code_ptr == nullptr) {
     return nullptr;
   }
   OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
+
+  // Commit roots and stack maps before updating the entry point.
+  region->CommitData(roots_data, roots, stack_map, stack_map_size);
 
   number_of_compilations_++;
 
@@ -754,14 +735,6 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
         }
       }
     } else {
-      // Fill the root table before updating the entry point.
-      DCHECK_EQ(FromStackMapToRoots(stack_map), roots_data);
-      DCHECK_LE(roots_data, stack_map);
-      FillRootTable(roots_data, roots);
-      {
-        // Flush data cache, as compiled code references literals in it.
-        FlushDataCache(roots_data, roots_data + data_size);
-      }
       method_code_map_.Put(code_ptr, method);
       if (osr) {
         number_of_osr_compilations_++;
@@ -963,20 +936,16 @@ size_t JitCodeCache::DataCacheSizeLocked() {
 
 void JitCodeCache::ClearData(Thread* self,
                              JitMemoryRegion* region,
-                             uint8_t* stack_map_data,
                              uint8_t* roots_data) {
-  DCHECK_EQ(FromStackMapToRoots(stack_map_data), roots_data);
   MutexLock mu(self, *Locks::jit_lock_);
   region->FreeData(reinterpret_cast<uint8_t*>(roots_data));
 }
 
-size_t JitCodeCache::ReserveData(Thread* self,
-                                 JitMemoryRegion* region,
-                                 size_t stack_map_size,
-                                 size_t number_of_roots,
-                                 ArtMethod* method,
-                                 uint8_t** stack_map_data,
-                                 uint8_t** roots_data) {
+uint8_t* JitCodeCache::ReserveData(Thread* self,
+                                   JitMemoryRegion* region,
+                                   size_t stack_map_size,
+                                   size_t number_of_roots,
+                                   ArtMethod* method) {
   size_t table_size = ComputeRootTableSize(number_of_roots);
   size_t size = RoundUp(stack_map_size + table_size, sizeof(void*));
   uint8_t* result = nullptr;
@@ -1005,16 +974,7 @@ size_t JitCodeCache::ReserveData(Thread* self,
               << " for stack maps of "
               << ArtMethod::PrettyMethod(method);
   }
-  if (result != nullptr) {
-    *roots_data = result;
-    *stack_map_data = result + table_size;
-    FillRootTableLength(*roots_data, number_of_roots);
-    return size;
-  } else {
-    *roots_data = nullptr;
-    *stack_map_data = nullptr;
-    return 0;
-  }
+  return result;
 }
 
 class MarkCodeClosure final : public Closure {

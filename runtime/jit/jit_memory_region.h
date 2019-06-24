@@ -23,8 +23,15 @@
 #include "base/globals.h"
 #include "base/locks.h"
 #include "base/mem_map.h"
+#include "gc_root-inl.h"
+#include "handle.h"
 
 namespace art {
+
+namespace mirror {
+class Object;
+}
+
 namespace jit {
 
 class TestZygoteMemory;
@@ -42,6 +49,12 @@ size_t inline GetJitCodeAlignment() {
     return 64;
   }
   return GetInstructionSetAlignment(kRuntimeISA);
+}
+
+// Helper to get the size required for emitting `number_of_roots` in the
+// data portion of a JIT memory region.
+uint32_t inline ComputeRootTableSize(uint32_t number_of_roots) {
+  return sizeof(uint32_t) + number_of_roots * sizeof(GcRoot<mirror::Object>);
 }
 
 // Represents a memory region for the JIT, where code and data are stored. This class
@@ -85,6 +98,14 @@ class JitMemoryRegion {
   void FreeCode(const uint8_t* code) REQUIRES(Locks::jit_lock_);
   uint8_t* AllocateData(size_t data_size) REQUIRES(Locks::jit_lock_);
   void FreeData(uint8_t* data) REQUIRES(Locks::jit_lock_);
+
+  // Emit roots and stack map into the memory pointed by `roots_data`.
+  void CommitData(uint8_t* roots_data,
+                  const std::vector<Handle<mirror::Object>>& roots,
+                  const uint8_t* stack_map,
+                  size_t stack_map_size)
+      REQUIRES(Locks::jit_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool HasDualCodeMapping() const {
     return non_exec_pages_.IsValid();

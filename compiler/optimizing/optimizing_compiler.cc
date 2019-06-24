@@ -1281,36 +1281,31 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     ScopedArenaAllocator stack_map_allocator(&arena_stack);  // Will hold the stack map.
     ScopedArenaVector<uint8_t> stack_map = CreateJniStackMap(&stack_map_allocator,
                                                              jni_compiled_method);
-    uint8_t* stack_map_data = nullptr;
-    uint8_t* roots_data = nullptr;
-    uint32_t data_size = code_cache->ReserveData(self,
-                                                 region,
-                                                 stack_map.size(),
-                                                 /* number_of_roots= */ 0,
-                                                 method,
-                                                 &stack_map_data,
-                                                 &roots_data);
-    if (stack_map_data == nullptr || roots_data == nullptr) {
+    uint8_t* roots_data = code_cache->ReserveData(self,
+                                                  region,
+                                                  stack_map.size(),
+                                                  /* number_of_roots= */ 0,
+                                                  method);
+    if (roots_data == nullptr) {
       MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
       return false;
     }
-    memcpy(stack_map_data, stack_map.data(), stack_map.size());
 
     const void* code = code_cache->CommitCode(
         self,
         region,
         method,
-        stack_map_data,
-        roots_data,
         jni_compiled_method.GetCode().data(),
         jni_compiled_method.GetCode().size(),
-        data_size,
-        osr,
+        stack_map.data(),
+        stack_map.size(),
+        roots_data,
         roots,
+        osr,
         /* has_should_deoptimize_flag= */ false,
         cha_single_implementation_list);
     if (code == nullptr) {
-      code_cache->ClearData(self, region, stack_map_data, roots_data);
+      code_cache->ClearData(self, region, roots_data);
       return false;
     }
 
@@ -1381,20 +1376,15 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   ScopedArenaVector<uint8_t> stack_map = codegen->BuildStackMaps(code_item);
   size_t number_of_roots = codegen->GetNumberOfJitRoots();
-  uint8_t* stack_map_data = nullptr;
-  uint8_t* roots_data = nullptr;
-  uint32_t data_size = code_cache->ReserveData(self,
-                                               region,
-                                               stack_map.size(),
-                                               number_of_roots,
-                                               method,
-                                               &stack_map_data,
-                                               &roots_data);
-  if (stack_map_data == nullptr || roots_data == nullptr) {
+  uint8_t* roots_data = code_cache->ReserveData(self,
+                                                region,
+                                                stack_map.size(),
+                                                number_of_roots,
+                                                method);
+  if (roots_data == nullptr) {
     MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
     return false;
   }
-  memcpy(stack_map_data, stack_map.data(), stack_map.size());
   std::vector<Handle<mirror::Object>> roots;
   codegen->EmitJitRoots(code_allocator.GetData(), roots_data, &roots);
   // The root Handle<>s filled by the codegen reference entries in the VariableSizedHandleScope.
@@ -1408,25 +1398,25 @@ bool OptimizingCompiler::JitCompile(Thread* self,
       self,
       region,
       method,
-      stack_map_data,
-      roots_data,
       code_allocator.GetMemory().data(),
       code_allocator.GetMemory().size(),
-      data_size,
-      osr,
+      stack_map.data(),
+      stack_map.size(),
+      roots_data,
       roots,
+      osr,
       codegen->GetGraph()->HasShouldDeoptimizeFlag(),
       codegen->GetGraph()->GetCHASingleImplementationList());
 
   if (code == nullptr) {
     MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
-    code_cache->ClearData(self, region, stack_map_data, roots_data);
+    code_cache->ClearData(self, region, roots_data);
     return false;
   }
 
   const CompilerOptions& compiler_options = GetCompilerOptions();
   if (compiler_options.GenerateAnyDebugInfo()) {
-    const auto* method_header = reinterpret_cast<const OatQuickMethodHeader*>(code);
+    const OatQuickMethodHeader* method_header = reinterpret_cast<const OatQuickMethodHeader*>(code);
     const uintptr_t code_address = reinterpret_cast<uintptr_t>(method_header->GetCode());
     debug::MethodDebugInfo info = {};
     DCHECK(info.custom_name.empty());
@@ -1443,7 +1433,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     info.code_address = code_address;
     info.code_size = code_allocator.GetMemory().size();
     info.frame_size_in_bytes = method_header->GetFrameSizeInBytes();
-    info.code_info = stack_map.size() == 0 ? nullptr : stack_map_data;
+    info.code_info = stack_map.size() == 0 ? nullptr : method_header->GetOptimizedCodeInfoPtr();
     info.cfi = ArrayRef<const uint8_t>(*codegen->GetAssembler()->cfi().data());
     GenerateJitDebugInfo(method, info);
   }
