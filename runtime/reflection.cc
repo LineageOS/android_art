@@ -497,14 +497,10 @@ bool InvokeMethodImpl(const ScopedObjectAccessAlreadyRunnable& soa,
     // If we get another exception when we are trying to wrap, then just use that instead.
     ScopedLocalRef<jthrowable> th(soa.Env(), soa.Env()->ExceptionOccurred());
     soa.Self()->ClearException();
-    jclass exception_class = soa.Env()->FindClass("java/lang/reflect/InvocationTargetException");
-    if (exception_class == nullptr) {
-      soa.Self()->AssertPendingException();
-      return false;
-    }
-    jmethodID mid = soa.Env()->GetMethodID(exception_class, "<init>", "(Ljava/lang/Throwable;)V");
-    CHECK(mid != nullptr);
-    jobject exception_instance = soa.Env()->NewObject(exception_class, mid, th.get());
+    jobject exception_instance =
+        soa.Env()->NewObject(WellKnownClasses::java_lang_reflect_InvocationTargetException,
+                             WellKnownClasses::java_lang_reflect_InvocationTargetException_init,
+                             th.get());
     if (exception_instance == nullptr) {
       soa.Self()->AssertPendingException();
       return false;
