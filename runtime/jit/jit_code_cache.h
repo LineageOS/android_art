@@ -129,13 +129,13 @@ class JitCodeCache {
   uint8_t* CommitCode(Thread* self,
                       JitMemoryRegion* region,
                       ArtMethod* method,
-                      uint8_t* stack_map,
-                      uint8_t* roots_data,
                       const uint8_t* code,
                       size_t code_size,
-                      size_t data_size,
-                      bool osr,
+                      const uint8_t* stack_map,
+                      size_t stack_map_size,
+                      uint8_t* roots_data,
                       const std::vector<Handle<mirror::Object>>& roots,
+                      bool osr,
                       bool has_should_deoptimize_flag,
                       const ArenaSet<ArtMethod*>& cha_single_implementation_list)
       REQUIRES_SHARED(Locks::mutator_lock_)
@@ -154,22 +154,20 @@ class JitCodeCache {
   // Return the code pointer for a JNI-compiled stub if the method is in the cache, null otherwise.
   const void* GetJniStubCode(ArtMethod* method) REQUIRES(!Locks::jit_lock_);
 
-  // Allocate a region of data that contain `size` bytes, and potentially space
-  // for storing `number_of_roots` roots. Returns null if there is no more room.
-  // Return the number of bytes allocated.
-  size_t ReserveData(Thread* self,
-                     JitMemoryRegion* region,
-                     size_t stack_map_size,
-                     size_t number_of_roots,
-                     ArtMethod* method,
-                     uint8_t** stack_map_data,
-                     uint8_t** roots_data)
+  // Allocate a region of data that will contain a stack map of size `stack_map_size` and
+  // `number_of_roots` roots accessed by the JIT code.
+  // Return a pointer to where roots will be stored.
+  uint8_t* ReserveData(Thread* self,
+                       JitMemoryRegion* region,
+                       size_t stack_map_size,
+                       size_t number_of_roots,
+                       ArtMethod* method)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
   // Clear data from the data portion of the code cache.
   void ClearData(
-      Thread* self, JitMemoryRegion* region, uint8_t* stack_map_data, uint8_t* roots_data)
+      Thread* self, JitMemoryRegion* region, uint8_t* roots_data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -288,21 +286,16 @@ class JitCodeCache {
   uint8_t* CommitCodeInternal(Thread* self,
                               JitMemoryRegion* region,
                               ArtMethod* method,
-                              uint8_t* stack_map,
-                              uint8_t* roots_data,
                               const uint8_t* code,
                               size_t code_size,
-                              size_t data_size,
-                              bool osr,
+                              const uint8_t* stack_map,
+                              size_t stack_map_size,
+                              uint8_t* roots_data,
                               const std::vector<Handle<mirror::Object>>& roots,
+                              bool osr,
                               bool has_should_deoptimize_flag,
                               const ArenaSet<ArtMethod*>& cha_single_implementation_list)
       REQUIRES(!Locks::jit_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Adds the given roots to the roots_data. Only a member for annotalysis.
-  void FillRootTable(uint8_t* roots_data, const std::vector<Handle<mirror::Object>>& roots)
-      REQUIRES(Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   ProfilingInfo* AddProfilingInfoInternal(Thread* self,
