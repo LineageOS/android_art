@@ -521,9 +521,14 @@ class DebugChecker:
   def run(self):
     # Check binaries for ART.
     self._checker.check_executable('dexdiag')
+    self._checker.check_executable('dexanalyze')
+    self._checker.check_executable('dexlayout')
+    self._checker.check_symlinked_multilib_executable('imgdiag')
 
     # Check debug binaries for ART.
+    self._checker.check_executable('dexlayoutd')
     self._checker.check_executable('dexoptanalyzerd')
+    self._checker.check_symlinked_multilib_executable('imgdiagd')
     self._checker.check_executable('profmand')
 
     # Check internal libraries for ART.
