@@ -1,0 +1,72 @@
+#! /bin/bash
+#
+# Copyright 2019 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+usage() {
+  cat >&2 <<EOF
+Determine and print the 32- or 64-bit architecture of a device.
+
+Usage:
+  $0 --32    Select the 32-bit architecture
+  $0 --64    Select the 64-bit architecture
+EOF
+  exit 1
+}
+
+if [[ $# -ne 1 ]]; then
+  usage
+fi
+
+ARCHITECTURES_32="(arm|x86|mips|none)"
+ARCHITECTURES_64="(arm64|x86_64|mips64|none)"
+
+case "$1" in
+  (--32)
+    ARCHITECTURES_PATTERN="${ARCHITECTURES_32}"
+    ;;
+  (--64)
+    ARCHITECTURES_PATTERN="${ARCHITECTURES_64}"
+    ;;
+  (*) usage;;
+esac
+
+# Need to be root to query /data/dalvik-cache
+adb root > /dev/null
+adb wait-for-device
+ISA=
+ISA_adb_invocation=
+ISA_outcome=
+# We iterate a few times to workaround an adb issue. b/32655576
+for i in {1..10}; do
+  ISA_adb_invocation=$(adb shell ls /data/dalvik-cache)
+  ISA_outcome=$?
+  ISA=$(echo $ISA_adb_invocation | grep -Ewo "${ARCHITECTURES_PATTERN}")
+  if [[ -n "$ISA" ]]; then
+    break;
+  fi
+done
+if [[ -z "$ISA" ]]; then
+  echo >&2 "Unable to determine architecture"
+  # Print a few things for helping diagnosing the problem.
+  echo >&2 "adb invocation output: $ISA_adb_invocation"
+  echo >&2 "adb invocation outcome: $ISA_outcome"
+  echo >&2 $(adb shell ls -F /data/dalvik-cache)
+  echo >&2 $(adb shell ls /data/dalvik-cache)
+  echo >&2 ${ARCHITECTURES_PATTERN}
+  echo >&2 $(adb shell ls -F /data/dalvik-cache | grep -Ewo "${ARCHITECTURES_PATTERN}")
+  exit 1
+fi
+
+echo "$ISA"

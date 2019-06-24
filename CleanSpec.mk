@@ -69,6 +69,15 @@ $(call add-clean-step, rm -rf $(OUT_DIR)/soong/.intermediates/art/runtime/libart
 # Force regeneration of .apex files after removal of time zone data files from the runtime APEX
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex/com.android.runtime.*)
 
+# Remove artifacts that used to be generated (as a workaround for
+# improper Runtime APEX support) by tools/buildbot-build.sh via the
+# `standalone-apex-files` Make rule.
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/bin)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib*)
+# Remove artifacts that used to be generated (as a workaround for
+# improper Runtime APEX support) by tools/buildbot-build.sh via the
+# `icu-data-art-test` Make rule.
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/icu)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST

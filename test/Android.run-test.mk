@@ -25,9 +25,11 @@ TEST_ART_RUN_TEST_DEPENDENCIES := \
   $(HOST_OUT_EXECUTABLES)/jasmin \
   $(HOST_OUT_EXECUTABLES)/smali
 
-# We need dex2oat and dalvikvm on the target as well as the core images (all images as we sync
-# only once).
-ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(ART_TARGET_EXECUTABLES) $(TARGET_CORE_IMG_OUTS)
+# We need the Debug Runtime APEX (which is a superset of the Release
+# Runtime APEX) -- which contains dex2oat and dalvikvm and their
+# dependencies -- on the target, as well as the core images (all images
+# as we sync only once).
+ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := com.android.runtime.debug $(TARGET_CORE_IMG_OUTS)
 
 # Also need libartagent.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libartagent-target libartagentd-target
@@ -43,9 +45,6 @@ ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libarttest-target libarttestd-target
 
 # Also need libnativebridgetest.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libnativebridgetest-target libnativebridgetestd-target
-
-# Also need libopenjdkjvmti.
-ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libopenjdkjvmti-target libopenjdkjvmtid-target
 
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += \
   $(foreach jar,$(TARGET_TEST_CORE_JARS),$(TARGET_OUT_JAVA_LIBRARIES)/$(jar).jar)
