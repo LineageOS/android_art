@@ -16,12 +16,10 @@
 
 public class Main {
   public static void main(String[] args) {
-    SimdSadByte.main();
-    SimdSadShort.main();
-    SimdSadShort2.main();
-    SimdSadShort3.main();
-    SimdSadChar.main();
-    SimdSadInt.main();
-    SimdSadLong.main();
+    SadByte.main();
+    SadShort.main();
+    SadChar.main();
+    SadInt.main();
+    SadLong.main();
   }
 }
