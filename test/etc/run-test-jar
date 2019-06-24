@@ -2,6 +2,11 @@
 #
 # Runner for an individual run-test.
 
+if [[ -z "$ANDROID_BUILD_TOP" ]]; then
+  echo 'ANDROID_BUILD_TOP environment variable is empty; did you forget to run `lunch`?'
+  exit 1
+fi
+
 msg() {
     if [ "$QUIET" = "n" ]; then
         echo "$@"
@@ -14,6 +19,7 @@ ANDROID_TZDATA_ROOT="/apex/com.android.tzdata"
 ARCHITECTURES_32="(arm|x86|mips|none)"
 ARCHITECTURES_64="(arm64|x86_64|mips64|none)"
 ARCHITECTURES_PATTERN="${ARCHITECTURES_32}"
+GET_DEVICE_ISA_BITNESS_FLAG="--32"
 BOOT_IMAGE=""
 CHROOT=
 COMPILE_FLAGS=""
@@ -387,6 +393,7 @@ while true; do
         LIBRARY_DIRECTORY="lib64"
         TEST_DIRECTORY="nativetest64"
         ARCHITECTURES_PATTERN="${ARCHITECTURES_64}"
+        GET_DEVICE_ISA_BITNESS_FLAG="--64"
         shift
     elif [ "x$1" = "x--experimental" ]; then
         if [ "$#" -lt 2 ]; then
@@ -435,6 +442,11 @@ done
 
 # The DEX_LOCATION with the chroot prefix, if any.
 CHROOT_DEX_LOCATION="$CHROOT$DEX_LOCATION"
+
+# If running on device, determine the ISA of the device.
+if [ "$HOST" = "n" ]; then
+  ISA=$("$ANDROID_BUILD_TOP/art/test/utils/get-device-isa" "$GET_DEVICE_ISA_BITNESS_FLAG")
+fi
 
 if [ "$USE_JVM" = "n" ]; then
     FLAGS="${FLAGS} ${ANDROID_FLAGS}"
@@ -552,7 +564,14 @@ if [ "$IS_JVMTI_TEST" = "y" ]; then
   if [[ "$USE_JVM" = "y" ]]; then
     FLAGS="${FLAGS} -agentpath:${ANDROID_HOST_OUT}/nativetest64/${agent}=${TEST_NAME},jvm"
   else
-    FLAGS="${FLAGS} -agentpath:${agent}=${TEST_NAME},art"
+    if [[ "$HOST" = "y" ]]; then
+      FLAGS="${FLAGS} -agentpath:${agent}=${TEST_NAME},art"
+    else
+      # The linker configuration used for dalvikvm(64) in the Runtime APEX
+      # requires us to pass the full path to the agent to the runtime when
+      # running on device.
+      FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${TEST_NAME},art"
+    fi
   fi
 fi
 
@@ -583,7 +602,14 @@ if [[ "$JVMTI_STRESS" = "y" ]]; then
   if [[ "$USE_JVM" = "y" ]]; then
     FLAGS="${FLAGS} -agentpath:${ANDROID_HOST_OUT}/nativetest64/${agent}=${agent_args}"
   else
-    FLAGS="${FLAGS} -agentpath:${agent}=${agent_args}"
+    if [[ "$HOST" = "y" ]]; then
+      FLAGS="${FLAGS} -agentpath:${agent}=${agent_args}"
+    else
+      # The linker configuration used for dalvikvm(64) in the Runtime APEX
+      # requires us to pass the full path to the agent to the runtime when
+      # running on device.
+      FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${agent_args}"
+    fi
   fi
 fi
 
@@ -719,35 +745,6 @@ else
     FLAGS="$FLAGS -Xnorelocate"
 fi
 
-if [ "$HOST" = "n" ]; then
-  # Need to be root to query /data/dalvik-cache
-  adb root > /dev/null
-  adb wait-for-device
-  ISA=
-  ISA_adb_invocation=
-  ISA_outcome=
-  # We iterate a few times to workaround an adb issue. b/32655576
-  for i in {1..10}; do
-    ISA_adb_invocation=$(adb shell ls -F /data/dalvik-cache)
-    ISA_outcome=$?
-    ISA=$(echo $ISA_adb_invocation | grep -Ewo "${ARCHITECTURES_PATTERN}")
-    if [ x"$ISA" != "x" ]; then
-      break;
-    fi
-  done
-  if [ x"$ISA" = "x" ]; then
-    echo "Unable to determine architecture"
-    # Print a few things for helping diagnosing the problem.
-    echo "adb invocation output: $ISA_adb_invocation"
-    echo "adb invocation outcome: $ISA_outcome"
-    echo $(adb shell ls -F /data/dalvik-cache)
-    echo $(adb shell ls /data/dalvik-cache)
-    echo ${ARCHITECTURES_PATTERN}
-    echo $(adb shell ls -F /data/dalvik-cache | grep -Ewo "${ARCHITECTURES_PATTERN}")
-    exit 1
-  fi
-fi
-
 if [ "$BIONIC" = "y" ]; then
   # This is the location that soong drops linux_bionic builds. Despite being
   # called linux_bionic-x86 the build is actually amd64 (x86_64) only.
@@ -779,7 +776,21 @@ if [ ${#VDEX_NAME} -gt $max_filename_size ]; then
     exit 1
 fi
 
-BIN_DIR=$ANDROID_ROOT/bin
+if [ "$HOST" = "y" ]; then
+  # On host, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the `bin`
+  # directory under the "Android Root" (usually `out/host/linux-x86`).
+  #
+  # TODO(b/130295968): Adjust this if/when ART host artifacts are installed
+  # under the Android Runtime Root (usually
+  # `out/host/linux-x86/com.android.runtime`).
+  ANDROID_RUNTIME_BIN_DIR=$ANDROID_ROOT/bin
+else
+  # On target, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the
+  # Runtime APEX's `bin` directory. This means the linker will observe the
+  # Runtime APEX linker configuration file
+  # (`/apex/com.android.runtime/etc/ld.config.txt`) for these binaries.
+  ANDROID_RUNTIME_BIN_DIR=$ANDROID_RUNTIME_ROOT/bin
+fi
 
 profman_cmdline="true"
 dex2oat_cmdline="true"
@@ -816,10 +827,10 @@ if [ "$USE_ZIPAPEX" = "y" ]; then
   fi
   setupapex_cmdline="unzip -o -u ${zip_options} ${ZIPAPEX_LOC} apex_payload.zip -d ${DEX_LOCATION}"
   installapex_cmdline="unzip -o -u ${zip_options} ${DEX_LOCATION}/apex_payload.zip -d ${DEX_LOCATION}/zipapex"
-  BIN_DIR=$DEX_LOCATION/zipapex/bin
+  ANDROID_RUNTIME_BIN_DIR=$DEX_LOCATION/zipapex/bin
 elif [ "$USE_EXTRACTED_ZIPAPEX" = "y" ]; then
   # Just symlink the zipapex binaries
-  BIN_DIR=$DEX_LOCATION/zipapex/bin
+  ANDROID_RUNTIME_BIN_DIR=$DEX_LOCATION/zipapex/bin
   # Force since some tests manually run this file twice.
   ln_options=""
   if [ "$DEV_MODE" = "y" ]; then
@@ -831,7 +842,7 @@ fi
 # PROFILE takes precedence over RANDOM_PROFILE, since PROFILE tests require a
 # specific profile to run properly.
 if [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
-  profman_cmdline="$BIN_DIR/profman  \
+  profman_cmdline="$ANDROID_RUNTIME_BIN_DIR/profman  \
     --apk=$DEX_LOCATION/$TEST_NAME.jar \
     --dex-location=$DEX_LOCATION/$TEST_NAME.jar"
   if [ -f $DEX_LOCATION/$TEST_NAME-ex.jar ]; then
@@ -861,7 +872,7 @@ if [ "$PREBUILD" = "y" ]; then
   if  [[ "$TEST_IS_NDEBUG" = "y" ]]; then
     dex2oat_binary=${DEX2OAT_NDEBUG_BINARY}
   fi
-  dex2oat_cmdline="$INVOKE_WITH $BIN_DIR/$dex2oat_binary \
+  dex2oat_cmdline="$INVOKE_WITH $ANDROID_RUNTIME_BIN_DIR/$dex2oat_binary \
                       $COMPILE_FLAGS \
                       --boot-image=${BOOT_IMAGE} \
                       --dex-file=$DEX_LOCATION/$TEST_NAME.jar \
@@ -918,7 +929,7 @@ fi
 # We set DumpNativeStackOnSigQuit to false to avoid stressing libunwind.
 # b/27185632
 # b/24664297
-dalvikvm_cmdline="$INVOKE_WITH $GDB $BIN_DIR/$DALVIKVM \
+dalvikvm_cmdline="$INVOKE_WITH $GDB $ANDROID_RUNTIME_BIN_DIR/$DALVIKVM \
                   $GDB_ARGS \
                   $FLAGS \
                   $DEX_VERIFY \
@@ -995,13 +1006,23 @@ if [ "$HOST" = "n" ]; then
       fi
     fi
 
-    LD_LIBRARY_PATH=/data/$TEST_DIRECTORY/art/$ISA
+    # Populate LD_LIBRARY_PATH.
+    LD_LIBRARY_PATH=
     if [ "$ANDROID_ROOT" != "/system" ]; then
       # Current default installation is dalvikvm 64bits and dex2oat 32bits,
       # so we can only use LD_LIBRARY_PATH when testing on a local
       # installation.
-      LD_LIBRARY_PATH="$ANDROID_ROOT/$LIBRARY_DIRECTORY:$LD_LIBRARY_PATH"
+      LD_LIBRARY_PATH="$ANDROID_ROOT/$LIBRARY_DIRECTORY"
     fi
+    # Needed to access libarttest(d).so and JVMTI agent libraries.
+    LD_LIBRARY_PATH="/data/$TEST_DIRECTORY/art/$ISA:$LD_LIBRARY_PATH"
+    # Needed to access the boot (core) image files.
+    LD_LIBRARY_PATH="/data/art-test/$ISA:$LD_LIBRARY_PATH"
+    # Needed to access the test's Odex files.
+    LD_LIBRARY_PATH="$DEX_LOCATION/oat/$ISA:$LD_LIBRARY_PATH"
+    # Needed to access the test's native libraries (see e.g. 674-hiddenapi,
+    # which generates `libhiddenapitest_*.so` libraries in `$DEX_LOCATION`).
+    LD_LIBRARY_PATH="$DEX_LOCATION:$LD_LIBRARY_PATH"
 
     # System libraries needed by libarttestd.so
     PUBLIC_LIBS=libc++.so:libbacktrace.so:libbase.so:libnativehelper.so
@@ -1009,6 +1030,12 @@ if [ "$HOST" = "n" ]; then
       PUBLIC_LIBS=$PUBLIC_LIBS:libart.so:libdexfile.so:libprofile.so:libartbase.so
     else
       PUBLIC_LIBS=$PUBLIC_LIBS:libartd.so:libdexfiled.so:libprofiled.so:libartbased.so
+    fi
+
+    # Prepend directories to the path on device.
+    PREPEND_TARGET_PATH=$ANDROID_RUNTIME_BIN_DIR
+    if [ "$ANDROID_ROOT" != "/system" ]; then
+      PREPEND_TARGET_PATH="$PREPEND_TARGET_PATH:$ANDROID_ROOT/bin"
     fi
 
     # Create a script with the command. The command can get longer than the longest
@@ -1027,7 +1054,7 @@ if [ "$HOST" = "n" ]; then
              rm -rf ${DEX_LOCATION}/dalvik-cache/ && \
              mkdir -p ${mkdir_locations} && \
              export LD_LIBRARY_PATH=$LD_LIBRARY_PATH && \
-             export PATH=$BIN_DIR:$PATH && \
+             export PATH=$PREPEND_TARGET_PATH:\$PATH && \
              $profman_cmdline && \
              $dex2oat_cmdline && \
              $dm_cmdline && \
@@ -1077,7 +1104,7 @@ else
       export LD_LIBRARY_PATH="${ANDROID_ROOT}/${LIBRARY_DIRECTORY}:${ANDROID_ROOT}/${TEST_DIRECTORY}"
       export DYLD_LIBRARY_PATH="${ANDROID_ROOT}/${LIBRARY_DIRECTORY}:${ANDROID_ROOT}/${TEST_DIRECTORY}"
     fi
-    export PATH="$PATH:$BIN_DIR"
+    export PATH="$PATH:$ANDROID_RUNTIME_BIN_DIR"
 
     # Temporarily disable address space layout randomization (ASLR).
     # This is needed on the host so that the linker loads core.oat at the necessary address.
