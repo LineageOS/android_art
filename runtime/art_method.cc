@@ -65,7 +65,7 @@ static_assert(ArtMethod::kRuntimeMethodDexMethodIndex == dex::kDexNoIndex,
               "Wrong runtime-method dex method index");
 
 ArtMethod* ArtMethod::GetCanonicalMethod(PointerSize pointer_size) {
-  if (LIKELY(!IsDefault())) {
+  if (LIKELY(!IsCopied())) {
     return this;
   } else {
     ObjPtr<mirror::Class> declaring_class = GetDeclaringClass();
