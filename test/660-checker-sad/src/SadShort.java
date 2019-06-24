@@ -17,126 +17,126 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class Main {
+public class SadShort {
 
-  /// CHECK-START: int Main.sad1(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int SadShort.sad1(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:i\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: int Main.sad1(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int SadShort.sad1(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:i\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static int sad1(char x, char y) {
+  static int sad1(short x, short y) {
     return x >= y ? x - y : y - x;
   }
 
-  /// CHECK-START: int Main.sad2(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int SadShort.sad2(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:i\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: int Main.sad2(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int SadShort.sad2(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:i\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static int sad2(char x, char y) {
+  static int sad2(short x, short y) {
     int diff = x - y;
     if (diff < 0) diff = -diff;
     return diff;
   }
 
-  /// CHECK-START: int Main.sad3(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int SadShort.sad3(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:i\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: int Main.sad3(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int SadShort.sad3(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:i\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static int sad3(char x, char y) {
+  static int sad3(short x, short y) {
     int diff = x - y;
     return diff >= 0 ? diff : -diff;
   }
 
-  /// CHECK-START: int Main.sad3Alt(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int SadShort.sad3Alt(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:i\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: int Main.sad3Alt(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int SadShort.sad3Alt(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:i\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static int sad3Alt(char x, char y) {
+  static int sad3Alt(short x, short y) {
     int diff = x - y;
     return 0 <= diff ? diff : -diff;
   }
 
-  /// CHECK-START: long Main.sadL1(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadShort.sadL1(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sadL1(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadShort.sadL1(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static long sadL1(char x, char y) {
+  static long sadL1(short x, short y) {
     long xl = x;
     long yl = y;
     return xl >= yl ? xl - yl : yl - xl;
   }
 
-  /// CHECK-START: long Main.sadL2(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadShort.sadL2(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sadL2(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadShort.sadL2(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static long sadL2(char x, char y) {
+  static long sadL2(short x, short y) {
     long diff = x - y;
     if (diff < 0L) diff = -diff;
     return diff;
   }
 
-  /// CHECK-START: long Main.sadL3(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadShort.sadL3(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sadL3(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadShort.sadL3(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static long sadL3(char x, char y) {
+  static long sadL3(short x, short y) {
     long diff = x - y;
     return diff >= 0L ? diff : -diff;
   }
 
-  /// CHECK-START: long Main.sadL3Alt(char, char) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadShort.sadL3Alt(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sadL3Alt(char, char) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadShort.sadL3Alt(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
-  static long sadL3Alt(char x, char y) {
+  static long sadL3Alt(short x, short y) {
     long diff = x - y;
     return 0L <= diff ? diff : -diff;
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Use cross-values to test all cases.
-    char[] interesting = {
-      (char) 0x0000, (char) 0x0001, (char) 0x007f,
-      (char) 0x0080, (char) 0x0081, (char) 0x00ff,
-      (char) 0x0100, (char) 0x0101, (char) 0x017f,
-      (char) 0x0180, (char) 0x0181, (char) 0x01ff,
-      (char) 0x7f00, (char) 0x7f01, (char) 0x7f7f,
-      (char) 0x7f80, (char) 0x7f81, (char) 0x7fff,
-      (char) 0x8000, (char) 0x8001, (char) 0x807f,
-      (char) 0x8080, (char) 0x8081, (char) 0x80ff,
-      (char) 0x8100, (char) 0x8101, (char) 0x817f,
-      (char) 0x8180, (char) 0x8181, (char) 0x81ff,
-      (char) 0xff00, (char) 0xff01, (char) 0xff7f,
-      (char) 0xff80, (char) 0xff81, (char) 0xffff
+    short[] interesting = {
+      (short) 0x0000, (short) 0x0001, (short) 0x007f,
+      (short) 0x0080, (short) 0x0081, (short) 0x00ff,
+      (short) 0x0100, (short) 0x0101, (short) 0x017f,
+      (short) 0x0180, (short) 0x0181, (short) 0x01ff,
+      (short) 0x7f00, (short) 0x7f01, (short) 0x7f7f,
+      (short) 0x7f80, (short) 0x7f81, (short) 0x7fff,
+      (short) 0x8000, (short) 0x8001, (short) 0x807f,
+      (short) 0x8080, (short) 0x8081, (short) 0x80ff,
+      (short) 0x8100, (short) 0x8101, (short) 0x817f,
+      (short) 0x8180, (short) 0x8181, (short) 0x81ff,
+      (short) 0xff00, (short) 0xff01, (short) 0xff7f,
+      (short) 0xff80, (short) 0xff81, (short) 0xffff
     };
     for (int i = 0; i < interesting.length; i++) {
       for (int j = 0; j < interesting.length; j++) {
-        char x = interesting[i];
-        char y = interesting[j];
+        short x = interesting[i];
+        short y = interesting[j];
         int e = Math.abs(x - y);
         expectEquals(e, sad1(x, y));
         expectEquals(e, sad2(x, y));
@@ -148,7 +148,7 @@ public class Main {
         expectEquals(e, sadL3Alt(x, y));
       }
     }
-    System.out.println("passed");
+    System.out.println("SadShort passed");
   }
 
   private static void expectEquals(int expected, int result) {
