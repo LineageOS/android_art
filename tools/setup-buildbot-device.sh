@@ -17,7 +17,9 @@
 # The work does by this script is (mostly) undone by tools/teardown-buildbot-device.sh.
 # Make sure to keep these files in sync.
 
+red='\033[0;31m'
 green='\033[0;32m'
+yellow='\033[0;33m'
 nc='\033[0m'
 
 if [ "$1" = --verbose ]; then
@@ -105,6 +107,9 @@ else
   for i in $processes; do adb shell kill -9 $i; done
 fi
 
+# Chroot environment.
+# ===================
+
 if [[ -n "$ART_TEST_CHROOT" ]]; then
   # Prepare the chroot dir.
   echo -e "${green}Prepare the chroot dir in $ART_TEST_CHROOT${nc}"
@@ -119,8 +124,9 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
   # This is required to have Android system properties work from the chroot.
   # Notes:
   # - In Android N, only '/property_contexts' is expected.
-  # - In Android O, property_context files are expected under /system and /vendor.
-  # (See bionic/libc/bionic/system_properties.cpp for more information.)
+  # - In Android O+, property_context files are expected under /system and /vendor.
+  # (See bionic/libc/bionic/system_properties.cpp or
+  # bionic/libc/system_properties/contexts_split.cpp for more information.)
   property_context_files="/property_contexts \
     /system/etc/selinux/plat_property_contexts \
     /vendor/etc/selinux/nonplat_property_context \
@@ -139,7 +145,7 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
 
   # Populate /etc in chroot with required files.
   adb shell mkdir -p "$ART_TEST_CHROOT/system/etc"
-  adb shell "cd $ART_TEST_CHROOT && ln -s system/etc etc"
+  adb shell "cd $ART_TEST_CHROOT && ln -sf system/etc etc"
 
   # Provide /proc in chroot.
   adb shell mkdir -p "$ART_TEST_CHROOT/proc"
@@ -160,5 +166,11 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
     || adb shell mount -o bind /dev "$ART_TEST_CHROOT/dev"
 
   # Create /apex directory in chroot.
+  #
+  # Note that we do not mount a tmpfs in this directory, as we simply copy the
+  # contents of the flattened Runtime APEX in it during the execution of
+  # art/tools/buildbot-sync.sh. (This may change in the future, if we start
+  # using scripts art/tools/mount-buildbot-apexes.sh and
+  # art/tools/unmount-buildbot-apexes.sh.)
   adb shell mkdir -p "$ART_TEST_CHROOT/apex"
 fi
