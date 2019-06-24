@@ -374,6 +374,33 @@ const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
   return result;
 }
 
+static void FillRootTable(uint8_t* roots_data, const std::vector<Handle<mirror::Object>>& roots)
+    REQUIRES(Locks::jit_lock_)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  GcRoot<mirror::Object>* gc_roots = reinterpret_cast<GcRoot<mirror::Object>*>(roots_data);
+  const uint32_t length = roots.size();
+  // Put all roots in `roots_data`.
+  for (uint32_t i = 0; i < length; ++i) {
+    ObjPtr<mirror::Object> object = roots[i].Get();
+    gc_roots[i] = GcRoot<mirror::Object>(object);
+  }
+  // Store the length of the table at the end. This will allow fetching it from a stack_map
+  // pointer.
+  reinterpret_cast<uint32_t*>(roots_data)[length] = length;
+}
+
+void JitMemoryRegion::CommitData(uint8_t* roots_data,
+                                 const std::vector<Handle<mirror::Object>>& roots,
+                                 const uint8_t* stack_map,
+                                 size_t stack_map_size) {
+  size_t root_table_size = ComputeRootTableSize(roots.size());
+  uint8_t* stack_map_data = roots_data + root_table_size;
+  FillRootTable(roots_data, roots);
+  memcpy(stack_map_data, stack_map, stack_map_size);
+  // Flush data cache, as compiled code references literals in it.
+  FlushDataCache(roots_data, roots_data + root_table_size + stack_map_size);
+}
+
 void JitMemoryRegion::FreeCode(const uint8_t* code) {
   code = GetNonExecutableAddress(code);
   used_memory_for_code_ -= mspace_usable_size(code);
