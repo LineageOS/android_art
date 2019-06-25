@@ -4168,7 +4168,7 @@ bool MethodVerifier<kVerifierDebug>::CheckCallSite(uint32_t call_site_idx) {
   }
 
   CallSiteArrayValueIterator it(*dex_file_, dex_file_->GetCallSiteId(call_site_idx));
-  // Check essential arguments are provided. The dex file verifier has verified indicies of the
+  // Check essential arguments are provided. The dex file verifier has verified indices of the
   // main values (method handle, name, method_type).
   static const size_t kRequiredArguments = 3;
   if (it.Size() < kRequiredArguments) {

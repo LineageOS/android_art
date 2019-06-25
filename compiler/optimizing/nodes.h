@@ -1099,7 +1099,7 @@ class HBasicBlock : public ArenaObject<kArenaAllocBasicBlock> {
   }
 
   // Insert `this` between `predecessor` and `successor. This method
-  // preserves the indicies, and will update the first edge found between
+  // preserves the indices, and will update the first edge found between
   // `predecessor` and `successor`.
   void InsertBetween(HBasicBlock* predecessor, HBasicBlock* successor) {
     size_t predecessor_index = successor->GetPredecessorIndexOf(predecessor);

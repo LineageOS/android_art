@@ -43,7 +43,7 @@ public class TestInvokeCustomWithConcurrentThreads extends TestBase implements R
     // Array of counters for how many times each instantiated call site is called
     private static final AtomicInteger[] called = new AtomicInteger[NUMBER_OF_THREADS];
 
-    // Array of call site indicies of which call site a thread invoked
+    // Array of call site indices of which call site a thread invoked
     private static final AtomicInteger[] targetted = new AtomicInteger[NUMBER_OF_THREADS];
 
     // Synchronization barrier all threads will wait on in the bootstrap method.
