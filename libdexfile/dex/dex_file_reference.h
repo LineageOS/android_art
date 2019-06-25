@@ -39,7 +39,7 @@ class DexFileReference {
   };
 };
 
-// Default comparators, compares the indicies, not the backing data.
+// Default comparators, compares the indices, not the backing data.
 inline bool operator<(const DexFileReference& a, const DexFileReference& b) {
   return DexFileReference::Comparator()(a, b);
 }
