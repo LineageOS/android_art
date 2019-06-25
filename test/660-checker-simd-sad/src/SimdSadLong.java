@@ -17,9 +17,9 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class SadLong {
+public class SimdSadLong {
 
-  /// CHECK-START: long SadLong.sadLong2Long(long[], long[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadLong.sadLong2Long(long[], long[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -32,7 +32,7 @@ public class SadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SadLong.sadLong2Long(long[], long[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2Long(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -52,7 +52,7 @@ public class SadLong {
     return sad;
   }
 
-  /// CHECK-START: long SadLong.sadLong2LongAlt(long[], long[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadLong.sadLong2LongAlt(long[], long[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                       loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                       loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                      loop:none
@@ -68,7 +68,7 @@ public class SadLong {
   //
   // No ABS? No SAD!
   //
-  /// CHECK-START: long SadLong.sadLong2LongAlt(long[], long[]) loop_optimization (after)
+  /// CHECK-START: long SimdSadLong.sadLong2LongAlt(long[], long[]) loop_optimization (after)
   /// CHECK-NOT: VecSADAccumulate
   private static long sadLong2LongAlt(long[] x, long[] y) {
     int min_length = Math.min(x.length, y.length);
@@ -81,7 +81,7 @@ public class SadLong {
     return sad;
   }
 
-  /// CHECK-START: long SadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -94,7 +94,7 @@ public class SadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -118,7 +118,7 @@ public class SadLong {
     return sad;
   }
 
-  /// CHECK-START: long SadLong.sadLong2LongAt1(long[], long[]) loop_optimization (before)
+  /// CHECK-START: long SimdSadLong.sadLong2LongAt1(long[], long[]) loop_optimization (before)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -131,7 +131,7 @@ public class SadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SadLong.sadLong2LongAt1(long[], long[]) loop_optimization (after)
+  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2LongAt1(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
@@ -198,7 +198,7 @@ public class SadLong {
     expectEquals(8L, sadLong2LongAlt2(x, y));
     expectEquals(9L, sadLong2LongAt1(x, y));
 
-    System.out.println("SadLong passed");
+    System.out.println("SimdSadLong passed");
   }
 
   private static void expectEquals(long expected, long result) {

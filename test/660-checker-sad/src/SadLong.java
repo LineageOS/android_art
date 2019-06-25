@@ -17,17 +17,17 @@
 /**
  * Tests for SAD (sum of absolute differences).
  */
-public class Main {
+public class SadLong {
 
-  /// CHECK-START: long Main.sad1(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadLong.sad1(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sad1(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadLong.sad1(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sad1(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadLong.sad1(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT: Abs
   //
   // NOTE: for direct 64-bit operands, this is not an ABS.
@@ -35,11 +35,11 @@ public class Main {
     return x >= y ? x - y : y - x;
   }
 
-  /// CHECK-START: long Main.sad2(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadLong.sad2(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sad2(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadLong.sad2(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
   static long sad2(long x, long y) {
@@ -48,11 +48,11 @@ public class Main {
     return diff;
   }
 
-  /// CHECK-START: long Main.sad3(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadLong.sad3(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sad3(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadLong.sad3(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
   static long sad3(long x, long y) {
@@ -60,11 +60,11 @@ public class Main {
     return diff >= 0 ? diff : -diff;
   }
 
-  /// CHECK-START: long Main.sad3Alt(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long SadLong.sad3Alt(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Select:j\d+>> Select
   /// CHECK-DAG:                 Return [<<Select>>]
   //
-  /// CHECK-START: long Main.sad3Alt(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long SadLong.sad3Alt(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Intrin:j\d+>> Abs
   /// CHECK-DAG:                 Return [<<Intrin>>]
   static long sad3Alt(long x, long y) {
@@ -72,7 +72,7 @@ public class Main {
     return 0 <= diff ? diff : -diff;
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Use cross-values for the interesting values.
     long[] interesting = {
       0x0000000000000000L, 0x0000000000000001L, 0x000000007fffffffL,
@@ -100,7 +100,7 @@ public class Main {
         expectEquals(e2, sad3Alt(x, y));
       }
     }
-    System.out.println("passed");
+    System.out.println("SadLong passed");
   }
 
   private static void expectEquals(long expected, long result) {

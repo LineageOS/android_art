@@ -70,6 +70,7 @@ struct WellKnownClasses {
   static jclass java_lang_NoClassDefFoundError;
   static jclass java_lang_Object;
   static jclass java_lang_OutOfMemoryError;
+  static jclass java_lang_reflect_InvocationTargetException;
   static jclass java_lang_reflect_Parameter;
   static jclass java_lang_reflect_Parameter__array;
   static jclass java_lang_reflect_Proxy;
@@ -110,6 +111,7 @@ struct WellKnownClasses {
   static jmethodID java_lang_Long_valueOf;
   static jmethodID java_lang_ref_FinalizerReference_add;
   static jmethodID java_lang_ref_ReferenceQueue_add;
+  static jmethodID java_lang_reflect_InvocationTargetException_init;
   static jmethodID java_lang_reflect_Parameter_init;
   static jmethodID java_lang_reflect_Proxy_init;
   static jmethodID java_lang_reflect_Proxy_invoke;
