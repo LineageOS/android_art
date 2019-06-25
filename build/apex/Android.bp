@@ -49,7 +49,7 @@ bionic_native_shared_libs = [
     "libdl",
 ]
 
-bionic_native_shared_libs_device = [
+bionic_native_device_only_shared_libs = [
     // ... and their internal dependencies
     // These are available only on device
     "libc_malloc_debug",
@@ -204,6 +204,7 @@ prebuilt_etc {
     installable: false,
 }
 
+// Default values shared by device Runtime APEXes.
 apex_defaults {
     name: "com.android.runtime-defaults",
     compile_multilib: "both",
@@ -211,6 +212,7 @@ apex_defaults {
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         bionic_native_shared_libs +
+        bionic_native_device_only_shared_libs +
         libcore_native_device_only_shared_libs +
         libcore_native_shared_libs,
     multilib: {
@@ -245,7 +247,6 @@ apex_defaults {
 apex {
     name: "com.android.runtime.release",
     defaults: ["com.android.runtime-defaults"],
-    native_shared_libs: bionic_native_shared_libs_device,
     certificate: ":com.android.runtime.release.certificate",
 }
 
@@ -256,8 +257,7 @@ apex {
     name: "com.android.runtime.debug",
     defaults: ["com.android.runtime-defaults"],
     native_shared_libs: art_runtime_debug_native_shared_libs +
-        libcore_debug_native_shared_libs +
-        bionic_native_shared_libs_device,
+        libcore_debug_native_shared_libs,
     multilib: {
         both: {
             binaries: art_tools_debug_binaries_both,
