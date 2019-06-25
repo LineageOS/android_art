@@ -2461,7 +2461,7 @@ class OatWriter::WriteQuickeningInfoMethodVisitor {
     return written_bytes_;
   }
 
-  SafeMap<const DexFile*, std::vector<uint32_t>>& GetQuickenInfoOffsetIndicies() {
+  SafeMap<const DexFile*, std::vector<uint32_t>>& GetQuickenInfoOffsetIndices() {
     return quicken_info_offset_indices_;
   }
 
@@ -2572,7 +2572,7 @@ bool OatWriter::WriteQuickeningInfo(OutputStream* vdex_out) {
     WriteQuickeningInfoOffsetsMethodVisitor table_visitor(
         vdex_out,
         quicken_info_offset,
-        &write_quicken_info_visitor.GetQuickenInfoOffsetIndicies(),
+        &write_quicken_info_visitor.GetQuickenInfoOffsetIndices(),
         /*out*/ &table_offsets);
     if (!table_visitor.VisitDexMethods(*dex_files_)) {
       PLOG(ERROR) << "Failed to write the vdex quickening info. File: "
