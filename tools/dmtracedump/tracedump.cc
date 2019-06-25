@@ -2332,7 +2332,7 @@ void createDiff(DataKeys* d1, DataKeys* d2) {
   MethodEntry** methods1 = parseMethodEntries(d1);
   MethodEntry** methods2 = parseMethodEntries(d2);
 
-  // sort and assign the indicies
+  // sort and assign the indices
   qsort(methods1, d1->numMethods, sizeof(MethodEntry*), compareElapsedInclusive);
   for (int32_t i = 0; i < d1->numMethods; ++i) {
     methods1[i]->index = i;

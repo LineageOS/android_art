@@ -343,7 +343,7 @@ std::vector<uint8_t> DexToDexCompiler::CompilationState::Compile() {
     DCHECK_EQ(quicken_index_, existing_quicken_info_.NumIndices());
   }
 
-  // Even if there are no indicies, generate an empty quicken info so that we know the method was
+  // Even if there are no indices, generate an empty quicken info so that we know the method was
   // quickened.
 
   std::vector<uint8_t> quicken_data;
