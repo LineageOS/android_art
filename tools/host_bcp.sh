@@ -29,9 +29,9 @@ fi
 
 IMAGE=$1
 if [[ ! -e ${IMAGE} ]]; then
-  IMAGE=${ANDROID_PRODUCT_OUT}$1
+  IMAGE=${ANDROID_PRODUCT_OUT}/$1
   if [[ ! -e ${IMAGE} ]]; then
-    echo "Neither $1 nor ${ANDROID_PRODUCT_OUT}$1 exists."
+    echo "Neither $1 nor ${ANDROID_PRODUCT_OUT}/$1 exists."
     exit 1
   fi
 fi
@@ -42,9 +42,11 @@ if [[ "x${BCPL}" == "x" ]]; then
   exit 1
 fi
 
+MANIFEST=/apex_manifest.json
 RUNTIME_APEX=/apex/com.android.runtime
 RUNTIME_APEX_SELECTED=
-for d in `ls -1 -d ${ANDROID_PRODUCT_OUT}${RUNTIME_APEX}* 2>/dev/null`; do
+for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${RUNTIME_APEX}*${MANIFEST} 2>/dev/null`; do
+  d=${m:0:-${#MANIFEST}}
   if [[ "x${RUNTIME_APEX_SELECTED}" != "x" ]]; then
     echo "Multiple Runtime apex dirs: ${RUNTIME_APEX_SELECTED}, ${d}."
     exit 1
@@ -65,6 +67,10 @@ for COMPONENT in ${BCPL}; do
   if [[ ${COMPONENT:0:${#RUNTIME_APEX}} = ${RUNTIME_APEX} ]]; then
     HEAD=${RUNTIME_APEX_SELECTED}
     TAIL=${COMPONENT:${#RUNTIME_APEX}}
+  fi
+  if [[ ! -e $HEAD$TAIL ]]; then
+    echo "File does not exist: $HEAD$TAIL"
+    exit 1
   fi
   BCP="${BCP}:${HEAD}${TAIL}"
 done
