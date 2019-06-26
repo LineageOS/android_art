@@ -225,6 +225,11 @@ void CommonArtTestImpl::SetUp() {
   dalvik_cache_.append("/dalvik-cache");
   int mkdir_result = mkdir(dalvik_cache_.c_str(), 0700);
   ASSERT_EQ(mkdir_result, 0);
+
+  static bool gSlowDebugTestFlag = false;
+  RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
+  SetRuntimeDebugFlagsEnabled(true);
+  CHECK(gSlowDebugTestFlag);
 }
 
 void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
