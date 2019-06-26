@@ -143,10 +143,10 @@ TEST(BitTableTest, TestBitmapTable) {
   BitMemoryWriter<std::vector<uint8_t>> writer(&buffer);
   const uint64_t value = 0xDEADBEEF0BADF00Dull;
   BitmapTableBuilder builder(&allocator);
-  std::multimap<uint64_t, size_t> indicies;  // bitmap -> row.
+  std::multimap<uint64_t, size_t> indices;  // bitmap -> row.
   for (size_t bit_length = 0; bit_length <= BitSizeOf<uint64_t>(); ++bit_length) {
     uint64_t bitmap = value & MaxInt<uint64_t>(bit_length);
-    indicies.emplace(bitmap, builder.Dedup(&bitmap, MinimumBitsToStore(bitmap)));
+    indices.emplace(bitmap, builder.Dedup(&bitmap, MinimumBitsToStore(bitmap)));
   }
   builder.Encode(writer);
   EXPECT_EQ(1 + static_cast<uint32_t>(POPCOUNT(value)), builder.size());
@@ -154,7 +154,7 @@ TEST(BitTableTest, TestBitmapTable) {
   BitMemoryReader reader(buffer.data());
   BitTableBase<1> table(reader);
   EXPECT_EQ(writer.NumberOfWrittenBits(), reader.NumberOfReadBits());
-  for (auto it : indicies) {
+  for (auto it : indices) {
     uint64_t expected = it.first;
     BitMemoryRegion actual = table.GetBitMemoryRegion(it.second);
     EXPECT_GE(actual.size_in_bits(), MinimumBitsToStore(expected));
