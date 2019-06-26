@@ -107,6 +107,10 @@ class JitMemoryRegion {
       REQUIRES(Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  bool IsValid() const NO_THREAD_SAFETY_ANALYSIS {
+    return exec_mspace_ != nullptr || data_mspace_ != nullptr;
+  }
+
   bool HasDualCodeMapping() const {
     return non_exec_pages_.IsValid();
   }
