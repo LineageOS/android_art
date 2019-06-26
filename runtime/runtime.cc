@@ -2840,6 +2840,10 @@ void Runtime::WaitForThreadPoolWorkersToStart() {
   }
 }
 
+void Runtime::ResetStartupCompleted() {
+  startup_completed_.store(false, std::memory_order_seq_cst);
+}
+
 void Runtime::NotifyStartupCompleted() {
   bool expected = false;
   if (!startup_completed_.compare_exchange_strong(expected, true, std::memory_order_seq_cst)) {

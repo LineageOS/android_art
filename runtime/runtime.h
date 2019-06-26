@@ -868,6 +868,10 @@ class Runtime {
     load_app_image_startup_cache_ = enabled;
   }
 
+  // Reset the startup completed status so that we can call NotifyStartupCompleted again. Should
+  // only be used for testing.
+  void ResetStartupCompleted();
+
   // Notify the runtime that application startup is considered completed. Only has effect for the
   // first call.
   void NotifyStartupCompleted();
