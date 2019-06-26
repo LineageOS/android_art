@@ -428,6 +428,7 @@ static ObjPtr<mirror::Class> EnsureInitialized(Thread* self, ObjPtr<mirror::Clas
   return h_klass.Get();
 }
 
+template<bool kEnableIndexIds>
 static jmethodID FindMethodID(ScopedObjectAccess& soa, jclass jni_class,
                               const char* name, const char* sig, bool is_static)
     REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -449,14 +450,16 @@ static jmethodID FindMethodID(ScopedObjectAccess& soa, jclass jni_class,
     ThrowNoSuchMethodError(soa, c, name, sig, is_static ? "static" : "non-static");
     return nullptr;
   }
-  return jni::EncodeArtMethod(method);
+  return jni::EncodeArtMethod<kEnableIndexIds>(method);
 }
 
+template<bool kEnableIndexIds>
 static ObjPtr<mirror::ClassLoader> GetClassLoader(const ScopedObjectAccess& soa)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ArtMethod* method = soa.Self()->GetCurrentMethod(nullptr);
   // If we are running Runtime.nativeLoad, use the overriding ClassLoader it set.
-  if (method == jni::DecodeArtMethod(WellKnownClasses::java_lang_Runtime_nativeLoad)) {
+  if (method ==
+      jni::DecodeArtMethod<kEnableIndexIds>(WellKnownClasses::java_lang_Runtime_nativeLoad)) {
     return soa.Decode<mirror::ClassLoader>(soa.Self()->GetClassLoaderOverride());
   }
   // If we have a method, use its ClassLoader for context.
@@ -482,6 +485,7 @@ static ObjPtr<mirror::ClassLoader> GetClassLoader(const ScopedObjectAccess& soa)
   return nullptr;
 }
 
+template<bool kEnableIndexIds>
 static jfieldID FindFieldID(const ScopedObjectAccess& soa, jclass jni_class, const char* name,
                             const char* sig, bool is_static)
     REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -534,7 +538,7 @@ static jfieldID FindFieldID(const ScopedObjectAccess& soa, jclass jni_class, con
                                    sig, name, c->GetDescriptor(&temp));
     return nullptr;
   }
-  return jni::EncodeArtField(field);
+  return jni::EncodeArtField<kEnableIndexIds>(field);
 }
 
 static void ThrowAIOOBE(ScopedObjectAccess& soa,
@@ -641,6 +645,7 @@ static ArtMethod* FindMethod(ObjPtr<mirror::Class> c,
   return nullptr;
 }
 
+template <bool kEnableIndexIds>
 class JNI {
  public:
   static jint GetVersion(JNIEnv*) {
@@ -661,7 +666,7 @@ class JNI {
     ObjPtr<mirror::Class> c = nullptr;
     if (runtime->IsStarted()) {
       StackHandleScope<1> hs(soa.Self());
-      Handle<mirror::ClassLoader> class_loader(hs.NewHandle(GetClassLoader(soa)));
+      Handle<mirror::ClassLoader> class_loader(hs.NewHandle(GetClassLoader<kEnableIndexIds>(soa)));
       c = class_linker->FindClass(soa.Self(), descriptor.c_str(), class_loader);
     } else {
       c = class_linker->FindSystemClass(soa.Self(), descriptor.c_str());
@@ -672,7 +677,7 @@ class JNI {
   static jmethodID FromReflectedMethod(JNIEnv* env, jobject jlr_method) {
     CHECK_NON_NULL_ARGUMENT(jlr_method);
     ScopedObjectAccess soa(env);
-    return jni::EncodeArtMethod(ArtMethod::FromReflectedMethod(soa, jlr_method));
+    return jni::EncodeArtMethod<kEnableIndexIds>(ArtMethod::FromReflectedMethod(soa, jlr_method));
   }
 
   static jfieldID FromReflectedField(JNIEnv* env, jobject jlr_field) {
@@ -684,7 +689,7 @@ class JNI {
       return nullptr;
     }
     ObjPtr<mirror::Field> field = ObjPtr<mirror::Field>::DownCast(obj_field);
-    return jni::EncodeArtField(field->GetArtField());
+    return jni::EncodeArtField<kEnableIndexIds>(field->GetArtField());
   }
 
   static jobject ToReflectedMethod(JNIEnv* env, jclass, jmethodID mid, jboolean) {
@@ -935,7 +940,7 @@ class JNI {
     }
     if (c->IsStringClass()) {
       // Replace calls to String.<init> with equivalent StringFactory call.
-      jmethodID sf_mid = jni::EncodeArtMethod(
+      jmethodID sf_mid = jni::EncodeArtMethod<kEnableIndexIds>(
           WellKnownClasses::StringInitToStringFactory(jni::DecodeArtMethod(mid)));
       return CallStaticObjectMethodV(env, WellKnownClasses::java_lang_StringFactory, sf_mid, args);
     }
@@ -962,7 +967,7 @@ class JNI {
     }
     if (c->IsStringClass()) {
       // Replace calls to String.<init> with equivalent StringFactory call.
-      jmethodID sf_mid = jni::EncodeArtMethod(
+      jmethodID sf_mid = jni::EncodeArtMethod<kEnableIndexIds>(
           WellKnownClasses::StringInitToStringFactory(jni::DecodeArtMethod(mid)));
       return CallStaticObjectMethodA(env, WellKnownClasses::java_lang_StringFactory, sf_mid, args);
     }
@@ -983,7 +988,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
-    return FindMethodID(soa, java_class, name, sig, false);
+    return FindMethodID<kEnableIndexIds>(soa, java_class, name, sig, false);
   }
 
   static jmethodID GetStaticMethodID(JNIEnv* env, jclass java_class, const char* name,
@@ -992,7 +997,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
-    return FindMethodID(soa, java_class, name, sig, true);
+    return FindMethodID<kEnableIndexIds>(soa, java_class, name, sig, true);
   }
 
   static jobject CallObjectMethod(JNIEnv* env, jobject obj, jmethodID mid, ...) {
@@ -1524,7 +1529,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
-    return FindFieldID(soa, java_class, name, sig, false);
+    return FindFieldID<kEnableIndexIds>(soa, java_class, name, sig, false);
   }
 
   static jfieldID GetStaticFieldID(JNIEnv* env, jclass java_class, const char* name,
@@ -1533,14 +1538,14 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
-    return FindFieldID(soa, java_class, name, sig, true);
+    return FindFieldID<kEnableIndexIds>(soa, java_class, name, sig, true);
   }
 
   static jobject GetObjectField(JNIEnv* env, jobject obj, jfieldID fid) {
     CHECK_NON_NULL_ARGUMENT(obj);
     CHECK_NON_NULL_ARGUMENT(fid);
     ScopedObjectAccess soa(env);
-    ArtField* f = jni::DecodeArtField(fid);
+    ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid);
     NotifyGetField(f, obj);
     ObjPtr<mirror::Object> o = soa.Decode<mirror::Object>(obj);
     return soa.AddLocalReference<jobject>(f->GetObject(o));
@@ -1549,7 +1554,7 @@ class JNI {
   static jobject GetStaticObjectField(JNIEnv* env, jclass, jfieldID fid) {
     CHECK_NON_NULL_ARGUMENT(fid);
     ScopedObjectAccess soa(env);
-    ArtField* f = jni::DecodeArtField(fid);
+    ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid);
     NotifyGetField(f, nullptr);
     return soa.AddLocalReference<jobject>(f->GetObject(f->GetDeclaringClass()));
   }
@@ -1558,7 +1563,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT_RETURN_VOID(java_object);
     CHECK_NON_NULL_ARGUMENT_RETURN_VOID(fid);
     ScopedObjectAccess soa(env);
-    ArtField* f = jni::DecodeArtField(fid);
+    ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid);
     NotifySetObjectField(f, java_object, java_value);
     ObjPtr<mirror::Object> o = soa.Decode<mirror::Object>(java_object);
     ObjPtr<mirror::Object> v = soa.Decode<mirror::Object>(java_value);
@@ -1568,7 +1573,7 @@ class JNI {
   static void SetStaticObjectField(JNIEnv* env, jclass, jfieldID fid, jobject java_value) {
     CHECK_NON_NULL_ARGUMENT_RETURN_VOID(fid);
     ScopedObjectAccess soa(env);
-    ArtField* f = jni::DecodeArtField(fid);
+    ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid);
     NotifySetObjectField(f, nullptr, java_value);
     ObjPtr<mirror::Object> v = soa.Decode<mirror::Object>(java_value);
     f->SetObject<false>(f->GetDeclaringClass(), v);
@@ -1578,7 +1583,7 @@ class JNI {
   CHECK_NON_NULL_ARGUMENT_RETURN_ZERO(instance); \
   CHECK_NON_NULL_ARGUMENT_RETURN_ZERO(fid); \
   ScopedObjectAccess soa(env); \
-  ArtField* f = jni::DecodeArtField(fid); \
+  ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid); \
   NotifyGetField(f, instance); \
   ObjPtr<mirror::Object> o = soa.Decode<mirror::Object>(instance); \
   return f->Get ##fn (o)
@@ -1586,7 +1591,7 @@ class JNI {
 #define GET_STATIC_PRIMITIVE_FIELD(fn) \
   CHECK_NON_NULL_ARGUMENT_RETURN_ZERO(fid); \
   ScopedObjectAccess soa(env); \
-  ArtField* f = jni::DecodeArtField(fid); \
+  ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid); \
   NotifyGetField(f, nullptr); \
   return f->Get ##fn (f->GetDeclaringClass())
 
@@ -1594,7 +1599,7 @@ class JNI {
   CHECK_NON_NULL_ARGUMENT_RETURN_VOID(instance); \
   CHECK_NON_NULL_ARGUMENT_RETURN_VOID(fid); \
   ScopedObjectAccess soa(env); \
-  ArtField* f = jni::DecodeArtField(fid); \
+  ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid); \
   NotifySetPrimitiveField(f, instance, JValue::FromPrimitive<decltype(value)>(value)); \
   ObjPtr<mirror::Object> o = soa.Decode<mirror::Object>(instance); \
   f->Set ##fn <false>(o, value)
@@ -1602,7 +1607,7 @@ class JNI {
 #define SET_STATIC_PRIMITIVE_FIELD(fn, value) \
   CHECK_NON_NULL_ARGUMENT_RETURN_VOID(fid); \
   ScopedObjectAccess soa(env); \
-  ArtField* f = jni::DecodeArtField(fid); \
+  ArtField* f = jni::DecodeArtField<kEnableIndexIds>(fid); \
   NotifySetPrimitiveField(f, nullptr, JValue::FromPrimitive<decltype(value)>(value)); \
   f->Set ##fn <false>(f->GetDeclaringClass(), value)
 
@@ -2881,244 +2886,253 @@ class JNI {
   }
 };
 
-const JNINativeInterface gJniNativeInterface = {
-  nullptr,  // reserved0.
-  nullptr,  // reserved1.
-  nullptr,  // reserved2.
-  nullptr,  // reserved3.
-  JNI::GetVersion,
-  JNI::DefineClass,
-  JNI::FindClass,
-  JNI::FromReflectedMethod,
-  JNI::FromReflectedField,
-  JNI::ToReflectedMethod,
-  JNI::GetSuperclass,
-  JNI::IsAssignableFrom,
-  JNI::ToReflectedField,
-  JNI::Throw,
-  JNI::ThrowNew,
-  JNI::ExceptionOccurred,
-  JNI::ExceptionDescribe,
-  JNI::ExceptionClear,
-  JNI::FatalError,
-  JNI::PushLocalFrame,
-  JNI::PopLocalFrame,
-  JNI::NewGlobalRef,
-  JNI::DeleteGlobalRef,
-  JNI::DeleteLocalRef,
-  JNI::IsSameObject,
-  JNI::NewLocalRef,
-  JNI::EnsureLocalCapacity,
-  JNI::AllocObject,
-  JNI::NewObject,
-  JNI::NewObjectV,
-  JNI::NewObjectA,
-  JNI::GetObjectClass,
-  JNI::IsInstanceOf,
-  JNI::GetMethodID,
-  JNI::CallObjectMethod,
-  JNI::CallObjectMethodV,
-  JNI::CallObjectMethodA,
-  JNI::CallBooleanMethod,
-  JNI::CallBooleanMethodV,
-  JNI::CallBooleanMethodA,
-  JNI::CallByteMethod,
-  JNI::CallByteMethodV,
-  JNI::CallByteMethodA,
-  JNI::CallCharMethod,
-  JNI::CallCharMethodV,
-  JNI::CallCharMethodA,
-  JNI::CallShortMethod,
-  JNI::CallShortMethodV,
-  JNI::CallShortMethodA,
-  JNI::CallIntMethod,
-  JNI::CallIntMethodV,
-  JNI::CallIntMethodA,
-  JNI::CallLongMethod,
-  JNI::CallLongMethodV,
-  JNI::CallLongMethodA,
-  JNI::CallFloatMethod,
-  JNI::CallFloatMethodV,
-  JNI::CallFloatMethodA,
-  JNI::CallDoubleMethod,
-  JNI::CallDoubleMethodV,
-  JNI::CallDoubleMethodA,
-  JNI::CallVoidMethod,
-  JNI::CallVoidMethodV,
-  JNI::CallVoidMethodA,
-  JNI::CallNonvirtualObjectMethod,
-  JNI::CallNonvirtualObjectMethodV,
-  JNI::CallNonvirtualObjectMethodA,
-  JNI::CallNonvirtualBooleanMethod,
-  JNI::CallNonvirtualBooleanMethodV,
-  JNI::CallNonvirtualBooleanMethodA,
-  JNI::CallNonvirtualByteMethod,
-  JNI::CallNonvirtualByteMethodV,
-  JNI::CallNonvirtualByteMethodA,
-  JNI::CallNonvirtualCharMethod,
-  JNI::CallNonvirtualCharMethodV,
-  JNI::CallNonvirtualCharMethodA,
-  JNI::CallNonvirtualShortMethod,
-  JNI::CallNonvirtualShortMethodV,
-  JNI::CallNonvirtualShortMethodA,
-  JNI::CallNonvirtualIntMethod,
-  JNI::CallNonvirtualIntMethodV,
-  JNI::CallNonvirtualIntMethodA,
-  JNI::CallNonvirtualLongMethod,
-  JNI::CallNonvirtualLongMethodV,
-  JNI::CallNonvirtualLongMethodA,
-  JNI::CallNonvirtualFloatMethod,
-  JNI::CallNonvirtualFloatMethodV,
-  JNI::CallNonvirtualFloatMethodA,
-  JNI::CallNonvirtualDoubleMethod,
-  JNI::CallNonvirtualDoubleMethodV,
-  JNI::CallNonvirtualDoubleMethodA,
-  JNI::CallNonvirtualVoidMethod,
-  JNI::CallNonvirtualVoidMethodV,
-  JNI::CallNonvirtualVoidMethodA,
-  JNI::GetFieldID,
-  JNI::GetObjectField,
-  JNI::GetBooleanField,
-  JNI::GetByteField,
-  JNI::GetCharField,
-  JNI::GetShortField,
-  JNI::GetIntField,
-  JNI::GetLongField,
-  JNI::GetFloatField,
-  JNI::GetDoubleField,
-  JNI::SetObjectField,
-  JNI::SetBooleanField,
-  JNI::SetByteField,
-  JNI::SetCharField,
-  JNI::SetShortField,
-  JNI::SetIntField,
-  JNI::SetLongField,
-  JNI::SetFloatField,
-  JNI::SetDoubleField,
-  JNI::GetStaticMethodID,
-  JNI::CallStaticObjectMethod,
-  JNI::CallStaticObjectMethodV,
-  JNI::CallStaticObjectMethodA,
-  JNI::CallStaticBooleanMethod,
-  JNI::CallStaticBooleanMethodV,
-  JNI::CallStaticBooleanMethodA,
-  JNI::CallStaticByteMethod,
-  JNI::CallStaticByteMethodV,
-  JNI::CallStaticByteMethodA,
-  JNI::CallStaticCharMethod,
-  JNI::CallStaticCharMethodV,
-  JNI::CallStaticCharMethodA,
-  JNI::CallStaticShortMethod,
-  JNI::CallStaticShortMethodV,
-  JNI::CallStaticShortMethodA,
-  JNI::CallStaticIntMethod,
-  JNI::CallStaticIntMethodV,
-  JNI::CallStaticIntMethodA,
-  JNI::CallStaticLongMethod,
-  JNI::CallStaticLongMethodV,
-  JNI::CallStaticLongMethodA,
-  JNI::CallStaticFloatMethod,
-  JNI::CallStaticFloatMethodV,
-  JNI::CallStaticFloatMethodA,
-  JNI::CallStaticDoubleMethod,
-  JNI::CallStaticDoubleMethodV,
-  JNI::CallStaticDoubleMethodA,
-  JNI::CallStaticVoidMethod,
-  JNI::CallStaticVoidMethodV,
-  JNI::CallStaticVoidMethodA,
-  JNI::GetStaticFieldID,
-  JNI::GetStaticObjectField,
-  JNI::GetStaticBooleanField,
-  JNI::GetStaticByteField,
-  JNI::GetStaticCharField,
-  JNI::GetStaticShortField,
-  JNI::GetStaticIntField,
-  JNI::GetStaticLongField,
-  JNI::GetStaticFloatField,
-  JNI::GetStaticDoubleField,
-  JNI::SetStaticObjectField,
-  JNI::SetStaticBooleanField,
-  JNI::SetStaticByteField,
-  JNI::SetStaticCharField,
-  JNI::SetStaticShortField,
-  JNI::SetStaticIntField,
-  JNI::SetStaticLongField,
-  JNI::SetStaticFloatField,
-  JNI::SetStaticDoubleField,
-  JNI::NewString,
-  JNI::GetStringLength,
-  JNI::GetStringChars,
-  JNI::ReleaseStringChars,
-  JNI::NewStringUTF,
-  JNI::GetStringUTFLength,
-  JNI::GetStringUTFChars,
-  JNI::ReleaseStringUTFChars,
-  JNI::GetArrayLength,
-  JNI::NewObjectArray,
-  JNI::GetObjectArrayElement,
-  JNI::SetObjectArrayElement,
-  JNI::NewBooleanArray,
-  JNI::NewByteArray,
-  JNI::NewCharArray,
-  JNI::NewShortArray,
-  JNI::NewIntArray,
-  JNI::NewLongArray,
-  JNI::NewFloatArray,
-  JNI::NewDoubleArray,
-  JNI::GetBooleanArrayElements,
-  JNI::GetByteArrayElements,
-  JNI::GetCharArrayElements,
-  JNI::GetShortArrayElements,
-  JNI::GetIntArrayElements,
-  JNI::GetLongArrayElements,
-  JNI::GetFloatArrayElements,
-  JNI::GetDoubleArrayElements,
-  JNI::ReleaseBooleanArrayElements,
-  JNI::ReleaseByteArrayElements,
-  JNI::ReleaseCharArrayElements,
-  JNI::ReleaseShortArrayElements,
-  JNI::ReleaseIntArrayElements,
-  JNI::ReleaseLongArrayElements,
-  JNI::ReleaseFloatArrayElements,
-  JNI::ReleaseDoubleArrayElements,
-  JNI::GetBooleanArrayRegion,
-  JNI::GetByteArrayRegion,
-  JNI::GetCharArrayRegion,
-  JNI::GetShortArrayRegion,
-  JNI::GetIntArrayRegion,
-  JNI::GetLongArrayRegion,
-  JNI::GetFloatArrayRegion,
-  JNI::GetDoubleArrayRegion,
-  JNI::SetBooleanArrayRegion,
-  JNI::SetByteArrayRegion,
-  JNI::SetCharArrayRegion,
-  JNI::SetShortArrayRegion,
-  JNI::SetIntArrayRegion,
-  JNI::SetLongArrayRegion,
-  JNI::SetFloatArrayRegion,
-  JNI::SetDoubleArrayRegion,
-  JNI::RegisterNatives,
-  JNI::UnregisterNatives,
-  JNI::MonitorEnter,
-  JNI::MonitorExit,
-  JNI::GetJavaVM,
-  JNI::GetStringRegion,
-  JNI::GetStringUTFRegion,
-  JNI::GetPrimitiveArrayCritical,
-  JNI::ReleasePrimitiveArrayCritical,
-  JNI::GetStringCritical,
-  JNI::ReleaseStringCritical,
-  JNI::NewWeakGlobalRef,
-  JNI::DeleteWeakGlobalRef,
-  JNI::ExceptionCheck,
-  JNI::NewDirectByteBuffer,
-  JNI::GetDirectBufferAddress,
-  JNI::GetDirectBufferCapacity,
-  JNI::GetObjectRefType,
+template<bool kEnableIndexIds>
+struct JniNativeInterfaceFunctions {
+  using JNIImpl = JNI<kEnableIndexIds>;
+  static constexpr JNINativeInterface gJniNativeInterface = {
+    nullptr,  // reserved0.
+    nullptr,  // reserved1.
+    nullptr,  // reserved2.
+    nullptr,  // reserved3.
+    JNIImpl::GetVersion,
+    JNIImpl::DefineClass,
+    JNIImpl::FindClass,
+    JNIImpl::FromReflectedMethod,
+    JNIImpl::FromReflectedField,
+    JNIImpl::ToReflectedMethod,
+    JNIImpl::GetSuperclass,
+    JNIImpl::IsAssignableFrom,
+    JNIImpl::ToReflectedField,
+    JNIImpl::Throw,
+    JNIImpl::ThrowNew,
+    JNIImpl::ExceptionOccurred,
+    JNIImpl::ExceptionDescribe,
+    JNIImpl::ExceptionClear,
+    JNIImpl::FatalError,
+    JNIImpl::PushLocalFrame,
+    JNIImpl::PopLocalFrame,
+    JNIImpl::NewGlobalRef,
+    JNIImpl::DeleteGlobalRef,
+    JNIImpl::DeleteLocalRef,
+    JNIImpl::IsSameObject,
+    JNIImpl::NewLocalRef,
+    JNIImpl::EnsureLocalCapacity,
+    JNIImpl::AllocObject,
+    JNIImpl::NewObject,
+    JNIImpl::NewObjectV,
+    JNIImpl::NewObjectA,
+    JNIImpl::GetObjectClass,
+    JNIImpl::IsInstanceOf,
+    JNIImpl::GetMethodID,
+    JNIImpl::CallObjectMethod,
+    JNIImpl::CallObjectMethodV,
+    JNIImpl::CallObjectMethodA,
+    JNIImpl::CallBooleanMethod,
+    JNIImpl::CallBooleanMethodV,
+    JNIImpl::CallBooleanMethodA,
+    JNIImpl::CallByteMethod,
+    JNIImpl::CallByteMethodV,
+    JNIImpl::CallByteMethodA,
+    JNIImpl::CallCharMethod,
+    JNIImpl::CallCharMethodV,
+    JNIImpl::CallCharMethodA,
+    JNIImpl::CallShortMethod,
+    JNIImpl::CallShortMethodV,
+    JNIImpl::CallShortMethodA,
+    JNIImpl::CallIntMethod,
+    JNIImpl::CallIntMethodV,
+    JNIImpl::CallIntMethodA,
+    JNIImpl::CallLongMethod,
+    JNIImpl::CallLongMethodV,
+    JNIImpl::CallLongMethodA,
+    JNIImpl::CallFloatMethod,
+    JNIImpl::CallFloatMethodV,
+    JNIImpl::CallFloatMethodA,
+    JNIImpl::CallDoubleMethod,
+    JNIImpl::CallDoubleMethodV,
+    JNIImpl::CallDoubleMethodA,
+    JNIImpl::CallVoidMethod,
+    JNIImpl::CallVoidMethodV,
+    JNIImpl::CallVoidMethodA,
+    JNIImpl::CallNonvirtualObjectMethod,
+    JNIImpl::CallNonvirtualObjectMethodV,
+    JNIImpl::CallNonvirtualObjectMethodA,
+    JNIImpl::CallNonvirtualBooleanMethod,
+    JNIImpl::CallNonvirtualBooleanMethodV,
+    JNIImpl::CallNonvirtualBooleanMethodA,
+    JNIImpl::CallNonvirtualByteMethod,
+    JNIImpl::CallNonvirtualByteMethodV,
+    JNIImpl::CallNonvirtualByteMethodA,
+    JNIImpl::CallNonvirtualCharMethod,
+    JNIImpl::CallNonvirtualCharMethodV,
+    JNIImpl::CallNonvirtualCharMethodA,
+    JNIImpl::CallNonvirtualShortMethod,
+    JNIImpl::CallNonvirtualShortMethodV,
+    JNIImpl::CallNonvirtualShortMethodA,
+    JNIImpl::CallNonvirtualIntMethod,
+    JNIImpl::CallNonvirtualIntMethodV,
+    JNIImpl::CallNonvirtualIntMethodA,
+    JNIImpl::CallNonvirtualLongMethod,
+    JNIImpl::CallNonvirtualLongMethodV,
+    JNIImpl::CallNonvirtualLongMethodA,
+    JNIImpl::CallNonvirtualFloatMethod,
+    JNIImpl::CallNonvirtualFloatMethodV,
+    JNIImpl::CallNonvirtualFloatMethodA,
+    JNIImpl::CallNonvirtualDoubleMethod,
+    JNIImpl::CallNonvirtualDoubleMethodV,
+    JNIImpl::CallNonvirtualDoubleMethodA,
+    JNIImpl::CallNonvirtualVoidMethod,
+    JNIImpl::CallNonvirtualVoidMethodV,
+    JNIImpl::CallNonvirtualVoidMethodA,
+    JNIImpl::GetFieldID,
+    JNIImpl::GetObjectField,
+    JNIImpl::GetBooleanField,
+    JNIImpl::GetByteField,
+    JNIImpl::GetCharField,
+    JNIImpl::GetShortField,
+    JNIImpl::GetIntField,
+    JNIImpl::GetLongField,
+    JNIImpl::GetFloatField,
+    JNIImpl::GetDoubleField,
+    JNIImpl::SetObjectField,
+    JNIImpl::SetBooleanField,
+    JNIImpl::SetByteField,
+    JNIImpl::SetCharField,
+    JNIImpl::SetShortField,
+    JNIImpl::SetIntField,
+    JNIImpl::SetLongField,
+    JNIImpl::SetFloatField,
+    JNIImpl::SetDoubleField,
+    JNIImpl::GetStaticMethodID,
+    JNIImpl::CallStaticObjectMethod,
+    JNIImpl::CallStaticObjectMethodV,
+    JNIImpl::CallStaticObjectMethodA,
+    JNIImpl::CallStaticBooleanMethod,
+    JNIImpl::CallStaticBooleanMethodV,
+    JNIImpl::CallStaticBooleanMethodA,
+    JNIImpl::CallStaticByteMethod,
+    JNIImpl::CallStaticByteMethodV,
+    JNIImpl::CallStaticByteMethodA,
+    JNIImpl::CallStaticCharMethod,
+    JNIImpl::CallStaticCharMethodV,
+    JNIImpl::CallStaticCharMethodA,
+    JNIImpl::CallStaticShortMethod,
+    JNIImpl::CallStaticShortMethodV,
+    JNIImpl::CallStaticShortMethodA,
+    JNIImpl::CallStaticIntMethod,
+    JNIImpl::CallStaticIntMethodV,
+    JNIImpl::CallStaticIntMethodA,
+    JNIImpl::CallStaticLongMethod,
+    JNIImpl::CallStaticLongMethodV,
+    JNIImpl::CallStaticLongMethodA,
+    JNIImpl::CallStaticFloatMethod,
+    JNIImpl::CallStaticFloatMethodV,
+    JNIImpl::CallStaticFloatMethodA,
+    JNIImpl::CallStaticDoubleMethod,
+    JNIImpl::CallStaticDoubleMethodV,
+    JNIImpl::CallStaticDoubleMethodA,
+    JNIImpl::CallStaticVoidMethod,
+    JNIImpl::CallStaticVoidMethodV,
+    JNIImpl::CallStaticVoidMethodA,
+    JNIImpl::GetStaticFieldID,
+    JNIImpl::GetStaticObjectField,
+    JNIImpl::GetStaticBooleanField,
+    JNIImpl::GetStaticByteField,
+    JNIImpl::GetStaticCharField,
+    JNIImpl::GetStaticShortField,
+    JNIImpl::GetStaticIntField,
+    JNIImpl::GetStaticLongField,
+    JNIImpl::GetStaticFloatField,
+    JNIImpl::GetStaticDoubleField,
+    JNIImpl::SetStaticObjectField,
+    JNIImpl::SetStaticBooleanField,
+    JNIImpl::SetStaticByteField,
+    JNIImpl::SetStaticCharField,
+    JNIImpl::SetStaticShortField,
+    JNIImpl::SetStaticIntField,
+    JNIImpl::SetStaticLongField,
+    JNIImpl::SetStaticFloatField,
+    JNIImpl::SetStaticDoubleField,
+    JNIImpl::NewString,
+    JNIImpl::GetStringLength,
+    JNIImpl::GetStringChars,
+    JNIImpl::ReleaseStringChars,
+    JNIImpl::NewStringUTF,
+    JNIImpl::GetStringUTFLength,
+    JNIImpl::GetStringUTFChars,
+    JNIImpl::ReleaseStringUTFChars,
+    JNIImpl::GetArrayLength,
+    JNIImpl::NewObjectArray,
+    JNIImpl::GetObjectArrayElement,
+    JNIImpl::SetObjectArrayElement,
+    JNIImpl::NewBooleanArray,
+    JNIImpl::NewByteArray,
+    JNIImpl::NewCharArray,
+    JNIImpl::NewShortArray,
+    JNIImpl::NewIntArray,
+    JNIImpl::NewLongArray,
+    JNIImpl::NewFloatArray,
+    JNIImpl::NewDoubleArray,
+    JNIImpl::GetBooleanArrayElements,
+    JNIImpl::GetByteArrayElements,
+    JNIImpl::GetCharArrayElements,
+    JNIImpl::GetShortArrayElements,
+    JNIImpl::GetIntArrayElements,
+    JNIImpl::GetLongArrayElements,
+    JNIImpl::GetFloatArrayElements,
+    JNIImpl::GetDoubleArrayElements,
+    JNIImpl::ReleaseBooleanArrayElements,
+    JNIImpl::ReleaseByteArrayElements,
+    JNIImpl::ReleaseCharArrayElements,
+    JNIImpl::ReleaseShortArrayElements,
+    JNIImpl::ReleaseIntArrayElements,
+    JNIImpl::ReleaseLongArrayElements,
+    JNIImpl::ReleaseFloatArrayElements,
+    JNIImpl::ReleaseDoubleArrayElements,
+    JNIImpl::GetBooleanArrayRegion,
+    JNIImpl::GetByteArrayRegion,
+    JNIImpl::GetCharArrayRegion,
+    JNIImpl::GetShortArrayRegion,
+    JNIImpl::GetIntArrayRegion,
+    JNIImpl::GetLongArrayRegion,
+    JNIImpl::GetFloatArrayRegion,
+    JNIImpl::GetDoubleArrayRegion,
+    JNIImpl::SetBooleanArrayRegion,
+    JNIImpl::SetByteArrayRegion,
+    JNIImpl::SetCharArrayRegion,
+    JNIImpl::SetShortArrayRegion,
+    JNIImpl::SetIntArrayRegion,
+    JNIImpl::SetLongArrayRegion,
+    JNIImpl::SetFloatArrayRegion,
+    JNIImpl::SetDoubleArrayRegion,
+    JNIImpl::RegisterNatives,
+    JNIImpl::UnregisterNatives,
+    JNIImpl::MonitorEnter,
+    JNIImpl::MonitorExit,
+    JNIImpl::GetJavaVM,
+    JNIImpl::GetStringRegion,
+    JNIImpl::GetStringUTFRegion,
+    JNIImpl::GetPrimitiveArrayCritical,
+    JNIImpl::ReleasePrimitiveArrayCritical,
+    JNIImpl::GetStringCritical,
+    JNIImpl::ReleaseStringCritical,
+    JNIImpl::NewWeakGlobalRef,
+    JNIImpl::DeleteWeakGlobalRef,
+    JNIImpl::ExceptionCheck,
+    JNIImpl::NewDirectByteBuffer,
+    JNIImpl::GetDirectBufferAddress,
+    JNIImpl::GetDirectBufferCapacity,
+    JNIImpl::GetObjectRefType,
+  };
 };
 
 const JNINativeInterface* GetJniNativeInterface() {
-  return &gJniNativeInterface;
+  // The template argument is passed down through the Encode/DecodeArtMethod/Field calls so if
+  // JniIdsAreIndices is false the calls will be a simple cast with no branches. This ensures that
+  // the normal case is still fast.
+  return Runtime::Current()->JniIdsAreIndices()
+             ? &JniNativeInterfaceFunctions<true>::gJniNativeInterface
+             : &JniNativeInterfaceFunctions<false>::gJniNativeInterface;
 }
 
 void (*gJniSleepForeverStub[])()  = {

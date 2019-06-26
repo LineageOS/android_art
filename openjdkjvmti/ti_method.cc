@@ -93,12 +93,13 @@ struct TiMethodCallback : public art::MethodCallback {
       ScopedLocalRef<jthread> thread_jni(
           jnienv, PhaseUtil::IsLivePhase() ? jnienv->AddLocalReference<jthread>(thread->GetPeer())
                                            : nullptr);
+      jmethodID method_id = art::jni::EncodeArtMethod(method);
       art::ScopedThreadSuspension sts(thread, art::ThreadState::kNative);
       event_handler->DispatchEvent<ArtJvmtiEvent::kNativeMethodBind>(
           thread,
           static_cast<JNIEnv*>(jnienv),
           thread_jni.get(),
-          art::jni::EncodeArtMethod(method),
+          method_id,
           const_cast<void*>(cur_method),
           new_method);
     }
