@@ -14,15 +14,62 @@
  * limitations under the License.
  */
 
+import dalvik.system.PathClassLoader;
 import dalvik.system.VMRuntime;
 
-public class Main {
-  public static void main(String[] args) {
-    System.loadLibrary(args[0]);
-    System.out.println("Startup completed: " + hasStartupCompleted());
-    VMRuntime.getRuntime().notifyStartupCompleted();
-    System.out.println("Startup completed: " + hasStartupCompleted());
-  }
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-  private static native boolean hasStartupCompleted();
+public class Main {
+    static final String DEX_FILE = System.getenv("DEX_LOCATION") + "/1002-notify-startup.jar";
+    static final String LIBRARY_SEARCH_PATH = System.getProperty("java.library.path");
+    static AtomicBoolean completed = new AtomicBoolean(false);
+
+    public static void main(String[] args) {
+        System.loadLibrary(args[0]);
+        System.out.println("Startup completed: " + hasStartupCompleted());
+        Thread workerThread = new WorkerThread();
+        workerThread.start();
+        do {
+            resetStartupCompleted();
+            VMRuntime.getRuntime().notifyStartupCompleted();
+            Thread.yield();
+        } while (!completed.get());
+        try {
+            workerThread.join();
+        } catch (Throwable e) {
+            System.err.println(e);
+        }
+        System.out.println("Startup completed: " + hasStartupCompleted());
+    }
+
+    private static class WorkerThread extends Thread {
+        static final int NUM_ITERATIONS = 100;
+
+        private WeakReference<Class<?>> $noinline$loadClassInLoader() throws Exception {
+            ClassLoader loader = new PathClassLoader(
+                    DEX_FILE, LIBRARY_SEARCH_PATH, ClassLoader.getSystemClassLoader());
+            Class ret = loader.loadClass("Main");
+            return new WeakReference(ret);
+        }
+
+        public void run() {
+            for (int i = 0; i < NUM_ITERATIONS; ++i) {
+                try {
+                    WeakReference<Class<?>> ref = $noinline$loadClassInLoader();
+                    Runtime.getRuntime().gc();
+                    Thread.yield();
+                    // Don't validate the unloading since app images will keep classes live (for now).
+                } catch (Throwable e) {
+                    System.err.println(e);
+                    break;
+                }
+            }
+            completed.set(true);
+        }
+    }
+
+    private static native boolean hasStartupCompleted();
+    private static native void resetStartupCompleted();
 }
