@@ -1183,7 +1183,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   oat_file_manager_ = new OatFileManager;
 
-  jni_id_manager_ = new jni::JniIdManager;
+  jni_id_manager_.reset(new jni::JniIdManager);
 
   Thread::SetSensitiveThreadHook(runtime_options.GetOrDefault(Opt::HookIsSensitiveThread));
   Monitor::Init(runtime_options.GetOrDefault(Opt::LockProfThreshold),
