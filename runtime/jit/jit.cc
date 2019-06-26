@@ -267,14 +267,14 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
     return false;
   }
 
+  JitMemoryRegion* region = GetCodeCache()->GetCurrentRegion();
+
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
   ArtMethod* method_to_compile = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
-  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit)) {
+  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit, region)) {
     return false;
   }
-
-  JitMemoryRegion* region = GetCodeCache()->GetPrivateRegion();
 
   VLOG(jit) << "Compiling method "
             << ArtMethod::PrettyMethod(method_to_compile)
@@ -838,7 +838,7 @@ static bool IgnoreSamplesForMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mut
         klass == GetClassRoot<mirror::VarHandle>()) {
       // MethodHandle and VarHandle invocation methods are required to throw an
       // UnsupportedOperationException if invoked reflectively. We achieve this by having native
-      // implementations that arise the exception. We need to disable JIT compilation of these JNI
+      // implementations that raise the exception. We need to disable JIT compilation of these JNI
       // methods as it can lead to transitioning between JIT compiled JNI stubs and generic JNI
       // stubs. Since these stubs have different stack representations we can then crash in stack
       // walking (b/78151261).
@@ -1072,6 +1072,36 @@ void Jit::PostZygoteFork() {
     return;
   }
   thread_pool_->CreateThreads();
+}
+
+bool Jit::CanEncodeMethod(ArtMethod* method ATTRIBUTE_UNUSED,
+                          bool is_for_shared_region ATTRIBUTE_UNUSED) const {
+  // TODO: For shared region, we should only encode a method of a class
+  // allocated before any fork.
+  return true;
+}
+
+bool Jit::CanEncodeClass(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const {
+  // TODO: For shared region, we should only encode a non-moving class allocated
+  // before any fork.
+  return !is_for_shared_region || !Runtime::Current()->GetHeap()->IsMovableObject(cls);
+}
+
+bool Jit::CanEncodeString(ObjPtr<mirror::String> string, bool is_for_shared_region) const {
+  // TODO: For shared region, we should only encode a non-moving string allocated
+  // before any fork.
+  return !is_for_shared_region || !Runtime::Current()->GetHeap()->IsMovableObject(string);
+}
+
+bool Jit::CanAssumeInitialized(ObjPtr<mirror::Class> cls,
+                               bool is_for_shared_region ATTRIBUTE_UNUSED) const {
+  // TODO: For shared region, we should assume initialized if the class is initialized
+  // before any fork.
+  return cls->IsInitialized();
+}
+
+bool Jit::UseJitCompilation() {
+  return options_->UseJitCompilation() && GetCodeCache()->GetCurrentRegion()->IsValid();
 }
 
 }  // namespace jit
