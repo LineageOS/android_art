@@ -100,7 +100,7 @@ class JitMemoryRegion {
   void FreeData(uint8_t* data) REQUIRES(Locks::jit_lock_);
 
   // Emit roots and stack map into the memory pointed by `roots_data`.
-  void CommitData(uint8_t* roots_data,
+  bool CommitData(uint8_t* roots_data,
                   const std::vector<Handle<mirror::Object>>& roots,
                   const uint8_t* stack_map,
                   size_t stack_map_size)

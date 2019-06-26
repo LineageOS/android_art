@@ -360,14 +360,24 @@ const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
   // For reference, this behavior is caused by this commit:
   // https://android.googlesource.com/kernel/msm/+/3fbe6bc28a6b9939d0650f2f17eb5216c719950c
   //
+  bool cache_flush_success = true;
   if (HasDualCodeMapping()) {
-    // Flush the data cache lines associated with the non-executable copy of the code just added.
-    FlushDataCache(w_memory, w_memory + total_size);
+    // Flush d-cache for the non-executable mapping.
+    cache_flush_success = FlushCpuCaches(w_memory, w_memory + total_size);
   }
 
-  // FlushInstructionCache() flushes both data and instruction caches lines. The cacheline range
-  // flushed is for the executable mapping of the code just added.
-  FlushInstructionCache(x_memory, x_memory + total_size);
+  // Invalidate i-cache for the executable mapping.
+  if (cache_flush_success) {
+    cache_flush_success = FlushCpuCaches(x_memory, x_memory + total_size);
+  }
+
+  // If flushing the cache has failed, reject the allocation because we can't guarantee
+  // correctness of the instructions present in the processor caches.
+  if (!cache_flush_success) {
+    PLOG(ERROR) << "Cache flush failed triggering code allocation failure";
+    FreeCode(x_memory);
+    return nullptr;
+  }
 
   // Ensure CPU instruction pipelines are flushed for all cores. This is necessary for
   // correctness as code may still be in instruction pipelines despite the i-cache flush. It is
@@ -398,7 +408,7 @@ static void FillRootTable(uint8_t* roots_data, const std::vector<Handle<mirror::
   reinterpret_cast<uint32_t*>(roots_data)[length] = length;
 }
 
-void JitMemoryRegion::CommitData(uint8_t* roots_data,
+bool JitMemoryRegion::CommitData(uint8_t* roots_data,
                                  const std::vector<Handle<mirror::Object>>& roots,
                                  const uint8_t* stack_map,
                                  size_t stack_map_size) {
@@ -407,7 +417,12 @@ void JitMemoryRegion::CommitData(uint8_t* roots_data,
   FillRootTable(roots_data, roots);
   memcpy(stack_map_data, stack_map, stack_map_size);
   // Flush data cache, as compiled code references literals in it.
-  FlushDataCache(roots_data, roots_data + root_table_size + stack_map_size);
+  // TODO(oth): establish whether this is necessary.
+  if (UNLIKELY(!FlushCpuCaches(roots_data, roots_data + root_table_size + stack_map_size))) {
+    VLOG(jit) << "Failed to flush data in CommitData";
+    return false;
+  }
+  return true;
 }
 
 void JitMemoryRegion::FreeCode(const uint8_t* code) {
