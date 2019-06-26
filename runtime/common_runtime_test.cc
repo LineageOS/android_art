@@ -122,6 +122,8 @@ void CommonRuntimeTestImpl::SetUp() {
   options.push_back(std::make_pair("-Xcheck:jni", nullptr));
   options.push_back(std::make_pair(min_heap_string, nullptr));
   options.push_back(std::make_pair(max_heap_string, nullptr));
+
+  // Technically this is redundant w/ common_art_test, but still check.
   options.push_back(std::make_pair("-XX:SlowDebug=true", nullptr));
   static bool gSlowDebugTestFlag = false;
   RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
