@@ -1,0 +1,2 @@
+Test a loop with invariants. In this case, since the invariants gets used later in the loop constant calculation sinking doesnt work.
+Hence loop cannot be removed.
