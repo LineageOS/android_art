@@ -1,0 +1,6 @@
+JNI_OnLoad called
+JNI Type is: SwapablePointer
+pointer ID looks like a pointer!
+JNI Type is: Pointer
+pointer2 ID looks like a pointer!
+pointer ID remains a pointer!

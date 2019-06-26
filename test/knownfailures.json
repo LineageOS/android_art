@@ -1114,7 +1114,10 @@
                   "1001-app-image-regions",
                   "1339-dead-reference-safe",
                   "1951-monitor-enter-no-suspend",
-                  "1957-error-ext"],
+                  "1957-error-ext",
+                  "1972-jni-id-swap-indices",
+                  "1973-jni-id-swap-pointer"
+                ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
