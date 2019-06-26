@@ -206,6 +206,12 @@ class DexFileVerifier {
 
   void FindStringRangesForMethodNames();
 
+  template <typename ExtraCheckFn>
+  bool VerifyTypeDescriptor(dex::TypeIndex idx,
+                            const char* error_msg1,
+                            const char* error_msg2,
+                            ExtraCheckFn extra_check);
+
   const DexFile* const dex_file_;
   const uint8_t* const begin_;
   const size_t size_;
@@ -262,6 +268,10 @@ class DexFileVerifier {
   size_t angle_bracket_end_index_;
   size_t angle_init_angle_index_;
   size_t angle_clinit_angle_index_;
+
+  // A bitvector for verified type descriptors. Each bit corresponds to a type index. A set
+  // bit denotes that the descriptor has been verified wrt/ IsValidDescriptor.
+  std::vector<char> verified_type_descriptors_;
 };
 
 }  // namespace art
