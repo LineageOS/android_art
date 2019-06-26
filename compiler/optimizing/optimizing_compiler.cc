@@ -384,7 +384,6 @@ class OptimizingCompiler final : public Compiler {
                             ArtMethod* method,
                             bool baseline,
                             bool osr,
-                            bool is_shared_jit_code,
                             VariableSizedHandleScope* handles) const;
 
   CodeGenerator* TryCompileIntrinsic(ArenaAllocator* allocator,
@@ -784,7 +783,6 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
                                               ArtMethod* method,
                                               bool baseline,
                                               bool osr,
-                                              bool is_shared_jit_code,
                                               VariableSizedHandleScope* handles) const {
   MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kAttemptBytecodeCompilation);
   const CompilerOptions& compiler_options = GetCompilerOptions();
@@ -852,8 +850,7 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
       kInvalidInvokeType,
       dead_reference_safe,
       compiler_options.GetDebuggable(),
-      /* osr= */ osr,
-      /* is_shared_jit_code= */ is_shared_jit_code);
+      /* osr= */ osr);
 
   if (method != nullptr) {
     graph->SetArtMethod(method);
@@ -1110,7 +1107,6 @@ CompiledMethod* OptimizingCompiler::Compile(const dex::CodeItem* code_item,
                        method,
                        compiler_options.IsBaseline(),
                        /* osr= */ false,
-                       /* is_shared_jit_code= */ false,
                        &handles));
       }
     }
@@ -1372,7 +1368,6 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                    method,
                    baseline,
                    osr,
-                   /* is_shared_jit_code= */ code_cache->IsSharedRegion(*region),
                    &handles));
     if (codegen.get() == nullptr) {
       return false;
