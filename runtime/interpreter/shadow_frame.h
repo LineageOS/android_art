@@ -60,6 +60,8 @@ class ShadowFrame {
     // Mark that we expect the next frame to retry the last instruction (used by instrumentation and
     // debuggers to keep track of required events)
     kSkipMethodExitEvents = 1 << 3,
+    // Used to suppress exception events caused by other instrumentation events.
+    kSkipNextExceptionEvent = 1 << 4,
   };
 
  public:
@@ -383,6 +385,14 @@ class ShadowFrame {
 
   void SetSkipMethodExitEvents(bool enable) {
     UpdateFrameFlag(enable, FrameFlags::kSkipMethodExitEvents);
+  }
+
+  bool GetSkipNextExceptionEvent() const {
+    return GetFrameFlag(FrameFlags::kSkipNextExceptionEvent);
+  }
+
+  void SetSkipNextExceptionEvent(bool enable) {
+    UpdateFrameFlag(enable, FrameFlags::kSkipNextExceptionEvent);
   }
 
   void CheckConsistentVRegs() const {
