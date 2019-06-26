@@ -689,7 +689,12 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
 
   // Commit roots and stack maps before updating the entry point.
-  region->CommitData(roots_data, roots, stack_map, stack_map_size);
+  if (!region->CommitData(roots_data, roots, stack_map, stack_map_size)) {
+    ScopedCodeCacheWrite ccw(*region);
+    uintptr_t allocation = FromCodeToAllocation(code_ptr);
+    region->FreeCode(reinterpret_cast<uint8_t*>(allocation));
+    return nullptr;
+  }
 
   number_of_compilations_++;
 
