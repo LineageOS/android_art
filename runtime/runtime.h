@@ -282,7 +282,7 @@ class Runtime {
   }
 
   jni::JniIdManager* GetJniIdManager() const {
-    return jni_id_manager_;
+    return jni_id_manager_.get();
   }
 
   size_t GetDefaultStackSize() const {
@@ -1015,7 +1015,7 @@ class Runtime {
 
   SignalCatcher* signal_catcher_;
 
-  jni::JniIdManager* jni_id_manager_;
+  std::unique_ptr<jni::JniIdManager> jni_id_manager_;
 
   std::unique_ptr<JavaVMExt> java_vm_;
 
