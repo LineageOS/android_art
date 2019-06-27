@@ -1220,12 +1220,6 @@
                         "Requires zip, which isn't available on device"]
     },
     {
-        "tests": ["122-npe"],
-        "variant": "jit-on-first-use & debuggable",
-        "description": ["Fails due to `Unexpected vreg location Kind<-1>` for unknown reasons."],
-        "bug": "http://b/136021898"
-    },
-    {
         "tests": ["004-ReferenceMap",
                   "449-checker-bce",
                   "466-get-live-vreg",
