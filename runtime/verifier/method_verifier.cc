@@ -1059,7 +1059,7 @@ bool MethodVerifier<kVerifierDebug>::VerifyInstruction(const Instruction* inst,
     // the data flow analysis will fail.
     Fail(VERIFY_ERROR_FORCE_INTERPRETER)
         << "experimental instruction is not supported by verifier; skipping verification";
-    have_pending_experimental_failure_ = true;
+    flags_.have_pending_experimental_failure_ = true;
     return false;
   }
 
@@ -1597,7 +1597,7 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
     return false;
   }
   // We may have a runtime failure here, clear.
-  have_pending_runtime_throw_failure_ = false;
+  flags_.have_pending_runtime_throw_failure_ = false;
 
   /* Perform code flow verification. */
   if (!CodeFlowVerifyMethod()) {
@@ -2057,7 +2057,8 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
   } else if (kIsDebugBuild) {
     saved_line_->FillWithGarbage();
   }
-  DCHECK(!have_pending_runtime_throw_failure_);  // Per-instruction flag, should not be set here.
+  // Per-instruction flag, should not be set here.
+  DCHECK(!flags_.have_pending_runtime_throw_failure_);
   bool exc_handler_unreachable = false;
 
 
@@ -3457,7 +3458,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
      */
   }  // end - switch (dec_insn.opcode)
 
-  if (have_pending_hard_failure_) {
+  if (flags_.have_pending_hard_failure_) {
     if (Runtime::Current()->IsAotCompiler()) {
       /* When AOT compiling, check that the last failure is a hard failure */
       if (failures_[failures_.size() - 1] != VERIFY_ERROR_BAD_CLASS_HARD) {
@@ -3474,7 +3475,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
     /* immediate failure, reject class */
     info_messages_ << "Rejecting opcode " << inst->DumpString(dex_file_);
     return false;
-  } else if (have_pending_runtime_throw_failure_) {
+  } else if (flags_.have_pending_runtime_throw_failure_) {
     LogVerifyInfo() << "Elevating opcode flags from " << opcode_flags << " to Throw";
     /* checking interpreter will throw, mark following code as unreachable */
     opcode_flags = Instruction::kThrow;
@@ -3695,10 +3696,10 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
   DCHECK_LT(*start_guess, code_item_accessor_.InsnsSizeInCodeUnits());
   DCHECK(GetInstructionFlags(*start_guess).IsOpcode());
 
-  if (have_pending_runtime_throw_failure_) {
-    have_any_pending_runtime_throw_failure_ = true;
+  if (flags_.have_pending_runtime_throw_failure_) {
+    flags_.have_any_pending_runtime_throw_failure_ = true;
     // Reset the pending_runtime_throw flag now.
-    have_pending_runtime_throw_failure_ = false;
+    flags_.have_pending_runtime_throw_failure_ = false;
   }
 
   return true;
@@ -4025,7 +4026,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::VerifyInvocationArgsFromIterator(
   if (method_type != METHOD_STATIC) {
     const RegType& actual_arg_type = work_line_->GetInvocationThis(this, inst);
     if (actual_arg_type.IsConflict()) {  // GetInvocationThis failed.
-      CHECK(have_pending_hard_failure_);
+      CHECK(flags_.have_pending_hard_failure_);
       return nullptr;
     }
     bool is_init = false;
@@ -4074,7 +4075,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::VerifyInvocationArgsFromIterator(
             << *res_method_class << "'";
         // Continue on soft failures. We need to find possible hard failures to avoid problems in
         // the compiler.
-        if (have_pending_hard_failure_) {
+        if (flags_.have_pending_hard_failure_) {
           return nullptr;
         }
       }
@@ -4117,7 +4118,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::VerifyInvocationArgsFromIterator(
       if (!work_line_->VerifyRegisterType(this, get_reg, reg_type)) {
         // Continue on soft failures. We need to find possible hard failures to avoid problems in
         // the compiler.
-        if (have_pending_hard_failure_) {
+        if (flags_.have_pending_hard_failure_) {
           return nullptr;
         }
       } else if (reg_type.IsLongOrDoubleTypes()) {
@@ -4249,7 +4250,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::VerifyInvocationArgs(
   ArtMethod* res_method = ResolveMethodAndCheckAccess(method_idx, method_type);
   if (res_method == nullptr) {  // error or class is unresolved
     // Check what we can statically.
-    if (!have_pending_hard_failure_) {
+    if (!flags_.have_pending_hard_failure_) {
       VerifyInvocationArgsUnresolvedMethod(inst, method_type, is_range);
     }
     return nullptr;
@@ -4840,7 +4841,7 @@ void MethodVerifier<kVerifierDebug>::VerifyISFieldAccess(const Instruction* inst
                                        ? GetRegTypeCache()->FromUninitialized(object_type)
                                        : object_type;
     field = GetInstanceField(adjusted_type, field_idx);
-    if (UNLIKELY(have_pending_hard_failure_)) {
+    if (UNLIKELY(flags_.have_pending_hard_failure_)) {
       return;
     }
     if (should_adjust) {
@@ -4997,7 +4998,7 @@ bool MethodVerifier<kVerifierDebug>::UpdateRegisters(uint32_t next_insn,
       const Instruction* ret_inst = &code_item_accessor_.InstructionAt(next_insn);
       AdjustReturnLine(this, ret_inst, target_line);
       // Directly bail if a hard failure was found.
-      if (have_pending_hard_failure_) {
+      if (flags_.have_pending_hard_failure_) {
         return false;
       }
     }
@@ -5008,7 +5009,7 @@ bool MethodVerifier<kVerifierDebug>::UpdateRegisters(uint32_t next_insn,
       copy->CopyFromLine(target_line);
     }
     changed = target_line->MergeRegisters(this, merge_line);
-    if (have_pending_hard_failure_) {
+    if (flags_.have_pending_hard_failure_) {
       return false;
     }
     if (kVerifierDebug && changed) {
@@ -5132,10 +5133,7 @@ MethodVerifier::MethodVerifier(Thread* self,
       dex_method_idx_(dex_method_idx),
       dex_file_(dex_file),
       code_item_accessor_(*dex_file, code_item),
-      have_pending_hard_failure_(false),
-      have_pending_runtime_throw_failure_(false),
-      have_pending_experimental_failure_(false),
-      have_any_pending_runtime_throw_failure_(false),
+      flags_({false, false, false, false}),
       encountered_failure_types_(0),
       can_load_classes_(can_load_classes),
       allow_soft_failures_(allow_soft_failures),
@@ -5237,7 +5235,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
   if (verifier.Verify()) {
     // Verification completed, however failures may be pending that didn't cause the verification
     // to hard fail.
-    CHECK(!verifier.have_pending_hard_failure_);
+    CHECK(!verifier.flags_.have_pending_hard_failure_);
 
     if (code_item != nullptr && callbacks != nullptr) {
       // Let the interested party know that the method was verified.
@@ -5284,12 +5282,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
     // Bad method data.
     CHECK_NE(verifier.failures_.size(), 0U);
 
-    if (UNLIKELY(verifier.have_pending_experimental_failure_)) {
+    if (UNLIKELY(verifier.flags_.have_pending_experimental_failure_)) {
       // Failed due to being forced into interpreter. This is ok because
       // we just want to skip verification.
       result.kind = FailureKind::kSoftFailure;
     } else {
-      CHECK(verifier.have_pending_hard_failure_);
+      CHECK(verifier.flags_.have_pending_hard_failure_);
       if (VLOG_IS_ON(verifier)) {
         log_level = std::max(HardFailLogMode::kLogVerbose, log_level);
       }
@@ -5388,7 +5386,7 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
     VLOG(verifier) << verifier->info_messages_.str();
     verifier->Dump(VLOG_STREAM(verifier));
   }
-  if (verifier->have_pending_hard_failure_) {
+  if (verifier->flags_.have_pending_hard_failure_) {
     return nullptr;
   } else {
     return verifier.release();
@@ -5428,7 +5426,7 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
   vios->Stream() << verifier->info_messages_.str();
   // Only dump and return if no hard failures. Otherwise the verifier may be not fully initialized
   // and querying any info is dangerous/can abort.
-  if (verifier->have_pending_hard_failure_) {
+  if (verifier->flags_.have_pending_hard_failure_) {
     delete verifier;
     return nullptr;
   } else {
@@ -5542,7 +5540,7 @@ std::ostream& MethodVerifier::Fail(VerifyError error) {
       } else {
         // If we fail again at runtime, mark that this instruction would throw and force this
         // method to be executed using the interpreter with checks.
-        have_pending_runtime_throw_failure_ = true;
+        flags_.have_pending_runtime_throw_failure_ = true;
 
         // We need to save the work_line if the instruction wasn't throwing before. Otherwise we'll
         // try to merge garbage.
@@ -5564,14 +5562,14 @@ std::ostream& MethodVerifier::Fail(VerifyError error) {
       // Indication that verification should be retried at runtime.
     case VERIFY_ERROR_BAD_CLASS_SOFT:
       if (!allow_soft_failures_) {
-        have_pending_hard_failure_ = true;
+        flags_.have_pending_hard_failure_ = true;
       }
       break;
 
       // Hard verification failures at compile time will still fail at runtime, so the class is
       // marked as rejected to prevent it from being compiled.
     case VERIFY_ERROR_BAD_CLASS_HARD: {
-      have_pending_hard_failure_ = true;
+      flags_.have_pending_hard_failure_ = true;
       break;
     }
 
