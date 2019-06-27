@@ -19,7 +19,6 @@
 #include "art_method-inl.h"
 #include "base/casts.h"
 #include "base/enums.h"
-#include "base/logging.h"
 #include "class_linker.h"
 #include "code_generator.h"
 #include "driver/compiler_options.h"
@@ -27,7 +26,6 @@
 #include "gc/heap.h"
 #include "gc/space/image_space.h"
 #include "handle_scope-inl.h"
-#include "jit/jit.h"
 #include "mirror/dex_cache.h"
 #include "mirror/string.h"
 #include "nodes.h"
@@ -100,17 +98,11 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
     }
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
   } else if (Runtime::Current()->UseJitCompilation()) {
-    if (Runtime::Current()->GetJit()->CanEncodeMethod(
-            callee,
-            codegen->GetGraph()->IsCompilingForSharedJitCode())) {
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress;
-      method_load_data = reinterpret_cast<uintptr_t>(callee);
-      code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
-    } else {
-      // Do not sharpen.
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
-      code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
-    }
+    // JIT or on-device AOT compilation referencing a boot image method.
+    // Use the method address directly.
+    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress;
+    method_load_data = reinterpret_cast<uintptr_t>(callee);
+    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
   } else if (IsInBootImage(callee)) {
     // Use PC-relative access to the .data.bimg.rel.ro methods array.
     method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
@@ -183,16 +175,7 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
         if (is_in_boot_image) {
           desired_load_kind = HLoadClass::LoadKind::kJitBootImageAddress;
         } else if (klass != nullptr) {
-          if (runtime->GetJit()->CanEncodeClass(
-                  klass.Get(),
-                  codegen->GetGraph()->IsCompilingForSharedJitCode())) {
-            desired_load_kind = HLoadClass::LoadKind::kJitTableAddress;
-          } else {
-            // Shared JIT code cannot encode a literal that the GC can move.
-            VLOG(jit) << "Unable to encode in shared region class literal: "
-                      << klass->PrettyClass();
-            desired_load_kind = HLoadClass::LoadKind::kRuntimeCall;
-          }
+          desired_load_kind = HLoadClass::LoadKind::kJitTableAddress;
         } else {
           // Class not loaded yet. This happens when the dex code requesting
           // this `HLoadClass` hasn't been executed in the interpreter.
@@ -348,18 +331,10 @@ void HSharpening::ProcessLoadString(
       DCHECK(!codegen->GetCompilerOptions().GetCompilePic());
       string = class_linker->LookupString(string_index, dex_cache.Get());
       if (string != nullptr) {
-        gc::Heap* heap = runtime->GetHeap();
-        if (heap->ObjectIsInBootImageSpace(string)) {
+        if (runtime->GetHeap()->ObjectIsInBootImageSpace(string)) {
           desired_load_kind = HLoadString::LoadKind::kJitBootImageAddress;
-        } else if (runtime->GetJit()->CanEncodeString(
-                  string,
-                  codegen->GetGraph()->IsCompilingForSharedJitCode())) {
-          desired_load_kind = HLoadString::LoadKind::kJitTableAddress;
         } else {
-          // Shared JIT code cannot encode a literal that the GC can move.
-          VLOG(jit) << "Unable to encode in shared region string literal: "
-                    << string->ToModifiedUtf8();
-          desired_load_kind = HLoadString::LoadKind::kRuntimeCall;
+          desired_load_kind = HLoadString::LoadKind::kJitTableAddress;
         }
       } else {
         desired_load_kind = HLoadString::LoadKind::kRuntimeCall;
