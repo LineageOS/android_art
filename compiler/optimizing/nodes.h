@@ -2140,12 +2140,13 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   // If this instruction will do an implicit null check, return the `HNullCheck` associated
   // with it. Otherwise return null.
   HNullCheck* GetImplicitNullCheck() const {
-    // Find the first previous instruction which is not a move.
-    HInstruction* first_prev_not_move = GetPreviousDisregardingMoves();
-    if (first_prev_not_move != nullptr &&
-        first_prev_not_move->IsNullCheck() &&
-        first_prev_not_move->IsEmittedAtUseSite()) {
-      return first_prev_not_move->AsNullCheck();
+    // Go over previous non-move instructions that are emitted at use site.
+    HInstruction* prev_not_move = GetPreviousDisregardingMoves();
+    while (prev_not_move != nullptr && prev_not_move->IsEmittedAtUseSite()) {
+      if (prev_not_move->IsNullCheck()) {
+        return prev_not_move->AsNullCheck();
+      }
+      prev_not_move = prev_not_move->GetPreviousDisregardingMoves();
     }
     return nullptr;
   }
