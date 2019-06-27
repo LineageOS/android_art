@@ -1814,8 +1814,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
       callee_dead_reference_safe,
       graph_->IsDebuggable(),
       /* osr= */ false,
-      /* is_shared_jit_code= */ graph_->IsCompilingForSharedJitCode(),
-      /* start_instruction_id= */ caller_instruction_counter);
+      caller_instruction_counter);
   callee_graph->SetArtMethod(resolved_method);
 
   // When they are needed, allocate `inline_stats_` on the Arena instead
