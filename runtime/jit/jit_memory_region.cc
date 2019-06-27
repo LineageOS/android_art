@@ -303,7 +303,7 @@ const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
                                              bool has_should_deoptimize_flag) {
   ScopedCodeCacheWrite scc(*this);
 
-  size_t alignment = GetJitCodeAlignment();
+  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
   // Ensure the header ends up at expected instruction alignment.
   size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
   size_t total_size = header_size + code_size;
