@@ -31,6 +31,9 @@ int memfd_create(const char* name, unsigned int flags);
 // other way if memfd fails or isn't supported.
 int memfd_create_compat(const char* name, unsigned int flags);
 
+// Return whether the kernel supports sealing future writes of a memfd.
+bool IsSealFutureWriteSupported();
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_MEMFD_H_
