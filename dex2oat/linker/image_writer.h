@@ -121,7 +121,7 @@ class ImageWriter final {
     } else {
       size_t oat_index = GetOatIndex(object);
       const ImageInfo& image_info = GetImageInfo(oat_index);
-      return reinterpret_cast<T*>(image_info.image_begin_ + GetImageOffset(object));
+      return reinterpret_cast<T*>(image_info.image_begin_ + GetImageOffset(object, oat_index));
     }
   }
 
@@ -267,7 +267,7 @@ class ImageWriter final {
     // The bin an object belongs to, i.e. regular, class/verified, class/initialized, etc.
     Bin GetBin() const;
     // The offset in bytes from the beginning of the bin. Aligned to object size.
-    uint32_t GetIndex() const;
+    uint32_t GetOffset() const;
     // Pack into a single uint32_t, for storing into a lock word.
     uint32_t Uint32Value() const { return lockword_; }
     // Comparison operator for map support
@@ -394,16 +394,15 @@ class ImageWriter final {
     // Class table associated with this image for serialization.
     std::unique_ptr<ClassTable> class_table_;
 
-    // Padding objects to ensure region alignment (if required).
-    std::vector<size_t> padding_object_offsets_;
+    // Padding offsets to ensure region alignment (if required).
+    // Objects need to be added from the recorded offset until the end of the region.
+    std::vector<size_t> padding_offsets_;
   };
 
   // We use the lock word to store the offset of the object in the image.
-  void SetImageOffset(mirror::Object* object, size_t offset)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  bool IsImageOffsetAssigned(mirror::Object* object) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
   size_t GetImageOffset(mirror::Object* object) const REQUIRES_SHARED(Locks::mutator_lock_);
+  size_t GetImageOffset(mirror::Object* object, size_t oat_index) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   void PrepareDexCacheArraySlots() REQUIRES_SHARED(Locks::mutator_lock_);
   void AssignImageBinSlot(mirror::Object* object, size_t oat_index)
@@ -414,21 +413,15 @@ class ImageWriter final {
       REQUIRES_SHARED(Locks::mutator_lock_);
   bool IsImageBinSlotAssigned(mirror::Object* object) const
       REQUIRES_SHARED(Locks::mutator_lock_);
-  BinSlot GetImageBinSlot(mirror::Object* object) const REQUIRES_SHARED(Locks::mutator_lock_);
+  BinSlot GetImageBinSlot(mirror::Object* object, size_t oat_index) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  void UpdateImageBinSlotOffset(mirror::Object* object, size_t oat_index, size_t new_offset)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   void AddDexCacheArrayRelocation(void* array, size_t offset, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  mirror::Object* GetLocalAddress(mirror::Object* object) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    size_t offset = GetImageOffset(object);
-    size_t oat_index = GetOatIndex(object);
-    const ImageInfo& image_info = GetImageInfo(oat_index);
-    uint8_t* dst = image_info.image_.Begin() + offset;
-    return reinterpret_cast<mirror::Object*>(dst);
-  }
 
   // Returns the address in the boot image if we are compiling the app image.
   const uint8_t* GetOatAddress(StubType type) const;
