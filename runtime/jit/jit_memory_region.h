@@ -40,17 +40,6 @@ class TestZygoteMemory;
 // architectures.
 static constexpr int kJitCodeAccountingBytes = 16;
 
-size_t inline GetJitCodeAlignment() {
-  if (kRuntimeISA == InstructionSet::kArm || kRuntimeISA == InstructionSet::kThumb2) {
-    // Some devices with 32-bit ARM kernels need additional JIT code alignment when using dual
-    // view JIT (b/132205399). The alignment returned here coincides with the typical ARM d-cache
-    // line (though the value should be probed ideally). Both the method header and code in the
-    // cache are aligned to this size.
-    return 64;
-  }
-  return GetInstructionSetAlignment(kRuntimeISA);
-}
-
 // Helper to get the size required for emitting `number_of_roots` in the
 // data portion of a JIT memory region.
 uint32_t inline ComputeRootTableSize(uint32_t number_of_roots) {
