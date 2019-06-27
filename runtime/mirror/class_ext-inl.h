@@ -19,80 +19,11 @@
 
 #include "class_ext.h"
 
-#include "array-inl.h"
 #include "art_method-inl.h"
-#include "handle_scope.h"
 #include "object-inl.h"
 
 namespace art {
 namespace mirror {
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::EnsureJniIdsArrayPresent(MemberOffset off, size_t count) {
-  ObjPtr<PointerArray> existing(
-      GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(off));
-  if (!existing.IsNull()) {
-    return existing;
-  }
-  Thread* self = Thread::Current();
-  StackHandleScope<2> hs(self);
-  Handle<ClassExt> h_this(hs.NewHandle(this));
-  Handle<PointerArray> new_arr(
-      hs.NewHandle(Runtime::Current()->GetClassLinker()->AllocPointerArray(self, count)));
-  if (new_arr.IsNull()) {
-    // Fail.
-    self->AssertPendingOOMException();
-    return nullptr;
-  }
-  bool set;
-  // Set the ext_data_ field using CAS semantics.
-  if (Runtime::Current()->IsActiveTransaction()) {
-    set = h_this->CasFieldObject<true>(
-        off, nullptr, new_arr.Get(), CASMode::kStrong, std::memory_order_seq_cst);
-  } else {
-    set = h_this->CasFieldObject<false>(
-        off, nullptr, new_arr.Get(), CASMode::kStrong, std::memory_order_seq_cst);
-  }
-  ObjPtr<PointerArray> ret(
-      set ? new_arr.Get()
-          : h_this->GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(off));
-  CHECK(!ret.IsNull());
-  return ret;
-}
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::EnsureJMethodIDsArrayPresent(size_t count) {
-  return EnsureJniIdsArrayPresent<kVerifyFlags, kReadBarrierOption>(
-      MemberOffset(OFFSET_OF_OBJECT_MEMBER(ClassExt, jmethod_ids_)), count);
-}
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::EnsureStaticJFieldIDsArrayPresent(size_t count) {
-  return EnsureJniIdsArrayPresent<kVerifyFlags, kReadBarrierOption>(
-      MemberOffset(OFFSET_OF_OBJECT_MEMBER(ClassExt, static_jfield_ids_)), count);
-}
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::EnsureInstanceJFieldIDsArrayPresent(size_t count) {
-  return EnsureJniIdsArrayPresent<kVerifyFlags, kReadBarrierOption>(
-      MemberOffset(OFFSET_OF_OBJECT_MEMBER(ClassExt, instance_jfield_ids_)), count);
-}
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::GetInstanceJFieldIDs() {
-  return GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(
-      OFFSET_OF_OBJECT_MEMBER(ClassExt, instance_jfield_ids_));
-}
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::GetStaticJFieldIDs() {
-  return GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(
-      OFFSET_OF_OBJECT_MEMBER(ClassExt, static_jfield_ids_));
-}
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<PointerArray> ClassExt::GetJMethodIDs() {
-  return GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(
-      OFFSET_OF_OBJECT_MEMBER(ClassExt, jmethod_ids_));
-}
 
 inline ObjPtr<Object> ClassExt::GetVerifyError() {
   return GetFieldObject<ClassExt>(OFFSET_OF_OBJECT_MEMBER(ClassExt, verify_error_));

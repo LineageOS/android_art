@@ -435,7 +435,7 @@ def run_tests(tests):
         options_test += ' --no-image'
 
       if debuggable == 'debuggable':
-        options_test += ' --debuggable --runtime-option -Xopaque-jni-ids:true'
+        options_test += ' --debuggable'
 
       if jvmti == 'jvmti-stress':
         options_test += ' --jvmti-trace-stress --jvmti-redefine-stress --jvmti-field-stress'
@@ -797,7 +797,7 @@ def parse_test_name(test_name):
   It supports two types of test_name:
   1) Like 001-HelloWorld. In this case, it will just verify if the test actually
   exists and if it does, it returns the testname.
-  2) Like test-art-host-run-test-debug-prebuild-interpreter-no-relocate-ntrace-cms-checkjni-pointer-ids-picimage-ndebuggable-001-HelloWorld32
+  2) Like test-art-host-run-test-debug-prebuild-interpreter-no-relocate-ntrace-cms-checkjni-picimage-ndebuggable-001-HelloWorld32
   In this case, it will parse all the variants and check if they are placed
   correctly. If yes, it will set the various VARIANT_TYPES to use the
   variants required to run the test. Again, it returns the test_name
