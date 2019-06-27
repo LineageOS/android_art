@@ -94,9 +94,7 @@
 #include "jit/jit_code_cache.h"
 #include "jit/profile_saver.h"
 #include "jni/java_vm_ext.h"
-#include "jni/jni_id_manager.h"
 #include "jni/jni_internal.h"
-#include "jni_id_type.h"
 #include "linear_alloc.h"
 #include "memory_representation.h"
 #include "mirror/array.h"
@@ -1183,8 +1181,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   oat_file_manager_ = new OatFileManager;
 
-  jni_id_manager_ = new jni::JniIdManager;
-
   Thread::SetSensitiveThreadHook(runtime_options.GetOrDefault(Opt::HookIsSensitiveThread));
   Monitor::Init(runtime_options.GetOrDefault(Opt::LockProfThreshold),
                 runtime_options.GetOrDefault(Opt::StackDumpLockProfThreshold));
@@ -1305,13 +1301,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   experimental_flags_ = runtime_options.GetOrDefault(Opt::Experimental);
   is_low_memory_mode_ = runtime_options.Exists(Opt::LowMemoryMode);
   madvise_random_access_ = runtime_options.GetOrDefault(Opt::MadviseRandomAccess);
-
-  if (!runtime_options.Exists(Opt::OpaqueJniIds)) {
-    jni_ids_indirection_ = JniIdType::kDefault;
-  } else {
-    jni_ids_indirection_ = *runtime_options.Get(Opt::OpaqueJniIds) ? JniIdType::kIndices
-                                                                   : JniIdType::kPointer;
-  }
 
   plugins_ = runtime_options.ReleaseOrDefault(Opt::Plugins);
   agent_specs_ = runtime_options.ReleaseOrDefault(Opt::AgentPath);

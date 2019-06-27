@@ -76,7 +76,6 @@ ReaderWriterMutex* Locks::jni_globals_lock_ = nullptr;
 Mutex* Locks::jni_weak_globals_lock_ = nullptr;
 ReaderWriterMutex* Locks::dex_lock_ = nullptr;
 Mutex* Locks::native_debug_interface_lock_ = nullptr;
-ReaderWriterMutex* Locks::jni_id_lock_ = nullptr;
 std::vector<BaseMutex*> Locks::expected_mutexes_on_weak_ref_access_;
 Atomic<const BaseMutex*> Locks::expected_mutexes_on_weak_ref_access_guard_;
 
@@ -158,7 +157,6 @@ void Locks::Init() {
     DCHECK(user_code_suspension_lock_ != nullptr);
     DCHECK(dex_lock_ != nullptr);
     DCHECK(native_debug_interface_lock_ != nullptr);
-    DCHECK(jni_id_lock_ != nullptr);
     DCHECK(runtime_thread_pool_lock_ != nullptr);
   } else {
     // Create global locks in level order from highest lock level to lowest.
@@ -318,10 +316,6 @@ void Locks::Init() {
     UPDATE_CURRENT_LOCK_LEVEL(kNativeDebugInterfaceLock);
     DCHECK(native_debug_interface_lock_ == nullptr);
     native_debug_interface_lock_ = new Mutex("Native debug interface lock", current_lock_level);
-
-    UPDATE_CURRENT_LOCK_LEVEL(kJniIdLock);
-    DCHECK(jni_id_lock_ == nullptr);
-    jni_id_lock_ = new ReaderWriterMutex("JNI id map lock", current_lock_level);
 
     UPDATE_CURRENT_LOCK_LEVEL(kAbortLock);
     DCHECK(abort_lock_ == nullptr);
