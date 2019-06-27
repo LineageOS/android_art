@@ -367,10 +367,6 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
           .WithType<bool>()
           .WithValueMap({{"false", false}, {"true", true}})
           .IntoKey(M::FastClassNotFoundException)
-      .Define("-Xopaque-jni-ids:_")
-          .WithType<bool>()
-          .WithValueMap({{"true", true}, {"false", false}})
-          .IntoKey(M::OpaqueJniIds)
       .Ignore({
           "-ea", "-da", "-enableassertions", "-disableassertions", "--runtime-arg", "-esa",
           "-dsa", "-enablesystemassertions", "-disablesystemassertions", "-Xrs", "-Xint:_",
@@ -788,7 +784,6 @@ void ParsedOptions::Usage(const char* fmt, ...) {
                        "(Enable new and experimental agent support)\n");
   UsageMessage(stream, "  -Xexperimental:agents"
                        "(Enable new and experimental agent support)\n");
-  UsageMessage(stream, "  -Xopaque-jni-ids:{true,false} (Use opauque integers for jni ids)\n");
   UsageMessage(stream, "\n");
 
   UsageMessage(stream, "The following previously supported Dalvik options are ignored:\n");
