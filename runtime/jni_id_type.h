@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,25 @@
  * limitations under the License.
  */
 
-#include "gc/heap.h"
-#include "runtime.h"
+#ifndef ART_RUNTIME_JNI_ID_TYPE_H_
+#define ART_RUNTIME_JNI_ID_TYPE_H_
+
+#include <iosfwd>
 
 namespace art {
-namespace {
 
-extern "C" bool JNICALL Java_Main_hasStartupCompleted(JNIEnv*, jclass) {
-  return Runtime::Current()->GetStartupCompleted();
-}
+enum class JniIdType {
+  // All Jni method/field IDs are pointers to the corresponding Art{Field,Method} type
+  kPointer,
 
-extern "C" void JNICALL Java_Main_resetStartupCompleted(JNIEnv*, jclass) {
-  Runtime::Current()->ResetStartupCompleted();
-}
+  // All Jni method/field IDs are indices into a table.
+  kIndices,
 
-}  // namespace
+  // The current default provider. Used if you run -XjdwpProvider:default
+  kDefault = kPointer,
+};
+
+std::ostream& operator<<(std::ostream& os, const JniIdType& rhs);
+
 }  // namespace art
+#endif  // ART_RUNTIME_JNI_ID_TYPE_H_

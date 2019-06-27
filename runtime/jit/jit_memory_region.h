@@ -100,12 +100,16 @@ class JitMemoryRegion {
   void FreeData(uint8_t* data) REQUIRES(Locks::jit_lock_);
 
   // Emit roots and stack map into the memory pointed by `roots_data`.
-  void CommitData(uint8_t* roots_data,
+  bool CommitData(uint8_t* roots_data,
                   const std::vector<Handle<mirror::Object>>& roots,
                   const uint8_t* stack_map,
                   size_t stack_map_size)
       REQUIRES(Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  bool IsValid() const NO_THREAD_SAFETY_ANALYSIS {
+    return exec_mspace_ != nullptr || data_mspace_ != nullptr;
+  }
 
   bool HasDualCodeMapping() const {
     return non_exec_pages_.IsValid();

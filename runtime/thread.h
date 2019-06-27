@@ -1901,12 +1901,13 @@ class ThreadLifecycleCallback {
 class ScopedExceptionStorage {
  public:
   explicit ScopedExceptionStorage(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
+  void SuppressOldException(const char* message = "") REQUIRES_SHARED(Locks::mutator_lock_);
   ~ScopedExceptionStorage() REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   Thread* self_;
   StackHandleScope<1> hs_;
-  Handle<mirror::Throwable> excp_;
+  MutableHandle<mirror::Throwable> excp_;
 };
 
 std::ostream& operator<<(std::ostream& os, const Thread& thread);

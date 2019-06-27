@@ -39,6 +39,7 @@ namespace mirror {
 class Object;
 class Class;
 class ClassLoader;
+class String;
 }   // namespace mirror
 
 namespace jit {
@@ -212,10 +213,9 @@ class Jit {
     return options_->GetPriorityThreadWeight();
   }
 
-  // Returns false if we only need to save profile information and not compile methods.
-  bool UseJitCompilation() const {
-    return options_->UseJitCompilation();
-  }
+  // Return whether we should do JIT compilation. Note this will returns false
+  // if we only need to save profile information and not compile methods.
+  bool UseJitCompilation();
 
   bool GetSaveProfilingInfo() const {
     return options_->GetSaveProfilingInfo();
@@ -321,6 +321,16 @@ class Jit {
   // at the point of loading the dex files.
   void RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
                         jobject class_loader);
+
+  // Called by the compiler to know whether it can directly encode the
+  // method/class/string.
+  bool CanEncodeMethod(ArtMethod* method, bool is_for_shared_region) const;
+  bool CanEncodeClass(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  bool CanEncodeString(ObjPtr<mirror::String> string, bool is_for_shared_region) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  bool CanAssumeInitialized(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);
