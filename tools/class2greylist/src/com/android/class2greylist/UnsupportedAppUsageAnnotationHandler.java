@@ -159,10 +159,17 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
                     mSdkVersionToFlagMap.keySet());
             return;
         }
+
         try {
-            mApiResolver.resolvePublicAlternatives(publicAlternativesString, signature);
+            mApiResolver.resolvePublicAlternatives(publicAlternativesString, signature,
+                    maxTargetSdk);
         } catch (JavadocLinkSyntaxError | AlternativeNotFoundError e) {
             context.reportError(e.toString());
+        } catch (RequiredAlternativeNotSpecifiedError e) {
+            context.reportError("Signature %s moved to %s without specifying public "
+                            + "alternatives; Refer to go/unsupportedappusage-public-alternatives "
+                            + "for details.",
+                    signature, mSdkVersionToFlagMap.get(maxTargetSdk));
         }
 
         // Consume this annotation if it matches the predicate.

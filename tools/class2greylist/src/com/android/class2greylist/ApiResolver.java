@@ -31,6 +31,7 @@ public class ApiResolver {
 
     private static final Pattern LINK_TAG_PATTERN = Pattern.compile("\\{@link ([^\\}]+)\\}");
     private static final Pattern CODE_TAG_PATTERN = Pattern.compile("\\{@code ([^\\}]+)\\}");
+    private static final Integer MIN_SDK_REQUIRING_PUBLIC_ALTERNATIVES = 29;
 
     public ApiResolver() {
         mPotentialPublicAlternatives = null;
@@ -58,8 +59,14 @@ public class ApiResolver {
      * @param publicAlternativesString String containing public alternative explanations.
      * @param signature                Signature of the member that has the annotation.
      */
-    public void resolvePublicAlternatives(String publicAlternativesString, String signature)
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError {
+    public void resolvePublicAlternatives(String publicAlternativesString, String signature,
+                                          Integer maxSdkVersion)
+            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
+                    RequiredAlternativeNotSpecifiedError {
+        if (Strings.isNullOrEmpty(publicAlternativesString) && maxSdkVersion != null
+                && maxSdkVersion >= MIN_SDK_REQUIRING_PUBLIC_ALTERNATIVES) {
+            throw new RequiredAlternativeNotSpecifiedError();
+        }
         if (publicAlternativesString != null && mPotentialPublicAlternatives != null) {
             // Grab all instances of type {@link foo}
             Matcher matcher = LINK_TAG_PATTERN.matcher(publicAlternativesString);
