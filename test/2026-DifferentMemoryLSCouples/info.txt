@@ -1,0 +1,1 @@
+Tests are written for Load Hoist Store Sink pass
