@@ -125,10 +125,14 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
     // cache, and the executable view of the code cache has fixed RX memory protections.
     //
     // This memory needs to be mapped shared as the code portions will have two mappings.
+    //
+    // Additionally, the zyzote will create a dual view of the data portion of
+    // the cache. This mapping will be read-only, whereas the second mapping
+    // will be writable.
     base_flags = MAP_SHARED;
     data_pages = MemMap::MapFile(
         data_capacity + exec_capacity,
-        kProtRW,
+        is_zygote ? kProtR : kProtRW,
         base_flags,
         mem_fd,
         /* start= */ 0,
@@ -168,6 +172,7 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
 
   MemMap exec_pages;
   MemMap non_exec_pages;
+  MemMap writable_data_pages;
   if (exec_capacity > 0) {
     uint8_t* const divider = data_pages.Begin() + data_capacity;
     // Set initial permission for executable view to catch any SELinux permission problems early
@@ -209,12 +214,28 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
           return false;
         }
       }
-    }
-    if (is_zygote) {
-      // Now that we have created the writable and executable mappings, prevent creating any new
-      // ones.
-      if (!ProtectZygoteMemory(mem_fd.get(), error_msg)) {
-        return false;
+      // For the zygote, create a dual view of the data cache.
+      if (is_zygote) {
+        name = data_cache_name + "-rw";
+        writable_data_pages = MemMap::MapFile(data_capacity,
+                                              kProtRW,
+                                              base_flags,
+                                              mem_fd,
+                                              /* start= */ 0,
+                                              /* low_4GB= */ false,
+                                              name.c_str(),
+                                              &error_str);
+        if (!writable_data_pages.IsValid()) {
+          std::ostringstream oss;
+          oss << "Failed to create dual data view for zygote: " << error_str;
+          *error_msg = oss.str();
+          return false;
+        }
+        // Now that we have created the writable and executable mappings, prevent creating any new
+        // ones.
+        if (!ProtectZygoteMemory(mem_fd.get(), error_msg)) {
+          return false;
+        }
       }
     }
   } else {
@@ -224,14 +245,24 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
   data_pages_ = std::move(data_pages);
   exec_pages_ = std::move(exec_pages);
   non_exec_pages_ = std::move(non_exec_pages);
+  writable_data_pages_ = std::move(writable_data_pages);
+
+  VLOG(jit) << "Created JitMemoryRegion"
+            << ": data_pages=" << reinterpret_cast<void*>(data_pages_.Begin())
+            << ", exec_pages=" << reinterpret_cast<void*>(exec_pages_.Begin())
+            << ", non_exec_pages=" << reinterpret_cast<void*>(non_exec_pages_.Begin())
+            << ", writable_data_pages=" << reinterpret_cast<void*>(writable_data_pages_.Begin());
 
   // Now that the pages are initialized, initialize the spaces.
 
-  // Initialize the data heap
-  data_mspace_ = create_mspace_with_base(data_pages_.Begin(), data_end_, false /*locked*/);
+  // Initialize the data heap.
+  data_mspace_ = create_mspace_with_base(
+      HasDualDataMapping() ? writable_data_pages_.Begin() : data_pages_.Begin(),
+      data_end_,
+      /* locked= */ false);
   CHECK(data_mspace_ != nullptr) << "create_mspace_with_base (data) failed";
 
-  // Initialize the code heap
+  // Initialize the code heap.
   MemMap* code_heap = nullptr;
   if (non_exec_pages_.IsValid()) {
     code_heap = &non_exec_pages_;
@@ -293,14 +324,15 @@ bool JitMemoryRegion::IncreaseCodeCacheCapacity() {
 // is already held.
 void* JitMemoryRegion::MoreCore(const void* mspace, intptr_t increment) NO_THREAD_SAFETY_ANALYSIS {
   if (mspace == exec_mspace_) {
-    DCHECK(exec_mspace_ != nullptr);
+    CHECK(exec_mspace_ != nullptr);
     const MemMap* const code_pages = GetUpdatableCodeMapping();
     void* result = code_pages->Begin() + exec_end_;
     exec_end_ += increment;
     return result;
   } else {
-    DCHECK_EQ(data_mspace_, mspace);
-    void* result = data_pages_.Begin() + data_end_;
+    CHECK_EQ(data_mspace_, mspace);
+    const MemMap* const writable_data_pages = GetWritableDataMapping();
+    void* result = writable_data_pages->Begin() + data_end_;
     data_end_ += increment;
     return result;
   }
@@ -412,6 +444,7 @@ bool JitMemoryRegion::CommitData(uint8_t* roots_data,
                                  const std::vector<Handle<mirror::Object>>& roots,
                                  const uint8_t* stack_map,
                                  size_t stack_map_size) {
+  roots_data = GetWritableDataAddress(roots_data);
   size_t root_table_size = ComputeRootTableSize(roots.size());
   uint8_t* stack_map_data = roots_data + root_table_size;
   FillRootTable(roots_data, roots);
@@ -434,10 +467,11 @@ void JitMemoryRegion::FreeCode(const uint8_t* code) {
 uint8_t* JitMemoryRegion::AllocateData(size_t data_size) {
   void* result = mspace_malloc(data_mspace_, data_size);
   used_memory_for_data_ += mspace_usable_size(result);
-  return reinterpret_cast<uint8_t*>(result);
+  return reinterpret_cast<uint8_t*>(GetNonWritableDataAddress(result));
 }
 
 void JitMemoryRegion::FreeData(uint8_t* data) {
+  data = GetWritableDataAddress(data);
   used_memory_for_data_ -= mspace_usable_size(data);
   mspace_free(data_mspace_, data);
 }
