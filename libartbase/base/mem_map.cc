@@ -619,6 +619,13 @@ void MemMap::DoReset() {
   Invalidate();
 }
 
+void MemMap::ResetInForkedProcess() {
+  // This should be called on a map that has MADV_DONTFORK.
+  // The kernel has already unmapped this.
+  already_unmapped_ = true;
+  Reset();
+}
+
 void MemMap::Invalidate() {
   DCHECK(IsValid());
 
@@ -822,6 +829,15 @@ void MemMap::MadviseDontNeedAndZero() {
     }
 #endif
   }
+}
+
+int MemMap::MadviseDontFork() {
+#if defined(__linux__)
+  if (base_begin_ != nullptr || base_size_ != 0) {
+    return madvise(base_begin_, base_size_, MADV_DONTFORK);
+  }
+#endif
+  return -1;
 }
 
 bool MemMap::Sync() {
