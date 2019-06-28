@@ -772,7 +772,7 @@ static jobject CreateSystemClassLoader(Runtime* runtime) {
 
   JValue result = InvokeWithJValues(soa,
                                     nullptr,
-                                    jni::EncodeArtMethod(getSystemClassLoader),
+                                    getSystemClassLoader,
                                     nullptr);
   JNIEnv* env = soa.Self()->GetJniEnv();
   ScopedLocalRef<jobject> system_class_loader(env, soa.AddLocalReference<jobject>(result.GetL()));
