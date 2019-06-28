@@ -2966,6 +2966,8 @@ static dex2oat::ReturnCode Dex2oat(int argc, char** argv) {
   // Parse arguments. Argument mistakes will lead to exit(EXIT_FAILURE) in UsageError.
   dex2oat->ParseArgs(argc, argv);
 
+  art::MemMap::Init();  // For ZipEntry::ExtractToMemMap, vdex and profiles.
+
   // If needed, process profile information for profile guided compilation.
   // This operation involves I/O.
   if (dex2oat->UseProfile()) {
@@ -2975,7 +2977,6 @@ static dex2oat::ReturnCode Dex2oat(int argc, char** argv) {
     }
   }
 
-  art::MemMap::Init();  // For ZipEntry::ExtractToMemMap, and vdex.
 
   // Check early that the result of compilation can be written
   if (!dex2oat->OpenFile()) {

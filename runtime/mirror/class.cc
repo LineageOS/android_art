@@ -16,17 +16,14 @@
 
 #include "class.h"
 
-#include "android-base/macros.h"
 #include "android-base/stringprintf.h"
 
-#include "array-inl.h"
 #include "art_field-inl.h"
 #include "art_method-inl.h"
-#include "base/enums.h"
 #include "base/logging.h"  // For VLOG.
 #include "base/utils.h"
 #include "class-inl.h"
-#include "class_ext-inl.h"
+#include "class_ext.h"
 #include "class_linker-inl.h"
 #include "class_loader.h"
 #include "class_root.h"
@@ -1548,127 +1545,6 @@ void Class::SetAccessFlagsDCheck(uint32_t new_access_flags) {
   // kAccVerificationAttempted is retained.
   CHECK((old_access_flags & kAccVerificationAttempted) == 0 ||
         (new_access_flags & kAccVerificationAttempted) != 0);
-}
-
-ObjPtr<PointerArray> Class::GetMethodIds() {
-  ObjPtr<ClassExt> ext(GetExtData());
-  if (ext.IsNull()) {
-    return nullptr;
-  } else {
-    return ext->GetJMethodIDs();
-  }
-}
-ObjPtr<PointerArray> Class::GetOrCreateMethodIds() {
-  DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
-  Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
-  ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
-  if (ext.IsNull()) {
-    self->AssertPendingOOMException();
-    return nullptr;
-  }
-  return ext->EnsureJMethodIDsArrayPresent(NumMethods());
-}
-
-ObjPtr<PointerArray> Class::GetStaticFieldIds() {
-  ObjPtr<ClassExt> ext(GetExtData());
-  if (ext.IsNull()) {
-    return nullptr;
-  } else {
-    return ext->GetStaticJFieldIDs();
-  }
-}
-ObjPtr<PointerArray> Class::GetOrCreateStaticFieldIds() {
-  DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
-  Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
-  ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
-  if (ext.IsNull()) {
-    self->AssertPendingOOMException();
-    return nullptr;
-  }
-  return ext->EnsureStaticJFieldIDsArrayPresent(NumStaticFields());
-}
-ObjPtr<PointerArray> Class::GetInstanceFieldIds() {
-  ObjPtr<ClassExt> ext(GetExtData());
-  if (ext.IsNull()) {
-    return nullptr;
-  } else {
-    return ext->GetInstanceJFieldIDs();
-  }
-}
-ObjPtr<PointerArray> Class::GetOrCreateInstanceFieldIds() {
-  DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
-  Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
-  ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
-  if (ext.IsNull()) {
-    self->AssertPendingOOMException();
-    return nullptr;
-  }
-  return ext->EnsureInstanceJFieldIDsArrayPresent(NumInstanceFields());
-}
-
-size_t Class::GetStaticFieldIdOffset(ArtField* field) {
-  DCHECK_LT(reinterpret_cast<uintptr_t>(field),
-            reinterpret_cast<uintptr_t>(&*GetSFieldsPtr()->end()))
-      << "field not part of the current class. " << field->PrettyField() << " class is "
-      << PrettyClass();
-  DCHECK_GE(reinterpret_cast<uintptr_t>(field),
-            reinterpret_cast<uintptr_t>(&*GetSFieldsPtr()->begin()))
-      << "field not part of the current class. " << field->PrettyField() << " class is "
-      << PrettyClass();
-  uintptr_t start = reinterpret_cast<uintptr_t>(&GetSFieldsPtr()->At(0));
-  uintptr_t fld = reinterpret_cast<uintptr_t>(field);
-  size_t res = (fld - start) / sizeof(ArtField);
-  DCHECK_EQ(&GetSFieldsPtr()->At(res), field)
-      << "Incorrect field computation expected: " << field->PrettyField()
-      << " got: " << GetSFieldsPtr()->At(res).PrettyField();
-  return res;
-}
-
-size_t Class::GetInstanceFieldIdOffset(ArtField* field) {
-  DCHECK_LT(reinterpret_cast<uintptr_t>(field),
-            reinterpret_cast<uintptr_t>(&*GetIFieldsPtr()->end()))
-      << "field not part of the current class. " << field->PrettyField() << " class is "
-      << PrettyClass();
-  DCHECK_GE(reinterpret_cast<uintptr_t>(field),
-            reinterpret_cast<uintptr_t>(&*GetIFieldsPtr()->begin()))
-      << "field not part of the current class. " << field->PrettyField() << " class is "
-      << PrettyClass();
-  uintptr_t start = reinterpret_cast<uintptr_t>(&GetIFieldsPtr()->At(0));
-  uintptr_t fld = reinterpret_cast<uintptr_t>(field);
-  size_t res = (fld - start) / sizeof(ArtField);
-  DCHECK_EQ(&GetIFieldsPtr()->At(res), field)
-      << "Incorrect field computation expected: " << field->PrettyField()
-      << " got: " << GetIFieldsPtr()->At(res).PrettyField();
-  return res;
-}
-
-size_t Class::GetMethodIdOffset(ArtMethod* method, PointerSize pointer_size) {
-  DCHECK(GetMethodsSlice(kRuntimePointerSize).Contains(method))
-      << "method not part of the current class. " << method->PrettyMethod() << "( " << reinterpret_cast<void*>(method) << ")" << " class is "
-      << PrettyClass() << [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
-        std::ostringstream os;
-        os << " Methods are [";
-        for (ArtMethod& m : GetMethodsSlice(kRuntimePointerSize)) {
-          os << m.PrettyMethod() << "( " << reinterpret_cast<void*>(&m) << "), ";
-        }
-        os << "]";
-        return os.str();
-      }();
-  uintptr_t start = reinterpret_cast<uintptr_t>(&*GetMethodsSlice(pointer_size).begin());
-  uintptr_t fld = reinterpret_cast<uintptr_t>(method);
-  size_t art_method_size = ArtMethod::Size(pointer_size);
-  size_t art_method_align = ArtMethod::Alignment(pointer_size);
-  size_t res = (fld - start) / art_method_size;
-  DCHECK_EQ(&GetMethodsPtr()->At(res, art_method_size, art_method_align), method)
-      << "Incorrect method computation expected: " << method->PrettyMethod()
-      << " got: " << GetMethodsPtr()->At(res, art_method_size, art_method_align).PrettyMethod();
-  return res;
 }
 
 }  // namespace mirror

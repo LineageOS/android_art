@@ -289,6 +289,11 @@ ObjPtr<mirror::String> InternTable::InternStrong(ObjPtr<mirror::String> s) {
   return Insert(s, true, false);
 }
 
+ObjPtr<mirror::String> InternTable::InternWeak(const char* utf8_data) {
+  DCHECK(utf8_data != nullptr);
+  return InternWeak(mirror::String::AllocFromModifiedUtf8(Thread::Current(), utf8_data));
+}
+
 ObjPtr<mirror::String> InternTable::InternWeak(ObjPtr<mirror::String> s) {
   return Insert(s, false, false);
 }

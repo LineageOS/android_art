@@ -2538,7 +2538,9 @@ ObjPtr<mirror::DexCache> ClassLinker::AllocDexCache(/*out*/ ObjPtr<mirror::Strin
     self->AssertPendingOOMException();
     return nullptr;
   }
-  ObjPtr<mirror::String> location = intern_table_->InternStrong(dex_file.GetLocation().c_str());
+  // Use InternWeak() so that the location String can be collected when the ClassLoader
+  // with this DexCache is collected.
+  ObjPtr<mirror::String> location = intern_table_->InternWeak(dex_file.GetLocation().c_str());
   if (location == nullptr) {
     self->AssertPendingOOMException();
     return nullptr;

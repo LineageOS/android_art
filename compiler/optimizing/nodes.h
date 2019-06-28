@@ -320,7 +320,6 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
          bool dead_reference_safe = false,
          bool debuggable = false,
          bool osr = false,
-         bool is_shared_jit_code = false,
          int start_instruction_id = 0)
       : allocator_(allocator),
         arena_stack_(arena_stack),
@@ -356,8 +355,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         art_method_(nullptr),
         inexact_object_rti_(ReferenceTypeInfo::CreateInvalid()),
         osr_(osr),
-        cha_single_implementation_list_(allocator->Adapter(kArenaAllocCHA)),
-        is_shared_jit_code_(is_shared_jit_code) {
+        cha_single_implementation_list_(allocator->Adapter(kArenaAllocCHA)) {
     blocks_.reserve(kDefaultNumberOfBlocks);
   }
 
@@ -587,10 +585,6 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
 
   bool IsCompilingOsr() const { return osr_; }
 
-  bool IsCompilingForSharedJitCode() const {
-    return is_shared_jit_code_;
-  }
-
   ArenaSet<ArtMethod*>& GetCHASingleImplementationList() {
     return cha_single_implementation_list_;
   }
@@ -779,10 +773,6 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
 
   // List of methods that are assumed to have single implementation.
   ArenaSet<ArtMethod*> cha_single_implementation_list_;
-
-  // Whether we are JIT compiling in the shared region area, putting
-  // restrictions on, for example, how literals are being generated.
-  bool is_shared_jit_code_;
 
   friend class SsaBuilder;           // For caching constants.
   friend class SsaLivenessAnalysis;  // For the linear order.
@@ -2150,12 +2140,13 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   // If this instruction will do an implicit null check, return the `HNullCheck` associated
   // with it. Otherwise return null.
   HNullCheck* GetImplicitNullCheck() const {
-    // Find the first previous instruction which is not a move.
-    HInstruction* first_prev_not_move = GetPreviousDisregardingMoves();
-    if (first_prev_not_move != nullptr &&
-        first_prev_not_move->IsNullCheck() &&
-        first_prev_not_move->IsEmittedAtUseSite()) {
-      return first_prev_not_move->AsNullCheck();
+    // Go over previous non-move instructions that are emitted at use site.
+    HInstruction* prev_not_move = GetPreviousDisregardingMoves();
+    while (prev_not_move != nullptr && prev_not_move->IsEmittedAtUseSite()) {
+      if (prev_not_move->IsNullCheck()) {
+        return prev_not_move->AsNullCheck();
+      }
+      prev_not_move = prev_not_move->GetPreviousDisregardingMoves();
     }
     return nullptr;
   }
