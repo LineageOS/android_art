@@ -1,0 +1,88 @@
+//
+// Copyright (C) 2018 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// Build variants {target,host} x {debug,ndebug} x {32,64}
+cc_defaults {
+    name: "fieldcount-base-defaults",
+    srcs: ["fieldcount.cc"],
+    defaults: ["art_defaults"],
+
+    // Note that this tool needs to be built for both 32-bit and 64-bit since it requires
+    // to be same ISA as what it is attached to.
+    compile_multilib: "both",
+    header_libs: [
+        "libopenjdkjvmti_headers",
+        // Annoyingly you aren't allowed to include even header-only non-ndk libs into an ndk build.
+        // Instead we put the directories this would bring in below in 'include_dirs'
+        // "libnativehelper_header_only",
+    ],
+    include_dirs: [
+        // NDK headers aren't available in platform NDK builds.
+        "libnativehelper/include_jni",
+        "libnativehelper/header_only_include",
+    ],
+    multilib: {
+        lib32: {
+            suffix: "32",
+        },
+        lib64: {
+            suffix: "64",
+        },
+    },
+    symlink_preferred_arch: true,
+}
+
+cc_defaults {
+    name: "fieldcount-defaults",
+    host_supported: true,
+    shared_libs: [
+        "libbase",
+    ],
+    defaults: ["fieldcount-base-defaults"],
+}
+
+cc_defaults {
+    name: "fieldcount-static-defaults",
+    host_supported: false,
+    defaults: ["fieldcount-base-defaults"],
+
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libbase_ndk",
+    ],
+    sdk_version: "current",
+    stl: "c++_static",
+}
+
+cc_library {
+    name: "libfieldcounts",
+    defaults: ["fieldcount-static-defaults"],
+}
+
+art_cc_library {
+    name: "libfieldcount",
+    defaults: ["fieldcount-defaults"],
+}
+
+art_cc_library {
+    name: "libfieldcountd",
+    defaults: [
+        "art_debug_defaults",
+        "fieldcount-defaults",
+    ],
+}
