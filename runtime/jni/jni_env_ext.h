@@ -199,7 +199,7 @@ class JNIEnvExt : public JNIEnv {
   // If we are a JNI env for a daemon thread with a deleted runtime.
   bool runtime_deleted_;
 
-  friend class JNI;
+  template<bool kEnableIndexIds> friend class JNI;
   friend class ScopedJniEnvLocalRefState;
   friend class Thread;
   ART_FRIEND_TEST(JniInternalTest, JNIEnvExtOffsets);

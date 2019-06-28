@@ -77,6 +77,7 @@ RUNTIME_OPTIONS_KEY (bool,                EnableHSpaceCompactForOOM,      true)
 RUNTIME_OPTIONS_KEY (bool,                UseJitCompilation,              true)
 RUNTIME_OPTIONS_KEY (bool,                DumpNativeStackOnSigQuit,       true)
 RUNTIME_OPTIONS_KEY (bool,                MadviseRandomAccess,            false)
+RUNTIME_OPTIONS_KEY (bool,                OpaqueJniIds,                   false)  // -Xopaque-jni-ids:{true, false}
 RUNTIME_OPTIONS_KEY (unsigned int,        JITCompileThreshold)
 RUNTIME_OPTIONS_KEY (unsigned int,        JITWarmupThreshold)
 RUNTIME_OPTIONS_KEY (unsigned int,        JITOsrThreshold)

@@ -4280,8 +4280,16 @@ ScopedExceptionStorage::ScopedExceptionStorage(art::Thread* self)
   self_->ClearException();
 }
 
+void ScopedExceptionStorage::SuppressOldException(const char* message) {
+  CHECK(self_->IsExceptionPending()) << *self_;
+  ObjPtr<mirror::Throwable> old_suppressed(excp_.Get());
+  excp_.Assign(self_->GetException());
+  LOG(WARNING) << message << "Suppressing old exception: " << old_suppressed->Dump();
+  self_->ClearException();
+}
+
 ScopedExceptionStorage::~ScopedExceptionStorage() {
-  CHECK(!self_->IsExceptionPending()) << self_;
+  CHECK(!self_->IsExceptionPending()) << *self_;
   if (!excp_.IsNull()) {
     self_->SetException(excp_.Get());
   }
