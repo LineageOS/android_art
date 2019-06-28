@@ -64,6 +64,15 @@ art_cc_library {
     ],
 }
 
+cc_library {
+    name: "libadbconnection_server",
+    srcs: ["adbconnection_server.cc"],
+    export_include_dirs: ["include"],
+    shared_libs: ["libbase"],
+    host_supported: true,
+    recovery_available: true,
+}
+
 art_cc_library {
     name: "libadbconnectiond",
     defaults: [
