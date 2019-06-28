@@ -94,11 +94,19 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     EXPECT_TRUE(file->WriteFully(&line[0], line.length()));
   }
 
-  void GenerateClasses(File* out_file, size_t frequency = 1) {
-    VisitLibcoreDexes(VoidFunctor(),
-                      [out_file](TypeReference ref) {
-      WriteLine(out_file, ref.dex_file->PrettyType(ref.TypeIndex()));
-    }, frequency, frequency);
+  void GenerateProfile(File* out_file, size_t method_frequency,  size_t type_frequency) {
+    ProfileCompilationInfo profile;
+    VisitLibcoreDexes([&profile](MethodReference ref) {
+      uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
+          ProfileCompilationInfo::MethodHotness::kFlagStartup;
+      EXPECT_TRUE(profile.AddMethodIndex(
+          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+          ref));
+    }, [&profile](TypeReference ref) {
+      EXPECT_TRUE(profile.AddClassForDex(ref));
+    }, method_frequency, type_frequency);
+    ScratchFile profile_file;
+    profile.Save(out_file->Fd());
     EXPECT_EQ(out_file->Flush(), 0);
   }
 
@@ -209,87 +217,46 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
     return;
   }
   ImageSizes base_sizes = CompileImageAndGetSizes({});
-  ImageSizes image_classes_sizes;
-  ImageSizes compiled_classes_sizes;
-  ImageSizes compiled_methods_sizes;
-  ImageSizes profile_sizes;
+  ImageSizes everything_sizes;
+  ImageSizes filter_sizes;
   std::cout << "Base compile sizes " << base_sizes << std::endl;
-  // Test image classes
+  // Compile all methods and classes
   {
-    ScratchFile classes;
-    GenerateClasses(classes.GetFile(), /*frequency*/ 1u);
-    image_classes_sizes = CompileImageAndGetSizes(
-        {"--image-classes=" + classes.GetFilename()});
-    classes.Close();
-    std::cout << "Image classes sizes " << image_classes_sizes << std::endl;
+    ScratchFile profile_file;
+    GenerateProfile(profile_file.GetFile(), /*method_frequency=*/ 1u, /*type_frequency=*/ 1u);
+    everything_sizes = CompileImageAndGetSizes(
+        {"--profile-file=" + profile_file.GetFilename(),
+         "--compiler-filter=speed-profile"});
+    profile_file.Close();
+    std::cout << "All methods and classes sizes " << everything_sizes << std::endl;
     // Putting all classes as image classes should increase art size
-    EXPECT_GE(image_classes_sizes.art_size, base_sizes.art_size);
+    EXPECT_GE(everything_sizes.art_size, base_sizes.art_size);
     // Sanity check that dex is the same size.
-    EXPECT_EQ(image_classes_sizes.vdex_size, base_sizes.vdex_size);
-  }
-  // Test compiled classes.
-  {
-    ScratchFile classes;
-    // Only compile every even class.
-    GenerateClasses(classes.GetFile(), /*frequency*/ 2u);
-    compiled_classes_sizes = CompileImageAndGetSizes(
-        {"--image-classes=" + classes.GetFilename()});
-    classes.Close();
-    std::cout << "Compiled classes sizes " << compiled_classes_sizes << std::endl;
-    // Art file should be smaller than image classes version since we included fewer classes in the
-    // list.
-    EXPECT_LT(compiled_classes_sizes.art_size, image_classes_sizes.art_size);
+    EXPECT_EQ(everything_sizes.vdex_size, base_sizes.vdex_size);
   }
   static size_t kMethodFrequency = 3;
   static size_t kTypeFrequency = 4;
   // Test compiling fewer methods and classes.
   {
-    ScratchFile classes;
-    // Only compile every even class.
-    GenerateClasses(classes.GetFile(), kTypeFrequency);
-    compiled_methods_sizes = CompileImageAndGetSizes(
-        {"--image-classes=" + classes.GetFilename()});
-    classes.Close();
-    std::cout << "Compiled fewer methods sizes " << compiled_methods_sizes << std::endl;
-  }
-  // Cross verify profile based image against image-classes and compiled-methods to make sure it
-  // matches.
-  {
-    ProfileCompilationInfo profile;
-    VisitLibcoreDexes([&profile](MethodReference ref) {
-      uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
-          ProfileCompilationInfo::MethodHotness::kFlagStartup;
-      EXPECT_TRUE(profile.AddMethodIndex(
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
-          ref));
-    }, [&profile](TypeReference ref) {
-      EXPECT_TRUE(profile.AddClassForDex(ref));
-    }, kMethodFrequency, kTypeFrequency);
     ScratchFile profile_file;
-    profile.Save(profile_file.GetFile()->Fd());
-    EXPECT_EQ(profile_file.GetFile()->Flush(), 0);
-    profile_sizes = CompileImageAndGetSizes(
+    GenerateProfile(profile_file.GetFile(), kMethodFrequency, kTypeFrequency);
+    filter_sizes = CompileImageAndGetSizes(
         {"--profile-file=" + profile_file.GetFilename(),
          "--compiler-filter=speed-profile"});
     profile_file.Close();
-    std::cout << "Profile sizes " << profile_sizes << std::endl;
-    // Since there is some difference between profile vs image + methods due to layout, check that
-    // the range is within expected margins (+-10%).
-    const double kRatio = 0.90;
-    EXPECT_LE(profile_sizes.art_size * kRatio, compiled_methods_sizes.art_size);
-    // TODO(mathieuc): Find a reliable way to check compiled code. b/63746626
-    // EXPECT_LE(profile_sizes.oat_size * kRatio, compiled_methods_sizes.oat_size);
-    EXPECT_LE(profile_sizes.vdex_size * kRatio, compiled_methods_sizes.vdex_size);
-    EXPECT_GE(profile_sizes.art_size / kRatio, compiled_methods_sizes.art_size);
-    // TODO(mathieuc): Find a reliable way to check compiled code. b/63746626
-    // EXPECT_GE(profile_sizes.oat_size / kRatio, compiled_methods_sizes.oat_size);
-    EXPECT_GE(profile_sizes.vdex_size / kRatio, compiled_methods_sizes.vdex_size);
+    std::cout << "Fewer methods and classes sizes " << filter_sizes << std::endl;
+    EXPECT_LE(filter_sizes.art_size, everything_sizes.art_size);
+    EXPECT_LE(filter_sizes.oat_size, everything_sizes.oat_size);
+    EXPECT_LE(filter_sizes.vdex_size, everything_sizes.vdex_size);
   }
   // Test dirty image objects.
   {
     ScratchFile classes;
-    GenerateClasses(classes.GetFile(), /*frequency*/ 1u);
-    image_classes_sizes = CompileImageAndGetSizes(
+    VisitLibcoreDexes(VoidFunctor(),
+                      [&](TypeReference ref) {
+      WriteLine(classes.GetFile(), ref.dex_file->PrettyType(ref.TypeIndex()));
+    }, /*method_frequency=*/ 1u, /*class_frequency=*/ 1u);
+    ImageSizes image_classes_sizes = CompileImageAndGetSizes(
         {"--dirty-image-objects=" + classes.GetFilename()});
     classes.Close();
     std::cout << "Dirty image object sizes " << image_classes_sizes << std::endl;
