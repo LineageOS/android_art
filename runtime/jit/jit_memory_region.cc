@@ -231,6 +231,14 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
           *error_msg = oss.str();
           return false;
         }
+        if (writable_data_pages.MadviseDontFork() != 0) {
+          *error_msg = "Failed to madvise dont fork the writable data view";
+          return false;
+        }
+        if (non_exec_pages.MadviseDontFork() != 0) {
+          *error_msg = "Failed to madvise dont fork the writable code view";
+          return false;
+        }
         // Now that we have created the writable and executable mappings, prevent creating any new
         // ones.
         if (!ProtectZygoteMemory(mem_fd.get(), error_msg)) {
