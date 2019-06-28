@@ -1730,6 +1730,12 @@ void JitCodeCache::Dump(std::ostream& os) {
 }
 
 void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
+  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+
+  // Reset potential writable MemMaps inherited from the zygote. We never want
+  // to write to them.
+  shared_region_.ResetWritableMappings();
+
   if (is_zygote || Runtime::Current()->IsSafeMode()) {
     // Don't create a private region for a child zygote. Regions are usually map shared
     // (to satisfy dual-view), and we don't want children of a child zygote to inherit it.
@@ -1742,7 +1748,6 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
     CHECK(!shared_region_.IsValid());
     std::swap(shared_region_, private_region_);
   }
-  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
 
   // Reset all statistics to be specific to this process.
   number_of_compilations_ = 0;
