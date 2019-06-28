@@ -206,8 +206,10 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
   if (is_zygote) {
     // Zygote should never collect code to share the memory with the children.
     jit_code_cache->garbage_collect_code_ = false;
+    jit_code_cache->shared_region_ = std::move(region);
+  } else {
+    jit_code_cache->private_region_ = std::move(region);
   }
-  jit_code_cache->private_region_ = std::move(region);
 
   VLOG(jit) << "Created jit code cache: initial capacity="
             << PrettySize(initial_capacity)
@@ -383,7 +385,8 @@ static uint32_t GetNumberOfRoots(const uint8_t* stack_map) {
   return reinterpret_cast<const uint32_t*>(stack_map)[-1];
 }
 
-static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots)
+static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots,
+                                bool is_shared_region)
     REQUIRES(!Locks::intern_table_lock_) REQUIRES_SHARED(Locks::mutator_lock_) {
   if (!kIsDebugBuild) {
     return;
@@ -395,6 +398,10 @@ static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots
       ObjPtr<mirror::String> str = object->AsString();
       ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
       CHECK(class_linker->GetInternTable()->LookupStrong(Thread::Current(), str) != nullptr);
+    }
+    // Ensure that we don't put movable objects in the shared region.
+    if (is_shared_region) {
+      CHECK(!Runtime::Current()->GetHeap()->IsMovableObject(object.Get()));
     }
   }
 }
@@ -664,7 +671,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   if (!method->IsNative()) {
     // We need to do this before grabbing the lock_ because it needs to be able to see the string
     // InternTable. Native methods do not have roots.
-    DCheckRootsAreValid(roots);
+    DCheckRootsAreValid(roots, IsSharedRegion(*region));
   }
 
   size_t root_table_size = ComputeRootTableSize(roots.size());
@@ -1401,6 +1408,7 @@ ProfilingInfo* JitCodeCache::AddProfilingInfo(Thread* self,
                                               bool retry_allocation)
     // No thread safety analysis as we are using TryLock/Unlock explicitly.
     NO_THREAD_SAFETY_ANALYSIS {
+  DCHECK(CanAllocateProfilingInfo());
   ProfilingInfo* info = nullptr;
   if (!retry_allocation) {
     // If we are allocating for the interpreter, just try to lock, to avoid
@@ -1454,7 +1462,9 @@ ProfilingInfo* JitCodeCache::AddProfilingInfoInternal(Thread* self ATTRIBUTE_UNU
 }
 
 void* JitCodeCache::MoreCore(const void* mspace, intptr_t increment) {
-  return private_region_.MoreCore(mspace, increment);
+  return shared_region_.OwnsSpace(mspace)
+      ? shared_region_.MoreCore(mspace, increment)
+      : private_region_.MoreCore(mspace, increment);
 }
 
 void JitCodeCache::GetProfiledMethods(const std::set<std::string>& dex_base_locations,
@@ -1546,7 +1556,11 @@ bool JitCodeCache::IsOsrCompiled(ArtMethod* method) {
   return osr_code_map_.find(method) != osr_code_map_.end();
 }
 
-bool JitCodeCache::NotifyCompilationOf(ArtMethod* method, Thread* self, bool osr, bool prejit) {
+bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
+                                       Thread* self,
+                                       bool osr,
+                                       bool prejit,
+                                       JitMemoryRegion* region) {
   if (!osr && ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
     return false;
   }
@@ -1608,7 +1622,7 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method, Thread* self, bool osr
     ProfilingInfo* info = method->GetProfilingInfo(kRuntimePointerSize);
     if (info == nullptr) {
       // When prejitting, we don't allocate a profiling info.
-      if (!prejit) {
+      if (!prejit && !IsSharedRegion(*region)) {
         VLOG(jit) << method->PrettyMethod() << " needs a ProfilingInfo to be compiled";
         // Because the counter is not atomic, there are some rare cases where we may not hit the
         // threshold for creating the ProfilingInfo. Reset the counter now to "correct" this.
@@ -1716,13 +1730,19 @@ void JitCodeCache::Dump(std::ostream& os) {
 }
 
 void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
-  if (is_zygote) {
-    // Don't transition if this is for a child zygote.
+  if (is_zygote || Runtime::Current()->IsSafeMode()) {
+    // Don't create a private region for a child zygote. Regions are usually map shared
+    // (to satisfy dual-view), and we don't want children of a child zygote to inherit it.
     return;
   }
-  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
 
-  shared_region_ = std::move(private_region_);
+  if (private_region_.IsValid()) {
+    // In case the zygote was running with its own private region (happens for
+    // unit tests), move the region to the shared one.
+    CHECK(!shared_region_.IsValid());
+    std::swap(shared_region_, private_region_);
+  }
+  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
 
   // Reset all statistics to be specific to this process.
   number_of_compilations_ = 0;
@@ -1739,6 +1759,10 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
                                   &error_msg)) {
     LOG(WARNING) << "Could not create private region after zygote fork: " << error_msg;
   }
+}
+
+JitMemoryRegion* JitCodeCache::GetCurrentRegion() {
+  return Runtime::Current()->IsZygote() ? &shared_region_ : &private_region_;
 }
 
 }  // namespace jit
