@@ -40,8 +40,6 @@ done
 PROFILING=
 if [ -f "/system/etc/boot-image.prof" ] ; then
   PROFILING="--compiler-filter=speed-profile --profile-file=/system/etc/boot-image.prof"
-elif [ -f "/system/etc/preloaded-classes" ]; then
-  PROFILING="--image-classes=/system/etc/preloaded-classes"
 fi
 if [ -f "/system/etc/dirty-image-objects" ] ; then
   PROFILING="$PROFILING --dirty-image-objects=/system/etc/dirty-image-objects"
