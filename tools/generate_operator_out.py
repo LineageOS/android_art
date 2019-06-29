@@ -39,135 +39,146 @@ def Confused(filename, line_number, line):
 
 def ProcessFile(filename):
     lines = codecs.open(filename, 'r', 'utf8', 'replace').read().split('\n')
-    in_enum = False
-    is_enum_private = False
-    is_enum_class = False
-    line_number = 0
 
-    namespaces = []
-    enclosing_classes = []
+    class EnumLines:
+        def __init__(self, ns, ec):
+            self.namespaces = ns
+            self.enclosing_classes = ec
+            self.lines = []
 
-    for raw_line in lines:
-        line_number += 1
+    def generate_enum_lines(l):
+        line_number = 0
+        enum_lines = None
+        namespaces = []
+        enclosing_classes = []
 
-        if not in_enum:
-            # Is this the start of a new enum?
-            m = _ENUM_START_RE.search(raw_line)
+        for raw_line in l:
+            line_number += 1
+
+            if enum_lines is None:
+                # Is this the start of a new enum?
+                m = _ENUM_START_RE.search(raw_line)
+                if m:
+                    # Yes, so create new line list.
+                    enum_lines = EnumLines(namespaces[:], enclosing_classes[:])
+                    enum_lines.lines.append((raw_line, line_number))
+                    continue
+
+                # Is this the start or end of a namespace?
+                m = re.search(r'^namespace (\S+) \{', raw_line)
+                if m:
+                    namespaces.append(m.group(1))
+                    continue
+                m = re.search(r'^\}\s+// namespace', raw_line)
+                if m:
+                    namespaces = namespaces[0:len(namespaces) - 1]
+                    continue
+
+                # Is this the start or end of an enclosing class or struct?
+                m = re.search(
+                    r'^\s*(?:class|struct)(?: MANAGED)?(?: PACKED\([0-9]\))? (\S+).* \{', raw_line)
+                if m:
+                    enclosing_classes.append(m.group(1))
+                    continue
+
+                # End of class/struct -- be careful not to match "do { ... } while" constructs by accident
+                m = re.search(r'^\s*\}(\s+)?(while)?(.+)?;', raw_line)
+                if m and not m.group(2):
+                    enclosing_classes = enclosing_classes[0:len(enclosing_classes) - 1]
+                    continue
+
+                continue
+
+            # Is this the end of the current enum?
+            m = _ENUM_END_RE.search(raw_line)
             if m:
-                # Yes, so add an empty entry to _ENUMS for this enum.
-
-                # Except when it's private
-                if m.group(3) is not None:
-                    is_enum_private = True
-                else:
-                    is_enum_private = False
-                    is_enum_class = m.group(1) is not None
-                    enum_name = m.group(2)
-                    if len(enclosing_classes) > 0:
-                        enum_name = '::'.join(
-                            enclosing_classes) + '::' + enum_name
-                    _ENUMS[enum_name] = []
-                    _NAMESPACES[enum_name] = '::'.join(namespaces)
-                    _ENUM_CLASSES[enum_name] = is_enum_class
-                in_enum = True
+                if enum_lines is None:
+                    Confused(filename, line_number, raw_line)
+                yield enum_lines
+                enum_lines = None
                 continue
 
-            # Is this the start or end of a namespace?
-            m = re.search(r'^namespace (\S+) \{', raw_line)
-            if m:
-                namespaces.append(m.group(1))
-                continue
-            m = re.search(r'^\}\s+// namespace', raw_line)
-            if m:
-                namespaces = namespaces[0:len(namespaces) - 1]
-                continue
+            # Append the line
+            enum_lines.lines.append((raw_line, line_number))
 
-            # Is this the start or end of an enclosing class or struct?
-            m = re.search(
-                r'^\s*(?:class|struct)(?: MANAGED)?(?: PACKED\([0-9]\))? (\S+).* \{', raw_line)
-            if m:
-                enclosing_classes.append(m.group(1))
-                continue
-
-            # End of class/struct -- be careful not to match "do { ... } while" constructs by accident
-            m = re.search(r'^\s*\}(\s+)?(while)?(.+)?;', raw_line)
-            if m and not m.group(2):
-                enclosing_classes = enclosing_classes[0:len(
-                    enclosing_classes) - 1]
-                continue
-
+    for enum_lines in generate_enum_lines(lines):
+        m = _ENUM_START_RE.search(enum_lines.lines[0][0])
+        if m.group(3) is not None:
+            # Skip private enums.
             continue
 
-        # Is this the end of the current enum?
-        m = _ENUM_END_RE.search(raw_line)
-        if m:
-            if not in_enum:
+        # Add an empty entry to _ENUMS for this enum.
+        is_enum_class = m.group(1) is not None
+        enum_name = m.group(2)
+        if len(enum_lines.enclosing_classes) > 0:
+            enum_name = '::'.join(enum_lines.enclosing_classes) + '::' + enum_name
+        _ENUMS[enum_name] = []
+        _NAMESPACES[enum_name] = '::'.join(enum_lines.namespaces)
+        _ENUM_CLASSES[enum_name] = is_enum_class
+
+        def generate_non_empty_line(lines):
+            for raw_line, line_number in lines:
+                # Strip // comments.
+                line = re.sub(r'//.*', '', raw_line)
+                # Strip whitespace.
+                line = line.strip()
+                # Skip blank lines.
+                if len(line) == 0:
+                    continue
+
+                # The only useful thing in comments is the <<alternate text>> syntax for
+                # overriding the default enum value names. Pull that out...
+                enum_text = None
+                m_comment = re.search(r'// <<(.*?)>>', raw_line)
+                if m_comment:
+                    enum_text = m_comment.group(1)
+
+                yield (line, enum_text, raw_line, line_number)
+
+        for line, enum_text, raw_line, line_number in generate_non_empty_line(enum_lines.lines[1:]):
+            # Since we know we're in an enum type, and we're not looking at a comment
+            # or a blank line, this line should be the next enum value...
+            m = _ENUM_VALUE_RE.search(line)
+            if not m:
                 Confused(filename, line_number, raw_line)
-            in_enum = False
-            continue
+            enum_value = m.group(1)
 
-        if is_enum_private:
-            continue
+            # By default, we turn "kSomeValue" into "SomeValue".
+            if enum_text is None:
+                enum_text = enum_value
+                if enum_text.startswith('k'):
+                    enum_text = enum_text[1:]
 
-        # The only useful thing in comments is the <<alternate text>> syntax for
-        # overriding the default enum value names. Pull that out...
-        enum_text = None
-        m_comment = re.search(r'// <<(.*?)>>', raw_line)
-        if m_comment:
-            enum_text = m_comment.group(1)
-        # ...and then strip // comments.
-        line = re.sub(r'//.*', '', raw_line)
+            # Lose literal values because we don't care; turn "= 123, // blah" into ", // blah".
+            rest = m.group(2).strip()
+            m_literal = re.search(r'= (0x[0-9a-f]+|-?[0-9]+|\'.\')', rest)
+            if m_literal:
+                rest = rest[(len(m_literal.group(0))):]
 
-        # Strip whitespace.
-        line = line.strip()
+            # With "kSomeValue = kOtherValue," we take the original and skip later synonyms.
+            # TODO: check that the rhs is actually an existing value.
+            if rest.startswith('= k'):
+                continue
 
-        # Skip blank lines.
-        if len(line) == 0:
-            continue
+            # Remove any trailing comma and whitespace
+            if rest.startswith(','):
+                rest = rest[1:]
+            rest = rest.strip()
 
-        # Since we know we're in an enum type, and we're not looking at a comment
-        # or a blank line, this line should be the next enum value...
-        m = _ENUM_VALUE_RE.search(line)
-        if not m:
-            Confused(filename, line_number, raw_line)
-        enum_value = m.group(1)
+            # There shouldn't be anything left.
+            if len(rest):
+                sys.stderr.write('%s\n' % (rest))
+                Confused(filename, line_number, raw_line)
 
-        # By default, we turn "kSomeValue" into "SomeValue".
-        if enum_text is None:
-            enum_text = enum_value
-            if enum_text.startswith('k'):
-                enum_text = enum_text[1:]
+            # If the enum is scoped, we must prefix enum value with enum name (which is already prefixed
+            # by enclosing classes).
+            if is_enum_class:
+                enum_value = enum_name + '::' + enum_value
+            else:
+                if len(enum_lines.enclosing_classes) > 0:
+                    enum_value = '::'.join(enum_lines.enclosing_classes) + '::' + enum_value
 
-        # Lose literal values because we don't care; turn "= 123, // blah" into ", // blah".
-        rest = m.group(2).strip()
-        m_literal = re.search(r'= (0x[0-9a-f]+|-?[0-9]+|\'.\')', rest)
-        if m_literal:
-            rest = rest[(len(m_literal.group(0))):]
-
-        # With "kSomeValue = kOtherValue," we take the original and skip later synonyms.
-        # TODO: check that the rhs is actually an existing value.
-        if rest.startswith('= k'):
-            continue
-
-        # Remove any trailing comma and whitespace
-        if rest.startswith(','):
-            rest = rest[1:]
-        rest = rest.strip()
-
-        # There shouldn't be anything left.
-        if len(rest):
-            sys.stderr.write('%s\n' % (rest))
-            Confused(filename, line_number, raw_line)
-
-        # If the enum is scoped, we must prefix enum value with enum name (which is already prefixed
-        # by enclosing classes).
-        if is_enum_class:
-            enum_value = enum_name + '::' + enum_value
-        else:
-            if len(enclosing_classes) > 0:
-                enum_value = '::'.join(enclosing_classes) + '::' + enum_value
-
-        _ENUMS[enum_name].append((enum_value, enum_text))
+            _ENUMS[enum_name].append((enum_value, enum_text))
 
 
 def main():
