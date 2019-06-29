@@ -149,26 +149,27 @@ def ProcessFile(filename):
                 if enum_text.startswith('k'):
                     enum_text = enum_text[1:]
 
-            # Lose literal values because we don't care; turn "= 123, // blah" into ", // blah".
+            # Check that we understand the line (and hopefully do not parse incorrectly), or should
+            # filter.
             rest = m.group(2).strip()
-            m_literal = re.search(r'= (0x[0-9a-f]+|-?[0-9]+|\'.\')', rest)
-            if m_literal:
-                rest = rest[(len(m_literal.group(0))):]
 
             # With "kSomeValue = kOtherValue," we take the original and skip later synonyms.
             # TODO: check that the rhs is actually an existing value.
             if rest.startswith('= k'):
                 continue
 
-            # Remove any trailing comma and whitespace
-            if rest.startswith(','):
-                rest = rest[1:]
-            rest = rest.strip()
+            # Remove trailing comma.
+            if rest.endswith(','):
+                rest = rest[:-1]
 
-            # There shouldn't be anything left.
+            # We now expect rest to be empty, or an assignment to an "expression."
             if len(rest):
-                sys.stderr.write('%s\n' % (rest))
-                Confused(filename, line_number, raw_line)
+                # We want to lose the expression "= [exp]". As we do not have a real C parser, just
+                # assume anything without a comma is valid.
+                m_exp = re.match('= [^,]+$', rest)
+                if m_exp is None:
+                    sys.stderr.write('%s\n' % (rest))
+                    Confused(filename, line_number, raw_line)
 
             # If the enum is scoped, we must prefix enum value with enum name (which is already prefixed
             # by enclosing classes).
