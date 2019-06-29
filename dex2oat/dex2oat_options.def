@@ -54,8 +54,6 @@ DEX2OAT_OPTIONS_KEY (bool,                           Watchdog)
 DEX2OAT_OPTIONS_KEY (int,                            WatchdogTimeout)
 DEX2OAT_OPTIONS_KEY (unsigned int,                   Threads)
 DEX2OAT_OPTIONS_KEY (std::vector<std::string>,       ImageFilenames)
-DEX2OAT_OPTIONS_KEY (std::string,                    ImageClasses)
-DEX2OAT_OPTIONS_KEY (std::string,                    ImageClassesZip)
 DEX2OAT_OPTIONS_KEY (ImageHeader::StorageMode,       ImageFormat)
 DEX2OAT_OPTIONS_KEY (std::string,                    Passes)
 DEX2OAT_OPTIONS_KEY (std::string,                    Base)  // TODO: Hex string parsing.
