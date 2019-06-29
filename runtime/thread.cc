@@ -3273,7 +3273,7 @@ void Thread::ThrowNewWrappedException(const char* exception_class_descriptor,
       ++i;
     }
     ScopedLocalRef<jobject> ref(soa.Env(), soa.AddLocalReference<jobject>(exception.Get()));
-    InvokeWithJValues(soa, ref.get(), jni::EncodeArtMethod(exception_init_method), jv_args);
+    InvokeWithJValues(soa, ref.get(), exception_init_method, jv_args);
     if (LIKELY(!IsExceptionPending())) {
       SetException(exception.Get());
     }
@@ -4280,8 +4280,16 @@ ScopedExceptionStorage::ScopedExceptionStorage(art::Thread* self)
   self_->ClearException();
 }
 
+void ScopedExceptionStorage::SuppressOldException(const char* message) {
+  CHECK(self_->IsExceptionPending()) << *self_;
+  ObjPtr<mirror::Throwable> old_suppressed(excp_.Get());
+  excp_.Assign(self_->GetException());
+  LOG(WARNING) << message << "Suppressing old exception: " << old_suppressed->Dump();
+  self_->ClearException();
+}
+
 ScopedExceptionStorage::~ScopedExceptionStorage() {
-  CHECK(!self_->IsExceptionPending()) << self_;
+  CHECK(!self_->IsExceptionPending()) << *self_;
   if (!excp_.IsNull()) {
     self_->SetException(excp_.Get());
   }

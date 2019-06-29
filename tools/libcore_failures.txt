@@ -256,5 +256,15 @@
   result: EXEC_FAILED,
   modes: [host],
   names: ["libcore.android.system.OsTest#test_socketPing"]
+},
+{
+  description: "Test fails on host with: `/home/dalvik-prebuild/jaxen/xml/test/tests.xml: open failed: ENOENT (No such file or directory)`",
+  result: EXEC_FAILED,
+  names: ["libcore.xml.JaxenXPathTestSuite#suite"]
+},
+{
+  description: "Test fails on host with: `/home/dalvik-prebuild/OASIS/XSLT-Conformance-TC/TESTS/catalog.xml: open failed: ENOENT (No such file or directory)`",
+  result: EXEC_FAILED,
+  names: ["libcore.xml.XsltXPathConformanceTestSuite#suite"]
 }
 ]

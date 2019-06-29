@@ -58,6 +58,8 @@ class JitMemoryRegion {
         exec_end_(0),
         used_memory_for_code_(0),
         used_memory_for_data_(0),
+        data_pages_(),
+        writable_data_pages_(),
         exec_pages_(),
         non_exec_pages_(),
         data_mspace_(nullptr),
@@ -96,8 +98,25 @@ class JitMemoryRegion {
       REQUIRES(Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  void ResetWritableMappings() REQUIRES(Locks::jit_lock_) {
+    non_exec_pages_.ResetInForkedProcess();
+    writable_data_pages_.ResetInForkedProcess();
+    // Also clear the mspaces, which, in their implementation,
+    // point to the discarded mappings.
+    exec_mspace_ = nullptr;
+    data_mspace_ = nullptr;
+  }
+
+  bool IsValid() const NO_THREAD_SAFETY_ANALYSIS {
+    return exec_mspace_ != nullptr || data_mspace_ != nullptr;
+  }
+
   bool HasDualCodeMapping() const {
     return non_exec_pages_.IsValid();
+  }
+
+  bool HasDualDataMapping() const {
+    return writable_data_pages_.IsValid();
   }
 
   bool HasCodeMapping() const {
@@ -141,9 +160,6 @@ class JitMemoryRegion {
  private:
   template <typename T>
   T* TranslateAddress(T* src_ptr, const MemMap& src, const MemMap& dst) {
-    if (!HasDualCodeMapping()) {
-      return src_ptr;
-    }
     CHECK(src.HasAddress(src_ptr)) << reinterpret_cast<const void*>(src_ptr);
     const uint8_t* const raw_src_ptr = reinterpret_cast<const uint8_t*>(src_ptr);
     return reinterpret_cast<T*>(raw_src_ptr - src.Begin() + dst.Begin());
@@ -159,11 +175,39 @@ class JitMemoryRegion {
     }
   }
 
+  const MemMap* GetWritableDataMapping() const {
+    if (HasDualDataMapping()) {
+      return &writable_data_pages_;
+    } else {
+      return &data_pages_;
+    }
+  }
+
+  template <typename T> T* GetNonWritableDataAddress(T* src_ptr) {
+    if (!HasDualDataMapping()) {
+      return src_ptr;
+    }
+    return TranslateAddress(src_ptr, writable_data_pages_, data_pages_);
+  }
+
+  template <typename T> T* GetWritableDataAddress(T* src_ptr) {
+    if (!HasDualDataMapping()) {
+      return src_ptr;
+    }
+    return TranslateAddress(src_ptr, data_pages_, writable_data_pages_);
+  }
+
   template <typename T> T* GetExecutableAddress(T* src_ptr) {
+    if (!HasDualCodeMapping()) {
+      return src_ptr;
+    }
     return TranslateAddress(src_ptr, non_exec_pages_, exec_pages_);
   }
 
   template <typename T> T* GetNonExecutableAddress(T* src_ptr) {
+    if (!HasDualCodeMapping()) {
+      return src_ptr;
+    }
     return TranslateAddress(src_ptr, exec_pages_, non_exec_pages_);
   }
 
@@ -193,6 +237,10 @@ class JitMemoryRegion {
 
   // Mem map which holds data (stack maps and profiling info).
   MemMap data_pages_;
+
+  // Mem map which holds data with writable permission. Only valid for dual view
+  // JIT when this is the writable view and data_pages_ is the readable view.
+  MemMap writable_data_pages_;
 
   // Mem map which holds code and has executable permission.
   MemMap exec_pages_;

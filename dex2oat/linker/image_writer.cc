@@ -2220,8 +2220,6 @@ class ImageWriter::LayoutHelper {
   void ProcessRoots(VariableSizedHandleScope* handles) REQUIRES_SHARED(Locks::mutator_lock_);
 
   void ProcessWorkQueue() REQUIRES_SHARED(Locks::mutator_lock_);
-  void VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   void VerifyImageBinSlotsAssigned() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -2234,6 +2232,8 @@ class ImageWriter::LayoutHelper {
 
   using WorkQueue = std::deque<std::pair<ObjPtr<mirror::Object>, size_t>>;
 
+  void VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   bool TryAssignBinSlot(ObjPtr<mirror::Object> obj, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -2469,20 +2469,6 @@ void ImageWriter::LayoutHelper::ProcessWorkQueue() {
   }
 }
 
-void ImageWriter::LayoutHelper::VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index) {
-  size_t old_work_queue_size = work_queue_.size();
-  VisitReferencesVisitor visitor(this, oat_index);
-  // Walk references and assign bin slots for them.
-  obj->VisitReferences</*kVisitNativeRoots=*/ true, kVerifyNone, kWithoutReadBarrier>(
-      visitor,
-      visitor);
-  // Put the added references in the queue in the order in which they were added.
-  // The visitor just pushes them to the front as it visits them.
-  DCHECK_LE(old_work_queue_size, work_queue_.size());
-  size_t num_added = work_queue_.size() - old_work_queue_size;
-  std::reverse(work_queue_.begin(), work_queue_.begin() + num_added);
-}
-
 void ImageWriter::LayoutHelper::VerifyImageBinSlotsAssigned() {
   std::vector<mirror::Object*> carveout;
   if (image_writer_->compiler_options_.IsAppImage()) {
@@ -2512,8 +2498,32 @@ void ImageWriter::LayoutHelper::VerifyImageBinSlotsAssigned() {
   auto ensure_bin_slots_assigned = [&](mirror::Object* obj)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     if (!image_writer_->IsInBootImage(obj)) {
-      CHECK(image_writer_->IsImageBinSlotAssigned(obj) || ContainsElement(carveout, obj))
-          << mirror::Object::PrettyTypeOf(obj) << " " << obj;
+      if (!UNLIKELY(image_writer_->IsImageBinSlotAssigned(obj))) {
+        // Ignore the `carveout` objects.
+        if (ContainsElement(carveout, obj)) {
+          return;
+        }
+        // Ignore finalizer references for the dalvik.system.DexFile objects referenced by
+        // the app class loader.
+        if (obj->IsFinalizerReferenceInstance()) {
+          ArtField* ref_field =
+              obj->GetClass()->FindInstanceField("referent", "Ljava/lang/Object;");
+          CHECK(ref_field != nullptr);
+          ObjPtr<mirror::Object> ref = ref_field->GetObject(obj);
+          CHECK(ref != nullptr);
+          CHECK(image_writer_->IsImageBinSlotAssigned(ref.Ptr()));
+          ObjPtr<mirror::Class> klass = ref->GetClass();
+          CHECK(klass == WellKnownClasses::ToClass(WellKnownClasses::dalvik_system_DexFile));
+          // Note: The app class loader is used only for checking against the runtime
+          // class loader, the dex file cookie is cleared and therefore we do not need
+          // to run the finalizer even if we implement app image objects collection.
+          ArtField* field = jni::DecodeArtField(WellKnownClasses::dalvik_system_DexFile_cookie);
+          CHECK(field->GetObject(ref) == nullptr);
+          return;
+        }
+        LOG(FATAL) << "Image object without assigned bin slot: "
+            << mirror::Object::PrettyTypeOf(obj) << " " << obj;
+      }
     }
   };
   Runtime::Current()->GetHeap()->VisitObjects(ensure_bin_slots_assigned);
@@ -2621,6 +2631,20 @@ void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {
   VLOG(image) << "Space wasted for region alignment " << image_writer_->region_alignment_wasted_;
 }
 
+void ImageWriter::LayoutHelper::VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index) {
+  size_t old_work_queue_size = work_queue_.size();
+  VisitReferencesVisitor visitor(this, oat_index);
+  // Walk references and assign bin slots for them.
+  obj->VisitReferences</*kVisitNativeRoots=*/ true, kVerifyNone, kWithoutReadBarrier>(
+      visitor,
+      visitor);
+  // Put the added references in the queue in the order in which they were added.
+  // The visitor just pushes them to the front as it visits them.
+  DCHECK_LE(old_work_queue_size, work_queue_.size());
+  size_t num_added = work_queue_.size() - old_work_queue_size;
+  std::reverse(work_queue_.begin(), work_queue_.begin() + num_added);
+}
+
 bool ImageWriter::LayoutHelper::TryAssignBinSlot(ObjPtr<mirror::Object> obj, size_t oat_index) {
   if (obj == nullptr || image_writer_->IsInBootImage(obj.Ptr())) {
     // Object is null or already in the image, there is no work to do.
@@ -2701,25 +2725,6 @@ void ImageWriter::CalculateNewObjectOffsets() {
   LayoutHelper layout_helper(this);
   layout_helper.ProcessDexFileObjects(self);
   layout_helper.ProcessRoots(&handles);
-
-  // For app images, there may be objects that are only held live by the boot image. One
-  // example is finalizer references. Forward these objects so that EnsureBinSlotAssignedCallback
-  // does not fail any checks.
-  if (compiler_options_.IsAppImage()) {
-    for (gc::space::ImageSpace* space : heap->GetBootImageSpaces()) {
-      DCHECK(space->IsImageSpace());
-      gc::accounting::ContinuousSpaceBitmap* live_bitmap = space->GetLiveBitmap();
-      live_bitmap->VisitMarkedRange(reinterpret_cast<uintptr_t>(space->Begin()),
-                                    reinterpret_cast<uintptr_t>(space->Limit()),
-                                    [&layout_helper](mirror::Object* obj)
-          REQUIRES_SHARED(Locks::mutator_lock_) {
-        // Visit all references and try to assign bin slots for them.
-        layout_helper.VisitReferences(obj, GetDefaultOatIndex());
-      });
-    }
-    // Process the work queue in case anything was added in VisitReferences().
-    layout_helper.ProcessWorkQueue();
-  }
 
   // Verify that all objects have assigned image bin slots.
   layout_helper.VerifyImageBinSlotsAssigned();

@@ -18,9 +18,9 @@
 #define ART_LIBDEXFILE_DEX_DEX_FILE_VERIFIER_H_
 
 #include <limits>
-#include <unordered_set>
 
 #include "base/hash_map.h"
+#include "base/hash_set.h"
 #include "base/safe_map.h"
 #include "class_accessor.h"
 #include "dex_file.h"
@@ -253,7 +253,7 @@ class DexFileVerifier {
   std::string failure_reason_;
 
   // Set of type ids for which there are ClassDef elements in the dex file.
-  std::unordered_set<decltype(dex::ClassDef::class_idx_)> defined_classes_;
+  HashSet<decltype(dex::ClassDef::class_idx_)> defined_classes_;
 
   // Cached string indices for "interesting" entries wrt/ method names. Will be populated by
   // FindStringRangesForMethodNames (which is automatically called before verifying the

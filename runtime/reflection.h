@@ -60,27 +60,39 @@ ALWAYS_INLINE bool ConvertPrimitiveValue(bool unbox_for_result,
                                          JValue* dst)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+// Invokes the given method (either an ArtMethod or a jmethodID) with direct/static semantics.
+template<typename MethodType>
 JValue InvokeWithVarArgs(const ScopedObjectAccessAlreadyRunnable& soa,
                          jobject obj,
-                         jmethodID mid,
+                         MethodType mid,
                          va_list args)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+// Invokes the given method (either an ArtMethod or a jmethodID) with reflection semantics.
+template<typename MethodType>
 JValue InvokeWithJValues(const ScopedObjectAccessAlreadyRunnable& soa,
                          jobject obj,
-                         jmethodID mid,
+                         MethodType mid,
                          const jvalue* args)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+// Invokes the given method (either an ArtMethod or a jmethodID) with virtual/interface semantics.
+// Note this will perform lookup based on the 'obj' to determine which implementation of the given
+// method should be invoked.
+template<typename MethodType>
 JValue InvokeVirtualOrInterfaceWithJValues(const ScopedObjectAccessAlreadyRunnable& soa,
                                            jobject obj,
-                                           jmethodID mid,
+                                           MethodType mid,
                                            const jvalue* args)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+// Invokes the given method (either an ArtMethod or a jmethodID) with virtual/interface semantics.
+// Note this will perform lookup based on the 'obj' to determine which implementation of the given
+// method should be invoked.
+template<typename MethodType>
 JValue InvokeVirtualOrInterfaceWithVarArgs(const ScopedObjectAccessAlreadyRunnable& soa,
                                            jobject obj,
-                                           jmethodID mid,
+                                           MethodType mid,
                                            va_list args)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
