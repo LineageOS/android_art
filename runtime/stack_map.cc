@@ -27,32 +27,64 @@
 
 namespace art {
 
-CodeInfo::CodeInfo(const OatQuickMethodHeader* header, DecodeFlags flags)
-  : CodeInfo(header->GetOptimizedCodeInfoPtr(), flags) {
-}
-
-void CodeInfo::Decode(const uint8_t* data, DecodeFlags flags) {
+// The callback is used to inform the caller about memory bounds of the bit-tables.
+template<typename DecodeCallback>
+CodeInfo::CodeInfo(const uint8_t* data, size_t* num_read_bits, DecodeCallback callback) {
   BitMemoryReader reader(data);
   std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
   ForEachHeaderField([this, &header](size_t i, auto member_pointer) {
     this->*member_pointer = header[i];
   });
-  ForEachBitTableField([this, &reader](size_t i, auto member_pointer) {
+  ForEachBitTableField([this, &reader, &callback](size_t i, auto member_pointer) {
     auto& table = this->*member_pointer;
     if (LIKELY(HasBitTable(i))) {
       if (UNLIKELY(IsBitTableDeduped(i))) {
         ssize_t bit_offset = reader.NumberOfReadBits() - reader.ReadVarint();
         BitMemoryReader reader2(reader.data(), bit_offset);  // The offset is negative.
         table.Decode(reader2);
+        callback(i, &table, reader2.GetReadRegion());
       } else {
+        ssize_t bit_offset = reader.NumberOfReadBits();
         table.Decode(reader);
+        callback(i, &table, reader.GetReadRegion().Subregion(bit_offset));
       }
     }
-  }, flags);
-  size_in_bits_ = reader.NumberOfReadBits();
-  if (flags == AllTables) {
-    DCHECK_EQ(HasInlineInfo(data), HasInlineInfo());
+  });
+  if (num_read_bits != nullptr) {
+    *num_read_bits = reader.NumberOfReadBits();
   }
+}
+
+CodeInfo::CodeInfo(const uint8_t* data, size_t* num_read_bits)
+    : CodeInfo(data, num_read_bits, [](size_t, auto*, BitMemoryRegion){}) {}
+
+CodeInfo::CodeInfo(const OatQuickMethodHeader* header)
+    : CodeInfo(header->GetOptimizedCodeInfoPtr()) {}
+
+QuickMethodFrameInfo CodeInfo::DecodeFrameInfo(const uint8_t* data) {
+  CodeInfo code_info(data);
+  return QuickMethodFrameInfo(code_info.packed_frame_size_ * kStackAlignment,
+                              code_info.core_spill_mask_,
+                              code_info.fp_spill_mask_);
+}
+
+CodeInfo CodeInfo::DecodeGcMasksOnly(const OatQuickMethodHeader* header) {
+  CodeInfo code_info(header->GetOptimizedCodeInfoPtr());
+  CodeInfo copy;  // Copy to dead-code-eliminate all fields that we do not need.
+  copy.stack_maps_ = code_info.stack_maps_;
+  copy.register_masks_ = code_info.register_masks_;
+  copy.stack_masks_ = code_info.stack_masks_;
+  return copy;
+}
+
+CodeInfo CodeInfo::DecodeInlineInfoOnly(const OatQuickMethodHeader* header) {
+  CodeInfo code_info(header->GetOptimizedCodeInfoPtr());
+  CodeInfo copy;  // Copy to dead-code-eliminate all fields that we do not need.
+  copy.number_of_dex_registers_ = code_info.number_of_dex_registers_;
+  copy.stack_maps_ = code_info.stack_maps_;
+  copy.inline_infos_ = code_info.inline_infos_;
+  copy.method_infos_ = code_info.method_infos_;
+  return copy;
 }
 
 size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
@@ -64,27 +96,16 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
 
   // Read the existing code info and find (and keep) dedup-map iterator for each table.
   // The iterator stores BitMemoryRegion and bit_offset of previous identical BitTable.
-  BitMemoryReader reader(code_info_data);
-  CodeInfo code_info;  // Temporary storage for decoded data.
-  std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
-  ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
-    code_info.*member_pointer = header[i];
-  });
   std::map<BitMemoryRegion, uint32_t, BitMemoryRegion::Less>::iterator it[kNumBitTables];
-  ForEachBitTableField([this, &reader, &code_info, &it](size_t i, auto member_pointer) {
-    DCHECK(!code_info.IsBitTableDeduped(i));
-    if (code_info.HasBitTable(i)) {
-      size_t bit_table_start = reader.NumberOfReadBits();
-      (code_info.*member_pointer).Decode(reader);
-      BitMemoryRegion region = reader.GetReadRegion().Subregion(bit_table_start);
-      it[i] = dedupe_map_.emplace(region, /* default bit_offset */ 0).first;
-      if (it[i]->second != 0 && region.size_in_bits() > kMinDedupSize) {  // Seen before and large?
-        code_info.SetBitTableDeduped(i);  // Mark as deduped before we write header.
-      }
+  CodeInfo code_info(code_info_data, nullptr, [&](size_t i, auto*, BitMemoryRegion region) {
+    it[i] = dedupe_map_.emplace(region, /*bit_offset=*/0).first;
+    if (it[i]->second != 0 && region.size_in_bits() > kMinDedupSize) {  // Seen before and large?
+      code_info.SetBitTableDeduped(i);  // Mark as deduped before we write header.
     }
   });
 
   // Write the code info back, but replace deduped tables with relative offsets.
+  std::array<uint32_t, kNumHeaders> header;
   ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
     header[i] = code_info.*member_pointer;
   });
@@ -119,17 +140,15 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
   return deduped_offset;
 }
 
-BitTable<StackMap>::const_iterator CodeInfo::BinarySearchNativePc(uint32_t packed_pc) const {
-  return std::partition_point(
+StackMap CodeInfo::GetStackMapForNativePcOffset(uint32_t pc, InstructionSet isa) const {
+  uint32_t packed_pc = StackMap::PackNativePc(pc, isa);
+  // Binary search.  All catch stack maps are stored separately at the end.
+  auto it = std::partition_point(
       stack_maps_.begin(),
       stack_maps_.end(),
       [packed_pc](const StackMap& sm) {
         return sm.GetPackedNativePc() < packed_pc && sm.GetKind() != StackMap::Kind::Catch;
       });
-}
-
-StackMap CodeInfo::GetStackMapForNativePcOffset(uint32_t pc, InstructionSet isa) const {
-  auto it = BinarySearchNativePc(StackMap::PackNativePc(pc, isa));
   // Start at the lower bound and iterate over all stack maps with the given native pc.
   for (; it != stack_maps_.end() && (*it).GetNativePcOffset(isa) == pc; ++it) {
     StackMap::Kind kind = static_cast<StackMap::Kind>((*it).GetKind());
@@ -207,34 +226,23 @@ void CodeInfo::DecodeDexRegisterMap(uint32_t stack_map_index,
 void CodeInfo::CollectSizeStats(const uint8_t* code_info_data, /*out*/ Stats* parent) {
   Stats* codeinfo_stats = parent->Child("CodeInfo");
   BitMemoryReader reader(code_info_data);
-  CodeInfo code_info;  // Temporary storage for decoded tables.
-  std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
-  ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
-    code_info.*member_pointer = header[i];
-  });
+  reader.ReadInterleavedVarints<kNumHeaders>();
   codeinfo_stats->Child("Header")->AddBits(reader.NumberOfReadBits());
-  ForEachBitTableField([codeinfo_stats, &reader, &code_info](size_t i, auto member_pointer) {
-    auto& table = code_info.*member_pointer;
-    size_t bit_offset = reader.NumberOfReadBits();
-    if (code_info.HasBitTable(i)) {
-      if (code_info.IsBitTableDeduped(i)) {
-        reader.ReadVarint();
-        codeinfo_stats->Child("DedupeOffset")->AddBits(reader.NumberOfReadBits() - bit_offset);
-      } else {
-        table.Decode(reader);
-        Stats* table_stats = codeinfo_stats->Child(table.GetName());
-        table_stats->AddBits(reader.NumberOfReadBits() - bit_offset);
-        const char* const* column_names = table.GetColumnNames();
-        for (size_t c = 0; c < table.NumColumns(); c++) {
-          if (table.NumColumnBits(c) > 0) {
-            Stats* column_stats = table_stats->Child(column_names[c]);
-            column_stats->AddBits(table.NumRows() * table.NumColumnBits(c), table.NumRows());
-          }
+  size_t num_bits;
+  CodeInfo code_info(code_info_data, &num_bits, [&](size_t i, auto* table, BitMemoryRegion region) {
+    if (!code_info.IsBitTableDeduped(i)) {
+      Stats* table_stats = codeinfo_stats->Child(table->GetName());
+      table_stats->AddBits(region.size_in_bits());
+      const char* const* column_names = table->GetColumnNames();
+      for (size_t c = 0; c < table->NumColumns(); c++) {
+        if (table->NumColumnBits(c) > 0) {
+          Stats* column_stats = table_stats->Child(column_names[c]);
+          column_stats->AddBits(table->NumRows() * table->NumColumnBits(c), table->NumRows());
         }
       }
     }
   });
-  codeinfo_stats->AddBytes(BitsToBytesRoundUp(reader.NumberOfReadBits()));
+  codeinfo_stats->AddBytes(BitsToBytesRoundUp(num_bits));
 }
 
 void DexRegisterMap::Dump(VariableIndentationOutputStream* vios) const {
@@ -254,7 +262,7 @@ void CodeInfo::Dump(VariableIndentationOutputStream* vios,
                     uint32_t code_offset,
                     bool verbose,
                     InstructionSet instruction_set) const {
-  vios->Stream() << "CodeInfo BitSize=" << size_in_bits_
+  vios->Stream() << "CodeInfo "
     << " FrameSize:" << packed_frame_size_ * kStackAlignment
     << " CoreSpillMask:" << std::hex << core_spill_mask_
     << " FpSpillMask:" << std::hex << fp_spill_mask_
