@@ -546,10 +546,24 @@ bool JitMemoryRegion::ProtectZygoteMemory(int fd, std::string* error_msg) {
 
 #else
 
-// When running on non-bionic configuration, this is not supported.
-int JitMemoryRegion::CreateZygoteMemory(size_t capacity ATTRIBUTE_UNUSED,
-                                        std::string* error_msg ATTRIBUTE_UNUSED) {
-  return -1;
+int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg) {
+  // To simplify host building, we don't rely on the latest memfd features.
+  LOG(WARNING) << "Returning un-sealable region on non-bionic";
+  static const char* kRegionName = "/jit-zygote-cache";
+  int fd = art::memfd_create(kRegionName, 0);
+  if (fd == -1) {
+    std::ostringstream oss;
+    oss << "Failed to create zygote mapping: " << strerror(errno);
+    *error_msg = oss.str();
+    return -1;
+  }
+  if (ftruncate(fd, capacity) != 0) {
+    std::ostringstream oss;
+    oss << "Failed to create zygote mapping: " << strerror(errno);
+    *error_msg = oss.str();
+    return -1;
+  }
+  return fd;
 }
 
 bool JitMemoryRegion::ProtectZygoteMemory(int fd ATTRIBUTE_UNUSED,
