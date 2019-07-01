@@ -486,31 +486,10 @@ void JitMemoryRegion::FreeData(uint8_t* data) {
 
 #if defined(__BIONIC__)
 
-static bool IsSealFutureWriteSupportedInternal() {
-  unique_fd fd(art::memfd_create("test_android_memfd", MFD_ALLOW_SEALING));
-  if (fd == -1) {
-    LOG(INFO) << "memfd_create failed: " << strerror(errno) << ", no memfd support.";
-    return false;
-  }
-
-  if (fcntl(fd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE) == -1) {
-    LOG(INFO) << "fcntl(F_ADD_SEALS) failed: " << strerror(errno) << ", no memfd support.";
-    return false;
-  }
-
-  LOG(INFO) << "Using memfd for future sealing";
-  return true;
-}
-
-static bool IsSealFutureWriteSupported() {
-  static bool is_seal_future_write_supported = IsSealFutureWriteSupportedInternal();
-  return is_seal_future_write_supported;
-}
-
 int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg) {
   /* Check if kernel support exists, otherwise fall back to ashmem */
   static const char* kRegionName = "/jit-zygote-cache";
-  if (IsSealFutureWriteSupported()) {
+  if (art::IsSealFutureWriteSupported()) {
     int fd = art::memfd_create(kRegionName, MFD_ALLOW_SEALING);
     if (fd == -1) {
       std::ostringstream oss;
@@ -544,7 +523,7 @@ int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg)
 }
 
 bool JitMemoryRegion::ProtectZygoteMemory(int fd, std::string* error_msg) {
-  if (IsSealFutureWriteSupported()) {
+  if (art::IsSealFutureWriteSupported()) {
     if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL | F_SEAL_FUTURE_WRITE)
             == -1) {
       std::ostringstream oss;
