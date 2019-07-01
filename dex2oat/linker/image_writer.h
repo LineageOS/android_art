@@ -388,6 +388,9 @@ class ImageWriter final {
     // StringFieldOffsets section.
     size_t num_string_references_ = 0;
 
+    // Offsets into the image that indicate where string references are recorded.
+    std::vector<AppImageReferenceOffsetInfo> string_reference_offsets_;
+
     // Intern table associated with this image for serialization.
     std::unique_ptr<InternTable> intern_table_;
 
@@ -400,12 +403,11 @@ class ImageWriter final {
   };
 
   // We use the lock word to store the offset of the object in the image.
-  size_t GetImageOffset(mirror::Object* object) const REQUIRES_SHARED(Locks::mutator_lock_);
   size_t GetImageOffset(mirror::Object* object, size_t oat_index) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   void PrepareDexCacheArraySlots() REQUIRES_SHARED(Locks::mutator_lock_);
-  void AssignImageBinSlot(mirror::Object* object, size_t oat_index)
+  Bin AssignImageBinSlot(mirror::Object* object, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -574,63 +576,6 @@ class ImageWriter final {
                                   std::unordered_set<mirror::Object*>* visited)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  /*
-   * This type holds the information necessary for calculating
-   * AppImageReferenceOffsetInfo values after the object relocations have been
-   * computed.
-   *
-   * The first element will always be a pointer to a managed object.  If the
-   * pointer has been tagged (testable with HasDexCacheNativeRefTag) it
-   * indicates that the referenced object is a DexCache object that requires
-   * special handling during loading and the second element has no meaningful
-   * value.  If the pointer isn't tagged then the second element is an
-   * object-relative offset to a field containing a string reference.
-   *
-   * Note that it is possible for an untagged DexCache pointer to occur in the
-   * first position if it has a managed reference that needs to be updated.
-   *
-   * TODO (chriswailes): Add a note indicating the source line where we ensure
-   * that no moving garbage collection will occur.
-   *
-   * TODO (chriswailes): Replace with std::variant once ART is building with
-   * C++17
-   */
-  typedef std::pair<uintptr_t, uint32_t> HeapReferencePointerInfo;
-
-  /*
-   * Collects the info necessary for calculating image offsets to string field
-   * later.
-   *
-   * This function is used when constructing AppImages.  Because AppImages
-   * contain strings that must be interned we need to visit references to these
-   * strings when the AppImage is loaded and either insert them into the
-   * runtime intern table or replace the existing reference with a reference
-   * to the interned strings.
-   *
-   * To speed up the interning of strings when the AppImage is loaded we include
-   * a list of offsets to string references in the AppImage.  These are then
-   * iterated over at load time and fixed up.
-   *
-   * To record the offsets we first have to count the number of string
-   * references that will be included in the AppImage.  This allows use to both
-   * allocate enough memory for soring the offsets and correctly calculate the
-   * offsets of various objects into the image.  Once the image offset
-   * calculations are done for managed objects the reference object/offset pairs
-   * are translated to image offsets.  The CopyMetadata function then copies
-   * these offsets into the image.
-   */
-  std::vector<HeapReferencePointerInfo> CollectStringReferenceInfo() const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  /*
-   * Ensures that assumptions about native GC roots and AppImages hold.
-   *
-   * This function verifies the following condition(s):
-   *   - Native references to managed strings are only reachable through DexCache
-   *     objects
-   */
-  void VerifyNativeGCRootInvariants() const REQUIRES_SHARED(Locks::mutator_lock_);
-
   bool IsMultiImage() const {
     return image_infos_.size() > 1;
   }
@@ -658,11 +603,6 @@ class ImageWriter final {
   // Location of where the temporary copy of the object currently is.
   template <typename T>
   T* NativeCopyLocation(T* obj) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Return true if `obj` belongs to the image we're writing.
-  // For a boot image, this is true for all objects.
-  // For an app image, boot image objects and boot class path dex caches are excluded.
-  bool IsImageObject(ObjPtr<mirror::Object> obj) const REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Return true if `dex_cache` belongs to the image we're writing.
   // For a boot image, this is true for all dex caches.
@@ -770,9 +710,6 @@ class ImageWriter final {
   // Boot image live objects, null for app image.
   mirror::ObjectArray<mirror::Object>* boot_image_live_objects_;
 
-  // Offsets into the image that indicate where string references are recorded.
-  std::vector<AppImageReferenceOffsetInfo> string_reference_offsets_;
-
   // Which mode the image is stored as, see image.h
   const ImageHeader::StorageMode image_storage_mode_;
 
@@ -800,17 +737,6 @@ class ImageWriter final {
   class PruneClassesVisitor;
   class PruneClassLoaderClassesVisitor;
   class PruneObjectReferenceVisitor;
-
-  /*
-   * A visitor class for extracting object/offset pairs.
-   *
-   * This visitor walks the fields of an object and extracts object/offset pairs
-   * that are later translated to image offsets.  This visitor is only
-   * responsible for extracting info for Java references.  Native references to
-   * Java strings are handled in the wrapper function
-   * CollectStringReferenceInfo().
-   */
-  class CollectStringReferenceVisitor;
 
   // A visitor used by the VerifyNativeGCRootInvariants() function.
   class NativeGCRootInvariantVisitor;
