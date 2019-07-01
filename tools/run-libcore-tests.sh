@@ -86,6 +86,7 @@ use_jit=true
 working_packages=("libcore.android.system"
                   "libcore.build"
                   "libcore.dalvik.system"
+                  "libcore.java.awt"
                   "libcore.java.lang"
                   "libcore.java.math"
                   "libcore.java.text"
