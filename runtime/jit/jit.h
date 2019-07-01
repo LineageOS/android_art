@@ -326,7 +326,8 @@ class Jit {
 
   // Called by the compiler to know whether it can directly encode the
   // method/class/string.
-  bool CanEncodeMethod(ArtMethod* method, bool is_for_shared_region) const;
+  bool CanEncodeMethod(ArtMethod* method, bool is_for_shared_region) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
   bool CanEncodeClass(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const
       REQUIRES_SHARED(Locks::mutator_lock_);
   bool CanEncodeString(ObjPtr<mirror::String> string, bool is_for_shared_region) const
