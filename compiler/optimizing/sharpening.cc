@@ -100,6 +100,7 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
     }
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
   } else if (Runtime::Current()->UseJitCompilation()) {
+    ScopedObjectAccess soa(Thread::Current());
     if (Runtime::Current()->GetJit()->CanEncodeMethod(
             callee,
             codegen->GetGraph()->IsCompilingForSharedJitCode())) {

@@ -1073,30 +1073,33 @@ void Jit::PostZygoteFork() {
   thread_pool_->CreateThreads();
 }
 
-bool Jit::CanEncodeMethod(ArtMethod* method ATTRIBUTE_UNUSED,
-                          bool is_for_shared_region ATTRIBUTE_UNUSED) const {
-  // TODO: For shared region, we should only encode a method of a class
-  // allocated before any fork.
-  return true;
+bool Jit::CanEncodeMethod(ArtMethod* method, bool is_for_shared_region) const {
+  return !is_for_shared_region ||
+      Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(method->GetDeclaringClass());
 }
 
 bool Jit::CanEncodeClass(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const {
-  // TODO: For shared region, we should only encode a non-moving class allocated
-  // before any fork.
-  return !is_for_shared_region || !Runtime::Current()->GetHeap()->IsMovableObject(cls);
+  return !is_for_shared_region || Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(cls);
 }
 
 bool Jit::CanEncodeString(ObjPtr<mirror::String> string, bool is_for_shared_region) const {
-  // TODO: For shared region, we should only encode a non-moving string allocated
-  // before any fork.
-  return !is_for_shared_region || !Runtime::Current()->GetHeap()->IsMovableObject(string);
+  return !is_for_shared_region || Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(string);
 }
 
-bool Jit::CanAssumeInitialized(ObjPtr<mirror::Class> cls,
-                               bool is_for_shared_region ATTRIBUTE_UNUSED) const {
-  // TODO: For shared region, we should assume initialized if the class is initialized
-  // before any fork.
-  return cls->IsInitialized();
+bool Jit::CanAssumeInitialized(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const {
+  if (!is_for_shared_region) {
+    return cls->IsInitialized();
+  } else {
+    // Look up the class status in the oat file.
+    const DexFile& dex_file = *cls->GetDexCache()->GetDexFile();
+    const OatDexFile* oat_dex_file = dex_file.GetOatDexFile();
+    // In case we run without an image there won't be a backing oat file.
+    if (oat_dex_file == nullptr || oat_dex_file->GetOatFile() == nullptr) {
+      return false;
+    }
+    uint16_t class_def_index = cls->GetDexClassDefIndex();
+    return oat_dex_file->GetOatClass(class_def_index).GetStatus() >= ClassStatus::kInitialized;
+  }
 }
 
 }  // namespace jit
