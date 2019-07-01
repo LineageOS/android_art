@@ -205,53 +205,6 @@ ObjPtr<mirror::ClassLoader> ImageWriter::GetAppClassLoader() const
       : nullptr;
 }
 
-bool ImageWriter::IsImageObject(ObjPtr<mirror::Object> obj) const {
-  // For boot image, we keep all objects remaining after the GC in PrepareImageAddressSpace().
-  if (compiler_options_.IsBootImage()) {
-    return true;
-  }
-  // Objects already in the boot image do not belong to the image being written.
-  if (IsInBootImage(obj.Ptr())) {
-    return false;
-  }
-  // DexCaches for the boot class path components that are not a part of the boot image
-  // cannot be garbage collected in PrepareImageAddressSpace() but we do not want to
-  // include them in the app image. So make sure we include only the app DexCaches.
-  if (obj->IsDexCache() &&
-      !ContainsElement(compiler_options_.GetDexFilesForOatFile(),
-                       obj->AsDexCache()->GetDexFile())) {
-    return false;
-  }
-  // Exclude also dex_cache->GetLocation() for those dex caches, unless some image dex cache
-  // has the same location (this happens for tests).
-  // FIXME: Do it some other way, this is broken if a class initializer explicitly interns
-  // the location string and stores it in a static field. TODO: CollectStringReferenceInfo().
-  // We could try and restrict IsImageObject() to the LayoutHelper, make explicit exclusion
-  // in VerifyImageBinSlotsAssigned() and use IsImageBinSlotAssigned() for all checks after
-  // the layout.
-  if (obj->IsString()) {
-    Thread* self = Thread::Current();
-    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
-    ReaderMutexLock mu(self, *Locks::dex_lock_);
-    bool non_image_dex_cache_found = false;
-    for (const ClassLinker::DexCacheData& data : class_linker->GetDexCachesData()) {
-      ObjPtr<mirror::DexCache> dex_cache =
-          ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data.weak_root));
-      if (dex_cache == nullptr) {
-        continue;
-      }
-      if (dex_cache->GetLocation() == obj) {
-        if (ContainsElement(compiler_options_.GetDexFilesForOatFile(), dex_cache->GetDexFile())) {
-          return true;  // Image dex cache location.
-        }
-        non_image_dex_cache_found = true;
-      }
-    }
-    return !non_image_dex_cache_found;
-  }
-  return true;
-}
-
 bool ImageWriter::IsImageDexCache(ObjPtr<mirror::DexCache> dex_cache) const {
   // For boot image, we keep all dex caches.
   if (compiler_options_.IsBootImage()) {
@@ -369,24 +322,6 @@ bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
     }
   }
 
-  // Used to store information that will later be used to calculate image
-  // offsets to string references in the AppImage.
-  std::vector<HeapReferencePointerInfo> string_ref_info;
-  if (ClassLinker::kAppImageMayContainStrings && compiler_options_.IsAppImage()) {
-    // Count the number of string fields so we can allocate the appropriate
-    // amount of space in the image section.
-    TimingLogger::ScopedTiming t("AppImage:CollectStringReferenceInfo", timings);
-    ScopedObjectAccess soa(self);
-
-    if (kIsDebugBuild) {
-      VerifyNativeGCRootInvariants();
-      CHECK_EQ(image_infos_.size(), 1u);
-    }
-
-    string_ref_info = CollectStringReferenceInfo();
-    image_infos_.back().num_string_references_ = string_ref_info.size();
-  }
-
   {
     TimingLogger::ScopedTiming t("CalculateNewObjectOffsets", timings);
     ScopedObjectAccess soa(self);
@@ -414,317 +349,10 @@ bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
     VLOG(compiler) << "Dex2Oat:AppImage:classCount = " << app_image_class_count;
   }
 
-  if (ClassLinker::kAppImageMayContainStrings && compiler_options_.IsAppImage()) {
-    // Use the string reference information obtained earlier to calculate image
-    // offsets.  These will later be written to the image by Write/CopyMetadata.
-    TimingLogger::ScopedTiming t("AppImage:CalculateImageOffsets", timings);
-    ScopedObjectAccess soa(self);
-
-    size_t managed_string_refs = 0;
-    size_t native_string_refs = 0;
-
-    /*
-     * Iterate over the string reference info and calculate image offsets.
-     * The first element of the pair is either the object the reference belongs
-     * to or the beginning of the native reference array it is located in.  In
-     * the first case the second element is the offset of the field relative to
-     * the object's base address.  In the second case, it is the index of the
-     * StringDexCacheType object in the array.
-     */
-    for (const HeapReferencePointerInfo& ref_info : string_ref_info) {
-      uint32_t base_offset;
-
-      if (HasDexCacheStringNativeRefTag(ref_info.first)) {
-        ++native_string_refs;
-        auto* obj_ptr = reinterpret_cast<mirror::Object*>(ClearDexCacheNativeRefTags(
-            ref_info.first));
-        base_offset = SetDexCacheStringNativeRefTag(GetImageOffset(obj_ptr));
-      } else if (HasDexCachePreResolvedStringNativeRefTag(ref_info.first)) {
-        ++native_string_refs;
-        auto* obj_ptr = reinterpret_cast<mirror::Object*>(ClearDexCacheNativeRefTags(
-            ref_info.first));
-        base_offset = SetDexCachePreResolvedStringNativeRefTag(GetImageOffset(obj_ptr));
-      } else {
-        ++managed_string_refs;
-        base_offset = GetImageOffset(reinterpret_cast<mirror::Object*>(ref_info.first));
-      }
-
-      string_reference_offsets_.emplace_back(base_offset, ref_info.second);
-    }
-
-    CHECK_EQ(image_infos_.back().num_string_references_,
-             string_reference_offsets_.size());
-
-    VLOG(compiler) << "Dex2Oat:AppImage:stringReferences = " << string_reference_offsets_.size();
-    VLOG(compiler) << "Dex2Oat:AppImage:managedStringReferences = " << managed_string_refs;
-    VLOG(compiler) << "Dex2Oat:AppImage:nativeStringReferences = " << native_string_refs;
-  }
-
   // This needs to happen after CalculateNewObjectOffsets since it relies on intern_table_bytes_ and
   // bin size sums being calculated.
   TimingLogger::ScopedTiming t("AllocMemory", timings);
   return AllocMemory();
-}
-
-class ImageWriter::CollectStringReferenceVisitor {
- public:
-  explicit CollectStringReferenceVisitor(const ImageWriter& image_writer)
-      : image_writer_(image_writer),
-        curr_obj_(nullptr),
-        string_ref_info_(0),
-        dex_cache_string_ref_counter_(0) {}
-
-  // Used to prevent repeated null checks in the code that calls the visitor.
-  ALWAYS_INLINE
-  void VisitRootIfNonNull(mirror::CompressedReference<mirror::Object>* root) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!root->IsNull()) {
-      VisitRoot(root);
-    }
-  }
-
-  /*
-   * Counts the number of native references to strings reachable through
-   * DexCache objects for verification later.
-   */
-  ALWAYS_INLINE
-  void VisitRoot(mirror::CompressedReference<mirror::Object>* root) const
-      REQUIRES_SHARED(Locks::mutator_lock_)  {
-    ObjPtr<mirror::Object> referred_obj = root->AsMirrorPtr();
-
-    if (curr_obj_->IsDexCache() &&
-        image_writer_.IsInternedAppImageStringReference(referred_obj)) {
-      ++dex_cache_string_ref_counter_;
-    }
-  }
-
-  // Collects info for managed fields that reference managed Strings.
-  ALWAYS_INLINE
-  void operator() (ObjPtr<mirror::Object> obj,
-                   MemberOffset member_offset,
-                   bool is_static ATTRIBUTE_UNUSED) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::Object> referred_obj =
-        obj->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(
-            member_offset);
-
-    if (image_writer_.IsInternedAppImageStringReference(referred_obj)) {
-      string_ref_info_.emplace_back(reinterpret_cast<uintptr_t>(obj.Ptr()),
-                                    member_offset.Uint32Value());
-    }
-  }
-
-  ALWAYS_INLINE
-  void operator() (ObjPtr<mirror::Class> klass ATTRIBUTE_UNUSED,
-                   ObjPtr<mirror::Reference> ref) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    operator()(ref, mirror::Reference::ReferentOffset(), /* is_static */ false);
-  }
-
-  void AddStringRefInfo(uint32_t first, uint32_t second) {
-    string_ref_info_.emplace_back(first, second);
-  }
-
-  std::vector<HeapReferencePointerInfo>&& MoveRefInfo() {
-    return std::move(string_ref_info_);
-  }
-
-  // Used by the wrapper function to obtain a native reference count.
-  size_t GetDexCacheStringRefCount() const {
-    return dex_cache_string_ref_counter_;
-  }
-
-  void SetObject(ObjPtr<mirror::Object> obj) {
-    curr_obj_ = obj;
-    dex_cache_string_ref_counter_ = 0;
-  }
-
- private:
-  const ImageWriter& image_writer_;
-  ObjPtr<mirror::Object> curr_obj_;
-  mutable std::vector<HeapReferencePointerInfo> string_ref_info_;
-  mutable size_t dex_cache_string_ref_counter_;
-};
-
-std::vector<ImageWriter::HeapReferencePointerInfo> ImageWriter::CollectStringReferenceInfo() const
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  gc::Heap* const heap = Runtime::Current()->GetHeap();
-  CollectStringReferenceVisitor visitor(*this);
-
-  /*
-   * References to managed strings can occur either in the managed heap or in
-   * native memory regions.  Information about managed references is collected
-   * by the CollectStringReferenceVisitor and directly added to the internal
-   * info vector.
-   *
-   * Native references to managed strings can only occur through DexCache
-   * objects.  This is verified by VerifyNativeGCRootInvariants().  Due to the
-   * fact that these native references are encapsulated in std::atomic objects
-   * the VisitReferences() function can't pass the visiting object the address
-   * of the reference.  Instead, the VisitReferences() function loads the
-   * reference into a temporary variable and passes that address to the
-   * visitor.  As a consequence of this we can't uniquely identify the location
-   * of the string reference in the visitor.
-   *
-   * Due to these limitations, the visitor will only count the number of
-   * managed strings reachable through the native references of a DexCache
-   * object.  If there are any such strings, this function will then iterate
-   * over the native references, test the string for membership in the
-   * AppImage, and add the tagged DexCache pointer and string array offset to
-   * the info vector if necessary.
-   */
-  heap->VisitObjects([this, &visitor](ObjPtr<mirror::Object> object)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (IsImageObject(object)) {
-      visitor.SetObject(object);
-
-      if (object->IsDexCache()) {
-        object->VisitReferences</* kVisitNativeRoots= */ true,
-                                kVerifyNone,
-                                kWithoutReadBarrier>(visitor, visitor);
-
-        if (visitor.GetDexCacheStringRefCount() > 0) {
-          size_t string_info_collected = 0;
-
-          ObjPtr<mirror::DexCache> dex_cache = object->AsDexCache();
-          // Both of the dex cache string arrays are visited, so add up the total in the check.
-          DCHECK_LE(visitor.GetDexCacheStringRefCount(),
-                    dex_cache->NumPreResolvedStrings() + dex_cache->NumStrings());
-
-          for (uint32_t index = 0; index < dex_cache->NumStrings(); ++index) {
-            // GetResolvedString() can't be used here due to the circular
-            // nature of the cache and the collision detection this requires.
-            ObjPtr<mirror::String> referred_string =
-                dex_cache->GetStrings()[index].load().object.Read();
-
-            if (IsInternedAppImageStringReference(referred_string)) {
-              ++string_info_collected;
-              visitor.AddStringRefInfo(
-                  SetDexCacheStringNativeRefTag(reinterpret_cast<uintptr_t>(object.Ptr())), index);
-            }
-          }
-
-          // Visit all of the preinitialized strings.
-          GcRoot<mirror::String>* preresolved_strings = dex_cache->GetPreResolvedStrings();
-          for (size_t index = 0; index < dex_cache->NumPreResolvedStrings(); ++index) {
-            ObjPtr<mirror::String> referred_string = preresolved_strings[index].Read();
-            if (IsInternedAppImageStringReference(referred_string)) {
-              ++string_info_collected;
-              visitor.AddStringRefInfo(SetDexCachePreResolvedStringNativeRefTag(
-                reinterpret_cast<uintptr_t>(object.Ptr())),
-                index);
-            }
-          }
-
-          DCHECK_EQ(string_info_collected, visitor.GetDexCacheStringRefCount());
-        }
-      } else {
-        object->VisitReferences</* kVisitNativeRoots= */ false,
-                                kVerifyNone,
-                                kWithoutReadBarrier>(visitor, visitor);
-      }
-    }
-  });
-
-  return visitor.MoveRefInfo();
-}
-
-class ImageWriter::NativeGCRootInvariantVisitor {
- public:
-  explicit NativeGCRootInvariantVisitor(const ImageWriter& image_writer) :
-    curr_obj_(nullptr), class_violation_(false), class_loader_violation_(false),
-    image_writer_(image_writer) {}
-
-  ALWAYS_INLINE
-  void VisitRootIfNonNull(mirror::CompressedReference<mirror::Object>* root) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!root->IsNull()) {
-      VisitRoot(root);
-    }
-  }
-
-  ALWAYS_INLINE
-  void VisitRoot(mirror::CompressedReference<mirror::Object>* root) const
-      REQUIRES_SHARED(Locks::mutator_lock_)  {
-    ObjPtr<mirror::Object> referred_obj = root->AsMirrorPtr();
-
-    if (curr_obj_->IsClass()) {
-      class_violation_ = class_violation_ ||
-                         image_writer_.IsInternedAppImageStringReference(referred_obj);
-
-    } else if (curr_obj_->IsClassLoader()) {
-      class_loader_violation_ = class_loader_violation_ ||
-                                image_writer_.IsInternedAppImageStringReference(referred_obj);
-
-    } else if (!curr_obj_->IsDexCache()) {
-      LOG(FATAL) << "Dex2Oat:AppImage | " <<
-                    "Native reference to String found in unexpected object type.";
-    }
-  }
-
-  ALWAYS_INLINE
-  void operator() (ObjPtr<mirror::Object> obj ATTRIBUTE_UNUSED,
-                   MemberOffset member_offset ATTRIBUTE_UNUSED,
-                   bool is_static ATTRIBUTE_UNUSED) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {}
-
-  ALWAYS_INLINE
-  void operator() (ObjPtr<mirror::Class> klass ATTRIBUTE_UNUSED,
-                   ObjPtr<mirror::Reference> ref ATTRIBUTE_UNUSED) const
-      REQUIRES_SHARED(Locks::mutator_lock_) {}
-
-  // Returns true iff the only reachable native string references are through DexCache objects.
-  bool InvariantsHold() const {
-    return !(class_violation_ || class_loader_violation_);
-  }
-
-  ObjPtr<mirror::Object> curr_obj_;
-  mutable bool class_violation_;
-  mutable bool class_loader_violation_;
-
- private:
-  const ImageWriter& image_writer_;
-};
-
-void ImageWriter::VerifyNativeGCRootInvariants() const REQUIRES_SHARED(Locks::mutator_lock_) {
-  gc::Heap* const heap = Runtime::Current()->GetHeap();
-
-  NativeGCRootInvariantVisitor visitor(*this);
-
-  heap->VisitObjects([this, &visitor](ObjPtr<mirror::Object> object)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    visitor.curr_obj_ = object;
-
-    if (!IsInBootImage(object.Ptr())) {
-      object->VisitReferences</* kVisitNativeReferences= */ true,
-                              kVerifyNone,
-                              kWithoutReadBarrier>(visitor, visitor);
-    }
-  });
-
-  bool error = false;
-  std::ostringstream error_str;
-
-  /*
-   * Build the error string
-   */
-
-  if (UNLIKELY(visitor.class_violation_)) {
-    error_str << "Class";
-    error = true;
-  }
-
-  if (UNLIKELY(visitor.class_loader_violation_)) {
-    if (error) {
-      error_str << ", ";
-    }
-
-    error_str << "ClassLoader";
-  }
-
-  CHECK(visitor.InvariantsHold()) <<
-    "Native GC root invariant failure. String ref invariants don't hold for the following " <<
-    "object types: " << error_str.str();
 }
 
 void ImageWriter::CopyMetadata() {
@@ -738,8 +366,8 @@ void ImageWriter::CopyMetadata() {
       image_info.image_.Begin() +
       image_sections[ImageHeader::kSectionStringReferenceOffsets].Offset());
 
-  std::copy(string_reference_offsets_.begin(),
-            string_reference_offsets_.end(),
+  std::copy(image_info.string_reference_offsets_.begin(),
+            image_info.string_reference_offsets_.end(),
             sfo_section_base);
 }
 
@@ -1013,10 +641,6 @@ bool ImageWriter::Write(int image_fd,
   return true;
 }
 
-size_t ImageWriter::GetImageOffset(mirror::Object* object) const {
-  return GetImageOffset(object, GetOatIndex(object));
-}
-
 size_t ImageWriter::GetImageOffset(mirror::Object* object, size_t oat_index) const {
   BinSlot bin_slot = GetImageBinSlot(object, oat_index);
   const ImageInfo& image_info = GetImageInfo(oat_index);
@@ -1162,7 +786,7 @@ void ImageWriter::AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr) {
   pointer_arrays_.emplace(arr.Ptr(), Bin::kArtMethodClean);
 }
 
-void ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
+ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
   DCHECK(object != nullptr);
   size_t object_size = object->SizeOf();
 
@@ -1287,6 +911,8 @@ void ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
 
   // Grow the image closer to the end by the object we just assigned.
   image_info.image_end_ += offset_delta;
+
+  return bin;
 }
 
 bool ImageWriter::WillMethodBeDirty(ArtMethod* m) const {
@@ -2208,11 +1834,9 @@ class ImageWriter::LayoutHelper {
  public:
   explicit LayoutHelper(ImageWriter* image_writer)
       : image_writer_(image_writer) {
-    if (image_writer_->region_size_ != 0u) {
-      bin_objects_.resize(image_writer_->image_infos_.size());
-      for (auto& inner : bin_objects_) {
-        inner.resize(enum_cast<size_t>(Bin::kMirrorCount));
-      }
+    bin_objects_.resize(image_writer_->image_infos_.size());
+    for (auto& inner : bin_objects_) {
+      inner.resize(enum_cast<size_t>(Bin::kMirrorCount));
     }
   }
 
@@ -2225,9 +1849,21 @@ class ImageWriter::LayoutHelper {
 
   void FinalizeBinSlotOffsets() REQUIRES_SHARED(Locks::mutator_lock_);
 
+  /*
+   * Collects the string reference info necessary for loading app images.
+   *
+   * Because AppImages may contain interned strings that must be deduplicated
+   * with previously interned strings when loading the app image, we need to
+   * visit references to these strings and update them to point to the correct
+   * string. To speed up the visiting of references at load time we include
+   * a list of offsets to string references in the AppImage.
+   */
+  void CollectStringReferenceInfo(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
+
  private:
   class CollectClassesVisitor;
   class CollectRootsVisitor;
+  class CollectStringReferenceVisitor;
   class VisitReferencesVisitor;
 
   using WorkQueue = std::deque<std::pair<ObjPtr<mirror::Object>, size_t>>;
@@ -2243,8 +1879,7 @@ class ImageWriter::LayoutHelper {
   // assigned a bin slot.
   WorkQueue work_queue_;
 
-  // Objects for individual bins. This is filled only if we need to add padding for regions.
-  // Indexed by `oat_index` and `bin`.
+  // Objects for individual bins. Indexed by `oat_index` and `bin`.
   // Cannot use ObjPtr<> because of invalidation in Heap::VisitObjects().
   dchecked_vector<dchecked_vector<dchecked_vector<mirror::Object*>>> bin_objects_;
 };
@@ -2343,6 +1978,61 @@ class ImageWriter::LayoutHelper::CollectRootsVisitor {
   std::vector<ObjPtr<mirror::Object>> roots_;
 };
 
+class ImageWriter::LayoutHelper::CollectStringReferenceVisitor {
+ public:
+  explicit CollectStringReferenceVisitor(
+      const ImageWriter* image_writer,
+      size_t oat_index,
+      std::vector<AppImageReferenceOffsetInfo>* const string_reference_offsets,
+      ObjPtr<mirror::Object> current_obj)
+      : image_writer_(image_writer),
+        oat_index_(oat_index),
+        string_reference_offsets_(string_reference_offsets),
+        current_obj_(current_obj) {}
+
+  void VisitRootIfNonNull(mirror::CompressedReference<mirror::Object>* root) const
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (!root->IsNull()) {
+      VisitRoot(root);
+    }
+  }
+
+  void VisitRoot(mirror::CompressedReference<mirror::Object>* root) const
+      REQUIRES_SHARED(Locks::mutator_lock_)  {
+    // Only dex caches have native String roots. These are collected separately.
+    DCHECK(current_obj_->IsDexCache() ||
+           !image_writer_->IsInternedAppImageStringReference(root->AsMirrorPtr()))
+        << mirror::Object::PrettyTypeOf(current_obj_);
+  }
+
+  // Collects info for managed fields that reference managed Strings.
+  void operator() (ObjPtr<mirror::Object> obj,
+                   MemberOffset member_offset,
+                   bool is_static ATTRIBUTE_UNUSED) const
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    ObjPtr<mirror::Object> referred_obj =
+        obj->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(member_offset);
+
+    if (image_writer_->IsInternedAppImageStringReference(referred_obj)) {
+      size_t base_offset = image_writer_->GetImageOffset(current_obj_.Ptr(), oat_index_);
+      string_reference_offsets_->emplace_back(base_offset, member_offset.Uint32Value());
+    }
+  }
+
+  ALWAYS_INLINE
+  void operator() (ObjPtr<mirror::Class> klass ATTRIBUTE_UNUSED,
+                   ObjPtr<mirror::Reference> ref) const
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    operator()(ref, mirror::Reference::ReferentOffset(), /* is_static */ false);
+  }
+
+ private:
+  const ImageWriter* const image_writer_;
+  const size_t oat_index_;
+  std::vector<AppImageReferenceOffsetInfo>* const string_reference_offsets_;
+  const ObjPtr<mirror::Object> current_obj_;
+};
+
 class ImageWriter::LayoutHelper::VisitReferencesVisitor {
  public:
   VisitReferencesVisitor(LayoutHelper* helper, size_t oat_index)
@@ -2382,6 +2072,11 @@ class ImageWriter::LayoutHelper::VisitReferencesVisitor {
       // Remember how many objects we're adding at the front of the queue as we want
       // to reverse that range to process these references in the order of addition.
       helper_->work_queue_.emplace_front(ref, oat_index_);
+    }
+    if (ClassLinker::kAppImageMayContainStrings &&
+        helper_->image_writer_->compiler_options_.IsAppImage() &&
+        helper_->image_writer_->IsInternedAppImageStringReference(ref)) {
+      helper_->image_writer_->image_infos_[oat_index_].num_string_references_ += 1u;
     }
     return ref;
   }
@@ -2561,7 +2256,7 @@ void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {
       image_info.bin_slot_offsets_[i] = bin_offset;
 
       // If the bin is for mirror objects, we may need to add region padding and update offsets.
-      if (i < static_cast<size_t>(Bin::kMirrorCount) && region_size != 0u) {
+      if (i < enum_cast<size_t>(Bin::kMirrorCount) && region_size != 0u) {
         const size_t offset_after_header = bin_offset - sizeof(ImageHeader);
         size_t remaining_space =
             RoundUp(offset_after_header + 1u, region_size) - offset_after_header;
@@ -2626,9 +2321,84 @@ void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {
         image_info.image_end_,
         image_info.GetBinSizeSum(Bin::kMirrorCount) + image_writer_->image_objects_offset_begin_);
   }
-  bin_objects_.clear();  // No longer needed.
 
   VLOG(image) << "Space wasted for region alignment " << image_writer_->region_alignment_wasted_;
+}
+
+void ImageWriter::LayoutHelper::CollectStringReferenceInfo(Thread* self) {
+  size_t managed_string_refs = 0u;
+  size_t total_string_refs = 0u;
+
+  const size_t num_image_infos = image_writer_->image_infos_.size();
+  for (size_t oat_index = 0; oat_index != num_image_infos; ++oat_index) {
+    ImageInfo& image_info = image_writer_->image_infos_[oat_index];
+    DCHECK(image_info.string_reference_offsets_.empty());
+    image_info.string_reference_offsets_.reserve(image_info.num_string_references_);
+
+    for (size_t i = 0; i < enum_cast<size_t>(Bin::kMirrorCount); ++i) {
+      for (mirror::Object* obj : bin_objects_[oat_index][i]) {
+        CollectStringReferenceVisitor visitor(image_writer_,
+                                              oat_index,
+                                              &image_info.string_reference_offsets_,
+                                              obj);
+        /*
+         * References to managed strings can occur either in the managed heap or in
+         * native memory regions. Information about managed references is collected
+         * by the CollectStringReferenceVisitor and directly added to the image info.
+         *
+         * Native references to managed strings can only occur through DexCache
+         * objects. This is verified by the visitor in debug mode and the references
+         * are collected separately below.
+         */
+        obj->VisitReferences</*kVisitNativeRoots=*/ kIsDebugBuild,
+                             kVerifyNone,
+                             kWithoutReadBarrier>(visitor, visitor);
+      }
+    }
+
+    managed_string_refs += image_info.string_reference_offsets_.size();
+
+    // Collect dex cache string arrays.
+    for (const DexFile* dex_file : image_writer_->compiler_options_.GetDexFilesForOatFile()) {
+      if (image_writer_->GetOatIndexForDexFile(dex_file) == oat_index) {
+        ObjPtr<mirror::DexCache> dex_cache =
+            Runtime::Current()->GetClassLinker()->FindDexCache(self, *dex_file);
+        DCHECK(dex_cache != nullptr);
+        size_t base_offset = image_writer_->GetImageOffset(dex_cache.Ptr(), oat_index);
+
+        // Visit all string cache entries.
+        mirror::StringDexCacheType* strings = dex_cache->GetStrings();
+        const size_t num_strings = dex_cache->NumStrings();
+        for (uint32_t index = 0; index != num_strings; ++index) {
+          ObjPtr<mirror::String> referred_string = strings[index].load().object.Read();
+          if (image_writer_->IsInternedAppImageStringReference(referred_string)) {
+            image_info.string_reference_offsets_.emplace_back(
+                SetDexCacheStringNativeRefTag(base_offset), index);
+          }
+        }
+
+        // Visit all pre-resolved string entries.
+        GcRoot<mirror::String>* preresolved_strings = dex_cache->GetPreResolvedStrings();
+        const size_t num_pre_resolved_strings = dex_cache->NumPreResolvedStrings();
+        for (uint32_t index = 0; index != num_pre_resolved_strings; ++index) {
+          ObjPtr<mirror::String> referred_string = preresolved_strings[index].Read();
+          if (image_writer_->IsInternedAppImageStringReference(referred_string)) {
+            image_info.string_reference_offsets_.emplace_back(
+                SetDexCachePreResolvedStringNativeRefTag(base_offset), index);
+          }
+        }
+      }
+    }
+
+    total_string_refs += image_info.string_reference_offsets_.size();
+
+    // Check that we collected the same number of string references as we saw in the previous pass.
+    CHECK_EQ(image_info.string_reference_offsets_.size(), image_info.num_string_references_);
+  }
+
+  VLOG(compiler) << "Dex2Oat:AppImage:stringReferences = " << total_string_refs
+      << " (managed: " << managed_string_refs
+      << ", native: " << (total_string_refs - managed_string_refs) << ")";
 }
 
 void ImageWriter::LayoutHelper::VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index) {
@@ -2653,12 +2423,8 @@ bool ImageWriter::LayoutHelper::TryAssignBinSlot(ObjPtr<mirror::Object> obj, siz
   bool assigned = false;
   if (!image_writer_->IsImageBinSlotAssigned(obj.Ptr())) {
     image_writer_->RecordNativeRelocations(obj, oat_index);
-    image_writer_->AssignImageBinSlot(obj.Ptr(), oat_index);
-    // If we need to add padding for regions, collect objects in `bin_objects_`.
-    if (image_writer_->region_size_ != 0u) {
-      Bin bin = image_writer_->GetImageBinSlot(obj.Ptr(), oat_index).GetBin();
-      bin_objects_[oat_index][enum_cast<size_t>(bin)].push_back(obj.Ptr());
-    }
+    Bin bin = image_writer_->AssignImageBinSlot(obj.Ptr(), oat_index);
+    bin_objects_[oat_index][enum_cast<size_t>(bin)].push_back(obj.Ptr());
     assigned = true;
   }
   return assigned;
@@ -2751,6 +2517,11 @@ void ImageWriter::CalculateNewObjectOffsets() {
 
   // Finalize bin slot offsets. This may add padding for regions.
   layout_helper.FinalizeBinSlotOffsets();
+
+  // Collect string reference info for app images.
+  if (ClassLinker::kAppImageMayContainStrings && compiler_options_.IsAppImage()) {
+    layout_helper.CollectStringReferenceInfo(self);
+  }
 
   // Calculate image offsets.
   size_t image_offset = 0;
@@ -2867,9 +2638,7 @@ std::pair<size_t, std::vector<ImageSection>> ImageWriter::ImageInfo::CreateImage
   // compute the actual offsets.
   const ImageSection& string_reference_offsets =
       sections[ImageHeader::kSectionStringReferenceOffsets] =
-          ImageSection(cur_pos,
-                       sizeof(typename decltype(string_reference_offsets_)::value_type) *
-                           num_string_references_);
+          ImageSection(cur_pos, sizeof(string_reference_offsets_[0]) * num_string_references_);
 
   /*
    * Metadata section.
