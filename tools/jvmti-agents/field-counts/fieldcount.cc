@@ -98,7 +98,7 @@ static void DataDumpRequestCb(jvmtiEnv* jvmti) {
   LOG(INFO) << "\t" << "Field name"
             << "\t" << "Type"
             << "\t" << "Count"
-            << "\t" << "Total Size";
+            << "\t" << "TotalSize";
   RequestList* list;
   CHECK_JVMTI(jvmti->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&list)));
   for (std::pair<jclass, jfieldID>& p : list->fields_) {
@@ -153,7 +153,7 @@ static void DataDumpRequestCb(jvmtiEnv* jvmti) {
     CHECK_JVMTI(jvmti->GetFieldName(klass, field, &field_name, &field_sig, nullptr));
     CHECK_JVMTI(jvmti->GetClassSignature(klass, &field_class_name, nullptr));
     LOG(INFO) << "\t" << field_class_name << "." << field_name << ":" << field_sig
-              << "\t" << "<ALL TYPES>"
+              << "\t" << "<ALL_TYPES>"
               << "\t" << obj_len
               << "\t" << total_size;
     for (auto sz : class_sizes) {
