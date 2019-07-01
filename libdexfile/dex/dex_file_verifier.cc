@@ -20,6 +20,8 @@
 
 #include <memory>
 
+#include "android-base/logging.h"
+#include "android-base/macros.h"
 #include "android-base/stringprintf.h"
 
 #include "base/leb128.h"
@@ -2452,11 +2454,16 @@ bool DexFileVerifier::CheckInterClassDefItem() {
     return false;
   }
   // Check for duplicate class def.
-  if (defined_classes_.find(item->class_idx_) != defined_classes_.end()) {
+
+  // Sanity checks, should be optimized away.
+  DCHECK_LE(item->class_idx_.index_, kTypeIdLimit);
+  static_assert(kTypeIdLimit < kTypeIdSize, "Unexpected type-id range.");
+
+  if (defined_classes_[item->class_idx_.index_]) {
     ErrorStringPrintf("Redefinition of class with type idx: '%d'", item->class_idx_.index_);
     return false;
   }
-  defined_classes_.insert(item->class_idx_);
+  defined_classes_[item->class_idx_.index_] = true;
 
 
   if (UNLIKELY(!VerifyTypeDescriptor(item->class_idx_,
@@ -2997,10 +3004,6 @@ bool DexFileVerifier::CheckInterSection() {
   const dex::MapList* map = reinterpret_cast<const dex::MapList*>(begin_ + header_->map_off_);
   const dex::MapItem* item = map->list_;
   uint32_t count = map->size_;
-
-  // Avoid allocations, reserve space ahead of time. At most the type-id limit number
-  // of type IDs can be added.
-  defined_classes_.reserve(std::min(header_->class_defs_size_, kTypeIdLimit) + 1);
 
   // Cross check the items listed in the map.
   for (; count != 0u; --count) {
