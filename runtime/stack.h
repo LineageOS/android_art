@@ -17,6 +17,7 @@
 #ifndef ART_RUNTIME_STACK_H_
 #define ART_RUNTIME_STACK_H_
 
+#include <optional>
 #include <stdint.h>
 #include <string>
 
@@ -223,7 +224,12 @@ class StackVisitor {
   bool GetNextMethodAndDexPc(ArtMethod** next_method, uint32_t* next_dex_pc)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool GetVReg(ArtMethod* m, uint16_t vreg, VRegKind kind, uint32_t* val) const
+  bool GetVReg(ArtMethod* m,
+               uint16_t vreg,
+               VRegKind kind,
+               uint32_t* val,
+               std::optional<DexRegisterLocation> location =
+                   std::optional<DexRegisterLocation>()) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool GetVRegPair(ArtMethod* m, uint16_t vreg, VRegKind kind_lo, VRegKind kind_hi,
@@ -329,6 +335,8 @@ class StackVisitor {
   bool GetVRegPairFromOptimizedCode(ArtMethod* m, uint16_t vreg,
                                     VRegKind kind_lo, VRegKind kind_hi,
                                     uint64_t* val) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  bool GetVRegFromOptimizedCode(DexRegisterLocation location, VRegKind kind, uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
   bool GetRegisterPairIfAccessible(uint32_t reg_lo, uint32_t reg_hi, VRegKind kind_lo,
                                    uint64_t* val) const
