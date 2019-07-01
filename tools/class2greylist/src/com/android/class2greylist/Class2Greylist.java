@@ -65,6 +65,7 @@ public class Class2Greylist {
     static {
         Map<Integer, String> map = new HashMap<>();
         map.put(null, FLAG_GREYLIST);
+        map.put(0, FLAG_BLACKLIST);
         map.put(26, FLAG_GREYLIST_MAX_O);
         map.put(28, FLAG_GREYLIST_MAX_P);
         map.put(29, FLAG_GREYLIST_MAX_Q);
