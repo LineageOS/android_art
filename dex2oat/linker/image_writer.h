@@ -610,9 +610,11 @@ class ImageWriter final {
   bool IsImageDexCache(ObjPtr<mirror::DexCache> dex_cache) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Return true if `obj` is inside of the boot image space. This may only return true if we are
-  // compiling an app image.
-  bool IsInBootImage(const void* obj) const;
+  // Return true if `obj` is inside of a boot image space that we're compiling against.
+  // (Always false when compiling the boot image.)
+  ALWAYS_INLINE bool IsInBootImage(const void* obj) const {
+    return reinterpret_cast<uintptr_t>(obj) - boot_image_begin_ < boot_image_size_;
+  }
 
   // Return true if ptr is within the boot oat file.
   bool IsInBootOatFile(const void* ptr) const;
@@ -665,6 +667,10 @@ class ImageWriter final {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   const CompilerOptions& compiler_options_;
+
+  // Cached boot image begin and size. This includes heap, native objects and oat files.
+  const uintptr_t boot_image_begin_;
+  const size_t boot_image_size_;
 
   // Beginning target image address for the first image.
   uint8_t* global_image_begin_;
