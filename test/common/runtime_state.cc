@@ -241,7 +241,7 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
       // Sleep to yield to the compiler thread.
       usleep(1000);
       ScopedObjectAccess soa(self);
-      if (!native) {
+      if (!native && jit->GetCodeCache()->CanAllocateProfilingInfo()) {
         // Make sure there is a profiling info, required by the compiler.
         ProfilingInfo::Create(self, method, /* retry_allocation */ true);
       }
@@ -363,17 +363,6 @@ extern "C" JNIEXPORT void JNICALL Java_Main_startJit(JNIEnv*, jclass) {
 extern "C" JNIEXPORT jint JNICALL Java_Main_getJitThreshold(JNIEnv*, jclass) {
   jit::Jit* jit = Runtime::Current()->GetJit();
   return (jit != nullptr) ? jit->HotMethodThreshold() : 0;
-}
-
-extern "C" JNIEXPORT void JNICALL Java_Main_transitionJitFromZygote(JNIEnv*, jclass) {
-  jit::Jit* jit = Runtime::Current()->GetJit();
-  if (jit == nullptr) {
-    return;
-  }
-  // Mimic the transition behavior a zygote fork would have.
-  jit->PreZygoteFork();
-  jit->GetCodeCache()->PostForkChildAction(/*is_system_server=*/ false, /*is_zygote=*/ false);
-  jit->PostForkChildAction(/*is_system_server=*/ false, /*is_zygote=*/ false);
 }
 
 extern "C" JNIEXPORT void JNICALL Java_Main_deoptimizeBootImage(JNIEnv*, jclass) {
