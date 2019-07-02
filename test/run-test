@@ -130,7 +130,7 @@ cfg_output="graph.cfg"
 strace_output="strace-output.txt"
 lib="libartd.so"
 testlib="arttestd"
-run_args="--quiet"
+run_args=(--quiet)
 build_args=""
 
 quiet="no"
@@ -173,11 +173,12 @@ run_optimizing="false"
 # particular configurations.
 file_ulimit=128000
 
+
 while true; do
     if [ "x$1" = "x--host" ]; then
         target_mode="no"
         DEX_LOCATION=$tmp_dir
-        run_args="${run_args} --host"
+        run_args+=(--host)
         shift
     elif [ "x$1" = "x--quiet" ]; then
         quiet="yes"
@@ -197,12 +198,12 @@ while true; do
         runtime="jvm"
         prebuild_mode="no"
         NEED_DEX="false"
-        run_args="${run_args} --jvm"
+        run_args+=(--jvm)
         shift
     elif [ "x$1" = "x-O" ]; then
         lib="libart.so"
         testlib="arttest"
-        run_args="${run_args} -O"
+        run_args+=(-O)
         shift
     elif [ "x$1" = "x--dalvik" ]; then
         lib="libdvm.so"
@@ -218,23 +219,23 @@ while true; do
         relocate="no"
         shift
     elif [ "x$1" = "x--prebuild" ]; then
-        run_args="${run_args} --prebuild"
+        run_args+=(--prebuild)
         prebuild_mode="yes"
         shift;
     elif [ "x$1" = "x--compact-dex-level" ]; then
         option="$1"
         shift
-        run_args="${run_args} $option $1"
+        run_args+=("$option" "$1")
         shift;
     elif [ "x$1" = "x--strip-dex" ]; then
-        run_args="${run_args} --strip-dex"
+        run_args+=(--strip-dex)
         shift;
     elif [ "x$1" = "x--debuggable" ]; then
-        run_args="${run_args} -Xcompiler-option --debuggable"
+        run_args+=(-Xcompiler-option --debuggable)
         debuggable="yes"
         shift;
     elif [ "x$1" = "x--no-prebuild" ]; then
-        run_args="${run_args} --no-prebuild"
+        run_args+=(--no-prebuild)
         prebuild_mode="no"
         shift;
     elif [ "x$1" = "x--gcverify" ]; then
@@ -264,12 +265,12 @@ while true; do
     elif [ "x$1" = "x--image" ]; then
         shift
         image="$1"
-        run_args="${run_args} --image $image"
+        run_args+=(--image "$image")
         shift
     elif [ "x$1" = "x-Xcompiler-option" ]; then
         shift
         option="$1"
-        run_args="${run_args} -Xcompiler-option $option"
+        run_args+=(-Xcompiler-option "$option")
         shift
     elif [ "x$1" = "x--build-option" ]; then
         shift
@@ -279,78 +280,78 @@ while true; do
     elif [ "x$1" = "x--runtime-option" ]; then
         shift
         option="$1"
-        run_args="${run_args} --runtime-option $option"
+        run_args+=(--runtime-option "$option")
         shift
     elif [ "x$1" = "x--gdb-arg" ]; then
         shift
         gdb_arg="$1"
-        run_args="${run_args} --gdb-arg $gdb_arg"
+        run_args+=(--gdb-arg "$gdb_arg")
         shift
     elif [ "x$1" = "x--debug" ]; then
-        run_args="${run_args} --debug"
+        run_args+=(--debug)
         shift
     elif [ "x$1" = "x--debug-wrap-agent" ]; then
-        run_args="${run_args} --debug-wrap-agent"
+        run_args+=(--debug-wrap-agent)
         shift
     elif [ "x$1" = "x--with-agent" ]; then
         shift
         option="$1"
-        run_args="${run_args} --with-agent $1"
+        run_args+=(--with-agent "$1")
         shift
     elif [ "x$1" = "x--debug-agent" ]; then
         shift
         option="$1"
-        run_args="${run_args} --debug-agent $1"
+        run_args+=(--debug-agent "$1")
         shift
     elif [ "x$1" = "x--gdb" ]; then
-        run_args="${run_args} --gdb"
+        run_args+=(--gdb)
         dev_mode="yes"
         shift
     elif [ "x$1" = "x--gdbserver-bin" ]; then
         shift
-        run_args="${run_args} --gdbserver-bin $1"
+        run_args+=(--gdbserver-bin "$1")
         shift
     elif [ "x$1" = "x--gdbserver-port" ]; then
         shift
-        run_args="${run_args} --gdbserver-port $1"
+        run_args+=(--gdbserver-port "$1")
         shift
     elif [ "x$1" = "x--gdbserver" ]; then
-        run_args="${run_args} --gdbserver"
+        run_args+=(--gdbserver)
         dev_mode="yes"
         shift
     elif [ "x$1" = "x--strace" ]; then
         strace="yes"
-        run_args="${run_args} --timeout 1800 --invoke-with strace --invoke-with -o --invoke-with $tmp_dir/$strace_output"
+        run_args+=(--timeout 1800 --invoke-with strace --invoke-with -o --invoke-with "$tmp_dir/$strace_output")
         shift
     elif [ "x$1" = "x--zygote" ]; then
-        run_args="${run_args} --zygote"
+        run_args+=(--zygote)
         shift
     elif [ "x$1" = "x--interpreter" ]; then
-        run_args="${run_args} --interpreter"
+        run_args+=(--interpreter)
         image_suffix="-interpreter"
         shift
     elif [ "x$1" = "x--jit" ]; then
-        run_args="${run_args} --jit"
+        run_args+=(--jit)
         image_suffix="-interpreter"
         shift
     elif [ "x$1" = "x--baseline" ]; then
-        run_args="${run_args} --baseline"
+        run_args+=(--baseline)
         shift
     elif [ "x$1" = "x--optimizing" ]; then
         run_optimizing="true"
         shift
     elif [ "x$1" = "x--no-verify" ]; then
-        run_args="${run_args} --no-verify"
+        run_args+=(--no-verify)
         shift
     elif [ "x$1" = "x--verify-soft-fail" ]; then
-        run_args="${run_args} --verify-soft-fail"
+        run_args+=(--verify-soft-fail)
         image_suffix="-interp-ac"
         shift
     elif [ "x$1" = "x--no-optimize" ]; then
-        run_args="${run_args} --no-optimize"
+        run_args+=(--no-optimize)
         shift
     elif [ "x$1" = "x--no-precise" ]; then
-        run_args="${run_args} --no-precise"
+        run_args+=(--no-precise)
         shift
     elif [ "x$1" = "x--invoke-with" ]; then
         shift
@@ -360,10 +361,10 @@ while true; do
             usage="yes"
             break
         fi
-        run_args="${run_args} --invoke-with ${what}"
+        run_args+=(--invoke-with "${what}")
         shift
     elif [ "x$1" = "x--dev" ]; then
-        run_args="${run_args} --dev"
+        run_args+=(--dev)
         dev_mode="yes"
         shift
     elif [ "x$1" = "x--build-only" ]; then
@@ -386,7 +387,7 @@ while true; do
             break
         fi
         chroot="$1"
-        run_args="${run_args} --chroot $1"
+        run_args+=(--chroot "$1")
         shift
     elif [ "x$1" = "x--android-root" ]; then
         shift
@@ -396,7 +397,7 @@ while true; do
             break
         fi
         android_root="$1"
-        run_args="${run_args} --android-root $1"
+        run_args+=(--android-root "$1")
         shift
     elif [ "x$1" = "x--android-runtime-root" ]; then
         shift
@@ -405,7 +406,7 @@ while true; do
             usage="yes"
             break
         fi
-        run_args="${run_args} --android-runtime-root $1"
+        run_args+=(--android-runtime-root "$1")
         shift
     elif [ "x$1" = "x--android-tzdata-root" ]; then
         shift
@@ -414,7 +415,7 @@ while true; do
             usage="yes"
             break
         fi
-        run_args="${run_args} --android-tzdata-root $1"
+        run_args+=(--android-tzdata-root "$1")
         shift
     elif [ "x$1" = "x--update" ]; then
         update_mode="yes"
@@ -423,12 +424,12 @@ while true; do
         usage="yes"
         shift
     elif [ "x$1" = "x--64" ]; then
-        run_args="${run_args} --64"
+        run_args+=(--64)
         suffix64="64"
         shift
     elif [ "x$1" = "x--bionic" ]; then
         # soong linux_bionic builds are 64bit only.
-        run_args="${run_args} --bionic --host --64"
+        run_args+=(--bionic --host --64)
         suffix64="64"
         target_mode="no"
         DEX_LOCATION=$tmp_dir
@@ -439,7 +440,7 @@ while true; do
         # TODO Should we allow the java.library.path to search the zipapex too?
         # Not needed at the moment and adding it will be complicated so for now
         # we'll ignore this.
-        run_args="${run_args} --host --runtime-extracted-zipapex $1"
+        run_args+=(--host --runtime-extracted-zipapex "$1")
         target_mode="no"
         DEX_LOCATION=$tmp_dir
         shift
@@ -448,7 +449,7 @@ while true; do
         # TODO Should we allow the java.library.path to search the zipapex too?
         # Not needed at the moment and adding it will be complicated so for now
         # we'll ignore this.
-        run_args="${run_args} --host --runtime-zipapex $1"
+        run_args+=(--host --runtime-zipapex "$1")
         target_mode="no"
         DEX_LOCATION=$tmp_dir
         # apex_payload.zip is quite large we need a high enough ulimit to
@@ -468,32 +469,32 @@ while true; do
         never_clean="yes"
         shift
     elif [ "x$1" = "x--dex2oat-swap" ]; then
-        run_args="${run_args} --dex2oat-swap"
+        run_args+=(--dex2oat-swap)
         shift
     elif [ "x$1" = "x--instruction-set-features" ]; then
         shift
-        run_args="${run_args} --instruction-set-features $1"
+        run_args+=(--instruction-set-features "$1")
         shift
     elif [ "x$1" = "x--bisection-search" ]; then
         bisection_search="yes"
         shift
     elif [ "x$1" = "x--vdex" ]; then
-        run_args="${run_args} --vdex"
+        run_args+=(--vdex)
         shift
     elif [ "x$1" = "x--dm" ]; then
-        run_args="${run_args} --dm"
+        run_args+=(--dm)
         shift
     elif [ "x$1" = "x--vdex-filter" ]; then
         shift
         filter=$1
-        run_args="${run_args} --vdex-filter $filter"
+        run_args+=(--vdex-filter "$filter")
         shift
     elif [ "x$1" = "x--random-profile" ]; then
-        run_args="${run_args} --random-profile"
+        run_args+=(--random-profile)
         shift
     elif [ "x$1" = "x--dex2oat-jobs" ]; then
         shift
-        run_args="${run_args} -Xcompiler-option -j$1"
+        run_args+=(-Xcompiler-option "-j$1")
         shift
     elif expr "x$1" : "x--" >/dev/null 2>&1; then
         echo "unknown $0 option: $1" 1>&2
@@ -547,41 +548,41 @@ mkdir -p $tmp_dir
 
 # Add thread suspend timeout flag
 if [ ! "$runtime" = "jvm" ]; then
-  run_args="${run_args} --runtime-option -XX:ThreadSuspendTimeout=$suspend_timeout"
+  run_args+=(--runtime-option "-XX:ThreadSuspendTimeout=$suspend_timeout")
 fi
 
 if [ "$basic_verify" = "true" ]; then
   # Set HspaceCompactForOOMMinIntervalMs to zero to run hspace compaction for OOM more frequently in tests.
-  run_args="${run_args} --runtime-option -Xgc:preverify --runtime-option -Xgc:postverify --runtime-option -XX:HspaceCompactForOOMMinIntervalMs=0"
+  run_args+=(--runtime-option -Xgc:preverify --runtime-option -Xgc:postverify --runtime-option -XX:HspaceCompactForOOMMinIntervalMs=0)
 fi
 if [ "$gc_verify" = "true" ]; then
-  run_args="${run_args} --runtime-option -Xgc:preverify_rosalloc --runtime-option -Xgc:postverify_rosalloc"
+  run_args+=(--runtime-option -Xgc:preverify_rosalloc --runtime-option -Xgc:postverify_rosalloc)
 fi
 if [ "$gc_stress" = "true" ]; then
-  run_args="${run_args} --gc-stress --runtime-option -Xgc:gcstress --runtime-option -Xms2m --runtime-option -Xmx16m"
+  run_args+=(--gc-stress --runtime-option -Xgc:gcstress --runtime-option -Xms2m --runtime-option -Xmx16m)
 fi
 if [ "$jvmti_redefine_stress" = "true" ]; then
-    run_args="${run_args} --no-app-image --jvmti-redefine-stress"
+    run_args+=(--no-app-image --jvmti-redefine-stress)
 fi
 if [ "$jvmti_step_stress" = "true" ]; then
-    run_args="${run_args} --no-app-image --jvmti-step-stress"
+    run_args+=(--no-app-image --jvmti-step-stress)
 fi
 if [ "$jvmti_field_stress" = "true" ]; then
-    run_args="${run_args} --no-app-image --jvmti-field-stress"
+    run_args+=(--no-app-image --jvmti-field-stress)
 fi
 if [ "$jvmti_trace_stress" = "true" ]; then
-    run_args="${run_args} --no-app-image --jvmti-trace-stress"
+    run_args+=(--no-app-image --jvmti-trace-stress)
 fi
 if [ "$trace" = "true" ]; then
-    run_args="${run_args} --runtime-option -Xmethod-trace --runtime-option -Xmethod-trace-file-size:2000000"
+    run_args+=(--runtime-option -Xmethod-trace --runtime-option -Xmethod-trace-file-size:2000000)
     if [ "$trace_stream" = "true" ]; then
         # Streaming mode uses the file size as the buffer size. So output gets really large. Drop
         # the ability to analyze the file and just write to /dev/null.
-        run_args="${run_args} --runtime-option -Xmethod-trace-file:/dev/null"
+        run_args+=(--runtime-option -Xmethod-trace-file:/dev/null)
         # Enable streaming mode.
-        run_args="${run_args} --runtime-option -Xmethod-trace-stream"
+        run_args+=(--runtime-option -Xmethod-trace-stream)
     else
-        run_args="${run_args} --runtime-option -Xmethod-trace-file:${DEX_LOCATION}/trace.bin"
+        run_args+=(--runtime-option "-Xmethod-trace-file:${DEX_LOCATION}/trace.bin")
     fi
 elif [ "$trace_stream" = "true" ]; then
     err_echo "Cannot use --stream without --trace."
@@ -639,35 +640,35 @@ if [ "$target_mode" = "no" ]; then
 fi
 
 if [ ! "$runtime" = "jvm" ]; then
-  run_args="${run_args} --lib $lib"
+  run_args+=(--lib "$lib")
 fi
 
 if [ "$runtime" = "dalvik" ]; then
     if [ "$target_mode" = "no" ]; then
         framework="${ANDROID_PRODUCT_OUT}/system/framework"
         bpath="${framework}/core-libart.jar:${framework}/core-oj.jar:${framework}/conscrypt.jar:${framework}/okhttp.jar:${framework}/bouncycastle.jar:${framework}/ext.jar"
-        run_args="${run_args} --boot --runtime-option -Xbootclasspath:${bpath}"
+        run_args+=(--boot --runtime-option "-Xbootclasspath:${bpath}")
     else
         true # defaults to using target BOOTCLASSPATH
     fi
 elif [ "$runtime" = "art" ]; then
     if [ "$target_mode" = "no" ]; then
         guess_host_arch_name
-        run_args="${run_args} --boot ${ANDROID_HOST_OUT}/framework/core${image_suffix}.art"
-        run_args="${run_args} --runtime-option -Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}"
+        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core${image_suffix}.art")
+        run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
-        run_args="${run_args} --runtime-option -Djava.library.path=/data/nativetest${suffix64}/art/${target_arch_name}"
-        run_args="${run_args} --boot /data/art-test/core${image_suffix}.art"
+        run_args+=(--runtime-option "-Djava.library.path=/data/nativetest${suffix64}/art/${target_arch_name}")
+        run_args+=(--boot "/data/art-test/core${image_suffix}.art")
     fi
     if [ "$relocate" = "yes" ]; then
-      run_args="${run_args} --relocate"
+      run_args+=(--relocate)
     else
-      run_args="${run_args} --no-relocate"
+      run_args+=(--no-relocate)
     fi
 elif [ "$runtime" = "jvm" ]; then
     # TODO: Detect whether the host is 32-bit or 64-bit.
-    run_args="${run_args} --runtime-option -Djava.library.path=${ANDROID_HOST_OUT}/lib64:${ANDROID_HOST_OUT}/nativetest64"
+    run_args+=(--runtime-option "-Djava.library.path=${ANDROID_HOST_OUT}/lib64:${ANDROID_HOST_OUT}/nativetest64")
 fi
 
 if [ "$have_image" = "no" ]; then
@@ -675,7 +676,7 @@ if [ "$have_image" = "no" ]; then
         err_echo "--no-image is only supported on the art runtime"
         exit 1
     fi
-    run_args="${run_args} --no-image"
+    run_args+=(--no-image)
 fi
 
 if [ "$dev_mode" = "yes" -a "$update_mode" = "yes" ]; then
@@ -891,13 +892,12 @@ if [[ "$TEST_NAME" =~ ^[0-9]+-checker- ]]; then
         checker_args="$checker_args --debuggable"
       fi
 
-      run_args="${run_args} -Xcompiler-option --dump-cfg=$cfg_output_dir/$cfg_output \
-                            -Xcompiler-option -j1"
+      run_args+=(-Xcompiler-option "--dump-cfg=$cfg_output_dir/$cfg_output" -Xcompiler-option -j1)
     fi
   fi
 fi
 
-run_args="${run_args} --testlib ${testlib}"
+run_args+=(--testlib "${testlib}")
 
 if ! ulimit -f ${file_ulimit}; then
   err_echo "ulimit file size setting failed"
@@ -929,7 +929,7 @@ if [ "$dev_mode" = "yes" ]; then
     echo "build exit status: $build_exit" 1>&2
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" $run_args "$@" 2>&1
+        "./${run}" "${run_args[@]}" "$@" 2>&1
         run_exit="$?"
 
         if [ "$run_exit" = "0" ]; then
@@ -954,7 +954,7 @@ elif [ "$update_mode" = "yes" ]; then
     build_exit="$?"
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" $run_args "$@" >"$output" 2>&1
+        "./${run}" "${run_args[@]}" "$@" >"$output" 2>&1
         if [ "$run_checker" = "yes" ]; then
           if [ "$target_mode" = "yes" ]; then
             adb pull "$chroot/$cfg_output_dir/$cfg_output" &> /dev/null
@@ -988,7 +988,7 @@ else
     build_exit="$?"
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" $run_args "$@" >"$output" 2>&1
+        "./${run}" "${run_args[@]}" "$@" >"$output" 2>&1
         run_exit="$?"
         if [ "$run_exit" != "0" ]; then
             err_echo "run exit status: $run_exit"
@@ -1071,12 +1071,12 @@ if [ "$bisection_search" = "yes" -a "$good" != "yes" ]; then
         # so that cmdline.sh forwards its arguments to dalvikvm. invoke-with is set
         # to exec in order to preserve pid when calling dalvikvm. This is required
         # for bisection search to correctly retrieve logs from device.
-        "./${run}" $run_args --runtime-option '"$@"' --invoke-with exec --dry-run "$@" &> /dev/null
+        "./${run}" "${run_args[@]}" --runtime-option '"$@"' --invoke-with exec --dry-run "$@" &> /dev/null
         adb shell chmod u+x "$chroot_dex_location/cmdline.sh"
         maybe_device_mode="--device"
         raw_cmd="$DEX_LOCATION/cmdline.sh"
       else
-        raw_cmd="$cwd/${run} --external-log-tags $run_args $@"
+        raw_cmd="$cwd/${run} --external-log-tags "${run_args[@]}" $@"
       fi
       # TODO: Pass a `--chroot` option to the bisection_search.py script and use it there.
       $ANDROID_BUILD_TOP/art/tools/bisection_search/bisection_search.py \
