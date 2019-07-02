@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import dalvik.system.ZygoteHooks;
+
 public class Main {
   public static void main(String[] args) {
     System.loadLibrary(args[0]);
@@ -21,7 +23,10 @@ public class Main {
       return;
     }
     ensureJitCompiled(Object.class, "toString");
-    transitionJitFromZygote();
+    ZygoteHooks.preFork();
+    ZygoteHooks.postForkChild(
+        /*flags=*/0, /*is_system_server=*/false, /*is_zygote=*/false, /*instruction_set=*/null);
+    ZygoteHooks.postForkCommon();
     deoptimizeBootImage();
     if (hasJitCompiledEntrypoint(Object.class, "toString")) {
       throw new Error("Expected Object.toString to be deoptimized");
@@ -32,5 +37,4 @@ public class Main {
   private static native void ensureJitCompiled(Class<?> cls, String name);
   private static native boolean hasJitCompiledEntrypoint(Class<?> cls, String name);
   private static native void deoptimizeBootImage();
-  private static native void transitionJitFromZygote();
 }
