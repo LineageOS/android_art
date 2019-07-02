@@ -1416,7 +1416,10 @@ extern "C" const void* artQuickResolutionTrampoline(
         DCHECK_GE(method_entry, oat_file->GetBssMethods().data());
         DCHECK_LT(method_entry,
                   oat_file->GetBssMethods().data() + oat_file->GetBssMethods().size());
-        *method_entry = called;
+        std::atomic<ArtMethod*>* atomic_entry =
+            reinterpret_cast<std::atomic<ArtMethod*>*>(method_entry);
+        static_assert(sizeof(*method_entry) == sizeof(*atomic_entry), "Size check.");
+        atomic_entry->store(called, std::memory_order_release);
       }
     }
   }
