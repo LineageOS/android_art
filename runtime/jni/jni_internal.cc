@@ -263,10 +263,13 @@ namespace art {
 // things not rendering correctly. E.g. b/16858794
 static constexpr bool kWarnJniAbort = false;
 
+// Disable native JNI checking pending stack walk re-evaluation (b/136276414).
+static constexpr bool kNativeJniCheckEnabled = false;
+
 template<typename T>
 ALWAYS_INLINE static bool ShouldDenyAccessToMember(T* member, Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (IsWhitelistedNativeCaller()) {
+  if (kNativeJniCheckEnabled && IsWhitelistedNativeCaller()) {
     return false;
   }
   return hiddenapi::ShouldDenyAccessToMember(
