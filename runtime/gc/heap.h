@@ -684,10 +684,11 @@ class Heap {
   bool IsInBootImageOatFile(const void* p) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void GetBootImagesSize(uint32_t* boot_image_begin,
-                         uint32_t* boot_image_end,
-                         uint32_t* boot_oat_begin,
-                         uint32_t* boot_oat_end);
+  // Get the start address of the boot images if any; otherwise returns 0.
+  uint32_t GetBootImagesStartAddress() const;
+
+  // Get the size of all boot images, including the heap and oat areas.
+  uint32_t GetBootImagesSize() const;
 
   space::DlMallocSpace* GetDlMallocSpace() const {
     return dlmalloc_space_;
