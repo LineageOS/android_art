@@ -55,10 +55,10 @@ class DexFileVerifier {
         header_(&dex_file->GetHeader()),
         ptr_(nullptr),
         previous_item_(nullptr),
-        angle_bracket_start_index_(std::numeric_limits<size_t>::max()),
-        angle_bracket_end_index_(std::numeric_limits<size_t>::max()),
-        angle_init_angle_index_(std::numeric_limits<size_t>::max()),
-        angle_clinit_angle_index_(std::numeric_limits<size_t>::max()) {
+        init_indices_{std::numeric_limits<size_t>::max(),
+                      std::numeric_limits<size_t>::max(),
+                      std::numeric_limits<size_t>::max(),
+                      std::numeric_limits<size_t>::max()} {
   }
 
   bool Verify();
@@ -259,12 +259,14 @@ class DexFileVerifier {
   // Strings starting with '<' are in the range
   //    [angle_bracket_start_index_,angle_bracket_end_index_).
   // angle_init_angle_index_ and angle_clinit_angle_index_ denote the indices of "<init>" and
-  // angle_clinit_angle_index_, respectively. If any value is not found, the corresponding
-  // index will be larger than any valid string index for this dex file.
-  size_t angle_bracket_start_index_;
-  size_t angle_bracket_end_index_;
-  size_t angle_init_angle_index_;
-  size_t angle_clinit_angle_index_;
+  // "<clinit>", respectively. If any value is not found, the corresponding index will be larger
+  // than any valid string index for this dex file.
+  struct {
+    size_t angle_bracket_start_index;
+    size_t angle_bracket_end_index;
+    size_t angle_init_angle_index;
+    size_t angle_clinit_angle_index;
+  } init_indices_;
 
   // A bitvector for verified type descriptors. Each bit corresponds to a type index. A set
   // bit denotes that the descriptor has been verified wrt/ IsValidDescriptor.

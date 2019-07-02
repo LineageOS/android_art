@@ -709,11 +709,11 @@ bool DexFileVerifier::CheckClassDataItemMethod(uint32_t idx,
     if (!CheckIndex(string_idx, header_->string_ids_size_, "method flags verification")) {
       return false;
     }
-    if (UNLIKELY(string_idx < angle_bracket_end_index_) &&
-            string_idx >= angle_bracket_start_index_) {
-      if (string_idx == angle_clinit_angle_index_) {
+    if (UNLIKELY(string_idx < init_indices_.angle_bracket_end_index) &&
+            string_idx >= init_indices_.angle_bracket_start_index) {
+      if (string_idx == init_indices_.angle_clinit_angle_index) {
         constructor_flags_by_name = kAccStatic | kAccConstructor;
-      } else if (string_idx == angle_init_angle_index_) {
+      } else if (string_idx == init_indices_.angle_init_angle_index) {
         constructor_flags_by_name = kAccConstructor;
       } else {
         ErrorStringPrintf("Bad method name for method index %u", idx);
@@ -3274,14 +3274,14 @@ void DexFileVerifier::FindStringRangesForMethodNames() {
   // '=' follows '<'
   static_assert('<' + 1 == '=', "Unexpected character relation");
   const auto angle_end = std::lower_bound(first, last, "=", compare);
-  angle_bracket_end_index_ = angle_end - first;
+  init_indices_.angle_bracket_end_index = angle_end - first;
 
   const auto angle_start = std::lower_bound(first, angle_end, "<", compare);
-  angle_bracket_start_index_ = angle_start - first;
+  init_indices_.angle_bracket_start_index = angle_start - first;
   if (angle_start == angle_end) {
     // No strings starting with '<'.
-    angle_init_angle_index_ = std::numeric_limits<size_t>::max();
-    angle_clinit_angle_index_ = std::numeric_limits<size_t>::max();
+    init_indices_.angle_init_angle_index = std::numeric_limits<size_t>::max();
+    init_indices_.angle_clinit_angle_index = std::numeric_limits<size_t>::max();
     return;
   }
 
@@ -3289,18 +3289,18 @@ void DexFileVerifier::FindStringRangesForMethodNames() {
     constexpr const char* kClinit = "<clinit>";
     const auto it = std::lower_bound(angle_start, angle_end, kClinit, compare);
     if (it != angle_end && strcmp(get_string(*it), kClinit) == 0) {
-      angle_clinit_angle_index_ = it - first;
+      init_indices_.angle_clinit_angle_index = it - first;
     } else {
-      angle_clinit_angle_index_ = std::numeric_limits<size_t>::max();
+      init_indices_.angle_clinit_angle_index = std::numeric_limits<size_t>::max();
     }
   }
   {
     constexpr const char* kInit = "<init>";
     const auto it = std::lower_bound(angle_start, angle_end, kInit, compare);
     if (it != angle_end && strcmp(get_string(*it), kInit) == 0) {
-      angle_init_angle_index_ = it - first;
+      init_indices_.angle_init_angle_index = it - first;
     } else {
-      angle_init_angle_index_ = std::numeric_limits<size_t>::max();
+      init_indices_.angle_init_angle_index = std::numeric_limits<size_t>::max();
     }
   }
 }
