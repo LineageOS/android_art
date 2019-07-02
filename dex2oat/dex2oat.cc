@@ -329,16 +329,6 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("      Example: --large-method-max=%d", CompilerOptions::kDefaultLargeMethodThreshold);
   UsageError("      Default: %d", CompilerOptions::kDefaultLargeMethodThreshold);
   UsageError("");
-  UsageError("  --small-method-max=<method-instruction-count>: threshold size for a small");
-  UsageError("      method for compiler filter tuning.");
-  UsageError("      Example: --small-method-max=%d", CompilerOptions::kDefaultSmallMethodThreshold);
-  UsageError("      Default: %d", CompilerOptions::kDefaultSmallMethodThreshold);
-  UsageError("");
-  UsageError("  --tiny-method-max=<method-instruction-count>: threshold size for a tiny");
-  UsageError("      method for compiler filter tuning.");
-  UsageError("      Example: --tiny-method-max=%d", CompilerOptions::kDefaultTinyMethodThreshold);
-  UsageError("      Default: %d", CompilerOptions::kDefaultTinyMethodThreshold);
-  UsageError("");
   UsageError("  --num-dex-methods=<method-count>: threshold size for a small dex file for");
   UsageError("      compiler filter tuning. If the input has fewer than this many methods");
   UsageError("      and the filter is not interpret-only or verify-none or verify-at-runtime, ");
