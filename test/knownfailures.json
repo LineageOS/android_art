@@ -1227,11 +1227,5 @@
                   "575-checker-string-init-alias"],
         "variant": "baseline",
         "description": [ "Working as intended tests that don't pass with baseline." ]
-    },
-    {
-        "tests": ["689-zygote-jit-deopt"],
-        "bug": "b/136584457",
-        "variant": "target & 64",
-        "description": [ "Fails on old kernels." ]
     }
 ]
