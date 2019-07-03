@@ -1914,11 +1914,6 @@ ATTRIBUTE_NO_SANITIZE_ADDRESS void ExecuteSwitchImplCpp(SwitchImplContext* ctx) 
   Thread* self = ctx->self;
   const CodeItemDataAccessor& accessor = ctx->accessor;
   ShadowFrame& shadow_frame = ctx->shadow_frame;
-  if (UNLIKELY(!shadow_frame.HasReferenceArray())) {
-    LOG(FATAL) << "Invalid shadow frame for interpreter use";
-    ctx->result = JValue();
-    return;
-  }
   self->VerifyStack();
 
   uint32_t dex_pc = shadow_frame.GetDexPC();
