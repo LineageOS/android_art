@@ -917,18 +917,10 @@ void JitCodeCache::MoveObsoleteMethod(ArtMethod* old_method, ArtMethod* new_meth
 
 void JitCodeCache::ClearEntryPointsInZygoteExecSpace() {
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  // Iterate over profiling infos to know which methods may have been JITted. Note that
-  // to be JITted, a method must have a profiling info.
-  for (ProfilingInfo* info : profiling_infos_) {
-    ArtMethod* method = info->GetMethod();
+  for (const auto& it : method_code_map_) {
+    ArtMethod* method = it.second;
     if (IsInZygoteExecSpace(method->GetEntryPointFromQuickCompiledCode())) {
       method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
-    }
-    // If zygote does method tracing, or in some configuration where
-    // the JIT zygote does GC, we also need to clear the saved entry point
-    // in the profiling info.
-    if (IsInZygoteExecSpace(info->GetSavedEntryPoint())) {
-      info->SetSavedEntryPoint(nullptr);
     }
   }
 }
@@ -1740,13 +1732,6 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
     // Don't create a private region for a child zygote. Regions are usually map shared
     // (to satisfy dual-view), and we don't want children of a child zygote to inherit it.
     return;
-  }
-
-  if (private_region_.IsValid()) {
-    // In case the zygote was running with its own private region (happens for
-    // unit tests), move the region to the shared one.
-    CHECK(!shared_region_.IsValid());
-    std::swap(shared_region_, private_region_);
   }
 
   // Reset all statistics to be specific to this process.
