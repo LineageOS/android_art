@@ -4874,6 +4874,7 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
                                                                 temp.AsRegister<Register>());
       __ movl(temp.AsRegister<Register>(), Address(base_reg, kDummy32BitOffset));
       RecordMethodBssEntryPatch(invoke);
+      // No need for memory fence, thanks to the x86 memory model.
       break;
     }
     case HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress:
@@ -6617,6 +6618,7 @@ void InstructionCodeGeneratorX86::VisitLoadClass(HLoadClass* cls) NO_THREAD_SAFE
       Address address(method_address, CodeGeneratorX86::kDummy32BitOffset);
       Label* fixup_label = codegen_->NewTypeBssEntryPatch(cls);
       GenerateGcRootFieldLoad(cls, out_loc, address, fixup_label, read_barrier_option);
+      // No need for memory fence, thanks to the x86 memory model.
       generate_null_check = true;
       break;
     }
@@ -6814,6 +6816,7 @@ void InstructionCodeGeneratorX86::VisitLoadString(HLoadString* load) NO_THREAD_S
       Label* fixup_label = codegen_->NewStringBssEntryPatch(load);
       // /* GcRoot<mirror::String> */ out = *address  /* PC-relative */
       GenerateGcRootFieldLoad(load, out_loc, address, fixup_label, kCompilerReadBarrierOption);
+      // No need for memory fence, thanks to the x86 memory model.
       SlowPathCode* slow_path = new (codegen_->GetScopedAllocator()) LoadStringSlowPathX86(load);
       codegen_->AddSlowPath(slow_path);
       __ testl(out, out);
