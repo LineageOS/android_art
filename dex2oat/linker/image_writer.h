@@ -616,9 +616,6 @@ class ImageWriter final {
     return reinterpret_cast<uintptr_t>(obj) - boot_image_begin_ < boot_image_size_;
   }
 
-  // Return true if ptr is within the boot oat file.
-  bool IsInBootOatFile(const void* ptr) const;
-
   // Get the index of the oat file associated with the object.
   size_t GetOatIndex(mirror::Object* object) const REQUIRES_SHARED(Locks::mutator_lock_);
 
