@@ -669,8 +669,8 @@ class ImageWriter final {
   const CompilerOptions& compiler_options_;
 
   // Cached boot image begin and size. This includes heap, native objects and oat files.
-  const uintptr_t boot_image_begin_;
-  const size_t boot_image_size_;
+  const uint32_t boot_image_begin_;
+  const uint32_t boot_image_size_;
 
   // Beginning target image address for the first image.
   uint8_t* global_image_begin_;
