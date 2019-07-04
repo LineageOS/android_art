@@ -307,7 +307,6 @@ void Jit::WaitForWorkersToBeCreated() {
 
 void Jit::DeleteThreadPool() {
   Thread* self = Thread::Current();
-  DCHECK(Runtime::Current()->IsShuttingDown(self));
   if (thread_pool_ != nullptr) {
     std::unique_ptr<ThreadPool> pool;
     {
@@ -854,12 +853,6 @@ bool Jit::MaybeCompileMethod(Thread* self,
                              uint32_t new_count,
                              bool with_backedges) {
   if (thread_pool_ == nullptr) {
-    // Should only see this when shutting down, starting up, in safe mode, or
-    // child zygote.
-    DCHECK(Runtime::Current()->IsShuttingDown(self) ||
-           !Runtime::Current()->IsFinishedStarting() ||
-           Runtime::Current()->IsZygote() ||
-           Runtime::Current()->IsSafeMode());
     return false;
   }
   if (IgnoreSamplesForMethod(method)) {
@@ -869,7 +862,6 @@ bool Jit::MaybeCompileMethod(Thread* self,
     // Tests might request JIT on first use (compiled synchronously in the interpreter).
     return false;
   }
-  DCHECK(thread_pool_ != nullptr);
   DCHECK_GT(WarmMethodThreshold(), 0);
   DCHECK_GT(HotMethodThreshold(), WarmMethodThreshold());
   DCHECK_GT(OSRMethodThreshold(), HotMethodThreshold());
@@ -889,7 +881,6 @@ bool Jit::MaybeCompileMethod(Thread* self,
       if (thread_pool_ == nullptr) {
         // Calling ProfilingInfo::Create might put us in a suspended state, which could
         // lead to the thread pool being deleted when we are shutting down.
-        DCHECK(Runtime::Current()->IsShuttingDown(self));
         return false;
       }
 

@@ -33,9 +33,7 @@ inline void ShadowFrame::SetVRegReference(size_t i, ObjPtr<mirror::Object> val)
   ReadBarrier::MaybeAssertToSpaceInvariant(val.Ptr());
   uint32_t* vreg = &vregs_[i];
   reinterpret_cast<StackReference<mirror::Object>*>(vreg)->Assign(val);
-  if (HasReferenceArray()) {
-    References()[i].Assign(val);
-  }
+  References()[i].Assign(val);
 }
 
 }  // namespace art

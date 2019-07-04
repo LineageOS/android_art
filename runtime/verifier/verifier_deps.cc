@@ -830,7 +830,20 @@ bool VerifierDeps::DexFileDeps::Equals(const VerifierDeps::DexFileDeps& rhs) con
 }
 
 void VerifierDeps::Dump(VariableIndentationOutputStream* vios) const {
+  // Sort dex files by their location to ensure deterministic ordering.
+  using DepsEntry = std::pair<const DexFile*, const DexFileDeps*>;
+  std::vector<DepsEntry> dex_deps;
+  dex_deps.reserve(dex_deps_.size());
   for (const auto& dep : dex_deps_) {
+    dex_deps.emplace_back(dep.first, dep.second.get());
+  }
+  std::sort(
+      dex_deps.begin(),
+      dex_deps.end(),
+      [](const DepsEntry& lhs, const DepsEntry& rhs) {
+        return lhs.first->GetLocation() < rhs.first->GetLocation();
+      });
+  for (const auto& dep : dex_deps) {
     const DexFile& dex_file = *dep.first;
     vios->Stream()
         << "Dependencies of "
