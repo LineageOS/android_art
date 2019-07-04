@@ -91,16 +91,6 @@ elif [[ $mode == "target" ]]; then
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
   # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
   make_command+=" linker libc.bootstrap libdl.bootstrap libm.bootstrap"
-  # Create a copy of the time zone data module prebuilt time zone data files in
-  # /system/etc/tzdata_module/etc on target, so that they can be found even if
-  # the Time Zone Data APEX is not available, by setting the environment
-  # variable `ART_TEST_ANDROID_TZDATA_ROOT` to "/system/etc/tzdata_module" on
-  # device. This is a temporary change needed until both the ART Buildbot and
-  # Golem fully support the Time Zone Data APEX.
-  #
-  # TODO(b/121117762, b/129332183): Remove this when the ART Buildbot and Golem
-  # have full support for the Time Zone Data APEX.
-  make_command+=" icu_overlay-art-test-tzdata tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata tz_version-art-test-tzdata"
   # Build the Time Zone Data APEX.
   make_command+=" com.android.tzdata"
   mode_suffix="-target"
