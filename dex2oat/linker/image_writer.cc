@@ -2687,13 +2687,6 @@ void ImageWriter::CreateHeader(size_t oat_index) {
               << " Oat data end=" << reinterpret_cast<uintptr_t>(oat_data_end)
               << " Oat file end=" << reinterpret_cast<uintptr_t>(oat_file_end);
   }
-  // Store boot image info for app image so that we can relocate.
-  uint32_t boot_image_begin = 0;
-  uint32_t boot_image_end = 0;
-  uint32_t boot_oat_begin = 0;
-  uint32_t boot_oat_end = 0;
-  gc::Heap* const heap = Runtime::Current()->GetHeap();
-  heap->GetBootImagesSize(&boot_image_begin, &boot_image_end, &boot_oat_begin, &boot_oat_end);
 
   // Create the header, leave 0 for data size since we will fill this in as we are writing the
   // image.
@@ -2709,8 +2702,8 @@ void ImageWriter::CreateHeader(size_t oat_index) {
       PointerToLowMemUInt32(image_info.oat_data_begin_),
       PointerToLowMemUInt32(oat_data_end),
       PointerToLowMemUInt32(oat_file_end),
-      boot_image_begin,
-      boot_oat_end - boot_image_begin,
+      boot_image_begin_,
+      boot_image_size_,
       static_cast<uint32_t>(target_ptr_size_));
 }
 
@@ -3616,43 +3609,6 @@ void ImageWriter::UpdateOatFileHeader(size_t oat_index, const OatHeader& oat_hea
   }
 }
 
-static uintptr_t GetBootImageBegin(const CompilerOptions& compiler_options) {
-  if (compiler_options.IsBootImage()) {
-    DCHECK(Runtime::Current()->GetHeap()->GetBootImageSpaces().empty());
-    return 0u;
-  } else {
-    const std::vector<gc::space::ImageSpace*>& image_spaces =
-        Runtime::Current()->GetHeap()->GetBootImageSpaces();
-    DCHECK(!image_spaces.empty());
-    return reinterpret_cast<uintptr_t>(image_spaces.front()->Begin());
-  }
-}
-
-static size_t GetBootImageSize(const CompilerOptions& compiler_options) {
-  if (compiler_options.IsBootImage()) {
-    DCHECK(Runtime::Current()->GetHeap()->GetBootImageSpaces().empty());
-    return 0u;
-  } else {
-    const std::vector<gc::space::ImageSpace*>& image_spaces =
-        Runtime::Current()->GetHeap()->GetBootImageSpaces();
-    DCHECK(!image_spaces.empty());
-    size_t boot_image_size = 0u;
-    for (size_t i = 0, num_spaces = image_spaces.size(); i != num_spaces; ) {
-      const ImageHeader& image_header = image_spaces[i]->GetImageHeader();
-      DCHECK_NE(image_header.GetComponentCount(), 0u);
-      DCHECK_LE(image_header.GetComponentCount(), num_spaces - i);
-      if (kIsDebugBuild) {
-        for (size_t j = 1u; j != image_header.GetComponentCount(); ++j) {
-          DCHECK_EQ(image_spaces[i + j]->GetImageHeader().GetComponentCount(), 0u);
-        }
-      }
-      boot_image_size += image_header.GetImageReservationSize();
-      i += image_header.GetComponentCount();
-    }
-    return boot_image_size;
-  }
-}
-
 ImageWriter::ImageWriter(
     const CompilerOptions& compiler_options,
     uintptr_t image_begin,
@@ -3662,8 +3618,8 @@ ImageWriter::ImageWriter(
     jobject class_loader,
     const HashSet<std::string>* dirty_image_objects)
     : compiler_options_(compiler_options),
-      boot_image_begin_(GetBootImageBegin(compiler_options_)),
-      boot_image_size_(GetBootImageSize(compiler_options_)),
+      boot_image_begin_(Runtime::Current()->GetHeap()->GetBootImagesStartAddress()),
+      boot_image_size_(Runtime::Current()->GetHeap()->GetBootImagesSize()),
       global_image_begin_(reinterpret_cast<uint8_t*>(image_begin)),
       image_objects_offset_begin_(0),
       target_ptr_size_(InstructionSetPointerSize(compiler_options.GetInstructionSet())),
@@ -3677,6 +3633,8 @@ ImageWriter::ImageWriter(
       dex_file_oat_index_map_(dex_file_oat_index_map),
       dirty_image_objects_(dirty_image_objects) {
   DCHECK(compiler_options.IsBootImage() || compiler_options.IsAppImage());
+  DCHECK_EQ(compiler_options.IsBootImage(), boot_image_begin_ == 0u);
+  DCHECK_EQ(compiler_options.IsBootImage(), boot_image_size_ == 0u);
   CHECK_NE(image_begin, 0U);
   std::fill_n(image_methods_, arraysize(image_methods_), nullptr);
   CHECK_EQ(compiler_options.IsBootImage(),

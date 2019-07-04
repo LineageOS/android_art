@@ -1143,21 +1143,13 @@ class ImageSpace::Loader {
                               std::string* error_msg) {
     DCHECK(error_msg != nullptr);
     // Set up sections.
-    uint32_t boot_image_begin = 0;
-    uint32_t boot_image_end = 0;
-    uint32_t boot_oat_begin = 0;
-    uint32_t boot_oat_end = 0;
     gc::Heap* const heap = Runtime::Current()->GetHeap();
-    heap->GetBootImagesSize(&boot_image_begin, &boot_image_end, &boot_oat_begin, &boot_oat_end);
-    if (boot_image_begin == boot_image_end) {
+    uint32_t boot_image_begin = heap->GetBootImagesStartAddress();
+    uint32_t boot_image_size = heap->GetBootImagesSize();
+    if (boot_image_size == 0u) {
       *error_msg = "Can not relocate app image without boot image space";
       return false;
     }
-    if (boot_oat_begin == boot_oat_end) {
-      *error_msg = "Can not relocate app image without boot oat file";
-      return false;
-    }
-    const uint32_t boot_image_size = boot_oat_end - boot_image_begin;
     const uint32_t image_header_boot_image_size = image_header.GetBootImageSize();
     if (boot_image_size != image_header_boot_image_size) {
       *error_msg = StringPrintf("Boot image size %" PRIu64 " does not match expected size %"
