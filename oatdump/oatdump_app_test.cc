@@ -19,27 +19,27 @@
 namespace art {
 
 TEST_F(OatDumpTest, TestAppWithBootImage) {
-  ASSERT_TRUE(GenerateAppOdexFile(kDynamic, {"--runtime-arg", "-Xmx64M"}));
-  ASSERT_TRUE(Exec(kDynamic, kModeOatWithBootImage, {}, kListAndCode));
+  ASSERT_TRUE(GenerateAppOdexFile(kDynamicLinking, {"--runtime-arg", "-Xmx64M"}));
+  ASSERT_TRUE(Exec(kDynamicLinking, kModeOatWithBootImage, {}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestAppWithBootImageStatic) {
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
-  ASSERT_TRUE(GenerateAppOdexFile(kStatic, {"--runtime-arg", "-Xmx64M"}));
-  ASSERT_TRUE(Exec(kStatic, kModeOatWithBootImage, {}, kListAndCode));
+  ASSERT_TRUE(GenerateAppOdexFile(kStaticLinking, {"--runtime-arg", "-Xmx64M"}));
+  ASSERT_TRUE(Exec(kStaticLinking, kModeOatWithBootImage, {}, kListAndCode));
 }
 
 TEST_F(OatDumpTest, TestAppImageWithBootImage) {
   TEST_DISABLED_WITHOUT_BAKER_READ_BARRIERS();  // GC bug, b/126305867
   const std::string app_image_arg = "--app-image-file=" + GetAppImageName();
-  ASSERT_TRUE(GenerateAppOdexFile(kDynamic, {"--runtime-arg", "-Xmx64M", app_image_arg}));
-  ASSERT_TRUE(Exec(kDynamic, kModeAppImage, {}, kListAndCode));
+  ASSERT_TRUE(GenerateAppOdexFile(kDynamicLinking, {"--runtime-arg", "-Xmx64M", app_image_arg}));
+  ASSERT_TRUE(Exec(kDynamicLinking, kModeAppImage, {}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestAppImageWithBootImageStatic) {
   TEST_DISABLED_WITHOUT_BAKER_READ_BARRIERS();  // GC bug, b/126305867
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   const std::string app_image_arg = "--app-image-file=" + GetAppImageName();
-  ASSERT_TRUE(GenerateAppOdexFile(kStatic, {"--runtime-arg", "-Xmx64M", app_image_arg}));
-  ASSERT_TRUE(Exec(kStatic, kModeAppImage, {}, kListAndCode));
+  ASSERT_TRUE(GenerateAppOdexFile(kStaticLinking, {"--runtime-arg", "-Xmx64M", app_image_arg}));
+  ASSERT_TRUE(Exec(kStaticLinking, kModeAppImage, {}, kListAndCode));
 }
 
 }  // namespace art

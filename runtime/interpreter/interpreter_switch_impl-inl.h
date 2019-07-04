@@ -1917,6 +1917,7 @@ ATTRIBUTE_NO_SANITIZE_ADDRESS void ExecuteSwitchImplCpp(SwitchImplContext* ctx) 
   self->VerifyStack();
 
   uint32_t dex_pc = shadow_frame.GetDexPC();
+  DCHECK_LT(dex_pc, shadow_frame.GetMethod()->DexInstructionData().InsnsSizeInCodeUnits());
   const auto* const instrumentation = Runtime::Current()->GetInstrumentation();
   const uint16_t* const insns = accessor.Insns();
   const Instruction* next = Instruction::At(insns + dex_pc);
