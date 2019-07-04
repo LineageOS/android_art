@@ -283,6 +283,24 @@ func testInstall(ctx android.InstallHookContext) {
 var artTestMutex sync.Mutex
 
 func init() {
+	artModuleTypes := []string{
+		"art_cc_library",
+		"art_cc_library_static",
+		"art_cc_binary",
+		"art_cc_test",
+		"art_cc_test_library",
+		"art_cc_defaults",
+		"libart_cc_defaults",
+		"libart_static_cc_defaults",
+		"art_global_defaults",
+		"art_debug_defaults",
+		"art_apex_test",
+	}
+	android.AddNeverAllowRules(
+		android.NeverAllow().
+			NotIn("art", "external/vixl").
+			ModuleType(artModuleTypes...))
+
 	android.RegisterModuleType("art_cc_library", artLibrary)
 	android.RegisterModuleType("art_cc_library_static", artStaticLibrary)
 	android.RegisterModuleType("art_cc_binary", artBinary)
