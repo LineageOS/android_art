@@ -131,12 +131,10 @@ unspecified registers or condition codes.
  */
 #define OFF_FP(a) (a - SHADOWFRAME_VREGS_OFFSET)
 #define OFF_FP_NUMBER_OF_VREGS OFF_FP(SHADOWFRAME_NUMBER_OF_VREGS_OFFSET)
-#define OFF_FP_DEX_PC OFF_FP(SHADOWFRAME_DEX_PC_OFFSET)
 #define OFF_FP_LINK OFF_FP(SHADOWFRAME_LINK_OFFSET)
 #define OFF_FP_METHOD OFF_FP(SHADOWFRAME_METHOD_OFFSET)
 #define OFF_FP_RESULT_REGISTER OFF_FP(SHADOWFRAME_RESULT_REGISTER_OFFSET)
 #define OFF_FP_DEX_PC_PTR OFF_FP(SHADOWFRAME_DEX_PC_PTR_OFFSET)
-#define OFF_FP_DEX_INSTRUCTIONS OFF_FP(SHADOWFRAME_DEX_INSTRUCTIONS_OFFSET)
 #define OFF_FP_COUNTDOWN_OFFSET OFF_FP(SHADOWFRAME_HOTNESS_COUNTDOWN_OFFSET)
 #define OFF_FP_SHADOWFRAME OFF_FP(0)
 
@@ -182,12 +180,6 @@ unspecified registers or condition codes.
  * be done *before* something throws.
  *
  * It's okay to do this more than once.
- *
- * NOTE: the fast interpreter keeps track of dex pc as a direct pointer to the mapped
- * dex byte codes.  However, the rest of the runtime expects dex pc to be an instruction
- * offset into the code_items_[] array.  For effiency, we will "export" the
- * current dex pc as a direct pointer using the EXPORT_PC macro, and rely on GetDexPC
- * to convert to a dex pc when needed.
  */
 .macro EXPORT_PC
     movl    rPC, OFF_FP_DEX_PC_PTR(rFP)
@@ -393,18 +385,12 @@ ENTRY ExecuteMterpImpl
     movl    IN_ARG3(%esp), %eax
     movl    %eax, SHADOWFRAME_RESULT_REGISTER_OFFSET(%edx)
 
-    /* Remember the code_item */
-    movl    IN_ARG1(%esp), %ecx
-    movl    %ecx, SHADOWFRAME_DEX_INSTRUCTIONS_OFFSET(%edx)
-
     /* set up "named" registers */
     movl    SHADOWFRAME_NUMBER_OF_VREGS_OFFSET(%edx), %eax
     leal    SHADOWFRAME_VREGS_OFFSET(%edx), rFP
     leal    (rFP, %eax, 4), rREFS
-    movl    SHADOWFRAME_DEX_PC_OFFSET(%edx), %eax
-    lea     (%ecx, %eax, 2), rPC
+    movl    SHADOWFRAME_DEX_PC_PTR_OFFSET(%edx), rPC
     CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
-    EXPORT_PC
 
     /* Set up for backwards branches & osr profiling */
     movl    OFF_FP_METHOD(rFP), %eax
@@ -570,10 +556,7 @@ MterpException:
     call    SYMBOL(MterpHandleException)
     testb   %al, %al
     jz      MterpExceptionReturn
-    movl    OFF_FP_DEX_INSTRUCTIONS(rFP), %eax
-    movl    OFF_FP_DEX_PC(rFP), %ecx
-    lea     (%eax, %ecx, 2), rPC
-    movl    rPC, OFF_FP_DEX_PC_PTR(rFP)
+    movl    OFF_FP_DEX_PC_PTR(rFP), rPC
     /* Do we need to switch interpreters? */
     movl    rSELF, %eax
     cmpb    LITERAL(0), THREAD_USE_MTERP_OFFSET(%eax)

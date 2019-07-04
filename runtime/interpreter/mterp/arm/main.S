@@ -109,12 +109,10 @@ unspecified registers or condition codes.
  */
 #define OFF_FP(a) (a - SHADOWFRAME_VREGS_OFFSET)
 #define OFF_FP_NUMBER_OF_VREGS OFF_FP(SHADOWFRAME_NUMBER_OF_VREGS_OFFSET)
-#define OFF_FP_DEX_PC OFF_FP(SHADOWFRAME_DEX_PC_OFFSET)
 #define OFF_FP_LINK OFF_FP(SHADOWFRAME_LINK_OFFSET)
 #define OFF_FP_METHOD OFF_FP(SHADOWFRAME_METHOD_OFFSET)
 #define OFF_FP_RESULT_REGISTER OFF_FP(SHADOWFRAME_RESULT_REGISTER_OFFSET)
 #define OFF_FP_DEX_PC_PTR OFF_FP(SHADOWFRAME_DEX_PC_PTR_OFFSET)
-#define OFF_FP_DEX_INSTRUCTIONS OFF_FP(SHADOWFRAME_DEX_INSTRUCTIONS_OFFSET)
 #define OFF_FP_SHADOWFRAME OFF_FP(0)
 
 /*
@@ -122,23 +120,9 @@ unspecified registers or condition codes.
  * be done *before* something throws.
  *
  * It's okay to do this more than once.
- *
- * NOTE: the fast interpreter keeps track of dex pc as a direct pointer to the mapped
- * dex byte codes.  However, the rest of the runtime expects dex pc to be an instruction
- * offset into the code_items_[] array.  For effiency, we will "export" the
- * current dex pc as a direct pointer using the EXPORT_PC macro, and rely on GetDexPC
- * to convert to a dex pc when needed.
  */
 .macro EXPORT_PC
     str  rPC, [rFP, #OFF_FP_DEX_PC_PTR]
-.endm
-
-.macro EXPORT_DEX_PC tmp
-    ldr  \tmp, [rFP, #OFF_FP_DEX_INSTRUCTIONS]
-    str  rPC, [rFP, #OFF_FP_DEX_PC_PTR]
-    sub  \tmp, rPC, \tmp
-    asr  \tmp, #1
-    str  \tmp, [rFP, #OFF_FP_DEX_PC]
 .endm
 
 /*
@@ -398,18 +382,13 @@ ENTRY ExecuteMterpImpl
     /* Remember the return register */
     str     r3, [r2, #SHADOWFRAME_RESULT_REGISTER_OFFSET]
 
-    /* Remember the dex instruction pointer */
-    str     r1, [r2, #SHADOWFRAME_DEX_INSTRUCTIONS_OFFSET]
-
     /* set up "named" registers */
     mov     rSELF, r0
     ldr     r0, [r2, #SHADOWFRAME_NUMBER_OF_VREGS_OFFSET]
-    add     rFP, r2, #SHADOWFRAME_VREGS_OFFSET     @ point to vregs.
-    VREG_INDEX_TO_ADDR rREFS, r0                   @ point to reference array in shadow frame
-    ldr     r0, [r2, #SHADOWFRAME_DEX_PC_OFFSET]   @ Get starting dex_pc.
-    add     rPC, r1, r0, lsl #1                    @ Create direct pointer to 1st dex opcode
+    add     rFP, r2, #SHADOWFRAME_VREGS_OFFSET         @ pointer to vregs.
+    VREG_INDEX_TO_ADDR rREFS, r0                       @ pointer to reference array in shadow frame
+    ldr     rPC, [r2, #SHADOWFRAME_DEX_PC_PTR_OFFSET]  @ pointer to current dex instruction.
     CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
-    EXPORT_PC
 
     /* Starting ibase */
     ldr     rIBASE, [rSELF, #THREAD_CURRENT_IBASE_OFFSET]
@@ -551,10 +530,8 @@ MterpException:
     bl      MterpHandleException                    @ (self, shadow_frame)
     cmp     r0, #0
     beq     MterpExceptionReturn                    @ no local catch, back to caller.
-    ldr     r0, [rFP, #OFF_FP_DEX_INSTRUCTIONS]
-    ldr     r1, [rFP, #OFF_FP_DEX_PC]
     ldr     rIBASE, [rSELF, #THREAD_CURRENT_IBASE_OFFSET]
-    add     rPC, r0, r1, lsl #1                     @ generate new dex_pc_ptr
+    ldr     rPC, [rFP, #OFF_FP_DEX_PC_PTR]          @ reload dex pc pointer.
     /* Do we need to switch interpreters? */
     ldr     r0, [rSELF, #THREAD_USE_MTERP_OFFSET]
     cmp     r0, #0
