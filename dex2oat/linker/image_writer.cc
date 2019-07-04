@@ -223,21 +223,6 @@ bool ImageWriter::IsImageDexCache(ObjPtr<mirror::DexCache> dex_cache) const {
   return true;
 }
 
-bool ImageWriter::IsInBootOatFile(const void* ptr) const {
-  gc::Heap* const heap = Runtime::Current()->GetHeap();
-  if (compiler_options_.IsBootImage()) {
-    DCHECK(heap->GetBootImageSpaces().empty());
-    return false;
-  }
-  for (gc::space::ImageSpace* boot_image_space : heap->GetBootImageSpaces()) {
-    const ImageHeader& image_header = boot_image_space->GetImageHeader();
-    if (image_header.GetOatFileBegin() <= ptr && ptr < image_header.GetOatFileEnd()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void ClearDexFileCookies() REQUIRES_SHARED(Locks::mutator_lock_) {
   auto visitor = [](Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK(obj != nullptr);
@@ -1168,9 +1153,9 @@ bool ImageWriter::KeepClass(ObjPtr<mirror::Class> klass) {
   if (klass == nullptr) {
     return false;
   }
-  if (!compiler_options_.IsBootImage() &&
-      Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(klass)) {
+  if (IsInBootImage(klass.Ptr())) {
     // Already in boot image, return true.
+    DCHECK(!compiler_options_.IsBootImage());
     return true;
   }
   std::string temp;
@@ -3392,9 +3377,6 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method,
     // We have code for a static method, but need to go through the resolution stub for class
     // initialization.
     quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
-  }
-  if (!IsInBootOatFile(quick_code)) {
-    // DCHECK_GE(quick_code, oat_data_begin_);
   }
   return quick_code;
 }
