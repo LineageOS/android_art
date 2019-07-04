@@ -484,7 +484,8 @@ void JitMemoryRegion::FreeData(uint8_t* data) {
   mspace_free(data_mspace_, data);
 }
 
-#if defined(__BIONIC__)
+#if defined(__BIONIC__) && defined(ART_TARGET)
+// The code below only works on bionic on target.
 
 int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg) {
   /* Check if kernel support exists, otherwise fall back to ashmem */
