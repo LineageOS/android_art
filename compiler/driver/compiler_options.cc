@@ -42,8 +42,6 @@ CompilerOptions::CompilerOptions()
     : compiler_filter_(CompilerFilter::kDefaultCompilerFilter),
       huge_method_threshold_(kDefaultHugeMethodThreshold),
       large_method_threshold_(kDefaultLargeMethodThreshold),
-      small_method_threshold_(kDefaultSmallMethodThreshold),
-      tiny_method_threshold_(kDefaultTinyMethodThreshold),
       num_dex_methods_threshold_(kDefaultNumDexMethodsThreshold),
       inline_max_code_units_(kUnsetInlineMaxCodeUnits),
       instruction_set_(kRuntimeISA == InstructionSet::kArm ? InstructionSet::kThumb2 : kRuntimeISA),

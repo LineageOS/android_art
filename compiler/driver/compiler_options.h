@@ -62,8 +62,6 @@ class CompilerOptions final {
   // Guide heuristics to determine whether to compile method if profile data not available.
   static const size_t kDefaultHugeMethodThreshold = 10000;
   static const size_t kDefaultLargeMethodThreshold = 600;
-  static const size_t kDefaultSmallMethodThreshold = 60;
-  static const size_t kDefaultTinyMethodThreshold = 20;
   static const size_t kDefaultNumDexMethodsThreshold = 900;
   static constexpr double kDefaultTopKProfileThreshold = 90.0;
   static const bool kDefaultGenerateDebugInfo = false;
@@ -125,28 +123,12 @@ class CompilerOptions final {
     return large_method_threshold_;
   }
 
-  size_t GetSmallMethodThreshold() const {
-    return small_method_threshold_;
-  }
-
-  size_t GetTinyMethodThreshold() const {
-    return tiny_method_threshold_;
-  }
-
   bool IsHugeMethod(size_t num_dalvik_instructions) const {
     return num_dalvik_instructions > huge_method_threshold_;
   }
 
   bool IsLargeMethod(size_t num_dalvik_instructions) const {
     return num_dalvik_instructions > large_method_threshold_;
-  }
-
-  bool IsSmallMethod(size_t num_dalvik_instructions) const {
-    return num_dalvik_instructions > small_method_threshold_;
-  }
-
-  bool IsTinyMethod(size_t num_dalvik_instructions) const {
-    return num_dalvik_instructions > tiny_method_threshold_;
   }
 
   size_t GetNumDexMethodsThreshold() const {
@@ -375,8 +357,6 @@ class CompilerOptions final {
   CompilerFilter::Filter compiler_filter_;
   size_t huge_method_threshold_;
   size_t large_method_threshold_;
-  size_t small_method_threshold_;
-  size_t tiny_method_threshold_;
   size_t num_dex_methods_threshold_;
   size_t inline_max_code_units_;
 
