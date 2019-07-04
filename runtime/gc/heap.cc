@@ -4008,33 +4008,46 @@ bool Heap::IsInBootImageOatFile(const void* p) const {
   return false;
 }
 
-void Heap::GetBootImagesSize(uint32_t* boot_image_begin,
-                             uint32_t* boot_image_end,
-                             uint32_t* boot_oat_begin,
-                             uint32_t* boot_oat_end) {
-  DCHECK(boot_image_begin != nullptr);
-  DCHECK(boot_image_end != nullptr);
-  DCHECK(boot_oat_begin != nullptr);
-  DCHECK(boot_oat_end != nullptr);
-  *boot_image_begin = 0u;
-  *boot_image_end = 0u;
-  *boot_oat_begin = 0u;
-  *boot_oat_end = 0u;
-  for (gc::space::ImageSpace* space_ : GetBootImageSpaces()) {
-    const uint32_t image_begin = PointerToLowMemUInt32(space_->Begin());
-    const uint32_t image_size = space_->GetImageHeader().GetImageSize();
-    if (*boot_image_begin == 0 || image_begin < *boot_image_begin) {
-      *boot_image_begin = image_begin;
+uint32_t Heap::GetBootImagesStartAddress() const {
+  const std::vector<gc::space::ImageSpace*>& image_spaces = GetBootImageSpaces();
+  return image_spaces.empty() ? 0u : PointerToLowMemUInt32(image_spaces.front()->Begin());
+}
+
+uint32_t Heap::GetBootImagesSize() const {
+  const std::vector<gc::space::ImageSpace*>& image_spaces = GetBootImageSpaces();
+  uint32_t boot_image_size = 0u;
+  for (size_t i = 0u, num_spaces = image_spaces.size(); i != num_spaces; ) {
+    const ImageHeader& image_header = image_spaces[i]->GetImageHeader();
+    uint32_t reservation_size = image_header.GetImageReservationSize();
+    uint32_t component_count = image_header.GetComponentCount();
+    if (kIsDebugBuild) {
+      CHECK_NE(component_count, 0u);
+      CHECK_LE(component_count, num_spaces - i);
+      CHECK_NE(reservation_size, 0u);
+      for (size_t j = 1u; j != image_header.GetComponentCount(); ++j) {
+        CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetComponentCount(), 0u);
+        CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetImageReservationSize(), 0u);
+      }
+      // Check the start of the heap.
+      CHECK_EQ(image_spaces[0]->Begin() + boot_image_size, image_spaces[i]->Begin());
+      // Check contiguous layout of images and oat files.
+      const uint8_t* current_heap = image_spaces[i]->Begin();
+      const uint8_t* current_oat = image_spaces[i]->GetImageHeader().GetOatFileBegin();
+      for (size_t j = 0u; j != image_header.GetComponentCount(); ++j) {
+        CHECK_EQ(current_heap, image_spaces[i + j]->Begin());
+        CHECK_EQ(current_oat, image_spaces[i + j]->GetImageHeader().GetOatFileBegin());
+        current_heap += RoundUp(image_spaces[i + j]->GetImageHeader().GetImageSize(), kPageSize);
+        current_oat = image_spaces[i + j]->GetImageHeader().GetOatFileEnd();
+      }
+      // Check that oat files start at the end of images.
+      CHECK_EQ(current_heap, image_spaces[i]->GetImageHeader().GetOatFileBegin());
+      // Check that the reservation size equals the size of images and oat files.
+      CHECK_EQ(reservation_size, static_cast<size_t>(current_oat - image_spaces[i]->Begin()));
     }
-    *boot_image_end = std::max(*boot_image_end, image_begin + image_size);
-    const OatFile* boot_oat_file = space_->GetOatFile();
-    const uint32_t oat_begin = PointerToLowMemUInt32(boot_oat_file->Begin());
-    const uint32_t oat_size = boot_oat_file->Size();
-    if (*boot_oat_begin == 0 || oat_begin < *boot_oat_begin) {
-      *boot_oat_begin = oat_begin;
-    }
-    *boot_oat_end = std::max(*boot_oat_end, oat_begin + oat_size);
+    boot_image_size += reservation_size;
+    i += component_count;
   }
+  return boot_image_size;
 }
 
 void Heap::SetAllocationListener(AllocationListener* l) {
