@@ -33,7 +33,6 @@
 #include "oat_quick_method_header.h"
 #include "read_barrier.h"
 #include "stream/output_stream.h"
-#include "utils/arm64/assembler_arm64.h"
 
 namespace art {
 namespace linker {
