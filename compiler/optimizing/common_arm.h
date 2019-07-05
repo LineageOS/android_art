@@ -17,7 +17,6 @@
 #ifndef ART_COMPILER_OPTIMIZING_COMMON_ARM_H_
 #define ART_COMPILER_OPTIMIZING_COMMON_ARM_H_
 
-#include "dwarf/register.h"
 #include "instruction_simplifier_shared.h"
 #include "locations.h"
 #include "nodes.h"
@@ -37,14 +36,6 @@ namespace arm {
 namespace helpers {
 
 static_assert(vixl::aarch32::kSpCode == SP, "vixl::aarch32::kSpCode must equal ART's SP");
-
-inline dwarf::Reg DWARFReg(vixl::aarch32::Register reg) {
-  return dwarf::Reg::ArmCore(static_cast<int>(reg.GetCode()));
-}
-
-inline dwarf::Reg DWARFReg(vixl::aarch32::SRegister reg) {
-  return dwarf::Reg::ArmFp(static_cast<int>(reg.GetCode()));
-}
 
 inline vixl::aarch32::Register HighRegisterFrom(Location location) {
   DCHECK(location.IsRegisterPair()) << location;

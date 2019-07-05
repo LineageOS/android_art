@@ -80,8 +80,10 @@ class DebugFrameOpCodeWriter : private Writer<Vector> {
   }
 
   // Custom alias - spill many registers based on bitmask.
-  void ALWAYS_INLINE RelOffsetForMany(Reg reg_base, int offset,
-                                      uint32_t reg_mask, int reg_size) {
+  void ALWAYS_INLINE RelOffsetForMany(Reg reg_base,
+                                      int32_t offset,
+                                      uint32_t reg_mask,
+                                      int32_t reg_size) {
     DCHECK(reg_size == 4 || reg_size == 8);
     if (UNLIKELY(enabled_)) {
       for (int i = 0; reg_mask != 0u; reg_mask >>= 1, i++) {
