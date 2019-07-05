@@ -148,11 +148,11 @@ ART_HOST_EXECUTABLES += $(foreach name,$(ART_CORE_DEBUGGABLE_EXECUTABLES),$(name
 endif
 
 # Release Runtime APEX, included by default in "user" builds.
-RELEASE_RUNTIME_APEX := com.android.runtime.release
+RELEASE_RUNTIME_APEX := com.android.art.release
 # Debug Runtime APEX, included by default in "userdebug" and "eng"
 # builds and used in ART device benchmarking.
-DEBUG_RUNTIME_APEX := com.android.runtime.debug
+DEBUG_RUNTIME_APEX := com.android.art.debug
 # Testing Runtime APEX, used in ART device testing.
-TESTING_RUNTIME_APEX := com.android.runtime.testing
+TESTING_RUNTIME_APEX := com.android.art.testing
 
 endif # ART_ANDROID_COMMON_PATH_MK
