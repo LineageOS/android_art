@@ -313,11 +313,12 @@ class Jit {
   // Compile methods from the given profile. If `add_to_queue` is true, methods
   // in the profile are added to the JIT queue. Otherwise they are compiled
   // directly.
-  void CompileMethodsFromProfile(Thread* self,
-                                 const std::vector<const DexFile*>& dex_files,
-                                 const std::string& profile_path,
-                                 Handle<mirror::ClassLoader> class_loader,
-                                 bool add_to_queue);
+  // Return the number of methods added to the queue.
+  uint32_t CompileMethodsFromProfile(Thread* self,
+                                     const std::vector<const DexFile*>& dex_files,
+                                     const std::string& profile_path,
+                                     Handle<mirror::ClassLoader> class_loader,
+                                     bool add_to_queue);
 
   // Register the dex files to the JIT. This is to perform any compilation/optimization
   // at the point of loading the dex files.
