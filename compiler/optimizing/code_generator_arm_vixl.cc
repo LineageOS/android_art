@@ -47,7 +47,6 @@ namespace vixl32 = vixl::aarch32;
 using namespace vixl32;  // NOLINT(build/namespaces)
 
 using helpers::DRegisterFrom;
-using helpers::DWARFReg;
 using helpers::HighRegisterFrom;
 using helpers::InputDRegisterAt;
 using helpers::InputOperandAt;
@@ -2125,32 +2124,66 @@ void CodeGeneratorARMVIXL::GenerateFrameEntry() {
     RecordPcInfo(nullptr, 0);
   }
 
-  __ Push(RegisterList(core_spill_mask_));
-  GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize * POPCOUNT(core_spill_mask_));
-  GetAssembler()->cfi().RelOffsetForMany(DWARFReg(kMethodRegister),
-                                         0,
-                                         core_spill_mask_,
-                                         kArmWordSize);
-  if (fpu_spill_mask_ != 0) {
-    uint32_t first = LeastSignificantBit(fpu_spill_mask_);
+  uint32_t frame_size = GetFrameSize();
+  uint32_t core_spills_offset = frame_size - GetCoreSpillSize();
+  uint32_t fp_spills_offset = frame_size - FrameEntrySpillSize();
+  if ((fpu_spill_mask_ == 0u || IsPowerOfTwo(fpu_spill_mask_)) &&
+      core_spills_offset <= 3u * kArmWordSize) {
+    // Do a single PUSH for core registers including the method and up to two
+    // filler registers. Then store the single FP spill if any.
+    // (The worst case is when the method is not required and we actually
+    // store 3 extra registers but they are stored in the same properly
+    // aligned 16-byte chunk where we're already writing anyway.)
+    DCHECK_EQ(kMethodRegister.GetCode(), 0u);
+    uint32_t extra_regs = MaxInt<uint32_t>(core_spills_offset / kArmWordSize);
+    DCHECK_LT(MostSignificantBit(extra_regs), LeastSignificantBit(core_spill_mask_));
+    __ Push(RegisterList(core_spill_mask_ | extra_regs));
+    GetAssembler()->cfi().AdjustCFAOffset(frame_size);
+    GetAssembler()->cfi().RelOffsetForMany(DWARFReg(kMethodRegister),
+                                           core_spills_offset,
+                                           core_spill_mask_,
+                                           kArmWordSize);
+    if (fpu_spill_mask_ != 0u) {
+      DCHECK(IsPowerOfTwo(fpu_spill_mask_));
+      vixl::aarch32::SRegister sreg(LeastSignificantBit(fpu_spill_mask_));
+      GetAssembler()->StoreSToOffset(sreg, sp, fp_spills_offset);
+      GetAssembler()->cfi().RelOffset(DWARFReg(sreg), /*offset=*/ fp_spills_offset);
+    }
+  } else {
+    __ Push(RegisterList(core_spill_mask_));
+    GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize * POPCOUNT(core_spill_mask_));
+    GetAssembler()->cfi().RelOffsetForMany(DWARFReg(kMethodRegister),
+                                           /*offset=*/ 0,
+                                           core_spill_mask_,
+                                           kArmWordSize);
+    if (fpu_spill_mask_ != 0) {
+      uint32_t first = LeastSignificantBit(fpu_spill_mask_);
 
-    // Check that list is contiguous.
-    DCHECK_EQ(fpu_spill_mask_ >> CTZ(fpu_spill_mask_), ~0u >> (32 - POPCOUNT(fpu_spill_mask_)));
+      // Check that list is contiguous.
+      DCHECK_EQ(fpu_spill_mask_ >> CTZ(fpu_spill_mask_), ~0u >> (32 - POPCOUNT(fpu_spill_mask_)));
 
-    __ Vpush(SRegisterList(vixl32::SRegister(first), POPCOUNT(fpu_spill_mask_)));
-    GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize * POPCOUNT(fpu_spill_mask_));
-    GetAssembler()->cfi().RelOffsetForMany(DWARFReg(s0), 0, fpu_spill_mask_, kArmWordSize);
-  }
+      __ Vpush(SRegisterList(vixl32::SRegister(first), POPCOUNT(fpu_spill_mask_)));
+      GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize * POPCOUNT(fpu_spill_mask_));
+      GetAssembler()->cfi().RelOffsetForMany(DWARFReg(s0),
+                                             /*offset=*/ 0,
+                                             fpu_spill_mask_,
+                                             kArmWordSize);
+    }
 
-  int adjust = GetFrameSize() - FrameEntrySpillSize();
-  __ Sub(sp, sp, adjust);
-  GetAssembler()->cfi().AdjustCFAOffset(adjust);
-
-  // Save the current method if we need it. Note that we do not
-  // do this in HCurrentMethod, as the instruction might have been removed
-  // in the SSA graph.
-  if (RequiresCurrentMethod()) {
-    GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
+    // Adjust SP and save the current method if we need it. Note that we do
+    // not save the method in HCurrentMethod, as the instruction might have
+    // been removed in the SSA graph.
+    if (RequiresCurrentMethod() && fp_spills_offset <= 3 * kArmWordSize) {
+      DCHECK_EQ(kMethodRegister.GetCode(), 0u);
+      __ Push(RegisterList(MaxInt<uint32_t>(fp_spills_offset / kArmWordSize)));
+      GetAssembler()->cfi().AdjustCFAOffset(fp_spills_offset);
+    } else {
+      __ Sub(sp, sp, dchecked_integral_cast<int32_t>(fp_spills_offset));
+      GetAssembler()->cfi().AdjustCFAOffset(fp_spills_offset);
+      if (RequiresCurrentMethod()) {
+        GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
+      }
+    }
   }
 
   if (GetGraph()->HasShouldDeoptimizeFlag()) {
@@ -2169,27 +2202,55 @@ void CodeGeneratorARMVIXL::GenerateFrameExit() {
     __ Bx(lr);
     return;
   }
-  GetAssembler()->cfi().RememberState();
-  int adjust = GetFrameSize() - FrameEntrySpillSize();
-  __ Add(sp, sp, adjust);
-  GetAssembler()->cfi().AdjustCFAOffset(-adjust);
-  if (fpu_spill_mask_ != 0) {
-    uint32_t first = LeastSignificantBit(fpu_spill_mask_);
 
-    // Check that list is contiguous.
-    DCHECK_EQ(fpu_spill_mask_ >> CTZ(fpu_spill_mask_), ~0u >> (32 - POPCOUNT(fpu_spill_mask_)));
-
-    __ Vpop(SRegisterList(vixl32::SRegister(first), POPCOUNT(fpu_spill_mask_)));
-    GetAssembler()->cfi().AdjustCFAOffset(
-        -static_cast<int>(kArmWordSize) * POPCOUNT(fpu_spill_mask_));
-    GetAssembler()->cfi().RestoreMany(DWARFReg(vixl32::SRegister(0)), fpu_spill_mask_);
-  }
   // Pop LR into PC to return.
   DCHECK_NE(core_spill_mask_ & (1 << kLrCode), 0U);
   uint32_t pop_mask = (core_spill_mask_ & (~(1 << kLrCode))) | 1 << kPcCode;
-  __ Pop(RegisterList(pop_mask));
-  GetAssembler()->cfi().RestoreState();
-  GetAssembler()->cfi().DefCFAOffset(GetFrameSize());
+
+  uint32_t frame_size = GetFrameSize();
+  uint32_t core_spills_offset = frame_size - GetCoreSpillSize();
+  uint32_t fp_spills_offset = frame_size - FrameEntrySpillSize();
+  if ((fpu_spill_mask_ == 0u || IsPowerOfTwo(fpu_spill_mask_)) &&
+      // r4 is blocked by TestCodeGeneratorARMVIXL used by some tests.
+      core_spills_offset <= (blocked_core_registers_[r4.GetCode()] ? 2u : 3u) * kArmWordSize) {
+    // Load the FP spill if any and then do a single POP including the method
+    // and up to two filler registers. If we have no FP spills, this also has
+    // the advantage that we do not need to emit CFI directives.
+    if (fpu_spill_mask_ != 0u) {
+      DCHECK(IsPowerOfTwo(fpu_spill_mask_));
+      vixl::aarch32::SRegister sreg(LeastSignificantBit(fpu_spill_mask_));
+      GetAssembler()->cfi().RememberState();
+      GetAssembler()->LoadSFromOffset(sreg, sp, fp_spills_offset);
+      GetAssembler()->cfi().Restore(DWARFReg(sreg));
+    }
+    // Clobber registers r2-r4 as they are caller-save in ART managed ABI and
+    // never hold the return value.
+    uint32_t extra_regs = MaxInt<uint32_t>(core_spills_offset / kArmWordSize) << r2.GetCode();
+    DCHECK_EQ(extra_regs & kCoreCalleeSaves.GetList(), 0u);
+    DCHECK_LT(MostSignificantBit(extra_regs), LeastSignificantBit(pop_mask));
+    __ Pop(RegisterList(pop_mask | extra_regs));
+    if (fpu_spill_mask_ != 0u) {
+      GetAssembler()->cfi().RestoreState();
+    }
+  } else {
+    GetAssembler()->cfi().RememberState();
+    __ Add(sp, sp, fp_spills_offset);
+    GetAssembler()->cfi().AdjustCFAOffset(-dchecked_integral_cast<int32_t>(fp_spills_offset));
+    if (fpu_spill_mask_ != 0) {
+      uint32_t first = LeastSignificantBit(fpu_spill_mask_);
+
+      // Check that list is contiguous.
+      DCHECK_EQ(fpu_spill_mask_ >> CTZ(fpu_spill_mask_), ~0u >> (32 - POPCOUNT(fpu_spill_mask_)));
+
+      __ Vpop(SRegisterList(vixl32::SRegister(first), POPCOUNT(fpu_spill_mask_)));
+      GetAssembler()->cfi().AdjustCFAOffset(
+          -static_cast<int>(kArmWordSize) * POPCOUNT(fpu_spill_mask_));
+      GetAssembler()->cfi().RestoreMany(DWARFReg(vixl32::SRegister(0)), fpu_spill_mask_);
+    }
+    __ Pop(RegisterList(pop_mask));
+    GetAssembler()->cfi().RestoreState();
+    GetAssembler()->cfi().DefCFAOffset(GetFrameSize());
+  }
 }
 
 void CodeGeneratorARMVIXL::Bind(HBasicBlock* block) {

@@ -22,6 +22,7 @@
 #include "base/arena_containers.h"
 #include "base/macros.h"
 #include "constants_arm.h"
+#include "dwarf/register.h"
 #include "offsets.h"
 #include "utils/arm/assembler_arm_shared.h"
 #include "utils/arm/managed_register_arm.h"
@@ -38,6 +39,14 @@ namespace vixl32 = vixl::aarch32;
 
 namespace art {
 namespace arm {
+
+inline dwarf::Reg DWARFReg(vixl32::Register reg) {
+  return dwarf::Reg::ArmCore(static_cast<int>(reg.GetCode()));
+}
+
+inline dwarf::Reg DWARFReg(vixl32::SRegister reg) {
+  return dwarf::Reg::ArmFp(static_cast<int>(reg.GetCode()));
+}
 
 class ArmVIXLMacroAssembler final : public vixl32::MacroAssembler {
  public:

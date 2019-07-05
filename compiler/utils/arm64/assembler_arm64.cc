@@ -103,15 +103,6 @@ void Arm64Assembler::JumpTo(ManagedRegister m_base, Offset offs, ManagedRegister
   ___ Br(reg_x(scratch.AsXRegister()));
 }
 
-static inline dwarf::Reg DWARFReg(CPURegister reg) {
-  if (reg.IsFPRegister()) {
-    return dwarf::Reg::Arm64Fp(reg.GetCode());
-  } else {
-    DCHECK_LT(reg.GetCode(), 31u);  // X0 - X30.
-    return dwarf::Reg::Arm64Core(reg.GetCode());
-  }
-}
-
 void Arm64Assembler::SpillRegisters(CPURegList registers, int offset) {
   int size = registers.GetRegisterSizeInBytes();
   const Register sp = vixl_masm_.StackPointer();
