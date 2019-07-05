@@ -370,12 +370,12 @@ std::unique_ptr<DexFile> DexFileLoader::OpenCommon(const uint8_t* base,
     dex_file.reset();
     return nullptr;
   }
-  if (verify && !DexFileVerifier::Verify(dex_file.get(),
-                                         dex_file->Begin(),
-                                         dex_file->Size(),
-                                         location.c_str(),
-                                         verify_checksum,
-                                         error_msg)) {
+  if (verify && !dex::Verify(dex_file.get(),
+                             dex_file->Begin(),
+                             dex_file->Size(),
+                             location.c_str(),
+                             verify_checksum,
+                             error_msg)) {
     if (verify_result != nullptr) {
       *verify_result = VerifyResult::kVerifyFailed;
     }
