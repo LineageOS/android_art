@@ -554,10 +554,14 @@ extern "C" void MterpCheckBefore(Thread* self, ShadowFrame* shadow_frame, uint16
   }
   DCHECK(!Runtime::Current()->IsActiveTransaction());
   const Instruction* inst = Instruction::At(dex_pc_ptr);
-  DCHECK_EQ(self->IsExceptionPending(), inst->Opcode() == Instruction::MOVE_EXCEPTION);
-  uint32_t dex_pc = dex_pc_ptr - shadow_frame->GetDexInstructions();
-  DCHECK_LT(dex_pc, shadow_frame->GetMethod()->DexInstructionData().InsnsSizeInCodeUnits());
+  uint16_t inst_data = inst->Fetch16(0);
+  if (inst->Opcode(inst_data) == Instruction::MOVE_EXCEPTION) {
+    self->AssertPendingException();
+  } else {
+    self->AssertNoPendingException();
+  }
   if (kTraceExecutionEnabled) {
+    uint32_t dex_pc = dex_pc_ptr - shadow_frame->GetDexInstructions();
     TraceExecution(*shadow_frame, inst, dex_pc);
   }
   if (kTestExportPC) {

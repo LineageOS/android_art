@@ -40,8 +40,8 @@ bool CanUseMterp();
 // handler for a recent opcode failed to export the Dalvik PC prior to a possible exit from
 // the mterp environment.
 constexpr uintptr_t kExportPCPoison = 0xdead00ff;
-// Set true to enable poison testing of ExportPC.
-constexpr bool kTestExportPC = true;
+// Set true to enable poison testing of ExportPC.  Uses Alt interpreter.
+constexpr bool kTestExportPC = false;
 
 constexpr size_t kMterpHandlerSize = 128;
 
