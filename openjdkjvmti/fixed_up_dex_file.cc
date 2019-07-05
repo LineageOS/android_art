@@ -76,12 +76,12 @@ static void DoDexUnquicken(const art::DexFile& new_dex_file,
 static void DCheckVerifyDexFile(const art::DexFile& dex) {
   if (art::kIsDebugBuild) {
     std::string error;
-    if (!art::DexFileVerifier::Verify(&dex,
-                                      dex.Begin(),
-                                      dex.Size(),
-                                      "FixedUpDexFile_Verification.dex",
-                                      /*verify_checksum=*/ true,
-                                      &error)) {
+    if (!art::dex::Verify(&dex,
+                          dex.Begin(),
+                          dex.Size(),
+                          "FixedUpDexFile_Verification.dex",
+                          /*verify_checksum=*/ true,
+                          &error)) {
       LOG(FATAL) << "Failed to verify de-quickened dex file: " << error;
     }
   }
