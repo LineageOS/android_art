@@ -111,6 +111,18 @@ class JitMemoryRegion {
     return exec_mspace_ != nullptr || data_mspace_ != nullptr;
   }
 
+  template <typename T>
+  void FillData(T* address, size_t n, const T& t)  REQUIRES(Locks::jit_lock_) {
+    std::fill_n(GetWritableDataAddress(address), n, t);
+  }
+
+  // Generic helper for writing abritrary data in the data portion of the
+  // region.
+  template <typename T>
+  void WriteData(T* address, const T& value) {
+    *GetWritableDataAddress(address) = value;
+  }
+
   bool HasDualCodeMapping() const {
     return non_exec_pages_.IsValid();
   }
