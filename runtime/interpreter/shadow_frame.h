@@ -21,10 +21,8 @@
 #include <cstring>
 #include <string>
 
-#include "art_method.h"
 #include "base/locks.h"
 #include "base/macros.h"
-#include "dex/code_item_accessors-inl.h"
 #include "lock_count_data.h"
 #include "read_barrier.h"
 #include "stack_reference.h"
@@ -104,7 +102,7 @@ class ShadowFrame {
   }
 
   uint32_t GetDexPC() const {
-    return (dex_pc_ptr_ == nullptr) ? dex::kDexNoIndex : (dex_pc_ptr_ - dex_instructions_);
+    return (dex_pc_ptr_ == nullptr) ? dex_pc_ : dex_pc_ptr_ - dex_instructions_;
   }
 
   int16_t GetCachedHotnessCountdown() const {
@@ -124,7 +122,8 @@ class ShadowFrame {
   }
 
   void SetDexPC(uint32_t dex_pc) {
-    dex_pc_ptr_ = (dex_pc == dex::kDexNoIndex) ? nullptr : (dex_instructions_ + dex_pc);
+    dex_pc_ = dex_pc;
+    dex_pc_ptr_ = nullptr;
   }
 
   ShadowFrame* GetLink() const {
@@ -281,6 +280,10 @@ class ShadowFrame {
     return OFFSETOF_MEMBER(ShadowFrame, method_);
   }
 
+  static constexpr size_t DexPCOffset() {
+    return OFFSETOF_MEMBER(ShadowFrame, dex_pc_);
+  }
+
   static constexpr size_t NumberOfVRegsOffset() {
     return OFFSETOF_MEMBER(ShadowFrame, number_of_vregs_);
   }
@@ -295,6 +298,10 @@ class ShadowFrame {
 
   static constexpr size_t DexPCPtrOffset() {
     return OFFSETOF_MEMBER(ShadowFrame, dex_pc_ptr_);
+  }
+
+  static constexpr size_t DexInstructionsOffset() {
+    return OFFSETOF_MEMBER(ShadowFrame, dex_instructions_);
   }
 
   static constexpr size_t CachedHotnessCountdownOffset() {
@@ -382,9 +389,10 @@ class ShadowFrame {
       : link_(link),
         method_(method),
         result_register_(nullptr),
-        dex_instructions_(method == nullptr ? nullptr : method->DexInstructionData().Insns()),
-        dex_pc_ptr_(dex_instructions_ + dex_pc),
+        dex_pc_ptr_(nullptr),
+        dex_instructions_(nullptr),
         number_of_vregs_(num_vregs),
+        dex_pc_(dex_pc),
         cached_hotness_countdown_(0),
         hotness_countdown_(0),
         frame_flags_(0) {
@@ -417,10 +425,12 @@ class ShadowFrame {
   ShadowFrame* link_;
   ArtMethod* method_;
   JValue* result_register_;
-  const uint16_t* dex_instructions_;  // Dex instruction base of the code item.
   const uint16_t* dex_pc_ptr_;
+  // Dex instruction base of the code item.
+  const uint16_t* dex_instructions_;
   LockCountData lock_count_data_;  // This may contain GC roots when lock counting is active.
   const uint32_t number_of_vregs_;
+  uint32_t dex_pc_;
   int16_t cached_hotness_countdown_;
   int16_t hotness_countdown_;
 

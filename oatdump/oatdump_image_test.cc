@@ -28,25 +28,25 @@ namespace art {
 TEST_F(OatDumpTest, TestImage) {
   TEST_DISABLED_FOR_ARM_AND_MIPS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamicLinking, kModeArt, {}, kListAndCode));
+  ASSERT_TRUE(Exec(kDynamic, kModeArt, {}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestImageStatic) {
   TEST_DISABLED_FOR_ARM_AND_MIPS();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStaticLinking, kModeArt, {}, kListAndCode));
+  ASSERT_TRUE(Exec(kStatic, kModeArt, {}, kListAndCode));
 }
 
 TEST_F(OatDumpTest, TestOatImage) {
   TEST_DISABLED_FOR_ARM_AND_MIPS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamicLinking, kModeCoreOat, {}, kListAndCode));
+  ASSERT_TRUE(Exec(kDynamic, kModeCoreOat, {}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestOatImageStatic) {
   TEST_DISABLED_FOR_ARM_AND_MIPS();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStaticLinking, kModeCoreOat, {}, kListAndCode));
+  ASSERT_TRUE(Exec(kStatic, kModeCoreOat, {}, kListAndCode));
 }
 
 }  // namespace art
