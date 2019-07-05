@@ -222,6 +222,7 @@ JitCodeCache* JitCodeCache::Create(bool used_only_for_profile_data,
 JitCodeCache::JitCodeCache()
     : is_weak_access_enabled_(true),
       inline_cache_cond_("Jit inline cache condition variable", *Locks::jit_lock_),
+      zygote_map_(&shared_region_),
       lock_cond_("Jit code cache condition variable", *Locks::jit_lock_),
       collection_in_progress_(false),
       last_collection_increased_code_cache_(false),
@@ -265,6 +266,9 @@ bool JitCodeCache::ContainsMethod(ArtMethod* method) {
       if (it.second == method) {
         return true;
       }
+    }
+    if (zygote_map_.ContainsMethod(method)) {
+      return true;
     }
   }
   return false;
@@ -747,7 +751,11 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
         }
       }
     } else {
-      method_code_map_.Put(code_ptr, method);
+      if (method->IsZygoteCompiled() && IsSharedRegion(*region)) {
+        zygote_map_.Put(code_ptr, method);
+      } else {
+        method_code_map_.Put(code_ptr, method);
+      }
       if (osr) {
         number_of_osr_compilations_++;
         osr_code_map_.Put(method, code_ptr);
@@ -1351,6 +1359,12 @@ OatQuickMethodHeader* JitCodeCache::LookupMethodHeader(uintptr_t pc, ArtMethod* 
       return nullptr;
     }
   } else {
+    if (shared_region_.IsInExecSpace(reinterpret_cast<const void*>(pc))) {
+      const void* code_ptr = zygote_map_.GetCodeFor(method, pc);
+      if (code_ptr != nullptr) {
+        return OatQuickMethodHeader::FromCodePointer(code_ptr);
+      }
+    }
     auto it = method_code_map_.lower_bound(reinterpret_cast<const void*>(pc));
     if (it != method_code_map_.begin()) {
       --it;
@@ -1700,6 +1714,12 @@ void JitCodeCache::InvalidateCompiledCodeFor(ArtMethod* method,
       osr_code_map_.erase(it);
     }
   }
+
+  // In case the method was compiled by the zygote, clear that information so we
+  // can recompile it ourselves.
+  if (method->IsZygoteCompiled()) {
+    method->ClearZygoteCompiled();
+  }
 }
 
 void JitCodeCache::Dump(std::ostream& os) {
@@ -1753,6 +1773,92 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
 
 JitMemoryRegion* JitCodeCache::GetCurrentRegion() {
   return Runtime::Current()->IsZygote() ? &shared_region_ : &private_region_;
+}
+
+void ZygoteMap::Initialize(uint32_t number_of_methods) {
+  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+  // Allocate for 40-80% capacity. This will offer OK lookup times, and termination
+  // cases.
+  size_t capacity = RoundUpToPowerOfTwo(number_of_methods * 100 / 80);
+  Entry* data = reinterpret_cast<Entry*>(region_->AllocateData(capacity * sizeof(Entry)));
+  if (data != nullptr) {
+    region_->FillData(data, capacity, Entry { nullptr, nullptr });
+    map_ = ArrayRef(data, capacity);
+  }
+}
+
+const void* ZygoteMap::GetCodeFor(ArtMethod* method, uintptr_t pc) const {
+  if (map_.empty()) {
+    return nullptr;
+  }
+
+  if (method == nullptr) {
+    // Do a linear search. This should only be used in debug builds.
+    CHECK(kIsDebugBuild);
+    for (const Entry& entry : map_) {
+      const void* code_ptr = entry.code_ptr;
+      if (code_ptr != nullptr) {
+        OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
+        if (method_header->Contains(pc)) {
+          return code_ptr;
+        }
+      }
+    }
+    return nullptr;
+  }
+
+  std::hash<ArtMethod*> hf;
+  size_t index = hf(method) & (map_.size() - 1u);
+  size_t original_index = index;
+  // Loop over the array: we know this loop terminates as we will either
+  // encounter the given method, or a null entry. Both terminate the loop.
+  // Note that the zygote may concurrently write new entries to the map. That's OK as the
+  // map is never resized.
+  while (true) {
+    const Entry& entry = map_[index];
+    if (entry.method == nullptr) {
+      // Not compiled yet.
+      return nullptr;
+    }
+    if (entry.method == method) {
+      if (entry.code_ptr == nullptr) {
+        // This is a race with the zygote which wrote the method, but hasn't written the
+        // code. Just bail and wait for the next time we need the method.
+        return nullptr;
+      }
+      if (pc != 0 && !OatQuickMethodHeader::FromCodePointer(entry.code_ptr)->Contains(pc)) {
+        return nullptr;
+      }
+      return entry.code_ptr;
+    }
+    index = (index + 1) & (map_.size() - 1);
+    DCHECK_NE(original_index, index);
+  }
+}
+
+void ZygoteMap::Put(const void* code, ArtMethod* method) {
+  if (map_.empty()) {
+    return;
+  }
+  CHECK(Runtime::Current()->IsZygote());
+  std::hash<ArtMethod*> hf;
+  size_t index = hf(method) & (map_.size() - 1);
+  size_t original_index = index;
+  // Because the size of the map is bigger than the number of methods that will
+  // be added, we are guaranteed to find a free slot in the array, and
+  // therefore for this loop to terminate.
+  while (true) {
+    Entry* entry = &map_[index];
+    if (entry->method == nullptr) {
+      // Note that readers can read this memory concurrently, but that's OK as
+      // we are writing pointers.
+      region_->WriteData(entry, Entry { method, code });
+      break;
+    }
+    index = (index + 1) & (map_.size() - 1);
+    DCHECK_NE(original_index, index);
+  }
+  DCHECK_EQ(GetCodeFor(method), code);
 }
 
 }  // namespace jit
