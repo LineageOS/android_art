@@ -5,9 +5,9 @@
 # There are no versioned APEX paths here - this APEX module does not support
 # having several versions mounted.
 
-dir.runtime = /apex/com.android.runtime/bin/
+dir.art = /apex/com.android.art/bin/
 
-[runtime]
+[art]
 additional.namespaces = platform,conscrypt,runtime
 
 # The default namespace here only links to other namespaces, in particular
