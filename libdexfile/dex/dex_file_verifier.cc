@@ -39,12 +39,167 @@
 namespace art {
 namespace dex {
 
-// Note: an anonymous namespace would be nice, but we need friend access into accessors.
-
 using android::base::StringAppendV;
 using android::base::StringPrintf;
 
-static constexpr uint32_t kTypeIdLimit = std::numeric_limits<uint16_t>::max();
+namespace {
+
+constexpr uint32_t kTypeIdLimit = std::numeric_limits<uint16_t>::max();
+
+constexpr bool IsValidOrNoTypeId(uint16_t low, uint16_t high) {
+  return (high == 0) || ((high == 0xffffU) && (low == 0xffffU));
+}
+
+constexpr bool IsValidTypeId(uint16_t low ATTRIBUTE_UNUSED, uint16_t high) {
+  return (high == 0);
+}
+
+constexpr uint32_t MapTypeToBitMask(DexFile::MapItemType map_item_type) {
+  switch (map_item_type) {
+    case DexFile::kDexTypeHeaderItem:               return 1 << 0;
+    case DexFile::kDexTypeStringIdItem:             return 1 << 1;
+    case DexFile::kDexTypeTypeIdItem:               return 1 << 2;
+    case DexFile::kDexTypeProtoIdItem:              return 1 << 3;
+    case DexFile::kDexTypeFieldIdItem:              return 1 << 4;
+    case DexFile::kDexTypeMethodIdItem:             return 1 << 5;
+    case DexFile::kDexTypeClassDefItem:             return 1 << 6;
+    case DexFile::kDexTypeCallSiteIdItem:           return 1 << 7;
+    case DexFile::kDexTypeMethodHandleItem:         return 1 << 8;
+    case DexFile::kDexTypeMapList:                  return 1 << 9;
+    case DexFile::kDexTypeTypeList:                 return 1 << 10;
+    case DexFile::kDexTypeAnnotationSetRefList:     return 1 << 11;
+    case DexFile::kDexTypeAnnotationSetItem:        return 1 << 12;
+    case DexFile::kDexTypeClassDataItem:            return 1 << 13;
+    case DexFile::kDexTypeCodeItem:                 return 1 << 14;
+    case DexFile::kDexTypeStringDataItem:           return 1 << 15;
+    case DexFile::kDexTypeDebugInfoItem:            return 1 << 16;
+    case DexFile::kDexTypeAnnotationItem:           return 1 << 17;
+    case DexFile::kDexTypeEncodedArrayItem:         return 1 << 18;
+    case DexFile::kDexTypeAnnotationsDirectoryItem: return 1 << 19;
+    case DexFile::kDexTypeHiddenapiClassData:       return 1 << 20;
+  }
+  return 0;
+}
+
+constexpr bool IsDataSectionType(DexFile::MapItemType map_item_type) {
+  switch (map_item_type) {
+    case DexFile::kDexTypeHeaderItem:
+    case DexFile::kDexTypeStringIdItem:
+    case DexFile::kDexTypeTypeIdItem:
+    case DexFile::kDexTypeProtoIdItem:
+    case DexFile::kDexTypeFieldIdItem:
+    case DexFile::kDexTypeMethodIdItem:
+    case DexFile::kDexTypeClassDefItem:
+      return false;
+    case DexFile::kDexTypeCallSiteIdItem:
+    case DexFile::kDexTypeMethodHandleItem:
+    case DexFile::kDexTypeMapList:
+    case DexFile::kDexTypeTypeList:
+    case DexFile::kDexTypeAnnotationSetRefList:
+    case DexFile::kDexTypeAnnotationSetItem:
+    case DexFile::kDexTypeClassDataItem:
+    case DexFile::kDexTypeCodeItem:
+    case DexFile::kDexTypeStringDataItem:
+    case DexFile::kDexTypeDebugInfoItem:
+    case DexFile::kDexTypeAnnotationItem:
+    case DexFile::kDexTypeEncodedArrayItem:
+    case DexFile::kDexTypeAnnotationsDirectoryItem:
+    case DexFile::kDexTypeHiddenapiClassData:
+      return true;
+  }
+  return true;
+}
+
+// Fields and methods may have only one of public/protected/private.
+ALWAYS_INLINE
+constexpr bool CheckAtMostOneOfPublicProtectedPrivate(uint32_t flags) {
+  // Semantically we want 'return POPCOUNT(flags & kAcc) <= 1;'.
+  static_assert(IsPowerOfTwo(0), "0 not marked as power of two");
+  static_assert(IsPowerOfTwo(kAccPublic), "kAccPublic not marked as power of two");
+  static_assert(IsPowerOfTwo(kAccProtected), "kAccProtected not marked as power of two");
+  static_assert(IsPowerOfTwo(kAccPrivate), "kAccPrivate not marked as power of two");
+  return IsPowerOfTwo(flags & (kAccPublic | kAccProtected | kAccPrivate));
+}
+
+// Helper functions to retrieve names from the dex file. We do not want to rely on DexFile
+// functionality, as we're still verifying the dex file. begin and header correspond to the
+// underscored variants in the DexFileVerifier.
+
+std::string GetStringOrError(const uint8_t* const begin,
+                             const DexFile::Header* const header,
+                             dex::StringIndex string_idx) {
+  // The `string_idx` is not guaranteed to be valid yet.
+  if (header->string_ids_size_ <= string_idx.index_) {
+    return "(error)";
+  }
+
+  const dex::StringId* string_id =
+      reinterpret_cast<const dex::StringId*>(begin + header->string_ids_off_) + string_idx.index_;
+
+  // Assume that the data is OK at this point. String data has been checked at this point.
+
+  const uint8_t* ptr = begin + string_id->string_data_off_;
+  uint32_t dummy;
+  if (!DecodeUnsignedLeb128Checked(&ptr, begin + header->file_size_, &dummy)) {
+    return "(error)";
+  }
+  return reinterpret_cast<const char*>(ptr);
+}
+
+std::string GetClassOrError(const uint8_t* const begin,
+                            const DexFile::Header* const header,
+                            dex::TypeIndex class_idx) {
+  // The `class_idx` is either `FieldId::class_idx_` or `MethodId::class_idx_` and
+  // it has already been checked in `DexFileVerifier::CheckClassDataItemField()`
+  // or `DexFileVerifier::CheckClassDataItemMethod()`, respectively, to match
+  // a valid defining class.
+  CHECK_LT(class_idx.index_, header->type_ids_size_);
+
+  const dex::TypeId* type_id =
+      reinterpret_cast<const dex::TypeId*>(begin + header->type_ids_off_) + class_idx.index_;
+
+  // Assume that the data is OK at this point. Type id offsets have been checked at this point.
+
+  return GetStringOrError(begin, header, type_id->descriptor_idx_);
+}
+
+std::string GetFieldDescriptionOrError(const uint8_t* const begin,
+                                       const DexFile::Header* const header,
+                                       uint32_t idx) {
+  // The `idx` has already been checked in `DexFileVerifier::CheckClassDataItemField()`.
+  CHECK_LT(idx, header->field_ids_size_);
+
+  const dex::FieldId* field_id =
+      reinterpret_cast<const dex::FieldId*>(begin + header->field_ids_off_) + idx;
+
+  // Assume that the data is OK at this point. Field id offsets have been checked at this point.
+
+  std::string class_name = GetClassOrError(begin, header, field_id->class_idx_);
+  std::string field_name = GetStringOrError(begin, header, field_id->name_idx_);
+
+  return class_name + "." + field_name;
+}
+
+std::string GetMethodDescriptionOrError(const uint8_t* const begin,
+                                        const DexFile::Header* const header,
+                                        uint32_t idx) {
+  // The `idx` has already been checked in `DexFileVerifier::CheckClassDataItemMethod()`.
+  CHECK_LT(idx, header->method_ids_size_);
+
+  const dex::MethodId* method_id =
+      reinterpret_cast<const dex::MethodId*>(begin + header->method_ids_off_) + idx;
+
+  // Assume that the data is OK at this point. Method id offsets have been checked at this point.
+
+  std::string class_name = GetClassOrError(begin, header, method_id->class_idx_);
+  std::string method_name = GetStringOrError(begin, header, method_id->name_idx_);
+
+  return class_name + "." + method_name;
+}
+
+}  // namespace
+
+// Note: the anonymous namespace would be nice, but we need friend access into accessors.
 
 class DexFileVerifier {
  public:
@@ -83,13 +238,33 @@ class DexFileVerifier {
   // claimed by the file.
   bool CheckValidOffsetAndSize(uint32_t offset, uint32_t size, size_t alignment, const char* label);
   // Checks whether the size is less than the limit.
-  bool CheckSizeLimit(uint32_t size, uint32_t limit, const char* label);
-  bool CheckIndex(uint32_t field, uint32_t limit, const char* label);
+  ALWAYS_INLINE bool CheckSizeLimit(uint32_t size, uint32_t limit, const char* label) {
+    if (size > limit) {
+      ErrorStringPrintf("Size(%u) should not exceed limit(%u) for %s.", size, limit, label);
+      return false;
+    }
+    return true;
+  }
+  ALWAYS_INLINE bool CheckIndex(uint32_t field, uint32_t limit, const char* label) {
+    if (UNLIKELY(field >= limit)) {
+      ErrorStringPrintf("Bad index for %s: %x >= %x", label, field, limit);
+      return false;
+    }
+    return true;
+  }
 
   bool CheckHeader();
   bool CheckMap();
 
-  uint32_t ReadUnsignedLittleEndian(uint32_t size);
+  uint32_t ReadUnsignedLittleEndian(uint32_t size) {
+    uint32_t result = 0;
+    if (LIKELY(CheckListSize(ptr_, size, sizeof(uint8_t), "encoded_value"))) {
+      for (uint32_t i = 0; i < size; i++) {
+        result |= ((uint32_t) *(ptr_++)) << (i * 8);
+      }
+    }
+    return result;
+  }
   bool CheckAndGetHandlerOffsets(const dex::CodeItem* code_item,
                                  uint32_t* handler_offsets, uint32_t handlers_size);
   bool CheckClassDataItemField(uint32_t idx,
@@ -105,7 +280,16 @@ class DexFileVerifier {
                                 ClassAccessor::Method* direct_method,
                                 size_t* remaining_directs);
   ALWAYS_INLINE
-  bool CheckOrder(const char* type_descr, uint32_t curr_index, uint32_t prev_index);
+  bool CheckOrder(const char* type_descr, uint32_t curr_index, uint32_t prev_index) {
+    if (UNLIKELY(curr_index < prev_index)) {
+      ErrorStringPrintf("out-of-order %s indexes %" PRIu32 " and %" PRIu32,
+                        type_descr,
+                        prev_index,
+                        curr_index);
+      return false;
+    }
+    return true;
+  }
   bool CheckStaticFieldTypes(const dex::ClassDef* class_def);
 
   bool CheckPadding(size_t offset, uint32_t aligned_offset, DexFile::MapItemType type);
@@ -172,17 +356,49 @@ class DexFileVerifier {
 
   // Load a string by (type) index. Checks whether the index is in bounds, printing the error if
   // not. If there is an error, null is returned.
-  const char* CheckLoadStringByIdx(dex::StringIndex idx, const char* error_fmt);
-  const char* CheckLoadStringByTypeIdx(dex::TypeIndex type_idx, const char* error_fmt);
+  const char* CheckLoadStringByIdx(dex::StringIndex idx, const char* error_fmt) {
+    if (UNLIKELY(!CheckIndex(idx.index_, dex_file_->NumStringIds(), error_fmt))) {
+      return nullptr;
+    }
+    return dex_file_->StringDataByIdx(idx);
+  }
+  const char* CheckLoadStringByTypeIdx(dex::TypeIndex type_idx, const char* error_fmt) {
+    if (UNLIKELY(!CheckIndex(type_idx.index_, dex_file_->NumTypeIds(), error_fmt))) {
+      return nullptr;
+    }
+    return CheckLoadStringByIdx(dex_file_->GetTypeId(type_idx).descriptor_idx_, error_fmt);
+  }
 
   // Load a field/method/proto Id by index. Checks whether the index is in bounds, printing the
   // error if not. If there is an error, null is returned.
-  const dex::FieldId* CheckLoadFieldId(uint32_t idx, const char* error_fmt);
-  const dex::MethodId* CheckLoadMethodId(uint32_t idx, const char* error_fmt);
-  const dex::ProtoId* CheckLoadProtoId(dex::ProtoIndex idx, const char* error_fmt);
+  const dex::FieldId* CheckLoadFieldId(uint32_t idx, const char* error_fmt) {
+    if (UNLIKELY(!CheckIndex(idx, dex_file_->NumFieldIds(), error_fmt))) {
+      return nullptr;
+    }
+    return &dex_file_->GetFieldId(idx);
+  }
+  const dex::MethodId* CheckLoadMethodId(uint32_t idx, const char* error_fmt) {
+    if (UNLIKELY(!CheckIndex(idx, dex_file_->NumMethodIds(), error_fmt))) {
+      return nullptr;
+    }
+    return &dex_file_->GetMethodId(idx);
+  }
+  const dex::ProtoId* CheckLoadProtoId(dex::ProtoIndex idx, const char* error_fmt) {
+    if (UNLIKELY(!CheckIndex(idx.index_, dex_file_->NumProtoIds(), error_fmt))) {
+      return nullptr;
+    }
+    return &dex_file_->GetProtoId(idx);
+  }
 
   void ErrorStringPrintf(const char* fmt, ...)
-      __attribute__((__format__(__printf__, 2, 3))) COLD_ATTR;
+      __attribute__((__format__(__printf__, 2, 3))) COLD_ATTR {
+    va_list ap;
+    va_start(ap, fmt);
+    DCHECK(failure_reason_.empty()) << failure_reason_;
+    failure_reason_ = StringPrintf("Failure to verify dex file '%s': ", location_);
+    StringAppendV(&failure_reason_, fmt, ap);
+    va_end(ap);
+  }
   bool FailureReasonIsSet() const { return failure_reason_.size() != 0; }
 
   // Retrieve class index and class def from the given member. index is the member index, which is
@@ -288,107 +504,6 @@ class DexFileVerifier {
   // tight enough for all callers.
   std::bitset<kTypeIdLimit + 1> defined_classes_;
 };
-
-static bool IsValidOrNoTypeId(uint16_t low, uint16_t high) {
-  return (high == 0) || ((high == 0xffffU) && (low == 0xffffU));
-}
-
-static bool IsValidTypeId(uint16_t low ATTRIBUTE_UNUSED, uint16_t high) {
-  return (high == 0);
-}
-
-static uint32_t MapTypeToBitMask(DexFile::MapItemType map_item_type) {
-  switch (map_item_type) {
-    case DexFile::kDexTypeHeaderItem:               return 1 << 0;
-    case DexFile::kDexTypeStringIdItem:             return 1 << 1;
-    case DexFile::kDexTypeTypeIdItem:               return 1 << 2;
-    case DexFile::kDexTypeProtoIdItem:              return 1 << 3;
-    case DexFile::kDexTypeFieldIdItem:              return 1 << 4;
-    case DexFile::kDexTypeMethodIdItem:             return 1 << 5;
-    case DexFile::kDexTypeClassDefItem:             return 1 << 6;
-    case DexFile::kDexTypeCallSiteIdItem:           return 1 << 7;
-    case DexFile::kDexTypeMethodHandleItem:         return 1 << 8;
-    case DexFile::kDexTypeMapList:                  return 1 << 9;
-    case DexFile::kDexTypeTypeList:                 return 1 << 10;
-    case DexFile::kDexTypeAnnotationSetRefList:     return 1 << 11;
-    case DexFile::kDexTypeAnnotationSetItem:        return 1 << 12;
-    case DexFile::kDexTypeClassDataItem:            return 1 << 13;
-    case DexFile::kDexTypeCodeItem:                 return 1 << 14;
-    case DexFile::kDexTypeStringDataItem:           return 1 << 15;
-    case DexFile::kDexTypeDebugInfoItem:            return 1 << 16;
-    case DexFile::kDexTypeAnnotationItem:           return 1 << 17;
-    case DexFile::kDexTypeEncodedArrayItem:         return 1 << 18;
-    case DexFile::kDexTypeAnnotationsDirectoryItem: return 1 << 19;
-    case DexFile::kDexTypeHiddenapiClassData:       return 1 << 20;
-  }
-  return 0;
-}
-
-static bool IsDataSectionType(DexFile::MapItemType map_item_type) {
-  switch (map_item_type) {
-    case DexFile::kDexTypeHeaderItem:
-    case DexFile::kDexTypeStringIdItem:
-    case DexFile::kDexTypeTypeIdItem:
-    case DexFile::kDexTypeProtoIdItem:
-    case DexFile::kDexTypeFieldIdItem:
-    case DexFile::kDexTypeMethodIdItem:
-    case DexFile::kDexTypeClassDefItem:
-      return false;
-    case DexFile::kDexTypeCallSiteIdItem:
-    case DexFile::kDexTypeMethodHandleItem:
-    case DexFile::kDexTypeMapList:
-    case DexFile::kDexTypeTypeList:
-    case DexFile::kDexTypeAnnotationSetRefList:
-    case DexFile::kDexTypeAnnotationSetItem:
-    case DexFile::kDexTypeClassDataItem:
-    case DexFile::kDexTypeCodeItem:
-    case DexFile::kDexTypeStringDataItem:
-    case DexFile::kDexTypeDebugInfoItem:
-    case DexFile::kDexTypeAnnotationItem:
-    case DexFile::kDexTypeEncodedArrayItem:
-    case DexFile::kDexTypeAnnotationsDirectoryItem:
-    case DexFile::kDexTypeHiddenapiClassData:
-      return true;
-  }
-  return true;
-}
-
-const char* DexFileVerifier::CheckLoadStringByIdx(dex::StringIndex idx, const char* error_string) {
-  if (UNLIKELY(!CheckIndex(idx.index_, dex_file_->NumStringIds(), error_string))) {
-    return nullptr;
-  }
-  return dex_file_->StringDataByIdx(idx);
-}
-
-const char* DexFileVerifier::CheckLoadStringByTypeIdx(dex::TypeIndex type_idx,
-                                                      const char* error_string) {
-  if (UNLIKELY(!CheckIndex(type_idx.index_, dex_file_->NumTypeIds(), error_string))) {
-    return nullptr;
-  }
-  return CheckLoadStringByIdx(dex_file_->GetTypeId(type_idx).descriptor_idx_, error_string);
-}
-
-const dex::FieldId* DexFileVerifier::CheckLoadFieldId(uint32_t idx, const char* error_string) {
-  if (UNLIKELY(!CheckIndex(idx, dex_file_->NumFieldIds(), error_string))) {
-    return nullptr;
-  }
-  return &dex_file_->GetFieldId(idx);
-}
-
-const dex::MethodId* DexFileVerifier::CheckLoadMethodId(uint32_t idx, const char* err_string) {
-  if (UNLIKELY(!CheckIndex(idx, dex_file_->NumMethodIds(), err_string))) {
-    return nullptr;
-  }
-  return &dex_file_->GetMethodId(idx);
-}
-
-const dex::ProtoId* DexFileVerifier::CheckLoadProtoId(dex::ProtoIndex idx,
-                                                      const char* err_string) {
-  if (UNLIKELY(!CheckIndex(idx.index_, dex_file_->NumProtoIds(), err_string))) {
-    return nullptr;
-  }
-  return &dex_file_->GetProtoId(idx);
-}
 
 // Helper macro to load string and return false on error.
 #define LOAD_STRING(var, idx, error)                    \
@@ -543,14 +658,6 @@ bool DexFileVerifier::CheckList(size_t element_size, const char* label, const ui
   return true;
 }
 
-bool DexFileVerifier::CheckIndex(uint32_t field, uint32_t limit, const char* label) {
-  if (UNLIKELY(field >= limit)) {
-    ErrorStringPrintf("Bad index for %s: %x >= %x", label, field, limit);
-    return false;
-  }
-  return true;
-}
-
 bool DexFileVerifier::CheckValidOffsetAndSize(uint32_t offset,
                                               uint32_t size,
                                               size_t alignment,
@@ -567,14 +674,6 @@ bool DexFileVerifier::CheckValidOffsetAndSize(uint32_t offset,
   }
   if (alignment != 0 && !IsAlignedParam(offset, alignment)) {
     ErrorStringPrintf("Offset(%d) should be aligned by %zu for %s.", offset, alignment, label);
-    return false;
-  }
-  return true;
-}
-
-bool DexFileVerifier::CheckSizeLimit(uint32_t size, uint32_t limit, const char* label) {
-  if (size > limit) {
-    ErrorStringPrintf("Size(%u) should not exceed limit(%u) for %s.", size, limit, label);
     return false;
   }
   return true;
@@ -771,17 +870,6 @@ bool DexFileVerifier::CheckMap() {
   }
   return true;
 }
-
-uint32_t DexFileVerifier::ReadUnsignedLittleEndian(uint32_t size) {
-  uint32_t result = 0;
-  if (LIKELY(CheckListSize(ptr_, size, sizeof(uint8_t), "encoded_value"))) {
-    for (uint32_t i = 0; i < size; i++) {
-      result |= ((uint32_t) *(ptr_++)) << (i * 8);
-    }
-  }
-  return result;
-}
-
 
 #define DECODE_UNSIGNED_CHECKED_FROM_WITH_ERROR_VALUE(ptr, var, error_value)  \
   uint32_t var;                                                               \
@@ -1227,19 +1315,6 @@ bool DexFileVerifier::FindClassIndexAndDef(uint32_t index,
 
   // Didn't find the class-def, not defined here...
   return false;
-}
-
-bool DexFileVerifier::CheckOrder(const char* type_descr,
-                                 uint32_t curr_index,
-                                 uint32_t prev_index) {
-  if (UNLIKELY(curr_index < prev_index)) {
-    ErrorStringPrintf("out-of-order %s indexes %" PRIu32 " and %" PRIu32,
-                      type_descr,
-                      prev_index,
-                      curr_index);
-    return false;
-  }
-  return true;
 }
 
 bool DexFileVerifier::CheckStaticFieldTypes(const dex::ClassDef* class_def) {
@@ -3330,102 +3405,6 @@ bool DexFileVerifier::Verify() {
   }
 
   return true;
-}
-
-void DexFileVerifier::ErrorStringPrintf(const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  DCHECK(failure_reason_.empty()) << failure_reason_;
-  failure_reason_ = StringPrintf("Failure to verify dex file '%s': ", location_);
-  StringAppendV(&failure_reason_, fmt, ap);
-  va_end(ap);
-}
-
-// Fields and methods may have only one of public/protected/private.
-ALWAYS_INLINE
-static constexpr bool CheckAtMostOneOfPublicProtectedPrivate(uint32_t flags) {
-  // Semantically we want 'return POPCOUNT(flags & kAcc) <= 1;'.
-  static_assert(IsPowerOfTwo(0), "0 not marked as power of two");
-  static_assert(IsPowerOfTwo(kAccPublic), "kAccPublic not marked as power of two");
-  static_assert(IsPowerOfTwo(kAccProtected), "kAccProtected not marked as power of two");
-  static_assert(IsPowerOfTwo(kAccPrivate), "kAccPrivate not marked as power of two");
-  return IsPowerOfTwo(flags & (kAccPublic | kAccProtected | kAccPrivate));
-}
-
-// Helper functions to retrieve names from the dex file. We do not want to rely on DexFile
-// functionality, as we're still verifying the dex file. begin and header correspond to the
-// underscored variants in the DexFileVerifier.
-
-static std::string GetStringOrError(const uint8_t* const begin,
-                                    const DexFile::Header* const header,
-                                    dex::StringIndex string_idx) {
-  // The `string_idx` is not guaranteed to be valid yet.
-  if (header->string_ids_size_ <= string_idx.index_) {
-    return "(error)";
-  }
-
-  const dex::StringId* string_id =
-      reinterpret_cast<const dex::StringId*>(begin + header->string_ids_off_) + string_idx.index_;
-
-  // Assume that the data is OK at this point. String data has been checked at this point.
-
-  const uint8_t* ptr = begin + string_id->string_data_off_;
-  uint32_t dummy;
-  if (!DecodeUnsignedLeb128Checked(&ptr, begin + header->file_size_, &dummy)) {
-    return "(error)";
-  }
-  return reinterpret_cast<const char*>(ptr);
-}
-
-static std::string GetClassOrError(const uint8_t* const begin,
-                                   const DexFile::Header* const header,
-                                   dex::TypeIndex class_idx) {
-  // The `class_idx` is either `FieldId::class_idx_` or `MethodId::class_idx_` and
-  // it has already been checked in `DexFileVerifier::CheckClassDataItemField()`
-  // or `DexFileVerifier::CheckClassDataItemMethod()`, respectively, to match
-  // a valid defining class.
-  CHECK_LT(class_idx.index_, header->type_ids_size_);
-
-  const dex::TypeId* type_id =
-      reinterpret_cast<const dex::TypeId*>(begin + header->type_ids_off_) + class_idx.index_;
-
-  // Assume that the data is OK at this point. Type id offsets have been checked at this point.
-
-  return GetStringOrError(begin, header, type_id->descriptor_idx_);
-}
-
-static std::string GetFieldDescriptionOrError(const uint8_t* const begin,
-                                              const DexFile::Header* const header,
-                                              uint32_t idx) {
-  // The `idx` has already been checked in `DexFileVerifier::CheckClassDataItemField()`.
-  CHECK_LT(idx, header->field_ids_size_);
-
-  const dex::FieldId* field_id =
-      reinterpret_cast<const dex::FieldId*>(begin + header->field_ids_off_) + idx;
-
-  // Assume that the data is OK at this point. Field id offsets have been checked at this point.
-
-  std::string class_name = GetClassOrError(begin, header, field_id->class_idx_);
-  std::string field_name = GetStringOrError(begin, header, field_id->name_idx_);
-
-  return class_name + "." + field_name;
-}
-
-static std::string GetMethodDescriptionOrError(const uint8_t* const begin,
-                                               const DexFile::Header* const header,
-                                               uint32_t idx) {
-  // The `idx` has already been checked in `DexFileVerifier::CheckClassDataItemMethod()`.
-  CHECK_LT(idx, header->method_ids_size_);
-
-  const dex::MethodId* method_id =
-      reinterpret_cast<const dex::MethodId*>(begin + header->method_ids_off_) + idx;
-
-  // Assume that the data is OK at this point. Method id offsets have been checked at this point.
-
-  std::string class_name = GetClassOrError(begin, header, method_id->class_idx_);
-  std::string method_name = GetStringOrError(begin, header, method_id->name_idx_);
-
-  return class_name + "." + method_name;
 }
 
 bool DexFileVerifier::CheckFieldAccessFlags(uint32_t idx,
