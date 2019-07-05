@@ -2225,8 +2225,7 @@ void OatFile::InitializeRelocations() const {
                 reloc_begin,
                 DataBimgRelRoSize(),
                 PROT_READ | PROT_WRITE);
-    uint32_t boot_image_begin = dchecked_integral_cast<uint32_t>(reinterpret_cast<uintptr_t>(
-        Runtime::Current()->GetHeap()->GetBootImageSpaces().front()->Begin()));
+    uint32_t boot_image_begin = Runtime::Current()->GetHeap()->GetBootImagesStartAddress();
     for (const uint32_t& relocation : GetBootImageRelocations()) {
       const_cast<uint32_t&>(relocation) += boot_image_begin;
     }
