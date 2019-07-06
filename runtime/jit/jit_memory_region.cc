@@ -17,6 +17,7 @@
 #include "jit_memory_region.h"
 
 #include <fcntl.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <android-base/unique_fd.h>
@@ -484,9 +485,39 @@ void JitMemoryRegion::FreeData(uint8_t* data) {
   mspace_free(data_mspace_, data);
 }
 
-#if defined(__BIONIC__)
+#if defined(__BIONIC__) && defined(ART_TARGET)
+// The code below only works on bionic on target.
+
+bool CacheOperationsMaySegFault() {
+#if defined(__linux__) && defined(__aarch64__)
+  // Avoid issue on older ARM64 kernels where data cache operations could be classified as writes
+  // and cause segmentation faults. This was fixed in Linux 3.11rc2:
+  //
+  // https://github.com/torvalds/linux/commit/db6f41063cbdb58b14846e600e6bc3f4e4c2e888
+  //
+  // This behaviour means we should avoid the dual view JIT on the device. This is just
+  // an issue when running tests on devices that have an old kernel.
+  static constexpr int kRequiredMajor = 3;
+  static constexpr int kRequiredMinor = 12;
+  struct utsname uts;
+  int major, minor;
+  if (uname(&uts) != 0 ||
+      strcmp(uts.sysname, "Linux") != 0 ||
+      sscanf(uts.release, "%d.%d", &major, &minor) != 2 ||
+      (major < kRequiredMajor || (major == kRequiredMajor && minor < kRequiredMinor))) {
+    return true;
+  }
+#endif
+  return false;
+}
 
 int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg) {
+  if (CacheOperationsMaySegFault()) {
+    // Zygote JIT requires dual code mappings by design. We can only do this if the cache flush
+    // and invalidate instructions work without raising faults.
+    *error_msg = "Zygote memory only works with dual mappings";
+    return -1;
+  }
   /* Check if kernel support exists, otherwise fall back to ashmem */
   static const char* kRegionName = "/jit-zygote-cache";
   if (art::IsSealFutureWriteSupported()) {

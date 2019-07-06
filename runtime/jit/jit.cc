@@ -268,6 +268,12 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   }
 
   JitMemoryRegion* region = GetCodeCache()->GetCurrentRegion();
+  if (osr && GetCodeCache()->IsSharedRegion(*region)) {
+    VLOG(jit) << "JIT not osr compiling "
+              << method->PrettyMethod()
+              << " due to using shared region";
+    return false;
+  }
 
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
@@ -640,8 +646,11 @@ class ZygoteTask final : public Task {
     ScopedNullHandle<mirror::ClassLoader> null_handle;
     // We add to the queue for zygote so that we can fork processes in-between
     // compilations.
-    runtime->GetJit()->CompileMethodsFromProfile(
+    uint32_t added_to_queue = runtime->GetJit()->CompileMethodsFromProfile(
         self, boot_class_path, profile_file, null_handle, /* add_to_queue= */ true);
+
+    JitCodeCache* code_cache = runtime->GetJit()->GetCodeCache();
+    code_cache->GetZygoteMap()->Initialize(added_to_queue);
   }
 
   void Finalize() override {
@@ -738,7 +747,7 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
   }
 }
 
-void Jit::CompileMethodsFromProfile(
+uint32_t Jit::CompileMethodsFromProfile(
     Thread* self,
     const std::vector<const DexFile*>& dex_files,
     const std::string& profile_file,
@@ -747,7 +756,7 @@ void Jit::CompileMethodsFromProfile(
 
   if (profile_file.empty()) {
     LOG(WARNING) << "Expected a profile file in JIT zygote mode";
-    return;
+    return 0u;
   }
 
   std::string error_msg;
@@ -757,18 +766,19 @@ void Jit::CompileMethodsFromProfile(
   // Return early if we're unable to obtain a lock on the profile.
   if (profile.get() == nullptr) {
     LOG(ERROR) << "Cannot lock profile: " << error_msg;
-    return;
+    return 0u;
   }
 
   ProfileCompilationInfo profile_info;
   if (!profile_info.Load(profile->Fd())) {
     LOG(ERROR) << "Could not load profile file";
-    return;
+    return 0u;
   }
   ScopedObjectAccess soa(self);
   StackHandleScope<1> hs(self);
   MutableHandle<mirror::DexCache> dex_cache = hs.NewHandle<mirror::DexCache>(nullptr);
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  uint32_t added_to_queue = 0u;
   for (const DexFile* dex_file : dex_files) {
     if (LocationIsOnRuntimeModule(dex_file->GetLocation().c_str())) {
       // The runtime module jars are already preopted.
@@ -818,16 +828,21 @@ void Jit::CompileMethodsFromProfile(
                 "Lcom/android/internal/os/ZygoteServer;")) {
           CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
         } else {
+          ++added_to_queue;
           thread_pool_->AddTask(self,
               new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile));
+          if (Runtime::Current()->IsZygote()) {
+            method->SetZygoteCompiled();
+          }
         }
       }
     }
   }
+  return added_to_queue;
 }
 
 static bool IgnoreSamplesForMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (method->IsClassInitializer() || !method->IsCompilable()) {
+  if (method->IsClassInitializer() || !method->IsCompilable() || method->IsZygoteCompiled()) {
     // We do not want to compile such methods.
     return true;
   }
@@ -939,10 +954,10 @@ class ScopedSetRuntimeThread {
 
 void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
   Runtime* runtime = Runtime::Current();
-  if (UNLIKELY(runtime->UseJitCompilation() && runtime->GetJit()->JitAtFirstUse())) {
+  if (UNLIKELY(runtime->UseJitCompilation() && JitAtFirstUse())) {
     ArtMethod* np_method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
     if (np_method->IsCompilable()) {
-      if (!np_method->IsNative()) {
+      if (!np_method->IsNative() && GetCodeCache()->CanAllocateProfilingInfo()) {
         // The compiler requires a ProfilingInfo object for non-native methods.
         ProfilingInfo::Create(thread, np_method, /* retry_allocation= */ true);
       }
@@ -954,6 +969,14 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
       compile_task.Run(thread);
     }
     return;
+  }
+
+  if (UNLIKELY(method->IsZygoteCompiled())) {
+    const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
+    if (code_ptr != nullptr) {
+      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);
+      return;
+    }
   }
 
   ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
@@ -1033,12 +1056,11 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
   if (thread_pool_ != nullptr) {
-    if (!is_system_server) {
-      // Remove potential tasks that have been inherited from the zygote.
-      // We keep the queue for system server, as not having those methods compiled
-      // impacts app startup.
-      thread_pool_->RemoveAllTasks(Thread::Current());
-    } else if (Runtime::Current()->IsUsingApexBootImageLocation() && UseJitCompilation()) {
+    // Remove potential tasks that have been inherited from the zygote.
+    thread_pool_->RemoveAllTasks(Thread::Current());
+    if (is_system_server &&
+        Runtime::Current()->IsUsingApexBootImageLocation() &&
+        UseJitCompilation()) {
       // Disable garbage collection: we don't want it to delete methods we're compiling
       // through boot and system server profiles.
       // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.

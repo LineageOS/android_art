@@ -597,8 +597,8 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker com.
 # the Runtime APEX. This is a temporary change needed until Golem
 # fully supports the Runtime APEX.
 #
-# TODO(b/121117762, b/129332183): Remove this when the ART Buildbot
-# and Golem have full support for the Runtime APEX.
+# TODO(b/129332183): Remove this when Golem has full support for the
+# Runtime APEX.
 
 # Also include:
 # - a copy of the ICU prebuilt .dat file in /system/etc/icu on target
@@ -608,6 +608,9 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker com.
 # to "/system" on device. This is a temporary change needed
 # until Golem fully supports the Runtime APEX.
 #
+# TODO(b/129332183): Remove this when Golem has full support for the
+# Runtime APEX.
+
 # Also include:
 # - a copy of the time zone data prebuilt files in
 #   /system/etc/tzdata_module/etc/tz and /system/etc/tzdata_module/etc/icu
@@ -618,10 +621,10 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker com.
 # by setting the environment variable `ART_TEST_ANDROID_TZDATA_ROOT`
 # to "/system/etc/tzdata_module" on device. This is a temporary change needed
 # until Golem fully supports the Time Zone Data APEX.
-
 #
-# TODO(b/121117762, b/129332183): Remove this when the ART Buildbot
-# and Golem have full support for the Runtime APEX.
+# TODO(b/129332183): Remove this when Golem has full support for the
+# Runtime APEX (and TZ Data APEX).
+
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
                         $(TARGET_OUT_EXECUTABLES)/art \
