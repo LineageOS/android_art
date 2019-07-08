@@ -893,7 +893,7 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
       type_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_string_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       string_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
-      boot_image_intrinsic_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      boot_image_other_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       call_entrypoint_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       baker_read_barrier_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       uint32_literals_(std::less<uint32_t>(),
@@ -4210,14 +4210,14 @@ vixl::aarch64::Label* CodeGeneratorARM64::NewBootImageIntrinsicPatch(
     uint32_t intrinsic_data,
     vixl::aarch64::Label* adrp_label) {
   return NewPcRelativePatch(
-      /* dex_file= */ nullptr, intrinsic_data, adrp_label, &boot_image_intrinsic_patches_);
+      /* dex_file= */ nullptr, intrinsic_data, adrp_label, &boot_image_other_patches_);
 }
 
 vixl::aarch64::Label* CodeGeneratorARM64::NewBootImageRelRoPatch(
     uint32_t boot_image_offset,
     vixl::aarch64::Label* adrp_label) {
   return NewPcRelativePatch(
-      /* dex_file= */ nullptr, boot_image_offset, adrp_label, &boot_image_method_patches_);
+      /* dex_file= */ nullptr, boot_image_offset, adrp_label, &boot_image_other_patches_);
 }
 
 vixl::aarch64::Label* CodeGeneratorARM64::NewBootImageMethodPatch(
@@ -4427,7 +4427,7 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
       type_bss_entry_patches_.size() +
       boot_image_string_patches_.size() +
       string_bss_entry_patches_.size() +
-      boot_image_intrinsic_patches_.size() +
+      boot_image_other_patches_.size() +
       call_entrypoint_patches_.size() +
       baker_read_barrier_patches_.size();
   linker_patches->reserve(size);
@@ -4438,14 +4438,17 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
         boot_image_type_patches_, linker_patches);
     EmitPcRelativeLinkerPatches<linker::LinkerPatch::RelativeStringPatch>(
         boot_image_string_patches_, linker_patches);
-    EmitPcRelativeLinkerPatches<NoDexFileAdapter<linker::LinkerPatch::IntrinsicReferencePatch>>(
-        boot_image_intrinsic_patches_, linker_patches);
   } else {
-    EmitPcRelativeLinkerPatches<NoDexFileAdapter<linker::LinkerPatch::DataBimgRelRoPatch>>(
-        boot_image_method_patches_, linker_patches);
+    DCHECK(boot_image_method_patches_.empty());
     DCHECK(boot_image_type_patches_.empty());
     DCHECK(boot_image_string_patches_.empty());
-    DCHECK(boot_image_intrinsic_patches_.empty());
+  }
+  if (GetCompilerOptions().IsBootImage()) {
+    EmitPcRelativeLinkerPatches<NoDexFileAdapter<linker::LinkerPatch::IntrinsicReferencePatch>>(
+        boot_image_other_patches_, linker_patches);
+  } else {
+    EmitPcRelativeLinkerPatches<NoDexFileAdapter<linker::LinkerPatch::DataBimgRelRoPatch>>(
+        boot_image_other_patches_, linker_patches);
   }
   EmitPcRelativeLinkerPatches<linker::LinkerPatch::MethodBssEntryPatch>(
       method_bss_entry_patches_, linker_patches);

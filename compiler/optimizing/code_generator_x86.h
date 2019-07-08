@@ -644,8 +644,7 @@ class CodeGeneratorX86 : public CodeGenerator {
   ParallelMoveResolverX86 move_resolver_;
   X86Assembler assembler_;
 
-  // PC-relative method patch info for kBootImageLinkTimePcRelative/kBootImageRelRo.
-  // Also used for type/string patches for kBootImageRelRo (same linker patch as for methods).
+  // PC-relative method patch info for kBootImageLinkTimePcRelative.
   ArenaDeque<X86PcRelativePatchInfo> boot_image_method_patches_;
   // PC-relative method patch info for kBssEntry.
   ArenaDeque<X86PcRelativePatchInfo> method_bss_entry_patches_;
@@ -657,8 +656,9 @@ class CodeGeneratorX86 : public CodeGenerator {
   ArenaDeque<X86PcRelativePatchInfo> boot_image_string_patches_;
   // PC-relative String patch info for kBssEntry.
   ArenaDeque<X86PcRelativePatchInfo> string_bss_entry_patches_;
-  // PC-relative patch info for IntrinsicObjects.
-  ArenaDeque<X86PcRelativePatchInfo> boot_image_intrinsic_patches_;
+  // PC-relative patch info for IntrinsicObjects for the boot image,
+  // and for method/type/string patches for kBootImageRelRo otherwise.
+  ArenaDeque<X86PcRelativePatchInfo> boot_image_other_patches_;
 
   // Patches for string root accesses in JIT compiled code.
   ArenaDeque<PatchInfo<Label>> jit_string_patches_;

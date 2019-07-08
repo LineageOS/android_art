@@ -870,8 +870,7 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
 
   ArmVIXLAssembler assembler_;
 
-  // PC-relative method patch info for kBootImageLinkTimePcRelative/kBootImageRelRo.
-  // Also used for type/string patches for kBootImageRelRo (same linker patch as for methods).
+  // PC-relative method patch info for kBootImageLinkTimePcRelative.
   ArenaDeque<PcRelativePatchInfo> boot_image_method_patches_;
   // PC-relative method patch info for kBssEntry.
   ArenaDeque<PcRelativePatchInfo> method_bss_entry_patches_;
@@ -883,8 +882,9 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
   ArenaDeque<PcRelativePatchInfo> boot_image_string_patches_;
   // PC-relative String patch info for kBssEntry.
   ArenaDeque<PcRelativePatchInfo> string_bss_entry_patches_;
-  // PC-relative patch info for IntrinsicObjects.
-  ArenaDeque<PcRelativePatchInfo> boot_image_intrinsic_patches_;
+  // PC-relative patch info for IntrinsicObjects for the boot image,
+  // and for method/type/string patches for kBootImageRelRo otherwise.
+  ArenaDeque<PcRelativePatchInfo> boot_image_other_patches_;
   // Patch info for calls to entrypoint dispatch thunks. Used for slow paths.
   ArenaDeque<PatchInfo<vixl::aarch32::Label>> call_entrypoint_patches_;
   // Baker read barrier patch info.
