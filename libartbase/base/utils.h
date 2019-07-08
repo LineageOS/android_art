@@ -116,6 +116,9 @@ NO_RETURN void SleepForever();
 // Flush CPU caches. Returns true on success, false if flush failed.
 WARN_UNUSED bool FlushCpuCaches(void* begin, void* end);
 
+// On some old kernels, a cache operation may segfault.
+WARN_UNUSED bool CacheOperationsMaySegFault();
+
 template <typename T>
 constexpr PointerSize ConvertToPointerSize(T any) {
   if (any == 4 || any == 8) {
