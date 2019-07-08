@@ -265,6 +265,12 @@ class CheckJniAbortCatcher {
     return; \
   }
 
+#define TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT() \
+  if (CacheOperationsMaySegFault()) { \
+    printf("WARNING: TEST DISABLED ON KERNEL THAT SEGFAULT ON CACHE OPERATIONS\n"); \
+    return; \
+  }
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_COMMON_RUNTIME_TEST_H_

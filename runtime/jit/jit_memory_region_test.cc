@@ -26,6 +26,8 @@
 
 #include "base/globals.h"
 #include "base/memfd.h"
+#include "base/utils.h"
+#include "common_runtime_test.h"
 
 namespace art {
 namespace jit {
@@ -53,6 +55,8 @@ static void registerSignalHandler() {
 class TestZygoteMemory : public testing::Test {
  public:
   void BasicTest() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
     std::string error_msg;
     size_t size = kPageSize;
     android::base::unique_fd fd(JitMemoryRegion::CreateZygoteMemory(size, &error_msg));
@@ -104,6 +108,8 @@ class TestZygoteMemory : public testing::Test {
   }
 
   void TestUnmapWritableAfterFork() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
     std::string error_msg;
     size_t size = kPageSize;
     int32_t* addr = nullptr;
@@ -199,6 +205,8 @@ class TestZygoteMemory : public testing::Test {
   }
 
   void TestMadviseDontFork() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
     std::string error_msg;
     size_t size = kPageSize;
     int32_t* addr = nullptr;
@@ -290,6 +298,8 @@ class TestZygoteMemory : public testing::Test {
   // copy-on-write mapping that can incorporate changes from a shared mapping
   // owned by another process.
   void TestFromSharedToPrivate() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
     // This test is only for memfd with future write sealing support:
     // 1) ashmem with PROT_READ doesn't permit mapping MAP_PRIVATE | PROT_WRITE
     // 2) ashmem mapped MAP_PRIVATE discards the contents already written.
