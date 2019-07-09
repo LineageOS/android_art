@@ -1025,6 +1025,13 @@ void Runtime::InitNonZygoteOrPostFork(
   // this to come last.
   ScopedObjectAccess soa(Thread::Current());
   GetRuntimeCallbacks()->StartDebugger();
+
+  if (Dbg::IsJdwpAllowed() || IsProfileableFromShell() || IsJavaDebuggable()) {
+    std::string err;
+    if (!EnsurePerfettoPlugin(&err)) {
+      LOG(WARNING) << "Failed to load perfetto_hprof: " << err;
+    }
+  }
 }
 
 void Runtime::StartSignalCatcher() {
@@ -1763,18 +1770,30 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   return true;
 }
 
-static bool EnsureJvmtiPlugin(Runtime* runtime,
-                              std::vector<Plugin>* plugins,
-                              std::string* error_msg) {
-  constexpr const char* plugin_name = kIsDebugBuild ? "libopenjdkjvmtid.so" : "libopenjdkjvmti.so";
-
+bool Runtime::EnsurePluginLoaded(const char* plugin_name, std::string* error_msg) {
   // Is the plugin already loaded?
-  for (const Plugin& p : *plugins) {
+  for (const Plugin& p : plugins_) {
     if (p.GetLibrary() == plugin_name) {
       return true;
     }
   }
+  Plugin new_plugin = Plugin::Create(plugin_name);
 
+  if (!new_plugin.Load(error_msg)) {
+    return false;
+  }
+  plugins_.push_back(std::move(new_plugin));
+  return true;
+}
+
+bool Runtime::EnsurePerfettoPlugin(std::string* error_msg) {
+  constexpr const char* plugin_name = kIsDebugBuild ?
+    "libperfetto_hprofd.so" : "libperfetto_hprof.so";
+  return EnsurePluginLoaded(plugin_name, error_msg);
+}
+
+static bool EnsureJvmtiPlugin(Runtime* runtime,
+                              std::string* error_msg) {
   // TODO Rename Dbg::IsJdwpAllowed is IsDebuggingAllowed.
   DCHECK(Dbg::IsJdwpAllowed() || !runtime->IsJavaDebuggable())
       << "Being debuggable requires that jdwp (i.e. debugging) is allowed.";
@@ -1785,14 +1804,8 @@ static bool EnsureJvmtiPlugin(Runtime* runtime,
     return false;
   }
 
-  Plugin new_plugin = Plugin::Create(plugin_name);
-
-  if (!new_plugin.Load(error_msg)) {
-    return false;
-  }
-
-  plugins->push_back(std::move(new_plugin));
-  return true;
+  constexpr const char* plugin_name = kIsDebugBuild ? "libopenjdkjvmtid.so" : "libopenjdkjvmti.so";
+  return runtime->EnsurePluginLoaded(plugin_name, error_msg);
 }
 
 // Attach a new agent and add it to the list of runtime agents
@@ -1803,7 +1816,7 @@ static bool EnsureJvmtiPlugin(Runtime* runtime,
 //
 void Runtime::AttachAgent(JNIEnv* env, const std::string& agent_arg, jobject class_loader) {
   std::string error_msg;
-  if (!EnsureJvmtiPlugin(this, &plugins_, &error_msg)) {
+  if (!EnsureJvmtiPlugin(this, &error_msg)) {
     LOG(WARNING) << "Could not load plugin: " << error_msg;
     ScopedObjectAccess soa(Thread::Current());
     ThrowIOException("%s", error_msg.c_str());
