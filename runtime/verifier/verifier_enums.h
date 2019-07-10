@@ -94,6 +94,9 @@ enum VerifyError : uint32_t {
                                              // (sets a soft fail at compile time).
   VERIFY_ERROR_LOCKING =           1 << 11,  // Could not guarantee balanced locking. This should be
                                              // punted to the interpreter with access checks.
+  VERIFY_ERROR_UNRESOLVED_CATCH =  1 << 12,  // Error code necessary to have a synthetic soft fail
+                                             // that is not an exception, to let the compiler know
+                                             // that there is (unreachable) unverified code.
 };
 std::ostream& operator<<(std::ostream& os, const VerifyError& rhs);
 
