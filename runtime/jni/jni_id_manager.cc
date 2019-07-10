@@ -69,11 +69,14 @@ ObjPtr<mirror::PointerArray> GetOrCreateIds(Thread* self,
                                             ArtField* field,
                                             /*out*/bool* allocation_failure) {
   ScopedExceptionStorage ses(self);
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Class> h_k(hs.NewHandle(k));
   ObjPtr<mirror::PointerArray> res;
   if (Locks::mutator_lock_->IsExclusiveHeld(self)) {
-    res = field->IsStatic() ? k->GetStaticFieldIds() : k->GetInstanceFieldIds();
+    res = field->IsStatic() ? h_k->GetStaticFieldIds() : h_k->GetInstanceFieldIds();
   } else {
-    res = field->IsStatic() ? k->GetOrCreateStaticFieldIds() : k->GetOrCreateInstanceFieldIds();
+    res = field->IsStatic() ? mirror::Class::GetOrCreateStaticFieldIds(h_k)
+                            : mirror::Class::GetOrCreateInstanceFieldIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();
@@ -98,11 +101,13 @@ ObjPtr<mirror::PointerArray> GetOrCreateIds(Thread* self,
     *allocation_failure = false;
     return nullptr;
   }
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Class> h_k(hs.NewHandle(k));
   ObjPtr<mirror::PointerArray> res;
   if (Locks::mutator_lock_->IsExclusiveHeld(self) || !Locks::mutator_lock_->IsSharedHeld(self)) {
-    res = k->GetMethodIds();
+    res = h_k->GetMethodIds();
   } else {
-    res = k->GetOrCreateMethodIds();
+    res = mirror::Class::GetOrCreateMethodIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();

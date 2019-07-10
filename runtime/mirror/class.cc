@@ -1558,17 +1558,15 @@ ObjPtr<PointerArray> Class::GetMethodIds() {
     return ext->GetJMethodIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateMethodIds() {
+ObjPtr<PointerArray> Class::GetOrCreateMethodIds(Handle<Class> h_this) {
   DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
     return nullptr;
   }
-  return ext->EnsureJMethodIDsArrayPresent(NumMethods());
+  return ext->EnsureJMethodIDsArrayPresent(h_this->NumMethods());
 }
 
 ObjPtr<PointerArray> Class::GetStaticFieldIds() {
@@ -1579,17 +1577,15 @@ ObjPtr<PointerArray> Class::GetStaticFieldIds() {
     return ext->GetStaticJFieldIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateStaticFieldIds() {
+ObjPtr<PointerArray> Class::GetOrCreateStaticFieldIds(Handle<Class> h_this) {
   DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
     return nullptr;
   }
-  return ext->EnsureStaticJFieldIDsArrayPresent(NumStaticFields());
+  return ext->EnsureStaticJFieldIDsArrayPresent(h_this->NumStaticFields());
 }
 ObjPtr<PointerArray> Class::GetInstanceFieldIds() {
   ObjPtr<ClassExt> ext(GetExtData());
@@ -1599,17 +1595,15 @@ ObjPtr<PointerArray> Class::GetInstanceFieldIds() {
     return ext->GetInstanceJFieldIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateInstanceFieldIds() {
+ObjPtr<PointerArray> Class::GetOrCreateInstanceFieldIds(Handle<Class> h_this) {
   DCHECK(Runtime::Current()->JniIdsAreIndices()) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
-  StackHandleScope<1> hs(self);
-  Handle<Class> h_this(hs.NewHandle(this));
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
     return nullptr;
   }
-  return ext->EnsureInstanceJFieldIDsArrayPresent(NumInstanceFields());
+  return ext->EnsureInstanceJFieldIDsArrayPresent(h_this->NumInstanceFields());
 }
 
 size_t Class::GetStaticFieldIdOffset(ArtField* field) {
