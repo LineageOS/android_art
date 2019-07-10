@@ -435,7 +435,7 @@ def run_tests(tests):
         options_test += ' --no-image'
 
       if debuggable == 'debuggable':
-        options_test += ' --debuggable'
+        options_test += ' --debuggable --runtime-option -Xopaque-jni-ids:true'
 
       if jvmti == 'jvmti-stress':
         options_test += ' --jvmti-trace-stress --jvmti-redefine-stress --jvmti-field-stress'

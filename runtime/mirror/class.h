@@ -1230,11 +1230,14 @@ class MANAGED Class final : public Object {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get or create the various jni id arrays in a lock-less thread safe manner.
-  ObjPtr<PointerArray> GetOrCreateMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static ObjPtr<PointerArray> GetOrCreateMethodIds(Handle<Class> h_this)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<PointerArray> GetMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetOrCreateStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static ObjPtr<PointerArray> GetOrCreateStaticFieldIds(Handle<Class> h_this)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<PointerArray> GetStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetOrCreateInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static ObjPtr<PointerArray> GetOrCreateInstanceFieldIds(Handle<Class> h_this)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<PointerArray> GetInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Calculate the index in the ifields_, methods_ or sfields_ arrays a method is located at. This
