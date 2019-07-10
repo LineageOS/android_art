@@ -175,6 +175,8 @@ class LocationsBuilderX86 : public HGraphVisitor {
   void HandleShift(HBinaryOperation* instruction);
   void HandleFieldSet(HInstruction* instruction, const FieldInfo& field_info);
   void HandleFieldGet(HInstruction* instruction, const FieldInfo& field_info);
+  bool CpuHasAvxFeatureFlag();
+  bool CpuHasAvx2FeatureFlag();
 
   CodeGeneratorX86* const codegen_;
   InvokeDexCallingConventionVisitorX86 parameter_visitor_;
@@ -307,6 +309,8 @@ class InstructionCodeGeneratorX86 : public InstructionCodeGenerator {
                                    HBasicBlock* default_block);
 
   void GenerateFPCompare(Location lhs, Location rhs, HInstruction* insn, bool is_double);
+  bool CpuHasAvxFeatureFlag();
+  bool CpuHasAvx2FeatureFlag();
 
   X86Assembler* const assembler_;
   CodeGeneratorX86* const codegen_;
