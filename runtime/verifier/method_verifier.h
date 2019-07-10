@@ -138,7 +138,7 @@ class MethodVerifier {
   }
 
   // Log a verification failure.
-  std::ostream& Fail(VerifyError error, bool pending_exc = true);
+  std::ostream& Fail(VerifyError error);
 
   // Log for verification information.
   ScopedNewLine LogVerifyInfo();
