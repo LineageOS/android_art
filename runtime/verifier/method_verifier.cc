@@ -3829,12 +3829,13 @@ bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst
 
           // We need to post a failure. The compiler currently does not handle unreachable
           // code correctly.
-          Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler, fail for compiler";
+          Fail(VERIFY_ERROR_NO_CLASS, /*pending_exc=*/ false)
+              << "Unresolved catch handler, fail for compiler";
 
           return std::make_pair(false, unresolved);
         }
         // Soft-fail, but do not handle this with a synthetic throw.
-        Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler";
+        Fail(VERIFY_ERROR_NO_CLASS, /*pending_exc=*/ false) << "Unresolved catch handler";
         if (common_super != nullptr) {
           unresolved = &unresolved->Merge(*common_super, &reg_types_, this);
         }
@@ -5513,70 +5514,72 @@ void MethodVerifier::VisitRoots(RootVisitor* visitor, const RootInfo& root_info)
   reg_types_.VisitRoots(visitor, root_info);
 }
 
-std::ostream& MethodVerifier::Fail(VerifyError error) {
+std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
   // Mark the error type as encountered.
   encountered_failure_types_ |= static_cast<uint32_t>(error);
 
-  switch (error) {
-    case VERIFY_ERROR_NO_CLASS:
-    case VERIFY_ERROR_NO_FIELD:
-    case VERIFY_ERROR_NO_METHOD:
-    case VERIFY_ERROR_ACCESS_CLASS:
-    case VERIFY_ERROR_ACCESS_FIELD:
-    case VERIFY_ERROR_ACCESS_METHOD:
-    case VERIFY_ERROR_INSTANTIATION:
-    case VERIFY_ERROR_CLASS_CHANGE:
-    case VERIFY_ERROR_FORCE_INTERPRETER:
-    case VERIFY_ERROR_LOCKING:
-      if (Runtime::Current()->IsAotCompiler() || !can_load_classes_) {
-        // If we're optimistically running verification at compile time, turn NO_xxx, ACCESS_xxx,
-        // class change and instantiation errors into soft verification errors so that we re-verify
-        // at runtime. We may fail to find or to agree on access because of not yet available class
-        // loaders, or class loaders that will differ at runtime. In these cases, we don't want to
-        // affect the soundness of the code being compiled. Instead, the generated code runs "slow
-        // paths" that dynamically perform the verification and cause the behavior to be that akin
-        // to an interpreter.
-        error = VERIFY_ERROR_BAD_CLASS_SOFT;
-      } else {
-        // If we fail again at runtime, mark that this instruction would throw and force this
-        // method to be executed using the interpreter with checks.
-        flags_.have_pending_runtime_throw_failure_ = true;
+  if (pending_exc) {
+    switch (error) {
+      case VERIFY_ERROR_NO_CLASS:
+      case VERIFY_ERROR_NO_FIELD:
+      case VERIFY_ERROR_NO_METHOD:
+      case VERIFY_ERROR_ACCESS_CLASS:
+      case VERIFY_ERROR_ACCESS_FIELD:
+      case VERIFY_ERROR_ACCESS_METHOD:
+      case VERIFY_ERROR_INSTANTIATION:
+      case VERIFY_ERROR_CLASS_CHANGE:
+      case VERIFY_ERROR_FORCE_INTERPRETER:
+      case VERIFY_ERROR_LOCKING:
+        if (Runtime::Current()->IsAotCompiler() || !can_load_classes_) {
+          // If we're optimistically running verification at compile time, turn NO_xxx, ACCESS_xxx,
+          // class change and instantiation errors into soft verification errors so that we
+          // re-verify at runtime. We may fail to find or to agree on access because of not yet
+          // available class loaders, or class loaders that will differ at runtime. In these cases,
+          // we don't want to affect the soundness of the code being compiled. Instead, the
+          // generated code runs "slow paths" that dynamically perform the verification and cause
+          // the behavior to be that akin to an interpreter.
+          error = VERIFY_ERROR_BAD_CLASS_SOFT;
+        } else {
+          // If we fail again at runtime, mark that this instruction would throw and force this
+          // method to be executed using the interpreter with checks.
+          flags_.have_pending_runtime_throw_failure_ = true;
 
-        // We need to save the work_line if the instruction wasn't throwing before. Otherwise we'll
-        // try to merge garbage.
-        // Note: this assumes that Fail is called before we do any work_line modifications.
-        // Note: this can fail before we touch any instruction, for the signature of a method. So
-        //       add a check.
-        if (work_insn_idx_ < dex::kDexNoIndex) {
-          const Instruction& inst = code_item_accessor_.InstructionAt(work_insn_idx_);
-          int opcode_flags = Instruction::FlagsOf(inst.Opcode());
+          // We need to save the work_line if the instruction wasn't throwing before. Otherwise
+          // we'll try to merge garbage.
+          // Note: this assumes that Fail is called before we do any work_line modifications.
+          // Note: this can fail before we touch any instruction, for the signature of a method. So
+          //       add a check.
+          if (work_insn_idx_ < dex::kDexNoIndex) {
+            const Instruction& inst = code_item_accessor_.InstructionAt(work_insn_idx_);
+            int opcode_flags = Instruction::FlagsOf(inst.Opcode());
 
-          if ((opcode_flags & Instruction::kThrow) == 0 &&
-              GetInstructionFlags(work_insn_idx_).IsInTry()) {
-            saved_line_->CopyFromLine(work_line_.get());
+            if ((opcode_flags & Instruction::kThrow) == 0 &&
+                GetInstructionFlags(work_insn_idx_).IsInTry()) {
+              saved_line_->CopyFromLine(work_line_.get());
+            }
           }
         }
-      }
-      break;
+        break;
 
-      // Indication that verification should be retried at runtime.
-    case VERIFY_ERROR_BAD_CLASS_SOFT:
-      if (!allow_soft_failures_) {
+        // Indication that verification should be retried at runtime.
+      case VERIFY_ERROR_BAD_CLASS_SOFT:
+        if (!allow_soft_failures_) {
+          flags_.have_pending_hard_failure_ = true;
+        }
+        break;
+
+        // Hard verification failures at compile time will still fail at runtime, so the class is
+        // marked as rejected to prevent it from being compiled.
+      case VERIFY_ERROR_BAD_CLASS_HARD: {
         flags_.have_pending_hard_failure_ = true;
+        break;
       }
-      break;
-
-      // Hard verification failures at compile time will still fail at runtime, so the class is
-      // marked as rejected to prevent it from being compiled.
-    case VERIFY_ERROR_BAD_CLASS_HARD: {
-      flags_.have_pending_hard_failure_ = true;
-      break;
     }
-
-    case VERIFY_ERROR_UNRESOLVED_CATCH:
-      // Nothing to do, just remember the failure type.
-      break;
+  } else if (kIsDebugBuild) {
+    CHECK_NE(error, VERIFY_ERROR_BAD_CLASS_SOFT);
+    CHECK_NE(error, VERIFY_ERROR_BAD_CLASS_HARD);
   }
+
   failures_.push_back(error);
   std::string location(StringPrintf("%s: [0x%X] ", dex_file_->PrettyMethod(dex_method_idx_).c_str(),
                                     work_insn_idx_));
