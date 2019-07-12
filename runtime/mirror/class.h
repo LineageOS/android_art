@@ -98,6 +98,8 @@ class MANAGED Class final : public Object {
   static void SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
+  void SetStatusForPrimitiveOrArray(ClassStatus new_status) REQUIRES_SHARED(Locks::mutator_lock_);
+
   static constexpr MemberOffset StatusOffset() {
     return MemberOffset(OFFSET_OF_OBJECT_MEMBER(Class, status_));
   }

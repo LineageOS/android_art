@@ -235,6 +235,38 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
   }
 }
 
+void Class::SetStatusForPrimitiveOrArray(ClassStatus new_status) {
+  DCHECK(IsPrimitive<kVerifyNone>() || IsArrayClass<kVerifyNone>());
+  DCHECK(!IsErroneous(new_status));
+  DCHECK(!IsErroneous(GetStatus<kVerifyNone>()));
+  DCHECK_GT(new_status, GetStatus<kVerifyNone>());
+
+  if (kBitstringSubtypeCheckEnabled) {
+    LOG(FATAL) << "Unimplemented";
+  }
+  // The ClassStatus is always in the 4 most-significant bits of status_.
+  static_assert(sizeof(status_) == sizeof(uint32_t), "Size of status_ not equal to uint32");
+  uint32_t new_status_value = static_cast<uint32_t>(new_status) << (32 - kClassStatusBitSize);
+  // Use normal store. For primitives and core arrays classes (Object[],
+  // Class[], String[] and primitive arrays), the status is set while the
+  // process is still single threaded. For other arrays classes, it is set
+  // in a pre-fence visitor which initializes all fields and the subsequent
+  // fence together with address dependency shall ensure memory visibility.
+  SetField32</*kTransactionActive=*/ false,
+             /*kCheckTransaction=*/ false,
+             kVerifyNone>(StatusOffset(), new_status_value);
+
+  // Do not update `object_alloc_fast_path_`. Arrays are variable size and
+  // instances of primitive classes cannot be created at all.
+
+  if (kIsDebugBuild && new_status >= ClassStatus::kInitialized) {
+    CHECK(WasVerificationAttempted()) << PrettyClassAndClassLoader();
+  }
+
+  // There can be no waiters to notify as these classes are initialized
+  // before another thread can see them.
+}
+
 void Class::SetDexCache(ObjPtr<DexCache> new_dex_cache) {
   SetFieldObjectTransaction(OFFSET_OF_OBJECT_MEMBER(Class, dex_cache_), new_dex_cache);
 }
