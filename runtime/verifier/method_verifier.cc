@@ -3829,12 +3829,13 @@ bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst
 
           // We need to post a failure. The compiler currently does not handle unreachable
           // code correctly.
-          Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler, fail for compiler";
+          Fail(VERIFY_ERROR_SKIP_COMPILER, /*pending_exc=*/ false)
+              << "Unresolved catch handler, fail for compiler";
 
           return std::make_pair(false, unresolved);
         }
         // Soft-fail, but do not handle this with a synthetic throw.
-        Fail(VERIFY_ERROR_UNRESOLVED_CATCH) << "Unresolved catch handler";
+        Fail(VERIFY_ERROR_NO_CLASS, /*pending_exc=*/ false) << "Unresolved catch handler";
         if (common_super != nullptr) {
           unresolved = &unresolved->Merge(*common_super, &reg_types_, this);
         }
@@ -5574,7 +5575,7 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
         break;
       }
 
-      case VERIFY_ERROR_UNRESOLVED_CATCH:
+      case VERIFY_ERROR_SKIP_COMPILER:
         // Nothing to do, just remember the failure type.
         break;
     }
