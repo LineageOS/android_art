@@ -190,7 +190,7 @@ public class Main {
     server.createContext("/bitmap", new BitmapHandler(ahat));
     server.createContext("/style.css", new StaticHandler("etc/style.css", "text/css"));
     server.setExecutor(Executors.newFixedThreadPool(1));
-    System.out.println("Server started on localhost:" + port);
+    System.out.println("Server started on http://localhost:" + port);
 
     server.start();
   }
