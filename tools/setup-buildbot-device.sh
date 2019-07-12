@@ -166,11 +166,5 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
     || adb shell mount -o bind /dev "$ART_TEST_CHROOT/dev"
 
   # Create /apex directory in chroot.
-  #
-  # Note that we do not mount a tmpfs in this directory, as we simply copy the
-  # contents of the flattened Runtime APEX in it during the execution of
-  # art/tools/buildbot-sync.sh. (This may change in the future, if we start
-  # using scripts art/tools/mount-buildbot-apexes.sh and
-  # art/tools/unmount-buildbot-apexes.sh.)
   adb shell mkdir -p "$ART_TEST_CHROOT/apex"
 fi
