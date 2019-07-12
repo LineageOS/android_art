@@ -73,7 +73,7 @@ elif [[ $mode == "target" ]]; then
     exit 1
   fi
   make_command="make $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
-  make_command+=" libjavacrypto-target libnetd_client-target toybox toolbox sh unzip"
+  make_command+=" libjavacrypto-target libnetd_client-target toybox toolbox sh"
   make_command+=" debuggerd su"
   make_command+=" libstdc++ "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
