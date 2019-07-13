@@ -48,6 +48,7 @@ import argparse
 import collections
 import concurrent.futures
 import contextlib
+import datetime
 import fnmatch
 import itertools
 import json
@@ -59,7 +60,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 
 import env
 from target_config import target_config
@@ -484,9 +484,9 @@ def run_tests(tests):
 
       tests_done = 0
       for test_future in concurrent.futures.as_completed(test_futures):
-        (test, status, failure_info) = test_future.result()
+        (test, status, failure_info, test_time) = test_future.result()
         tests_done += 1
-        print_test_info(tests_done, test, status, failure_info)
+        print_test_info(tests_done, test, status, failure_info, test_time)
         if failure_info and not env.ART_TEST_KEEP_GOING:
           for f in test_futures:
             f.cancel()
@@ -531,8 +531,10 @@ def run_test(command, test, test_variant, test_name):
   try:
     if is_test_disabled(test, test_variant):
       test_skipped = True
+      test_time = datetime.timedelta()
     else:
       test_skipped = False
+      test_start_time = datetime.datetime.now()
       if gdb:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, universal_newlines=True)
       else:
@@ -540,26 +542,32 @@ def run_test(command, test, test_variant, test_name):
                                 universal_newlines=True)
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
+      test_end_time = datetime.datetime.now()
+      test_time = test_end_time - test_start_time
 
     if not test_skipped:
       if test_passed:
-        return (test_name, 'PASS', None)
+        return (test_name, 'PASS', None, test_time)
       else:
         failed_tests.append((test_name, str(command) + "\n" + script_output))
-        return (test_name, 'FAIL', ('%s\n%s') % (command, script_output))
+        return (test_name, 'FAIL', ('%s\n%s') % (command, script_output), test_time)
     elif not dry_run:
       skipped_tests.append(test_name)
-      return (test_name, 'SKIP', None)
+      return (test_name, 'SKIP', None, test_time)
     else:
-      return (test_name, 'PASS', None)
+      return (test_name, 'PASS', None, test_time)
   except subprocess.TimeoutExpired as e:
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
-    return (test_name, 'TIMEOUT', 'Timed out in %d seconds\n%s' % (timeout, command))
+    return (test_name,
+            'TIMEOUT',
+            'Timed out in %d seconds\n%s' % (timeout, command),
+            datetime.timedelta(seconds=timeout))
   except Exception as e:
     failed_tests.append((test_name, str(e)))
-    return (test_name, 'FAIL', ('%s\n%s\n\n') % (command, str(e)))
+    return (test_name, 'FAIL', ('%s\n%s\n\n') % (command, str(e)), datetime.timedelta())
 
-def print_test_info(test_count, test_name, result, failed_test_info=""):
+def print_test_info(test_count, test_name, result, failed_test_info="",
+                    test_time=datetime.timedelta()):
   """Print the continous test information
 
   If verbose is set to True, it continuously prints test status information
@@ -587,6 +595,9 @@ def print_test_info(test_count, test_name, result, failed_test_info=""):
       percent,
       test_count,
       total_test_count)
+    if test_time.total_seconds() != 0 and verbose:
+      info += '(%s)' % str(test_time)
+
 
     if result == 'FAIL' or result == 'TIMEOUT':
       if not verbose:
