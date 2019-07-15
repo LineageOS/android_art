@@ -2699,8 +2699,11 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
         // type is assignable to the original then allow optimization. This check is performed to
         // ensure that subsequent merges don't lose type information - such as becoming an
         // interface from a class that would lose information relevant to field checks.
+        //
+        // Note: do not do an access check. This may mark this with a runtime throw that actually
+        //       happens at the instanceof, not the branch (and branches aren't flagged to throw).
         const RegType& orig_type = work_line_->GetRegisterType(this, instance_of_inst.VRegB_22c());
-        const RegType& cast_type = ResolveClass<CheckAccess::kYes>(
+        const RegType& cast_type = ResolveClass<CheckAccess::kNo>(
             dex::TypeIndex(instance_of_inst.VRegC_22c()));
 
         if (!orig_type.Equals(cast_type) &&
