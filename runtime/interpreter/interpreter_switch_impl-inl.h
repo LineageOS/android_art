@@ -502,6 +502,7 @@ class InstructionHandler {
         return false;  // Pending exception.
       }
       if (!obj_result->VerifierInstanceOf(return_type)) {
+        CHECK_LE(Runtime::Current()->GetTargetSdkVersion(), 29u);
         // This should never happen.
         std::string temp1, temp2;
         self->ThrowNewExceptionF("Ljava/lang/InternalError;",
