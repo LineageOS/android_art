@@ -2209,8 +2209,8 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
                                               << reg_type;
           } else if (!return_type.IsAssignableFrom(reg_type, this)) {
             if (reg_type.IsUnresolvedTypes() || return_type.IsUnresolvedTypes()) {
-              Fail(VERIFY_ERROR_NO_CLASS) << " can't resolve returned type '" << return_type
-                  << "' or '" << reg_type << "'";
+              Fail(api_level_ > 29u ? VERIFY_ERROR_BAD_CLASS_SOFT : VERIFY_ERROR_NO_CLASS)
+                  << " can't resolve returned type '" << return_type << "' or '" << reg_type << "'";
             } else {
               bool soft_error = false;
               // Check whether arrays are involved. They will show a valid class status, even
