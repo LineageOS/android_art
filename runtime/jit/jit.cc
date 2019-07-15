@@ -591,25 +591,27 @@ class JitCompileTask final : public Task {
   }
 
   void Run(Thread* self) override {
-    ScopedObjectAccess soa(self);
-    switch (kind_) {
-      case TaskKind::kPreCompile:
-      case TaskKind::kCompile:
-      case TaskKind::kCompileBaseline:
-      case TaskKind::kCompileOsr: {
-        Runtime::Current()->GetJit()->CompileMethod(
-            method_,
-            self,
-            /* baseline= */ (kind_ == TaskKind::kCompileBaseline),
-            /* osr= */ (kind_ == TaskKind::kCompileOsr),
-            /* prejit= */ (kind_ == TaskKind::kPreCompile));
-        break;
-      }
-      case TaskKind::kAllocateProfile: {
-        if (ProfilingInfo::Create(self, method_, /* retry_allocation= */ true)) {
-          VLOG(jit) << "Start profiling " << ArtMethod::PrettyMethod(method_);
+    {
+      ScopedObjectAccess soa(self);
+      switch (kind_) {
+        case TaskKind::kPreCompile:
+        case TaskKind::kCompile:
+        case TaskKind::kCompileBaseline:
+        case TaskKind::kCompileOsr: {
+          Runtime::Current()->GetJit()->CompileMethod(
+              method_,
+              self,
+              /* baseline= */ (kind_ == TaskKind::kCompileBaseline),
+              /* osr= */ (kind_ == TaskKind::kCompileOsr),
+              /* prejit= */ (kind_ == TaskKind::kPreCompile));
+          break;
         }
-        break;
+        case TaskKind::kAllocateProfile: {
+          if (ProfilingInfo::Create(self, method_, /* retry_allocation= */ true)) {
+            VLOG(jit) << "Start profiling " << ArtMethod::PrettyMethod(method_);
+          }
+          break;
+        }
       }
     }
     ProfileSaver::NotifyJitActivity();
