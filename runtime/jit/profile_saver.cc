@@ -122,6 +122,10 @@ void ProfileSaver::NotifyStartupCompleted() {
 void ProfileSaver::Run() {
   Thread* self = Thread::Current();
 
+  // For thread annotalysis, the setup is more complicated than it should be. Run needs to start
+  // under mutex, but should drop it.
+  Locks::profiler_lock_->ExclusiveUnlock(self);
+
   // Fetch the resolved classes for the app images after sleeping for
   // options_.GetSaveResolvedClassesDelayMs().
   // TODO(calin) This only considers the case of the primary profile file.
@@ -647,8 +651,11 @@ void* ProfileSaver::RunProfileSaverThread(void* arg) {
     return nullptr;
   }
 
-  ProfileSaver* profile_saver = reinterpret_cast<ProfileSaver*>(arg);
-  profile_saver->Run();
+  {
+    Locks::profiler_lock_->ExclusiveLock(Thread::Current());
+    CHECK_EQ(reinterpret_cast<ProfileSaver*>(arg), instance_);
+    instance_->Run();
+  }
 
   runtime->DetachCurrentThread();
   VLOG(profiler) << "Profile saver shutdown";
@@ -784,7 +791,7 @@ void ProfileSaver::Stop(bool dump_info) {
 
   // Force save everything before destroying the thread since we want profiler_pthread_ to remain
   // valid.
-  instance_->ProcessProfilingInfo(/*force_save=*/true, /*number_of_new_methods=*/nullptr);
+  profile_saver->ProcessProfilingInfo(/*force_save=*/true, /*number_of_new_methods=*/nullptr);
 
   // Wait for the saver thread to stop.
   CHECK_PTHREAD_CALL(pthread_join, (profiler_pthread, nullptr), "profile saver thread shutdown");
