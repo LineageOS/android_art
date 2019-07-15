@@ -81,7 +81,8 @@ void StackMapStream::BeginStackMapEntry(uint32_t dex_pc,
                                         uint32_t native_pc_offset,
                                         uint32_t register_mask,
                                         BitVector* stack_mask,
-                                        StackMap::Kind kind) {
+                                        StackMap::Kind kind,
+                                        bool needs_vreg_info) {
   DCHECK(in_method_) << "Call BeginMethod first";
   DCHECK(!in_stack_map_) << "Mismatched Begin/End calls";
   in_stack_map_ = true;
@@ -114,7 +115,7 @@ void StackMapStream::BeginStackMapEntry(uint32_t dex_pc,
   lazy_stack_masks_.push_back(stack_mask);
   current_inline_infos_.clear();
   current_dex_registers_.clear();
-  expected_num_dex_registers_ = num_dex_registers_;
+  expected_num_dex_registers_ = needs_vreg_info  ? num_dex_registers_ : 0u;
 
   if (kVerifyStackMaps) {
     size_t stack_map_index = stack_maps_.size();

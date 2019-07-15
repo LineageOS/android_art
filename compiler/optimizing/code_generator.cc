@@ -1088,6 +1088,30 @@ ScopedArenaVector<uint8_t> CodeGenerator::BuildStackMaps(const dex::CodeItem* co
   return stack_map;
 }
 
+// Returns whether stackmap dex register info is needed for the instruction.
+//
+// The following cases mandate having a dex register map:
+//  * Deoptimization
+//    when we need to obtain the values to restore actual vregisters for interpreter.
+//  * Debuggability
+//    when we want to observe the values / asynchronously deoptimize.
+//  * Monitor operations
+//    to allow dumping in a stack trace locked dex registers for non-debuggable code.
+//  * On-stack-replacement (OSR)
+//    when entering compiled for OSR code from the interpreter we need to initialize the compiled
+//    code values with the values from the vregisters.
+//  * Method local catch blocks
+//    a catch block must see the environment of the instruction from the same method that can
+//    throw to this block.
+static bool NeedsVregInfo(HInstruction* instruction, bool osr) {
+  HGraph* graph = instruction->GetBlock()->GetGraph();
+  return instruction->IsDeoptimize() ||
+         graph->IsDebuggable() ||
+         graph->HasMonitorOperations() ||
+         osr ||
+         instruction->CanThrowIntoCatchBlock();
+}
+
 void CodeGenerator::RecordPcInfo(HInstruction* instruction,
                                  uint32_t dex_pc,
                                  SlowPathCode* slow_path,
@@ -1166,12 +1190,15 @@ void CodeGenerator::RecordPcInfo(HInstruction* instruction,
   StackMap::Kind kind = native_debug_info
       ? StackMap::Kind::Debug
       : (osr ? StackMap::Kind::OSR : StackMap::Kind::Default);
+  bool needs_vreg_info = NeedsVregInfo(instruction, osr);
   stack_map_stream->BeginStackMapEntry(outer_dex_pc,
                                        native_pc,
                                        register_mask,
                                        locations->GetStackMask(),
-                                       kind);
-  EmitEnvironment(environment, slow_path);
+                                       kind,
+                                       needs_vreg_info);
+
+  EmitEnvironment(environment, slow_path, needs_vreg_info);
   stack_map_stream->EndStackMapEntry();
 
   if (osr) {
@@ -1284,19 +1311,8 @@ void CodeGenerator::AddSlowPath(SlowPathCode* slow_path) {
   code_generation_data_->AddSlowPath(slow_path);
 }
 
-void CodeGenerator::EmitEnvironment(HEnvironment* environment, SlowPathCode* slow_path) {
-  if (environment == nullptr) return;
-
+void CodeGenerator::EmitVRegInfo(HEnvironment* environment, SlowPathCode* slow_path) {
   StackMapStream* stack_map_stream = GetStackMapStream();
-  if (environment->GetParent() != nullptr) {
-    // We emit the parent environment first.
-    EmitEnvironment(environment->GetParent(), slow_path);
-    stack_map_stream->BeginInlineInfoEntry(environment->GetMethod(),
-                                           environment->GetDexPc(),
-                                           environment->Size(),
-                                           &graph_->GetDexFile());
-  }
-
   // Walk over the environment, and record the location of dex registers.
   for (size_t i = 0, environment_size = environment->Size(); i < environment_size; ++i) {
     HInstruction* current = environment->GetInstructionAt(i);
@@ -1441,8 +1457,31 @@ void CodeGenerator::EmitEnvironment(HEnvironment* environment, SlowPathCode* slo
         LOG(FATAL) << "Unexpected kind " << location.GetKind();
     }
   }
+}
 
-  if (environment->GetParent() != nullptr) {
+void CodeGenerator::EmitEnvironment(HEnvironment* environment,
+                                    SlowPathCode* slow_path,
+                                    bool needs_vreg_info) {
+  if (environment == nullptr) return;
+
+  StackMapStream* stack_map_stream = GetStackMapStream();
+  bool emit_inline_info = environment->GetParent() != nullptr;
+
+  if (emit_inline_info) {
+    // We emit the parent environment first.
+    EmitEnvironment(environment->GetParent(), slow_path, needs_vreg_info);
+    stack_map_stream->BeginInlineInfoEntry(environment->GetMethod(),
+                                           environment->GetDexPc(),
+                                           needs_vreg_info ? environment->Size() : 0,
+                                           &graph_->GetDexFile());
+  }
+
+  if (needs_vreg_info) {
+    // If a dex register map is not required we just won't emit it.
+    EmitVRegInfo(environment, slow_path);
+  }
+
+  if (emit_inline_info) {
     stack_map_stream->EndInlineInfoEntry();
   }
 }
