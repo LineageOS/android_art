@@ -1481,6 +1481,9 @@ void Monitor::VisitLocks(StackVisitor* stack_visitor,
     bool success = false;
     for (uint32_t dex_reg : dex_lock_info.dex_registers) {
       uint32_t value;
+
+      // For optimized code we expect the DexRegisterMap to be present - monitor information
+      // not be optimized out.
       success = stack_visitor->GetVReg(m, dex_reg, kReferenceVReg, &value);
       if (success) {
         ObjPtr<mirror::Object> o = reinterpret_cast<mirror::Object*>(value);
