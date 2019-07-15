@@ -76,8 +76,6 @@ static const size_t kParameterFpuRegistersLengthVIXL = arraysize(kParameterFpuRe
 
 static const vixl::aarch32::Register kMethodRegister = vixl::aarch32::r0;
 
-static const vixl::aarch32::Register kCoreAlwaysSpillRegister = vixl::aarch32::r5;
-
 // Callee saves core registers r5, r6, r7, r8 (except when emitting Baker
 // read barriers, where it is used as Marking Register), r10, r11, and lr.
 static const vixl::aarch32::RegisterList kCoreCalleeSaves = vixl::aarch32::RegisterList::Union(

@@ -2061,10 +2061,10 @@ InstructionCodeGeneratorARMVIXL::InstructionCodeGeneratorARMVIXL(HGraph* graph,
 
 void CodeGeneratorARMVIXL::ComputeSpillMask() {
   core_spill_mask_ = allocated_registers_.GetCoreRegisters() & core_callee_save_mask_;
-  DCHECK_NE(core_spill_mask_, 0u) << "At least the return address register must be saved";
-  // There is no easy instruction to restore just the PC on thumb2. We spill and
-  // restore another arbitrary register.
-  core_spill_mask_ |= (1 << kCoreAlwaysSpillRegister.GetCode());
+  DCHECK_NE(core_spill_mask_ & (1u << kLrCode), 0u)
+      << "At least the return address register must be saved";
+  // 16-bit PUSH/POP (T1) can save/restore just the LR/PC.
+  DCHECK(GetVIXLAssembler()->IsUsingT32());
   fpu_spill_mask_ = allocated_registers_.GetFloatingPointRegisters() & fpu_callee_save_mask_;
   // We use vpush and vpop for saving and restoring floating point registers, which take
   // a SRegister and the number of registers to save/restore after that SRegister. We
