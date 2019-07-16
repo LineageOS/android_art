@@ -811,7 +811,7 @@ if [ "$usage" = "yes" ]; then
         echo "                          (/apex/com.android.i18n by default)."
         echo "    --android-runtime-root [path]"
         echo "                          The path on target for the Android Runtime root."
-        echo "                          (/apex/com.android.runtime by default)."
+        echo "                          (/apex/com.android.art by default)."
         echo "    --android-tzdata-root [path]"
         echo "                          The path on target for the Android Time Zone Data root."
         echo "                          (/apex/com.android.tzdata by default)."
