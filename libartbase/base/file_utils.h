@@ -41,15 +41,15 @@ std::string GetAndroidRootSafe(/*out*/ std::string* error_msg);
 
 // These methods return the Android Runtime Root, which is the location of the
 // (activated) Android Runtime APEX module. On target, this is normally
-// "/apex/com.android.runtime". On host, this is usually a subdirectory of the
+// "/apex/com.android.art". On host, this is usually a subdirectory of the
 // Android Root, e.g.
-// "$ANDROID_BUILD_TOP/out/host/linux-x86/com.android.runtime". The location of
+// "$ANDROID_BUILD_TOP/out/host/linux-x86/com.android.art". The location of
 // the Android Runtime Root can be overriden using the ANDROID_RUNTIME_ROOT
 // environment variable.
 //
-// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.runtime, or abort.
+// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.art, or abort.
 std::string GetAndroidRuntimeRoot();
-// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.runtime, or return an empty string.
+// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.art, or return an empty string.
 std::string GetAndroidRuntimeRootSafe(/*out*/ std::string* error_msg);
 
 // Return the path to the directory containing the Android Runtime binaries.
@@ -96,7 +96,7 @@ std::string GetVdexFilename(const std::string& oat_filename);
 //          ReplaceFileExtension("foo", "abc") == "foo.abc"
 std::string ReplaceFileExtension(const std::string& filename, const std::string& new_extension);
 
-// Return whether the location is on /apex/com.android.runtime
+// Return whether the location is on /apex/com.android.art
 bool LocationIsOnRuntimeModule(const char* location);
 
 // Return whether the location is on /apex/com.android.conscrypt
