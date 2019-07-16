@@ -2352,7 +2352,9 @@ void Heap::PreZygoteFork() {
   AddSpace(zygote_space_);
   non_moving_space_->SetFootprintLimit(non_moving_space_->Capacity());
   AddSpace(non_moving_space_);
-  if (kUseBakerReadBarrier && gc::collector::ConcurrentCopying::kGrayDirtyImmuneObjects) {
+  constexpr bool set_mark_bit = kUseBakerReadBarrier
+                                && gc::collector::ConcurrentCopying::kGrayDirtyImmuneObjects;
+  if (set_mark_bit) {
     // Treat all of the objects in the zygote as marked to avoid unnecessary dirty pages. This is
     // safe since we mark all of the objects that may reference non immune objects as gray.
     zygote_space_->GetLiveBitmap()->VisitMarkedRange(
@@ -2392,7 +2394,7 @@ void Heap::PreZygoteFork() {
     }
   }
   AddModUnionTable(mod_union_table);
-  large_object_space_->SetAllLargeObjectsAsZygoteObjects(self);
+  large_object_space_->SetAllLargeObjectsAsZygoteObjects(self, set_mark_bit);
   if (collector::SemiSpace::kUseRememberedSet) {
     // Add a new remembered set for the post-zygote non-moving space.
     accounting::RememberedSet* post_zygote_non_moving_space_rem_set =
