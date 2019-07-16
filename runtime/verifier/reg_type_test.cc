@@ -664,6 +664,23 @@ TEST_F(RegTypeTest, MergingDouble) {
   }
 }
 
+// Without a running MethodVerifier, the class-bearing register types may become stale as the GC
+// will not visit them. It is easiest to disable moving GC.
+//
+// For some of the tests we need (or want) a working RegTypeCache that can load classes. So it is
+// not generally possible to disable GC using ScopedGCCriticalSection (as it blocks GC and
+// suspension completely).
+struct ScopedDisableMovingGC {
+  explicit ScopedDisableMovingGC(Thread* t) : self(t) {
+    Runtime::Current()->GetHeap()->IncrementDisableMovingGC(self);
+  }
+  ~ScopedDisableMovingGC() {
+    Runtime::Current()->GetHeap()->DecrementDisableMovingGC(self);
+  }
+
+  Thread* self;
+};
+
 TEST_F(RegTypeTest, MergeSemiLatticeRef) {
   //  (Incomplete) semilattice:
   //
@@ -700,10 +717,7 @@ TEST_F(RegTypeTest, MergeSemiLatticeRef) {
   ScopedArenaAllocator allocator(&stack);
   ScopedObjectAccess soa(Thread::Current());
 
-  // We cannot allow moving GC. Otherwise we'd have to ensure the reg types are updated (reference
-  // reg types store a class pointer in a GCRoot, which is normally updated through active verifiers
-  // being registered with their thread), which is unnecessarily complex.
-  Runtime::Current()->GetHeap()->IncrementDisableMovingGC(soa.Self());
+  ScopedDisableMovingGC no_gc(soa.Self());
 
   RegTypeCache cache(true, allocator);
 
@@ -1022,8 +1036,6 @@ TEST_F(RegTypeTest, MergeSemiLatticeRef) {
     check(triple.in1, triple.in2, triple.out);
     check(triple.in2, triple.in1, triple.out);
   }
-
-  Runtime::Current()->GetHeap()->DecrementDisableMovingGC(soa.Self());
 }
 
 TEST_F(RegTypeTest, ConstPrecision) {
@@ -1060,10 +1072,7 @@ TEST_F(RegTypeOOMTest, ClassJoinOOM) {
   ScopedArenaAllocator allocator(&stack);
   ScopedObjectAccess soa(Thread::Current());
 
-  // We cannot allow moving GC. Otherwise we'd have to ensure the reg types are updated (reference
-  // reg types store a class pointer in a GCRoot, which is normally updated through active verifiers
-  // being registered with their thread), which is unnecessarily complex.
-  Runtime::Current()->GetHeap()->IncrementDisableMovingGC(soa.Self());
+  ScopedDisableMovingGC no_gc(soa.Self());
 
   // We merge nested array of primitive wrappers. These have a join type of an array of Number of
   // the same depth. We start with depth five, as we want at least two newly created classes to
@@ -1090,8 +1099,6 @@ TEST_F(RegTypeOOMTest, ClassJoinOOM) {
 
   const RegType& join_type = int_array_array.Merge(float_array_array, &cache, nullptr);
   ASSERT_TRUE(join_type.IsUnresolvedReference());
-
-  Runtime::Current()->GetHeap()->DecrementDisableMovingGC(soa.Self());
 }
 
 class RegTypeClassJoinTest : public RegTypeTest {
@@ -1113,10 +1120,7 @@ class RegTypeClassJoinTest : public RegTypeTest {
     ASSERT_TRUE(c1 != nullptr);
     ASSERT_TRUE(c2 != nullptr);
 
-    // We cannot allow moving GC. Otherwise we'd have to ensure the reg types are updated (reference
-    // reg types store a class pointer in a GCRoot, which is normally updated through active
-    // verifiers being registered with their thread), which is unnecessarily complex.
-    Runtime::Current()->GetHeap()->IncrementDisableMovingGC(soa.Self());
+    ScopedDisableMovingGC no_gc(soa.Self());
 
     RegTypeCache cache(true, allocator);
     const RegType& c1_reg_type = *cache.InsertClass(in1, c1.Get(), false);
@@ -1125,8 +1129,6 @@ class RegTypeClassJoinTest : public RegTypeTest {
     const RegType& join_type = c1_reg_type.Merge(c2_reg_type, &cache, nullptr);
     EXPECT_TRUE(join_type.HasClass());
     EXPECT_EQ(join_type.GetDescriptor(), std::string_view(out));
-
-    Runtime::Current()->GetHeap()->DecrementDisableMovingGC(soa.Self());
   }
 };
 
