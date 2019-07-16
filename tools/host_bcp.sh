@@ -22,7 +22,7 @@ Extracts boot class path locations from <image> and outputs the appropriate
   --runtime-arg -Xbootclasspath:...
   --runtime-arg -Xbootclasspath-locations:...
 arguments for many ART host tools based on the \$ANDROID_PRODUCT_OUT variable
-and existing \$ANDROID_PRODUCT_OUT/apex/com.android.runtime* paths.
+and existing \$ANDROID_PRODUCT_OUT/apex/com.android.art* paths.
 If --use-first-dir is specified, the script will use the first apex dir instead
 of resulting in an error.
 EOF
@@ -51,20 +51,20 @@ if [[ "x${BCPL}" == "x" ]]; then
 fi
 
 MANIFEST=/apex_manifest.json
-RUNTIME_APEX=/apex/com.android.runtime
-RUNTIME_APEX_SELECTED=
-for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${RUNTIME_APEX}*${MANIFEST} 2>/dev/null`; do
+ART_APEX=/apex/com.android.art
+ART_APEX_SELECTED=
+for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${ART_APEX}*${MANIFEST} 2>/dev/null`; do
   d=${m:0:-${#MANIFEST}}
-  if [[ "x${RUNTIME_APEX_SELECTED}" != "x" ]]; then
+  if [[ "x${ART_APEX_SELECTED}" != "x" ]]; then
     if [[ $USE_FIRST_DIR == true ]]; then
       break
     fi
-    echo "Multiple Runtime apex dirs: ${RUNTIME_APEX_SELECTED}, ${d}."
+    echo "Multiple Runtime apex dirs: ${ART_APEX_SELECTED}, ${d}."
     exit 1
   fi
-  RUNTIME_APEX_SELECTED=${d}
+  ART_APEX_SELECTED=${d}
 done
-if [[ "x${RUNTIME_APEX_SELECTED}" == "x" ]]; then
+if [[ "x${ART_APEX_SELECTED}" == "x" ]]; then
   echo "No Runtime apex dir."
   exit 1
 fi
@@ -75,9 +75,9 @@ IFS=:
 for COMPONENT in ${BCPL}; do
   HEAD=${ANDROID_PRODUCT_OUT}
   TAIL=${COMPONENT}
-  if [[ ${COMPONENT:0:${#RUNTIME_APEX}} = ${RUNTIME_APEX} ]]; then
-    HEAD=${RUNTIME_APEX_SELECTED}
-    TAIL=${COMPONENT:${#RUNTIME_APEX}}
+  if [[ ${COMPONENT:0:${#ART_APEX}} = ${ART_APEX} ]]; then
+    HEAD=${ART_APEX_SELECTED}
+    TAIL=${COMPONENT:${#ART_APEX}}
   fi
   if [[ ! -e $HEAD$TAIL ]]; then
     echo "File does not exist: $HEAD$TAIL"
