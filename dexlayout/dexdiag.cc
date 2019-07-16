@@ -495,7 +495,9 @@ static int DexDiagMain(int argc, char* argv[]) {
   // get libmeminfo process information.
   ProcMemInfo proc(pid);
   // Get the set of mappings by the specified process.
-  const std::vector<Vma>& maps = proc.Maps();
+  // Do not get the map usage stats, they are never used and it can take
+  // a long time to get this data.
+  const std::vector<Vma>& maps = proc.MapsWithoutUsageStats();
   if (maps.empty()) {
     std::cerr << "Error listing maps." << std::endl;
     return EXIT_FAILURE;
