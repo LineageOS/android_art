@@ -35,6 +35,7 @@ extern "C" void AddSpecialSignalHandlerFn(int signal, SigchainAction* sa);
 extern "C" void RemoveSpecialSignalHandlerFn(int signal, bool (*fn)(int, siginfo_t*, void*));
 
 extern "C" void EnsureFrontOfChain(int signal);
+extern "C" void SkipAddSignalHandler(bool value);
 
 }  // namespace art
 
