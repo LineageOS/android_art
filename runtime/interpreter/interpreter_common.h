@@ -201,8 +201,8 @@ static inline ALWAYS_INLINE WARN_UNUSED bool PerformNonStandardReturn(
       uint16_t num_dex_inst,
       uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_) {
   static constexpr bool kMonitorCounting = (kMonitorState == MonitorState::kCountingMonitors);
-  ObjPtr<mirror::Object> thiz(frame.GetThisObject(num_dex_inst));
   if (UNLIKELY(frame.GetForcePopFrame())) {
+    ObjPtr<mirror::Object> thiz(frame.GetThisObject(num_dex_inst));
     StackHandleScope<1> hs(self);
     Handle<mirror::Object> h_thiz(hs.NewHandle(thiz));
     DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
