@@ -31,6 +31,7 @@
 #include "gc/accounting/space_bitmap-inl.h"
 #include "gc/heap.h"
 #include "image.h"
+#include "mirror/object-readbarrier-inl.h"
 #include "scoped_thread_state_change-inl.h"
 #include "space-inl.h"
 #include "thread-current-inl.h"
@@ -176,10 +177,14 @@ bool LargeObjectMapSpace::IsZygoteLargeObject(Thread* self, mirror::Object* obj)
   return it->second.is_zygote;
 }
 
-void LargeObjectMapSpace::SetAllLargeObjectsAsZygoteObjects(Thread* self) {
+void LargeObjectMapSpace::SetAllLargeObjectsAsZygoteObjects(Thread* self, const bool set_mark_bit) {
   MutexLock mu(self, lock_);
   for (auto& pair : large_objects_) {
     pair.second.is_zygote = true;
+    if (set_mark_bit) {
+      bool success = pair.first->AtomicSetMarkBit(0, 1);
+      CHECK(success);
+    }
   }
 }
 
@@ -579,7 +584,7 @@ bool FreeListSpace::IsZygoteLargeObject(Thread* self ATTRIBUTE_UNUSED, mirror::O
   return info->IsZygoteObject();
 }
 
-void FreeListSpace::SetAllLargeObjectsAsZygoteObjects(Thread* self) {
+void FreeListSpace::SetAllLargeObjectsAsZygoteObjects(Thread* self, const bool set_mark_bit) {
   MutexLock mu(self, lock_);
   uintptr_t free_end_start = reinterpret_cast<uintptr_t>(end_) - free_end_;
   for (AllocationInfo* cur_info = GetAllocationInfoForAddress(reinterpret_cast<uintptr_t>(Begin())),
@@ -587,6 +592,12 @@ void FreeListSpace::SetAllLargeObjectsAsZygoteObjects(Thread* self) {
       cur_info = cur_info->GetNextInfo()) {
     if (!cur_info->IsFree()) {
       cur_info->SetZygoteObject();
+      if (set_mark_bit) {
+        mirror::Object* obj =
+            reinterpret_cast<mirror::Object*>(GetAddressForAllocationInfo(cur_info));
+        bool success = obj->AtomicSetMarkBit(0, 1);
+        CHECK(success);
+      }
     }
   }
 }
