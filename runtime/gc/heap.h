@@ -685,10 +685,19 @@ class Heap {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get the start address of the boot images if any; otherwise returns 0.
-  uint32_t GetBootImagesStartAddress() const;
+  uint32_t GetBootImagesStartAddress() const {
+    return boot_images_start_address_;
+  }
 
   // Get the size of all boot images, including the heap and oat areas.
-  uint32_t GetBootImagesSize() const;
+  uint32_t GetBootImagesSize() const {
+    return boot_images_size_;
+  }
+
+  // Check if a pointer points to a boot image.
+  bool IsBootImageAddress(const void* p) const {
+    return reinterpret_cast<uintptr_t>(p) - boot_images_start_address_ < boot_images_size_;
+  }
 
   space::DlMallocSpace* GetDlMallocSpace() const {
     return dlmalloc_space_;
@@ -1552,6 +1561,10 @@ class Heap {
 
   // Boot image spaces.
   std::vector<space::ImageSpace*> boot_image_spaces_;
+
+  // Boot image address range. Includes images and oat files.
+  uint32_t boot_images_start_address_;
+  uint32_t boot_images_size_;
 
   // An installed allocation listener.
   Atomic<AllocationListener*> alloc_listener_;
