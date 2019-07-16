@@ -14,20 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [[ ${#@} != 1 ]]; then
+if [[ ${#@} != 1 ]] && [[ ${#@} != 2 ]]; then
   cat <<EOF
 Usage
-  host_bcp <image> | xargs <art-host-tool> ...
+  host_bcp <image> [--use-first-dir] | xargs <art-host-tool> ...
 Extracts boot class path locations from <image> and outputs the appropriate
   --runtime-arg -Xbootclasspath:...
   --runtime-arg -Xbootclasspath-locations:...
 arguments for many ART host tools based on the \$ANDROID_PRODUCT_OUT variable
 and existing \$ANDROID_PRODUCT_OUT/apex/com.android.runtime* paths.
+If --use-first-dir is specified, the script will use the first apex dir instead
+of resulting in an error.
 EOF
   exit 1
 fi
 
 IMAGE=$1
+USE_FIRST_DIR=false
+
+if [[ $2 == "--use-first-dir" ]]; then
+  USE_FIRST_DIR=true
+fi
+
 if [[ ! -e ${IMAGE} ]]; then
   IMAGE=${ANDROID_PRODUCT_OUT}/$1
   if [[ ! -e ${IMAGE} ]]; then
@@ -48,6 +56,9 @@ RUNTIME_APEX_SELECTED=
 for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${RUNTIME_APEX}*${MANIFEST} 2>/dev/null`; do
   d=${m:0:-${#MANIFEST}}
   if [[ "x${RUNTIME_APEX_SELECTED}" != "x" ]]; then
+    if [[ $USE_FIRST_DIR == true ]]; then
+      break
+    fi
     echo "Multiple Runtime apex dirs: ${RUNTIME_APEX_SELECTED}, ${d}."
     exit 1
   fi
