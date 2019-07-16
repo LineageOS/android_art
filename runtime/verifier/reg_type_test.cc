@@ -1094,5 +1094,55 @@ TEST_F(RegTypeOOMTest, ClassJoinOOM) {
   Runtime::Current()->GetHeap()->DecrementDisableMovingGC(soa.Self());
 }
 
+class RegTypeClassJoinTest : public RegTypeTest {
+ protected:
+  void TestClassJoin(const char* in1, const char* in2, const char* out) {
+    ArenaStack stack(Runtime::Current()->GetArenaPool());
+    ScopedArenaAllocator allocator(&stack);
+
+    ScopedObjectAccess soa(Thread::Current());
+    jobject jclass_loader = LoadDex("Interfaces");
+    StackHandleScope<4> hs(soa.Self());
+    Handle<mirror::ClassLoader> class_loader(
+        hs.NewHandle(soa.Decode<mirror::ClassLoader>(jclass_loader)));
+
+    Handle<mirror::Class> c1(hs.NewHandle(
+        class_linker_->FindClass(soa.Self(), in1, class_loader)));
+    Handle<mirror::Class> c2(hs.NewHandle(
+        class_linker_->FindClass(soa.Self(), in2, class_loader)));
+    ASSERT_TRUE(c1 != nullptr);
+    ASSERT_TRUE(c2 != nullptr);
+
+    // We cannot allow moving GC. Otherwise we'd have to ensure the reg types are updated (reference
+    // reg types store a class pointer in a GCRoot, which is normally updated through active
+    // verifiers being registered with their thread), which is unnecessarily complex.
+    Runtime::Current()->GetHeap()->IncrementDisableMovingGC(soa.Self());
+
+    RegTypeCache cache(true, allocator);
+    const RegType& c1_reg_type = *cache.InsertClass(in1, c1.Get(), false);
+    const RegType& c2_reg_type = *cache.InsertClass(in2, c2.Get(), false);
+
+    const RegType& join_type = c1_reg_type.Merge(c2_reg_type, &cache, nullptr);
+    EXPECT_TRUE(join_type.HasClass());
+    EXPECT_EQ(join_type.GetDescriptor(), std::string_view(out));
+
+    Runtime::Current()->GetHeap()->DecrementDisableMovingGC(soa.Self());
+  }
+};
+
+TEST_F(RegTypeClassJoinTest, ClassJoinInterfaces) {
+  TestClassJoin("LInterfaces$K;", "LInterfaces$L;", "LInterfaces$J;");
+}
+
+TEST_F(RegTypeClassJoinTest, ClassJoinInterfaceClass) {
+  TestClassJoin("LInterfaces$B;", "LInterfaces$L;", "LInterfaces$J;");
+}
+
+TEST_F(RegTypeClassJoinTest, ClassJoinClassClass) {
+  // This test codifies that we prefer the class hierarchy over interfaces. It's a mostly
+  // arbitrary choice, optimally we'd have set types and could handle multi-inheritance precisely.
+  TestClassJoin("LInterfaces$A;", "LInterfaces$B;", "Ljava/lang/Object;");
+}
+
 }  // namespace verifier
 }  // namespace art

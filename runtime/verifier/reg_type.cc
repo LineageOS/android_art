@@ -608,6 +608,9 @@ namespace {
 ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+ObjPtr<mirror::Class> InterfaceClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
 /*
  * A basic Join operation on classes. For a pair of types S and T the Join, written S v T = J, is
  * S <: J, T <: J and for-all U such that S <: U, T <: U then J <: U. That is J is the parent of
@@ -640,6 +643,8 @@ ObjPtr<mirror::Class> ClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t
     return t;
   } else if (s->IsArrayClass() && t->IsArrayClass()) {
     return ArrayClassJoin(s, t);
+  } else if (s->IsInterface() || t->IsInterface()) {
+    return InterfaceClassJoin(s, t);
   } else {
     size_t s_depth = s->Depth();
     size_t t_depth = t->Depth();
@@ -688,6 +693,48 @@ ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Cla
     return nullptr;
   }
   return array_class;
+}
+
+ObjPtr<mirror::Class> InterfaceClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t) {
+  // This is expensive, as we do not have good data structures to do this even halfway
+  // efficiently.
+  //
+  // We're not following JVMS for interface verification (not everything is assignable to an
+  // interface, we trade this for IMT dispatch). We also don't have set types to make up for
+  // it. So we choose one arbitrary common ancestor interface by walking the interface tables
+  // backwards.
+  //
+  // For comparison, runtimes following the JVMS will punt all interface type checking to
+  // runtime.
+  ObjPtr<mirror::IfTable> s_if = s->GetIfTable();
+  int32_t s_if_count = s->GetIfTableCount();
+  ObjPtr<mirror::IfTable> t_if = t->GetIfTable();
+  int32_t t_if_count = t->GetIfTableCount();
+
+  // Note: we'll be using index == count to stand for the argument itself.
+  for (int32_t s_it = s_if_count; s_it >= 0; --s_it) {
+    ObjPtr<mirror::Class> s_cl = s_it == s_if_count ? s : s_if->GetInterface(s_it);
+    if (!s_cl->IsInterface()) {
+      continue;
+    }
+
+    for (int32_t t_it = t_if_count; t_it >= 0; --t_it) {
+      ObjPtr<mirror::Class> t_cl = t_it == t_if_count ? t : t_if->GetInterface(t_it);
+      if (!t_cl->IsInterface()) {
+        continue;
+      }
+
+      if (s_cl == t_cl) {
+        // Found something arbitrary in common.
+        return s_cl;
+      }
+    }
+  }
+
+  // Return java.lang.Object.
+  ObjPtr<mirror::Class> obj_class = s->IsInterface() ? s->GetSuperClass() : t->GetSuperClass();
+  DCHECK(obj_class->IsObjectClass());
+  return obj_class;
 }
 
 }  // namespace

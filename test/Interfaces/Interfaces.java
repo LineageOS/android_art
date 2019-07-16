@@ -26,6 +26,8 @@ class Interfaces {
     interface K extends J {
         public void k();
     }
+    interface L extends I, J {
+    }
     class A implements I, J {
         public void i() {};
         public void j1() {};
