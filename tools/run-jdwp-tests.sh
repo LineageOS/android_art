@@ -122,7 +122,7 @@ while true; do
     shift
   elif [[ "$1" == "--mode=jvm" ]]; then
     mode="ri"
-    make_target_name="apache-harmony-jdwp-tests-host"
+    make_target_name="apache-harmony-jdwp-tests"
     art="$(which java)"
     art_debugee="$(which java)"
     # No need for extra args.
