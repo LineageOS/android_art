@@ -201,6 +201,12 @@ public class Main {
                 new NullPointerException(), 0));
         testCases.add(new TestCase("b/134061982 (2)", "B134061982_2", "run", new Object[] { 0 },
                 new VerifyError(), 0));
+        testCases.add(new TestCase("b/121245951", "B121245951", "run", new Object[] { true,
+                new Object() }, new IllegalMonitorStateException(), 0));
+        testCases.add(new TestCase("b/121245951 (2)", "B121245951_2", "run", new Object[] { true,
+                new Object() }, new VerifyError(), 0));
+        testCases.add(new TestCase("b/121245951 (3)", "B121245951_3", "run", new Object[] {
+                new Object() }, new IllegalMonitorStateException(), 0));
     }
 
     public void runTests() {

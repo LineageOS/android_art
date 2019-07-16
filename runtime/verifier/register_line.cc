@@ -442,7 +442,7 @@ bool RegisterLine::MergeRegisters(MethodVerifier* verifier, const RegisterLine* 
   }
   if (monitors_.size() > 0 || incoming_line->monitors_.size() > 0) {
     if (monitors_.size() != incoming_line->monitors_.size()) {
-      verifier->Fail(VERIFY_ERROR_LOCKING);
+      verifier->Fail(VERIFY_ERROR_LOCKING, /*pending_exc=*/ false);
       if (kDumpLockFailures) {
         VLOG(verifier) << "mismatched stack depths (depth=" << MonitorStackDepth()
                        << ", incoming depth=" << incoming_line->MonitorStackDepth() << ") in "
@@ -476,7 +476,7 @@ bool RegisterLine::MergeRegisters(MethodVerifier* verifier, const RegisterLine* 
               !FindLockAliasedRegister(idx,
                                        incoming_line->reg_to_lock_depths_,
                                        reg_to_lock_depths_)) {
-            verifier->Fail(VERIFY_ERROR_LOCKING);
+            verifier->Fail(VERIFY_ERROR_LOCKING, /*pending_exc=*/ false);
             if (kDumpLockFailures) {
               VLOG(verifier) << "mismatched stack depths for register v" << idx
                              << ": " << depths  << " != " << incoming_depths << " in "
@@ -517,7 +517,7 @@ bool RegisterLine::MergeRegisters(MethodVerifier* verifier, const RegisterLine* 
                                          incoming_line->reg_to_lock_depths_,
                                          reg_to_lock_depths_)) {
               // No aliases for both current and incoming, we'll lose information.
-              verifier->Fail(VERIFY_ERROR_LOCKING);
+              verifier->Fail(VERIFY_ERROR_LOCKING, /*pending_exc=*/ false);
               if (kDumpLockFailures) {
                 VLOG(verifier) << "mismatched lock levels for register v" << idx << ": "
                                << std::hex << locked_levels << std::dec  << " != "
