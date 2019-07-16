@@ -17,6 +17,21 @@
 import java.lang.reflect.Method;
 
 public class Main {
+  public static String smallString = generateString(100);
+  public static String mediumString = generateString(300);
+  public static String largeString = generateString(2000);
+
+  public static String generateString(int length) {
+    // Generate a string in the ASCII range that will
+    // use string compression.
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < length; i++) {
+      // Generate repeating alphabet.
+      sb.append(Character.valueOf((char)('a' + (i % 26))));
+    }
+    return sb.toString();
+  }
+
   public static void assertIntEquals(int expected, int result) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result);
@@ -31,6 +46,12 @@ public class Main {
 
   public static void assertCharEquals(char expected, char result) {
     if (expected != result) {
+      throw new Error("Expected: " + expected + ", found: " + result);
+    }
+  }
+
+  public static void assertStringEquals(String expected, String result) {
+    if (!expected.equals(result)) {
       throw new Error("Expected: " + expected + ", found: " + result);
     }
   }
@@ -58,6 +79,30 @@ public class Main {
     assertCharEquals('b', $opt$noinline$stringCharAt("abc", 1));
     assertCharEquals('c', $opt$noinline$stringCharAt("abc", 2));
     assertCharEquals('7', $opt$noinline$stringCharAt("0123456789", 7));
+
+    // Single character.
+    assertStringEquals("a", stringGetCharsAndBack("a"));
+    // Strings < 8 characters.
+    assertStringEquals("foobar", stringGetCharsAndBack("foobar"));
+    // Strings > 8 characters of various lengths.
+    assertStringEquals(smallString, stringGetCharsAndBack(smallString));
+    assertStringEquals(mediumString, stringGetCharsAndBack(mediumString));
+    assertStringEquals(largeString, stringGetCharsAndBack(largeString));
+
+    // Get only a substring:
+    // Substring < 8 characters.
+    assertStringEquals(smallString.substring(5, 10), stringGetCharsRange(smallString, 5, 10, 0));
+    // Substring > 8 characters.
+    assertStringEquals(smallString.substring(7, 28), stringGetCharsRange(smallString, 7, 28, 0));
+
+    // Get full string with offset in the char array.
+    assertStringEquals(smallString, stringGetCharsAndBackOffset(smallString, 17));
+
+    // Get a substring with an offset in the char array.
+    // Substring < 8 characters.
+    assertStringEquals(smallString.substring(5, 10), stringGetCharsRange(smallString, 5, 10, 17));
+    // Substring > 8 characters.
+    assertStringEquals(smallString.substring(7, 28), stringGetCharsRange(smallString, 7, 28, 17));
 
     try {
       $opt$noinline$stringCharAt("abc", -1);
@@ -430,5 +475,23 @@ public class Main {
     } catch (Exception ex) {
       throw new Error(ex);
     }
+  }
+
+  public static String stringGetCharsAndBack(String src) {
+    char[] dst = new char[src.length()];
+    src.getChars(0, src.length(), dst, 0);
+    return new String(dst);
+  }
+
+  public static String stringGetCharsAndBackOffset(String src, int offset) {
+    char[] dst = new char[src.length() + offset];
+    src.getChars(0, src.length(), dst, offset);
+    return new String(dst, offset, src.length());
+  }
+
+  public static String stringGetCharsRange(String src, int srcBegin, int srcEnd, int offset) {
+    char[] dst = new char[srcEnd - srcBegin + offset];
+    src.getChars(srcBegin, srcEnd, dst, offset);
+    return new String(dst, offset, srcEnd - srcBegin);
   }
 }
