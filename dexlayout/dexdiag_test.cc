@@ -20,7 +20,6 @@
 #include "base/common_art_test.h"
 #include "base/file_utils.h"
 #include "base/os.h"
-#include "common_runtime_test.h"
 #include "exec_utils.h"
 #include "oat_file.h"
 
@@ -114,10 +113,6 @@ TEST_F(DexDiagTest, DexDiagContainsTest) {
 #else
 TEST_F(DexDiagTest, DISABLED_DexDiagContainsTest) {
 #endif
-  if (kIsTargetBuild) {
-    // Disable test on fugu b/136245508
-    TEST_DISABLED_FOR_X86();
-  }
   std::unique_ptr<OatFile> oat = OpenOatAndVdexFiles();
   // TODO: test the resulting output.
   std::string error_msg;
@@ -143,10 +138,6 @@ TEST_F(DexDiagTest, DexDiagVerboseTest) {
 #else
 TEST_F(DexDiagTest, DISABLED_DexDiagVerboseTest) {
 #endif
-  if (kIsTargetBuild) {
-    // Disable test on fugu b/136245508
-    TEST_DISABLED_FOR_X86();
-  }
   // TODO: test the resulting output.
   std::unique_ptr<OatFile> oat = OpenOatAndVdexFiles();
   std::string error_msg;
