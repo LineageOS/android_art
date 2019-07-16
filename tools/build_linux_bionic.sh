@@ -35,15 +35,7 @@ source build/envsetup.sh >&/dev/null # for get_build_var
 # Soong needs a bunch of variables set and will not run if they are missing.
 # The default values of these variables is only contained in make, so use
 # nothing to create the variables then remove all the other artifacts.
-
-# TODO(b/123645297) Move hiddenapi steps to soong.
-#
-# Currently hiddenapi relies on .mk to build some of it's configuration files.
-# This prevents us from just cleaning using soong and forces us to do this
-# hacky workaround where we build the targets without linux_bionic and delete
-# the build-config files before going around again. If we fix this issue we can
-# change to only building 'nothing' instead.
-build/soong/soong_ui.bash --make-mode "$@"
+build/soong/soong_ui.bash --make-mode nothing
 
 if [ $? != 0 ]; then
   exit 1
