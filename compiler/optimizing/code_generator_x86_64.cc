@@ -7667,6 +7667,22 @@ void CodeGeneratorX86_64::EmitJitRootPatches(uint8_t* code, const uint8_t* roots
   }
 }
 
+bool LocationsBuilderX86_64::CpuHasAvxFeatureFlag() {
+  return codegen_->GetInstructionSetFeatures().HasAVX();
+}
+
+bool LocationsBuilderX86_64::CpuHasAvx2FeatureFlag() {
+  return codegen_->GetInstructionSetFeatures().HasAVX2();
+}
+
+bool InstructionCodeGeneratorX86_64::CpuHasAvxFeatureFlag() {
+  return codegen_->GetInstructionSetFeatures().HasAVX();
+}
+
+bool InstructionCodeGeneratorX86_64::CpuHasAvx2FeatureFlag() {
+  return codegen_->GetInstructionSetFeatures().HasAVX2();
+}
+
 #undef __
 
 }  // namespace x86_64
