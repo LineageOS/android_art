@@ -79,6 +79,7 @@ inline bool ReadCompilerOptions(Base& map, CompilerOptions* options, std::string
     options->count_hotness_in_compiled_code_ = true;
   }
   map.AssignIfExists(Base::ResolveStartupConstStrings, &options->resolve_startup_const_strings_);
+  map.AssignIfExists(Base::InitializeAppImageClasses, &options->initialize_app_image_classes_);
   if (map.Exists(Base::CheckProfiledMethods)) {
     options->check_profiled_methods_ = *map.Get(Base::CheckProfiledMethods);
   }
@@ -191,6 +192,11 @@ inline void AddCompilerOptionsArgumentParserOptions(Builder& b) {
           .template WithType<bool>()
           .WithValueMap({{"false", false}, {"true", true}})
           .IntoKey(Map::ResolveStartupConstStrings)
+
+      .Define("--initialize-app-image-classes=_")
+          .template WithType<bool>()
+          .WithValueMap({{"false", false}, {"true", true}})
+          .IntoKey(Map::InitializeAppImageClasses)
 
       .Define("--verbose-methods=_")
           .template WithType<ParseStringList<','>>()
