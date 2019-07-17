@@ -3334,9 +3334,7 @@ const uint8_t* ImageWriter::GetOatAddress(StubType type) const {
   return GetOatAddressForOffset(primary_image_info.GetStubOffset(type), primary_image_info);
 }
 
-const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method,
-                                         const ImageInfo& image_info,
-                                         bool* quick_is_interpreted) {
+const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method, const ImageInfo& image_info) {
   DCHECK(!method->IsResolutionMethod()) << method->PrettyMethod();
   DCHECK_NE(method, Runtime::Current()->GetImtConflictMethod()) << method->PrettyMethod();
   DCHECK(!method->IsImtUnimplementedMethod()) << method->PrettyMethod();
@@ -3360,22 +3358,17 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method,
     quick_code = GetOatAddressForOffset(quick_oat_code_offset, image_info);
   }
 
-  *quick_is_interpreted = false;
-  if (quick_code != nullptr && (!method->IsStatic() || method->IsConstructor() ||
-      method->GetDeclaringClass()->IsInitialized())) {
-    // We have code for a non-static or initialized method, just use the code.
-  } else if (quick_code == nullptr && method->IsNative() &&
-      (!method->IsStatic() || method->GetDeclaringClass()->IsInitialized())) {
-    // Non-static or initialized native method missing compiled code, use generic JNI version.
-    quick_code = GetOatAddress(StubType::kQuickGenericJNITrampoline);
-  } else if (quick_code == nullptr && !method->IsNative()) {
-    // We don't have code at all for a non-native method, use the interpreter.
-    quick_code = GetOatAddress(StubType::kQuickToInterpreterBridge);
-    *quick_is_interpreted = true;
-  } else {
-    CHECK(!method->GetDeclaringClass()->IsInitialized());
-    // We have code for a static method, but need to go through the resolution stub for class
-    // initialization.
+  if (quick_code == nullptr) {
+    // If we don't have code, use generic jni / interpreter bridge.
+    quick_code = method->IsNative()
+        ? GetOatAddress(StubType::kQuickGenericJNITrampoline)
+        : GetOatAddress(StubType::kQuickToInterpreterBridge);
+  }
+
+  if (!method->GetDeclaringClass()->IsInitialized() &&
+      method->IsStatic() &&
+      !method->IsConstructor()) {
+    // We need to go through the resolution stub for class initialization.
     quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
   }
   return quick_code;
@@ -3434,9 +3427,8 @@ void ImageWriter::CopyAndFixupMethod(ArtMethod* orig,
     if (UNLIKELY(!orig->IsInvokable())) {
       quick_code = GetOatAddress(StubType::kQuickToInterpreterBridge);
     } else {
-      bool quick_is_interpreted;
       const ImageInfo& image_info = image_infos_[oat_index];
-      quick_code = GetQuickCode(orig, image_info, &quick_is_interpreted);
+      quick_code = GetQuickCode(orig, image_info);
 
       // JNI entrypoint:
       if (orig->IsNative()) {
