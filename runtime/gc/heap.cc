@@ -167,6 +167,44 @@ static inline bool CareAboutPauseTimes() {
   return Runtime::Current()->InJankPerceptibleProcessState();
 }
 
+static void VerifyBootImagesContiguity(const std::vector<gc::space::ImageSpace*>& image_spaces) {
+  uint32_t boot_image_size = 0u;
+  for (size_t i = 0u, num_spaces = image_spaces.size(); i != num_spaces; ) {
+    const ImageHeader& image_header = image_spaces[i]->GetImageHeader();
+    uint32_t reservation_size = image_header.GetImageReservationSize();
+    uint32_t component_count = image_header.GetComponentCount();
+
+    CHECK_NE(component_count, 0u);
+    CHECK_LE(component_count, num_spaces - i);
+    CHECK_NE(reservation_size, 0u);
+    for (size_t j = 1u; j != image_header.GetComponentCount(); ++j) {
+      CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetComponentCount(), 0u);
+      CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetImageReservationSize(), 0u);
+    }
+
+    // Check the start of the heap.
+    CHECK_EQ(image_spaces[0]->Begin() + boot_image_size, image_spaces[i]->Begin());
+    // Check contiguous layout of images and oat files.
+    const uint8_t* current_heap = image_spaces[i]->Begin();
+    const uint8_t* current_oat = image_spaces[i]->GetImageHeader().GetOatFileBegin();
+    for (size_t j = 0u; j != image_header.GetComponentCount(); ++j) {
+      const ImageHeader& current_header = image_spaces[i + j]->GetImageHeader();
+      CHECK_EQ(current_heap, image_spaces[i + j]->Begin());
+      CHECK_EQ(current_oat, current_header.GetOatFileBegin());
+      current_heap += RoundUp(current_header.GetImageSize(), kPageSize);
+      CHECK_GT(current_header.GetOatFileEnd(), current_header.GetOatFileBegin());
+      current_oat = current_header.GetOatFileEnd();
+    }
+    // Check that oat files start at the end of images.
+    CHECK_EQ(current_heap, image_spaces[i]->GetImageHeader().GetOatFileBegin());
+    // Check that the reservation size equals the size of images and oat files.
+    CHECK_EQ(reservation_size, static_cast<size_t>(current_oat - image_spaces[i]->Begin()));
+
+    boot_image_size += reservation_size;
+    i += component_count;
+  }
+}
+
 Heap::Heap(size_t initial_size,
            size_t growth_limit,
            size_t min_free,
@@ -308,7 +346,10 @@ Heap::Heap(size_t initial_size,
       unique_backtrace_count_(0u),
       gc_disabled_for_shutdown_(false),
       dump_region_info_before_gc_(dump_region_info_before_gc),
-      dump_region_info_after_gc_(dump_region_info_after_gc) {
+      dump_region_info_after_gc_(dump_region_info_after_gc),
+      boot_image_spaces_(),
+      boot_images_start_address_(0u),
+      boot_images_size_(0u) {
   if (VLOG_IS_ON(heap) || VLOG_IS_ON(startup)) {
     LOG(INFO) << "Heap() entering";
   }
@@ -386,6 +427,13 @@ Heap::Heap(size_t initial_size,
     for (std::unique_ptr<space::ImageSpace>& space : boot_image_spaces) {
       boot_image_spaces_.push_back(space.get());
       AddSpace(space.release());
+    }
+    boot_images_start_address_ = PointerToLowMemUInt32(boot_image_spaces_.front()->Begin());
+    uint32_t boot_images_end =
+        PointerToLowMemUInt32(boot_image_spaces_.back()->GetImageHeader().GetOatFileEnd());
+    boot_images_size_ = boot_images_end - boot_images_start_address_;
+    if (kIsDebugBuild) {
+      VerifyBootImagesContiguity(boot_image_spaces_);
     }
   } else {
     if (foreground_collector_type_ == kCollectorTypeCC) {
@@ -2304,7 +2352,9 @@ void Heap::PreZygoteFork() {
   AddSpace(zygote_space_);
   non_moving_space_->SetFootprintLimit(non_moving_space_->Capacity());
   AddSpace(non_moving_space_);
-  if (kUseBakerReadBarrier && gc::collector::ConcurrentCopying::kGrayDirtyImmuneObjects) {
+  constexpr bool set_mark_bit = kUseBakerReadBarrier
+                                && gc::collector::ConcurrentCopying::kGrayDirtyImmuneObjects;
+  if (set_mark_bit) {
     // Treat all of the objects in the zygote as marked to avoid unnecessary dirty pages. This is
     // safe since we mark all of the objects that may reference non immune objects as gray.
     zygote_space_->GetLiveBitmap()->VisitMarkedRange(
@@ -2344,7 +2394,7 @@ void Heap::PreZygoteFork() {
     }
   }
   AddModUnionTable(mod_union_table);
-  large_object_space_->SetAllLargeObjectsAsZygoteObjects(self);
+  large_object_space_->SetAllLargeObjectsAsZygoteObjects(self, set_mark_bit);
   if (collector::SemiSpace::kUseRememberedSet) {
     // Add a new remembered set for the post-zygote non-moving space.
     accounting::RememberedSet* post_zygote_non_moving_space_rem_set =
@@ -3991,63 +4041,23 @@ void Heap::DisableGCForShutdown() {
 }
 
 bool Heap::ObjectIsInBootImageSpace(ObjPtr<mirror::Object> obj) const {
-  for (gc::space::ImageSpace* space : boot_image_spaces_) {
-    if (space->HasAddress(obj.Ptr())) {
-      return true;
-    }
-  }
-  return false;
+  DCHECK_EQ(IsBootImageAddress(obj.Ptr()),
+            any_of(boot_image_spaces_.begin(),
+                   boot_image_spaces_.end(),
+                   [obj](gc::space::ImageSpace* space) REQUIRES_SHARED(Locks::mutator_lock_) {
+                     return space->HasAddress(obj.Ptr());
+                   }));
+  return IsBootImageAddress(obj.Ptr());
 }
 
 bool Heap::IsInBootImageOatFile(const void* p) const {
-  for (gc::space::ImageSpace* space : boot_image_spaces_) {
-    if (space->GetOatFile()->Contains(p)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-uint32_t Heap::GetBootImagesStartAddress() const {
-  const std::vector<gc::space::ImageSpace*>& image_spaces = GetBootImageSpaces();
-  return image_spaces.empty() ? 0u : PointerToLowMemUInt32(image_spaces.front()->Begin());
-}
-
-uint32_t Heap::GetBootImagesSize() const {
-  const std::vector<gc::space::ImageSpace*>& image_spaces = GetBootImageSpaces();
-  uint32_t boot_image_size = 0u;
-  for (size_t i = 0u, num_spaces = image_spaces.size(); i != num_spaces; ) {
-    const ImageHeader& image_header = image_spaces[i]->GetImageHeader();
-    uint32_t reservation_size = image_header.GetImageReservationSize();
-    uint32_t component_count = image_header.GetComponentCount();
-    if (kIsDebugBuild) {
-      CHECK_NE(component_count, 0u);
-      CHECK_LE(component_count, num_spaces - i);
-      CHECK_NE(reservation_size, 0u);
-      for (size_t j = 1u; j != image_header.GetComponentCount(); ++j) {
-        CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetComponentCount(), 0u);
-        CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetImageReservationSize(), 0u);
-      }
-      // Check the start of the heap.
-      CHECK_EQ(image_spaces[0]->Begin() + boot_image_size, image_spaces[i]->Begin());
-      // Check contiguous layout of images and oat files.
-      const uint8_t* current_heap = image_spaces[i]->Begin();
-      const uint8_t* current_oat = image_spaces[i]->GetImageHeader().GetOatFileBegin();
-      for (size_t j = 0u; j != image_header.GetComponentCount(); ++j) {
-        CHECK_EQ(current_heap, image_spaces[i + j]->Begin());
-        CHECK_EQ(current_oat, image_spaces[i + j]->GetImageHeader().GetOatFileBegin());
-        current_heap += RoundUp(image_spaces[i + j]->GetImageHeader().GetImageSize(), kPageSize);
-        current_oat = image_spaces[i + j]->GetImageHeader().GetOatFileEnd();
-      }
-      // Check that oat files start at the end of images.
-      CHECK_EQ(current_heap, image_spaces[i]->GetImageHeader().GetOatFileBegin());
-      // Check that the reservation size equals the size of images and oat files.
-      CHECK_EQ(reservation_size, static_cast<size_t>(current_oat - image_spaces[i]->Begin()));
-    }
-    boot_image_size += reservation_size;
-    i += component_count;
-  }
-  return boot_image_size;
+  DCHECK_EQ(IsBootImageAddress(p),
+            any_of(boot_image_spaces_.begin(),
+                   boot_image_spaces_.end(),
+                   [p](gc::space::ImageSpace* space) REQUIRES_SHARED(Locks::mutator_lock_) {
+                     return space->GetOatFile()->Contains(p);
+                   }));
+  return IsBootImageAddress(p);
 }
 
 void Heap::SetAllocationListener(AllocationListener* l) {

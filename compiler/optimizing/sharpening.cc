@@ -38,15 +38,15 @@
 namespace art {
 
 static bool IsInBootImage(ArtMethod* method) {
-  const std::vector<gc::space::ImageSpace*>& image_spaces =
-      Runtime::Current()->GetHeap()->GetBootImageSpaces();
-  for (gc::space::ImageSpace* image_space : image_spaces) {
-    const ImageSection& method_section = image_space->GetImageHeader().GetMethodsSection();
-    if (method_section.Contains(reinterpret_cast<uint8_t*>(method) - image_space->Begin())) {
-      return true;
-    }
-  }
-  return false;
+  gc::Heap* heap = Runtime::Current()->GetHeap();
+  DCHECK_EQ(heap->IsBootImageAddress(method),
+            std::any_of(heap->GetBootImageSpaces().begin(),
+                        heap->GetBootImageSpaces().end(),
+                        [=](gc::space::ImageSpace* space) REQUIRES_SHARED(Locks::mutator_lock_) {
+                          return space->GetImageHeader().GetMethodsSection().Contains(
+                              reinterpret_cast<uint8_t*>(method) - space->Begin());
+                        }));
+  return heap->IsBootImageAddress(method);
 }
 
 static bool BootImageAOTCanEmbedMethod(ArtMethod* method, const CompilerOptions& compiler_options) {

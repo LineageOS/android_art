@@ -271,6 +271,8 @@ class SignalChain {
 // Leave an empty element at index 0 for convenience.
 static SignalChain chains[_NSIG + 1];
 
+static bool is_signal_hook_debuggable = false;
+
 void SignalChain::Handler(int signo, siginfo_t* siginfo, void* ucontext_raw) {
   // Try the special handlers first.
   // If one of them crashes, we'll reenter this handler and pass that crash onto the user handler.
@@ -339,6 +341,10 @@ static int __sigaction(int signal, const SigactionType* new_action,
                        SigactionType* old_action,
                        int (*linked)(int, const SigactionType*,
                                      SigactionType*)) {
+  if (is_signal_hook_debuggable) {
+    return 0;
+  }
+
   // If this signal has been claimed as a signal chain, record the user's
   // action but don't pass it on to the kernel.
   // Note that we check that the signal number is in range here.  An out of range signal
@@ -504,6 +510,10 @@ extern "C" void EnsureFrontOfChain(int signal) {
     log("Warning: Unexpected sigaction action found %p\n", current_action.sa_sigaction);
     chains[signal].Register(signal);
   }
+}
+
+extern "C" void SkipAddSignalHandler(bool value) {
+  is_signal_hook_debuggable = value;
 }
 
 }   // namespace art
