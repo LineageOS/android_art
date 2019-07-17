@@ -1742,7 +1742,18 @@ void JitCodeCache::Dump(std::ostream& os) {
 }
 
 void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
-  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+  Thread* self = Thread::Current();
+
+  // Remove potential tasks that have been inherited from the zygote.
+  // We do this now and not in Jit::PostForkChildAction, as system server calls
+  // JitCodeCache::PostForkChildAction first, and then does some code loading
+  // that may result in new JIT tasks that we want to keep.
+  ThreadPool* pool = Runtime::Current()->GetJit()->GetThreadPool();
+  if (pool != nullptr) {
+    pool->RemoveAllTasks(self);
+  }
+
+  MutexLock mu(self, *Locks::jit_lock_);
 
   // Reset potential writable MemMaps inherited from the zygote. We never want
   // to write to them.

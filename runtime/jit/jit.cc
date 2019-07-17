@@ -1043,8 +1043,6 @@ ScopedJitSuspend::~ScopedJitSuspend() {
 
 void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   if (is_zygote || Runtime::Current()->IsSafeMode()) {
-    // Remove potential tasks that have been inherited from the zygote.
-    thread_pool_->RemoveAllTasks(Thread::Current());
     // Delete the thread pool, we are not going to JIT.
     thread_pool_.reset(nullptr);
     return;
@@ -1058,8 +1056,6 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
   if (thread_pool_ != nullptr) {
-    // Remove potential tasks that have been inherited from the zygote.
-    thread_pool_->RemoveAllTasks(Thread::Current());
     if (is_system_server &&
         Runtime::Current()->IsUsingApexBootImageLocation() &&
         UseJitCompilation()) {
