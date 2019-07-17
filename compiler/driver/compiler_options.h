@@ -346,6 +346,10 @@ class CompilerOptions final {
     max_image_block_size_ = size;
   }
 
+  bool InitializeAppImageClasses() const {
+    return initialize_app_image_classes_;
+  }
+
   // Is `boot_image_filename` the name of a core image (small boot
   // image used for ART testing only)?
   static bool IsCoreImageFilename(const std::string& boot_image_filename);
@@ -428,6 +432,9 @@ class CompilerOptions final {
   // Whether we eagerly resolve all of the const strings that are loaded from startup methods in the
   // profile.
   bool resolve_startup_const_strings_;
+
+  // Whether we attempt to run class initializers for app image classes.
+  bool initialize_app_image_classes_;
 
   // When running profile-guided compilation, check that methods intended to be compiled end
   // up compiled and are not punted.

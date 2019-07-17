@@ -2186,7 +2186,8 @@ class InitializeClassVisitor : public CompilationVisitor {
                 ClassLinker::kAppImageMayContainStrings &&
                 !soa.Self()->IsExceptionPending() &&
                 is_superclass_initialized &&
-                NoClinitInDependency(klass, soa.Self(), &class_loader);
+                (manager_->GetCompiler()->GetCompilerOptions().InitializeAppImageClasses() ||
+                 NoClinitInDependency(klass, soa.Self(), &class_loader));
             // TODO The checking for clinit can be removed since it's already
             // checked when init superclass. Currently keep it because it contains
             // processing of intern strings. Will be removed later when intern strings
