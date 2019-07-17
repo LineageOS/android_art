@@ -417,6 +417,11 @@ class X86Assembler final : public Assembler {
   void mulps(XmmRegister dst, XmmRegister src);
   void divps(XmmRegister dst, XmmRegister src);
 
+  void vmulps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vmulpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vdivps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vdivpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+
   void vaddps(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
   void vsubps(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
   void vsubpd(XmmRegister dst, XmmRegister add_left, XmmRegister add_right);
@@ -476,6 +481,7 @@ class X86Assembler final : public Assembler {
   void paddw(XmmRegister dst, XmmRegister src);
   void psubw(XmmRegister dst, XmmRegister src);
   void pmullw(XmmRegister dst, XmmRegister src);
+  void vpmullw(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void vpsubb(XmmRegister dst, XmmRegister src1, XmmRegister src2);
   void vpsubw(XmmRegister dst, XmmRegister src1, XmmRegister src2);
@@ -484,6 +490,8 @@ class X86Assembler final : public Assembler {
   void paddd(XmmRegister dst, XmmRegister src);
   void psubd(XmmRegister dst, XmmRegister src);
   void pmulld(XmmRegister dst, XmmRegister src);
+
+  void vpmulld(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void vpaddd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
