@@ -964,6 +964,14 @@ class Thread {
     is_runtime_thread_ = is_runtime_thread;
   }
 
+  uint32_t CorePlatformApiCookie() {
+    return core_platform_api_cookie_;
+  }
+
+  void SetCorePlatformApiCookie(uint32_t cookie) {
+    core_platform_api_cookie_ = cookie;
+  }
+
   // Returns true if the thread is allowed to load java classes.
   bool CanLoadClasses() const;
 
@@ -1796,6 +1804,10 @@ class Thread {
 
   // True if the thread is some form of runtime thread (ex, GC or JIT).
   bool is_runtime_thread_;
+
+  // Set during execution of JNI methods that get field and method id's as part of determining if
+  // the caller is allowed to access all fields and methods in the Core Platform API.
+  uint32_t core_platform_api_cookie_ = 0;
 
   friend class Dbg;  // For SetStateUnsafe.
   friend class gc::collector::SemiSpace;  // For getting stack traces.
