@@ -223,6 +223,9 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   virtual const Assembler& GetAssembler() const = 0;
   virtual size_t GetWordSize() const = 0;
 
+  // Returns whether the target supports predicated SIMD instructions.
+  virtual bool SupportsPredicatedSIMD() const { return false; }
+
   // Get FP register width in bytes for spilling/restoring in the slow paths.
   //
   // Note: In SIMD graphs this should return SIMD register width as all FP and SIMD registers
