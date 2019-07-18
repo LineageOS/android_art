@@ -3548,8 +3548,8 @@ void Thread::QuickDeliverException() {
   // instrumentation trampolines (for example with DDMS tracing). That forces us to do deopt later
   // and see every frame being popped. We don't need to handle it any differently.
   ShadowFrame* cf;
-  bool force_deopt;
-  {
+  bool force_deopt = false;
+  if (Runtime::Current()->AreNonStandardExitsEnabled() || kIsDebugBuild) {
     NthCallerVisitor visitor(this, 0, false);
     visitor.WalkStack();
     cf = visitor.GetCurrentShadowFrame();
@@ -3559,12 +3559,16 @@ void Thread::QuickDeliverException() {
     bool force_frame_pop = cf != nullptr && cf->GetForcePopFrame();
     bool force_retry_instr = cf != nullptr && cf->GetForceRetryInstruction();
     if (kIsDebugBuild && force_frame_pop) {
+      DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
       NthCallerVisitor penultimate_visitor(this, 1, false);
       penultimate_visitor.WalkStack();
       ShadowFrame* penultimate_frame = penultimate_visitor.GetCurrentShadowFrame();
       if (penultimate_frame == nullptr) {
         penultimate_frame = FindDebuggerShadowFrame(penultimate_visitor.GetFrameId());
       }
+    }
+    if (force_retry_instr) {
+      DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
     }
     force_deopt = force_frame_pop || force_retry_instr;
   }
