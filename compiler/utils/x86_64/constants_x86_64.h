@@ -59,6 +59,9 @@ class XmmRegister {
   constexpr bool NeedsRex() const {
     return reg_ > 7;
   }
+  bool operator==(XmmRegister& other) {
+    return reg_ == other.reg_;
+  }
  private:
   const FloatRegister reg_;
 };

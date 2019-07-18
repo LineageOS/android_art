@@ -76,6 +76,7 @@ CompilerOptions::CompilerOptions()
       deduplicate_code_(true),
       count_hotness_in_compiled_code_(false),
       resolve_startup_const_strings_(false),
+      initialize_app_image_classes_(false),
       check_profiled_methods_(ProfileMethodsCheck::kNone),
       max_image_block_size_(std::numeric_limits<uint32_t>::max()),
       register_allocation_strategy_(RegisterAllocator::kRegisterAllocatorDefault),

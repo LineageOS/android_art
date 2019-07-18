@@ -538,9 +538,7 @@ class ImageWriter final {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get quick code for non-resolution/imt_conflict/abstract method.
-  const uint8_t* GetQuickCode(ArtMethod* method,
-                              const ImageInfo& image_info,
-                              bool* quick_is_interpreted)
+  const uint8_t* GetQuickCode(ArtMethod* method, const ImageInfo& image_info)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Return true if a method is likely to be dirtied at runtime.
