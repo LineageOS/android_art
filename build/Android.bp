@@ -119,10 +119,10 @@ art_global_defaults {
                 // "-marm",
                 // "-mapcs",
             ],
-            include_dirs: [
+            header_libs: [
                 // We optimize Thread::Current() with a direct TLS access. This requires access to a
                 //  private Bionic header.
-                "bionic/libc/private",
+                "bionic_libc_private_headers",
             ],
         },
         linux: {
