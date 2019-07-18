@@ -221,9 +221,17 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixl",
                 ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_static_lib_headers: [
+                    "libvixl",
+                ],
             },
             shared: {
                 shared_libs: [
+                    "libvixl",
+                ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_shared_lib_headers: [
                     "libvixl",
                 ],
             },
@@ -234,9 +242,17 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixl",
                 ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_static_lib_headers: [
+                    "libvixl",
+                ],
             },
             shared: {
                 shared_libs: [
+                    "libvixl",
+                ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_shared_lib_headers: [
                     "libvixl",
                 ],
             },
@@ -285,9 +301,17 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixld",
                 ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_static_lib_headers: [
+                    "libvixld",
+                ],
             },
             shared: {
                 shared_libs: [
+                    "libvixld",
+                ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_shared_lib_headers: [
                     "libvixld",
                 ],
             },
@@ -298,9 +322,17 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixld",
                 ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_static_lib_headers: [
+                    "libvixld",
+                ],
             },
             shared: {
                 shared_libs: [
+                    "libvixld",
+                ],
+                // Export vixl headers as they are included in this library's exported headers.
+                export_shared_lib_headers: [
                     "libvixld",
                 ],
             },
