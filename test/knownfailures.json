@@ -738,9 +738,10 @@
     },
     {
         "tests": "660-clinit",
-        "variant": "no-image | no-prebuild | jvmti-stress | redefine-stress",
+        "variant": "no-image | no-prebuild | jvmti-stress | redefine-stress | interp-ac",
         "description": ["Tests <clinit> for app images, which --no-image, --no-prebuild, ",
-                        "and --redefine-stress do not create"]
+                        "and --redefine-stress do not create. Also avoid for ",
+                        "verify-soft-fail (interp-ac) since it prevents initialization."]
     },
     {
         "tests": ["961-default-iface-resolution-gen",
