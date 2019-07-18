@@ -316,9 +316,9 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Fetch the entrypoint that zygote may have saved for a method. The zygote saves an entrypoint
-  // only for the case when the method's declaring class is not initialized.
-  const void* GetZygoteSavedEntryPoint(ArtMethod* method)
+  // Fetch the code of a method that was JITted, but the JIT could not
+  // update its entrypoint due to the resolution trampoline.
+  const void* GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -465,6 +465,10 @@ class JitCodeCache {
 
   // Holds compiled code associated to the ArtMethod.
   SafeMap<const void*, ArtMethod*> method_code_map_ GUARDED_BY(Locks::jit_lock_);
+
+  // Holds compiled code associated to the ArtMethod. Used when pre-jitting
+  // methods whose entrypoints have the resolution stub.
+  SafeMap<ArtMethod*, const void*> saved_compiled_methods_map_ GUARDED_BY(Locks::jit_lock_);
 
   // Holds osr compiled code associated to the ArtMethod.
   SafeMap<ArtMethod*, const void*> osr_code_map_ GUARDED_BY(Locks::jit_lock_);

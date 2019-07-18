@@ -212,19 +212,19 @@ class ArtMethod final {
     return !IsAbstract() && !IsDefaultConflicting();
   }
 
-  bool IsZygoteCompiled() {
-    uint32_t expected = (kAccZygoteCompiled | kAccCompileDontBother);
+  bool IsPreCompiled() {
+    uint32_t expected = (kAccPreCompiled | kAccCompileDontBother);
     return (GetAccessFlags() & expected) == expected;
   }
 
-  void SetZygoteCompiled() {
+  void SetPreCompiled() {
     DCHECK(IsInvokable());
     DCHECK(IsCompilable());
-    AddAccessFlags(kAccZygoteCompiled | kAccCompileDontBother);
+    AddAccessFlags(kAccPreCompiled | kAccCompileDontBother);
   }
 
-  void ClearZygoteCompiled() {
-    ClearAccessFlags(kAccZygoteCompiled | kAccCompileDontBother);
+  void ClearPreCompiled() {
+    ClearAccessFlags(kAccPreCompiled | kAccCompileDontBother);
   }
 
   bool IsCompilable() {
@@ -232,7 +232,7 @@ class ArtMethod final {
       // kAccCompileDontBother overlaps with kAccIntrinsicBits.
       return true;
     }
-    if (IsZygoteCompiled()) {
+    if (IsPreCompiled()) {
       return true;
     }
     return (GetAccessFlags() & kAccCompileDontBother) == 0;
