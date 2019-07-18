@@ -3345,10 +3345,19 @@ const void* ClassLinker::GetQuickOatCodeFor(ArtMethod* method) {
   if (method->IsProxyMethod()) {
     return GetQuickProxyInvokeHandler();
   }
-  auto* code = method->GetOatMethodQuickCode(GetImagePointerSize());
+  const void* code = method->GetOatMethodQuickCode(GetImagePointerSize());
   if (code != nullptr) {
     return code;
   }
+
+  jit::Jit* jit = Runtime::Current()->GetJit();
+  if (jit != nullptr) {
+    code = jit->GetCodeCache()->GetSavedEntryPointOfPreCompiledMethod(method);
+    if (code != nullptr) {
+      return code;
+    }
+  }
+
   if (method->IsNative()) {
     // No code and native? Use generic trampoline.
     return GetQuickGenericJniStub();
@@ -3453,8 +3462,9 @@ void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
       quick_code = oat_method.GetQuickCode();
     }
     // Check if we have JIT compiled code for it.
-    if (quick_code == nullptr && Runtime::Current()->GetJit() != nullptr) {
-      quick_code = Runtime::Current()->GetJit()->GetCodeCache()->GetZygoteSavedEntryPoint(method);
+    jit::Jit* jit = Runtime::Current()->GetJit();
+    if (quick_code == nullptr && jit != nullptr) {
+      quick_code = jit->GetCodeCache()->GetSavedEntryPointOfPreCompiledMethod(method);
     }
     // Check whether the method is native, in which case it's generic JNI.
     if (quick_code == nullptr && method->IsNative()) {
