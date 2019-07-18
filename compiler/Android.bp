@@ -221,10 +221,6 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixl",
                 ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_static_lib_headers: [
-                    "libvixl",
-                ],
             },
             shared: {
                 shared_libs: [
@@ -240,10 +236,6 @@ art_cc_library {
             // VIXL assembly support for ARM64 targets.
             static: {
                 whole_static_libs: [
-                    "libvixl",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_static_lib_headers: [
                     "libvixl",
                 ],
             },
@@ -301,10 +293,6 @@ art_cc_library {
                 whole_static_libs: [
                     "libvixld",
                 ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_static_lib_headers: [
-                    "libvixld",
-                ],
             },
             shared: {
                 shared_libs: [
@@ -320,10 +308,6 @@ art_cc_library {
             // VIXL assembly support for ARM64 targets.
             static: {
                 whole_static_libs: [
-                    "libvixld",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_static_lib_headers: [
                     "libvixld",
                 ],
             },
