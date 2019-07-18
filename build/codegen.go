@@ -114,10 +114,12 @@ type CodegenCommonArchProperties struct {
 
 type CodegenLibraryArchProperties struct {
 	Static struct {
-		Whole_static_libs []string
+		Whole_static_libs         []string
+		Export_static_lib_headers []string
 	}
 	Shared struct {
-		Shared_libs []string
+		Shared_libs               []string
+		Export_shared_lib_headers []string
 	}
 }
 

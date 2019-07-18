@@ -174,10 +174,6 @@ art_global_defaults {
         },
     },
 
-    include_dirs: [
-        "external/vixl/src",
-    ],
-
     tidy_checks: art_clang_tidy_errors + art_clang_tidy_disabled,
     tidy_checks_as_errors: art_clang_tidy_errors,
 
