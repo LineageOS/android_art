@@ -42,4 +42,13 @@ TEST_F(OatDumpTest, TestAppImageWithBootImageStatic) {
   ASSERT_TRUE(Exec(kStatic, kModeAppImage, {}, kListAndCode));
 }
 
+TEST_F(OatDumpTest, TestAppImageInvalidPath) {
+  TEST_DISABLED_WITHOUT_BAKER_READ_BARRIERS();  // GC bug, b/126305867
+  TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
+  const std::string app_image_arg = "--app-image-file=" + GetAppImageName();
+  ASSERT_TRUE(GenerateAppOdexFile(kStatic, {"--runtime-arg", "-Xmx64M", app_image_arg}));
+  SetAppImageName("missing_app_image.art");
+  ASSERT_TRUE(Exec(kStatic, kModeAppImage, {}, kListAndCode, /*expect_failure=*/true));
+}
+
 }  // namespace art

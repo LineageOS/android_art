@@ -2782,12 +2782,14 @@ static int DumpImages(Runtime* runtime, OatDumperOptions* options, std::ostream*
     if (space == nullptr) {
       LOG(ERROR) << "Failed to open app image " << options->app_image_ << " with error "
                  << error_msg;
+      return EXIT_FAILURE;
     }
     // Open dex files for the image.
     std::vector<std::unique_ptr<const DexFile>> dex_files;
     if (!runtime->GetClassLinker()->OpenImageDexFiles(space.get(), &dex_files, &error_msg)) {
       LOG(ERROR) << "Failed to open app image dex files " << options->app_image_ << " with error "
                  << error_msg;
+      return EXIT_FAILURE;
     }
     // Dump the actual image.
     int result = DumpImage(space.get(), options, os);
