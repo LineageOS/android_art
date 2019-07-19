@@ -305,15 +305,19 @@ const void* JitCodeCache::FindCompiledCodeForInstrumentation(ArtMethod* method) 
 
 const void* JitCodeCache::GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method) {
   if (Runtime::Current()->IsUsingApexBootImageLocation() && method->IsPreCompiled()) {
+    const void* code_ptr = nullptr;
     if (method->GetDeclaringClass()->GetClassLoader() == nullptr) {
-      return zygote_map_.GetCodeFor(method);
+      code_ptr = zygote_map_.GetCodeFor(method);
     } else {
       MutexLock mu(Thread::Current(), *Locks::jit_lock_);
       auto it = saved_compiled_methods_map_.find(method);
       if (it != saved_compiled_methods_map_.end()) {
-        return it->second;
+        code_ptr = it->second;
       }
-      return nullptr;
+    }
+    if (code_ptr != nullptr) {
+      OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
+      return method_header->GetEntryPoint();
     }
   }
   return nullptr;
