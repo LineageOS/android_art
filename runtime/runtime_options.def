@@ -169,5 +169,6 @@ RUNTIME_OPTIONS_KEY (gc::space::ImageSpaceLoadingOrder, \
                      gc::space::ImageSpaceLoadingOrder::kSystemFirst)
 
 RUNTIME_OPTIONS_KEY (bool,                FastClassNotFoundException,     true)
+RUNTIME_OPTIONS_KEY (bool,                VerifierMissingKThrowFatal,     false)
 
 #undef RUNTIME_OPTIONS_KEY
