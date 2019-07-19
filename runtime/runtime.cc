@@ -294,7 +294,8 @@ Runtime::Runtime()
       // Initially assume we perceive jank in case the process state is never updated.
       process_state_(kProcessStateJankPerceptible),
       zygote_no_threads_(false),
-      verifier_logging_threshold_ms_(100) {
+      verifier_logging_threshold_ms_(100),
+      verifier_missing_kthrow_fatal_(false) {
   static_assert(Runtime::kCalleeSaveSize ==
                     static_cast<uint32_t>(CalleeSaveType::kLastCalleeSaveType), "Unexpected size");
   CheckConstants();
@@ -1148,6 +1149,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   }
 
   MemMap::Init();
+
+  verifier_missing_kthrow_fatal_ = runtime_options.GetOrDefault(Opt::VerifierMissingKThrowFatal);
 
   // Try to reserve a dedicated fault page. This is allocated for clobbered registers and sentinels.
   // If we cannot reserve it, log a warning.
