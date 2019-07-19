@@ -305,7 +305,7 @@ art_cc_defaults {
     header_libs: [
         "libopenjdkjvmti_headers",
     ],
-    include_dirs: ["art/test/ti-agent"],
+    local_include_dirs: ["ti-agent"],
 }
 
 art_cc_defaults {
@@ -384,14 +384,13 @@ cc_library_static {
     ],
     sdk_version: "current",
     stl: "c++_static",
-    include_dirs: [
+    header_libs: [
+        "jni_headers",
         // This is needed to resolve the base/ header file in libdexfile. Unfortunately there are
         // many problems with how we export headers that are making doing this the 'right' way
         // difficult.
         // TODO: move those headers to art/ rather than under runtime.
-        "art/runtime",
-        // NDK headers aren't available in platform NDK builds.
-        "libnativehelper/include_jni",
+        "libart_runtime_headers_ndk",
     ],
     export_include_dirs: ["ti-agent"],
 }
