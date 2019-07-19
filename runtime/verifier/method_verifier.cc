@@ -5559,21 +5559,21 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
           // If we fail again at runtime, mark that this instruction would throw and force this
           // method to be executed using the interpreter with checks.
           flags_.have_pending_runtime_throw_failure_ = true;
-
-          // We need to save the work_line if the instruction wasn't throwing before. Otherwise
-          // we'll try to merge garbage.
-          // Note: this assumes that Fail is called before we do any work_line modifications.
-          // Note: this can fail before we touch any instruction, for the signature of a method. So
-          //       add a check.
-          if (work_insn_idx_ < dex::kDexNoIndex) {
-            const Instruction& inst = code_item_accessor_.InstructionAt(work_insn_idx_);
-            int opcode_flags = Instruction::FlagsOf(inst.Opcode());
-
-            if ((opcode_flags & Instruction::kThrow) == 0 &&
-                !impl::IsCompatThrow(inst.Opcode()) &&
-                GetInstructionFlags(work_insn_idx_).IsInTry()) {
-              saved_line_->CopyFromLine(work_line_.get());
-            }
+        }
+        // How to handle runtime failures for instructions that are not flagged kThrow.
+        //
+        // The verifier may fail before we touch any instruction, for the signature of a method. So
+        // add a check.
+        if (work_insn_idx_ < dex::kDexNoIndex) {
+          const Instruction& inst = code_item_accessor_.InstructionAt(work_insn_idx_);
+          Instruction::Code opcode = inst.Opcode();
+          if ((Instruction::FlagsOf(opcode) & Instruction::kThrow) == 0 &&
+              !impl::IsCompatThrow(opcode) &&
+              GetInstructionFlags(work_insn_idx_).IsInTry()) {
+            // We need to save the work_line if the instruction wasn't throwing before. Otherwise
+            // we'll try to merge garbage.
+            // Note: this assumes that Fail is called before we do any work_line modifications.
+            saved_line_->CopyFromLine(work_line_.get());
           }
         }
         break;
