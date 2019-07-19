@@ -2354,12 +2354,7 @@ void Heap::PreZygoteFork() {
   if (set_mark_bit) {
     // Treat all of the objects in the zygote as marked to avoid unnecessary dirty pages. This is
     // safe since we mark all of the objects that may reference non immune objects as gray.
-    zygote_space_->GetLiveBitmap()->VisitMarkedRange(
-        reinterpret_cast<uintptr_t>(zygote_space_->Begin()),
-        reinterpret_cast<uintptr_t>(zygote_space_->Limit()),
-        [](mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
-      CHECK(obj->AtomicSetMarkBit(0, 1));
-    });
+    zygote_space_->SetMarkBitInLiveObjects();
   }
 
   // Create the zygote space mod union table.
