@@ -5570,6 +5570,10 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
           if ((Instruction::FlagsOf(opcode) & Instruction::kThrow) == 0 &&
               !impl::IsCompatThrow(opcode) &&
               GetInstructionFlags(work_insn_idx_).IsInTry()) {
+            if (Runtime::Current()->IsVerifierMissingKThrowFatal()) {
+              LOG(FATAL) << "Unexpected throw: " << std::hex << work_insn_idx_ << " " << opcode;
+              UNREACHABLE();
+            }
             // We need to save the work_line if the instruction wasn't throwing before. Otherwise
             // we'll try to merge garbage.
             // Note: this assumes that Fail is called before we do any work_line modifications.
