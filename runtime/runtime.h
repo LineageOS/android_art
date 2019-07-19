@@ -895,6 +895,10 @@ class Runtime {
     return image_space_loading_order_;
   }
 
+  bool IsVerifierMissingKThrowFatal() const {
+    return verifier_missing_kthrow_fatal_;
+  }
+
  private:
   static void InitPlatformSignalHandlers();
 
@@ -1239,6 +1243,8 @@ class Runtime {
 
   gc::space::ImageSpaceLoadingOrder image_space_loading_order_ =
       gc::space::ImageSpaceLoadingOrder::kSystemFirst;
+
+  bool verifier_missing_kthrow_fatal_;
 
   // Note: See comments on GetFaultMessage.
   friend std::string GetFaultMessageForAbortLogging();
