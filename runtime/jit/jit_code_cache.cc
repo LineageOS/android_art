@@ -303,24 +303,21 @@ const void* JitCodeCache::FindCompiledCodeForInstrumentation(ArtMethod* method) 
   return info->GetSavedEntryPoint();
 }
 
-const void* JitCodeCache::GetZygoteSavedEntryPoint(ArtMethod* method) {
-  if (Runtime::Current()->IsUsingApexBootImageLocation() &&
-      // Currently only applies to boot classpath
-      method->GetDeclaringClass()->GetClassLoader() == nullptr) {
-    const void* entry_point = nullptr;
-    if (method->IsNative()) {
-      const void* code_ptr = GetJniStubCode(method);
-      if (code_ptr != nullptr) {
-        entry_point = OatQuickMethodHeader::FromCodePointer(code_ptr)->GetEntryPoint();
-      }
+const void* JitCodeCache::GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method) {
+  if (Runtime::Current()->IsUsingApexBootImageLocation() && method->IsPreCompiled()) {
+    const void* code_ptr = nullptr;
+    if (method->GetDeclaringClass()->GetClassLoader() == nullptr) {
+      code_ptr = zygote_map_.GetCodeFor(method);
     } else {
-      ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
-      if (profiling_info != nullptr) {
-        entry_point = profiling_info->GetSavedEntryPoint();
+      MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+      auto it = saved_compiled_methods_map_.find(method);
+      if (it != saved_compiled_methods_map_.end()) {
+        code_ptr = it->second;
       }
     }
-    if (Runtime::Current()->IsZygote() || IsInZygoteExecSpace(entry_point)) {
-      return entry_point;
+    if (code_ptr != nullptr) {
+      OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
+      return method_header->GetEntryPoint();
     }
   }
   return nullptr;
@@ -751,7 +748,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
         }
       }
     } else {
-      if (method->IsZygoteCompiled() && IsSharedRegion(*region)) {
+      if (method->IsPreCompiled() && IsSharedRegion(*region)) {
         zygote_map_.Put(code_ptr, method);
       } else {
         method_code_map_.Put(code_ptr, method);
@@ -764,13 +761,11 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
         // This situation currently only occurs in the jit-zygote mode.
         DCHECK(Runtime::Current()->IsUsingApexBootImageLocation());
         DCHECK(!garbage_collect_code_);
-        // TODO(ngeoffray): In most cases, the zygote will not have a profiling
-        // info for a compiled method. Use a map instead.
-        if (method->GetProfilingInfo(kRuntimePointerSize) != nullptr) {
-          // Save the entrypoint, so it can be fetched later once the class is
-          // initialized.
-          method->GetProfilingInfo(kRuntimePointerSize)->SetSavedEntryPoint(
-              method_header->GetEntryPoint());
+        DCHECK(method->IsPreCompiled());
+        // The shared region can easily be queried. For the private region, we
+        // use a side map.
+        if (!IsSharedRegion(*region)) {
+          saved_compiled_methods_map_.Put(method, code_ptr);
         }
       } else {
         Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(
@@ -1715,10 +1710,10 @@ void JitCodeCache::InvalidateCompiledCodeFor(ArtMethod* method,
     }
   }
 
-  // In case the method was compiled by the zygote, clear that information so we
+  // In case the method was pre-compiled, clear that information so we
   // can recompile it ourselves.
-  if (method->IsZygoteCompiled()) {
-    method->ClearZygoteCompiled();
+  if (method->IsPreCompiled()) {
+    method->ClearPreCompiled();
   }
 }
 

@@ -79,9 +79,9 @@ static constexpr uint32_t kAccDefaultConflict =       0x01000000;  // method (ru
 // Set by the verifier for a method we do not want the compiler to compile.
 static constexpr uint32_t kAccCompileDontBother =     0x02000000;  // method (runtime)
 
-// Used in conjunction with kAccCompileDontBother to mark the method as zygote
-// compiled.
-static constexpr uint32_t kAccZygoteCompiled =        0x00200000;  // method (runtime)
+// Used in conjunction with kAccCompileDontBother to mark the method as pre
+// compiled by the JIT compiler.
+static constexpr uint32_t kAccPreCompiled =           0x00200000;  // method (runtime)
 
 // Set by the verifier for a method that could not be verified to follow structured locking.
 static constexpr uint32_t kAccMustCountLocks =        0x04000000;  // method (runtime)

@@ -826,6 +826,7 @@ uint32_t Jit::CompileMethodsFromProfile(
         // Special case ZygoteServer class so that it gets compiled before the
         // zygote enters it. This avoids needing to do OSR during app startup.
         // TODO: have a profile instead.
+        method->SetPreCompiled();
         if (!add_to_queue || method->GetDeclaringClass()->DescriptorEquals(
                 "Lcom/android/internal/os/ZygoteServer;")) {
           CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
@@ -833,9 +834,6 @@ uint32_t Jit::CompileMethodsFromProfile(
           ++added_to_queue;
           thread_pool_->AddTask(self,
               new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile));
-          if (Runtime::Current()->IsZygote()) {
-            method->SetZygoteCompiled();
-          }
         }
       }
     }
@@ -844,7 +842,7 @@ uint32_t Jit::CompileMethodsFromProfile(
 }
 
 static bool IgnoreSamplesForMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (method->IsClassInitializer() || !method->IsCompilable() || method->IsZygoteCompiled()) {
+  if (method->IsClassInitializer() || !method->IsCompilable() || method->IsPreCompiled()) {
     // We do not want to compile such methods.
     return true;
   }
@@ -973,7 +971,7 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
     return;
   }
 
-  if (UNLIKELY(method->IsZygoteCompiled())) {
+  if (UNLIKELY(method->IsPreCompiled())) {
     const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
     if (code_ptr != nullptr) {
       Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);

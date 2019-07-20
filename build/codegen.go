@@ -117,7 +117,8 @@ type CodegenLibraryArchProperties struct {
 		Whole_static_libs []string
 	}
 	Shared struct {
-		Shared_libs []string
+		Shared_libs               []string
+		Export_shared_lib_headers []string
 	}
 }
 

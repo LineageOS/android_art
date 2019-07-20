@@ -53,13 +53,12 @@ art_cc_defaults {
         //
         //   FAILED: ninja: out/soong/build.ninja:320768: multiple rules generate out/soong/.intermediates/art/disassembler/libart-disassembler/linux_glibc_x86_64_static/obj/art/disassembler/disassembler_mips.o [-w dupbuild=err]
     },
-    include_dirs: ["art/runtime"],
-
     shared_libs: [
         "libbase",
     ],
     header_libs: [
         "art_libartbase_headers",
+        "libart_runtime_headers_ndk",
     ],
     export_include_dirs: ["."],
 }
@@ -82,5 +81,13 @@ art_cc_library {
     shared_libs: [
         // For disassembler_arm*.
         "libvixld",
+    ],
+}
+
+cc_library_headers {
+    name: "art_disassembler_headers",
+    host_supported: true,
+    export_include_dirs: [
+        ".",
     ],
 }

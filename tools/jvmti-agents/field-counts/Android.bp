@@ -25,14 +25,8 @@ cc_defaults {
     compile_multilib: "both",
     header_libs: [
         "libopenjdkjvmti_headers",
-        // Annoyingly you aren't allowed to include even header-only non-ndk libs into an ndk build.
-        // Instead we put the directories this would bring in below in 'include_dirs'
-        // "libnativehelper_header_only",
-    ],
-    include_dirs: [
-        // NDK headers aren't available in platform NDK builds.
-        "libnativehelper/include_jni",
-        "libnativehelper/header_only_include",
+        "libnativehelper_header_only",
+        "jni_headers",
     ],
     multilib: {
         lib32: {

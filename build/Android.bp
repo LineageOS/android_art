@@ -119,10 +119,10 @@ art_global_defaults {
                 // "-marm",
                 // "-mapcs",
             ],
-            include_dirs: [
+            header_libs: [
                 // We optimize Thread::Current() with a direct TLS access. This requires access to a
                 //  private Bionic header.
-                "bionic/libc/private",
+                "bionic_libc_private_headers",
             ],
         },
         linux: {
@@ -173,10 +173,6 @@ art_global_defaults {
             cflags: ["-DART_ENABLE_CODEGEN_x86_64"],
         },
     },
-
-    include_dirs: [
-        "external/vixl/src",
-    ],
 
     tidy_checks: art_clang_tidy_errors + art_clang_tidy_disabled,
     tidy_checks_as_errors: art_clang_tidy_errors,
