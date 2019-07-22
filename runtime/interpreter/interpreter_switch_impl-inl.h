@@ -53,8 +53,9 @@ namespace interpreter {
 template<bool do_access_check, bool transaction_active, Instruction::Format kFormat>
 class InstructionHandler {
  public:
-  ALWAYS_INLINE WARN_UNUSED bool CheckForceReturn()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+#define HANDLER_ATTRIBUTES ALWAYS_INLINE FLATTEN WARN_UNUSED REQUIRES_SHARED(Locks::mutator_lock_)
+
+  HANDLER_ATTRIBUTES bool CheckForceReturn() {
     if (PerformNonStandardReturn<kMonitorState>(self,
                                                 shadow_frame,
                                                 ctx->result,
@@ -67,8 +68,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandlePendingException()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandlePendingException() {
     DCHECK(self->IsExceptionPending());
     self->AllowThreadSuspension();
     if (!CheckForceReturn()) {
@@ -92,8 +92,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool PossiblyHandlePendingExceptionOnInvoke(bool is_exception_pending)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool PossiblyHandlePendingExceptionOnInvoke(bool is_exception_pending) {
     if (UNLIKELY(shadow_frame.GetForceRetryInstruction())) {
       /* Don't need to do anything except clear the flag and exception. We leave the */
       /* instruction the same so it will be re-executed on the next go-around.       */
@@ -116,8 +115,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleMonitorChecks()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleMonitorChecks() {
     if (!DoMonitorCheckOnExit<do_assignability_check>(self, &shadow_frame)) {
       return false;  // Pending exception.
     }
@@ -125,8 +123,7 @@ class InstructionHandler {
   }
 
   // Code to run before each dex instruction.
-  ALWAYS_INLINE WARN_UNUSED bool Preamble()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool Preamble() {
     /* We need to put this before & after the instrumentation to avoid having to put in a */
     /* post-script macro.                                                                 */
     if (!CheckForceReturn()) {
@@ -154,8 +151,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool BranchInstrumentation(int32_t offset)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool BranchInstrumentation(int32_t offset) {
     if (UNLIKELY(instrumentation->HasBranchListeners())) {
       instrumentation->Branch(self, shadow_frame.GetMethod(), dex_pc, offset);
     }
@@ -180,8 +176,7 @@ class InstructionHandler {
     }
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleAsyncException()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleAsyncException() {
     if (UNLIKELY(self->ObserveAsyncException())) {
       return false;  // Pending exception.
     }
@@ -235,7 +230,7 @@ class InstructionHandler {
     }
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleReturn(JValue result) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleReturn(JValue result) {
     self->AllowThreadSuspension();
     if (!HandleMonitorChecks()) {
       return false;
@@ -258,7 +253,7 @@ class InstructionHandler {
     return false;
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleGoto(int32_t offset) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleGoto(int32_t offset) {
     if (!HandleAsyncException()) {
       return false;
     }
@@ -274,7 +269,7 @@ class InstructionHandler {
 #pragma clang diagnostic ignored "-Wfloat-equal"
 
   template<typename T>
-  ALWAYS_INLINE WARN_UNUSED bool HandleCmpl(T val1, T val2) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleCmpl(T val1, T val2) {
     int32_t result;
     if (val1 > val2) {
       result = 1;
@@ -289,7 +284,7 @@ class InstructionHandler {
 
   // Returns the same result as the function above. It only differs for NaN values.
   template<typename T>
-  ALWAYS_INLINE WARN_UNUSED bool HandleCmpg(T val1, T val2) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleCmpg(T val1, T val2) {
     int32_t result;
     if (val1 < val2) {
       result = -1;
@@ -304,8 +299,7 @@ class InstructionHandler {
 
 #pragma clang diagnostic pop
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleIf(bool cond, int32_t offset)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleIf(bool cond, int32_t offset) {
     if (cond) {
       if (!BranchInstrumentation(offset)) {
         return false;
@@ -321,7 +315,7 @@ class InstructionHandler {
   }
 
   template<typename ArrayType, typename SetVRegFn>
-  ALWAYS_INLINE bool HandleAGet(SetVRegFn setVReg) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleAGet(SetVRegFn setVReg) {
     ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
@@ -338,7 +332,7 @@ class InstructionHandler {
   }
 
   template<typename ArrayType, typename T>
-  ALWAYS_INLINE bool HandleAPut(T value) REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleAPut(T value) {
     ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
@@ -355,105 +349,105 @@ class InstructionHandler {
   }
 
   template<FindFieldType find_type, Primitive::Type field_type>
-  ALWAYS_INLINE WARN_UNUSED bool HandleGet() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleGet() {
     return DoFieldGet<find_type, field_type, do_access_check, transaction_active>(
         self, shadow_frame, inst, inst_data);
   }
 
   template<Primitive::Type field_type>
-  ALWAYS_INLINE WARN_UNUSED bool HandleGetQuick() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleGetQuick() {
     return DoIGetQuick<field_type>(shadow_frame, inst, inst_data);
   }
 
   template<FindFieldType find_type, Primitive::Type field_type>
-  ALWAYS_INLINE WARN_UNUSED bool HandlePut() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandlePut() {
     return DoFieldPut<find_type, field_type, do_access_check, transaction_active>(
         self, shadow_frame, inst, inst_data);
   }
 
   template<Primitive::Type field_type>
-  ALWAYS_INLINE WARN_UNUSED bool HandlePutQuick() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandlePutQuick() {
     return DoIPutQuick<field_type, transaction_active>(
         shadow_frame, inst, inst_data);
   }
 
   template<InvokeType type, bool is_range, bool is_quick = false>
-  ALWAYS_INLINE WARN_UNUSED bool HandleInvoke() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleInvoke() {
     bool success = DoInvoke<type, is_range, do_access_check, /*is_mterp=*/ false, is_quick>(
         self, shadow_frame, inst, inst_data, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
 
-  ALWAYS_INLINE WARN_UNUSED bool HandleUnused() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool HandleUnused() {
     UnexpectedOpcode(inst, shadow_frame);
     return true;
   }
 
-  ALWAYS_INLINE bool NOP() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NOP() {
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE() {
     SetVReg(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_FROM16() {
     SetVReg(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_16() {
     SetVReg(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_WIDE() {
     SetVRegLong(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_WIDE_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_WIDE_FROM16() {
     SetVRegLong(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_WIDE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_WIDE_16() {
     SetVRegLong(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_OBJECT() {
     SetVRegReference(A(), GetVRegReference(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_OBJECT_FROM16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_OBJECT_FROM16() {
     SetVRegReference(A(), GetVRegReference(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_OBJECT_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_OBJECT_16() {
     SetVRegReference(A(), GetVRegReference(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_RESULT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_RESULT() {
     SetVReg(A(), ResultRegister()->GetI());
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_RESULT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_RESULT_WIDE() {
     SetVRegLong(A(), ResultRegister()->GetJ());
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_RESULT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_RESULT_OBJECT() {
     SetVRegReference(A(), ResultRegister()->GetL());
     return true;
   }
 
-  ALWAYS_INLINE bool MOVE_EXCEPTION() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MOVE_EXCEPTION() {
     ObjPtr<mirror::Throwable> exception = self->GetException();
     DCHECK(exception != nullptr) << "No pending exception on MOVE_EXCEPTION instruction";
     SetVRegReference(A(), exception);
@@ -461,31 +455,31 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool RETURN_VOID_NO_BARRIER() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RETURN_VOID_NO_BARRIER() {
     JValue result;
     return HandleReturn(result);
   }
 
-  ALWAYS_INLINE bool RETURN_VOID() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RETURN_VOID() {
     QuasiAtomic::ThreadFenceForConstructor();
     JValue result;
     return HandleReturn(result);
   }
 
-  ALWAYS_INLINE bool RETURN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RETURN() {
     JValue result;
     result.SetJ(0);
     result.SetI(GetVReg(A()));
     return HandleReturn(result);
   }
 
-  ALWAYS_INLINE bool RETURN_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RETURN_WIDE() {
     JValue result;
     result.SetJ(GetVRegLong(A()));
     return HandleReturn(result);
   }
 
-  ALWAYS_INLINE bool RETURN_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RETURN_OBJECT() {
     JValue result;
     self->AllowThreadSuspension();
     if (!HandleMonitorChecks()) {
@@ -535,7 +529,7 @@ class InstructionHandler {
     return false;
   }
 
-  ALWAYS_INLINE bool CONST_4() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_4() {
     uint4_t dst = inst->VRegA_11n(inst_data);
     int4_t val = inst->VRegB_11n(inst_data);
     SetVReg(dst, val);
@@ -545,7 +539,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_16() {
     uint8_t dst = A();
     int16_t val = B();
     SetVReg(dst, val);
@@ -555,7 +549,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST() {
     uint8_t dst = A();
     int32_t val = B();
     SetVReg(dst, val);
@@ -565,7 +559,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_HIGH16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_HIGH16() {
     uint8_t dst = A();
     int32_t val = static_cast<int32_t>(B() << 16);
     SetVReg(dst, val);
@@ -575,27 +569,27 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_WIDE_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_WIDE_16() {
     SetVRegLong(A(), B());
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_WIDE_32() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_WIDE_32() {
     SetVRegLong(A(), B());
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_WIDE() {
     SetVRegLong(A(), inst->WideVRegB());
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_WIDE_HIGH16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_WIDE_HIGH16() {
     SetVRegLong(A(), static_cast<uint64_t>(B()) << 48);
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_STRING() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_STRING() {
     ObjPtr<mirror::String> s = ResolveString(self, shadow_frame, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       return false;  // Pending exception.
@@ -605,7 +599,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_STRING_JUMBO() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_STRING_JUMBO() {
     ObjPtr<mirror::String> s = ResolveString(self, shadow_frame, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       return false;  // Pending exception.
@@ -615,7 +609,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_CLASS() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_CLASS() {
     ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(B()),
                                                      shadow_frame.GetMethod(),
                                                      self,
@@ -629,7 +623,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_METHOD_HANDLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_METHOD_HANDLE() {
     ClassLinker* cl = Runtime::Current()->GetClassLinker();
     ObjPtr<mirror::MethodHandle> mh = cl->ResolveMethodHandle(self,
                                                               B(),
@@ -642,7 +636,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CONST_METHOD_TYPE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CONST_METHOD_TYPE() {
     ClassLinker* cl = Runtime::Current()->GetClassLinker();
     ObjPtr<mirror::MethodType> mt = cl->ResolveMethodType(self,
                                                           dex::ProtoIndex(B()),
@@ -655,7 +649,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool MONITOR_ENTER() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MONITOR_ENTER() {
     if (!HandleAsyncException()) {
       return false;
     }
@@ -669,7 +663,7 @@ class InstructionHandler {
     }
   }
 
-  ALWAYS_INLINE bool MONITOR_EXIT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MONITOR_EXIT() {
     if (!HandleAsyncException()) {
       return false;
     }
@@ -683,7 +677,7 @@ class InstructionHandler {
     }
   }
 
-  ALWAYS_INLINE bool CHECK_CAST() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CHECK_CAST() {
     ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(B()),
                                                      shadow_frame.GetMethod(),
                                                      self,
@@ -701,7 +695,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool INSTANCE_OF() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INSTANCE_OF() {
     ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(C()),
                                                      shadow_frame.GetMethod(),
                                                      self,
@@ -716,7 +710,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool ARRAY_LENGTH() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ARRAY_LENGTH() {
     ObjPtr<mirror::Object> array = GetVRegReference(B());
     if (UNLIKELY(array == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
@@ -727,7 +721,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool NEW_INSTANCE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEW_INSTANCE() {
     ObjPtr<mirror::Object> obj = nullptr;
     ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(B()),
                                                      shadow_frame.GetMethod(),
@@ -759,7 +753,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool NEW_ARRAY() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEW_ARRAY() {
     int32_t length = GetVReg(B());
     ObjPtr<mirror::Object> obj = AllocArrayFromCode<do_access_check>(
         dex::TypeIndex(C()),
@@ -775,17 +769,17 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool FILLED_NEW_ARRAY() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FILLED_NEW_ARRAY() {
     return DoFilledNewArray<false, do_access_check, transaction_active>(
         inst, shadow_frame, self, ResultRegister());
   }
 
-  ALWAYS_INLINE bool FILLED_NEW_ARRAY_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FILLED_NEW_ARRAY_RANGE() {
     return DoFilledNewArray<true, do_access_check, transaction_active>(
         inst, shadow_frame, self, ResultRegister());
   }
 
-  ALWAYS_INLINE bool FILL_ARRAY_DATA() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FILL_ARRAY_DATA() {
     const uint16_t* payload_addr = reinterpret_cast<const uint16_t*>(inst) + B();
     const Instruction::ArrayDataPayload* payload =
         reinterpret_cast<const Instruction::ArrayDataPayload*>(payload_addr);
@@ -799,7 +793,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool THROW() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool THROW() {
     if (!HandleAsyncException()) {
       return false;
     }
@@ -818,19 +812,19 @@ class InstructionHandler {
     return false;  // Pending exception.
   }
 
-  ALWAYS_INLINE bool GOTO() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool GOTO() {
     return HandleGoto(A());
   }
 
-  ALWAYS_INLINE bool GOTO_16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool GOTO_16() {
     return HandleGoto(A());
   }
 
-  ALWAYS_INLINE bool GOTO_32() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool GOTO_32() {
     return HandleGoto(A());
   }
 
-  ALWAYS_INLINE bool PACKED_SWITCH() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool PACKED_SWITCH() {
     int32_t offset = DoPackedSwitch(inst, shadow_frame, inst_data);
     if (!BranchInstrumentation(offset)) {
       return false;
@@ -840,7 +834,7 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool SPARSE_SWITCH() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPARSE_SWITCH() {
     int32_t offset = DoSparseSwitch(inst, shadow_frame, inst_data);
     if (!BranchInstrumentation(offset)) {
       return false;
@@ -850,127 +844,127 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool CMPL_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CMPL_FLOAT() {
     return HandleCmpl<float>(GetVRegFloat(B()), GetVRegFloat(C()));
   }
 
-  ALWAYS_INLINE bool CMPG_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CMPG_FLOAT() {
     return HandleCmpg<float>(GetVRegFloat(B()), GetVRegFloat(C()));
   }
 
-  ALWAYS_INLINE bool CMPL_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CMPL_DOUBLE() {
     return HandleCmpl<double>(GetVRegDouble(B()), GetVRegDouble(C()));
   }
 
-  ALWAYS_INLINE bool CMPG_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CMPG_DOUBLE() {
     return HandleCmpg<double>(GetVRegDouble(B()), GetVRegDouble(C()));
   }
 
-  ALWAYS_INLINE bool CMP_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool CMP_LONG() {
     return HandleCmpl<int64_t>(GetVRegLong(B()), GetVRegLong(C()));
   }
 
-  ALWAYS_INLINE bool IF_EQ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_EQ() {
     return HandleIf(GetVReg(A()) == GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_NE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_NE() {
     return HandleIf(GetVReg(A()) != GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_LT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_LT() {
     return HandleIf(GetVReg(A()) < GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_GE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_GE() {
     return HandleIf(GetVReg(A()) >= GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_GT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_GT() {
     return HandleIf(GetVReg(A()) > GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_LE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_LE() {
     return HandleIf(GetVReg(A()) <= GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool IF_EQZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_EQZ() {
     return HandleIf(GetVReg(A()) == 0, B());
   }
 
-  ALWAYS_INLINE bool IF_NEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_NEZ() {
     return HandleIf(GetVReg(A()) != 0, B());
   }
 
-  ALWAYS_INLINE bool IF_LTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_LTZ() {
     return HandleIf(GetVReg(A()) < 0, B());
   }
 
-  ALWAYS_INLINE bool IF_GEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_GEZ() {
     return HandleIf(GetVReg(A()) >= 0, B());
   }
 
-  ALWAYS_INLINE bool IF_GTZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_GTZ() {
     return HandleIf(GetVReg(A()) > 0, B());
   }
 
-  ALWAYS_INLINE bool IF_LEZ() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IF_LEZ() {
     return HandleIf(GetVReg(A()) <= 0, B());
   }
 
-  ALWAYS_INLINE bool AGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_BOOLEAN() {
     return HandleAGet<mirror::BooleanArray>(&InstructionHandler::SetVReg);
   }
 
-  ALWAYS_INLINE bool AGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_BYTE() {
     return HandleAGet<mirror::ByteArray>(&InstructionHandler::SetVReg);
   }
 
-  ALWAYS_INLINE bool AGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_CHAR() {
     return HandleAGet<mirror::CharArray>(&InstructionHandler::SetVReg);
   }
 
-  ALWAYS_INLINE bool AGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_SHORT() {
     return HandleAGet<mirror::ShortArray>(&InstructionHandler::SetVReg);
   }
 
-  ALWAYS_INLINE bool AGET() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET() {
     return HandleAGet<mirror::IntArray>(&InstructionHandler::SetVReg);
   }
 
-  ALWAYS_INLINE bool AGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_WIDE() {
     return HandleAGet<mirror::LongArray>(&InstructionHandler::SetVRegLong);
   }
 
-  ALWAYS_INLINE bool AGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AGET_OBJECT() {
     return HandleAGet<mirror::ObjectArray<mirror::Object>>(&InstructionHandler::SetVRegReference);
   }
 
-  ALWAYS_INLINE bool APUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_BOOLEAN() {
     return HandleAPut<mirror::BooleanArray>(GetVReg(A()));
   }
 
-  ALWAYS_INLINE bool APUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_BYTE() {
     return HandleAPut<mirror::ByteArray>(GetVReg(A()));
   }
 
-  ALWAYS_INLINE bool APUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_CHAR() {
     return HandleAPut<mirror::CharArray>(GetVReg(A()));
   }
 
-  ALWAYS_INLINE bool APUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_SHORT() {
     return HandleAPut<mirror::ShortArray>(GetVReg(A()));
   }
 
-  ALWAYS_INLINE bool APUT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT() {
     return HandleAPut<mirror::IntArray>(GetVReg(A()));
   }
 
-  ALWAYS_INLINE bool APUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_WIDE() {
     return HandleAPut<mirror::LongArray>(GetVRegLong(A()));
   }
 
-  ALWAYS_INLINE bool APUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool APUT_OBJECT() {
     ObjPtr<mirror::Object> a = GetVRegReference(B());
     if (UNLIKELY(a == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
@@ -987,855 +981,855 @@ class InstructionHandler {
     return true;
   }
 
-  ALWAYS_INLINE bool IGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_BOOLEAN() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool IGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_BYTE() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool IGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_CHAR() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool IGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_SHORT() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool IGET() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool IGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_WIDE() {
     return HandleGet<InstancePrimitiveRead, Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool IGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_OBJECT() {
     return HandleGet<InstanceObjectRead, Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool IGET_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_QUICK() {
     return HandleGetQuick<Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool IGET_WIDE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_WIDE_QUICK() {
     return HandleGetQuick<Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool IGET_OBJECT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_OBJECT_QUICK() {
     return HandleGetQuick<Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool IGET_BOOLEAN_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_BOOLEAN_QUICK() {
     return HandleGetQuick<Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool IGET_BYTE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_BYTE_QUICK() {
     return HandleGetQuick<Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool IGET_CHAR_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_CHAR_QUICK() {
     return HandleGetQuick<Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool IGET_SHORT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IGET_SHORT_QUICK() {
     return HandleGetQuick<Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool SGET_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_BOOLEAN() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool SGET_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_BYTE() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool SGET_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_CHAR() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool SGET_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_SHORT() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool SGET() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool SGET_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_WIDE() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool SGET_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SGET_OBJECT() {
     return HandleGet<StaticObjectRead, Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool IPUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_BOOLEAN() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool IPUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_BYTE() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool IPUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_CHAR() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool IPUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_SHORT() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool IPUT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool IPUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_WIDE() {
     return HandlePut<InstancePrimitiveWrite, Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool IPUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_OBJECT() {
     return HandlePut<InstanceObjectWrite, Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool IPUT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_QUICK() {
     return HandlePutQuick<Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool IPUT_BOOLEAN_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_BOOLEAN_QUICK() {
     return HandlePutQuick<Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool IPUT_BYTE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_BYTE_QUICK() {
     return HandlePutQuick<Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool IPUT_CHAR_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_CHAR_QUICK() {
     return HandlePutQuick<Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool IPUT_SHORT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_SHORT_QUICK() {
     return HandlePutQuick<Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool IPUT_WIDE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_WIDE_QUICK() {
     return HandlePutQuick<Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool IPUT_OBJECT_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool IPUT_OBJECT_QUICK() {
     return HandlePutQuick<Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool SPUT_BOOLEAN() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_BOOLEAN() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimBoolean>();
   }
 
-  ALWAYS_INLINE bool SPUT_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_BYTE() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimByte>();
   }
 
-  ALWAYS_INLINE bool SPUT_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_CHAR() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimChar>();
   }
 
-  ALWAYS_INLINE bool SPUT_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_SHORT() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimShort>();
   }
 
-  ALWAYS_INLINE bool SPUT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimInt>();
   }
 
-  ALWAYS_INLINE bool SPUT_WIDE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_WIDE() {
     return HandlePut<StaticPrimitiveWrite, Primitive::kPrimLong>();
   }
 
-  ALWAYS_INLINE bool SPUT_OBJECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SPUT_OBJECT() {
     return HandlePut<StaticObjectWrite, Primitive::kPrimNot>();
   }
 
-  ALWAYS_INLINE bool INVOKE_VIRTUAL() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL() {
     return HandleInvoke<kVirtual, /*is_range=*/ false>();
   }
 
-  ALWAYS_INLINE bool INVOKE_VIRTUAL_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_RANGE() {
     return HandleInvoke<kVirtual, /*is_range=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_SUPER() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_SUPER() {
     return HandleInvoke<kSuper, /*is_range=*/ false>();
   }
 
-  ALWAYS_INLINE bool INVOKE_SUPER_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_SUPER_RANGE() {
     return HandleInvoke<kSuper, /*is_range=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_DIRECT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_DIRECT() {
     return HandleInvoke<kDirect, /*is_range=*/ false>();
   }
 
-  ALWAYS_INLINE bool INVOKE_DIRECT_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_DIRECT_RANGE() {
     return HandleInvoke<kDirect, /*is_range=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_INTERFACE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_INTERFACE() {
     return HandleInvoke<kInterface, /*is_range=*/ false>();
   }
 
-  ALWAYS_INLINE bool INVOKE_INTERFACE_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_INTERFACE_RANGE() {
     return HandleInvoke<kInterface, /*is_range=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_STATIC() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_STATIC() {
     return HandleInvoke<kStatic, /*is_range=*/ false>();
   }
 
-  ALWAYS_INLINE bool INVOKE_STATIC_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_STATIC_RANGE() {
     return HandleInvoke<kStatic, /*is_range=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_VIRTUAL_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_QUICK() {
     return HandleInvoke<kVirtual, /*is_range=*/ false, /*is_quick=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_VIRTUAL_RANGE_QUICK() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_RANGE_QUICK() {
     return HandleInvoke<kVirtual, /*is_range=*/ true, /*is_quick=*/ true>();
   }
 
-  ALWAYS_INLINE bool INVOKE_POLYMORPHIC() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_POLYMORPHIC() {
     DCHECK(Runtime::Current()->IsMethodHandlesEnabled());
     bool success = DoInvokePolymorphic</* is_range= */ false>(
         self, shadow_frame, inst, inst_data, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
 
-  ALWAYS_INLINE bool INVOKE_POLYMORPHIC_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_POLYMORPHIC_RANGE() {
     DCHECK(Runtime::Current()->IsMethodHandlesEnabled());
     bool success = DoInvokePolymorphic</* is_range= */ true>(
         self, shadow_frame, inst, inst_data, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
 
-  ALWAYS_INLINE bool INVOKE_CUSTOM() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_CUSTOM() {
     DCHECK(Runtime::Current()->IsMethodHandlesEnabled());
     bool success = DoInvokeCustom</* is_range= */ false>(
         self, shadow_frame, inst, inst_data, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
 
-  ALWAYS_INLINE bool INVOKE_CUSTOM_RANGE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INVOKE_CUSTOM_RANGE() {
     DCHECK(Runtime::Current()->IsMethodHandlesEnabled());
     bool success = DoInvokeCustom</* is_range= */ true>(
         self, shadow_frame, inst, inst_data, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
 
-  ALWAYS_INLINE bool NEG_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEG_INT() {
     SetVReg(A(), -GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool NOT_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NOT_INT() {
     SetVReg(A(), ~GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool NEG_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEG_LONG() {
     SetVRegLong(A(), -GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool NOT_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NOT_LONG() {
     SetVRegLong(A(), ~GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool NEG_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEG_FLOAT() {
     SetVRegFloat(A(), -GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool NEG_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool NEG_DOUBLE() {
     SetVRegDouble(A(), -GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_LONG() {
     SetVRegLong(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_FLOAT() {
     SetVRegFloat(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_DOUBLE() {
     SetVRegDouble(A(), GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool LONG_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool LONG_TO_INT() {
     SetVReg(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool LONG_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool LONG_TO_FLOAT() {
     SetVRegFloat(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool LONG_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool LONG_TO_DOUBLE() {
     SetVRegDouble(A(), GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool FLOAT_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FLOAT_TO_INT() {
     float val = GetVRegFloat(B());
     int32_t result = art_float_to_integral<int32_t, float>(val);
     SetVReg(A(), result);
     return true;
   }
 
-  ALWAYS_INLINE bool FLOAT_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FLOAT_TO_LONG() {
     float val = GetVRegFloat(B());
     int64_t result = art_float_to_integral<int64_t, float>(val);
     SetVRegLong(A(), result);
     return true;
   }
 
-  ALWAYS_INLINE bool FLOAT_TO_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool FLOAT_TO_DOUBLE() {
     SetVRegDouble(A(), GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool DOUBLE_TO_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DOUBLE_TO_INT() {
     double val = GetVRegDouble(B());
     int32_t result = art_float_to_integral<int32_t, double>(val);
     SetVReg(A(), result);
     return true;
   }
 
-  ALWAYS_INLINE bool DOUBLE_TO_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DOUBLE_TO_LONG() {
     double val = GetVRegDouble(B());
     int64_t result = art_float_to_integral<int64_t, double>(val);
     SetVRegLong(A(), result);
     return true;
   }
 
-  ALWAYS_INLINE bool DOUBLE_TO_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DOUBLE_TO_FLOAT() {
     SetVRegFloat(A(), GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_BYTE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_BYTE() {
     SetVReg(A(), static_cast<int8_t>(GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_CHAR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_CHAR() {
     SetVReg(A(), static_cast<uint16_t>(GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool INT_TO_SHORT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool INT_TO_SHORT() {
     SetVReg(A(), static_cast<int16_t>(GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_INT() {
     SetVReg(A(), SafeAdd(GetVReg(B()), GetVReg(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_INT() {
     SetVReg(A(), SafeSub(GetVReg(B()), GetVReg(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_INT() {
     SetVReg(A(), SafeMul(GetVReg(B()), GetVReg(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_INT() {
     return DoIntDivide(shadow_frame, A(), GetVReg(B()), GetVReg(C()));
   }
 
-  ALWAYS_INLINE bool REM_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_INT() {
     return DoIntRemainder(shadow_frame, A(), GetVReg(B()), GetVReg(C()));
   }
 
-  ALWAYS_INLINE bool SHL_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHL_INT() {
     SetVReg(A(), GetVReg(B()) << (GetVReg(C()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool SHR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHR_INT() {
     SetVReg(A(), GetVReg(B()) >> (GetVReg(C()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool USHR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool USHR_INT() {
     SetVReg(A(), static_cast<uint32_t>(GetVReg(B())) >> (GetVReg(C()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool AND_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_INT() {
     SetVReg(A(), GetVReg(B()) & GetVReg(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool OR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_INT() {
     SetVReg(A(), GetVReg(B()) | GetVReg(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_INT() {
     SetVReg(A(), GetVReg(B()) ^ GetVReg(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_LONG() {
     SetVRegLong(A(), SafeAdd(GetVRegLong(B()), GetVRegLong(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_LONG() {
     SetVRegLong(A(), SafeSub(GetVRegLong(B()), GetVRegLong(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_LONG() {
     SetVRegLong(A(), SafeMul(GetVRegLong(B()), GetVRegLong(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_LONG() {
     return DoLongDivide(shadow_frame, A(), GetVRegLong(B()), GetVRegLong(C()));
   }
 
-  ALWAYS_INLINE bool REM_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_LONG() {
     return DoLongRemainder(shadow_frame, A(), GetVRegLong(B()), GetVRegLong(C()));
   }
 
-  ALWAYS_INLINE bool AND_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_LONG() {
     SetVRegLong(A(), GetVRegLong(B()) & GetVRegLong(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool OR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_LONG() {
     SetVRegLong(A(), GetVRegLong(B()) | GetVRegLong(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_LONG() {
     SetVRegLong(A(), GetVRegLong(B()) ^ GetVRegLong(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool SHL_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHL_LONG() {
     SetVRegLong(A(), GetVRegLong(B()) << (GetVReg(C()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool SHR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHR_LONG() {
     SetVRegLong(A(), GetVRegLong(B()) >> (GetVReg(C()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool USHR_LONG() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool USHR_LONG() {
     SetVRegLong(A(), static_cast<uint64_t>(GetVRegLong(B())) >> (GetVReg(C()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_FLOAT() {
     SetVRegFloat(A(), GetVRegFloat(B()) + GetVRegFloat(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_FLOAT() {
     SetVRegFloat(A(), GetVRegFloat(B()) - GetVRegFloat(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_FLOAT() {
     SetVRegFloat(A(), GetVRegFloat(B()) * GetVRegFloat(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_FLOAT() {
     SetVRegFloat(A(), GetVRegFloat(B()) / GetVRegFloat(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool REM_FLOAT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_FLOAT() {
     SetVRegFloat(A(), fmodf(GetVRegFloat(B()), GetVRegFloat(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_DOUBLE() {
     SetVRegDouble(A(), GetVRegDouble(B()) + GetVRegDouble(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_DOUBLE() {
     SetVRegDouble(A(), GetVRegDouble(B()) - GetVRegDouble(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_DOUBLE() {
     SetVRegDouble(A(), GetVRegDouble(B()) * GetVRegDouble(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_DOUBLE() {
     SetVRegDouble(A(), GetVRegDouble(B()) / GetVRegDouble(C()));
     return true;
   }
 
-  ALWAYS_INLINE bool REM_DOUBLE() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_DOUBLE() {
     SetVRegDouble(A(), fmod(GetVRegDouble(B()), GetVRegDouble(C())));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, SafeAdd(GetVReg(vregA), GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, SafeSub(GetVReg(vregA), GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, SafeMul(GetVReg(vregA), GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_INT_2ADDR() {
     uint4_t vregA = A();
     return DoIntDivide(shadow_frame, vregA, GetVReg(vregA), GetVReg(B()));
   }
 
-  ALWAYS_INLINE bool REM_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_INT_2ADDR() {
     uint4_t vregA = A();
     return DoIntRemainder(shadow_frame, vregA, GetVReg(vregA), GetVReg(B()));
   }
 
-  ALWAYS_INLINE bool SHL_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHL_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, GetVReg(vregA) << (GetVReg(B()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool SHR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHR_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, GetVReg(vregA) >> (GetVReg(B()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool USHR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool USHR_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, static_cast<uint32_t>(GetVReg(vregA)) >> (GetVReg(B()) & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool AND_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, GetVReg(vregA) & GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool OR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, GetVReg(vregA) | GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_INT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_INT_2ADDR() {
     uint4_t vregA = A();
     SetVReg(vregA, GetVReg(vregA) ^ GetVReg(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, SafeAdd(GetVRegLong(vregA), GetVRegLong(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, SafeSub(GetVRegLong(vregA), GetVRegLong(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, SafeMul(GetVRegLong(vregA), GetVRegLong(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_LONG_2ADDR() {
     uint4_t vregA = A();
     return DoLongDivide(shadow_frame, vregA, GetVRegLong(vregA), GetVRegLong(B()));
   }
 
-  ALWAYS_INLINE bool REM_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_LONG_2ADDR() {
     uint4_t vregA = A();
     return DoLongRemainder(shadow_frame, vregA, GetVRegLong(vregA), GetVRegLong(B()));
   }
 
-  ALWAYS_INLINE bool AND_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, GetVRegLong(vregA) & GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool OR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, GetVRegLong(vregA) | GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, GetVRegLong(vregA) ^ GetVRegLong(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool SHL_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHL_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, GetVRegLong(vregA) << (GetVReg(B()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool SHR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHR_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, GetVRegLong(vregA) >> (GetVReg(B()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool USHR_LONG_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool USHR_LONG_2ADDR() {
     uint4_t vregA = A();
     SetVRegLong(vregA, static_cast<uint64_t>(GetVRegLong(vregA)) >> (GetVReg(B()) & 0x3f));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_FLOAT_2ADDR() {
     uint4_t vregA = A();
     SetVRegFloat(vregA, GetVRegFloat(vregA) + GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_FLOAT_2ADDR() {
     uint4_t vregA = A();
     SetVRegFloat(vregA, GetVRegFloat(vregA) - GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_FLOAT_2ADDR() {
     uint4_t vregA = A();
     SetVRegFloat(vregA, GetVRegFloat(vregA) * GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_FLOAT_2ADDR() {
     uint4_t vregA = A();
     SetVRegFloat(vregA, GetVRegFloat(vregA) / GetVRegFloat(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool REM_FLOAT_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_FLOAT_2ADDR() {
     uint4_t vregA = A();
     SetVRegFloat(vregA, fmodf(GetVRegFloat(vregA), GetVRegFloat(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_DOUBLE_2ADDR() {
     uint4_t vregA = A();
     SetVRegDouble(vregA, GetVRegDouble(vregA) + GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool SUB_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SUB_DOUBLE_2ADDR() {
     uint4_t vregA = A();
     SetVRegDouble(vregA, GetVRegDouble(vregA) - GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_DOUBLE_2ADDR() {
     uint4_t vregA = A();
     SetVRegDouble(vregA, GetVRegDouble(vregA) * GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_DOUBLE_2ADDR() {
     uint4_t vregA = A();
     SetVRegDouble(vregA, GetVRegDouble(vregA) / GetVRegDouble(B()));
     return true;
   }
 
-  ALWAYS_INLINE bool REM_DOUBLE_2ADDR() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_DOUBLE_2ADDR() {
     uint4_t vregA = A();
     SetVRegDouble(vregA, fmod(GetVRegDouble(vregA), GetVRegDouble(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_INT_LIT16() {
     SetVReg(A(), SafeAdd(GetVReg(B()), C()));
     return true;
   }
 
-  ALWAYS_INLINE bool RSUB_INT() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RSUB_INT() {
     SetVReg(A(), SafeSub(C(), GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_INT_LIT16() {
     SetVReg(A(), SafeMul(GetVReg(B()), C()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_INT_LIT16() {
     return DoIntDivide(shadow_frame, A(), GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool REM_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_INT_LIT16() {
     return DoIntRemainder(shadow_frame, A(), GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool AND_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_INT_LIT16() {
     SetVReg(A(), GetVReg(B()) & C());
     return true;
   }
 
-  ALWAYS_INLINE bool OR_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_INT_LIT16() {
     SetVReg(A(), GetVReg(B()) | C());
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_INT_LIT16() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_INT_LIT16() {
     SetVReg(A(), GetVReg(B()) ^ C());
     return true;
   }
 
-  ALWAYS_INLINE bool ADD_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool ADD_INT_LIT8() {
     SetVReg(A(), SafeAdd(GetVReg(B()), C()));
     return true;
   }
 
-  ALWAYS_INLINE bool RSUB_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool RSUB_INT_LIT8() {
     SetVReg(A(), SafeSub(C(), GetVReg(B())));
     return true;
   }
 
-  ALWAYS_INLINE bool MUL_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool MUL_INT_LIT8() {
     SetVReg(A(), SafeMul(GetVReg(B()), C()));
     return true;
   }
 
-  ALWAYS_INLINE bool DIV_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool DIV_INT_LIT8() {
     return DoIntDivide(shadow_frame, A(), GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool REM_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool REM_INT_LIT8() {
     return DoIntRemainder(shadow_frame, A(), GetVReg(B()), C());
   }
 
-  ALWAYS_INLINE bool AND_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool AND_INT_LIT8() {
     SetVReg(A(), GetVReg(B()) & C());
     return true;
   }
 
-  ALWAYS_INLINE bool OR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool OR_INT_LIT8() {
     SetVReg(A(), GetVReg(B()) | C());
     return true;
   }
 
-  ALWAYS_INLINE bool XOR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool XOR_INT_LIT8() {
     SetVReg(A(), GetVReg(B()) ^ C());
     return true;
   }
 
-  ALWAYS_INLINE bool SHL_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHL_INT_LIT8() {
     SetVReg(A(), GetVReg(B()) << (C() & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool SHR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool SHR_INT_LIT8() {
     SetVReg(A(), GetVReg(B()) >> (C() & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool USHR_INT_LIT8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool USHR_INT_LIT8() {
     SetVReg(A(), static_cast<uint32_t>(GetVReg(B())) >> (C() & 0x1f));
     return true;
   }
 
-  ALWAYS_INLINE bool UNUSED_3E() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_3E() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_3F() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_3F() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_40() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_40() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_41() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_41() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_42() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_42() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_43() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_43() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_79() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_79() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_7A() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_7A() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F3() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F3() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F4() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F4() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F5() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F5() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F6() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F6() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F7() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F7() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F8() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F8() {
     return HandleUnused();
   }
 
-  ALWAYS_INLINE bool UNUSED_F9() REQUIRES_SHARED(Locks::mutator_lock_) {
+  HANDLER_ATTRIBUTES bool UNUSED_F9() {
     return HandleUnused();
   }
 
