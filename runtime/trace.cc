@@ -650,9 +650,9 @@ void Trace::FinishTracing() {
   os << StringPrintf("vm=art\n");
   os << StringPrintf("pid=%d\n", getpid());
   if ((flags_ & kTraceCountAllocs) != 0) {
-    os << StringPrintf("alloc-count=%d\n", Runtime::Current()->GetStat(KIND_ALLOCATED_OBJECTS));
-    os << StringPrintf("alloc-size=%d\n", Runtime::Current()->GetStat(KIND_ALLOCATED_BYTES));
-    os << StringPrintf("gc-count=%d\n", Runtime::Current()->GetStat(KIND_GC_INVOCATIONS));
+    os << "alloc-count=" << Runtime::Current()->GetStat(KIND_ALLOCATED_OBJECTS) << "\n";
+    os << "alloc-size=" << Runtime::Current()->GetStat(KIND_ALLOCATED_BYTES) << "\n";
+    os << "gc-count=" <<  Runtime::Current()->GetStat(KIND_GC_INVOCATIONS) << "\n";
   }
   os << StringPrintf("%cthreads\n", kTraceTokenChar);
   DumpThreadList(os);
