@@ -2366,7 +2366,7 @@ void Runtime::RegisterAppInfo(const std::vector<std::string>& code_paths,
     return;
   }
   if (!OS::FileExists(profile_output_filename.c_str(), /*check_file_type=*/ false)) {
-    LOG(WARNING) << "JIT profile information will not be recorded: profile file does not exits.";
+    LOG(WARNING) << "JIT profile information will not be recorded: profile file does not exist.";
     return;
   }
   if (code_paths.empty()) {
