@@ -33,11 +33,16 @@ function die {
   exit 1
 }
 
-[[ -n "$ANDROID_PRODUCT_OUT" ]] \
-  || die "You need to source and lunch before you can use this script."
+function setup_die {
+  die "You need to source and lunch before you can use this script."
+}
 
-[[ -n "$ANDROID_HOST_OUT" ]] \
-  || die "You need to source and lunch before you can use this script."
+[[ -n "$ANDROID_BUILD_TOP" ]] || setup_die
+[[ -n "$ANDROID_PRODUCT_OUT" ]] || setup_die
+[[ -n "$ANDROID_HOST_OUT" ]] || setup_die
+
+flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)\
+  || setup_die
 
 if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
   say "Could not find debugfs, building now."
@@ -143,10 +148,16 @@ for apex_module in ${apex_modules[@]}; do
     art_apex_test_args="$art_apex_test_args --host"
     test_only_args="--debug"
   else
-    apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
+    if $flattened_apex_p; then
+      apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}"
+      art_apex_test_args="$art_apex_test_args --flattened"
+    else
+      apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
+    fi
     art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
     [[ $apex_module = *.debug ]] && test_only_args="--debug"
   fi
+  say "APEX package path: $apex_path"
 
   # List the contents of the APEX image (optional).
   maybe_list_apex_contents_apex $art_apex_test_args $apex_path

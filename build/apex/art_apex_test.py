@@ -112,6 +112,34 @@ class TargetApexProvider:
     return apex_map
 
 
+class TargetFlattenedApexProvider:
+  def __init__(self, apex):
+    self._folder_cache = {}
+    self._apex = apex
+
+  def get(self, path):
+    apex_dir, name = os.path.split(path)
+    if not apex_dir:
+      apex_dir = '.'
+    apex_map = self.read_dir(apex_dir)
+    return apex_map[name] if name in apex_map else None
+
+  def read_dir(self, apex_dir):
+    if apex_dir in self._folder_cache:
+      return self._folder_cache[apex_dir]
+    apex_map = {}
+    dirname = os.path.join(self._apex, apex_dir)
+    if os.path.exists(dirname):
+      for basename in os.listdir(dirname):
+        filepath = os.path.join(dirname, basename)
+        is_dir = os.path.isdir(filepath)
+        is_exec = os.access(filepath, os.X_OK)
+        is_symlink = os.path.islink(filepath)
+        apex_map[basename] = FSObject(basename, is_dir, is_exec, is_symlink)
+    self._folder_cache[apex_dir] = apex_map
+    return apex_map
+
+
 class HostApexProvider:
   def __init__(self, apex, tmpdir):
     self._tmpdir = tmpdir
@@ -674,6 +702,9 @@ class Tree:
 
 # Note: do not sys.exit early, for __del__ cleanup.
 def art_apex_test_main(test_args):
+  if test_args.host and test_args.flattened:
+    logging.error("Both of --host and --flattened set")
+    return 1
   if test_args.tree and test_args.debug:
     logging.error("Both of --tree and --debug set")
     return 1
@@ -696,7 +727,10 @@ def art_apex_test_main(test_args):
     if test_args.host:
       apex_provider = HostApexProvider(test_args.apex, test_args.tmpdir)
     else:
-      apex_provider = TargetApexProvider(test_args.apex, test_args.tmpdir, test_args.debugfs)
+      if test_args.flattened:
+        apex_provider = TargetFlattenedApexProvider(test_args.apex)
+      else:
+        apex_provider = TargetApexProvider(test_args.apex, test_args.tmpdir, test_args.debugfs)
   except (zipfile.BadZipFile, zipfile.LargeZipFile) as e:
     logging.error('Failed to create provider: %s', e)
     return 1
@@ -817,6 +851,8 @@ if __name__ == "__main__":
   parser.add_argument('apex', help='apex file input')
 
   parser.add_argument('--host', help='Check as host apex', action='store_true')
+
+  parser.add_argument('--flattened', help='Check as flattened (target) apex', action='store_true')
 
   parser.add_argument('--debug', help='Check as debug apex', action='store_true')
 
