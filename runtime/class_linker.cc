@@ -5464,6 +5464,8 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
     t0 = NanoTime();
   }
 
+  uint64_t t_sub = 0;
+
   // Initialize super classes, must be done while initializing for the JLS.
   if (!klass->IsInterface() && klass->HasSuperClass()) {
     ObjPtr<mirror::Class> super_class = klass->GetSuperClass();
@@ -5472,7 +5474,9 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
       CHECK(can_init_parents);
       StackHandleScope<1> hs(self);
       Handle<mirror::Class> handle_scope_super(hs.NewHandle(super_class));
+      uint64_t super_t0 = NanoTime();
       bool super_initialized = InitializeClass(self, handle_scope_super, can_init_statics, true);
+      uint64_t super_t1 = NanoTime();
       if (!super_initialized) {
         // The super class was verified ahead of entering initializing, we should only be here if
         // the super class became erroneous due to initialization.
@@ -5489,6 +5493,7 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
         mirror::Class::SetStatus(klass, ClassStatus::kErrorResolved, self);
         return false;
       }
+      t_sub = super_t1 - super_t0;
     }
   }
 
@@ -5510,16 +5515,19 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
         // We cannot just call initialize class directly because we need to ensure that ALL
         // interfaces with default methods are initialized. Non-default interface initialization
         // will not affect other non-default super-interfaces.
+        uint64_t inf_t0 = NanoTime();  // This is not very precise, misses all walking.
         bool iface_initialized = InitializeDefaultInterfaceRecursive(self,
                                                                      handle_scope_iface,
                                                                      can_init_statics,
                                                                      can_init_parents);
+        uint64_t inf_t1 = NanoTime();
         if (!iface_initialized) {
           ObjectLock<mirror::Class> lock(self, klass);
           // Initialization failed because one of our interfaces with default methods is erroneous.
           mirror::Class::SetStatus(klass, ClassStatus::kErrorResolved, self);
           return false;
         }
+        t_sub += inf_t1 - inf_t0;
       }
     }
   }
@@ -5616,8 +5624,8 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
       RuntimeStats* thread_stats = self->GetStats();
       ++global_stats->class_init_count;
       ++thread_stats->class_init_count;
-      global_stats->class_init_time_ns += (t1 - t0);
-      thread_stats->class_init_time_ns += (t1 - t0);
+      global_stats->class_init_time_ns += (t1 - t0 - t_sub);
+      thread_stats->class_init_time_ns += (t1 - t0 - t_sub);
       // Set the class as initialized except if failed to initialize static fields.
       callback = MarkClassInitialized(self, klass);
       if (VLOG_IS_ON(class_linker)) {
