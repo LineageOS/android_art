@@ -175,7 +175,7 @@ inline bool RegisterLine::VerifyRegisterType(MethodVerifier* verifier, uint32_t 
 
 inline void RegisterLine::VerifyMonitorStackEmpty(MethodVerifier* verifier) const {
   if (MonitorStackDepth() != 0) {
-    verifier->Fail(VERIFY_ERROR_LOCKING);
+    verifier->Fail(VERIFY_ERROR_LOCKING, /*pending_exc=*/ false);
     if (kDumpLockFailures) {
       VLOG(verifier) << "expected empty monitor stack in "
                      << verifier->GetMethodReference().PrettyMethod();

@@ -69,8 +69,10 @@ template<typename T> ART_FRIEND_TEST(test_set_name, individual_test)
 
 #ifndef NDEBUG
 #define ALWAYS_INLINE
+#define FLATTEN
 #else
 #define ALWAYS_INLINE  __attribute__ ((always_inline))
+#define FLATTEN  __attribute__ ((flatten))
 #endif
 
 // clang doesn't like attributes on lambda functions. It would be nice to say:
