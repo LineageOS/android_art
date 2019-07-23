@@ -89,9 +89,6 @@ bool UseFastInterpreterToInterpreterInvoke(ArtMethod* method) {
   if ((profiling_info != nullptr) && (profiling_info->GetSavedEntryPoint() != nullptr)) {
     return false;
   }
-  if (method->IsPreCompiled()) {
-    return false;
-  }
   return true;
 }
 
