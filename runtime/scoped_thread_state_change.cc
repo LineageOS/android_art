@@ -18,6 +18,7 @@
 
 #include <type_traits>
 
+#include "base/aborting.h"
 #include "base/casts.h"
 #include "jni/java_vm_ext.h"
 #include "mirror/object-inl.h"
@@ -36,6 +37,14 @@ void ScopedObjectAccessAlreadyRunnable::DCheckObjIsNotClearedJniWeakGlobal(
 
 bool ScopedObjectAccessAlreadyRunnable::ForceCopy() const {
   return vm_->ForceCopy();
+}
+
+void ScopedThreadStateChange::ScopedThreadChangeDestructorCheck() {
+  if (!expected_has_no_thread_) {
+    Runtime* runtime = Runtime::Current();
+    bool shutting_down = (runtime == nullptr) || runtime->IsShuttingDown(nullptr) || gAborting > 0;
+    CHECK(shutting_down);
+  }
 }
 
 }  // namespace art
