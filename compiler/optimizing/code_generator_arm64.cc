@@ -224,12 +224,13 @@ void SlowPathCodeARM64::SaveLiveRegisters(CodeGenerator* codegen, LocationSummar
     stack_offset += kXRegSizeInBytes;
   }
 
+  const size_t fp_reg_size = codegen->GetGraph()->HasSIMD() ? kQRegSizeInBytes : kDRegSizeInBytes;
   const uint32_t fp_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ false);
   for (uint32_t i : LowToHighBits(fp_spills)) {
     DCHECK_LT(stack_offset, codegen->GetFrameSize() - codegen->FrameEntrySpillSize());
     DCHECK_LT(i, kMaximumNumberOfExpectedRegisters);
     saved_fpu_stack_offsets_[i] = stack_offset;
-    stack_offset += kDRegSizeInBytes;
+    stack_offset += fp_reg_size;
   }
 
   SaveRestoreLiveRegistersHelper(codegen,
@@ -1279,16 +1280,18 @@ size_t CodeGeneratorARM64::RestoreCoreRegister(size_t stack_index, uint32_t reg_
   return kArm64WordSize;
 }
 
-size_t CodeGeneratorARM64::SaveFloatingPointRegister(size_t stack_index, uint32_t reg_id) {
-  FPRegister reg = FPRegister(reg_id, kDRegSize);
-  __ Str(reg, MemOperand(sp, stack_index));
-  return kArm64WordSize;
+size_t CodeGeneratorARM64::SaveFloatingPointRegister(size_t stack_index ATTRIBUTE_UNUSED,
+                                                     uint32_t reg_id ATTRIBUTE_UNUSED) {
+  LOG(FATAL) << "FP registers shouldn't be saved/restored individually, "
+             << "use SaveRestoreLiveRegistersHelper";
+  UNREACHABLE();
 }
 
-size_t CodeGeneratorARM64::RestoreFloatingPointRegister(size_t stack_index, uint32_t reg_id) {
-  FPRegister reg = FPRegister(reg_id, kDRegSize);
-  __ Ldr(reg, MemOperand(sp, stack_index));
-  return kArm64WordSize;
+size_t CodeGeneratorARM64::RestoreFloatingPointRegister(size_t stack_index ATTRIBUTE_UNUSED,
+                                                        uint32_t reg_id ATTRIBUTE_UNUSED) {
+  LOG(FATAL) << "FP registers shouldn't be saved/restored individually, "
+             << "use SaveRestoreLiveRegistersHelper";
+  UNREACHABLE();
 }
 
 void CodeGeneratorARM64::DumpCoreRegister(std::ostream& stream, int reg) const {

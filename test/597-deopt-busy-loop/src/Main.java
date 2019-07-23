@@ -14,56 +14,22 @@
  * limitations under the License.
  */
 
-public class Main implements Runnable {
-    static final int numberOfThreads = 2;
-    volatile static boolean sExitFlag = false;
-    volatile static boolean sEntered = false;
-    int threadIndex;
+public class Main {
 
-    private static native void deoptimizeAll();
-    private static native void assertIsInterpreted();
-    private static native void assertIsManaged();
+    public static native void deoptimizeAll();
+    public static native void undeoptimizeAll();
+    public static native void assertIsInterpreted();
+    public static native void assertIsManaged();
     private static native void ensureJitCompiled(Class<?> cls, String methodName);
-
-    Main(int index) {
-        threadIndex = index;
-    }
 
     public static void main(String[] args) throws Exception {
         System.loadLibrary(args[0]);
 
-        final Thread[] threads = new Thread[numberOfThreads];
-        for (int t = 0; t < threads.length; t++) {
-            threads[t] = new Thread(new Main(t));
-            threads[t].start();
-        }
-        for (Thread t : threads) {
-            t.join();
-        }
-        System.out.println("Finishing");
-    }
+        ensureJitCompiled(SimpleLoop.class, "$noinline$busyLoop");
+        SimpleLoop.main();
 
-    public void $noinline$busyLoop() {
-        assertIsManaged();
-        sEntered = true;
-        for (;;) {
-            if (sExitFlag) {
-                break;
-            }
-        }
-        assertIsInterpreted();
-    }
-
-    public void run() {
-        if (threadIndex == 0) {
-            while (!sEntered) {
-              Thread.yield();
-            }
-            deoptimizeAll();
-            sExitFlag = true;
-        } else {
-            ensureJitCompiled(Main.class, "$noinline$busyLoop");
-            $noinline$busyLoop();
-        }
+        undeoptimizeAll();
+        ensureJitCompiled(FloatLoop.class, "$noinline$busyLoop");
+        FloatLoop.main();
     }
 }
