@@ -2020,7 +2020,7 @@ void Runtime::ResetStats(int kinds) {
   Thread::Current()->GetStats()->Clear(kinds >> 16);
 }
 
-int32_t Runtime::GetStat(int kind) {
+uint64_t Runtime::GetStat(int kind) {
   RuntimeStats* stats;
   if (kind < (1<<16)) {
     stats = GetStats();
@@ -2042,8 +2042,7 @@ int32_t Runtime::GetStat(int kind) {
   case KIND_CLASS_INIT_COUNT:
     return stats->class_init_count;
   case KIND_CLASS_INIT_TIME:
-    // Convert ns to us, reduce to 32 bits.
-    return static_cast<int>(stats->class_init_time_ns / 1000);
+    return stats->class_init_time_ns;
   case KIND_EXT_ALLOCATED_OBJECTS:
   case KIND_EXT_ALLOCATED_BYTES:
   case KIND_EXT_FREED_OBJECTS:
