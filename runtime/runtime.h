@@ -451,7 +451,7 @@ class Runtime {
 
   ArtMethod* CreateCalleeSaveMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  int32_t GetStat(int kind);
+  uint64_t GetStat(int kind);
 
   RuntimeStats* GetStats() {
     return &stats_;
