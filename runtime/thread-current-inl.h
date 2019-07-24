@@ -36,7 +36,7 @@ inline Thread* Thread::Current() {
 #ifdef __BIONIC__
     void* thread = __get_tls()[TLS_SLOT_ART_THREAD_SELF];
 #else
-    void* thread = pthread_getspecific(Thread::pthread_key_self_);
+    Thread* thread = Thread::self_tls_;
 #endif
     return reinterpret_cast<Thread*>(thread);
   }
