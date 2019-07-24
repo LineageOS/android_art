@@ -57,11 +57,7 @@ inline ScopedThreadStateChange::ScopedThreadStateChange(Thread* self, ThreadStat
 
 inline ScopedThreadStateChange::~ScopedThreadStateChange() {
   if (UNLIKELY(self_ == nullptr)) {
-    if (!expected_has_no_thread_) {
-      Runtime* runtime = Runtime::Current();
-      bool shutting_down = (runtime == nullptr) || runtime->IsShuttingDown(nullptr);
-      CHECK(shutting_down);
-    }
+    ScopedThreadChangeDestructorCheck();
   } else {
     if (old_thread_state_ != thread_state_) {
       if (old_thread_state_ == kRunnable) {
