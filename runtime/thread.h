@@ -1789,6 +1789,10 @@ class Thread {
   // compiled code or entrypoints.
   SafeMap<std::string, std::unique_ptr<TLSData>> custom_tls_ GUARDED_BY(Locks::custom_tls_lock_);
 
+#ifndef __BIONIC__
+  static thread_local Thread* self_tls_;
+#endif
+
   // True if the thread is some form of runtime thread (ex, GC or JIT).
   bool is_runtime_thread_;
 
