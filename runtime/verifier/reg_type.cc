@@ -887,7 +887,7 @@ const RegType& RegType::Merge(const RegType& incoming_type,
 
         // When compiling on the host, we rather want to abort to ensure determinism for preopting.
         // (In that case, it is likely a misconfiguration of dex2oat.)
-        if (!kIsTargetBuild && Runtime::Current()->IsAotCompiler()) {
+        if (!kIsTargetBuild && (verifier != nullptr && verifier->IsAotMode())) {
           LOG(FATAL) << "Could not create class join of "
                      << GetClass()->PrettyClass()
                      << " & "
