@@ -58,6 +58,8 @@ class ScopedThreadStateChange : public ValueObject {
   const ThreadState thread_state_ = kTerminated;
 
  private:
+  void ScopedThreadChangeDestructorCheck();
+
   ThreadState old_thread_state_ = kTerminated;
   const bool expected_has_no_thread_ = true;
 

@@ -2005,10 +2005,7 @@ HomogeneousSpaceCompactResult Heap::PerformHomogeneousSpaceCompact() {
   count_requested_homogeneous_space_compaction_++;
   // Store performed homogeneous space compaction at a new request arrival.
   ScopedThreadStateChange tsc(self, kWaitingPerformingGc);
-  // TODO: Clang prebuilt for r316199 produces bogus thread safety analysis warning for holding both
-  // exclusive and shared lock in the same scope. Remove the assertion as a temporary workaround.
-  // http://b/71769596
-  // Locks::mutator_lock_->AssertNotHeld(self);
+  Locks::mutator_lock_->AssertNotHeld(self);
   {
     ScopedThreadStateChange tsc2(self, kWaitingForGcToComplete);
     MutexLock mu(self, *gc_complete_lock_);
@@ -2511,10 +2508,7 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
     }
   }
   ScopedThreadStateChange tsc(self, kWaitingPerformingGc);
-  // TODO: Clang prebuilt for r316199 produces bogus thread safety analysis warning for holding both
-  // exclusive and shared lock in the same scope. Remove the assertion as a temporary workaround.
-  // http://b/71769596
-  // Locks::mutator_lock_->AssertNotHeld(self);
+  Locks::mutator_lock_->AssertNotHeld(self);
   if (self->IsHandlingStackOverflow()) {
     // If we are throwing a stack overflow error we probably don't have enough remaining stack
     // space to run the GC.
