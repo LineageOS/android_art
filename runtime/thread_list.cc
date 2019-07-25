@@ -1485,6 +1485,7 @@ void ThreadList::Unregister(Thread* self) {
   __get_tls()[TLS_SLOT_ART_THREAD_SELF] = nullptr;
 #else
   CHECK_PTHREAD_CALL(pthread_setspecific, (Thread::pthread_key_self_, nullptr), "detach self");
+  Thread::self_tls_ = nullptr;
 #endif
 
   // Signal that a thread just detached.
