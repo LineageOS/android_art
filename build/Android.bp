@@ -132,6 +132,13 @@ art_global_defaults {
                 "-Wmissing-noreturn",
             ],
         },
+        linux_bionic: {
+            header_libs: [
+                // We optimize Thread::Current() with a direct TLS access. This requires access to a
+                //  private Bionic header.
+                "bionic_libc_private_headers",
+            ],
+        },
         darwin: {
             enabled: false,
         },
