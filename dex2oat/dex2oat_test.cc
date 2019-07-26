@@ -1262,12 +1262,6 @@ TEST_F(Dex2oatClassLoaderContextTest, ContextWithSharedLibrariesDependenciesAndI
 class Dex2oatDeterminism : public Dex2oatTest {};
 
 TEST_F(Dex2oatDeterminism, UnloadCompile) {
-  if (!kUseReadBarrier &&
-      gc::kCollectorTypeDefault != gc::kCollectorTypeCMS &&
-      gc::kCollectorTypeDefault != gc::kCollectorTypeMS) {
-    LOG(INFO) << "Test requires determinism support.";
-    return;
-  }
   Runtime* const runtime = Runtime::Current();
   std::string out_dir = GetScratchDir();
   const std::string base_oat_name = out_dir + "/base.oat";
