@@ -500,7 +500,6 @@ class Runtime {
 
   // Transaction support.
   bool IsActiveTransaction() const;
-  void EnterTransactionMode();
   void EnterTransactionMode(bool strict, mirror::Class* root);
   void ExitTransactionMode();
   void RollbackAllTransactions() REQUIRES_SHARED(Locks::mutator_lock_);
