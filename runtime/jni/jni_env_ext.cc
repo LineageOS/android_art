@@ -24,6 +24,7 @@
 #include "base/mutex.h"
 #include "base/to_str.h"
 #include "check_jni.h"
+#include "hidden_api.h"
 #include "indirect_reference_table.h"
 #include "java_vm_ext.h"
 #include "jni_internal.h"
@@ -308,6 +309,9 @@ void JNIEnvExt::SetTableOverride(const JNINativeInterface* table_override) {
   Runtime* runtime = Runtime::Current();
   if (runtime != nullptr) {
     runtime->GetThreadList()->ForEach(ThreadResetFunctionTable, nullptr);
+    // Core Platform API checks rely on stack walking and classifying the caller. If a table
+    // override is installed do not try to guess what semantics should be.
+    runtime->SetCorePlatformApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kDisabled);
   }
 }
 
