@@ -18,30 +18,25 @@
 
 #include <cstdarg>
 #include <memory>
-#include <mutex>
 #include <utility>
-
-#include <link.h>
 
 #include "art_field-inl.h"
 #include "art_method-inl.h"
 #include "base/allocator.h"
 #include "base/atomic.h"
-#include "base/bit_utils.h"
 #include "base/enums.h"
 #include "base/file_utils.h"
 #include "base/logging.h"  // For VLOG.
-#include "base/memory_type_table.h"
 #include "base/mutex.h"
 #include "base/safe_map.h"
 #include "base/stl_util.h"
-#include "base/string_view_cpp20.h"
 #include "class_linker-inl.h"
 #include "class_root.h"
 #include "dex/dex_file-inl.h"
 #include "dex/utf.h"
 #include "fault_handler.h"
 #include "hidden_api.h"
+#include "hidden_api_jni.h"
 #include "gc/accounting/card_table-inl.h"
 #include "gc_root.h"
 #include "indirect_reference_table-inl.h"
@@ -82,180 +77,6 @@ struct ScopedVAArgs {
   va_list* args;
 };
 
-static constexpr size_t kMaxReturnAddressDepth = 4;
-
-inline void* GetReturnAddress(size_t depth) {
-  DCHECK_LT(depth, kMaxReturnAddressDepth);
-  switch (depth) {
-    case 0u: return __builtin_return_address(0);
-    case 1u: return __builtin_return_address(1);
-    case 2u: return __builtin_return_address(2);
-    case 3u: return __builtin_return_address(3);
-    default:
-      return nullptr;
-  }
-}
-
-enum class SharedObjectKind {
-  kRuntime = 0,
-  kApexModule = 1,
-  kOther = 2
-};
-
-std::ostream& operator<<(std::ostream& os, SharedObjectKind kind) {
-  switch (kind) {
-    case SharedObjectKind::kRuntime:
-      os << "Runtime";
-      break;
-    case SharedObjectKind::kApexModule:
-      os << "APEX Module";
-      break;
-    case SharedObjectKind::kOther:
-      os << "Other";
-      break;
-  }
-  return os;
-}
-
-// Class holding Cached ranges of loaded shared objects to facilitate checks of field and method
-// resolutions within the Core Platform API for native callers.
-class CodeRangeCache final {
- public:
-  static CodeRangeCache& GetSingleton() {
-    static CodeRangeCache Singleton;
-    return Singleton;
-  }
-
-  SharedObjectKind GetSharedObjectKind(void* pc) {
-    uintptr_t address = reinterpret_cast<uintptr_t>(pc);
-    SharedObjectKind kind;
-    if (Find(address, &kind)) {
-      return kind;
-    }
-    return SharedObjectKind::kOther;
-  }
-
-  bool HasCache() const {
-    return memory_type_table_.Size() != 0;
-  }
-
-  void BuildCache() {
-    DCHECK(!HasCache());
-    art::MemoryTypeTable<SharedObjectKind>::Builder builder;
-    builder_ = &builder;
-    libjavacore_loaded_ = false;
-    libnativehelper_loaded_ = false;
-    libopenjdk_loaded_ = false;
-
-    // Iterate over ELF headers populating table_builder with executable ranges.
-    dl_iterate_phdr(VisitElfInfo, this);
-    memory_type_table_ = builder_->Build();
-
-    // Check expected libraries loaded when iterating headers.
-    CHECK(libjavacore_loaded_);
-    CHECK(libnativehelper_loaded_);
-    CHECK(libopenjdk_loaded_);
-    builder_ = nullptr;
-  }
-
-  void DropCache() {
-    memory_type_table_ = {};
-  }
-
- private:
-  CodeRangeCache() {}
-
-  bool Find(uintptr_t address, SharedObjectKind* kind) const {
-    const art::MemoryTypeRange<SharedObjectKind>* range = memory_type_table_.Lookup(address);
-    if (range == nullptr) {
-      return false;
-    }
-    *kind = range->Type();
-    return true;
-  }
-
-  static int VisitElfInfo(struct dl_phdr_info *info, size_t size ATTRIBUTE_UNUSED, void *data)
-      NO_THREAD_SAFETY_ANALYSIS {
-    auto cache = reinterpret_cast<CodeRangeCache*>(data);
-    art::MemoryTypeTable<SharedObjectKind>::Builder* builder = cache->builder_;
-
-    for (size_t i = 0u; i < info->dlpi_phnum; ++i) {
-      const ElfW(Phdr)& phdr = info->dlpi_phdr[i];
-      if (phdr.p_type != PT_LOAD || ((phdr.p_flags & PF_X) != PF_X)) {
-        continue;  // Skip anything other than code pages
-      }
-      uintptr_t start = info->dlpi_addr + phdr.p_vaddr;
-      const uintptr_t limit = art::RoundUp(start + phdr.p_memsz, art::kPageSize);
-      SharedObjectKind kind = GetKind(info->dlpi_name, start, limit);
-      art::MemoryTypeRange<SharedObjectKind> range{start, limit, kind};
-      if (!builder->Add(range)) {
-        LOG(WARNING) << "Overlapping/invalid range found in ELF headers: " << range;
-      }
-    }
-
-    // Update sanity check state.
-    std::string_view dlpi_name{info->dlpi_name};
-    if (!cache->libjavacore_loaded_) {
-      cache->libjavacore_loaded_ = art::EndsWith(dlpi_name, kLibjavacore);
-    }
-    if (!cache->libnativehelper_loaded_) {
-      cache->libnativehelper_loaded_ = art::EndsWith(dlpi_name, kLibnativehelper);
-    }
-    if (!cache->libopenjdk_loaded_) {
-      cache->libopenjdk_loaded_ = art::EndsWith(dlpi_name, kLibopenjdk);
-    }
-
-    return 0;
-  }
-
-  static SharedObjectKind GetKind(const char* so_name, uintptr_t start, uintptr_t limit) {
-    uintptr_t runtime_method = reinterpret_cast<uintptr_t>(art::GetJniNativeInterface);
-    if (runtime_method >= start && runtime_method < limit) {
-      return SharedObjectKind::kRuntime;
-    }
-    return art::LocationIsOnApex(so_name) ? SharedObjectKind::kApexModule
-                                          : SharedObjectKind::kOther;
-  }
-
-  art::MemoryTypeTable<SharedObjectKind> memory_type_table_;
-
-  // Table builder, only valid during BuildCache().
-  art::MemoryTypeTable<SharedObjectKind>::Builder* builder_;
-
-  // Sanity checking state.
-  bool libjavacore_loaded_;
-  bool libnativehelper_loaded_;
-  bool libopenjdk_loaded_;
-
-  static constexpr std::string_view kLibjavacore = "libjavacore.so";
-  static constexpr std::string_view kLibnativehelper = "libnativehelper.so";
-  static constexpr std::string_view kLibopenjdk = art::kIsDebugBuild ? "libopenjdkd.so"
-                                                                     : "libopenjdk.so";
-
-  DISALLOW_COPY_AND_ASSIGN(CodeRangeCache);
-};
-
-// Whitelisted native callers can resolve method and field id's via JNI. Check the first caller
-// outside of the JNI library who will have called Get(Static)?(Field|Member)ID(). The presence of
-// checked JNI means we need to walk frames as the internal methods can be called directly from an
-// external shared-object or indirectly (via checked JNI) from an external shared-object.
-static inline bool IsWhitelistedNativeCaller() {
-  if (!art::kIsTargetBuild) {
-    return false;
-  }
-  for (size_t i = 0; i < kMaxReturnAddressDepth; ++i) {
-    void* return_address = GetReturnAddress(i);
-    if (return_address == nullptr) {
-      return false;
-    }
-    SharedObjectKind kind = CodeRangeCache::GetSingleton().GetSharedObjectKind(return_address);
-    if (kind != SharedObjectKind::kRuntime) {
-      return kind == SharedObjectKind::kApexModule;
-    }
-  }
-  return false;
-}
-
 }  // namespace
 
 namespace art {
@@ -264,13 +85,10 @@ namespace art {
 // things not rendering correctly. E.g. b/16858794
 static constexpr bool kWarnJniAbort = false;
 
-// Disable native JNI checking pending stack walk re-evaluation (b/136276414).
-static constexpr bool kNativeJniCheckEnabled = false;
-
 template<typename T>
 ALWAYS_INLINE static bool ShouldDenyAccessToMember(T* member, Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (kNativeJniCheckEnabled && IsWhitelistedNativeCaller()) {
+  if (hiddenapi::ScopedCorePlatformApiCheck::IsCurrentCallerApproved(self)) {
     return false;
   }
   return hiddenapi::ShouldDenyAccessToMember(
@@ -991,6 +809,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck sc;
     return FindMethodID<kEnableIndexIds>(soa, java_class, name, sig, false);
   }
 
@@ -1000,6 +819,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck sc;
     return FindMethodID<kEnableIndexIds>(soa, java_class, name, sig, true);
   }
 
@@ -1532,6 +1352,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck sc;
     return FindFieldID<kEnableIndexIds>(soa, java_class, name, sig, false);
   }
 
@@ -1541,6 +1362,7 @@ class JNI {
     CHECK_NON_NULL_ARGUMENT(name);
     CHECK_NON_NULL_ARGUMENT(sig);
     ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck sc;
     return FindFieldID<kEnableIndexIds>(soa, java_class, name, sig, true);
   }
 
@@ -3376,16 +3198,6 @@ void (*gJniSleepForeverStub[])()  = {
 
 const JNINativeInterface* GetRuntimeShutdownNativeInterface() {
   return reinterpret_cast<JNINativeInterface*>(&gJniSleepForeverStub);
-}
-
-void JniInitializeNativeCallerCheck() {
-  // This method should be called only once and before there are multiple runtime threads.
-  DCHECK(!CodeRangeCache::GetSingleton().HasCache());
-  CodeRangeCache::GetSingleton().BuildCache();
-}
-
-void JniShutdownNativeCallerCheck() {
-  CodeRangeCache::GetSingleton().DropCache();
 }
 
 }  // namespace art
