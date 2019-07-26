@@ -1790,6 +1790,7 @@ class Thread {
   SafeMap<std::string, std::unique_ptr<TLSData>> custom_tls_ GUARDED_BY(Locks::custom_tls_lock_);
 
 #ifndef __BIONIC__
+  __attribute__((tls_model("initial-exec")))
   static thread_local Thread* self_tls_;
 #endif
 
