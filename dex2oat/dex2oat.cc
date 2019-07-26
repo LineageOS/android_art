@@ -937,16 +937,9 @@ class Dex2Oat final {
     // Fill some values into the key-value store for the oat header.
     key_value_store_.reset(new SafeMap<std::string, std::string>());
 
-    // Automatically force determinism for the boot image in a host build if read barriers
-    // are enabled, or if the default GC is CMS or MS. When the default GC is CMS
-    // (Concurrent Mark-Sweep), the GC is switched to a non-concurrent one by passing the
-    // option `-Xgc:nonconcurrent` (see below).
+    // Automatically force determinism for the boot image in a host build.
     if (!kIsTargetBuild && IsBootImage()) {
-      if (SupportsDeterministicCompilation()) {
-        force_determinism_ = true;
-      } else {
-        LOG(WARNING) << "Deterministic compilation is disabled.";
-      }
+      force_determinism_ = true;
     }
     compiler_options_->force_determinism_ = force_determinism_;
 
@@ -962,12 +955,6 @@ class Dex2Oat final {
     compiler_options_->compiling_with_core_image_ =
         !boot_image_filename_.empty() &&
         CompilerOptions::IsCoreImageFilename(boot_image_filename_);
-  }
-
-  static bool SupportsDeterministicCompilation() {
-    return (kUseReadBarrier ||
-            gc::kCollectorTypeDefault == gc::kCollectorTypeCMS ||
-            gc::kCollectorTypeDefault == gc::kCollectorTypeMS);
   }
 
   void ExpandOatAndImageFilenames() {
@@ -1151,9 +1138,6 @@ class Dex2Oat final {
     AssignIfExists(args, M::CopyDexFiles, &copy_dex_files_);
 
     if (args.Exists(M::ForceDeterminism)) {
-      if (!SupportsDeterministicCompilation()) {
-        Usage("Option --force-determinism requires read barriers or a CMS/MS garbage collector");
-      }
       force_determinism_ = true;
     }
 
@@ -2437,26 +2421,6 @@ class Dex2Oat final {
     raw_options.push_back(std::make_pair("-XX:DisableHSpaceCompactForOOM", nullptr));
 
     if (compiler_options_->IsForceDeterminism()) {
-      // If we're asked to be deterministic, ensure non-concurrent GC for determinism.
-      //
-      // Note that with read barriers, this option is ignored, because Runtime::Init
-      // overrides the foreground GC to be gc::kCollectorTypeCC when instantiating
-      // gc::Heap. This is fine, as concurrent GC requests are not honored in dex2oat,
-      // which uses an unstarted runtime.
-      raw_options.push_back(std::make_pair("-Xgc:nonconcurrent", nullptr));
-
-      // The default LOS implementation (map) is not deterministic. So disable it.
-      raw_options.push_back(std::make_pair("-XX:LargeObjectSpace=disabled", nullptr));
-
-      // We also need to turn off the nonmoving space. For that, we need to disable HSpace
-      // compaction (done above) and ensure that neither foreground nor background collectors
-      // are concurrent.
-      //
-      // Likewise, this option is ignored with read barriers because Runtime::Init
-      // overrides the background GC to be gc::kCollectorTypeCCBackground, but that's
-      // fine too, for the same reason (see above).
-      raw_options.push_back(std::make_pair("-XX:BackgroundGC=nonconcurrent", nullptr));
-
       // To make identity hashcode deterministic, set a known seed.
       mirror::Object::SetHashCodeSeed(987654321U);
     }
