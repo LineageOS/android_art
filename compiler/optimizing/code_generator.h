@@ -222,7 +222,19 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   virtual Assembler* GetAssembler() = 0;
   virtual const Assembler& GetAssembler() const = 0;
   virtual size_t GetWordSize() const = 0;
-  virtual size_t GetFloatingPointSpillSlotSize() const = 0;
+
+  // Get FP register width in bytes for spilling/restoring in the slow paths.
+  //
+  // Note: In SIMD graphs this should return SIMD register width as all FP and SIMD registers
+  // alias and live SIMD registers are forced to be spilled in full size in the slow paths.
+  virtual size_t GetSlowPathFPWidth() const {
+    // Default implementation.
+    return GetCalleePreservedFPWidth();
+  }
+
+  // Get FP register width required to be preserved by the target ABI.
+  virtual size_t GetCalleePreservedFPWidth() const  = 0;
+
   virtual uintptr_t GetAddressOf(HBasicBlock* block) = 0;
   void InitializeCodeGeneration(size_t number_of_spill_slots,
                                 size_t maximum_safepoint_spill_size,
@@ -675,7 +687,7 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   }
 
   uint32_t GetFpuSpillSize() const {
-    return POPCOUNT(fpu_spill_mask_) * GetFloatingPointSpillSlotSize();
+    return POPCOUNT(fpu_spill_mask_) * GetCalleePreservedFPWidth();
   }
 
   uint32_t GetCoreSpillSize() const {
@@ -793,6 +805,8 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   std::unique_ptr<CodeGenerationData> code_generation_data_;
 
   friend class OptimizingCFITest;
+  ART_FRIEND_TEST(CodegenTest, ARM64FrameSizeSIMD);
+  ART_FRIEND_TEST(CodegenTest, ARM64FrameSizeNoSIMD);
 
   DISALLOW_COPY_AND_ASSIGN(CodeGenerator);
 };

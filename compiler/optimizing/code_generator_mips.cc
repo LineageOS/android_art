@@ -1953,7 +1953,7 @@ size_t CodeGeneratorMIPS::SaveFloatingPointRegister(size_t stack_index, uint32_t
   } else {
     __ StoreDToOffset(FRegister(reg_id), SP, stack_index);
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 size_t CodeGeneratorMIPS::RestoreFloatingPointRegister(size_t stack_index, uint32_t reg_id) {
@@ -1962,7 +1962,7 @@ size_t CodeGeneratorMIPS::RestoreFloatingPointRegister(size_t stack_index, uint3
   } else {
     __ LoadDFromOffset(FRegister(reg_id), SP, stack_index);
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 void CodeGeneratorMIPS::DumpCoreRegister(std::ostream& stream, int reg) const {

@@ -353,10 +353,14 @@ class CodeGeneratorX86 : public CodeGenerator {
     return kX86WordSize;
   }
 
-  size_t GetFloatingPointSpillSlotSize() const override {
+  size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
         ? 4 * kX86WordSize   // 16 bytes == 4 words for each spill
         : 2 * kX86WordSize;  //  8 bytes == 2 words for each spill
+  }
+
+  size_t GetCalleePreservedFPWidth() const override {
+    return 2 * kX86WordSize;
   }
 
   HGraphVisitor* GetLocationBuilder() override {

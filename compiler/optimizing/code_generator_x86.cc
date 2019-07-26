@@ -987,7 +987,7 @@ size_t CodeGeneratorX86::SaveFloatingPointRegister(size_t stack_index, uint32_t 
   } else {
     __ movsd(Address(ESP, stack_index), XmmRegister(reg_id));
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 size_t CodeGeneratorX86::RestoreFloatingPointRegister(size_t stack_index, uint32_t reg_id) {
@@ -996,7 +996,7 @@ size_t CodeGeneratorX86::RestoreFloatingPointRegister(size_t stack_index, uint32
   } else {
     __ movsd(XmmRegister(reg_id), Address(ESP, stack_index));
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 void CodeGeneratorX86::InvokeRuntime(QuickEntrypointEnum entrypoint,
