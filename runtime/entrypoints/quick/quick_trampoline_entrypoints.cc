@@ -769,22 +769,31 @@ extern "C" uint64_t artQuickToInterpreterBridge(ArtMethod* method, Thread* self,
     BuildQuickShadowFrameVisitor shadow_frame_builder(sp, method->IsStatic(), shorty, shorty_len,
                                                       shadow_frame, first_arg_reg);
     shadow_frame_builder.VisitArguments();
-    const bool needs_initialization =
-        method->IsStatic() && !method->GetDeclaringClass()->IsInitialized();
     // Push a transition back into managed code onto the linked list in thread.
     self->PushManagedStackFragment(&fragment);
     self->PushShadowFrame(shadow_frame);
     self->EndAssertNoThreadSuspension(old_cause);
 
-    if (needs_initialization) {
-      // Ensure static method's class is initialized.
-      StackHandleScope<1> hs(self);
-      Handle<mirror::Class> h_class(hs.NewHandle(shadow_frame->GetMethod()->GetDeclaringClass()));
-      if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
-        DCHECK(Thread::Current()->IsExceptionPending())
-            << shadow_frame->GetMethod()->PrettyMethod();
-        self->PopManagedStackFragment(fragment);
-        return 0;
+    if (method->IsStatic()) {
+      ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass();
+      if (LIKELY(declaring_class->IsVisiblyInitialized())) {
+        // Visibly initialized, nothing to do.
+      } else if (!declaring_class->IsInitialized()) {
+        // Ensure static method's class is initialized.
+        StackHandleScope<1> hs(self);
+        Handle<mirror::Class> h_class(hs.NewHandle(shadow_frame->GetMethod()->GetDeclaringClass()));
+        if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
+          DCHECK(Thread::Current()->IsExceptionPending())
+              << shadow_frame->GetMethod()->PrettyMethod();
+          self->PopManagedStackFragment(fragment);
+          return 0;
+        }
+      } else {
+        // Initialized but not visibly initialized.
+        if (self->IncrementMakeVisiblyInitializedCounter()) {
+          Runtime::Current()->GetClassLinker()->MakeInitializedClassesVisiblyInitialized(
+              self, /*wait=*/ false);
+        }
       }
     }
 
