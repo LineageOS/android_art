@@ -810,6 +810,8 @@ class TestingTargetChecker:
     self._checker.check_art_test_data('art-gtest-jars-IMTA.jar')
     self._checker.check_art_test_data('art-gtest-jars-ImageLayoutA.jar')
     self._checker.check_art_test_data('art-gtest-jars-MainEmptyUncompressed.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Dex2oatVdexTestDex.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Dex2oatVdexPublicSdkDex.dex')
 
 
 class NoSuperfluousBinariesChecker:
