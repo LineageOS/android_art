@@ -71,6 +71,12 @@ public class Main {
   /// CHECK-DAG:                 Add [<<I>>,<<Cons>>]          loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Red:d\d+>>    VecReduce [<<Phi>>]           loop:none
   /// CHECK-DAG: <<Extr:i\d+>>   VecExtractScalar [<<Red>>]    loop:none
+
+  //  Check that full 128-bit Q-Register are saved across SuspendCheck slow path.
+  /// CHECK-START-ARM64: int Main.reductionInt(int[]) disassembly (after)
+  /// CHECK:                     SuspendCheckSlowPathARM64
+  /// CHECK:                       stur q<<RegNo:\d+>>, [sp, #<<Offset:\d+>>]
+  /// CHECK:                       ldur q<<RegNo>>, [sp, #<<Offset>>]
   private static int reductionInt(int[] x) {
     int sum = 0;
     for (int i = 0; i < x.length; i++) {

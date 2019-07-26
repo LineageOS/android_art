@@ -1245,7 +1245,7 @@ size_t CodeGeneratorX86_64::SaveFloatingPointRegister(size_t stack_index, uint32
   } else {
     __ movsd(Address(CpuRegister(RSP), stack_index), XmmRegister(reg_id));
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 size_t CodeGeneratorX86_64::RestoreFloatingPointRegister(size_t stack_index, uint32_t reg_id) {
@@ -1254,7 +1254,7 @@ size_t CodeGeneratorX86_64::RestoreFloatingPointRegister(size_t stack_index, uin
   } else {
     __ movsd(XmmRegister(reg_id), Address(CpuRegister(RSP), stack_index));
   }
-  return GetFloatingPointSpillSlotSize();
+  return GetSlowPathFPWidth();
 }
 
 void CodeGeneratorX86_64::InvokeRuntime(QuickEntrypointEnum entrypoint,
@@ -1373,7 +1373,7 @@ void CodeGeneratorX86_64::GenerateFrameEntry() {
   __ subq(CpuRegister(RSP), Immediate(adjust));
   __ cfi().AdjustCFAOffset(adjust);
   uint32_t xmm_spill_location = GetFpuSpillStart();
-  size_t xmm_spill_slot_size = GetFloatingPointSpillSlotSize();
+  size_t xmm_spill_slot_size = GetCalleePreservedFPWidth();
 
   for (int i = arraysize(kFpuCalleeSaves) - 1; i >= 0; --i) {
     if (allocated_registers_.ContainsFloatingPointRegister(kFpuCalleeSaves[i])) {
@@ -1401,7 +1401,7 @@ void CodeGeneratorX86_64::GenerateFrameExit() {
   __ cfi().RememberState();
   if (!HasEmptyFrame()) {
     uint32_t xmm_spill_location = GetFpuSpillStart();
-    size_t xmm_spill_slot_size = GetFloatingPointSpillSlotSize();
+    size_t xmm_spill_slot_size = GetCalleePreservedFPWidth();
     for (size_t i = 0; i < arraysize(kFpuCalleeSaves); ++i) {
       if (allocated_registers_.ContainsFloatingPointRegister(kFpuCalleeSaves[i])) {
         int offset = xmm_spill_location + (xmm_spill_slot_size * i);

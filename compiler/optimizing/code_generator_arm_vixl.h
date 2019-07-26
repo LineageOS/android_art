@@ -448,7 +448,9 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
     return static_cast<size_t>(kArmPointerSize);
   }
 
-  size_t GetFloatingPointSpillSlotSize() const override { return vixl::aarch32::kRegSizeInBytes; }
+  size_t GetCalleePreservedFPWidth() const override {
+    return vixl::aarch32::kSRegSizeInBytes;
+  }
 
   HGraphVisitor* GetLocationBuilder() override { return &location_builder_; }
 

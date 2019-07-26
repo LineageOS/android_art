@@ -435,10 +435,14 @@ class CodeGeneratorARM64 : public CodeGenerator {
     return kArm64WordSize;
   }
 
-  size_t GetFloatingPointSpillSlotSize() const override {
+  size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
-        ? 2 * kArm64WordSize   // 16 bytes == 2 arm64 words for each spill
-        : 1 * kArm64WordSize;  //  8 bytes == 1 arm64 words for each spill
+        ? vixl::aarch64::kQRegSizeInBytes
+        : vixl::aarch64::kDRegSizeInBytes;
+  }
+
+  size_t GetCalleePreservedFPWidth() const override {
+    return vixl::aarch64::kDRegSizeInBytes;
   }
 
   uintptr_t GetAddressOf(HBasicBlock* block) override {

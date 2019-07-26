@@ -274,7 +274,7 @@ void RegisterAllocationResolver::UpdateSafepointLiveRegisters() {
 size_t RegisterAllocationResolver::CalculateMaximumSafepointSpillSize(
     ArrayRef<HInstruction* const> safepoints) {
   size_t core_register_spill_size = codegen_->GetWordSize();
-  size_t fp_register_spill_size = codegen_->GetFloatingPointSpillSlotSize();
+  size_t fp_register_spill_size = codegen_->GetSlowPathFPWidth();
   size_t maximum_safepoint_spill_size = 0u;
   for (HInstruction* instruction : safepoints) {
     LocationSummary* locations = instruction->GetLocations();
