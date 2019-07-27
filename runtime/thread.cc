@@ -131,6 +131,9 @@ ConditionVariable* Thread::resume_cond_ = nullptr;
 const size_t Thread::kStackOverflowImplicitCheckSize = GetStackOverflowReservedBytes(kRuntimeISA);
 bool (*Thread::is_sensitive_thread_hook_)() = nullptr;
 Thread* Thread::jit_sensitive_thread_ = nullptr;
+#ifndef __BIONIC__
+thread_local Thread* Thread::self_tls_ = nullptr;
+#endif
 
 static constexpr bool kVerifyImageObjectsMarked = kIsDebugBuild;
 
@@ -933,10 +936,11 @@ bool Thread::Init(ThreadList* thread_list, JavaVMExt* java_vm, JNIEnvExt* jni_en
     interpreter::InitInterpreterTls(this);
   }
 
-#ifdef ART_TARGET_ANDROID
+#ifdef __BIONIC__
   __get_tls()[TLS_SLOT_ART_THREAD_SELF] = this;
 #else
   CHECK_PTHREAD_CALL(pthread_setspecific, (Thread::pthread_key_self_, this), "attach self");
+  Thread::self_tls_ = this;
 #endif
   DCHECK_EQ(Thread::Current(), this);
 
@@ -2187,10 +2191,11 @@ void Thread::ThreadExitCallback(void* arg) {
     LOG(WARNING) << "Native thread exiting without having called DetachCurrentThread (maybe it's "
         "going to use a pthread_key_create destructor?): " << *self;
     CHECK(is_started_);
-#ifdef ART_TARGET_ANDROID
+#ifdef __BIONIC__
     __get_tls()[TLS_SLOT_ART_THREAD_SELF] = self;
 #else
     CHECK_PTHREAD_CALL(pthread_setspecific, (Thread::pthread_key_self_, self), "reattach self");
+    Thread::self_tls_ = self;
 #endif
     self->tls32_.thread_exit_check_count = 1;
   } else {
@@ -2221,6 +2226,9 @@ void Thread::Startup() {
   if (pthread_getspecific(pthread_key_self_) != nullptr) {
     LOG(FATAL) << "Newly-created pthread TLS slot is not nullptr";
   }
+#ifndef __BIONIC__
+  CHECK(Thread::self_tls_ == nullptr);
+#endif
 }
 
 void Thread::FinishStartup() {

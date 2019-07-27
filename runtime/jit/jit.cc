@@ -39,6 +39,7 @@
 #include "oat_file.h"
 #include "oat_file_manager.h"
 #include "oat_quick_method_header.h"
+#include "profile/profile_boot_info.h"
 #include "profile/profile_compilation_info.h"
 #include "profile_saver.h"
 #include "runtime.h"
@@ -629,6 +630,20 @@ class JitCompileTask final : public Task {
   DISALLOW_IMPLICIT_CONSTRUCTORS(JitCompileTask);
 };
 
+static std::string GetProfileFile(const std::string& dex_location) {
+  // Hardcoded assumption where the profile file is.
+  // TODO(ngeoffray): this is brittle and we would need to change change if we
+  // wanted to do more eager JITting of methods in a profile. This is
+  // currently only for system server.
+  return dex_location + ".prof";
+}
+
+static std::string GetBootProfileFile(const std::string& profile) {
+  // The boot profile can be found next to the compilation profile, with a
+  // different extension.
+  return ReplaceFileExtension(profile, "bprof");
+}
+
 class ZygoteTask final : public Task {
  public:
   ZygoteTask() {}
@@ -646,9 +661,12 @@ class ZygoteTask final : public Task {
     const std::vector<const DexFile*>& boot_class_path =
         runtime->GetClassLinker()->GetBootClassPath();
     ScopedNullHandle<mirror::ClassLoader> null_handle;
+    std::string boot_profile = GetBootProfileFile(profile_file);
     // We add to the queue for zygote so that we can fork processes in-between
     // compilations.
-    uint32_t added_to_queue = runtime->GetJit()->CompileMethodsFromProfile(
+    uint32_t added_to_queue = runtime->GetJit()->CompileMethodsFromBootProfile(
+        self, boot_class_path, boot_profile, null_handle, /* add_to_queue= */ true);
+    added_to_queue += runtime->GetJit()->CompileMethodsFromProfile(
         self, boot_class_path, profile_file, null_handle, /* add_to_queue= */ true);
 
     JitCodeCache* code_cache = runtime->GetJit()->GetCodeCache();
@@ -662,14 +680,6 @@ class ZygoteTask final : public Task {
  private:
   DISALLOW_COPY_AND_ASSIGN(ZygoteTask);
 };
-
-static std::string GetProfileFile(const std::string& dex_location) {
-  // Hardcoded assumption where the profile file is.
-  // TODO(ngeoffray): this is brittle and we would need to change change if we
-  // wanted to do more eager JITting of methods in a profile. This is
-  // currently only for system server.
-  return dex_location + ".prof";
-}
 
 class JitProfileTask final : public Task {
  public:
@@ -695,10 +705,21 @@ class JitProfileTask final : public Task {
     StackHandleScope<1> hs(self);
     Handle<mirror::ClassLoader> loader = hs.NewHandle<mirror::ClassLoader>(
         soa.Decode<mirror::ClassLoader>(class_loader_));
+
+    std::string profile = GetProfileFile(dex_files_[0]->GetLocation());
+    std::string boot_profile = GetBootProfileFile(profile);
+
+    Runtime::Current()->GetJit()->CompileMethodsFromBootProfile(
+        self,
+        dex_files_,
+        boot_profile,
+        loader,
+        /* add_to_queue= */ false);
+
     Runtime::Current()->GetJit()->CompileMethodsFromProfile(
         self,
         dex_files_,
-        GetProfileFile(dex_files_[0]->GetLocation()),
+        profile,
         loader,
         /* add_to_queue= */ false);
   }
@@ -747,6 +768,82 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
   if (runtime->IsSystemServer() && runtime->IsUsingApexBootImageLocation() && UseJitCompilation()) {
     thread_pool_->AddTask(Thread::Current(), new JitProfileTask(dex_files, class_loader));
   }
+}
+
+bool Jit::CompileMethodFromProfile(Thread* self,
+                                   ClassLinker* class_linker,
+                                   uint32_t method_idx,
+                                   Handle<mirror::DexCache> dex_cache,
+                                   Handle<mirror::ClassLoader> class_loader,
+                                   bool add_to_queue) {
+  ArtMethod* method = class_linker->ResolveMethodWithoutInvokeType(
+      method_idx, dex_cache, class_loader);
+  if (method == nullptr) {
+    self->ClearException();
+    return false;
+  }
+  if (!method->IsCompilable() || !method->IsInvokable()) {
+    return false;
+  }
+  const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
+  if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
+      class_linker->IsQuickGenericJniStub(entry_point) ||
+      class_linker->IsQuickResolutionStub(entry_point)) {
+    // Special case ZygoteServer class so that it gets compiled before the
+    // zygote enters it. This avoids needing to do OSR during app startup.
+    // TODO: have a profile instead.
+    method->SetPreCompiled();
+    if (!add_to_queue || method->GetDeclaringClass()->DescriptorEquals(
+            "Lcom/android/internal/os/ZygoteServer;")) {
+      CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
+    } else {
+      thread_pool_->AddTask(self,
+          new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile));
+      return true;
+    }
+  }
+  return false;
+}
+
+uint32_t Jit::CompileMethodsFromBootProfile(
+    Thread* self,
+    const std::vector<const DexFile*>& dex_files,
+    const std::string& profile_file,
+    Handle<mirror::ClassLoader> class_loader,
+    bool add_to_queue) {
+  unix_file::FdFile profile(profile_file.c_str(), O_RDONLY, true);
+
+  if (profile.Fd() == -1) {
+    PLOG(WARNING) << "No boot profile: " << profile_file;
+    return 0u;
+  }
+
+  ProfileBootInfo profile_info;
+  if (!profile_info.Load(profile.Fd(), dex_files)) {
+    LOG(ERROR) << "Could not load profile file: " << profile_file;
+    return 0u;
+  }
+
+  ScopedObjectAccess soa(self);
+  VariableSizedHandleScope handles(self);
+  std::vector<Handle<mirror::DexCache>> dex_caches;
+  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  for (const DexFile* dex_file : profile_info.GetDexFiles()) {
+    dex_caches.push_back(handles.NewHandle(class_linker->FindDexCache(self, *dex_file)));
+  }
+
+  uint32_t added_to_queue = 0;
+  for (const std::pair<uint32_t, uint32_t>& pair : profile_info.GetMethods()) {
+    if (CompileMethodFromProfile(self,
+                                 class_linker,
+                                 pair.second,
+                                 dex_caches[pair.first],
+                                 class_loader,
+                                 add_to_queue)) {
+      ++added_to_queue;
+    }
+  }
+  return added_to_queue;
 }
 
 uint32_t Jit::CompileMethodsFromProfile(
@@ -810,31 +907,13 @@ uint32_t Jit::CompileMethodsFromProfile(
     CHECK(dex_cache != nullptr) << "Could not find dex cache for " << dex_file->GetLocation();
 
     for (uint16_t method_idx : all_methods) {
-      ArtMethod* method = class_linker->ResolveMethodWithoutInvokeType(
-          method_idx, dex_cache, class_loader);
-      if (method == nullptr) {
-        self->ClearException();
-        continue;
-      }
-      if (!method->IsCompilable() || !method->IsInvokable()) {
-        continue;
-      }
-      const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
-      if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
-          class_linker->IsQuickGenericJniStub(entry_point) ||
-          class_linker->IsQuickResolutionStub(entry_point)) {
-        // Special case ZygoteServer class so that it gets compiled before the
-        // zygote enters it. This avoids needing to do OSR during app startup.
-        // TODO: have a profile instead.
-        method->SetPreCompiled();
-        if (!add_to_queue || method->GetDeclaringClass()->DescriptorEquals(
-                "Lcom/android/internal/os/ZygoteServer;")) {
-          CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
-        } else {
-          ++added_to_queue;
-          thread_pool_->AddTask(self,
-              new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile));
-        }
+      if (CompileMethodFromProfile(self,
+                                   class_linker,
+                                   method_idx,
+                                   dex_cache,
+                                   class_loader,
+                                   add_to_queue)) {
+        ++added_to_queue;
       }
     }
   }
@@ -869,6 +948,13 @@ bool Jit::MaybeCompileMethod(Thread* self,
                              bool with_backedges) {
   if (thread_pool_ == nullptr) {
     return false;
+  }
+  if (UNLIKELY(method->IsPreCompiled()) && !with_backedges /* don't check for OSR */) {
+    const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
+    if (code_ptr != nullptr) {
+      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);
+      return true;
+    }
   }
   if (IgnoreSamplesForMethod(method)) {
     return false;
@@ -969,14 +1055,6 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
       compile_task.Run(thread);
     }
     return;
-  }
-
-  if (UNLIKELY(method->IsPreCompiled())) {
-    const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
-    if (code_ptr != nullptr) {
-      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);
-      return;
-    }
   }
 
   ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);

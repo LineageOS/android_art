@@ -86,6 +86,7 @@
 #include "gc/system_weak.h"
 #include "handle_scope-inl.h"
 #include "hidden_api.h"
+#include "hidden_api_jni.h"
 #include "image-inl.h"
 #include "instrumentation.h"
 #include "intern_table-inl.h"
@@ -95,7 +96,6 @@
 #include "jit/profile_saver.h"
 #include "jni/java_vm_ext.h"
 #include "jni/jni_id_manager.h"
-#include "jni/jni_internal.h"
 #include "jni_id_type.h"
 #include "linear_alloc.h"
 #include "memory_representation.h"
@@ -495,7 +495,7 @@ Runtime::~Runtime() {
   // elements of WellKnownClasses to be null, see b/65500943.
   WellKnownClasses::Clear();
 
-  JniShutdownNativeCallerCheck();
+  hiddenapi::JniShutdownNativeCallerCheck();
 }
 
 struct AbortState {
@@ -1873,7 +1873,7 @@ void Runtime::InitNativeMethods() {
 
   // Having loaded native libraries for Managed Core library, enable field and
   // method resolution checks via JNI from native code.
-  JniInitializeNativeCallerCheck();
+  hiddenapi::JniInitializeNativeCallerCheck();
 
   VLOG(startup) << "Runtime::InitNativeMethods exiting";
 }
@@ -2384,6 +2384,10 @@ bool Runtime::IsActiveTransaction() const {
 void Runtime::EnterTransactionMode() {
   DCHECK(IsAotCompiler());
   DCHECK(!IsActiveTransaction());
+  // Make initialized classes visibly initialized now. If that happened during the transaction
+  // and then the transaction was aborted, we would roll back the status update but not the
+  // ClassLinker's bookkeeping structures, so these classes would never be visibly initialized.
+  GetClassLinker()->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
   preinitialization_transactions_.push_back(std::make_unique<Transaction>());
 }
 

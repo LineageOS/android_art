@@ -39,6 +39,7 @@ namespace mirror {
 class Object;
 class Class;
 class ClassLoader;
+class DexCache;
 class String;
 }   // namespace mirror
 
@@ -310,8 +311,8 @@ class Jit {
   // Adjust state after forking.
   void PostZygoteFork();
 
-  // Compile methods from the given profile. If `add_to_queue` is true, methods
-  // in the profile are added to the JIT queue. Otherwise they are compiled
+  // Compile methods from the given profile (.prof extension). If `add_to_queue`
+  // is true, methods in the profile are added to the JIT queue. Otherwise they are compiled
   // directly.
   // Return the number of methods added to the queue.
   uint32_t CompileMethodsFromProfile(Thread* self,
@@ -319,6 +320,16 @@ class Jit {
                                      const std::string& profile_path,
                                      Handle<mirror::ClassLoader> class_loader,
                                      bool add_to_queue);
+
+  // Compile methods from the given boot profile (.bprof extension). If `add_to_queue`
+  // is true, methods in the profile are added to the JIT queue. Otherwise they are compiled
+  // directly.
+  // Return the number of methods added to the queue.
+  uint32_t CompileMethodsFromBootProfile(Thread* self,
+                                         const std::vector<const DexFile*>& dex_files,
+                                         const std::string& profile_path,
+                                         Handle<mirror::ClassLoader> class_loader,
+                                         bool add_to_queue);
 
   // Register the dex files to the JIT. This is to perform any compilation/optimization
   // at the point of loading the dex files.
@@ -338,6 +349,16 @@ class Jit {
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);
+
+  // Compile an individual method listed in a profile. If `add_to_queue` is
+  // true and the method was resolved, return true. Otherwise return false.
+  bool CompileMethodFromProfile(Thread* self,
+                                ClassLinker* linker,
+                                uint32_t method_idx,
+                                Handle<mirror::DexCache> dex_cache,
+                                Handle<mirror::ClassLoader> class_loader,
+                                bool add_to_queue)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Compile the method if the number of samples passes a threshold.
   // Returns false if we can not compile now - don't increment the counter and retry later.
