@@ -35,9 +35,6 @@ inline void Jit::AddSamples(Thread* self,
                             ArtMethod* method,
                             uint16_t samples,
                             bool with_backedges) {
-  if (method->IsPreCompiled()) {
-    return;
-  }
   if (Jit::ShouldUsePriorityThreadWeight(self)) {
     samples *= PriorityThreadWeight();
   }
