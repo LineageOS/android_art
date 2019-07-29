@@ -205,6 +205,7 @@ class MethodVerifier {
  protected:
   MethodVerifier(Thread* self,
                  ClassLinker* class_linker,
+                 ArenaPool* arena_pool,
                  const DexFile* dex_file,
                  const dex::CodeItem* code_item,
                  uint32_t dex_method_idx,
@@ -237,6 +238,7 @@ class MethodVerifier {
    */
   static FailureData VerifyMethod(Thread* self,
                                   ClassLinker* class_linker,
+                                  ArenaPool* arena_pool,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
@@ -257,6 +259,7 @@ class MethodVerifier {
   template <bool kVerifierDebug>
   static FailureData VerifyMethod(Thread* self,
                                   ClassLinker* class_linker,
+                                  ArenaPool* arena_pool,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
