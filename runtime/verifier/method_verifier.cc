@@ -166,6 +166,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
                  bool verify_to_dump,
                  bool allow_thread_suspension,
                  bool fill_register_lines_,
+                 bool aot_mode,
                  uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -716,6 +717,7 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
                                                bool verify_to_dump,
                                                bool allow_thread_suspension,
                                                bool fill_register_lines,
+                                               bool aot_mode,
                                                uint32_t api_level)
     : art::verifier::MethodVerifier(self,
                                     class_linker,
@@ -724,7 +726,8 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
                                     dex_method_idx,
                                     can_load_classes,
                                     allow_thread_suspension,
-                                    allow_soft_failures),
+                                    allow_soft_failures,
+                                    aot_mode),
       method_being_verified_(method),
       method_access_flags_(method_access_flags),
       return_type_(nullptr),
@@ -916,7 +919,7 @@ bool MethodVerifier<kVerifierDebug>::Verify() {
                             InstructionFlags());
   // Run through the instructions and see if the width checks out.
   bool result = ComputeWidthsAndCountOps();
-  bool allow_runtime_only_instructions = !Runtime::Current()->IsAotCompiler() || verify_to_dump_;
+  bool allow_runtime_only_instructions = !IsAotMode() || verify_to_dump_;
   // Flag instructions guarded by a "try" block and check exception handlers.
   result = result && ScanTryCatchBlocks();
   // Perform static instruction verification.
@@ -1590,7 +1593,7 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   const uint16_t registers_size = code_item_accessor_.RegistersSize();
 
   /* Create and initialize table holding register status */
-  RegisterTrackingMode base_mode = Runtime::Current()->IsAotCompiler()
+  RegisterTrackingMode base_mode = IsAotMode()
                                        ? kTrackCompilerInterestPoints
                                        : kTrackRegsBranches;
   reg_table_.Init(fill_register_lines_ ? kTrackRegsAll : base_mode,
@@ -3478,7 +3481,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
   }  // end - switch (dec_insn.opcode)
 
   if (flags_.have_pending_hard_failure_) {
-    if (Runtime::Current()->IsAotCompiler()) {
+    if (IsAotMode()) {
       /* When AOT compiling, check that the last failure is a hard failure */
       if (failures_[failures_.size() - 1] != VERIFY_ERROR_BAD_CLASS_HARD) {
         LOG(ERROR) << "Pending failures:";
@@ -3843,7 +3846,7 @@ bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst
         handlers_ptr = iterator.EndDataPointer();
       }
       if (unresolved != nullptr) {
-        if (!Runtime::Current()->IsAotCompiler() && common_super == nullptr) {
+        if (!IsAotMode() && common_super == nullptr) {
           // This is an unreachable handler.
 
           // We need to post a failure. The compiler currently does not handle unreachable
@@ -4805,7 +4808,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetInstanceField(const RegType& obj_ty
       // of C1. For resolution to occur the declared class of the field must be compatible with
       // obj_type, we've discovered this wasn't so, so report the field didn't exist.
       VerifyError type;
-      bool is_aot = Runtime::Current()->IsAotCompiler();
+      bool is_aot = IsAotMode();
       if (is_aot && (field_klass.IsUnresolvedTypes() || obj_type.IsUnresolvedTypes())) {
         // Compiler & unresolved types involved, retry at runtime.
         type = VerifyError::VERIFY_ERROR_NO_CLASS;
@@ -5142,7 +5145,8 @@ MethodVerifier::MethodVerifier(Thread* self,
                                uint32_t dex_method_idx,
                                bool can_load_classes,
                                bool allow_thread_suspension,
-                               bool allow_soft_failures)
+                               bool allow_soft_failures,
+                               bool aot_mode)
     : self_(self),
       arena_stack_(Runtime::Current()->GetArenaPool()),
       allocator_(&arena_stack_),
@@ -5152,7 +5156,8 @@ MethodVerifier::MethodVerifier(Thread* self,
       dex_method_idx_(dex_method_idx),
       dex_file_(dex_file),
       code_item_accessor_(*dex_file, code_item),
-      flags_({false, false, false, false}),
+      // TODO: make it designated initialization when we compile as C++20.
+      flags_({false, false, false, false, aot_mode}),
       encountered_failure_types_(0),
       can_load_classes_(can_load_classes),
       allow_soft_failures_(allow_soft_failures),
@@ -5182,6 +5187,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
+                                                         bool aot_mode,
                                                          std::string* hard_failure_msg) {
   if (VLOG_IS_ON(verifier_debug)) {
     return VerifyMethod<true>(self,
@@ -5199,6 +5205,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                               log_level,
                               need_precise_constants,
                               api_level,
+                              aot_mode,
                               hard_failure_msg);
   } else {
     return VerifyMethod<false>(self,
@@ -5216,6 +5223,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                log_level,
                                need_precise_constants,
                                api_level,
+                               aot_mode,
                                hard_failure_msg);
   }
 }
@@ -5236,6 +5244,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
+                                                         bool aot_mode,
                                                          std::string* hard_failure_msg) {
   MethodVerifier::FailureData result;
   uint64_t start_ns = kTimeVerifyMethod ? NanoTime() : 0;
@@ -5256,6 +5265,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 /* verify to dump */ false,
                                                 /* allow_thread_suspension= */ true,
                                                 /* fill_register_lines= */ false,
+                                                aot_mode,
                                                 api_level);
   if (verifier.Verify()) {
     // Verification completed, however failures may be pending that didn't cause the verification
@@ -5285,8 +5295,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
     if (method != nullptr) {
       if (verifier.HasInstructionThatWillThrow()) {
         method->SetDontCompile();
-        if (Runtime::Current()->IsAotCompiler() &&
-            (callbacks != nullptr) && !callbacks->IsBootImage()) {
+        if (aot_mode && (callbacks != nullptr) && !callbacks->IsBootImage()) {
           // When compiling apps, make HasInstructionThatWillThrow a soft error to trigger
           // re-verification at runtime.
           // The dead code after the throw is not verified and might be invalid. This may cause
@@ -5402,6 +5411,7 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
                                       /* verify_to_dump= */ false,
                                       /* allow_thread_suspension= */ false,
                                       /* fill_register_lines= */ true,
+                                      Runtime::Current()->IsAotCompiler(),
                                       // Just use the verifier at the current skd-version.
                                       // This might affect what soft-verifier errors are reported.
                                       // Callers can then filter out relevant errors if needed.
@@ -5447,6 +5457,7 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
       /* verify_to_dump= */ true,
       /* allow_thread_suspension= */ true,
       /* fill_register_lines= */ false,
+      Runtime::Current()->IsAotCompiler(),
       api_level);
   verifier->Verify();
   verifier->DumpFailures(vios->Stream());
@@ -5486,6 +5497,7 @@ void MethodVerifier::FindLocksAtDexPc(
                                        /* verify_to_dump= */ false,
                                        /* allow_thread_suspension= */ false,
                                        /* fill_register_lines= */ false,
+                                       Runtime::Current()->IsAotCompiler(),
                                        api_level);
   verifier.interesting_dex_pc_ = dex_pc;
   verifier.monitor_enter_dex_pcs_ = monitor_enter_dex_pcs;
@@ -5523,6 +5535,7 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                          verify_to_dump,
                                          allow_thread_suspension,
                                          /* fill_register_lines= */ false,
+                                         Runtime::Current()->IsAotCompiler(),
                                          api_level);
 }
 
@@ -5558,7 +5571,7 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
       case VERIFY_ERROR_CLASS_CHANGE:
       case VERIFY_ERROR_FORCE_INTERPRETER:
       case VERIFY_ERROR_LOCKING:
-        if (Runtime::Current()->IsAotCompiler() || !can_load_classes_) {
+        if (IsAotMode() || !can_load_classes_) {
           // If we're optimistically running verification at compile time, turn NO_xxx, ACCESS_xxx,
           // class change and instantiation errors into soft verification errors so that we
           // re-verify at runtime. We may fail to find or to agree on access because of not yet
