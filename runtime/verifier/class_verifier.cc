@@ -154,6 +154,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                                      log_level,
                                      /*need_precise_constants=*/ false,
                                      api_level,
+                                     Runtime::Current()->IsAotCompiler(),
                                      &hard_failure_msg);
     if (result.kind == FailureKind::kHardFailure) {
       if (failure_data.kind == FailureKind::kHardFailure) {
