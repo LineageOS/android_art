@@ -24,6 +24,7 @@
 #include "art_field.h"
 #include "art_method.h"
 #include "base/mutex.h"
+#include "jni_id_type.h"
 
 namespace art {
 namespace jni {
@@ -45,7 +46,8 @@ class JniIdManager {
   template <typename ArtType>
   ArtType* DecodeGenericId(uintptr_t input) REQUIRES(!Locks::jni_id_lock_);
   template <typename ArtType> std::vector<ArtType*>& GetGenericMap() REQUIRES(Locks::jni_id_lock_);
-  template <typename ArtType> uintptr_t GetNextId() REQUIRES(Locks::jni_id_lock_);
+  template <typename ArtType>
+  uintptr_t GetNextId(JniIdType id, ArtType* t) REQUIRES(Locks::jni_id_lock_);
   template <typename ArtType>
   size_t GetLinearSearchStartId(ArtType* t) REQUIRES(Locks::jni_id_lock_);
 
