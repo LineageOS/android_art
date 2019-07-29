@@ -433,6 +433,43 @@ bool CommonRuntimeTestImpl::StartDex2OatCommandLine(/*out*/std::vector<std::stri
   return true;
 }
 
+std::string CommonRuntimeTestImpl::GetImageDirectory() {
+  if (IsHost()) {
+    const char* host_dir = getenv("ANDROID_HOST_OUT");
+    CHECK(host_dir != nullptr);
+    return std::string(host_dir) + "/framework";
+  } else {
+    return std::string("/data/art-test");
+  }
+}
+
+std::string CommonRuntimeTestImpl::GetImageLocation() {
+  return GetImageDirectory() + "/core.art";
+}
+
+std::string CommonRuntimeTestImpl::GetSystemImageFile() {
+  return GetImageDirectory() + "/" + GetInstructionSetString(kRuntimeISA) + "/core.art";
+}
+
+void CommonRuntimeTestImpl::EnterTransactionMode() {
+  CHECK(!Runtime::Current()->IsActiveTransaction());
+  Runtime::Current()->EnterTransactionMode(/*strict=*/ false, /*root=*/ nullptr);
+}
+
+void CommonRuntimeTestImpl::ExitTransactionMode() {
+  Runtime::Current()->ExitTransactionMode();
+  CHECK(!Runtime::Current()->IsActiveTransaction());
+}
+
+void CommonRuntimeTestImpl::RollbackAndExitTransactionMode() {
+  Runtime::Current()->RollbackAndExitTransactionMode();
+  CHECK(!Runtime::Current()->IsActiveTransaction());
+}
+
+bool CommonRuntimeTestImpl::IsTransactionAborted() {
+  return Runtime::Current()->IsTransactionAborted();
+}
+
 CheckJniAbortCatcher::CheckJniAbortCatcher() : vm_(Runtime::Current()->GetJavaVM()) {
   vm_->SetCheckJniAbortHook(Hook, &actual_);
 }
