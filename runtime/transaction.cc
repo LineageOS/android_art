@@ -21,12 +21,15 @@
 #include "base/mutex-inl.h"
 #include "base/stl_util.h"
 #include "gc/accounting/card_table-inl.h"
+#include "gc/heap.h"
 #include "gc_root-inl.h"
 #include "intern_table.h"
 #include "mirror/class-inl.h"
 #include "mirror/dex_cache-inl.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
+#include "obj_ptr-inl.h"
+#include "runtime.h"
 
 #include <list>
 
@@ -35,17 +38,14 @@ namespace art {
 // TODO: remove (only used for debugging purpose).
 static constexpr bool kEnableTransactionStats = false;
 
-Transaction::Transaction()
-  : log_lock_("transaction log lock", kTransactionLogLock),
-    aborted_(false),
-    rolling_back_(false),
-    strict_(false) {
-  CHECK(Runtime::Current()->IsAotCompiler());
-}
-
-Transaction::Transaction(bool strict, mirror::Class* root) : Transaction() {
-  strict_ = strict;
-  root_ = root;
+Transaction::Transaction(bool strict, mirror::Class* root)
+    : log_lock_("transaction log lock", kTransactionLogLock),
+      aborted_(false),
+      rolling_back_(false),
+      heap_(strict ? nullptr : Runtime::Current()->GetHeap()),
+      root_(root) {
+  DCHECK_EQ(strict, IsStrict());
+  DCHECK(Runtime::Current()->IsAotCompiler());
 }
 
 Transaction::~Transaction() {
@@ -111,35 +111,33 @@ bool Transaction::IsRollingBack() {
   return rolling_back_;
 }
 
-bool Transaction::IsStrict() {
-  MutexLock mu(Thread::Current(), log_lock_);
-  return strict_;
-}
-
 const std::string& Transaction::GetAbortMessage() {
   MutexLock mu(Thread::Current(), log_lock_);
   return abort_message_;
 }
 
-bool Transaction::WriteConstraint(mirror::Object* obj, ArtField* field) {
-  MutexLock mu(Thread::Current(), log_lock_);
-  if (strict_  // no constraint for boot image
-      && field->IsStatic()  // no constraint instance updating
-      && obj != root_) {  // modifying other classes' static field, fail
-    return true;
+bool Transaction::WriteConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field) {
+  MutexLock mu(self, log_lock_);
+  if (IsStrict()) {
+    return field->IsStatic() &&  // no constraint instance updating
+           obj != root_;  // modifying other classes' static field, fail
+  } else {
+    // For boot image extension, prevent changes in boot image.
+    // For boot image there are no boot image spaces and this returns false.
+    return heap_->ObjectIsInBootImageSpace(obj);
   }
-  return false;
 }
 
-bool Transaction::ReadConstraint(mirror::Object* obj, ArtField* field) {
+bool Transaction::ReadConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field) {
   DCHECK(field->IsStatic());
   DCHECK(obj->IsClass());
-  MutexLock mu(Thread::Current(), log_lock_);
-  if (!strict_ ||   // no constraint for boot image
-      obj == root_) {  // self-updating, pass
+  MutexLock mu(self, log_lock_);
+  if (IsStrict()) {
+    return obj != root_;  // fail if not self-updating
+  } else {
+    // For boot image and boot image extension, allow reading any field.
     return false;
   }
-  return true;
 }
 
 void Transaction::RecordWriteFieldBoolean(mirror::Object* obj,
