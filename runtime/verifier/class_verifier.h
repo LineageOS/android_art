@@ -29,6 +29,7 @@
 
 namespace art {
 
+class ClassLinker;
 class CompilerCallbacks;
 class DexFile;
 class RootVisitor;
@@ -70,7 +71,7 @@ class ClassVerifier {
                                  std::string* error)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  static void Init() REQUIRES_SHARED(Locks::mutator_lock_);
+  static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static void Shutdown();
 
   static void VisitStaticRoots(RootVisitor* visitor)

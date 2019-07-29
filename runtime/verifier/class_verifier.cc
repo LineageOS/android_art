@@ -140,6 +140,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
     std::string hard_failure_msg;
     MethodVerifier::FailureData result =
         MethodVerifier::VerifyMethod(self,
+                                     linker,
                                      method_idx,
                                      dex_file,
                                      dex_cache,
@@ -190,8 +191,8 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
   }
 }
 
-void ClassVerifier::Init() {
-  MethodVerifier::Init();
+void ClassVerifier::Init(ClassLinker* class_linker) {
+  MethodVerifier::Init(class_linker);
 }
 
 void ClassVerifier::Shutdown() {
