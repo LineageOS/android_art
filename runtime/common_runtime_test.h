@@ -168,6 +168,16 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   // Called to finish up runtime creation and filling test fields. By default runs root
   // initializers, initialize well-known classes, and creates the heap thread pool.
   virtual void FinalizeSetup();
+
+  // Returns the directory where the pre-compiled core.art can be found.
+  static std::string GetImageDirectory();
+  static std::string GetImageLocation();
+  static std::string GetSystemImageFile();
+
+  static void EnterTransactionMode();
+  static void ExitTransactionMode();
+  static void RollbackAndExitTransactionMode() REQUIRES_SHARED(Locks::mutator_lock_);
+  static bool IsTransactionAborted();
 };
 
 template <typename TestType>
