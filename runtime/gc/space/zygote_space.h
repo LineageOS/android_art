@@ -35,7 +35,9 @@ class ZygoteSpace final : public ContinuousMemMapAllocSpace {
                              accounting::ContinuousSpaceBitmap* live_bitmap,
                              accounting::ContinuousSpaceBitmap* mark_bitmap)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
+  // In PreZygoteFork() we set mark-bit of all live objects to avoid page
+  // getting dirtied due to it.
+  void SetMarkBitInLiveObjects();
   void Dump(std::ostream& os) const override;
 
   SpaceType GetType() const override {
