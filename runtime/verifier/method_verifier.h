@@ -198,6 +198,10 @@ class MethodVerifier {
     return class_linker_;
   }
 
+  bool IsAotMode() const {
+    return flags_.aot_mode_;
+  }
+
  protected:
   MethodVerifier(Thread* self,
                  ClassLinker* class_linker,
@@ -206,7 +210,8 @@ class MethodVerifier {
                  uint32_t dex_method_idx,
                  bool can_load_classes,
                  bool allow_thread_suspension,
-                 bool allow_soft_failures)
+                 bool allow_soft_failures,
+                 bool aot_mode)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Verification result for method(s). Includes a (maximum) failure kind, and (the union of)
@@ -245,6 +250,7 @@ class MethodVerifier {
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
+                                  bool aot_mode,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -264,6 +270,7 @@ class MethodVerifier {
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
+                                  bool aot_mode,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -339,6 +346,9 @@ class MethodVerifier {
     // A version of the above that is not reset and thus captures if there were *any* throw
     // failures.
     bool have_any_pending_runtime_throw_failure_ : 1;
+
+    // Verify in AoT mode?
+    bool aot_mode_ : 1;
   } flags_;
 
   // Info message log use primarily for verifier diagnostics.
