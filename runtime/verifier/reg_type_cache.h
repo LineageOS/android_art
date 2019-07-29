@@ -28,10 +28,13 @@
 #include "gc_root.h"
 
 namespace art {
+
 namespace mirror {
 class Class;
 class ClassLoader;
 }  // namespace mirror
+
+class ClassLinker;
 class ScopedArenaAllocator;
 
 namespace verifier {
@@ -62,12 +65,15 @@ static constexpr size_t kDefaultArenaBitVectorBytes = 8;
 
 class RegTypeCache {
  public:
-  RegTypeCache(bool can_load_classes, ScopedArenaAllocator& allocator, bool can_suspend = true);
+  RegTypeCache(ClassLinker* class_linker,
+               bool can_load_classes,
+               ScopedArenaAllocator& allocator,
+               bool can_suspend = true);
   ~RegTypeCache();
-  static void Init() REQUIRES_SHARED(Locks::mutator_lock_) {
+  static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_) {
     if (!RegTypeCache::primitive_initialized_) {
       CHECK_EQ(RegTypeCache::primitive_count_, 0);
-      CreatePrimitiveAndSmallConstantTypes();
+      CreatePrimitiveAndSmallConstantTypes(class_linker);
       CHECK_EQ(RegTypeCache::primitive_count_, kNumPrimitivesAndSmallConstants);
       RegTypeCache::primitive_initialized_ = true;
     }
@@ -160,6 +166,10 @@ class RegTypeCache {
   static void VisitStaticRoots(RootVisitor* visitor)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  ClassLinker* GetClassLinker() {
+    return class_linker_;
+  }
+
  private:
   void FillPrimitiveAndSmallConstantTypes() REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<mirror::Class> ResolveClass(const char* descriptor, ObjPtr<mirror::ClassLoader> loader)
@@ -177,7 +187,8 @@ class RegTypeCache {
   // verifier and return a string view.
   std::string_view AddString(const std::string_view& str);
 
-  static void CreatePrimitiveAndSmallConstantTypes() REQUIRES_SHARED(Locks::mutator_lock_);
+  static void CreatePrimitiveAndSmallConstantTypes(ClassLinker* class_linker)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // A quick look up for popular small constants.
   static constexpr int32_t kMinSmallConstant = -1;
@@ -200,11 +211,13 @@ class RegTypeCache {
   // Fast lookup for quickly finding entries that have a matching class.
   ScopedArenaVector<std::pair<GcRoot<mirror::Class>, const RegType*>> klass_entries_;
 
-  // Whether or not we're allowed to load classes.
-  const bool can_load_classes_;
-
   // Arena allocator.
   ScopedArenaAllocator& allocator_;
+
+  ClassLinker* class_linker_;
+
+  // Whether or not we're allowed to load classes.
+  const bool can_load_classes_;
 
   DISALLOW_COPY_AND_ASSIGN(RegTypeCache);
 };
