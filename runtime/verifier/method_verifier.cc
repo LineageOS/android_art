@@ -151,6 +151,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
 
  private:
   MethodVerifier(Thread* self,
+                 ClassLinker* class_linker,
                  const DexFile* dex_file,
                  Handle<mirror::DexCache> dex_cache,
                  Handle<mirror::ClassLoader> class_loader,
@@ -700,6 +701,7 @@ static bool IsLargeMethod(const CodeItemDataAccessor& accessor) {
 
 template <bool kVerifierDebug>
 MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
+                                               ClassLinker* class_linker,
                                                const DexFile* dex_file,
                                                Handle<mirror::DexCache> dex_cache,
                                                Handle<mirror::ClassLoader> class_loader,
@@ -716,6 +718,7 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
                                                bool fill_register_lines,
                                                uint32_t api_level)
     : art::verifier::MethodVerifier(self,
+                                    class_linker,
                                     dex_file,
                                     code_item,
                                     dex_method_idx,
@@ -1006,7 +1009,7 @@ bool MethodVerifier<kVerifierDebug>::ScanTryCatchBlocks() {
   // Iterate over each of the handlers to verify target addresses.
   const uint8_t* handlers_ptr = code_item_accessor_.GetCatchHandlerData();
   const uint32_t handlers_size = DecodeUnsignedLeb128(&handlers_ptr);
-  ClassLinker* linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* linker = GetClassLinker();
   for (uint32_t idx = 0; idx < handlers_size; idx++) {
     CatchHandlerIterator iterator(handlers_ptr);
     for (; iterator.HasNext(); iterator.Next()) {
@@ -2432,7 +2435,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
       const RegType& res_type = ResolveClass<CheckAccess::kYes>(type_idx);
       if (res_type.IsConflict()) {
         // If this is a primitive type, fail HARD.
-        ObjPtr<mirror::Class> klass = Runtime::Current()->GetClassLinker()->LookupResolvedType(
+        ObjPtr<mirror::Class> klass = GetClassLinker()->LookupResolvedType(
             type_idx, dex_cache_.Get(), class_loader_.Get());
         if (klass != nullptr && klass->IsPrimitive()) {
           Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "using primitive type "
@@ -3595,7 +3598,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
     CatchHandlerIterator iterator(code_item_accessor_, *try_item);
 
     // Need the linker to try and resolve the handled class to check if it's Throwable.
-    ClassLinker* linker = Runtime::Current()->GetClassLinker();
+    ClassLinker* linker = GetClassLinker();
 
     for (; iterator.HasNext(); iterator.Next()) {
       dex::TypeIndex handler_type_idx = iterator.GetHandlerTypeIndex();
@@ -3724,7 +3727,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
 template <bool kVerifierDebug>
 template <CheckAccess C>
 const RegType& MethodVerifier<kVerifierDebug>::ResolveClass(dex::TypeIndex class_idx) {
-  ClassLinker* linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* linker = GetClassLinker();
   ObjPtr<mirror::Class> klass = can_load_classes_
       ? linker->ResolveType(class_idx, dex_cache_, class_loader_)
       : linker->LookupResolvedType(class_idx, dex_cache_.Get(), class_loader_.Get());
@@ -3886,7 +3889,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::ResolveMethodAndCheckAccess(
   }
   ObjPtr<mirror::Class> klass = klass_type.GetClass();
   const RegType& referrer = GetDeclaringClass();
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   PointerSize pointer_size = class_linker->GetImagePointerSize();
 
   ArtMethod* res_method = dex_cache_->GetResolvedMethod(dex_method_idx, pointer_size);
@@ -4344,8 +4347,7 @@ bool MethodVerifier<kVerifierDebug>::CheckSignaturePolymorphicMethod(ArtMethod* 
   const char* method_name = method->GetName();
 
   const char* expected_return_descriptor;
-  ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
-      Runtime::Current()->GetClassLinker()->GetClassRoots();
+  ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots = GetClassLinker()->GetClassRoots();
   if (klass == GetClassRoot<mirror::MethodHandle>(class_roots)) {
     expected_return_descriptor = mirror::MethodHandle::GetReturnTypeDescriptor(method_name);
   } else if (klass == GetClassRoot<mirror::VarHandle>(class_roots)) {
@@ -4410,8 +4412,7 @@ bool MethodVerifier<kVerifierDebug>::CheckSignaturePolymorphicReceiver(const Ins
         << this_type;
     return false;
   } else {
-    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
-        Runtime::Current()->GetClassLinker()->GetClassRoots();
+    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots = GetClassLinker()->GetClassRoots();
     if (!this_type.GetClass()->IsSubClass(GetClassRoot<mirror::MethodHandle>(class_roots)) &&
         !this_type.GetClass()->IsSubClass(GetClassRoot<mirror::VarHandle>(class_roots))) {
       Fail(VERIFY_ERROR_BAD_CLASS_HARD)
@@ -4715,7 +4716,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetStaticField(int field_idx) {
 
     return nullptr;  // Can't resolve Class so no more to do here, will do checking at runtime.
   }
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
 
   // Record result of the field resolution attempt.
@@ -4765,7 +4766,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetInstanceField(const RegType& obj_ty
 
     return nullptr;  // Can't resolve Class so no more to do here
   }
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
 
   // Record result of the field resolution attempt.
@@ -5135,6 +5136,7 @@ const RegType& MethodVerifier<kVerifierDebug>::FromClass(const char* descriptor,
 }  // namespace impl
 
 MethodVerifier::MethodVerifier(Thread* self,
+                               ClassLinker* class_linker,
                                const DexFile* dex_file,
                                const dex::CodeItem* code_item,
                                uint32_t dex_method_idx,
@@ -5144,7 +5146,7 @@ MethodVerifier::MethodVerifier(Thread* self,
     : self_(self),
       arena_stack_(Runtime::Current()->GetArenaPool()),
       allocator_(&arena_stack_),
-      reg_types_(can_load_classes, allocator_, allow_thread_suspension),
+      reg_types_(class_linker, can_load_classes, allocator_, allow_thread_suspension),
       reg_table_(allocator_),
       work_insn_idx_(dex::kDexNoIndex),
       dex_method_idx_(dex_method_idx),
@@ -5155,6 +5157,7 @@ MethodVerifier::MethodVerifier(Thread* self,
       can_load_classes_(can_load_classes),
       allow_soft_failures_(allow_soft_failures),
       has_check_casts_(false),
+      class_linker_(class_linker),
       link_(nullptr) {
   self->PushVerifier(this);
 }
@@ -5165,6 +5168,7 @@ MethodVerifier::~MethodVerifier() {
 }
 
 MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
+                                                         ClassLinker* class_linker,
                                                          uint32_t method_idx,
                                                          const DexFile* dex_file,
                                                          Handle<mirror::DexCache> dex_cache,
@@ -5181,6 +5185,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          std::string* hard_failure_msg) {
   if (VLOG_IS_ON(verifier_debug)) {
     return VerifyMethod<true>(self,
+                              class_linker,
                               method_idx,
                               dex_file,
                               dex_cache,
@@ -5197,6 +5202,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                               hard_failure_msg);
   } else {
     return VerifyMethod<false>(self,
+                               class_linker,
                                method_idx,
                                dex_file,
                                dex_cache,
@@ -5216,6 +5222,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
 
 template <bool kVerifierDebug>
 MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
+                                                         ClassLinker* class_linker,
                                                          uint32_t method_idx,
                                                          const DexFile* dex_file,
                                                          Handle<mirror::DexCache> dex_cache,
@@ -5234,6 +5241,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
   uint64_t start_ns = kTimeVerifyMethod ? NanoTime() : 0;
 
   impl::MethodVerifier<kVerifierDebug> verifier(self,
+                                                class_linker,
                                                 dex_file,
                                                 dex_cache,
                                                 class_loader,
@@ -5379,6 +5387,7 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
       Handle<mirror::ClassLoader> class_loader) {
   std::unique_ptr<impl::MethodVerifier<false>> verifier(
       new impl::MethodVerifier<false>(self,
+                                      Runtime::Current()->GetClassLinker(),
                                       method->GetDexFile(),
                                       dex_cache,
                                       class_loader,
@@ -5423,6 +5432,7 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
                                                     uint32_t api_level) {
   impl::MethodVerifier<false>* verifier = new impl::MethodVerifier<false>(
       self,
+      Runtime::Current()->GetClassLinker(),
       dex_file,
       dex_cache,
       class_loader,
@@ -5461,6 +5471,7 @@ void MethodVerifier::FindLocksAtDexPc(
   Handle<mirror::DexCache> dex_cache(hs.NewHandle(m->GetDexCache()));
   Handle<mirror::ClassLoader> class_loader(hs.NewHandle(m->GetClassLoader()));
   impl::MethodVerifier<false> verifier(hs.Self(),
+                                       Runtime::Current()->GetClassLinker(),
                                        m->GetDexFile(),
                                        dex_cache,
                                        class_loader,
@@ -5497,6 +5508,7 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                                bool allow_thread_suspension,
                                                uint32_t api_level) {
   return new impl::MethodVerifier<false>(self,
+                                         Runtime::Current()->GetClassLinker(),
                                          dex_file,
                                          dex_cache,
                                          class_loader,
@@ -5514,8 +5526,8 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                          api_level);
 }
 
-void MethodVerifier::Init() {
-  art::verifier::RegTypeCache::Init();
+void MethodVerifier::Init(ClassLinker* class_linker) {
+  art::verifier::RegTypeCache::Init(class_linker);
 }
 
 void MethodVerifier::Shutdown() {

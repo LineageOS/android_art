@@ -1608,7 +1608,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   CHECK(class_linker_ != nullptr);
 
-  verifier::ClassVerifier::Init();
+  verifier::ClassVerifier::Init(class_linker_);
 
   if (runtime_options.Exists(Opt::MethodTrace)) {
     trace_config_.reset(new TraceConfig());
