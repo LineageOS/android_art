@@ -27,6 +27,7 @@
 #include "base/utils.h"
 #include "debugger.h"
 #include "gc/heap.h"
+#include "jni_id_type.h"
 #include "monitor.h"
 #include "runtime.h"
 #include "ti/agent.h"
@@ -368,8 +369,13 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
           .WithValueMap({{"false", false}, {"true", true}})
           .IntoKey(M::FastClassNotFoundException)
       .Define("-Xopaque-jni-ids:_")
-          .WithType<bool>()
-          .WithValueMap({{"true", true}, {"false", false}})
+          .WithType<JniIdType>()
+          .WithValueMap({{"true", JniIdType::kIndices},
+                         {"false", JniIdType::kPointer},
+                         {"swapable", JniIdType::kSwapablePointer},
+                         {"pointer", JniIdType::kPointer},
+                         {"indices", JniIdType::kIndices},
+                         {"default", JniIdType::kDefault}})
           .IntoKey(M::OpaqueJniIds)
       .Define("-XX:VerifierMissingKThrowFatal=_")
           .WithType<bool>()
@@ -792,7 +798,8 @@ void ParsedOptions::Usage(const char* fmt, ...) {
                        "(Enable new and experimental agent support)\n");
   UsageMessage(stream, "  -Xexperimental:agents"
                        "(Enable new and experimental agent support)\n");
-  UsageMessage(stream, "  -Xopaque-jni-ids:{true,false} (Use opauque integers for jni ids)\n");
+  UsageMessage(stream, "  -Xopaque-jni-ids:{true,false,swapable}");
+  UsageMessage(stream, "(Use opauque integers for jni ids, yes, no or punt for later)\n");
   UsageMessage(stream, "\n");
 
   UsageMessage(stream, "The following previously supported Dalvik options are ignored:\n");

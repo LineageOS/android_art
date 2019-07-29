@@ -35,10 +35,14 @@ class Class;
 
 struct WellKnownClasses {
  public:
-  static void Init(JNIEnv* env);  // Run before native methods are registered.
-  static void LateInit(JNIEnv* env);  // Run after native methods are registered.
+  // Run before native methods are registered.
+  static void Init(JNIEnv* env);
+  // Run after native methods are registered.
+  static void LateInit(JNIEnv* env);
 
   static void Clear();
+
+  static void HandleJniIdTypeChange(JNIEnv* env);
 
   static void InitStringInit(ObjPtr<mirror::Class> string_class,
                              ObjPtr<mirror::Class> string_builder_class)
@@ -48,6 +52,10 @@ struct WellKnownClasses {
 
   static ObjPtr<mirror::Class> ToClass(jclass global_jclass) REQUIRES_SHARED(Locks::mutator_lock_);
 
+ private:
+  static void InitFieldsAndMethodsOnly(JNIEnv* env);
+
+ public:
   static jclass dalvik_annotation_optimization_CriticalNative;
   static jclass dalvik_annotation_optimization_FastNative;
   static jclass dalvik_system_BaseDexClassLoader;
