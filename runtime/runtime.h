@@ -841,9 +841,17 @@ class Runtime {
     return jdwp_provider_;
   }
 
-  bool JniIdsAreIndices() const {
-    return jni_ids_indirection_ != JniIdType::kPointer;
+  JniIdType GetJniIdType() const {
+    return jni_ids_indirection_;
   }
+
+  bool CanSetJniIdType() const {
+    return GetJniIdType() == JniIdType::kSwapablePointer;
+  }
+
+  // Changes the JniIdType to the given type. Only allowed if CanSetJniIdType(). All threads must be
+  // suspended to call this function.
+  void SetJniIdType(JniIdType t);
 
   uint32_t GetVerifierLoggingThresholdMs() const {
     return verifier_logging_threshold_ms_;

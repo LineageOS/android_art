@@ -28,6 +28,7 @@ namespace art {
 
 class ArtField;
 class ArtMethod;
+class ScopedObjectAccess;
 
 const JNINativeInterface* GetJniNativeInterface();
 const JNINativeInterface* GetRuntimeShutdownNativeInterface();
@@ -40,6 +41,22 @@ void JniInitializeNativeCallerCheck();
 
 // Removes native stack checking state.
 void JniShutdownNativeCallerCheck();
+
+// Finds the method using JNI semantics and initializes any classes. Does not encode the method in a
+// JNI id
+ArtMethod* FindMethodJNI(const ScopedObjectAccess& soa,
+                         jclass java_class,
+                         const char* name,
+                         const char* sig,
+                         bool is_static) REQUIRES_SHARED(Locks::mutator_lock_);
+
+// Finds the field using JNI semantics and initializes any classes. Does not encode the method in a
+// JNI id.
+ArtField* FindFieldJNI(const ScopedObjectAccess& soa,
+                       jclass java_class,
+                       const char* name,
+                       const char* sig,
+                       bool is_static) REQUIRES_SHARED(Locks::mutator_lock_);
 
 namespace jni {
 
@@ -72,7 +89,7 @@ static inline ArtField* DecodeArtField(jfieldID fid) {
 template <bool kEnableIndexIds = true>
 ALWAYS_INLINE
 static inline jfieldID EncodeArtField(ArtField* field) REQUIRES_SHARED(Locks::mutator_lock_)  {
-  if (kEnableIndexIds && Runtime::Current()->JniIdsAreIndices()) {
+  if (kEnableIndexIds && Runtime::Current()->GetJniIdType() != JniIdType::kPointer) {
     return Runtime::Current()->GetJniIdManager()->EncodeFieldId(field);
   } else {
     return reinterpret_cast<jfieldID>(field);
@@ -83,7 +100,7 @@ template <bool kEnableIndexIds = true>
 ALWAYS_INLINE
 static inline jmethodID EncodeArtMethod(ArtMethod* art_method)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (kEnableIndexIds && Runtime::Current()->JniIdsAreIndices()) {
+  if (kEnableIndexIds && Runtime::Current()->GetJniIdType() != JniIdType::kPointer) {
     return Runtime::Current()->GetJniIdManager()->EncodeMethodId(art_method);
   } else {
     return reinterpret_cast<jmethodID>(art_method);
