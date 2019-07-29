@@ -109,7 +109,7 @@ class LargeObjectSpace : public DiscontinuousSpace, public AllocSpace {
   // Called when we create the zygote space, mark all existing large objects as zygote large
   // objects. Set mark-bit if called from PreZygoteFork() for ConcurrentCopying
   // GC to avoid dirtying the first page.
-  virtual void SetAllLargeObjectsAsZygoteObjects(Thread* self, const bool set_mark_bit = false) = 0;
+  virtual void SetAllLargeObjectsAsZygoteObjects(Thread* self, bool set_mark_bit) = 0;
 
   virtual void ForEachMemMap(std::function<void(const MemMap&)> func) const = 0;
   // GetRangeAtomic returns Begin() and End() atomically, that is, it never returns Begin() and
@@ -174,7 +174,7 @@ class LargeObjectMapSpace : public LargeObjectSpace {
   virtual ~LargeObjectMapSpace() {}
 
   bool IsZygoteLargeObject(Thread* self, mirror::Object* obj) const override REQUIRES(!lock_);
-  void SetAllLargeObjectsAsZygoteObjects(Thread* self, const bool set_mark_bit = false) override
+  void SetAllLargeObjectsAsZygoteObjects(Thread* self, bool set_mark_bit) override
       REQUIRES(!lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -218,7 +218,7 @@ class FreeListSpace final : public LargeObjectSpace {
   // Removes header from the free blocks set by finding the corresponding iterator and erasing it.
   void RemoveFreePrev(AllocationInfo* info) REQUIRES(lock_);
   bool IsZygoteLargeObject(Thread* self, mirror::Object* obj) const override;
-  void SetAllLargeObjectsAsZygoteObjects(Thread* self, const bool set_mark_bit = false) override
+  void SetAllLargeObjectsAsZygoteObjects(Thread* self, bool set_mark_bit) override
       REQUIRES(!lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
