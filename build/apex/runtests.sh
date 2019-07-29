@@ -55,15 +55,17 @@ set -e
 build_apex_p=true
 list_image_files_p=false
 print_image_tree_p=false
+print_file_sizes_p=false
 
 function usage {
   cat <<EOF
 Usage: $0 [OPTION]
 Build (optional) and run tests on Android Runtime APEX package (on host).
 
-  -s, --skip-build    skip the build step
+  -B, --skip-build    skip the build step
   -l, --list-files    list the contents of the ext4 image (\`find\`-like style)
   -t, --print-tree    list the contents of the ext4 image (\`tree\`-like style)
+  -s, --print-sizes   print the size in bytes of each file in tree output
   -h, --help          display this help and exit
 
 EOF
@@ -72,9 +74,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    (-s|--skip-build) build_apex_p=false;;
-    (-l|--list-files) list_image_files_p=true;;
-    (-t|--print-tree) print_image_tree_p=true;;
+    (-B|--skip-build)  build_apex_p=false;;
+    (-l|--list-files)  list_image_files_p=true;;
+    (-t|--print-tree)  print_image_tree_p=true;;
+    (-s|--print-sizes) print_file_sizes_p=true;;
     (-h|--help) usage;;
     (*) die "Unknown option: '$1'
 Try '$0 --help' for more information.";;
@@ -102,7 +105,11 @@ function maybe_list_apex_contents_apex {
   # List the contents of the apex in tree form.
   if $print_image_tree_p; then
     say "Printing image tree"
-    $SCRIPT_DIR/art_apex_test.py --tree $@
+    tree_options=()
+    if $print_file_sizes_p; then
+      tree_options+=(--size)
+    fi
+    $SCRIPT_DIR/art_apex_test.py --tree ${tree_options[@]} $@
   fi
 }
 
