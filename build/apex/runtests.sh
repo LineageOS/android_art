@@ -65,7 +65,7 @@ Build (optional) and run tests on Android Runtime APEX package (on host).
   -B, --skip-build    skip the build step
   -l, --list-files    list the contents of the ext4 image (\`find\`-like style)
   -t, --print-tree    list the contents of the ext4 image (\`tree\`-like style)
-  -s, --print-sizes   print the size in bytes of each file in tree output
+  -s, --print-sizes   print the size in bytes of each file when listing contents
   -h, --help          display this help and exit
 
 EOF
@@ -96,20 +96,21 @@ function build_apex {
 
 # maybe_list_apex_contents_apex APEX TMPDIR [other]
 function maybe_list_apex_contents_apex {
+  local print_options=()
+  if $print_file_sizes_p; then
+    print_options+=(--size)
+  fi
+
   # List the contents of the apex in list form.
   if $list_image_files_p; then
     say "Listing image files"
-    $SCRIPT_DIR/art_apex_test.py --list $@
+    $SCRIPT_DIR/art_apex_test.py --list ${print_options[@]} $@
   fi
 
   # List the contents of the apex in tree form.
   if $print_image_tree_p; then
     say "Printing image tree"
-    tree_options=()
-    if $print_file_sizes_p; then
-      tree_options+=(--size)
-    fi
-    $SCRIPT_DIR/art_apex_test.py --tree ${tree_options[@]} $@
+    $SCRIPT_DIR/art_apex_test.py --tree ${print_options[@]} $@
   fi
 }
 
