@@ -28,7 +28,10 @@ enum class JniIdType {
   // All Jni method/field IDs are indices into a table.
   kIndices,
 
-  // The current default provider. Used if you run -XjdwpProvider:default
+  // All Jni method/field IDs are pointers to the corresponding Art{Field,Method} type but we
+  // keep around extra information support changing modes to either kPointer or kIndices later.
+  kSwapablePointer,
+
   kDefault = kPointer,
 };
 

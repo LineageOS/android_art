@@ -28,13 +28,16 @@
 #include "entrypoints/quick/quick_entrypoints_enum.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
 #include "hidden_api.h"
+#include "hidden_api_jni.h"
 #include "jni/jni_internal.h"
+#include "jni_id_type.h"
 #include "mirror/class.h"
 #include "mirror/throwable.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "obj_ptr-inl.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
+#include "scoped_thread_state_change.h"
 #include "thread-current-inl.h"
 
 namespace art {
@@ -172,8 +175,18 @@ static jclass CacheClass(JNIEnv* env, const char* jni_class_name) {
 
 static jfieldID CacheField(JNIEnv* env, jclass c, bool is_static,
                            const char* name, const char* signature) {
-  jfieldID fid = is_static ? env->GetStaticFieldID(c, name, signature) :
-      env->GetFieldID(c, name, signature);
+  jfieldID fid;
+  {
+    ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck scpac;
+    if (Runtime::Current()->GetJniIdType() != JniIdType::kSwapablePointer) {
+      fid = jni::EncodeArtField</*kEnableIndexIds*/ true>(
+          FindFieldJNI(soa, c, name, signature, is_static));
+    } else {
+      fid = jni::EncodeArtField</*kEnableIndexIds*/ false>(
+          FindFieldJNI(soa, c, name, signature, is_static));
+    }
+  }
   if (fid == nullptr) {
     ScopedObjectAccess soa(env);
     if (soa.Self()->IsExceptionPending()) {
@@ -189,8 +202,18 @@ static jfieldID CacheField(JNIEnv* env, jclass c, bool is_static,
 
 static jmethodID CacheMethod(JNIEnv* env, jclass c, bool is_static,
                              const char* name, const char* signature) {
-  jmethodID mid = is_static ? env->GetStaticMethodID(c, name, signature) :
-      env->GetMethodID(c, name, signature);
+  jmethodID mid;
+  {
+    ScopedObjectAccess soa(env);
+    hiddenapi::ScopedCorePlatformApiCheck scpac;
+    if (Runtime::Current()->GetJniIdType() != JniIdType::kSwapablePointer) {
+      mid = jni::EncodeArtMethod</*kEnableIndexIds*/ true>(
+          FindMethodJNI(soa, c, name, signature, is_static));
+    } else {
+      mid = jni::EncodeArtMethod</*kEnableIndexIds*/ false>(
+          FindMethodJNI(soa, c, name, signature, is_static));
+    }
+  }
   if (mid == nullptr) {
     ScopedObjectAccess soa(env);
     if (soa.Self()->IsExceptionPending()) {
@@ -348,6 +371,13 @@ void WellKnownClasses::Init(JNIEnv* env) {
   org_apache_harmony_dalvik_ddmc_Chunk = CacheClass(env, "org/apache/harmony/dalvik/ddmc/Chunk");
   org_apache_harmony_dalvik_ddmc_DdmServer = CacheClass(env, "org/apache/harmony/dalvik/ddmc/DdmServer");
 
+  InitFieldsAndMethodsOnly(env);
+}
+
+void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
+  hiddenapi::ScopedHiddenApiEnforcementPolicySetting hiddenapi_exemption(
+      hiddenapi::EnforcementPolicy::kDisabled);
+
   dalvik_system_BaseDexClassLoader_getLdLibraryPath = CacheMethod(env, dalvik_system_BaseDexClassLoader, false, "getLdLibraryPath", "()Ljava/lang/String;");
   dalvik_system_VMRuntime_runFinalization = CacheMethod(env, dalvik_system_VMRuntime, true, "runFinalization", "(J)V");
   dalvik_system_VMRuntime_hiddenApiUsed = CacheMethod(env, dalvik_system_VMRuntime, true, "hiddenApiUsed", "(ILjava/lang/String;Ljava/lang/String;IZ)V");
@@ -450,6 +480,11 @@ void WellKnownClasses::LateInit(JNIEnv* env) {
     CacheMethod(env, java_lang_reflect_Proxy, true, "invoke",
                 "(Ljava/lang/reflect/Proxy;Ljava/lang/reflect/Method;"
                     "[Ljava/lang/Object;)Ljava/lang/Object;");
+}
+
+void WellKnownClasses::HandleJniIdTypeChange(JNIEnv* env) {
+  WellKnownClasses::InitFieldsAndMethodsOnly(env);
+  WellKnownClasses::LateInit(env);
 }
 
 void WellKnownClasses::Clear() {

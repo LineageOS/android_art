@@ -291,11 +291,12 @@ void JNIEnvExt::CheckNoHeldMonitors() {
   }
 }
 
-static void ThreadResetFunctionTable(Thread* thread, void* arg ATTRIBUTE_UNUSED)
+void ThreadResetFunctionTable(Thread* thread, void* arg ATTRIBUTE_UNUSED)
     REQUIRES(Locks::jni_function_table_lock_) {
   JNIEnvExt* env = thread->GetJniEnv();
   bool check_jni = env->IsCheckJniEnabled();
   env->functions = JNIEnvExt::GetFunctionTable(check_jni);
+  env->unchecked_functions_ = GetJniNativeInterface();
 }
 
 void JNIEnvExt::SetTableOverride(const JNINativeInterface* table_override) {
@@ -321,6 +322,14 @@ const JNINativeInterface* JNIEnvExt::GetFunctionTable(bool check_jni) {
     return override;
   }
   return check_jni ? GetCheckJniNativeInterface() : GetJniNativeInterface();
+}
+
+void JNIEnvExt::ResetFunctionTable() {
+  MutexLock mu(Thread::Current(), *Locks::thread_list_lock_);
+  MutexLock mu2(Thread::Current(), *Locks::jni_function_table_lock_);
+  Runtime* runtime = Runtime::Current();
+  CHECK(runtime != nullptr);
+  runtime->GetThreadList()->ForEach(ThreadResetFunctionTable, nullptr);
 }
 
 }  // namespace art
