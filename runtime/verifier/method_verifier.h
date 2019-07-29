@@ -163,7 +163,7 @@ class MethodVerifier {
                                uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  static void Init() REQUIRES_SHARED(Locks::mutator_lock_);
+  static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static void Shutdown();
 
   virtual ~MethodVerifier();
@@ -194,8 +194,13 @@ class MethodVerifier {
     return encountered_failure_types_;
   }
 
+  ClassLinker* GetClassLinker() {
+    return class_linker_;
+  }
+
  protected:
   MethodVerifier(Thread* self,
+                 ClassLinker* class_linker,
                  const DexFile* dex_file,
                  const dex::CodeItem* code_item,
                  uint32_t dex_method_idx,
@@ -226,6 +231,7 @@ class MethodVerifier {
    *      for code flow problems.
    */
   static FailureData VerifyMethod(Thread* self,
+                                  ClassLinker* class_linker,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
@@ -244,6 +250,7 @@ class MethodVerifier {
 
   template <bool kVerifierDebug>
   static FailureData VerifyMethod(Thread* self,
+                                  ClassLinker* class_linker,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
@@ -350,6 +357,9 @@ class MethodVerifier {
   // instruction. Aput-object operations implicitly check for array-store exceptions, similar to
   // check-cast.
   bool has_check_casts_;
+
+  // Classlinker to use when resolving.
+  ClassLinker* class_linker_;
 
   // Link, for the method verifier root linked list.
   MethodVerifier* link_;
