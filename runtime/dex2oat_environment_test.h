@@ -137,29 +137,6 @@ class Dex2oatEnvironmentTest : public CommonRuntimeTest {
     dst_stream << src_stream.rdbuf();
   }
 
-  // Returns the directory where the pre-compiled core.art can be found.
-  // TODO: We should factor out this into common tests somewhere rather than
-  // re-hardcoding it here (This was copied originally from the elf writer
-  // test).
-  std::string GetImageDirectory() const {
-    if (IsHost()) {
-      const char* host_dir = getenv("ANDROID_HOST_OUT");
-      CHECK(host_dir != nullptr);
-      return std::string(host_dir) + "/framework";
-    } else {
-      return std::string("/data/art-test");
-    }
-  }
-
-  std::string GetImageLocation() const {
-    return GetImageDirectory() + "/core.art";
-  }
-
-  std::string GetSystemImageFile() const {
-    return GetImageDirectory() + "/" + GetInstructionSetString(kRuntimeISA)
-      + "/core.art";
-  }
-
   // Returns the path to an image location whose contents differ from the
   // image at GetImageLocation(). This is used for testing mismatched
   // image checksums in the oat_file_assistant_tests.
