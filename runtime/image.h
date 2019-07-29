@@ -339,9 +339,8 @@ class PACKED(8) ImageHeader {
   ObjPtr<mirror::ObjectArray<mirror::Object>> GetImageRoots() const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void RelocateImage(int64_t delta);
-  void RelocateImageMethods(int64_t delta);
-  void RelocateImageObjects(int64_t delta);
+  void RelocateImageReferences(int64_t delta);
+  void RelocateBootImageReferences(int64_t delta);
 
   uint32_t GetBootImageBegin() const {
     return boot_image_begin_;
