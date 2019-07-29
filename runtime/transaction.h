@@ -30,6 +30,9 @@
 #include <map>
 
 namespace art {
+namespace gc {
+class Heap;
+}  // namespace gc
 namespace mirror {
 class Array;
 class Class;
@@ -38,14 +41,14 @@ class Object;
 class String;
 }  // namespace mirror
 class InternTable;
+template<class MirrorType> class ObjPtr;
 
 class Transaction final {
  public:
   static constexpr const char* kAbortExceptionDescriptor = "dalvik.system.TransactionAbortError";
   static constexpr const char* kAbortExceptionSignature = "Ldalvik/system/TransactionAbortError;";
 
-  Transaction();
-  explicit Transaction(bool strict, mirror::Class* root);
+  Transaction(bool strict, mirror::Class* root);
   ~Transaction();
 
   void Abort(const std::string& abort_message)
@@ -63,7 +66,9 @@ class Transaction final {
   // If the transaction is in strict mode, then all access of static fields will be constrained,
   // one class's clinit will not be allowed to read or modify another class's static fields, unless
   // the transaction is aborted.
-  bool IsStrict() REQUIRES(!log_lock_);
+  bool IsStrict() {
+    return heap_ == nullptr;
+  }
 
   // Record object field changes.
   void RecordWriteFieldBoolean(mirror::Object* obj,
@@ -135,11 +140,11 @@ class Transaction final {
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool ReadConstraint(mirror::Object* obj, ArtField* field)
+  bool ReadConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field)
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool WriteConstraint(mirror::Object* obj, ArtField* field)
+  bool WriteConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field)
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -307,7 +312,7 @@ class Transaction final {
   std::list<ResolveStringLog> resolve_string_logs_ GUARDED_BY(log_lock_);
   bool aborted_ GUARDED_BY(log_lock_);
   bool rolling_back_;  // Single thread, no race.
-  bool strict_ GUARDED_BY(log_lock_);
+  gc::Heap* const heap_;
   std::string abort_message_ GUARDED_BY(log_lock_);
   mirror::Class* root_ GUARDED_BY(log_lock_);
 

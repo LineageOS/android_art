@@ -28,7 +28,12 @@
 namespace art {
 
 class TransactionTest : public CommonRuntimeTest {
- public:
+ protected:
+  void SetUpRuntimeOptions(/*out*/RuntimeOptions* options) override {
+    // Set up the image location.
+    options->emplace_back("-Ximage:" + GetImageLocation(), nullptr);
+  }
+
   // Tests failing class initialization due to native call with transaction rollback.
   void testTransactionAbort(const char* tested_class_signature) {
     ScopedObjectAccess soa(Thread::Current());
@@ -70,9 +75,9 @@ class TransactionTest : public CommonRuntimeTest {
     ClassStatus old_status = h_klass->GetStatus();
     LockWord old_lock_word = h_klass->GetLockWord(false);
 
-    Runtime::Current()->EnterTransactionMode();
+    EnterTransactionMode();
     bool success = class_linker_->EnsureInitialized(soa.Self(), h_klass, true, true);
-    ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
+    ASSERT_TRUE(IsTransactionAborted());
     ASSERT_FALSE(success);
     ASSERT_TRUE(h_klass->IsErroneous());
     ASSERT_TRUE(soa.Self()->IsExceptionPending());
@@ -83,7 +88,7 @@ class TransactionTest : public CommonRuntimeTest {
 
     // Check class status is rolled back properly.
     soa.Self()->ClearException();
-    Runtime::Current()->RollbackAndExitTransactionMode();
+    RollbackAndExitTransactionMode();
     ASSERT_EQ(old_status, h_klass->GetStatus());
   }
 };
@@ -96,12 +101,12 @@ TEST_F(TransactionTest, Object_class) {
       hs.NewHandle(class_linker_->FindSystemClass(soa.Self(), "Ljava/lang/Object;")));
   ASSERT_TRUE(h_klass != nullptr);
 
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   Handle<mirror::Object> h_obj(hs.NewHandle(h_klass->AllocObject(soa.Self())));
   ASSERT_TRUE(h_obj != nullptr);
   ASSERT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
   // Rolling back transaction's changes must not clear the Object::class field.
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
   EXPECT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
 }
 
@@ -120,12 +125,12 @@ TEST_F(TransactionTest, Object_monitor) {
   h_obj->MonitorEnter(soa.Self());
   LockWord old_lock_word = h_obj->GetLockWord(false);
 
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   // Unlock object's monitor inside the transaction.
   h_obj->MonitorExit(soa.Self());
   LockWord new_lock_word = h_obj->GetLockWord(false);
   // Rolling back transaction's changes must not change monitor's state.
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
 
   LockWord aborted_lock_word = h_obj->GetLockWord(false);
   EXPECT_FALSE(LockWord::Equal<false>(old_lock_word, new_lock_word));
@@ -142,7 +147,7 @@ TEST_F(TransactionTest, Array_length) {
 
   constexpr int32_t kArraySize = 2;
 
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
 
   // Allocate an array during transaction.
   Handle<mirror::Array> h_obj = hs.NewHandle(
@@ -153,7 +158,7 @@ TEST_F(TransactionTest, Array_length) {
                            Runtime::Current()->GetHeap()->GetCurrentAllocator()));
   ASSERT_TRUE(h_obj != nullptr);
   ASSERT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
 
   // Rolling back transaction's changes must not reset array's length.
   EXPECT_EQ(h_obj->GetLength(), kArraySize);
@@ -231,7 +236,7 @@ TEST_F(TransactionTest, StaticFieldsTest) {
   ASSERT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
 
   // Modify fields inside transaction then rollback changes.
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   booleanField->SetBoolean<true>(h_klass.Get(), true);
   byteField->SetByte<true>(h_klass.Get(), 1);
   charField->SetChar<true>(h_klass.Get(), 1u);
@@ -241,7 +246,7 @@ TEST_F(TransactionTest, StaticFieldsTest) {
   floatField->SetFloat<true>(h_klass.Get(), 1.0);
   doubleField->SetDouble<true>(h_klass.Get(), 1.0);
   objectField->SetObject<true>(h_klass.Get(), h_obj.Get());
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
 
   // Check values have properly been restored to their original (default) value.
   EXPECT_EQ(booleanField->GetBoolean(h_klass.Get()), false);
@@ -331,7 +336,7 @@ TEST_F(TransactionTest, InstanceFieldsTest) {
   ASSERT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
 
   // Modify fields inside transaction then rollback changes.
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   booleanField->SetBoolean<true>(h_instance.Get(), true);
   byteField->SetByte<true>(h_instance.Get(), 1);
   charField->SetChar<true>(h_instance.Get(), 1u);
@@ -341,7 +346,7 @@ TEST_F(TransactionTest, InstanceFieldsTest) {
   floatField->SetFloat<true>(h_instance.Get(), 1.0);
   doubleField->SetDouble<true>(h_instance.Get(), 1.0);
   objectField->SetObject<true>(h_instance.Get(), h_obj.Get());
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
 
   // Check values have properly been restored to their original (default) value.
   EXPECT_EQ(booleanField->GetBoolean(h_instance.Get()), false);
@@ -454,7 +459,7 @@ TEST_F(TransactionTest, StaticArrayFieldsTest) {
   ASSERT_OBJ_PTR_EQ(h_obj->GetClass(), h_klass.Get());
 
   // Modify fields inside transaction then rollback changes.
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   booleanArray->SetWithoutChecks<true>(0, true);
   byteArray->SetWithoutChecks<true>(0, 1);
   charArray->SetWithoutChecks<true>(0, 1u);
@@ -464,7 +469,7 @@ TEST_F(TransactionTest, StaticArrayFieldsTest) {
   floatArray->SetWithoutChecks<true>(0, 1.0);
   doubleArray->SetWithoutChecks<true>(0, 1.0);
   objectArray->SetWithoutChecks<true>(0, h_obj.Get());
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
 
   // Check values have properly been restored to their original (default) value.
   EXPECT_EQ(booleanArray->GetWithoutChecks(0), false);
@@ -506,7 +511,7 @@ TEST_F(TransactionTest, ResolveString) {
   EXPECT_TRUE(class_linker_->LookupString(string_idx, h_dex_cache.Get()) == nullptr);
   EXPECT_TRUE(h_dex_cache->GetResolvedString(string_idx) == nullptr);
   // Do the transaction, then roll back.
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   bool success = class_linker_->EnsureInitialized(soa.Self(), h_klass, true, true);
   ASSERT_TRUE(success);
   ASSERT_TRUE(h_klass->IsInitialized());
@@ -518,7 +523,7 @@ TEST_F(TransactionTest, ResolveString) {
     EXPECT_STREQ(s->ToModifiedUtf8().c_str(), kResolvedString);
     EXPECT_OBJ_PTR_EQ(s, h_dex_cache->GetResolvedString(string_idx));
   }
-  Runtime::Current()->RollbackAndExitTransactionMode();
+  RollbackAndExitTransactionMode();
   // Check that the string did not stay resolved.
   EXPECT_TRUE(class_linker_->LookupString(string_idx, h_dex_cache.Get()) == nullptr);
   EXPECT_TRUE(h_dex_cache->GetResolvedString(string_idx) == nullptr);
@@ -541,9 +546,9 @@ TEST_F(TransactionTest, EmptyClass) {
   class_linker_->VerifyClass(soa.Self(), h_klass);
   ASSERT_TRUE(h_klass->IsVerified());
 
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   bool success = class_linker_->EnsureInitialized(soa.Self(), h_klass, true, true);
-  Runtime::Current()->ExitTransactionMode();
+  ExitTransactionMode();
   ASSERT_TRUE(success);
   ASSERT_TRUE(h_klass->IsInitialized());
   ASSERT_FALSE(soa.Self()->IsExceptionPending());
@@ -564,9 +569,9 @@ TEST_F(TransactionTest, StaticFieldClass) {
   class_linker_->VerifyClass(soa.Self(), h_klass);
   ASSERT_TRUE(h_klass->IsVerified());
 
-  Runtime::Current()->EnterTransactionMode();
+  EnterTransactionMode();
   bool success = class_linker_->EnsureInitialized(soa.Self(), h_klass, true, true);
-  Runtime::Current()->ExitTransactionMode();
+  ExitTransactionMode();
   ASSERT_TRUE(success);
   ASSERT_TRUE(h_klass->IsInitialized());
   ASSERT_FALSE(soa.Self()->IsExceptionPending());
@@ -598,4 +603,56 @@ TEST_F(TransactionTest, MultipleNativeCallAbortClass) {
 TEST_F(TransactionTest, FinalizableAbortClass) {
   testTransactionAbort("LTransaction$FinalizableAbortClass;");
 }
+
+TEST_F(TransactionTest, Constraints) {
+  ScopedObjectAccess soa(Thread::Current());
+  StackHandleScope<4> hs(soa.Self());
+  Handle<mirror::ClassLoader> class_loader(
+      hs.NewHandle(soa.Decode<mirror::ClassLoader>(LoadDex("Transaction"))));
+
+  Handle<mirror::Class> boolean_class = hs.NewHandle(
+      class_linker_->FindClass(soa.Self(), "Ljava/lang/Boolean;", class_loader));
+  ArtField* true_field =
+      mirror::Class::FindField(soa.Self(), boolean_class.Get(), "TRUE", "Ljava/lang/Boolean;");
+  ASSERT_TRUE(true_field != nullptr);
+  ASSERT_TRUE(true_field->IsStatic());
+  Handle<mirror::Object> true_value = hs.NewHandle(true_field->GetObject(boolean_class.Get()));
+  ASSERT_TRUE(true_value != nullptr);
+  ArtField* value_field =
+      mirror::Class::FindField(soa.Self(), boolean_class.Get(), "value", "Z");
+  ASSERT_TRUE(value_field != nullptr);
+  ASSERT_FALSE(value_field->IsStatic());
+
+  Handle<mirror::Class> static_field_class(hs.NewHandle(
+      class_linker_->FindClass(soa.Self(), "LTransaction$StaticFieldClass;", class_loader)));
+  ArtField* int_field =
+      mirror::Class::FindField(soa.Self(), static_field_class.Get(), "intField", "I");
+  ASSERT_TRUE(int_field != nullptr);
+
+  // Test non-strict transaction.
+  Transaction transaction(/*strict=*/ false, /*root=*/ nullptr);
+  // Static field in boot image.
+  ASSERT_TRUE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(boolean_class.Get()));
+  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), boolean_class.Get(), true_field));
+  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), boolean_class.Get(), true_field));
+  // Instance field in boot image. Do not check ReadConstraint(), it expects only static fields.
+  ASSERT_TRUE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(true_value.Get()));
+  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), true_value.Get(), value_field));
+  // Static field not in boot image.
+  ASSERT_FALSE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(static_field_class.Get()));
+  EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
+  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+
+  // Test strict transaction.
+  Transaction strict_transaction(/*strict=*/ true, /*root=*/ static_field_class.Get());
+  // Static field in another class.
+  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), boolean_class.Get(), true_field));
+  EXPECT_TRUE(strict_transaction.ReadConstraint(soa.Self(), boolean_class.Get(), true_field));
+  // Instance field in another class. Do not check ReadConstraint(), it expects only static fields.
+  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), true_value.Get(), value_field));
+  // Static field in the same class.
+  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
+  EXPECT_FALSE(strict_transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+}
+
 }  // namespace art

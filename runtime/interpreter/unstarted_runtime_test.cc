@@ -785,19 +785,19 @@ TEST_F(UnstartedRuntimeTest, ToLowerUpper) {
     {
       JValue result;
       tmp->SetVReg(0, static_cast<int32_t>(i));
-      Runtime::Current()->EnterTransactionMode();
+      EnterTransactionMode();
       UnstartedCharacterToLowerCase(self, tmp.get(), &result, 0);
-      ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-      Runtime::Current()->ExitTransactionMode();
+      ASSERT_TRUE(IsTransactionAborted());
+      ExitTransactionMode();
       ASSERT_TRUE(self->IsExceptionPending());
     }
     {
       JValue result;
       tmp->SetVReg(0, static_cast<int32_t>(i));
-      Runtime::Current()->EnterTransactionMode();
+      EnterTransactionMode();
       UnstartedCharacterToUpperCase(self, tmp.get(), &result, 0);
-      ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-      Runtime::Current()->ExitTransactionMode();
+      ASSERT_TRUE(IsTransactionAborted());
+      ExitTransactionMode();
       ASSERT_TRUE(self->IsExceptionPending());
     }
   }
@@ -805,19 +805,19 @@ TEST_F(UnstartedRuntimeTest, ToLowerUpper) {
     {
       JValue result;
       tmp->SetVReg(0, static_cast<int32_t>(i));
-      Runtime::Current()->EnterTransactionMode();
+      EnterTransactionMode();
       UnstartedCharacterToLowerCase(self, tmp.get(), &result, 0);
-      ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-      Runtime::Current()->ExitTransactionMode();
+      ASSERT_TRUE(IsTransactionAborted());
+      ExitTransactionMode();
       ASSERT_TRUE(self->IsExceptionPending());
     }
     {
       JValue result;
       tmp->SetVReg(0, static_cast<int32_t>(i));
-      Runtime::Current()->EnterTransactionMode();
+      EnterTransactionMode();
       UnstartedCharacterToUpperCase(self, tmp.get(), &result, 0);
-      ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-      Runtime::Current()->ExitTransactionMode();
+      ASSERT_TRUE(IsTransactionAborted());
+      ExitTransactionMode();
       ASSERT_TRUE(self->IsExceptionPending());
     }
   }
@@ -980,10 +980,10 @@ TEST_F(UnstartedRuntimeTest, ThreadLocalGet) {
     UniqueDeoptShadowFramePtr caller_frame = CreateShadowFrame(10, nullptr, caller_method, 0);
     shadow_frame->SetLink(caller_frame.get());
 
-    Runtime::Current()->EnterTransactionMode();
+    EnterTransactionMode();
     UnstartedThreadLocalGet(self, shadow_frame.get(), &result, 0);
-    ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-    Runtime::Current()->ExitTransactionMode();
+    ASSERT_TRUE(IsTransactionAborted());
+    ExitTransactionMode();
     ASSERT_TRUE(self->IsExceptionPending());
     self->ClearException();
 
@@ -1050,10 +1050,10 @@ TEST_F(UnstartedRuntimeTest, ThreadCurrentThread) {
   PrepareForAborts();
 
   {
-    Runtime::Current()->EnterTransactionMode();
+    EnterTransactionMode();
     UnstartedThreadCurrentThread(self, shadow_frame.get(), &result, 0);
-    ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
-    Runtime::Current()->ExitTransactionMode();
+    ASSERT_TRUE(IsTransactionAborted());
+    ExitTransactionMode();
     ASSERT_TRUE(self->IsExceptionPending());
     self->ClearException();
   }
@@ -1120,7 +1120,7 @@ class UnstartedClassForNameTest : public UnstartedRuntimeTest {
       CHECK(name_string != nullptr);
 
       if (in_transaction) {
-        Runtime::Current()->EnterTransactionMode();
+        EnterTransactionMode();
       }
       CHECK(!self->IsExceptionPending());
 
@@ -1132,13 +1132,13 @@ class UnstartedClassForNameTest : public UnstartedRuntimeTest {
       } else {
         CHECK(self->IsExceptionPending()) << name;
         if (in_transaction) {
-          ASSERT_TRUE(Runtime::Current()->IsTransactionAborted());
+          ASSERT_TRUE(IsTransactionAborted());
         }
         self->ClearException();
       }
 
       if (in_transaction) {
-        Runtime::Current()->ExitTransactionMode();
+        ExitTransactionMode();
       }
     }
   }
