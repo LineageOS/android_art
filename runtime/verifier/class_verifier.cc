@@ -141,6 +141,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
     MethodVerifier::FailureData result =
         MethodVerifier::VerifyMethod(self,
                                      linker,
+                                     Runtime::Current()->GetArenaPool(),
                                      method_idx,
                                      dex_file,
                                      dex_cache,
