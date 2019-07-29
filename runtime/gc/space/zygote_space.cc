@@ -21,6 +21,7 @@
 #include "gc/accounting/card_table-inl.h"
 #include "gc/accounting/space_bitmap-inl.h"
 #include "gc/heap.h"
+#include "mirror/object-readbarrier-inl.h"
 #include "runtime.h"
 #include "thread-current-inl.h"
 
@@ -58,6 +59,15 @@ ZygoteSpace* ZygoteSpace::Create(const std::string& name,
   zygote_space->live_bitmap_.reset(live_bitmap);
   zygote_space->mark_bitmap_.reset(mark_bitmap);
   return zygote_space;
+}
+
+void ZygoteSpace::SetMarkBitInLiveObjects() {
+  GetLiveBitmap()->VisitMarkedRange(reinterpret_cast<uintptr_t>(Begin()),
+                                    reinterpret_cast<uintptr_t>(Limit()),
+                                    [](mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
+                                      bool success = obj->AtomicSetMarkBit(0, 1);
+                                      CHECK(success);
+                                    });
 }
 
 void ZygoteSpace::Clear() {
