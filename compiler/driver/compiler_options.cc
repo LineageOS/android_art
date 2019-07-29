@@ -20,11 +20,11 @@
 #include <string_view>
 
 #include "android-base/stringprintf.h"
-#include "android-base/strings.h"
 
 #include "arch/instruction_set.h"
 #include "arch/instruction_set_features.h"
 #include "base/runtime_debug.h"
+#include "base/string_view_cpp20.h"
 #include "base/variant_map.h"
 #include "class_linker.h"
 #include "cmdline_parser.h"
@@ -185,18 +185,23 @@ bool CompilerOptions::IsMethodVerifiedWithoutFailures(uint32_t method_idx,
 }
 
 bool CompilerOptions::IsCoreImageFilename(const std::string& boot_image_filename) {
+  std::string_view filename(boot_image_filename);
+  size_t colon_pos = filename.find(':');
+  if (colon_pos != std::string_view::npos) {
+    filename = filename.substr(0u, colon_pos);
+  }
   // Look for "core.art" or "core-*.art".
-  if (android::base::EndsWith(boot_image_filename, "core.art")) {
+  if (EndsWith(filename, "core.art")) {
     return true;
   }
-  if (!android::base::EndsWith(boot_image_filename, ".art")) {
+  if (!EndsWith(filename, ".art")) {
     return false;
   }
-  size_t slash_pos = boot_image_filename.rfind('/');
+  size_t slash_pos = filename.rfind('/');
   if (slash_pos == std::string::npos) {
-    return android::base::StartsWith(boot_image_filename, "core-");
+    return StartsWith(filename, "core-");
   }
-  return boot_image_filename.compare(slash_pos + 1, 5u, "core-") == 0;
+  return filename.compare(slash_pos + 1, 5u, "core-") == 0;
 }
 
 }  // namespace art
