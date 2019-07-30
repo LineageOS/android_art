@@ -605,7 +605,9 @@ static const RegType& SelectNonConstant2(const RegType& a, const RegType& b) {
 
 namespace {
 
-ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t)
+ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s,
+                                     ObjPtr<mirror::Class> t,
+                                     ClassLinker* class_linker)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
 ObjPtr<mirror::Class> InterfaceClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t)
@@ -631,7 +633,9 @@ ObjPtr<mirror::Class> InterfaceClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror:
  *
  * [1] Java bytecode verification: algorithms and formalizations, Xavier Leroy
  */
-ObjPtr<mirror::Class> ClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t)
+ObjPtr<mirror::Class> ClassJoin(ObjPtr<mirror::Class> s,
+                                ObjPtr<mirror::Class> t,
+                                ClassLinker* class_linker)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   DCHECK(!s->IsPrimitive()) << s->PrettyClass();
   DCHECK(!t->IsPrimitive()) << t->PrettyClass();
@@ -642,7 +646,7 @@ ObjPtr<mirror::Class> ClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t
   } else if (t->IsAssignableFrom(s)) {
     return t;
   } else if (s->IsArrayClass() && t->IsArrayClass()) {
-    return ArrayClassJoin(s, t);
+    return ArrayClassJoin(s, t, class_linker);
   } else if (s->IsInterface() || t->IsInterface()) {
     return InterfaceClassJoin(s, t);
   } else {
@@ -669,7 +673,9 @@ ObjPtr<mirror::Class> ClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t
   }
 }
 
-ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Class> t) {
+ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s,
+                                     ObjPtr<mirror::Class> t,
+                                     ClassLinker* class_linker) {
   ObjPtr<mirror::Class> s_ct = s->GetComponentType();
   ObjPtr<mirror::Class> t_ct = t->GetComponentType();
   if (s_ct->IsPrimitive() || t_ct->IsPrimitive()) {
@@ -680,14 +686,13 @@ ObjPtr<mirror::Class> ArrayClassJoin(ObjPtr<mirror::Class> s, ObjPtr<mirror::Cla
     return result;
   }
   Thread* self = Thread::Current();
-  ObjPtr<mirror::Class> common_elem = ClassJoin(s_ct, t_ct);
+  ObjPtr<mirror::Class> common_elem = ClassJoin(s_ct, t_ct, class_linker);
   if (UNLIKELY(common_elem == nullptr)) {
     self->AssertPendingException();
     return nullptr;
   }
   // Note: The following lookup invalidates existing ObjPtr<>s.
-  ObjPtr<mirror::Class> array_class =
-      Runtime::Current()->GetClassLinker()->FindArrayClass(self, common_elem);
+  ObjPtr<mirror::Class> array_class = class_linker->FindArrayClass(self, common_elem);
   if (UNLIKELY(array_class == nullptr)) {
     self->AssertPendingException();
     return nullptr;
@@ -867,7 +872,9 @@ const RegType& RegType::Merge(const RegType& incoming_type,
       // Do not cache the classes as ClassJoin() can suspend and invalidate ObjPtr<>s.
       DCHECK(GetClass() != nullptr && !GetClass()->IsPrimitive());
       DCHECK(incoming_type.GetClass() != nullptr && !incoming_type.GetClass()->IsPrimitive());
-      ObjPtr<mirror::Class> join_class = ClassJoin(GetClass(), incoming_type.GetClass());
+      ObjPtr<mirror::Class> join_class = ClassJoin(GetClass(),
+                                                   incoming_type.GetClass(),
+                                                   reg_types->GetClassLinker());
       if (UNLIKELY(join_class == nullptr)) {
         // Internal error joining the classes (e.g., OOME). Report an unresolved reference type.
         // We cannot report an unresolved merge type, as that will attempt to merge the resolved
@@ -880,7 +887,7 @@ const RegType& RegType::Merge(const RegType& incoming_type,
 
         // When compiling on the host, we rather want to abort to ensure determinism for preopting.
         // (In that case, it is likely a misconfiguration of dex2oat.)
-        if (!kIsTargetBuild && Runtime::Current()->IsAotCompiler()) {
+        if (!kIsTargetBuild && (verifier != nullptr && verifier->IsAotMode())) {
           LOG(FATAL) << "Could not create class join of "
                      << GetClass()->PrettyClass()
                      << " & "

@@ -163,7 +163,7 @@ class MethodVerifier {
                                uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  static void Init() REQUIRES_SHARED(Locks::mutator_lock_);
+  static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static void Shutdown();
 
   virtual ~MethodVerifier();
@@ -194,14 +194,25 @@ class MethodVerifier {
     return encountered_failure_types_;
   }
 
+  ClassLinker* GetClassLinker() {
+    return class_linker_;
+  }
+
+  bool IsAotMode() const {
+    return flags_.aot_mode_;
+  }
+
  protected:
   MethodVerifier(Thread* self,
+                 ClassLinker* class_linker,
+                 ArenaPool* arena_pool,
                  const DexFile* dex_file,
                  const dex::CodeItem* code_item,
                  uint32_t dex_method_idx,
                  bool can_load_classes,
                  bool allow_thread_suspension,
-                 bool allow_soft_failures)
+                 bool allow_soft_failures,
+                 bool aot_mode)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Verification result for method(s). Includes a (maximum) failure kind, and (the union of)
@@ -226,6 +237,8 @@ class MethodVerifier {
    *      for code flow problems.
    */
   static FailureData VerifyMethod(Thread* self,
+                                  ClassLinker* class_linker,
+                                  ArenaPool* arena_pool,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
@@ -239,11 +252,14 @@ class MethodVerifier {
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
+                                  bool aot_mode,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template <bool kVerifierDebug>
   static FailureData VerifyMethod(Thread* self,
+                                  ClassLinker* class_linker,
+                                  ArenaPool* arena_pool,
                                   uint32_t method_idx,
                                   const DexFile* dex_file,
                                   Handle<mirror::DexCache> dex_cache,
@@ -257,6 +273,7 @@ class MethodVerifier {
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
+                                  bool aot_mode,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -332,6 +349,9 @@ class MethodVerifier {
     // A version of the above that is not reset and thus captures if there were *any* throw
     // failures.
     bool have_any_pending_runtime_throw_failure_ : 1;
+
+    // Verify in AoT mode?
+    bool aot_mode_ : 1;
   } flags_;
 
   // Info message log use primarily for verifier diagnostics.
@@ -350,6 +370,9 @@ class MethodVerifier {
   // instruction. Aput-object operations implicitly check for array-store exceptions, similar to
   // check-cast.
   bool has_check_casts_;
+
+  // Classlinker to use when resolving.
+  ClassLinker* class_linker_;
 
   // Link, for the method verifier root linked list.
   MethodVerifier* link_;

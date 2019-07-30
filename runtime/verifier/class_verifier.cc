@@ -140,6 +140,8 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
     std::string hard_failure_msg;
     MethodVerifier::FailureData result =
         MethodVerifier::VerifyMethod(self,
+                                     linker,
+                                     Runtime::Current()->GetArenaPool(),
                                      method_idx,
                                      dex_file,
                                      dex_cache,
@@ -153,6 +155,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                                      log_level,
                                      /*need_precise_constants=*/ false,
                                      api_level,
+                                     Runtime::Current()->IsAotCompiler(),
                                      &hard_failure_msg);
     if (result.kind == FailureKind::kHardFailure) {
       if (failure_data.kind == FailureKind::kHardFailure) {
@@ -190,8 +193,8 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
   }
 }
 
-void ClassVerifier::Init() {
-  MethodVerifier::Init();
+void ClassVerifier::Init(ClassLinker* class_linker) {
+  MethodVerifier::Init(class_linker);
 }
 
 void ClassVerifier::Shutdown() {

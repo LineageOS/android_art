@@ -1306,12 +1306,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   is_low_memory_mode_ = runtime_options.Exists(Opt::LowMemoryMode);
   madvise_random_access_ = runtime_options.GetOrDefault(Opt::MadviseRandomAccess);
 
-  if (!runtime_options.Exists(Opt::OpaqueJniIds)) {
-    jni_ids_indirection_ = JniIdType::kDefault;
-  } else {
-    jni_ids_indirection_ = *runtime_options.Get(Opt::OpaqueJniIds) ? JniIdType::kIndices
-                                                                   : JniIdType::kPointer;
-  }
+  jni_ids_indirection_ = runtime_options.GetOrDefault(Opt::OpaqueJniIds);
 
   plugins_ = runtime_options.ReleaseOrDefault(Opt::Plugins);
   agent_specs_ = runtime_options.ReleaseOrDefault(Opt::AgentPath);
@@ -1608,7 +1603,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   CHECK(class_linker_ != nullptr);
 
-  verifier::ClassVerifier::Init();
+  verifier::ClassVerifier::Init(class_linker_);
 
   if (runtime_options.Exists(Opt::MethodTrace)) {
     trace_config_.reset(new TraceConfig());
@@ -2381,18 +2376,14 @@ bool Runtime::IsActiveTransaction() const {
   return !preinitialization_transactions_.empty() && !GetTransaction()->IsRollingBack();
 }
 
-void Runtime::EnterTransactionMode() {
-  DCHECK(IsAotCompiler());
-  DCHECK(!IsActiveTransaction());
-  // Make initialized classes visibly initialized now. If that happened during the transaction
-  // and then the transaction was aborted, we would roll back the status update but not the
-  // ClassLinker's bookkeeping structures, so these classes would never be visibly initialized.
-  GetClassLinker()->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
-  preinitialization_transactions_.push_back(std::make_unique<Transaction>());
-}
-
 void Runtime::EnterTransactionMode(bool strict, mirror::Class* root) {
   DCHECK(IsAotCompiler());
+  if (preinitialization_transactions_.empty()) {  // Top-level transaction?
+    // Make initialized classes visibly initialized now. If that happened during the transaction
+    // and then the transaction was aborted, we would roll back the status update but not the
+    // ClassLinker's bookkeeping structures, so these classes would never be visibly initialized.
+    GetClassLinker()->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
+  }
   preinitialization_transactions_.push_back(std::make_unique<Transaction>(strict, root));
 }
 
@@ -2929,6 +2920,16 @@ bool Runtime::GetStartupCompleted() const {
 
 void Runtime::SetSignalHookDebuggable(bool value) {
   SkipAddSignalHandler(value);
+}
+
+void Runtime::SetJniIdType(JniIdType t) {
+  CHECK(CanSetJniIdType()) << "Not allowed to change id type!";
+  if (t == GetJniIdType()) {
+    return;
+  }
+  jni_ids_indirection_ = t;
+  JNIEnvExt::ResetFunctionTable();
+  WellKnownClasses::HandleJniIdTypeChange(Thread::Current()->GetJniEnv());
 }
 
 }  // namespace art

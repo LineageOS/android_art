@@ -151,6 +151,8 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
 
  private:
   MethodVerifier(Thread* self,
+                 ClassLinker* class_linker,
+                 ArenaPool* arena_pool,
                  const DexFile* dex_file,
                  Handle<mirror::DexCache> dex_cache,
                  Handle<mirror::ClassLoader> class_loader,
@@ -165,6 +167,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
                  bool verify_to_dump,
                  bool allow_thread_suspension,
                  bool fill_register_lines_,
+                 bool aot_mode,
                  uint32_t api_level)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -700,6 +703,8 @@ static bool IsLargeMethod(const CodeItemDataAccessor& accessor) {
 
 template <bool kVerifierDebug>
 MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
+                                               ClassLinker* class_linker,
+                                               ArenaPool* arena_pool,
                                                const DexFile* dex_file,
                                                Handle<mirror::DexCache> dex_cache,
                                                Handle<mirror::ClassLoader> class_loader,
@@ -714,14 +719,18 @@ MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
                                                bool verify_to_dump,
                                                bool allow_thread_suspension,
                                                bool fill_register_lines,
+                                               bool aot_mode,
                                                uint32_t api_level)
     : art::verifier::MethodVerifier(self,
+                                    class_linker,
+                                    arena_pool,
                                     dex_file,
                                     code_item,
                                     dex_method_idx,
                                     can_load_classes,
                                     allow_thread_suspension,
-                                    allow_soft_failures),
+                                    allow_soft_failures,
+                                    aot_mode),
       method_being_verified_(method),
       method_access_flags_(method_access_flags),
       return_type_(nullptr),
@@ -913,7 +922,7 @@ bool MethodVerifier<kVerifierDebug>::Verify() {
                             InstructionFlags());
   // Run through the instructions and see if the width checks out.
   bool result = ComputeWidthsAndCountOps();
-  bool allow_runtime_only_instructions = !Runtime::Current()->IsAotCompiler() || verify_to_dump_;
+  bool allow_runtime_only_instructions = !IsAotMode() || verify_to_dump_;
   // Flag instructions guarded by a "try" block and check exception handlers.
   result = result && ScanTryCatchBlocks();
   // Perform static instruction verification.
@@ -1006,7 +1015,7 @@ bool MethodVerifier<kVerifierDebug>::ScanTryCatchBlocks() {
   // Iterate over each of the handlers to verify target addresses.
   const uint8_t* handlers_ptr = code_item_accessor_.GetCatchHandlerData();
   const uint32_t handlers_size = DecodeUnsignedLeb128(&handlers_ptr);
-  ClassLinker* linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* linker = GetClassLinker();
   for (uint32_t idx = 0; idx < handlers_size; idx++) {
     CatchHandlerIterator iterator(handlers_ptr);
     for (; iterator.HasNext(); iterator.Next()) {
@@ -1587,7 +1596,7 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   const uint16_t registers_size = code_item_accessor_.RegistersSize();
 
   /* Create and initialize table holding register status */
-  RegisterTrackingMode base_mode = Runtime::Current()->IsAotCompiler()
+  RegisterTrackingMode base_mode = IsAotMode()
                                        ? kTrackCompilerInterestPoints
                                        : kTrackRegsBranches;
   reg_table_.Init(fill_register_lines_ ? kTrackRegsAll : base_mode,
@@ -2432,7 +2441,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
       const RegType& res_type = ResolveClass<CheckAccess::kYes>(type_idx);
       if (res_type.IsConflict()) {
         // If this is a primitive type, fail HARD.
-        ObjPtr<mirror::Class> klass = Runtime::Current()->GetClassLinker()->LookupResolvedType(
+        ObjPtr<mirror::Class> klass = GetClassLinker()->LookupResolvedType(
             type_idx, dex_cache_.Get(), class_loader_.Get());
         if (klass != nullptr && klass->IsPrimitive()) {
           Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "using primitive type "
@@ -3475,7 +3484,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
   }  // end - switch (dec_insn.opcode)
 
   if (flags_.have_pending_hard_failure_) {
-    if (Runtime::Current()->IsAotCompiler()) {
+    if (IsAotMode()) {
       /* When AOT compiling, check that the last failure is a hard failure */
       if (failures_[failures_.size() - 1] != VERIFY_ERROR_BAD_CLASS_HARD) {
         LOG(ERROR) << "Pending failures:";
@@ -3595,7 +3604,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
     CatchHandlerIterator iterator(code_item_accessor_, *try_item);
 
     // Need the linker to try and resolve the handled class to check if it's Throwable.
-    ClassLinker* linker = Runtime::Current()->GetClassLinker();
+    ClassLinker* linker = GetClassLinker();
 
     for (; iterator.HasNext(); iterator.Next()) {
       dex::TypeIndex handler_type_idx = iterator.GetHandlerTypeIndex();
@@ -3724,7 +3733,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
 template <bool kVerifierDebug>
 template <CheckAccess C>
 const RegType& MethodVerifier<kVerifierDebug>::ResolveClass(dex::TypeIndex class_idx) {
-  ClassLinker* linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* linker = GetClassLinker();
   ObjPtr<mirror::Class> klass = can_load_classes_
       ? linker->ResolveType(class_idx, dex_cache_, class_loader_)
       : linker->LookupResolvedType(class_idx, dex_cache_.Get(), class_loader_.Get());
@@ -3840,7 +3849,7 @@ bool MethodVerifier<kVerifierDebug>::HandleMoveException(const Instruction* inst
         handlers_ptr = iterator.EndDataPointer();
       }
       if (unresolved != nullptr) {
-        if (!Runtime::Current()->IsAotCompiler() && common_super == nullptr) {
+        if (!IsAotMode() && common_super == nullptr) {
           // This is an unreachable handler.
 
           // We need to post a failure. The compiler currently does not handle unreachable
@@ -3886,7 +3895,7 @@ ArtMethod* MethodVerifier<kVerifierDebug>::ResolveMethodAndCheckAccess(
   }
   ObjPtr<mirror::Class> klass = klass_type.GetClass();
   const RegType& referrer = GetDeclaringClass();
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   PointerSize pointer_size = class_linker->GetImagePointerSize();
 
   ArtMethod* res_method = dex_cache_->GetResolvedMethod(dex_method_idx, pointer_size);
@@ -4344,8 +4353,7 @@ bool MethodVerifier<kVerifierDebug>::CheckSignaturePolymorphicMethod(ArtMethod* 
   const char* method_name = method->GetName();
 
   const char* expected_return_descriptor;
-  ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
-      Runtime::Current()->GetClassLinker()->GetClassRoots();
+  ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots = GetClassLinker()->GetClassRoots();
   if (klass == GetClassRoot<mirror::MethodHandle>(class_roots)) {
     expected_return_descriptor = mirror::MethodHandle::GetReturnTypeDescriptor(method_name);
   } else if (klass == GetClassRoot<mirror::VarHandle>(class_roots)) {
@@ -4410,8 +4418,7 @@ bool MethodVerifier<kVerifierDebug>::CheckSignaturePolymorphicReceiver(const Ins
         << this_type;
     return false;
   } else {
-    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
-        Runtime::Current()->GetClassLinker()->GetClassRoots();
+    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots = GetClassLinker()->GetClassRoots();
     if (!this_type.GetClass()->IsSubClass(GetClassRoot<mirror::MethodHandle>(class_roots)) &&
         !this_type.GetClass()->IsSubClass(GetClassRoot<mirror::VarHandle>(class_roots))) {
       Fail(VERIFY_ERROR_BAD_CLASS_HARD)
@@ -4715,7 +4722,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetStaticField(int field_idx) {
 
     return nullptr;  // Can't resolve Class so no more to do here, will do checking at runtime.
   }
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
 
   // Record result of the field resolution attempt.
@@ -4765,7 +4772,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetInstanceField(const RegType& obj_ty
 
     return nullptr;  // Can't resolve Class so no more to do here
   }
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
 
   // Record result of the field resolution attempt.
@@ -4804,7 +4811,7 @@ ArtField* MethodVerifier<kVerifierDebug>::GetInstanceField(const RegType& obj_ty
       // of C1. For resolution to occur the declared class of the field must be compatible with
       // obj_type, we've discovered this wasn't so, so report the field didn't exist.
       VerifyError type;
-      bool is_aot = Runtime::Current()->IsAotCompiler();
+      bool is_aot = IsAotMode();
       if (is_aot && (field_klass.IsUnresolvedTypes() || obj_type.IsUnresolvedTypes())) {
         // Compiler & unresolved types involved, retry at runtime.
         type = VerifyError::VERIFY_ERROR_NO_CLASS;
@@ -5135,26 +5142,31 @@ const RegType& MethodVerifier<kVerifierDebug>::FromClass(const char* descriptor,
 }  // namespace impl
 
 MethodVerifier::MethodVerifier(Thread* self,
+                               ClassLinker* class_linker,
+                               ArenaPool* arena_pool,
                                const DexFile* dex_file,
                                const dex::CodeItem* code_item,
                                uint32_t dex_method_idx,
                                bool can_load_classes,
                                bool allow_thread_suspension,
-                               bool allow_soft_failures)
+                               bool allow_soft_failures,
+                               bool aot_mode)
     : self_(self),
-      arena_stack_(Runtime::Current()->GetArenaPool()),
+      arena_stack_(arena_pool),
       allocator_(&arena_stack_),
-      reg_types_(can_load_classes, allocator_, allow_thread_suspension),
+      reg_types_(class_linker, can_load_classes, allocator_, allow_thread_suspension),
       reg_table_(allocator_),
       work_insn_idx_(dex::kDexNoIndex),
       dex_method_idx_(dex_method_idx),
       dex_file_(dex_file),
       code_item_accessor_(*dex_file, code_item),
-      flags_({false, false, false, false}),
+      // TODO: make it designated initialization when we compile as C++20.
+      flags_({false, false, false, false, aot_mode}),
       encountered_failure_types_(0),
       can_load_classes_(can_load_classes),
       allow_soft_failures_(allow_soft_failures),
       has_check_casts_(false),
+      class_linker_(class_linker),
       link_(nullptr) {
   self->PushVerifier(this);
 }
@@ -5165,6 +5177,8 @@ MethodVerifier::~MethodVerifier() {
 }
 
 MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
+                                                         ClassLinker* class_linker,
+                                                         ArenaPool* arena_pool,
                                                          uint32_t method_idx,
                                                          const DexFile* dex_file,
                                                          Handle<mirror::DexCache> dex_cache,
@@ -5178,9 +5192,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
+                                                         bool aot_mode,
                                                          std::string* hard_failure_msg) {
   if (VLOG_IS_ON(verifier_debug)) {
     return VerifyMethod<true>(self,
+                              class_linker,
+                              arena_pool,
                               method_idx,
                               dex_file,
                               dex_cache,
@@ -5194,9 +5211,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                               log_level,
                               need_precise_constants,
                               api_level,
+                              aot_mode,
                               hard_failure_msg);
   } else {
     return VerifyMethod<false>(self,
+                               class_linker,
+                               arena_pool,
                                method_idx,
                                dex_file,
                                dex_cache,
@@ -5210,12 +5230,15 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                log_level,
                                need_precise_constants,
                                api_level,
+                               aot_mode,
                                hard_failure_msg);
   }
 }
 
 template <bool kVerifierDebug>
 MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
+                                                         ClassLinker* class_linker,
+                                                         ArenaPool* arena_pool,
                                                          uint32_t method_idx,
                                                          const DexFile* dex_file,
                                                          Handle<mirror::DexCache> dex_cache,
@@ -5229,11 +5252,14 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
+                                                         bool aot_mode,
                                                          std::string* hard_failure_msg) {
   MethodVerifier::FailureData result;
   uint64_t start_ns = kTimeVerifyMethod ? NanoTime() : 0;
 
   impl::MethodVerifier<kVerifierDebug> verifier(self,
+                                                class_linker,
+                                                arena_pool,
                                                 dex_file,
                                                 dex_cache,
                                                 class_loader,
@@ -5248,6 +5274,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 /* verify to dump */ false,
                                                 /* allow_thread_suspension= */ true,
                                                 /* fill_register_lines= */ false,
+                                                aot_mode,
                                                 api_level);
   if (verifier.Verify()) {
     // Verification completed, however failures may be pending that didn't cause the verification
@@ -5277,8 +5304,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
     if (method != nullptr) {
       if (verifier.HasInstructionThatWillThrow()) {
         method->SetDontCompile();
-        if (Runtime::Current()->IsAotCompiler() &&
-            (callbacks != nullptr) && !callbacks->IsBootImage()) {
+        if (aot_mode && (callbacks != nullptr) && !callbacks->IsBootImage()) {
           // When compiling apps, make HasInstructionThatWillThrow a soft error to trigger
           // re-verification at runtime.
           // The dead code after the throw is not verified and might be invalid. This may cause
@@ -5379,6 +5405,8 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
       Handle<mirror::ClassLoader> class_loader) {
   std::unique_ptr<impl::MethodVerifier<false>> verifier(
       new impl::MethodVerifier<false>(self,
+                                      Runtime::Current()->GetClassLinker(),
+                                      Runtime::Current()->GetArenaPool(),
                                       method->GetDexFile(),
                                       dex_cache,
                                       class_loader,
@@ -5393,6 +5421,7 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
                                       /* verify_to_dump= */ false,
                                       /* allow_thread_suspension= */ false,
                                       /* fill_register_lines= */ true,
+                                      Runtime::Current()->IsAotCompiler(),
                                       // Just use the verifier at the current skd-version.
                                       // This might affect what soft-verifier errors are reported.
                                       // Callers can then filter out relevant errors if needed.
@@ -5423,6 +5452,8 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
                                                     uint32_t api_level) {
   impl::MethodVerifier<false>* verifier = new impl::MethodVerifier<false>(
       self,
+      Runtime::Current()->GetClassLinker(),
+      Runtime::Current()->GetArenaPool(),
       dex_file,
       dex_cache,
       class_loader,
@@ -5437,6 +5468,7 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
       /* verify_to_dump= */ true,
       /* allow_thread_suspension= */ true,
       /* fill_register_lines= */ false,
+      Runtime::Current()->IsAotCompiler(),
       api_level);
   verifier->Verify();
   verifier->DumpFailures(vios->Stream());
@@ -5461,6 +5493,8 @@ void MethodVerifier::FindLocksAtDexPc(
   Handle<mirror::DexCache> dex_cache(hs.NewHandle(m->GetDexCache()));
   Handle<mirror::ClassLoader> class_loader(hs.NewHandle(m->GetClassLoader()));
   impl::MethodVerifier<false> verifier(hs.Self(),
+                                       Runtime::Current()->GetClassLinker(),
+                                       Runtime::Current()->GetArenaPool(),
                                        m->GetDexFile(),
                                        dex_cache,
                                        class_loader,
@@ -5475,6 +5509,7 @@ void MethodVerifier::FindLocksAtDexPc(
                                        /* verify_to_dump= */ false,
                                        /* allow_thread_suspension= */ false,
                                        /* fill_register_lines= */ false,
+                                       Runtime::Current()->IsAotCompiler(),
                                        api_level);
   verifier.interesting_dex_pc_ = dex_pc;
   verifier.monitor_enter_dex_pcs_ = monitor_enter_dex_pcs;
@@ -5497,6 +5532,8 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                                bool allow_thread_suspension,
                                                uint32_t api_level) {
   return new impl::MethodVerifier<false>(self,
+                                         Runtime::Current()->GetClassLinker(),
+                                         Runtime::Current()->GetArenaPool(),
                                          dex_file,
                                          dex_cache,
                                          class_loader,
@@ -5511,11 +5548,12 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                          verify_to_dump,
                                          allow_thread_suspension,
                                          /* fill_register_lines= */ false,
+                                         Runtime::Current()->IsAotCompiler(),
                                          api_level);
 }
 
-void MethodVerifier::Init() {
-  art::verifier::RegTypeCache::Init();
+void MethodVerifier::Init(ClassLinker* class_linker) {
+  art::verifier::RegTypeCache::Init(class_linker);
 }
 
 void MethodVerifier::Shutdown() {
@@ -5546,7 +5584,7 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
       case VERIFY_ERROR_CLASS_CHANGE:
       case VERIFY_ERROR_FORCE_INTERPRETER:
       case VERIFY_ERROR_LOCKING:
-        if (Runtime::Current()->IsAotCompiler() || !can_load_classes_) {
+        if (IsAotMode() || !can_load_classes_) {
           // If we're optimistically running verification at compile time, turn NO_xxx, ACCESS_xxx,
           // class change and instantiation errors into soft verification errors so that we
           // re-verify at runtime. We may fail to find or to agree on access because of not yet

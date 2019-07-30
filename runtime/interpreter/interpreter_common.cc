@@ -109,7 +109,7 @@ bool DoFieldGet(Thread* self, ShadowFrame& shadow_frame, const Instruction* inst
   if (is_static) {
     obj = f->GetDeclaringClass();
     if (transaction_active) {
-      if (Runtime::Current()->GetTransaction()->ReadConstraint(obj.Ptr(), f)) {
+      if (Runtime::Current()->GetTransaction()->ReadConstraint(self, obj, f)) {
         Runtime::Current()->AbortTransactionAndThrowAbortError(self, "Can't read static fields of "
             + obj->PrettyTypeOf() + " since it does not belong to clinit's class.");
         return false;
@@ -321,18 +321,26 @@ bool DoFieldPut(Thread* self, const ShadowFrame& shadow_frame, const Instruction
   ObjPtr<mirror::Object> obj;
   if (is_static) {
     obj = f->GetDeclaringClass();
-    if (transaction_active) {
-      if (Runtime::Current()->GetTransaction()->WriteConstraint(obj.Ptr(), f)) {
-        Runtime::Current()->AbortTransactionAndThrowAbortError(
-            self, "Can't set fields of " + obj->PrettyTypeOf());
-        return false;
-      }
-    }
-
   } else {
     obj = shadow_frame.GetVRegReference(inst->VRegB_22c(inst_data));
     if (UNLIKELY(obj == nullptr)) {
       ThrowNullPointerExceptionForFieldAccess(f, false);
+      return false;
+    }
+  }
+  if (transaction_active) {
+    Runtime* runtime = Runtime::Current();
+    if (runtime->GetTransaction()->WriteConstraint(self, obj, f)) {
+      if (is_static) {
+        runtime->AbortTransactionAndThrowAbortError(
+            self, "Can't set fields of " + obj->PrettyTypeOf());
+      } else {
+        // This can happen only when compiling a boot image extension.
+        DCHECK(!runtime->GetTransaction()->IsStrict());
+        DCHECK(runtime->GetHeap()->ObjectIsInBootImageSpace(obj));
+        runtime->AbortTransactionAndThrowAbortError(
+            self, "Can't set fields of boot image objects");
+      }
       return false;
     }
   }

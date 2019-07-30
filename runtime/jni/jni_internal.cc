@@ -206,21 +206,6 @@ static std::string NormalizeJniClassDescriptor(const char* name) {
   return result;
 }
 
-static void ThrowNoSuchMethodError(ScopedObjectAccess& soa,
-                                   ObjPtr<mirror::Class> c,
-                                   const char* name,
-                                   const char* sig,
-                                   const char* kind)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  std::string temp;
-  soa.Self()->ThrowNewExceptionF("Ljava/lang/NoSuchMethodError;",
-                                 "no %s method \"%s.%s%s\"",
-                                 kind,
-                                 c->GetDescriptor(&temp),
-                                 name,
-                                 sig);
-}
-
 static void ReportInvalidJNINativeMethod(const ScopedObjectAccess& soa,
                                          ObjPtr<mirror::Class> c,
                                          const char* kind,
@@ -236,42 +221,11 @@ static void ReportInvalidJNINativeMethod(const ScopedObjectAccess& soa,
                                  idx);
 }
 
-static ObjPtr<mirror::Class> EnsureInitialized(Thread* self, ObjPtr<mirror::Class> klass)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (LIKELY(klass->IsInitialized())) {
-    return klass;
-  }
-  StackHandleScope<1> hs(self);
-  Handle<mirror::Class> h_klass(hs.NewHandle(klass));
-  if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_klass, true, true)) {
-    return nullptr;
-  }
-  return h_klass.Get();
-}
-
 template<bool kEnableIndexIds>
 static jmethodID FindMethodID(ScopedObjectAccess& soa, jclass jni_class,
                               const char* name, const char* sig, bool is_static)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::Class> c = EnsureInitialized(soa.Self(), soa.Decode<mirror::Class>(jni_class));
-  if (c == nullptr) {
-    return nullptr;
-  }
-  ArtMethod* method = nullptr;
-  auto pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-  if (c->IsInterface()) {
-    method = c->FindInterfaceMethod(name, sig, pointer_size);
-  } else {
-    method = c->FindClassMethod(name, sig, pointer_size);
-  }
-  if (method != nullptr && ShouldDenyAccessToMember(method, soa.Self())) {
-    method = nullptr;
-  }
-  if (method == nullptr || method->IsStatic() != is_static) {
-    ThrowNoSuchMethodError(soa, c, name, sig, is_static ? "static" : "non-static");
-    return nullptr;
-  }
-  return jni::EncodeArtMethod<kEnableIndexIds>(method);
+  return jni::EncodeArtMethod<kEnableIndexIds>(FindMethodJNI(soa, jni_class, name, sig, is_static));
 }
 
 template<bool kEnableIndexIds>
@@ -310,6 +264,88 @@ template<bool kEnableIndexIds>
 static jfieldID FindFieldID(const ScopedObjectAccess& soa, jclass jni_class, const char* name,
                             const char* sig, bool is_static)
     REQUIRES_SHARED(Locks::mutator_lock_) {
+  return jni::EncodeArtField<kEnableIndexIds>(FindFieldJNI(soa, jni_class, name, sig, is_static));
+}
+
+static void ThrowAIOOBE(ScopedObjectAccess& soa,
+                        ObjPtr<mirror::Array> array,
+                        jsize start,
+                        jsize length,
+                        const char* identifier)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  std::string type(array->PrettyTypeOf());
+  soa.Self()->ThrowNewExceptionF("Ljava/lang/ArrayIndexOutOfBoundsException;",
+                                 "%s offset=%d length=%d %s.length=%d",
+                                 type.c_str(), start, length, identifier, array->GetLength());
+}
+
+static void ThrowSIOOBE(ScopedObjectAccess& soa, jsize start, jsize length,
+                        jsize array_length)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  soa.Self()->ThrowNewExceptionF("Ljava/lang/StringIndexOutOfBoundsException;",
+                                 "offset=%d length=%d string.length()=%d", start, length,
+                                 array_length);
+}
+
+static void ThrowNoSuchMethodError(const ScopedObjectAccess& soa,
+                                   ObjPtr<mirror::Class> c,
+                                   const char* name,
+                                   const char* sig,
+                                   const char* kind)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  std::string temp;
+  soa.Self()->ThrowNewExceptionF("Ljava/lang/NoSuchMethodError;",
+                                 "no %s method \"%s.%s%s\"",
+                                 kind,
+                                 c->GetDescriptor(&temp),
+                                 name,
+                                 sig);
+}
+
+static ObjPtr<mirror::Class> EnsureInitialized(Thread* self, ObjPtr<mirror::Class> klass)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  if (LIKELY(klass->IsInitialized())) {
+    return klass;
+  }
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Class> h_klass(hs.NewHandle(klass));
+  if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_klass, true, true)) {
+    return nullptr;
+  }
+  return h_klass.Get();
+}
+
+ArtMethod* FindMethodJNI(const ScopedObjectAccess& soa,
+                         jclass jni_class,
+                         const char* name,
+                         const char* sig,
+                         bool is_static) {
+  ObjPtr<mirror::Class> c = EnsureInitialized(soa.Self(), soa.Decode<mirror::Class>(jni_class));
+  if (c == nullptr) {
+    return nullptr;
+  }
+  ArtMethod* method = nullptr;
+  auto pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+  if (c->IsInterface()) {
+    method = c->FindInterfaceMethod(name, sig, pointer_size);
+  } else {
+    method = c->FindClassMethod(name, sig, pointer_size);
+  }
+  if (method != nullptr && ShouldDenyAccessToMember(method, soa.Self())) {
+    method = nullptr;
+  }
+  if (method == nullptr || method->IsStatic() != is_static) {
+    ThrowNoSuchMethodError(soa, c, name, sig, is_static ? "static" : "non-static");
+    return nullptr;
+  }
+  return method;
+}
+
+ArtField* FindFieldJNI(const ScopedObjectAccess& soa,
+                       jclass jni_class,
+                       const char* name,
+                       const char* sig,
+                       bool is_static) {
   StackHandleScope<2> hs(soa.Self());
   Handle<mirror::Class> c(
       hs.NewHandle(EnsureInitialized(soa.Self(), soa.Decode<mirror::Class>(jni_class))));
@@ -359,27 +395,7 @@ static jfieldID FindFieldID(const ScopedObjectAccess& soa, jclass jni_class, con
                                    sig, name, c->GetDescriptor(&temp));
     return nullptr;
   }
-  return jni::EncodeArtField<kEnableIndexIds>(field);
-}
-
-static void ThrowAIOOBE(ScopedObjectAccess& soa,
-                        ObjPtr<mirror::Array> array,
-                        jsize start,
-                        jsize length,
-                        const char* identifier)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  std::string type(array->PrettyTypeOf());
-  soa.Self()->ThrowNewExceptionF("Ljava/lang/ArrayIndexOutOfBoundsException;",
-                                 "%s offset=%d length=%d %s.length=%d",
-                                 type.c_str(), start, length, identifier, array->GetLength());
-}
-
-static void ThrowSIOOBE(ScopedObjectAccess& soa, jsize start, jsize length,
-                        jsize array_length)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  soa.Self()->ThrowNewExceptionF("Ljava/lang/StringIndexOutOfBoundsException;",
-                                 "offset=%d length=%d string.length()=%d", start, length,
-                                 array_length);
+  return field;
 }
 
 int ThrowNewException(JNIEnv* env, jclass exception_class, const char* msg, jobject cause)
@@ -2953,11 +2969,11 @@ struct JniNativeInterfaceFunctions {
 
 const JNINativeInterface* GetJniNativeInterface() {
   // The template argument is passed down through the Encode/DecodeArtMethod/Field calls so if
-  // JniIdsAreIndices is false the calls will be a simple cast with no branches. This ensures that
+  // JniIdType is kPointer the calls will be a simple cast with no branches. This ensures that
   // the normal case is still fast.
-  return Runtime::Current()->JniIdsAreIndices()
-             ? &JniNativeInterfaceFunctions<true>::gJniNativeInterface
-             : &JniNativeInterfaceFunctions<false>::gJniNativeInterface;
+  return Runtime::Current()->GetJniIdType() == JniIdType::kPointer
+             ? &JniNativeInterfaceFunctions<false>::gJniNativeInterface
+             : &JniNativeInterfaceFunctions<true>::gJniNativeInterface;
 }
 
 void (*gJniSleepForeverStub[])()  = {

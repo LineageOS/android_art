@@ -509,6 +509,7 @@ cc_defaults {
         "1001-app-image-regions/app_image_regions.cc",
         "1002-notify-startup/startup_interface.cc",
         "1947-breakpoint-redefine-deopt/check_deopt.cc",
+        "1972-jni-id-swap-indices/jni_id.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],

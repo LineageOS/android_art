@@ -28,14 +28,16 @@ logging.basicConfig(format='%(message)s')
 
 
 class FSObject:
-  def __init__(self, name, is_dir, is_exec, is_symlink):
+  def __init__(self, name, is_dir, is_exec, is_symlink, size):
     self.name = name
     self.is_dir = is_dir
     self.is_exec = is_exec
     self.is_symlink = is_symlink
+    self.size = size
 
   def __str__(self):
-    return '%s(dir=%r,exec=%r,symlink=%r)' % (self.name, self.is_dir, self.is_exec, self.is_symlink)
+    return '%s(dir=%r,exec=%r,symlink=%r,size=%d)' \
+             % (self.name, self.is_dir, self.is_exec, self.is_symlink, self.size)
 
 
 class TargetApexProvider:
@@ -97,6 +99,9 @@ class TargetApexProvider:
         continue
       bits = comps[2]
       name = comps[5]
+      size_str = comps[6]
+      # Use a negative value as an indicator of undefined/unknown size.
+      size = int(size_str) if size_str != '' else -1
       if len(bits) != 6:
         logging.warning('Dont understand bits \'%s\'', bits)
         continue
@@ -107,7 +112,7 @@ class TargetApexProvider:
 
       is_exec = is_exec_bit(bits[3]) and is_exec_bit(bits[4]) and is_exec_bit(bits[5])
       is_symlink = bits[1] == '2'
-      apex_map[name] = FSObject(name, is_dir, is_exec, is_symlink)
+      apex_map[name] = FSObject(name, is_dir, is_exec, is_symlink, size)
     self._folder_cache[apex_dir] = apex_map
     return apex_map
 
@@ -135,7 +140,8 @@ class TargetFlattenedApexProvider:
         is_dir = os.path.isdir(filepath)
         is_exec = os.access(filepath, os.X_OK)
         is_symlink = os.path.islink(filepath)
-        apex_map[basename] = FSObject(basename, is_dir, is_exec, is_symlink)
+        size = os.path.getsize(filepath)
+        apex_map[basename] = FSObject(basename, is_dir, is_exec, is_symlink, size)
     self._folder_cache[apex_dir] = apex_map
     return apex_map
 
@@ -200,11 +206,14 @@ class HostApexProvider:
             is_dir = get_octal(bits, 4) == 4
             is_symlink = get_octal(bits, 4) == 2
             is_exec = bits_is_exec(bits)
+            size = zipinfo.file_size
           else:
             is_exec = False  # Seems we can't get this easily?
             is_symlink = False
             is_dir = True
-          dir_map[base] = FSObject(base, is_dir, is_exec, is_symlink)
+            # Use a negative value as an indicator of undefined/unknown size.
+            size = -1
+          dir_map[base] = FSObject(base, is_dir, is_exec, is_symlink, size)
         is_zipinfo = False
         path = apex_dir
 
@@ -634,8 +643,9 @@ class NoSuperfluousLibrariesChecker:
 
 
 class List:
-  def __init__(self, provider):
+  def __init__(self, provider, print_size):
     self._provider = provider
+    self._print_size = print_size
 
   def print_list(self):
 
@@ -650,7 +660,13 @@ class List:
         del apex_map['..']
       for (_, val) in sorted(apex_map.items()):
         val_path = os.path.join(path, val.name)
-        print(val_path)
+        if self._print_size:
+          if val.size < 0:
+            print('[    n/a    ]  %s' % val_path)
+          else:
+            print('[%11d]  %s' % (val.size, val_path))
+        else:
+          print(val_path)
         if val.is_dir:
           print_list_rec(val_path)
 
@@ -658,10 +674,11 @@ class List:
 
 
 class Tree:
-  def __init__(self, provider, title):
+  def __init__(self, provider, title, print_size):
     print('%s' % title)
     self._provider = provider
     self._has_next_list = []
+    self._print_size = print_size
 
   @staticmethod
   def get_vertical(has_next_list):
@@ -690,7 +707,13 @@ class Tree:
         prev = self.get_vertical(self._has_next_list)
         last = self.get_last_vertical(i == len(key_list) - 1)
         val = apex_map[key]
-        print('%s%s%s' % (prev, last, val.name))
+        if self._print_size:
+          if val.size < 0:
+            print('%s%s[    n/a    ]  %s' % (prev, last, val.name))
+          else:
+            print('%s%s[%11d]  %s' % (prev, last, val.size, val.name))
+        else:
+          print('%s%s%s' % (prev, last, val.name))
         if val.is_dir:
           self._has_next_list.append(i < len(key_list) - 1)
           val_path = os.path.join(path, val.name)
@@ -714,6 +737,9 @@ def art_apex_test_main(test_args):
   if test_args.list and test_args.tree:
     logging.error("Both of --list and --tree set")
     return 1
+  if test_args.size and not (test_args.list or test_args.tree):
+    logging.error("--size set but neither --list nor --tree set")
+    return 1
   if not test_args.tmpdir:
     logging.error("Need a tmpdir.")
     return 1
@@ -736,10 +762,10 @@ def art_apex_test_main(test_args):
     return 1
 
   if test_args.tree:
-    Tree(apex_provider, test_args.apex).print_tree()
+    Tree(apex_provider, test_args.apex, test_args.size).print_tree()
     return 0
   if test_args.list:
-    List(apex_provider).print_list()
+    List(apex_provider, test_args.size).print_list()
     return 0
 
   checkers = []
@@ -858,6 +884,7 @@ if __name__ == "__main__":
 
   parser.add_argument('--list', help='List all files', action='store_true')
   parser.add_argument('--tree', help='Print directory tree', action='store_true')
+  parser.add_argument('--size', help='Print file sizes', action='store_true')
 
   parser.add_argument('--tmpdir', help='Directory for temp files')
   parser.add_argument('--debugfs', help='Path to debugfs')
