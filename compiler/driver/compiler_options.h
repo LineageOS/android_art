@@ -72,6 +72,7 @@ class CompilerOptions final {
   enum class ImageType : uint8_t {
     kNone,                // JIT or AOT app compilation producing only an oat file but no image.
     kBootImage,           // Creating boot image.
+    kBootImageExtension,  // Creating boot image extension.
     kAppImage,            // Creating app image.
     kApexBootImage,       // Creating the apex image for jit/zygote experiment b/119800099.
   };
@@ -198,6 +199,11 @@ class CompilerOptions final {
 
   bool IsApexBootImage() const {
     return image_type_ == ImageType::kApexBootImage;
+  }
+
+  // Are we compiling a boot image extension?
+  bool IsBootImageExtension() const {
+    return image_type_ == ImageType::kBootImageExtension;
   }
 
   bool IsBaseline() const {
