@@ -1552,7 +1552,7 @@ void CodeGeneratorMIPS64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* li
       string_bss_entry_patches_.size() +
       boot_image_other_patches_.size();
   linker_patches->reserve(size);
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     EmitPcRelativeLinkerPatches<linker::LinkerPatch::RelativeMethodPatch>(
         boot_image_method_patches_, linker_patches);
     EmitPcRelativeLinkerPatches<linker::LinkerPatch::RelativeTypePatch>(
@@ -6089,7 +6089,7 @@ void CodeGeneratorMIPS64::GenerateStaticOrDirectCall(
       callee_method = invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex());
       break;
     case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(GetCompilerOptions().IsBootImage());
+      DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       CodeGeneratorMIPS64::PcRelativePatchInfo* info_high =
           NewBootImageMethodPatch(invoke->GetTargetMethod());
       CodeGeneratorMIPS64::PcRelativePatchInfo* info_low =
@@ -6276,7 +6276,8 @@ void InstructionCodeGeneratorMIPS64::VisitLoadClass(HLoadClass* cls) NO_THREAD_S
                               read_barrier_option);
       break;
     case HLoadClass::LoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(codegen_->GetCompilerOptions().IsBootImage());
+      DCHECK(codegen_->GetCompilerOptions().IsBootImage() ||
+             codegen_->GetCompilerOptions().IsBootImageExtension());
       DCHECK_EQ(read_barrier_option, kWithoutReadBarrier);
       CodeGeneratorMIPS64::PcRelativePatchInfo* info_high =
           codegen_->NewBootImageTypePatch(cls->GetDexFile(), cls->GetTypeIndex());
@@ -6424,7 +6425,8 @@ void InstructionCodeGeneratorMIPS64::VisitLoadString(HLoadString* load) NO_THREA
 
   switch (load_kind) {
     case HLoadString::LoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(codegen_->GetCompilerOptions().IsBootImage());
+      DCHECK(codegen_->GetCompilerOptions().IsBootImage() ||
+             codegen_->GetCompilerOptions().IsBootImageExtension());
       CodeGeneratorMIPS64::PcRelativePatchInfo* info_high =
           codegen_->NewBootImageStringPatch(load->GetDexFile(), load->GetStringIndex());
       CodeGeneratorMIPS64::PcRelativePatchInfo* info_low =

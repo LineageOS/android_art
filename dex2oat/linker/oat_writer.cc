@@ -726,7 +726,7 @@ void OatWriter::PrepareLayout(MultiOatRelativePatcher* relative_patcher) {
   relative_patcher_ = relative_patcher;
   SetMultiOatRelativePatcherAdjustment();
 
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     CHECK(image_writer_ != nullptr);
   }
   InstructionSet instruction_set = compiler_options_.GetInstructionSet();
@@ -1560,7 +1560,8 @@ class OatWriter::InitImageMethodVisitor : public OatDexMethodVisitor {
     Thread* self = Thread::Current();
     ObjPtr<mirror::DexCache> dex_cache = class_linker_->FindDexCache(self, *dex_file_);
     ArtMethod* resolved_method;
-    if (writer_->GetCompilerOptions().IsBootImage()) {
+    if (writer_->GetCompilerOptions().IsBootImage() ||
+        writer_->GetCompilerOptions().IsBootImageExtension()) {
       resolved_method = class_linker_->LookupResolvedMethod(
           method.GetIndex(), dex_cache, /*class_loader=*/ nullptr);
       if (resolved_method == nullptr) {
@@ -1640,7 +1641,8 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
         dex_cache_(nullptr),
         no_thread_suspension_("OatWriter patching") {
     patched_code_.reserve(16 * KB);
-    if (writer_->GetCompilerOptions().IsBootImage()) {
+    if (writer_->GetCompilerOptions().IsBootImage() ||
+        writer_->GetCompilerOptions().IsBootImageExtension()) {
       // If we're creating the image, the address space must be ready so that we can apply patches.
       CHECK(writer_->image_writer_->IsImageAddressSpaceReady());
     }
@@ -1889,24 +1891,20 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
 
   uint32_t GetTargetOffset(const LinkerPatch& patch) REQUIRES_SHARED(Locks::mutator_lock_) {
     uint32_t target_offset = writer_->relative_patcher_->GetOffset(patch.TargetMethod());
-    // If there's no new compiled code, either we're compiling an app and the target method
-    // is in the boot image, or we need to point to the correct trampoline.
+    // If there's no new compiled code, we need to point to the correct trampoline.
     if (UNLIKELY(target_offset == 0)) {
       ArtMethod* target = GetTargetMethod(patch);
       DCHECK(target != nullptr);
-      const void* oat_code_offset =
-          target->GetEntryPointFromQuickCompiledCodePtrSize(pointer_size_);
-      if (oat_code_offset != nullptr) {
-        DCHECK(!writer_->GetCompilerOptions().IsBootImage());
-        DCHECK(!Runtime::Current()->GetClassLinker()->IsQuickResolutionStub(oat_code_offset));
-        DCHECK(!Runtime::Current()->GetClassLinker()->IsQuickToInterpreterBridge(oat_code_offset));
-        DCHECK(!Runtime::Current()->GetClassLinker()->IsQuickGenericJniStub(oat_code_offset));
-        target_offset = PointerToLowMemUInt32(oat_code_offset);
-      } else {
-        target_offset = target->IsNative()
-            ? writer_->oat_header_->GetQuickGenericJniTrampolineOffset()
-            : writer_->oat_header_->GetQuickToInterpreterBridgeOffset();
-      }
+      // TODO: Remove kCallRelative? This patch type is currently not in use.
+      // If we want to use it again, we should make sure that we either use it
+      // only for target methods that were actually compiled, or call the
+      // method dispatch thunk. Currently, ARM/ARM64 patchers would emit the
+      // thunk for far `target_offset` (so we could teach them to use the
+      // thunk for `target_offset == 0`) but x86/x86-64 patchers do not.
+      // (When this was originally implemented, every oat file contained
+      // trampolines, so we could just return their offset here. Now only
+      // the boot image contains them, so this is not always an option.)
+      LOG(FATAL) << "The target method was not compiled.";
     }
     return target_offset;
   }
@@ -1935,7 +1933,7 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
         linker->LookupString(patch.TargetStringIndex(), GetDexCache(patch.TargetStringDexFile()));
     DCHECK(string != nullptr);
     DCHECK(writer_->GetCompilerOptions().IsBootImage() ||
-           Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(string));
+           writer_->GetCompilerOptions().IsBootImageExtension());
     return string;
   }
 
@@ -1951,7 +1949,8 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
   }
 
   uint32_t GetTargetMethodOffset(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(writer_->GetCompilerOptions().IsBootImage());
+    DCHECK(writer_->GetCompilerOptions().IsBootImage() ||
+           writer_->GetCompilerOptions().IsBootImageExtension());
     method = writer_->image_writer_->GetImageMethodAddress(method);
     size_t oat_index = writer_->image_writer_->GetOatIndexForDexFile(dex_file_);
     uintptr_t oat_data_begin = writer_->image_writer_->GetOatDataBegin(oat_index);
@@ -1961,32 +1960,13 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
 
   uint32_t GetTargetObjectOffset(ObjPtr<mirror::Object> object)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(writer_->GetCompilerOptions().IsBootImage());
+    DCHECK(writer_->GetCompilerOptions().IsBootImage() ||
+           writer_->GetCompilerOptions().IsBootImageExtension());
     object = writer_->image_writer_->GetImageAddress(object.Ptr());
     size_t oat_index = writer_->image_writer_->GetOatIndexForDexFile(dex_file_);
     uintptr_t oat_data_begin = writer_->image_writer_->GetOatDataBegin(oat_index);
     // TODO: Clean up offset types. The target offset must be treated as signed.
     return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(object.Ptr()) - oat_data_begin);
-  }
-
-  void PatchObjectAddress(std::vector<uint8_t>* code, uint32_t offset, mirror::Object* object)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (writer_->GetCompilerOptions().IsBootImage()) {
-      object = writer_->image_writer_->GetImageAddress(object);
-    } else {
-      // NOTE: We're using linker patches for app->boot references when the image can
-      // be relocated and therefore we need to emit .oat_patches. We're not using this
-      // for app->app references, so check that the object is in the image space.
-      DCHECK(Runtime::Current()->GetHeap()->FindSpaceFromObject(object, false)->IsImageSpace());
-    }
-    // Note: We only patch targeting Objects in image which is in the low 4gb.
-    uint32_t address = PointerToLowMemUInt32(object);
-    DCHECK_LE(offset + 4, code->size());
-    uint8_t* data = &(*code)[offset];
-    data[0] = address & 0xffu;
-    data[1] = (address >> 8) & 0xffu;
-    data[2] = (address >> 16) & 0xffu;
-    data[3] = (address >> 24) & 0xffu;
   }
 };
 
