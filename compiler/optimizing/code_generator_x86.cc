@@ -4853,7 +4853,7 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
       callee_method = invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex());
       break;
     case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(GetCompilerOptions().IsBootImage());
+      DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       Register base_reg = GetInvokeStaticOrDirectExtraParameter(invoke,
                                                                 temp.AsRegister<Register>());
       __ leal(temp.AsRegister<Register>(), Address(base_reg, CodeGeneratorX86::kDummy32BitOffset));
@@ -5092,7 +5092,7 @@ void CodeGeneratorX86::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* linke
       string_bss_entry_patches_.size() +
       boot_image_other_patches_.size();
   linker_patches->reserve(size);
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     EmitPcRelativeLinkerPatches<linker::LinkerPatch::RelativeMethodPatch>(
         boot_image_method_patches_, linker_patches);
     EmitPcRelativeLinkerPatches<linker::LinkerPatch::RelativeTypePatch>(
@@ -6601,7 +6601,8 @@ void InstructionCodeGeneratorX86::VisitLoadClass(HLoadClass* cls) NO_THREAD_SAFE
       break;
     }
     case HLoadClass::LoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(codegen_->GetCompilerOptions().IsBootImage());
+      DCHECK(codegen_->GetCompilerOptions().IsBootImage() ||
+             codegen_->GetCompilerOptions().IsBootImageExtension());
       DCHECK_EQ(read_barrier_option, kWithoutReadBarrier);
       Register method_address = locations->InAt(0).AsRegister<Register>();
       __ leal(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
@@ -6798,7 +6799,8 @@ void InstructionCodeGeneratorX86::VisitLoadString(HLoadString* load) NO_THREAD_S
 
   switch (load->GetLoadKind()) {
     case HLoadString::LoadKind::kBootImageLinkTimePcRelative: {
-      DCHECK(codegen_->GetCompilerOptions().IsBootImage());
+      DCHECK(codegen_->GetCompilerOptions().IsBootImage() ||
+             codegen_->GetCompilerOptions().IsBootImageExtension());
       Register method_address = locations->InAt(0).AsRegister<Register>();
       __ leal(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
       codegen_->RecordBootImageStringPatch(load);
