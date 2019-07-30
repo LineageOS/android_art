@@ -1,0 +1,3 @@
+Tests changing from SwapablePointer to indices for JniIdType
+
+Also tests that WellKnownClasses jmethodIDs are indices after swap.

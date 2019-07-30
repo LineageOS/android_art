@@ -26,6 +26,7 @@
 #include "gc/allocation_listener.h"
 #include "gc/heap.h"
 #include "jni/jni_internal.h"
+#include "jni_id_type.h"
 #include "mirror/array-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/class.h"
@@ -166,18 +167,28 @@ template <> ArtMethod* Canonicalize(ArtMethod* t) {
 // We increment the id by 2 each time to allow us to use the LSB as a flag that the ID is an index
 // and not a pointer. This gives us 2**31 unique methods that can be addressed on 32-bit art, which
 // should be more than enough.
-template <> uintptr_t JniIdManager::GetNextId<ArtField>() {
-  uintptr_t res = next_field_id_;
-  next_field_id_ += 2;
-  CHECK_GT(next_field_id_, res) << "jfieldID Overflow";
-  return res;
+template <> uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type, ArtField* f) {
+  if (LIKELY(type == JniIdType::kIndices)) {
+    uintptr_t res = next_field_id_;
+    next_field_id_ += 2;
+    CHECK_GT(next_field_id_, res) << "jfieldID Overflow";
+    return res;
+  } else {
+    DCHECK_EQ(type, JniIdType::kSwapablePointer);
+    return reinterpret_cast<uintptr_t>(f);
+  }
 }
 
-template <> uintptr_t JniIdManager::GetNextId<ArtMethod>() {
-  uintptr_t res = next_method_id_;
-  next_method_id_ += 2;
-  CHECK_GT(next_method_id_, res) << "jmethodID Overflow";
-  return res;
+template <> uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type, ArtMethod* m) {
+  if (LIKELY(type == JniIdType::kIndices)) {
+    uintptr_t res = next_method_id_;
+    next_method_id_ += 2;
+    CHECK_GT(next_method_id_, res) << "jmethodID Overflow";
+    return res;
+  } else {
+    DCHECK_EQ(type, JniIdType::kSwapablePointer);
+    return reinterpret_cast<uintptr_t>(m);
+  }
 }
 template <> std::vector<ArtField*>& JniIdManager::GetGenericMap<ArtField>() {
   return field_id_map_;
@@ -199,7 +210,9 @@ template <> size_t JniIdManager::GetLinearSearchStartId<ArtMethod>(ArtMethod* m)
 }
 
 template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) {
-  if (!Runtime::Current()->JniIdsAreIndices() || t == nullptr) {
+  Runtime* runtime = Runtime::Current();
+  JniIdType id_type = runtime->GetJniIdType();
+  if (id_type == JniIdType::kPointer || t == nullptr) {
     return reinterpret_cast<uintptr_t>(t);
   }
   Thread* self = Thread::Current();
@@ -257,12 +270,18 @@ template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) 
       return IndexToId(index);
     }
   }
-  cur_id = GetNextId<ArtType>();
-  size_t cur_index = IdToIndex(cur_id);
-  std::vector<ArtType*>& vec = GetGenericMap<ArtType>();
-  vec.reserve(cur_index + 1);
-  vec.resize(std::max(vec.size(), cur_index + 1), nullptr);
-  vec[cur_index] = t;
+  cur_id = GetNextId(id_type, t);
+  if (UNLIKELY(id_type == JniIdType::kIndices)) {
+    DCHECK_EQ(cur_id % 2, 1u);
+    size_t cur_index = IdToIndex(cur_id);
+    std::vector<ArtType*>& vec = GetGenericMap<ArtType>();
+    vec.reserve(cur_index + 1);
+    vec.resize(std::max(vec.size(), cur_index + 1), nullptr);
+    vec[cur_index] = t;
+  } else {
+    DCHECK_EQ(cur_id % 2, 0u);
+    DCHECK_EQ(cur_id, reinterpret_cast<uintptr_t>(t));
+  }
   if (ids.IsNull()) {
     if (kIsDebugBuild && !IsObsolete(t)) {
       CHECK_NE(deferred_allocation_refcount_, 0u)
@@ -291,7 +310,7 @@ jmethodID JniIdManager::EncodeMethodId(ArtMethod* method) {
 }
 
 template <typename ArtType> ArtType* JniIdManager::DecodeGenericId(uintptr_t t) {
-  if (Runtime::Current()->JniIdsAreIndices() && (t % 2) == 1) {
+  if (Runtime::Current()->GetJniIdType() == JniIdType::kIndices && (t % 2) == 1) {
     ReaderMutexLock mu(Thread::Current(), *Locks::jni_id_lock_);
     size_t index = IdToIndex(t);
     DCHECK_GT(GetGenericMap<ArtType>().size(), index);
