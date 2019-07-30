@@ -9,6 +9,7 @@ runtime. Most of these work on both the RI and ART, on both host and device.
 * [libdumpjvmti](./dump-jvmti-state)
 * [libfieldnull](./field-null-percent)
 * [libjitload](./jit-load)
+* [liblistextensions](./list-extensions)
 * [libforceredefine](./simple-force-redefine)
 * [litifast](./ti-fast)
 * [libtitrace](./titrace)
