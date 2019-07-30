@@ -64,7 +64,7 @@ done
 extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true TEMPORARY_DISABLE_PATH_RESTRICTIONS=true"
 
 if [[ $mode == "host" ]]; then
-  make_command="make $j_arg $extra_args $showcommands build-art-host-tests $common_targets"
+  make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-host-tests $common_targets"
   make_command+=" dx-tests junit-host"
   mode_suffix="-host"
 elif [[ $mode == "target" ]]; then
@@ -72,7 +72,7 @@ elif [[ $mode == "target" ]]; then
     echo 'ANDROID_PRODUCT_OUT environment variable is empty; did you forget to run `lunch`?'
     exit 1
   fi
-  make_command="make $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
+  make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
   make_command+=" libjavacrypto-target libnetd_client-target toybox toolbox sh"
   make_command+=" debuggerd su"
   make_command+=" libstdc++ "
