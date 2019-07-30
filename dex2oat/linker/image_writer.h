@@ -561,17 +561,17 @@ class ImageWriter final {
   // Return true if klass is loaded by the boot class loader but not in the boot image.
   bool IsBootClassLoaderNonImageClass(mirror::Class* klass) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Return true if klass depends on a boot class loader non image class. We want to prune these
-  // classes since we do not want any boot class loader classes in the image. This means that
-  // we also cannot have any classes which refer to these boot class loader non image classes.
-  // PruneAppImageClass also prunes if klass depends on a non-image class according to the compiler
-  // options.
-  bool PruneAppImageClass(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
+  // Return true if `klass` depends on a class defined by the boot class path
+  // we're compiling against but not present in the boot image spaces. We want
+  // to prune these classes since we cannot guarantee that they will not be
+  // already loaded at run time when loading this image. This means that we
+  // also cannot have any classes which refer to these non image classes.
+  bool PruneImageClass(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // early_exit is true if we had a cyclic dependency anywhere down the chain.
-  bool PruneAppImageClassInternal(ObjPtr<mirror::Class> klass,
-                                  bool* early_exit,
-                                  std::unordered_set<mirror::Object*>* visited)
+  bool PruneImageClassInternal(ObjPtr<mirror::Class> klass,
+                               bool* early_exit,
+                               std::unordered_set<mirror::Object*>* visited)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool IsMultiImage() const {
