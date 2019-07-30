@@ -5934,6 +5934,16 @@ bool ClassLinker::EnsureInitialized(Thread* self,
   DCHECK(c != nullptr);
 
   if (c->IsInitialized()) {
+    // If we've seen an initialized but not visibly initialized class
+    // many times, request visible initialization.
+    if (kRuntimeISA == InstructionSet::kX86 || kRuntimeISA == InstructionSet::kX86_64) {
+      // Thanks to the x86 memory model classes skip the initialized status.
+      DCHECK(c->IsVisiblyInitialized());
+    } else if (UNLIKELY(!c->IsVisiblyInitialized())) {
+      if (self->IncrementMakeVisiblyInitializedCounter()) {
+        MakeInitializedClassesVisiblyInitialized(self, /*wait=*/ false);
+      }
+    }
     DCHECK(c->WasVerificationAttempted()) << c->PrettyClassAndClassLoader();
     return true;
   }

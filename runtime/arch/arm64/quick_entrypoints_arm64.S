@@ -1641,14 +1641,11 @@ ENTRY \c_name
     bhs    .Lslow_path\c_name
     ldr    w3, [x0, #MIRROR_CLASS_OBJECT_SIZE_ALLOC_FAST_PATH_OFFSET]  // Load the object size (x3)
     cmp    x3, #ROSALLOC_MAX_THREAD_LOCAL_BRACKET_SIZE        // Check if the size is for a thread
-                                                              // local allocation. Also does the
-                                                              // finalizable and initialization
-                                                              // checks.
-    // When isInitialized == 0, then the class is potentially not yet initialized.
-    // If the class is not yet initialized, the object size will be very large to force the branch
-    // below to be taken.
+                                                              // local allocation.
+    // If the class is not yet visibly initialized, or it is finalizable,
+    // the object size will be very large to force the branch below to be taken.
     //
-    // See InitializeClassVisitors in class-inl.h for more details.
+    // See Class::SetStatus() in class.cc for more details.
     bhs    .Lslow_path\c_name
                                                               // Compute the rosalloc bracket index
                                                               // from the size. Since the size is
@@ -1716,19 +1713,9 @@ ENTRY \c_name
     str    w1, [x4, #(ROSALLOC_RUN_FREE_LIST_OFFSET + ROSALLOC_RUN_FREE_LIST_SIZE_OFFSET)]
 
     mov    x0, x3                                             // Set the return value and return.
-.if \isInitialized == 0
-    // This barrier is only necessary when the allocation also requires
-    // a class initialization check.
-    //
-    // If the class is already observably initialized, then new-instance allocations are protected
+    // No barrier. The class is already observably initialized (otherwise the fast
+    // path size check above would fail) and new-instance allocations are protected
     // from publishing by the compiler which inserts its own StoreStore barrier.
-    dmb    ish
-    // Use a "dmb ish" fence here because if there are later loads of statics (e.g. class size),
-    // they should happen-after the implicit initialization check.
-    //
-    // TODO: Remove this dmb for class initialization checks (b/36692143) by introducing
-    // a new observably-initialized class state.
-.endif
     ret
 .Lslow_path\c_name:
     SETUP_SAVE_REFS_ONLY_FRAME                      // save callee saves in case of GC
@@ -1754,11 +1741,10 @@ ART_QUICK_ALLOC_OBJECT_ROSALLOC art_quick_alloc_object_initialized_rosalloc, art
                                                               // since the tlab pos and end are 32
                                                               // bit values.
 
-    // When isInitialized == 0, then the class is potentially not yet initialized.
-    // If the class is not yet initialized, the object size will be very large to force the branch
-    // below to be taken.
+    // If the class is not yet visibly initialized, or it is finalizable,
+    // the object size will be very large to force the branch below to be taken.
     //
-    // See InitializeClassVisitors in class-inl.h for more details.
+    // See Class::SetStatus() in class.cc for more details.
     bhi    \slowPathLabel
     str    x6, [xSELF, #THREAD_LOCAL_POS_OFFSET]              // Store new thread_local_pos.
     ldr    x5, [xSELF, #THREAD_LOCAL_OBJECTS_OFFSET]          // Increment thread_local_objects.
@@ -1771,19 +1757,9 @@ ART_QUICK_ALLOC_OBJECT_ROSALLOC art_quick_alloc_object_initialized_rosalloc, art
                                                               // site will see the right values in
                                                               // the fields of the class.
     mov    x0, x4
-.if \isInitialized == 0
-    // This barrier is only necessary when the allocation also requires
-    // a class initialization check.
-    //
-    // If the class is already observably initialized, then new-instance allocations are protected
+    // No barrier. The class is already observably initialized (otherwise the fast
+    // path size check above would fail) and new-instance allocations are protected
     // from publishing by the compiler which inserts its own StoreStore barrier.
-    dmb    ish
-    // Use a "dmb ish" fence here because if there are later loads of statics (e.g. class size),
-    // they should happen-after the implicit initialization check.
-    //
-    // TODO: Remove this dmb for class initialization checks (b/36692143) by introducing
-    // a new observably-initialized class state.
-.endif
     ret
 .endm
 

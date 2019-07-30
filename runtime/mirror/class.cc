@@ -204,11 +204,7 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
   // Setting the object size alloc fast path needs to be after the status write so that if the
   // alloc path sees a valid object size, we would know that it's initialized as long as it has a
   // load-acquire/fake dependency.
-  // TODO: Update the object size alloc fast path only for ClassStatus::kVisiblyInitialized
-  // and take advantage of this in allocation entrypoints. b/36692143
-  if (new_status >= ClassStatus::kInitialized &&
-      old_status < ClassStatus::kInitialized &&
-      !h_this->IsVariableSize()) {
+  if (new_status == ClassStatus::kVisiblyInitialized && !h_this->IsVariableSize()) {
     DCHECK_EQ(h_this->GetObjectSizeAllocFastPath(), std::numeric_limits<uint32_t>::max());
     // Finalizable objects must always go slow path.
     if (!h_this->IsFinalizable()) {

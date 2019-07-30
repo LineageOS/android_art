@@ -114,6 +114,35 @@ inline ArtMethod* GetResolvedMethod(ArtMethod* outer_method,
   return method;
 }
 
+ALWAYS_INLINE
+inline ObjPtr<mirror::Class> CheckClassInitializedForObjectAlloc(ObjPtr<mirror::Class> klass,
+                                                                 Thread* self,
+                                                                 bool* slow_path)
+    REQUIRES_SHARED(Locks::mutator_lock_)
+    REQUIRES(!Roles::uninterruptible_) {
+  if (UNLIKELY(!klass->IsVisiblyInitialized())) {
+    StackHandleScope<1> hs(self);
+    Handle<mirror::Class> h_class(hs.NewHandle(klass));
+    // EnsureInitialized (the class initializer) might cause a GC.
+    // may cause us to suspend meaning that another thread may try to
+    // change the allocator while we are stuck in the entrypoints of
+    // an old allocator. Also, the class initialization may fail. To
+    // handle these cases we mark the slow path boolean as true so
+    // that the caller knows to check the allocator type to see if it
+    // has changed and to null-check the return value in case the
+    // initialization fails.
+    *slow_path = true;
+    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
+      DCHECK(self->IsExceptionPending());
+      return nullptr;  // Failure
+    } else {
+      DCHECK(!self->IsExceptionPending());
+    }
+    return h_class.Get();
+  }
+  return klass;
+}
+
 ALWAYS_INLINE inline ObjPtr<mirror::Class> CheckObjectAlloc(ObjPtr<mirror::Class> klass,
                                                             Thread* self,
                                                             bool* slow_path)
@@ -130,54 +159,7 @@ ALWAYS_INLINE inline ObjPtr<mirror::Class> CheckObjectAlloc(ObjPtr<mirror::Class
     *slow_path = true;
     return nullptr;  // Failure
   }
-  if (UNLIKELY(!klass->IsInitialized())) {
-    StackHandleScope<1> hs(self);
-    Handle<mirror::Class> h_klass(hs.NewHandle(klass));
-    // EnsureInitialized (the class initializer) might cause a GC.
-    // may cause us to suspend meaning that another thread may try to
-    // change the allocator while we are stuck in the entrypoints of
-    // an old allocator. Also, the class initialization may fail. To
-    // handle these cases we mark the slow path boolean as true so
-    // that the caller knows to check the allocator type to see if it
-    // has changed and to null-check the return value in case the
-    // initialization fails.
-    *slow_path = true;
-    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_klass, true, true)) {
-      DCHECK(self->IsExceptionPending());
-      return nullptr;  // Failure
-    } else {
-      DCHECK(!self->IsExceptionPending());
-    }
-    return h_klass.Get();
-  }
-  return klass;
-}
-
-ALWAYS_INLINE
-inline ObjPtr<mirror::Class> CheckClassInitializedForObjectAlloc(ObjPtr<mirror::Class> klass,
-                                                                 Thread* self,
-                                                                 bool* slow_path)
-    REQUIRES_SHARED(Locks::mutator_lock_)
-    REQUIRES(!Roles::uninterruptible_) {
-  if (UNLIKELY(!klass->IsInitialized())) {
-    StackHandleScope<1> hs(self);
-    Handle<mirror::Class> h_class(hs.NewHandle(klass));
-    // EnsureInitialized (the class initializer) might cause a GC.
-    // may cause us to suspend meaning that another thread may try to
-    // change the allocator while we are stuck in the entrypoints of
-    // an old allocator. Also, the class initialization may fail. To
-    // handle these cases we mark the slow path boolean as true so
-    // that the caller knows to check the allocator type to see if it
-    // has changed and to null-check the return value in case the
-    // initialization fails.
-    *slow_path = true;
-    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
-      DCHECK(self->IsExceptionPending());
-      return nullptr;  // Failure
-    }
-    return h_class.Get();
-  }
-  return klass;
+  return CheckClassInitializedForObjectAlloc(klass, self, slow_path);
 }
 
 // Allocate an instance of klass. Throws InstantationError if klass is not instantiable,

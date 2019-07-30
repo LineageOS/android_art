@@ -776,23 +776,14 @@ extern "C" uint64_t artQuickToInterpreterBridge(ArtMethod* method, Thread* self,
 
     if (method->IsStatic()) {
       ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass();
-      if (LIKELY(declaring_class->IsVisiblyInitialized())) {
-        // Visibly initialized, nothing to do.
-      } else if (!declaring_class->IsInitialized()) {
+      if (UNLIKELY(!declaring_class->IsVisiblyInitialized())) {
         // Ensure static method's class is initialized.
         StackHandleScope<1> hs(self);
-        Handle<mirror::Class> h_class(hs.NewHandle(shadow_frame->GetMethod()->GetDeclaringClass()));
+        Handle<mirror::Class> h_class(hs.NewHandle(declaring_class));
         if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
-          DCHECK(Thread::Current()->IsExceptionPending())
-              << shadow_frame->GetMethod()->PrettyMethod();
+          DCHECK(Thread::Current()->IsExceptionPending()) << method->PrettyMethod();
           self->PopManagedStackFragment(fragment);
           return 0;
-        }
-      } else {
-        // Initialized but not visibly initialized.
-        if (self->IncrementMakeVisiblyInitializedCounter()) {
-          Runtime::Current()->GetClassLinker()->MakeInitializedClassesVisiblyInitialized(
-              self, /*wait=*/ false);
         }
       }
     }

@@ -137,12 +137,6 @@ extern "C" mirror::Class* artInitializeStaticStorageFromCode(mirror::Class* klas
   ScopedQuickEntrypointChecks sqec(self);
   DCHECK(klass != nullptr);
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
-  if (UNLIKELY(klass->IsInitialized())) {
-    if (self->IncrementMakeVisiblyInitializedCounter()) {
-      class_linker->MakeInitializedClassesVisiblyInitialized(self, /*wait=*/ false);
-    }
-    return klass;
-  }
   StackHandleScope<1> hs(self);
   Handle<mirror::Class> h_klass = hs.NewHandle(klass);
   bool success = class_linker->EnsureInitialized(
