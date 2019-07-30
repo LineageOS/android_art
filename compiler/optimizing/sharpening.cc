@@ -33,7 +33,6 @@
 #include "nodes.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 
 namespace art {
 
@@ -50,7 +49,7 @@ static bool IsInBootImage(ArtMethod* method) {
 }
 
 static bool BootImageAOTCanEmbedMethod(ArtMethod* method, const CompilerOptions& compiler_options) {
-  DCHECK(compiler_options.IsBootImage());
+  DCHECK(compiler_options.IsBootImage() || compiler_options.IsBootImageExtension());
   ScopedObjectAccess soa(Thread::Current());
   ObjPtr<mirror::Class> klass = method->GetDeclaringClass();
   DCHECK(klass != nullptr);
@@ -88,10 +87,13 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
     // Recursive call.
     method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRecursive;
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallSelf;
-  } else if (compiler_options.IsBootImage()) {
+  } else if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
     if (!compiler_options.GetCompilePic()) {
       // Test configuration, do not sharpen.
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
+    } else if (IsInBootImage(callee)) {
+      DCHECK(compiler_options.IsBootImageExtension());
+      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
     } else if (BootImageAOTCanEmbedMethod(callee, compiler_options)) {
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative;
     } else {
@@ -161,19 +163,22 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
     HLoadClass::LoadKind desired_load_kind = HLoadClass::LoadKind::kInvalid;
     Runtime* runtime = Runtime::Current();
     const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
-    if (compiler_options.IsBootImage()) {
-      // Compiling boot image. Check if the class is a boot image class.
+    if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
+      // Compiling boot image or boot image extension. Check if the class is a boot image class.
       DCHECK(!runtime->UseJitCompilation());
       if (!compiler_options.GetCompilePic()) {
         // Test configuration, do not sharpen.
         desired_load_kind = HLoadClass::LoadKind::kRuntimeCall;
+      } else if (klass != nullptr && runtime->GetHeap()->ObjectIsInBootImageSpace(klass.Get())) {
+        DCHECK(compiler_options.IsBootImageExtension());
+        is_in_boot_image = true;
+        desired_load_kind = HLoadClass::LoadKind::kBootImageRelRo;
       } else if ((klass != nullptr) &&
                  compiler_options.IsImageClass(dex_file.StringByTypeIdx(type_index))) {
         is_in_boot_image = true;
         desired_load_kind = HLoadClass::LoadKind::kBootImageLinkTimePcRelative;
       } else {
         // Not a boot image class.
-        DCHECK(ContainsElement(compiler_options.GetDexFilesForOatFile(), &dex_file));
         desired_load_kind = HLoadClass::LoadKind::kBssEntry;
       }
     } else {
@@ -317,12 +322,11 @@ void HSharpening::ProcessLoadString(
     ObjPtr<mirror::String> string = nullptr;
 
     const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
-    if (compiler_options.IsBootImage()) {
-      // Compiling boot image. Resolve the string and allocate it if needed, to ensure
-      // the string will be added to the boot image.
+    if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
+      // Compiling boot image or boot image extension. Resolve the string and allocate it
+      // if needed, to ensure the string will be added to the boot image.
       DCHECK(!runtime->UseJitCompilation());
       if (compiler_options.GetCompilePic()) {
-        DCHECK(ContainsElement(compiler_options.GetDexFilesForOatFile(), &dex_file));
         if (compiler_options.IsForceDeterminism()) {
           // Strings for methods we're compiling should be pre-resolved but Strings in inlined
           // methods may not be if these inlined methods are not in the boot image profile.
@@ -337,7 +341,12 @@ void HSharpening::ProcessLoadString(
           CHECK(string != nullptr);
         }
         if (string != nullptr) {
-          desired_load_kind = HLoadString::LoadKind::kBootImageLinkTimePcRelative;
+          if (runtime->GetHeap()->ObjectIsInBootImageSpace(string)) {
+            DCHECK(compiler_options.IsBootImageExtension());
+            desired_load_kind = HLoadString::LoadKind::kBootImageRelRo;
+          } else {
+            desired_load_kind = HLoadString::LoadKind::kBootImageLinkTimePcRelative;
+          }
         } else {
           desired_load_kind = HLoadString::LoadKind::kBssEntry;
         }
