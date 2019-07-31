@@ -17,8 +17,6 @@
 import java.lang.reflect.Method;
 
 public class Main {
-  public static boolean doThrow = false;
-
   public static void assertIntEquals(int expected, int result) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result);
@@ -84,9 +82,9 @@ public class Main {
     }
 
     assertCharEquals('7', $opt$noinline$stringCharAtCatch("0123456789", 7));
-    assertCharEquals('7', $noinline$runSmaliTest("stringCharAtCatch", "0123456789", 7));
+    assertCharEquals('7', $noinline$runSmaliTest("$noinline$stringCharAtCatch", "0123456789", 7));
     assertCharEquals('\0', $opt$noinline$stringCharAtCatch("0123456789", 10));
-    assertCharEquals('\0', $noinline$runSmaliTest("stringCharAtCatch","0123456789", 10));
+    assertCharEquals('\0', $noinline$runSmaliTest("$noinline$stringCharAtCatch","0123456789", 10));
 
     assertIntEquals('a' + 'b' + 'c', $opt$noinline$stringSumChars("abc"));
     assertIntEquals('a' + 'b' + 'c', $opt$noinline$stringSumLeadingChars("abcdef", 3));
@@ -123,7 +121,6 @@ public class Main {
   /// CHECK-NOT:                    InvokeVirtual intrinsic:StringLength
 
   static public int $opt$noinline$getStringLength(String s) {
-    if (doThrow) { throw new Error(); }
     return s.length();
   }
 
@@ -143,7 +140,6 @@ public class Main {
   /// CHECK-NOT:                    InvokeVirtual intrinsic:StringIsEmpty
 
   static public boolean $opt$noinline$isStringEmpty(String s) {
-    if (doThrow) { throw new Error(); }
     return s.isEmpty();
   }
 
@@ -164,7 +160,6 @@ public class Main {
   /// CHECK-NOT:                    InvokeVirtual intrinsic:StringCharAt
 
   static public char $opt$noinline$stringCharAt(String s, int pos) {
-    if (doThrow) { throw new Error(); }
     return s.charAt(pos);
   }
 
@@ -191,7 +186,6 @@ public class Main {
   /// CHECK-NOT:                    InvokeVirtual intrinsic:StringCharAt
 
   static public char $opt$noinline$stringCharAtCatch(String s, int pos) {
-    if (doThrow) { throw new Error(); }
     try {
       return s.charAt(pos);
     } catch (StringIndexOutOfBoundsException ignored) {
@@ -221,7 +215,6 @@ public class Main {
   /// CHECK-NOT:                    BoundsCheck
 
   static public int $opt$noinline$stringSumChars(String s) {
-    if (doThrow) { throw new Error(); }
     int sum = 0;
     int len = s.length();
     for (int i = 0; i < len; ++i) {
@@ -248,7 +241,6 @@ public class Main {
   /// CHECK-NOT:                    BoundsCheck is_string_char_at:true
 
   static public int $opt$noinline$stringSumLeadingChars(String s, int n) {
-    if (doThrow) { throw new Error(); }
     int sum = 0;
     for (int i = 0; i < n; ++i) {
       sum += s.charAt(i);
@@ -286,7 +278,6 @@ public class Main {
   /// CHECK-NOT:                    BoundsCheck is_string_char_at:true
 
   static public int $opt$noinline$stringSum4LeadingChars(String s) {
-    if (doThrow) { throw new Error(); }
     int sum = s.charAt(0) + s.charAt(1) + s.charAt(2) + s.charAt(3);
     return sum;
   }

@@ -15,11 +15,11 @@
 .class public LSmaliTests;
 .super Ljava/lang/Object;
 
-## CHECK-START: char SmaliTests.stringCharAtCatch(java.lang.String, int) instruction_simplifier (before)
+## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) instruction_simplifier (before)
 ## CHECK-DAG:  <<Char:c\d+>>     InvokeVirtual intrinsic:StringCharAt
 ## CHECK-DAG:                    Return [<<Char>>]
 
-## CHECK-START: char SmaliTests.stringCharAtCatch(java.lang.String, int) instruction_simplifier (after)
+## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) instruction_simplifier (after)
 ## CHECK-DAG:  <<String:l\d+>>   ParameterValue
 ## CHECK-DAG:  <<Pos:i\d+>>      ParameterValue
 ## CHECK-DAG:  <<NullCk:l\d+>>   NullCheck [<<String>>]
@@ -28,23 +28,15 @@
 ## CHECK-DAG:  <<Char:c\d+>>     ArrayGet [<<NullCk>>,<<Bounds>>] is_string_char_at:true
 ## CHECK-DAG:                    Return [<<Char>>]
 
-## CHECK-START: char SmaliTests.stringCharAtCatch(java.lang.String, int) instruction_simplifier (after)
+## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) instruction_simplifier (after)
 ## CHECK-NOT:                    InvokeVirtual intrinsic:StringCharAt
-.method public static stringCharAtCatch(Ljava/lang/String;I)C
+.method public static $noinline$stringCharAtCatch(Ljava/lang/String;I)C
     .registers 4
     .param p0, "s"    # Ljava/lang/String;
     .param p1, "pos"    # I
 
     .prologue
 
-    # if (doThrow) { throw new Error(); }
-    sget-boolean v1, LMain;->doThrow:Z
-    if-eqz v1, :doThrow_false
-    new-instance v1, Ljava/lang/Error;
-    invoke-direct {v1}, Ljava/lang/Error;-><init>()V
-    throw v1
-
-  :doThrow_false
   :try_start
     # tmp = s.charAt(pos)
     invoke-virtual {p0, p1}, Ljava/lang/String;->charAt(I)C
