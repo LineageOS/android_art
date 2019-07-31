@@ -46,14 +46,12 @@ inline void Jit::AddSamples(Thread* self,
   // NB: The method needs to see the transitions of the counter past the thresholds.
   uint32_t old_batch = RoundDown(old_count, kJitSamplesBatchSize);  // Clear lower bits.
   uint32_t new_batch = RoundDown(new_count, kJitSamplesBatchSize);  // Clear lower bits.
-  if (UNLIKELY(old_batch == 0)) {
-    // For low sample counts, we check every time (which is important for tests).
+  if (UNLIKELY(kSlowMode)) {  // Check every time in slow-debug mode.
     if (!MaybeCompileMethod(self, method, old_count, new_count, with_backedges)) {
       // Tests may check that the counter is 0 for methods that we never compile.
       return;  // Ignore the samples for now and retry later.
     }
   } else if (UNLIKELY(old_batch != new_batch)) {
-    // For high sample counts, we check only when we move past the batch boundary.
     if (!MaybeCompileMethod(self, method, old_batch, new_batch, with_backedges)) {
       // OSR compilation will ignore the samples if they don't have backedges.
       return;  // Ignore the samples for now and retry later.
