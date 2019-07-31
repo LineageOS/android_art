@@ -40,7 +40,7 @@ public class SimdLoop implements Runnable {
         System.out.println("Simd loop finishing");
     }
 
-    static final int kArraySize = 10000000;
+    static final int kArraySize = 3000000;
 
     public void expectEqual(int value, int expected) {
         if (value != expected) {
