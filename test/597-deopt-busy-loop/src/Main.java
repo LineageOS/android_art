@@ -31,5 +31,9 @@ public class Main {
         undeoptimizeAll();
         ensureJitCompiled(FloatLoop.class, "$noinline$busyLoop");
         FloatLoop.main();
+
+        undeoptimizeAll();
+        ensureJitCompiled(SimdLoop.class, "$noinline$busyLoop");
+        SimdLoop.main();
     }
 }
