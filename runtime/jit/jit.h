@@ -20,6 +20,7 @@
 #include "base/histogram-inl.h"
 #include "base/macros.h"
 #include "base/mutex.h"
+#include "base/runtime_debug.h"
 #include "base/timing_logger.h"
 #include "handle.h"
 #include "jit/profile_saver_options.h"
@@ -54,7 +55,7 @@ static constexpr int16_t kJitHotnessDisabled = -2;
 // At what priority to schedule jit threads. 9 is the lowest foreground priority on device.
 // See android/os/Process.java.
 static constexpr int kJitPoolThreadPthreadDefaultPriority = 9;
-static constexpr uint32_t kJitSamplesBatchSize = 32;  // Must be power of 2.
+static constexpr uint32_t kJitSamplesBatchSize = 1024;  // Must be power of 2.
 
 class JitOptions {
  public:
@@ -167,6 +168,8 @@ class Jit {
   static constexpr size_t kDefaultInvokeTransitionWeightRatio = 500;
   // How frequently should the interpreter check to see if OSR compilation is ready.
   static constexpr int16_t kJitRecheckOSRThreshold = 101;  // Prime number to avoid patterns.
+
+  DECLARE_RUNTIME_DEBUG_FLAG(kSlowMode);
 
   virtual ~Jit();
 
