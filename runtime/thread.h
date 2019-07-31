@@ -1473,7 +1473,7 @@ class Thread {
   // Stores the jit sensitive thread (which for now is the UI thread).
   static Thread* jit_sensitive_thread_;
 
-  static constexpr uint32_t kMakeVisiblyInitializedCounterTriggerCount = 1024;
+  static constexpr uint32_t kMakeVisiblyInitializedCounterTriggerCount = 128;
 
   /***********************************************************************************************/
   // Thread local storage. Fields are grouped by size to enable 32 <-> 64 searching to account for
