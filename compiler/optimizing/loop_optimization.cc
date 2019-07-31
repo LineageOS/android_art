@@ -763,6 +763,11 @@ bool HLoopOptimization::TryOptimizeInnerLoopFinite(LoopNode* node) {
   }
   // Vectorize loop, if possible and valid.
   if (kEnableVectorization &&
+      // Disable vectorization for debuggable graphs: this is a workaround for the bug
+      // in 'GenerateNewLoop' which caused the SuspendCheck environment to be invalid.
+      // TODO: b/138601207, investigate other possible cases with wrong environment values and
+      // possibly switch back vectorization on for debuggable graphs.
+      !graph_->IsDebuggable() &&
       TrySetSimpleLoopHeader(header, &main_phi) &&
       ShouldVectorize(node, body, trip_count) &&
       TryAssignLastValue(node->loop_info, main_phi, preheader, /*collect_loop_uses*/ true)) {
