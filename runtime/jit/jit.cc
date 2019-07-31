@@ -59,6 +59,8 @@ static constexpr size_t kJitDefaultCompileThreshold           = 10000;  // Non-d
 static constexpr size_t kJitStressDefaultCompileThreshold     = 100;    // Fast-debug build.
 static constexpr size_t kJitSlowStressDefaultCompileThreshold = 2;      // Slow-debug build.
 
+DEFINE_RUNTIME_DEBUG_FLAG(Jit, kSlowMode);
+
 // JIT compiler
 void* Jit::jit_library_handle_ = nullptr;
 void* Jit::jit_compiler_handle_ = nullptr;
@@ -70,13 +72,8 @@ void (*Jit::jit_types_loaded_)(void*, mirror::Class**, size_t count) = nullptr;
 bool (*Jit::jit_generate_debug_info_)(void*) = nullptr;
 void (*Jit::jit_update_options_)(void*) = nullptr;
 
-struct StressModeHelper {
-  DECLARE_RUNTIME_DEBUG_FLAG(kSlowMode);
-};
-DEFINE_RUNTIME_DEBUG_FLAG(StressModeHelper, kSlowMode);
-
 uint32_t JitOptions::RoundUpThreshold(uint32_t threshold) {
-  if (threshold > kJitSamplesBatchSize) {
+  if (!Jit::kSlowMode) {
     threshold = RoundUp(threshold, kJitSamplesBatchSize);
   }
   CHECK_LE(threshold, std::numeric_limits<uint16_t>::max());
@@ -103,7 +100,7 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
   } else {
     jit_options->compile_threshold_ =
         kIsDebugBuild
-            ? (StressModeHelper::kSlowMode
+            ? (Jit::kSlowMode
                    ? kJitSlowStressDefaultCompileThreshold
                    : kJitStressDefaultCompileThreshold)
             : kJitDefaultCompileThreshold;
