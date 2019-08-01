@@ -295,8 +295,8 @@ class ContinuousSpace : public Space {
     return End() - Begin();
   }
 
-  virtual accounting::ContinuousSpaceBitmap* GetLiveBitmap() const = 0;
-  virtual accounting::ContinuousSpaceBitmap* GetMarkBitmap() const = 0;
+  virtual accounting::ContinuousSpaceBitmap* GetLiveBitmap() = 0;
+  virtual accounting::ContinuousSpaceBitmap* GetMarkBitmap() = 0;
 
   // Maximum which the mapped space can grow to.
   virtual size_t Capacity() const {
@@ -317,6 +317,8 @@ class ContinuousSpace : public Space {
   virtual bool IsContinuousSpace() const {
     return true;
   }
+
+  bool HasBoundBitmaps() REQUIRES(Locks::heap_bitmap_lock_);
 
   virtual ~ContinuousSpace() {}
 
@@ -344,12 +346,12 @@ class ContinuousSpace : public Space {
 // is suitable for use for large primitive arrays.
 class DiscontinuousSpace : public Space {
  public:
-  accounting::LargeObjectBitmap* GetLiveBitmap() const {
-    return live_bitmap_.get();
+  accounting::LargeObjectBitmap* GetLiveBitmap() {
+    return &live_bitmap_;
   }
 
-  accounting::LargeObjectBitmap* GetMarkBitmap() const {
-    return mark_bitmap_.get();
+  accounting::LargeObjectBitmap* GetMarkBitmap() {
+    return &mark_bitmap_;
   }
 
   bool IsDiscontinuousSpace() const override {
@@ -361,8 +363,8 @@ class DiscontinuousSpace : public Space {
  protected:
   DiscontinuousSpace(const std::string& name, GcRetentionPolicy gc_retention_policy);
 
-  std::unique_ptr<accounting::LargeObjectBitmap> live_bitmap_;
-  std::unique_ptr<accounting::LargeObjectBitmap> mark_bitmap_;
+  accounting::LargeObjectBitmap live_bitmap_;
+  accounting::LargeObjectBitmap mark_bitmap_;
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(DiscontinuousSpace);
@@ -423,37 +425,36 @@ class ContinuousMemMapAllocSpace : public MemMapSpace, public AllocSpace {
     return this;
   }
 
-  bool HasBoundBitmaps() const REQUIRES(Locks::heap_bitmap_lock_);
   // Make the mark bitmap an alias of the live bitmap. Save the current mark bitmap into
   // `temp_bitmap_`, so that we can restore it later in ContinuousMemMapAllocSpace::UnBindBitmaps.
   void BindLiveToMarkBitmap() REQUIRES(Locks::heap_bitmap_lock_);
   // Unalias the mark bitmap from the live bitmap and restore the old mark bitmap.
   void UnBindBitmaps() REQUIRES(Locks::heap_bitmap_lock_);
   // Swap the live and mark bitmaps of this space. This is used by the GC for concurrent sweeping.
-  void SwapBitmaps();
+  void SwapBitmaps() REQUIRES(Locks::heap_bitmap_lock_);
 
   // Clear the space back to an empty space.
   virtual void Clear() = 0;
 
-  accounting::ContinuousSpaceBitmap* GetLiveBitmap() const override {
-    return live_bitmap_.get();
+  accounting::ContinuousSpaceBitmap* GetLiveBitmap() override {
+    return &live_bitmap_;
   }
 
-  accounting::ContinuousSpaceBitmap* GetMarkBitmap() const override {
-    return mark_bitmap_.get();
+  accounting::ContinuousSpaceBitmap* GetMarkBitmap() override {
+    return &mark_bitmap_;
   }
 
-  accounting::ContinuousSpaceBitmap* GetTempBitmap() const {
-    return temp_bitmap_.get();
+  accounting::ContinuousSpaceBitmap* GetTempBitmap() {
+    return &temp_bitmap_;
   }
 
   collector::ObjectBytePair Sweep(bool swap_bitmaps);
   virtual accounting::ContinuousSpaceBitmap::SweepCallback* GetSweepCallback() = 0;
 
  protected:
-  std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap_;
-  std::unique_ptr<accounting::ContinuousSpaceBitmap> mark_bitmap_;
-  std::unique_ptr<accounting::ContinuousSpaceBitmap> temp_bitmap_;
+  accounting::ContinuousSpaceBitmap live_bitmap_;
+  accounting::ContinuousSpaceBitmap mark_bitmap_;
+  accounting::ContinuousSpaceBitmap temp_bitmap_;
 
   ContinuousMemMapAllocSpace(const std::string& name,
                              MemMap&& mem_map,

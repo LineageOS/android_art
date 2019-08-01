@@ -45,15 +45,15 @@ class SpaceBitmap {
 
   // Initialize a space bitmap so that it points to a bitmap large enough to cover a heap at
   // heap_begin of heap_capacity bytes, where objects are guaranteed to be kAlignment-aligned.
-  static SpaceBitmap* Create(const std::string& name, uint8_t* heap_begin, size_t heap_capacity);
+  static SpaceBitmap Create(const std::string& name, uint8_t* heap_begin, size_t heap_capacity);
 
   // Initialize a space bitmap using the provided mem_map as the live bits. Takes ownership of the
   // mem map. The address range covered starts at heap_begin and is of size equal to heap_capacity.
   // Objects are kAlignement-aligned.
-  static SpaceBitmap* CreateFromMemMap(const std::string& name,
-                                       MemMap&& mem_map,
-                                       uint8_t* heap_begin,
-                                       size_t heap_capacity);
+  static SpaceBitmap CreateFromMemMap(const std::string& name,
+                                      MemMap&& mem_map,
+                                      uint8_t* heap_begin,
+                                      size_t heap_capacity);
 
   ~SpaceBitmap();
 
@@ -123,19 +123,6 @@ class SpaceBitmap {
     const size_t index = OffsetToIndex(offset);
     return index < bitmap_size_ / sizeof(intptr_t);
   }
-
-  class ClearVisitor {
-   public:
-    explicit ClearVisitor(SpaceBitmap* const bitmap)
-        : bitmap_(bitmap) {
-    }
-
-    void operator()(mirror::Object* obj) const {
-      bitmap_->Clear(obj);
-    }
-   private:
-    SpaceBitmap* const bitmap_;
-  };
 
   template <typename Visitor>
   void VisitRange(uintptr_t visit_begin, uintptr_t visit_end, const Visitor& visitor) const {
@@ -219,6 +206,26 @@ class SpaceBitmap {
   static size_t ComputeBitmapSize(uint64_t capacity);
   static size_t ComputeHeapSize(uint64_t bitmap_bytes);
 
+  // TODO: heap_end_ is initialized so that the heap bitmap is empty, this doesn't require the -1,
+  // however, we document that this is expected on heap_end_
+
+  SpaceBitmap() = default;
+  SpaceBitmap(SpaceBitmap&&) = default;
+  SpaceBitmap& operator=(SpaceBitmap&&) = default;
+
+  bool IsValid() const {
+    return bitmap_begin_ != nullptr;
+  }
+
+  // Copy a view of the other bitmap without taking ownership of the underlying data.
+  void CopyView(SpaceBitmap& other) {
+    bitmap_begin_ = other.bitmap_begin_;
+    bitmap_size_ = other.bitmap_size_;
+    heap_begin_ = other.heap_begin_;
+    heap_limit_ = other.heap_limit_;
+    name_ = other.name_;
+  }
+
  private:
   // TODO: heap_end_ is initialized so that the heap bitmap is empty, this doesn't require the -1,
   // however, we document that this is expected on heap_end_
@@ -238,17 +245,17 @@ class SpaceBitmap {
   MemMap mem_map_;
 
   // This bitmap itself, word sized for efficiency in scanning.
-  Atomic<uintptr_t>* const bitmap_begin_;
+  Atomic<uintptr_t>* bitmap_begin_ = nullptr;
 
   // Size of this bitmap.
-  size_t bitmap_size_;
+  size_t bitmap_size_ = 0u;
 
   // The start address of the memory covered by the bitmap, which corresponds to the word
   // containing the first bit in the bitmap.
-  const uintptr_t heap_begin_;
+  uintptr_t heap_begin_ = 0u;
 
   // The end address of the memory covered by the bitmap. This may not be on a word boundary.
-  uintptr_t heap_limit_;
+  uintptr_t heap_limit_ = 0u;
 
   // Name of this bitmap.
   std::string name_;

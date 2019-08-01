@@ -41,7 +41,7 @@ class DummyOatFile : public OatFile {
 class DummyImageSpace : public space::ImageSpace {
  public:
   DummyImageSpace(MemMap&& map,
-                  std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap,
+                  accounting::ContinuousSpaceBitmap&& live_bitmap,
                   std::unique_ptr<DummyOatFile>&& oat_file,
                   MemMap&& oat_map)
       : ImageSpace("DummyImageSpace",
@@ -68,11 +68,11 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
     // Create a bunch of dummy bitmaps since these are required to create image spaces. The bitmaps
     // do not need to cover the image spaces though.
     for (size_t i = 0; i < kMaxBitmaps; ++i) {
-      std::unique_ptr<accounting::ContinuousSpaceBitmap> bitmap(
+      accounting::ContinuousSpaceBitmap bitmap(
           accounting::ContinuousSpaceBitmap::Create("bitmap",
                                                     reinterpret_cast<uint8_t*>(kPageSize),
                                                     kPageSize));
-      CHECK(bitmap != nullptr);
+      CHECK(bitmap.IsValid());
       live_bitmaps_.push_back(std::move(bitmap));
     }
   }
@@ -96,7 +96,7 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
       return nullptr;
     }
     CHECK(!live_bitmaps_.empty());
-    std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap(std::move(live_bitmaps_.back()));
+    accounting::ContinuousSpaceBitmap live_bitmap(std::move(live_bitmaps_.back()));
     live_bitmaps_.pop_back();
     MemMap oat_map = MemMap::MapAnonymous("OatMap",
                                           oat_size,
@@ -136,7 +136,7 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
  private:
   // Bitmap pool for pre-allocated dummy bitmaps. We need to pre-allocate them since we don't want
   // them to randomly get placed somewhere where we want an image space.
-  std::vector<std::unique_ptr<accounting::ContinuousSpaceBitmap>> live_bitmaps_;
+  std::vector<accounting::ContinuousSpaceBitmap> live_bitmaps_;
 };
 
 class DummySpace : public space::ContinuousSpace {
@@ -156,11 +156,11 @@ class DummySpace : public space::ContinuousSpace {
     return false;
   }
 
-  accounting::ContinuousSpaceBitmap* GetLiveBitmap() const override {
+  accounting::ContinuousSpaceBitmap* GetLiveBitmap() override {
     return nullptr;
   }
 
-  accounting::ContinuousSpaceBitmap* GetMarkBitmap() const override {
+  accounting::ContinuousSpaceBitmap* GetMarkBitmap() override {
     return nullptr;
   }
 };

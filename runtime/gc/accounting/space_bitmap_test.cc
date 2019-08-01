@@ -33,9 +33,9 @@ class SpaceBitmapTest : public CommonRuntimeTest {};
 TEST_F(SpaceBitmapTest, Init) {
   uint8_t* heap_begin = reinterpret_cast<uint8_t*>(0x10000000);
   size_t heap_capacity = 16 * MB;
-  std::unique_ptr<ContinuousSpaceBitmap> space_bitmap(
+  ContinuousSpaceBitmap space_bitmap(
       ContinuousSpaceBitmap::Create("test bitmap", heap_begin, heap_capacity));
-  EXPECT_TRUE(space_bitmap.get() != nullptr);
+  EXPECT_TRUE(space_bitmap.IsValid());
 }
 
 class BitmapVerify {
@@ -61,16 +61,16 @@ TEST_F(SpaceBitmapTest, ScanRange) {
   uint8_t* heap_begin = reinterpret_cast<uint8_t*>(0x10000000);
   size_t heap_capacity = 16 * MB;
 
-  std::unique_ptr<ContinuousSpaceBitmap> space_bitmap(
+  ContinuousSpaceBitmap space_bitmap(
       ContinuousSpaceBitmap::Create("test bitmap", heap_begin, heap_capacity));
-  EXPECT_TRUE(space_bitmap != nullptr);
+  EXPECT_TRUE(space_bitmap.IsValid());
 
   // Set all the odd bits in the first BitsPerIntPtrT * 3 to one.
   for (size_t j = 0; j < kBitsPerIntPtrT * 3; ++j) {
     const mirror::Object* obj =
         reinterpret_cast<mirror::Object*>(heap_begin + j * kObjectAlignment);
     if (reinterpret_cast<uintptr_t>(obj) & 0xF) {
-      space_bitmap->Set(obj);
+      space_bitmap.Set(obj);
     }
   }
   // Try every possible starting bit in the first word. Then for each starting bit, try each
@@ -83,7 +83,7 @@ TEST_F(SpaceBitmapTest, ScanRange) {
     for (size_t j = 0; j < static_cast<size_t>(kBitsPerIntPtrT * 2); ++j) {
       mirror::Object* end =
           reinterpret_cast<mirror::Object*>(heap_begin + (i + j) * kObjectAlignment);
-      BitmapVerify(space_bitmap.get(), start, end);
+      BitmapVerify(&space_bitmap, start, end);
     }
   }
 }
@@ -92,14 +92,14 @@ TEST_F(SpaceBitmapTest, ClearRange) {
   uint8_t* heap_begin = reinterpret_cast<uint8_t*>(0x10000000);
   size_t heap_capacity = 16 * MB;
 
-  std::unique_ptr<ContinuousSpaceBitmap> bitmap(
+  ContinuousSpaceBitmap bitmap(
       ContinuousSpaceBitmap::Create("test bitmap", heap_begin, heap_capacity));
-  EXPECT_TRUE(bitmap != nullptr);
+  EXPECT_TRUE(bitmap.IsValid());
 
   // Set all of the bits in the bitmap.
   for (size_t j = 0; j < heap_capacity; j += kObjectAlignment) {
     const mirror::Object* obj = reinterpret_cast<mirror::Object*>(heap_begin + j);
-    bitmap->Set(obj);
+    bitmap.Set(obj);
   }
 
   std::vector<std::pair<uintptr_t, uintptr_t>> ranges = {
@@ -113,18 +113,18 @@ TEST_F(SpaceBitmapTest, ClearRange) {
   for (const std::pair<uintptr_t, uintptr_t>& range : ranges) {
     const mirror::Object* obj_begin = reinterpret_cast<mirror::Object*>(heap_begin + range.first);
     const mirror::Object* obj_end = reinterpret_cast<mirror::Object*>(heap_begin + range.second);
-    bitmap->ClearRange(obj_begin, obj_end);
+    bitmap.ClearRange(obj_begin, obj_end);
     // Boundaries should still be marked.
     for (uintptr_t i = 0; i < range.first; i += kObjectAlignment) {
-      EXPECT_TRUE(bitmap->Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
+      EXPECT_TRUE(bitmap.Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
     }
     for (uintptr_t i = range.second; i < range.second + kPageSize; i += kObjectAlignment) {
-      EXPECT_TRUE(bitmap->Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
+      EXPECT_TRUE(bitmap.Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
     }
     // Everything inside should be cleared.
     for (uintptr_t i = range.first; i < range.second; i += kObjectAlignment) {
-      EXPECT_FALSE(bitmap->Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
-      bitmap->Set(reinterpret_cast<mirror::Object*>(heap_begin + i));
+      EXPECT_FALSE(bitmap.Test(reinterpret_cast<mirror::Object*>(heap_begin + i)));
+      bitmap.Set(reinterpret_cast<mirror::Object*>(heap_begin + i));
     }
   }
 }
@@ -162,7 +162,7 @@ static void RunTest(TestFn&& fn) NO_THREAD_SAFETY_ANALYSIS {
   RandGen r(0x1234);
 
   for (int i = 0; i < 5 ; ++i) {
-    std::unique_ptr<ContinuousSpaceBitmap> space_bitmap(
+    ContinuousSpaceBitmap space_bitmap(
         ContinuousSpaceBitmap::Create("test bitmap", heap_begin, heap_capacity));
 
     for (int j = 0; j < 10000; ++j) {
@@ -170,9 +170,9 @@ static void RunTest(TestFn&& fn) NO_THREAD_SAFETY_ANALYSIS {
       bool set = r.next() % 2 == 1;
 
       if (set) {
-        space_bitmap->Set(reinterpret_cast<mirror::Object*>(heap_begin + offset));
+        space_bitmap.Set(reinterpret_cast<mirror::Object*>(heap_begin + offset));
       } else {
-        space_bitmap->Clear(reinterpret_cast<mirror::Object*>(heap_begin + offset));
+        space_bitmap.Clear(reinterpret_cast<mirror::Object*>(heap_begin + offset));
       }
     }
 
@@ -183,7 +183,7 @@ static void RunTest(TestFn&& fn) NO_THREAD_SAFETY_ANALYSIS {
 
       size_t manual = 0;
       for (uintptr_t k = offset; k < end; k += kAlignment) {
-        if (space_bitmap->Test(reinterpret_cast<mirror::Object*>(heap_begin + k))) {
+        if (space_bitmap.Test(reinterpret_cast<mirror::Object*>(heap_begin + k))) {
           manual++;
         }
       }
@@ -191,7 +191,7 @@ static void RunTest(TestFn&& fn) NO_THREAD_SAFETY_ANALYSIS {
       uintptr_t range_begin = reinterpret_cast<uintptr_t>(heap_begin) + offset;
       uintptr_t range_end = reinterpret_cast<uintptr_t>(heap_begin) + end;
 
-      fn(space_bitmap.get(), range_begin, range_end, manual);
+      fn(&space_bitmap, range_begin, range_end, manual);
     }
   }
 }

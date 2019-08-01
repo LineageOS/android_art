@@ -48,13 +48,12 @@ size_t SpaceBitmap<kAlignment>::ComputeHeapSize(uint64_t bitmap_bytes) {
 }
 
 template<size_t kAlignment>
-SpaceBitmap<kAlignment>* SpaceBitmap<kAlignment>::CreateFromMemMap(
+SpaceBitmap<kAlignment> SpaceBitmap<kAlignment>::CreateFromMemMap(
     const std::string& name, MemMap&& mem_map, uint8_t* heap_begin, size_t heap_capacity) {
   CHECK(mem_map.IsValid());
   uintptr_t* bitmap_begin = reinterpret_cast<uintptr_t*>(mem_map.Begin());
   const size_t bitmap_size = ComputeBitmapSize(heap_capacity);
-  return new SpaceBitmap(
-      name, std::move(mem_map), bitmap_begin, bitmap_size, heap_begin, heap_capacity);
+  return { name, std::move(mem_map), bitmap_begin, bitmap_size, heap_begin, heap_capacity };
 }
 
 template<size_t kAlignment>
@@ -78,7 +77,7 @@ template<size_t kAlignment>
 SpaceBitmap<kAlignment>::~SpaceBitmap() {}
 
 template<size_t kAlignment>
-SpaceBitmap<kAlignment>* SpaceBitmap<kAlignment>::Create(
+SpaceBitmap<kAlignment> SpaceBitmap<kAlignment>::Create(
     const std::string& name, uint8_t* heap_begin, size_t heap_capacity) {
   // Round up since `heap_capacity` is not necessarily a multiple of `kAlignment * kBitsPerIntPtrT`
   // (we represent one word as an `intptr_t`).
@@ -91,7 +90,7 @@ SpaceBitmap<kAlignment>* SpaceBitmap<kAlignment>::Create(
                                         &error_msg);
   if (UNLIKELY(!mem_map.IsValid())) {
     LOG(ERROR) << "Failed to allocate bitmap " << name << ": " << error_msg;
-    return nullptr;
+    return SpaceBitmap<kAlignment>();
   }
   return CreateFromMemMap(name, std::move(mem_map), heap_begin, heap_capacity);
 }
