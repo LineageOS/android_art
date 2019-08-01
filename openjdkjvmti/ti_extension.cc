@@ -22,7 +22,6 @@
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
@@ -365,6 +364,28 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
          ERR(CLASS_LOADER_UNSUPPORTED),
          ERR(ILLEGAL_ARGUMENT),
          ERR(WRONG_PHASE),
+      });
+  if (error != ERR(NONE)) {
+    return error;
+  }
+
+  // ChangeArraySize
+  error = add_extension(
+      reinterpret_cast<jvmtiExtensionFunction>(HeapExtensions::ChangeArraySize),
+      "com.android.art.heap.change_array_size",
+      "Changes the size of a java array. As far as all JNI and java code is concerned this is"
+      " atomic. Must have can_tag_objects capability. If the new length of the array is smaller"
+      " than the original length, then the array will be truncated to the new length. Otherwise,"
+      " all new slots will be filled with null, 0, or False as appropriate for the array type.",
+      {
+        { "array", JVMTI_KIND_IN, JVMTI_TYPE_JOBJECT, false },
+        { "new_size", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
+      },
+      {
+         ERR(NULL_POINTER),
+         ERR(MUST_POSSESS_CAPABILITY),
+         ERR(ILLEGAL_ARGUMENT),
+         ERR(OUT_OF_MEMORY),
       });
   if (error != ERR(NONE)) {
     return error;
