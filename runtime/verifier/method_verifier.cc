@@ -1096,6 +1096,7 @@ bool MethodVerifier<kVerifierDebug>::ComputeWidthsAndCountOps() {
                                       << it.DexPc() << " vs. " << insns_size << ")";
     return false;
   }
+  DCHECK(GetInstructionFlags(0).IsOpcode());
 
   return true;
 }
@@ -2676,20 +2677,15 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
       }
 
       // Find previous instruction - its existence is a precondition to peephole optimization.
-      uint32_t instance_of_idx = 0;
-      if (0 != work_insn_idx_) {
-        instance_of_idx = work_insn_idx_ - 1;
-        while (0 != instance_of_idx && !GetInstructionFlags(instance_of_idx).IsOpcode()) {
-          instance_of_idx--;
-        }
-        if (FailOrAbort(GetInstructionFlags(instance_of_idx).IsOpcode(),
-                        "Unable to get previous instruction of if-eqz/if-nez for work index ",
-                        work_insn_idx_)) {
-          break;
-        }
-      } else {
+      if (UNLIKELY(0 == work_insn_idx_)) {
         break;
       }
+      uint32_t instance_of_idx = work_insn_idx_ - 1;
+      while (0 != instance_of_idx && !GetInstructionFlags(instance_of_idx).IsOpcode()) {
+        instance_of_idx--;
+      }
+      // Dex index 0 must be an opcode.
+      DCHECK(GetInstructionFlags(instance_of_idx).IsOpcode());
 
       const Instruction& instance_of_inst = code_item_accessor_.InstructionAt(instance_of_idx);
 
@@ -2754,11 +2750,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
             while (0 != move_idx && !GetInstructionFlags(move_idx).IsOpcode()) {
               move_idx--;
             }
-            if (FailOrAbort(GetInstructionFlags(move_idx).IsOpcode(),
-                            "Unable to get previous instruction of if-eqz/if-nez for work index ",
-                            work_insn_idx_)) {
-              break;
-            }
+            DCHECK(GetInstructionFlags(move_idx).IsOpcode());
             auto maybe_update_fn = [&instance_of_inst, update_line, this, &cast_type](
                 uint16_t move_src,
                 uint16_t move_trg)
