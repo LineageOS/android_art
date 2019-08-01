@@ -523,6 +523,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
    * reordering by specifying that you can't execute the new-instance instruction if a register
    * contains an uninitialized instance created by that same instruction.
    */
+  template <bool kMonitorDexPCs>
   bool CodeFlowVerifyMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
   /*
@@ -1614,7 +1615,10 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   flags_.have_pending_runtime_throw_failure_ = false;
 
   /* Perform code flow verification. */
-  if (!CodeFlowVerifyMethod()) {
+  bool res = LIKELY(monitor_enter_dex_pcs_ == nullptr)
+                 ? CodeFlowVerifyMethod</*kMonitorDexPCs=*/ false>()
+                 : CodeFlowVerifyMethod</*kMonitorDexPCs=*/ true>();
+  if (UNLIKELY(!res)) {
     DCHECK_NE(failures_.size(), 0U);
     return false;
   }
@@ -1831,7 +1835,31 @@ bool MethodVerifier<kVerifierDebug>::SetTypesFromSignature() {
   return result;
 }
 
+COLD_ATTR
+void HandleMonitorDexPcsWorkLine(
+    std::vector<::art::verifier::MethodVerifier::DexLockInfo>* monitor_enter_dex_pcs,
+    RegisterLine* work_line) {
+  monitor_enter_dex_pcs->clear();  // The new work line is more accurate than the previous one.
+
+  std::map<uint32_t, ::art::verifier::MethodVerifier::DexLockInfo> depth_to_lock_info;
+  auto collector = [&](uint32_t dex_reg, uint32_t depth) {
+    auto insert_pair = depth_to_lock_info.emplace(
+        depth, ::art::verifier::MethodVerifier::DexLockInfo(depth));
+    auto it = insert_pair.first;
+    auto set_insert_pair = it->second.dex_registers.insert(dex_reg);
+    DCHECK(set_insert_pair.second);
+  };
+  work_line->IterateRegToLockDepths(collector);
+  for (auto& pair : depth_to_lock_info) {
+    monitor_enter_dex_pcs->push_back(pair.second);
+    // Map depth to dex PC.
+    (*monitor_enter_dex_pcs)[monitor_enter_dex_pcs->size() - 1].dex_pc =
+        work_line->GetMonitorEnterDexPc(pair.second.dex_pc);
+  }
+}
+
 template <bool kVerifierDebug>
+template <bool kMonitorDexPCs>
 bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
   const uint16_t* insns = code_item_accessor_.Insns();
   const uint32_t insns_size = code_item_accessor_.InsnsSizeInCodeUnits();
@@ -1887,6 +1915,15 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
         }
       }
     }
+
+    // If we're doing FindLocksAtDexPc, check whether we're at the dex pc we care about.
+    // We want the state _before_ the instruction, for the case where the dex pc we're
+    // interested in is itself a monitor-enter instruction (which is a likely place
+    // for a thread to be suspended).
+    if (kMonitorDexPCs && UNLIKELY(work_insn_idx_ == interesting_dex_pc_)) {
+      HandleMonitorDexPcsWorkLine(monitor_enter_dex_pcs_, work_line_.get());
+    }
+
     if (!CodeFlowVerifyInstruction(&start_guess)) {
       std::string prepend(dex_file_->PrettyMethod(dex_method_idx_));
       prepend += " failed to verify: ";
@@ -1997,29 +2034,6 @@ static void AdjustReturnLine(MethodVerifier<kVerifierDebug>* verifier,
 
 template <bool kVerifierDebug>
 bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_guess) {
-  // If we're doing FindLocksAtDexPc, check whether we're at the dex pc we care about.
-  // We want the state _before_ the instruction, for the case where the dex pc we're
-  // interested in is itself a monitor-enter instruction (which is a likely place
-  // for a thread to be suspended).
-  if (monitor_enter_dex_pcs_ != nullptr && work_insn_idx_ == interesting_dex_pc_) {
-    monitor_enter_dex_pcs_->clear();  // The new work line is more accurate than the previous one.
-
-    std::map<uint32_t, DexLockInfo> depth_to_lock_info;
-    auto collector = [&](uint32_t dex_reg, uint32_t depth) {
-      auto insert_pair = depth_to_lock_info.emplace(depth, DexLockInfo(depth));
-      auto it = insert_pair.first;
-      auto set_insert_pair = it->second.dex_registers.insert(dex_reg);
-      DCHECK(set_insert_pair.second);
-    };
-    work_line_->IterateRegToLockDepths(collector);
-    for (auto& pair : depth_to_lock_info) {
-      monitor_enter_dex_pcs_->push_back(pair.second);
-      // Map depth to dex PC.
-      (*monitor_enter_dex_pcs_)[monitor_enter_dex_pcs_->size() - 1].dex_pc =
-          work_line_->GetMonitorEnterDexPc(pair.second.dex_pc);
-    }
-  }
-
   /*
    * Once we finish decoding the instruction, we need to figure out where
    * we can go from here. There are three possible ways to transfer
