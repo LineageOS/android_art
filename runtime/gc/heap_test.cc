@@ -87,11 +87,11 @@ TEST_F(HeapTest, GarbageCollectClassLinkerInit) {
 TEST_F(HeapTest, HeapBitmapCapacityTest) {
   uint8_t* heap_begin = reinterpret_cast<uint8_t*>(0x1000);
   const size_t heap_capacity = kObjectAlignment * (sizeof(intptr_t) * 8 + 1);
-  std::unique_ptr<accounting::ContinuousSpaceBitmap> bitmap(
+  accounting::ContinuousSpaceBitmap bitmap(
       accounting::ContinuousSpaceBitmap::Create("test bitmap", heap_begin, heap_capacity));
   mirror::Object* fake_end_of_heap_object =
       reinterpret_cast<mirror::Object*>(&heap_begin[heap_capacity - kObjectAlignment]);
-  bitmap->Set(fake_end_of_heap_object);
+  bitmap.Set(fake_end_of_heap_object);
 }
 
 TEST_F(HeapTest, DumpGCPerformanceOnShutdown) {

@@ -55,14 +55,6 @@ class HeapBitmap {
       REQUIRES(Locks::heap_bitmap_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Find and replace a bitmap pointer, this is used by for the bitmap swapping in the GC.
-  void ReplaceBitmap(ContinuousSpaceBitmap* old_bitmap, ContinuousSpaceBitmap* new_bitmap)
-      REQUIRES(Locks::heap_bitmap_lock_);
-
-  // Find and replace a object set pointer, this is used by for the bitmap swapping in the GC.
-  void ReplaceLargeObjectBitmap(LargeObjectBitmap* old_bitmap, LargeObjectBitmap* new_bitmap)
-      REQUIRES(Locks::heap_bitmap_lock_);
-
   explicit HeapBitmap(Heap* heap) : heap_(heap) {}
 
  private:

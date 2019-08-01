@@ -23,23 +23,6 @@ namespace art {
 namespace gc {
 namespace accounting {
 
-void HeapBitmap::ReplaceBitmap(ContinuousSpaceBitmap* old_bitmap,
-                               ContinuousSpaceBitmap* new_bitmap) {
-  auto it = std::find(continuous_space_bitmaps_.begin(), continuous_space_bitmaps_.end(),
-                      old_bitmap);
-  CHECK(it != continuous_space_bitmaps_.end()) << " continuous space bitmap " << old_bitmap
-      << " not found";
-  *it = new_bitmap;
-}
-
-void HeapBitmap::ReplaceLargeObjectBitmap(LargeObjectBitmap* old_bitmap,
-                                          LargeObjectBitmap* new_bitmap) {
-  auto it = std::find(large_object_bitmaps_.begin(), large_object_bitmaps_.end(), old_bitmap);
-  CHECK(it != large_object_bitmaps_.end()) << " large object bitmap " << old_bitmap
-      << " not found";
-  *it = new_bitmap;
-}
-
 void HeapBitmap::AddContinuousSpaceBitmap(accounting::ContinuousSpaceBitmap* bitmap) {
   DCHECK(bitmap != nullptr);
   // Check that there is no bitmap overlap.

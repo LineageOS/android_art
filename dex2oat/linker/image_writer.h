@@ -40,6 +40,7 @@
 #include "base/safe_map.h"
 #include "base/utils.h"
 #include "class_table.h"
+#include "gc/accounting/space_bitmap.h"
 #include "image.h"
 #include "intern_table.h"
 #include "lock_word.h"
@@ -359,7 +360,7 @@ class ImageWriter final {
     uint32_t oat_checksum_ = 0u;
 
     // Image bitmap which lets us know where the objects inside of the image reside.
-    std::unique_ptr<gc::accounting::ContinuousSpaceBitmap> image_bitmap_;
+    gc::accounting::ContinuousSpaceBitmap image_bitmap_;
 
     // The start offsets of the dex cache arrays.
     SafeMap<const DexFile*, size_t> dex_cache_array_starts_;

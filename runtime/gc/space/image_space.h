@@ -97,14 +97,14 @@ class ImageSpace : public MemMapSpace {
     return image_location_;
   }
 
-  accounting::ContinuousSpaceBitmap* GetLiveBitmap() const override {
-    return live_bitmap_.get();
+  accounting::ContinuousSpaceBitmap* GetLiveBitmap() override {
+    return &live_bitmap_;
   }
 
-  accounting::ContinuousSpaceBitmap* GetMarkBitmap() const override {
+  accounting::ContinuousSpaceBitmap* GetMarkBitmap() override {
     // ImageSpaces have the same bitmap for both live and marked. This helps reduce the number of
     // special cases to test against.
-    return live_bitmap_.get();
+    return &live_bitmap_;
   }
 
   void Dump(std::ostream& os) const override;
@@ -191,12 +191,12 @@ class ImageSpace : public MemMapSpace {
 
   static Atomic<uint32_t> bitmap_index_;
 
-  std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap_;
+  accounting::ContinuousSpaceBitmap live_bitmap_;
 
   ImageSpace(const std::string& name,
              const char* image_location,
              MemMap&& mem_map,
-             std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap,
+             accounting::ContinuousSpaceBitmap&& live_bitmap,
              uint8_t* end);
 
   // The OatFile associated with the image during early startup to

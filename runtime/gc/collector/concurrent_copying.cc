@@ -101,8 +101,6 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
       weak_ref_access_enabled_(true),
       copied_live_bytes_ratio_sum_(0.f),
       gc_count_(0),
-      region_space_inter_region_bitmap_(nullptr),
-      non_moving_space_inter_region_bitmap_(nullptr),
       reclaimed_bytes_ratio_sum_(0.f),
       skipped_blocks_lock_("concurrent copying bytes blocks lock", kMarkSweepMarkStackLock),
       measure_read_barrier_slow_path_(measure_read_barrier_slow_path),
@@ -294,24 +292,24 @@ void ConcurrentCopying::ActivateReadBarrierEntrypoints() {
 
 void ConcurrentCopying::CreateInterRegionRefBitmaps() {
   DCHECK(use_generational_cc_);
-  DCHECK(region_space_inter_region_bitmap_ == nullptr);
-  DCHECK(non_moving_space_inter_region_bitmap_ == nullptr);
+  DCHECK(!region_space_inter_region_bitmap_.IsValid());
+  DCHECK(!non_moving_space_inter_region_bitmap_.IsValid());
   DCHECK(region_space_ != nullptr);
   DCHECK(heap_->non_moving_space_ != nullptr);
   // Region-space
-  region_space_inter_region_bitmap_.reset(accounting::ContinuousSpaceBitmap::Create(
+  region_space_inter_region_bitmap_ = accounting::ContinuousSpaceBitmap::Create(
       "region-space inter region ref bitmap",
       reinterpret_cast<uint8_t*>(region_space_->Begin()),
-      region_space_->Limit() - region_space_->Begin()));
-  CHECK(region_space_inter_region_bitmap_ != nullptr)
+      region_space_->Limit() - region_space_->Begin());
+  CHECK(region_space_inter_region_bitmap_.IsValid())
       << "Couldn't allocate region-space inter region ref bitmap";
 
   // non-moving-space
-  non_moving_space_inter_region_bitmap_.reset(accounting::ContinuousSpaceBitmap::Create(
+  non_moving_space_inter_region_bitmap_ = accounting::ContinuousSpaceBitmap::Create(
       "non-moving-space inter region ref bitmap",
       reinterpret_cast<uint8_t*>(heap_->non_moving_space_->Begin()),
-      heap_->non_moving_space_->Limit() - heap_->non_moving_space_->Begin()));
-  CHECK(non_moving_space_inter_region_bitmap_ != nullptr)
+      heap_->non_moving_space_->Limit() - heap_->non_moving_space_->Begin());
+  CHECK(non_moving_space_inter_region_bitmap_.IsValid())
       << "Couldn't allocate non-moving-space inter region ref bitmap";
 }
 
@@ -1138,9 +1136,9 @@ void ConcurrentCopying::AddLiveBytesAndScanRef(mirror::Object* ref) {
       // only class object reference, which is either in some immune-space, or
       // in non-moving-space.
       DCHECK(heap_->non_moving_space_->HasAddress(ref));
-      non_moving_space_inter_region_bitmap_->Set(ref);
+      non_moving_space_inter_region_bitmap_.Set(ref);
     } else {
-      region_space_inter_region_bitmap_->Set(ref);
+      region_space_inter_region_bitmap_.Set(ref);
     }
   }
 }
@@ -1459,10 +1457,10 @@ void ConcurrentCopying::CopyingPhase() {
               // We need to process un-evac references as they may be unprocessed,
               // if they skipped the marking phase due to heap mutation.
               ScanDirtyObject</*kNoUnEvac*/ false>(obj);
-              non_moving_space_inter_region_bitmap_->Clear(obj);
+              non_moving_space_inter_region_bitmap_.Clear(obj);
             } else if (region_space_->IsInUnevacFromSpace(obj)) {
               ScanDirtyObject</*kNoUnEvac*/ false>(obj);
-              region_space_inter_region_bitmap_->Clear(obj);
+              region_space_inter_region_bitmap_.Clear(obj);
             }
           },
           accounting::CardTable::kCardAged);
@@ -1474,10 +1472,10 @@ void ConcurrentCopying::CopyingPhase() {
                          ScanDirtyObject</*kNoUnEvac*/ true>(obj);
                        };
         if (space == region_space_) {
-          region_space_->ScanUnevacFromSpace(region_space_inter_region_bitmap_.get(), visitor);
+          region_space_->ScanUnevacFromSpace(&region_space_inter_region_bitmap_, visitor);
         } else {
           DCHECK(space == heap_->non_moving_space_);
-          non_moving_space_inter_region_bitmap_->VisitMarkedRange(
+          non_moving_space_inter_region_bitmap_.VisitMarkedRange(
               reinterpret_cast<uintptr_t>(space->Begin()),
               reinterpret_cast<uintptr_t>(space->End()),
               visitor);
@@ -2584,11 +2582,11 @@ void ConcurrentCopying::CaptureRssAtPeak() {
     // inter-region refs
     if (use_generational_cc_ && !young_gen_) {
       // region space
-      add_gc_range(region_space_inter_region_bitmap_->Begin(),
-                   region_space_inter_region_bitmap_->Size());
+      add_gc_range(region_space_inter_region_bitmap_.Begin(),
+                   region_space_inter_region_bitmap_.Size());
       // non-moving space
-      add_gc_range(non_moving_space_inter_region_bitmap_->Begin(),
-                   non_moving_space_inter_region_bitmap_->Size());
+      add_gc_range(non_moving_space_inter_region_bitmap_.Begin(),
+                   non_moving_space_inter_region_bitmap_.Size());
     }
     // Extract RSS using mincore(). Updates the cummulative RSS counter.
     ExtractRssFromMincore(&gc_ranges);
@@ -3639,8 +3637,8 @@ void ConcurrentCopying::FinishPhase() {
     // We do not currently use the region space cards at all, madvise them away to save ram.
     heap_->GetCardTable()->ClearCardRange(region_space_->Begin(), region_space_->Limit());
   } else if (use_generational_cc_ && !young_gen_) {
-    region_space_inter_region_bitmap_->Clear();
-    non_moving_space_inter_region_bitmap_->Clear();
+    region_space_inter_region_bitmap_.Clear();
+    non_moving_space_inter_region_bitmap_.Clear();
   }
   {
     MutexLock mu(self, skipped_blocks_lock_);

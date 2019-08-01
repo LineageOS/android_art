@@ -337,8 +337,8 @@ uint64_t DlMallocSpace::GetObjectsAllocated() {
 void DlMallocSpace::Clear() {
   size_t footprint_limit = GetFootprintLimit();
   madvise(GetMemMap()->Begin(), GetMemMap()->Size(), MADV_DONTNEED);
-  live_bitmap_->Clear();
-  mark_bitmap_->Clear();
+  live_bitmap_.Clear();
+  mark_bitmap_.Clear();
   SetEnd(Begin() + starting_size_);
   mspace_ = CreateMspace(mem_map_.Begin(), starting_size_, initial_size_);
   SetFootprintLimit(footprint_limit);
