@@ -72,6 +72,8 @@ class HeapExtensions {
                                                   jclass klass,
                                                   const jvmtiHeapCallbacks* callbacks,
                                                   const void* user_data);
+
+  static jvmtiError JNICALL ChangeArraySize(jvmtiEnv* env, jobject arr, jsize new_size);
 };
 
 }  // namespace openjdkjvmti

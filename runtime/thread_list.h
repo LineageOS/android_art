@@ -148,6 +148,13 @@ class ThreadList {
   void ForEach(void (*callback)(Thread*, void*), void* context)
       REQUIRES(Locks::thread_list_lock_);
 
+  template<typename CallBack>
+  void ForEach(CallBack cb) REQUIRES(Locks::thread_list_lock_) {
+    ForEach([](Thread* t, void* ctx) REQUIRES(Locks::thread_list_lock_) {
+      (*reinterpret_cast<CallBack*>(ctx))(t);
+    }, &cb);
+  }
+
   // Add/remove current thread from list.
   void Register(Thread* self)
       REQUIRES(Locks::runtime_shutdown_lock_)
