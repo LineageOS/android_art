@@ -1,0 +1,3 @@
+Test for change_array_size extension function.
+
+Tests that we are able to use the extension function to change the length of arrays.

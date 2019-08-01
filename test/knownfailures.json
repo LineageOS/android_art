@@ -1117,7 +1117,8 @@
                   "1951-monitor-enter-no-suspend",
                   "1957-error-ext",
                   "1972-jni-id-swap-indices",
-                  "1973-jni-id-swap-pointer"
+                  "1973-jni-id-swap-pointer",
+                  "1974-resize-array"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
