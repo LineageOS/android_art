@@ -112,6 +112,8 @@ void ContinuousMemMapAllocSpace::BindLiveToMarkBitmap() {
 }
 
 bool ContinuousSpace::HasBoundBitmaps() {
+  DCHECK(GetLiveBitmap() != nullptr);
+  DCHECK(GetMarkBitmap() != nullptr);
   // Check if the bitmaps are pointing to the same underlying data.
   return GetLiveBitmap()->Begin() == GetMarkBitmap()->Begin();
 }

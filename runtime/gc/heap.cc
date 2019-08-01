@@ -2227,7 +2227,7 @@ void Heap::UnBindBitmaps() {
   for (const auto& space : GetContinuousSpaces()) {
     if (space->IsContinuousMemMapAllocSpace()) {
       space::ContinuousMemMapAllocSpace* alloc_space = space->AsContinuousMemMapAllocSpace();
-      if (alloc_space->HasBoundBitmaps()) {
+      if (alloc_space->GetLiveBitmap() != nullptr && alloc_space->HasBoundBitmaps()) {
         alloc_space->UnBindBitmaps();
       }
     }
