@@ -32,8 +32,8 @@ class ZygoteSpace final : public ContinuousMemMapAllocSpace {
   // Returns the remaining storage in the out_map field.
   static ZygoteSpace* Create(const std::string& name,
                              MemMap&& mem_map,
-                             accounting::ContinuousSpaceBitmap* live_bitmap,
-                             accounting::ContinuousSpaceBitmap* mark_bitmap)
+                             accounting::ContinuousSpaceBitmap&& live_bitmap,
+                             accounting::ContinuousSpaceBitmap&& mark_bitmap)
       REQUIRES_SHARED(Locks::mutator_lock_);
   // In PreZygoteFork() we set mark-bit of all live objects to avoid page
   // getting dirtied due to it.

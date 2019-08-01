@@ -3932,9 +3932,8 @@ void Heap::RemoveRememberedSet(space::Space* space) {
 void Heap::ClearMarkedObjects() {
   // Clear all of the spaces' mark bitmaps.
   for (const auto& space : GetContinuousSpaces()) {
-    accounting::ContinuousSpaceBitmap* mark_bitmap = space->GetMarkBitmap();
-    if (space->GetLiveBitmap() != mark_bitmap) {
-      mark_bitmap->Clear();
+    if (space->GetLiveBitmap() != nullptr && !space->HasBoundBitmaps()) {
+      space->GetMarkBitmap()->Clear();
     }
   }
   // Clear the marked objects in the discontinous space object sets.
