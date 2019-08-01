@@ -46,7 +46,7 @@ flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode T
 
 if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
   say "Could not find debugfs, building now."
-  make debugfs-host || die "Cannot build debugfs"
+  build/soong/soong_ui.bash --make-mode debugfs-host || die "Cannot build debugfs"
 fi
 
 # Fail early.
@@ -90,7 +90,7 @@ done
 # Build APEX packages APEX_MODULES.
 function build_apex {
   if $build_apex_p; then
-    say "Building $@" && make "$@" || die "Cannot build $@"
+    say "Building $@" && build/soong/soong_ui.bash --make-mode "$@" || die "Cannot build $@"
   fi
 }
 
