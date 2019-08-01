@@ -301,7 +301,6 @@ class ClassLinker::VisiblyInitializedCallback final
           klass.Assign(ObjPtr<mirror::Class>::DownCast(self->DecodeJObject(classes_[i])));
           vm->DeleteWeakGlobalRef(self, classes_[i]);
           if (klass != nullptr) {
-            ObjectLock<mirror::Class> lock(self, klass);
             mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
           }
         }

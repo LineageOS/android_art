@@ -152,7 +152,11 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
       LOG(FATAL) << "Unexpected change back of class status for " << h_this->PrettyClass()
                  << " " << old_status << " -> " << new_status;
     }
-    if (new_status >= ClassStatus::kResolved || old_status >= ClassStatus::kResolved) {
+    if (old_status == ClassStatus::kInitialized) {
+      // We do not hold the lock for making the class visibly initialized
+      // as this is unnecessary and could lead to deadlocks.
+      CHECK_EQ(new_status, ClassStatus::kVisiblyInitialized);
+    } else if (new_status >= ClassStatus::kResolved || old_status >= ClassStatus::kResolved) {
       // When classes are being resolved the resolution code should hold the lock.
       CHECK_EQ(h_this->GetLockOwnerThreadId(), self->GetThreadId())
             << "Attempt to change status of class while not holding its lock: "
@@ -230,6 +234,10 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
       if (new_status == ClassStatus::kRetired || new_status == ClassStatus::kErrorUnresolved) {
         h_this->NotifyAll(self);
       }
+    } else if (old_status == ClassStatus::kInitialized) {
+      // Do not notify for transition from kInitialized to ClassStatus::kVisiblyInitialized.
+      // This is a hidden transition, not observable by bytecode.
+      DCHECK_EQ(new_status, ClassStatus::kVisiblyInitialized);  // Already CHECK()ed above.
     } else {
       CHECK_NE(new_status, ClassStatus::kRetired);
       if (old_status >= ClassStatus::kResolved || new_status >= ClassStatus::kResolved) {
