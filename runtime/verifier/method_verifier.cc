@@ -770,8 +770,8 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   // Dump the failures encountered by the verifier.
   std::ostream& DumpFailures(std::ostream& os) {
     DCHECK_EQ(failures_.size(), failure_messages_.size());
-    for (size_t i = 0; i < failures_.size(); ++i) {
-        os << failure_messages_[i]->str() << "\n";
+    for (const auto* stream : failure_messages_) {
+        os << stream->str() << "\n";
     }
     return os;
   }
@@ -1854,8 +1854,7 @@ void HandleMonitorDexPcsWorkLine(
   for (auto& pair : depth_to_lock_info) {
     monitor_enter_dex_pcs->push_back(pair.second);
     // Map depth to dex PC.
-    (*monitor_enter_dex_pcs)[monitor_enter_dex_pcs->size() - 1].dex_pc =
-        work_line->GetMonitorEnterDexPc(pair.second.dex_pc);
+    monitor_enter_dex_pcs->back().dex_pc = work_line->GetMonitorEnterDexPc(pair.second.dex_pc);
   }
 }
 
