@@ -553,7 +553,7 @@ bool ImageWriter::Write(int image_fd,
     out_offset = RoundUp(out_offset, kPageSize);
     bitmap_section = ImageSection(out_offset, bitmap_section.Size());
 
-    if (!image_file->PwriteFully(image_info.image_bitmap_->Begin(),
+    if (!image_file->PwriteFully(image_info.image_bitmap_.Begin(),
                                  bitmap_section.Size(),
                                  bitmap_section.Offset())) {
       PLOG(ERROR) << "Failed to write image file bitmap " << image_filename;
@@ -568,7 +568,7 @@ bool ImageWriter::Write(int image_fd,
 
     // Calculate the image checksum of the remaining data.
     image_checksum = adler32(image_checksum,
-                             reinterpret_cast<const uint8_t*>(image_info.image_bitmap_->Begin()),
+                             reinterpret_cast<const uint8_t*>(image_info.image_bitmap_.Begin()),
                              bitmap_section.Size());
     image_header->SetImageChecksum(image_checksum);
 
@@ -954,9 +954,9 @@ bool ImageWriter::AllocMemory() {
 
     // Create the image bitmap, only needs to cover mirror object section which is up to image_end_.
     CHECK_LE(image_info.image_end_, length);
-    image_info.image_bitmap_.reset(gc::accounting::ContinuousSpaceBitmap::Create(
-        "image bitmap", image_info.image_.Begin(), RoundUp(image_info.image_end_, kPageSize)));
-    if (image_info.image_bitmap_.get() == nullptr) {
+    image_info.image_bitmap_ = gc::accounting::ContinuousSpaceBitmap::Create(
+        "image bitmap", image_info.image_.Begin(), RoundUp(image_info.image_end_, kPageSize));
+    if (!image_info.image_bitmap_.IsValid()) {
       LOG(ERROR) << "Failed to allocate memory for image bitmap";
       return false;
     }
@@ -2658,7 +2658,7 @@ void ImageWriter::CreateHeader(size_t oat_index) {
   std::vector<ImageSection>& sections = section_info_pair.second;
 
   // Finally bitmap section.
-  const size_t bitmap_bytes = image_info.image_bitmap_->Size();
+  const size_t bitmap_bytes = image_info.image_bitmap_.Size();
   auto* bitmap_section = &sections[ImageHeader::kSectionImageBitmap];
   *bitmap_section = ImageSection(RoundUp(image_end, kPageSize), RoundUp(bitmap_bytes, kPageSize));
   if (VLOG_IS_ON(compiler)) {
@@ -2954,7 +2954,7 @@ void ImageWriter::CopyAndFixupObject(Object* obj) {
   DCHECK_LT(offset, image_info.image_end_);
   const auto* src = reinterpret_cast<const uint8_t*>(obj);
 
-  image_info.image_bitmap_->Set(dst);  // Mark the obj as live.
+  image_info.image_bitmap_.Set(dst);  // Mark the obj as live.
 
   const size_t n = obj->SizeOf();
 
@@ -3025,7 +3025,7 @@ void ImageWriter::CopyAndFixupObjects() {
   };
   Runtime::Current()->GetHeap()->VisitObjects(visitor);
   // Fill the padding objects since they are required for in order traversal of the image space.
-  for (const ImageInfo& image_info : image_infos_) {
+  for (ImageInfo& image_info : image_infos_) {
     for (const size_t start_offset : image_info.padding_offsets_) {
       const size_t offset_after_header = start_offset - sizeof(ImageHeader);
       size_t remaining_space =
@@ -3040,7 +3040,7 @@ void ImageWriter::CopyAndFixupObjects() {
       while (dst != end) {
         dst->SetClass<kVerifyNone>(image_object_class);
         dst->SetLockWord<kVerifyNone>(LockWord::Default(), /*as_volatile=*/ false);
-        image_info.image_bitmap_->Set(dst);  // Mark the obj as live.
+        image_info.image_bitmap_.Set(dst);  // Mark the obj as live.
         ++dst;
       }
     }

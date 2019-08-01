@@ -107,7 +107,7 @@ void ImmuneSpaces::CreateLargestImmuneRegion() {
 void ImmuneSpaces::AddSpace(space::ContinuousSpace* space) {
   DCHECK(spaces_.find(space) == spaces_.end()) << *space;
   // Bind live to mark bitmap if necessary.
-  if (space->GetLiveBitmap() != space->GetMarkBitmap()) {
+  if (space->GetLiveBitmap() != nullptr && !space->HasBoundBitmaps()) {
     CHECK(space->IsContinuousMemMapAllocSpace());
     space->AsContinuousMemMapAllocSpace()->BindLiveToMarkBitmap();
   }

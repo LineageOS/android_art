@@ -63,16 +63,15 @@ MallocSpace::MallocSpace(const std::string& name,
     static const uintptr_t kGcCardSize = static_cast<uintptr_t>(accounting::CardTable::kCardSize);
     CHECK_ALIGNED(reinterpret_cast<uintptr_t>(mem_map_.Begin()), kGcCardSize);
     CHECK_ALIGNED(reinterpret_cast<uintptr_t>(mem_map_.End()), kGcCardSize);
-    live_bitmap_.reset(accounting::ContinuousSpaceBitmap::Create(
+    live_bitmap_ = accounting::ContinuousSpaceBitmap::Create(
         StringPrintf("allocspace %s live-bitmap %d", name.c_str(), static_cast<int>(bitmap_index)),
-        Begin(), NonGrowthLimitCapacity()));
-    CHECK(live_bitmap_.get() != nullptr) << "could not create allocspace live bitmap #"
+        Begin(), NonGrowthLimitCapacity());
+    CHECK(live_bitmap_.IsValid()) << "could not create allocspace live bitmap #"
         << bitmap_index;
-    mark_bitmap_.reset(accounting::ContinuousSpaceBitmap::Create(
+    mark_bitmap_ = accounting::ContinuousSpaceBitmap::Create(
         StringPrintf("allocspace %s mark-bitmap %d", name.c_str(), static_cast<int>(bitmap_index)),
-        Begin(), NonGrowthLimitCapacity()));
-    CHECK(mark_bitmap_.get() != nullptr) << "could not create allocspace mark bitmap #"
-        << bitmap_index;
+        Begin(), NonGrowthLimitCapacity());
+    CHECK(mark_bitmap_.IsValid()) << "could not create allocspace mark bitmap #" << bitmap_index;
   }
   for (auto& freed : recent_freed_objects_) {
     freed.first = nullptr;
@@ -229,14 +228,16 @@ ZygoteSpace* MallocSpace::CreateZygoteSpace(const char* alloc_space_name, bool l
                                      growth_limit,
                                      CanMoveObjects());
   SetLimit(End());
-  live_bitmap_->SetHeapLimit(reinterpret_cast<uintptr_t>(End()));
-  CHECK_EQ(live_bitmap_->HeapLimit(), reinterpret_cast<uintptr_t>(End()));
-  mark_bitmap_->SetHeapLimit(reinterpret_cast<uintptr_t>(End()));
-  CHECK_EQ(mark_bitmap_->HeapLimit(), reinterpret_cast<uintptr_t>(End()));
+  live_bitmap_.SetHeapLimit(reinterpret_cast<uintptr_t>(End()));
+  CHECK_EQ(live_bitmap_.HeapLimit(), reinterpret_cast<uintptr_t>(End()));
+  mark_bitmap_.SetHeapLimit(reinterpret_cast<uintptr_t>(End()));
+  CHECK_EQ(mark_bitmap_.HeapLimit(), reinterpret_cast<uintptr_t>(End()));
 
   // Create the actual zygote space.
-  ZygoteSpace* zygote_space = ZygoteSpace::Create("Zygote space", ReleaseMemMap(),
-                                                  live_bitmap_.release(), mark_bitmap_.release());
+  ZygoteSpace* zygote_space = ZygoteSpace::Create("Zygote space",
+                                                  ReleaseMemMap(),
+                                                  std::move(live_bitmap_),
+                                                  std::move(mark_bitmap_));
   if (UNLIKELY(zygote_space == nullptr)) {
     VLOG(heap) << "Failed creating zygote space from space " << GetName();
   } else {
@@ -280,9 +281,9 @@ void MallocSpace::ClampGrowthLimit() {
   CHECK_LE(new_capacity, NonGrowthLimitCapacity());
   GetLiveBitmap()->SetHeapSize(new_capacity);
   GetMarkBitmap()->SetHeapSize(new_capacity);
-  if (temp_bitmap_.get() != nullptr) {
+  if (temp_bitmap_.IsValid()) {
     // If the bitmaps are clamped, then the temp bitmap is actually the mark bitmap.
-    temp_bitmap_->SetHeapSize(new_capacity);
+    temp_bitmap_.SetHeapSize(new_capacity);
   }
   GetMemMap()->SetSize(new_capacity);
   limit_ = Begin() + new_capacity;
