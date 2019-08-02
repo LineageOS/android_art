@@ -474,14 +474,18 @@ void EnterInterpreterFromInvoke(Thread* self,
   }
   self->EndAssertNoThreadSuspension(old_cause);
   // Do this after populating the shadow frame in case EnsureInitialized causes a GC.
-  if (method->IsStatic() && UNLIKELY(!method->GetDeclaringClass()->IsInitialized())) {
-    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
-    StackHandleScope<1> hs(self);
-    Handle<mirror::Class> h_class(hs.NewHandle(method->GetDeclaringClass()));
-    if (UNLIKELY(!class_linker->EnsureInitialized(self, h_class, true, true))) {
-      CHECK(self->IsExceptionPending());
-      self->PopShadowFrame();
-      return;
+  if (method->IsStatic()) {
+    ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass();
+    if (UNLIKELY(!declaring_class->IsVisiblyInitialized())) {
+      StackHandleScope<1> hs(self);
+      Handle<mirror::Class> h_class(hs.NewHandle(declaring_class));
+      if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
+                        self, h_class, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
+        CHECK(self->IsExceptionPending());
+        self->PopShadowFrame();
+        return;
+      }
+      DCHECK(h_class->IsInitializing());
     }
   }
   if (LIKELY(!method->IsNative())) {
@@ -654,16 +658,16 @@ void ArtInterpreterToInterpreterBridge(Thread* self,
   const bool is_static = method->IsStatic();
   if (is_static) {
     ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass();
-    if (UNLIKELY(!declaring_class->IsInitialized())) {
+    if (UNLIKELY(!declaring_class->IsVisiblyInitialized())) {
       StackHandleScope<1> hs(self);
-      HandleWrapperObjPtr<mirror::Class> h_declaring_class(hs.NewHandleWrapper(&declaring_class));
+      Handle<mirror::Class> h_class(hs.NewHandle(declaring_class));
       if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
-          self, h_declaring_class, true, true))) {
+                        self, h_class, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
         DCHECK(self->IsExceptionPending());
         self->PopShadowFrame();
         return;
       }
-      CHECK(h_declaring_class->IsInitializing());
+      DCHECK(h_class->IsInitializing());
     }
   }
 

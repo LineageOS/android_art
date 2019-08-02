@@ -81,7 +81,7 @@ bool UseFastInterpreterToInterpreterInvoke(ArtMethod* method) {
   if (method->GetDeclaringClass()->IsStringClass() && method->IsConstructor()) {
     return false;
   }
-  if (method->IsStatic() && !method->GetDeclaringClass()->IsInitialized()) {
+  if (method->IsStatic() && !method->GetDeclaringClass()->IsVisiblyInitialized()) {
     return false;
   }
   ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
@@ -585,18 +585,18 @@ void ArtInterpreterToCompiledCodeBridge(Thread* self,
   // Ensure static methods are initialized.
   if (method->IsStatic()) {
     ObjPtr<mirror::Class> declaringClass = method->GetDeclaringClass();
-    if (UNLIKELY(!declaringClass->IsInitialized())) {
+    if (UNLIKELY(!declaringClass->IsVisiblyInitialized())) {
       self->PushShadowFrame(shadow_frame);
       StackHandleScope<1> hs(self);
       Handle<mirror::Class> h_class(hs.NewHandle(declaringClass));
-      if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true,
-                                                                            true))) {
+      if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
+                        self, h_class, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
         self->PopShadowFrame();
         DCHECK(self->IsExceptionPending());
         return;
       }
       self->PopShadowFrame();
-      CHECK(h_class->IsInitializing());
+      DCHECK(h_class->IsInitializing());
       // Reload from shadow frame in case the method moved, this is faster than adding a handle.
       method = shadow_frame->GetMethod();
     }

@@ -238,7 +238,7 @@ static ALWAYS_INLINE bool DoInvoke(Thread* self,
     DCHECK(!called_method->IsIntrinsic());
     DCHECK(!(called_method->GetDeclaringClass()->IsStringClass() &&
         called_method->IsConstructor()));
-    DCHECK(type != kStatic || called_method->GetDeclaringClass()->IsInitialized());
+    DCHECK(type != kStatic || called_method->GetDeclaringClass()->IsVisiblyInitialized());
 
     const uint16_t number_of_inputs =
         (is_range) ? inst->VRegA_3rc(inst_data) : inst->VRegA_35c(inst_data);
@@ -402,14 +402,15 @@ static inline ObjPtr<mirror::String> ResolveString(Thread* self,
                                                    dex::StringIndex string_idx)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ObjPtr<mirror::Class> java_lang_string_class = GetClassRoot<mirror::String>();
-  if (UNLIKELY(!java_lang_string_class->IsInitialized())) {
-    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  if (UNLIKELY(!java_lang_string_class->IsVisiblyInitialized())) {
     StackHandleScope<1> hs(self);
     Handle<mirror::Class> h_class(hs.NewHandle(java_lang_string_class));
-    if (UNLIKELY(!class_linker->EnsureInitialized(self, h_class, true, true))) {
+    if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
+                      self, h_class, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
       DCHECK(self->IsExceptionPending());
       return nullptr;
     }
+    DCHECK(h_class->IsInitializing());
   }
   ArtMethod* method = shadow_frame.GetMethod();
   ObjPtr<mirror::String> string_ptr =

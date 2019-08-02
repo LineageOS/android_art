@@ -377,7 +377,7 @@ inline ArtField* FindFieldFromCode(uint32_t field_idx,
     return resolved_field;
   } else {
     // If the class is initialized we're done.
-    if (LIKELY(fields_class->IsInitialized())) {
+    if (LIKELY(fields_class->IsVisiblyInitialized())) {
       return resolved_field;
     } else {
       StackHandleScope<1> hs(self);
@@ -619,7 +619,7 @@ inline ArtField* FindFieldFast(uint32_t field_idx, ArtMethod* referrer, FindFiel
   if (is_static) {
     // Check class is initialized else fail so that we can contend to initialize the class with
     // other threads that may be racing to do this.
-    if (UNLIKELY(!fields_class->IsInitialized())) {
+    if (UNLIKELY(!fields_class->IsVisiblyInitialized())) {
       return nullptr;
     }
   }
