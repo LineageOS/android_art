@@ -316,16 +316,19 @@ endif
 
 include $(CLEAR_VARS)
 
-# The Android Runtime APEX comes in two flavors:
+# The Android Runtime APEX comes in three flavors:
 # - the release module (`com.android.runtime.release`), containing
 #   only "release" artifacts;
 # - the debug module (`com.android.runtime.debug`), containing both
-#   "release" and "debug" artifacts, as well as additional tools.
+#   "release" and "debug" artifacts, as well as additional tools;
+# - the testing module (`com.android.runtime.testing`), containing
+#   both "release" and "debug" artifacts, as well as additional tools
+#   and ART gtests).
 #
 # The Android Runtime APEX module (`com.android.runtime`) is an
-# "alias" for one of the previous modules. By default, "user" build
-# variants contain the release module, while "userdebug" and "eng"
-# build variant contain the debug module. However, if
+# "alias" for either the release or the debug module. By default,
+# "user" build variants contain the release module, while "userdebug"
+# and "eng" build variants contain the debug module. However, if
 # `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is defined, it overrides
 # the previous logic:
 # - if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is set to `false`, the
@@ -343,11 +346,11 @@ endif
 ifeq (true,$(art_target_include_debug_build))
   # Module with both release and debug variants, as well as
   # additional tools.
-  TARGET_RUNTIME_APEX := com.android.runtime.debug
+  TARGET_RUNTIME_APEX := $(DEBUG_RUNTIME_APEX)
   APEX_TEST_MODULE := art-check-debug-apex-gen-fakebin
 else
   # Release module (without debug variants nor tools).
-  TARGET_RUNTIME_APEX := com.android.runtime.release
+  TARGET_RUNTIME_APEX := $(RELEASE_RUNTIME_APEX)
   APEX_TEST_MODULE := art-check-release-apex-gen-fakebin
 endif
 
@@ -570,15 +573,15 @@ PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
 # TODO(b/129332183): Remove this when Golem has full support for the
 # Runtime APEX.
 .PHONY: standalone-apex-files
-standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker com.android.runtime.debug
+standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DEBUG_RUNTIME_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
 	done
 	if [ "x$(TARGET_FLATTEN_APEX)" = xtrue ]; then \
-	  runtime_apex_orig_dir=$(TARGET_OUT)/apex/com.android.runtime.debug; \
+	  runtime_apex_orig_dir=$(TARGET_OUT)/apex/$(DEBUG_RUNTIME_APEX); \
 	else \
-	  runtime_apex_orig_dir=$(TARGET_OUT)/../apex/com.android.runtime.debug; \
+	  runtime_apex_orig_dir=$(TARGET_OUT)/../apex/$(DEBUG_RUNTIME_APEX); \
 	fi; \
 	for f in $(PRIVATE_RUNTIME_DEPENDENCY_LIBS); do \
 	  tf="$$runtime_apex_orig_dir/$$f"; \
