@@ -125,6 +125,7 @@ function fail_check {
 apex_modules=(
   "com.android.runtime.release"
   "com.android.runtime.debug"
+  "com.android.runtime.testing"
   "com.android.runtime.host"
 )
 
@@ -163,7 +164,10 @@ for apex_module in ${apex_modules[@]}; do
       apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
     fi
     art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
-    [[ $apex_module = *.debug ]] && test_only_args="--debug"
+    case $apex_module in
+      (*.debug)   test_only_args="--debug";;
+      (*.testing) test_only_args="--testing";;
+    esac
   fi
   say "APEX package path: $apex_path"
 
