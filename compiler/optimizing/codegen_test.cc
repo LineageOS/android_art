@@ -850,6 +850,49 @@ TEST_F(CodegenTest, ARM64IsaVIXLFeaturesA53) {
   EXPECT_FALSE(features->Has(vixl::CPUFeatures::kAtomics));
 }
 
+constexpr static size_t kExpectedFPSpillSize = 8 * vixl::aarch64::kDRegSizeInBytes;
+
+// The following two tests check that for both SIMD and non-SIMD graphs exactly 64-bit is
+// allocated on stack per callee-saved FP register to be preserved in the frame entry as
+// ABI states.
+TEST_F(CodegenTest, ARM64FrameSizeSIMD) {
+  OverrideInstructionSetFeatures(InstructionSet::kArm64, "default");
+  HGraph* graph = CreateGraph();
+  arm64::CodeGeneratorARM64 codegen(graph, *compiler_options_);
+
+  codegen.Initialize();
+  graph->SetHasSIMD(true);
+
+  DCHECK_EQ(arm64::callee_saved_fp_registers.GetCount(), 8);
+  vixl::aarch64::CPURegList reg_list = arm64::callee_saved_fp_registers;
+  while (!reg_list.IsEmpty()) {
+    uint32_t reg_code = reg_list.PopLowestIndex().GetCode();
+    codegen.AddAllocatedRegister(Location::FpuRegisterLocation(reg_code));
+  }
+  codegen.ComputeSpillMask();
+
+  EXPECT_EQ(codegen.GetFpuSpillSize(), kExpectedFPSpillSize);
+}
+
+TEST_F(CodegenTest, ARM64FrameSizeNoSIMD) {
+  OverrideInstructionSetFeatures(InstructionSet::kArm64, "default");
+  HGraph* graph = CreateGraph();
+  arm64::CodeGeneratorARM64 codegen(graph, *compiler_options_);
+
+  codegen.Initialize();
+  graph->SetHasSIMD(false);
+
+  DCHECK_EQ(arm64::callee_saved_fp_registers.GetCount(), 8);
+  vixl::aarch64::CPURegList reg_list = arm64::callee_saved_fp_registers;
+  while (!reg_list.IsEmpty()) {
+    uint32_t reg_code = reg_list.PopLowestIndex().GetCode();
+    codegen.AddAllocatedRegister(Location::FpuRegisterLocation(reg_code));
+  }
+  codegen.ComputeSpillMask();
+
+  EXPECT_EQ(codegen.GetFpuSpillSize(), kExpectedFPSpillSize);
+}
+
 #endif
 
 #ifdef ART_ENABLE_CODEGEN_mips
