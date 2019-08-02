@@ -29,7 +29,7 @@ TEST_ART_RUN_TEST_DEPENDENCIES := \
 # Runtime APEX) -- which contains dex2oat and dalvikvm and their
 # dependencies -- on the target, as well as the core images (all images
 # as we sync only once).
-ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := com.android.runtime.debug $(TARGET_CORE_IMG_OUTS)
+ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(DEBUG_RUNTIME_APEX) $(TARGET_CORE_IMG_OUTS)
 
 # Also need libartagent.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libartagent-target libartagentd-target
