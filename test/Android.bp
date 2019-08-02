@@ -19,22 +19,22 @@ art_cc_defaults {
     host_supported: true,
     target: {
         android_arm: {
-            relative_install_path: "art/arm",
+            relative_install_path: "test/arm",
         },
         android_arm64: {
-            relative_install_path: "art/arm64",
+            relative_install_path: "test/arm64",
         },
         android_mips: {
-            relative_install_path: "art/mips",
+            relative_install_path: "test/mips",
         },
         android_mips64: {
-            relative_install_path: "art/mips64",
+            relative_install_path: "test/mips64",
         },
         android_x86: {
-            relative_install_path: "art/x86",
+            relative_install_path: "test/x86",
         },
         android_x86_64: {
-            relative_install_path: "art/x86_64",
+            relative_install_path: "test/x86_64",
         },
         darwin: {
             enabled: false,
