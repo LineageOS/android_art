@@ -842,9 +842,9 @@ static jobject Class_newInstance(JNIEnv* env, jobject javaThis) {
       caller.Assign(GetCallingClass(soa.Self(), 1));
     }
     if (UNLIKELY(caller != nullptr && !VerifyAccess(receiver.Get(),
-                                                          declaring_class,
-                                                          constructor->GetAccessFlags(),
-                                                          caller.Get()))) {
+                                                    declaring_class,
+                                                    constructor->GetAccessFlags(),
+                                                    caller.Get()))) {
       soa.Self()->ThrowNewExceptionF(
           "Ljava/lang/IllegalAccessException;", "%s is not accessible from %s",
           constructor->PrettyMethod().c_str(), caller->PrettyClass().c_str());
@@ -852,12 +852,15 @@ static jobject Class_newInstance(JNIEnv* env, jobject javaThis) {
     }
   }
   // Ensure that we are initialized.
-  if (UNLIKELY(!declaring_class->IsInitialized())) {
-    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(
-        soa.Self(), hs.NewHandle(declaring_class), true, true)) {
-      soa.Self()->AssertPendingException();
+  if (UNLIKELY(!declaring_class->IsVisiblyInitialized())) {
+    Thread* self = soa.Self();
+    Handle<mirror::Class> h_class = hs.NewHandle(declaring_class);
+    if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
+                      self, h_class, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
+      DCHECK(self->IsExceptionPending());
       return nullptr;
     }
+    DCHECK(h_class->IsInitializing());
   }
   // Invoke the constructor.
   JValue result;
