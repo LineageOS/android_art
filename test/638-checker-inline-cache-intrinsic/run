@@ -16,4 +16,6 @@
 
 # Set threshold to 1000 to match the iterations done in the test.
 # Pass --verbose-methods to only generate the CFG of these methods.
+# The test is for JIT, but we run in "optimizing" (AOT) mode, so that the Checker
+# stanzas in test/638-checker-inline-cache-intrinsic/src/Main.java will be checked.
 exec ${RUN} --jit --runtime-option -Xjitthreshold:1000 -Xcompiler-option --verbose-methods=inlineMonomorphic,knownReceiverType,stringEquals $@

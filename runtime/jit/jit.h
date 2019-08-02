@@ -55,7 +55,9 @@ static constexpr int16_t kJitHotnessDisabled = -2;
 // At what priority to schedule jit threads. 9 is the lowest foreground priority on device.
 // See android/os/Process.java.
 static constexpr int kJitPoolThreadPthreadDefaultPriority = 9;
-static constexpr uint32_t kJitSamplesBatchSize = 1024;  // Must be power of 2.
+// We check whether to jit-compile the method every Nth invoke.
+// The tests often use threshold of 1000 (and thus 500 to start profiling).
+static constexpr uint32_t kJitSamplesBatchSize = 512;  // Must be power of 2.
 
 class JitOptions {
  public:
