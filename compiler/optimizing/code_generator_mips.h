@@ -385,10 +385,14 @@ class CodeGeneratorMIPS : public CodeGenerator {
 
   size_t GetWordSize() const override { return kMipsWordSize; }
 
-  size_t GetFloatingPointSpillSlotSize() const override {
+  size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
         ? 2 * kMipsDoublewordSize   // 16 bytes for each spill.
         : 1 * kMipsDoublewordSize;  //  8 bytes for each spill.
+  }
+
+  size_t GetCalleePreservedFPWidth() const override {
+    return 1 * kMipsDoublewordSize;
   }
 
   uintptr_t GetAddressOf(HBasicBlock* block) override {
