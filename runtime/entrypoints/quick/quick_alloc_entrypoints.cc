@@ -41,22 +41,21 @@ static ALWAYS_INLINE inline mirror::Object* artAllocObjectFromCode(
   ScopedQuickEntrypointChecks sqec(self);
   DCHECK(klass != nullptr);
   if (kUseTlabFastPath && !kInstrumented && allocator_type == gc::kAllocatorTypeTLAB) {
-    if (kInitialized || klass->IsInitialized()) {
-      if (!kFinalize || !klass->IsFinalizable()) {
-        size_t byte_count = klass->GetObjectSize();
-        byte_count = RoundUp(byte_count, gc::space::BumpPointerSpace::kAlignment);
-        mirror::Object* obj;
-        if (LIKELY(byte_count < self->TlabSize())) {
-          obj = self->AllocTlab(byte_count);
-          DCHECK(obj != nullptr) << "AllocTlab can't fail";
-          obj->SetClass(klass);
-          if (kUseBakerReadBarrier) {
-            obj->AssertReadBarrierState();
-          }
-          QuasiAtomic::ThreadFenceForConstructor();
-          return obj;
-        }
+    // The "object size alloc fast path" is set when the class is
+    // visibly initialized, objects are fixed size and non-finalizable.
+    // Otherwise, the value is too large for the size check to succeed.
+    size_t byte_count = klass->GetObjectSizeAllocFastPath();
+    if (LIKELY(byte_count < self->TlabSize())) {
+      static_assert(kObjectAlignment == gc::space::BumpPointerSpace::kAlignment, "Alignment check");
+      DCHECK_ALIGNED(byte_count, gc::space::BumpPointerSpace::kAlignment);
+      mirror::Object* obj = self->AllocTlab(byte_count);
+      DCHECK(obj != nullptr) << "AllocTlab can't fail";
+      obj->SetClass(klass);
+      if (kUseBakerReadBarrier) {
+        obj->AssertReadBarrierState();
       }
+      QuasiAtomic::ThreadFenceForConstructor();
+      return obj;
     }
   }
   if (kInitialized) {

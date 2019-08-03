@@ -1,0 +1,78 @@
+Test instance
+val is: [1, 2, 3] resize +3
+val is: [1, 2, 3, 0, 0, 0, 0, 0]
+Same value? true
+
+Test HashMap
+val is: [1, 2, 3, 4] resize +3
+Map is: ([1, 2, 3, 4]->Other Value), ([1, 2, 3, 4]->THE VALUE), ([1, 4]->Third value), 
+val is: [1, 2, 3, 4, 0, 0, 0]
+Map is: ([1, 2, 3, 4]->Other Value), ([1, 2, 3, 4, 0, 0, 0]->THE VALUE), ([1, 4]->Third value), 
+
+Test j.l.r.WeakReference
+val is: [weak, ref] resize +3
+val is: [weak, ref, null, null, null, null, null]
+Same value? true
+
+Test instance self-ref
+val is: [<SELF REF>, A, B, C] resize +5 item 0 is [<SELF REF>, A, B, C]
+val is: [<SELF REF>, A, B, C, null, null, null, null, null]
+val is: [<SELF REF>, A, B, C, null, null, null, null, null]
+Same value? true
+Same structure? true
+Same inner-structure? true
+
+Test instance self-ref smaller
+val is: [<SELF REF>, A, B, C, null, null, null, null, null] resize -7 item 0 is [<SELF REF>, A, B, C, null, null, null, null, null]
+val is: [<SELF REF>, A]
+val is: [<SELF REF>, A]
+Same value? true
+Same structure? true
+Same inner-structure? true
+
+Test local
+val is: [2, 3, 4] resize +5
+val is: [2, 3, 4, 0, 0, 0, 0, 0]
+Same value? true
+
+Test local smaller
+val is: [1, 2, 3, 4, 5] resize -2
+val is: [1, 2, 3]
+Same value? true
+
+T1: Test local multi-thread
+T1: val is: [1, 2, 3] resize -2
+T1: val is: [1]
+T1: Same value? true
+T2: Test local multi-thread
+T2: val is: [1, 2, 3] resize -2
+T2: val is: [1]
+T2: Same value? true
+
+Test locks
+val is: [A, 2, C] resize -2
+val is: [A]
+Same value? true
+Locks seem to all work.
+
+Test jni-ref
+val is: [1, 11, 111] resize +5
+val is: [1, 11, 111, null, null, null, null, null]
+Same value? true
+
+Test weak jni-ref
+val is: [2, 22, 222] resize +5
+val is: [2, 22, 222, null, null, null, null, null]
+Same value? true
+
+Test jni local ref
+val is: [3, 32, 322]
+Resize +4
+val is: [3, 32, 322, null, null, null, null]
+Same value? true
+
+Test jvmti-tags
+val is: [[3, 33, 333]] resize +5
+val is: [[3, 33, 333, null, null, null, null, null]]
+Same value? true
+

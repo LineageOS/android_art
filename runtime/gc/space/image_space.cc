@@ -69,7 +69,7 @@ Atomic<uint32_t> ImageSpace::bitmap_index_(0);
 ImageSpace::ImageSpace(const std::string& image_filename,
                        const char* image_location,
                        MemMap&& mem_map,
-                       std::unique_ptr<accounting::ContinuousSpaceBitmap> live_bitmap,
+                       accounting::ContinuousSpaceBitmap&& live_bitmap,
                        uint8_t* end)
     : MemMapSpace(image_filename,
                   std::move(mem_map),
@@ -80,7 +80,7 @@ ImageSpace::ImageSpace(const std::string& image_filename,
       live_bitmap_(std::move(live_bitmap)),
       oat_file_non_owned_(nullptr),
       image_location_(image_location) {
-  DCHECK(live_bitmap_ != nullptr);
+  DCHECK(live_bitmap_.IsValid());
 }
 
 static int32_t ChooseRelocationOffsetDelta(int32_t min_delta, int32_t max_delta) {
@@ -348,7 +348,7 @@ void ImageSpace::VerifyImageAllocations() {
     CHECK_ALIGNED(current, kObjectAlignment);
     auto* obj = reinterpret_cast<mirror::Object*>(current);
     CHECK(obj->GetClass() != nullptr) << "Image object at address " << obj << " has null class";
-    CHECK(live_bitmap_->Test(obj)) << obj->PrettyTypeOf();
+    CHECK(live_bitmap_.Test(obj)) << obj->PrettyTypeOf();
     if (kUseBakerReadBarrier) {
       obj->AssertReadBarrierState();
     }
@@ -876,17 +876,16 @@ class ImageSpace::Loader {
     const ImageSection& image_objects = image_header->GetObjectsSection();
     // We only want the mirror object, not the ArtFields and ArtMethods.
     uint8_t* const image_end = map.Begin() + image_objects.End();
-    std::unique_ptr<accounting::ContinuousSpaceBitmap> bitmap;
+    accounting::ContinuousSpaceBitmap bitmap;
     {
       TimingLogger::ScopedTiming timing("CreateImageBitmap", logger);
-      bitmap.reset(
-          accounting::ContinuousSpaceBitmap::CreateFromMemMap(
-              bitmap_name,
-              std::move(image_bitmap_map),
-              reinterpret_cast<uint8_t*>(map.Begin()),
-              // Make sure the bitmap is aligned to card size instead of just bitmap word size.
-              RoundUp(image_objects.End(), gc::accounting::CardTable::kCardSize)));
-      if (bitmap == nullptr) {
+      bitmap = accounting::ContinuousSpaceBitmap::CreateFromMemMap(
+          bitmap_name,
+          std::move(image_bitmap_map),
+          reinterpret_cast<uint8_t*>(map.Begin()),
+          // Make sure the bitmap is aligned to card size instead of just bitmap word size.
+          RoundUp(image_objects.End(), gc::accounting::CardTable::kCardSize));
+      if (!bitmap.IsValid()) {
         *error_msg = StringPrintf("Could not create bitmap '%s'", bitmap_name.c_str());
         return nullptr;
       }
@@ -1209,7 +1208,7 @@ class ImageSpace::Loader {
     if (fixup_image) {
       // Two pass approach, fix up all classes first, then fix up non class-objects.
       // The visited bitmap is used to ensure that pointer arrays are not forwarded twice.
-      std::unique_ptr<gc::accounting::ContinuousSpaceBitmap> visited_bitmap(
+      gc::accounting::ContinuousSpaceBitmap visited_bitmap(
           gc::accounting::ContinuousSpaceBitmap::Create("Relocate bitmap",
                                                         target_base,
                                                         image_header.GetImageSize()));
@@ -1240,7 +1239,7 @@ class ImageSpace::Loader {
             if (!app_image_objects.InDest(klass.Ptr())) {
               continue;
             }
-            const bool already_marked = visited_bitmap->Set(klass.Ptr());
+            const bool already_marked = visited_bitmap.Set(klass.Ptr());
             CHECK(!already_marked) << "App image class already visited";
             patch_object_visitor.VisitClass(klass, class_class);
             // Then patch the non-embedded vtable and iftable.
@@ -1248,7 +1247,7 @@ class ImageSpace::Loader {
                 klass->GetVTable<kVerifyNone, kWithoutReadBarrier>();
             if (vtable != nullptr &&
                 app_image_objects.InDest(vtable.Ptr()) &&
-                !visited_bitmap->Set(vtable.Ptr())) {
+                !visited_bitmap.Set(vtable.Ptr())) {
               patch_object_visitor.VisitPointerArray(vtable);
             }
             ObjPtr<mirror::IfTable> iftable = klass->GetIfTable<kVerifyNone, kWithoutReadBarrier>();
@@ -1263,7 +1262,7 @@ class ImageSpace::Loader {
                   // The iftable has not been patched, so we need to explicitly adjust the pointer.
                   ObjPtr<mirror::PointerArray> ifarray = forward_object(unpatched_ifarray.Ptr());
                   if (app_image_objects.InDest(ifarray.Ptr()) &&
-                      !visited_bitmap->Set(ifarray.Ptr())) {
+                      !visited_bitmap.Set(ifarray.Ptr())) {
                     patch_object_visitor.VisitPointerArray(ifarray);
                   }
                 }
@@ -1280,7 +1279,7 @@ class ImageSpace::Loader {
       // Need to update the image to be at the target base.
       uintptr_t objects_begin = reinterpret_cast<uintptr_t>(target_base + objects_section.Offset());
       uintptr_t objects_end = reinterpret_cast<uintptr_t>(target_base + objects_section.End());
-      FixupObjectVisitor<ForwardObject> fixup_object_visitor(visited_bitmap.get(), forward_object);
+      FixupObjectVisitor<ForwardObject> fixup_object_visitor(&visited_bitmap, forward_object);
       bitmap->VisitMarkedRange(objects_begin, objects_end, fixup_object_visitor);
       // Fixup image roots.
       CHECK(app_image_objects.InSource(reinterpret_cast<uintptr_t>(
@@ -1636,7 +1635,7 @@ class ImageSpace::BootImageLoader {
   static void DoRelocateSpaces(ArrayRef<const std::unique_ptr<ImageSpace>>& spaces,
                                int64_t base_diff64) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK(!spaces.empty());
-    std::unique_ptr<gc::accounting::ContinuousSpaceBitmap> patched_objects(
+    gc::accounting::ContinuousSpaceBitmap patched_objects(
         gc::accounting::ContinuousSpaceBitmap::Create(
             "Marked objects",
             spaces.front()->Begin(),
@@ -1647,7 +1646,7 @@ class ImageSpace::BootImageLoader {
     DoRelocateSpaces<kPointerSize, /*kExtension=*/ false>(
         spaces.SubArray(/*pos=*/ 0u, base_component_count),
         base_diff64,
-        patched_objects.get());
+        &patched_objects);
 
     for (size_t i = base_component_count, size = spaces.size(); i != size; ) {
       const ImageHeader& ext_header = spaces[i]->GetImageHeader();
@@ -1656,7 +1655,7 @@ class ImageSpace::BootImageLoader {
       DoRelocateSpaces<kPointerSize, /*kExtension=*/ true>(
           spaces.SubArray(/*pos=*/ i, ext_component_count),
           base_diff64,
-          patched_objects.get());
+          &patched_objects);
       i += ext_component_count;
     }
   }

@@ -318,10 +318,10 @@ func init() {
 	// changes this to 'prefer32' on all host binaries. Since HOST_PREFER_32_BIT is
 	// only used for testing we can just disable the module.
 	// See b/120617876 for more information.
-	android.RegisterModuleType("art_apex_test", artTestApexBundleFactory)
+	android.RegisterModuleType("art_apex_test_host", artHostTestApexBundleFactory)
 }
 
-func artTestApexBundleFactory() android.Module {
+func artHostTestApexBundleFactory() android.Module {
 	module := apex.ApexBundleFactory( /*testApex*/ true)
 	android.AddLoadHook(module, func(ctx android.LoadHookContext) {
 		if envTrue(ctx, "HOST_PREFER_32_BIT") {

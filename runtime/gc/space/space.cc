@@ -81,12 +81,10 @@ DiscontinuousSpace::DiscontinuousSpace(const std::string& name,
     Space(name, gc_retention_policy) {
   // TODO: Fix this if we ever support objects not in the low 32 bit.
   const size_t capacity = static_cast<size_t>(std::numeric_limits<uint32_t>::max());
-  live_bitmap_.reset(accounting::LargeObjectBitmap::Create("large live objects", nullptr,
-                                                           capacity));
-  CHECK(live_bitmap_.get() != nullptr);
-  mark_bitmap_.reset(accounting::LargeObjectBitmap::Create("large marked objects", nullptr,
-                                                           capacity));
-  CHECK(mark_bitmap_.get() != nullptr);
+  live_bitmap_ = accounting::LargeObjectBitmap::Create("large live objects", nullptr, capacity);
+  CHECK(live_bitmap_.IsValid());
+  mark_bitmap_ = accounting::LargeObjectBitmap::Create("large marked objects", nullptr, capacity);
+  CHECK(mark_bitmap_.IsValid());
 }
 
 collector::ObjectBytePair ContinuousMemMapAllocSpace::Sweep(bool swap_bitmaps) {
@@ -109,35 +107,30 @@ collector::ObjectBytePair ContinuousMemMapAllocSpace::Sweep(bool swap_bitmaps) {
 
 void ContinuousMemMapAllocSpace::BindLiveToMarkBitmap() {
   CHECK(!HasBoundBitmaps());
-  accounting::ContinuousSpaceBitmap* live_bitmap = GetLiveBitmap();
-  if (live_bitmap != mark_bitmap_.get()) {
-    accounting::ContinuousSpaceBitmap* mark_bitmap = mark_bitmap_.release();
-    Runtime::Current()->GetHeap()->GetMarkBitmap()->ReplaceBitmap(mark_bitmap, live_bitmap);
-    temp_bitmap_.reset(mark_bitmap);
-    mark_bitmap_.reset(live_bitmap);
-  }
+  temp_bitmap_ = std::move(mark_bitmap_);
+  mark_bitmap_.CopyView(live_bitmap_);
 }
 
-bool ContinuousMemMapAllocSpace::HasBoundBitmaps() const {
-  return temp_bitmap_.get() != nullptr;
+bool ContinuousSpace::HasBoundBitmaps() {
+  DCHECK(GetLiveBitmap() != nullptr);
+  DCHECK(GetMarkBitmap() != nullptr);
+  // Check if the bitmaps are pointing to the same underlying data.
+  return GetLiveBitmap()->Begin() == GetMarkBitmap()->Begin();
 }
 
 void ContinuousMemMapAllocSpace::UnBindBitmaps() {
   CHECK(HasBoundBitmaps());
   // At this point, `temp_bitmap_` holds our old mark bitmap.
-  accounting::ContinuousSpaceBitmap* new_bitmap = temp_bitmap_.release();
-  Runtime::Current()->GetHeap()->GetMarkBitmap()->ReplaceBitmap(mark_bitmap_.get(), new_bitmap);
-  CHECK_EQ(mark_bitmap_.release(), live_bitmap_.get());
-  mark_bitmap_.reset(new_bitmap);
-  DCHECK(temp_bitmap_.get() == nullptr);
+  mark_bitmap_ = std::move(temp_bitmap_);
 }
 
 void ContinuousMemMapAllocSpace::SwapBitmaps() {
-  live_bitmap_.swap(mark_bitmap_);
-  // Swap names to get more descriptive diagnostics.
-  std::string temp_name(live_bitmap_->GetName());
-  live_bitmap_->SetName(mark_bitmap_->GetName());
-  mark_bitmap_->SetName(temp_name);
+  CHECK(!HasBoundBitmaps());
+  std::swap(live_bitmap_, mark_bitmap_);
+  // Preserve names to get more descriptive diagnostics.
+  std::string temp_name(live_bitmap_.GetName());
+  live_bitmap_.SetName(mark_bitmap_.GetName());
+  mark_bitmap_.SetName(temp_name);
 }
 
 AllocSpace::SweepCallbackContext::SweepCallbackContext(bool swap_bitmaps_in, space::Space* space_in)

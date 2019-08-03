@@ -154,22 +154,47 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
                  ClassLinker* class_linker,
                  ArenaPool* arena_pool,
                  const DexFile* dex_file,
+                 const dex::CodeItem* code_item,
+                 uint32_t method_idx,
+                 bool can_load_classes,
+                 bool allow_thread_suspension,
+                 bool allow_soft_failures,
+                 bool aot_mode,
                  Handle<mirror::DexCache> dex_cache,
                  Handle<mirror::ClassLoader> class_loader,
                  const dex::ClassDef& class_def,
-                 const dex::CodeItem* code_item,
-                 uint32_t method_idx,
                  ArtMethod* method,
                  uint32_t access_flags,
-                 bool can_load_classes,
-                 bool allow_soft_failures,
                  bool need_precise_constants,
                  bool verify_to_dump,
-                 bool allow_thread_suspension,
-                 bool fill_register_lines_,
-                 bool aot_mode,
-                 uint32_t api_level)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+                 bool fill_register_lines,
+                 uint32_t api_level) REQUIRES_SHARED(Locks::mutator_lock_)
+     : art::verifier::MethodVerifier(self,
+                                     class_linker,
+                                     arena_pool,
+                                     dex_file,
+                                     code_item,
+                                     method_idx,
+                                     can_load_classes,
+                                     allow_thread_suspension,
+                                     allow_soft_failures,
+                                     aot_mode),
+       method_being_verified_(method),
+       method_access_flags_(access_flags),
+       return_type_(nullptr),
+       dex_cache_(dex_cache),
+       class_loader_(class_loader),
+       class_def_(class_def),
+       declaring_class_(nullptr),
+       interesting_dex_pc_(-1),
+       monitor_enter_dex_pcs_(nullptr),
+       need_precise_constants_(need_precise_constants),
+       verify_to_dump_(verify_to_dump),
+       allow_thread_suspension_(allow_thread_suspension),
+       is_constructor_(false),
+       fill_register_lines_(fill_register_lines),
+       api_level_(api_level == 0 ? std::numeric_limits<uint32_t>::max() : api_level) {
+  }
 
   void UninstantiableError(const char* descriptor) {
     Fail(VerifyError::VERIFY_ERROR_NO_CLASS) << "Could not create precise reference for "
@@ -191,10 +216,22 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   }
 
   // Adds the given string to the beginning of the last failure message.
-  void PrependToLastFailMessage(std::string);
+  void PrependToLastFailMessage(std::string prepend) {
+    size_t failure_num = failure_messages_.size();
+    DCHECK_NE(failure_num, 0U);
+    std::ostringstream* last_fail_message = failure_messages_[failure_num - 1];
+    prepend += last_fail_message->str();
+    failure_messages_[failure_num - 1] = new std::ostringstream(prepend, std::ostringstream::ate);
+    delete last_fail_message;
+  }
 
   // Adds the given string to the end of the last failure message.
-  void AppendToLastFailMessage(const std::string& append);
+  void AppendToLastFailMessage(const std::string& append) {
+    size_t failure_num = failure_messages_.size();
+    DCHECK_NE(failure_num, 0U);
+    std::ostringstream* last_fail_message = failure_messages_[failure_num - 1];
+    (*last_fail_message) << append;
+  }
 
   /*
    * Compute the width of the instruction at each address in the instruction stream, and store it in
@@ -269,26 +306,70 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   bool VerifyInstruction(const Instruction* inst, uint32_t code_offset);
 
   /* Ensure that the register index is valid for this code item. */
-  bool CheckRegisterIndex(uint32_t idx);
+  bool CheckRegisterIndex(uint32_t idx) {
+    if (UNLIKELY(idx >= code_item_accessor_.RegistersSize())) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "register index out of range (" << idx << " >= "
+                                        << code_item_accessor_.RegistersSize() << ")";
+      return false;
+    }
+    return true;
+  }
 
   /* Ensure that the wide register index is valid for this code item. */
-  bool CheckWideRegisterIndex(uint32_t idx);
+  bool CheckWideRegisterIndex(uint32_t idx) {
+    if (UNLIKELY(idx + 1 >= code_item_accessor_.RegistersSize())) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "wide register index out of range (" << idx
+                                        << "+1 >= " << code_item_accessor_.RegistersSize() << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on an instruction referencing a CallSite. All we do here is ensure that
   // the call site index is in the valid range.
-  bool CheckCallSiteIndex(uint32_t idx);
+  bool CheckCallSiteIndex(uint32_t idx) {
+    uint32_t limit = dex_file_->NumCallSiteIds();
+    if (UNLIKELY(idx >= limit)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad call site index " << idx << " (max "
+                                        << limit << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on a field Get or set instruction. All we do here is ensure that the
   // field index is in the valid range.
-  bool CheckFieldIndex(uint32_t idx);
+  bool CheckFieldIndex(uint32_t idx) {
+    if (UNLIKELY(idx >= dex_file_->GetHeader().field_ids_size_)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad field index " << idx << " (max "
+                                        << dex_file_->GetHeader().field_ids_size_ << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on a method invocation instruction. All we do here is ensure that the
   // method index is in the valid range.
-  bool CheckMethodIndex(uint32_t idx);
+  bool CheckMethodIndex(uint32_t idx) {
+    if (UNLIKELY(idx >= dex_file_->GetHeader().method_ids_size_)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad method index " << idx << " (max "
+                                        << dex_file_->GetHeader().method_ids_size_ << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on an instruction referencing a constant method handle. All we do here
   // is ensure that the method index is in the valid range.
-  bool CheckMethodHandleIndex(uint32_t idx);
+  bool CheckMethodHandleIndex(uint32_t idx) {
+    uint32_t limit = dex_file_->NumMethodHandles();
+    if (UNLIKELY(idx >= limit)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad method handle index " << idx << " (max "
+                                        << limit << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on a "new-instance" instruction. Specifically, make sure the class
   // reference isn't for an array class.
@@ -296,14 +377,35 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
 
   // Perform static checks on a prototype indexing instruction. All we do here is ensure that the
   // prototype index is in the valid range.
-  bool CheckPrototypeIndex(uint32_t idx);
+  bool CheckPrototypeIndex(uint32_t idx) {
+    if (UNLIKELY(idx >= dex_file_->GetHeader().proto_ids_size_)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad prototype index " << idx << " (max "
+                                        << dex_file_->GetHeader().proto_ids_size_ << ")";
+      return false;
+    }
+    return true;
+  }
 
   /* Ensure that the string index is in the valid range. */
-  bool CheckStringIndex(uint32_t idx);
+  bool CheckStringIndex(uint32_t idx) {
+    if (UNLIKELY(idx >= dex_file_->GetHeader().string_ids_size_)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad string index " << idx << " (max "
+                                        << dex_file_->GetHeader().string_ids_size_ << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on an instruction that takes a class constant. Ensure that the class
   // index is in the valid range.
-  bool CheckTypeIndex(dex::TypeIndex idx);
+  bool CheckTypeIndex(dex::TypeIndex idx) {
+    if (UNLIKELY(idx.index_ >= dex_file_->GetHeader().type_ids_size_)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad type index " << idx.index_ << " (max "
+                                        << dex_file_->GetHeader().type_ids_size_ << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Perform static checks on a "new-array" instruction. Specifically, make sure they aren't
   // creating an array of arrays that causes the number of dimensions to exceed 255.
@@ -329,12 +431,33 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   // There are some tests we don't do here, e.g. we don't try to verify that invoking a method that
   // takes a double is done with consecutive registers. This requires parsing the target method
   // signature, which we will be doing later on during the code flow analysis.
-  bool CheckVarArgRegs(uint32_t vA, uint32_t arg[]);
+  bool CheckVarArgRegs(uint32_t vA, uint32_t arg[]) {
+    uint16_t registers_size = code_item_accessor_.RegistersSize();
+    for (uint32_t idx = 0; idx < vA; idx++) {
+      if (UNLIKELY(arg[idx] >= registers_size)) {
+        Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "invalid reg index (" << arg[idx]
+                                          << ") in non-range invoke (>= " << registers_size << ")";
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   // Check the register indices used in a "vararg/range" instruction, such as invoke-virtual/range
   // or filled-new-array/range.
   // - vA holds word count, vC holds index of first reg.
-  bool CheckVarArgRangeRegs(uint32_t vA, uint32_t vC);
+  bool CheckVarArgRangeRegs(uint32_t vA, uint32_t vC) {
+    uint16_t registers_size = code_item_accessor_.RegistersSize();
+    // vA/vC are unsigned 8-bit/16-bit quantities for /range instructions, so there's no risk of
+    // integer overflow when adding them here.
+    if (UNLIKELY(vA + vC > registers_size)) {
+      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "invalid reg index " << vA << "+" << vC
+                                        << " in range invoke (> " << registers_size << ")";
+      return false;
+    }
+    return true;
+  }
 
   // Checks the method matches the expectations required to be signature polymorphic.
   bool CheckSignaturePolymorphicMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
@@ -400,6 +523,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
    * reordering by specifying that you can't execute the new-instance instruction if a register
    * contains an uninitialized instance created by that same instruction.
    */
+  template <bool kMonitorDexPCs>
   bool CodeFlowVerifyMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
   /*
@@ -561,7 +685,20 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   const RegType& GetMethodReturnType() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get a type representing the declaring class of the method.
-  const RegType& GetDeclaringClass() REQUIRES_SHARED(Locks::mutator_lock_);
+  const RegType& GetDeclaringClass() REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (declaring_class_ == nullptr) {
+      const dex::MethodId& method_id = dex_file_->GetMethodId(dex_method_idx_);
+      const char* descriptor
+          = dex_file_->GetTypeDescriptor(dex_file_->GetTypeId(method_id.class_idx_));
+      if (method_being_verified_ != nullptr) {
+        ObjPtr<mirror::Class> klass = method_being_verified_->GetDeclaringClass();
+        declaring_class_ = &FromClass(descriptor, klass, klass->CannotBeAssignedFromOtherTypes());
+      } else {
+        declaring_class_ = &reg_types_.FromDescriptor(class_loader_.Get(), descriptor, false);
+      }
+    }
+    return *declaring_class_;
+  }
 
   InstructionFlags* CurrentInsnFlags() {
     return &GetModifiableInstructionFlags(work_insn_idx_);
@@ -576,7 +713,15 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   // Note: we reuse NO_CLASS as this will throw an exception at runtime, when the failing class is
   //       actually touched.
   const RegType& FromClass(const char* descriptor, ObjPtr<mirror::Class> klass, bool precise)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(klass != nullptr);
+    if (precise && !klass->IsInstantiable() && !klass->IsPrimitive()) {
+      Fail(VerifyError::VERIFY_ERROR_NO_CLASS) << "Could not create precise reference for "
+          << "non-instantiable klass " << descriptor;
+      precise = false;
+    }
+    return reg_types_.FromClass(descriptor, klass, precise);
+  }
 
   ALWAYS_INLINE bool FailOrAbort(bool condition, const char* error_msg, uint32_t work_insn_idx);
 
@@ -586,17 +731,50 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
 
   // Returns the method index of an invoke instruction.
   uint16_t GetMethodIdxOfInvoke(const Instruction* inst)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    switch (inst->Opcode()) {
+      case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
+      case Instruction::INVOKE_VIRTUAL_QUICK: {
+        DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_)
+            << dex_file_->PrettyMethod(dex_method_idx_, true) << "@" << work_insn_idx_;
+        DCHECK(method_being_verified_ != nullptr);
+        uint16_t method_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
+        CHECK_NE(method_idx, DexFile::kDexNoIndex16);
+        return method_idx;
+      }
+      default: {
+        return inst->VRegB();
+      }
+    }
+  }
   // Returns the field index of a field access instruction.
   uint16_t GetFieldIdxOfFieldAccess(const Instruction* inst, bool is_static)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (is_static) {
+      return inst->VRegB_21c();
+    } else if (inst->IsQuickened()) {
+      DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_);
+      DCHECK(method_being_verified_ != nullptr);
+      uint16_t field_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
+      CHECK_NE(field_idx, DexFile::kDexNoIndex16);
+      return field_idx;
+    } else {
+      return inst->VRegC_22c();
+    }
+  }
 
   // Run verification on the method. Returns true if verification completes and false if the input
   // has an irrecoverable corruption.
   bool Verify() override REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Dump the failures encountered by the verifier.
-  std::ostream& DumpFailures(std::ostream& os);
+  std::ostream& DumpFailures(std::ostream& os) {
+    DCHECK_EQ(failures_.size(), failure_messages_.size());
+    for (size_t i = 0; i < failures_.size(); ++i) {
+        os << failure_messages_[i]->str() << "\n";
+    }
+    return os;
+  }
 
   // Dump the state of the verifier, namely each instruction, what flags are set on it, register
   // information
@@ -699,53 +877,6 @@ static bool IsLargeMethod(const CodeItemDataAccessor& accessor) {
   uint32_t insns_size = accessor.InsnsSizeInCodeUnits();
 
   return registers_size * insns_size > 4*1024*1024;
-}
-
-template <bool kVerifierDebug>
-MethodVerifier<kVerifierDebug>::MethodVerifier(Thread* self,
-                                               ClassLinker* class_linker,
-                                               ArenaPool* arena_pool,
-                                               const DexFile* dex_file,
-                                               Handle<mirror::DexCache> dex_cache,
-                                               Handle<mirror::ClassLoader> class_loader,
-                                               const dex::ClassDef& class_def,
-                                               const dex::CodeItem* code_item,
-                                               uint32_t dex_method_idx,
-                                               ArtMethod* method,
-                                               uint32_t method_access_flags,
-                                               bool can_load_classes,
-                                               bool allow_soft_failures,
-                                               bool need_precise_constants,
-                                               bool verify_to_dump,
-                                               bool allow_thread_suspension,
-                                               bool fill_register_lines,
-                                               bool aot_mode,
-                                               uint32_t api_level)
-    : art::verifier::MethodVerifier(self,
-                                    class_linker,
-                                    arena_pool,
-                                    dex_file,
-                                    code_item,
-                                    dex_method_idx,
-                                    can_load_classes,
-                                    allow_thread_suspension,
-                                    allow_soft_failures,
-                                    aot_mode),
-      method_being_verified_(method),
-      method_access_flags_(method_access_flags),
-      return_type_(nullptr),
-      dex_cache_(dex_cache),
-      class_loader_(class_loader),
-      class_def_(class_def),
-      declaring_class_(nullptr),
-      interesting_dex_pc_(-1),
-      monitor_enter_dex_pcs_(nullptr),
-      need_precise_constants_(need_precise_constants),
-      verify_to_dump_(verify_to_dump),
-      allow_thread_suspension_(allow_thread_suspension),
-      is_constructor_(false),
-      fill_register_lines_(fill_register_lines),
-      api_level_(api_level == 0 ? std::numeric_limits<uint32_t>::max() : api_level) {
 }
 
 template <bool kVerifierDebug>
@@ -936,24 +1067,6 @@ bool MethodVerifier<kVerifierDebug>::Verify() {
 }
 
 template <bool kVerifierDebug>
-void MethodVerifier<kVerifierDebug>::PrependToLastFailMessage(std::string prepend) {
-  size_t failure_num = failure_messages_.size();
-  DCHECK_NE(failure_num, 0U);
-  std::ostringstream* last_fail_message = failure_messages_[failure_num - 1];
-  prepend += last_fail_message->str();
-  failure_messages_[failure_num - 1] = new std::ostringstream(prepend, std::ostringstream::ate);
-  delete last_fail_message;
-}
-
-template <bool kVerifierDebug>
-void MethodVerifier<kVerifierDebug>::AppendToLastFailMessage(const std::string& append) {
-  size_t failure_num = failure_messages_.size();
-  DCHECK_NE(failure_num, 0U);
-  std::ostringstream* last_fail_message = failure_messages_[failure_num - 1];
-  (*last_fail_message) << append;
-}
-
-template <bool kVerifierDebug>
 bool MethodVerifier<kVerifierDebug>::ComputeWidthsAndCountOps() {
   // We can't assume the instruction is well formed, handle the case where calculating the size
   // goes past the end of the code item.
@@ -983,6 +1096,7 @@ bool MethodVerifier<kVerifierDebug>::ComputeWidthsAndCountOps() {
                                       << it.DexPc() << " vs. " << insns_size << ")";
     return false;
   }
+  DCHECK(GetInstructionFlags(0).IsOpcode());
 
   return true;
 }
@@ -1198,68 +1312,6 @@ bool MethodVerifier<kVerifierDebug>::VerifyInstruction(const Instruction* inst,
 }
 
 template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckRegisterIndex(uint32_t idx) {
-  if (UNLIKELY(idx >= code_item_accessor_.RegistersSize())) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "register index out of range (" << idx << " >= "
-                                      << code_item_accessor_.RegistersSize() << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckWideRegisterIndex(uint32_t idx) {
-  if (UNLIKELY(idx + 1 >= code_item_accessor_.RegistersSize())) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "wide register index out of range (" << idx
-                                      << "+1 >= " << code_item_accessor_.RegistersSize() << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckCallSiteIndex(uint32_t idx) {
-  uint32_t limit = dex_file_->NumCallSiteIds();
-  if (UNLIKELY(idx >= limit)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad call site index " << idx << " (max "
-                                      << limit << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckFieldIndex(uint32_t idx) {
-  if (UNLIKELY(idx >= dex_file_->GetHeader().field_ids_size_)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad field index " << idx << " (max "
-                                      << dex_file_->GetHeader().field_ids_size_ << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckMethodIndex(uint32_t idx) {
-  if (UNLIKELY(idx >= dex_file_->GetHeader().method_ids_size_)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad method index " << idx << " (max "
-                                      << dex_file_->GetHeader().method_ids_size_ << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckMethodHandleIndex(uint32_t idx) {
-  uint32_t limit = dex_file_->NumMethodHandles();
-  if (UNLIKELY(idx >= limit)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad method handle index " << idx << " (max "
-                                      << limit << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
 inline bool MethodVerifier<kVerifierDebug>::CheckNewInstance(dex::TypeIndex idx) {
   if (UNLIKELY(idx.index_ >= dex_file_->GetHeader().type_ids_size_)) {
     Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad type index " << idx.index_ << " (max "
@@ -1275,36 +1327,6 @@ inline bool MethodVerifier<kVerifierDebug>::CheckNewInstance(dex::TypeIndex idx)
     // An unlikely new instance on Class is not allowed. Fall back to interpreter to ensure an
     // exception is thrown when this statement is executed (compiled code would not do that).
     Fail(VERIFY_ERROR_INSTANTIATION);
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckPrototypeIndex(uint32_t idx) {
-  if (UNLIKELY(idx >= dex_file_->GetHeader().proto_ids_size_)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad prototype index " << idx << " (max "
-                                      << dex_file_->GetHeader().proto_ids_size_ << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckStringIndex(uint32_t idx) {
-  if (UNLIKELY(idx >= dex_file_->GetHeader().string_ids_size_)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad string index " << idx << " (max "
-                                      << dex_file_->GetHeader().string_ids_size_ << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
-inline bool MethodVerifier<kVerifierDebug>::CheckTypeIndex(dex::TypeIndex idx) {
-  if (UNLIKELY(idx.index_ >= dex_file_->GetHeader().type_ids_size_)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad type index " << idx.index_ << " (max "
-                                      << dex_file_->GetHeader().type_ids_size_ << ")";
-    return false;
   }
   return true;
 }
@@ -1565,33 +1587,6 @@ bool MethodVerifier<kVerifierDebug>::CheckSwitchTargets(uint32_t cur_offset) {
 }
 
 template <bool kVerifierDebug>
-bool MethodVerifier<kVerifierDebug>::CheckVarArgRegs(uint32_t vA, uint32_t arg[]) {
-  uint16_t registers_size = code_item_accessor_.RegistersSize();
-  for (uint32_t idx = 0; idx < vA; idx++) {
-    if (UNLIKELY(arg[idx] >= registers_size)) {
-      Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "invalid reg index (" << arg[idx]
-                                        << ") in non-range invoke (>= " << registers_size << ")";
-      return false;
-    }
-  }
-
-  return true;
-}
-
-template <bool kVerifierDebug>
-bool MethodVerifier<kVerifierDebug>::CheckVarArgRangeRegs(uint32_t vA, uint32_t vC) {
-  uint16_t registers_size = code_item_accessor_.RegistersSize();
-  // vA/vC are unsigned 8-bit/16-bit quantities for /range instructions, so there's no risk of
-  // integer overflow when adding them here.
-  if (UNLIKELY(vA + vC > registers_size)) {
-    Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "invalid reg index " << vA << "+" << vC
-                                      << " in range invoke (> " << registers_size << ")";
-    return false;
-  }
-  return true;
-}
-
-template <bool kVerifierDebug>
 bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   const uint16_t registers_size = code_item_accessor_.RegistersSize();
 
@@ -1621,20 +1616,14 @@ bool MethodVerifier<kVerifierDebug>::VerifyCodeFlow() {
   flags_.have_pending_runtime_throw_failure_ = false;
 
   /* Perform code flow verification. */
-  if (!CodeFlowVerifyMethod()) {
+  bool res = LIKELY(monitor_enter_dex_pcs_ == nullptr)
+                 ? CodeFlowVerifyMethod</*kMonitorDexPCs=*/ false>()
+                 : CodeFlowVerifyMethod</*kMonitorDexPCs=*/ true>();
+  if (UNLIKELY(!res)) {
     DCHECK_NE(failures_.size(), 0U);
     return false;
   }
   return true;
-}
-
-template <bool kVerifierDebug>
-std::ostream& MethodVerifier<kVerifierDebug>::DumpFailures(std::ostream& os) {
-  DCHECK_EQ(failures_.size(), failure_messages_.size());
-  for (size_t i = 0; i < failures_.size(); ++i) {
-      os << failure_messages_[i]->str() << "\n";
-  }
-  return os;
 }
 
 template <bool kVerifierDebug>
@@ -1847,7 +1836,31 @@ bool MethodVerifier<kVerifierDebug>::SetTypesFromSignature() {
   return result;
 }
 
+COLD_ATTR
+void HandleMonitorDexPcsWorkLine(
+    std::vector<::art::verifier::MethodVerifier::DexLockInfo>* monitor_enter_dex_pcs,
+    RegisterLine* work_line) {
+  monitor_enter_dex_pcs->clear();  // The new work line is more accurate than the previous one.
+
+  std::map<uint32_t, ::art::verifier::MethodVerifier::DexLockInfo> depth_to_lock_info;
+  auto collector = [&](uint32_t dex_reg, uint32_t depth) {
+    auto insert_pair = depth_to_lock_info.emplace(
+        depth, ::art::verifier::MethodVerifier::DexLockInfo(depth));
+    auto it = insert_pair.first;
+    auto set_insert_pair = it->second.dex_registers.insert(dex_reg);
+    DCHECK(set_insert_pair.second);
+  };
+  work_line->IterateRegToLockDepths(collector);
+  for (auto& pair : depth_to_lock_info) {
+    monitor_enter_dex_pcs->push_back(pair.second);
+    // Map depth to dex PC.
+    (*monitor_enter_dex_pcs)[monitor_enter_dex_pcs->size() - 1].dex_pc =
+        work_line->GetMonitorEnterDexPc(pair.second.dex_pc);
+  }
+}
+
 template <bool kVerifierDebug>
+template <bool kMonitorDexPCs>
 bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
   const uint16_t* insns = code_item_accessor_.Insns();
   const uint32_t insns_size = code_item_accessor_.InsnsSizeInCodeUnits();
@@ -1903,6 +1916,15 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
         }
       }
     }
+
+    // If we're doing FindLocksAtDexPc, check whether we're at the dex pc we care about.
+    // We want the state _before_ the instruction, for the case where the dex pc we're
+    // interested in is itself a monitor-enter instruction (which is a likely place
+    // for a thread to be suspended).
+    if (kMonitorDexPCs && UNLIKELY(work_insn_idx_ == interesting_dex_pc_)) {
+      HandleMonitorDexPcsWorkLine(monitor_enter_dex_pcs_, work_line_.get());
+    }
+
     if (!CodeFlowVerifyInstruction(&start_guess)) {
       std::string prepend(dex_file_->PrettyMethod(dex_method_idx_));
       prepend += " failed to verify: ";
@@ -2013,29 +2035,6 @@ static void AdjustReturnLine(MethodVerifier<kVerifierDebug>* verifier,
 
 template <bool kVerifierDebug>
 bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_guess) {
-  // If we're doing FindLocksAtDexPc, check whether we're at the dex pc we care about.
-  // We want the state _before_ the instruction, for the case where the dex pc we're
-  // interested in is itself a monitor-enter instruction (which is a likely place
-  // for a thread to be suspended).
-  if (monitor_enter_dex_pcs_ != nullptr && work_insn_idx_ == interesting_dex_pc_) {
-    monitor_enter_dex_pcs_->clear();  // The new work line is more accurate than the previous one.
-
-    std::map<uint32_t, DexLockInfo> depth_to_lock_info;
-    auto collector = [&](uint32_t dex_reg, uint32_t depth) {
-      auto insert_pair = depth_to_lock_info.emplace(depth, DexLockInfo(depth));
-      auto it = insert_pair.first;
-      auto set_insert_pair = it->second.dex_registers.insert(dex_reg);
-      DCHECK(set_insert_pair.second);
-    };
-    work_line_->IterateRegToLockDepths(collector);
-    for (auto& pair : depth_to_lock_info) {
-      monitor_enter_dex_pcs_->push_back(pair.second);
-      // Map depth to dex PC.
-      (*monitor_enter_dex_pcs_)[monitor_enter_dex_pcs_->size() - 1].dex_pc =
-          work_line_->GetMonitorEnterDexPc(pair.second.dex_pc);
-    }
-  }
-
   /*
    * Once we finish decoding the instruction, we need to figure out where
    * we can go from here. There are three possible ways to transfer
@@ -2678,20 +2677,15 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
       }
 
       // Find previous instruction - its existence is a precondition to peephole optimization.
-      uint32_t instance_of_idx = 0;
-      if (0 != work_insn_idx_) {
-        instance_of_idx = work_insn_idx_ - 1;
-        while (0 != instance_of_idx && !GetInstructionFlags(instance_of_idx).IsOpcode()) {
-          instance_of_idx--;
-        }
-        if (FailOrAbort(GetInstructionFlags(instance_of_idx).IsOpcode(),
-                        "Unable to get previous instruction of if-eqz/if-nez for work index ",
-                        work_insn_idx_)) {
-          break;
-        }
-      } else {
+      if (UNLIKELY(0 == work_insn_idx_)) {
         break;
       }
+      uint32_t instance_of_idx = work_insn_idx_ - 1;
+      while (0 != instance_of_idx && !GetInstructionFlags(instance_of_idx).IsOpcode()) {
+        instance_of_idx--;
+      }
+      // Dex index 0 must be an opcode.
+      DCHECK(GetInstructionFlags(instance_of_idx).IsOpcode());
 
       const Instruction& instance_of_inst = code_item_accessor_.InstructionAt(instance_of_idx);
 
@@ -2756,11 +2750,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
             while (0 != move_idx && !GetInstructionFlags(move_idx).IsOpcode()) {
               move_idx--;
             }
-            if (FailOrAbort(GetInstructionFlags(move_idx).IsOpcode(),
-                            "Unable to get previous instruction of if-eqz/if-nez for work index ",
-                            work_insn_idx_)) {
-              break;
-            }
+            DCHECK(GetInstructionFlags(move_idx).IsOpcode());
             auto maybe_update_fn = [&instance_of_inst, update_line, this, &cast_type](
                 uint16_t move_src,
                 uint16_t move_trg)
@@ -4431,40 +4421,6 @@ bool MethodVerifier<kVerifierDebug>::CheckSignaturePolymorphicReceiver(const Ins
 }
 
 template <bool kVerifierDebug>
-uint16_t MethodVerifier<kVerifierDebug>::GetMethodIdxOfInvoke(const Instruction* inst) {
-  switch (inst->Opcode()) {
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
-    case Instruction::INVOKE_VIRTUAL_QUICK: {
-      DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_)
-          << dex_file_->PrettyMethod(dex_method_idx_, true) << "@" << work_insn_idx_;
-      DCHECK(method_being_verified_ != nullptr);
-      uint16_t method_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
-      CHECK_NE(method_idx, DexFile::kDexNoIndex16);
-      return method_idx;
-    }
-    default: {
-      return inst->VRegB();
-    }
-  }
-}
-
-template <bool kVerifierDebug>
-uint16_t MethodVerifier<kVerifierDebug>::GetFieldIdxOfFieldAccess(const Instruction* inst,
-                                                                  bool is_static) {
-  if (is_static) {
-    return inst->VRegB_21c();
-  } else if (inst->IsQuickened()) {
-    DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_);
-    DCHECK(method_being_verified_ != nullptr);
-    uint16_t field_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
-    CHECK_NE(field_idx, DexFile::kDexNoIndex16);
-    return field_idx;
-  } else {
-    return inst->VRegC_22c();
-  }
-}
-
-template <bool kVerifierDebug>
 void MethodVerifier<kVerifierDebug>::VerifyNewArray(const Instruction* inst,
                                                     bool is_filled,
                                                     bool is_range) {
@@ -5081,22 +5037,6 @@ const RegType& MethodVerifier<kVerifierDebug>::GetMethodReturnType() {
 }
 
 template <bool kVerifierDebug>
-const RegType& MethodVerifier<kVerifierDebug>::GetDeclaringClass() {
-  if (declaring_class_ == nullptr) {
-    const dex::MethodId& method_id = dex_file_->GetMethodId(dex_method_idx_);
-    const char* descriptor
-        = dex_file_->GetTypeDescriptor(dex_file_->GetTypeId(method_id.class_idx_));
-    if (method_being_verified_ != nullptr) {
-      ObjPtr<mirror::Class> klass = method_being_verified_->GetDeclaringClass();
-      declaring_class_ = &FromClass(descriptor, klass, klass->CannotBeAssignedFromOtherTypes());
-    } else {
-      declaring_class_ = &reg_types_.FromDescriptor(class_loader_.Get(), descriptor, false);
-    }
-  }
-  return *declaring_class_;
-}
-
-template <bool kVerifierDebug>
 const RegType& MethodVerifier<kVerifierDebug>::DetermineCat1Constant(int32_t value, bool precise) {
   if (precise) {
     // Precise constant type.
@@ -5123,19 +5063,6 @@ const RegType& MethodVerifier<kVerifierDebug>::DetermineCat1Constant(int32_t val
       return reg_types_.IntConstant();
     }
   }
-}
-
-template <bool kVerifierDebug>
-const RegType& MethodVerifier<kVerifierDebug>::FromClass(const char* descriptor,
-                                                         ObjPtr<mirror::Class> klass,
-                                                         bool precise) {
-  DCHECK(klass != nullptr);
-  if (precise && !klass->IsInstantiable() && !klass->IsPrimitive()) {
-    Fail(VerifyError::VERIFY_ERROR_NO_CLASS) << "Could not create precise reference for "
-        << "non-instantiable klass " << descriptor;
-    precise = false;
-  }
-  return reg_types_.FromClass(descriptor, klass, precise);
 }
 
 }  // namespace
@@ -5261,20 +5188,20 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 class_linker,
                                                 arena_pool,
                                                 dex_file,
+                                                code_item,
+                                                method_idx,
+                                                /* can_load_classes= */ true,
+                                                /* allow_thread_suspension= */ true,
+                                                allow_soft_failures,
+                                                aot_mode,
                                                 dex_cache,
                                                 class_loader,
                                                 class_def,
-                                                code_item,
-                                                method_idx,
                                                 method,
                                                 method_access_flags,
-                                                /* can_load_classes= */ true,
-                                                allow_soft_failures,
                                                 need_precise_constants,
                                                 /* verify to dump */ false,
-                                                /* allow_thread_suspension= */ true,
                                                 /* fill_register_lines= */ false,
-                                                aot_mode,
                                                 api_level);
   if (verifier.Verify()) {
     // Verification completed, however failures may be pending that didn't cause the verification
@@ -5408,20 +5335,20 @@ MethodVerifier* MethodVerifier::CalculateVerificationInfo(
                                       Runtime::Current()->GetClassLinker(),
                                       Runtime::Current()->GetArenaPool(),
                                       method->GetDexFile(),
+                                      method->GetCodeItem(),
+                                      method->GetDexMethodIndex(),
+                                      /* can_load_classes= */ false,
+                                      /* allow_thread_suspension= */ false,
+                                      /* allow_soft_failures= */ true,
+                                      Runtime::Current()->IsAotCompiler(),
                                       dex_cache,
                                       class_loader,
                                       *method->GetDeclaringClass()->GetClassDef(),
-                                      method->GetCodeItem(),
-                                      method->GetDexMethodIndex(),
                                       method,
                                       method->GetAccessFlags(),
-                                      /* can_load_classes= */ false,
-                                      /* allow_soft_failures= */ true,
                                       /* need_precise_constants= */ true,
                                       /* verify_to_dump= */ false,
-                                      /* allow_thread_suspension= */ false,
                                       /* fill_register_lines= */ true,
-                                      Runtime::Current()->IsAotCompiler(),
                                       // Just use the verifier at the current skd-version.
                                       // This might affect what soft-verifier errors are reported.
                                       // Callers can then filter out relevant errors if needed.
@@ -5455,20 +5382,20 @@ MethodVerifier* MethodVerifier::VerifyMethodAndDump(Thread* self,
       Runtime::Current()->GetClassLinker(),
       Runtime::Current()->GetArenaPool(),
       dex_file,
+      code_item,
+      dex_method_idx,
+      /* can_load_classes= */ true,
+      /* allow_thread_suspension= */ true,
+      /* allow_soft_failures= */ true,
+      Runtime::Current()->IsAotCompiler(),
       dex_cache,
       class_loader,
       class_def,
-      code_item,
-      dex_method_idx,
       method,
       method_access_flags,
-      /* can_load_classes= */ true,
-      /* allow_soft_failures= */ true,
       /* need_precise_constants= */ true,
       /* verify_to_dump= */ true,
-      /* allow_thread_suspension= */ true,
       /* fill_register_lines= */ false,
-      Runtime::Current()->IsAotCompiler(),
       api_level);
   verifier->Verify();
   verifier->DumpFailures(vios->Stream());
@@ -5496,20 +5423,20 @@ void MethodVerifier::FindLocksAtDexPc(
                                        Runtime::Current()->GetClassLinker(),
                                        Runtime::Current()->GetArenaPool(),
                                        m->GetDexFile(),
+                                       m->GetCodeItem(),
+                                       m->GetDexMethodIndex(),
+                                       /* can_load_classes= */ false,
+                                       /* allow_thread_suspension= */ false,
+                                       /* allow_soft_failures= */ true,
+                                       Runtime::Current()->IsAotCompiler(),
                                        dex_cache,
                                        class_loader,
                                        m->GetClassDef(),
-                                       m->GetCodeItem(),
-                                       m->GetDexMethodIndex(),
                                        m,
                                        m->GetAccessFlags(),
-                                       /* can_load_classes= */ false,
-                                       /* allow_soft_failures= */ true,
                                        /* need_precise_constants= */ false,
                                        /* verify_to_dump= */ false,
-                                       /* allow_thread_suspension= */ false,
                                        /* fill_register_lines= */ false,
-                                       Runtime::Current()->IsAotCompiler(),
                                        api_level);
   verifier.interesting_dex_pc_ = dex_pc;
   verifier.monitor_enter_dex_pcs_ = monitor_enter_dex_pcs;
@@ -5535,20 +5462,20 @@ MethodVerifier* MethodVerifier::CreateVerifier(Thread* self,
                                          Runtime::Current()->GetClassLinker(),
                                          Runtime::Current()->GetArenaPool(),
                                          dex_file,
+                                         code_item,
+                                         method_idx,
+                                         can_load_classes,
+                                         allow_thread_suspension,
+                                         allow_soft_failures,
+                                         Runtime::Current()->IsAotCompiler(),
                                          dex_cache,
                                          class_loader,
                                          class_def,
-                                         code_item,
-                                         method_idx,
                                          method,
                                          access_flags,
-                                         can_load_classes,
-                                         allow_soft_failures,
                                          need_precise_constants,
                                          verify_to_dump,
-                                         allow_thread_suspension,
                                          /* fill_register_lines= */ false,
-                                         Runtime::Current()->IsAotCompiler(),
                                          api_level);
 }
 

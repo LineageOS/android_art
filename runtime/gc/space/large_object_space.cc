@@ -102,11 +102,11 @@ class MemoryToolLargeObjectMapSpace final : public LargeObjectMapSpace {
 };
 
 void LargeObjectSpace::SwapBitmaps() {
-  live_bitmap_.swap(mark_bitmap_);
-  // Swap names to get more descriptive diagnostics.
-  std::string temp_name = live_bitmap_->GetName();
-  live_bitmap_->SetName(mark_bitmap_->GetName());
-  mark_bitmap_->SetName(temp_name);
+  std::swap(live_bitmap_, mark_bitmap_);
+  // Preserve names to get more descriptive diagnostics.
+  std::string temp_name = live_bitmap_.GetName();
+  live_bitmap_.SetName(mark_bitmap_.GetName());
+  mark_bitmap_.SetName(temp_name);
 }
 
 LargeObjectSpace::LargeObjectSpace(const std::string& name, uint8_t* begin, uint8_t* end,
@@ -119,7 +119,7 @@ LargeObjectSpace::LargeObjectSpace(const std::string& name, uint8_t* begin, uint
 
 
 void LargeObjectSpace::CopyLiveToMarked() {
-  mark_bitmap_->CopyFrom(live_bitmap_.get());
+  mark_bitmap_.CopyFrom(&live_bitmap_);
 }
 
 LargeObjectMapSpace::LargeObjectMapSpace(const std::string& name)

@@ -427,8 +427,8 @@ void RosAllocSpace::AssertAllThreadLocalBuffersAreRevoked() {
 void RosAllocSpace::Clear() {
   size_t footprint_limit = GetFootprintLimit();
   madvise(GetMemMap()->Begin(), GetMemMap()->Size(), MADV_DONTNEED);
-  live_bitmap_->Clear();
-  mark_bitmap_->Clear();
+  live_bitmap_.Clear();
+  mark_bitmap_.Clear();
   SetEnd(begin_ + starting_size_);
   delete rosalloc_;
   rosalloc_ = CreateRosAlloc(mem_map_.Begin(),

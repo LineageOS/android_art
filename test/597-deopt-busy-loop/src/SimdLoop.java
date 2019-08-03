@@ -55,8 +55,19 @@ public class SimdLoop implements Runnable {
         sEntered = true;
 
         // On Arm64:
-        // This loop is likely to be vectorized; when deoptimizing to interpreter the induction
+        // These loops are likely to be vectorized; when deoptimizing to interpreter the induction
         // variable i will be set to wrong value (== 0).
+        //
+        // Copy-paste instead of nested loop is here to avoid extra loop suspend check.
+        for (int i = 0; i < kArraySize; i++) {
+            array[i]++;
+        }
+        for (int i = 0; i < kArraySize; i++) {
+            array[i]++;
+        }
+        for (int i = 0; i < kArraySize; i++) {
+            array[i]++;
+        }
         for (int i = 0; i < kArraySize; i++) {
             array[i]++;
         }
@@ -65,22 +76,15 @@ public class SimdLoop implements Runnable {
         if (sExitFlag) {
             Main.assertIsInterpreted();
         }
-
         // Regression: the value of the induction variable might have been set to 0 when
         // deoptimizing causing to have another array[0]++.
-        expectEqual(array[0], 1);
+        expectEqual(array[0], 4);
     }
 
     public void run() {
         if (threadIndex == 0) {
             while (!sEntered) {
               Thread.yield();
-            }
-
-            try {
-                Thread.sleep(1L);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
 
             Main.deoptimizeAll();
