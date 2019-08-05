@@ -847,25 +847,22 @@ bool OatFileBase::Setup(int zip_fd, const char* abs_dex_location, std::string* e
     }
   }
 
-  Runtime* runtime = Runtime::Current();
-
   if (DataBimgRelRoBegin() != nullptr) {
-    // Make .data.bimg.rel.ro read only. ClassLinker shall make it writable for relocation.
+    // Make .data.bimg.rel.ro read only. ClassLinker shall temporarily make it writable for
+    // relocation when we register a dex file from this oat file. We do not do the relocation
+    // here to avoid dirtying the pages if the code is never actually ready to be executed.
     uint8_t* reloc_begin = const_cast<uint8_t*>(DataBimgRelRoBegin());
     CheckedCall(mprotect, "protect relocations", reloc_begin, DataBimgRelRoSize(), PROT_READ);
-    if (UNLIKELY(runtime == nullptr)) {
-      // This must be oatdump without boot image.
-    } else if (!IsExecutable()) {
-      // Do not check whether we have a boot image if the oat file is not executable.
-    } else if (UNLIKELY(runtime->GetHeap()->GetBootImageSpaces().empty())) {
-      *error_msg = StringPrintf("Cannot load oat file '%s' with .data.bimg.rel.ro as executable "
-                                    "without boot image.",
+    // Make sure the file lists a boot image dependency, otherwise the .data.bimg.rel.ro
+    // section is bogus. The full dependency is checked before the code is executed.
+    const char* boot_class_path_checksum =
+        GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
+    if (boot_class_path_checksum == nullptr ||
+        boot_class_path_checksum[0] != gc::space::ImageSpace::kImageChecksumPrefix) {
+      *error_msg = StringPrintf("Oat file '%s' contains .data.bimg.rel.ro section "
+                                    "without boot image dependency.",
                                 GetLocation().c_str());
       return false;
-    } else {
-      // ClassLinker shall perform the relocation when we register a dex file from
-      // this oat file. We do not do the relocation here to avoid dirtying the pages
-      // if the code is never actually ready to be executed.
     }
   }
 
