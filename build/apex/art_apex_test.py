@@ -33,7 +33,7 @@ archs = ["arm", "arm64", "x86", "x86_64"]
 # tests by architecture is useful on devices supporting more than one
 # architecture, as it permits testing all of them using a single Runtime APEX
 # package.
-art_test_dir = 'bin/test'
+art_test_dir = 'bin/art'
 
 class FSObject:
   def __init__(self, name, is_dir, is_exec, is_symlink, size):
