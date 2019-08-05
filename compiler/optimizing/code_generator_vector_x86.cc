@@ -63,9 +63,10 @@ void InstructionCodeGeneratorX86::VisitVecReplicateScalar(HVecReplicateScalar* i
   LocationSummary* locations = instruction->GetLocations();
   XmmRegister dst = locations->Out().AsFpuRegister<XmmRegister>();
 
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
   // Shorthand for any type of zero.
   if (IsZeroBitPattern(instruction->InputAt(0))) {
-    __ xorps(dst, dst);
+    cpu_has_avx ? __ vxorps(dst, dst, dst) : __ xorps(dst, dst);
     return;
   }
 
@@ -808,14 +809,20 @@ void InstructionCodeGeneratorX86::VisitVecMax(HVecMax* instruction) {
 }
 
 void LocationsBuilderX86::VisitVecAnd(HVecAnd* instruction) {
-  CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  if (CpuHasAvxFeatureFlag()) {
+    CreateVecTerOpLocations(GetGraph()->GetAllocator(), instruction);
+  } else {
+    CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  }
 }
 
 void InstructionCodeGeneratorX86::VisitVecAnd(HVecAnd* instruction) {
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
   LocationSummary* locations = instruction->GetLocations();
-  DCHECK(locations->InAt(0).Equals(locations->Out()));
+  XmmRegister other_src = locations->InAt(0).AsFpuRegister<XmmRegister>();
   XmmRegister src = locations->InAt(1).AsFpuRegister<XmmRegister>();
   XmmRegister dst = locations->Out().AsFpuRegister<XmmRegister>();
+  DCHECK(cpu_has_avx || other_src == dst);
   switch (instruction->GetPackedType()) {
     case DataType::Type::kBool:
     case DataType::Type::kUint8:
@@ -826,15 +833,15 @@ void InstructionCodeGeneratorX86::VisitVecAnd(HVecAnd* instruction) {
     case DataType::Type::kInt64:
       DCHECK_LE(2u, instruction->GetVectorLength());
       DCHECK_LE(instruction->GetVectorLength(), 16u);
-      __ pand(dst, src);
+      cpu_has_avx ? __ vpand(dst, other_src, src) : __ pand(dst, src);
       break;
     case DataType::Type::kFloat32:
       DCHECK_EQ(4u, instruction->GetVectorLength());
-      __ andps(dst, src);
+      cpu_has_avx ? __ vandps(dst, other_src, src) : __ andps(dst, src);
       break;
     case DataType::Type::kFloat64:
       DCHECK_EQ(2u, instruction->GetVectorLength());
-      __ andpd(dst, src);
+      cpu_has_avx ? __ vandpd(dst, other_src, src) : __ andpd(dst, src);
       break;
     default:
       LOG(FATAL) << "Unsupported SIMD type: " << instruction->GetPackedType();
@@ -843,14 +850,20 @@ void InstructionCodeGeneratorX86::VisitVecAnd(HVecAnd* instruction) {
 }
 
 void LocationsBuilderX86::VisitVecAndNot(HVecAndNot* instruction) {
-  CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  if (CpuHasAvxFeatureFlag()) {
+    CreateVecTerOpLocations(GetGraph()->GetAllocator(), instruction);
+  } else {
+    CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  }
 }
 
 void InstructionCodeGeneratorX86::VisitVecAndNot(HVecAndNot* instruction) {
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
   LocationSummary* locations = instruction->GetLocations();
-  DCHECK(locations->InAt(0).Equals(locations->Out()));
+  XmmRegister other_src = locations->InAt(0).AsFpuRegister<XmmRegister>();
   XmmRegister src = locations->InAt(1).AsFpuRegister<XmmRegister>();
   XmmRegister dst = locations->Out().AsFpuRegister<XmmRegister>();
+  DCHECK(cpu_has_avx || other_src == dst);
   switch (instruction->GetPackedType()) {
     case DataType::Type::kBool:
     case DataType::Type::kUint8:
@@ -861,15 +874,15 @@ void InstructionCodeGeneratorX86::VisitVecAndNot(HVecAndNot* instruction) {
     case DataType::Type::kInt64:
       DCHECK_LE(2u, instruction->GetVectorLength());
       DCHECK_LE(instruction->GetVectorLength(), 16u);
-      __ pandn(dst, src);
+      cpu_has_avx ? __ vpandn(dst, other_src, src) : __ pandn(dst, src);
       break;
     case DataType::Type::kFloat32:
       DCHECK_EQ(4u, instruction->GetVectorLength());
-      __ andnps(dst, src);
+      cpu_has_avx ? __ vandnps(dst, other_src, src) : __ andnps(dst, src);
       break;
     case DataType::Type::kFloat64:
       DCHECK_EQ(2u, instruction->GetVectorLength());
-      __ andnpd(dst, src);
+      cpu_has_avx ? __ vandnpd(dst, other_src, src) : __ andnpd(dst, src);
       break;
     default:
       LOG(FATAL) << "Unsupported SIMD type: " << instruction->GetPackedType();
@@ -878,14 +891,20 @@ void InstructionCodeGeneratorX86::VisitVecAndNot(HVecAndNot* instruction) {
 }
 
 void LocationsBuilderX86::VisitVecOr(HVecOr* instruction) {
-  CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  if (CpuHasAvxFeatureFlag()) {
+    CreateVecTerOpLocations(GetGraph()->GetAllocator(), instruction);
+  } else {
+    CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  }
 }
 
 void InstructionCodeGeneratorX86::VisitVecOr(HVecOr* instruction) {
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
   LocationSummary* locations = instruction->GetLocations();
-  DCHECK(locations->InAt(0).Equals(locations->Out()));
+  XmmRegister other_src = locations->InAt(0).AsFpuRegister<XmmRegister>();
   XmmRegister src = locations->InAt(1).AsFpuRegister<XmmRegister>();
   XmmRegister dst = locations->Out().AsFpuRegister<XmmRegister>();
+  DCHECK(cpu_has_avx || other_src == dst);
   switch (instruction->GetPackedType()) {
     case DataType::Type::kBool:
     case DataType::Type::kUint8:
@@ -896,15 +915,15 @@ void InstructionCodeGeneratorX86::VisitVecOr(HVecOr* instruction) {
     case DataType::Type::kInt64:
       DCHECK_LE(2u, instruction->GetVectorLength());
       DCHECK_LE(instruction->GetVectorLength(), 16u);
-      __ por(dst, src);
+      cpu_has_avx ? __ vpor(dst, other_src, src) : __ por(dst, src);
       break;
     case DataType::Type::kFloat32:
       DCHECK_EQ(4u, instruction->GetVectorLength());
-      __ orps(dst, src);
+      cpu_has_avx ? __ vorps(dst, other_src, src) : __ orps(dst, src);
       break;
     case DataType::Type::kFloat64:
       DCHECK_EQ(2u, instruction->GetVectorLength());
-      __ orpd(dst, src);
+      cpu_has_avx ? __ vorpd(dst, other_src, src) : __ orpd(dst, src);
       break;
     default:
       LOG(FATAL) << "Unsupported SIMD type: " << instruction->GetPackedType();
@@ -913,14 +932,20 @@ void InstructionCodeGeneratorX86::VisitVecOr(HVecOr* instruction) {
 }
 
 void LocationsBuilderX86::VisitVecXor(HVecXor* instruction) {
-  CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  if (CpuHasAvxFeatureFlag()) {
+    CreateVecTerOpLocations(GetGraph()->GetAllocator(), instruction);
+  } else {
+    CreateVecBinOpLocations(GetGraph()->GetAllocator(), instruction);
+  }
 }
 
 void InstructionCodeGeneratorX86::VisitVecXor(HVecXor* instruction) {
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
   LocationSummary* locations = instruction->GetLocations();
-  DCHECK(locations->InAt(0).Equals(locations->Out()));
+  XmmRegister other_src = locations->InAt(0).AsFpuRegister<XmmRegister>();
   XmmRegister src = locations->InAt(1).AsFpuRegister<XmmRegister>();
   XmmRegister dst = locations->Out().AsFpuRegister<XmmRegister>();
+  DCHECK(cpu_has_avx || other_src == dst);
   switch (instruction->GetPackedType()) {
     case DataType::Type::kBool:
     case DataType::Type::kUint8:
@@ -931,15 +956,15 @@ void InstructionCodeGeneratorX86::VisitVecXor(HVecXor* instruction) {
     case DataType::Type::kInt64:
       DCHECK_LE(2u, instruction->GetVectorLength());
       DCHECK_LE(instruction->GetVectorLength(), 16u);
-      __ pxor(dst, src);
+      cpu_has_avx ? __ vpxor(dst, other_src, src) : __ pxor(dst, src);
       break;
     case DataType::Type::kFloat32:
       DCHECK_EQ(4u, instruction->GetVectorLength());
-      __ xorps(dst, src);
+      cpu_has_avx ? __ vxorps(dst, other_src, src) : __ xorps(dst, src);
       break;
     case DataType::Type::kFloat64:
       DCHECK_EQ(2u, instruction->GetVectorLength());
-      __ xorpd(dst, src);
+      cpu_has_avx ? __ vxorpd(dst, other_src, src) : __ xorpd(dst, src);
       break;
     default:
       LOG(FATAL) << "Unsupported SIMD type: " << instruction->GetPackedType();
@@ -1092,7 +1117,8 @@ void InstructionCodeGeneratorX86::VisitVecSetScalars(HVecSetScalars* instruction
   DCHECK_EQ(1u, instruction->InputCount());  // only one input currently implemented
 
   // Zero out all other elements first.
-  __ xorps(dst, dst);
+  bool cpu_has_avx = CpuHasAvxFeatureFlag();
+  cpu_has_avx ? __ vxorps(dst, dst, dst) : __ xorps(dst, dst);
 
   // Shorthand for any type of zero.
   if (IsZeroBitPattern(instruction->InputAt(0))) {
