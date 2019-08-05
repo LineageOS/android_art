@@ -308,11 +308,73 @@ class Main {
     }
   }
 
+  private static void testReflectFieldSetDuringClinit() {
+    try {
+      int value = ReflectFieldSetDuringClinit.intField;
+      int expected = 42;
+      if (value != expected) {
+        System.out.println("Unexpected value: " + value + ", expected: " + expected);
+      }
+    } catch (Exception e) {
+      // Error.
+      e.printStackTrace(System.out);
+    }
+  }
+
+  private static void testReflectNewInstanceDuringClinit() {
+    try {
+      int value = ReflectNewInstanceDuringClinit.instance.intField;
+      int expected = 42;
+      if (value != expected) {
+        System.out.println("Unexpected value: " + value + ", expected: " + expected);
+      }
+    } catch (Exception e) {
+      // Error.
+      e.printStackTrace(System.out);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     testFieldReflection();
     testMethodReflection();
     testConstructorReflection();
     testPackagePrivateConstructor();
     testPackagePrivateAccessibleConstructor();
+    testReflectFieldSetDuringClinit();
+    testReflectNewInstanceDuringClinit();
+  }
+}
+
+class ReflectFieldSetDuringClinit {
+  public static int intField;
+
+  static {
+    try {
+      Field f = ReflectFieldSetDuringClinit.class.getDeclaredField("intField");
+      f.setInt(null, 42);
+    } catch (Exception e) {
+      // Error.
+      e.printStackTrace(System.out);
+    }
+  }
+}
+
+class ReflectNewInstanceDuringClinit {
+  public int intField;
+
+  public ReflectNewInstanceDuringClinit() {
+    intField = 42;
+  }
+
+  public static ReflectNewInstanceDuringClinit instance;
+
+  static {
+    try {
+      Constructor<?> ctor = ReflectNewInstanceDuringClinit.class.getConstructor();
+      instance = (ReflectNewInstanceDuringClinit) ctor.newInstance();
+    } catch (Exception e) {
+      // Error.
+      e.printStackTrace(System.out);
+    }
   }
 }

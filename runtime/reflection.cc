@@ -776,7 +776,7 @@ void InvokeConstructor(const ScopedObjectAccessAlreadyRunnable& soa,
     CHECK(constructor->IsConstructor());
 
     ObjPtr<mirror::Class> declaring_class = constructor->GetDeclaringClass();
-    CHECK(declaring_class->IsInitialized());
+    CHECK(declaring_class->IsInitializing());
 
     // Calls to String.<init> should have been repplaced with with equivalent StringFactory calls.
     CHECK(!declaring_class->IsStringClass());
