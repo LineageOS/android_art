@@ -132,6 +132,11 @@ class ImageSpace : public MemMapSpace {
                                 bool* has_data,
                                 bool *is_global_cache);
 
+  // The leading character in an image checksum part of boot class path checkums.
+  static constexpr char kImageChecksumPrefix = 'i';
+  // The leading character in a dex file checksum part of boot class path checkums.
+  static constexpr char kDexFileChecksumPrefix = 'd';
+
   // Returns the checksums for the boot image and extra boot class path dex files,
   // based on the boot class path, image location and ISA (may differ from the ISA of an
   // initialized Runtime). The boot image and dex files do not need to be loaded in memory.
