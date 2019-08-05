@@ -41,21 +41,7 @@ func codegen(ctx android.LoadHookContext, c *codegenProperties, library bool) {
 		deviceArches = strings.Split(e, " ")
 	}
 
-	addCodegenArchProperties := func(host bool, archName string) {
-		type props struct {
-			Target struct {
-				Android *CodegenCommonArchProperties
-				Host    *CodegenCommonArchProperties
-			}
-		}
-
-		type libraryProps struct {
-			Target struct {
-				Android *CodegenLibraryArchProperties
-				Host    *CodegenLibraryArchProperties
-			}
-		}
-
+	getCodegenArchProperties := func(archName string) *codegenArchProperties {
 		var arch *codegenArchProperties
 		switch archName {
 		case "arm":
@@ -72,42 +58,86 @@ func codegen(ctx android.LoadHookContext, c *codegenProperties, library bool) {
 			arch = &c.Codegen.X86_64
 		default:
 			ctx.ModuleErrorf("Unknown codegen architecture %q", archName)
-			return
+		}
+		return arch
+	}
+
+	appendCodegenSourceArchProperties := func(p *CodegenSourceArchProperties, archName string) {
+		arch := getCodegenArchProperties(archName)
+		p.Srcs = append(p.Srcs, arch.CodegenSourceArchProperties.Srcs...)
+	}
+
+	addCodegenSourceArchProperties := func(host bool, p *CodegenSourceArchProperties) {
+		type sourceProps struct {
+			Target struct {
+				Android *CodegenSourceArchProperties
+				Host    *CodegenSourceArchProperties
+			}
 		}
 
-		p := &props{}
-		l := &libraryProps{}
+		sp := &sourceProps{}
 		if host {
-			p.Target.Host = &arch.CodegenCommonArchProperties
-			l.Target.Host = &arch.CodegenLibraryArchProperties
+			sp.Target.Host = p
 		} else {
-			p.Target.Android = &arch.CodegenCommonArchProperties
-			l.Target.Android = &arch.CodegenLibraryArchProperties
+			sp.Target.Android = p
+		}
+		ctx.AppendProperties(sp)
+	}
+
+	addCodegenArchProperties := func(host bool, archName string) {
+		type commonProps struct {
+			Target struct {
+				Android *CodegenCommonArchProperties
+				Host    *CodegenCommonArchProperties
+			}
 		}
 
-		ctx.AppendProperties(p)
+		type libraryProps struct {
+			Target struct {
+				Android *CodegenLibraryArchProperties
+				Host    *CodegenLibraryArchProperties
+			}
+		}
+
+		arch := getCodegenArchProperties(archName)
+
+		cp := &commonProps{}
+		lp := &libraryProps{}
+		if host {
+			cp.Target.Host = &arch.CodegenCommonArchProperties
+			lp.Target.Host = &arch.CodegenLibraryArchProperties
+		} else {
+			cp.Target.Android = &arch.CodegenCommonArchProperties
+			lp.Target.Android = &arch.CodegenLibraryArchProperties
+		}
+
+		ctx.AppendProperties(cp)
 		if library {
-			ctx.AppendProperties(l)
+			ctx.AppendProperties(lp)
 		}
 	}
 
-	for _, arch := range deviceArches {
-		addCodegenArchProperties(false, arch)
-		if ctx.Failed() {
-			return
+	addCodegenProperties := func(host bool, arches []string) {
+		sourceProps := &CodegenSourceArchProperties{}
+		for _, arch := range arches {
+			appendCodegenSourceArchProperties(sourceProps, arch)
+			addCodegenArchProperties(host, arch)
 		}
+		sourceProps.Srcs = android.FirstUniqueStrings(sourceProps.Srcs)
+		addCodegenSourceArchProperties(host, sourceProps)
 	}
 
-	for _, arch := range hostArches {
-		addCodegenArchProperties(true, arch)
-		if ctx.Failed() {
-			return
-		}
-	}
+	addCodegenProperties(false /* host */, deviceArches)
+	addCodegenProperties(true /* host */, hostArches)
+}
+
+// These properties are allowed to contain the same source file name in different architectures.
+// They we will be deduplicated automatically.
+type CodegenSourceArchProperties struct {
+	Srcs []string
 }
 
 type CodegenCommonArchProperties struct {
-	Srcs     []string
 	Cflags   []string
 	Cppflags []string
 }
@@ -123,6 +153,7 @@ type CodegenLibraryArchProperties struct {
 }
 
 type codegenArchProperties struct {
+	CodegenSourceArchProperties
 	CodegenCommonArchProperties
 	CodegenLibraryArchProperties
 }
