@@ -115,7 +115,7 @@ void JitCompiler::ParseCompilerOptions() {
   }
 }
 
-extern "C" void* jit_load() {
+extern "C" JitCompilerInterface* jit_load() {
   VLOG(jit) << "Create jit compiler";
   auto* const jit_compiler = JitCompiler::Create();
   CHECK(jit_compiler != nullptr);
@@ -123,24 +123,9 @@ extern "C" void* jit_load() {
   return jit_compiler;
 }
 
-extern "C" void jit_unload(void* handle) {
-  DCHECK(handle != nullptr);
-  delete reinterpret_cast<JitCompiler*>(handle);
-}
-
-extern "C" bool jit_compile_method(
-    void* handle, JitMemoryRegion* region, ArtMethod* method, Thread* self, bool baseline, bool osr)
+void JitCompiler::TypesLoaded(mirror::Class** types, size_t count)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  auto* jit_compiler = reinterpret_cast<JitCompiler*>(handle);
-  DCHECK(jit_compiler != nullptr);
-  return jit_compiler->CompileMethod(self, region, method, baseline, osr);
-}
-
-extern "C" void jit_types_loaded(void* handle, mirror::Class** types, size_t count)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  auto* jit_compiler = reinterpret_cast<JitCompiler*>(handle);
-  DCHECK(jit_compiler != nullptr);
-  const CompilerOptions& compiler_options = jit_compiler->GetCompilerOptions();
+  const CompilerOptions& compiler_options = GetCompilerOptions();
   if (compiler_options.GetGenerateDebugInfo()) {
     const ArrayRef<mirror::Class*> types_array(types, count);
     std::vector<uint8_t> elf_file = debug::WriteDebugElfFileForClasses(
@@ -156,16 +141,8 @@ extern "C" void jit_types_loaded(void* handle, mirror::Class** types, size_t cou
   }
 }
 
-extern "C" void jit_update_options(void* handle) {
-  JitCompiler* jit_compiler = reinterpret_cast<JitCompiler*>(handle);
-  DCHECK(jit_compiler != nullptr);
-  jit_compiler->ParseCompilerOptions();
-}
-
-extern "C" bool jit_generate_debug_info(void* handle) {
-  JitCompiler* jit_compiler = reinterpret_cast<JitCompiler*>(handle);
-  DCHECK(jit_compiler != nullptr);
-  return jit_compiler->GetCompilerOptions().GetGenerateDebugInfo();
+bool JitCompiler::GenerateDebugInfo() {
+  return GetCompilerOptions().GetGenerateDebugInfo();
 }
 
 JitCompiler::JitCompiler() {
