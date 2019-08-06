@@ -63,14 +63,8 @@ DEFINE_RUNTIME_DEBUG_FLAG(Jit, kSlowMode);
 
 // JIT compiler
 void* Jit::jit_library_handle_ = nullptr;
-void* Jit::jit_compiler_handle_ = nullptr;
-void* (*Jit::jit_load_)(void) = nullptr;
-void (*Jit::jit_unload_)(void*) = nullptr;
-bool (*Jit::jit_compile_method_)(void*, JitMemoryRegion*, ArtMethod*, Thread*, bool, bool)
-    = nullptr;
-void (*Jit::jit_types_loaded_)(void*, mirror::Class**, size_t count) = nullptr;
-bool (*Jit::jit_generate_debug_info_)(void*) = nullptr;
-void (*Jit::jit_update_options_)(void*) = nullptr;
+JitCompilerInterface* Jit::jit_compiler_ = nullptr;
+JitCompilerInterface* (*Jit::jit_load_)(void) = nullptr;
 
 uint32_t JitOptions::RoundUpThreshold(uint32_t threshold) {
   if (!Jit::kSlowMode) {
@@ -184,8 +178,8 @@ Jit* Jit::Create(JitCodeCache* code_cache, JitOptions* options) {
     LOG(WARNING) << "Not creating JIT: library not loaded";
     return nullptr;
   }
-  jit_compiler_handle_ = (jit_load_)();
-  if (jit_compiler_handle_ == nullptr) {
+  jit_compiler_ = (jit_load_)();
+  if (jit_compiler_ == nullptr) {
     LOG(WARNING) << "Not creating JIT: failed to allocate a compiler";
     return nullptr;
   }
@@ -196,7 +190,7 @@ Jit* Jit::Create(JitCodeCache* code_cache, JitOptions* options) {
   // We aren't able to keep method pointers live during the instrumentation method entry trampoline
   // so we will just disable jit-gc if we are doing that.
   if (code_cache->GetGarbageCollectCode()) {
-    code_cache->SetGarbageCollectCode(!jit_generate_debug_info_(jit_compiler_handle_) &&
+    code_cache->SetGarbageCollectCode(!jit_compiler_->GenerateDebugInfo() &&
         !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
   }
 
@@ -230,15 +224,7 @@ bool Jit::LoadCompilerLibrary(std::string* error_msg) {
     *error_msg = oss.str();
     return false;
   }
-  bool all_resolved = true;
-  all_resolved = all_resolved && LoadSymbol(&jit_load_, "jit_load", error_msg);
-  all_resolved = all_resolved && LoadSymbol(&jit_unload_, "jit_unload", error_msg);
-  all_resolved = all_resolved && LoadSymbol(&jit_compile_method_, "jit_compile_method", error_msg);
-  all_resolved = all_resolved && LoadSymbol(&jit_types_loaded_, "jit_types_loaded", error_msg);
-  all_resolved = all_resolved && LoadSymbol(&jit_update_options_, "jit_update_options", error_msg);
-  all_resolved = all_resolved &&
-      LoadSymbol(&jit_generate_debug_info_, "jit_generate_debug_info", error_msg);
-  if (!all_resolved) {
+  if (!LoadSymbol(&jit_load_, "jit_load", error_msg)) {
     dlclose(jit_library_handle_);
     return false;
   }
@@ -283,8 +269,7 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   VLOG(jit) << "Compiling method "
             << ArtMethod::PrettyMethod(method_to_compile)
             << " osr=" << std::boolalpha << osr;
-  bool success = jit_compile_method_(
-      jit_compiler_handle_, region, method_to_compile, self, baseline, osr);
+  bool success = jit_compiler_->CompileMethod(self, region, method_to_compile, baseline, osr);
   code_cache_->DoneCompiling(method_to_compile, self, osr);
   if (!success) {
     VLOG(jit) << "Failed to compile method "
@@ -360,9 +345,9 @@ Jit::~Jit() {
     Runtime::Current()->DumpDeoptimizations(LOG_STREAM(INFO));
   }
   DeleteThreadPool();
-  if (jit_compiler_handle_ != nullptr) {
-    jit_unload_(jit_compiler_handle_);
-    jit_compiler_handle_ = nullptr;
+  if (jit_compiler_ != nullptr) {
+    delete jit_compiler_;
+    jit_compiler_ = nullptr;
   }
   if (jit_library_handle_ != nullptr) {
     dlclose(jit_library_handle_);
@@ -376,9 +361,8 @@ void Jit::NewTypeLoadedIfUsingJit(mirror::Class* type) {
     return;
   }
   jit::Jit* jit = Runtime::Current()->GetJit();
-  if (jit_generate_debug_info_(jit->jit_compiler_handle_)) {
-    DCHECK(jit->jit_types_loaded_ != nullptr);
-    jit->jit_types_loaded_(jit->jit_compiler_handle_, &type, 1);
+  if (jit->jit_compiler_->GenerateDebugInfo()) {
+    jit_compiler_->TypesLoaded(&type, 1);
   }
 }
 
@@ -391,12 +375,12 @@ void Jit::DumpTypeInfoForLoadedTypes(ClassLinker* linker) {
     std::vector<mirror::Class*> classes_;
   };
 
-  if (jit_generate_debug_info_(jit_compiler_handle_)) {
+  if (jit_compiler_->GenerateDebugInfo()) {
     ScopedObjectAccess so(Thread::Current());
 
     CollectClasses visitor;
     linker->VisitClasses(&visitor);
-    jit_types_loaded_(jit_compiler_handle_, visitor.classes_.data(), visitor.classes_.size());
+    jit_compiler_->TypesLoaded(visitor.classes_.data(), visitor.classes_.size());
   }
 }
 
@@ -1122,10 +1106,10 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   }
   // At this point, the compiler options have been adjusted to the particular configuration
   // of the forked child. Parse them again.
-  jit_update_options_(jit_compiler_handle_);
+  jit_compiler_->ParseCompilerOptions();
 
   // Adjust the status of code cache collection: the status from zygote was to not collect.
-  code_cache_->SetGarbageCollectCode(!jit_generate_debug_info_(jit_compiler_handle_) &&
+  code_cache_->SetGarbageCollectCode(!jit_compiler_->GenerateDebugInfo() &&
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
   if (thread_pool_ != nullptr) {
