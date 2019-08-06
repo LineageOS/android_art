@@ -164,6 +164,19 @@ class JitOptions {
   DISALLOW_COPY_AND_ASSIGN(JitOptions);
 };
 
+// Implemented and provided by the compiler library.
+class JitCompilerInterface {
+ public:
+  virtual ~JitCompilerInterface() {}
+  virtual bool CompileMethod(
+      Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  virtual void TypesLoaded(mirror::Class**, size_t count)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  virtual bool GenerateDebugInfo();
+  virtual void ParseCompilerOptions();
+};
+
 class Jit {
  public:
   static constexpr size_t kDefaultPriorityThreadWeightRatio = 1000;
@@ -378,13 +391,8 @@ class Jit {
 
   // JIT compiler
   static void* jit_library_handle_;
-  static void* jit_compiler_handle_;
-  static void* (*jit_load_)(void);
-  static void (*jit_unload_)(void*);
-  static bool (*jit_compile_method_)(void*, JitMemoryRegion*, ArtMethod*, Thread*, bool, bool);
-  static void (*jit_types_loaded_)(void*, mirror::Class**, size_t count);
-  static void (*jit_update_options_)(void*);
-  static bool (*jit_generate_debug_info_)(void*);
+  static JitCompilerInterface* jit_compiler_;
+  static JitCompilerInterface* (*jit_load_)(void);
   template <typename T> static bool LoadSymbol(T*, const char* symbol, std::string* error_msg);
 
   // JIT resources owned by runtime.
