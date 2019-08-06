@@ -375,12 +375,12 @@ class Thread {
   void SetNativePriority(int newPriority);
 
   /*
-   * Returns the thread priority for the current thread by querying the system.
+   * Returns the priority of this thread by querying the system.
    * This is useful when attaching a thread through JNI.
    *
    * Returns a value from 1 to 10 (compatible with java.lang.Thread values).
    */
-  static int GetNativePriority();
+  int GetNativePriority() const;
 
   // Guaranteed to be non-zero.
   uint32_t GetThreadId() const {
