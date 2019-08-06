@@ -256,7 +256,7 @@ ALWAYS_INLINE inline static void SetFieldValue(ObjPtr<mirror::Object> o,
                                                bool allow_references,
                                                const JValue& new_value)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  DCHECK(f->GetDeclaringClass()->IsInitialized());
+  DCHECK(f->GetDeclaringClass()->IsInitializing());
   MemberOffset offset(f->GetOffset());
   const bool is_volatile = f->IsVolatile();
   switch (field_type) {
