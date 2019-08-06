@@ -19,6 +19,8 @@
 
 #include "base/mutex.h"
 
+#include "jit/jit.h"
+
 namespace art {
 
 class ArtMethod;
@@ -31,7 +33,7 @@ namespace jit {
 class JitLogger;
 class JitMemoryRegion;
 
-class JitCompiler {
+class JitCompiler : public JitCompilerInterface {
  public:
   static JitCompiler* Create();
   virtual ~JitCompiler();
@@ -39,13 +41,17 @@ class JitCompiler {
   // Compilation entrypoint. Returns whether the compilation succeeded.
   bool CompileMethod(
       Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_) override;
 
   const CompilerOptions& GetCompilerOptions() const {
     return *compiler_options_.get();
   }
 
-  void ParseCompilerOptions();
+  bool GenerateDebugInfo() override;
+
+  void ParseCompilerOptions() override;
+
+  void TypesLoaded(mirror::Class**, size_t count) REQUIRES_SHARED(Locks::mutator_lock_) override;
 
  private:
   std::unique_ptr<CompilerOptions> compiler_options_;
