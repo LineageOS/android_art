@@ -799,7 +799,7 @@ class InstructionHandler {
     }
     ObjPtr<mirror::Object> exception = GetVRegReference(A());
     if (UNLIKELY(exception == nullptr)) {
-      ThrowNullPointerException("throw with null exception");
+      ThrowNullPointerException();
     } else if (do_assignability_check && !exception->GetClass()->IsThrowableClass()) {
       // This should never happen.
       std::string temp;
