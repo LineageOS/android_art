@@ -496,6 +496,22 @@ void SsaBuilder::RemoveRedundantUninitializedStrings() {
   }
 }
 
+static bool HasPhiEquivalentAtLoopEntry(HGraph* graph) {
+  // Phi equivalents for a dex register do not work with OSR, as the phis will
+  // receive two different stack slots but only one is recorded in the stack
+  // map.
+  for (HBasicBlock* block : graph->GetReversePostOrder()) {
+    if (block->IsLoopHeader()) {
+      for (HInstructionIterator it(block->GetPhis()); !it.Done(); it.Advance()) {
+        if (it.Current()->AsPhi()->HasEquivalentPhi()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 GraphAnalysisResult SsaBuilder::BuildSsa() {
   DCHECK(!graph_->IsInSsaForm());
 
@@ -573,6 +589,10 @@ GraphAnalysisResult SsaBuilder::BuildSsa() {
   // be deoptimized at any safepoint. We must therefore perform it before any
   // other optimizations.
   RemoveRedundantUninitializedStrings();
+
+  if (graph_->IsCompilingOsr() && HasPhiEquivalentAtLoopEntry(graph_)) {
+    return kAnalysisFailPhiEquivalentInOsr;
+  }
 
   graph_->SetInSsaForm();
   return kAnalysisSuccess;
