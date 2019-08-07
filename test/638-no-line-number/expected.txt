@@ -1,5 +1,5 @@
 java.lang.Error
 	at Main.main(Unknown Source:2)
-java.lang.NullPointerException: throw with null exception
+java.lang.NullPointerException
 	at Main.doThrow(Unknown Source:0)
 	at Main.main(Unknown Source:16)
