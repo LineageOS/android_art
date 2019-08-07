@@ -728,6 +728,10 @@ void ThrowNullPointerException(const char* msg) {
   ThrowException("Ljava/lang/NullPointerException;", nullptr, msg);
 }
 
+void ThrowNullPointerException() {
+  ThrowException("Ljava/lang/NullPointerException;");
+}
+
 // ReadOnlyBufferException
 
 void ThrowReadOnlyBufferException() {
