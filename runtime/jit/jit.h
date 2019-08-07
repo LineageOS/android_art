@@ -170,11 +170,11 @@ class JitCompilerInterface {
   virtual ~JitCompilerInterface() {}
   virtual bool CompileMethod(
       Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_) = 0;
   virtual void TypesLoaded(mirror::Class**, size_t count)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  virtual bool GenerateDebugInfo();
-  virtual void ParseCompilerOptions();
+      REQUIRES_SHARED(Locks::mutator_lock_) = 0;
+  virtual bool GenerateDebugInfo() = 0;
+  virtual void ParseCompilerOptions() = 0;
 };
 
 class Jit {
