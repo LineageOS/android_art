@@ -150,9 +150,9 @@ endif
 # Release Runtime APEX, included by default in "user" builds.
 RELEASE_RUNTIME_APEX := com.android.runtime.release
 # Debug Runtime APEX, included by default in "userdebug" and "eng"
-# builds and used in ART device testing and benchmarking.
+# builds and used in ART device benchmarking.
 DEBUG_RUNTIME_APEX := com.android.runtime.debug
-# Testing Runtime APEX (not used yet).
+# Testing Runtime APEX, used in ART device testing.
 TESTING_RUNTIME_APEX := com.android.runtime.testing
 
 endif # ART_ANDROID_COMMON_PATH_MK
