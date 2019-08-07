@@ -14,38 +14,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to run all gtests located under $ART_TEST_CHROOT/data/nativetest{64}
+# Script to run all gtests located in the (Testing) Runtime APEX.
 
 if [[ -z "$ART_TEST_CHROOT" ]]; then
   echo 'ART_TEST_CHROOT environment variable is empty; please set it before running this script.'
   exit 1
 fi
 
-ADB="${ADB:-adb}"
-all_tests=
+adb="${ADB:-adb}"
+
+android_runtime_root=/apex/com.android.runtime
+android_tzdata_root=/apex/com.android.tzdata
+
+# Search for executables under the `bin/art` directory of the Runtime APEX.
+tests=$("$adb" shell chroot "$ART_TEST_CHROOT" \
+  find "$android_runtime_root/bin/art" -type f -perm /ugo+x | sort)
+
 failing_tests=()
 
-function add_tests {
-  # Search for *_test and *_tests executables, but skip e.g. libfoo_test.so.
-  local found_tests=$(${ADB} shell "test -d $ART_TEST_CHROOT/$1 && chroot $ART_TEST_CHROOT find $1 -type f -perm /ugo+x -name \*_test\* \! -name \*.so")
-  all_tests+=" $found_tests"
-}
-
-function fail {
-  failing_tests+=($1)
-}
-
-add_tests "/data/nativetest"
-add_tests "/data/nativetest64"
-
-for i in $all_tests; do
-  echo "$i"
-  ${ADB} shell "chroot $ART_TEST_CHROOT env ANDROID_RUNTIME_ROOT='/apex/com.android.runtime' ANDROID_TZDATA_ROOT='/apex/com.android.tzdata' $i" || fail $i
+for t in $tests; do
+  echo "$t"
+  "$adb" shell chroot "$ART_TEST_CHROOT" \
+    env ANDROID_RUNTIME_ROOT="$android_runtime_root" ANDROID_TZDATA_ROOT="$android_tzdata_root" $t \
+    || failing_tests+=("$t")
 done
 
 if [ -n "$failing_tests" ]; then
-  for i in "${failing_tests[@]}"; do
-    echo "Failed test: $i"
+  for t in "${failing_tests[@]}"; do
+    echo "Failed test: $t"
   done
   exit 1
 fi
