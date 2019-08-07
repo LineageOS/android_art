@@ -82,6 +82,10 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/icu)
 # Remove ART test target artifacts.
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 
+# Remove all APEX artifacts after the change to use the Testing
+# Runtime APEX in lieu of the Debug Runtime APEX for ART testing.
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************

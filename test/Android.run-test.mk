@@ -25,11 +25,11 @@ TEST_ART_RUN_TEST_DEPENDENCIES := \
   $(HOST_OUT_EXECUTABLES)/jasmin \
   $(HOST_OUT_EXECUTABLES)/smali
 
-# We need the Debug Runtime APEX (which is a superset of the Release
-# Runtime APEX) -- which contains dex2oat and dalvikvm and their
-# dependencies -- on the target, as well as the core images (all images
-# as we sync only once).
-ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(DEBUG_RUNTIME_APEX) $(TARGET_CORE_IMG_OUTS)
+# We need the Testing Runtime APEX (which is a superset of the Release
+# and Debug Runtime APEXes) -- which contains dex2oat, dalvikvm, their
+# dependencies and ART gtests -- on the target, as well as the core
+# images (all images as we sync only once).
+ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(TESTING_RUNTIME_APEX) $(TARGET_CORE_IMG_OUTS)
 
 # Also need libartagent.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libartagent-target libartagentd-target
