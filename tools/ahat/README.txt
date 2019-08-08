@@ -52,7 +52,11 @@ Reported Issues:
  * Request to be able to sort tables by size.
 
 Release History:
- 1.7 Pending
+ 1.7 August 8, 2019
+   Annotate binder services, tokens, and proxies.
+   Add option for viewing subclass instances of a class.
+   Recognize java.lang.ref.Finalizer as a finalizer reference.
+   Minor bug fixes and API improvements.
 
  1.6 July 24, 2018
    Distinguish between soft/weak/phantom/etc references.
