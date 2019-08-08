@@ -102,20 +102,25 @@ TEST_F(FileUtilsTest, GetAndroidRootSafe) {
 
 TEST_F(FileUtilsTest, GetAndroidRuntimeRootSafe) {
   std::string error_msg;
+  std::string android_runtime_root;
+  std::string android_runtime_root_env;
 
-  // We don't expect null returns for most cases, so don't check and let std::string crash.
+  // TODO(b/130295968): Re-enable this part when the directory exists on host
+  if (kIsTargetBuild) {
+    // We don't expect null returns for most cases, so don't check and let std::string crash.
 
-  // CommonArtTest sets ANDROID_RUNTIME_ROOT, so expect this to be the same.
-  std::string android_runtime_root = GetAndroidRuntimeRootSafe(&error_msg);
-  std::string android_runtime_root_env = getenv("ANDROID_RUNTIME_ROOT");
-  EXPECT_EQ(android_runtime_root, android_runtime_root_env) << error_msg;
+    // CommonArtTest sets ANDROID_RUNTIME_ROOT, so expect this to be the same.
+    android_runtime_root = GetAndroidRuntimeRootSafe(&error_msg);
+    android_runtime_root_env = getenv("ANDROID_RUNTIME_ROOT");
+    EXPECT_EQ(android_runtime_root, android_runtime_root_env) << error_msg;
 
-  // Set ANDROID_RUNTIME_ROOT to something else (but the directory must exist). So use dirname.
-  UniqueCPtr<char> root_dup(strdup(android_runtime_root_env.c_str()));
-  char* dir = dirname(root_dup.get());
-  ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", dir, /* overwrite */ 1));
-  std::string android_runtime_root2 = GetAndroidRuntimeRootSafe(&error_msg);
-  EXPECT_STREQ(dir, android_runtime_root2.c_str()) << error_msg;
+    // Set ANDROID_RUNTIME_ROOT to something else (but the directory must exist). So use dirname.
+    UniqueCPtr<char> root_dup(strdup(android_runtime_root_env.c_str()));
+    char* dir = dirname(root_dup.get());
+    ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", dir, /* overwrite */ 1));
+    std::string android_runtime_root2 = GetAndroidRuntimeRootSafe(&error_msg);
+    EXPECT_STREQ(dir, android_runtime_root2.c_str()) << error_msg;
+  }
 
   // Set a bogus value for ANDROID_RUNTIME_ROOT. This should be an error.
   ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", "/this/is/obviously/bogus", /* overwrite */ 1));
