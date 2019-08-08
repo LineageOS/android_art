@@ -164,11 +164,6 @@ type codegenProperties struct {
 	}
 }
 
-type codegenCustomizer struct {
-	library           bool
-	codegenProperties codegenProperties
-}
-
 func defaultDeviceCodegenArches(ctx android.LoadHookContext) []string {
 	arches := make(map[string]bool)
 	for _, a := range ctx.DeviceConfig().Arches() {
