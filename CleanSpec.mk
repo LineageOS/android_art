@@ -86,6 +86,10 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/data/nativetest*/)
 # Runtime APEX in lieu of the Debug Runtime APEX for ART testing.
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex)
 
+# Remove the icu .dat file from /apex/com.android.runtime and the host equivalent.
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex)
+$(call add-clean-step, rm -rf $(HOST_OUT)/com.android.runtime/etc/icu/*)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/icu)
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
