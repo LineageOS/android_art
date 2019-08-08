@@ -156,6 +156,14 @@ adb shell rm -rf "$ART_TEST_CHROOT/apex/com.android.runtime"
 adb shell cp -a "$ART_TEST_CHROOT/system/apex/com.android.runtime.testing" \
   "$ART_TEST_CHROOT/apex/com.android.runtime"
 
+echo -e "${green}Activating i18n APEX...${nc}"
+# Manually "activate" the flattened i18n APEX by syncing it to the
+# /apex directory in the chroot.
+#
+# TODO: Likewise, handle the case of build targets using non-flatted APEX packages.
+adb shell rm -rf "$ART_TEST_CHROOT/apex/com.android.i18n"
+adb shell cp -a "$ART_TEST_CHROOT/system/apex/com.android.i18n" "$ART_TEST_CHROOT/apex/"
+
 echo -e "${green}Activating Time Zone Data APEX...${nc}"
 # Manually "activate" the flattened Time Zone Data APEX by syncing it to the
 # /apex directory in the chroot.

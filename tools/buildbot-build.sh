@@ -91,6 +91,8 @@ elif [[ $mode == "target" ]]; then
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
   # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
   make_command+=" linker libc.bootstrap libdl.bootstrap libm.bootstrap"
+  # Build the i18n APEX.
+  make_command+=" com.android.i18n"
   # Build the Time Zone Data APEX.
   make_command+=" com.android.tzdata"
   mode_suffix="-target"

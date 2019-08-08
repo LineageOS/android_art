@@ -371,12 +371,14 @@ def run_tests(tests):
         options_test += ' --jvm'
 
       # Honor ART_TEST_CHROOT, ART_TEST_ANDROID_ROOT, ART_TEST_ANDROID_RUNTIME_ROOT,
-      # and ART_TEST_ANDROID_TZDATA_ROOT but only for target tests.
+      # ART_TEST_ANDROID_I18N_ROOT, and ART_TEST_ANDROID_TZDATA_ROOT but only for target tests.
       if target == 'target':
         if env.ART_TEST_CHROOT:
           options_test += ' --chroot ' + env.ART_TEST_CHROOT
         if env.ART_TEST_ANDROID_ROOT:
           options_test += ' --android-root ' + env.ART_TEST_ANDROID_ROOT
+        if env.ART_TEST_ANDROID_I18N_ROOT:
+            options_test += ' --android-i18n-root ' + env.ART_TEST_ANDROID_I18N_ROOT
         if env.ART_TEST_ANDROID_RUNTIME_ROOT:
           options_test += ' --android-runtime-root ' + env.ART_TEST_ANDROID_RUNTIME_ROOT
         if env.ART_TEST_ANDROID_TZDATA_ROOT:
