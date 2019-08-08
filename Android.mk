@@ -605,7 +605,7 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DE
 
 # Also include:
 # - a copy of the ICU prebuilt .dat file in /system/etc/icu on target
-#   (see module `icu-data-art-test-runtime`); and
+#   (see module `icu-data-art-test-i18n`); and
 # so that it can be found even if the Runtime APEX is not available,
 # by setting the environment variable `ART_TEST_ANDROID_RUNTIME_ROOT`
 # to "/system" on device. This is a temporary change needed
@@ -638,7 +638,7 @@ build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
                         $(TARGET_CORE_IMG_OUT_BASE).art \
                         $(TARGET_CORE_IMG_OUT_BASE)-interpreter.art \
                         libc.bootstrap libdl.bootstrap libm.bootstrap \
-                        icu-data-art-test-runtime \
+                        icu-data-art-test-i18n \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
                         tz_version-art-test-tzdata icu_overlay-art-test-tzdata \
                         standalone-apex-files
