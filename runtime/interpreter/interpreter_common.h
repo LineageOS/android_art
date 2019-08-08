@@ -21,6 +21,7 @@
 #include "instrumentation.h"
 #include "interpreter.h"
 #include "interpreter_intrinsics.h"
+#include "transaction.h"
 
 #include <math.h>
 
@@ -464,32 +465,300 @@ bool DoInvokeCustom(Thread* self,
   }
 }
 
+template<Primitive::Type field_type>
+ALWAYS_INLINE static JValue GetFieldValue(const ShadowFrame& shadow_frame, uint32_t vreg)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  JValue field_value;
+  switch (field_type) {
+    case Primitive::kPrimBoolean:
+      field_value.SetZ(static_cast<uint8_t>(shadow_frame.GetVReg(vreg)));
+      break;
+    case Primitive::kPrimByte:
+      field_value.SetB(static_cast<int8_t>(shadow_frame.GetVReg(vreg)));
+      break;
+    case Primitive::kPrimChar:
+      field_value.SetC(static_cast<uint16_t>(shadow_frame.GetVReg(vreg)));
+      break;
+    case Primitive::kPrimShort:
+      field_value.SetS(static_cast<int16_t>(shadow_frame.GetVReg(vreg)));
+      break;
+    case Primitive::kPrimInt:
+      field_value.SetI(shadow_frame.GetVReg(vreg));
+      break;
+    case Primitive::kPrimLong:
+      field_value.SetJ(shadow_frame.GetVRegLong(vreg));
+      break;
+    case Primitive::kPrimNot:
+      field_value.SetL(shadow_frame.GetVRegReference(vreg));
+      break;
+    default:
+      LOG(FATAL) << "Unreachable: " << field_type;
+      UNREACHABLE();
+  }
+  return field_value;
+}
+
 // Handles iget-XXX and sget-XXX instructions.
 // Returns true on success, otherwise throws an exception and returns false.
 template<FindFieldType find_type, Primitive::Type field_type, bool do_access_check,
          bool transaction_active = false>
-bool DoFieldGet(Thread* self, ShadowFrame& shadow_frame, const Instruction* inst,
-                uint16_t inst_data) REQUIRES_SHARED(Locks::mutator_lock_);
+ALWAYS_INLINE bool DoFieldGet(Thread* self, ShadowFrame& shadow_frame, const Instruction* inst,
+                              uint16_t inst_data) REQUIRES_SHARED(Locks::mutator_lock_) {
+  const bool is_static = (find_type == StaticObjectRead) || (find_type == StaticPrimitiveRead);
+  const uint32_t field_idx = is_static ? inst->VRegB_21c() : inst->VRegC_22c();
+  ArtField* f =
+      FindFieldFromCode<find_type, do_access_check>(field_idx, shadow_frame.GetMethod(), self,
+                                                    Primitive::ComponentSize(field_type));
+  if (UNLIKELY(f == nullptr)) {
+    CHECK(self->IsExceptionPending());
+    return false;
+  }
+  ObjPtr<mirror::Object> obj;
+  if (is_static) {
+    obj = f->GetDeclaringClass();
+    if (transaction_active) {
+      if (Runtime::Current()->GetTransaction()->ReadConstraint(self, obj, f)) {
+        Runtime::Current()->AbortTransactionAndThrowAbortError(self, "Can't read static fields of "
+            + obj->PrettyTypeOf() + " since it does not belong to clinit's class.");
+        return false;
+      }
+    }
+  } else {
+    obj = shadow_frame.GetVRegReference(inst->VRegB_22c(inst_data));
+    if (UNLIKELY(obj == nullptr)) {
+      ThrowNullPointerExceptionForFieldAccess(f, true);
+      return false;
+    }
+  }
+
+  JValue result;
+  if (UNLIKELY(!DoFieldGetCommon<field_type>(self, shadow_frame, obj, f, &result))) {
+    // Instrumentation threw an error!
+    CHECK(self->IsExceptionPending());
+    return false;
+  }
+  uint32_t vregA = is_static ? inst->VRegA_21c(inst_data) : inst->VRegA_22c(inst_data);
+  switch (field_type) {
+    case Primitive::kPrimBoolean:
+      shadow_frame.SetVReg(vregA, result.GetZ());
+      break;
+    case Primitive::kPrimByte:
+      shadow_frame.SetVReg(vregA, result.GetB());
+      break;
+    case Primitive::kPrimChar:
+      shadow_frame.SetVReg(vregA, result.GetC());
+      break;
+    case Primitive::kPrimShort:
+      shadow_frame.SetVReg(vregA, result.GetS());
+      break;
+    case Primitive::kPrimInt:
+      shadow_frame.SetVReg(vregA, result.GetI());
+      break;
+    case Primitive::kPrimLong:
+      shadow_frame.SetVRegLong(vregA, result.GetJ());
+      break;
+    case Primitive::kPrimNot:
+      shadow_frame.SetVRegReference(vregA, result.GetL());
+      break;
+    default:
+      LOG(FATAL) << "Unreachable: " << field_type;
+      UNREACHABLE();
+  }
+  return true;
+}
 
 // Handles iget-quick, iget-wide-quick and iget-object-quick instructions.
 // Returns true on success, otherwise throws an exception and returns false.
 template<Primitive::Type field_type>
-bool DoIGetQuick(ShadowFrame& shadow_frame, const Instruction* inst, uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_);
+ALWAYS_INLINE bool DoIGetQuick(ShadowFrame& shadow_frame, const Instruction* inst,
+                               uint16_t inst_data) REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(inst->VRegB_22c(inst_data));
+  if (UNLIKELY(obj == nullptr)) {
+    // We lost the reference to the field index so we cannot get a more
+    // precised exception message.
+    ThrowNullPointerExceptionFromDexPC();
+    return false;
+  }
+  MemberOffset field_offset(inst->VRegC_22c());
+  // Report this field access to instrumentation if needed. Since we only have the offset of
+  // the field from the base of the object, we need to look for it first.
+  instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+  if (UNLIKELY(instrumentation->HasFieldReadListeners())) {
+    ArtField* f = ArtField::FindInstanceFieldWithOffset(obj->GetClass(),
+                                                        field_offset.Uint32Value());
+    DCHECK(f != nullptr);
+    DCHECK(!f->IsStatic());
+    Thread* self = Thread::Current();
+    StackHandleScope<1> hs(self);
+    // Save obj in case the instrumentation event has thread suspension.
+    HandleWrapperObjPtr<mirror::Object> h = hs.NewHandleWrapper(&obj);
+    instrumentation->FieldReadEvent(self,
+                                    obj,
+                                    shadow_frame.GetMethod(),
+                                    shadow_frame.GetDexPC(),
+                                    f);
+    if (UNLIKELY(self->IsExceptionPending())) {
+      return false;
+    }
+  }
+  // Note: iget-x-quick instructions are only for non-volatile fields.
+  const uint32_t vregA = inst->VRegA_22c(inst_data);
+  switch (field_type) {
+    case Primitive::kPrimInt:
+      shadow_frame.SetVReg(vregA, static_cast<int32_t>(obj->GetField32(field_offset)));
+      break;
+    case Primitive::kPrimBoolean:
+      shadow_frame.SetVReg(vregA, static_cast<int32_t>(obj->GetFieldBoolean(field_offset)));
+      break;
+    case Primitive::kPrimByte:
+      shadow_frame.SetVReg(vregA, static_cast<int32_t>(obj->GetFieldByte(field_offset)));
+      break;
+    case Primitive::kPrimChar:
+      shadow_frame.SetVReg(vregA, static_cast<int32_t>(obj->GetFieldChar(field_offset)));
+      break;
+    case Primitive::kPrimShort:
+      shadow_frame.SetVReg(vregA, static_cast<int32_t>(obj->GetFieldShort(field_offset)));
+      break;
+    case Primitive::kPrimLong:
+      shadow_frame.SetVRegLong(vregA, static_cast<int64_t>(obj->GetField64(field_offset)));
+      break;
+    case Primitive::kPrimNot:
+      shadow_frame.SetVRegReference(vregA, obj->GetFieldObject<mirror::Object>(field_offset));
+      break;
+    default:
+      LOG(FATAL) << "Unreachable: " << field_type;
+      UNREACHABLE();
+  }
+  return true;
+}
 
 // Handles iput-XXX and sput-XXX instructions.
 // Returns true on success, otherwise throws an exception and returns false.
 template<FindFieldType find_type, Primitive::Type field_type, bool do_access_check,
          bool transaction_active>
-bool DoFieldPut(Thread* self, const ShadowFrame& shadow_frame, const Instruction* inst,
-                uint16_t inst_data) REQUIRES_SHARED(Locks::mutator_lock_);
+ALWAYS_INLINE bool DoFieldPut(Thread* self, const ShadowFrame& shadow_frame,
+                              const Instruction* inst, uint16_t inst_data)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  const bool do_assignability_check = do_access_check;
+  bool is_static = (find_type == StaticObjectWrite) || (find_type == StaticPrimitiveWrite);
+  uint32_t field_idx = is_static ? inst->VRegB_21c() : inst->VRegC_22c();
+  ArtField* f =
+      FindFieldFromCode<find_type, do_access_check>(field_idx, shadow_frame.GetMethod(), self,
+                                                    Primitive::ComponentSize(field_type));
+  if (UNLIKELY(f == nullptr)) {
+    CHECK(self->IsExceptionPending());
+    return false;
+  }
+  ObjPtr<mirror::Object> obj;
+  if (is_static) {
+    obj = f->GetDeclaringClass();
+  } else {
+    obj = shadow_frame.GetVRegReference(inst->VRegB_22c(inst_data));
+    if (UNLIKELY(obj == nullptr)) {
+      ThrowNullPointerExceptionForFieldAccess(f, false);
+      return false;
+    }
+  }
+  if (transaction_active) {
+    Runtime* runtime = Runtime::Current();
+    if (runtime->GetTransaction()->WriteConstraint(self, obj, f)) {
+      if (is_static) {
+        runtime->AbortTransactionAndThrowAbortError(
+            self, "Can't set fields of " + obj->PrettyTypeOf());
+      } else {
+        // This can happen only when compiling a boot image extension.
+        DCHECK(!runtime->GetTransaction()->IsStrict());
+        DCHECK(runtime->GetHeap()->ObjectIsInBootImageSpace(obj));
+        runtime->AbortTransactionAndThrowAbortError(
+            self, "Can't set fields of boot image objects");
+      }
+      return false;
+    }
+  }
+
+  uint32_t vregA = is_static ? inst->VRegA_21c(inst_data) : inst->VRegA_22c(inst_data);
+  JValue value = GetFieldValue<field_type>(shadow_frame, vregA);
+  return DoFieldPutCommon<field_type, do_assignability_check, transaction_active>(self,
+                                                                                  shadow_frame,
+                                                                                  obj,
+                                                                                  f,
+                                                                                  value);
+}
 
 // Handles iput-quick, iput-wide-quick and iput-object-quick instructions.
 // Returns true on success, otherwise throws an exception and returns false.
 template<Primitive::Type field_type, bool transaction_active>
-bool DoIPutQuick(const ShadowFrame& shadow_frame, const Instruction* inst, uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_);
-
+ALWAYS_INLINE bool DoIPutQuick(const ShadowFrame& shadow_frame, const Instruction* inst,
+                               uint16_t inst_data) REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Object> obj = shadow_frame.GetVRegReference(inst->VRegB_22c(inst_data));
+  if (UNLIKELY(obj == nullptr)) {
+    // We lost the reference to the field index so we cannot get a more
+    // precised exception message.
+    ThrowNullPointerExceptionFromDexPC();
+    return false;
+  }
+  MemberOffset field_offset(inst->VRegC_22c());
+  const uint32_t vregA = inst->VRegA_22c(inst_data);
+  // Report this field modification to instrumentation if needed. Since we only have the offset of
+  // the field from the base of the object, we need to look for it first.
+  instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+  if (UNLIKELY(instrumentation->HasFieldWriteListeners())) {
+    ArtField* f = ArtField::FindInstanceFieldWithOffset(obj->GetClass(),
+                                                        field_offset.Uint32Value());
+    DCHECK(f != nullptr);
+    DCHECK(!f->IsStatic());
+    JValue field_value = GetFieldValue<field_type>(shadow_frame, vregA);
+    Thread* self = Thread::Current();
+    StackHandleScope<2> hs(self);
+    // Save obj in case the instrumentation event has thread suspension.
+    HandleWrapperObjPtr<mirror::Object> h = hs.NewHandleWrapper(&obj);
+    mirror::Object* fake_root = nullptr;
+    HandleWrapper<mirror::Object> ret(hs.NewHandleWrapper<mirror::Object>(
+        field_type == Primitive::kPrimNot ? field_value.GetGCRoot() : &fake_root));
+    instrumentation->FieldWriteEvent(self,
+                                     obj,
+                                     shadow_frame.GetMethod(),
+                                     shadow_frame.GetDexPC(),
+                                     f,
+                                     field_value);
+    if (UNLIKELY(self->IsExceptionPending())) {
+      return false;
+    }
+    if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
+      // Don't actually set the field. The next instruction will force us to pop.
+      DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
+      return true;
+    }
+  }
+  // Note: iput-x-quick instructions are only for non-volatile fields.
+  switch (field_type) {
+    case Primitive::kPrimBoolean:
+      obj->SetFieldBoolean<transaction_active>(field_offset, shadow_frame.GetVReg(vregA));
+      break;
+    case Primitive::kPrimByte:
+      obj->SetFieldByte<transaction_active>(field_offset, shadow_frame.GetVReg(vregA));
+      break;
+    case Primitive::kPrimChar:
+      obj->SetFieldChar<transaction_active>(field_offset, shadow_frame.GetVReg(vregA));
+      break;
+    case Primitive::kPrimShort:
+      obj->SetFieldShort<transaction_active>(field_offset, shadow_frame.GetVReg(vregA));
+      break;
+    case Primitive::kPrimInt:
+      obj->SetField32<transaction_active>(field_offset, shadow_frame.GetVReg(vregA));
+      break;
+    case Primitive::kPrimLong:
+      obj->SetField64<transaction_active>(field_offset, shadow_frame.GetVRegLong(vregA));
+      break;
+    case Primitive::kPrimNot:
+      obj->SetFieldObject<transaction_active>(field_offset, shadow_frame.GetVRegReference(vregA));
+      break;
+    default:
+      LOG(FATAL) << "Unreachable: " << field_type;
+      UNREACHABLE();
+  }
+  return true;
+}
 
 // Handles string resolution for const-string and const-string-jumbo instructions. Also ensures the
 // java.lang.String class is initialized.

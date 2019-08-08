@@ -234,6 +234,9 @@ void ThrowNullPointerExceptionFromDexPC(bool check_address = false, uintptr_t ad
 void ThrowNullPointerException(const char* msg)
     REQUIRES_SHARED(Locks::mutator_lock_) COLD_ATTR;
 
+void ThrowNullPointerException()
+    REQUIRES_SHARED(Locks::mutator_lock_) COLD_ATTR;
+
 // ReadOnlyBufferException
 
 void ThrowReadOnlyBufferException() REQUIRES_SHARED(Locks::mutator_lock_) COLD_ATTR;

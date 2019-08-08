@@ -1,0 +1,3 @@
+Regression test for OSR compilation, which used to not fill the
+right dex register value in the presence of equivalent phis.
+(see b/136698025)
