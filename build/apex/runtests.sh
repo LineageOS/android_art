@@ -44,9 +44,13 @@ function setup_die {
 flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)\
   || setup_die
 
-if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
-  say "Could not find debugfs, building now."
-  build/soong/soong_ui.bash --make-mode debugfs-host || die "Cannot build debugfs"
+have_debugfs_p=false
+if [ ! $flattened_apex_p ]; then
+  if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
+    say "Could not find debugfs, building now."
+    build/soong/soong_ui.bash --make-mode debugfs-host || die "Cannot build debugfs"
+  fi
+  have_debugfs_p=true
 fi
 
 # Fail early.
@@ -163,7 +167,9 @@ for apex_module in ${apex_modules[@]}; do
     else
       apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
     fi
-    art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
+    if $have_debugfs_p; then
+      art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
+    fi
     case $apex_module in
       (*.debug)   test_only_args="--debug";;
       (*.testing) test_only_args="--testing";;
