@@ -81,11 +81,6 @@ art_runtime_debug_native_shared_libs = [
     "libopenjdkjvmtid",
 ]
 
-// Data files associated with bionic / managed core library APIs.
-art_runtime_data_file_prebuilts = [
-    "apex_icu.dat",
-]
-
 // Tools common to both device APEX and host APEX. Derived from art-tools in art/Android.mk.
 art_tools_common_binaries = [
     "dexdump",
@@ -240,10 +235,12 @@ apex_defaults {
         "art_preinstall_hook_system_server",
         "art_prepostinstall_utils",
     ],
-    prebuilts: art_runtime_data_file_prebuilts +
-        ["com.android.runtime.ld.config.txt"],
+    prebuilts: ["com.android.runtime.ld.config.txt"],
     key: "com.android.runtime.key",
-    required: ["art_apex_boot_integrity"],
+    required: [
+        "art_apex_boot_integrity",
+        "com.android.i18n",
+    ],
 }
 
 // Default values shared by (device) Debug and Testing Runtime APEXes.
