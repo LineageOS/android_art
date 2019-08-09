@@ -1719,17 +1719,19 @@ void JitCodeCache::InvalidateCompiledCodeFor(ArtMethod* method,
 
 void JitCodeCache::Dump(std::ostream& os) {
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  os << "Current JIT code cache size: " << PrettySize(GetCurrentRegion()->GetUsedMemoryForCode())
-                                        << "\n"
-     << "Current JIT data cache size: " << PrettySize(GetCurrentRegion()->GetUsedMemoryForData())
-                                        << "\n";
+  os << "Current JIT code cache size (used / resident): "
+     << GetCurrentRegion()->GetUsedMemoryForCode() / KB << "KB / "
+     << GetCurrentRegion()->GetResidentMemoryForCode() / KB << "KB\n"
+     << "Current JIT data cache size (used / resident): "
+     << GetCurrentRegion()->GetUsedMemoryForData() / KB << "KB / "
+     << GetCurrentRegion()->GetResidentMemoryForData() / KB << "KB\n";
   if (!Runtime::Current()->IsZygote()) {
     os << "Zygote JIT code cache size (at point of fork): "
-       << PrettySize(shared_region_.GetUsedMemoryForCode())
-       << "\n"
+       << shared_region_.GetUsedMemoryForCode() / KB << "KB / "
+       << shared_region_.GetResidentMemoryForCode() / KB << "KB\n"
        << "Zygote JIT data cache size (at point of fork): "
-       << PrettySize(shared_region_.GetUsedMemoryForData())
-       << "\n";
+       << shared_region_.GetUsedMemoryForData() / KB << "KB / "
+       << shared_region_.GetResidentMemoryForData() / KB << "KB\n";
   }
   os << "Current JIT mini-debug-info size: " << PrettySize(GetJitMiniDebugInfoMemUsage()) << "\n"
      << "Current JIT capacity: " << PrettySize(GetCurrentRegion()->GetCurrentCapacity()) << "\n"
