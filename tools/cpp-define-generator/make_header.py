@@ -31,7 +31,7 @@ import sys
 def convert(input):
   """Find all defines in the compiler generated assembly and convert them to #define pragmas"""
 
-  asm_define_re = re.compile(r'">>(\w+) (?:\$|#)([-0-9]+) (?:\$|#)(0|1)<<"')
+  asm_define_re = re.compile(r'">>(\w+) (?:\$|#)?([-0-9]+) (?:\$|#)?(0|1)<<"')
   asm_defines = asm_define_re.findall(input)
   if not asm_defines:
     raise RuntimeError("Failed to find any asm defines in the input")
