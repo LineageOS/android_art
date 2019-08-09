@@ -1,0 +1,2 @@
+Regression test for Thread.setPriority, which used to always set the priority
+to the main thread, instead of the passed one.
