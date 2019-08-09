@@ -62,14 +62,9 @@ if options.gtest or not options.run_test:
   if options.target or not options.host:
     build_target += ' test-art-target-gtest'
 
-  build_command = 'make'
-  build_command += ' -j' + str(options.n_threads)
-  build_command += ' -C ' + ANDROID_BUILD_TOP
-  build_command += ' ' + build_target
-
+  build_command = 'm -j' + str(options.n_threads) + ' ' + build_target
   print build_command
-
-  if subprocess.call(build_command.split()):
+  if subprocess.call(build_command.split(), cwd=ANDROID_BUILD_TOP):
       sys.exit(1)
 
 sys.exit(0)
