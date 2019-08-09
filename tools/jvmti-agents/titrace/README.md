@@ -4,7 +4,7 @@ Titrace is a bytecode instruction tracing tool that uses JVMTI and works on both
 
 # Usage
 ### Build
->    `make libtitrace`  # or 'make libtitraced' with debugging checks enabled
+>    `m libtitrace`  # or 'm libtitraced' with debugging checks enabled
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples assume you want to use the 64-bit version.
 ### Command Line

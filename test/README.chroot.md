@@ -58,7 +58,7 @@ Note that using this chroot-based approach requires root access to the device
         ```bash
         . ./build/envsetup.sh
         lunch aosp_arm64-eng  # or aosp_arm-eng for 32-bit ARM
-        make adb
+        m adb
         ```
 3. Build ART and required dependencies:
     ```bash
@@ -84,7 +84,7 @@ Note that using this chroot-based approach requires root access to the device
     * Note: This currently fails on test
     `test-art-target-gtest-image_space_test{32,64}` when using the full AOSP
     tree (b/119815008).
-        * Workaround: Run `make clean-oat-host` before the build step
+        * Workaround: Run `m clean-oat-host` before the build step
         (`art/tools/buildbot-build.sh --target -j40`) above.
     * Note: The `-j` option is not honored yet (b/129930445).
 8. Run ART run-tests:
