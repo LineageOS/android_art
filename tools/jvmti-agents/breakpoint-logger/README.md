@@ -5,7 +5,7 @@ when they are hit.
 
 # Usage
 ### Build
->    `make libbreakpointlogger`  # or 'make libbreakpointloggerd' with debugging checks enabled
+>    `m libbreakpointlogger`  # or 'm libbreakpointloggerd' with debugging checks enabled
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.
