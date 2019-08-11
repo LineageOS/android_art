@@ -306,7 +306,7 @@ test_jar=$(jlib_name "${java_lib_location}/${make_target_name}_intermediates")
 
 if [[ ! -f $test_jar ]]; then
   echo "Before running, you must build jdwp tests and vogar:" \
-       "make ${make_target_name} vogar"
+       "m ${make_target_name} vogar"
   exit 1
 fi
 

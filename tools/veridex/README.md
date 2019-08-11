@@ -8,7 +8,7 @@ API uses that do not execute at runtime, and reflection uses
 that do not exist. It can also miss on reflection uses.
 
 To build it:
-> make appcompat
+> m appcompat
 
 To run it:
 > ./art/tools/veridex/appcompat.sh --dex-file=test.apk
