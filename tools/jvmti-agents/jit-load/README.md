@@ -5,7 +5,7 @@ loaded on the jit-thread or verify that none were.
 
 # Usage
 ### Build
->    `make libjitload`  # or 'make libjitloadd' with debugging checks enabled
+>    `m libjitload`  # or 'm libjitloadd' with debugging checks enabled
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples assume you want to use the 64-bit version.
 ### Command Line

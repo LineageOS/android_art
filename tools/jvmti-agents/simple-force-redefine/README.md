@@ -7,7 +7,7 @@ NOP at the beginning of every function in the class.
 
 # Usage
 ### Build
->    `make libforceredefine`
+>    `m libforceredefine`
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.
