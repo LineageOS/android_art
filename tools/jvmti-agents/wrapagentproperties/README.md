@@ -5,7 +5,7 @@ an agents GetSystemPropert{y,ies} calls.
 
 # Usage
 ### Build
->    `make libwrapagentproperties`  # or 'make libwrapagentpropertiesd' with debugging checks enabled
+>    `m libwrapagentproperties`  # or 'm libwrapagentpropertiesd' with debugging checks enabled
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.

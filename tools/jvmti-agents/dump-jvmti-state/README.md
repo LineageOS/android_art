@@ -6,7 +6,7 @@ this by calling the com.android.art.misc.get_plugin_internal_state extension fun
 
 # Usage
 ### Build
->    `make libdumpjvmti`
+>    `m libdumpjvmti`
 
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.
