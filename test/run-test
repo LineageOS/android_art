@@ -646,7 +646,7 @@ fi
 if [ "$runtime" = "dalvik" ]; then
     if [ "$target_mode" = "no" ]; then
         framework="${ANDROID_PRODUCT_OUT}/system/framework"
-        bpath="${framework}/core-libart.jar:${framework}/core-oj.jar:${framework}/conscrypt.jar:${framework}/okhttp.jar:${framework}/bouncycastle.jar:${framework}/ext.jar"
+        bpath="${framework}/core-icu4j.jar:${framework}/core-libart.jar:${framework}/core-oj.jar:${framework}/conscrypt.jar:${framework}/okhttp.jar:${framework}/bouncycastle.jar:${framework}/ext.jar"
         run_args+=(--boot --runtime-option "-Xbootclasspath:${bpath}")
     else
         true # defaults to using target BOOTCLASSPATH
