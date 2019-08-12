@@ -469,6 +469,7 @@ class ReleaseChecker:
     # Check java libraries for Managed Core Library.
     self._checker.check_java_library('apache-xml')
     self._checker.check_java_library('bouncycastle')
+    self._checker.check_java_library('core-icu4j')
     self._checker.check_java_library('core-libart')
     self._checker.check_java_library('core-oj')
     self._checker.check_java_library('okhttp')
