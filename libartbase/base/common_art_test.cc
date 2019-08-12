@@ -381,6 +381,7 @@ std::vector<std::string> CommonArtTestImpl::GetLibCoreModuleNames() const {
       // CORE_IMG_JARS modules.
       "core-oj",
       "core-libart",
+      "core-icu4j",
       "okhttp",
       "bouncycastle",
       "apache-xml",

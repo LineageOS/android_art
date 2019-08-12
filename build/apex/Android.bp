@@ -130,6 +130,7 @@ art_runtime_host_run_test_libs = [
 libcore_java_libs = [
     "core-oj",
     "core-libart",
+    "core-icu4j",
     "okhttp",
     "bouncycastle",
     "apache-xml",
