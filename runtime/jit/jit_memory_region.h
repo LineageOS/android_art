@@ -165,8 +165,16 @@ class JitMemoryRegion {
     return used_memory_for_code_;
   }
 
+  size_t GetResidentMemoryForCode() const REQUIRES(Locks::jit_lock_) {
+    return exec_end_;
+  }
+
   size_t GetUsedMemoryForData() const REQUIRES(Locks::jit_lock_) {
     return used_memory_for_data_;
+  }
+
+  size_t GetResidentMemoryForData() const REQUIRES(Locks::jit_lock_) {
+    return data_end_;
   }
 
  private:
