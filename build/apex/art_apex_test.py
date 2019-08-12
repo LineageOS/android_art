@@ -157,7 +157,7 @@ class TargetFlattenedApexProvider:
 class HostApexProvider:
   def __init__(self, apex, tmpdir):
     self._tmpdir = tmpdir
-    self.folder_cache = {}
+    self._folder_cache = {}
     self._payload = os.path.join(self._tmpdir, 'apex_payload.zip')
     # Extract payload to tmpdir.
     apex_zip = zipfile.ZipFile(apex)
@@ -176,12 +176,12 @@ class HostApexProvider:
     return apex_map[name] if name in apex_map else None
 
   def read_dir(self, apex_dir):
-    if apex_dir in self.folder_cache:
-      return self.folder_cache[apex_dir]
-    if not self.folder_cache:
+    if apex_dir in self._folder_cache:
+      return self._folder_cache[apex_dir]
+    if not self._folder_cache:
       self.parse_zip()
-    if apex_dir in self.folder_cache:
-      return self.folder_cache[apex_dir]
+    if apex_dir in self._folder_cache:
+      return self._folder_cache[apex_dir]
     return {}
 
   def parse_zip(self):
@@ -205,9 +205,9 @@ class HostApexProvider:
         apex_dir, base = os.path.split(path)
         # TODO: If directories are stored, base will be empty.
 
-        if apex_dir not in self.folder_cache:
-          self.folder_cache[apex_dir] = {}
-        dir_map = self.folder_cache[apex_dir]
+        if apex_dir not in self._folder_cache:
+          self._folder_cache[apex_dir] = {}
+        dir_map = self._folder_cache[apex_dir]
         if base not in dir_map:
           if is_zipinfo:
             bits = (zipinfo.external_attr >> 16) & 0xFFFF
@@ -950,7 +950,7 @@ class NoSuperfluousArtTestsChecker:
 
 
 class List:
-  def __init__(self, provider, print_size):
+  def __init__(self, provider, print_size=False):
     self._provider = provider
     self._print_size = print_size
 
@@ -981,7 +981,7 @@ class List:
 
 
 class Tree:
-  def __init__(self, provider, title, print_size):
+  def __init__(self, provider, title, print_size=False):
     print('%s' % title)
     self._provider = provider
     self._has_next_list = []
@@ -1100,7 +1100,7 @@ def art_apex_test_main(test_args):
       test_args.bitness = '64'
     else:
       logging.error('  Could not detect bitness, neither lib nor lib64 contained.')
-      print('%s' % apex_provider.folder_cache)
+      List(apex_provider).print_list()
       return 1
 
   if test_args.bitness == '32':
