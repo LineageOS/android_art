@@ -646,8 +646,13 @@ class ZygoteTask final : public Task {
     std::string boot_profile = GetBootProfileFile(profile_file);
     // We add to the queue for zygote so that we can fork processes in-between
     // compilations.
-    uint32_t added_to_queue = runtime->GetJit()->CompileMethodsFromBootProfile(
-        self, boot_class_path, boot_profile, null_handle, /* add_to_queue= */ true);
+    uint32_t added_to_queue = 0;
+    if (Runtime::Current()->IsPrimaryZygote()) {
+      // We avoid doing compilation at boot for the secondary zygote, as apps
+      // forked from it are not critical for boot.
+      added_to_queue += runtime->GetJit()->CompileMethodsFromBootProfile(
+          self, boot_class_path, boot_profile, null_handle, /* add_to_queue= */ true);
+    }
     added_to_queue += runtime->GetJit()->CompileMethodsFromProfile(
         self, boot_class_path, profile_file, null_handle, /* add_to_queue= */ true);
 
@@ -768,16 +773,16 @@ bool Jit::CompileMethodFromProfile(Thread* self,
   if (!method->IsCompilable() || !method->IsInvokable()) {
     return false;
   }
+  if (method->IsPreCompiled()) {
+    // Already seen by another profile.
+    return false;
+  }
   const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
   if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
       class_linker->IsQuickGenericJniStub(entry_point) ||
       class_linker->IsQuickResolutionStub(entry_point)) {
-    // Special case ZygoteServer class so that it gets compiled before the
-    // zygote enters it. This avoids needing to do OSR during app startup.
-    // TODO: have a profile instead.
     method->SetPreCompiled();
-    if (!add_to_queue || method->GetDeclaringClass()->DescriptorEquals(
-            "Lcom/android/internal/os/ZygoteServer;")) {
+    if (!add_to_queue) {
       CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
     } else {
       Task* task = new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile);
@@ -850,18 +855,17 @@ uint32_t Jit::CompileMethodsFromProfile(
     return 0u;
   }
 
-  std::string error_msg;
-  ScopedFlock profile = LockedFile::Open(
-      profile_file.c_str(), O_RDONLY, /* block= */ false, &error_msg);
+  // We don't generate boot profiles on device, therefore we don't
+  // need to lock the file.
+  unix_file::FdFile profile(profile_file.c_str(), O_RDONLY, true);
 
-  // Return early if we're unable to obtain a lock on the profile.
-  if (profile.get() == nullptr) {
-    LOG(ERROR) << "Cannot lock profile: " << error_msg;
+  if (profile.Fd() == -1) {
+    PLOG(WARNING) << "No profile: " << profile_file;
     return 0u;
   }
 
   ProfileCompilationInfo profile_info;
-  if (!profile_info.Load(profile->Fd())) {
+  if (!profile_info.Load(profile.Fd())) {
     LOG(ERROR) << "Could not load profile file";
     return 0u;
   }
