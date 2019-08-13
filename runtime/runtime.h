@@ -484,6 +484,10 @@ class Runtime {
     return jit_.get();
   }
 
+  jit::JitCodeCache* GetJitCodeCache() const {
+    return jit_code_cache_.get();
+  }
+
   // Returns true if JIT compilations are enabled. GetJit() will be not null in this case.
   bool UseJitCompilation() const;
 
