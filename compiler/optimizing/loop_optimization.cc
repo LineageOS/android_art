@@ -1283,6 +1283,10 @@ bool HLoopOptimization::VectorizeDef(LoopNode* node,
   // (3) unit stride index,
   // (4) vectorizable right-hand-side value.
   uint64_t restrictions = kNone;
+  // Don't accept expressions that can throw.
+  if (instruction->CanThrow()) {
+    return false;
+  }
   if (instruction->IsArraySet()) {
     DataType::Type type = instruction->AsArraySet()->GetComponentType();
     HInstruction* base = instruction->InputAt(0);
@@ -1334,7 +1338,8 @@ bool HLoopOptimization::VectorizeDef(LoopNode* node,
   }
   // Otherwise accept only expressions with no effects outside the immediate loop-body.
   // Note that actual uses are inspected during right-hand-side tree traversal.
-  return !IsUsedOutsideLoop(node->loop_info, instruction) && !instruction->DoesAnyWrite();
+  return !IsUsedOutsideLoop(node->loop_info, instruction)
+         && !instruction->DoesAnyWrite();
 }
 
 bool HLoopOptimization::VectorizeUse(LoopNode* node,
