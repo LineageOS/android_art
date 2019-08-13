@@ -978,8 +978,7 @@ void Runtime::InitNonZygoteOrPostFork(
     NativeBridgeAction action,
     const char* isa,
     bool profile_system_server) {
-  is_zygote_ = false;
-  is_primary_zygote_ = false;
+  DCHECK(!IsZygote());
 
   if (is_native_bridge_loaded_) {
     switch (action) {
