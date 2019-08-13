@@ -947,9 +947,9 @@ bool Jit::MaybeCompileMethod(Thread* self,
     return false;
   }
   if (UNLIKELY(method->IsPreCompiled()) && !with_backedges /* don't check for OSR */) {
-    const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
-    if (code_ptr != nullptr) {
-      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);
+    const void* entry_point = code_cache_->GetSavedEntryPointOfPreCompiledMethod(method);
+    if (entry_point != nullptr) {
+      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, entry_point);
       return true;
     }
   }
