@@ -80,7 +80,8 @@ enum class ArtJvmtiEvent : jint {
     // capability.
     kClassFileLoadHookRetransformable = JVMTI_MAX_EVENT_TYPE_VAL + 1,
     kDdmPublishChunk = JVMTI_MAX_EVENT_TYPE_VAL + 2,
-    kMaxNormalEventTypeVal = kDdmPublishChunk,
+    kObsoleteObjectCreated = JVMTI_MAX_EVENT_TYPE_VAL + 3,
+    kMaxNormalEventTypeVal = kObsoleteObjectCreated,
 
     // All that follow are events used to implement internal JVMTI functions. They are not settable
     // directly by agents.
@@ -102,6 +103,10 @@ using ArtJvmtiEventDdmPublishChunk = void (*)(jvmtiEnv *jvmti_env,
                                               jint data_len,
                                               const jbyte* data);
 
+using ArtJvmtiEventObsoleteObjectCreated = void (*)(jvmtiEnv *jvmti_env,
+                                                    jlong* obsolete_tag,
+                                                    jlong* new_tag);
+
 // It is not enough to store a Thread pointer, as these may be reused. Use the pointer and the
 // thread id.
 // Note: We could just use the tid like tracing does.
@@ -114,7 +119,7 @@ struct UniqueThreadHasher {
 };
 
 struct ArtJvmtiEventCallbacks : jvmtiEventCallbacks {
-  ArtJvmtiEventCallbacks() : DdmPublishChunk(nullptr) {
+  ArtJvmtiEventCallbacks() : DdmPublishChunk(nullptr), ObsoleteObjectCreated(nullptr) {
     memset(this, 0, sizeof(jvmtiEventCallbacks));
   }
 
@@ -125,6 +130,7 @@ struct ArtJvmtiEventCallbacks : jvmtiEventCallbacks {
   jvmtiError Set(jint index, jvmtiExtensionEvent cb);
 
   ArtJvmtiEventDdmPublishChunk DdmPublishChunk;
+  ArtJvmtiEventObsoleteObjectCreated ObsoleteObjectCreated;
 };
 
 bool IsExtensionEvent(jint e);
@@ -284,6 +290,16 @@ class EventHandler {
   void AddDelayedNonStandardExitEvent(const art::ShadowFrame* frame, bool is_object, jvalue val)
       REQUIRES_SHARED(art::Locks::mutator_lock_)
       REQUIRES(art::Locks::user_code_suspension_lock_, art::Locks::thread_list_lock_);
+
+  template<typename Visitor>
+  void ForEachEnv(art::Thread* self, Visitor v) REQUIRES(!envs_lock_) {
+    art::ReaderMutexLock mu(self, envs_lock_);
+    for (ArtJvmTiEnv* e : envs) {
+      if (e != nullptr) {
+        v(e);
+      }
+    }
+  }
 
  private:
   void SetupTraceListener(JvmtiMethodTraceListener* listener, ArtJvmtiEvent event, bool enable);

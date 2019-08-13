@@ -422,6 +422,56 @@ public class Test1974 {
     System.out.println("Same value? " + (after_tagged_obj[0] == arr));
   }
 
+  public static void runWithJvmtiTagsObsolete() throws Exception {
+    Object[] arr = new Object[] {"4", "44", "444"};
+    long globalID = 444_444_444l;
+    System.out.println("Test jvmti-tags with obsolete");
+    Main.setTag(arr, globalID);
+    StartCollectFrees();
+    StartAssignObsoleteIncrementedId();
+    DbgPrintln("Pre hash: " + arr.hashCode());
+    System.out.println(
+        "val is: " + Arrays.deepToString(GetObjectsWithTag(globalID)) + " resize +5");
+    ResizeArray(() -> arr, arr.length + 5);
+    Object[] after_tagged_obj = GetObjectsWithTag(globalID);
+    Object[] obsolete_tagged_obj = GetObjectsWithTag(globalID + 1);
+    System.out.println("val is: " + Arrays.deepToString(GetObjectsWithTag(globalID)));
+    EndAssignObsoleteIncrementedId();
+    long[] obsoletes_freed = CollectFreedTags();
+    DbgPrintln("Post hash: " + after_tagged_obj[0].hashCode());
+    System.out.println("Same value? " + (after_tagged_obj[0] == arr));
+    if (obsolete_tagged_obj.length >= 1) {
+      DbgPrintln("Found objects with obsolete tag: " + Arrays.deepToString(obsolete_tagged_obj));
+      boolean bad = false;
+      if (obsolete_tagged_obj.length != 1) {
+        System.out.println(
+            "Found obsolete tag'd objects: "
+                + Arrays.deepHashCode(obsolete_tagged_obj)
+                + " but only expected one!");
+        bad = true;
+      }
+      if (!Arrays.deepEquals(
+          Arrays.copyOf(arr, ((Object[]) obsolete_tagged_obj[0]).length),
+          (Object[]) obsolete_tagged_obj[0])) {
+        System.out.println("Obsolete array was unexpectedly different than non-obsolete one!");
+        bad = true;
+      }
+      if (!Arrays.stream(obsoletes_freed).anyMatch((l) -> l == globalID + 1)) {
+        DbgPrintln("Didn't see a free of the obsolete id");
+      }
+      if (!bad) {
+        System.out.println("Everything looks good WRT obsolete object");
+      }
+    } else {
+      if (!Arrays.stream(obsoletes_freed).anyMatch((l) -> l == globalID + 1)) {
+        System.out.println("Didn't see a free of the obsolete id");
+      } else {
+        DbgPrintln("Saw a free of obsolete id!");
+        System.out.println("Everything looks good WRT obsolete object!");
+      }
+    }
+  }
+
   public static void run() throws Exception {
     // Simple
     runAsThread(Test1974::runInstance);
@@ -457,6 +507,9 @@ public class Test1974 {
 
     // Basic jvmti tags
     runAsThread(Test1974::runWithJvmtiTags);
+
+    // Grab obsolete reference using tags/detect free
+    runAsThread(Test1974::runWithJvmtiTagsObsolete);
   }
 
   // Use a supplier so that we don't have to have a local ref to the resized
@@ -470,4 +523,12 @@ public class Test1974 {
   public static native <T> T ReadJniRef(long t);
 
   public static native Object[] GetObjectsWithTag(long tag);
+
+  public static native void StartCollectFrees();
+
+  public static native void StartAssignObsoleteIncrementedId();
+
+  public static native void EndAssignObsoleteIncrementedId();
+
+  public static native long[] CollectFreedTags();
 }

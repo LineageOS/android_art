@@ -92,6 +92,9 @@ void ArtJvmtiEventCallbacks::CopyExtensionsFrom(const ArtJvmtiEventCallbacks* cb
 
 jvmtiError ArtJvmtiEventCallbacks::Set(jint index, jvmtiExtensionEvent cb) {
   switch (index) {
+    case static_cast<jint>(ArtJvmtiEvent::kObsoleteObjectCreated):
+      ObsoleteObjectCreated = reinterpret_cast<ArtJvmtiEventObsoleteObjectCreated>(cb);
+      return OK;
     case static_cast<jint>(ArtJvmtiEvent::kDdmPublishChunk):
       DdmPublishChunk = reinterpret_cast<ArtJvmtiEventDdmPublishChunk>(cb);
       return OK;
@@ -110,6 +113,7 @@ bool IsExtensionEvent(jint e) {
 bool IsExtensionEvent(ArtJvmtiEvent e) {
   switch (e) {
     case ArtJvmtiEvent::kDdmPublishChunk:
+    case ArtJvmtiEvent::kObsoleteObjectCreated:
       return true;
     default:
       return false;
@@ -243,6 +247,7 @@ static bool IsThreadControllable(ArtJvmtiEvent event) {
     case ArtJvmtiEvent::kCompiledMethodUnload:
     case ArtJvmtiEvent::kDynamicCodeGenerated:
     case ArtJvmtiEvent::kDataDumpRequest:
+    case ArtJvmtiEvent::kObsoleteObjectCreated:
       return false;
 
     default:
@@ -1158,6 +1163,7 @@ static DeoptRequirement GetDeoptRequirement(ArtJvmtiEvent event, jthread thread)
     case ArtJvmtiEvent::kVmObjectAlloc:
     case ArtJvmtiEvent::kClassFileLoadHookRetransformable:
     case ArtJvmtiEvent::kDdmPublishChunk:
+    case ArtJvmtiEvent::kObsoleteObjectCreated:
       return DeoptRequirement::kNone;
   }
 }
