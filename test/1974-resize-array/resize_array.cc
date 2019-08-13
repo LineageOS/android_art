@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,34 @@ static void DeallocParams(jvmtiParamInfo* params, jint n_params) {
   for (jint i = 0; i < n_params; i++) {
     Dealloc(params[i].name);
   }
+}
+
+static jint FindExtensionEvent(JNIEnv* env, const std::string& name) {
+  jint n_ext;
+  jvmtiExtensionEventInfo* infos;
+  if (JvmtiErrorToException(env, jvmti_env, jvmti_env->GetExtensionEvents(&n_ext, &infos))) {
+    return -1;
+  }
+  jint res = -1;
+  bool found = false;
+  for (jint i = 0; i < n_ext; i++) {
+    jvmtiExtensionEventInfo* cur_info = &infos[i];
+    if (strcmp(name.c_str(), cur_info->id) == 0) {
+      res = cur_info->extension_event_index;
+      found = true;
+    }
+    // Cleanup the cur_info
+    DeallocParams(cur_info->params, cur_info->param_count);
+    Dealloc(cur_info->id, cur_info->short_description, cur_info->params);
+  }
+  // Cleanup the array.
+  Dealloc(infos);
+  if (!found) {
+    ScopedLocalRef<jclass> rt_exception(env, env->FindClass("java/lang/RuntimeException"));
+    env->ThrowNew(rt_exception.get(), (name + " extensions not found").c_str());
+    return -1;
+  }
+  return res;
 }
 
 static jvmtiExtensionFunction FindExtensionMethod(JNIEnv* env, const std::string& name) {
@@ -144,6 +173,96 @@ extern "C" JNIEXPORT void JNICALL Java_art_Test1974_runNativeTest(JNIEnv* env,
   env->CallVoidMethod(resize, run);
   env->CallVoidMethod(print, accept, arr);
   env->CallVoidMethod(check, accept, arr);
+}
+
+struct JvmtiInfo {
+  std::mutex mu_;
+  std::vector<jlong> freed_tags_;
+};
+
+extern "C" JNIEXPORT void JNICALL Java_art_Test1974_StartCollectFrees(JNIEnv* env,
+                                                                      jclass k ATTRIBUTE_UNUSED) {
+  jvmtiEventCallbacks cb{
+    .ObjectFree =
+        [](jvmtiEnv* jvmti, jlong tag) {
+          JvmtiInfo* dat = nullptr;
+          CHECK_EQ(jvmti->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&dat)),
+                   JVMTI_ERROR_NONE);
+          std::lock_guard<std::mutex> mu(dat->mu_);
+          dat->freed_tags_.push_back(tag);
+        },
+  };
+  JvmtiInfo* info = new JvmtiInfo;
+  if (JvmtiErrorToException(env, jvmti_env, jvmti_env->SetEnvironmentLocalStorage(info))) {
+    LOG(INFO) << "couldn't set env-local storage";
+    return;
+  }
+  if (JvmtiErrorToException(env, jvmti_env, jvmti_env->SetEventCallbacks(&cb, sizeof(cb)))) {
+    LOG(INFO) << "couldn't set event callback";
+    return;
+  }
+  JvmtiErrorToException(
+      env,
+      jvmti_env,
+      jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_OBJECT_FREE, nullptr));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_art_Test1974_StartAssignObsoleteIncrementedId(JNIEnv* env, jclass k ATTRIBUTE_UNUSED) {
+  jint id = FindExtensionEvent(env, "com.android.art.heap.obsolete_object_created");
+  if (env->ExceptionCheck()) {
+    LOG(INFO) << "Could not find extension event!";
+    return;
+  }
+  using ObsoleteEvent = void (*)(jvmtiEnv * env, jlong * obsolete, jlong * non_obsolete);
+  ObsoleteEvent oe = [](jvmtiEnv* env ATTRIBUTE_UNUSED, jlong* obsolete, jlong* non_obsolete) {
+    *non_obsolete = *obsolete;
+    *obsolete = *obsolete + 1;
+  };
+  JvmtiErrorToException(
+      env,
+      jvmti_env,
+      jvmti_env->SetExtensionEventCallback(id, reinterpret_cast<jvmtiExtensionEvent>(oe)));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_art_Test1974_EndAssignObsoleteIncrementedId(JNIEnv* env, jclass k ATTRIBUTE_UNUSED) {
+  jint id = FindExtensionEvent(env, "com.android.art.heap.obsolete_object_created");
+  if (env->ExceptionCheck()) {
+    LOG(INFO) << "Could not find extension event!";
+    return;
+  }
+  JvmtiErrorToException(env, jvmti_env, jvmti_env->SetExtensionEventCallback(id, nullptr));
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_art_Test1974_CollectFreedTags(JNIEnv* env, jclass k ATTRIBUTE_UNUSED) {
+  if (JvmtiErrorToException(
+          env,
+          jvmti_env,
+          jvmti_env->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_OBJECT_FREE, nullptr))) {
+    return nullptr;
+  }
+  JvmtiInfo* info_p = nullptr;
+  if (JvmtiErrorToException(
+          env,
+          jvmti_env,
+          jvmti_env->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&info_p)))) {
+    return nullptr;
+  }
+  if (JvmtiErrorToException(env, jvmti_env, jvmti_env->SetEnvironmentLocalStorage(nullptr))) {
+    return nullptr;
+  }
+  std::unique_ptr<JvmtiInfo> info(info_p);
+  ScopedLocalRef<jlongArray> arr(env, env->NewLongArray(info->freed_tags_.size()));
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  env->SetLongArrayRegion(arr.get(), 0, info->freed_tags_.size(), info->freed_tags_.data());
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  return arr.release();
 }
 }  // namespace Test1974ResizeArray
 }  // namespace art
