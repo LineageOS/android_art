@@ -964,15 +964,6 @@ uint8_t* JitCodeCache::ReserveData(Thread* self,
     result = region->AllocateData(size);
   }
 
-  if (result == nullptr) {
-    // Retry.
-    GarbageCollectCache(self);
-    ScopedThreadSuspension sts(self, kSuspended);
-    MutexLock mu(self, *Locks::jit_lock_);
-    WaitForPotentialCollectionToComplete(self);
-    result = region->AllocateData(size);
-  }
-
   MutexLock mu(self, *Locks::jit_lock_);
   histogram_stack_map_memory_use_.AddValue(size);
   if (size > kStackMapSizeLogThreshold) {
