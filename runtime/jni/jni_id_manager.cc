@@ -209,6 +209,7 @@ template <> size_t JniIdManager::GetLinearSearchStartId<ArtMethod>(ArtMethod* m)
   }
 }
 
+// TODO need to fix races in here with visitors
 template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) {
   Runtime* runtime = Runtime::Current();
   JniIdType id_type = runtime->GetJniIdType();
@@ -307,6 +308,22 @@ jmethodID JniIdManager::EncodeMethodId(ArtMethod* method) {
     LOG(INFO) << "Returning " << res << " for method " << method->PrettyMethod();
   }
   return res;
+}
+
+void JniIdManager::VisitIds(Thread* self, JniIdManager::IdVisitor* visitor) {
+  art::WriterMutexLock mu(self, *Locks::jni_id_lock_);
+  if (visitor->ShouldVisitFields()) {
+    for (auto it = field_id_map_.begin(); it != field_id_map_.end(); ++it) {
+      visitor->VisitFieldId(
+          reinterpret_cast<jfieldID>(IndexToId(std::distance(field_id_map_.begin(), it))), &*it);
+    }
+  }
+  if (visitor->ShouldVisitMethods()) {
+    for (auto it = method_id_map_.begin(); it != method_id_map_.end(); ++it) {
+      visitor->VisitMethodId(
+          reinterpret_cast<jmethodID>(IndexToId(std::distance(method_id_map_.begin(), it))), &*it);
+    }
+  }
 }
 
 template <typename ArtType> ArtType* JniIdManager::DecodeGenericId(uintptr_t t) {

@@ -1,0 +1,21 @@
+hello Alex
+Not doing anything here - op1
+Running after op1 using normal definition
+how do you do Alex
+Not doing anything here - op2
+Running after op2 using normal definition
+goodbye Alex
+hello Alex
+transforming calling function - non-structural
+Running after op1 using non-structural redefinition
+how do you do Alex
+transforming calling function - structural
+Running after op2 using structural redefinition
+goodbye Alex
+Hello Alex - Transformed
+Not doing anything here - op1
+Running after op2 using structural redefinition
+How do you do this fine day - Transformed
+Not doing anything here - op2
+Running after op2 using structural redefinition
+Goodbye and good luck - Transformed
