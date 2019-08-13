@@ -76,3 +76,9 @@ val is: [[3, 33, 333]] resize +5
 val is: [[3, 33, 333, null, null, null, null, null]]
 Same value? true
 
+Test jvmti-tags with obsolete
+val is: [[4, 44, 444]] resize +5
+val is: [[4, 44, 444, null, null, null, null, null]]
+Same value? true
+Everything looks good WRT obsolete object
+

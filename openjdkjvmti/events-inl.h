@@ -123,7 +123,8 @@ class ScopedEventDispatchEnvironment final : public art::ValueObject {
   fn(GarbageCollectionFinish, ArtJvmtiEvent::kGarbageCollectionFinish)               \
   fn(ObjectFree,              ArtJvmtiEvent::kObjectFree)                            \
   fn(VMObjectAlloc,           ArtJvmtiEvent::kVmObjectAlloc)                         \
-  fn(DdmPublishChunk,         ArtJvmtiEvent::kDdmPublishChunk)
+  fn(DdmPublishChunk,         ArtJvmtiEvent::kDdmPublishChunk)                       \
+  fn(ObsoleteObjectCreated,   ArtJvmtiEvent::kObsoleteObjectCreated)
 
 template <ArtJvmtiEvent kEvent>
 struct EventFnType {
@@ -315,6 +316,24 @@ inline void EventHandler::DispatchEventOnEnv(
     art::ScopedThreadStateChange stsc(thread, art::ThreadState::kNative);
     impl::EventHandlerFunc<kEvent> func(env);
     ExecuteCallback<kEvent>(func, args...);
+  }
+}
+
+template <>
+inline void EventHandler::DispatchEventOnEnv<ArtJvmtiEvent::kObsoleteObjectCreated>(
+    ArtJvmTiEnv* env, art::Thread* thread, jlong* obsolete_tag, jlong* new_tag) const {
+  static constexpr ArtJvmtiEvent kEvent = ArtJvmtiEvent::kObsoleteObjectCreated;
+  DCHECK(env != nullptr);
+  if (ShouldDispatch<kEvent>(env, thread, obsolete_tag, new_tag)) {
+    art::ScopedThreadStateChange stsc(thread, art::ThreadState::kNative);
+    impl::EventHandlerFunc<kEvent> func(env);
+    ExecuteCallback<kEvent>(func, obsolete_tag, new_tag);
+  } else {
+    // Unlike most others this has a default action to make sure that agents without knowledge of
+    // this extension get reasonable behavior.
+    jlong temp = *obsolete_tag;
+    *obsolete_tag = *new_tag;
+    *new_tag = temp;
   }
 }
 
