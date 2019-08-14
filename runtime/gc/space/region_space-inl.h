@@ -328,58 +328,53 @@ inline mirror::Object* RegionSpace::AllocLarge(size_t num_bytes,
     }
   }
 
+  mirror::Object* region = nullptr;
   // Find a large enough set of contiguous free regions.
   if (kCyclicRegionAllocation) {
+    size_t next_region = -1;
     // Try to find a range of free regions within [cyclic_alloc_region_index_, num_regions_).
-    size_t next_region1 = -1;
-    mirror::Object* region1 = AllocLargeInRange<kForEvac>(cyclic_alloc_region_index_,
-                                                          num_regions_,
-                                                          num_regs_in_large_region,
-                                                          bytes_allocated,
-                                                          usable_size,
-                                                          bytes_tl_bulk_allocated,
-                                                          &next_region1);
-    if (region1 != nullptr) {
-      DCHECK_LT(0u, next_region1);
-      DCHECK_LE(next_region1, num_regions_);
-      // Move the cyclic allocation region marker to the region
-      // following the large region that was just allocated.
-      cyclic_alloc_region_index_ = next_region1 % num_regions_;
-      return region1;
+    region = AllocLargeInRange<kForEvac>(cyclic_alloc_region_index_,
+                                         num_regions_,
+                                         num_regs_in_large_region,
+                                         bytes_allocated,
+                                         usable_size,
+                                         bytes_tl_bulk_allocated,
+                                         &next_region);
+
+    if (region == nullptr) {
+      DCHECK_EQ(next_region, static_cast<size_t>(-1));
+      // If the previous attempt failed, try to find a range of free regions within
+      // [0, min(cyclic_alloc_region_index_ + num_regs_in_large_region - 1, num_regions_)).
+      region = AllocLargeInRange<kForEvac>(
+          0,
+          std::min(cyclic_alloc_region_index_ + num_regs_in_large_region - 1, num_regions_),
+          num_regs_in_large_region,
+          bytes_allocated,
+          usable_size,
+          bytes_tl_bulk_allocated,
+          &next_region);
     }
 
-    // If the previous attempt failed, try to find a range of free regions within
-    // [0, min(cyclic_alloc_region_index_ + num_regs_in_large_region - 1, num_regions_)).
-    size_t next_region2 = -1;
-    mirror::Object* region2 = AllocLargeInRange<kForEvac>(
-            0,
-            std::min(cyclic_alloc_region_index_ + num_regs_in_large_region - 1, num_regions_),
-            num_regs_in_large_region,
-            bytes_allocated,
-            usable_size,
-            bytes_tl_bulk_allocated,
-            &next_region2);
-    if (region2 != nullptr) {
-      DCHECK_LT(0u, next_region2);
-      DCHECK_LE(next_region2, num_regions_);
+    if (region != nullptr) {
+      DCHECK_LT(0u, next_region);
+      DCHECK_LE(next_region, num_regions_);
       // Move the cyclic allocation region marker to the region
       // following the large region that was just allocated.
-      cyclic_alloc_region_index_ = next_region2 % num_regions_;
-      return region2;
+      cyclic_alloc_region_index_ = next_region % num_regions_;
     }
   } else {
     // Try to find a range of free regions within [0, num_regions_).
-    mirror::Object* region = AllocLargeInRange<kForEvac>(0,
-                                                         num_regions_,
-                                                         num_regs_in_large_region,
-                                                         bytes_allocated,
-                                                         usable_size,
-                                                         bytes_tl_bulk_allocated);
-    if (region != nullptr) {
-      return region;
-    }
+    region = AllocLargeInRange<kForEvac>(0,
+                                         num_regions_,
+                                         num_regs_in_large_region,
+                                         bytes_allocated,
+                                         usable_size,
+                                         bytes_tl_bulk_allocated);
   }
-  return nullptr;
+  if (kForEvac && region != nullptr) {
+    TraceHeapSize();
+  }
+  return region;
 }
 
 template<bool kForEvac>

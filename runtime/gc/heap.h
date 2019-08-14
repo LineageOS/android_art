@@ -902,6 +902,8 @@ class Heap {
 
   void PostForkChildAction(Thread* self);
 
+  void TraceHeapSize(size_t heap_size);
+
  private:
   class ConcurrentGCTask;
   class CollectorTransitionTask;
@@ -1179,8 +1181,6 @@ class Heap {
   }
 
   ALWAYS_INLINE void IncrementNumberOfBytesFreedRevoke(size_t freed_bytes_revoke);
-
-  void TraceHeapSize(size_t heap_size);
 
   // Remove a vlog code from heap-inl.h which is transitively included in half the world.
   static void VlogHeapGrowth(size_t max_allowed_footprint, size_t new_footprint, size_t alloc_size);

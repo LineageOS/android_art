@@ -156,7 +156,15 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
       new_num_bytes_allocated = num_bytes_allocated_before + bytes_tl_bulk_allocated;
       // Only trace when we get an increase in the number of bytes allocated. This happens when
       // obtaining a new TLAB and isn't often enough to hurt performance according to golem.
-      TraceHeapSize(new_num_bytes_allocated);
+      if (region_space_) {
+        // With CC collector, during a GC cycle, the heap usage increases as
+        // there are two copies of evacuated objects. Therefore, add evac-bytes
+        // to the heap size. When the GC cycle is not running, evac-bytes
+        // are 0, as required.
+        TraceHeapSize(new_num_bytes_allocated + region_space_->EvacBytes());
+      } else {
+        TraceHeapSize(new_num_bytes_allocated);
+      }
     }
   }
   if (kIsDebugBuild && Runtime::Current()->IsStarted()) {
