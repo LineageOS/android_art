@@ -195,6 +195,15 @@ void Instrumentation::InstallStubsForClass(ObjPtr<mirror::Class> klass) {
 
 static void UpdateEntrypoints(ArtMethod* method, const void* quick_code)
     REQUIRES_SHARED(Locks::mutator_lock_) {
+  if (kIsDebugBuild) {
+    jit::Jit* jit = Runtime::Current()->GetJit();
+    if (jit != nullptr && jit->GetCodeCache()->ContainsPc(quick_code)) {
+      // Ensure we always have the thumb entrypoint for JIT on arm32.
+      if (kRuntimeISA == InstructionSet::kArm) {
+        CHECK_EQ(reinterpret_cast<uintptr_t>(quick_code) & 1, 1u);
+      }
+    }
+  }
   method->SetEntryPointFromQuickCompiledCode(quick_code);
 }
 

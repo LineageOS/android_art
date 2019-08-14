@@ -947,9 +947,9 @@ bool Jit::MaybeCompileMethod(Thread* self,
     return false;
   }
   if (UNLIKELY(method->IsPreCompiled()) && !with_backedges /* don't check for OSR */) {
-    const void* code_ptr = code_cache_->GetZygoteMap()->GetCodeFor(method);
-    if (code_ptr != nullptr) {
-      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, code_ptr);
+    const void* entry_point = code_cache_->GetSavedEntryPointOfPreCompiledMethod(method);
+    if (entry_point != nullptr) {
+      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, entry_point);
       return true;
     }
   }
@@ -1128,18 +1128,11 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   code_cache_->SetGarbageCollectCode(!jit_compiler_->GenerateDebugInfo() &&
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
-  if (thread_pool_ != nullptr) {
-    if (is_system_server &&
-        Runtime::Current()->IsUsingApexBootImageLocation() &&
-        UseJitCompilation()) {
-      // Disable garbage collection: we don't want it to delete methods we're compiling
-      // through boot and system server profiles.
-      // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.
-      code_cache_->SetGarbageCollectCode(false);
-    }
-
-    // Resume JIT compilation.
-    thread_pool_->CreateThreads();
+  if (is_system_server && Runtime::Current()->IsUsingApexBootImageLocation()) {
+    // Disable garbage collection: we don't want it to delete methods we're compiling
+    // through boot and system server profiles.
+    // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.
+    code_cache_->SetGarbageCollectCode(false);
   }
 }
 
