@@ -105,12 +105,6 @@
   names: ["org.apache.harmony.tests.java.lang.ProcessTest#test_getErrorStream"]
 },
 {
-  description: "Test sometimes timeouts on volantis, and on most modes in debug mode",
-  result: EXEC_TIMEOUT,
-  names: ["libcore.java.lang.SystemTest#testArrayCopyConcurrentModification"],
-  bug: 19165288
-},
-{
   description: "Needs kernel updates on host/device",
   result: EXEC_FAILED,
   names: ["libcore.libcore.io.OsTest#test_socketPing"]
