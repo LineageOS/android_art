@@ -696,6 +696,19 @@ TEST_F(ProfileAssistantTest, TestProfileCreationAllMatch) {
   ASSERT_EQ(output_file_contents, file_contents);
 }
 
+TEST_F(ProfileAssistantTest, TestArrayClass) {
+  std::vector<std::string> class_names = {
+    "[Ljava/lang/Comparable;",
+  };
+  std::string file_contents;
+  for (std::string& class_name : class_names) {
+    file_contents += class_name + std::string("\n");
+  }
+  std::string output_file_contents;
+  ASSERT_TRUE(CreateAndDump(file_contents, &output_file_contents));
+  ASSERT_EQ(output_file_contents, file_contents);
+}
+
 TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
   // Class names put here need to be in sorted order.
   std::vector<std::string> class_names = {

@@ -804,7 +804,8 @@ class ProfMan final {
 
   // Find class klass_descriptor in the given dex_files and store its reference
   // in the out parameter class_ref.
-  // Return true if the definition of the class was found in any of the dex_files.
+  // Return true if the definition or a reference of the class was found in any
+  // of the dex_files.
   bool FindClass(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
                  const std::string& klass_descriptor,
                  /*out*/TypeReference* class_ref) {
@@ -829,14 +830,22 @@ class ProfMan final {
         continue;
       }
       dex::TypeIndex type_index = dex_file->GetIndexForTypeId(*type_id);
+      *class_ref = TypeReference(dex_file, type_index);
+
       if (dex_file->FindClassDef(type_index) == nullptr) {
         // Class is only referenced in the current dex file but not defined in it.
+        // We use its current type reference, but keep looking for its
+        // definition.
+        // Note that array classes fall into that category, as they do not have
+        // a class definition.
         continue;
       }
-      *class_ref = TypeReference(dex_file, type_index);
       return true;
     }
-    return false;
+    // If we arrive here, we haven't found a class definition. If the dex file
+    // of the class reference is not null, then we have found a type reference,
+    // and we return that to the caller.
+    return (class_ref->dex_file != nullptr);
   }
 
   // Find the method specified by method_spec in the class class_ref.
