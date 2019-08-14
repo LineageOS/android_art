@@ -369,6 +369,10 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
     return time_;
   }
 
+  size_t EvacBytes() const NO_THREAD_SAFETY_ANALYSIS {
+    return num_evac_regions_ * kRegionSize;
+  }
+
  private:
   RegionSpace(const std::string& name, MemMap&& mem_map, bool use_generational_cc);
 
@@ -634,6 +638,8 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
     MutexLock mu(Thread::Current(), region_lock_);
     return RefToRegionLocked(ref);
   }
+
+  void TraceHeapSize() REQUIRES(region_lock_);
 
   Region* RefToRegionUnlocked(mirror::Object* ref) NO_THREAD_SAFETY_ANALYSIS {
     // For a performance reason (this is frequently called via
