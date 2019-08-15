@@ -385,24 +385,22 @@ python_binary_host {
 
 // Genrules so we can run the checker, and empty Java library so that it gets executed.
 
-genrule {
-    name: "art-check-release-apex-gen",
-    srcs: [":com.android.runtime.release"],
+art_check_apex_gen_stem = "$(location art-apex-tester)" +
+    " --debugfs $(location debugfs)" +
+    " --tmpdir $(genDir)"
+
+// The non-flattened APEXes are always checked, as they are always generated
+// (even when APEX flattening is enabled).
+genrule_defaults {
+    name: "art-check-apex-gen-defaults",
     tools: [
         "art-apex-tester",
         "debugfs",
     ],
-    cmd: "$(location art-apex-tester)" +
-        " --debugfs $(location debugfs)" +
-        " --tmpdir $(genDir)" +
-        " $(in)" +
-        " && touch $(out)",
-    out: ["art-check-release-apex-gen.dummy"],
 }
 
-cc_prebuilt_binary {
-    name: "art-check-release-apex-gen-fakebin",
-    srcs: [":art-check-release-apex-gen"],
+cc_defaults {
+    name: "art-check-apex-gen-fakebin-defaults",
     host_supported: true,
     device_supported: false,
     target: {
@@ -413,15 +411,26 @@ cc_prebuilt_binary {
 }
 
 genrule {
+    name: "art-check-release-apex-gen",
+    defaults: ["art-check-apex-gen-defaults"],
+    srcs: [":com.android.runtime.release"],
+    cmd: art_check_apex_gen_stem +
+        " $(in)" +
+        " && touch $(out)",
+    out: ["art-check-release-apex-gen.dummy"],
+}
+
+cc_prebuilt_binary {
+    name: "art-check-release-apex-gen-fakebin",
+    defaults: ["art-check-apex-gen-fakebin-defaults"],
+    srcs: [":art-check-release-apex-gen"],
+}
+
+genrule {
     name: "art-check-debug-apex-gen",
+    defaults: ["art-check-apex-gen-defaults"],
     srcs: [":com.android.runtime.debug"],
-    tools: [
-        "art-apex-tester",
-        "debugfs",
-    ],
-    cmd: "$(location art-apex-tester)" +
-        " --debugfs $(location debugfs)" +
-        " --tmpdir $(genDir)" +
+    cmd: art_check_apex_gen_stem +
         " --debug" +
         " $(in)" +
         " && touch $(out)",
@@ -430,26 +439,15 @@ genrule {
 
 cc_prebuilt_binary {
     name: "art-check-debug-apex-gen-fakebin",
+    defaults: ["art-check-apex-gen-fakebin-defaults"],
     srcs: [":art-check-debug-apex-gen"],
-    host_supported: true,
-    device_supported: false,
-    target: {
-        darwin: {
-            enabled: false, // No python3.
-        },
-    },
 }
 
 genrule {
     name: "art-check-testing-apex-gen",
+    defaults: ["art-check-apex-gen-defaults"],
     srcs: [":com.android.runtime.testing"],
-    tools: [
-        "art-apex-tester",
-        "debugfs",
-    ],
-    cmd: "$(location art-apex-tester)" +
-        " --debugfs $(location debugfs)" +
-        " --tmpdir $(genDir)" +
+    cmd: art_check_apex_gen_stem +
         " --testing" +
         " $(in)" +
         " && touch $(out)",
@@ -458,14 +456,8 @@ genrule {
 
 cc_prebuilt_binary {
     name: "art-check-testing-apex-gen-fakebin",
+    defaults: ["art-check-apex-gen-fakebin-defaults"],
     srcs: [":art-check-testing-apex-gen"],
-    host_supported: true,
-    device_supported: false,
-    target: {
-        darwin: {
-            enabled: false, // No python3.
-        },
-    },
 }
 
 // Pre-install scripts.
