@@ -29,7 +29,7 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-const uint8_t ImageHeader::kImageVersion[] = { '0', '7', '7', '\0' };  // Use boot image sentinel.
+const uint8_t ImageHeader::kImageVersion[] = { '0', '7', '8', '\0' };  // FP16ToFloat intrinsic
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,
