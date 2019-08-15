@@ -3169,6 +3169,29 @@ void IntrinsicCodeGeneratorARM64::VisitCRC32UpdateByteBuffer(HInvoke* invoke) {
   GenerateCodeForCalculationCRC32ValueOfBytes(masm, crc, ptr, length, out);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitFP16ToFloat(HInvoke* invoke) {
+  if (!codegen_->GetInstructionSetFeatures().HasFP16()) {
+    return;
+  }
+
+  LocationSummary* locations = new (allocator_) LocationSummary(invoke,
+                                                                LocationSummary::kNoCall,
+                                                                kIntrinsified);
+  locations->SetInAt(0, Location::RequiresRegister());
+  locations->SetOut(Location::RequiresFpuRegister());
+}
+
+void IntrinsicCodeGeneratorARM64::VisitFP16ToFloat(HInvoke* invoke) {
+  DCHECK(codegen_->GetInstructionSetFeatures().HasFP16());
+  MacroAssembler* masm = GetVIXLAssembler();
+  UseScratchRegisterScope scratch_scope(masm);
+  Register bits = InputRegisterAt(invoke, 0);
+  FPRegister out = SRegisterFrom(invoke->GetLocations()->Out());
+  FPRegister half = scratch_scope.AcquireH();
+  __ Fmov(half, bits);  // ARMv8.2
+  __ Fcvt(out, half);
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
