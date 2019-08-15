@@ -950,6 +950,7 @@
           "574-irreducible-and-constant-area",
           "575-checker-string-init-alias",
           "580-checker-string-fact-intrinsics",
+          "580-fp16",
           "585-inline-unresolved",
           "586-checker-null-array-get",
           "587-inline-class-error",
