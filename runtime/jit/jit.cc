@@ -1115,6 +1115,11 @@ ScopedJitSuspend::~ScopedJitSuspend() {
 }
 
 void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
+  // Clear the potential boot tasks inherited from the zygote.
+  {
+    MutexLock mu(Thread::Current(), boot_completed_lock_);
+    tasks_after_boot_.clear();
+  }
   if (is_zygote || Runtime::Current()->IsSafeMode()) {
     // Delete the thread pool, we are not going to JIT.
     thread_pool_.reset(nullptr);
