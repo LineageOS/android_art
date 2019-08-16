@@ -11,6 +11,8 @@ anything meaning that it can be considered speed-of-light.
 The libraries will be built for 32-bit, 64-bit, host and target. Below examples
 assume you want to use the 64-bit version.
 
+Use `libtifasts` if you wish to build a version without non-NDK dynamic dependencies.
+
 ### Command Line
 
 The agent is loaded using -agentpath like normal. It takes arguments in the

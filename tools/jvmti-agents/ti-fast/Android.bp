@@ -16,20 +16,17 @@
 
 // Build variants {target,host} x {debug,ndebug} x {32,64}
 cc_defaults {
-    name: "tifast-defaults",
-    host_supported: true,
+    name: "tifast-base-defaults",
     srcs: ["tifast.cc"],
     defaults: ["art_defaults"],
 
     // Note that this tool needs to be built for both 32-bit and 64-bit since it requires
     // to be same ISA as what it is attached to.
     compile_multilib: "both",
-
-    shared_libs: [
-        "libbase",
-    ],
     header_libs: [
         "libopenjdkjvmti_headers",
+        "libnativehelper_header_only",
+        "jni_headers",
     ],
     multilib: {
         lib32: {
@@ -40,6 +37,35 @@ cc_defaults {
         },
     },
     symlink_preferred_arch: true,
+}
+
+cc_defaults {
+    name: "tifast-defaults",
+    host_supported: true,
+    shared_libs: [
+        "libbase",
+    ],
+    defaults: ["tifast-base-defaults"],
+}
+
+cc_defaults {
+    name: "tifast-static-defaults",
+    host_supported: false,
+    defaults: ["tifast-base-defaults"],
+
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libbase_ndk",
+    ],
+    sdk_version: "current",
+    stl: "c++_static",
+}
+
+art_cc_library {
+    name: "libtifasts",
+    defaults: ["tifast-static-defaults"],
 }
 
 art_cc_library {
