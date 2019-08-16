@@ -1481,17 +1481,13 @@ void OptimizingCompiler::GenerateJitDebugInfo(ArtMethod* method ATTRIBUTE_UNUSED
     const bool mini_debug_info = !compiler_options.GetGenerateDebugInfo();
 
     // Create entry for the single method that we just compiled.
-    std::vector<uint8_t> elf_file = debug::MakeElfFileForJIT(
-        compiler_options.GetInstructionSet(),
-        compiler_options.GetInstructionSetFeatures(),
-        mini_debug_info,
-        info);
-    AddNativeDebugInfoForJit(Thread::Current(),
-                             reinterpret_cast<const void*>(info.code_address),
-                             elf_file,
-                             mini_debug_info ? debug::PackElfFileForJIT : nullptr,
-                             compiler_options.GetInstructionSet(),
-                             compiler_options.GetInstructionSetFeatures());
+    InstructionSet isa = compiler_options.GetInstructionSet();
+    const InstructionSetFeatures* features = compiler_options.GetInstructionSetFeatures();
+    std::vector<uint8_t> elf = debug::MakeElfFileForJIT(isa, features, mini_debug_info, info);
+
+    // NB: Don't allow packing of full info since it would remove non-backtrace data.
+    const void* code_ptr = reinterpret_cast<const void*>(info.code_address);
+    AddNativeDebugInfoForJit(code_ptr, elf, /*allow_packing=*/ mini_debug_info);
   }
   Runtime::Current()->GetJit()->AddTimingLogger(logger);
 }
