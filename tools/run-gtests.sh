@@ -14,7 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to run all gtests located in the (Testing) Runtime APEX.
+if [[ $1 = -h ]]; then
+  cat <<EOF
+Script to run gtests located in the ART (Testing) APEX.
+
+If called with arguments, only those tests are run, as specified by their
+absolute paths (starting with /apex). All gtests are run otherwise.
+EOF
+  exit
+fi
 
 if [[ -z "$ART_TEST_CHROOT" ]]; then
   echo 'ART_TEST_CHROOT environment variable is empty; please set it before running this script.'
@@ -27,9 +35,18 @@ android_i18n_root=/apex/com.android.i18n
 android_runtime_root=/apex/com.android.runtime
 android_tzdata_root=/apex/com.android.tzdata
 
-# Search for executables under the `bin/art` directory of the Runtime APEX.
-tests=$("$adb" shell chroot "$ART_TEST_CHROOT" \
-  find "$android_runtime_root/bin/art" -type f -perm /ugo+x | sort)
+if [[ $1 = -j* ]]; then
+  # TODO(b/129930445): Implement support for parallel execution.
+  shift
+fi
+
+if [ $# -gt 0 ]; then
+  tests="$@"
+else
+  # Search for executables under the `bin/art` directory of the ART APEX.
+  tests=$("$adb" shell chroot "$ART_TEST_CHROOT" \
+    find "$android_runtime_root/bin/art" -type f -perm /ugo+x | sort)
+fi
 
 failing_tests=()
 
