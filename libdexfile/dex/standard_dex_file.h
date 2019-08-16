@@ -68,7 +68,7 @@ class StandardDexFile : public DexFile {
   static void WriteCurrentVersion(uint8_t* magic);
 
   static const uint8_t kDexMagic[kDexMagicSize];
-  static constexpr size_t kNumDexVersions = 4;
+  static constexpr size_t kNumDexVersions = 5;
   static const uint8_t kDexMagicVersions[kNumDexVersions][kDexVersionLen];
 
   // Returns true if the byte string points to the magic value.

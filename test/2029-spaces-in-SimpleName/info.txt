@@ -1,0 +1,5 @@
+Whitespace support in DEX format 040.
+
+This test uses ASM Java bytecode generator to generate a simple class with
+the methods 'main' and some unpronounceable method which name contains all
+space characters in the Unicode 'Zs' category.

@@ -336,23 +336,13 @@ TEST_F(DexFileLoaderTest, Version39Accepted) {
   EXPECT_EQ(39u, header.GetVersion());
 }
 
-TEST_F(DexFileLoaderTest, Version40Rejected) {
+TEST_F(DexFileLoaderTest, Version40Accepted) {
   std::vector<uint8_t> dex_bytes;
-  DecodeDexFile(kRawDex40, &dex_bytes);
+  std::unique_ptr<const DexFile> raw(OpenDexFileBase64(kRawDex40, kLocationString, &dex_bytes));
+  ASSERT_TRUE(raw.get() != nullptr);
 
-  static constexpr bool kVerifyChecksum = true;
-  DexFileLoaderErrorCode error_code;
-  std::string error_msg;
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  const DexFileLoader dex_file_loader;
-  ASSERT_FALSE(dex_file_loader.OpenAll(dex_bytes.data(),
-                                       dex_bytes.size(),
-                                       kLocationString,
-                                       /* verify= */ true,
-                                       kVerifyChecksum,
-                                       &error_code,
-                                       &error_msg,
-                                       &dex_files));
+  const DexFile::Header& header = raw->GetHeader();
+  EXPECT_EQ(40u, header.GetVersion());
 }
 
 TEST_F(DexFileLoaderTest, Version41Rejected) {
