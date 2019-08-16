@@ -490,15 +490,17 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
   }
 }
 
-void JitCodeCache::FreeCodeAndData(const void* code_ptr) {
+void JitCodeCache::FreeCodeAndData(const void* code_ptr, bool free_debug_info) {
   if (IsInZygoteExecSpace(code_ptr)) {
     // No need to free, this is shared memory.
     return;
   }
   uintptr_t allocation = FromCodeToAllocation(code_ptr);
-  // Notify native debugger that we are about to remove the code.
-  // It does nothing if we are not using native debugger.
-  RemoveNativeDebugInfoForJit(Thread::Current(), code_ptr);
+  if (free_debug_info) {
+    // Remove compressed mini-debug info for the method.
+    // TODO: This is expensive, so we should always do it in the caller in bulk.
+    RemoveNativeDebugInfoForJit(ArrayRef<const void*>(&code_ptr, 1));
+  }
   if (OatQuickMethodHeader::FromCodePointer(code_ptr)->IsOptimized()) {
     private_region_.FreeData(GetRootTable(code_ptr));
   }  // else this is a JNI stub without any data.
@@ -519,9 +521,18 @@ void JitCodeCache::FreeAllMethodHeaders(
         ->RemoveDependentsWithMethodHeaders(method_headers);
   }
 
+  // Remove compressed mini-debug info for the methods.
+  std::vector<const void*> removed_symbols;
+  removed_symbols.reserve(method_headers.size());
+  for (const OatQuickMethodHeader* method_header : method_headers) {
+    removed_symbols.push_back(method_header->GetCode());
+  }
+  std::sort(removed_symbols.begin(), removed_symbols.end());
+  RemoveNativeDebugInfoForJit(ArrayRef<const void*>(removed_symbols));
+
   ScopedCodeCacheWrite scc(private_region_);
   for (const OatQuickMethodHeader* method_header : method_headers) {
-    FreeCodeAndData(method_header->GetCode());
+    FreeCodeAndData(method_header->GetCode(), /*free_debug_info=*/ false);
   }
 }
 
