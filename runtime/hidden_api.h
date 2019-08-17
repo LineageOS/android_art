@@ -357,6 +357,7 @@ ALWAYS_INLINE inline uint32_t GetRuntimeFlags(ArtMethod* method)
       case Intrinsics::kVarHandleWeakCompareAndSetRelease:
         return 0u;
       case Intrinsics::kUnsafeGetLong:
+      case Intrinsics::kFP16ToFloat:
         return kAccCorePlatformApi;
       default:
         // Remaining intrinsics are public API. We DCHECK that in SetIntrinsic().

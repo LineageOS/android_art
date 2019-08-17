@@ -23,6 +23,7 @@
 #include "base/runtime_debug.h"
 #include "base/timing_logger.h"
 #include "handle.h"
+#include "jit/debugger_interface.h"
 #include "jit/profile_saver_options.h"
 #include "obj_ptr.h"
 #include "thread_pool.h"
@@ -175,6 +176,11 @@ class JitCompilerInterface {
       REQUIRES_SHARED(Locks::mutator_lock_) = 0;
   virtual bool GenerateDebugInfo() = 0;
   virtual void ParseCompilerOptions() = 0;
+
+  virtual std::vector<uint8_t> PackElfFileForJIT(ArrayRef<JITCodeEntry*> elf_files,
+                                                 ArrayRef<const void*> removed_symbols,
+                                                 bool compress,
+                                                 /*out*/ size_t* num_symbols) = 0;
 };
 
 class Jit {
@@ -200,6 +206,10 @@ class Jit {
 
   JitCodeCache* GetCodeCache() {
     return code_cache_;
+  }
+
+  JitCompilerInterface* GetJitCompiler() const {
+    return jit_compiler_;
   }
 
   void CreateThreadPool();

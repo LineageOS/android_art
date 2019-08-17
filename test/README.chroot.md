@@ -87,6 +87,8 @@ Note that using this chroot-based approach requires root access to the device
         * Workaround: Run `m clean-oat-host` before the build step
         (`art/tools/buildbot-build.sh --target -j40`) above.
     * Note: The `-j` option is not honored yet (b/129930445).
+    * Specific tests to run can be passed on the command line, specified by
+    their absolute paths beginning with "/apex/".
 8. Run ART run-tests:
     * On a 64-bit target:
         ```bash

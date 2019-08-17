@@ -388,7 +388,8 @@ class JitCodeCache {
       REQUIRES(Locks::mutator_lock_);
 
   // Free code and data allocations for `code_ptr`.
-  void FreeCodeAndData(const void* code_ptr) REQUIRES(Locks::jit_lock_);
+  void FreeCodeAndData(const void* code_ptr, bool free_debug_info = true)
+      REQUIRES(Locks::jit_lock_);
 
   // Number of bytes allocated in the code cache.
   size_t CodeCacheSize() REQUIRES(!Locks::jit_lock_);

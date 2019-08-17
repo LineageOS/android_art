@@ -270,6 +270,11 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
       /* locked= */ false);
   CHECK(data_mspace_ != nullptr) << "create_mspace_with_base (data) failed";
 
+  // Allow mspace to use the full data capacity.
+  // It will still only use as litle memory as possible and ask for MoreCore as needed.
+  CHECK(IsAlignedParam(data_capacity, kPageSize));
+  mspace_set_footprint_limit(data_mspace_, data_capacity);
+
   // Initialize the code heap.
   MemMap* code_heap = nullptr;
   if (non_exec_pages_.IsValid()) {
@@ -298,7 +303,6 @@ void JitMemoryRegion::SetFootprintLimit(size_t new_footprint) {
   size_t data_space_footprint = new_footprint / kCodeAndDataCapacityDivider;
   DCHECK(IsAlignedParam(data_space_footprint, kPageSize));
   DCHECK_EQ(data_space_footprint * kCodeAndDataCapacityDivider, new_footprint);
-  mspace_set_footprint_limit(data_mspace_, data_space_footprint);
   if (HasCodeMapping()) {
     ScopedCodeCacheWrite scc(*this);
     mspace_set_footprint_limit(exec_mspace_, new_footprint - data_space_footprint);
