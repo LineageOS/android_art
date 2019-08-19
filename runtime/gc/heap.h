@@ -162,7 +162,7 @@ class Heap {
   static constexpr uint32_t kNotifyNativeInterval = 32;
 #else
   // Some host mallinfo() implementations are slow. And memory is less scarce.
-  static constexpr uint32_t kNotifyNativeInterval = 128;
+  static constexpr uint32_t kNotifyNativeInterval = 512;
 #endif
 
   // RegisterNativeAllocation checks immediately whether GC is needed if size exceeds the
