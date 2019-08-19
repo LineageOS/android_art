@@ -142,7 +142,7 @@ bool JitCompiler::GenerateDebugInfo() {
   return GetCompilerOptions().GetGenerateDebugInfo();
 }
 
-std::vector<uint8_t> JitCompiler::PackElfFileForJIT(ArrayRef<JITCodeEntry*> elf_files,
+std::vector<uint8_t> JitCompiler::PackElfFileForJIT(ArrayRef<const JITCodeEntry*> elf_files,
                                                     ArrayRef<const void*> removed_symbols,
                                                     bool compress,
                                                     /*out*/ size_t* num_symbols) {
