@@ -375,10 +375,10 @@ python_binary_host {
     main: "art_apex_test.py",
     version: {
         py2: {
-            enabled: false,
+            enabled: true,
         },
         py3: {
-            enabled: true,
+            enabled: false,
         },
     },
 }
