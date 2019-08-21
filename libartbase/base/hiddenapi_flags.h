@@ -297,7 +297,7 @@ class ApiList {
         } else {
           os << ",";
         }
-        os << kDomainApiNames[i];
+        os << kDomainApiNames[i - helper::ToUint(DomainApi::kMin)];
       }
     }
 
