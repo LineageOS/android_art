@@ -384,8 +384,8 @@ void* ArtDlMallocMoreCore(void* mspace, intptr_t increment) REQUIRES_SHARED(Lock
   ::art::gc::space::DlMallocSpace* dlmalloc_space = heap->GetDlMallocSpace();
   // Support for multiple DlMalloc provided by a slow path.
   if (UNLIKELY(dlmalloc_space == nullptr || dlmalloc_space->GetMspace() != mspace)) {
-    if (LIKELY(runtime->GetJit() != nullptr)) {
-      jit::JitCodeCache* code_cache = runtime->GetJit()->GetCodeCache();
+    if (LIKELY(runtime->GetJitCodeCache() != nullptr)) {
+      jit::JitCodeCache* code_cache = runtime->GetJitCodeCache();
       if (code_cache->OwnsSpace(mspace)) {
         return code_cache->MoreCore(mspace, increment);
       }
