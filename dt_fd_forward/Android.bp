@@ -43,14 +43,6 @@ cc_defaults {
         "dt_fd_forward_export",
         "art_libartbase_headers", // For strlcpy emulation.
     ],
-    multilib: {
-        lib32: {
-            suffix: "32",
-        },
-        lib64: {
-            suffix: "64",
-        },
-    },
 }
 
 art_cc_library {
