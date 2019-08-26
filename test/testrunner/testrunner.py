@@ -528,7 +528,7 @@ def run_test(command, test, test_variant, test_name):
     test_variant: The set of variant for the test.
     test_name: The name of the test along with the variants.
 
-  Returns: a tuple of testname, status, and optional failure info.
+  Returns: a tuple of testname, status, optional failure info, and test time.
   """
   try:
     if is_test_disabled(test, test_variant):
@@ -559,11 +559,13 @@ def run_test(command, test, test_variant, test_name):
     else:
       return (test_name, 'PASS', None, test_time)
   except subprocess.TimeoutExpired as e:
+    test_end_time = datetime.datetime.now()
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
+
     return (test_name,
             'TIMEOUT',
             'Timed out in %d seconds\n%s' % (timeout, command),
-            datetime.timedelta(seconds=timeout))
+            test_end_time - test_start_time)
   except Exception as e:
     failed_tests.append((test_name, str(e)))
     return (test_name, 'FAIL', ('%s\n%s\n\n') % (command, str(e)), datetime.timedelta())
