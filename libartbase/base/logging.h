@@ -75,7 +75,7 @@ extern void InitLogging(char* argv[], AbortFunction& default_aborter);
 // performed.
 extern const char* GetCmdLine();
 
-// The command used to start the ART runtime, such as "/apex/com.android.runtime/bin/dalvikvm". If
+// The command used to start the ART runtime, such as "/apex/com.android.art/bin/dalvikvm". If
 // InitLogging hasn't been performed then just returns "art".
 extern const char* ProgramInvocationName();
 

@@ -1486,6 +1486,7 @@ void OptimizingCompiler::GenerateJitDebugInfo(ArtMethod* method ATTRIBUTE_UNUSED
     std::vector<uint8_t> elf = debug::MakeElfFileForJIT(isa, features, mini_debug_info, info);
 
     // NB: Don't allow packing of full info since it would remove non-backtrace data.
+    MutexLock mu(Thread::Current(), *Locks::jit_lock_);
     const void* code_ptr = reinterpret_cast<const void*>(info.code_address);
     AddNativeDebugInfoForJit(code_ptr, elf, /*allow_packing=*/ mini_debug_info);
   }

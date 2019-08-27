@@ -26,6 +26,8 @@
 #include "base/utils.h"
 #include "dex/dex_file.h"
 #include "jit/jit.h"
+#include "jit/jit_code_cache.h"
+#include "jit/jit_memory_region.h"
 #include "runtime.h"
 #include "thread-current-inl.h"
 #include "thread.h"
@@ -158,6 +160,31 @@ extern "C" {
   JITDescriptor __dex_debug_descriptor GUARDED_BY(g_dex_debug_lock) {};
 }
 
+struct DexNativeInfo {
+  static constexpr bool kCopySymfileData = false;  // Just reference DEX files.
+  static JITDescriptor& Descriptor() { return __dex_debug_descriptor; }
+  static void NotifyNativeDebugger() { __dex_debug_register_code_ptr(); }
+  static void* Alloc(size_t size) { return malloc(size); }
+  static void Free(void* ptr) { free(ptr); }
+};
+
+struct JitNativeInfo {
+  static constexpr bool kCopySymfileData = true;  // Copy debug info to JIT memory.
+  static JITDescriptor& Descriptor() { return __jit_debug_descriptor; }
+  static void NotifyNativeDebugger() { __jit_debug_register_code_ptr(); }
+  static void* Alloc(size_t size) { return JitMemory()->AllocateData(size); }
+  static void Free(void* ptr) { JitMemory()->FreeData(reinterpret_cast<uint8_t*>(ptr)); }
+
+  static jit::JitMemoryRegion* JitMemory() ASSERT_CAPABILITY(Locks::jit_lock_) {
+    Locks::jit_lock_->AssertHeld(Thread::Current());
+    jit::JitCodeCache* jit_code_cache = Runtime::Current()->GetJitCodeCache();
+    CHECK(jit_code_cache != nullptr);
+    jit::JitMemoryRegion* memory = jit_code_cache->GetCurrentRegion();
+    CHECK(memory->IsValid());
+    return memory;
+  }
+};
+
 ArrayRef<const uint8_t> GetJITCodeEntrySymFile(JITCodeEntry* entry) {
   return ArrayRef<const uint8_t>(entry->symfile_addr_, entry->symfile_size_);
 }
@@ -178,18 +205,22 @@ static void ActionSequnlock(JITDescriptor& descriptor) {
   descriptor.action_seqlock_.fetch_add(1, std::memory_order_relaxed);
 }
 
+template<class NativeInfo>
 static JITCodeEntry* CreateJITCodeEntryInternal(
-    JITDescriptor& descriptor,
-    void (*register_code_ptr)(),
     ArrayRef<const uint8_t> symfile,
-    bool copy_symfile,
     const void* addr = nullptr,
     bool allow_packing = false,
     bool is_compressed = false) {
+  JITDescriptor& descriptor = NativeInfo::Descriptor();
+
   // Make a copy of the buffer to shrink it and to pass ownership to JITCodeEntry.
-  if (copy_symfile) {
-    uint8_t* copy = new uint8_t[symfile.size()];
-    CHECK(copy != nullptr);
+  uint8_t* copy = nullptr;
+  if (NativeInfo::kCopySymfileData) {
+    copy = reinterpret_cast<uint8_t*>(NativeInfo::Alloc(symfile.size()));
+    if (copy == nullptr) {
+      LOG(ERROR) << "Failed to allocate memory for native debug info";
+      return nullptr;
+    }
     memcpy(copy, symfile.data(), symfile.size());
     symfile = ArrayRef<const uint8_t>(copy, symfile.size());
   }
@@ -199,8 +230,15 @@ static JITCodeEntry* CreateJITCodeEntryInternal(
   uint64_t timestamp = std::max(descriptor.action_timestamp_ + 1, NanoTime());
 
   JITCodeEntry* head = descriptor.head_.load(std::memory_order_relaxed);
-  JITCodeEntry* entry = new JITCodeEntry();
-  CHECK(entry != nullptr);
+  void* memory = NativeInfo::Alloc(sizeof(JITCodeEntry));
+  if (memory == nullptr) {
+    LOG(ERROR) << "Failed to allocate memory for native debug info";
+    if (copy != nullptr) {
+      NativeInfo::Free(copy);
+    }
+    return nullptr;
+  }
+  JITCodeEntry* entry = new (memory) JITCodeEntry();
   entry->symfile_addr_ = symfile.data();
   entry->symfile_size_ = symfile.size();
   entry->prev_ = nullptr;
@@ -221,17 +259,16 @@ static JITCodeEntry* CreateJITCodeEntryInternal(
   descriptor.action_timestamp_ = timestamp;
   ActionSequnlock(descriptor);
 
-  (*register_code_ptr)();
+  NativeInfo::NotifyNativeDebugger();
+
   return entry;
 }
 
-static void DeleteJITCodeEntryInternal(
-    JITDescriptor& descriptor,
-    void (*register_code_ptr)(),
-    JITCodeEntry* entry,
-    bool free_symfile) {
+template<class NativeInfo>
+static void DeleteJITCodeEntryInternal(JITCodeEntry* entry) {
   CHECK(entry != nullptr);
   const uint8_t* symfile = entry->symfile_addr_;
+  JITDescriptor& descriptor = NativeInfo::Descriptor();
 
   // Ensure the timestamp is monotonically increasing even in presence of low
   // granularity system timer.  This ensures each entry has unique timestamp.
@@ -253,7 +290,7 @@ static void DeleteJITCodeEntryInternal(
   descriptor.action_timestamp_ = timestamp;
   ActionSequnlock(descriptor);
 
-  (*register_code_ptr)();
+  NativeInfo::NotifyNativeDebugger();
 
   // Ensure that clear below can not be reordered above the unlock above.
   std::atomic_thread_fence(std::memory_order_release);
@@ -261,9 +298,9 @@ static void DeleteJITCodeEntryInternal(
   // Aggressively clear the entry as an extra check of the synchronisation.
   memset(entry, 0, sizeof(*entry));
 
-  delete entry;
-  if (free_symfile) {
-    delete[] symfile;
+  NativeInfo::Free(entry);
+  if (NativeInfo::kCopySymfileData) {
+    NativeInfo::Free(const_cast<uint8_t*>(symfile));
   }
 }
 
@@ -271,10 +308,7 @@ void AddNativeDebugInfoForDex(Thread* self, const DexFile* dexfile) {
   MutexLock mu(self, g_dex_debug_lock);
   DCHECK(dexfile != nullptr);
   const ArrayRef<const uint8_t> symfile(dexfile->Begin(), dexfile->Size());
-  CreateJITCodeEntryInternal(__dex_debug_descriptor,
-                             __dex_debug_register_code_ptr,
-                             symfile,
-                             /*copy_symfile=*/ false);
+  CreateJITCodeEntryInternal<DexNativeInfo>(symfile);
 }
 
 void RemoveNativeDebugInfoForDex(Thread* self, const DexFile* dexfile) {
@@ -286,10 +320,7 @@ void RemoveNativeDebugInfoForDex(Thread* self, const DexFile* dexfile) {
   for (JITCodeEntry* entry = __dex_debug_descriptor.head_; entry != nullptr; ) {
     JITCodeEntry* next = entry->next_;  // Save next pointer before we free the memory.
     if (entry->symfile_addr_ == dexfile->Begin()) {
-      DeleteJITCodeEntryInternal(__dex_debug_descriptor,
-                                 __dex_debug_register_code_ptr,
-                                 entry,
-                                 /*free_symfile=*/ false);
+      DeleteJITCodeEntryInternal<DexNativeInfo>(entry);
     }
     entry = next;
   }
@@ -365,19 +396,12 @@ static void RepackEntries(bool compress, ArrayRef<const void*> removed)
         << " size=" << packed.size() << (compress ? "(lzma)" : "");
 
     // Replace the old entries with the new one (with their lifetime temporally overlapping).
-    CreateJITCodeEntryInternal(
-        __jit_debug_descriptor,
-        __jit_debug_register_code_ptr,
-        ArrayRef<const uint8_t>(packed),
-        /*copy_symfile=*/ true,
-        /*addr_=*/ group_ptr,
-        /*allow_packing_=*/ true,
-        /*is_compressed_=*/ compress);
+    CreateJITCodeEntryInternal<JitNativeInfo>(ArrayRef<const uint8_t>(packed),
+                                              /*addr_=*/ group_ptr,
+                                              /*allow_packing_=*/ true,
+                                              /*is_compressed_=*/ compress);
     for (auto it : elfs) {
-      DeleteJITCodeEntryInternal(__jit_debug_descriptor,
-                                 __jit_debug_register_code_ptr,
-                                 /*entry=*/ it,
-                                 /*free_symfile=*/ true);
+      DeleteJITCodeEntryInternal<JitNativeInfo>(/*entry=*/ it);
     }
     group_it = end;  // Go to next group.
   }
@@ -390,14 +414,14 @@ void AddNativeDebugInfoForJit(const void* code_ptr,
   MutexLock mu(Thread::Current(), g_jit_debug_lock);
   DCHECK_NE(symfile.size(), 0u);
 
-  CreateJITCodeEntryInternal(
-      __jit_debug_descriptor,
-      __jit_debug_register_code_ptr,
-      ArrayRef<const uint8_t>(symfile),
-      /*copy_symfile=*/ true,
-      /*addr=*/ code_ptr,
-      /*allow_packing=*/ allow_packing,
-      /*is_compressed=*/ false);
+  if (Runtime::Current()->IsZygote()) {
+    return;  // TODO: Implement memory sharing with the zygote process.
+  }
+
+  CreateJITCodeEntryInternal<JitNativeInfo>(ArrayRef<const uint8_t>(symfile),
+                                            /*addr=*/ code_ptr,
+                                            /*allow_packing=*/ allow_packing,
+                                            /*is_compressed=*/ false);
 
   VLOG(jit)
       << "JIT mini-debug-info added"
@@ -419,10 +443,7 @@ void RemoveNativeDebugInfoForJit(ArrayRef<const void*> removed) {
   // Remove entries which are not allowed to be packed (containing single method each).
   for (JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr; it = it->next_) {
     if (!it->allow_packing_ && std::binary_search(removed.begin(), removed.end(), it->addr_)) {
-      DeleteJITCodeEntryInternal(__jit_debug_descriptor,
-                                 __jit_debug_register_code_ptr,
-                                 /*entry=*/ it,
-                                 /*free_symfile=*/ true);
+      DeleteJITCodeEntryInternal<JitNativeInfo>(/*entry=*/ it);
     }
   }
 }

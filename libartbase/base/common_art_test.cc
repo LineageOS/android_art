@@ -189,9 +189,9 @@ void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
     // like libcore / icu4j / icu4c can find their data files.
     const char* android_runtime_root_from_env = getenv("ANDROID_RUNTIME_ROOT");
     if (android_runtime_root_from_env == nullptr) {
-      // Use ${ANDROID_HOST_OUT}/com.android.runtime for ANDROID_RUNTIME_ROOT.
+      // Use ${ANDROID_HOST_OUT}/com.android.art for ANDROID_RUNTIME_ROOT.
       std::string android_runtime_root = android_host_out_from_env;
-      android_runtime_root += "/com.android.runtime";
+      android_runtime_root += "/com.android.art";
       setenv("ANDROID_RUNTIME_ROOT", android_runtime_root.c_str(), 1);
     }
 
