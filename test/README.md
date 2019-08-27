@@ -72,7 +72,7 @@ ART gtests are defined in various directories within the ART project (usually in
 the same directory as the code they exercise). Their source files usually end
 with the suffix `_test.cc.`. The construction logic of these tests is
 implemented in ART's build system (`Android.bp` and `Android*.mk` files). On
-host, these gtests can be run by executing `m test-art-host-gtests`. On device,
+host, these gtests can be run by executing `m test-art-host-gtest`. On device,
 the recommended approach is to run these tests in a chroot environment (see
 `README.chroot.md` in this directory).
 
