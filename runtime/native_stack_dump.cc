@@ -420,7 +420,8 @@ void DumpKernelStack(std::ostream& os, pid_t tid, const char* prefix, bool inclu
   std::string kernel_stack_filename(StringPrintf("/proc/self/task/%d/stack", tid));
   std::string kernel_stack;
   if (!android::base::ReadFileToString(kernel_stack_filename, &kernel_stack)) {
-    os << prefix << "(couldn't read " << kernel_stack_filename << ")\n";
+    // Not being able to read is actually the normal case on Android, so just
+    // silently ignore the failure.
     return;
   }
 
