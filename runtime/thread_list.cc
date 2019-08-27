@@ -162,7 +162,6 @@ static void DumpUnattachedThread(std::ostream& os, pid_t tid, bool dump_native_s
   // TODO: No thread safety analysis as DumpState with a null thread won't access fields, should
   // refactor DumpState to avoid skipping analysis.
   Thread::DumpState(os, nullptr, tid);
-  DumpKernelStack(os, tid, "  kernel: ", false);
   if (dump_native_stack) {
     DumpNativeStack(os, tid, nullptr, "  native: ");
   }

@@ -411,45 +411,6 @@ void DumpNativeStack(std::ostream& os,
   }
 }
 
-void DumpKernelStack(std::ostream& os, pid_t tid, const char* prefix, bool include_count) {
-  if (tid == GetTid()) {
-    // There's no point showing that we're reading our stack out of /proc!
-    return;
-  }
-
-  std::string kernel_stack_filename(StringPrintf("/proc/self/task/%d/stack", tid));
-  std::string kernel_stack;
-  if (!android::base::ReadFileToString(kernel_stack_filename, &kernel_stack)) {
-    // Not being able to read is actually the normal case on Android, so just
-    // silently ignore the failure.
-    return;
-  }
-
-  std::vector<std::string> kernel_stack_frames;
-  Split(kernel_stack, '\n', &kernel_stack_frames);
-  if (kernel_stack_frames.empty()) {
-    os << prefix << "(" << kernel_stack_filename << " is empty)\n";
-    return;
-  }
-  // We skip the last stack frame because it's always equivalent to "[<ffffffff>] 0xffffffff",
-  // which looking at the source appears to be the kernel's way of saying "that's all, folks!".
-  kernel_stack_frames.pop_back();
-  for (size_t i = 0; i < kernel_stack_frames.size(); ++i) {
-    // Turn "[<ffffffff8109156d>] futex_wait_queue_me+0xcd/0x110"
-    // into "futex_wait_queue_me+0xcd/0x110".
-    const char* text = kernel_stack_frames[i].c_str();
-    const char* close_bracket = strchr(text, ']');
-    if (close_bracket != nullptr) {
-      text = close_bracket + 2;
-    }
-    os << prefix;
-    if (include_count) {
-      os << StringPrintf("#%02zd ", i);
-    }
-    os << text << std::endl;
-  }
-}
-
 #elif defined(__APPLE__)
 
 void DumpNativeStack(std::ostream& os ATTRIBUTE_UNUSED,
@@ -459,12 +420,6 @@ void DumpNativeStack(std::ostream& os ATTRIBUTE_UNUSED,
                      ArtMethod* current_method ATTRIBUTE_UNUSED,
                      void* ucontext_ptr ATTRIBUTE_UNUSED,
                      bool skip_frames ATTRIBUTE_UNUSED) {
-}
-
-void DumpKernelStack(std::ostream& os ATTRIBUTE_UNUSED,
-                     pid_t tid ATTRIBUTE_UNUSED,
-                     const char* prefix ATTRIBUTE_UNUSED,
-                     bool include_count ATTRIBUTE_UNUSED) {
 }
 
 #else

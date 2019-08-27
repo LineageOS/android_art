@@ -2173,7 +2173,6 @@ void Thread::DumpStack(std::ostream& os,
   if (safe_to_dump || force_dump_stack) {
     // If we're currently in native code, dump that stack before dumping the managed stack.
     if (dump_native_stack && (dump_for_abort || force_dump_stack || ShouldShowNativeStack(this))) {
-      DumpKernelStack(os, GetTid(), "  kernel: ", false);
       ArtMethod* method =
           GetCurrentMethod(nullptr,
                            /*check_suspended=*/ !force_dump_stack,
