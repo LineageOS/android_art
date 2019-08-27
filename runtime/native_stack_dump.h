@@ -39,12 +39,6 @@ void DumpNativeStack(std::ostream& os,
                      bool skip_frames = true)
     NO_THREAD_SAFETY_ANALYSIS;
 
-// Dumps the kernel stack for thread 'tid' to 'os'. Note that this is only available on linux-x86.
-void DumpKernelStack(std::ostream& os,
-                     pid_t tid,
-                     const char* prefix = "",
-                     bool include_count = true);
-
 }  // namespace art
 
 #endif  // ART_RUNTIME_NATIVE_STACK_DUMP_H_
