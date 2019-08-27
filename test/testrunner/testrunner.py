@@ -562,6 +562,12 @@ def run_test(command, test, test_variant, test_name):
     test_end_time = datetime.datetime.now()
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
+    # The python documentation states that it is necessary to actually kill the process.
+    # Note: This is not the correct solution, really, as it will not kill descendants. We would need
+    #       something more complex, e.g., killing by session ID (e.g., in a trap in run-test).
+    proc.kill()
+    script_output = proc.communicate()
+
     return (test_name,
             'TIMEOUT',
             'Timed out in %d seconds\n%s' % (timeout, command),
