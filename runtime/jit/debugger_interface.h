@@ -32,7 +32,7 @@ class Mutex;
 class Thread;
 struct JITCodeEntry;
 
-ArrayRef<const uint8_t> GetJITCodeEntrySymFile(JITCodeEntry*);
+ArrayRef<const uint8_t> GetJITCodeEntrySymFile(const JITCodeEntry*);
 
 // Notify native tools (e.g. libunwind) that DEX file has been opened.
 void AddNativeDebugInfoForDex(Thread* self, const DexFile* dexfile);
