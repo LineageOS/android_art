@@ -521,7 +521,6 @@ struct AbortState {
 
     if (self == nullptr) {
       os << "(Aborting thread was not attached to runtime!)\n";
-      DumpKernelStack(os, GetTid(), "  kernel: ", false);
       DumpNativeStack(os, GetTid(), nullptr, "  native: ", nullptr);
     } else {
       os << "Aborting thread:\n";
