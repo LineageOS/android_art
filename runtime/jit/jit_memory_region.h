@@ -28,6 +28,8 @@
 
 namespace art {
 
+struct JitNativeInfo;
+
 namespace mirror {
 class Object;
 }
@@ -277,6 +279,7 @@ class JitMemoryRegion {
 
   friend class ScopedCodeCacheWrite;  // For GetUpdatableCodeMapping
   friend class TestZygoteMemory;
+  friend struct art::JitNativeInfo;  // For GetWritableDataAddress.
 };
 
 }  // namespace jit

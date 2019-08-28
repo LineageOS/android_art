@@ -53,7 +53,7 @@ class JitCompiler : public JitCompilerInterface {
 
   void TypesLoaded(mirror::Class**, size_t count) REQUIRES_SHARED(Locks::mutator_lock_) override;
 
-  std::vector<uint8_t> PackElfFileForJIT(ArrayRef<JITCodeEntry*> elf_files,
+  std::vector<uint8_t> PackElfFileForJIT(ArrayRef<const JITCodeEntry*> elf_files,
                                          ArrayRef<const void*> removed_symbols,
                                          bool compress,
                                          /*out*/ size_t* num_symbols) override;
