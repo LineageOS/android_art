@@ -46,7 +46,16 @@ In the end, the script will print the failed and skipped tests if any.
 """
 import argparse
 import collections
-import concurrent.futures
+
+# b/140161314 diagnostics.
+try:
+  import concurrent.futures
+except Exception:
+  import sys
+  sys.stdout.write("\n\n" + sys.executable + " " + sys.version + "\n\n")
+  sys.stdout.flush()
+  raise
+
 import contextlib
 import datetime
 import fnmatch
