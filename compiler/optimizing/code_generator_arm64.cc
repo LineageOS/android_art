@@ -1068,8 +1068,10 @@ void CodeGeneratorARM64::GenerateFrameEntry() {
   if (GetCompilerOptions().CountHotnessInCompiledCode()) {
     UseScratchRegisterScope temps(masm);
     Register temp = temps.AcquireX();
-    __ Ldrh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-    __ Add(temp, temp, 1);
+    __ Ldrsh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
+    __ Adds(temp, temp, 1);
+    // Subtract carry if it overflowed.
+    __ Sbc(temp, temp, xzr);
     __ Strh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
   }
 
@@ -3175,8 +3177,10 @@ void InstructionCodeGeneratorARM64::HandleGoto(HInstruction* got, HBasicBlock* s
       Register temp1 = temps.AcquireX();
       Register temp2 = temps.AcquireX();
       __ Ldr(temp1, MemOperand(sp, 0));
-      __ Ldrh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
-      __ Add(temp2, temp2, 1);
+      __ Ldrsh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
+      __ Adds(temp2, temp2, 1);
+      // Subtract carry if it overflowed.
+      __ Sbc(temp2, temp2, xzr);
       __ Strh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
     }
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
