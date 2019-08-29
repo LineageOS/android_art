@@ -57,7 +57,7 @@ std::vector<uint8_t> MakeElfFileForJIT(
     const MethodDebugInfo& method_info);
 
 std::vector<uint8_t> PackElfFileForJIT(
-    ArrayRef<JITCodeEntry*> jit_entries,
+    ArrayRef<const JITCodeEntry*> jit_entries,
     ArrayRef<const void*> removed_symbols,
     bool compress,
     /*out*/ size_t* num_symbols);

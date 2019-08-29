@@ -228,7 +228,7 @@ std::vector<uint8_t> MakeElfFileForJIT(
 
 // Combine several mini-debug-info ELF files into one, while filtering some symbols.
 std::vector<uint8_t> PackElfFileForJIT(
-    ArrayRef<JITCodeEntry*> jit_entries,
+    ArrayRef<const JITCodeEntry*> jit_entries,
     ArrayRef<const void*> removed_symbols,
     bool compress,
     /*out*/ size_t* num_symbols) {
@@ -260,7 +260,7 @@ std::vector<uint8_t> PackElfFileForJIT(
 
     using Reader = ElfDebugReader<ElfTypes>;
     std::deque<Reader> readers;
-    for (JITCodeEntry* it : jit_entries) {
+    for (const JITCodeEntry* it : jit_entries) {
       readers.emplace_back(GetJITCodeEntrySymFile(it));
     }
 
