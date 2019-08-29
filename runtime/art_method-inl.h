@@ -405,7 +405,7 @@ inline CodeItemDebugInfoAccessor ArtMethod::DexInstructionDebugInfo() {
   return CodeItemDebugInfoAccessor(*GetDexFile(), GetCodeItem(), GetDexMethodIndex());
 }
 
-inline void ArtMethod::SetCounter(int16_t hotness_count) {
+inline void ArtMethod::SetCounter(uint16_t hotness_count) {
   DCHECK(!IsAbstract()) << PrettyMethod();
   hotness_count_ = hotness_count;
 }
