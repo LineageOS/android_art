@@ -292,6 +292,12 @@ libart_cc_defaults {
                 "arch/x86/thread_x86.cc",
                 "arch/x86/fault_handler_x86.cc",
             ],
+            avx: {
+                asflags: ["-DMTERP_USE_AVX"],
+            },
+            avx2: {
+                asflags: ["-DMTERP_USE_AVX"],
+            },
         },
         x86_64: {
             srcs: [
@@ -308,6 +314,12 @@ libart_cc_defaults {
                 "monitor_pool.cc",
                 "arch/x86/fault_handler_x86.cc",
             ],
+            avx: {
+                asflags: ["-DMTERP_USE_AVX"],
+            },
+            avx2: {
+                asflags: ["-DMTERP_USE_AVX"],
+            },
         },
         mips: {
             srcs: [
