@@ -37,6 +37,7 @@
 #include "gc/collector_type.h"
 #include "gc/gc_cause.h"
 #include "gc/scoped_gc_critical_section.h"
+#include "jit/jit.h"
 #include "jit/profiling_info.h"
 #include "oat_file_manager.h"
 #include "profile/profile_compilation_info.h"
@@ -421,9 +422,12 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
     MutexLock mu(self, *Locks::profiler_lock_);
     profiler_pthread = profiler_pthread_;
   }
-  const uint32_t hot_method_sample_threshold = startup ?
-      options_.GetHotStartupMethodSamples(is_low_ram) :
-      std::numeric_limits<uint32_t>::max();
+  uint32_t hot_method_sample_threshold = std::numeric_limits<uint32_t>::max();
+  if (startup) {
+    hot_method_sample_threshold = options_.GetHotStartupMethodSamples(is_low_ram);
+  } else if (Runtime::Current()->GetJit() != nullptr) {
+    hot_method_sample_threshold = Runtime::Current()->GetJit()->WarmMethodThreshold();
+  }
   SampleClassesAndExecutedMethods(profiler_pthread,
                                   options_.GetProfileBootClassPath(),
                                   &allocator,
@@ -916,11 +920,8 @@ bool ProfileSaver::HasSeenMethod(const std::string& profile, bool hot, MethodRef
     if (!info.Load(profile, /*clear_if_invalid=*/false)) {
       return false;
     }
-    ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
-    // Ignore hot parameter for now since it was causing test 595 to be flaky. TODO: Investigate.
-    // b/63635729
-    UNUSED(hot);
-    return hotness.IsInProfile();
+    const ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
+    return hot ? hotness.IsHot() : hotness.IsInProfile();
   }
   return false;
 }
