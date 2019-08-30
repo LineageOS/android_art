@@ -1078,15 +1078,8 @@ void CodeGeneratorX86::GenerateFrameEntry() {
   DCHECK(GetCompilerOptions().GetImplicitStackOverflowChecks());
 
   if (GetCompilerOptions().CountHotnessInCompiledCode()) {
-    NearLabel overflow;
-    __ cmpw(Address(kMethodRegisterArgument,
-                    ArtMethod::HotnessCountOffset().Int32Value()),
-            Immediate(ArtMethod::MaxCounter()));
-    __ j(kEqual, &overflow);
-    __ addw(Address(kMethodRegisterArgument,
-                    ArtMethod::HotnessCountOffset().Int32Value()),
+    __ addw(Address(kMethodRegisterArgument, ArtMethod::HotnessCountOffset().Int32Value()),
             Immediate(1));
-    __ Bind(&overflow);
   }
 
   if (!skip_overflow_check) {
@@ -1392,13 +1385,7 @@ void InstructionCodeGeneratorX86::HandleGoto(HInstruction* got, HBasicBlock* suc
     if (codegen_->GetCompilerOptions().CountHotnessInCompiledCode()) {
       __ pushl(EAX);
       __ movl(EAX, Address(ESP, kX86WordSize));
-          NearLabel overflow;
-      __ cmpw(Address(EAX, ArtMethod::HotnessCountOffset().Int32Value()),
-              Immediate(ArtMethod::MaxCounter()));
-      __ j(kEqual, &overflow);
-      __ addw(Address(EAX, ArtMethod::HotnessCountOffset().Int32Value()),
-              Immediate(1));
-      __ Bind(&overflow);
+      __ addw(Address(EAX, ArtMethod::HotnessCountOffset().Int32Value()), Immediate(1));
       __ popl(EAX);
     }
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
