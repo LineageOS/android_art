@@ -1070,6 +1070,8 @@ void CodeGeneratorARM64::GenerateFrameEntry() {
     Register temp = temps.AcquireX();
     __ Ldrh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
     __ Add(temp, temp, 1);
+      // Subtract one if the counter would overflow.
+    __ Sub(temp, temp, Operand(temp, LSR, 16));
     __ Strh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
   }
 
@@ -3177,6 +3179,8 @@ void InstructionCodeGeneratorARM64::HandleGoto(HInstruction* got, HBasicBlock* s
       __ Ldr(temp1, MemOperand(sp, 0));
       __ Ldrh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
       __ Add(temp2, temp2, 1);
+      // Subtract one if the counter would overflow.
+      __ Sub(temp2, temp2, Operand(temp2, LSR, 16));
       __ Strh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
     }
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
