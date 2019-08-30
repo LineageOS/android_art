@@ -32,8 +32,10 @@ const uint8_t StandardDexFile::kDexMagicVersions[StandardDexFile::kNumDexVersion
   {'0', '3', '7', '\0'},
   // Dex version 038: Android "O" and beyond.
   {'0', '3', '8', '\0'},
-  // Dex verion 039: Beyond Android "O".
+  // Dex verion 039: Android "P" and beyond.
   {'0', '3', '9', '\0'},
+  // Dex verion 040: beyond Android "10" (previously known as Android "Q").
+  {'0', '4', '0', '\0'},
 };
 
 void StandardDexFile::WriteMagic(uint8_t* magic) {
