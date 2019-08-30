@@ -18,8 +18,8 @@ public class Main {
   public static void $noinline$hotnessCount() {
   }
 
-  public static void $noinline$hotnessCountWithLoop(int count) {
-    for (int i = 0; i < count; i++) {
+  public static void $noinline$hotnessCountWithLoop() {
+    for (int i = 0; i < 100; i++) {
       $noinline$hotnessCount();
     }
   }
@@ -35,17 +35,9 @@ public class Main {
       throw new Error("Expected hotness counter to be updated");
     }
 
-    $noinline$hotnessCountWithLoop(1000);
-    int newCounter = getHotnessCounter(Main.class, "$noinline$hotnessCountWithLoop");
-    if (newCounter <= counter) {
-      throw new Error("Expected counter " + newCounter + " to be larger than " + counter);
-    }
-    counter = newCounter;
-
-    $noinline$hotnessCountWithLoop(65500);
-    newCounter = getHotnessCounter(Main.class, "$noinline$hotnessCountWithLoop");
-    if (newCounter <= counter) {
-      throw new Error("Expected counter " + newCounter + " to be larger than " + counter);
+    $noinline$hotnessCountWithLoop();
+    if (getHotnessCounter(Main.class, "$noinline$hotnessCountWithLoop") <= counter) {
+      throw new Error("Expected hotness counter of a loop to be greater than without loop");
     }
   }
 
