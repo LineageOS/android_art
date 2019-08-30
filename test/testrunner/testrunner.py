@@ -977,11 +977,21 @@ def parse_option():
     var_group = parser.add_argument_group(
         '{}-type Options'.format(variant_type),
         "Options that control the '{}' variants.".format(variant_type))
+    var_group.add_argument('--all-' + variant_type,
+                           action='store_true',
+                           dest='all_' + variant_type,
+                           help='Enable all variants of ' + variant_type)
     for variant in variant_set:
       flag = '--' + variant
       var_group.add_argument(flag, action='store_true', dest=variant)
 
   options = vars(parser.parse_args())
+  # Handle the --all-<type> meta-options
+  for variant_type, variant_set in VARIANT_TYPE_DICT.items():
+    if options['all_' + variant_type]:
+      for variant in variant_set:
+        options[variant] = True
+
   if options['build_target']:
     options = setup_env_for_build_target(target_config[options['build_target']],
                                          parser, options)
