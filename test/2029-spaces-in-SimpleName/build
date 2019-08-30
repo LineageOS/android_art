@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# Copyright 2019 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Stop on failure and be verbose.
+set -e -x
+
+export ASM_JAR="${ANDROID_BUILD_TOP}/prebuilts/misc/common/asm/asm-6.0.jar"
+
+cd src
+
+# generate Java bytecode with ASM
+${JAVAC:-java} -cp "$ASM_JAR:." SpacesInSimpleName.java
+${JAVA:-java} -cp "$ASM_JAR:." SpacesInSimpleName
+
+# compile Java bytecode to DEX bytecode
+# TODO: replace DX with D8 when it adds support for spaces in SimpleName
+# ${D8} --min-api 10000 Main.class
+$ANDROID_HOST_OUT/bin/dx --dex --output=classes.dex Main.class
+
+# move the resulting DEX file and cleanup
+mv classes.dex ../classes.dex
+rm *.class
+
+cd ..
+
+# Use API level 10000 for spaces in SimpleName
+DESUGAR=false ./default-build "$@" --api-level 10000
