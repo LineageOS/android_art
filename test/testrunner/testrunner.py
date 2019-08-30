@@ -92,6 +92,9 @@ DISABLED_TEST_CONTAINER = {}
 # the test name given as the argument to run.
 VARIANT_TYPE_DICT = {}
 
+# The set of all variant sets that are incompatible and will always be skipped.
+NONFUNCTIONAL_VARIANT_SETS = set()
+
 # The set contains all the variants of each time.
 TOTAL_VARIANTS_SET = set()
 
@@ -155,7 +158,11 @@ def gather_test_info():
   VARIANT_TYPE_DICT['jvmti'] = {'no-jvmti', 'jvmti-stress', 'redefine-stress', 'trace-stress',
                                 'field-stress', 'step-stress'}
   VARIANT_TYPE_DICT['compiler'] = {'interp-ac', 'interpreter', 'jit', 'jit-on-first-use',
-                                   'optimizing', 'regalloc_gc', 'speed-profile', 'baseline'}
+                                   'optimizing', 'regalloc_gc',
+                                   'speed-profile', 'baseline'}
+
+  # Regalloc_GC cannot work with prebuild.
+  NONFUNCTIONAL_VARIANT_SETS.add(frozenset({'regalloc_gc', 'prebuild'}))
 
   for v_type in VARIANT_TYPE_DICT:
     TOTAL_VARIANTS_SET = TOTAL_VARIANTS_SET.union(VARIANT_TYPE_DICT.get(v_type))
@@ -759,6 +766,9 @@ def is_test_disabled(test, variant_set):
         variants_present = False
         break
     if variants_present:
+      return True
+  for bad_combo in NONFUNCTIONAL_VARIANT_SETS:
+    if bad_combo.issubset(variant_set):
       return True
   return False
 
