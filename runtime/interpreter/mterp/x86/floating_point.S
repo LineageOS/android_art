@@ -56,10 +56,17 @@
     movzbl  2(rPC), %ecx                    # ecx <- BB
     movzbl  3(rPC), %eax                    # eax <- CC
     GET_VREG_XMM${suff} %xmm0, %ecx         # %xmm0 <- 1st src
+#ifdef MTERP_USE_AVX
+    v${instr}${suff} VREG_ADDRESS(%eax), %xmm0, %xmm0
+    SET_VREG_XMM${suff} %xmm0, rINST        # vAA <- %xmm0
+    vpxor    %xmm0, %xmm0, %xmm0
+    vmovs${suff}   %xmm0, VREG_REF_ADDRESS(rINST) # clear ref
+#else
     ${instr}${suff} VREG_ADDRESS(%eax), %xmm0
     SET_VREG_XMM${suff} %xmm0, rINST        # vAA <- %xmm0
     pxor    %xmm0, %xmm0
     movs${suff}   %xmm0, VREG_REF_ADDRESS(rINST) # clear ref
+#endif
     ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 
 %def sseBinop2Addr(instr="", suff=""):
@@ -67,10 +74,17 @@
     andl    $$0xf, %ecx                     # ecx <- A
     GET_VREG_XMM${suff} %xmm0, %ecx         # %xmm0 <- 1st src
     sarl    $$4, rINST                      # rINST<- B
+#ifdef MTERP_USE_AVX
+    v${instr}${suff} VREG_ADDRESS(rINST), %xmm0, %xmm0
+    SET_VREG_XMM${suff} %xmm0, %ecx         # vAA<- %xmm0
+    vpxor    %xmm0, %xmm0, %xmm0
+    vmovs${suff} %xmm0, VREG_REF_ADDRESS(rINST)  # clear ref
+#else
     ${instr}${suff} VREG_ADDRESS(rINST), %xmm0
     SET_VREG_XMM${suff} %xmm0, %ecx         # vAA<- %xmm0
     pxor    %xmm0, %xmm0
     movs${suff} %xmm0, VREG_REF_ADDRESS(rINST)  # clear ref
+#endif
     ADVANCE_PC_FETCH_AND_GOTO_NEXT 1
 
 %def op_add_double():

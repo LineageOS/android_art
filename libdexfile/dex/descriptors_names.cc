@@ -165,7 +165,7 @@ std::string DescriptorToName(const char* descriptor) {
 // Helper for IsValidPartOfMemberNameUtf8(), a bit vector indicating valid low ascii.
 static constexpr uint32_t DEX_MEMBER_VALID_LOW_ASCII[4] = {
   0x00000000,  // 00..1f low control characters; nothing valid
-  0x03ff2010,  // 20..3f digits and symbols; valid: '0'..'9', '$', '-'
+  0x03ff2011,  // 20..3f space, digits and symbols; valid: ' ', '0'..'9', '$', '-'
   0x87fffffe,  // 40..5f uppercase etc.; valid: 'A'..'Z', '_'
   0x07fffffe   // 60..7f lowercase etc.; valid: 'a'..'z'
 };
@@ -175,12 +175,17 @@ COLD_ATTR
 static bool IsValidPartOfMemberNameUtf8Slow(const char** pUtf8Ptr) {
   /*
    * It's a multibyte encoded character. Decode it and analyze. We
-   * accept anything that isn't (a) an improperly encoded low value,
-   * (b) an improper surrogate pair, (c) an encoded '\0', (d) a high
-   * control character, or (e) a high space, layout, or special
-   * character (U+00a0, U+2000..U+200f, U+2028..U+202f,
-   * U+fff0..U+ffff). This is all specified in the dex format
-   * document.
+   * accept anything that isn't:
+   *   - an improperly encoded low value
+   *   - an improper surrogate pair
+   *   - an encoded '\0'
+   *   - a C1 control character U+0080..U+009f
+   *   - a format character U+200b..U+200f, U+2028..U+202e
+   *   - a special character U+fff0..U+ffff
+   * Prior to DEX format version 040, we also excluded some of the Unicode
+   * space characters:
+   *   - U+00a0, U+2000..U+200a, U+202f
+   * This is all specified in the dex format document.
    */
 
   const uint32_t pair = GetUtf16FromUtf8(pUtf8Ptr);
@@ -200,8 +205,8 @@ static bool IsValidPartOfMemberNameUtf8Slow(const char** pUtf8Ptr) {
   // three byte UTF-8 sequence could be one half of a surrogate pair.
   switch (leading >> 8) {
     case 0x00:
-      // It's only valid if it's above the ISO-8859-1 high space (0xa0).
-      return (leading > 0x00a0);
+      // It's in the range that has C1 control characters.
+      return (leading >= 0x00a0);
     case 0xd8:
     case 0xd9:
     case 0xda:
@@ -222,11 +227,12 @@ static bool IsValidPartOfMemberNameUtf8Slow(const char** pUtf8Ptr) {
       return false;
     case 0x20:
     case 0xff:
-      // It's in the range that has spaces, controls, and specials.
+      // It's in the range that has format characters and specials.
       switch (leading & 0xfff8) {
-        case 0x2000:
         case 0x2008:
+          return (leading <= 0x200a);
         case 0x2028:
+          return (leading == 0x202f);
         case 0xfff0:
         case 0xfff8:
           return false;
