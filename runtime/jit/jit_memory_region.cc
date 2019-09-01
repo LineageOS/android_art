@@ -452,11 +452,11 @@ static void FillRootTable(uint8_t* roots_data, const std::vector<Handle<mirror::
   reinterpret_cast<uint32_t*>(roots_data)[length] = length;
 }
 
-bool JitMemoryRegion::CommitData(uint8_t* roots_data,
+bool JitMemoryRegion::CommitData(const uint8_t* readonly_roots_data,
                                  const std::vector<Handle<mirror::Object>>& roots,
                                  const uint8_t* stack_map,
                                  size_t stack_map_size) {
-  roots_data = GetWritableDataAddress(roots_data);
+  uint8_t* roots_data = GetWritableDataAddress(readonly_roots_data);
   size_t root_table_size = ComputeRootTableSize(roots.size());
   uint8_t* stack_map_data = roots_data + root_table_size;
   FillRootTable(roots_data, roots);
@@ -476,16 +476,19 @@ void JitMemoryRegion::FreeCode(const uint8_t* code) {
   mspace_free(exec_mspace_, const_cast<uint8_t*>(code));
 }
 
-uint8_t* JitMemoryRegion::AllocateData(size_t data_size) {
+const uint8_t* JitMemoryRegion::AllocateData(size_t data_size) {
   void* result = mspace_malloc(data_mspace_, data_size);
   used_memory_for_data_ += mspace_usable_size(result);
   return reinterpret_cast<uint8_t*>(GetNonWritableDataAddress(result));
 }
 
-void JitMemoryRegion::FreeData(uint8_t* data) {
-  data = GetWritableDataAddress(data);
-  used_memory_for_data_ -= mspace_usable_size(data);
-  mspace_free(data_mspace_, data);
+void JitMemoryRegion::FreeData(const uint8_t* data) {
+  FreeWritableData(GetWritableDataAddress(data));
+}
+
+void JitMemoryRegion::FreeWritableData(uint8_t* writable_data) REQUIRES(Locks::jit_lock_) {
+  used_memory_for_data_ -= mspace_usable_size(writable_data);
+  mspace_free(data_mspace_, writable_data);
 }
 
 #if defined(__BIONIC__) && defined(ART_TARGET)

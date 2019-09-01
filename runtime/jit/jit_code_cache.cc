@@ -330,7 +330,7 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
                                   size_t code_size,
                                   const uint8_t* stack_map,
                                   size_t stack_map_size,
-                                  uint8_t* roots_data,
+                                  const uint8_t* roots_data,
                                   const std::vector<Handle<mirror::Object>>& roots,
                                   bool osr,
                                   bool has_should_deoptimize_flag,
@@ -407,7 +407,7 @@ static void DCheckRootsAreValid(const std::vector<Handle<mirror::Object>>& roots
   }
 }
 
-static uint8_t* GetRootTable(const void* code_ptr, uint32_t* number_of_roots = nullptr) {
+static const uint8_t* GetRootTable(const void* code_ptr, uint32_t* number_of_roots = nullptr) {
   OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code_ptr);
   uint8_t* data = method_header->GetOptimizedCodeInfoPtr();
   uint32_t roots = GetNumberOfRoots(data);
@@ -454,7 +454,10 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
   for (const auto& entry : method_code_map_) {
     uint32_t number_of_roots = 0;
-    uint8_t* roots_data = GetRootTable(entry.first, &number_of_roots);
+    const uint8_t* root_table = GetRootTable(entry.first, &number_of_roots);
+    uint8_t* roots_data = private_region_.IsInDataSpace(root_table)
+        ? private_region_.GetWritableDataAddress(root_table)
+        : shared_region_.GetWritableDataAddress(root_table);
     GcRoot<mirror::Object>* roots = reinterpret_cast<GcRoot<mirror::Object>*>(roots_data);
     for (uint32_t i = 0; i < number_of_roots; ++i) {
       // This does not need a read barrier because this is called by GC.
@@ -581,7 +584,7 @@ void JitCodeCache::RemoveMethodsIn(Thread* self, const LinearAlloc& alloc) {
       ProfilingInfo* info = *it;
       if (alloc.ContainsUnsafe(info->GetMethod())) {
         info->GetMethod()->SetProfilingInfo(nullptr);
-        private_region_.FreeData(reinterpret_cast<uint8_t*>(info));
+        private_region_.FreeWritableData(reinterpret_cast<uint8_t*>(info));
         it = profiling_infos_.erase(it);
       } else {
         ++it;
@@ -672,7 +675,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
                                           size_t code_size,
                                           const uint8_t* stack_map,
                                           size_t stack_map_size,
-                                          uint8_t* roots_data,
+                                          const uint8_t* roots_data,
                                           const std::vector<Handle<mirror::Object>>& roots,
                                           bool osr,
                                           bool has_should_deoptimize_flag,
@@ -687,7 +690,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   }
 
   size_t root_table_size = ComputeRootTableSize(roots.size());
-  uint8_t* stack_map_data = roots_data + root_table_size;
+  const uint8_t* stack_map_data = roots_data + root_table_size;
 
   MutexLock mu(self, *Locks::jit_lock_);
   // We need to make sure that there will be no jit-gcs going on and wait for any ongoing one to
@@ -954,19 +957,19 @@ size_t JitCodeCache::DataCacheSizeLocked() {
 
 void JitCodeCache::ClearData(Thread* self,
                              JitMemoryRegion* region,
-                             uint8_t* roots_data) {
+                             const uint8_t* roots_data) {
   MutexLock mu(self, *Locks::jit_lock_);
-  region->FreeData(reinterpret_cast<uint8_t*>(roots_data));
+  region->FreeData(roots_data);
 }
 
-uint8_t* JitCodeCache::ReserveData(Thread* self,
-                                   JitMemoryRegion* region,
-                                   size_t stack_map_size,
-                                   size_t number_of_roots,
-                                   ArtMethod* method) {
+const uint8_t* JitCodeCache::ReserveData(Thread* self,
+                                         JitMemoryRegion* region,
+                                         size_t stack_map_size,
+                                         size_t number_of_roots,
+                                         ArtMethod* method) {
   size_t table_size = ComputeRootTableSize(number_of_roots);
   size_t size = RoundUp(stack_map_size + table_size, sizeof(void*));
-  uint8_t* result = nullptr;
+  const uint8_t* result = nullptr;
 
   {
     ScopedThreadSuspension sts(self, kSuspended);
@@ -1318,7 +1321,7 @@ void JitCodeCache::DoCollection(Thread* self, bool collect_profiling_info) {
           info->GetMethod()->SetProfilingInfo(info);
         } else if (info->GetMethod()->GetProfilingInfo(kRuntimePointerSize) != info) {
           // No need for this ProfilingInfo object anymore.
-          private_region_.FreeData(reinterpret_cast<uint8_t*>(info));
+          private_region_.FreeWritableData(reinterpret_cast<uint8_t*>(info));
           return true;
         }
         return false;
@@ -1448,11 +1451,12 @@ ProfilingInfo* JitCodeCache::AddProfilingInfoInternal(Thread* self ATTRIBUTE_UNU
     return info;
   }
 
-  uint8_t* data = private_region_.AllocateData(profile_info_size);
+  const uint8_t* data = private_region_.AllocateData(profile_info_size);
   if (data == nullptr) {
     return nullptr;
   }
-  info = new (data) ProfilingInfo(method, entries);
+  uint8_t* writable_data = private_region_.GetWritableDataAddress(data);
+  info = new (writable_data) ProfilingInfo(method, entries);
 
   // Make sure other threads see the data in the profiling info object before the
   // store in the ArtMethod's ProfilingInfo pointer.
@@ -1801,7 +1805,8 @@ void ZygoteMap::Initialize(uint32_t number_of_methods) {
   // Allocate for 40-80% capacity. This will offer OK lookup times, and termination
   // cases.
   size_t capacity = RoundUpToPowerOfTwo(number_of_methods * 100 / 80);
-  Entry* data = reinterpret_cast<Entry*>(region_->AllocateData(capacity * sizeof(Entry)));
+  const Entry* data =
+      reinterpret_cast<const Entry*>(region_->AllocateData(capacity * sizeof(Entry)));
   if (data != nullptr) {
     region_->FillData(data, capacity, Entry { nullptr, nullptr });
     map_ = ArrayRef(data, capacity);
@@ -1869,7 +1874,7 @@ void ZygoteMap::Put(const void* code, ArtMethod* method) {
   // be added, we are guaranteed to find a free slot in the array, and
   // therefore for this loop to terminate.
   while (true) {
-    Entry* entry = &map_[index];
+    const Entry* entry = &map_[index];
     if (entry->method == nullptr) {
       // Note that readers can read this memory concurrently, but that's OK as
       // we are writing pointers.

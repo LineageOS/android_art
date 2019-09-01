@@ -116,7 +116,7 @@ class ZygoteMap {
   };
 
   // The map allocated with `region_`.
-  ArrayRef<Entry> map_;
+  ArrayRef<const Entry> map_;
 
   // The region in which the map is allocated.
   JitMemoryRegion* const region_;
@@ -183,7 +183,7 @@ class JitCodeCache {
                       size_t code_size,
                       const uint8_t* stack_map,
                       size_t stack_map_size,
-                      uint8_t* roots_data,
+                      const uint8_t* roots_data,
                       const std::vector<Handle<mirror::Object>>& roots,
                       bool osr,
                       bool has_should_deoptimize_flag,
@@ -207,17 +207,17 @@ class JitCodeCache {
   // Allocate a region of data that will contain a stack map of size `stack_map_size` and
   // `number_of_roots` roots accessed by the JIT code.
   // Return a pointer to where roots will be stored.
-  uint8_t* ReserveData(Thread* self,
-                       JitMemoryRegion* region,
-                       size_t stack_map_size,
-                       size_t number_of_roots,
-                       ArtMethod* method)
+  const uint8_t* ReserveData(Thread* self,
+                             JitMemoryRegion* region,
+                             size_t stack_map_size,
+                             size_t number_of_roots,
+                             ArtMethod* method)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
   // Clear data from the data portion of the code cache.
   void ClearData(
-      Thread* self, JitMemoryRegion* region, uint8_t* roots_data)
+      Thread* self, JitMemoryRegion* region, const uint8_t* roots_data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -351,7 +351,7 @@ class JitCodeCache {
                               size_t code_size,
                               const uint8_t* stack_map,
                               size_t stack_map_size,
-                              uint8_t* roots_data,
+                              const uint8_t* roots_data,
                               const std::vector<Handle<mirror::Object>>& roots,
                               bool osr,
                               bool has_should_deoptimize_flag,
