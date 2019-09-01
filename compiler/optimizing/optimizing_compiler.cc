@@ -1290,11 +1290,8 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     ScopedArenaAllocator stack_map_allocator(&arena_stack);  // Will hold the stack map.
     ScopedArenaVector<uint8_t> stack_map = CreateJniStackMap(&stack_map_allocator,
                                                              jni_compiled_method);
-    uint8_t* roots_data = code_cache->ReserveData(self,
-                                                  region,
-                                                  stack_map.size(),
-                                                  /* number_of_roots= */ 0,
-                                                  method);
+    const uint8_t* roots_data = code_cache->ReserveData(
+        self, region, stack_map.size(), /* number_of_roots= */ 0, method);
     if (roots_data == nullptr) {
       MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
       return false;
@@ -1386,11 +1383,8 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   ScopedArenaVector<uint8_t> stack_map = codegen->BuildStackMaps(code_item);
   size_t number_of_roots = codegen->GetNumberOfJitRoots();
-  uint8_t* roots_data = code_cache->ReserveData(self,
-                                                region,
-                                                stack_map.size(),
-                                                number_of_roots,
-                                                method);
+  const uint8_t* roots_data = code_cache->ReserveData(
+      self, region, stack_map.size(), number_of_roots, method);
   if (roots_data == nullptr) {
     MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
     return false;
