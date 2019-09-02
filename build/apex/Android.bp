@@ -224,18 +224,8 @@ apex {
 // (Libcore).
 
 android_app_certificate {
-    name: "com.android.art.release.certificate",
-    certificate: "com.android.art.release",
-}
-
-android_app_certificate {
-    name: "com.android.art.debug.certificate",
-    certificate: "com.android.art.debug",
-}
-
-android_app_certificate {
-    name: "com.android.art.testing.certificate",
-    certificate: "com.android.art.testing",
+    name: "com.android.art.certificate",
+    certificate: "com.android.art",
 }
 
 apex_key {
@@ -314,7 +304,7 @@ apex_defaults {
 apex {
     name: "com.android.art.release",
     defaults: ["com.android.art-defaults"],
-    certificate: ":com.android.art.release.certificate",
+    certificate: ":com.android.art.certificate",
 }
 
 // "Debug" version of the ART APEX module (containing both release and
@@ -323,7 +313,7 @@ apex {
 apex {
     name: "com.android.art.debug",
     defaults: ["com.android.art-dev-defaults"],
-    certificate: ":com.android.art.debug.certificate",
+    certificate: ":com.android.art.certificate",
 }
 
 // ART gtests with dependencies on internal ART APEX libraries.
@@ -357,7 +347,7 @@ apex_test {
     name: "com.android.art.testing",
     defaults: ["com.android.art-dev-defaults"],
     file_contexts: "com.android.art.debug",
-    certificate: ":com.android.art.testing.certificate",
+    certificate: ":com.android.art.certificate",
     tests: art_gtests,
 }
 
