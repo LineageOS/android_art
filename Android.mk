@@ -312,25 +312,24 @@ endif
 
 
 #######################
-# Android Runtime APEX.
+# ART APEX.
 
 include $(CLEAR_VARS)
 
-# The Android Runtime APEX comes in three flavors:
-# - the release module (`com.android.runtime.release`), containing
+# The ART APEX comes in three flavors:
+# - the release module (`com.android.art.release`), containing
 #   only "release" artifacts;
-# - the debug module (`com.android.runtime.debug`), containing both
+# - the debug module (`com.android.art.debug`), containing both
 #   "release" and "debug" artifacts, as well as additional tools;
-# - the testing module (`com.android.runtime.testing`), containing
+# - the testing module (`com.android.art.testing`), containing
 #   both "release" and "debug" artifacts, as well as additional tools
 #   and ART gtests).
 #
-# The Android Runtime APEX module (`com.android.runtime`) is an
-# "alias" for either the release or the debug module. By default,
-# "user" build variants contain the release module, while "userdebug"
-# and "eng" build variants contain the debug module. However, if
-# `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is defined, it overrides
-# the previous logic:
+# The ART APEX module (`com.android.art`) is an "alias" for either the
+# release or the debug module. By default, "user" build variants contain
+# the release module, while "userdebug" and "eng" build variants contain
+# the debug module. However, if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD`
+# is defined, it overrides the previous logic:
 # - if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is set to `false`, the
 #   build will include the release module (whatever the build
 #   variant);
@@ -354,7 +353,7 @@ else
   APEX_TEST_MODULE := art-check-release-apex-gen-fakebin
 endif
 
-LOCAL_MODULE := com.android.runtime
+LOCAL_MODULE := com.android.art
 LOCAL_REQUIRED_MODULES := $(TARGET_RUNTIME_APEX)
 LOCAL_REQUIRED_MODULES += art_apex_boot_integrity
 
@@ -364,7 +363,7 @@ art_target_include_debug_build :=
 include $(BUILD_PHONY_PACKAGE)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := com.android.runtime
+LOCAL_MODULE := com.android.art
 LOCAL_IS_HOST_MODULE := true
 ifneq ($(HOST_OS),darwin)
   LOCAL_REQUIRED_MODULES += $(APEX_TEST_MODULE)
@@ -374,34 +373,34 @@ include $(BUILD_PHONY_PACKAGE)
 # Create canonical name -> file name symlink in the symbol directory
 # The symbol files for the debug or release variant are installed to
 # $(TARGET_OUT_UNSTRIPPED)/$(TARGET_RUNTIME_APEX) directory. However,
-# since they are available via /apex/com.android.runtime at runtime
+# since they are available via /apex/com.android.art at runtime
 # regardless of which variant is installed, create a symlink so that
-# $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime is linked to
+# $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art is linked to
 # $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_RUNTIME_APEX).
 # Note that installation of the symlink is triggered by the apex_manifest.json
 # file which is the file that is guaranteed to be created regardless of the
 # value of TARGET_FLATTEN_APEX.
 #
 # b/132413565: Also, when TARGET_FLATTEN_APEX, an empty directory
-# /system/apex/com.android.runtime is created. After the entire
-# /system/apex is mounted on /apex, the flattened runtime APEX
-# (either com.android.runtime.debug or *.release) is mounted on the empty
+# /system/apex/com.android.art is created. After the entire
+# /system/apex is mounted on /apex, the flattened ART APEX
+# (either com.android.art.debug or *.release) is mounted on the empty
 # directory so that the APEX is accessible via the canonical path
-# /apex/com.android.runtime
+# /apex/com.android.art
 ifeq ($(TARGET_FLATTEN_APEX),true)
 runtime_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
 else
 runtime_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
 endif
 
-runtime_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.runtime)/symlink.timestamp
+runtime_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)/symlink.timestamp
 $(runtime_apex_manifest_file): $(runtime_apex_symlink_timestamp)
-$(runtime_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.runtime
+$(runtime_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art
 $(runtime_apex_symlink_timestamp):
 	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
 	$(hide) ln -sf $(TARGET_RUNTIME_APEX) $(PRIVATE_LINK_NAME)
 ifeq ($(TARGET_FLATTEN_APEX),true)
-	$(hide) mkdir -p $(TARGET_OUT)/apex/com.android.runtime
+	$(hide) mkdir -p $(TARGET_OUT)/apex/com.android.art
 endif
 	$(hide) touch $@
 
@@ -548,7 +547,7 @@ PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
   lib/libandroidio.so \
   lib64/libandroidio.so \
 
-# Generate copies of Bionic bootstrap artifacts and Runtime APEX
+# Generate copies of Bionic bootstrap artifacts and ART APEX
 # libraries in the `system` (TARGET_OUT) directory. This is dangerous
 # as these files could inadvertently stay in this directory and be
 # included in a system image.
@@ -559,19 +558,19 @@ PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
 # - Bionic bootstrap libraries, copied from
 #   `$(TARGET_OUT)/lib(64)/bootstrap` (the `/system/lib(64)/bootstrap`
 #   directory to be sync'd to the target);
-# - Some libraries which are part of the Runtime APEX; if the product
+# - Some libraries which are part of the ART APEX; if the product
 #   to build uses flattened APEXes, these libraries are copied from
-#   `$(TARGET_OUT)/apex/com.android.runtime.debug` (the flattened
-#   (Debug) Runtime APEX directory to be sync'd to the target);
+#   `$(TARGET_OUT)/apex/com.android.art.debug` (the flattened
+#   (Debug) ART APEX directory to be sync'd to the target);
 #   otherwise, they are copied from
-#   `$(TARGET_OUT)/../apex/com.android.runtime.debug` (the local
-#   directory under the build tree containing the (Debug) Runtime APEX
+#   `$(TARGET_OUT)/../apex/com.android.art.debug` (the local
+#   directory under the build tree containing the (Debug) ART APEX
 #   artifacts, which is not sync'd to the target).
 #
 # This target is only used by Golem now.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
-# Runtime APEX.
+# ART APEX.
 .PHONY: standalone-apex-files
 standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DEBUG_RUNTIME_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
@@ -597,22 +596,22 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DE
 
 # Also include the bootstrap Bionic libraries (libc, libdl, libm).
 # These are required as the "main" libc, libdl, and libm have moved to
-# the Runtime APEX. This is a temporary change needed until Golem
-# fully supports the Runtime APEX.
+# the ART APEX. This is a temporary change needed until Golem
+# fully supports the ART APEX.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
-# Runtime APEX.
+# ART APEX.
 
 # Also include:
 # - a copy of the ICU prebuilt .dat file in /system/etc/icu on target
 #   (see module `icu-data-art-test-i18n`); and
-# so that it can be found even if the Runtime APEX is not available,
+# so that it can be found even if the ART APEX is not available,
 # by setting the environment variable `ART_TEST_ANDROID_RUNTIME_ROOT`
 # to "/system" on device. This is a temporary change needed
-# until Golem fully supports the Runtime APEX.
+# until Golem fully supports the ART APEX.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
-# Runtime APEX.
+# ART APEX.
 
 # Also include:
 # - a copy of the time zone data prebuilt files in
@@ -626,7 +625,7 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DE
 # until Golem fully supports the Time Zone Data APEX.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
-# Runtime APEX (and TZ Data APEX).
+# ART APEX (and TZ Data APEX).
 
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
