@@ -81,8 +81,10 @@ elif [[ $mode == "target" ]]; then
     # These targets are needed for the chroot environment.
     make_command+=" crash_dump event-log-tags"
   fi
-  # Build the Testing Runtime APEX (which is a superset of the Release and Debug Runtime APEXes).
-  make_command+=" com.android.runtime.testing"
+  # Build the Runtime (Bionic) APEX.
+  make_command+=" com.android.runtime"
+  # Build the Testing ART APEX (which is a superset of the Release and Debug ART APEXes).
+  make_command+=" com.android.art.testing"
   # Build the system linker configuration, which is needed to use the
   # Runtime APEX's linker configuration.
   make_command+=" ld.config.txt "

@@ -299,9 +299,9 @@ target_config = {
                      '--no-build-dependencies'],
     },
     'art-linux-bionic-x64-zipapex': {
-        'build': '{ANDROID_BUILD_TOP}/art/tools/build_linux_bionic_tests.sh {MAKE_OPTIONS} com.android.runtime.host',
+        'build': '{ANDROID_BUILD_TOP}/art/tools/build_linux_bionic_tests.sh {MAKE_OPTIONS} com.android.art.host',
         'run-test': ['--run-test-option=--bionic',
-                     "--runtime-zipapex={SOONG_OUT_DIR}/host/linux_bionic-x86/apex/com.android.runtime.host.zipapex",
+                     "--runtime-zipapex={SOONG_OUT_DIR}/host/linux_bionic-x86/apex/com.android.art.host.zipapex",
                      '--host',
                      '--64',
                      '--no-build-dependencies'],

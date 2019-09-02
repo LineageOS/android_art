@@ -32,7 +32,7 @@ fi
 adb="${ADB:-adb}"
 
 android_i18n_root=/apex/com.android.i18n
-android_runtime_root=/apex/com.android.runtime
+android_runtime_root=/apex/com.android.art
 android_tzdata_root=/apex/com.android.tzdata
 
 if [[ $1 = -j* ]]; then
