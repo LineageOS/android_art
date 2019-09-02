@@ -139,39 +139,29 @@ adb push "$ANDROID_PRODUCT_OUT/system" "$ART_TEST_CHROOT/"
 adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
   "$ART_TEST_CHROOT/system/etc/public.libraries.txt"
 
-echo -e "${green}Activating Runtime APEX...${nc}"
-# Manually "activate" the flattened Testing Runtime APEX by syncing it to the
-# /apex directory in the chroot.
-#
-# We copy the files from `/system/apex/com.android.runtime.testing` to
-# `/apex/com.android.runtime` in the chroot directory, instead of simply using a
-# symlink, as Bionic's linker relies on the real path name of a binary
-# (e.g. `/apex/com.android.runtime/bin/dex2oat`) to select the linker
-# configuration.
+# Manually "activate" the flattened APEX $1 by syncing it to /apex/$2 in the
+# chroot. $2 defaults to $1.
 #
 # TODO: Handle the case of build targets using non-flatted APEX packages.
 # As a workaround, one can run `export TARGET_FLATTEN_APEX=true` before building
 # a target to have its APEX packages flattened.
-adb shell rm -rf "$ART_TEST_CHROOT/apex/com.android.runtime"
-adb shell cp -a "$ART_TEST_CHROOT/system/apex/com.android.runtime.testing" \
-  "$ART_TEST_CHROOT/apex/com.android.runtime"
+activate_apex() {
+  local src_apex=${1}
+  local dst_apex=${2:-${src_apex}}
+  echo -e "${green}Activating APEX ${src_apex} as ${dst_apex}...${nc}"
+  # We copy the files from `/system/apex/${src_apex}` to `/apex/${dst_apex}` in
+  # the chroot directory, instead of simply using a symlink, as Bionic's linker
+  # relies on the real path name of a binary (e.g.
+  # `/apex/com.android.art/bin/dex2oat`) to select the linker configuration.
+  adb shell rm -rf "$ART_TEST_CHROOT/apex/${dst_apex}"
+  adb shell cp -a "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" || exit 1
+}
 
-echo -e "${green}Activating i18n APEX...${nc}"
-# Manually "activate" the flattened i18n APEX by syncing it to the
-# /apex directory in the chroot.
-#
-# TODO: Likewise, handle the case of build targets using non-flatted APEX packages.
-adb shell rm -rf "$ART_TEST_CHROOT/apex/com.android.i18n"
-adb shell cp -a "$ART_TEST_CHROOT/system/apex/com.android.i18n" "$ART_TEST_CHROOT/apex/"
-
-echo -e "${green}Activating Time Zone Data APEX...${nc}"
-# Manually "activate" the flattened Time Zone Data APEX by syncing it to the
-# /apex directory in the chroot.
-#
-# TODO: Likewise, handle the case of build targets using non-flatted APEX
-# packages.
-adb shell rm -rf "$ART_TEST_CHROOT/apex/com.android.tzdata"
-adb shell cp -a "$ART_TEST_CHROOT/system/apex/com.android.tzdata" "$ART_TEST_CHROOT/apex/"
+# "Activate" the required APEX modules.
+activate_apex com.android.art.testing com.android.art
+activate_apex com.android.i18n
+activate_apex com.android.runtime
+activate_apex com.android.tzdata
 
 # Adjust the linker configuration file (if needed).
 #
