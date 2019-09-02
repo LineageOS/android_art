@@ -1,6 +1,6 @@
 # Copyright (C) 2018 The Android Open Source Project
 #
-# Bionic loader config file for the Runtime APEX.
+# Bionic loader config file for the ART APEX.
 #
 # There are no versioned APEX paths here - this APEX module does not support
 # having several versions mounted.
@@ -31,12 +31,12 @@ namespace.runtime.isolated = true
 namespace.runtime.visible = true
 
 # Keep in sync with the "runtime" namespace in system/core/rootdir/etc/ld.config*.txt.
-namespace.runtime.search.paths = /apex/com.android.runtime/${LIB}
-namespace.runtime.asan.search.paths = /apex/com.android.runtime/${LIB}
+namespace.runtime.search.paths = /apex/com.android.art/${LIB}
+namespace.runtime.asan.search.paths = /apex/com.android.art/${LIB}
 # JVMTI libraries used in ART testing are located under /data; dalvikvm
 # has to be able to dlopen them.
 # TODO(b/129534335): Move this to the linker configuration of the Test
-# Runtime APEX when it is available.
+# ART APEX when it is available.
 namespace.runtime.permitted.paths = /data
 # odex files are in /system/framework. dalvikvm has to be able to dlopen the
 # files for CTS.
