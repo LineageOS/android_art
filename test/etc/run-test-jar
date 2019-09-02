@@ -15,7 +15,7 @@ msg() {
 
 ANDROID_ROOT="/system"
 ANDROID_I18N_ROOT="/apex/com.android.i18n"
-ANDROID_RUNTIME_ROOT="/apex/com.android.runtime"
+ANDROID_RUNTIME_ROOT="/apex/com.android.art"
 ANDROID_TZDATA_ROOT="/apex/com.android.tzdata"
 ARCHITECTURES_32="(arm|x86|mips|none)"
 ARCHITECTURES_64="(arm64|x86_64|mips64|none)"
@@ -234,7 +234,7 @@ while true; do
         HOST="y"
         ANDROID_ROOT="${ANDROID_HOST_OUT}"
         ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.runtime"
+        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         shift
     elif [ "x$1" = "x--bionic" ]; then
@@ -308,7 +308,7 @@ while true; do
         HOST="y"
         ANDROID_ROOT="${ANDROID_HOST_OUT}"
         ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.runtime"
+        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         shift
     elif [ "x$1" = "x--gdb" ]; then
@@ -789,13 +789,13 @@ if [ "$HOST" = "y" ]; then
   #
   # TODO(b/130295968): Adjust this if/when ART host artifacts are installed
   # under the Android Runtime Root (usually
-  # `out/host/linux-x86/com.android.runtime`).
+  # `out/host/linux-x86/com.android.art`).
   ANDROID_RUNTIME_BIN_DIR=$ANDROID_ROOT/bin
 else
   # On target, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the
   # Runtime APEX's `bin` directory. This means the linker will observe the
   # Runtime APEX linker configuration file
-  # (`/apex/com.android.runtime/etc/ld.config.txt`) for these binaries.
+  # (`/apex/com.android.art/etc/ld.config.txt`) for these binaries.
   ANDROID_RUNTIME_BIN_DIR=$ANDROID_RUNTIME_ROOT/bin
 fi
 
