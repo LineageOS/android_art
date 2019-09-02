@@ -333,4 +333,26 @@ std::string GetProcessStatus(const char* key) {
   return "<unknown>";
 }
 
+bool IsAddressKnownBackedByFileOrShared(const void* addr) {
+  // We use the Linux pagemap interface for knowing if an address is backed
+  // by a file or is shared. See:
+  // https://www.kernel.org/doc/Documentation/vm/pagemap.txt
+  uintptr_t vmstart = reinterpret_cast<uintptr_t>(AlignDown(addr, kPageSize));
+  off_t index = (vmstart / kPageSize) * sizeof(uint64_t);
+  android::base::unique_fd pagemap(open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC));
+  if (pagemap == -1) {
+    return false;
+  }
+  if (lseek(pagemap, index, SEEK_SET) != index) {
+    return false;
+  }
+  uint64_t flags;
+  if (read(pagemap, &flags, sizeof(uint64_t)) != sizeof(uint64_t)) {
+    return false;
+  }
+  // From https://www.kernel.org/doc/Documentation/vm/pagemap.txt:
+  //  * Bit  61    page is file-page or shared-anon (since 3.5)
+  return (flags & (1LL << 61)) != 0;
+}
+
 }  // namespace art
