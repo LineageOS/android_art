@@ -626,6 +626,33 @@ static std::string GetBootProfileFile(const std::string& profile) {
   return ReplaceFileExtension(profile, "bprof");
 }
 
+/**
+ * A JIT task to madvise DONTNEED dex files after we're done compiling methods.
+ */
+class JitMadviseDontNeedTask final : public SelfDeletingTask {
+ public:
+  explicit JitMadviseDontNeedTask(const std::vector<const DexFile*>& dex_files)
+      : dex_files_(dex_files) {}
+
+  void Run(Thread* self ATTRIBUTE_UNUSED) override {
+    for (const DexFile* dex_file : dex_files_) {
+      if (IsAddressKnownBackedByFileOrShared(dex_file->Begin())) {
+        int result = madvise(const_cast<uint8_t*>(AlignDown(dex_file->Begin(), kPageSize)),
+                             RoundUp(dex_file->Size(), kPageSize),
+                             MADV_DONTNEED);
+        if (result == -1) {
+          PLOG(WARNING) << "Madvise failed";
+        }
+      }
+    }
+  }
+
+ private:
+  std::vector<const DexFile*> dex_files_;
+
+  DISALLOW_COPY_AND_ASSIGN(JitMadviseDontNeedTask);
+};
+
 class ZygoteTask final : public Task {
  public:
   ZygoteTask() {}
@@ -696,14 +723,16 @@ class JitProfileTask final : public Task {
     std::string profile = GetProfileFile(dex_files_[0]->GetLocation());
     std::string boot_profile = GetBootProfileFile(profile);
 
-    Runtime::Current()->GetJit()->CompileMethodsFromBootProfile(
+    Jit* jit = Runtime::Current()->GetJit();
+
+    jit->CompileMethodsFromBootProfile(
         self,
         dex_files_,
         boot_profile,
         loader,
         /* add_to_queue= */ false);
 
-    Runtime::Current()->GetJit()->CompileMethodsFromProfile(
+    jit->CompileMethodsFromProfile(
         self,
         dex_files_,
         profile,
@@ -913,6 +942,16 @@ uint32_t Jit::CompileMethodsFromProfile(
         ++added_to_queue;
       }
     }
+  }
+
+  // Add a madvise task to release dex file pages once all compilation is done.
+  JitMadviseDontNeedTask* task = new JitMadviseDontNeedTask(dex_files);
+  MutexLock mu(Thread::Current(), boot_completed_lock_);
+  if (!boot_completed_) {
+    tasks_after_boot_.push_back(task);
+  } else {
+    DCHECK(tasks_after_boot_.empty());
+    thread_pool_->AddTask(self, task);
   }
   return added_to_queue;
 }
