@@ -232,7 +232,7 @@ def setup_test_env():
     _user_input_variants['address_sizes_target']['target'] = _user_input_variants['address_sizes']
 
   global n_thread
-  if n_thread is -1:
+  if n_thread == -1:
     if 'target' in _user_input_variants['target']:
       n_thread = get_default_threads('target')
     else:
@@ -908,13 +908,13 @@ def setup_env_for_build_target(build_target, parser, options):
   return target_options
 
 def get_default_threads(target):
-  if target is 'target':
+  if target == 'target':
     adb_command = 'adb shell cat /sys/devices/system/cpu/present'
     cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
     cpu_info = cpu_info_proc.stdout.read()
     if type(cpu_info) is bytes:
       cpu_info = cpu_info.decode('utf-8')
-    cpu_info_regex = '\d*-(\d*)'
+    cpu_info_regex = r'\d*-(\d*)'
     match = re.match(cpu_info_regex, cpu_info)
     if match:
       return int(match.group(1))
