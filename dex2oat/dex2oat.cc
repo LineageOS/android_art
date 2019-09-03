@@ -187,7 +187,7 @@ static std::string StrippedCommandLine() {
 
   // Construct the final output.
   if (command.size() <= 1U) {
-    // It seems only "/apex/com.android.runtime/bin/dex2oat" is left, or not
+    // It seems only "/apex/com.android.art/bin/dex2oat" is left, or not
     // even that. Use a pretty line.
     return "Starting dex2oat.";
   }
