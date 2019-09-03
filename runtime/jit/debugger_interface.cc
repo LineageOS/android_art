@@ -174,9 +174,7 @@ struct JitNativeInfo {
   static JITDescriptor& Descriptor() { return __jit_debug_descriptor; }
   static void NotifyNativeDebugger() { __jit_debug_register_code_ptr(); }
   static const void* Alloc(size_t size) { return Memory()->AllocateData(size); }
-  static void Free(const void* ptr) {
-    Memory()->FreeData(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(ptr)));
-  }
+  static void Free(const void* ptr) { Memory()->FreeData(reinterpret_cast<const uint8_t*>(ptr)); }
   static void Free(void* ptr) = delete;
   template<class T> static T* Writable(const T* v) {
     return const_cast<T*>(Memory()->GetWritableDataAddress(v));
