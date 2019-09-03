@@ -112,9 +112,6 @@ struct ProfileSaverOptions {
   bool GetProfileAOTCode() const {
     return profile_aot_code_;
   }
-  void SetProfileAOTCode(bool value) {
-    profile_aot_code_ = value;
-  }
   bool GetWaitForJitNotificationsToSave() const {
     return wait_for_jit_notifications_to_save_;
   }

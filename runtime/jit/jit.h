@@ -124,10 +124,6 @@ class JitOptions {
     profile_saver_options_.SetWaitForJitNotificationsToSave(value);
   }
 
-  void SetProfileAOTCode(bool value) {
-    profile_saver_options_.SetProfileAOTCode(value);
-  }
-
   void SetJitAtFirstUse() {
     use_jit_compilation_ = true;
     compile_threshold_ = 0;
