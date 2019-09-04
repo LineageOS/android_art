@@ -73,6 +73,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 import env
 from target_config import target_config
@@ -556,7 +557,7 @@ def run_test(command, test, test_variant, test_name):
       test_time = datetime.timedelta()
     else:
       test_skipped = False
-      test_start_time = datetime.datetime.now()
+      test_start_time = time.monotonic()
       if gdb:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, universal_newlines=True)
       else:
@@ -564,8 +565,8 @@ def run_test(command, test, test_variant, test_name):
                                 universal_newlines=True)
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
-      test_end_time = datetime.datetime.now()
-      test_time = test_end_time - test_start_time
+      test_time_seconds = time.monotonic() - test_start_time
+      test_time = datetime.timedelta(seconds=test_time_seconds)
 
     if not test_skipped:
       if test_passed:
@@ -579,7 +580,8 @@ def run_test(command, test, test_variant, test_name):
     else:
       return (test_name, 'PASS', None, test_time)
   except subprocess.TimeoutExpired as e:
-    test_end_time = datetime.datetime.now()
+    test_time_seconds = time.monotonic() - test_start_time
+    test_time = datetime.timedelta(seconds=test_time_seconds)
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
     # The python documentation states that it is necessary to actually kill the process.
@@ -588,10 +590,7 @@ def run_test(command, test, test_variant, test_name):
     proc.kill()
     script_output = proc.communicate()
 
-    return (test_name,
-            'TIMEOUT',
-            'Timed out in %d seconds\n%s' % (timeout, command),
-            test_end_time - test_start_time)
+    return (test_name, 'TIMEOUT', 'Timed out in %d seconds\n%s' % (timeout, command), test_time)
   except Exception as e:
     failed_tests.append((test_name, str(e)))
     return (test_name, 'FAIL', ('%s\n%s\n\n') % (command, str(e)), datetime.timedelta())
