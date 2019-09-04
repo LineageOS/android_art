@@ -45,7 +45,7 @@ flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode T
   || setup_die
 
 have_debugfs_p=false
-if [ ! $flattened_apex_p ]; then
+if $flattened_apex_p; then :; else
   if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
     say "Could not find debugfs, building now."
     build/soong/soong_ui.bash --make-mode debugfs-host || die "Cannot build debugfs"
