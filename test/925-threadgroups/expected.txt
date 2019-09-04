@@ -14,3 +14,8 @@ main:
 system:
   [Thread[FinalizerDaemon,5,system], Thread[FinalizerWatchdogDaemon,5,system], Thread[HeapTaskDaemon,5,system], Thread[ReferenceQueueDaemon,5,system], Thread[Signal Catcher,5,system]]
   [java.lang.ThreadGroup[name=main,maxpri=10]]
+art.Test925$CustomThreadGroup[name=TEST GROUP,maxpri=10]
+  java.lang.ThreadGroup[name=main,maxpri=10]
+  TEST GROUP
+  10
+  false
