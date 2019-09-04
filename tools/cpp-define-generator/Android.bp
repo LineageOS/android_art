@@ -42,6 +42,11 @@ cc_genrule {
     out: ["asm_defines.h"],
     tool_files: ["make_header.py"],
     cmd: "$(location make_header.py) \"$(in)\" > \"$(out)\"",
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library_headers {
