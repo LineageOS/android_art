@@ -73,6 +73,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 import env
 from target_config import target_config
@@ -232,7 +233,7 @@ def setup_test_env():
     _user_input_variants['address_sizes_target']['target'] = _user_input_variants['address_sizes']
 
   global n_thread
-  if n_thread is -1:
+  if n_thread == -1:
     if 'target' in _user_input_variants['target']:
       n_thread = get_default_threads('target')
     else:
@@ -556,7 +557,7 @@ def run_test(command, test, test_variant, test_name):
       test_time = datetime.timedelta()
     else:
       test_skipped = False
-      test_start_time = datetime.datetime.now()
+      test_start_time = time.monotonic()
       if gdb:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, universal_newlines=True)
       else:
@@ -564,8 +565,8 @@ def run_test(command, test, test_variant, test_name):
                                 universal_newlines=True)
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
-      test_end_time = datetime.datetime.now()
-      test_time = test_end_time - test_start_time
+      test_time_seconds = time.monotonic() - test_start_time
+      test_time = datetime.timedelta(seconds=test_time_seconds)
 
     if not test_skipped:
       if test_passed:
@@ -579,7 +580,8 @@ def run_test(command, test, test_variant, test_name):
     else:
       return (test_name, 'PASS', None, test_time)
   except subprocess.TimeoutExpired as e:
-    test_end_time = datetime.datetime.now()
+    test_time_seconds = time.monotonic() - test_start_time
+    test_time = datetime.timedelta(seconds=test_time_seconds)
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
     # The python documentation states that it is necessary to actually kill the process.
@@ -588,10 +590,7 @@ def run_test(command, test, test_variant, test_name):
     proc.kill()
     script_output = proc.communicate()
 
-    return (test_name,
-            'TIMEOUT',
-            'Timed out in %d seconds\n%s' % (timeout, command),
-            test_end_time - test_start_time)
+    return (test_name, 'TIMEOUT', 'Timed out in %d seconds\n%s' % (timeout, command), test_time)
   except Exception as e:
     failed_tests.append((test_name, str(e)))
     return (test_name, 'FAIL', ('%s\n%s\n\n') % (command, str(e)), datetime.timedelta())
@@ -908,13 +907,13 @@ def setup_env_for_build_target(build_target, parser, options):
   return target_options
 
 def get_default_threads(target):
-  if target is 'target':
+  if target == 'target':
     adb_command = 'adb shell cat /sys/devices/system/cpu/present'
     cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
     cpu_info = cpu_info_proc.stdout.read()
     if type(cpu_info) is bytes:
       cpu_info = cpu_info.decode('utf-8')
-    cpu_info_regex = '\d*-(\d*)'
+    cpu_info_regex = r'\d*-(\d*)'
     match = re.match(cpu_info_regex, cpu_info)
     if match:
       return int(match.group(1))
