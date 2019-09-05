@@ -278,6 +278,7 @@ cc_defaults {
         symbol_file: "external/libdexfile_external.map.txt",
         versions: ["1"],
     },
+    export_header_lib_headers: ["libdexfile_external_headers"],
 }
 
 cc_library {
