@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 public class Test925 {
   public static void run() throws Exception {
@@ -49,6 +50,30 @@ public class Test925 {
     waitGroupChildren(rootGroup, 5 /* # daemons */, 30 /* timeout in seconds */);
 
     checkChildren(curGroup);
+
+    // Test custom groups
+    ThreadGroup testGroup = new CustomThreadGroup(curGroup, "TEST GROUP");
+    final CountDownLatch cdl = new CountDownLatch(1);
+    final CountDownLatch startup = new CountDownLatch(1);
+    Thread t2 = new Thread(testGroup, "Test Thread") {
+      public void run() {
+        startup.countDown();
+        try {
+          cdl.await();
+        } catch (Exception e) {}
+      }
+    };
+    t2.start();
+    startup.await();
+    printThreadGroupInfo(testGroup);
+    cdl.countDown();
+    t2.join();
+  }
+
+  private static final class CustomThreadGroup extends ThreadGroup {
+    public CustomThreadGroup(ThreadGroup parent, String name) {
+      super(parent, name);
+    }
   }
 
   private static void printThreadGroupInfo(ThreadGroup tg) {
