@@ -367,7 +367,7 @@ const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
   DCHECK_GT(total_size, header_size);
   uint8_t* w_memory = reinterpret_cast<uint8_t*>(
       mspace_memalign(exec_mspace_, alignment, total_size));
-  if (w_memory == nullptr) {
+  if (UNLIKELY(w_memory == nullptr)) {
     return nullptr;
   }
   uint8_t* x_memory = GetExecutableAddress(w_memory);
@@ -478,6 +478,9 @@ void JitMemoryRegion::FreeCode(const uint8_t* code) {
 
 const uint8_t* JitMemoryRegion::AllocateData(size_t data_size) {
   void* result = mspace_malloc(data_mspace_, data_size);
+  if (UNLIKELY(result == nullptr)) {
+    return nullptr;
+  }
   used_memory_for_data_ += mspace_usable_size(result);
   return reinterpret_cast<uint8_t*>(GetNonWritableDataAddress(result));
 }
