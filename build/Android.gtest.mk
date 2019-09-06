@@ -286,7 +286,7 @@ ART_GTEST_dexoptanalyzer_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dexoptanalyzerd
 ART_GTEST_dexoptanalyzer_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
-  $(TESTING_RUNTIME_APEX)  # For dexoptanalyzerd.
+  $(TESTING_ART_APEX)  # For dexoptanalyzerd.
 
 ART_GTEST_image_space_test_HOST_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_HOST_DEPS)
@@ -298,21 +298,21 @@ ART_GTEST_dex2oat_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dex2oatd
 ART_GTEST_dex2oat_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
-  $(TESTING_RUNTIME_APEX)  # For dex2oatd.
+  $(TESTING_ART_APEX)  # For dex2oatd.
 
 ART_GTEST_dex2oat_image_test_HOST_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_HOST_DEPS) \
   $(HOST_OUT_EXECUTABLES)/dex2oatd
 ART_GTEST_dex2oat_image_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
-  $(TESTING_RUNTIME_APEX)  # For dex2oatd.
+  $(TESTING_ART_APEX)  # For dex2oatd.
 
 # TODO: document why this is needed.
 ART_GTEST_proxy_test_HOST_DEPS := $(HOST_CORE_IMAGE_DEFAULT_64) $(HOST_CORE_IMAGE_DEFAULT_32)
 
 # The dexdiag test requires the dexdiag utility.
 ART_GTEST_dexdiag_test_HOST_DEPS := $(HOST_OUT_EXECUTABLES)/dexdiag
-ART_GTEST_dexdiag_test_TARGET_DEPS := $(TESTING_RUNTIME_APEX)  # For dexdiag.
+ART_GTEST_dexdiag_test_TARGET_DEPS := $(TESTING_ART_APEX)  # For dexdiag.
 
 # The dexdump test requires an image and the dexdump utility.
 # TODO: rename into dexdump when migration completes
@@ -356,7 +356,7 @@ ART_GTEST_dexlist_test_HOST_DEPS := \
 ART_GTEST_dexlist_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TESTING_RUNTIME_APEX)   # For dexlist.
+  $(TESTING_ART_APEX)   # For dexlist.
 
 # The imgdiag test has dependencies on core.oat since it needs to load it during the test.
 # For the host, also add the installed tool (in the base size, that should suffice). For the
@@ -388,7 +388,7 @@ ART_GTEST_oatdump_test_HOST_DEPS := \
 ART_GTEST_oatdump_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TESTING_RUNTIME_APEX)    # For oatdumpd, dexdump, dex2oatd.
+  $(TESTING_ART_APEX)    # For oatdumpd, dexdump, dex2oatd.
 ART_GTEST_oatdump_image_test_HOST_DEPS := $(ART_GTEST_oatdump_test_HOST_DEPS)
 ART_GTEST_oatdump_image_test_TARGET_DEPS := $(ART_GTEST_oatdump_test_TARGET_DEPS)
 ART_GTEST_oatdump_app_test_HOST_DEPS := $(ART_GTEST_oatdump_test_HOST_DEPS)
@@ -396,7 +396,7 @@ ART_GTEST_oatdump_app_test_TARGET_DEPS := $(ART_GTEST_oatdump_test_TARGET_DEPS)
 
 # Profile assistant tests requires profman utility.
 ART_GTEST_profile_assistant_test_HOST_DEPS := $(HOST_OUT_EXECUTABLES)/profmand
-ART_GTEST_profile_assistant_test_TARGET_DEPS := $(TESTING_RUNTIME_APEX)  # For profmand.
+ART_GTEST_profile_assistant_test_TARGET_DEPS := $(TESTING_ART_APEX)  # For profmand.
 
 ART_GTEST_hiddenapi_test_HOST_DEPS := \
   $(HOST_CORE_IMAGE_DEFAULT_64) \

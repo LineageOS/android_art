@@ -30,7 +30,7 @@ TEST_ART_RUN_TEST_DEPENDENCIES := \
 # and Debug APEXes) -- which contains dex2oat, dalvikvm, their
 # dependencies and ART gtests -- on the target, as well as the core
 # images (all images as we sync only once).
-ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(TESTING_RUNTIME_APEX) $(TARGET_CORE_IMG_OUTS)
+ART_TEST_TARGET_RUN_TEST_DEPENDENCIES := $(TESTING_ART_APEX) $(TARGET_CORE_IMG_OUTS)
 
 # Also need libartagent.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libartagent-target libartagentd-target
