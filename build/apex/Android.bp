@@ -40,6 +40,11 @@ art_runtime_base_native_shared_libs = [
     "libopenjdkjvm",
     "libopenjdkjvmti",
 ]
+
+art_runtime_base_native_device_only_shared_libs = [
+    "libperfetto_hprof",
+]
+
 bionic_native_shared_libs = [
     // External API (having APEX stubs).
     "libc",
@@ -79,6 +84,10 @@ art_runtime_debug_native_shared_libs = [
     "libdexfiled_external",
     "libopenjdkjvmd",
     "libopenjdkjvmtid",
+]
+
+art_runtime_base_native_device_only_debug_shared_libs = [
+  "libperfetto_hprofd",
 ]
 
 // Tools common to both device APEX and host APEX. Derived from art-tools in art/Android.mk.
@@ -248,6 +257,7 @@ apex_defaults {
     manifest: "manifest-art.json",
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
+        art_runtime_base_native_device_only_shared_libs +
         libcore_native_device_only_shared_libs +
         libcore_native_shared_libs,
     multilib: {
@@ -281,7 +291,8 @@ apex_defaults {
 apex_defaults {
     name: "com.android.art-dev-defaults",
     defaults: ["com.android.art-defaults"],
-    native_shared_libs: art_runtime_debug_native_shared_libs +
+    native_shared_libs: art_runtime_base_native_device_only_debug_shared_libs +
+        art_runtime_debug_native_shared_libs +
         libcore_debug_native_shared_libs,
     multilib: {
         both: {

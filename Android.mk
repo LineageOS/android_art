@@ -426,6 +426,7 @@ LOCAL_REQUIRED_MODULES := \
     libopenjdkjvmti \
     profman \
     libadbconnection \
+    libperfetto_hprof \
 
 # Potentially add in debug variants:
 #
@@ -448,6 +449,7 @@ LOCAL_REQUIRED_MODULES += \
     libopenjdkjvmtid \
     profmand \
     libadbconnectiond \
+    libperfetto_hprofd \
 
 endif
 endif
