@@ -2087,8 +2087,12 @@ void CodeGeneratorARMVIXL::GenerateFrameEntry() {
   if (GetCompilerOptions().CountHotnessInCompiledCode()) {
     UseScratchRegisterScope temps(GetVIXLAssembler());
     vixl32::Register temp = temps.Acquire();
+    static_assert(ArtMethod::MaxCounter() == 0xFFFF, "asm is probably wrong");
+    // Load with sign extend to set the high bits for integer overflow check.
     __ Ldrh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
     __ Add(temp, temp, 1);
+    // Subtract one if the counter would overflow.
+    __ Sub(temp, temp, Operand(temp, ShiftType::LSR, 16));
     __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
   }
 
@@ -2497,8 +2501,11 @@ void InstructionCodeGeneratorARMVIXL::HandleGoto(HInstruction* got, HBasicBlock*
       vixl32::Register temp = temps.Acquire();
       __ Push(vixl32::Register(kMethodRegister));
       GetAssembler()->LoadFromOffset(kLoadWord, kMethodRegister, sp, kArmWordSize);
+      // Load with sign extend to set the high bits for integer overflow check.
       __ Ldrh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
       __ Add(temp, temp, 1);
+      // Subtract one if the counter would overflow.
+      __ Sub(temp, temp, Operand(temp, ShiftType::LSR, 16));
       __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
       __ Pop(vixl32::Register(kMethodRegister));
     }
