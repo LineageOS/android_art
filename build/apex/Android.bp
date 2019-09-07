@@ -16,7 +16,7 @@ art_runtime_base_binaries_prefer32 = [
 // installed in `/system` for the ART Buildbot set-up to work properly. This is
 // done by the `standalone-apex-files` Make phony target, used by the ART
 // Buildbot and Golem (see `art/Android.mk`). If you add libraries to this list,
-// you may have to also add them to `PRIVATE_RUNTIME_DEPENDENCY_LIBS` in
+// you may have to also add them to `PRIVATE_ART_APEX_DEPENDENCY_LIBS` in
 // `art/Android.mk`.
 // TODO(b/121117762): Remove this note when both the ART Buildbot and Golem use
 // the ART APEX.
@@ -143,7 +143,7 @@ libcore_java_libs = [
 // installed in `/system` for the ART Buildbot set-up to work properly. This is
 // done by the `standalone-apex-files` Make phony target, used by the ART
 // Buildbot and Golem (see `art/Android.mk`). If you add libraries to this list,
-// you may have to also add them to `PRIVATE_RUNTIME_DEPENDENCY_LIBS` in
+// you may have to also add them to `PRIVATE_ART_APEX_DEPENDENCY_LIBS` in
 // `art/Android.mk`.
 // TODO(b/121117762): Remove this note when both the ART Buildbot and Golem use
 // the ART APEX.

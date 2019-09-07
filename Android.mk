@@ -345,16 +345,16 @@ endif
 ifeq (true,$(art_target_include_debug_build))
   # Module with both release and debug variants, as well as
   # additional tools.
-  TARGET_RUNTIME_APEX := $(DEBUG_RUNTIME_APEX)
+  TARGET_ART_APEX := $(DEBUG_ART_APEX)
   APEX_TEST_MODULE := art-check-debug-apex-gen-fakebin
 else
   # Release module (without debug variants nor tools).
-  TARGET_RUNTIME_APEX := $(RELEASE_RUNTIME_APEX)
+  TARGET_ART_APEX := $(RELEASE_ART_APEX)
   APEX_TEST_MODULE := art-check-release-apex-gen-fakebin
 endif
 
 LOCAL_MODULE := com.android.art
-LOCAL_REQUIRED_MODULES := $(TARGET_RUNTIME_APEX)
+LOCAL_REQUIRED_MODULES := $(TARGET_ART_APEX)
 LOCAL_REQUIRED_MODULES += art_apex_boot_integrity
 
 # Clear locally used variable.
@@ -372,11 +372,11 @@ include $(BUILD_PHONY_PACKAGE)
 
 # Create canonical name -> file name symlink in the symbol directory
 # The symbol files for the debug or release variant are installed to
-# $(TARGET_OUT_UNSTRIPPED)/$(TARGET_RUNTIME_APEX) directory. However,
+# $(TARGET_OUT_UNSTRIPPED)/$(TARGET_ART_APEX) directory. However,
 # since they are available via /apex/com.android.art at runtime
 # regardless of which variant is installed, create a symlink so that
 # $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art is linked to
-# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_RUNTIME_APEX).
+# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_ART_APEX).
 # Note that installation of the symlink is triggered by the apex_manifest.json
 # file which is the file that is guaranteed to be created regardless of the
 # value of TARGET_FLATTEN_APEX.
@@ -388,23 +388,23 @@ include $(BUILD_PHONY_PACKAGE)
 # directory so that the APEX is accessible via the canonical path
 # /apex/com.android.art
 ifeq ($(TARGET_FLATTEN_APEX),true)
-runtime_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
+art_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_ART_APEX)/apex_manifest.json
 else
-runtime_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_RUNTIME_APEX)/apex_manifest.json
+art_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_ART_APEX)/apex_manifest.json
 endif
 
-runtime_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)/symlink.timestamp
-$(runtime_apex_manifest_file): $(runtime_apex_symlink_timestamp)
-$(runtime_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art
-$(runtime_apex_symlink_timestamp):
+art_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)/symlink.timestamp
+$(art_apex_manifest_file): $(art_apex_symlink_timestamp)
+$(art_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art
+$(art_apex_symlink_timestamp):
 	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
-	$(hide) ln -sf $(TARGET_RUNTIME_APEX) $(PRIVATE_LINK_NAME)
+	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
 ifeq ($(TARGET_FLATTEN_APEX),true)
 	$(hide) mkdir -p $(TARGET_OUT)/apex/com.android.art
 endif
 	$(hide) touch $@
 
-runtime_apex_manifest_file :=
+art_apex_manifest_file :=
 
 #######################
 # Fake packages for ART
@@ -533,7 +533,7 @@ PRIVATE_BIONIC_FILES := \
   lib64/bootstrap/libm.so \
   lib64/bootstrap/libdl.so \
 
-PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
+PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libnativebridge.so \
   lib64/libnativebridge.so \
   lib/libnativehelper.so \
@@ -572,18 +572,18 @@ PRIVATE_RUNTIME_DEPENDENCY_LIBS := \
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
 .PHONY: standalone-apex-files
-standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DEBUG_RUNTIME_APEX)
+standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DEBUG_ART_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
 	done
 	if [ "x$(TARGET_FLATTEN_APEX)" = xtrue ]; then \
-	  runtime_apex_orig_dir=$(TARGET_OUT)/apex/$(DEBUG_RUNTIME_APEX); \
+	  art_apex_orig_dir=$(TARGET_OUT)/apex/$(DEBUG_ART_APEX); \
 	else \
-	  runtime_apex_orig_dir=$(TARGET_OUT)/../apex/$(DEBUG_RUNTIME_APEX); \
+	  art_apex_orig_dir=$(TARGET_OUT)/../apex/$(DEBUG_ART_APEX); \
 	fi; \
-	for f in $(PRIVATE_RUNTIME_DEPENDENCY_LIBS); do \
-	  tf="$$runtime_apex_orig_dir/$$f"; \
+	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS); do \
+	  tf="$$art_apex_orig_dir/$$f"; \
 	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
 	done
 
