@@ -209,7 +209,7 @@ bool JitCodeCache::InitializeMappings(bool rwx_memory_allowed,
     if (mem_fd.get() < 0) {
       std::ostringstream oss;
       oss << "Failed to initialize dual view JIT. memfd_create() error: " << strerror(errno);
-      if (!rwx_memory_allowed) {
+      if (!rwx_memory_allowed && errno != ENOSYS) {
         // Without using RWX page permissions, the JIT can not fallback to single mapping as it
         // requires tranitioning the code pages to RWX for updates.
         *error_msg = oss.str();
