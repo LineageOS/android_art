@@ -460,6 +460,7 @@ genrule {
     defaults: ["art-check-apex-gen-defaults"],
     srcs: [":com.android.art.release"],
     cmd: art_check_apex_gen_stem +
+        " --flavor release" +
         " $(in)" +
         " && touch $(out)",
     out: ["art-check-release-apex-gen.dummy"],
@@ -476,7 +477,7 @@ genrule {
     defaults: ["art-check-apex-gen-defaults"],
     srcs: [":com.android.art.debug"],
     cmd: art_check_apex_gen_stem +
-        " --debug" +
+        " --flavor debug" +
         " $(in)" +
         " && touch $(out)",
     out: ["art-check-debug-apex-gen.dummy"],
@@ -493,7 +494,7 @@ genrule {
     defaults: ["art-check-apex-gen-defaults"],
     srcs: [":com.android.art.testing"],
     cmd: art_check_apex_gen_stem +
-        " --testing" +
+        " --flavor testing" +
         " $(in)" +
         " && touch $(out)",
     out: ["art-check-testing-apex-gen.dummy"],
