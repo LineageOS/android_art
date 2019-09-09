@@ -4284,13 +4284,6 @@ ArtMethod* MethodVerifier<kVerifierDebug>::VerifyInvocationArgs(
       return nullptr;
     }
     if (reference_type.GetClass()->IsInterface()) {
-      // TODO Can we verify anything else.
-      if (class_idx == class_def_.class_idx_) {
-        Fail(VERIFY_ERROR_CLASS_CHANGE) << "Cannot invoke-super on self as interface";
-        return nullptr;
-      }
-      // TODO Revisit whether we want to allow invoke-super on direct interfaces only like the JLS
-      // does.
       if (!GetDeclaringClass().HasClass()) {
         Fail(VERIFY_ERROR_NO_CLASS) << "Unable to resolve the full class of 'this' used in an"
                                     << "interface invoke-super";
