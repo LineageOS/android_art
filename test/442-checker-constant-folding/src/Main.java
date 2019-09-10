@@ -864,6 +864,23 @@ public class Main {
     return lhs & rhs;
   }
 
+  /// CHECK-START: int Main.AndSelfNegated(int) constant_folding (before)
+  /// CHECK-DAG:     <<Arg:i\d+>>     ParameterValue
+  /// CHECK-DAG:     <<Not:i\d+>>     Not [<<Arg>>]
+  /// CHECK-DAG:     <<And:i\d+>>     And [<<Not>>,<<Arg>>]
+  /// CHECK-DAG:                      Return [<<And>>]
+
+  /// CHECK-START: int Main.AndSelfNegated(int) constant_folding (after)
+  /// CHECK-DAG:     <<Const0:i\d+>>  IntConstant 0
+  /// CHECK-DAG:                      Return [<<Const0>>]
+
+  /// CHECK-START: int Main.AndSelfNegated(int) constant_folding (after)
+  /// CHECK-NOT:                      And
+
+  public static int AndSelfNegated(int arg) {
+    return arg & ~arg;
+  }
+
 
   /**
    * Exercise constant folding on logical or.
