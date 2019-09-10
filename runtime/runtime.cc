@@ -1002,7 +1002,9 @@ void Runtime::InitNonZygoteOrPostFork(
 
   // Create the thread pools.
   heap_->CreateThreadPool();
-  {
+  // Avoid creating the runtime thread pool for system server since it will not be used and would
+  // waste memory.
+  if (!is_system_server) {
     ScopedTrace timing("CreateThreadPool");
     constexpr size_t kStackSize = 64 * KB;
     constexpr size_t kMaxRuntimeWorkers = 4u;
