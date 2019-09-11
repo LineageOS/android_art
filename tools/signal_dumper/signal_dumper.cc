@@ -449,7 +449,7 @@ void DumpABI(pid_t forked_pid) {
       abi_str = "x86_64";
       break;
   }
-  std::cerr << "ABI: '" << abi_str << "'" << std::endl;
+  LOG(ERROR) << "ABI: '" << abi_str << "'" << std::endl;
 }
 
 }  // namespace ptrace
@@ -515,8 +515,7 @@ void DumpThread(pid_t pid,
                 const std::string* addr2line_path,
                 const char* prefix,
                 BacktraceMap* map) {
-  // Use std::cerr to avoid the LOG prefix.
-  std::cerr << std::endl << "=== pid: " << pid << " tid: " << tid << " ===" << std::endl;
+  LOG(ERROR) << std::endl << "=== pid: " << pid << " tid: " << tid << " ===" << std::endl;
 
   constexpr uint32_t kMaxWaitMicros = 1000 * 1000;  // 1s.
   if (pid != tid && !WaitForSigStopped(tid, kMaxWaitMicros)) {
@@ -574,19 +573,19 @@ void DumpThread(pid_t pid,
       }
       oss << ")";
     }
-    std::cerr << oss.str() << std::endl;
+    LOG(ERROR) << oss.str() << std::endl;
     if (try_addr2line && addr2line_path != nullptr) {
       addr2line::Addr2line(*addr2line_path,
                            it->map.name,
                            it->rel_pc,
-                           std::cerr,
+                           LOG_STREAM(ERROR),
                            prefix,
                            &addr2line_state);
     }
   }
 
   if (addr2line_state != nullptr) {
-    addr2line::Drain(0, prefix, &addr2line_state, std::cerr);
+    addr2line::Drain(0, prefix, &addr2line_state, LOG_STREAM(ERROR));
   }
 }
 
@@ -681,10 +680,25 @@ void SetupAndWait(pid_t forked_pid, int signal) {
 }  // namespace art
 
 int main(int argc ATTRIBUTE_UNUSED, char** argv) {
+  android::base::InitLogging(argv);
+
   int signal = SIGRTMIN + 2;
 
   size_t index = 1u;
   CHECK(argv[index] != nullptr);
+
+  bool to_logcat = false;
+#ifdef __ANDROID__
+  if (strcmp(argv[index], "-l") == 0) {
+    index++;
+    CHECK(argv[index] != nullptr);
+    to_logcat = true;
+  }
+#endif
+  if (!to_logcat) {
+    android::base::SetLogger(android::base::StderrLogger);
+  }
+
   if (strcmp(argv[index], "-s") == 0) {
     index++;
     CHECK(argv[index] != nullptr);
