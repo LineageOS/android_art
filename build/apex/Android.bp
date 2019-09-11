@@ -349,6 +349,7 @@ apex_test {
     file_contexts: "com.android.art.debug",
     certificate: ":com.android.art.certificate",
     tests: art_gtests,
+    binaries: ["signal_dumper"], // Need signal_dumper for run-tests.
 }
 
 // TODO: Do this better. art_apex_test_host will disable host builds when
