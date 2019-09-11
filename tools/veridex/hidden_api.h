@@ -17,6 +17,8 @@
 #ifndef ART_TOOLS_VERIDEX_HIDDEN_API_H_
 #define ART_TOOLS_VERIDEX_HIDDEN_API_H_
 
+#include "api_list_filter.h"
+
 #include "base/hiddenapi_flags.h"
 #include "dex/method_reference.h"
 
@@ -33,7 +35,7 @@ class DexFile;
  */
 class HiddenApi {
  public:
-  HiddenApi(const char* flags_file, bool sdk_uses_only);
+  HiddenApi(const char* flags_file, const ApiListFilter& api_list_filter);
 
   hiddenapi::ApiList GetApiList(const std::string& name) const {
     auto it = api_list_.find(name);
