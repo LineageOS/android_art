@@ -690,6 +690,40 @@ TEST_F(HiddenApiTest, StaticNativeMethodTwoListsMatch3) {
   ASSERT_EQ(dex_file.get(), nullptr);
 }
 
+TEST_F(HiddenApiTest, InstanceFieldCorePlatformApiMatch) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:LBadType1;,greylist" << std::endl
+      << "LMain;->ifield:LBadType2;,greylist-max-o" << std::endl
+      << "LMain;->ifield:I,greylist,core-platform-api" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::CorePlatformApi() |
+  hiddenapi::ApiList::Greylist(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldTestApiMatch) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:LBadType1;,greylist" << std::endl
+      << "LMain;->ifield:LBadType2;,greylist-max-o" << std::endl
+      << "LMain;->ifield:I,greylist,test-api" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::TestApi()
+  | hiddenapi::ApiList::Greylist(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldUnknownFlagMatch) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:LBadType1;,greylist" << std::endl
+      << "LMain;->ifield:LBadType2;,greylist-max-o" << std::endl
+      << "LMain;->ifield:I,greylist,unknown-flag" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
+  ASSERT_EQ(dex_file.get(), nullptr);
+}
+
 // The following tests use this class hierarchy:
 //
 //    AbstractPackageClass  PublicInterface
