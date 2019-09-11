@@ -19,6 +19,9 @@
 #include <dlfcn.h>
 
 #include "android-base/stringprintf.h"
+#include "base/locks.h"
+#include "base/mutex.h"
+#include "thread-current-inl.h"
 
 namespace art {
 
@@ -32,6 +35,7 @@ Plugin::Plugin(const Plugin& other) : library_(other.library_), dlopen_handle_(n
 }
 
 bool Plugin::Load(/*out*/std::string* error_msg) {
+  Locks::mutator_lock_->AssertNotHeld(Thread::Current());
   DCHECK(!IsLoaded());
   void* res = dlopen(library_.c_str(), RTLD_LAZY);
   if (res == nullptr) {
@@ -55,6 +59,7 @@ bool Plugin::Load(/*out*/std::string* error_msg) {
 }
 
 bool Plugin::Unload() {
+  Locks::mutator_lock_->AssertNotHeld(Thread::Current());
   DCHECK(IsLoaded());
   bool ret = true;
   void* handle = dlopen_handle_;

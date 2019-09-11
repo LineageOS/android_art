@@ -156,10 +156,10 @@ class TraceFastPhaseCB : public art::RuntimePhaseCallback {
 TraceFastPhaseCB gPhaseCallback;
 
 // The plugin initialization function.
-extern "C" bool ArtPlugin_Initialize() REQUIRES_SHARED(art::Locks::mutator_lock_) {
+extern "C" bool ArtPlugin_Initialize() {
   art::Runtime* runtime = art::Runtime::Current();
-  art::ScopedThreadSuspension stsc(art::Thread::Current(),
-                                   art::ThreadState::kWaitingForMethodTracingStart);
+  art::ScopedThreadStateChange stsc(art::Thread::Current(),
+                                    art::ThreadState::kWaitingForMethodTracingStart);
   art::ScopedSuspendAll ssa("Add phase callback");
   runtime->GetRuntimeCallbacks()->AddRuntimePhaseCallback(&gPhaseCallback);
   return true;
