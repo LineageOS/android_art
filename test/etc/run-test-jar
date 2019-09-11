@@ -1045,6 +1045,27 @@ if [ "$HOST" = "n" ]; then
       PREPEND_TARGET_PATH="$PREPEND_TARGET_PATH:$ANDROID_ROOT/bin"
     fi
 
+    # Todo: Implement existence check.
+    TIMEOUT_DUMPER=
+
+    timeout_dumper_cmd=
+    if [ ! -z "$TIMEOUT_DUMPER" ] ; then
+      # Use "-l" to dump to logcat. That is convenience for the build bot crash symbolization.
+      timeout_dumper_cmd="${TIMEOUT_DUMPER} -l -s 15"
+    fi
+
+    timeout_prefix=
+    if [ "$TIME_OUT" = "timeout" ]; then
+      # Add timeout command if time out is desired.
+      #
+      # Note: We first send SIGTERM (the timeout default, signal 15) to the signal dumper, which
+      #       will induce a full thread dump before killing the process. To ensure any issues in
+      #       dumping do not lead to a deadlock, we also use the "-k" option to definitely kill the
+      #       child.
+      # Note: Using "--foreground" to not propagate the signal to children, i.e., the runtime.
+      timeout_prefix="timeout --foreground -k 120s ${TIME_OUT_VALUE}s ${timeout_dumper_cmd} $cmdline"
+    fi
+
     # Create a script with the command. The command can get longer than the longest
     # allowed adb command and there is no way to get the exit status from a adb shell
     # command. Dalvik cache is cleaned before running to make subsequent executions
@@ -1069,7 +1090,7 @@ if [ "$HOST" = "n" ]; then
              $vdex_cmdline && \
              $strip_cmdline && \
              $sync_cmdline && \
-             $dalvikvm_cmdline"
+             $timeout_prefix $dalvikvm_cmdline"
 
     cmdfile=$(tempfile -p "cmd-" -s "-$TEST_NAME")
     echo "$cmdline" > $cmdfile
