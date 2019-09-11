@@ -15,29 +15,31 @@
 //
 
 cc_defaults {
-  name: "signal_dumper_libbase_static_deps",
-  static_libs: ["liblog"],
+    name: "signal_dumper_libbase_static_deps",
+    static_libs: ["liblog"],
 }
+
 cc_defaults {
-  name: "signal_dumper_libunwindstack_static_deps",
-  defaults: ["signal_dumper_libbase_static_deps"],
-  static_libs: [
-    "libbase",
-    "libdexfile_support",
-    "liblog",
-    "liblzma",
-  ],
+    name: "signal_dumper_libunwindstack_static_deps",
+    defaults: ["signal_dumper_libbase_static_deps"],
+    static_libs: [
+        "libbase",
+        "libdexfile_support",
+        "liblog",
+        "liblzma",
+    ],
 }
+
 cc_defaults {
-  name: "signal_dumper_libbacktrace_static_deps",
-  defaults: [
-    "signal_dumper_libbase_static_deps",
-    "signal_dumper_libunwindstack_static_deps",
-  ],
-  static_libs: [
-    "libbase",
-    "libunwindstack",
-  ],
+    name: "signal_dumper_libbacktrace_static_deps",
+    defaults: [
+        "signal_dumper_libbase_static_deps",
+        "signal_dumper_libunwindstack_static_deps",
+    ],
+    static_libs: [
+        "libbase",
+        "libunwindstack",
+    ],
 }
 
 art_cc_binary {
@@ -57,9 +59,9 @@ art_cc_binary {
     device_supported: false,
 
     defaults: [
-      "art_defaults",
-      "signal_dumper_libbacktrace_static_deps",
-      "signal_dumper_libbase_static_deps",
+        "art_defaults",
+        "signal_dumper_libbacktrace_static_deps",
+        "signal_dumper_libbase_static_deps",
     ],
 
     srcs: ["signal_dumper.cc"],
