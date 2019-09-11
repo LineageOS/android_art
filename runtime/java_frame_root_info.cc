@@ -24,7 +24,18 @@ void JavaFrameRootInfo::Describe(std::ostream& os) const {
   const StackVisitor* visitor = stack_visitor_;
   CHECK(visitor != nullptr);
   os << "Type=" << GetType() << " thread_id=" << GetThreadId() << " location=" <<
-      visitor->DescribeLocation() << " vreg=" << vreg_;
+      visitor->DescribeLocation() << " vreg=";
+  if (vreg_ == JavaFrameRootInfo::kUnknownVreg) {
+    os << "Unknown";
+  } else if (vreg_ == JavaFrameRootInfo::kImpreciseVreg) {
+    os << "imprecise";
+  } else if (vreg_ == JavaFrameRootInfo::kProxyReferenceArgument) {
+    os << "Proxy reference argument";
+  } else if (vreg_ == JavaFrameRootInfo::kMethodDeclaringClass) {
+    os << "method declaring class";
+  } else {
+    os << vreg_;
+  }
 }
 
 }  // namespace art
