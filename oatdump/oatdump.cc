@@ -3488,7 +3488,7 @@ struct OatdumpArgs : public CmdlineArgs {
         "\n"
         // Either oat-file or image is required.
         "  --oat-file=<file.oat>: specifies an input oat filename.\n"
-        "      Example: --oat-file=/system/framework/boot.oat\n"
+        "      Example: --oat-file=/system/framework/arm64/boot.oat\n"
         "\n"
         "  --image=<file.art>: specifies an input image location.\n"
         "      Example: --image=/system/framework/boot.art\n"
