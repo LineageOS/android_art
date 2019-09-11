@@ -899,6 +899,9 @@ class TestingTargetChecker:
     self._checker.check_native_library('libartd-disassembler')
     self._checker.check_native_library('libartd-simulator-container')
 
+    # Check ART test tools.
+    self._checker.check_executable('signal_dumper')
+
 
 class NoSuperfluousBinariesChecker:
   def __init__(self, checker):
