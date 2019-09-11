@@ -47,6 +47,9 @@ ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libarttest-target libarttestd-target
 # Also need libnativebridgetest.
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += libnativebridgetest-target libnativebridgetestd-target
 
+# Also need signal_dumper.
+ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += signal_dumper-target
+
 ART_TEST_TARGET_RUN_TEST_DEPENDENCIES += \
   $(foreach jar,$(TARGET_TEST_CORE_JARS),$(TARGET_OUT_JAVA_LIBRARIES)/$(jar).jar)
 
