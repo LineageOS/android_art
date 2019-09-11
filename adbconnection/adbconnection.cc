@@ -878,7 +878,7 @@ void AdbConnectionState::StopDebuggerThreads() {
 }
 
 // The plugin initialization function.
-extern "C" bool ArtPlugin_Initialize() REQUIRES_SHARED(art::Locks::mutator_lock_) {
+extern "C" bool ArtPlugin_Initialize() {
   DCHECK(art::Runtime::Current()->GetJdwpProvider() == art::JdwpProvider::kAdbConnection);
   // TODO Provide some way for apps to set this maybe?
   DCHECK(gState == nullptr);
