@@ -73,7 +73,7 @@ class ProfileCompilationInfo {
  public:
   static const uint8_t kProfileMagic[];
   static const uint8_t kProfileVersion[];
-  static const uint8_t kProfileVersionWithCounters[];
+  static const uint8_t kProfileVersionForBootImage[];
   static const char kDexMetadataProfileEntry[];
 
   static constexpr size_t kProfileVersionSize = 4;
@@ -241,7 +241,9 @@ class ProfileCompilationInfo {
 
   // Public methods to create, extend or query the profile.
   ProfileCompilationInfo();
+  explicit ProfileCompilationInfo(bool for_boot_image);
   explicit ProfileCompilationInfo(ArenaPool* arena_pool);
+  ProfileCompilationInfo(ArenaPool* arena_pool, bool for_boot_image);
 
   ~ProfileCompilationInfo();
 
@@ -393,6 +395,9 @@ class ProfileCompilationInfo {
                             /*out*/std::set<uint16_t>* startup_method_set,
                             /*out*/std::set<uint16_t>* post_startup_method_method_set) const;
 
+  // Returns true iff both profiles have the same version.
+  bool SameVersion(const ProfileCompilationInfo& other) const;
+
   // Perform an equality test with the `other` profile information.
   bool Equals(const ProfileCompilationInfo& other);
 
@@ -455,19 +460,7 @@ class ProfileCompilationInfo {
   void PrepareForAggregationCounters();
 
   // Returns true if the profile is configured to store aggregation counters.
-  bool StoresAggregationCounters() const;
-
-  // Returns the aggregation counter for the given method.
-  // Returns -1 if the method is not in the profile.
-  // CHECKs that the profile is configured to store aggregations counters.
-  int32_t GetMethodAggregationCounter(const MethodReference& method_ref) const;
-  // Returns the aggregation counter for the given class.
-  // Returns -1 if the class is not in the profile.
-  // CHECKs that the profile is configured to store aggregations counters.
-  int32_t GetClassAggregationCounter(const TypeReference& type_ref) const;
-  // Returns the number of times the profile was merged.
-  // CHECKs that the profile is configured to store aggregations counters.
-  uint16_t GetAggregationCounter() const;
+  bool IsForBootImage() const;
 
   // Return the version of this profile.
   const uint8_t* GetVersion() const;
@@ -495,8 +488,7 @@ class ProfileCompilationInfo {
                 const std::string& key,
                 uint32_t location_checksum,
                 uint16_t index,
-                uint32_t num_methods,
-                bool store_aggregation_counters)
+                uint32_t num_methods)
         : allocator_(allocator),
           profile_key(key),
           profile_index(index),
@@ -504,17 +496,12 @@ class ProfileCompilationInfo {
           method_map(std::less<uint16_t>(), allocator->Adapter(kArenaAllocProfile)),
           class_set(std::less<dex::TypeIndex>(), allocator->Adapter(kArenaAllocProfile)),
           num_method_ids(num_methods),
-          bitmap_storage(allocator->Adapter(kArenaAllocProfile)),
-          method_counters(allocator->Adapter(kArenaAllocProfile)),
-          class_counters(allocator->Adapter(kArenaAllocProfile)) {
+          bitmap_storage(allocator->Adapter(kArenaAllocProfile)) {
       bitmap_storage.resize(ComputeBitmapStorage(num_method_ids));
       if (!bitmap_storage.empty()) {
         method_bitmap =
             BitMemoryRegion(MemoryRegion(
                 &bitmap_storage[0], bitmap_storage.size()), 0, ComputeBitmapBits(num_method_ids));
-      }
-      if (store_aggregation_counters) {
-        PrepareForAggregationCounters();
       }
     }
 
@@ -530,9 +517,7 @@ class ProfileCompilationInfo {
           num_method_ids == other.num_method_ids &&
           method_map == other.method_map &&
           class_set == other.class_set &&
-          (BitMemoryRegion::Compare(method_bitmap, other.method_bitmap) == 0) &&
-          class_counters == other.class_counters &&
-          method_counters == other.method_counters;
+          (BitMemoryRegion::Compare(method_bitmap, other.method_bitmap) == 0);
     }
 
     // Mark a method as executed at least once.
@@ -547,12 +532,6 @@ class ProfileCompilationInfo {
 
     void SetMethodHotness(size_t index, MethodHotness::Flag flags);
     MethodHotness GetHotnessInfo(uint32_t dex_method_index) const;
-    void PrepareForAggregationCounters();
-
-    int32_t GetMethodAggregationCounter(uint16_t method_index) const;
-    int32_t GetClassAggregationCounter(uint16_t type_index) const;
-
-    uint16_t GetNumMethodCounters() const;
 
     bool ContainsClass(const dex::TypeIndex type_index) const;
 
@@ -576,8 +555,6 @@ class ProfileCompilationInfo {
     uint32_t num_method_ids;
     ArenaVector<uint8_t> bitmap_storage;
     BitMemoryRegion method_bitmap;
-    ArenaVector<uint16_t> method_counters;
-    ArenaVector<uint16_t> class_counters;
 
    private:
     enum BitmapIndex {
@@ -808,11 +785,6 @@ class ProfileCompilationInfo {
                    const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
                    /*out*/std::string* error);
 
-  // Read the aggregation counters from the buffer.
-  bool ReadAggregationCounters(SafeBuffer& buffer,
-                               DexFileData& dex_data,
-                               /*out*/std::string* error);
-
   // The method generates mapping of profile indices while merging a new profile
   // data into current data. It returns true, if the mapping was successful.
   bool RemapProfileIndex(const std::vector<ProfileLineHeader>& profile_line_headers,
@@ -866,12 +838,7 @@ class ProfileCompilationInfo {
   ArenaSafeMap<const std::string, uint8_t> profile_key_map_;
 
   // The version of the profile.
-  // This may change if a "normal" profile is transformed to keep track
-  // of aggregation counters.
   uint8_t version_[kProfileVersionSize];
-
-  // Stored only when the profile is configured to keep track of aggregation counters.
-  uint16_t aggregation_count_;
 };
 
 }  // namespace art

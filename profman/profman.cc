@@ -159,9 +159,8 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("      the file passed with --profile-fd(file) to the profile passed with");
   UsageError("      --reference-profile-fd(file) and update at the same time the profile-key");
   UsageError("      of entries corresponding to the apks passed with --apk(-fd).");
-  UsageError("  --store-aggregation-counters: if present, profman will compute and store");
-  UsageError("      the aggregation counters of classes and methods in the output profile.");
-  UsageError("      In this case the profile will have a different version.");
+  // TODO(calin): remove after the flag is removed from installd.
+  UsageError("  --store-aggregation-counters: no-op");
   UsageError("");
 
   exit(EXIT_FAILURE);
@@ -233,8 +232,7 @@ class ProfMan final {
       test_profile_class_percentage_(kDefaultTestProfileClassPercentage),
       test_profile_seed_(NanoTime()),
       start_ns_(NanoTime()),
-      copy_and_update_profile_key_(false),
-      store_aggregation_counters_(false) {}
+      copy_and_update_profile_key_(false) {}
 
   ~ProfMan() {
     LogCompletionTime();
@@ -319,7 +317,7 @@ class ProfMan final {
       } else if (option == "--copy-and-update-profile-key") {
         copy_and_update_profile_key_ = true;
       } else if (option == "--store-aggregation-counters") {
-        store_aggregation_counters_ = true;
+        // TODO(calin): remove this branch
       } else {
         Usage("Unknown argument '%s'", raw_option);
       }
@@ -396,14 +394,12 @@ class ProfMan final {
       File file(reference_profile_file_fd_, false);
       result = ProfileAssistant::ProcessProfiles(profile_files_fd_,
                                                  reference_profile_file_fd_,
-                                                 filter_fn,
-                                                 store_aggregation_counters_);
+                                                 filter_fn);
       CloseAllFds(profile_files_fd_, "profile_files_fd_");
     } else {
       result = ProfileAssistant::ProcessProfiles(profile_files_,
                                                  reference_profile_file_,
-                                                 filter_fn,
-                                                 store_aggregation_counters_);
+                                                 filter_fn);
     }
     return result;
   }
@@ -1422,7 +1418,6 @@ class ProfMan final {
   uint32_t test_profile_seed_;
   uint64_t start_ns_;
   bool copy_and_update_profile_key_;
-  bool store_aggregation_counters_;
 };
 
 // See ProfileAssistant::ProcessingResult for return codes.
