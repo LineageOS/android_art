@@ -294,7 +294,7 @@ func init() {
 		"libart_static_cc_defaults",
 		"art_global_defaults",
 		"art_debug_defaults",
-		"art_apex_test",
+		"art_apex_test_host",
 	}
 	android.AddNeverAllowRules(
 		android.NeverAllow().
