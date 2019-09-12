@@ -20,6 +20,7 @@
 #include "bit_utils.h"
 #include "casts.h"
 #include "iteration_range.h"
+#include "length_prefixed_array.h"
 #include "stride_iterator.h"
 
 namespace art {
@@ -54,6 +55,14 @@ class ArraySlice {
         element_size_(element_size) {
     DCHECK(array_ != nullptr || length == 0);
   }
+
+  ArraySlice(LengthPrefixedArray<T>* lpa,
+             size_t element_size = sizeof(T),
+             size_t alignment = alignof(T))
+      : ArraySlice(
+            lpa != nullptr && lpa->size() != 0 ? &lpa->At(0, element_size, alignment) : nullptr,
+            lpa != nullptr ? lpa->size() : 0,
+            element_size) {}
 
   // Iterators.
   iterator begin() { return iterator(&AtUnchecked(0), element_size_); }
@@ -130,7 +139,17 @@ class ArraySlice {
   }
 
   bool Contains(const T* element) const {
-    return &AtUnchecked(0) <= element && element < &AtUnchecked(size_);
+    return &AtUnchecked(0) <= element && element < &AtUnchecked(size_) &&
+          ((reinterpret_cast<uintptr_t>(element) -
+            reinterpret_cast<uintptr_t>(&AtUnchecked(0))) % element_size_) == 0;
+  }
+
+  size_t OffsetOf(const T* element) const {
+    DCHECK(Contains(element));
+    // Since it's possible element_size_ != sizeof(T) we cannot just use pointer arithmatic
+    uintptr_t base_ptr = reinterpret_cast<uintptr_t>(&AtUnchecked(0));
+    uintptr_t obj_ptr = reinterpret_cast<uintptr_t>(element);
+    return (obj_ptr - base_ptr) / element_size_;
   }
 
  private:
