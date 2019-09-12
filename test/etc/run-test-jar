@@ -1049,10 +1049,10 @@ if [ "$HOST" = "n" ]; then
 
     # Check whether signal_dumper is available.
     if [ "$TIMEOUT_DUMPER" = signal_dumper ] ; then
-      // Testing APEX?
+      # Testing APEX?
       if adb shell 'test -e /apex/com.android.art.testing/bin/signal_dumper' ; then
         TIMEOUT_DUMPER="/apex/com.android.art.testing/bin/signal_dumper"
-      // Fallback: is it in PATH?
+      # Fallback: is it in PATH?
       else
         TIMEOUT_DUMPER=$(adb shell which signal_dumper)
         if [ $? -ne 0 ] ; then
