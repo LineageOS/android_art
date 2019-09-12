@@ -1039,7 +1039,9 @@ class FollowReferencesHelper final {
           }
 
           auto& java_info = static_cast<const art::JavaFrameRootInfo&>(info);
-          ref_info->stack_local.slot = static_cast<jint>(java_info.GetVReg());
+          size_t vreg = java_info.GetVReg();
+          ref_info->stack_local.slot = static_cast<jint>(
+              vreg <= art::JavaFrameRootInfo::kMaxVReg ? vreg : -1);
           const art::StackVisitor* visitor = java_info.GetVisitor();
           ref_info->stack_local.location =
               static_cast<jlocation>(visitor->GetDexPc(/* abort_on_failure= */ false));
