@@ -81,7 +81,15 @@ from device_config import device_config
 
 # timeout for individual tests.
 # TODO: make it adjustable per tests and for buildbots
-timeout = 3000 # 50 minutes
+#
+# Note: this needs to be larger than run-test timeouts, as long as this script
+#       does not push the value to run-test. run-test is somewhat complicated:
+#                      base: 25m  (large for ASAN)
+#        + timeout handling:  2m
+#        +   gcstress extra:  5m
+#        -----------------------
+#                            32m
+timeout = 2100 # 35 minutes
 
 # DISABLED_TEST_CONTAINER holds information about the disabled tests. It is a map
 # that has key as the test name (like 001-HelloWorld), and value as set of
