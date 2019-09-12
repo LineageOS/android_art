@@ -64,12 +64,9 @@ STRIP_DEX="n"
 SECONDARY_DEX=""
 TIME_OUT="timeout"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
 TIMEOUT_DUMPER=signal_dumper
-# Value in seconds
-if [ "$ART_USE_READ_BARRIER" != "false" ]; then
-  TIME_OUT_VALUE=2400  # 40 minutes.
-else
-  TIME_OUT_VALUE=1200  # 20 minutes.
-fi
+# Value in seconds. If you change this, update the timeout in testrunner.py as well.
+# TODO: Only ASAN builds come close to this value. Distinguish ASAN from non-ASAN builds.
+TIME_OUT_VALUE=1500  # 25 minutes.
 USE_GDB="n"
 USE_GDBSERVER="n"
 GDBSERVER_PORT=":5039"
