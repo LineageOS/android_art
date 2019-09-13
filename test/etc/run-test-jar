@@ -1088,7 +1088,8 @@ if [ "$HOST" = "n" ]; then
 
     if [ ! -z "$TIMEOUT_DUMPER" ] ; then
       # Use "-l" to dump to logcat. That is convenience for the build bot crash symbolization.
-      timeout_dumper_cmd="${TIMEOUT_DUMPER} -l -s 15"
+      # Use exit code 124 for toybox timeout (b/141007616).
+      timeout_dumper_cmd="${TIMEOUT_DUMPER} -l -s 15 -e 124"
     fi
 
     timeout_prefix=

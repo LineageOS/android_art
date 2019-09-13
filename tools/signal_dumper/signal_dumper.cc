@@ -654,7 +654,7 @@ void WaitMainLoop(pid_t forked_pid, std::atomic<bool>* saw_wif_stopped_for_main)
 }
 
 [[noreturn]]
-void SetupAndWait(pid_t forked_pid, int signal) {
+void SetupAndWait(pid_t forked_pid, int signal, int timeout_exit_code) {
   timeout_signal::SignalSet signals;
   signals.Add(signal);
   signals.Block();
@@ -670,7 +670,7 @@ void SetupAndWait(pid_t forked_pid, int signal) {
 
     // Don't clean up. Just kill the child and exit.
     kill(forked_pid, SIGKILL);
-    _exit(1);
+    _exit(timeout_exit_code);
   });
 
   WaitMainLoop(forked_pid, &saw_wif_stopped_for_main);
@@ -683,6 +683,7 @@ int main(int argc ATTRIBUTE_UNUSED, char** argv) {
   android::base::InitLogging(argv);
 
   int signal = SIGRTMIN + 2;
+  int timeout_exit_code = 1;
 
   size_t index = 1u;
   CHECK(argv[index] != nullptr);
@@ -709,6 +710,17 @@ int main(int argc ATTRIBUTE_UNUSED, char** argv) {
     CHECK(argv[index] != nullptr);
   }
 
+  if (strcmp(argv[index], "-e") == 0) {
+    index++;
+    CHECK(argv[index] != nullptr);
+    uint32_t timeout_exit_code_uint;
+    CHECK(android::base::ParseUint(argv[index], &timeout_exit_code_uint))
+        << "Exit code not a number.";
+    timeout_exit_code = timeout_exit_code_uint;
+    index++;
+    CHECK(argv[index] != nullptr);
+  }
+
   pid_t orig_ppid = getpid();
 
   pid_t pid = fork();
@@ -727,6 +739,6 @@ int main(int argc ATTRIBUTE_UNUSED, char** argv) {
     __builtin_unreachable();
   }
 
-  art::SetupAndWait(pid, signal);
+  art::SetupAndWait(pid, signal, timeout_exit_code);
   __builtin_unreachable();
 }
