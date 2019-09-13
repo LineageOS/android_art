@@ -1074,10 +1074,10 @@ if [ "$HOST" = "n" ]; then
       fi
 
       # Testing APEX?
-      if adb shell "test -e ${TIMEOUT_DUMPER_PATH_PREFIX}/apex/com.android.art/bin/signal_dumper" ; then
+      if adb shell "test -x ${TIMEOUT_DUMPER_PATH_PREFIX}/apex/com.android.art/bin/signal_dumper" ; then
         TIMEOUT_DUMPER="/apex/com.android.art/bin/signal_dumper"
       # Is it in /system/bin?
-      elif adb shell "test -e ${TIMEOUT_DUMPER_PATH_PREFIX}/system/bin/signal_dumper" ; then
+      elif adb shell "test -x ${TIMEOUT_DUMPER_PATH_PREFIX}/system/bin/signal_dumper" ; then
         TIMEOUT_DUMPER="/system/bin/signal_dumper"
       else
         TIMEOUT_DUMPER=
