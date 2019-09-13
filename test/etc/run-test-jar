@@ -460,6 +460,11 @@ if [ -z "$TIME_OUT_VALUE" ] ; then
   fi
 fi
 
+# Escape hatch for slow hosts or devices. Accept an environment variable as a timeout factor.
+if [ ! -z "$ART_TIME_OUT_MULTIPLIER" ] ; then
+  TIME_OUT_VALUE=$((${TIME_OUT_VALUE} * ${ART_TIME_OUT_MULTIPLIER}))
+fi
+
 # The DEX_LOCATION with the chroot prefix, if any.
 CHROOT_DEX_LOCATION="$CHROOT$DEX_LOCATION"
 
