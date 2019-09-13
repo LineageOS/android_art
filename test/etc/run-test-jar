@@ -1067,15 +1067,20 @@ if [ "$HOST" = "n" ]; then
 
     # Check whether signal_dumper is available.
     if [ "$TIMEOUT_DUMPER" = signal_dumper ] ; then
+      # Chroot? Use as prefix for tests.
+      TIMEOUT_DUMPER_PATH_PREFIX=
+      if [ -n "$CHROOT" ]; then
+        TIMEOUT_DUMPER_PATH_PREFIX="$CHROOT/"
+      fi
+
       # Testing APEX?
-      if adb shell 'test -e /apex/com.android.art.testing/bin/signal_dumper' ; then
-        TIMEOUT_DUMPER="/apex/com.android.art.testing/bin/signal_dumper"
-      # Fallback: is it in PATH?
+      if adb shell "test -e ${TIMEOUT_DUMPER_PATH_PREFIX}/apex/com.android.art/bin/signal_dumper" ; then
+        TIMEOUT_DUMPER="/apex/com.android.art/bin/signal_dumper"
+      # Is it in /system/bin?
+      elif adb shell "test -e ${TIMEOUT_DUMPER_PATH_PREFIX}/system/bin/signal_dumper" ; then
+        TIMEOUT_DUMPER="/system/bin/signal_dumper"
       else
-        TIMEOUT_DUMPER=$(adb shell which signal_dumper)
-        if [ $? -ne 0 ] ; then
-          TIMEOUT_DUMPER=
-        fi
+        TIMEOUT_DUMPER=
       fi
     else
       TIMEOUT_DUMPER=
