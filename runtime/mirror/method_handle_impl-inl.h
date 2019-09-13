@@ -35,7 +35,7 @@ inline ObjPtr<mirror::MethodType> MethodHandle::GetNominalType() {
 
 inline ObjPtr<mirror::Class> MethodHandle::GetTargetClass() {
   Kind kind = GetHandleKind();
-  return (kind <= kLastValidKind) ?
+  return (kind < kFirstAccessorKind) ?
       GetTargetMethod()->GetDeclaringClass() : GetTargetField()->GetDeclaringClass();
 }
 
