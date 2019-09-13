@@ -64,9 +64,9 @@ STRIP_DEX="n"
 SECONDARY_DEX=""
 TIME_OUT="timeout"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
 TIMEOUT_DUMPER=signal_dumper
-# Value in seconds. If you change this, update the timeout in testrunner.py as well.
-# TODO: Only ASAN builds come close to this value. Distinguish ASAN from non-ASAN builds.
-TIME_OUT_VALUE=1500  # 25 minutes.
+# Values in seconds.
+TIME_OUT_EXTRA=
+TIME_OUT_VALUE=
 USE_GDB="n"
 USE_GDBSERVER="n"
 GDBSERVER_PORT=":5039"
@@ -143,7 +143,7 @@ while true; do
         shift
     elif [ "x$1" = "x--gc-stress" ]; then
         # Give an extra 5 mins if we are gc-stress.
-        TIME_OUT_VALUE=$((${TIME_OUT_VALUE} + 300))
+        TIME_OUT_EXTRA=300
         shift
     elif [ "x$1" = "x--testlib" ]; then
         shift
@@ -443,6 +443,22 @@ while true; do
         break
     fi
 done
+
+# If you change this, update the timeout in testrunner.py as well.
+if [ -z "$TIME_OUT_VALUE" ] ; then
+  # 10 minutes is the default.
+  TIME_OUT_VALUE=600
+
+  # For sanitized builds use a larger base.
+  # TODO: Consider sanitized target builds?
+  if [ "x$SANITIZE_HOST" != "x" ] ; then
+    TIME_OUT_VALUE=1500  # 25 minutes.
+  fi
+
+  if [ ! -z "$TIME_OUT_EXTRA" ] ; then
+    TIME_OUT_VALUE=$((${TIME_OUT_VALUE} + ${TIME_OUT_EXTRA}))
+  fi
+fi
 
 # The DEX_LOCATION with the chroot prefix, if any.
 CHROOT_DEX_LOCATION="$CHROOT$DEX_LOCATION"
