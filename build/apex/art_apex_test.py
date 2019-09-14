@@ -528,7 +528,6 @@ class ReleaseTargetChecker:
 
     # Check internal libraries for ART.
     self._checker.check_prefer64_library('libart-disassembler')
-    self._checker.check_native_library('libperfetto_hprof')
 
     # Check exported native libraries for Managed Core Library.
     self._checker.check_native_library('libandroidicu')
@@ -622,7 +621,6 @@ class DebugTargetChecker:
     # Check ART internal libraries.
     self._checker.check_native_library('libdexfiled_external')
     self._checker.check_prefer64_library('libartd-disassembler')
-    self._checker.check_native_library('libperfetto_hprofd')
 
     # Check internal native library dependencies.
     #
