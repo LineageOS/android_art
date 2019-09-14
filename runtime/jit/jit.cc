@@ -55,22 +55,22 @@ namespace jit {
 static constexpr bool kEnableOnStackReplacement = true;
 
 // Maximum permitted threshold value.
-static constexpr size_t kJitMaxThreshold = std::numeric_limits<uint16_t>::max();
+static constexpr uint32_t kJitMaxThreshold = std::numeric_limits<uint16_t>::max();
 
 // Different compilation threshold constants. These can be overridden on the command line.
 
 // Non-debug default
-static constexpr size_t kJitDefaultCompileThreshold = 20 * kJitSamplesBatchSize;
+static constexpr uint32_t kJitDefaultCompileThreshold = 20 * kJitSamplesBatchSize;
 // Fast-debug build.
-static constexpr size_t kJitStressDefaultCompileThreshold = 2 * kJitSamplesBatchSize;
+static constexpr uint32_t kJitStressDefaultCompileThreshold = 2 * kJitSamplesBatchSize;
 // Slow-debug build.
-static constexpr size_t kJitSlowStressDefaultCompileThreshold = 2;
+static constexpr uint32_t kJitSlowStressDefaultCompileThreshold = 2;
 
 // Different warm-up threshold constants. These default to the equivalent compile thresholds divided
 // by 2, but can be overridden at the command-line.
-static constexpr size_t kJitDefaultWarmUpThreshold = kJitDefaultCompileThreshold / 2;
-static constexpr size_t kJitStressDefaultWarmUpThreshold = kJitStressDefaultCompileThreshold / 2;
-static constexpr size_t kJitSlowStressDefaultWarmUpThreshold =
+static constexpr uint32_t kJitDefaultWarmUpThreshold = kJitDefaultCompileThreshold / 2;
+static constexpr uint32_t kJitStressDefaultWarmUpThreshold = kJitStressDefaultCompileThreshold / 2;
+static constexpr uint32_t kJitSlowStressDefaultWarmUpThreshold =
     kJitSlowStressDefaultCompileThreshold / 2;
 
 DEFINE_RUNTIME_DEBUG_FLAG(Jit, kSlowMode);
@@ -79,14 +79,6 @@ DEFINE_RUNTIME_DEBUG_FLAG(Jit, kSlowMode);
 void* Jit::jit_library_handle_ = nullptr;
 JitCompilerInterface* Jit::jit_compiler_ = nullptr;
 JitCompilerInterface* (*Jit::jit_load_)(void) = nullptr;
-
-uint32_t JitOptions::RoundUpThreshold(uint32_t threshold) {
-  if (!Jit::kSlowMode) {
-    threshold = RoundUp(threshold, kJitSamplesBatchSize);
-  }
-  CHECK_LE(threshold, kJitMaxThreshold);
-  return threshold;
-}
 
 JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& options) {
   auto* jit_options = new JitOptions;
@@ -110,7 +102,9 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
          ? kJitSlowStressDefaultCompileThreshold
          : kJitStressDefaultCompileThreshold)
       : kJitDefaultCompileThreshold;
-  DCHECK_EQ(RoundUpThreshold(jit_options->compile_threshold_), jit_options->compile_threshold_);
+
+  // When not running in slow-mode, thresholds are quantized to kJitSamplesbatchsize.
+  const uint32_t kJitThresholdStep = Jit::kSlowMode ? 1u : kJitSamplesBatchSize;
 
   // Set default warm-up threshold to aide with sanity checking defaults.
   jit_options->warmup_threshold_ =
@@ -118,37 +112,22 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
                        ? kJitSlowStressDefaultWarmUpThreshold
                        : kJitStressDefaultWarmUpThreshold)
       : kJitDefaultWarmUpThreshold;
+
   // Warmup threshold should be less than compile threshold (so long as compile threshold is not
   // zero == JIT-on-first-use).
   DCHECK_LT(jit_options->warmup_threshold_, jit_options->compile_threshold_);
-  DCHECK_EQ(RoundUpThreshold(jit_options->warmup_threshold_), jit_options->warmup_threshold_);
+  DCHECK_EQ(RoundUp(jit_options->warmup_threshold_, kJitThresholdStep),
+            jit_options->warmup_threshold_);
 
   if (options.Exists(RuntimeArgumentMap::JITCompileThreshold)) {
     jit_options->compile_threshold_ = *options.Get(RuntimeArgumentMap::JITCompileThreshold);
   }
-  jit_options->compile_threshold_ = RoundUpThreshold(jit_options->compile_threshold_);
-  if (jit_options->compile_threshold_ > kJitMaxThreshold) {
-    LOG(FATAL) << "Compile threshold must be less than maximum ("
-               << jit_options->compile_threshold_
-               << " > "
-               << kJitMaxThreshold
-               << ").";
-  }
+  jit_options->compile_threshold_ = RoundUp(jit_options->compile_threshold_, kJitThresholdStep);
 
   if (options.Exists(RuntimeArgumentMap::JITWarmupThreshold)) {
     jit_options->warmup_threshold_ = *options.Get(RuntimeArgumentMap::JITWarmupThreshold);
   }
-  jit_options->warmup_threshold_ = RoundUpThreshold(jit_options->warmup_threshold_);
-
-  // Check compile threshold is either JIT-on-first-use (0) or greater than the warm up threshold.
-  if (jit_options->compile_threshold_ != 0 &&
-      jit_options->warmup_threshold_ >= jit_options->compile_threshold_) {
-    LOG(FATAL) << "Warm-up threshold must be less than compile threshold ("
-               << jit_options->warmup_threshold_
-               << " >= "
-               << jit_options->compile_threshold_
-               << ").";
-  }
+  jit_options->warmup_threshold_ = RoundUp(jit_options->warmup_threshold_, kJitThresholdStep);
 
   if (options.Exists(RuntimeArgumentMap::JITOsrThreshold)) {
     jit_options->osr_threshold_ = *options.Get(RuntimeArgumentMap::JITOsrThreshold);
@@ -156,10 +135,26 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
     jit_options->osr_threshold_ = jit_options->compile_threshold_ * 2;
     if (jit_options->osr_threshold_ > kJitMaxThreshold) {
       jit_options->osr_threshold_ =
-          RoundDown(kJitMaxThreshold, kJitSamplesBatchSize);
+          RoundDown(kJitMaxThreshold, kJitThresholdStep);
     }
   }
-  jit_options->osr_threshold_ = RoundUpThreshold(jit_options->osr_threshold_);
+  jit_options->osr_threshold_ = RoundUp(jit_options->osr_threshold_, kJitThresholdStep);
+
+  // Enforce ordering constraints between thresholds if not jit-on-first-use (when the compile
+  // threshold is 0).
+  if (jit_options->compile_threshold_ != 0) {
+    // Clamp thresholds such that OSR > compile > warm-up (see Jit::MaybeCompileMethod).
+    jit_options->osr_threshold_ = std::clamp(jit_options->osr_threshold_,
+                                             2u * kJitThresholdStep,
+                                             RoundDown(kJitMaxThreshold, kJitThresholdStep));
+    jit_options->compile_threshold_ = std::clamp(jit_options->compile_threshold_,
+                                                 kJitThresholdStep,
+                                                 jit_options->osr_threshold_ - kJitThresholdStep);
+    jit_options->warmup_threshold_ =
+        std::clamp(jit_options->warmup_threshold_,
+                   0u,
+                   jit_options->compile_threshold_ - kJitThresholdStep);
+  }
 
   if (options.Exists(RuntimeArgumentMap::JITPriorityThreadWeight)) {
     jit_options->priority_thread_weight_ =

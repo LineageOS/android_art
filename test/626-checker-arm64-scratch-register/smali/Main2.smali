@@ -176,7 +176,7 @@
 #       // For the purpose of this regression test, the order of
 #       // definition of these float variable matters.  Likewise with the
 #       // order of the instructions where these variables are used below.
-#       // Reordering these lines make make the original (b/32545705)
+#       // Reordering these lines makes the original (b/32545705)
 #       // issue vanish.
 #       float f17 = b17 ? 0.0f : 1.0f;
 #       float f16 = b16 ? 0.0f : 1.0f;

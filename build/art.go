@@ -86,7 +86,7 @@ func globalFlags(ctx android.BaseContext) ([]string, []string) {
 	if len(ctx.AConfig().SanitizeDevice()) > 0 || len(ctx.AConfig().SanitizeHost()) > 0 {
 		cflags = append(cflags,
 			"-DART_STACK_OVERFLOW_GAP_arm=8192",
-			"-DART_STACK_OVERFLOW_GAP_arm64=8192",
+			"-DART_STACK_OVERFLOW_GAP_arm64=16384",
 			"-DART_STACK_OVERFLOW_GAP_mips=16384",
 			"-DART_STACK_OVERFLOW_GAP_mips64=16384",
 			"-DART_STACK_OVERFLOW_GAP_x86=16384",
@@ -294,7 +294,7 @@ func init() {
 		"libart_static_cc_defaults",
 		"art_global_defaults",
 		"art_debug_defaults",
-		"art_apex_test",
+		"art_apex_test_host",
 	}
 	android.AddNeverAllowRules(
 		android.NeverAllow().
