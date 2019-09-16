@@ -1093,7 +1093,6 @@ if [ "$HOST" = "n" ]; then
     fi
 
     timeout_prefix=
-    timeout_suffix=
     if [ "$TIME_OUT" = "timeout" ]; then
       # Add timeout command if time out is desired.
       #
@@ -1102,10 +1101,7 @@ if [ "$HOST" = "n" ]; then
       #       dumping do not lead to a deadlock, we also use the "-k" option to definitely kill the
       #       child.
       # Note: Using "--foreground" to not propagate the signal to children, i.e., the runtime.
-      timeout_prefix="timeout --foreground -k 120s ${TIME_OUT_VALUE}s ${timeout_dumper_cmd}"
-      # Use a suffix to detect timeout and echo something. Otherwise there's no immediate
-      # visible feedback (outside of logcat).
-      timeout_suffix=' || if [ $? -eq 124 ] ; then echo "TIMED OUT!" ; false ; fi'
+      timeout_prefix="timeout --foreground -k 120s ${TIME_OUT_VALUE}s ${timeout_dumper_cmd} $cmdline"
     fi
 
     # Create a script with the command. The command can get longer than the longest
@@ -1132,7 +1128,7 @@ if [ "$HOST" = "n" ]; then
              $vdex_cmdline && \
              $strip_cmdline && \
              $sync_cmdline && \
-             $timeout_prefix $dalvikvm_cmdline $timeout_suffix"
+             $timeout_prefix $dalvikvm_cmdline"
 
     cmdfile=$(tempfile -p "cmd-" -s "-$TEST_NAME")
     echo "$cmdline" > $cmdfile
