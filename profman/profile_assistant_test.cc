@@ -102,7 +102,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
       }
     }
     for (uint16_t i = 0; i < number_of_classes; i++) {
-      ASSERT_TRUE(info->AddClassIndex(ProfileCompilationInfo::GetProfileDexFileKey(dex_location1),
+      ASSERT_TRUE(info->AddClassIndex(info->GetProfileDexFileKey(dex_location1),
                                       dex_location_checksum1,
                                       dex::TypeIndex(i),
                                       number_of_methods1));
@@ -1234,9 +1234,9 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithFilter) {
 
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
       [&d1, &d2](const std::string& dex_location, uint32_t checksum) -> bool {
-          return (dex_location == ProfileCompilationInfo::GetProfileDexFileKey(d1.GetLocation())
+          return (dex_location == ProfileCompilationInfo::GetProfileDexFileBaseKey(d1.GetLocation())
               && checksum == d1.GetLocationChecksum())
-              || (dex_location == ProfileCompilationInfo::GetProfileDexFileKey(d2.GetLocation())
+              || (dex_location == ProfileCompilationInfo::GetProfileDexFileBaseKey(d2.GetLocation())
               && checksum == d2.GetLocationChecksum());
         };
 
