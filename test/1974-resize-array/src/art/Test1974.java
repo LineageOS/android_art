@@ -460,7 +460,7 @@ public class Test1974 {
         DbgPrintln("Didn't see a free of the obsolete id");
       }
       if (!bad) {
-        System.out.println("Everything looks good WRT obsolete object");
+        System.out.println("Everything looks good WRT obsolete object!");
       }
     } else {
       if (!Arrays.stream(obsoletes_freed).anyMatch((l) -> l == globalID + 1)) {
