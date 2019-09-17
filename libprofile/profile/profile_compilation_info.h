@@ -181,9 +181,26 @@ class ProfileCompilationInfo {
   class MethodHotness {
    public:
     enum Flag {
-      kFlagHot = 0x1,
-      kFlagStartup = 0x2,
-      kFlagPostStartup = 0x4,
+      kFlagFirst = 1 << 0,
+      kFlagHot = 1 << 0,
+      kFlagStartup = 1 << 1,
+      kFlagPostStartup = 1 << 2,
+      kFlagLastRegular = 1 << 2,
+      kFlagAmStartup = 1 << 3,
+      kFlagAmPostStartup = 1 << 4,
+      kFlagBoot = 1 << 5,
+      kFlagPostBoot = 1 << 6,
+      kFlagForeground = 1 << 7,
+      kFlagBackground = 1 << 8,
+      // The startup bins captured the relative order of when a method become hot. There are 8
+      // total bins supported and each hot method will have at least one bit set. If the profile was
+      // merged multiple times more than one bit may be set as a given method may become hot at
+      // various times during subsequent executions.
+      // The granularity of the bins is unspecified (i.e. the runtime is free to change the
+      // values it uses - this may be 100ms, 200ms etc...).
+      kFlagStartupBin = 1 << 9,
+      kFlagStartupMaxBin = 1 << 16,
+      kFlagLastBoot = 1 << 16,
     };
 
     bool IsHot() const {
@@ -202,8 +219,12 @@ class ProfileCompilationInfo {
       flags_ |= flag;
     }
 
-    uint8_t GetFlags() const {
+    uint32_t GetFlags() const {
       return flags_;
+    }
+
+    bool HasFlagSet(MethodHotness::Flag flag) {
+      return (flags_ & flag ) != 0;
     }
 
     bool IsInProfile() const {
@@ -212,7 +233,7 @@ class ProfileCompilationInfo {
 
    private:
     const InlineCacheMap* inline_cache_map_ = nullptr;
-    uint8_t flags_ = 0;
+    uint32_t flags_ = 0;
 
     const InlineCacheMap* GetInlineCacheMap() const {
       return inline_cache_map_;
@@ -474,9 +495,6 @@ class ProfileCompilationInfo {
     kProfileLoadSuccess
   };
 
-  const uint32_t kProfileSizeWarningThresholdInBytes = 500000U;
-  const uint32_t kProfileSizeErrorThresholdInBytes = 1000000U;
-
   // Internal representation of the profile information belonging to a dex file.
   // Note that we could do without profile_key (the key used to encode the dex
   // file in the profile) and profile_index (the index of the dex file in the
@@ -488,7 +506,8 @@ class ProfileCompilationInfo {
                 const std::string& key,
                 uint32_t location_checksum,
                 uint16_t index,
-                uint32_t num_methods)
+                uint32_t num_methods,
+                bool for_boot_image)
         : allocator_(allocator),
           profile_key(key),
           profile_index(index),
@@ -496,20 +515,28 @@ class ProfileCompilationInfo {
           method_map(std::less<uint16_t>(), allocator->Adapter(kArenaAllocProfile)),
           class_set(std::less<dex::TypeIndex>(), allocator->Adapter(kArenaAllocProfile)),
           num_method_ids(num_methods),
-          bitmap_storage(allocator->Adapter(kArenaAllocProfile)) {
-      bitmap_storage.resize(ComputeBitmapStorage(num_method_ids));
+          bitmap_storage(allocator->Adapter(kArenaAllocProfile)),
+          is_for_boot_image(for_boot_image) {
+      bitmap_storage.resize(ComputeBitmapStorage(is_for_boot_image, num_method_ids));
       if (!bitmap_storage.empty()) {
         method_bitmap =
             BitMemoryRegion(MemoryRegion(
-                &bitmap_storage[0], bitmap_storage.size()), 0, ComputeBitmapBits(num_method_ids));
+                &bitmap_storage[0],
+                bitmap_storage.size()),
+                0,
+                ComputeBitmapBits(is_for_boot_image, num_method_ids));
       }
     }
 
-    static size_t ComputeBitmapBits(uint32_t num_method_ids) {
-      return num_method_ids * kBitmapIndexCount;
+    static size_t ComputeBitmapBits(bool is_for_boot_image, uint32_t num_method_ids) {
+      size_t flag_bitmap_index = FlagBitmapIndex(is_for_boot_image
+          ? MethodHotness::kFlagLastBoot
+          : MethodHotness::kFlagLastRegular);
+      return num_method_ids * (flag_bitmap_index + 1);
     }
-    static size_t ComputeBitmapStorage(uint32_t num_method_ids) {
-      return RoundUp(ComputeBitmapBits(num_method_ids), kBitsPerByte) / kBitsPerByte;
+    static size_t ComputeBitmapStorage(bool is_for_boot_image, uint32_t num_method_ids) {
+      return RoundUp(ComputeBitmapBits(is_for_boot_image, num_method_ids), kBitsPerByte) /
+          kBitsPerByte;
     }
 
     bool operator==(const DexFileData& other) const {
@@ -555,23 +582,11 @@ class ProfileCompilationInfo {
     uint32_t num_method_ids;
     ArenaVector<uint8_t> bitmap_storage;
     BitMemoryRegion method_bitmap;
+    bool is_for_boot_image;
 
    private:
-    enum BitmapIndex {
-      kBitmapIndexStartup,
-      kBitmapIndexPostStartup,
-      kBitmapIndexCount,
-    };
-
-    size_t MethodBitIndex(bool startup, size_t index) const {
-      DCHECK_LT(index, num_method_ids);
-      // The format is [startup bitmap][post startup bitmap]
-      // This compresses better than ([startup bit][post statup bit])*
-
-      return index + (startup
-          ? kBitmapIndexStartup * num_method_ids
-          : kBitmapIndexPostStartup * num_method_ids);
-    }
+    size_t MethodFlagBitmapIndex(MethodHotness::Flag flag, size_t method_index) const;
+    static size_t FlagBitmapIndex(MethodHotness::Flag flag);
   };
 
   // Return the profile data for the given profile key or null if the dex location
@@ -818,6 +833,11 @@ class ProfileCompilationInfo {
 
   // Initializes the profile version to the desired one.
   void InitProfileVersionInternal(const uint8_t version[]);
+
+  // Returns the threshold size (in bytes) which will triggers save/load warnings.
+  size_t GetSizeWarningThresholdBytes() const;
+  // Returns the threshold size (in bytes) which will cause save/load failures.
+  size_t GetSizeErrorThresholdBytes() const;
 
   friend class ProfileCompilationInfoTest;
   friend class CompilerDriverProfileTest;
