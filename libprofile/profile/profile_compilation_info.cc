@@ -147,11 +147,21 @@ void ProfileCompilationInfo::DexPcData::AddClass(uint16_t dex_profile_idx,
   classes.insert(ref);
 }
 
-// Transform the actual dex location into relative paths.
+// Transform the actual dex location into a key used to index the dex file in the profile.
+// See ProfileCompilationInfo#GetProfileDexFileBaseKey as well.
+// For regular profiles (non-boot) the profile key is the same as its base key.
+std::string ProfileCompilationInfo::GetProfileDexFileKey(const std::string& dex_location) const {
+  // TODO(calin): append the RuntimeInstructionSet to the key so we can capture arch-dependent data.
+  // This requires a bit of work as the ProfileSaver and various tests rely on this being a
+  // static public method.
+  return GetProfileDexFileBaseKey(dex_location);
+}
+
+// Transform the actual dex location into a base profile key (represented as relative paths).
 // Note: this is OK because we don't store profiles of different apps into the same file.
 // Apps with split apks don't cause trouble because each split has a different name and will not
 // collide with other entries.
-std::string ProfileCompilationInfo::GetProfileDexFileKey(const std::string& dex_location) {
+std::string ProfileCompilationInfo::GetProfileDexFileBaseKey(const std::string& dex_location) {
   DCHECK(!dex_location.empty());
   size_t last_sep_index = dex_location.find_last_of('/');
   if (last_sep_index == std::string::npos) {
@@ -160,10 +170,6 @@ std::string ProfileCompilationInfo::GetProfileDexFileKey(const std::string& dex_
     DCHECK(last_sep_index < dex_location.size());
     return dex_location.substr(last_sep_index + 1);
   }
-
-  // TODO(calin): append the RuntimeInstructionSet to the key so we can capture arch-dependent data.
-  // This requires a bit of work as the ProfileSaver and various tests rely on this being a
-  // static public method.
 }
 
 bool ProfileCompilationInfo::AddMethodIndex(MethodHotness::Flag flags, const MethodReference& ref) {
@@ -1875,7 +1881,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(int fd,
 
   for (uint16_t i = 0; i < number_of_dex_files; i++) {
     std::string dex_location = DexFileLoader::GetMultiDexLocation(i, base_dex_location.c_str());
-    std::string profile_key = GetProfileDexFileKey(dex_location);
+    std::string profile_key = info.GetProfileDexFileKey(dex_location);
 
     for (uint16_t m = 0; m < number_of_methods; m++) {
       uint16_t method_idx = rand() % max_method;
