@@ -98,7 +98,7 @@ class ProfileCompilationInfo {
 
     bool MatchesDex(const DexFile* dex_file) const {
       return dex_checksum == dex_file->GetLocationChecksum() &&
-           dex_location == GetProfileDexFileKey(dex_file->GetLocation());
+           dex_location == GetProfileDexFileBaseKey(dex_file->GetLocation());
     }
 
     std::string dex_location;
@@ -427,7 +427,12 @@ class ProfileCompilationInfo {
       const std::vector<const DexFile*>& dex_files_) const;
 
   // Return the profile key associated with the given dex location.
-  static std::string GetProfileDexFileKey(const std::string& dex_location);
+  std::string GetProfileDexFileKey(const std::string& dex_location) const;
+  // Return the base profile key associated with the given dex location. The base profile key
+  // is solely constructed based on the dex location (as opposed to the one produced by
+  // GetProfileDexFileKey which may include additional metadata like architecture or source
+  // package name)
+  static std::string GetProfileDexFileBaseKey(const std::string& dex_location);
 
   // Generate a test profile which will contain a percentage of the total maximum
   // number of methods and classes (method_ratio and class_ratio).

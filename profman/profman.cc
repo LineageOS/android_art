@@ -408,7 +408,7 @@ class ProfMan final {
     auto process_fn = [profile_filter_keys](std::unique_ptr<const DexFile>&& dex_file) {
       // Store the profile key of the location instead of the location itself.
       // This will make the matching in the profile filter method much easier.
-      profile_filter_keys->emplace(ProfileCompilationInfo::GetProfileDexFileKey(
+      profile_filter_keys->emplace(ProfileCompilationInfo::GetProfileDexFileBaseKey(
           dex_file->GetLocation()), dex_file->GetLocationChecksum());
     };
     return OpenApkFilesFromLocations(process_fn);
