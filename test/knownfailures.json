@@ -502,7 +502,8 @@
             "909-attach-agent",
             "924-threads",
             "981-dedup-original-dex",
-            "1900-track-alloc"
+            "1900-track-alloc",
+            "2230-profile-save-hotness"
         ],
         "description": ["Tests that require exact knowledge of the deoptimization state, the ",
                         "number of plugins and agents, or breaks other openjdkjvmti assumptions."],
@@ -1093,7 +1094,8 @@
           "1940-ddms-ext",
           "1945-proxy-method-arguments",
           "1946-list-descriptors",
-          "1947-breakpoint-redefine-deopt"
+          "1947-breakpoint-redefine-deopt",
+          "2230-profile-save-hotness"
         ],
         "variant": "jvm",
         "bug": "b/73888836",
