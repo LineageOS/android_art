@@ -63,5 +63,16 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_presentInProfile(JNIEnv* env,
                                                      art_method->GetDexMethodIndex()));
 }
 
+extern "C" JNIEXPORT jboolean JNICALL Java_Main_isForBootImage(JNIEnv* env,
+                                                               jclass,
+                                                               jstring filename) {
+  ScopedUtfChars filename_chars(env, filename);
+  CHECK(filename_chars.c_str() != nullptr);
+
+  ProfileCompilationInfo info;
+  info.Load(std::string(filename_chars.c_str()), /*clear_if_invalid=*/ false);
+  return info.IsForBootImage();
+}
+
 }  // namespace
 }  // namespace art
