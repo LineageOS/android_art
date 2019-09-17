@@ -641,7 +641,7 @@ class Dex2oatLayoutTest : public Dex2oatTest {
     CHECK_GE(profile_test_fd, 0);
 
     ProfileCompilationInfo info;
-    std::string profile_key = ProfileCompilationInfo::GetProfileDexFileKey(dex_location);
+    std::string profile_key = info.GetProfileDexFileKey(dex_location);
     for (size_t i = 0; i < num_classes; ++i) {
       info.AddClassIndex(profile_key, checksum, dex::TypeIndex(1 + i), kMaxMethodIds);
     }

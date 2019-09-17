@@ -204,7 +204,7 @@ class ProfileCompilationInfoTest : public CommonRuntimeTest {
         dex_pc_data.AddClass(dex_profile_index, class_ref.TypeIndex());
         if (dex_profile_index >= offline_pmi.dex_references.size()) {
           // This is a new dex.
-          const std::string& dex_key = ProfileCompilationInfo::GetProfileDexFileKey(
+          const std::string& dex_key = ProfileCompilationInfo::GetProfileDexFileBaseKey(
               class_ref.dex_file->GetLocation());
           offline_pmi.dex_references.emplace_back(dex_key,
                                                   class_ref.dex_file->GetLocationChecksum(),
