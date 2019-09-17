@@ -32,6 +32,10 @@ namespace art {
 using Hotness = ProfileCompilationInfo::MethodHotness;
 
 static constexpr size_t kMaxMethodIds = 65535;
+static uint32_t kMaxHotnessFlagBootIndex =
+    WhichPowerOf2(static_cast<uint32_t>(Hotness::kFlagLastBoot));
+static uint32_t kMaxHotnessFlagRegularIndex =
+    WhichPowerOf2(static_cast<uint32_t>(Hotness::kFlagLastRegular));
 
 class ProfileCompilationInfoTest : public CommonArtTest {
  public:
@@ -185,6 +189,56 @@ class ProfileCompilationInfoTest : public CommonArtTest {
 
   bool IsEmpty(const ProfileCompilationInfo& info) {
     return info.IsEmpty();
+  }
+
+  void SizeStressTest(bool random) {
+    ProfileCompilationInfo boot_profile(/*for_boot_image*/ true);
+    ProfileCompilationInfo reg_profile(/*for_boot_image*/ false);
+
+    static constexpr size_t kNumDexFiles = 5;
+    static constexpr size_t kNumMethods = 1 << 16;
+    static constexpr size_t kChecksum = 1234;
+    static const std::string kDex = "dex";
+
+    std::srand(0);
+    // Set a few flags on a 2 different methods in each of the profile.
+    for (uint32_t dex_index = 0; dex_index < kNumDexFiles; dex_index++) {
+      for (uint32_t method_idx = 0; method_idx < kNumMethods; method_idx++) {
+        for (uint32_t flag_index = 0; flag_index <= kMaxHotnessFlagBootIndex; flag_index++) {
+          if (!random || rand() % 2 == 0) {
+            ASSERT_TRUE(boot_profile.AddMethodIndex(
+                static_cast<Hotness::Flag>(1 << flag_index),
+                kDex + std::to_string(dex_index),
+                kChecksum + dex_index,
+                method_idx,
+                kNumMethods));
+          }
+        }
+        for (uint32_t flag_index = 0; flag_index <= kMaxHotnessFlagRegularIndex; flag_index++) {
+          if (!random || rand() % 2 == 0) {
+            ASSERT_TRUE(reg_profile.AddMethodIndex(
+                static_cast<Hotness::Flag>(1 << flag_index),
+                kDex + std::to_string(dex_index),
+                kChecksum + dex_index,
+                method_idx,
+                kNumMethods));
+          }
+        }
+      }
+    }
+
+    ScratchFile boot_file;
+    ScratchFile reg_file;
+
+    ASSERT_TRUE(boot_profile.Save(GetFd(boot_file)));
+    ASSERT_TRUE(reg_profile.Save(GetFd(reg_file)));
+    ASSERT_TRUE(boot_file.GetFile()->ResetOffset());
+    ASSERT_TRUE(reg_file.GetFile()->ResetOffset());
+
+    ProfileCompilationInfo loaded_boot;
+    ProfileCompilationInfo loaded_reg;
+    ASSERT_TRUE(loaded_boot.Load(GetFd(boot_file)));
+    ASSERT_TRUE(loaded_reg.Load(GetFd(reg_file)));
   }
 
   // Cannot sizeof the actual arrays so hard code the values here.
@@ -1166,4 +1220,135 @@ TEST_F(ProfileCompilationInfoTest, VersionEquality) {
   ASSERT_FALSE(info.Equals(info1));
 }
 
+TEST_F(ProfileCompilationInfoTest, AllMethodFlags) {
+  ProfileCompilationInfo info(/*for_boot_image*/ true);
+
+  static constexpr size_t kNumMethods = 1000;
+  static constexpr size_t kChecksum1 = 1234;
+  static const std::string kDex1 = "dex1";
+
+  for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex; index++) {
+    info.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, index, kNumMethods);
+  }
+
+  auto run_test = [](const ProfileCompilationInfo& info) {
+    for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex; index++) {
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, index).IsInProfile());
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, index)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << index))) << index << " "
+            << info.GetMethodHotness(kDex1, kChecksum1, index).GetFlags();
+    }
+  };
+  run_test(info);
+
+  // Save the profile.
+  ScratchFile profile;
+  ASSERT_TRUE(info.Save(GetFd(profile)));
+  ASSERT_EQ(0, profile.GetFile()->Flush());
+  ASSERT_TRUE(profile.GetFile()->ResetOffset());
+
+  // Load the profile and make sure we can read the data and it matches what we expect.
+  ProfileCompilationInfo loaded_info;
+  ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
+  run_test(loaded_info);
+}
+
+TEST_F(ProfileCompilationInfoTest, AllMethodFlagsOnOneMethod) {
+  ProfileCompilationInfo info(/*for_boot_image*/ true);
+
+  static constexpr size_t kNumMethods = 1000;
+  static constexpr size_t kChecksum1 = 1234;
+  static const std::string kDex1 = "dex1";
+
+  // Set all flags on a single method.
+  for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex; index++) {
+    info.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, 0, kNumMethods);
+  }
+
+  auto run_test = [](const ProfileCompilationInfo& info) {
+    for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex; index++) {
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 0).IsInProfile());
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 0)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << 0)));
+    }
+  };
+  run_test(info);
+
+  // Save the profile.
+  ScratchFile profile;
+  ASSERT_TRUE(info.Save(GetFd(profile)));
+  ASSERT_EQ(0, profile.GetFile()->Flush());
+  ASSERT_TRUE(profile.GetFile()->ResetOffset());
+
+  // Load the profile and make sure we can read the data and it matches what we expect.
+  ProfileCompilationInfo loaded_info;
+  ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
+  run_test(loaded_info);
+}
+
+
+TEST_F(ProfileCompilationInfoTest, MethodFlagsMerge) {
+  ProfileCompilationInfo info1(/*for_boot_image*/ true);
+  ProfileCompilationInfo info2(/*for_boot_image*/ true);
+
+  static constexpr size_t kNumMethods = 1000;
+  static constexpr size_t kChecksum1 = 1234;
+  static const std::string kDex1 = "dex1";
+
+  // Set a few flags on a 2 different methods in each of the profile.
+  for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex / 4; index++) {
+    info1.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, 0, kNumMethods);
+    info2.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, 1, kNumMethods);
+  }
+
+  // Set a few more flags on the same methods but reverse the profiles.
+  for (uint32_t index = kMaxHotnessFlagBootIndex / 4 + 1; index <= kMaxHotnessFlagBootIndex / 2; index++) {
+    info2.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, 0, kNumMethods);
+    info1.AddMethodIndex(static_cast<Hotness::Flag>(1 << index), kDex1, kChecksum1, 1, kNumMethods);
+  }
+
+  ASSERT_TRUE(info1.MergeWith(info2));
+
+  auto run_test = [](const ProfileCompilationInfo& info) {
+    // Assert that the flags were merged correctly for both methods.
+    for (uint32_t index = 0; index <= kMaxHotnessFlagBootIndex / 2; index++) {
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 0).IsInProfile());
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 0)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << 0)));
+
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 1).IsInProfile());
+      EXPECT_TRUE(info.GetMethodHotness(kDex1, kChecksum1, 1)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << index)));
+    }
+
+    // Assert that no extra flags were added.
+    for (uint32_t index = kMaxHotnessFlagBootIndex / 2 + 1; index <= kMaxHotnessFlagBootIndex; index++) {
+      EXPECT_FALSE(info.GetMethodHotness(kDex1, kChecksum1, 0)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << index)));
+      EXPECT_FALSE(info.GetMethodHotness(kDex1, kChecksum1, 1)
+          .HasFlagSet(static_cast<Hotness::Flag>(1 << index)));
+    }
+  };
+
+  run_test(info1);
+
+  // Save the profile.
+  ScratchFile profile;
+  ASSERT_TRUE(info1.Save(GetFd(profile)));
+  ASSERT_EQ(0, profile.GetFile()->Flush());
+  ASSERT_TRUE(profile.GetFile()->ResetOffset());
+
+  // Load the profile and make sure we can read the data and it matches what we expect.
+  ProfileCompilationInfo loaded_info;
+  ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
+  run_test(loaded_info);
+}
+
+TEST_F(ProfileCompilationInfoTest, SizeStressTestAllIn) {
+  SizeStressTest(/*random=*/ false);
+}
+
+TEST_F(ProfileCompilationInfoTest, SizeStressTestAllInRandom) {
+  SizeStressTest(/*random=*/ true);
+}
 }  // namespace art
