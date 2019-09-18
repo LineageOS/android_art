@@ -1,0 +1,16 @@
+Hitting class class art.Test1979$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>]
+Initial: class art.Test1979$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>]
+Reading with reflection.
+public static java.lang.Object art.Test1979$Transform.BAR = (ID: 0) value of <BAR FIELD>
+public static java.lang.Object art.Test1979$Transform.FOO = (ID: 1) value of <FOO FIELD>
+Reading normally.
+Read BAR field: (ID: 0) value of <BAR FIELD>
+Read FOO field: (ID: 1) value of <FOO FIELD>
+Redefined: class art.Test1979$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: null]
+Reading with reflection after possible modification.
+public static java.lang.Object art.Test1979$Transform.BAR = (ID: 0) value of <BAR FIELD>
+public static java.lang.Object art.Test1979$Transform.BAZ = (ID: 2) <NULL>
+public static java.lang.Object art.Test1979$Transform.FOO = (ID: 1) value of <FOO FIELD>
+Reading normally after possible modification.
+Read FOO field: (ID: 1) value of <FOO FIELD>
+Read BAR field: (ID: 0) value of <BAR FIELD>

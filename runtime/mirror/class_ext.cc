@@ -25,6 +25,8 @@
 #include "class_root.h"
 #include "dex/dex_file-inl.h"
 #include "gc/accounting/card_table-inl.h"
+#include "mirror/object.h"
+#include "mirror/object_array.h"
 #include "object-inl.h"
 #include "object_array-alloc-inl.h"
 #include "object_array-inl.h"
@@ -99,6 +101,10 @@ bool ClassExt::ExtendObsoleteArrays(Handle<ClassExt> h_this, Thread* self, uint3
   h_this->SetObsoleteArrays(new_methods.Get(), new_dex_caches.Get());
 
   return true;
+}
+
+void ClassExt::SetObsoleteClass(ObjPtr<Class> klass) {
+  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(ClassExt, obsolete_class_), klass);
 }
 
 ObjPtr<ClassExt> ClassExt::Alloc(Thread* self) {

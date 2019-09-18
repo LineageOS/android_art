@@ -313,6 +313,17 @@ class MANAGED Class final : public Object {
     }
   }
 
+  bool IsObsoleteObject() REQUIRES_SHARED(Locks::mutator_lock_) {
+    return (GetAccessFlags() & kAccObsoleteObject) != 0;
+  }
+
+  void SetObsoleteObject() REQUIRES_SHARED(Locks::mutator_lock_) {
+    uint32_t flags = GetField32(OFFSET_OF_OBJECT_MEMBER(Class, access_flags_));
+    if ((flags & kAccObsoleteObject) == 0) {
+      SetAccessFlags(flags | kAccObsoleteObject);
+    }
+  }
+
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsTypeOfReferenceClass() REQUIRES_SHARED(Locks::mutator_lock_) {
     return (GetClassFlags<kVerifyFlags>() & kClassFlagReference) != 0;
@@ -1109,6 +1120,15 @@ class MANAGED Class final : public Object {
   template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, class Visitor>
   void VisitNativeRoots(Visitor& visitor, PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Visit ArtMethods directly owned by this class.
+  template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, class Visitor>
+  void VisitMethods(Visitor visitor, PointerSize pointer_size)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Visit ArtFields directly owned by this class.
+  template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, class Visitor>
+  void VisitFields(Visitor visitor) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get one of the primitive classes.
   static ObjPtr<mirror::Class> GetPrimitiveClass(ObjPtr<mirror::String> name)
