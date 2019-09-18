@@ -129,6 +129,36 @@ static void DoClassRedefine(jvmtiEnv* jvmti_env,
   return DoMultiClassRedefine(jvmti_env, env, 1, &target, &class_file_bytes, &dex_file_bytes);
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_art_Redefinition_isStructurallyModifiable(JNIEnv* env, jclass, jclass target) {
+  using ArtCanStructurallyRedefineClass =
+      jvmtiError (*)(jvmtiEnv * env, jclass k, jboolean * result);
+  ArtCanStructurallyRedefineClass can_redef = GetExtensionFunction<ArtCanStructurallyRedefineClass>(
+      env, jvmti_env, "com.android.art.class.is_structurally_modifiable_class");
+  if (can_redef == nullptr || env->ExceptionCheck()) {
+    return false;
+  }
+  jboolean result = false;
+  JvmtiErrorToException(env, jvmti_env, can_redef(jvmti_env, target, &result));
+  return result;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonStructuralClassRedefinition(
+    JNIEnv* env, jclass, jclass target, jbyteArray dex_file_bytes) {
+  using ArtStructurallyRedefineClassDirect =
+      jvmtiError (*)(jvmtiEnv * env, jclass k, jbyte* data, jint len);
+  ArtStructurallyRedefineClassDirect redef =
+      GetExtensionFunction<ArtStructurallyRedefineClassDirect>(
+          env, jvmti_env, "com.android.art.UNSAFE.class.structurally_redefine_class_direct");
+  if (redef == nullptr || env->ExceptionCheck()) {
+    return;
+  }
+  jint len = env->GetArrayLength(dex_file_bytes);
+  std::vector<jbyte> v(len, 0);
+  env->GetByteArrayRegion(dex_file_bytes, 0, len, v.data());
+  JvmtiErrorToException(env, jvmti_env, redef(jvmti_env, target, v.data(), len));
+}
+
 // Magic JNI export that classes can use for redefining classes.
 // To use classes should declare this as a native function with signature (Ljava/lang/Class;[B[B)V
 extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonClassRedefinition(

@@ -536,6 +536,10 @@ class Instrumentation {
   void InstrumentThreadStack(Thread* thread)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Force all currently running frames to be deoptimized back to interpreter. This should only be
+  // used in cases where basically all compiled code has been invalidated.
+  void DeoptimizeAllThreadFrames() REQUIRES(art::Locks::mutator_lock_);
+
   static size_t ComputeFrameId(Thread* self,
                                size_t frame_depth,
                                size_t inlined_frames_before_frame)
@@ -643,6 +647,11 @@ class Instrumentation {
     return deoptimized_methods_lock_.get();
   }
 
+  // A counter that's incremented every time a DeoptimizeAllFrames. We check each
+  // InstrumentationStackFrames creation id against this number and if they differ we deopt even if
+  // we could otherwise continue running.
+  uint64_t current_force_deopt_id_ GUARDED_BY(Locks::mutator_lock_);
+
   // Have we hijacked ArtMethod::code_ so that it calls instrumentation/interpreter code?
   bool instrumentation_stubs_installed_;
 
@@ -746,6 +755,7 @@ class Instrumentation {
 
   friend class InstrumentationTest;  // For GetCurrentInstrumentationLevel and ConfigureStubs.
   friend class InstrumentationStackPopper;  // For popping instrumentation frames.
+  friend void InstrumentationInstallStack(Thread*, void*);
 
   DISALLOW_COPY_AND_ASSIGN(Instrumentation);
 };
@@ -758,12 +768,14 @@ struct InstrumentationStackFrame {
                             ArtMethod* method,
                             uintptr_t return_pc,
                             size_t frame_id,
-                            bool interpreter_entry)
+                            bool interpreter_entry,
+                            uint64_t force_deopt_id)
       : this_object_(this_object),
         method_(method),
         return_pc_(return_pc),
         frame_id_(frame_id),
-        interpreter_entry_(interpreter_entry) {
+        interpreter_entry_(interpreter_entry),
+        force_deopt_id_(force_deopt_id) {
   }
 
   std::string Dump() const REQUIRES_SHARED(Locks::mutator_lock_);
@@ -773,6 +785,7 @@ struct InstrumentationStackFrame {
   uintptr_t return_pc_;
   size_t frame_id_;
   bool interpreter_entry_;
+  uint64_t force_deopt_id_;
 };
 
 }  // namespace instrumentation
