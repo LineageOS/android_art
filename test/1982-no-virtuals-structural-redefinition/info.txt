@@ -1,0 +1,2 @@
+Test that structural redefinition works on classes with super-types and subtypes with virtual
+fields and methods so long as the target does not have any.

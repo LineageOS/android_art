@@ -156,7 +156,8 @@ bool InstrumentationStackPopper::PopFramesTo(uint32_t desired_pops,
 }
 
 Instrumentation::Instrumentation()
-    : instrumentation_stubs_installed_(false),
+    : current_force_deopt_id_(0),
+      instrumentation_stubs_installed_(false),
       entry_exit_stubs_installed_(false),
       interpreter_stubs_installed_(false),
       interpret_only_(false),
@@ -282,16 +283,20 @@ void Instrumentation::InstallStubsForMethod(ArtMethod* method) {
 // deoptimization of quick frames to interpreter frames.
 // Since we may already have done this previously, we need to push new instrumentation frame before
 // existing instrumentation frames.
-static void InstrumentationInstallStack(Thread* thread, void* arg)
+void InstrumentationInstallStack(Thread* thread, void* arg)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   struct InstallStackVisitor final : public StackVisitor {
-    InstallStackVisitor(Thread* thread_in, Context* context, uintptr_t instrumentation_exit_pc)
+    InstallStackVisitor(Thread* thread_in,
+                        Context* context,
+                        uintptr_t instrumentation_exit_pc,
+                        uint64_t force_deopt_id)
         : StackVisitor(thread_in, context, kInstrumentationStackWalk),
           instrumentation_stack_(thread_in->GetInstrumentationStack()),
           instrumentation_exit_pc_(instrumentation_exit_pc),
-          reached_existing_instrumentation_frames_(false), instrumentation_stack_depth_(0),
-          last_return_pc_(0) {
-    }
+          reached_existing_instrumentation_frames_(false),
+          instrumentation_stack_depth_(0),
+          last_return_pc_(0),
+          force_deopt_id_(force_deopt_id) {}
 
     bool VisitFrame() override REQUIRES_SHARED(Locks::mutator_lock_) {
       ArtMethod* m = GetMethod();
@@ -308,7 +313,8 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
                                                         m,
                                                         /*return_pc=*/ 0,
                                                         GetFrameId(),
-                                                        interpreter_frame);
+                                                        interpreter_frame,
+                                                        force_deopt_id_);
         if (kVerboseInstrumentation) {
           LOG(INFO) << "Pushing shadow frame " << instrumentation_frame.Dump();
         }
@@ -375,7 +381,8 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
             m,
             return_pc,
             GetFrameId(),    // A runtime method still gets a frame id.
-            false);
+            false,
+            force_deopt_id_);
         if (kVerboseInstrumentation) {
           LOG(INFO) << "Pushing frame " << instrumentation_frame.Dump();
         }
@@ -409,6 +416,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
     bool reached_existing_instrumentation_frames_;
     size_t instrumentation_stack_depth_;
     uintptr_t last_return_pc_;
+    uint64_t force_deopt_id_;
   };
   if (kVerboseInstrumentation) {
     std::string thread_name;
@@ -419,7 +427,8 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
   Instrumentation* instrumentation = reinterpret_cast<Instrumentation*>(arg);
   std::unique_ptr<Context> context(Context::Create());
   uintptr_t instrumentation_exit_pc = reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc());
-  InstallStackVisitor visitor(thread, context.get(), instrumentation_exit_pc);
+  InstallStackVisitor visitor(
+      thread, context.get(), instrumentation_exit_pc, instrumentation->current_force_deopt_id_);
   visitor.WalkStack(true);
   CHECK_EQ(visitor.dex_pcs_.size(), thread->GetInstrumentationStack()->size());
 
@@ -540,6 +549,17 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
       stack->pop_front();
     }
   }
+}
+
+void Instrumentation::DeoptimizeAllThreadFrames() {
+  Thread* self = Thread::Current();
+  MutexLock mu(self, *Locks::thread_list_lock_);
+  ThreadList* tl = Runtime::Current()->GetThreadList();
+  tl->ForEach([&](Thread* t) {
+    Locks::mutator_lock_->AssertExclusiveHeld(self);
+    InstrumentThreadStack(t);
+  });
+  current_force_deopt_id_++;
 }
 
 static bool HasEvent(Instrumentation::InstrumentationEvent expected, uint32_t events) {
@@ -803,10 +823,24 @@ void Instrumentation::UpdateStubs() {
     }
     if (empty) {
       MutexLock mu(self, *Locks::thread_list_lock_);
-      Runtime::Current()->GetThreadList()->ForEach(InstrumentationRestoreStack, this);
-      // Only do this after restoring, as walking the stack when restoring will see
-      // the instrumentation exit pc.
-      instrumentation_stubs_installed_ = false;
+      bool no_remaining_deopts = true;
+      // Check that there are no other forced deoptimizations. Do it here so we only need to lock
+      // thread_list_lock once.
+      runtime->GetThreadList()->ForEach([&](Thread* t) {
+        no_remaining_deopts =
+            no_remaining_deopts && !t->IsForceInterpreter() &&
+            std::all_of(t->GetInstrumentationStack()->cbegin(),
+                        t->GetInstrumentationStack()->cend(),
+                        [&](const auto& frame) REQUIRES_SHARED(Locks::mutator_lock_) {
+                          return frame.force_deopt_id_ == current_force_deopt_id_;
+                        });
+      });
+      if (no_remaining_deopts) {
+        Runtime::Current()->GetThreadList()->ForEach(InstrumentationRestoreStack, this);
+        // Only do this after restoring, as walking the stack when restoring will see
+        // the instrumentation exit pc.
+        instrumentation_stubs_installed_ = false;
+      }
     }
   }
 }
@@ -1401,8 +1435,8 @@ void Instrumentation::PushInstrumentationStackFrame(Thread* self,
   DCHECK(!self->IsExceptionPending());
   size_t frame_id = StackVisitor::ComputeNumFrames(self, kInstrumentationStackWalk);
 
-  instrumentation::InstrumentationStackFrame instrumentation_frame(h_this.Get(), method, lr,
-                                                                   frame_id, interpreter_entry);
+  instrumentation::InstrumentationStackFrame instrumentation_frame(
+      h_this.Get(), method, lr, frame_id, interpreter_entry, current_force_deopt_id_);
   stack->push_front(instrumentation_frame);
 }
 
@@ -1563,6 +1597,13 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self,
   bool deoptimize = (visitor.caller != nullptr) &&
                     (interpreter_stubs_installed_ || IsDeoptimized(visitor.caller) ||
                     self->IsForceInterpreter() ||
+                    // NB Since structurally obsolete compiled methods might have the offsets of
+                    // methods/fields compiled in we need to go back to interpreter whenever we hit
+                    // them.
+                    visitor.caller->GetDeclaringClass()->IsObsoleteObject() ||
+                    // Check if we forced all threads to deoptimize in the time between this frame
+                    // being created and now.
+                    instrumentation_frame.force_deopt_id_ != current_force_deopt_id_ ||
                     Dbg::IsForcedInterpreterNeededForUpcall(self, visitor.caller));
   if (is_ref) {
     // Restore the return value if it's a reference since it might have moved.
@@ -1628,7 +1669,8 @@ uintptr_t Instrumentation::PopFramesForDeoptimization(Thread* self, size_t nfram
 std::string InstrumentationStackFrame::Dump() const {
   std::ostringstream os;
   os << "Frame " << frame_id_ << " " << ArtMethod::PrettyMethod(method_) << ":"
-      << reinterpret_cast<void*>(return_pc_) << " this=" << reinterpret_cast<void*>(this_object_);
+      << reinterpret_cast<void*>(return_pc_) << " this=" << reinterpret_cast<void*>(this_object_)
+      << " force_deopt_id=" << force_deopt_id_;
   return os.str();
 }
 

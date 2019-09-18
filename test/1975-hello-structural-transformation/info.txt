@@ -1,0 +1,1 @@
+Test adding static fields using structural class redefinition.

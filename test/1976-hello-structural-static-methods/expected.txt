@@ -1,0 +1,70 @@
+Running directly
+Saying everything!
+hello
+Saying hi!
+hello
+Running reflective
+Reflectively invoking public static void art.Transform1976.sayEverything()
+hello
+Reflectively invoking public static void art.Transform1976.sayHi()
+hello
+Running jni
+Running method public static void art.Transform1976.sayEverything() using JNI.
+hello
+Running method public static void art.Transform1976.sayHi() using JNI.
+hello
+Running method handles
+Invoking MethodHandle()void (public static void art.Transform1976.sayEverything())
+hello
+Invoking MethodHandle()void (public static void art.Transform1976.sayHi())
+hello
+Running directly after redef
+Saying everything!
+Not saying hi again!
+Bye
+Saying hi!
+Not saying hi again!
+Saying bye!
+Bye
+Running reflective after redef using old j.l.r.Method
+Reflectively invoking public static void art.Transform1976.sayEverything() on old j.l.r.Method
+Not saying hi again!
+Bye
+Reflectively invoking public static void art.Transform1976.sayHi() on old j.l.r.Method
+Not saying hi again!
+Running reflective after redef using new j.l.r.Method
+Reflectively invoking public static void art.Transform1976.sayBye() on new j.l.r.Method
+Bye
+Reflectively invoking public static void art.Transform1976.sayEverything() on new j.l.r.Method
+Not saying hi again!
+Bye
+Reflectively invoking public static void art.Transform1976.sayHi() on new j.l.r.Method
+Not saying hi again!
+Running jni with old ids
+Running method public static void art.Transform1976.sayEverything() using JNI.
+Not saying hi again!
+Bye
+Running method public static void art.Transform1976.sayHi() using JNI.
+Not saying hi again!
+Running jni with new ids
+Running method public static void art.Transform1976.sayBye() using JNI.
+Bye
+Running method public static void art.Transform1976.sayEverything() using JNI.
+Not saying hi again!
+Bye
+Running method public static void art.Transform1976.sayHi() using JNI.
+Not saying hi again!
+Running method handles using old handles
+Invoking MethodHandle()void (public static void art.Transform1976.sayEverything())
+Not saying hi again!
+Bye
+Invoking MethodHandle()void (public static void art.Transform1976.sayHi())
+Not saying hi again!
+Running method handles using new handles
+Invoking MethodHandle()void (public static void art.Transform1976.sayBye())
+Bye
+Invoking MethodHandle()void (public static void art.Transform1976.sayEverything())
+Not saying hi again!
+Bye
+Invoking MethodHandle()void (public static void art.Transform1976.sayHi())
+Not saying hi again!
