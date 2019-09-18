@@ -6146,7 +6146,7 @@ bool ClassLinker::LinkClass(Thread* self,
     // Update CHA info based on whether we override methods.
     // Have to do this before setting the class as resolved which allows
     // instantiation of klass.
-    if (cha_ != nullptr) {
+    if (LIKELY(descriptor != nullptr) && cha_ != nullptr) {
       cha_->UpdateAfterLoadingOf(klass);
     }
 
@@ -6177,7 +6177,7 @@ bool ClassLinker::LinkClass(Thread* self,
     ObjectLock<mirror::Class> lock(self, h_new_class);
     FixupTemporaryDeclaringClass(klass.Get(), h_new_class.Get());
 
-    {
+    if (LIKELY(descriptor != nullptr)) {
       WriterMutexLock mu(self, *Locks::classlinker_classes_lock_);
       const ObjPtr<mirror::ClassLoader> class_loader = h_new_class.Get()->GetClassLoader();
       ClassTable* const table = InsertClassTableForClassLoader(class_loader);
@@ -6197,7 +6197,7 @@ bool ClassLinker::LinkClass(Thread* self,
     // Update CHA info based on whether we override methods.
     // Have to do this before setting the class as resolved which allows
     // instantiation of klass.
-    if (cha_ != nullptr) {
+    if (LIKELY(descriptor != nullptr) && cha_ != nullptr) {
       cha_->UpdateAfterLoadingOf(h_new_class);
     }
 

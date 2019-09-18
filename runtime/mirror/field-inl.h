@@ -104,6 +104,18 @@ inline void Field::SetType(ObjPtr<mirror::Class> type) {
   SetFieldObject<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, type_), type);
 }
 
+template<typename Visitor>
+inline void Field::VisitTarget(Visitor&& v) {
+  ArtField* orig = GetArtField(/*use_dex_cache*/false);
+  ArtField* new_value = v(orig);
+  if (orig != new_value) {
+    SetDexFieldIndex<false>(new_value->GetDexFieldIndex());
+    SetOffset<false>(new_value->GetOffset().Int32Value());
+    SetDeclaringClass<false>(new_value->GetDeclaringClass());
+  }
+  DCHECK_EQ(new_value, GetArtField(/*use_dex_cache*/false));
+}
+
 }  // namespace mirror
 }  // namespace art
 
