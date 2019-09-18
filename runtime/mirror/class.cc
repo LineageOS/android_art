@@ -1539,12 +1539,6 @@ std::string Class::PrettyClass(ObjPtr<mirror::Class> c) {
 
 std::string Class::PrettyClass() {
   std::string result;
-  if (IsObsoleteObject()) {
-    result += "(Obsolete)";
-  }
-  if (IsRetired()) {
-    result += "(Retired)";
-  }
   result += "java.lang.Class<";
   result += PrettyDescriptor();
   result += ">";

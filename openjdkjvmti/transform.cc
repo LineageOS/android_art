@@ -330,8 +330,7 @@ jvmtiError Transformer::RetransformClasses(ArtJvmTiEnv* env,
   if (res != OK) {
     return res;
   }
-  return Redefiner::RedefineClassesDirect(
-      env, runtime, self, definitions, RedefinitionType::kNormal, error_msg);
+  return Redefiner::RedefineClassesDirect(env, runtime, self, definitions, error_msg);
 }
 
 // TODO Move this somewhere else, ti_class?
