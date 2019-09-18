@@ -422,6 +422,26 @@ jvmtiError Redefiner::GetClassRedefinitionError(art::Handle<art::mirror::Class> 
   }
 
   if (kType == RedefinitionType::kStructural) {
+    // Class initialization interacts really badly with structural redefinition since we need to
+    // make the old class obsolete. We currently just blanket don't allow it.
+    // TODO It might be nice to allow this at some point.
+    if (klass->IsInitializing() &&
+       !klass->IsInitialized() &&
+        klass->GetClinitThreadId() == self->GetTid()) {
+      // We are in the class-init running on this thread.
+      *error_msg = "Modification of class " + klass->PrettyClass() + " during class" +
+                   " initialization is not allowed.";
+      return ERR(INTERNAL);
+    }
+    if (!art::Runtime::Current()->GetClassLinker()->EnsureInitialized(
+            self, klass, /*can_init_fields=*/true, /*can_init_parents=*/true)) {
+      self->AssertPendingException();
+      *error_msg = "Class " + klass->PrettyClass() + " failed initialization. Structural" +
+                   " redefinition of erroneous classes is not allowed. Failure was: " +
+                   self->GetException()->Dump();
+      self->ClearException();
+      return ERR(INVALID_CLASS);
+    }
     art::StackHandleScope<2> hs(self);
     art::Handle<art::mirror::ObjectArray<art::mirror::Class>> roots(
         hs.NewHandle(art::Runtime::Current()->GetClassLinker()->GetClassRoots()));
@@ -1676,7 +1696,11 @@ Redefiner::ClassRedefinition::AllocateNewClassObject(art::Handle<art::mirror::De
   art::ObjectLock<art::mirror::Class> objlock(driver_->self_, linked_class);
   // We already verified the class earlier. No need to do it again.
   linked_class->SetVerificationAttempted();
-  linked_class->SetStatus(linked_class, art::ClassStatus::kVisiblyInitialized, driver_->self_);
+  // Mark the class as initialized.
+  CHECK(old_class->IsInitialized())
+      << "Attempting to redefine an uninitalized class " << old_class->PrettyClass()
+      << " status=" << old_class->GetStatus();
+  linker->ForceClassInitialized(driver_->self_, linked_class);
   // Make sure we have ext-data space for method & field ids. We won't know if we need them until
   // it's too late to create them.
   // TODO We might want to remove these arrays if they're not needed.
