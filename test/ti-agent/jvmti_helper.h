@@ -79,6 +79,21 @@ static inline jvmtiError Deallocate(jvmtiEnv* env, T* mem) {
 // To print jvmtiError. Does not rely on GetErrorName, so is an approximation.
 std::ostream& operator<<(std::ostream& os, const jvmtiError& rhs);
 
+template <typename T> void Dealloc(jvmtiEnv* env, T* t) {
+  env->Deallocate(reinterpret_cast<unsigned char*>(t));
+}
+
+template <typename T, typename... Rest> void Dealloc(jvmtiEnv* env, T* t, Rest... rs) {
+  Dealloc(env, t);
+  Dealloc(env, rs...);
+}
+
+void* GetExtensionFunctionVoid(JNIEnv* env, jvmtiEnv* jvmti, const std::string_view& name);
+
+template<typename T> T GetExtensionFunction(JNIEnv* env, jvmtiEnv* jvmti, const std::string_view& name) {
+  return reinterpret_cast<T>(GetExtensionFunctionVoid(env, jvmti, name));
+}
+
 }  // namespace art
 
 #endif  // ART_TEST_TI_AGENT_JVMTI_HELPER_H_
