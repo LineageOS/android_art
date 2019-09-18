@@ -301,8 +301,6 @@ art_cc_defaults {
         "1969-force-early-return-void/force_early_return_void.cc",
         "1970-force-early-return-long/force_early_return_long.cc",
         "1974-resize-array/resize_array.cc",
-        "1975-hello-structural-transformation/structural_transform.cc",
-        "1976-hello-structural-static-methods/structural_transform_methods.cc",
     ],
     // Use NDK-compatible headers for ctstiagent.
     header_libs: [

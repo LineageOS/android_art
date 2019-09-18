@@ -1121,16 +1121,7 @@
                   "1957-error-ext",
                   "1972-jni-id-swap-indices",
                   "1973-jni-id-swap-pointer",
-                  "1974-resize-array",
-                  "1975-hello-structural-transformation",
-                  "1976-hello-structural-static-methods",
-                  "1977-hello-structural-obsolescence",
-                  "1978-regular-obsolete-then-structural-obsolescence",
-                  "1979-threaded-structural-transformation",
-                  "1980-obsolete-object-cleared",
-                  "1981-structural-redef-private-method-handles",
-                  "1982-no-virtuals-structural-redefinition",
-                  "1983-structural-redefinition-failures"
+                  "1974-resize-array"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
