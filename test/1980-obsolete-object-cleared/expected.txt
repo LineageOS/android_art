@@ -1,0 +1,440 @@
+JNI_OnLoad called
+Reading normally.
+	Original secret number is: 42
+	Original secret array is: [1, 2, 3, 4]
+Using unsafe to access values directly from memory.
+	Original secret number is: 42
+	Original secret array is: [1, 2, 3, 4]
+Reading normally post redefinition.
+	Post-redefinition secret number is: 42
+	Post-redefinition secret array is: [1, 2, 3, 4]
+Obsolete class is: class Main$Transform
+Using unsafe to access obsolete values directly from memory.
+	Obsolete secret number is: 0
+	Obsolete secret array is: null
+
+
+Using obsolete class object!
+
+
+Calling public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: Attempt to invoke virtual method 'boolean java.lang.Class.isAssignableFrom(java.lang.Class)' on a null object reference
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) on (obsolete)class Main$Transform with [class java.lang.Object] = (obsolete)class Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) on (obsolete)class Main$Transform with [(obsolete)class Main$Transform] = (obsolete)class Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to long
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to java.lang.Class
+Calling public java.lang.Object java.lang.Class.cast(java.lang.Object) with params: [[null, foo, NOT_USED_STRING, class Main$Transform]]
+public java.lang.Object java.lang.Class.cast(java.lang.Object) on (obsolete)class Main$Transform with [null] = null
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.String to Main$Transform
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.String to Main$Transform
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.Class to Main$Transform
+Calling public boolean java.lang.Class.desiredAssertionStatus() with params: []
+public boolean java.lang.Class.desiredAssertionStatus() on (obsolete)class Main$Transform with [] = false
+Calling public int java.lang.Class.getAccessFlags() with params: []
+public int java.lang.Class.getAccessFlags() on (obsolete)class Main$Transform with [] = 2621441
+Calling public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [class java.lang.Object] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.annotation.Annotation[] java.lang.Class.getAnnotations() with params: []
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotations() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: annotationClass
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class java.lang.Object] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.String java.lang.Class.getCanonicalName() with params: []
+public java.lang.String java.lang.Class.getCanonicalName() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.ClassLoader java.lang.Class.getClassLoader() with params: []
+public java.lang.ClassLoader java.lang.Class.getClassLoader() on (obsolete)class Main$Transform with [] = dalvik.system.PathClassLoader
+Calling public java.lang.Class[] java.lang.Class.getClasses() with params: []
+public java.lang.Class[] java.lang.Class.getClasses() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.Class java.lang.Class.getComponentType() with params: []
+public java.lang.Class java.lang.Class.getComponentType() on (obsolete)class Main$Transform with [] = null
+Calling public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getConstructor argument 1 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Constructor[] java.lang.Class.getConstructors() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Constructor[] java.lang.Class.getConstructors() throws java.lang.SecurityException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [class java.lang.Object] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.annotation.Annotation[] java.lang.Class.getDeclaredAnnotations() with params: []
+public native java.lang.annotation.Annotation[] java.lang.Class.getDeclaredAnnotations() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.Class[] java.lang.Class.getDeclaredClasses() with params: []
+public native java.lang.Class[] java.lang.Class.getDeclaredClasses() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredConstructor argument 1 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Constructor[] java.lang.Class.getDeclaredConstructors() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Constructor[] java.lang.Class.getDeclaredConstructors() throws java.lang.SecurityException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with [SECRET_ARRAY] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFields() with params: []
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFields() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) with params: [[true, false]]
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) with [true] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) with [false] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method[] java.lang.Class.getDeclaredMethods() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Method[] java.lang.Class.getDeclaredMethods() throws java.lang.SecurityException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) with params: [[true, false]]
+public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) with [true] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) with [false] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.Class java.lang.Class.getDeclaringClass() with params: []
+public native java.lang.Class java.lang.Class.getDeclaringClass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.Class java.lang.Class.getEnclosingClass() with params: []
+public native java.lang.Class java.lang.Class.getEnclosingClass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Constructor java.lang.Class.getEnclosingConstructor() with params: []
+public java.lang.reflect.Constructor java.lang.Class.getEnclosingConstructor() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method java.lang.Class.getEnclosingMethod() with params: []
+public java.lang.reflect.Method java.lang.Class.getEnclosingMethod() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.Object[] java.lang.Class.getEnumConstants() with params: []
+public java.lang.Object[] java.lang.Class.getEnumConstants() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.Object[] java.lang.Class.getEnumConstantsShared() with params: []
+public java.lang.Object[] java.lang.Class.getEnumConstantsShared() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with [SECRET_ARRAY] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Field[] java.lang.Class.getFields() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Field[] java.lang.Class.getFields() throws java.lang.SecurityException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Type[] java.lang.Class.getGenericInterfaces() with params: []
+public java.lang.reflect.Type[] java.lang.Class.getGenericInterfaces() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Type java.lang.Class.getGenericSuperclass() with params: []
+public java.lang.reflect.Type java.lang.Class.getGenericSuperclass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [NOT_USED_STRING, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [NOT_USED_STRING, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [foo, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [foo, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [SECRET_ARRAY, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [SECRET_ARRAY, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.Class[] java.lang.Class.getInterfaces() with params: []
+public java.lang.Class[] java.lang.Class.getInterfaces() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, null] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.reflect.Method[] java.lang.Class.getMethods() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Method[] java.lang.Class.getMethods() throws java.lang.SecurityException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public int java.lang.Class.getModifiers() with params: []
+public int java.lang.Class.getModifiers() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.String java.lang.Class.getName() with params: []
+public java.lang.String java.lang.Class.getName() on (obsolete)class Main$Transform with [] = Main$Transform
+Calling public java.lang.Package java.lang.Class.getPackage() with params: []
+public java.lang.Package java.lang.Class.getPackage() on (obsolete)class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getPackageName$() with params: []
+public java.lang.String java.lang.Class.getPackageName$() on (obsolete)class Main$Transform with [] = null
+Calling public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() with params: []
+public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() on (obsolete)class Main$Transform with [] = null
+Calling public java.net.URL java.lang.Class.getResource(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.net.URL java.lang.Class.getResource(java.lang.String) on (obsolete)class Main$Transform with [NOT_USED_STRING] = null
+public java.net.URL java.lang.Class.getResource(java.lang.String) on (obsolete)class Main$Transform with [foo] = null
+public java.net.URL java.lang.Class.getResource(java.lang.String) on (obsolete)class Main$Transform with [SECRET_ARRAY] = null
+Calling public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on (obsolete)class Main$Transform with [NOT_USED_STRING] = null
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on (obsolete)class Main$Transform with [foo] = null
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on (obsolete)class Main$Transform with [SECRET_ARRAY] = null
+Calling public java.lang.Object[] java.lang.Class.getSigners() with params: []
+public java.lang.Object[] java.lang.Class.getSigners() on (obsolete)class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getSimpleName() with params: []
+public java.lang.String java.lang.Class.getSimpleName() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.Class java.lang.Class.getSuperclass() with params: []
+public java.lang.Class java.lang.Class.getSuperclass() on (obsolete)class Main$Transform with [] = class java.lang.Object
+Calling public java.lang.String java.lang.Class.getTypeName() with params: []
+public java.lang.String java.lang.Class.getTypeName() on (obsolete)class Main$Transform with [] = Main$Transform
+Calling public synchronized java.lang.reflect.TypeVariable[] java.lang.Class.getTypeParameters() with params: []
+public synchronized java.lang.reflect.TypeVariable[] java.lang.Class.getTypeParameters() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isAnnotation() with params: []
+public boolean java.lang.Class.isAnnotation() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: annotationClass == null
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [class java.lang.Object] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native boolean java.lang.Class.isAnonymousClass() with params: []
+public native boolean java.lang.Class.isAnonymousClass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isArray() with params: []
+public boolean java.lang.Class.isArray() on (obsolete)class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isAssignableFrom(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: Attempt to invoke virtual method 'boolean java.lang.Class.isInterface()' on a null object reference
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on (obsolete)class Main$Transform with [class java.lang.Object] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on (obsolete)class Main$Transform with [(obsolete)class Main$Transform] = true
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on (obsolete)class Main$Transform with [class Main$Transform] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on (obsolete)class Main$Transform with [long] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on (obsolete)class Main$Transform with [class java.lang.Class] = false
+Calling public boolean java.lang.Class.isEnum() with params: []
+public boolean java.lang.Class.isEnum() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isFinalizable() with params: []
+public boolean java.lang.Class.isFinalizable() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isInstance(java.lang.Object) with params: [[null, foo, NOT_USED_STRING, class Main$Transform]]
+public boolean java.lang.Class.isInstance(java.lang.Object) on (obsolete)class Main$Transform with [null] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on (obsolete)class Main$Transform with [foo] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on (obsolete)class Main$Transform with [NOT_USED_STRING] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on (obsolete)class Main$Transform with [class Main$Transform] = false
+Calling public boolean java.lang.Class.isInterface() with params: []
+public boolean java.lang.Class.isInterface() on (obsolete)class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isLocalClass() with params: []
+public boolean java.lang.Class.isLocalClass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isMemberClass() with params: []
+public boolean java.lang.Class.isMemberClass() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public boolean java.lang.Class.isPrimitive() with params: []
+public boolean java.lang.Class.isPrimitive() on (obsolete)class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isProxy() with params: []
+public boolean java.lang.Class.isProxy() on (obsolete)class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isSynthetic() with params: []
+public boolean java.lang.Class.isSynthetic() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public native java.lang.Object java.lang.Class.newInstance() throws java.lang.InstantiationException,java.lang.IllegalAccessException with params: []
+public native java.lang.Object java.lang.Class.newInstance() throws java.lang.InstantiationException,java.lang.IllegalAccessException with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.String java.lang.Class.toGenericString() with params: []
+public java.lang.String java.lang.Class.toGenericString() with [] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+Calling public java.lang.String java.lang.Class.toString() with params: []
+public java.lang.String java.lang.Class.toString() on (obsolete)class Main$Transform with [] = class Main$Transform
+
+
+Using non-obsolete class object!
+
+
+Calling public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: Attempt to invoke virtual method 'boolean java.lang.Class.isAssignableFrom(java.lang.Class)' on a null object reference
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) on class Main$Transform with [class java.lang.Object] = class Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) on class Main$Transform with [class Main$Transform] = class Main$Transform
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to long
+public java.lang.Class java.lang.Class.asSubclass(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: class Main$Transform cannot be cast to java.lang.Class
+Calling public java.lang.Object java.lang.Class.cast(java.lang.Object) with params: [[null, foo, NOT_USED_STRING, class Main$Transform]]
+public java.lang.Object java.lang.Class.cast(java.lang.Object) on class Main$Transform with [null] = null
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.String to Main$Transform
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.String to Main$Transform
+public java.lang.Object java.lang.Class.cast(java.lang.Object) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Cannot cast java.lang.Class to Main$Transform
+Calling public boolean java.lang.Class.desiredAssertionStatus() with params: []
+public boolean java.lang.Class.desiredAssertionStatus() on class Main$Transform with [] = false
+Calling public int java.lang.Class.getAccessFlags() with params: []
+public int java.lang.Class.getAccessFlags() on class Main$Transform with [] = 524289
+Calling public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) on class Main$Transform with [class java.lang.Object] = null
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) on class Main$Transform with [class Main$Transform] = null
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) on class Main$Transform with [long] = null
+public java.lang.annotation.Annotation java.lang.Class.getAnnotation(java.lang.Class) on class Main$Transform with [class java.lang.Class] = null
+Calling public java.lang.annotation.Annotation[] java.lang.Class.getAnnotations() with params: []
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotations() on class Main$Transform with [] = []
+Calling public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: annotationClass
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class java.lang.Object] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: java.lang.Object[] cannot be cast to java.lang.annotation.Annotation[]
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: Main$Transform[] cannot be cast to java.lang.annotation.Annotation[]
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [long] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: long[] cannot be cast to java.lang.annotation.Annotation[]
+public java.lang.annotation.Annotation[] java.lang.Class.getAnnotationsByType(java.lang.Class) with [class java.lang.Class] throws java.lang.reflect.InvocationTargetException: java.lang.ClassCastException: java.lang.Class[] cannot be cast to java.lang.annotation.Annotation[]
+Calling public java.lang.String java.lang.Class.getCanonicalName() with params: []
+public java.lang.String java.lang.Class.getCanonicalName() on class Main$Transform with [] = Main.Transform
+Calling public java.lang.ClassLoader java.lang.Class.getClassLoader() with params: []
+public java.lang.ClassLoader java.lang.Class.getClassLoader() on class Main$Transform with [] = dalvik.system.PathClassLoader
+Calling public java.lang.Class[] java.lang.Class.getClasses() with params: []
+public java.lang.Class[] java.lang.Class.getClasses() on class Main$Transform with [] = []
+Calling public java.lang.Class java.lang.Class.getComponentType() with params: []
+public java.lang.Class java.lang.Class.getComponentType() on class Main$Transform with [] = null
+Calling public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getConstructor argument 1 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [new java.lang.Class[0]] = public Main$Transform()
+public java.lang.reflect.Constructor java.lang.Class.getConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [null] = public Main$Transform()
+Calling public java.lang.reflect.Constructor[] java.lang.Class.getConstructors() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Constructor[] java.lang.Class.getConstructors() throws java.lang.SecurityException on class Main$Transform with [] = [public Main$Transform()]
+Calling public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: annotationClass
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) on class Main$Transform with [class java.lang.Object] = null
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) on class Main$Transform with [(obsolete)class Main$Transform] = null
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) on class Main$Transform with [class Main$Transform] = null
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) on class Main$Transform with [long] = null
+public native java.lang.annotation.Annotation java.lang.Class.getDeclaredAnnotation(java.lang.Class) on class Main$Transform with [class java.lang.Class] = null
+Calling public native java.lang.annotation.Annotation[] java.lang.Class.getDeclaredAnnotations() with params: []
+public native java.lang.annotation.Annotation[] java.lang.Class.getDeclaredAnnotations() on class Main$Transform with [] = []
+Calling public native java.lang.Class[] java.lang.Class.getDeclaredClasses() with params: []
+public native java.lang.Class[] java.lang.Class.getDeclaredClasses() on class Main$Transform with [] = []
+Calling public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredConstructor argument 1 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [new java.lang.Class[0]] = public Main$Transform()
+public java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructor(java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [null] = public Main$Transform()
+Calling public java.lang.reflect.Constructor[] java.lang.Class.getDeclaredConstructors() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Constructor[] java.lang.Class.getDeclaredConstructors() throws java.lang.SecurityException on class Main$Transform with [] = [public Main$Transform()]
+Calling public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchFieldException: No field NOT_USED_STRING in class LMain$Transform; (declaration of 'Main$Transform' appears in <transformed-jar>)
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchFieldException: No field foo in class LMain$Transform; (declaration of 'Main$Transform' appears in <transformed-jar>)
+public native java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String) throws java.lang.NoSuchFieldException on class Main$Transform with [SECRET_ARRAY] = public static java.lang.Object Main$Transform.SECRET_ARRAY
+Calling public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFields() with params: []
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFields() on class Main$Transform with [] = [public static java.lang.Object Main$Transform.AAA_PADDING, public static java.lang.Object Main$Transform.SECRET_ARRAY, public static long Main$Transform.SECRET_NUMBER]
+Calling public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) with params: [[true, false]]
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) on class Main$Transform with [true] = [public static java.lang.Object Main$Transform.AAA_PADDING, public static java.lang.Object Main$Transform.SECRET_ARRAY, public static long Main$Transform.SECRET_NUMBER]
+public native java.lang.reflect.Field[] java.lang.Class.getDeclaredFieldsUnchecked(boolean) on class Main$Transform with [false] = [public static java.lang.Object Main$Transform.AAA_PADDING, public static java.lang.Object Main$Transform.SECRET_ARRAY, public static long Main$Transform.SECRET_NUMBER]
+Calling public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.NOT_USED_STRING []
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, null] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.NOT_USED_STRING []
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [foo, new java.lang.Class[0]] = public static void Main$Transform.foo()
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [foo, null] = public static void Main$Transform.foo()
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getDeclaredMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.SECRET_ARRAY []
+public java.lang.reflect.Method java.lang.Class.getDeclaredMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, null] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.SECRET_ARRAY []
+Calling public java.lang.reflect.Method[] java.lang.Class.getDeclaredMethods() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Method[] java.lang.Class.getDeclaredMethods() throws java.lang.SecurityException on class Main$Transform with [] = [public static void Main$Transform.bar(), public static void Main$Transform.foo()]
+Calling public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) with params: [[true, false]]
+public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) on class Main$Transform with [true] = [public static void Main$Transform.bar(), public static void Main$Transform.foo()]
+public native java.lang.reflect.Method[] java.lang.Class.getDeclaredMethodsUnchecked(boolean) on class Main$Transform with [false] = [public static void Main$Transform.bar(), public static void Main$Transform.foo()]
+Calling public native java.lang.Class java.lang.Class.getDeclaringClass() with params: []
+public native java.lang.Class java.lang.Class.getDeclaringClass() on class Main$Transform with [] = class Main
+Calling public native java.lang.Class java.lang.Class.getEnclosingClass() with params: []
+public native java.lang.Class java.lang.Class.getEnclosingClass() on class Main$Transform with [] = class Main
+Calling public java.lang.reflect.Constructor java.lang.Class.getEnclosingConstructor() with params: []
+public java.lang.reflect.Constructor java.lang.Class.getEnclosingConstructor() on class Main$Transform with [] = null
+Calling public java.lang.reflect.Method java.lang.Class.getEnclosingMethod() with params: []
+public java.lang.reflect.Method java.lang.Class.getEnclosingMethod() on class Main$Transform with [] = null
+Calling public java.lang.Object[] java.lang.Class.getEnumConstants() with params: []
+public java.lang.Object[] java.lang.Class.getEnumConstants() on class Main$Transform with [] = null
+Calling public java.lang.Object[] java.lang.Class.getEnumConstantsShared() with params: []
+public java.lang.Object[] java.lang.Class.getEnumConstantsShared() on class Main$Transform with [] = null
+Calling public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with [NOT_USED_STRING] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchFieldException: NOT_USED_STRING
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException with [foo] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchFieldException: foo
+public java.lang.reflect.Field java.lang.Class.getField(java.lang.String) throws java.lang.NoSuchFieldException on class Main$Transform with [SECRET_ARRAY] = public static java.lang.Object Main$Transform.SECRET_ARRAY
+Calling public java.lang.reflect.Field[] java.lang.Class.getFields() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Field[] java.lang.Class.getFields() throws java.lang.SecurityException on class Main$Transform with [] = [public static java.lang.Object Main$Transform.AAA_PADDING, public static java.lang.Object Main$Transform.SECRET_ARRAY, public static long Main$Transform.SECRET_NUMBER]
+Calling public java.lang.reflect.Type[] java.lang.Class.getGenericInterfaces() with params: []
+public java.lang.reflect.Type[] java.lang.Class.getGenericInterfaces() on class Main$Transform with [] = []
+Calling public java.lang.reflect.Type java.lang.Class.getGenericSuperclass() with params: []
+public java.lang.reflect.Type java.lang.Class.getGenericSuperclass() on class Main$Transform with [] = class java.lang.Object
+Calling public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [NOT_USED_STRING, new java.lang.Class[0]] = null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [NOT_USED_STRING, null] = null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [foo, new java.lang.Class[0]] = null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [foo, null] = null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getInstanceMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [SECRET_ARRAY, new java.lang.Class[0]] = null
+public java.lang.reflect.Method java.lang.Class.getInstanceMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.IllegalAccessException on class Main$Transform with [SECRET_ARRAY, null] = null
+Calling public java.lang.Class[] java.lang.Class.getInterfaces() with params: []
+public java.lang.Class[] java.lang.Class.getInterfaces() on class Main$Transform with [] = []
+Calling public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with params: [[NOT_USED_STRING, foo, SECRET_ARRAY], [new java.lang.Object[0], new java.lang.Class[0], null]]
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.NOT_USED_STRING []
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [NOT_USED_STRING, null] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.NOT_USED_STRING []
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [foo, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [foo, new java.lang.Class[0]] = public static void Main$Transform.foo()
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException on class Main$Transform with [foo, null] = public static void Main$Transform.foo()
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Object[0]] throws java.lang.IllegalArgumentException: method java.lang.Class.getMethod argument 2 has type java.lang.Class[], got java.lang.Object[]: null
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, new java.lang.Class[0]] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.SECRET_ARRAY []
+public java.lang.reflect.Method java.lang.Class.getMethod(java.lang.String,java.lang.Class[]) throws java.lang.NoSuchMethodException,java.lang.SecurityException with [SECRET_ARRAY, null] throws java.lang.reflect.InvocationTargetException: java.lang.NoSuchMethodException: Main$Transform.SECRET_ARRAY []
+Calling public java.lang.reflect.Method[] java.lang.Class.getMethods() throws java.lang.SecurityException with params: []
+public java.lang.reflect.Method[] java.lang.Class.getMethods() throws java.lang.SecurityException on class Main$Transform with [] = [public static void Main$Transform.bar(), public boolean java.lang.Object.equals(java.lang.Object), public static void Main$Transform.foo(), public final java.lang.Class java.lang.Object.getClass(), public int java.lang.Object.hashCode(), public final native void java.lang.Object.notify(), public final native void java.lang.Object.notifyAll(), public java.lang.String java.lang.Object.toString(), public final void java.lang.Object.wait() throws java.lang.InterruptedException, public final void java.lang.Object.wait(long) throws java.lang.InterruptedException, public final native void java.lang.Object.wait(long,int) throws java.lang.InterruptedException]
+Calling public int java.lang.Class.getModifiers() with params: []
+public int java.lang.Class.getModifiers() on class Main$Transform with [] = 9
+Calling public java.lang.String java.lang.Class.getName() with params: []
+public java.lang.String java.lang.Class.getName() on class Main$Transform with [] = Main$Transform
+Calling public java.lang.Package java.lang.Class.getPackage() with params: []
+public java.lang.Package java.lang.Class.getPackage() on class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getPackageName$() with params: []
+public java.lang.String java.lang.Class.getPackageName$() on class Main$Transform with [] = null
+Calling public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() with params: []
+public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() on class Main$Transform with [] = null
+Calling public java.net.URL java.lang.Class.getResource(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.net.URL java.lang.Class.getResource(java.lang.String) on class Main$Transform with [NOT_USED_STRING] = null
+public java.net.URL java.lang.Class.getResource(java.lang.String) on class Main$Transform with [foo] = null
+public java.net.URL java.lang.Class.getResource(java.lang.String) on class Main$Transform with [SECRET_ARRAY] = null
+Calling public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on class Main$Transform with [NOT_USED_STRING] = null
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on class Main$Transform with [foo] = null
+public java.io.InputStream java.lang.Class.getResourceAsStream(java.lang.String) on class Main$Transform with [SECRET_ARRAY] = null
+Calling public java.lang.Object[] java.lang.Class.getSigners() with params: []
+public java.lang.Object[] java.lang.Class.getSigners() on class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getSimpleName() with params: []
+public java.lang.String java.lang.Class.getSimpleName() on class Main$Transform with [] = Transform
+Calling public java.lang.Class java.lang.Class.getSuperclass() with params: []
+public java.lang.Class java.lang.Class.getSuperclass() on class Main$Transform with [] = class java.lang.Object
+Calling public java.lang.String java.lang.Class.getTypeName() with params: []
+public java.lang.String java.lang.Class.getTypeName() on class Main$Transform with [] = Main$Transform
+Calling public synchronized java.lang.reflect.TypeVariable[] java.lang.Class.getTypeParameters() with params: []
+public synchronized java.lang.reflect.TypeVariable[] java.lang.Class.getTypeParameters() on class Main$Transform with [] = []
+Calling public boolean java.lang.Class.isAnnotation() with params: []
+public boolean java.lang.Class.isAnnotation() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: annotationClass == null
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) on class Main$Transform with [class java.lang.Object] = false
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) with [(obsolete)class Main$Transform] throws java.lang.reflect.InvocationTargetException: java.lang.RuntimeException: Obsolete Object!
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) on class Main$Transform with [class Main$Transform] = false
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) on class Main$Transform with [long] = false
+public boolean java.lang.Class.isAnnotationPresent(java.lang.Class) on class Main$Transform with [class java.lang.Class] = false
+Calling public native boolean java.lang.Class.isAnonymousClass() with params: []
+public native boolean java.lang.Class.isAnonymousClass() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isArray() with params: []
+public boolean java.lang.Class.isArray() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isAssignableFrom(java.lang.Class) with params: [[null, class java.lang.Object, (obsolete)class Main$Transform, class Main$Transform, long, class java.lang.Class]]
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) with [null] throws java.lang.reflect.InvocationTargetException: java.lang.NullPointerException: Attempt to invoke virtual method 'boolean java.lang.Class.isInterface()' on a null object reference
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on class Main$Transform with [class java.lang.Object] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on class Main$Transform with [(obsolete)class Main$Transform] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on class Main$Transform with [class Main$Transform] = true
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on class Main$Transform with [long] = false
+public boolean java.lang.Class.isAssignableFrom(java.lang.Class) on class Main$Transform with [class java.lang.Class] = false
+Calling public boolean java.lang.Class.isEnum() with params: []
+public boolean java.lang.Class.isEnum() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isFinalizable() with params: []
+public boolean java.lang.Class.isFinalizable() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isInstance(java.lang.Object) with params: [[null, foo, NOT_USED_STRING, class Main$Transform]]
+public boolean java.lang.Class.isInstance(java.lang.Object) on class Main$Transform with [null] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on class Main$Transform with [foo] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on class Main$Transform with [NOT_USED_STRING] = false
+public boolean java.lang.Class.isInstance(java.lang.Object) on class Main$Transform with [class Main$Transform] = false
+Calling public boolean java.lang.Class.isInterface() with params: []
+public boolean java.lang.Class.isInterface() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isLocalClass() with params: []
+public boolean java.lang.Class.isLocalClass() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isMemberClass() with params: []
+public boolean java.lang.Class.isMemberClass() on class Main$Transform with [] = true
+Calling public boolean java.lang.Class.isPrimitive() with params: []
+public boolean java.lang.Class.isPrimitive() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isProxy() with params: []
+public boolean java.lang.Class.isProxy() on class Main$Transform with [] = false
+Calling public boolean java.lang.Class.isSynthetic() with params: []
+public boolean java.lang.Class.isSynthetic() on class Main$Transform with [] = false
+Calling public native java.lang.Object java.lang.Class.newInstance() throws java.lang.InstantiationException,java.lang.IllegalAccessException with params: []
+public native java.lang.Object java.lang.Class.newInstance() throws java.lang.InstantiationException,java.lang.IllegalAccessException on class Main$Transform with [] = Transform Instance
+Calling public java.lang.String java.lang.Class.toGenericString() with params: []
+public java.lang.String java.lang.Class.toGenericString() on class Main$Transform with [] = public static class Main$Transform
+Calling public java.lang.String java.lang.Class.toString() with params: []
+public java.lang.String java.lang.Class.toString() on class Main$Transform with [] = class Main$Transform
