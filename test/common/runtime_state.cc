@@ -19,7 +19,6 @@
 #include <android-base/logging.h>
 #include <android-base/macros.h>
 
-#include "art_field.h"
 #include "art_method-inl.h"
 #include "base/enums.h"
 #include "common_throws.h"
@@ -30,14 +29,12 @@
 #include "jit/profiling_info.h"
 #include "jni/jni_internal.h"
 #include "mirror/class-inl.h"
-#include "mirror/class.h"
 #include "nativehelper/ScopedUtfChars.h"
 #include "oat_file.h"
 #include "oat_quick_method_header.h"
 #include "profile/profile_compilation_info.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
-#include "scoped_thread_state_change.h"
 #include "thread-current-inl.h"
 
 namespace art {
@@ -379,18 +376,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_isDebuggable(JNIEnv*, jclass) {
 
 extern "C" JNIEXPORT void JNICALL Java_Main_setTargetSdkVersion(JNIEnv*, jclass, jint version) {
   Runtime::Current()->SetTargetSdkVersion(static_cast<uint32_t>(version));
-}
-
-extern "C" JNIEXPORT jlong JNICALL Java_Main_genericFieldOffset(JNIEnv* env, jclass, jobject fld) {
-  jfieldID fid = env->FromReflectedField(fld);
-  ScopedObjectAccess soa(env);
-  ArtField* af = jni::DecodeArtField(fid);
-  return af->GetOffset().Int32Value();
-}
-
-extern "C" JNIEXPORT jboolean JNICALL Java_Main_isObsoleteObject(JNIEnv* env, jclass, jclass c) {
-  ScopedObjectAccess soa(env);
-  return soa.Decode<mirror::Class>(c)->IsObsoleteObject();
 }
 
 }  // namespace art

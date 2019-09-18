@@ -15,7 +15,6 @@
  */
 
 #include "jvmti_helper.h"
-#include "jvmti.h"
 #include "test_env.h"
 
 #include <dlfcn.h>
@@ -230,34 +229,6 @@ std::ostream& operator<<(std::ostream& os, const jvmtiError& rhs) {
   }
   LOG(FATAL) << "Unexpected error type " << static_cast<int>(rhs);
   __builtin_unreachable();
-}
-
-void DeallocParams(jvmtiEnv* env, jvmtiParamInfo* params, jint n_params) {
-  for (jint i = 0; i < n_params; i++) {
-    Dealloc(env, params[i].name);
-  }
-}
-
-void* GetExtensionFunctionVoid(JNIEnv* env, jvmtiEnv* jvmti, const std::string_view& name) {
-  jint n_ext = 0;
-  void* res = nullptr;
-  jvmtiExtensionFunctionInfo* infos = nullptr;
-  if (JvmtiErrorToException(env, jvmti, jvmti->GetExtensionFunctions(&n_ext, &infos))) {
-    return nullptr;
-  }
-  for (jint i = 0; i < n_ext; i++) {
-    const jvmtiExtensionFunctionInfo& info = infos[i];
-    if (name == info.id) {
-      res = reinterpret_cast<void*>(info.func);
-    }
-    DeallocParams(jvmti, info.params, info.param_count);
-    Dealloc(jvmti, info.short_description, info.errors, info.id, info.params);
-  }
-  Dealloc(jvmti, infos);
-  if (res == nullptr) {
-    JvmtiErrorToException(env, jvmti, JVMTI_ERROR_NOT_FOUND);
-  }
-  return res;
 }
 
 }  // namespace art
