@@ -274,6 +274,10 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  void InvalidateAllCompiledCode()
+      REQUIRES(!Locks::jit_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
   void InvalidateCompiledCodeFor(ArtMethod* method, const OatQuickMethodHeader* code)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);

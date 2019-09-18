@@ -37,6 +37,7 @@
 #include "gc/collector_type.h"
 #include "gc/gc_cause.h"
 #include "gc/scoped_gc_critical_section.h"
+#include "jit/jit.h"
 #include "jit/profiling_info.h"
 #include "oat_file_manager.h"
 #include "profile/profile_compilation_info.h"
@@ -421,9 +422,12 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
     MutexLock mu(self, *Locks::profiler_lock_);
     profiler_pthread = profiler_pthread_;
   }
-  const uint32_t hot_method_sample_threshold = startup ?
-      options_.GetHotStartupMethodSamples(is_low_ram) :
-      std::numeric_limits<uint32_t>::max();
+  uint32_t hot_method_sample_threshold = std::numeric_limits<uint32_t>::max();
+  if (startup) {
+    hot_method_sample_threshold = options_.GetHotStartupMethodSamples(is_low_ram);
+  } else if (Runtime::Current()->GetJit() != nullptr) {
+    hot_method_sample_threshold = Runtime::Current()->GetJit()->WarmMethodThreshold();
+  }
   SampleClassesAndExecutedMethods(profiler_pthread,
                                   options_.GetProfileBootClassPath(),
                                   &allocator,
@@ -443,7 +447,8 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
     if (info_it == profile_cache_.end()) {
       info_it = profile_cache_.Put(
           filename,
-          new ProfileCompilationInfo(Runtime::Current()->GetArenaPool()));
+          new ProfileCompilationInfo(
+              Runtime::Current()->GetArenaPool(), options_.GetProfileBootClassPath()));
     }
     ProfileCompilationInfo* cached_info = info_it->second;
 
@@ -548,7 +553,8 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
       total_number_of_code_cache_queries_++;
     }
     {
-      ProfileCompilationInfo info(Runtime::Current()->GetArenaPool());
+      ProfileCompilationInfo info(
+          Runtime::Current()->GetArenaPool(), options_.GetProfileBootClassPath());
       if (!info.Load(filename, /*clear_if_invalid=*/ true)) {
         LOG(WARNING) << "Could not forcefully load profile " << filename;
         continue;
@@ -713,12 +719,14 @@ void ProfileSaver::Start(const ProfileSaverOptions& options,
   if (options.GetProfileBootClassPath()) {
     std::set<std::string> code_paths_keys;
     for (const std::string& location : code_paths) {
-      code_paths_keys.insert(ProfileCompilationInfo::GetProfileDexFileKey(location));
+      // Use the profile base key for checking file uniqueness (as it is constructed solely based
+      // on the location and ignores other metadata like architecture).
+      code_paths_keys.insert(ProfileCompilationInfo::GetProfileDexFileBaseKey(location));
     }
     for (const DexFile* dex_file : runtime->GetClassLinker()->GetBootClassPath()) {
       // Don't check ShouldProfileLocation since the boot class path may be speed compiled.
       const std::string& location = dex_file->GetLocation();
-      const std::string key = ProfileCompilationInfo::GetProfileDexFileKey(location);
+      const std::string key = ProfileCompilationInfo::GetProfileDexFileBaseKey(location);
       VLOG(profiler) << "Registering boot dex file " << location;
       if (code_paths_keys.find(key) != code_paths_keys.end()) {
         LOG(WARNING) << "Boot class path location key conflicts with code path " << location;
@@ -916,11 +924,8 @@ bool ProfileSaver::HasSeenMethod(const std::string& profile, bool hot, MethodRef
     if (!info.Load(profile, /*clear_if_invalid=*/false)) {
       return false;
     }
-    ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
-    // Ignore hot parameter for now since it was causing test 595 to be flaky. TODO: Investigate.
-    // b/63635729
-    UNUSED(hot);
-    return hotness.IsInProfile();
+    const ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
+    return hot ? hotness.IsHot() : hotness.IsInProfile();
   }
   return false;
 }

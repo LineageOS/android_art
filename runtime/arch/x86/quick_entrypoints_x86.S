@@ -944,8 +944,7 @@ MACRO3(ONE_ARG_SAVE_EVERYTHING_DOWNCALL, c_name, cxx_name, runtime_method_offset
     CFI_REMEMBER_STATE
     RESTORE_SAVE_EVERYTHING_FRAME_KEEP_EAX            // restore frame up to return address
     ret                                               // return
-    CFI_RESTORE_STATE
-    CFI_DEF_CFA(esp, FRAME_SIZE_SAVE_EVERYTHING)      // workaround for clang bug: 31975598
+    CFI_RESTORE_STATE_AND_DEF_CFA(esp, FRAME_SIZE_SAVE_EVERYTHING)
 1:
     DELIVER_PENDING_EXCEPTION_FRAME_READY
     END_FUNCTION VAR(c_name)
@@ -1836,7 +1835,7 @@ DEFINE_FUNCTION art_quick_imt_conflict_trampoline
     POP ESI
     POP EDI
     jmp *ART_METHOD_QUICK_CODE_OFFSET_32(%eax)
-    CFI_RESTORE_STATE
+    CFI_RESTORE_STATE_AND_DEF_CFA(esp, 16)
 .Limt_table_next_entry:
     // If the entry is null, the interface method is not in the ImtConflictTable.
     cmpl LITERAL(0), 0(%edi)
@@ -1852,7 +1851,7 @@ DEFINE_FUNCTION art_quick_imt_conflict_trampoline
     POP ESI
     POP EDI
     INVOKE_TRAMPOLINE_BODY artInvokeInterfaceTrampoline
-    CFI_RESTORE_STATE
+    CFI_RESTORE_STATE_AND_DEF_CFA(esp, 16)
 .Limt_conflict_trampoline_dex_cache_miss:
     // We're not creating a proper runtime method frame here,
     // artLookupResolvedMethod() is not allowed to walk the stack.
@@ -2445,8 +2444,7 @@ DEFINE_FUNCTION art_quick_osr_stub
     movss %xmm0, (%ecx)           // Store the floating point result
     ret
 .Losr_entry:
-    CFI_RESTORE_STATE
-    CFI_DEF_CFA(ebp, SAVE_SIZE)   // CFA = ebp + SAVE_SIZE
+    CFI_RESTORE_STATE_AND_DEF_CFA(ebp, SAVE_SIZE)  // CFA = ebp + SAVE_SIZE
     subl LITERAL(4), %ecx         // Given stack size contains pushed frame pointer, substract it.
     subl %ecx, %esp
     mov %esp, %edi                // EDI = beginning of stack

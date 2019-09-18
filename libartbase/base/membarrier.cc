@@ -17,9 +17,11 @@
 #include "membarrier.h"
 
 #include <errno.h>
+#include <stdio.h>
 
 #if !defined(_WIN32)
 #include <sys/syscall.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 #include "macros.h"
@@ -46,6 +48,18 @@ namespace art {
 #if defined(__NR_membarrier)
 
 int membarrier(MembarrierCommand command) {
+  // Check kernel version supports membarrier(2).
+  static constexpr int kRequiredMajor = 4;
+  static constexpr int kRequiredMinor = 16;
+  struct utsname uts;
+  int major, minor;
+  if (uname(&uts) != 0 ||
+      strcmp(uts.sysname, "Linux") != 0 ||
+      sscanf(uts.release, "%d.%d", &major, &minor) != 2 ||
+      (major < kRequiredMajor || (major == kRequiredMajor && minor < kRequiredMinor))) {
+    errno = ENOSYS;
+    return -1;
+  }
 #if defined(__BIONIC__)
   // Avoid calling membarrier on older Android versions where membarrier may be barred by secomp
   // causing the current process to be killed. The probing here could be considered expensive so
