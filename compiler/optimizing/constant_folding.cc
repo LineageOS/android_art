@@ -217,6 +217,7 @@ void InstructionWithAbsorbingInputSimplifier::VisitBelowOrEqual(HBelowOrEqual* i
 }
 
 void InstructionWithAbsorbingInputSimplifier::VisitAnd(HAnd* instruction) {
+  DataType::Type type = instruction->GetType();
   HConstant* input_cst = instruction->GetConstantRight();
   if ((input_cst != nullptr) && input_cst->IsZeroBitPattern()) {
     // Replace code looking like
@@ -225,6 +226,25 @@ void InstructionWithAbsorbingInputSimplifier::VisitAnd(HAnd* instruction) {
     //    CONSTANT 0
     instruction->ReplaceWith(input_cst);
     instruction->GetBlock()->RemoveInstruction(instruction);
+  }
+
+  HInstruction* left = instruction->GetLeft();
+  HInstruction* right = instruction->GetRight();
+
+  if (left->IsNot() ^ right->IsNot()) {
+    // Replace code looking like
+    //    NOT notsrc, src
+    //    AND dst, notsrc, src
+    // with
+    //    CONSTANT 0
+    HInstruction* hnot = (left->IsNot() ? left : right);
+    HInstruction* hother = (left->IsNot() ? right : left);
+    HInstruction* src = hnot->AsNot()->GetInput();
+
+    if (src == hother) {
+      instruction->ReplaceWith(GetGraph()->GetConstant(type, 0));
+      instruction->GetBlock()->RemoveInstruction(instruction);
+    }
   }
 }
 
