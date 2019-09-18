@@ -20,7 +20,6 @@
 #include <list>
 #include <set>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -480,38 +479,6 @@ class ClassLinker {
                                                       LinearAlloc* allocator,
                                                       size_t length);
 
-  // Convenience AllocClass() overload that uses mirror::Class::InitializeClassVisitor
-  // for the class initialization and uses the `java_lang_Class` from class roots
-  // instead of an explicit argument.
-  ObjPtr<mirror::Class> AllocClass(Thread* self, uint32_t class_size)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Roles::uninterruptible_);
-
-  // Setup the classloader, class def index, type idx so that we can insert this class in the class
-  // table.
-  void SetupClass(const DexFile& dex_file,
-                  const dex::ClassDef& dex_class_def,
-                  Handle<mirror::Class> klass,
-                  ObjPtr<mirror::ClassLoader> class_loader)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  void LoadClass(Thread* self,
-                 const DexFile& dex_file,
-                 const dex::ClassDef& dex_class_def,
-                 Handle<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Link the class and place it into the class-table using the given descriptor. NB if the
-  // descriptor is null the class will not be placed in any class-table. This is useful implementing
-  // obsolete classes and should not be used otherwise.
-  bool LinkClass(Thread* self,
-                 const char* descriptor,
-                 Handle<mirror::Class> klass,
-                 Handle<mirror::ObjectArray<mirror::Class>> interfaces,
-                 MutableHandle<mirror::Class>* h_new_class_out)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::classlinker_classes_lock_);
-
   ObjPtr<mirror::PointerArray> AllocPointerArray(Thread* self, size_t length)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
@@ -862,6 +829,13 @@ class ClassLinker {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 
+  // Convenience AllocClass() overload that uses mirror::Class::InitializeClassVisitor
+  // for the class initialization and uses the `java_lang_Class` from class roots
+  // instead of an explicit argument.
+  ObjPtr<mirror::Class> AllocClass(Thread* self, uint32_t class_size)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Roles::uninterruptible_);
+
   // Allocate a primitive array class and store it in appropriate class root.
   void AllocPrimitiveArrayClass(Thread* self,
                                 ClassRoot primitive_root,
@@ -914,6 +888,20 @@ class ClassLinker {
   // sufficient to hold all static fields.
   uint32_t SizeOfClassWithoutEmbeddedTables(const DexFile& dex_file,
                                             const dex::ClassDef& dex_class_def);
+
+  // Setup the classloader, class def index, type idx so that we can insert this class in the class
+  // table.
+  void SetupClass(const DexFile& dex_file,
+                  const dex::ClassDef& dex_class_def,
+                  Handle<mirror::Class> klass,
+                  ObjPtr<mirror::ClassLoader> class_loader)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void LoadClass(Thread* self,
+                 const DexFile& dex_file,
+                 const dex::ClassDef& dex_class_def,
+                 Handle<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   void LoadField(const ClassAccessor::Field& field, Handle<mirror::Class> klass, ArtField* dst)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -1060,6 +1048,14 @@ class ClassLinker {
                                                      ObjPtr<mirror::Class> klass1,
                                                      ObjPtr<mirror::Class> klass2)
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  bool LinkClass(Thread* self,
+                 const char* descriptor,
+                 Handle<mirror::Class> klass,
+                 Handle<mirror::ObjectArray<mirror::Class>> interfaces,
+                 MutableHandle<mirror::Class>* h_new_class_out)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Locks::classlinker_classes_lock_);
 
   bool LinkSuperClass(Handle<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);

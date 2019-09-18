@@ -53,41 +53,26 @@ inline void Class::VisitReferences(ObjPtr<Class> klass, const Visitor& visitor) 
 
 template<ReadBarrierOption kReadBarrierOption, class Visitor>
 void Class::VisitNativeRoots(Visitor& visitor, PointerSize pointer_size) {
-  VisitFields<kReadBarrierOption>([&](ArtField* field) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    field->VisitRoots(visitor);
+  for (ArtField& field : GetSFieldsUnchecked()) {
+    // Visit roots first in case the declaring class gets moved.
+    field.VisitRoots(visitor);
     if (kIsDebugBuild && IsResolved()) {
-      CHECK_EQ(field->GetDeclaringClass<kReadBarrierOption>(), this)
-          << GetStatus() << field->GetDeclaringClass()->PrettyClass() << " != " << PrettyClass();
+      CHECK_EQ(field.GetDeclaringClass<kReadBarrierOption>(), this) << GetStatus();
     }
-  });
-  // Don't use VisitMethods because we don't want to hit the class-ext methods twice.
+  }
+  for (ArtField& field : GetIFieldsUnchecked()) {
+    // Visit roots first in case the declaring class gets moved.
+    field.VisitRoots(visitor);
+    if (kIsDebugBuild && IsResolved()) {
+      CHECK_EQ(field.GetDeclaringClass<kReadBarrierOption>(), this) << GetStatus();
+    }
+  }
   for (ArtMethod& method : GetMethods(pointer_size)) {
     method.VisitRoots<kReadBarrierOption>(visitor, pointer_size);
   }
   ObjPtr<ClassExt> ext(GetExtData<kDefaultVerifyFlags, kReadBarrierOption>());
   if (!ext.IsNull()) {
     ext->VisitNativeRoots<kReadBarrierOption, Visitor>(visitor, pointer_size);
-  }
-}
-
-template<ReadBarrierOption kReadBarrierOption, class Visitor>
-void Class::VisitMethods(Visitor visitor, PointerSize pointer_size) {
-  for (ArtMethod& method : GetMethods(pointer_size)) {
-    visitor(&method);
-  }
-  ObjPtr<ClassExt> ext(GetExtData<kDefaultVerifyFlags, kReadBarrierOption>());
-  if (!ext.IsNull()) {
-    ext->VisitMethods<kReadBarrierOption, Visitor>(visitor, pointer_size);
-  }
-}
-
-template<ReadBarrierOption kReadBarrierOption, class Visitor>
-void Class::VisitFields(Visitor visitor) {
-  for (ArtField& sfield : GetSFieldsUnchecked()) {
-    visitor(&sfield);
-  }
-  for (ArtField& ifield : GetIFieldsUnchecked()) {
-    visitor(&ifield);
   }
 }
 
