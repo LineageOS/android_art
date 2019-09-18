@@ -19,6 +19,16 @@
 
 #include "jvmti.h"
 
+#include "base/locks.h"
+
+namespace art {
+class Thread;
+template<typename T> class ObjPtr;
+namespace mirror {
+class Object;
+}  // namespace mirror
+}  // namespace art
+
 namespace openjdkjvmti {
 
 class EventHandler;
@@ -77,6 +87,12 @@ class HeapExtensions {
                                                   const void* user_data);
 
   static jvmtiError JNICALL ChangeArraySize(jvmtiEnv* env, jobject arr, jsize new_size);
+
+  static void ReplaceReference(art::Thread* self,
+                               art::ObjPtr<art::mirror::Object> original,
+                               art::ObjPtr<art::mirror::Object> replacement)
+      REQUIRES(art::Locks::mutator_lock_,
+               art::Roles::uninterruptible_);
 
  private:
   static EventHandler* gEventHandler;

@@ -20,6 +20,7 @@
 #include "executable.h"
 
 #include "object-inl.h"
+#include "verify_object.h"
 
 namespace art {
 namespace mirror {
@@ -34,6 +35,17 @@ inline void Executable::SetArtMethod(ArtMethod* method) {
 
 inline ObjPtr<mirror::Class> Executable::GetDeclaringClass() {
   return GetFieldObject<mirror::Class>(DeclaringClassOffset());
+}
+
+template<typename Visitor, VerifyObjectFlags kVerifiyFlags>
+inline void Executable::VisitTarget(Visitor&& v) {
+  ArtMethod* orig = GetArtMethod<kVerifiyFlags>();
+  ArtMethod* new_target = v(orig);
+  if (orig != new_target) {
+    SetArtMethod(new_target);
+    SetDexMethodIndex(new_target->GetDexMethodIndex());
+    SetDeclaringClass(new_target->GetDeclaringClass());
+  }
 }
 
 }  // namespace mirror

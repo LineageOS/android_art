@@ -1,0 +1,30 @@
+Reading with reflection.
+public static java.lang.Object art.Test1982$Transform.BAR on (ID: 0) <NULL> = (ID: 1) value of <BAR FIELD>
+public static java.lang.Object art.Test1982$Transform.FOO on (ID: 0) <NULL> = (ID: 2) value of <FOO FIELD>
+Reading with reflection on subtransform instance.
+public static java.lang.Object art.Test1982$Transform.BAR on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 1) value of <BAR FIELD>
+public static java.lang.Object art.Test1982$Transform.FOO on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 2) value of <FOO FIELD>
+public int art.Test1982$SuperTransform.id on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 4) 2
+Reading normally.
+Read BAR field: (ID: 1) value of <BAR FIELD>
+Read FOO field: (ID: 2) value of <FOO FIELD>
+t1 is (ID: 5) SuperTransform { id: 1, class: class art.Test1982$Transform }
+t2 is (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform }
+Redefined: class art.Test1982$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: null]
+Reading with reflection after redefinition.
+public static java.lang.Object art.Test1982$Transform.BAR on (ID: 0) <NULL> = (ID: 1) value of <BAR FIELD>
+public static java.lang.Object art.Test1982$Transform.BAZ on (ID: 0) <NULL> = (ID: 0) <NULL>
+public static java.lang.Object art.Test1982$Transform.FOO on (ID: 0) <NULL> = (ID: 2) value of <FOO FIELD>
+Reading with reflection after redefinition on subtransform instance.
+public static java.lang.Object art.Test1982$Transform.BAR on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 1) value of <BAR FIELD>
+public static java.lang.Object art.Test1982$Transform.BAZ on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 0) <NULL>
+public static java.lang.Object art.Test1982$Transform.FOO on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 2) value of <FOO FIELD>
+public int art.Test1982$SuperTransform.id on (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform } = (ID: 4) 2
+Reading normally after possible modification.
+Read FOO field: (ID: 2) value of <FOO FIELD>
+Read BAR field: (ID: 1) value of <BAR FIELD>
+t1 is (ID: 5) SuperTransform { id: 1, class: class art.Test1982$Transform }
+t2 is (ID: 3) SuperTransform { id: 2, class: class art.Test1982$SubTransform }
+new SubTransform is (ID: 6) SuperTransform { id: 1003, class: class art.Test1982$SubTransform }
+myToString of (ID: 6) SuperTransform { id: 1003, class: class art.Test1982$SubTransform } is SubTransform (subclass of: class art.Test1982$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: null]) { id: 1003 }
+Creating new transform from t1 class = (ID: 7) SuperTransform { id: 1004, class: class art.Test1982$Transform }
