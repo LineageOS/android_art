@@ -1,0 +1,2 @@
+Test that obsoleted classes have their fields cleared and cannot be used to obtain
+obsolete/invalid reflection objects.

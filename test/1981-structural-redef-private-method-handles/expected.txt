@@ -1,0 +1,37 @@
+Initial: class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading field FOO using (ID: 2) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 1) value of <FOO FIELD>
+Reading field BAR using (ID: 3) MethodHandle()Object = (ID: 4) value of <BAR FIELD>
+Reading field BAR using (ID: 5) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 4) value of <BAR FIELD>
+Redefining Transform class
+Post redefinition : class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: null]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading field FOO using (ID: 2) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 1) value of <FOO FIELD>
+Reading field BAR using (ID: 3) MethodHandle()Object = (ID: 4) value of <BAR FIELD>
+Reading field BAR using (ID: 5) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 4) value of <BAR FIELD>
+Reading new field BAZ using (ID: 6) MethodHandle()Object = (ID: 7) <NULL>
+Reading new field BAZ using (ID: 8) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 7) <NULL>
+Reading new field FOO using (ID: 9) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading new field FOO using (ID: 10) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 1) value of <FOO FIELD>
+Reading new field BAR using (ID: 11) MethodHandle()Object = (ID: 4) value of <BAR FIELD>
+Reading new field BAR using (ID: 12) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 4) value of <BAR FIELD>
+Setting BAZ to (ID: 13) foo with new mh.
+Post set with new mh: class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: foo]
+Setting FOO to (ID: 14) class art.Test1981$Transform with old mh.
+Post set with old mh: class art.Test1981$Transform[FOO: class art.Test1981$Transform, BAR: value of <BAR FIELD>, BAZ: foo]
+Setting FOO to '(ID: 15) new_value object' with old varhandle.
+Post set with new varhandle: class art.Test1981$Transform[FOO: new_value object, BAR: value of <BAR FIELD>, BAZ: foo]
+Setting BAZ to 'bar' with new varhandle.
+Post set with old varhandle: class art.Test1981$Transform[FOO: new_value object, BAR: value of <BAR FIELD>, BAZ: bar]
+Using mh to call new private method.
+Post reinit with mh: class art.Test1981$Transform[FOO: new_value object, BAR: value of <BAR FIELD>, BAZ: 42]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 15) new_value object
+Reading field FOO using (ID: 2) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 15) new_value object
+Reading field BAR using (ID: 3) MethodHandle()Object = (ID: 4) value of <BAR FIELD>
+Reading field BAR using (ID: 5) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 4) value of <BAR FIELD>
+Reading new field BAZ using (ID: 6) MethodHandle()Object = (ID: 16) 42
+Reading new field BAZ using (ID: 8) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 16) 42
+Reading new field FOO using (ID: 9) MethodHandle()Object = (ID: 15) new_value object
+Reading new field FOO using (ID: 10) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 15) new_value object
+Reading new field BAR using (ID: 11) MethodHandle()Object = (ID: 4) value of <BAR FIELD>
+Reading new field BAR using (ID: 12) java.lang.invoke.FieldVarHandle()->java.lang.Object = (ID: 4) value of <BAR FIELD>

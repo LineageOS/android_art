@@ -1,0 +1,2 @@
+Test that remote threads without references to the redefined class are properly deoptimized when
+structural redefinition occurs.

@@ -32,12 +32,56 @@ namespace jni {
 class ScopedEnableSuspendAllJniIdQueries;
 class JniIdManager {
  public:
+  class IdVisitor {
+   public:
+    virtual ~IdVisitor() {}
+    virtual void VisitMethodId(jmethodID id, ArtMethod** method) = 0;
+    virtual void VisitFieldId(jfieldID id, ArtField** field) = 0;
+    virtual bool ShouldVisitFields() = 0;
+    virtual bool ShouldVisitMethods() = 0;
+  };
+
+  template <typename T,
+            typename = typename std::enable_if<std::is_same_v<T, jmethodID> ||
+                                               std::is_same_v<T, jfieldID>>>
+  static constexpr bool IsIndexId(T val) {
+    return val == nullptr || reinterpret_cast<uintptr_t>(val) % 2 == 1;
+  }
+
   ArtMethod* DecodeMethodId(jmethodID method) REQUIRES(!Locks::jni_id_lock_);
   ArtField* DecodeFieldId(jfieldID field) REQUIRES(!Locks::jni_id_lock_);
   jmethodID EncodeMethodId(ArtMethod* method) REQUIRES(!Locks::jni_id_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
   jfieldID EncodeFieldId(ArtField* field) REQUIRES(!Locks::jni_id_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void VisitIds(Thread* self, IdVisitor* visitor);
+
+  template<typename MethodVisitor, typename FieldVisitor>
+  void VisitIds(Thread* self, MethodVisitor m, FieldVisitor f) REQUIRES(!Locks::jni_id_lock_) {
+    struct FuncVisitor : public IdVisitor {
+     public:
+      FuncVisitor(MethodVisitor m, FieldVisitor f) : m_(m), f_(f) {}
+      bool ShouldVisitFields() override {
+        return true;
+      }
+      bool ShouldVisitMethods() override {
+        return true;
+      }
+      void VisitMethodId(jmethodID mid, ArtMethod** am) NO_THREAD_SAFETY_ANALYSIS override {
+        m_(mid, am);
+      }
+      void VisitFieldId(jfieldID fid, ArtField** af) NO_THREAD_SAFETY_ANALYSIS override {
+        f_(fid, af);
+      }
+
+     private:
+      MethodVisitor m_;
+      FieldVisitor f_;
+    };
+    FuncVisitor fv(m, f);
+    VisitIds(self, &fv);
+  }
 
  private:
   template <typename ArtType>
