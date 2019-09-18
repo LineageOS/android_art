@@ -1,0 +1,1 @@
+Test interaction between obsolete methods and structural class redefinition.
