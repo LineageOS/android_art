@@ -21,11 +21,8 @@
 
 #include "array-inl.h"
 #include "art_method-inl.h"
-#include "base/enums.h"
 #include "handle_scope.h"
-#include "mirror/object.h"
 #include "object-inl.h"
-#include "verify_object.h"
 
 namespace art {
 namespace mirror {
@@ -92,12 +89,6 @@ inline ObjPtr<PointerArray> ClassExt::GetStaticJFieldIDs() {
 }
 
 template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
-inline ObjPtr<Class> ClassExt::GetObsoleteClass() {
-  return GetFieldObject<Class, kVerifyFlags, kReadBarrierOption>(
-      OFFSET_OF_OBJECT_MEMBER(ClassExt, obsolete_class_));
-}
-
-template <VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
 inline ObjPtr<PointerArray> ClassExt::GetJMethodIDs() {
   return GetFieldObject<PointerArray, kVerifyFlags, kReadBarrierOption>(
       OFFSET_OF_OBJECT_MEMBER(ClassExt, jmethod_ids_));
@@ -125,58 +116,15 @@ inline ObjPtr<Object> ClassExt::GetOriginalDexFile() {
 
 template<ReadBarrierOption kReadBarrierOption, class Visitor>
 void ClassExt::VisitNativeRoots(Visitor& visitor, PointerSize pointer_size) {
-  VisitMethods<kReadBarrierOption>([&](ArtMethod* method) {
-    method->VisitRoots<kReadBarrierOption>(visitor, pointer_size);
-  }, pointer_size);
-}
-
-template<ReadBarrierOption kReadBarrierOption, class Visitor>
-void ClassExt::VisitMethods(Visitor visitor, PointerSize pointer_size) {
   ObjPtr<PointerArray> arr(GetObsoleteMethods<kDefaultVerifyFlags, kReadBarrierOption>());
-  if (!arr.IsNull()) {
-    int32_t len = arr->GetLength();
-    for (int32_t i = 0; i < len; i++) {
-      ArtMethod* method = arr->GetElementPtrSize<ArtMethod*>(i, pointer_size);
-      if (method != nullptr) {
-        visitor(method);
-      }
-    }
+  if (arr.IsNull()) {
+    return;
   }
-}
-
-template<ReadBarrierOption kReadBarrierOption, class Visitor>
-void ClassExt::VisitJMethodIDs(Visitor v) {
-  ObjPtr<PointerArray> marr(GetJMethodIDs<kDefaultVerifyFlags, kReadBarrierOption>());
-  if (!marr.IsNull()) {
-    int32_t len = marr->GetLength();
-    for (int32_t i = 0; i < len; i++) {
-      jmethodID id = marr->GetElementPtrSize<jmethodID>(i, kRuntimePointerSize);
-      if (id != nullptr) {
-        v(id, i);
-      }
-    }
-  }
-}
-template<ReadBarrierOption kReadBarrierOption, class Visitor>
-void ClassExt::VisitJFieldIDs(Visitor v) {
-  ObjPtr<PointerArray> sarr(GetStaticJFieldIDs<kDefaultVerifyFlags, kReadBarrierOption>());
-  if (!sarr.IsNull()) {
-    int32_t len = sarr->GetLength();
-    for (int32_t i = 0; i < len; i++) {
-      jfieldID id = sarr->GetElementPtrSize<jfieldID>(i, kRuntimePointerSize);
-      if (id != nullptr) {
-        v(id, i, true);
-      }
-    }
-  }
-  ObjPtr<PointerArray> iarr(GetInstanceJFieldIDs<kDefaultVerifyFlags, kReadBarrierOption>());
-  if (!iarr.IsNull()) {
-    int32_t len = iarr->GetLength();
-    for (int32_t i = 0; i < len; i++) {
-      jfieldID id = iarr->GetElementPtrSize<jfieldID>(i, kRuntimePointerSize);
-      if (id != nullptr) {
-        v(id, i, false);
-      }
+  int32_t len = arr->GetLength();
+  for (int32_t i = 0; i < len; i++) {
+    ArtMethod* method = arr->GetElementPtrSize<ArtMethod*, kDefaultVerifyFlags>(i, pointer_size);
+    if (method != nullptr) {
+      method->VisitRoots<kReadBarrierOption>(visitor, pointer_size);
     }
   }
 }

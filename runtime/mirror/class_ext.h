@@ -106,25 +106,7 @@ class MANAGED ClassExt : public Object {
   inline void VisitNativeRoots(Visitor& visitor, PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, class Visitor>
-  inline void VisitMethods(Visitor visitor, PointerSize pointer_size)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   static ObjPtr<ClassExt> Alloc(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // TODO Save the obsolete class, if we have one.
-  // TODO We need this so jit-cleanup can work. the obsolete class might get cleaned up early
-  // otherwise. We should remove the need for this.
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<Class> GetObsoleteClass() REQUIRES_SHARED(Locks::mutator_lock_);
-  void SetObsoleteClass(ObjPtr<Class> classes) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
-  inline void VisitJFieldIDs(Visitor v) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
-  inline void VisitJMethodIDs(Visitor v) REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
@@ -141,9 +123,6 @@ class MANAGED ClassExt : public Object {
   // the classes methods_ array or '0' if no id has been assigned to that method yet.
   HeapReference<PointerArray> jmethod_ids_;
 
-  // If set this is the Class object that was being used before a structural redefinition occurred.
-  HeapReference<Class> obsolete_class_;
-
   HeapReference<ObjectArray<DexCache>> obsolete_dex_caches_;
 
   HeapReference<PointerArray> obsolete_methods_;
@@ -158,8 +137,8 @@ class MANAGED ClassExt : public Object {
   HeapReference<Object> verify_error_;
 
   // Native pointer to DexFile and ClassDef index of this class before it was JVMTI-redefined.
-  int64_t pre_redefine_dex_file_ptr_;
   int32_t pre_redefine_class_def_index_;
+  int64_t pre_redefine_dex_file_ptr_;
 
   friend struct art::ClassExtOffsets;  // for verifying offset information
   DISALLOW_IMPLICIT_CONSTRUCTORS(ClassExt);

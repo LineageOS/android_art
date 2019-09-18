@@ -1618,10 +1618,11 @@ jvmtiError HeapExtensions::IterateThroughHeapExt(jvmtiEnv* env,
 
 namespace {
 
-using ObjectPtr = art::ObjPtr<art::mirror::Object>;
+using ArrayPtr = art::ObjPtr<art::mirror::Array>;
 
-static void ReplaceObjectReferences(ObjectPtr old_obj_ptr, ObjectPtr new_obj_ptr)
+static void ReplaceObjectReferences(ArrayPtr old_arr_ptr, ArrayPtr new_arr_ptr)
     REQUIRES(art::Locks::mutator_lock_,
+             art::Locks::user_code_suspension_lock_,
              art::Roles::uninterruptible_) {
   art::Runtime::Current()->GetHeap()->VisitObjectsPaused(
       [&](art::mirror::Object* ref) REQUIRES_SHARED(art::Locks::mutator_lock_) {
@@ -1629,31 +1630,21 @@ static void ReplaceObjectReferences(ObjectPtr old_obj_ptr, ObjectPtr new_obj_ptr
         class ResizeReferenceVisitor {
          public:
           using CompressedObj = art::mirror::CompressedReference<art::mirror::Object>;
-          ResizeReferenceVisitor(ObjectPtr old_arr, ObjectPtr new_arr)
-              : old_obj_(old_arr), new_obj_(new_arr) {}
+          ResizeReferenceVisitor(ArrayPtr old_arr, ArrayPtr new_arr)
+              : old_arr_(old_arr), new_arr_(new_arr) {}
 
-          // Ignore class roots.
-          void VisitRootIfNonNull(CompressedObj* root) const
-              REQUIRES_SHARED(art::Locks::mutator_lock_) {
-            if (root != nullptr) {
-              VisitRoot(root);
-            }
-          }
-          void VisitRoot(CompressedObj* root) const REQUIRES_SHARED(art::Locks::mutator_lock_) {
-            if (root->AsMirrorPtr() == old_obj_) {
-              root->Assign(new_obj_);
-              art::WriteBarrier::ForEveryFieldWrite(new_obj_);
-            }
-          }
+          // Ignore class roots. These do not need to be handled for arrays.
+          void VisitRootIfNonNull(CompressedObj* root ATTRIBUTE_UNUSED) const {}
+          void VisitRoot(CompressedObj* root ATTRIBUTE_UNUSED) const {}
 
           void operator()(art::ObjPtr<art::mirror::Object> obj,
                           art::MemberOffset off,
                           bool is_static ATTRIBUTE_UNUSED) const
               REQUIRES_SHARED(art::Locks::mutator_lock_) {
-            if (obj->GetFieldObject<art::mirror::Object>(off) == old_obj_) {
+            if (obj->GetFieldObject<art::mirror::Object>(off) == old_arr_) {
               LOG(DEBUG) << "Updating field at offset " << off.Uint32Value() << " of type "
                          << obj->GetClass()->PrettyClass();
-              obj->SetFieldObject</*transaction*/ false>(off, new_obj_);
+              obj->SetFieldObject</*transaction*/ false>(off, new_arr_);
             }
           }
 
@@ -1665,31 +1656,23 @@ static void ReplaceObjectReferences(ObjectPtr old_obj_ptr, ObjectPtr new_obj_ptr
           }
 
          private:
-          ObjectPtr old_obj_;
-          ObjectPtr new_obj_;
+          ArrayPtr old_arr_;
+          ArrayPtr new_arr_;
         };
 
-        ResizeReferenceVisitor rrv(old_obj_ptr, new_obj_ptr);
-        if (ref->IsClass()) {
-          // Class object native roots are the ArtField and ArtMethod 'declaring_class_' fields
-          // which we don't want to be messing with as it would break ref-visitor assumptions about
-          // what a class looks like. We want to keep the default behavior in other cases (such as
-          // dex-cache) though. Unfortunately there is no way to tell from the visitor where exactly
-          // the root came from.
-          // TODO It might be nice to have the visitors told where the reference came from.
-          ref->VisitReferences</*kVisitNativeRoots*/false>(rrv, rrv);
-        } else {
-          ref->VisitReferences</*kVisitNativeRoots*/true>(rrv, rrv);
-        }
+        ResizeReferenceVisitor rrv(old_arr_ptr, new_arr_ptr);
+        ref->VisitReferences(rrv, rrv);
       });
 }
 
-static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectPtr new_obj_ptr)
-    REQUIRES(art::Locks::mutator_lock_, art::Roles::uninterruptible_) {
+static void ReplaceStrongRoots(art::Thread* self, ArrayPtr old_arr_ptr, ArrayPtr new_arr_ptr)
+    REQUIRES(art::Locks::mutator_lock_,
+             art::Locks::user_code_suspension_lock_,
+             art::Roles::uninterruptible_) {
   // replace root references expcept java frames.
   struct ResizeRootVisitor : public art::RootVisitor {
    public:
-    ResizeRootVisitor(ObjectPtr new_val, ObjectPtr old_val)
+    ResizeRootVisitor(ArrayPtr new_val, ArrayPtr old_val)
         : new_val_(new_val), old_val_(old_val) {}
 
     // TODO It's somewhat annoying to have to have this function implemented twice. It might be
@@ -1703,16 +1686,7 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
           // Java frames might have the JIT doing optimizations (for example loop-unrolling or
           // eliding bounds checks) so we need deopt them once we're done here.
           if (info.GetType() == art::RootType::kRootJavaFrame) {
-            const art::JavaFrameRootInfo& jfri =
-                art::down_cast<const art::JavaFrameRootInfo&>(info);
-            if (jfri.GetVReg() == art::JavaFrameRootInfo::kMethodDeclaringClass) {
-              info.Describe(LOG_STREAM(INFO) << "Not changing declaring-class during stack walk. "
-                                                "Found obsolete java frame id ");
-              continue;
-            } else {
-              info.Describe(LOG_STREAM(INFO) << "Found java frame id ");
-              threads_with_roots_.insert(info.GetThreadId());
-            }
+            threads_with_roots_.insert(info.GetThreadId());
           }
           *obj = new_val_.Ptr();
         }
@@ -1729,16 +1703,7 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
           // Java frames might have the JIT doing optimizations (for example loop-unrolling or
           // eliding bounds checks) so we need deopt them once we're done here.
           if (info.GetType() == art::RootType::kRootJavaFrame) {
-            const art::JavaFrameRootInfo& jfri =
-                art::down_cast<const art::JavaFrameRootInfo&>(info);
-            if (jfri.GetVReg() == art::JavaFrameRootInfo::kMethodDeclaringClass) {
-              info.Describe(LOG_STREAM(INFO) << "Not changing declaring-class during stack walk. "
-                                                "Found obsolete java frame id ");
-              continue;
-            } else {
-              info.Describe(LOG_STREAM(INFO) << "Found java frame id ");
-              threads_with_roots_.insert(info.GetThreadId());
-            }
+            threads_with_roots_.insert(info.GetThreadId());
           }
           obj->Assign(new_val_);
         }
@@ -1750,11 +1715,11 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
     }
 
    private:
-    ObjectPtr new_val_;
-    ObjectPtr old_val_;
+    ArrayPtr new_val_;
+    ArrayPtr old_val_;
     std::unordered_set<uint32_t> threads_with_roots_;
   };
-  ResizeRootVisitor rrv(new_obj_ptr, old_obj_ptr);
+  ResizeRootVisitor rrv(new_arr_ptr, old_arr_ptr);
   art::Runtime::Current()->VisitRoots(&rrv, art::VisitRootFlags::kVisitRootFlagAllRoots);
   // Handle java Frames. Annoyingly the JIT can embed information about the length of the array into
   // the compiled code. By changing the length of the array we potentially invalidate these
@@ -1767,7 +1732,6 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
       art::Thread* t = thread_list->FindThreadByThreadId(id);
       CHECK(t != nullptr) << "id " << id << " does not refer to a valid thread."
                           << " Where did the roots come from?";
-      LOG(DEBUG) << "Instrumenting thread stack of thread " << *t;
       // TODO Use deopt manager. We need a version that doesn't acquire all the locks we
       // already have.
       // TODO We technically only need to do this if the frames are not already being interpreted.
@@ -1779,9 +1743,11 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
 
 static void ReplaceWeakRoots(art::Thread* self,
                              EventHandler* event_handler,
-                             ObjectPtr old_obj_ptr,
-                             ObjectPtr new_obj_ptr)
-    REQUIRES(art::Locks::mutator_lock_, art::Roles::uninterruptible_) {
+                             ArrayPtr old_arr_ptr,
+                             ArrayPtr new_arr_ptr)
+    REQUIRES(art::Locks::mutator_lock_,
+             art::Locks::user_code_suspension_lock_,
+             art::Roles::uninterruptible_) {
   // Handle tags. We want to do this seprately from other weak-refs (handled below) because we need
   // to send additional events and handle cases where the agent might have tagged the new
   // replacement object during the VMObjectAlloc. We do this by removing all tags associated with
@@ -1801,8 +1767,8 @@ static void ReplaceWeakRoots(art::Thread* self,
     // Get the tags and clear them (so we don't need to special-case the normal weak-ref visitor)
     jlong new_tag = 0;
     jlong obsolete_tag = 0;
-    bool had_new_tag = env->object_tag_table->RemoveLocked(new_obj_ptr, &new_tag);
-    bool had_obsolete_tag = env->object_tag_table->RemoveLocked(old_obj_ptr, &obsolete_tag);
+    bool had_new_tag = env->object_tag_table->RemoveLocked(new_arr_ptr, &new_tag);
+    bool had_obsolete_tag = env->object_tag_table->RemoveLocked(old_arr_ptr, &obsolete_tag);
     // Dispatch event.
     if (had_obsolete_tag || had_new_tag) {
       event_handler->DispatchEventOnEnv<ArtJvmtiEvent::kObsoleteObjectCreated>(env,
@@ -1813,55 +1779,59 @@ static void ReplaceWeakRoots(art::Thread* self,
       non_obsolete_tags[env] = new_tag;
     }
     // After weak-ref update we need to go back and re-add obsoletes. We wait to avoid having to
-    // deal with the visit-weaks overwriting the initial new_obj_ptr tag and generally making things
+    // deal with the visit-weaks overwriting the initial new_arr_ptr tag and generally making things
     // difficult.
     env->object_tag_table->Unlock();
   });
   // Handle weak-refs.
   struct ReplaceWeaksVisitor : public art::IsMarkedVisitor {
    public:
-    ReplaceWeaksVisitor(ObjectPtr old_obj, ObjectPtr new_obj)
-        : old_obj_(old_obj), new_obj_(new_obj) {}
+    ReplaceWeaksVisitor(ArrayPtr old_arr, ArrayPtr new_arr)
+        : old_arr_(old_arr), new_arr_(new_arr) {}
 
     art::mirror::Object* IsMarked(art::mirror::Object* obj)
         REQUIRES_SHARED(art::Locks::mutator_lock_) {
-      if (obj == old_obj_) {
-        return new_obj_.Ptr();
+      if (obj == old_arr_) {
+        return new_arr_.Ptr();
       } else {
         return obj;
       }
     }
 
    private:
-    ObjectPtr old_obj_;
-    ObjectPtr new_obj_;
+    ArrayPtr old_arr_;
+    ArrayPtr new_arr_;
   };
-  ReplaceWeaksVisitor rwv(old_obj_ptr, new_obj_ptr);
+  ReplaceWeaksVisitor rwv(old_arr_ptr, new_arr_ptr);
   art::Runtime::Current()->SweepSystemWeaks(&rwv);
-  // Re-add the object tags. At this point all weak-references to the old_obj_ptr are gone.
+  // Re-add the object tags. At this point all weak-references to the old_arr_ptr are gone.
   event_handler->ForEachEnv(self, [&](ArtJvmTiEnv* env) {
     // Cannot have REQUIRES(art::Locks::mutator_lock_) since ForEachEnv doesn't require it.
     art::Locks::mutator_lock_->AssertExclusiveHeld(self);
     env->object_tag_table->Lock();
     if (obsolete_tags.find(env) != obsolete_tags.end()) {
-      env->object_tag_table->SetLocked(old_obj_ptr, obsolete_tags[env]);
+      env->object_tag_table->SetLocked(old_arr_ptr, obsolete_tags[env]);
     }
     if (non_obsolete_tags.find(env) != non_obsolete_tags.end()) {
-      env->object_tag_table->SetLocked(new_obj_ptr, non_obsolete_tags[env]);
+      env->object_tag_table->SetLocked(new_arr_ptr, non_obsolete_tags[env]);
     }
     env->object_tag_table->Unlock();
   });
 }
 
-}  // namespace
-
-void HeapExtensions::ReplaceReference(art::Thread* self,
-                                      art::ObjPtr<art::mirror::Object> old_obj_ptr,
-                                      art::ObjPtr<art::mirror::Object> new_obj_ptr) {
-  ReplaceObjectReferences(old_obj_ptr, new_obj_ptr);
-  ReplaceStrongRoots(self, old_obj_ptr, new_obj_ptr);
-  ReplaceWeakRoots(self, HeapExtensions::gEventHandler, old_obj_ptr, new_obj_ptr);
+static void PerformArrayReferenceReplacement(art::Thread* self,
+                                             EventHandler* event_handler,
+                                             ArrayPtr old_arr_ptr,
+                                             ArrayPtr new_arr_ptr)
+    REQUIRES(art::Locks::mutator_lock_,
+             art::Locks::user_code_suspension_lock_,
+             art::Roles::uninterruptible_) {
+  ReplaceObjectReferences(old_arr_ptr, new_arr_ptr);
+  ReplaceStrongRoots(self, old_arr_ptr, new_arr_ptr);
+  ReplaceWeakRoots(self, event_handler, old_arr_ptr, new_arr_ptr);
 }
+
+}  // namespace
 
 jvmtiError HeapExtensions::ChangeArraySize(jvmtiEnv* env, jobject arr, jsize new_size) {
   if (ArtJvmTiEnv::AsArtJvmTiEnv(env)->capabilities.can_tag_objects != 1) {
@@ -1951,7 +1921,7 @@ jvmtiError HeapExtensions::ChangeArraySize(jvmtiEnv* env, jobject arr, jsize new
       UNREACHABLE();
   }
   // Actually replace all the pointers.
-  ReplaceReference(self, old_arr.Get(), new_arr.Get());
+  PerformArrayReferenceReplacement(self, gEventHandler, old_arr.Get(), new_arr.Get());
   return OK;
 }
 

@@ -597,8 +597,6 @@ struct CmdlineType<LogVerbosity> : CmdlineTypeParser<LogVerbosity> {
         log_verbosity.image = true;
       } else if (verbose_options[j] == "systrace-locks") {
         log_verbosity.systrace_lock_logging = true;
-      } else if (verbose_options[j] == "plugin") {
-        log_verbosity.plugin = true;
       } else if (verbose_options[j] == "agents") {
         log_verbosity.agents = true;
       } else if (verbose_options[j] == "dex") {
