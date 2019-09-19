@@ -1610,10 +1610,6 @@ bool DexFileVerifier::CheckIntraCodeItem() {
 
   const uint16_t* insns = accessor.Insns();
   uint32_t insns_size = accessor.InsnsSizeInCodeUnits();
-  if (insns_size == 0) {
-    ErrorStringPrintf("insns_size must not be zero (%ud)", insns_size);
-    return false;
-  }
   if (!CheckListSize(insns, insns_size, sizeof(uint16_t), "insns size")) {
     return false;
   }
