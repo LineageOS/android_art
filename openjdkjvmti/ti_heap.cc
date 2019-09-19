@@ -23,6 +23,7 @@
 #include "arch/context.h"
 #include "art_field-inl.h"
 #include "art_jvmti.h"
+#include "base/logging.h"
 #include "base/macros.h"
 #include "base/mutex.h"
 #include "base/utils.h"
@@ -1651,8 +1652,8 @@ static void ReplaceObjectReferences(ObjectPtr old_obj_ptr, ObjectPtr new_obj_ptr
                           bool is_static ATTRIBUTE_UNUSED) const
               REQUIRES_SHARED(art::Locks::mutator_lock_) {
             if (obj->GetFieldObject<art::mirror::Object>(off) == old_obj_) {
-              LOG(DEBUG) << "Updating field at offset " << off.Uint32Value() << " of type "
-                         << obj->GetClass()->PrettyClass();
+              VLOG(plugin) << "Updating field at offset " << off.Uint32Value() << " of type "
+                           << obj->GetClass()->PrettyClass();
               obj->SetFieldObject</*transaction*/ false>(off, new_obj_);
             }
           }
@@ -1767,7 +1768,7 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
       art::Thread* t = thread_list->FindThreadByThreadId(id);
       CHECK(t != nullptr) << "id " << id << " does not refer to a valid thread."
                           << " Where did the roots come from?";
-      LOG(DEBUG) << "Instrumenting thread stack of thread " << *t;
+      VLOG(plugin) << "Instrumenting thread stack of thread " << *t;
       // TODO Use deopt manager. We need a version that doesn't acquire all the locks we
       // already have.
       // TODO We technically only need to do this if the frames are not already being interpreted.
