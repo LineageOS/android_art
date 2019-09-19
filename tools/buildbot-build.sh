@@ -106,7 +106,27 @@ for LIB in ${mode_specific_libraries} ; do
 done
 
 
-
 echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
 bash -c "$make_command"
+
+
+# Create canonical name -> file name symlink in the symbol directory for the
+# Testing ART APEX.
+#
+# This mimics the logic from `art/Android.mk`. We made the choice not to
+# implement this in `art/Android.mk`, as the Testing ART APEX is a test artifact
+# that should never ship with an actual product, and we try to keep it out of
+# standard build recipes
+#
+# TODO(b/141004137, b/129534335): Remove this, expose the Testing ART APEX in
+# the `art/Android.mk` build logic, and add absence checks (e.g. in
+# `build/make/core/main.mk`) to prevent the Testing ART APEX from ending up in a
+# system image.
+if [[ $mode == "target" ]]; then
+  target_out_unstripped="$ANDROID_PRODUCT_OUT/symbols"
+  link_name="$target_out_unstripped/apex/com.android.art"
+  link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
+  echo "Executing $link_command"
+  bash -c "$link_command"
+fi

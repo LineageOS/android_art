@@ -131,6 +131,9 @@ vogar_args=$@
 gcstress=false
 debug=false
 
+# Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
+getrandom=true
+
 # Don't use device mode by default.
 device_mode=false
 
@@ -163,6 +166,9 @@ while true; do
     shift
   elif [[ "$1" == "-Xgc:gcstress" ]]; then
     gcstress=true
+    shift
+  elif [[ "$1" == "--no-getrandom" ]]; then
+    getrandom=false
     shift
   elif [[ "$1" == "" ]]; then
     break
@@ -212,6 +218,13 @@ if $gcstress; then
 else
   # We only run this package when not under gcstress as it can cause timeouts. See b/78228743.
   working_packages+=("libcore.libcore.icu")
+fi
+
+if $getrandom; then :; else
+  # Ignore failures in tests that use the getrandom() syscall (which requires
+  # Linux 3.17+). This is needed on fugu (Nexus Player) devices, where the
+  # kernel is Linux 3.10.
+  expectations="$expectations --expectations art/tools/libcore_no_getrandom_failures.txt"
 fi
 
 # Run the tests using vogar.
