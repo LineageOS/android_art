@@ -387,6 +387,15 @@ void ClassLinker::VisiblyInitializedCallbackDone(Thread* self,
   }
 }
 
+void ClassLinker::ForceClassInitialized(Thread* self, Handle<mirror::Class> klass) {
+  ClassLinker::VisiblyInitializedCallback* cb = MarkClassInitialized(self, klass);
+  if (cb != nullptr) {
+    cb->MakeVisible(self);
+  }
+  ScopedThreadSuspension sts(self, ThreadState::kSuspended);
+  MakeInitializedClassesVisiblyInitialized(self, /*wait=*/true);
+}
+
 ClassLinker::VisiblyInitializedCallback* ClassLinker::MarkClassInitialized(
     Thread* self, Handle<mirror::Class> klass) {
   if (kRuntimeISA == InstructionSet::kX86 || kRuntimeISA == InstructionSet::kX86_64) {

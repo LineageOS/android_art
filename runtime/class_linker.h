@@ -781,6 +781,12 @@ class ClassLinker {
     ClassTable* class_table;
   };
 
+  // Forces a class to be marked as initialized without actually running initializers. Should only
+  // be used by plugin code when creating new classes directly.
+  void ForceClassInitialized(Thread* self, Handle<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Locks::dex_lock_, !Roles::uninterruptible_);
+
  protected:
   virtual bool InitializeClass(Thread* self,
                                Handle<mirror::Class> klass,
