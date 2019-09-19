@@ -149,6 +149,7 @@ enum {
   HIDDEN_API_ENFORCEMENT_POLICY_MASK = (1 << 12)
                                      | (1 << 13),
   PROFILE_SYSTEM_SERVER              = 1 << 14,
+  PROFILE_FROM_SHELL                 = 1 << 15,
   USE_APP_IMAGE_STARTUP_CACHE        = 1 << 16,
   DEBUG_IGNORE_APP_SIGNAL_HANDLER    = 1 << 17,
 
@@ -240,6 +241,9 @@ static uint32_t EnableDebugFeatures(uint32_t runtime_flags) {
     runtime->SetSignalHookDebuggable(true);
     runtime_flags &= ~DEBUG_IGNORE_APP_SIGNAL_HANDLER;
   }
+
+  runtime->SetProfileableFromShell((runtime_flags & PROFILE_FROM_SHELL) != 0);
+  runtime_flags &= ~PROFILE_FROM_SHELL;
 
   return runtime_flags;
 }
