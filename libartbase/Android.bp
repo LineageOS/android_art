@@ -125,6 +125,14 @@ cc_defaults {
     // ART's macros.h depends on libbase's macros.h.
     // Note: runtime_options.h depends on cmdline. But we don't really want to export this
     //       generically. dex2oat takes care of it itself.
+
+    product_variables: {
+        lineage: {
+            has_memfd_backport: {
+                cppflags: ["-DMEMFD_BACKPORT"],
+            },
+        },
+    },
 }
 
 cc_defaults {

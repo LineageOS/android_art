@@ -41,6 +41,7 @@ namespace art {
 #if defined(__NR_memfd_create)
 
 int memfd_create(const char* name, unsigned int flags) {
+#ifndef MEMFD_BACKPORT
   // Check kernel version supports memfd_create(). Some older kernels segfault executing
   // memfd_create() rather than returning ENOSYS (b/116769556).
   static constexpr int kRequiredMajor = 3;
@@ -54,7 +55,7 @@ int memfd_create(const char* name, unsigned int flags) {
     errno = ENOSYS;
     return -1;
   }
-
+#endif
   return syscall(__NR_memfd_create, name, flags);
 }
 
