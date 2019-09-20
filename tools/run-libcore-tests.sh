@@ -168,6 +168,8 @@ while true; do
     gcstress=true
     shift
   elif [[ "$1" == "--no-getrandom" ]]; then
+    # Remove the option from Vogar arguments.
+    vogar_args=${vogar_args/$1}
     getrandom=false
     shift
   elif [[ "$1" == "" ]]; then
