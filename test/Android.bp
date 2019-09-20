@@ -372,6 +372,9 @@ art_cc_test_library {
 cc_library_static {
     name: "libctstiagent",
     defaults: ["libtiagent-base-defaults"],
+    visibility: [
+        "//cts/hostsidetests/jvmti:__subpackages__",
+    ],
     host_supported: false,
     srcs: [
         "983-source-transform-verify/source_transform_slicer.cc",
@@ -579,6 +582,9 @@ art_cc_test_library {
 
 filegroup {
     name: "art_cts_jvmti_test_library",
+    visibility: [
+        "//cts/hostsidetests/jvmti:__subpackages__",
+    ],
     srcs: [
         // shim classes. We use one that exposes the common functionality.
         "jvmti-common/Redefinition.java",
@@ -710,6 +716,9 @@ filegroup {
 // Copy+rename them them to a temporary directory and them zip them.
 java_genrule {
     name: "expected_cts_outputs",
+    visibility: [
+        "//cts/hostsidetests/jvmti:__subpackages__",
+    ],
     srcs: [
         "901-hello-ti-agent/expected.txt",
         "902-hello-transformation/expected.txt",
