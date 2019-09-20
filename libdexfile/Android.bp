@@ -108,6 +108,12 @@ cc_defaults {
         "libartbase_static_defaults",
         "libdexfile_static_base_defaults",
     ],
+    defaults_visibility: [
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/startop/view_compiler",
+        "//system/extras/simpleperf",
+    ],
     static_libs: ["libdexfile"],
 }
 
@@ -138,6 +144,13 @@ gensrcs {
 art_cc_library {
     name: "libdexfile",
     defaults: ["libdexfile_defaults"],
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//cts/tests/tests/appop",
+        "//frameworks/base/startop/view_compiler",
+        "//frameworks/base/tests/net:__subpackages__",
+        "//system/extras/simpleperf",
+    ],
     // Leave the symbols in the shared library so that stack unwinders can
     // produce meaningful name resolution.
     strip: {
@@ -242,6 +255,7 @@ art_cc_test {
 
 cc_library_headers {
     name: "libdexfile_external_headers",
+    visibility: ["//visibility:public"],
     host_supported: true,
     vendor_available: true,
     recovery_available: true,
@@ -287,6 +301,7 @@ cc_library {
         "art_defaults",
         "libdexfile_external-defaults",
     ],
+    visibility: ["//visibility:public"],
     target: {
         darwin: {
             enabled: true,
@@ -332,6 +347,7 @@ art_cc_test {
 // stack frames.
 cc_library {
     name: "libdexfile_support",
+    visibility: ["//visibility:public"],
     host_supported: true,
     vendor_available: true,
     recovery_available: true,
@@ -374,6 +390,7 @@ art_cc_test {
 
 cc_library_static {
     name: "libdexfile_support_static",
+    visibility: ["//visibility:public"],
     host_supported: true,
     defaults: ["libdexfile_static_defaults"],
     srcs: [
