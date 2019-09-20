@@ -25,17 +25,15 @@ namespace.default.link.platform.allow_all_shared_libs = true
 # make links created e.g. through android_link_namespace work consistently with
 # the platform linker config.
 ###############################################################################
+# TODO(b/139408016): Rename this namespace to "art".
 namespace.runtime.isolated = true
 # Visible to allow links to be created at runtime, e.g. through
 # android_link_namespaces in libnativeloader.
 namespace.runtime.visible = true
 
 # Keep in sync with the "runtime" namespace in system/core/rootdir/etc/ld.config*.txt.
-# TODO(b/139408016): Split the namespaces for the ART and Runtime APEXes
-namespace.runtime.search.paths  = /apex/com.android.art/${LIB}
-namespace.runtime.search.paths += /apex/com.android.runtime/${LIB}
-namespace.runtime.asan.search.paths  = /apex/com.android.art/${LIB}
-namespace.runtime.asan.search.paths += /apex/com.android.runtime/${LIB}
+namespace.runtime.search.paths = /apex/com.android.art/${LIB}
+namespace.runtime.asan.search.paths = /apex/com.android.art/${LIB}
 # JVMTI libraries used in ART testing are located under /data; dalvikvm
 # has to be able to dlopen them.
 # TODO(b/129534335): Move this to the linker configuration of the Test
