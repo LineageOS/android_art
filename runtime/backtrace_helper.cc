@@ -26,6 +26,8 @@
 #include "unwindstack/Memory.h"
 #include "unwindstack/Unwinder.h"
 
+#include "base/bit_utils.h"
+#include "entrypoints/runtime_asm_entrypoints.h"
 #include "thread-inl.h"
 
 #else
@@ -56,6 +58,9 @@ struct UnwindHelper : public TLSData {
     unwindstack::Elf::SetCachingEnabled(true);
   }
 
+  // Reparse process mmaps to detect newly loaded libraries.
+  bool Reparse() { return maps_.Reparse(); }
+
   static UnwindHelper* Get(Thread* self, size_t max_depth) {
     UnwindHelper* tls = reinterpret_cast<UnwindHelper*>(self->GetCustomTLS(kTlsKey));
     if (tls == nullptr) {
@@ -68,7 +73,7 @@ struct UnwindHelper : public TLSData {
   unwindstack::Unwinder* Unwinder() { return &unwinder_; }
 
  private:
-  unwindstack::LocalMaps maps_;
+  unwindstack::LocalUpdatableMaps maps_;
   std::shared_ptr<unwindstack::Memory> memory_;
   unwindstack::JitDebug jit_;
   unwindstack::DexFiles dex_;
@@ -76,19 +81,41 @@ struct UnwindHelper : public TLSData {
 };
 
 void BacktraceCollector::Collect() {
+  if (!CollectImpl()) {
+    // Reparse process mmaps to detect newly loaded libraries and retry.
+    UnwindHelper::Get(Thread::Current(), max_depth_)->Reparse();
+    if (!CollectImpl()) {
+      // Failed to unwind stack. Ignore for now.
+    }
+  }
+}
+
+bool BacktraceCollector::CollectImpl() {
   unwindstack::Unwinder* unwinder = UnwindHelper::Get(Thread::Current(), max_depth_)->Unwinder();
   std::unique_ptr<unwindstack::Regs> regs(unwindstack::Regs::CreateFromLocal());
   RegsGetLocal(regs.get());
   unwinder->SetRegs(regs.get());
   unwinder->Unwind();
+
   num_frames_ = 0;
   if (unwinder->NumFrames() > skip_count_) {
-    for (auto it = unwinder->frames().begin() + skip_count_;
-         max_depth_ > num_frames_ && it != unwinder->frames().end();
-         ++it) {
+    for (auto it = unwinder->frames().begin() + skip_count_; it != unwinder->frames().end(); ++it) {
+      CHECK_LT(num_frames_, max_depth_);
       out_frames_[num_frames_++] = static_cast<uintptr_t>(it->pc);
+
+      // Expected early end: Instrumentation breaks unwinding (b/138296821).
+      size_t align = GetInstructionSetAlignment(kRuntimeISA);
+      if (RoundUp(it->pc, align) == reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc())) {
+        return true;
+      }
     }
   }
+
+  if (unwinder->LastErrorCode() == unwindstack::ERROR_INVALID_MAP) {
+    return false;
+  }
+
+  return true;
 }
 
 #else
