@@ -61,7 +61,7 @@ class ImgDiagTest : public CommonRuntimeTest {
 
   // Path to the imgdiag(d?)[32|64] binary.
   std::string GetImgDiagFilePath() {
-    std::string path = GetAndroidRuntimeBinDir() + '/' + kImgDiagBinaryName;
+    std::string path = GetArtBinDir() + '/' + kImgDiagBinaryName;
     if (kIsDebugBuild) {
       path += 'd';
     }

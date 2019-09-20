@@ -72,7 +72,7 @@ class OatDumpTest : public CommonRuntimeTest {
 
   // Returns path to the oatdump/dex2oat/dexdump binary.
   std::string GetExecutableFilePath(const char* name, bool is_debug, bool is_static) {
-    std::string path = GetAndroidRuntimeBinDir() + '/' + name;
+    std::string path = GetArtBinDir() + '/' + name;
     if (is_debug) {
       path += 'd';
     }
