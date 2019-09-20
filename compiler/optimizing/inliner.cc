@@ -748,7 +748,7 @@ HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
     }
     if (!found) {
       VLOG(compiler) << "Could not find profiled dex file: "
-          << offline_profile.dex_references[i].dex_location;
+          << offline_profile.dex_references[i].profile_key;
       return kInlineCacheMissingTypes;
     }
   }
