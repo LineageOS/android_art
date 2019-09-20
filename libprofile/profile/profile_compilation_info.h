@@ -83,25 +83,25 @@ class ProfileCompilationInfo {
   // This is exposed as public in order to make it available to dex2oat compilations
   // (see compiler/optimizing/inliner.cc).
 
-  // A dex location together with its checksum.
+  // A profile reference to the dex file (profile key, dex checksum and number of methods).
   struct DexReference {
     DexReference() : dex_checksum(0), num_method_ids(0) {}
 
-    DexReference(const std::string& location, uint32_t checksum, uint32_t num_methods)
-        : dex_location(location), dex_checksum(checksum), num_method_ids(num_methods) {}
+    DexReference(const std::string& key, uint32_t checksum, uint32_t num_methods)
+        : profile_key(key), dex_checksum(checksum), num_method_ids(num_methods) {}
 
     bool operator==(const DexReference& other) const {
       return dex_checksum == other.dex_checksum &&
-          dex_location == other.dex_location &&
+          profile_key == other.profile_key &&
           num_method_ids == other.num_method_ids;
     }
 
     bool MatchesDex(const DexFile* dex_file) const {
       return dex_checksum == dex_file->GetLocationChecksum() &&
-           dex_location == GetProfileDexFileBaseKey(dex_file->GetLocation());
+           profile_key == GetProfileDexFileBaseKey(dex_file->GetLocation());
     }
 
-    std::string dex_location;
+    std::string profile_key;
     uint32_t dex_checksum;
     uint32_t num_method_ids;
   };
@@ -616,7 +616,7 @@ class ProfileCompilationInfo {
                  MethodHotness::Flag flags);
 
   // Add a class index to the profile.
-  bool AddClassIndex(const std::string& dex_location,
+  bool AddClassIndex(const std::string& profile_key,
                      uint32_t checksum,
                      dex::TypeIndex type_idx,
                      uint32_t num_method_ids);
@@ -657,7 +657,7 @@ class ProfileCompilationInfo {
 
   // The information present in the header of each profile line.
   struct ProfileLineHeader {
-    std::string dex_location;
+    std::string profile_key;
     uint16_t class_set_size;
     uint32_t method_region_size_bytes;
     uint32_t checksum;
