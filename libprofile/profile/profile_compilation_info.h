@@ -255,6 +255,8 @@ class ProfileCompilationInfo {
         : inline_caches(inline_cache_map) {}
 
     bool operator==(const OfflineProfileMethodInfo& other) const;
+    // Checks that this offline represenation of inline caches matches the runtime view of the data.
+    bool operator==(const std::vector<ProfileMethodInfo::ProfileInlineCache>& other) const;
 
     const InlineCacheMap* const inline_caches;
     std::vector<DexReference> dex_references;

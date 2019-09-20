@@ -33,6 +33,7 @@
 #include "base/unix_file/fd_file.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/compact_dex_level.h"
+#include "dex/compact_dex_file.h"
 
 namespace art {
 
@@ -73,6 +74,71 @@ class ScratchFile {
  private:
   std::string filename_;
   std::unique_ptr<File> file_;
+};
+
+// Close to store a fake dex file and its underlying data.
+class FakeDex {
+ public:
+  static std::unique_ptr<FakeDex> Create(
+      const std::string& location,
+      uint32_t checksum,
+      uint32_t num_method_ids) {
+    FakeDex* fake_dex = new FakeDex();
+    fake_dex->dex = CreateFakeDex(location, checksum, num_method_ids, &fake_dex->storage);
+    return std::unique_ptr<FakeDex>(fake_dex);
+  }
+
+  static std::unique_ptr<const DexFile> CreateFakeDex(
+      const std::string& location,
+      uint32_t checksum,
+      uint32_t num_method_ids,
+      std::vector<uint8_t>* storage) {
+    storage->resize(kPageSize);
+    CompactDexFile::Header* header =
+        const_cast<CompactDexFile::Header*>(CompactDexFile::Header::At(storage->data()));
+    CompactDexFile::WriteMagic(header->magic_);
+    CompactDexFile::WriteCurrentVersion(header->magic_);
+    header->data_off_ = 0;
+    header->data_size_ = storage->size();
+    header->method_ids_size_ = num_method_ids;
+
+    const DexFileLoader dex_file_loader;
+    std::string error_msg;
+    std::unique_ptr<const DexFile> dex(dex_file_loader.Open(storage->data(),
+                                                            storage->size(),
+                                                            location,
+                                                            checksum,
+                                                            /*oat_dex_file=*/nullptr,
+                                                            /*verify=*/false,
+                                                            /*verify_checksum=*/false,
+                                                            &error_msg));
+    CHECK(dex != nullptr) << error_msg;
+    return dex;
+  }
+
+  std::unique_ptr<const DexFile>& Dex() {
+    return dex;
+  }
+
+ private:
+  std::vector<uint8_t> storage;
+  std::unique_ptr<const DexFile> dex;
+};
+
+// Convenience class to store multiple fake dex files in order to make
+// allocation/de-allocation easier in tests.
+class FakeDexStorage {
+ public:
+  const DexFile* AddFakeDex(
+      const std::string& location,
+      uint32_t checksum,
+      uint32_t num_method_ids) {
+    fake_dex_files.push_back(FakeDex::Create(location, checksum, num_method_ids));
+    return fake_dex_files.back()->Dex().get();
+  }
+
+ private:
+  std::vector<std::unique_ptr<FakeDex>> fake_dex_files;
 };
 
 class CommonArtTestImpl {

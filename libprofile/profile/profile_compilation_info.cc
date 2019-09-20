@@ -1974,6 +1974,70 @@ bool ProfileCompilationInfo::OfflineProfileMethodInfo::operator==(
   return true;
 }
 
+bool ProfileCompilationInfo::OfflineProfileMethodInfo::operator==(
+      const std::vector<ProfileMethodInfo::ProfileInlineCache>& runtime_caches) const {
+  if (inline_caches->size() != runtime_caches.size()) {
+    return false;
+  }
+
+  for (const auto& inline_cache_it : *inline_caches) {
+    uint16_t dex_pc = inline_cache_it.first;
+    const DexPcData dex_pc_data = inline_cache_it.second;
+
+    // Find the corresponding inline cahce.
+    const ProfileMethodInfo::ProfileInlineCache* runtime_cache = nullptr;
+    for (const ProfileMethodInfo::ProfileInlineCache& pic : runtime_caches) {
+      if (pic.dex_pc == dex_pc) {
+        runtime_cache = &pic;
+        break;
+      }
+    }
+    // If not found, returnb false.
+    if (runtime_cache == nullptr) {
+      return false;
+    }
+    // Check that the inline cache properties match up.
+    if (dex_pc_data.is_missing_types) {
+      if (!runtime_cache->is_missing_types) {
+        return false;
+      } else {
+        // If the inline cache is megamorphic do not check the classes (they don't matter).
+        continue;
+      }
+    }
+
+    if (dex_pc_data.is_megamorphic) {
+      if (runtime_cache->classes.size() < ProfileCompilationInfo::kIndividualInlineCacheSize) {
+        return false;
+      } else {
+        // If the inline cache is megamorphic do not check the classes (they don't matter).
+        continue;
+      }
+    }
+
+    if (dex_pc_data.classes.size() != runtime_cache->classes.size()) {
+      return false;
+    }
+    // Verify that all classes matches.
+    for (const ClassReference& class_ref : dex_pc_data.classes) {
+      bool found = false;
+      const DexReference& dex_ref = dex_references[class_ref.dex_profile_index];
+      for (const TypeReference& type_ref : runtime_cache->classes) {
+        if (class_ref.type_index == type_ref.TypeIndex() &&
+            dex_ref.MatchesDex(type_ref.dex_file)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return false;
+      }
+    }
+  }
+  // If we didn't fail until now, then the two inline caches are equal.
+  return true;
+}
+
 bool ProfileCompilationInfo::IsEmpty() const {
   DCHECK_EQ(info_.empty(), profile_key_map_.empty());
   return info_.empty();
