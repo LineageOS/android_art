@@ -368,7 +368,7 @@ static constexpr size_t kLineHeaderSize =
  * profile_header:
  *   magic,version,number_of_dex_files,uncompressed_size_of_zipped_data,compressed_data_size
  * profile_line_header:
- *   dex_location,number_of_classes,methods_region_size,dex_location_checksum,num_method_ids
+ *   profile_key,number_of_classes,methods_region_size,dex_location_checksum,num_method_ids
  * profile_line_data:
  *   method_encoding_1,method_encoding_2...,class_id1,class_id2...,method_flags bitmap,
  * The method_encoding is:
@@ -673,9 +673,9 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
 }
 
 bool ProfileCompilationInfo::AddResolvedClasses(const DexCacheResolvedClasses& classes) {
-  const std::string dex_location = GetProfileDexFileKey(classes.GetDexLocation());
+  const std::string profile_key = GetProfileDexFileKey(classes.GetDexLocation());
   const uint32_t checksum = classes.GetLocationChecksum();
-  DexFileData* const data = GetOrAddDexFileData(dex_location, checksum, classes.NumMethodIds());
+  DexFileData* const data = GetOrAddDexFileData(profile_key, checksum, classes.NumMethodIds());
   if (data == nullptr) {
     return false;
   }
@@ -733,7 +733,7 @@ bool ProfileCompilationInfo::AddMethod(const std::string& dex_location,
     for (const ClassReference& class_ref : pmi_ic_dex_pc_data.classes) {
       const DexReference& dex_ref = pmi.dex_references[class_ref.dex_profile_index];
       DexFileData* class_dex_data = GetOrAddDexFileData(
-          GetProfileDexFileKey(dex_ref.dex_location),
+          dex_ref.profile_key,
           dex_ref.dex_checksum,
           dex_ref.num_method_ids);
       if (class_dex_data == nullptr) {  // checksum mismatch
@@ -777,11 +777,11 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotne
   return true;
 }
 
-bool ProfileCompilationInfo::AddClassIndex(const std::string& dex_location,
+bool ProfileCompilationInfo::AddClassIndex(const std::string& profile_key,
                                            uint32_t checksum,
                                            dex::TypeIndex type_idx,
                                            uint32_t num_method_ids) {
-  DexFileData* const data = GetOrAddDexFileData(dex_location, checksum, num_method_ids);
+  DexFileData* const data = GetOrAddDexFileData(profile_key, checksum, num_method_ids);
   if (data == nullptr) {
     return false;
   }
@@ -861,7 +861,7 @@ bool ProfileCompilationInfo::ReadMethods(SafeBuffer& buffer,
       - line_header.method_region_size_bytes;
   uint16_t last_method_index = 0;
   while (buffer.CountUnreadBytes() > expected_unread_bytes_after_operation) {
-    DexFileData* const data = GetOrAddDexFileData(line_header.dex_location,
+    DexFileData* const data = GetOrAddDexFileData(line_header.profile_key,
                                                   line_header.checksum,
                                                   line_header.num_method_ids);
     uint16_t diff_with_last_method_index;
@@ -903,7 +903,7 @@ bool ProfileCompilationInfo::ReadClasses(SafeBuffer& buffer,
     READ_UINT(uint16_t, buffer, diff_with_last_class_index, error);
     uint16_t type_index = last_class_index + diff_with_last_class_index;
     last_class_index = type_index;
-    if (!AddClassIndex(line_header.dex_location,
+    if (!AddClassIndex(line_header.profile_key,
                        line_header.checksum,
                        dex::TypeIndex(type_index),
                        line_header.num_method_ids)) {
@@ -1029,10 +1029,10 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileHea
 }
 
 bool ProfileCompilationInfo::ReadProfileLineHeaderElements(SafeBuffer& buffer,
-                                                           /*out*/uint16_t* dex_location_size,
+                                                           /*out*/uint16_t* profile_key_size,
                                                            /*out*/ProfileLineHeader* line_header,
                                                            /*out*/std::string* error) {
-  READ_UINT(uint16_t, buffer, *dex_location_size, error);
+  READ_UINT(uint16_t, buffer, *profile_key_size, error);
   READ_UINT(uint16_t, buffer, line_header->class_set_size, error);
   READ_UINT(uint32_t, buffer, line_header->method_region_size_bytes, error);
   READ_UINT(uint32_t, buffer, line_header->checksum, error);
@@ -1049,25 +1049,25 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileLin
     return kProfileLoadBadData;
   }
 
-  uint16_t dex_location_size;
-  if (!ReadProfileLineHeaderElements(buffer, &dex_location_size, line_header, error)) {
+  uint16_t profile_key_size;
+  if (!ReadProfileLineHeaderElements(buffer, &profile_key_size, line_header, error)) {
     return kProfileLoadBadData;
   }
 
-  if (dex_location_size == 0 || dex_location_size > kMaxDexFileKeyLength) {
-    *error = "DexFileKey has an invalid size: " +
-        std::to_string(static_cast<uint32_t>(dex_location_size));
+  if (profile_key_size == 0 || profile_key_size > kMaxDexFileKeyLength) {
+    *error = "ProfileKey has an invalid size: " +
+        std::to_string(static_cast<uint32_t>(profile_key_size));
     return kProfileLoadBadData;
   }
 
-  if (buffer.CountUnreadBytes() < dex_location_size) {
+  if (buffer.CountUnreadBytes() < profile_key_size) {
     *error += "Profile EOF reached prematurely for ReadProfileHeaderDexLocation";
     return kProfileLoadBadData;
   }
   const uint8_t* base_ptr = buffer.GetCurrentPtr();
-  line_header->dex_location.assign(
-      reinterpret_cast<const char*>(base_ptr), dex_location_size);
-  buffer.Advance(dex_location_size);
+  line_header->profile_key.assign(
+      reinterpret_cast<const char*>(base_ptr), profile_key_size);
+  buffer.Advance(profile_key_size);
   return kProfileLoadSuccess;
 }
 
@@ -1078,12 +1078,12 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileLin
       const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
       bool merge_classes,
       /*out*/std::string* error) {
-  DexFileData* data = GetOrAddDexFileData(line_header.dex_location,
+  DexFileData* data = GetOrAddDexFileData(line_header.profile_key,
                                           line_header.checksum,
                                           line_header.num_method_ids);
   if (data == nullptr) {
     *error = "Error when reading profile file line header: checksum mismatch for "
-        + line_header.dex_location;
+        + line_header.profile_key;
     return kProfileLoadBadData;
   }
 
@@ -1400,7 +1400,7 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
   }
 
   for (uint8_t k = 0; k < number_of_dex_files; k++) {
-    if (!filter_fn(profile_line_headers[k].dex_location, profile_line_headers[k].checksum)) {
+    if (!filter_fn(profile_line_headers[k].profile_key, profile_line_headers[k].checksum)) {
       // We have to skip the line. Advanced the current pointer of the buffer.
       size_t profile_line_size =
            profile_line_headers[k].class_set_size * sizeof(uint16_t) +
@@ -1441,26 +1441,26 @@ bool ProfileCompilationInfo::RemapProfileIndex(
   // Note that the number of elements should be very small, so this should not
   // be a performance issue.
   for (const ProfileLineHeader& other_profile_line_header : profile_line_headers) {
-    if (!filter_fn(other_profile_line_header.dex_location, other_profile_line_header.checksum)) {
+    if (!filter_fn(other_profile_line_header.profile_key, other_profile_line_header.checksum)) {
       continue;
     }
     // verify_checksum is false because we want to differentiate between a missing dex data and
     // a mismatched checksum.
-    const DexFileData* dex_data = FindDexData(other_profile_line_header.dex_location,
+    const DexFileData* dex_data = FindDexData(other_profile_line_header.profile_key,
                                               /* checksum= */ 0u,
                                               /* verify_checksum= */ false);
     if ((dex_data != nullptr) && (dex_data->checksum != other_profile_line_header.checksum)) {
-      LOG(WARNING) << "Checksum mismatch for dex " << other_profile_line_header.dex_location;
+      LOG(WARNING) << "Checksum mismatch for dex " << other_profile_line_header.profile_key;
       return false;
     }
   }
   // All checksums match. Import the data.
   uint32_t num_dex_files = static_cast<uint32_t>(profile_line_headers.size());
   for (uint32_t i = 0; i < num_dex_files; i++) {
-    if (!filter_fn(profile_line_headers[i].dex_location, profile_line_headers[i].checksum)) {
+    if (!filter_fn(profile_line_headers[i].profile_key, profile_line_headers[i].checksum)) {
       continue;
     }
-    const DexFileData* dex_data = GetOrAddDexFileData(profile_line_headers[i].dex_location,
+    const DexFileData* dex_data = GetOrAddDexFileData(profile_line_headers[i].profile_key,
                                                       profile_line_headers[i].checksum,
                                                       profile_line_headers[i].num_method_ids);
     if (dex_data == nullptr) {
@@ -1662,7 +1662,7 @@ std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> ProfileCompila
 
   pmi->dex_references.resize(info_.size());
   for (const DexFileData* dex_data : info_) {
-    pmi->dex_references[dex_data->profile_index].dex_location = dex_data->profile_key;
+    pmi->dex_references[dex_data->profile_index].profile_key = dex_data->profile_key;
     pmi->dex_references[dex_data->profile_index].dex_checksum = dex_data->checksum;
     pmi->dex_references[dex_data->profile_index].num_method_ids = dex_data->num_method_ids;
   }
@@ -1932,14 +1932,14 @@ bool ProfileCompilationInfo::GenerateTestProfile(
     return vec;
   };
   for (std::unique_ptr<const DexFile>& dex_file : dex_files) {
-    const std::string& location = dex_file->GetLocation();
+    const std::string& profile_key = dex_file->GetLocation();
     uint32_t checksum = dex_file->GetLocationChecksum();
 
     uint32_t number_of_classes = dex_file->NumClassDefs();
     uint32_t classes_required_in_profile = (number_of_classes * class_percentage) / 100;
     for (uint32_t class_index : create_shuffled_range(classes_required_in_profile,
                                                       number_of_classes)) {
-      info.AddClassIndex(location,
+      info.AddClassIndex(profile_key,
                          checksum,
                          dex_file->GetClassDef(class_index).class_idx_,
                          dex_file->NumMethodIds());

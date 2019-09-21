@@ -17,6 +17,8 @@
 #ifndef ART_RUNTIME_DEOPTIMIZATION_KIND_H_
 #define ART_RUNTIME_DEOPTIMIZATION_KIND_H_
 
+#include "base/logging.h"
+
 namespace art {
 
 enum class DeoptimizationKind {

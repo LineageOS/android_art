@@ -909,6 +909,9 @@ if [ "$PREBUILD" = "y" ]; then
     dex2oat_cmdline="${dex2oat_cmdline} --instruction-set-features=${INSTRUCTION_SET_FEATURES}"
   fi
 
+  # Enable mini-debug-info for JIT (if JIT is used).
+  FLAGS="$FLAGS -Xcompiler-option --generate-mini-debug-info"
+
   # Add in a timeout. This is important for testing the compilation/verification time of
   # pathological cases.
   # Note: as we don't know how decent targets are (e.g., emulator), only do this on the host for

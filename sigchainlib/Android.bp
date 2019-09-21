@@ -16,9 +16,13 @@
 
 cc_library {
     name: "libsigchain",
+    defaults: ["art_defaults"],
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/cmds/app_process",
+    ],
 
     host_supported: true,
-    defaults: ["art_defaults"],
     target: {
         linux: {
             shared: {
@@ -69,10 +73,18 @@ art_cc_test {
 
 filegroup {
     name: "art_sigchain_version_script32.txt",
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/cmds/app_process",
+    ],
     srcs: ["version-script32.txt"],
 }
 
 filegroup {
     name: "art_sigchain_version_script64.txt",
+    visibility: [
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/cmds/app_process",
+    ],
     srcs: ["version-script64.txt"],
 }
