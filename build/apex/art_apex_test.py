@@ -1047,8 +1047,20 @@ def art_apex_test_main(test_args):
   if test_args.size and not (test_args.list or test_args.tree):
     logging.error("--size set but neither --list nor --tree set")
     return 1
+  if test_args.host and test_args.flavor:
+    logging.error("Both of --host and --flavor set")
+    return 1
   if test_args.host and test_args.testing:
     logging.error("Both of --host and --testing set")
+    return 1
+  if test_args.debug and test_args.testing:
+    logging.error("Both of --debug and --testing set")
+    return 1
+  if test_args.flavor and test_args.debug:
+    logging.error("Both of --flavor and --debug set")
+    return 1
+  if test_args.flavor and test_args.testing:
+    logging.error("Both of --flavor and --testing set")
     return 1
   if not test_args.flattened and not test_args.tmpdir:
     logging.error("Need a tmpdir.")
@@ -1077,6 +1089,30 @@ def art_apex_test_main(test_args):
   if test_args.list:
     List(apex_provider, test_args.size).print_list()
     return 0
+
+  # Handle legacy flavor flags.
+  if test_args.debug:
+    logging.warning('Using deprecated option --debug')
+    test_args.flavor='debug'
+  if test_args.testing:
+    logging.warning('Using deprecated option --testing')
+    test_args.flavor='testing'
+  if test_args.flavor == 'auto':
+    logging.warning('--flavor=auto, trying to autodetect. This may be incorrect!')
+    if fnmatch.fnmatch(test_args.apex, '*.release*'):
+      logging.warning('  Detected Release APEX')
+      test_args.flavor='release'
+    elif fnmatch.fnmatch(test_args.apex, '*.debug*'):
+      logging.warning('  Detected Debug APEX')
+      test_args.flavor='debug'
+    elif fnmatch.fnmatch(test_args.apex, '*.testing*'):
+      logging.warning('  Detected Testing APEX')
+      test_args.flavor='testing'
+    else:
+      logging.error('  Could not detect APEX flavor, neither \'release\', \'debug\' nor ' +
+                    '\'testing\' in \'%s\'',
+          test_args.apex)
+      return 1
 
   checkers = []
   if test_args.bitness == 'auto':
@@ -1110,11 +1146,11 @@ def art_apex_test_main(test_args):
     checkers.append(ReleaseHostChecker(base_checker))
   else:
     checkers.append(ReleaseTargetChecker(base_checker))
-  if test_args.debug or test_args.testing:
+  if test_args.flavor == 'debug' or test_args.flavor == 'testing':
     checkers.append(DebugChecker(base_checker))
     if not test_args.host:
       checkers.append(DebugTargetChecker(base_checker))
-  if test_args.testing:
+  if test_args.flavor == 'testing':
     checkers.append(TestingTargetChecker(base_checker))
 
   # These checkers must be last.
@@ -1162,11 +1198,12 @@ def art_apex_test_default(test_parser):
                   test_args.debugfs)
     sys.exit(1)
 
-  # TODO: Add host support
+  # TODO: Add host support.
+  # TODO: Add support for flattened APEX packages.
   configs = [
-    {'name': 'com.android.art.release', 'debug': False, 'testing': False, 'host': False},
-    {'name': 'com.android.art.debug',   'debug': True,  'testing': False, 'host': False},
-    {'name': 'com.android.art.testing', 'debug': False, 'testing': True,  'host': False},
+    {'name': 'com.android.art.release', 'flavor': 'release', 'host': False},
+    {'name': 'com.android.art.debug',   'flavor': 'debug',   'host': False},
+    {'name': 'com.android.art.testing', 'flavor': 'testing', 'host': False},
   ]
 
   for config in configs:
@@ -1177,8 +1214,7 @@ def art_apex_test_default(test_parser):
       failed = True
       logging.error("Cannot find APEX %s. Please build it first.", test_args.apex)
       continue
-    test_args.debug = config['debug']
-    test_args.testing = config['testing']
+    test_args.flavor = config['flavor']
     test_args.host = config['host']
     failed = art_apex_test_main(test_args) != 0
 
@@ -1189,14 +1225,18 @@ def art_apex_test_default(test_parser):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Check integrity of a Runtime APEX.')
 
-  parser.add_argument('apex', help='apex file input')
+  parser.add_argument('apex', help='APEX file input')
 
-  parser.add_argument('--host', help='Check as host apex', action='store_true')
+  parser.add_argument('--host', help='Check as host APEX', action='store_true')
 
-  parser.add_argument('--flattened', help='Check as flattened (target) apex', action='store_true')
+  parser.add_argument('--flattened', help='Check as flattened (target) APEX', action='store_true')
 
-  parser.add_argument('--debug', help='Check as debug apex', action='store_true')
-  parser.add_argument('--testing', help='Check as testing apex', action='store_true')
+  parser.add_argument('--flavor', help='Check as FLAVOR APEX, release|debug|testing|auto',
+                      default='auto')
+  # Deprecated flavor flags.
+  # TODO: Stop supporting those flags eventually.
+  parser.add_argument('--debug', help='Check as debug APEX', action='store_true')
+  parser.add_argument('--testing', help='Check as testing APEX', action='store_true')
 
   parser.add_argument('--list', help='List all files', action='store_true')
   parser.add_argument('--tree', help='Print directory tree', action='store_true')

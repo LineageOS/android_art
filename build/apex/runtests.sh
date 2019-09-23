@@ -159,7 +159,7 @@ for apex_module in ${apex_modules[@]}; do
   if [[ $apex_module = *.host ]]; then
     apex_path="$ANDROID_HOST_OUT/apex/${apex_module}.zipapex"
     art_apex_test_args="$art_apex_test_args --host"
-    test_only_args="--debug"
+    test_only_args="--flavor debug"
   else
     if $flattened_apex_p; then
       apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}"
@@ -171,8 +171,9 @@ for apex_module in ${apex_modules[@]}; do
       art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
     fi
     case $apex_module in
-      (*.debug)   test_only_args="--debug";;
-      (*.testing) test_only_args="--testing";;
+      (*.release) test_only_args="--flavor release";;
+      (*.debug)   test_only_args="--flavor debug";;
+      (*.testing) test_only_args="--flavor testing";;
     esac
   fi
   say "APEX package path: $apex_path"
