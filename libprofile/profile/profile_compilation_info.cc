@@ -172,14 +172,6 @@ std::string ProfileCompilationInfo::GetProfileDexFileBaseKey(const std::string& 
   }
 }
 
-bool ProfileCompilationInfo::AddMethodIndex(MethodHotness::Flag flags, const MethodReference& ref) {
-  DexFileData* data = GetOrAddDexFileData(ref.dex_file);
-  if (data == nullptr) {
-    return false;
-  }
-  return data->AddMethod(flags, ref.index);
-}
-
 bool ProfileCompilationInfo::AddMethodIndex(MethodHotness::Flag flags,
                                             const std::string& dex_location,
                                             uint32_t checksum,
@@ -198,15 +190,6 @@ bool ProfileCompilationInfo::AddMethods(const std::vector<ProfileMethodInfo>& me
                                         MethodHotness::Flag flags) {
   for (const ProfileMethodInfo& method : methods) {
     if (!AddMethod(method, flags)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool ProfileCompilationInfo::AddClasses(const std::set<DexCacheResolvedClasses>& resolved_classes) {
-  for (const DexCacheResolvedClasses& dex_cache : resolved_classes) {
-    if (!AddResolvedClasses(dex_cache)) {
       return false;
     }
   }
@@ -670,17 +653,6 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
   DCHECK_EQ(profile_key, result->profile_key);
   DCHECK_EQ(profile_index, result->profile_index);
   return result;
-}
-
-bool ProfileCompilationInfo::AddResolvedClasses(const DexCacheResolvedClasses& classes) {
-  const std::string profile_key = GetProfileDexFileKey(classes.GetDexLocation());
-  const uint32_t checksum = classes.GetLocationChecksum();
-  DexFileData* const data = GetOrAddDexFileData(profile_key, checksum, classes.NumMethodIds());
-  if (data == nullptr) {
-    return false;
-  }
-  data->class_set.insert(classes.GetClasses().begin(), classes.GetClasses().end());
-  return true;
 }
 
 bool ProfileCompilationInfo::AddMethod(const std::string& dex_location,
@@ -1639,17 +1611,6 @@ ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
       : MethodHotness();
 }
 
-bool ProfileCompilationInfo::AddMethodHotness(const MethodReference& method_ref,
-                                              const MethodHotness& hotness) {
-  DexFileData* dex_data = GetOrAddDexFileData(method_ref.dex_file);
-  if (dex_data != nullptr) {
-    // TODO: Add inline caches.
-    return dex_data->AddMethod(
-        static_cast<MethodHotness::Flag>(hotness.GetFlags()), method_ref.index);
-  }
-  return false;
-}
-
 ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
     const std::string& dex_location,
     uint32_t dex_checksum,
@@ -1965,8 +1926,8 @@ bool ProfileCompilationInfo::GenerateTestProfile(
       flags |= ((method_index & 1) != 0)
                    ? MethodHotness::kFlagPostStartup
                    : MethodHotness::kFlagStartup;
-      info.AddMethodIndex(static_cast<MethodHotness::Flag>(flags),
-                          MethodReference(dex_file.get(), method_index));
+      info.AddMethod(ProfileMethodInfo(MethodReference(dex_file.get(), method_index)),
+                     static_cast<MethodHotness::Flag>(flags));
     }
   }
   return info.Save(fd);

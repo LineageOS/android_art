@@ -99,11 +99,13 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     VisitLibcoreDexes([&profile](MethodReference ref) {
       uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
           ProfileCompilationInfo::MethodHotness::kFlagStartup;
-      EXPECT_TRUE(profile.AddMethodIndex(
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
-          ref));
+      EXPECT_TRUE(profile.AddMethod(
+          ProfileMethodInfo(ref),
+          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags)));
     }, [&profile](TypeReference ref) {
-      EXPECT_TRUE(profile.AddClassForDex(ref));
+      std::set<dex::TypeIndex> classes;
+      classes.insert(ref.TypeIndex());
+      EXPECT_TRUE(profile.AddClassesForDex(ref.dex_file, classes.begin(), classes.end()));
     }, method_frequency, type_frequency);
     ScratchFile profile_file;
     profile.Save(out_file->Fd());
