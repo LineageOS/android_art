@@ -100,51 +100,50 @@ TEST_F(FileUtilsTest, GetAndroidRootSafe) {
   ASSERT_EQ(0, setenv("ANDROID_ROOT", android_root_env.c_str(), /* overwrite */ 1));
 }
 
-TEST_F(FileUtilsTest, GetAndroidRuntimeRootSafe) {
+TEST_F(FileUtilsTest, GetArtRootSafe) {
   std::string error_msg;
-  std::string android_runtime_root;
-  std::string android_runtime_root_env;
+  std::string android_art_root;
+  std::string android_art_root_env;
 
   // TODO(b/130295968): Re-enable this part when the directory exists on host
   if (kIsTargetBuild) {
     // We don't expect null returns for most cases, so don't check and let std::string crash.
 
-    // CommonArtTest sets ANDROID_RUNTIME_ROOT, so expect this to be the same.
-    android_runtime_root = GetAndroidRuntimeRootSafe(&error_msg);
-    android_runtime_root_env = getenv("ANDROID_RUNTIME_ROOT");
-    EXPECT_EQ(android_runtime_root, android_runtime_root_env) << error_msg;
+    // CommonArtTest sets ANDROID_ART_ROOT, so expect this to be the same.
+    android_art_root = GetArtRootSafe(&error_msg);
+    android_art_root_env = getenv("ANDROID_ART_ROOT");
+    EXPECT_EQ(android_art_root, android_art_root_env) << error_msg;
 
-    // Set ANDROID_RUNTIME_ROOT to something else (but the directory must exist). So use dirname.
-    UniqueCPtr<char> root_dup(strdup(android_runtime_root_env.c_str()));
+    // Set ANDROID_ART_ROOT to something else (but the directory must exist). So use dirname.
+    UniqueCPtr<char> root_dup(strdup(android_art_root_env.c_str()));
     char* dir = dirname(root_dup.get());
-    ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", dir, /* overwrite */ 1));
-    std::string android_runtime_root2 = GetAndroidRuntimeRootSafe(&error_msg);
-    EXPECT_STREQ(dir, android_runtime_root2.c_str()) << error_msg;
+    ASSERT_EQ(0, setenv("ANDROID_ART_ROOT", dir, /* overwrite */ 1));
+    std::string android_art_root2 = GetArtRootSafe(&error_msg);
+    EXPECT_STREQ(dir, android_art_root2.c_str()) << error_msg;
   }
 
-  // Set a bogus value for ANDROID_RUNTIME_ROOT. This should be an error.
-  ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", "/this/is/obviously/bogus", /* overwrite */ 1));
-  EXPECT_EQ(GetAndroidRuntimeRootSafe(&error_msg), "");
+  // Set a bogus value for ANDROID_ART_ROOT. This should be an error.
+  ASSERT_EQ(0, setenv("ANDROID_ART_ROOT", "/this/is/obviously/bogus", /* overwrite */ 1));
+  EXPECT_EQ(GetArtRootSafe(&error_msg), "");
 
-  // Inferring the Android Runtime Root from the location of libartbase only works on target.
+  // Inferring the ART root from the location of libartbase only works on target.
   if (kIsTargetBuild) {
     // Disabled for now, as we cannot reliably use `GetRootContainingLibartbase`
-    // to find the Android Runtime Root on target yet (see comment in
-    // `GetAndroidRuntimeRootSafe`).
+    // to find the ART root on target yet (see comment in `GetArtRootSafe`).
     //
     // TODO(b/129534335): Re-enable this part of the test on target when the
-    // only instance of libartbase is the one from the Runtime APEX.
+    // only instance of libartbase is the one from the ART APEX.
     if ((false)) {
-      // Unset ANDROID_RUNTIME_ROOT and see that it still returns something (as
+      // Unset ANDROID_ART_ROOT and see that it still returns something (as
       // libartbase code is running).
-      ASSERT_EQ(0, unsetenv("ANDROID_RUNTIME_ROOT"));
-      std::string android_runtime_root3 = GetAndroidRuntimeRootSafe(&error_msg);
+      ASSERT_EQ(0, unsetenv("ANDROID_ART_ROOT"));
+      std::string android_art_root3 = GetArtRootSafe(&error_msg);
       // This should be the same as the other root (modulo realpath), otherwise
       // the test setup is broken. On non-bionic. On bionic we can be running
-      // with a different libartbase that lives outside of ANDROID_RUNTIME_ROOT.
-      UniqueCPtr<char> real_root3(realpath(android_runtime_root3.c_str(), nullptr));
+      // with a different libartbase that lives outside of ANDROID_ART_ROOT.
+      UniqueCPtr<char> real_root3(realpath(android_art_root3.c_str(), nullptr));
 #if !defined(__BIONIC__ ) || defined(__ANDROID__)
-      UniqueCPtr<char> real_root(realpath(android_runtime_root.c_str(), nullptr));
+      UniqueCPtr<char> real_root(realpath(android_art_root.c_str(), nullptr));
       EXPECT_STREQ(real_root.get(), real_root3.get()) << error_msg;
 #else
       EXPECT_STRNE(real_root3.get(), "") << error_msg;
@@ -152,8 +151,8 @@ TEST_F(FileUtilsTest, GetAndroidRuntimeRootSafe) {
     }
   }
 
-  // Reset ANDROID_RUNTIME_ROOT, as other things may depend on it.
-  ASSERT_EQ(0, setenv("ANDROID_RUNTIME_ROOT", android_runtime_root_env.c_str(), /* overwrite */ 1));
+  // Reset ANDROID_ART_ROOT, as other things may depend on it.
+  ASSERT_EQ(0, setenv("ANDROID_ART_ROOT", android_art_root_env.c_str(), /* overwrite */ 1));
 }
 
 TEST_F(FileUtilsTest, ReplaceFileExtension) {

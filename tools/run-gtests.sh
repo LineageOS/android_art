@@ -32,7 +32,7 @@ fi
 adb="${ADB:-adb}"
 
 android_i18n_root=/apex/com.android.i18n
-android_runtime_root=/apex/com.android.art
+android_art_root=/apex/com.android.art
 android_tzdata_root=/apex/com.android.tzdata
 
 if [[ $1 = -j* ]]; then
@@ -45,7 +45,7 @@ if [ $# -gt 0 ]; then
 else
   # Search for executables under the `bin/art` directory of the ART APEX.
   tests=$("$adb" shell chroot "$ART_TEST_CHROOT" \
-    find "$android_runtime_root/bin/art" -type f -perm /ugo+x | sort)
+    find "$android_art_root/bin/art" -type f -perm /ugo+x | sort)
 fi
 
 failing_tests=()
@@ -53,7 +53,10 @@ failing_tests=()
 for t in $tests; do
   echo "$t"
   "$adb" shell chroot "$ART_TEST_CHROOT" \
-    env ANDROID_I18N_ROOT="$android_i18n_root" ANDROID_RUNTIME_ROOT="$android_runtime_root" ANDROID_TZDATA_ROOT="$android_tzdata_root" $t \
+    env ANDROID_ART_ROOT="$android_art_root" \
+        ANDROID_I18N_ROOT="$android_i18n_root" \
+        ANDROID_TZDATA_ROOT="$android_tzdata_root" \
+        $t \
     || failing_tests+=("$t")
 done
 

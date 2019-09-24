@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-# Run Android Runtime APEX tests.
+# Run ART APEX tests.
 
 SCRIPT_DIR=$(dirname $0)
 
@@ -64,7 +64,7 @@ print_file_sizes_p=false
 function usage {
   cat <<EOF
 Usage: $0 [OPTION]
-Build (optional) and run tests on Android Runtime APEX package (on host).
+Build (optional) and run tests on ART APEX package (on host).
 
   -B, --skip-build    skip the build step
   -l, --list-files    list the contents of the ext4 image (\`find\`-like style)
@@ -193,6 +193,6 @@ for apex_module in ${apex_modules[@]}; do
   echo
 done
 
-[[ "$exit_status" = 0 ]] && say "All Android Runtime APEX tests passed"
+[[ "$exit_status" = 0 ]] && say "All ART APEX tests passed"
 
 exit $exit_status

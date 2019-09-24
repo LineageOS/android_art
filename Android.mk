@@ -607,10 +607,9 @@ standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DE
 # Also include:
 # - a copy of the ICU prebuilt .dat file in /system/etc/icu on target
 #   (see module `icu-data-art-test-i18n`); and
-# so that it can be found even if the ART APEX is not available,
-# by setting the environment variable `ART_TEST_ANDROID_RUNTIME_ROOT`
-# to "/system" on device. This is a temporary change needed
-# until Golem fully supports the ART APEX.
+# so that it can be found even if the ART APEX is not available, by setting the
+# environment variable `ART_TEST_ANDROID_ART_ROOT` to "/system" on device. This
+# is a temporary change needed until Golem fully supports the ART APEX.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
