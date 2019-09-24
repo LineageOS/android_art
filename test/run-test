@@ -160,6 +160,7 @@ never_clean="no"
 have_image="yes"
 android_root="/system"
 bisection_search="no"
+timeout=""
 suspend_timeout="500000"
 image_suffix=""
 run_optimizing="false"
@@ -321,7 +322,8 @@ while true; do
         shift
     elif [ "x$1" = "x--strace" ]; then
         strace="yes"
-        run_args+=(--timeout 1800 --invoke-with strace --invoke-with -o --invoke-with "$tmp_dir/$strace_output")
+        run_args+=(--invoke-with strace --invoke-with -o --invoke-with "$tmp_dir/$strace_output")
+        timeout="${timeout:-1800}"
         shift
     elif [ "x$1" = "x--zygote" ]; then
         run_args+=(--zygote)
@@ -455,6 +457,15 @@ while true; do
         # apex_payload.zip is quite large we need a high enough ulimit to
         # extract it. 512mb should be good enough.
         file_ulimit=512000
+        shift
+    elif [ "x$1" = "x--timeout" ]; then
+        shift
+        if [ "x$1" = "x" ]; then
+            echo "$0 missing argument to --timeout" 1>&2
+            usage="yes"
+            break
+        fi
+        timeout="$1"
         shift
     elif [ "x$1" = "x--trace" ]; then
         trace="true"
@@ -591,6 +602,9 @@ if [ "$trace" = "true" ]; then
 elif [ "$trace_stream" = "true" ]; then
     err_echo "Cannot use --stream without --trace."
     exit 1
+fi
+if [ -n "$timeout" ]; then
+    run_args+=(--timeout "$timeout")
 fi
 
 # Most interesting target architecture variables are Makefile variables, not environment variables.
@@ -797,6 +811,7 @@ if [ "$usage" = "yes" ]; then
         echo "    --runtime-extracted-zipapex [dir]"
         echo "                          Use the given extracted zipapex directory to provide"
         echo "                          runtime binaries"
+        echo "    --timeout n           Test timeout in seconds"
         echo "    --trace               Run with method tracing"
         echo "    --strace              Run with syscall tracing from strace."
         echo "    --stream              Run method tracing in streaming mode (requires --trace)"
@@ -1092,7 +1107,7 @@ if [ "$bisection_search" = "yes" -a "$good" != "yes" ]; then
         --check-script="$cwd/check" \
         --expected-output="$cwd/expected.txt" \
         --logfile="$cwd/bisection_log.txt" \
-        --timeout=300
+        --timeout=${timeout:-300}
     fi
 fi
 
