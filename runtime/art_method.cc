@@ -881,4 +881,8 @@ ALWAYS_INLINE static inline void DoGetAccessFlagsHelper(ArtMethod* method)
         method->GetDeclaringClass<kReadBarrierOption>()->IsErroneous());
 }
 
+bool ArtMethod::NeedsInitializationCheck() {
+  return IsStatic() && !IsConstructor() && !GetDeclaringClass()->IsVisiblyInitialized();
+}
+
 }  // namespace art
