@@ -17,10 +17,8 @@
 #include "memfd.h"
 
 #include <errno.h>
-#include <stdio.h>
 #if !defined(_WIN32)
 #include <sys/syscall.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 
@@ -41,20 +39,6 @@ namespace art {
 #if defined(__NR_memfd_create)
 
 int memfd_create(const char* name, unsigned int flags) {
-  // Check kernel version supports memfd_create(). Some older kernels segfault executing
-  // memfd_create() rather than returning ENOSYS (b/116769556).
-  static constexpr int kRequiredMajor = 3;
-  static constexpr int kRequiredMinor = 17;
-  struct utsname uts;
-  int major, minor;
-  if (uname(&uts) != 0 ||
-      strcmp(uts.sysname, "Linux") != 0 ||
-      sscanf(uts.release, "%d.%d", &major, &minor) != 2 ||
-      (major < kRequiredMajor || (major == kRequiredMajor && minor < kRequiredMinor))) {
-    errno = ENOSYS;
-    return -1;
-  }
-
   return syscall(__NR_memfd_create, name, flags);
 }
 
