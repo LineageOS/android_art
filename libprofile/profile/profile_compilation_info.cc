@@ -696,15 +696,20 @@ bool ProfileCompilationInfo::AddMethod(const std::string& dex_location,
     // The data is null if there is a mismatch in the checksum or number of method ids.
     return false;
   }
-
-  // Add the method.
-  InlineCacheMap* inline_cache = data->FindOrAddMethod(method_index);
-  if (inline_cache == nullptr) {
+  if (!data->AddMethod(flags, method_index)) {
     // Happens if the method index is outside the range (i.e. is greater then the number
     // of methods in the dex file). This should not happen during normal execution,
     // But tools (e.g. boot image aggregation tools) and tests stress this behaviour.
     return false;
   }
+  if ((flags & MethodHotness::kFlagHot) == 0) {
+    // The method is not hot, do not add inline caches.
+    return true;
+  }
+
+  // Add inline caches.
+  InlineCacheMap* inline_cache = data->FindOrAddMethod(method_index);
+  DCHECK(inline_cache != nullptr);
 
   data->SetMethodHotness(method_index, flags);
 
@@ -750,11 +755,17 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotne
   if (data == nullptr) {  // checksum mismatch
     return false;
   }
-  InlineCacheMap* inline_cache = data->FindOrAddMethod(pmi.ref.index);
-  if (inline_cache == nullptr) {
+  if (!data->AddMethod(flags, pmi.ref.index)) {
     return false;
   }
-  data->SetMethodHotness(pmi.ref.index, flags);
+  if ((flags & MethodHotness::kFlagHot) == 0) {
+    // The method is not hot, do not add inline caches.
+    return true;
+  }
+
+  // Add inline caches.
+  InlineCacheMap* inline_cache = data->FindOrAddMethod(pmi.ref.index);
+  DCHECK(inline_cache != nullptr);
 
   for (const ProfileMethodInfo::ProfileInlineCache& cache : pmi.inline_caches) {
     if (cache.is_missing_types) {

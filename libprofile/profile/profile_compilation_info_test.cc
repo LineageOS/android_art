@@ -61,8 +61,10 @@ class ProfileCompilationInfoTest : public CommonArtTest {
                  uint16_t method_idx,
                  const ProfileCompilationInfo::OfflineProfileMethodInfo& pmi,
                  ProfileCompilationInfo* info) {
+    Hotness::Flag flags = static_cast<Hotness::Flag>(
+          Hotness::kFlagHot | Hotness::kFlagPostStartup);
     return info->AddMethod(
-        dex_location, checksum, method_idx, kMaxMethodIds, pmi, Hotness::kFlagPostStartup);
+        dex_location, checksum, method_idx, kMaxMethodIds, pmi, flags);
   }
 
   bool AddClass(const std::string& dex_location,
@@ -1350,5 +1352,74 @@ TEST_F(ProfileCompilationInfoTest, SizeStressTestAllIn) {
 
 TEST_F(ProfileCompilationInfoTest, SizeStressTestAllInRandom) {
   SizeStressTest(/*random=*/ true);
+}
+
+// Verifies that we correctly add methods to the profile according to their flags.
+TEST_F(ProfileCompilationInfoTest, AddMethodsProfileMethodInfoBasic) {
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("ManyMethods"));
+
+  ProfileCompilationInfo info;
+
+  MethodReference hot(dex.get(), 0);
+  MethodReference hot_startup(dex.get(), 1);
+  MethodReference startup(dex.get(), 2);
+
+  // Add methods
+  ASSERT_TRUE(info.AddMethod(ProfileMethodInfo(hot), Hotness::kFlagHot));
+  ASSERT_TRUE(info.AddMethod(
+      ProfileMethodInfo(hot_startup),
+      static_cast<Hotness::Flag>(Hotness::kFlagHot | Hotness::kFlagStartup)));
+  ASSERT_TRUE(info.AddMethod(ProfileMethodInfo(startup), Hotness::kFlagStartup));
+
+  // Verify the profile recorded them correctly.
+  EXPECT_TRUE(info.GetMethodHotness(hot).IsInProfile());
+  EXPECT_EQ(info.GetMethodHotness(hot).GetFlags(), Hotness::kFlagHot);
+
+  EXPECT_TRUE(info.GetMethodHotness(hot_startup).IsInProfile());
+  EXPECT_EQ(info.GetMethodHotness(hot_startup).GetFlags(),
+            static_cast<uint32_t>(Hotness::kFlagHot | Hotness::kFlagStartup));
+
+  EXPECT_TRUE(info.GetMethodHotness(startup).IsInProfile());
+  EXPECT_EQ(info.GetMethodHotness(startup).GetFlags(), Hotness::kFlagStartup);
+}
+
+// Verifies that we correctly add inline caches to the profile only for hot methods.
+TEST_F(ProfileCompilationInfoTest, AddMethodsProfileMethodInfoInlineCaches) {
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("ManyMethods"));
+
+  ProfileCompilationInfo info;
+  MethodReference hot(dex.get(), 0);
+  MethodReference startup(dex.get(), 2);
+
+  // Add inline caches with the methods. The profile should record only the one for the hot method.
+  std::vector<TypeReference> types = {};
+  ProfileMethodInfo::ProfileInlineCache ic(/*dex_pc*/ 0, /*missing_types*/true, types);
+  std::vector<ProfileMethodInfo::ProfileInlineCache> inline_caches = {ic};
+  info.AddMethod(ProfileMethodInfo(hot, inline_caches), Hotness::kFlagHot);
+  info.AddMethod(ProfileMethodInfo(startup, inline_caches), Hotness::kFlagStartup);
+
+  // Check the hot method's inline cache.
+  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> hot_pmi =
+      info.GetMethod(dex->GetLocation(), dex->GetLocationChecksum(), hot.index);
+  ASSERT_TRUE(hot_pmi != nullptr);
+  ASSERT_EQ(hot_pmi->inline_caches->size(), 1u);
+  ASSERT_TRUE(hot_pmi->inline_caches->Get(0).is_missing_types);
+
+  // Check there's no inline caches for the startup method.
+  ASSERT_TRUE(
+        info.GetMethod(dex->GetLocation(), dex->GetLocationChecksum(), startup.index) == nullptr);
+}
+
+// Verifies that we correctly add methods to the profile according to their flags.
+TEST_F(ProfileCompilationInfoTest, AddMethodsProfileMethodInfoFail) {
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("ManyMethods"));
+
+  ProfileCompilationInfo info;
+
+  MethodReference hot(dex.get(), 0);
+  MethodReference bad_ref(dex.get(), kMaxMethodIds);
+
+  std::vector<ProfileMethodInfo> pmis = {ProfileMethodInfo(hot), ProfileMethodInfo(bad_ref)};
+  ASSERT_FALSE(info.AddMethods(pmis, Hotness::kFlagHot));
 }
 }  // namespace art
