@@ -545,21 +545,33 @@ class X86Assembler final : public Assembler {
   void xorps(XmmRegister dst, const Address& src);
   void xorps(XmmRegister dst, XmmRegister src);
   void pxor(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
+  void vpxor(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vxorps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vxorpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void andpd(XmmRegister dst, XmmRegister src);
   void andpd(XmmRegister dst, const Address& src);
   void andps(XmmRegister dst, XmmRegister src);
   void andps(XmmRegister dst, const Address& src);
   void pand(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
+  void vpand(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vandps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vandpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void andn(Register dst, Register src1, Register src2);  // no addr variant (for now)
   void andnpd(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
   void andnps(XmmRegister dst, XmmRegister src);
   void pandn(XmmRegister dst, XmmRegister src);
+  void vpandn(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vandnps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vandnpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void orpd(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
   void orps(XmmRegister dst, XmmRegister src);
   void por(XmmRegister dst, XmmRegister src);
+  void vpor(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vorps(XmmRegister dst, XmmRegister src1, XmmRegister src2);
+  void vorpd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
 
   void pavgb(XmmRegister dst, XmmRegister src);  // no addr variant (for now)
   void pavgw(XmmRegister dst, XmmRegister src);
