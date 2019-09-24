@@ -59,13 +59,13 @@ for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${ART_APEX}*${MANIFEST} 2>/de
     if [[ $USE_FIRST_DIR == true ]]; then
       break
     fi
-    echo "Multiple Runtime apex dirs: ${ART_APEX_SELECTED}, ${d}."
+    echo "Multiple ART APEX dirs: ${ART_APEX_SELECTED}, ${d}."
     exit 1
   fi
   ART_APEX_SELECTED=${d}
 done
 if [[ "x${ART_APEX_SELECTED}" == "x" ]]; then
-  echo "No Runtime apex dir."
+  echo "No ART APEX dir."
   exit 1
 fi
 

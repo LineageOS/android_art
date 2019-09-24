@@ -35,9 +35,8 @@ if  [[ "$@" != *"--host"* ]]; then
   test_native_lib_path=$("$ANDROID_BUILD_TOP/art/test/utils/get-device-test-native-lib-path" \
     "$bitness_flag")
 
-  # The linker configuration used for dalvikvm(64) in the Runtime APEX
-  # requires us to pass the full path to the agent to the runtime when
-  # running on device.
+  # The linker configuration used for dalvikvm(64) in the ART APEX requires us
+  # to pass the full path to the agent to the runtime when running on device.
   plugin=${test_native_lib_path}/${plugin}
 fi
 

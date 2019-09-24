@@ -941,8 +941,8 @@ uint32_t Jit::CompileMethodsFromProfile(
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
   uint32_t added_to_queue = 0u;
   for (const DexFile* dex_file : dex_files) {
-    if (LocationIsOnRuntimeModule(dex_file->GetLocation().c_str())) {
-      // The runtime module jars are already preopted.
+    if (LocationIsOnArtModule(dex_file->GetLocation().c_str())) {
+      // The ART module jars are already preopted.
       continue;
     }
     // To speed up class lookups, generate a type lookup table for

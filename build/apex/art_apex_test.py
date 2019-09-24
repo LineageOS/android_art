@@ -29,10 +29,10 @@ logging.basicConfig(format='%(message)s')
 
 # Architectures supported by APEX packages.
 archs = ["arm", "arm64", "x86", "x86_64"]
-# Directory containing ART tests within a Runtime APEX (if the package includes
+# Directory containing ART tests within an ART APEX (if the package includes
 # any). ART test executables are installed in `bin/art/<arch>`. Segregating
 # tests by architecture is useful on devices supporting more than one
-# architecture, as it permits testing all of them using a single Runtime APEX
+# architecture, as it permits testing all of them using a single ART APEX
 # package.
 art_test_dir = 'bin/art'
 
@@ -1223,7 +1223,7 @@ def art_apex_test_default(test_parser):
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='Check integrity of a Runtime APEX.')
+  parser = argparse.ArgumentParser(description='Check integrity of an ART APEX.')
 
   parser.add_argument('apex', help='APEX file input')
 

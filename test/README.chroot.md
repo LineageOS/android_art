@@ -38,6 +38,7 @@ Note that using this chroot-based approach requires root access to the device
    ```bash
    unset ART_TEST_ANDROID_ROOT
    unset CUSTOM_TARGET_LINKER
+   unset ART_TEST_ANDROID_ART_ROOT
    unset ART_TEST_ANDROID_RUNTIME_ROOT
    unset ART_TEST_ANDROID_I18N_ROOT
    unset ART_TEST_ANDROID_TZDATA_ROOT
