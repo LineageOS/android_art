@@ -25,7 +25,10 @@ package {
 
 cc_defaults {
     name: "libartbase_defaults",
-    defaults: ["art_defaults"],
+    defaults: [
+        "art_defaults",
+        "has_memfd_backport_defaults",
+    ],
     host_supported: true,
     srcs: [
         "arch/instruction_set.cc",
