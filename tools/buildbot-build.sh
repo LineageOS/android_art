@@ -85,8 +85,8 @@ elif [[ $mode == "target" ]]; then
   make_command+=" com.android.runtime"
   # Build the Testing ART APEX (which is a superset of the Release and Debug ART APEXes).
   make_command+=" com.android.art.testing"
-  # Build the system linker configuration, which is needed to use the
-  # Runtime APEX's linker configuration.
+  # Build the system linker configuration, which is needed to use the ART APEX's
+  # linker configuration.
   make_command+=" ld.config.txt "
   # Build the bootstrap Bionic artifacts links (linker, libc, libdl, libm).
   # These targets create these symlinks:

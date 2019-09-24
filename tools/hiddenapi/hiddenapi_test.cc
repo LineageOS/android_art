@@ -31,7 +31,7 @@ namespace art {
 class HiddenApiTest : public CommonRuntimeTest {
  protected:
   std::string GetHiddenApiCmd() {
-    std::string file_path = GetAndroidRuntimeBinDir() + "/hiddenapi";
+    std::string file_path = GetArtBinDir() + "/hiddenapi";
     if (kIsDebugBuild) {
       file_path += 'd';
     }
