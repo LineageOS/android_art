@@ -39,21 +39,19 @@ std::string GetAndroidRoot();
 // Find $ANDROID_ROOT, /system, or return an empty string.
 std::string GetAndroidRootSafe(/*out*/ std::string* error_msg);
 
-// These methods return the Android Runtime Root, which is the location of the
-// (activated) Android Runtime APEX module. On target, this is normally
-// "/apex/com.android.art". On host, this is usually a subdirectory of the
-// Android Root, e.g.
-// "$ANDROID_BUILD_TOP/out/host/linux-x86/com.android.art". The location of
-// the Android Runtime Root can be overriden using the ANDROID_RUNTIME_ROOT
-// environment variable.
+// These methods return the ART Root, which is the location of the (activated)
+// ART APEX module. On target, this is normally "/apex/com.android.art". On
+// host, this is usually a subdirectory of the Android Root, e.g.
+// "$ANDROID_BUILD_TOP/out/host/linux-x86/com.android.art". The location of the
+// ART root can be overridden using the ANDROID_ART_ROOT environment variable.
 //
-// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.art, or abort.
-std::string GetAndroidRuntimeRoot();
-// Find $ANDROID_RUNTIME_ROOT, /apex/com.android.art, or return an empty string.
-std::string GetAndroidRuntimeRootSafe(/*out*/ std::string* error_msg);
+// Find $ANDROID_ART_ROOT, /apex/com.android.art, or abort.
+std::string GetArtRoot();
+// Find $ANDROID_ART_ROOT, /apex/com.android.art, or return an empty string.
+std::string GetArtRootSafe(/*out*/ std::string* error_msg);
 
-// Return the path to the directory containing the Android Runtime binaries.
-std::string GetAndroidRuntimeBinDir();
+// Return the path to the directory containing the ART binaries.
+std::string GetArtBinDir();
 
 // Find $ANDROID_DATA, /data, or abort.
 std::string GetAndroidData();
@@ -97,7 +95,7 @@ std::string GetVdexFilename(const std::string& oat_filename);
 std::string ReplaceFileExtension(const std::string& filename, const std::string& new_extension);
 
 // Return whether the location is on /apex/com.android.art
-bool LocationIsOnRuntimeModule(const char* location);
+bool LocationIsOnArtModule(const char* location);
 
 // Return whether the location is on /apex/com.android.conscrypt
 bool LocationIsOnConscryptModule(const char* location);
@@ -111,9 +109,9 @@ bool LocationIsOnSystemFramework(const char* location);
 // Return whether the location is on /apex/.
 bool LocationIsOnApex(const char* location);
 
-// Compare the runtime module root against android root. Returns true if they are
+// Compare the ART module root against android root. Returns true if they are
 // both known and distinct. This is meant to be a proxy for 'running with apex'.
-bool RuntimeModuleRootDistinctFromAndroidRoot();
+bool ArtModuleRootDistinctFromAndroidRoot();
 
 // dup(2), except setting the O_CLOEXEC flag atomically, when possible.
 int DupCloexec(int fd);

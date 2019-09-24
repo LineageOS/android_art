@@ -184,15 +184,15 @@ void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
       setenv("ANDROID_I18N_ROOT", android_i18n_root.c_str(), 1);
     }
 
-    // Environment variable ANDROID_RUNTIME_ROOT is set on the device, but not
+    // Environment variable ANDROID_ART_ROOT is set on the device, but not
     // necessarily on the host. It needs to be set so that various libraries
     // like libcore / icu4j / icu4c can find their data files.
-    const char* android_runtime_root_from_env = getenv("ANDROID_RUNTIME_ROOT");
-    if (android_runtime_root_from_env == nullptr) {
-      // Use ${ANDROID_HOST_OUT}/com.android.art for ANDROID_RUNTIME_ROOT.
-      std::string android_runtime_root = android_host_out_from_env;
-      android_runtime_root += "/com.android.art";
-      setenv("ANDROID_RUNTIME_ROOT", android_runtime_root.c_str(), 1);
+    const char* android_art_root_from_env = getenv("ANDROID_ART_ROOT");
+    if (android_art_root_from_env == nullptr) {
+      // Use ${ANDROID_HOST_OUT}/com.android.art for ANDROID_ART_ROOT.
+      std::string android_art_root = android_host_out_from_env;
+      android_art_root += "/com.android.art";
+      setenv("ANDROID_ART_ROOT", android_art_root.c_str(), 1);
     }
 
     // Environment variable ANDROID_TZDATA_ROOT is set on the device, but not

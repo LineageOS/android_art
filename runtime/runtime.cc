@@ -799,7 +799,7 @@ std::string Runtime::GetCompilerExecutable() const {
   if (!compiler_executable_.empty()) {
     return compiler_executable_;
   }
-  std::string compiler_executable = GetAndroidRuntimeBinDir() + "/dex2oat";
+  std::string compiler_executable = GetArtBinDir() + "/dex2oat";
   if (kIsDebugBuild) {
     compiler_executable += 'd';
   }
