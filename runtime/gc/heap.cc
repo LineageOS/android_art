@@ -41,6 +41,7 @@
 #include "base/systrace.h"
 #include "base/time_utils.h"
 #include "base/utils.h"
+#include "class_root.h"
 #include "common_throws.h"
 #include "debugger.h"
 #include "dex/dex_file-inl.h"
@@ -80,10 +81,14 @@
 #include "jit/jit_code_cache.h"
 #include "jni/java_vm_ext.h"
 #include "mirror/class-inl.h"
+#include "mirror/executable-inl.h"
+#include "mirror/field.h"
+#include "mirror/method_handle_impl.h"
 #include "mirror/object-inl.h"
 #include "mirror/object-refvisitor-inl.h"
 #include "mirror/object_array-inl.h"
 #include "mirror/reference-inl.h"
+#include "mirror/var_handle.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "obj_ptr-inl.h"
 #include "reflection.h"
@@ -4191,6 +4196,28 @@ void Heap::PostForkChildAction(Thread* self) {
     GetTaskProcessor()->AddTask(
         self, new TriggerPostForkCCGcTask(NanoTime() + MsToNs(kPostForkMaxHeapDurationMS)));
   }
+}
+
+void Heap::VisitReflectiveTargets(ReflectiveValueVisitor *visit) {
+  VisitObjectsPaused([&visit](mirror::Object* ref) NO_THREAD_SAFETY_ANALYSIS {
+    art::ObjPtr<mirror::Class> klass(ref->GetClass());
+    // All these classes are in the BootstrapClassLoader.
+    if (!klass->IsBootStrapClassLoaded()) {
+      return;
+    }
+    if (GetClassRoot<mirror::Method>()->IsAssignableFrom(klass) ||
+        GetClassRoot<mirror::Constructor>()->IsAssignableFrom(klass)) {
+      down_cast<mirror::Executable*>(ref)->VisitTarget(visit);
+    } else if (art::GetClassRoot<art::mirror::Field>() == klass) {
+      down_cast<mirror::Field*>(ref)->VisitTarget(visit);
+    } else if (art::GetClassRoot<art::mirror::MethodHandle>()->IsAssignableFrom(klass)) {
+      down_cast<mirror::MethodHandle*>(ref)->VisitTarget(visit);
+    } else if (art::GetClassRoot<art::mirror::FieldVarHandle>()->IsAssignableFrom(klass)) {
+      down_cast<mirror::FieldVarHandle*>(ref)->VisitTarget(visit);
+    } else if (art::GetClassRoot<art::mirror::DexCache>()->IsAssignableFrom(klass)) {
+      down_cast<mirror::DexCache*>(ref)->VisitReflectiveTargets(visit);
+    }
+  });
 }
 
 }  // namespace gc
