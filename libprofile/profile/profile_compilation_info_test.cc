@@ -103,7 +103,7 @@ class ProfileCompilationInfoTest : public CommonArtTest {
       const ProfileCompilationInfo& info,
       const DexFile* dex,
       uint16_t method_idx) {
-    return info.GetMethod(dex->GetLocation(), dex->GetLocationChecksum(), method_idx);
+    return info.GetHotMethodInfo(MethodReference(dex, method_idx));
   }
 
   // Creates an inline cache which will be destructed at the end of the test.

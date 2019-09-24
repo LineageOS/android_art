@@ -282,14 +282,13 @@ TEST_F(ProfileCompilationInfoTest, SaveArtMethodsWithInlineCaches) {
   {
     ScopedObjectAccess soa(self);
     for (ArtMethod* m : main_methods) {
-      Hotness h = info.GetMethodHotness(MethodReference(m->GetDexFile(), m->GetDexMethodIndex()));
+      MethodReference method_ref(m->GetDexFile(), m->GetDexMethodIndex());
+      Hotness h = info.GetMethodHotness(method_ref);
       ASSERT_TRUE(h.IsHot());
       ASSERT_TRUE(h.IsStartup());
       const ProfileMethodInfo& pmi = profile_methods_map.find(m)->second;
       std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> offline_pmi =
-          info.GetMethod(m->GetDexFile()->GetLocation(),
-                         m->GetDexFile()->GetLocationChecksum(),
-                         m->GetDexMethodIndex());
+          info.GetHotMethodInfo(method_ref);
       ASSERT_TRUE(offline_pmi != nullptr);
       ProfileCompilationInfo::OfflineProfileMethodInfo converted_pmi =
           ConvertProfileMethodInfo(pmi);

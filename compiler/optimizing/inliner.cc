@@ -692,9 +692,8 @@ HInliner::InlineCacheType HInliner::GetInlineCacheAOT(
   }
 
   std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> offline_profile =
-      pci->GetMethod(caller_dex_file.GetLocation(),
-                     caller_dex_file.GetLocationChecksum(),
-                     caller_compilation_unit_.GetDexMethodIndex());
+      pci->GetHotMethodInfo(MethodReference(
+          &caller_dex_file, caller_compilation_unit_.GetDexMethodIndex()));
   if (offline_profile == nullptr) {
     return kInlineCacheNoData;  // no profile information for this invocation.
   }
