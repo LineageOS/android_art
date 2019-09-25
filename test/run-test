@@ -399,14 +399,14 @@ while true; do
         android_root="$1"
         run_args+=(--android-root "$1")
         shift
-    elif [ "x$1" = "x--android-runtime-root" ]; then
+    elif [ "x$1" = "x--android-art-root" ]; then
         shift
         if [ "x$1" = "x" ]; then
-            echo "$0 missing argument to --android-runtime-root" 1>&2
+            echo "$0 missing argument to --android-art-root" 1>&2
             usage="yes"
             break
         fi
-        run_args+=(--android-runtime-root "$1")
+        run_args+=(--android-art-root "$1")
         shift
     elif [ "x$1" = "x--android-tzdata-root" ]; then
         shift
@@ -813,8 +813,8 @@ if [ "$usage" = "yes" ]; then
         echo "    --android-i18n-root [path]"
         echo "                          The path on target for the i18n module root."
         echo "                          (/apex/com.android.i18n by default)."
-        echo "    --android-runtime-root [path]"
-        echo "                          The path on target for the Android Runtime root."
+        echo "    --android-art-root [path]"
+        echo "                          The path on target for the ART module root."
         echo "                          (/apex/com.android.art by default)."
         echo "    --android-tzdata-root [path]"
         echo "                          The path on target for the Android Time Zone Data root."

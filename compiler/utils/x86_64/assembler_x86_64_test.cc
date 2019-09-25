@@ -1625,6 +1625,21 @@ TEST_F(AssemblerX86_64Test, Pxor) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::pxor, "pxor %{reg2}, %{reg1}"), "pxor");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VPXor) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vpxor,
+                      "vpxor %{reg3}, %{reg2}, %{reg1}"), "vpxor");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VXorps) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vxorps,
+                      "vxorps %{reg3}, %{reg2}, %{reg1}"), "vxorps");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VXorpd) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vxorpd,
+                      "vxorpd %{reg3}, %{reg2}, %{reg1}"), "vxorpd");
+}
+
 TEST_F(AssemblerX86_64Test, Andps) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::andps, "andps %{reg2}, %{reg1}"), "andps");
 }
@@ -1636,6 +1651,22 @@ TEST_F(AssemblerX86_64Test, Andpd) {
 TEST_F(AssemblerX86_64Test, Pand) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::pand, "pand %{reg2}, %{reg1}"), "pand");
 }
+
+TEST_F(AssemblerX86_64AVXTest, VPAnd) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vpand,
+                      "vpand %{reg3}, %{reg2}, %{reg1}"), "vpand");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VAndps) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vandps,
+                      "vandps %{reg3}, %{reg2}, %{reg1}"), "vandps");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VAndpd) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vandpd,
+                      "vandpd %{reg3}, %{reg2}, %{reg1}"), "vandpd");
+}
+
 TEST_F(AssemblerX86_64Test, Andn) {
   DriverStr(RepeatRRR(&x86_64::X86_64Assembler::andn, "andn %{reg3}, %{reg2}, %{reg1}"), "andn");
 }
@@ -1651,6 +1682,21 @@ TEST_F(AssemblerX86_64Test, Pandn) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::pandn, "pandn %{reg2}, %{reg1}"), "pandn");
 }
 
+TEST_F(AssemblerX86_64AVXTest, VPAndn) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vpandn,
+                      "vpandn %{reg3}, %{reg2}, %{reg1}"), "vpandn");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VAndnps) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vandnps,
+                      "vandnps %{reg3}, %{reg2}, %{reg1}"), "vandnps");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VAndnpd) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vandnpd,
+                      "vandnpd %{reg3}, %{reg2}, %{reg1}"), "vandnpd");
+}
+
 TEST_F(AssemblerX86_64Test, Orps) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::orps, "orps %{reg2}, %{reg1}"), "orps");
 }
@@ -1661,6 +1707,21 @@ TEST_F(AssemblerX86_64Test, Orpd) {
 
 TEST_F(AssemblerX86_64Test, Por) {
   DriverStr(RepeatFF(&x86_64::X86_64Assembler::por, "por %{reg2}, %{reg1}"), "por");
+}
+
+TEST_F(AssemblerX86_64AVXTest, VPor) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vpor,
+                      "vpor %{reg3}, %{reg2}, %{reg1}"), "vpor");
+}
+
+TEST_F(AssemblerX86_64AVXTest, Vorps) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vorps,
+                      "vorps %{reg3}, %{reg2}, %{reg1}"), "vorps");
+}
+
+TEST_F(AssemblerX86_64AVXTest, Vorpd) {
+  DriverStr(RepeatFFF(&x86_64::X86_64Assembler::vorpd,
+                      "vorpd %{reg3}, %{reg2}, %{reg1}"), "vorpd");
 }
 
 TEST_F(AssemblerX86_64Test, Pavgb) {

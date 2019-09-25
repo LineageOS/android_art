@@ -14,8 +14,8 @@ msg() {
 }
 
 ANDROID_ROOT="/system"
+ANDROID_ART_ROOT="/apex/com.android.art"
 ANDROID_I18N_ROOT="/apex/com.android.i18n"
-ANDROID_RUNTIME_ROOT="/apex/com.android.art"
 ANDROID_TZDATA_ROOT="/apex/com.android.tzdata"
 ARCHITECTURES_32="(arm|x86|mips|none)"
 ARCHITECTURES_64="(arm64|x86_64|mips64|none)"
@@ -230,8 +230,8 @@ while true; do
     elif [ "x$1" = "x--host" ]; then
         HOST="y"
         ANDROID_ROOT="${ANDROID_HOST_OUT}"
+        ANDROID_ART_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         shift
     elif [ "x$1" = "x--bionic" ]; then
@@ -304,8 +304,8 @@ while true; do
         TIME_OUT="n"
         HOST="y"
         ANDROID_ROOT="${ANDROID_HOST_OUT}"
+        ANDROID_ART_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-        ANDROID_RUNTIME_ROOT="${ANDROID_HOST_OUT}/com.android.art"
         ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         shift
     elif [ "x$1" = "x--gdb" ]; then
@@ -371,9 +371,9 @@ while true; do
         shift
         ANDROID_I18N_ROOT="$1"
         shift
-    elif [ "x$1" = "x--android-runtime-root" ]; then
+    elif [ "x$1" = "x--android-art-root" ]; then
         shift
-        ANDROID_RUNTIME_ROOT="$1"
+        ANDROID_ART_ROOT="$1"
         shift
     elif [ "x$1" = "x--android-tzdata-root" ]; then
         shift
@@ -592,7 +592,7 @@ if [ "$IS_JVMTI_TEST" = "y" ]; then
     if [[ "$HOST" = "y" ]]; then
       FLAGS="${FLAGS} -agentpath:${agent}=${TEST_NAME},art"
     else
-      # The linker configuration used for dalvikvm(64) in the Runtime APEX
+      # The linker configuration used for dalvikvm(64) in the ART APEX
       # requires us to pass the full path to the agent to the runtime when
       # running on device.
       FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${TEST_NAME},art"
@@ -630,7 +630,7 @@ if [[ "$JVMTI_STRESS" = "y" ]]; then
     if [[ "$HOST" = "y" ]]; then
       FLAGS="${FLAGS} -agentpath:${agent}=${agent_args}"
     else
-      # The linker configuration used for dalvikvm(64) in the Runtime APEX
+      # The linker configuration used for dalvikvm(64) in the ART APEX
       # requires us to pass the full path to the agent to the runtime when
       # running on device.
       FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${agent_args}"
@@ -806,15 +806,14 @@ if [ "$HOST" = "y" ]; then
   # directory under the "Android Root" (usually `out/host/linux-x86`).
   #
   # TODO(b/130295968): Adjust this if/when ART host artifacts are installed
-  # under the Android Runtime Root (usually
-  # `out/host/linux-x86/com.android.art`).
-  ANDROID_RUNTIME_BIN_DIR=$ANDROID_ROOT/bin
+  # under the ART root (usually `out/host/linux-x86/com.android.art`).
+  ANDROID_ART_BIN_DIR=$ANDROID_ROOT/bin
 else
-  # On target, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the
-  # Runtime APEX's `bin` directory. This means the linker will observe the
-  # Runtime APEX linker configuration file
-  # (`/apex/com.android.art/etc/ld.config.txt`) for these binaries.
-  ANDROID_RUNTIME_BIN_DIR=$ANDROID_RUNTIME_ROOT/bin
+  # On target, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the ART
+  # APEX's `bin` directory. This means the linker will observe the ART APEX
+  # linker configuration file (`/apex/com.android.art/etc/ld.config.txt`) for
+  # these binaries.
+  ANDROID_ART_BIN_DIR=$ANDROID_ART_ROOT/bin
 fi
 
 profman_cmdline="true"
@@ -852,10 +851,10 @@ if [ "$USE_ZIPAPEX" = "y" ]; then
   fi
   setupapex_cmdline="unzip -o -u ${zip_options} ${ZIPAPEX_LOC} apex_payload.zip -d ${DEX_LOCATION}"
   installapex_cmdline="unzip -o -u ${zip_options} ${DEX_LOCATION}/apex_payload.zip -d ${DEX_LOCATION}/zipapex"
-  ANDROID_RUNTIME_BIN_DIR=$DEX_LOCATION/zipapex/bin
+  ANDROID_ART_BIN_DIR=$DEX_LOCATION/zipapex/bin
 elif [ "$USE_EXTRACTED_ZIPAPEX" = "y" ]; then
   # Just symlink the zipapex binaries
-  ANDROID_RUNTIME_BIN_DIR=$DEX_LOCATION/zipapex/bin
+  ANDROID_ART_BIN_DIR=$DEX_LOCATION/zipapex/bin
   # Force since some tests manually run this file twice.
   ln_options=""
   if [ "$DEV_MODE" = "y" ]; then
@@ -867,7 +866,7 @@ fi
 # PROFILE takes precedence over RANDOM_PROFILE, since PROFILE tests require a
 # specific profile to run properly.
 if [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
-  profman_cmdline="$ANDROID_RUNTIME_BIN_DIR/profman  \
+  profman_cmdline="$ANDROID_ART_BIN_DIR/profman  \
     --apk=$DEX_LOCATION/$TEST_NAME.jar \
     --dex-location=$DEX_LOCATION/$TEST_NAME.jar"
   if [ -f $DEX_LOCATION/$TEST_NAME-ex.jar ]; then
@@ -897,7 +896,7 @@ if [ "$PREBUILD" = "y" ]; then
   if  [[ "$TEST_IS_NDEBUG" = "y" ]]; then
     dex2oat_binary=${DEX2OAT_NDEBUG_BINARY}
   fi
-  dex2oat_cmdline="$INVOKE_WITH $ANDROID_RUNTIME_BIN_DIR/$dex2oat_binary \
+  dex2oat_cmdline="$INVOKE_WITH $ANDROID_ART_BIN_DIR/$dex2oat_binary \
                       $COMPILE_FLAGS \
                       --boot-image=${BOOT_IMAGE} \
                       --dex-file=$DEX_LOCATION/$TEST_NAME.jar \
@@ -958,7 +957,7 @@ fi
 # We set DumpNativeStackOnSigQuit to false to avoid stressing libunwind.
 # b/27185632
 # b/24664297
-dalvikvm_cmdline="$INVOKE_WITH $GDB $ANDROID_RUNTIME_BIN_DIR/$DALVIKVM \
+dalvikvm_cmdline="$INVOKE_WITH $GDB $ANDROID_ART_BIN_DIR/$DALVIKVM \
                   $GDB_ARGS \
                   $FLAGS \
                   $DEX_VERIFY \
@@ -1062,7 +1061,7 @@ if [ "$HOST" = "n" ]; then
     fi
 
     # Prepend directories to the path on device.
-    PREPEND_TARGET_PATH=$ANDROID_RUNTIME_BIN_DIR
+    PREPEND_TARGET_PATH=$ANDROID_ART_BIN_DIR
     if [ "$ANDROID_ROOT" != "/system" ]; then
       PREPEND_TARGET_PATH="$PREPEND_TARGET_PATH:$ANDROID_ROOT/bin"
     fi
@@ -1119,7 +1118,7 @@ if [ "$HOST" = "n" ]; then
              export DEX_LOCATION=$DEX_LOCATION && \
              export ANDROID_ROOT=$ANDROID_ROOT && \
              export ANDROID_I18N_ROOT=$ANDROID_I18N_ROOT && \
-             export ANDROID_RUNTIME_ROOT=$ANDROID_RUNTIME_ROOT && \
+             export ANDROID_ART_ROOT=$ANDROID_ART_ROOT && \
              export ANDROID_TZDATA_ROOT=$ANDROID_TZDATA_ROOT && \
              export ANDROID_LOG_TAGS=$ANDROID_LOG_TAGS && \
              rm -rf ${DEX_LOCATION}/dalvik-cache/ && \
@@ -1166,7 +1165,7 @@ else
     export ANDROID_DATA="$DEX_LOCATION"
     export ANDROID_ROOT="${ANDROID_ROOT}"
     export ANDROID_I18N_ROOT="${ANDROID_I18N_ROOT}"
-    export ANDROID_RUNTIME_ROOT="${ANDROID_RUNTIME_ROOT}"
+    export ANDROID_ART_ROOT="${ANDROID_ART_ROOT}"
     export ANDROID_TZDATA_ROOT="${ANDROID_TZDATA_ROOT}"
     if [ "$USE_ZIPAPEX" = "y" ] || [ "$USE_EXRACTED_ZIPAPEX" = "y" ]; then
       # Put the zipapex files in front of the ld-library-path
@@ -1176,7 +1175,7 @@ else
       export LD_LIBRARY_PATH="${ANDROID_ROOT}/${LIBRARY_DIRECTORY}:${ANDROID_ROOT}/${TEST_DIRECTORY}"
       export DYLD_LIBRARY_PATH="${ANDROID_ROOT}/${LIBRARY_DIRECTORY}:${ANDROID_ROOT}/${TEST_DIRECTORY}"
     fi
-    export PATH="$PATH:$ANDROID_RUNTIME_BIN_DIR"
+    export PATH="$PATH:$ANDROID_ART_BIN_DIR"
 
     # Temporarily disable address space layout randomization (ASLR).
     # This is needed on the host so that the linker loads core.oat at the necessary address.
@@ -1213,7 +1212,7 @@ else
     fi
 
     if [ "$DEV_MODE" = "y" ]; then
-      for var in ANDROID_PRINTF_LOG ANDROID_DATA ANDROID_ROOT ANDROID_I18N_ROOT ANDROID_TZDATA_ROOT ANDROID_RUNTIME_ROOT LD_LIBRARY_PATH DYLD_LIBRARY_PATH PATH LD_USE_LOAD_BIAS; do
+      for var in ANDROID_PRINTF_LOG ANDROID_DATA ANDROID_ROOT ANDROID_I18N_ROOT ANDROID_TZDATA_ROOT ANDROID_ART_ROOT LD_LIBRARY_PATH DYLD_LIBRARY_PATH PATH LD_USE_LOAD_BIAS; do
         echo EXPORT $var=${!var}
       done
       echo "$(declare -f linkdirs)"

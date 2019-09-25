@@ -300,7 +300,7 @@ class HostTestEnv(ITestEnv):
     lib = 'lib64' if x64 else 'lib'
     android_root = GetEnvVariableOrError('ANDROID_HOST_OUT')
     android_i18n_root = android_root + '/com.android.i18n'
-    android_runtime_root = android_root + '/com.android.art'
+    android_art_root = android_root + '/com.android.art'
     android_tzdata_root = android_root + '/com.android.tzdata'
     library_path = android_root + '/' + lib
     path = android_root + '/bin'
@@ -308,7 +308,7 @@ class HostTestEnv(ITestEnv):
     self._shell_env['ANDROID_DATA'] = self._env_path
     self._shell_env['ANDROID_ROOT'] = android_root
     self._shell_env['ANDROID_I18N_ROOT'] = android_i18n_root
-    self._shell_env['ANDROID_RUNTIME_ROOT'] = android_runtime_root
+    self._shell_env['ANDROID_ART_ROOT'] = android_art_root
     self._shell_env['ANDROID_TZDATA_ROOT'] = android_tzdata_root
     self._shell_env['LD_LIBRARY_PATH'] = library_path
     self._shell_env['DYLD_LIBRARY_PATH'] = library_path

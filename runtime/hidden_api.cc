@@ -76,10 +76,10 @@ static inline std::ostream& operator<<(std::ostream& os, const AccessContext& va
 static Domain DetermineDomainFromLocation(const std::string& dex_location,
                                           ObjPtr<mirror::ClassLoader> class_loader) {
   // If running with APEX, check `path` against known APEX locations.
-  // These checks will be skipped on target buildbots where ANDROID_RUNTIME_ROOT
+  // These checks will be skipped on target buildbots where ANDROID_ART_ROOT
   // is set to "/system".
-  if (RuntimeModuleRootDistinctFromAndroidRoot()) {
-    if (LocationIsOnRuntimeModule(dex_location.c_str()) ||
+  if (ArtModuleRootDistinctFromAndroidRoot()) {
+    if (LocationIsOnArtModule(dex_location.c_str()) ||
         LocationIsOnConscryptModule(dex_location.c_str())) {
       return Domain::kCorePlatform;
     }

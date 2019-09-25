@@ -390,9 +390,14 @@ art_cc_test {
 
 cc_library_static {
     name: "libdexfile_support_static",
-    visibility: ["//visibility:public"],
-    host_supported: true,
     defaults: ["libdexfile_static_defaults"],
+    visibility: [
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
+        "//system/core/debuggerd",
+        "//system/extras/simpleperf",
+    ],
+    host_supported: true,
     srcs: [
         "external/dex_file_supp.cc",
     ],
