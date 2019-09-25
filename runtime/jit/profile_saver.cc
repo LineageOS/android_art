@@ -45,6 +45,8 @@
 
 namespace art {
 
+using Hotness = ProfileCompilationInfo::MethodHotness;
+
 ProfileSaver* ProfileSaver::instance_ = nullptr;
 pthread_t ProfileSaver::profiler_pthread_ = 0U;
 
@@ -438,7 +440,6 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
                                   &sampled_methods);
   MutexLock mu(self, *Locks::profiler_lock_);
   uint64_t total_number_of_profile_entries_cached = 0;
-  using Hotness = ProfileCompilationInfo::MethodHotness;
 
   for (const auto& it : tracked_dex_base_locations_) {
     std::set<DexCacheResolvedClasses> resolved_classes_for_location;
@@ -568,8 +569,9 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
       // Try to add the method data. Note this may fail is the profile loaded from disk contains
       // outdated data (e.g. the previous profiled dex files might have been updated).
       // If this happens we clear the profile data and for the save to ensure the file is cleared.
-      if (!info.AddMethods(profile_methods,
-              ProfileCompilationInfo::MethodHotness::kFlagPostStartup)) {
+      if (!info.AddMethods(
+              profile_methods,
+              static_cast<Hotness::Flag>(Hotness::kFlagHot | Hotness::kFlagPostStartup))) {
         LOG(WARNING) << "Could not add methods to the existing profiler. "
             << "Clearing the profile data.";
         info.ClearData();
