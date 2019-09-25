@@ -757,7 +757,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
       data->SetCode(code_ptr);
       instrumentation::Instrumentation* instrum = Runtime::Current()->GetInstrumentation();
       for (ArtMethod* m : data->GetMethods()) {
-        if (!class_linker->IsQuickResolutionStub(m->GetEntryPointFromQuickCompiledCode())) {
+        if (!m->NeedsInitializationCheck()) {
           instrum->UpdateMethodsCode(m, method_header->GetEntryPoint());
         }
       }
@@ -770,8 +770,7 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
       if (osr) {
         number_of_osr_compilations_++;
         osr_code_map_.Put(method, code_ptr);
-      } else if (class_linker->IsQuickResolutionStub(
-          method->GetEntryPointFromQuickCompiledCode())) {
+      } else if (method->NeedsInitializationCheck()) {
         // This situation currently only occurs in the jit-zygote mode.
         DCHECK(Runtime::Current()->IsUsingApexBootImageLocation());
         DCHECK(!garbage_collect_code_);
@@ -1572,18 +1571,15 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
     return false;
   }
 
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
-  if (class_linker->IsQuickResolutionStub(method->GetEntryPointFromQuickCompiledCode())) {
-    if (!prejit) {
-      // Unless we're pre-jitting, we currently don't save the JIT compiled code if we cannot
-      // update the entrypoint due to having the resolution stub.
-      VLOG(jit) << "Not compiling "
-                << method->PrettyMethod()
-                << " because it has the resolution stub";
-      // Give it a new chance to be hot.
-      ClearMethodCounter(method, /*was_warm=*/ false);
-      return false;
-    }
+  if (method->NeedsInitializationCheck() && !prejit) {
+    // Unless we're pre-jitting, we currently don't save the JIT compiled code if we cannot
+    // update the entrypoint due to needing an initialization check.
+    VLOG(jit) << "Not compiling "
+              << method->PrettyMethod()
+              << " because it has the resolution stub";
+    // Give it a new chance to be hot.
+    ClearMethodCounter(method, /*was_warm=*/ false);
+    return false;
   }
 
   MutexLock mu(self, *Locks::jit_lock_);
@@ -1614,7 +1610,7 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
       for (ArtMethod* m : data->GetMethods()) {
         // Call the dedicated method instead of the more generic UpdateMethodsCode, because
         // `m` might be in the process of being deleted.
-        if (!class_linker->IsQuickResolutionStub(m->GetEntryPointFromQuickCompiledCode())) {
+        if (!m->NeedsInitializationCheck()) {
           instrumentation->UpdateNativeMethodsCodeToJitCode(m, entrypoint);
         }
       }

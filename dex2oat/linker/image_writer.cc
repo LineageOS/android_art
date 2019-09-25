@@ -3371,12 +3371,9 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method, const ImageInfo& ima
     quick_code = method->IsNative()
         ? GetOatAddress(StubType::kQuickGenericJNITrampoline)
         : GetOatAddress(StubType::kQuickToInterpreterBridge);
-  }
-
-  if (!method->GetDeclaringClass()->IsInitialized() &&
-      method->IsStatic() &&
-      !method->IsConstructor()) {
-    // We need to go through the resolution stub for class initialization.
+  } else if (method->NeedsInitializationCheck()) {
+    // If we do have code and the method needs an initialization check, go through
+    // the resolution stub.
     quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
   }
   return quick_code;
