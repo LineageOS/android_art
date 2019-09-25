@@ -71,9 +71,8 @@ class ProfileCompilationInfoTest : public CommonArtTest {
                 uint32_t checksum,
                 dex::TypeIndex type_index,
                 ProfileCompilationInfo* info) {
-    DexCacheResolvedClasses classes(dex_location, dex_location, checksum, kMaxMethodIds);
-    classes.AddClass(type_index);
-    return info->AddClasses({classes});
+    return info->AddClassIndex(
+        info->GetProfileDexFileKey(dex_location), checksum, type_index, kMaxMethodIds);
   }
 
   uint32_t GetFd(const ScratchFile& file) {

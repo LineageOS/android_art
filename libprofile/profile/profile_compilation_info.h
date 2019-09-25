@@ -271,9 +271,6 @@ class ProfileCompilationInfo {
   // Add the given methods to the current profile object.
   bool AddMethods(const std::vector<ProfileMethodInfo>& methods, MethodHotness::Flag flags);
 
-  // Add the given classes to the current profile object.
-  bool AddClasses(const std::set<DexCacheResolvedClasses>& resolved_classes);
-
   // Add multiple type ids for classes in a single dex file. Iterator is for type_ids not
   // class_defs.
   template <class Iterator>
@@ -285,16 +282,6 @@ class ProfileCompilationInfo {
     data->class_set.insert(index_begin, index_end);
     return true;
   }
-  // Add a single type id for a dex file.
-  bool AddClassForDex(const TypeReference& ref) {
-    DexFileData* data = GetOrAddDexFileData(ref.dex_file);
-    if (data == nullptr) {
-      return false;
-    }
-    data->class_set.insert(ref.TypeIndex());
-    return true;
-  }
-
 
   // Add a method index to the profile (without inline caches). The method flags determine if it is
   // hot, startup, or post startup, or a combination of the previous.
@@ -303,7 +290,6 @@ class ProfileCompilationInfo {
                       uint32_t checksum,
                       uint16_t method_idx,
                       uint32_t num_method_ids);
-  bool AddMethodIndex(MethodHotness::Flag flags, const MethodReference& ref);
 
   // Add a method to the profile using its online representation (containing runtime structures).
   bool AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags);
@@ -327,9 +313,6 @@ class ProfileCompilationInfo {
     }
     return true;
   }
-
-  // Add hotness flags for a simple method.
-  bool AddMethodHotness(const MethodReference& method_ref, const MethodHotness& hotness);
 
   // Load or Merge profile information from the given file descriptor.
   // If the current profile is non-empty the load will fail.
@@ -620,9 +603,6 @@ class ProfileCompilationInfo {
                      uint32_t checksum,
                      dex::TypeIndex type_idx,
                      uint32_t num_method_ids);
-
-  // Add all classes from the given dex cache to the the profile.
-  bool AddResolvedClasses(const DexCacheResolvedClasses& classes);
 
   // Encode the known dex_files into a vector. The index of a dex_reference will
   // be the same as the profile index of the dex file (used to encode the ClassReferences).
