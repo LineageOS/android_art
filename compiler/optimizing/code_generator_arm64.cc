@@ -6227,12 +6227,20 @@ void CodeGeneratorARM64::CompileBakerReadBarrierThunk(Arm64Assembler& assembler,
       CheckValidReg(holder_reg.GetCode());
       UseScratchRegisterScope temps(assembler.GetVIXLAssembler());
       temps.Exclude(ip0, ip1);
-      // If base_reg differs from holder_reg, the offset was too large and we must have emitted
-      // an explicit null check before the load. Otherwise, for implicit null checks, we need to
-      // null-check the holder as we do not necessarily do that check before going to the thunk.
+      // In the case of a field load (with relaxed semantic), if `base_reg` differs from
+      // `holder_reg`, the offset was too large and we must have emitted (during the construction
+      // of the HIR graph, see `art::HInstructionBuilder::BuildInstanceFieldAccess`) and preserved
+      // (see `art::PrepareForRegisterAllocation::VisitNullCheck`) an explicit null check before
+      // the load. Otherwise, for implicit null checks, we need to null-check the holder as we do
+      // not necessarily do that check before going to the thunk.
+      //
+      // In the case of a field load with load-acquire semantics (where `base_reg` always differs
+      // from `holder_reg`), we also need an explicit null check when implicit null checks are
+      // allowed, as we do not emit one before going to the thunk.
       vixl::aarch64::Label throw_npe_label;
       vixl::aarch64::Label* throw_npe = nullptr;
-      if (GetCompilerOptions().GetImplicitNullChecks() && holder_reg.Is(base_reg)) {
+      if (GetCompilerOptions().GetImplicitNullChecks() &&
+          (holder_reg.Is(base_reg) || (kind == BakerReadBarrierKind::kAcquire))) {
         throw_npe = &throw_npe_label;
         __ Cbz(holder_reg.W(), throw_npe);
       }

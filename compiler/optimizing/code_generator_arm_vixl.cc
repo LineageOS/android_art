@@ -9357,9 +9357,12 @@ void CodeGeneratorARMVIXL::CompileBakerReadBarrierThunk(ArmVIXLAssembler& assemb
       BakerReadBarrierWidth width = BakerReadBarrierWidthField::Decode(encoded_data);
       UseScratchRegisterScope temps(assembler.GetVIXLAssembler());
       temps.Exclude(ip);
-      // If base_reg differs from holder_reg, the offset was too large and we must have emitted
-      // an explicit null check before the load. Otherwise, for implicit null checks, we need to
-      // null-check the holder as we do not necessarily do that check before going to the thunk.
+      // In the case of a field load, if `base_reg` differs from
+      // `holder_reg`, the offset was too large and we must have emitted (during the construction
+      // of the HIR graph, see `art::HInstructionBuilder::BuildInstanceFieldAccess`) and preserved
+      // (see `art::PrepareForRegisterAllocation::VisitNullCheck`) an explicit null check before
+      // the load. Otherwise, for implicit null checks, we need to null-check the holder as we do
+      // not necessarily do that check before going to the thunk.
       vixl32::Label throw_npe_label;
       vixl32::Label* throw_npe = nullptr;
       if (GetCompilerOptions().GetImplicitNullChecks() && holder_reg.Is(base_reg)) {

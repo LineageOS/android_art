@@ -1231,5 +1231,17 @@
                   "575-checker-string-init-alias"],
         "variant": "baseline",
         "description": [ "Working as intended tests that don't pass with baseline." ]
+    },
+    {
+        "tests": ["1004-checker-volatile-ref-load"],
+        "env_vars": {"ART_USE_READ_BARRIER": "false"},
+        "bug": "b/140507091",
+        "description": ["Test containing Checker assertions expecting Baker read barriers."]
+    },
+    {
+        "tests": ["1004-checker-volatile-ref-load"],
+        "env_vars": {"ART_READ_BARRIER_TYPE": "TABLELOOKUP"},
+        "bug": "b/140507091",
+        "description": ["Test containing Checker assertions expecting Baker read barriers."]
     }
 ]
