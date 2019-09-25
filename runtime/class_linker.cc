@@ -3725,6 +3725,10 @@ void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
       // Only update static methods.
       continue;
     }
+    if (!IsQuickResolutionStub(method->GetEntryPointFromQuickCompiledCode())) {
+      // Only update methods whose entrypoint is the resolution stub.
+      continue;
+    }
     const void* quick_code = nullptr;
     if (has_oat_class) {
       OatFile::OatMethod oat_method = oat_class.GetOatMethod(method_index);

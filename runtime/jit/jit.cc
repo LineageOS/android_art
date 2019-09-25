@@ -1023,12 +1023,15 @@ bool Jit::MaybeCompileMethod(Thread* self,
     return false;
   }
   if (UNLIKELY(method->IsPreCompiled()) && !with_backedges /* don't check for OSR */) {
-    const void* entry_point = code_cache_->GetSavedEntryPointOfPreCompiledMethod(method);
-    if (entry_point != nullptr) {
-      Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, entry_point);
-      return true;
+    if (!method->NeedsInitializationCheck()) {
+      const void* entry_point = code_cache_->GetSavedEntryPointOfPreCompiledMethod(method);
+      if (entry_point != nullptr) {
+        Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, entry_point);
+        return true;
+      }
     }
   }
+
   if (IgnoreSamplesForMethod(method)) {
     return false;
   }
