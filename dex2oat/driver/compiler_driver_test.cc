@@ -203,10 +203,10 @@ class CompilerDriverProfileTest : public CompilerDriverTest {
 
     ProfileCompilationInfo info;
     for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
-      profile_info_.AddMethodIndex(ProfileCompilationInfo::MethodHotness::kFlagHot,
-                                   MethodReference(dex_file.get(), 1));
-      profile_info_.AddMethodIndex(ProfileCompilationInfo::MethodHotness::kFlagHot,
-                                   MethodReference(dex_file.get(), 2));
+      profile_info_.AddMethod(ProfileMethodInfo(MethodReference(dex_file.get(), 1)),
+                              ProfileCompilationInfo::MethodHotness::kFlagHot);
+      profile_info_.AddMethod(ProfileMethodInfo(MethodReference(dex_file.get(), 2)),
+                              ProfileCompilationInfo::MethodHotness::kFlagHot);
     }
     return &profile_info_;
   }

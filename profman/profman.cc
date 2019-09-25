@@ -988,14 +988,7 @@ class ProfMan final {
 
     if (method_str.empty() || method_str == kClassAllMethods) {
       // Start by adding the class.
-      std::set<DexCacheResolvedClasses> resolved_class_set;
       const DexFile* dex_file = class_ref.dex_file;
-      const auto& dex_resolved_classes = resolved_class_set.emplace(
-            dex_file->GetLocation(),
-            DexFileLoader::GetBaseLocation(dex_file->GetLocation()),
-            dex_file->GetLocationChecksum(),
-            dex_file->NumMethodIds());
-      dex_resolved_classes.first->AddClass(class_ref.TypeIndex());
       std::vector<ProfileMethodInfo> methods;
       if (method_str == kClassAllMethods) {
         ClassAccessor accessor(
@@ -1010,7 +1003,9 @@ class ProfMan final {
       }
       // TODO: Check return values?
       profile->AddMethods(methods, static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags));
-      profile->AddClasses(resolved_class_set);
+      std::set<dex::TypeIndex> classes;
+      classes.insert(class_ref.TypeIndex());
+      profile->AddClassesForDex(dex_file, classes.begin(), classes.end());
       return true;
     }
 
@@ -1065,8 +1060,8 @@ class ProfMan final {
           static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags));
     }
     if (flags != 0) {
-      if (!profile->AddMethodIndex(
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags), ref)) {
+      if (!profile->AddMethod(ProfileMethodInfo(ref),
+                              static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags))) {
         return false;
       }
       DCHECK(profile->GetMethodHotness(ref).IsInProfile());
