@@ -88,7 +88,8 @@ class ProfileAssistantTest : public CommonRuntimeTest {
           GetOfflineProfileMethodInfo(dex_location1, dex_location_checksum1,
                                       dex_location2, dex_location_checksum2,
                                       number_of_methods1, number_of_methods2);
-      Hotness::Flag flags = Hotness::kFlagPostStartup;
+      Hotness::Flag flags = static_cast<Hotness::Flag>(
+          Hotness::kFlagHot | Hotness::kFlagPostStartup);
       if (reverse_dex_write_order) {
         ASSERT_TRUE(info->AddMethod(
             dex_location2, dex_location_checksum2, i, number_of_methods2, pmi, flags));
@@ -712,7 +713,7 @@ TEST_F(ProfileAssistantTest, TestArrayClass) {
 TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
   // Class names put here need to be in sorted order.
   std::vector<std::string> class_names = {
-    "Ljava/lang/Math;->*",
+    "HLjava/lang/Math;->*",
   };
   std::string input_file_contents;
   std::string expected_contents;
@@ -896,11 +897,11 @@ TEST_F(ProfileAssistantTest, TestProfileCreationNoneMatched) {
 TEST_F(ProfileAssistantTest, TestProfileCreateInlineCache) {
   // Create the profile content.
   std::vector<std::string> methods = {
-    "LTestInline;->inlineMonomorphic(LSuper;)I+LSubA;",
-    "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;",
-    "LTestInline;->inlineMegamorphic(LSuper;)I+LSubA;,LSubB;,LSubC;,LSubD;,LSubE;",
-    "LTestInline;->inlineMissingTypes(LSuper;)I+missing_types",
-    "LTestInline;->noInlineCache(LSuper;)I"
+    "HLTestInline;->inlineMonomorphic(LSuper;)I+LSubA;",
+    "HLTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;",
+    "HLTestInline;->inlineMegamorphic(LSuper;)I+LSubA;,LSubB;,LSubC;,LSubD;,LSubE;",
+    "HLTestInline;->inlineMissingTypes(LSuper;)I+missing_types",
+    "HLTestInline;->noInlineCache(LSuper;)I"
   };
   std::string input_file_contents;
   for (std::string& m : methods) {
@@ -1048,8 +1049,8 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithDifferentDexOrder) {
 TEST_F(ProfileAssistantTest, TestProfileCreateWithInvalidData) {
   // Create the profile content.
   std::vector<std::string> profile_methods = {
-    "LTestInline;->inlineMonomorphic(LSuper;)I+invalid_class",
-    "LTestInline;->invalid_method",
+    "HLTestInline;->inlineMonomorphic(LSuper;)I+invalid_class",
+    "HLTestInline;->invalid_method",
     "invalid_class"
   };
   std::string input_file_contents;
