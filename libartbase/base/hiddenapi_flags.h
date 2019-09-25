@@ -241,6 +241,7 @@ class ApiList {
 
   bool operator==(const ApiList& other) const { return dex_flags_ == other.dex_flags_; }
   bool operator!=(const ApiList& other) const { return !(*this == other); }
+  bool operator<(const ApiList& other) const { return dex_flags_ < other.dex_flags_; }
 
   // Returns true if combining this ApiList with `other` will succeed.
   bool CanCombineWith(const ApiList& other) const {
