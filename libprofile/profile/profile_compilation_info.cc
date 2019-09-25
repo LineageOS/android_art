@@ -1967,7 +1967,9 @@ bool ProfileCompilationInfo::DexFileData::AddMethod(MethodHotness::Flag flags, s
 void ProfileCompilationInfo::DexFileData::SetMethodHotness(size_t index,
                                                            MethodHotness::Flag flags) {
   DCHECK_LT(index, num_method_ids);
-  uint32_t lastFlag = is_for_boot_image ? MethodHotness::kFlagLastBoot : MethodHotness::kFlagLastRegular;
+  uint32_t lastFlag = is_for_boot_image
+      ? MethodHotness::kFlagLastBoot
+      : MethodHotness::kFlagLastRegular;
   for (uint32_t flag = MethodHotness::kFlagFirst; flag <= lastFlag; flag = flag << 1) {
     if (flag == MethodHotness::kFlagHot) {
       // There's no bit for hotness in the bitmap.
@@ -1975,7 +1977,8 @@ void ProfileCompilationInfo::DexFileData::SetMethodHotness(size_t index,
       continue;
     }
     if ((flags & flag) != 0) {
-      method_bitmap.StoreBit(MethodFlagBitmapIndex(static_cast<MethodHotness::Flag>(flag), index), /*value=*/ true);
+      method_bitmap.StoreBit(MethodFlagBitmapIndex(
+          static_cast<MethodHotness::Flag>(flag), index), /*value=*/ true);
     }
   }
 }
@@ -1983,12 +1986,15 @@ void ProfileCompilationInfo::DexFileData::SetMethodHotness(size_t index,
 ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::DexFileData::GetHotnessInfo(
     uint32_t dex_method_index) const {
   MethodHotness ret;
-  uint32_t lastFlag = is_for_boot_image ? MethodHotness::kFlagLastBoot : MethodHotness::kFlagLastRegular;
+  uint32_t lastFlag = is_for_boot_image
+      ? MethodHotness::kFlagLastBoot
+      : MethodHotness::kFlagLastRegular;
   for (uint32_t flag = MethodHotness::kFlagFirst; flag <= lastFlag; flag = flag << 1) {
     if (flag == MethodHotness::kFlagHot) {
       continue;
     }
-    if (method_bitmap.LoadBit(MethodFlagBitmapIndex(static_cast<MethodHotness::Flag>(flag), dex_method_index))) {
+    if (method_bitmap.LoadBit(MethodFlagBitmapIndex(
+          static_cast<MethodHotness::Flag>(flag), dex_method_index))) {
       ret.AddFlag(static_cast<MethodHotness::Flag>(flag));
     }
   }
@@ -2018,7 +2024,8 @@ static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupBin == 1 << 9);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupMaxBin == 1 << 16);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastBoot == 1 << 16);
 
-size_t ProfileCompilationInfo::DexFileData::MethodFlagBitmapIndex(MethodHotness::Flag flag, size_t method_index) const {
+size_t ProfileCompilationInfo::DexFileData::MethodFlagBitmapIndex(
+      MethodHotness::Flag flag, size_t method_index) const {
   DCHECK_LT(method_index, num_method_ids);
   // The format is [startup bitmap][post startup bitmap][AmStartup][...]
   // This compresses better than ([startup bit][post startup bit])*
