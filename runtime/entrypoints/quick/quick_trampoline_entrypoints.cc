@@ -2381,6 +2381,21 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
     jit->MethodEntered(self, called);
   }
 
+  // We can set the entrypoint of a native method to generic JNI even when the
+  // class hasn't been initialized, so we need to do the initialization check
+  // before invoking the native code.
+  if (called->NeedsInitializationCheck()) {
+    // Ensure static method's class is initialized.
+    StackHandleScope<1> hs(self);
+    Handle<mirror::Class> h_class(hs.NewHandle(called->GetDeclaringClass()));
+    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
+      DCHECK(Thread::Current()->IsExceptionPending()) << called->PrettyMethod();
+      self->PopHandleScope();
+      // A negative value denotes an error.
+      return GetTwoWordFailureValue();
+    }
+  }
+
   uint32_t cookie;
   uint32_t* sp32;
   // Skip calling JniMethodStart for @CriticalNative.
