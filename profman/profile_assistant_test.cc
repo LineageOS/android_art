@@ -328,9 +328,8 @@ class ProfileAssistantTest : public CommonRuntimeTest {
                           bool is_missing_types)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi =
-        info.GetMethod(method->GetDexFile()->GetLocation(),
-                       method->GetDexFile()->GetLocationChecksum(),
-                       method->GetDexMethodIndex());
+        info.GetHotMethodInfo(MethodReference(
+            method->GetDexFile(), method->GetDexMethodIndex()));
     ASSERT_TRUE(pmi != nullptr);
     ASSERT_EQ(pmi->inline_caches->size(), 1u);
     const ProfileCompilationInfo::DexPcData& dex_pc_data = pmi->inline_caches->begin()->second;
@@ -721,9 +720,7 @@ TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
     if (!method.IsCopied() && method.GetCodeItem() != nullptr) {
       ++method_count;
       std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi =
-          info.GetMethod(method.GetDexFile()->GetLocation(),
-                         method.GetDexFile()->GetLocationChecksum(),
-                         method.GetDexMethodIndex());
+          info.GetHotMethodInfo(MethodReference(method.GetDexFile(), method.GetDexMethodIndex()));
       ASSERT_TRUE(pmi != nullptr) << method.PrettyMethod();
     }
   }
@@ -980,9 +977,8 @@ TEST_F(ProfileAssistantTest, TestProfileCreateInlineCache) {
     ArtMethod* no_inline_cache = GetVirtualMethod(class_loader, "LTestInline;", "noInlineCache");
     ASSERT_TRUE(no_inline_cache != nullptr);
     std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi_no_inline_cache =
-        info.GetMethod(no_inline_cache->GetDexFile()->GetLocation(),
-                       no_inline_cache->GetDexFile()->GetLocationChecksum(),
-                       no_inline_cache->GetDexMethodIndex());
+        info.GetHotMethodInfo(MethodReference(
+            no_inline_cache->GetDexFile(), no_inline_cache->GetDexMethodIndex()));
     ASSERT_TRUE(pmi_no_inline_cache != nullptr);
     ASSERT_TRUE(pmi_no_inline_cache->inline_caches->empty());
   }
@@ -1064,9 +1060,7 @@ TEST_F(ProfileAssistantTest, TestProfileCreateWithInvalidData) {
 
   // Verify that the inline cache contains the invalid type.
   std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi =
-      info.GetMethod(dex_file->GetLocation(),
-                     dex_file->GetLocationChecksum(),
-                     inline_monomorphic->GetDexMethodIndex());
+      info.GetHotMethodInfo(MethodReference(dex_file, inline_monomorphic->GetDexMethodIndex()));
   ASSERT_TRUE(pmi != nullptr);
   ASSERT_EQ(pmi->inline_caches->size(), 1u);
   const ProfileCompilationInfo::DexPcData& dex_pc_data = pmi->inline_caches->begin()->second;
@@ -1281,12 +1275,12 @@ TEST_F(ProfileAssistantTest, CopyAndUpdateProfileKey) {
 
   // Verify that the renaming was done.
   for (uint16_t i = 0; i < num_methods_to_add; i ++) {
-      std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi;
-      ASSERT_TRUE(result.GetMethod(d1.GetLocation(), d1.GetLocationChecksum(), i) != nullptr) << i;
-      ASSERT_TRUE(result.GetMethod(d2.GetLocation(), d2.GetLocationChecksum(), i) != nullptr) << i;
+    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> pmi;
+    ASSERT_TRUE(result.GetHotMethodInfo(MethodReference(&d1, i)) != nullptr) << i;
+    ASSERT_TRUE(result.GetHotMethodInfo(MethodReference(&d2, i)) != nullptr) << i;
 
-      ASSERT_TRUE(result.GetMethod("fake-location1", d1.GetLocationChecksum(), i) == nullptr);
-      ASSERT_TRUE(result.GetMethod("fake-location2", d2.GetLocationChecksum(), i) == nullptr);
+    ASSERT_TRUE(result.GetHotMethodInfo(MethodReference(dex_to_be_updated1, i)) == nullptr);
+    ASSERT_TRUE(result.GetHotMethodInfo(MethodReference(dex_to_be_updated2, i)) == nullptr);
   }
 }
 

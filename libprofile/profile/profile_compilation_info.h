@@ -369,13 +369,12 @@ class ProfileCompilationInfo {
   // Return true if the class's type is present in the profiling info.
   bool ContainsClass(const DexFile& dex_file, dex::TypeIndex type_idx) const;
 
-  // Return the method data for the given location and index from the profiling info.
+  // Return the hot method info for the given location and index from the profiling info.
   // If the method index is not found or the checksum doesn't match, null is returned.
   // Note: the inline cache map is a pointer to the map stored in the profile and
   // its allocation will go away if the profile goes out of scope.
-  std::unique_ptr<OfflineProfileMethodInfo> GetMethod(const std::string& dex_location,
-                                                      uint32_t dex_checksum,
-                                                      uint16_t dex_method_index) const;
+  std::unique_ptr<OfflineProfileMethodInfo> GetHotMethodInfo(
+      const MethodReference& method_ref) const;
 
   // Dump all the loaded profile info into a string and returns it.
   // If dex_files is not empty then the method indices will be resolved to their
@@ -559,7 +558,7 @@ class ProfileCompilationInfo {
     ArenaSet<dex::TypeIndex> class_set;
     // Find the inline caches of the the given method index. Add an empty entry if
     // no previous data is found.
-    InlineCacheMap* FindOrAddMethod(uint16_t method_index);
+    InlineCacheMap* FindOrAddHotMethod(uint16_t method_index);
     // Num method ids.
     uint32_t num_method_ids;
     ArenaVector<uint8_t> bitmap_storage;
