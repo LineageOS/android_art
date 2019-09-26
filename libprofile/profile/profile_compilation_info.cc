@@ -1520,15 +1520,6 @@ ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
       : MethodHotness();
 }
 
-ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
-    const std::string& dex_location,
-    uint32_t dex_checksum,
-    uint16_t dex_method_index) const {
-  const DexFileData* dex_data = FindDexData(GetProfileDexFileKey(dex_location), dex_checksum);
-  return dex_data != nullptr ? dex_data->GetHotnessInfo(dex_method_index) : MethodHotness();
-}
-
-
 std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo>
 ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref) const {
   MethodHotness hotness(GetMethodHotness(method_ref));
