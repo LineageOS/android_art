@@ -429,8 +429,6 @@ libart_static_cc_defaults {
         "libartpalette",
         "libbacktrace",
         "libbase",
-        "libdexfile_external", // libunwindstack dependency
-        "libdexfile_support", // libunwindstack dependency
         "liblog",
         "libnativebridge",
         "libnativeloader",
@@ -450,6 +448,7 @@ cc_defaults {
     ],
     static_libs: [
         "libart",
+        "libdexfile_support_static",
         "libelffile",
     ],
 }
@@ -464,6 +463,7 @@ cc_defaults {
     ],
     static_libs: [
         "libartd",
+        "libdexfiled_support_static",
         "libelffiled",
     ],
 }
