@@ -65,6 +65,7 @@
 #include "nativehelper/scoped_local_ref.h"
 #include "oat_file.h"
 #include "obj_ptr.h"
+#include "runtime.h"
 #include "runtime_callbacks.h"
 #include "scoped_thread_state_change-inl.h"
 #include "scoped_thread_state_change.h"
@@ -890,11 +891,8 @@ class GetLocalVariableClosure : public CommonLocalVariableClosure {
                              &ptr_val)) {
           return ERR(OPAQUE_FRAME);
         }
-        art::JNIEnvExt* jni = art::Thread::Current()->GetJniEnv();
         art::ObjPtr<art::mirror::Object> obj(reinterpret_cast<art::mirror::Object*>(ptr_val));
-        ScopedLocalRef<jobject> local(
-            jni, obj.IsNull() ? nullptr : jni->AddLocalReference<jobject>(obj));
-        obj_val_ = jni->NewGlobalRef(local.get());
+        obj_val_ = art::Runtime::Current()->GetJavaVM()->AddGlobalRef(art::Thread::Current(), obj);
         break;
       }
       case art::Primitive::kPrimInt:
