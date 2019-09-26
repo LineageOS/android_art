@@ -833,6 +833,8 @@ class ProfileCompilationInfo {
   uint8_t version_[kProfileVersionSize];
 };
 
+std::ostream& operator<<(std::ostream& stream,
+                         const ProfileCompilationInfo::DexReference& dex_ref);
 }  // namespace art
 
 #endif  // ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
