@@ -15,6 +15,7 @@
  */
 
 #include "stack.h"
+#include <limits>
 
 #include "android-base/stringprintf.h"
 
@@ -224,7 +225,15 @@ bool StackVisitor::GetVReg(ArtMethod* m,
       DCHECK_EQ(*val, val2);
       return ok;
     }
-    return GetVRegFromOptimizedCode(m, vreg, kind, val);
+    bool res = GetVRegFromOptimizedCode(m, vreg, kind, val);
+    if (kind == kReferenceVReg) {
+      // Perform a read barrier in case we are in a different thread and GC is ongoing.
+      mirror::Object* out = reinterpret_cast<mirror::Object*>(static_cast<uintptr_t>(*val));
+      uintptr_t ptr_out = reinterpret_cast<uintptr_t>(GcRoot<mirror::Object>(out).Read());
+      DCHECK_LT(ptr_out, std::numeric_limits<uint32_t>::max());
+      *val = static_cast<uint32_t>(ptr_out);
+    }
+    return res;
   } else {
     DCHECK(cur_shadow_frame_ != nullptr);
     if (kind == kReferenceVReg) {
