@@ -679,18 +679,6 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotne
   return true;
 }
 
-bool ProfileCompilationInfo::AddClassIndex(const std::string& profile_key,
-                                           uint32_t checksum,
-                                           dex::TypeIndex type_idx,
-                                           uint32_t num_method_ids) {
-  DexFileData* const data = GetOrAddDexFileData(profile_key, checksum, num_method_ids);
-  if (data == nullptr) {
-    return false;
-  }
-  data->class_set.insert(type_idx);
-  return true;
-}
-
 #define READ_UINT(type, buffer, dest, error)            \
   do {                                                  \
     if (!(buffer).ReadUintAndAdvance<type>(&(dest))) {  \
@@ -805,12 +793,14 @@ bool ProfileCompilationInfo::ReadClasses(SafeBuffer& buffer,
     READ_UINT(uint16_t, buffer, diff_with_last_class_index, error);
     uint16_t type_index = last_class_index + diff_with_last_class_index;
     last_class_index = type_index;
-    if (!AddClassIndex(line_header.profile_key,
-                       line_header.checksum,
-                       dex::TypeIndex(type_index),
-                       line_header.num_method_ids)) {
-      return false;
+
+    DexFileData* const data = GetOrAddDexFileData(line_header.profile_key,
+                                                  line_header.checksum,
+                                                  line_header.num_method_ids);
+    if (data == nullptr) {
+       return false;
     }
+    data->class_set.insert(dex::TypeIndex(type_index));
   }
   size_t total_bytes_read = unread_bytes_before_op - buffer.CountUnreadBytes();
   uint32_t expected_bytes_read = line_header.class_set_size * sizeof(uint16_t);

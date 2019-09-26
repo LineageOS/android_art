@@ -88,12 +88,11 @@ class ProfileCompilationInfoTest : public CommonArtTest {
         Hotness::kFlagHot);
   }
 
-  bool AddClass(const std::string& dex_location,
-                uint32_t checksum,
-                dex::TypeIndex type_index,
-                ProfileCompilationInfo* info) {
-    return info->AddClassIndex(
-        info->GetProfileDexFileKey(dex_location), checksum, type_index, kMaxMethodIds);
+  bool AddClass(ProfileCompilationInfo* info,
+                const DexFile* dex,
+                dex::TypeIndex type_index) {
+    std::vector<dex::TypeIndex> classes = {type_index};
+    return info->AddClassesForDex(dex, classes.begin(), classes.end());
   }
 
   uint32_t GetFd(const ScratchFile& file) {
@@ -377,8 +376,8 @@ TEST_F(ProfileCompilationInfoTest, SaveMaxMethods) {
   }
   // Save the maximum number of classes
   for (uint16_t i = 0; i < std::numeric_limits<uint16_t>::max(); i++) {
-    ASSERT_TRUE(AddClass("dex_location1", /* checksum= */ 1, dex::TypeIndex(i), &saved_info));
-    ASSERT_TRUE(AddClass("dex_location2", /* checksum= */ 2, dex::TypeIndex(i), &saved_info));
+    ASSERT_TRUE(AddClass(&saved_info, dex1, dex::TypeIndex(i)));
+    ASSERT_TRUE(AddClass(&saved_info, dex2, dex::TypeIndex(i)));
   }
 
   ASSERT_TRUE(saved_info.Save(GetFd(profile)));
@@ -1136,8 +1135,8 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingWithClasses) {
   ProfileCompilationInfo saved_info;
   uint16_t item_count = 1000;
   for (uint16_t i = 0; i < item_count; i++) {
-    ASSERT_TRUE(AddClass("dex_location1", /* checksum= */ 1, dex::TypeIndex(i), &saved_info));
-    ASSERT_TRUE(AddClass("dex_location2", /* checksum= */ 2, dex::TypeIndex(i), &saved_info));
+    ASSERT_TRUE(AddClass(&saved_info, dex1, dex::TypeIndex(i)));
+    ASSERT_TRUE(AddClass(&saved_info, dex2, dex::TypeIndex(i)));
   }
 
   ASSERT_TRUE(saved_info.Save(GetFd(profile)));
@@ -1148,15 +1147,15 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingWithClasses) {
   ProfileCompilationInfo loaded_info;
   ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
-      [](const std::string& dex_location, uint32_t checksum) -> bool {
-          return (dex_location == "dex_location2" && checksum == 2);
+      [&dex2 = dex2](const std::string& dex_location, uint32_t checksum) -> bool {
+          return (dex_location == dex2->GetLocation() && checksum == dex2->GetLocationChecksum());
         };
   ASSERT_TRUE(loaded_info.Load(GetFd(profile), true, filter_fn));
 
   // Compute the expectation.
   ProfileCompilationInfo expected_info;
   for (uint16_t i = 0; i < item_count; i++) {
-    ASSERT_TRUE(AddClass("dex_location2", /* checksum= */ 2, dex::TypeIndex(i), &expected_info));
+    ASSERT_TRUE(AddClass(&expected_info, dex2, dex::TypeIndex(i)));
   }
 
   // Validate the expectation.
