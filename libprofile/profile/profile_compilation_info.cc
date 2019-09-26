@@ -655,7 +655,7 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotne
   }
 
   // Add inline caches.
-  InlineCacheMap* inline_cache = data->FindOrAddMethod(pmi.ref.index);
+  InlineCacheMap* inline_cache = data->FindOrAddHotMethod(pmi.ref.index);
   DCHECK(inline_cache != nullptr);
 
   for (const ProfileMethodInfo::ProfileInlineCache& cache : pmi.inline_caches) {
@@ -758,7 +758,7 @@ bool ProfileCompilationInfo::ReadMethods(SafeBuffer& buffer,
     READ_UINT(uint16_t, buffer, diff_with_last_method_index, error);
     uint16_t method_index = last_method_index + diff_with_last_method_index;
     last_method_index = method_index;
-    InlineCacheMap* inline_cache = data->FindOrAddMethod(method_index);
+    InlineCacheMap* inline_cache = data->FindOrAddHotMethod(method_index);
     if (inline_cache == nullptr) {
       return false;
     }
@@ -1477,7 +1477,7 @@ bool ProfileCompilationInfo::MergeWith(const ProfileCompilationInfo& other,
     // Merge the methods and the inline caches.
     for (const auto& other_method_it : other_dex_data->method_map) {
       uint16_t other_method_index = other_method_it.first;
-      InlineCacheMap* inline_cache = dex_data->FindOrAddMethod(other_method_index);
+      InlineCacheMap* inline_cache = dex_data->FindOrAddHotMethod(other_method_index);
       if (inline_cache == nullptr) {
         return false;
       }
@@ -1529,11 +1529,9 @@ ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
 }
 
 
-std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> ProfileCompilationInfo::GetMethod(
-    const std::string& dex_location,
-    uint32_t dex_checksum,
-    uint16_t dex_method_index) const {
-  MethodHotness hotness(GetMethodHotness(dex_location, dex_checksum, dex_method_index));
+std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo>
+ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref) const {
+  MethodHotness hotness(GetMethodHotness(method_ref));
   if (!hotness.IsHot()) {
     return nullptr;
   }
@@ -1949,7 +1947,7 @@ bool ProfileCompilationInfo::IsEmpty() const {
 }
 
 ProfileCompilationInfo::InlineCacheMap*
-ProfileCompilationInfo::DexFileData::FindOrAddMethod(uint16_t method_index) {
+ProfileCompilationInfo::DexFileData::FindOrAddHotMethod(uint16_t method_index) {
   if (method_index >= num_method_ids) {
     LOG(ERROR) << "Invalid method index " << method_index << ". num_method_ids=" << num_method_ids;
     return nullptr;
@@ -1969,7 +1967,7 @@ bool ProfileCompilationInfo::DexFileData::AddMethod(MethodHotness::Flag flags, s
   SetMethodHotness(index, flags);
 
   if ((flags & MethodHotness::kFlagHot) != 0) {
-    ProfileCompilationInfo::InlineCacheMap* result = FindOrAddMethod(index);
+    ProfileCompilationInfo::InlineCacheMap* result = FindOrAddHotMethod(index);
     DCHECK(result != nullptr);
   }
   return true;
