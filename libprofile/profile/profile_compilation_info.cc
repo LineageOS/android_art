@@ -2020,9 +2020,11 @@ static_assert(ProfileCompilationInfo::MethodHotness::kFlagBoot == 1 << 5);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagPostBoot == 1 << 6);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagForeground == 1 << 7);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagBackground == 1 << 8);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupBin == 1 << 9);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupMaxBin == 1 << 16);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastBoot == 1 << 16);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlag32bit == 1 << 9);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlag64bit == 1 << 10);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupBin == 1 << 11);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupMaxBin == 1 << 18);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastBoot == 1 << 18);
 
 size_t ProfileCompilationInfo::DexFileData::MethodFlagBitmapIndex(
       MethodHotness::Flag flag, size_t method_index) const {
