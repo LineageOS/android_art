@@ -172,20 +172,6 @@ std::string ProfileCompilationInfo::GetProfileDexFileBaseKey(const std::string& 
   }
 }
 
-bool ProfileCompilationInfo::AddMethodIndex(MethodHotness::Flag flags,
-                                            const std::string& dex_location,
-                                            uint32_t checksum,
-                                            uint16_t method_idx,
-                                            uint32_t num_method_ids) {
-  DexFileData* data = GetOrAddDexFileData(GetProfileDexFileKey(dex_location),
-                                          checksum,
-                                          num_method_ids);
-  if (data == nullptr) {
-    return false;
-  }
-  return data->AddMethod(flags, method_idx);
-}
-
 bool ProfileCompilationInfo::AddMethods(const std::vector<ProfileMethodInfo>& methods,
                                         MethodHotness::Flag flags) {
   for (const ProfileMethodInfo& method : methods) {
@@ -653,73 +639,6 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
   DCHECK_EQ(profile_key, result->profile_key);
   DCHECK_EQ(profile_index, result->profile_index);
   return result;
-}
-
-bool ProfileCompilationInfo::AddMethod(const std::string& dex_location,
-                                       uint32_t dex_checksum,
-                                       uint16_t method_index,
-                                       uint32_t num_method_ids,
-                                       const OfflineProfileMethodInfo& pmi,
-                                       MethodHotness::Flag flags) {
-  DexFileData* const data = GetOrAddDexFileData(GetProfileDexFileKey(dex_location),
-                                                dex_checksum,
-                                                num_method_ids);
-  if (data == nullptr) {
-    // The data is null if there is a mismatch in the checksum or number of method ids.
-    return false;
-  }
-  if (!data->AddMethod(flags, method_index)) {
-    // Happens if the method index is outside the range (i.e. is greater then the number
-    // of methods in the dex file). This should not happen during normal execution,
-    // But tools (e.g. boot image aggregation tools) and tests stress this behaviour.
-    return false;
-  }
-  if ((flags & MethodHotness::kFlagHot) == 0) {
-    // The method is not hot, do not add inline caches.
-    return true;
-  }
-
-  // Add inline caches.
-  InlineCacheMap* inline_cache = data->FindOrAddMethod(method_index);
-  DCHECK(inline_cache != nullptr);
-
-  data->SetMethodHotness(method_index, flags);
-
-  if (pmi.inline_caches == nullptr) {
-    // If we don't have inline caches return success right away.
-    return true;
-  }
-  for (const auto& pmi_inline_cache_it : *pmi.inline_caches) {
-    uint16_t pmi_ic_dex_pc = pmi_inline_cache_it.first;
-    const DexPcData& pmi_ic_dex_pc_data = pmi_inline_cache_it.second;
-    DexPcData* dex_pc_data = FindOrAddDexPc(inline_cache, pmi_ic_dex_pc);
-    if (dex_pc_data->is_missing_types || dex_pc_data->is_megamorphic) {
-      // We are already megamorphic or we are missing types; no point in going forward.
-      continue;
-    }
-
-    if (pmi_ic_dex_pc_data.is_missing_types) {
-      dex_pc_data->SetIsMissingTypes();
-      continue;
-    }
-    if (pmi_ic_dex_pc_data.is_megamorphic) {
-      dex_pc_data->SetIsMegamorphic();
-      continue;
-    }
-
-    for (const ClassReference& class_ref : pmi_ic_dex_pc_data.classes) {
-      const DexReference& dex_ref = pmi.dex_references[class_ref.dex_profile_index];
-      DexFileData* class_dex_data = GetOrAddDexFileData(
-          dex_ref.profile_key,
-          dex_ref.dex_checksum,
-          dex_ref.num_method_ids);
-      if (class_dex_data == nullptr) {  // checksum mismatch
-        return false;
-      }
-      dex_pc_data->AddClass(class_dex_data->profile_index, class_ref.type_index);
-    }
-  }
-  return true;
 }
 
 bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags) {
@@ -1855,6 +1774,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(int fd,
     std::string dex_location = DexFileLoader::GetMultiDexLocation(i, base_dex_location.c_str());
     std::string profile_key = info.GetProfileDexFileKey(dex_location);
 
+    DexFileData* const data = info.GetOrAddDexFileData(profile_key, /*checksum=*/ 0, max_method);
     for (uint16_t m = 0; m < number_of_methods; m++) {
       uint16_t method_idx = rand() % max_method;
       if (m < (number_of_methods / kFavorSplit)) {
@@ -1863,11 +1783,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(int fd,
       // Alternate between startup and post startup.
       uint32_t flags = MethodHotness::kFlagHot;
       flags |= ((m & 1) != 0) ? MethodHotness::kFlagPostStartup : MethodHotness::kFlagStartup;
-      info.AddMethodIndex(static_cast<MethodHotness::Flag>(flags),
-                          profile_key,
-                          /*checksum=*/ 0,
-                          method_idx,
-                          max_method);
+      data->AddMethod(static_cast<MethodHotness::Flag>(flags), method_idx);
     }
 
     for (uint16_t c = 0; c < number_of_classes; c++) {
@@ -1875,7 +1791,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(int fd,
       if (c < (number_of_classes / kFavorSplit)) {
         type_idx %= kFavorFirstN;
       }
-      info.AddClassIndex(profile_key, 0, dex::TypeIndex(type_idx), max_method);
+      data->class_set.insert(dex::TypeIndex(type_idx));
     }
   }
   return info.Save(fd);
@@ -1909,12 +1825,12 @@ bool ProfileCompilationInfo::GenerateTestProfile(
 
     uint32_t number_of_classes = dex_file->NumClassDefs();
     uint32_t classes_required_in_profile = (number_of_classes * class_percentage) / 100;
+
+    DexFileData* const data = info.GetOrAddDexFileData(
+          profile_key, checksum, dex_file->NumMethodIds());
     for (uint32_t class_index : create_shuffled_range(classes_required_in_profile,
                                                       number_of_classes)) {
-      info.AddClassIndex(profile_key,
-                         checksum,
-                         dex_file->GetClassDef(class_index).class_idx_,
-                         dex_file->NumMethodIds());
+      data->class_set.insert(dex_file->GetClassDef(class_index).class_idx_);
     }
 
     uint32_t number_of_methods = dex_file->NumMethodIds();
@@ -1926,8 +1842,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(
       flags |= ((method_index & 1) != 0)
                    ? MethodHotness::kFlagPostStartup
                    : MethodHotness::kFlagStartup;
-      info.AddMethod(ProfileMethodInfo(MethodReference(dex_file.get(), method_index)),
-                     static_cast<MethodHotness::Flag>(flags));
+      data->AddMethod(static_cast<MethodHotness::Flag>(flags), method_index);
     }
   }
   return info.Save(fd);
