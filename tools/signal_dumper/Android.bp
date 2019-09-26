@@ -24,7 +24,7 @@ cc_defaults {
     defaults: ["signal_dumper_libbase_static_deps"],
     static_libs: [
         "libbase",
-        "libdexfile_support",
+        "libdexfile_support_static",
         "liblog",
         "liblzma",
     ],

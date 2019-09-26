@@ -388,15 +388,8 @@ art_cc_test {
     ],
 }
 
-cc_library_static {
-    name: "libdexfile_support_static",
-    defaults: ["libdexfile_static_defaults"],
-    visibility: [
-        "//art:__subpackages__",
-        // TODO(b/133140750): Clean this up.
-        "//system/core/debuggerd",
-        "//system/extras/simpleperf",
-    ],
+cc_defaults {
+    name: "libdexfile_support_static_defaults",
     host_supported: true,
     srcs: [
         "external/dex_file_supp.cc",
@@ -405,14 +398,43 @@ cc_library_static {
     // Using whole_static_libs here only as a "poor man's transitivity" kludge.
     whole_static_libs: [
         "libbase",
-        "libdexfile",
-        "libdexfile_external",
         "liblog",
         "libz",
         "libziparchive",
     ],
     header_libs: ["libdexfile_external_headers"],
     export_header_lib_headers: ["libdexfile_external_headers"],
+}
+
+cc_library_static {
+    name: "libdexfile_support_static",
+    visibility: [
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
+        "//system/core/debuggerd",
+        "//system/core/init", // Dependency from Android.mk file, so not enforced.
+        "//system/extras/simpleperf",
+    ],
+    defaults: [
+        "libdexfile_static_defaults",
+        "libdexfile_support_static_defaults",
+    ],
+    whole_static_libs: [
+        "libdexfile",
+        "libdexfile_external",
+    ],
+}
+
+cc_library_static {
+    name: "libdexfiled_support_static",
+    defaults: [
+        "libdexfile_support_static_defaults",
+        "libdexfiled_static_defaults",
+    ],
+    whole_static_libs: [
+        "libdexfiled",
+        "libdexfiled_external",
+    ],
 }
 
 // The same source file is used in two tests here, so unlike other ART gtests it
