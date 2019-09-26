@@ -285,14 +285,6 @@ class ProfileCompilationInfo {
     return true;
   }
 
-  // Add a method index to the profile (without inline caches). The method flags determine if it is
-  // hot, startup, or post startup, or a combination of the previous.
-  bool AddMethodIndex(MethodHotness::Flag flags,
-                      const std::string& dex_location,
-                      uint32_t checksum,
-                      uint16_t method_idx,
-                      uint32_t num_method_ids);
-
   // Add a method to the profile using its online representation (containing runtime structures).
   bool AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags);
 
@@ -590,15 +582,6 @@ class ProfileCompilationInfo {
                                dex_file->GetLocationChecksum(),
                                dex_file->NumMethodIds());
   }
-
-  // Add a method to the profile using its offline representation.
-  // This is mostly used to facilitate testing.
-  bool AddMethod(const std::string& dex_location,
-                 uint32_t dex_checksum,
-                 uint16_t method_index,
-                 uint32_t num_method_ids,
-                 const OfflineProfileMethodInfo& pmi,
-                 MethodHotness::Flag flags);
 
   // Add a class index to the profile.
   bool AddClassIndex(const std::string& profile_key,

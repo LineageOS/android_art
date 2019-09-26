@@ -353,11 +353,8 @@ class DexLayoutTest : public CommonArtTest {
           flags |= ProfileCompilationInfo::MethodHotness::kFlagStartup;
           ++profile_methods;
         }
-        pfi.AddMethodIndex(static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
-                           dex_file->GetLocation(),
-                           dex_file->GetLocationChecksum(),
-                           /*method_idx=*/i,
-                           dex_file->NumMethodIds());
+        pfi.AddMethod(ProfileMethodInfo(MethodReference(dex_file.get(), /*index=*/ i)),
+                      static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags));
       }
       // Add every even class too.
       std::set<dex::TypeIndex> classes;

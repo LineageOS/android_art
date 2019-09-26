@@ -19,3 +19,6 @@ SubD:
 SubE:
   @@com.android.jack.annotations.ForceInMainDex
   class SubE
+ZLotsOfMethods:
+@@com.android.jack.annotations.ForceInMainDex
+  class ZLotsOfMethods
