@@ -36,8 +36,6 @@ namespace art {
 
 using Hotness = ProfileCompilationInfo::MethodHotness;
 
-static constexpr size_t kMaxMethodIds = 65535;
-
 class ProfileCompilationInfoTest : public CommonRuntimeTest {
  public:
   void PostRuntimeCreate() override {
@@ -61,34 +59,6 @@ class ProfileCompilationInfoTest : public CommonRuntimeTest {
       methods.push_back(&m);
     }
     return methods;
-  }
-
-  bool AddMethod(const std::string& dex_location,
-                 uint32_t checksum,
-                 uint16_t method_index,
-                 ProfileCompilationInfo* info) {
-    return info->AddMethodIndex(Hotness::kFlagHot,
-                                dex_location,
-                                checksum,
-                                method_index,
-                                kMaxMethodIds);
-  }
-
-  bool AddMethod(const std::string& dex_location,
-                 uint32_t checksum,
-                 uint16_t method_index,
-                 const ProfileCompilationInfo::OfflineProfileMethodInfo& pmi,
-                 ProfileCompilationInfo* info) {
-    return info->AddMethod(
-        dex_location, checksum, method_index, kMaxMethodIds, pmi, Hotness::kFlagPostStartup);
-  }
-
-  bool AddClass(const std::string& dex_location,
-                uint32_t checksum,
-                dex::TypeIndex type_index,
-                ProfileCompilationInfo* info) {
-    return info->AddClassIndex(
-        info->GetProfileDexFileKey(dex_location), checksum, type_index, kMaxMethodIds);
   }
 
   uint32_t GetFd(const ScratchFile& file) {
