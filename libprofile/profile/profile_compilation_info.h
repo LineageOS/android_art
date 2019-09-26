@@ -181,16 +181,27 @@ class ProfileCompilationInfo {
   class MethodHotness {
    public:
     enum Flag {
+      // Marker flag used to simplify iterations.
       kFlagFirst = 1 << 0,
+      // The method is profile-hot (this is implementation specific, e.g. equivalent to JIT-warm)
       kFlagHot = 1 << 0,
+      // Executed during the app startup as determined by the runtime.
       kFlagStartup = 1 << 1,
+      // Executed after app startup as determined by the runtime.
       kFlagPostStartup = 1 << 2,
+      // Marker flag used to simplify iterations.
       kFlagLastRegular = 1 << 2,
+      // Executed during the app startup as determined by the framework (equivalent to am start).
       kFlagAmStartup = 1 << 3,
+      // Executed after the app startup as determined by the framework (equivalent to am start).
       kFlagAmPostStartup = 1 << 4,
+      // Executed during system boot.
       kFlagBoot = 1 << 5,
+      // Executed after the system has booted.
       kFlagPostBoot = 1 << 6,
+      // Executed while the app is in foreground.
       kFlagForeground = 1 << 7,
+      // Executed while the app is in background.
       kFlagBackground = 1 << 8,
       // The startup bins captured the relative order of when a method become hot. There are 8
       // total bins supported and each hot method will have at least one bit set. If the profile was
@@ -200,6 +211,7 @@ class ProfileCompilationInfo {
       // values it uses - this may be 100ms, 200ms etc...).
       kFlagStartupBin = 1 << 9,
       kFlagStartupMaxBin = 1 << 16,
+      // Marker flag used to simplify iterations.
       kFlagLastBoot = 1 << 16,
     };
 
@@ -794,7 +806,7 @@ class ProfileCompilationInfo {
   // Initializes the profile version to the desired one.
   void InitProfileVersionInternal(const uint8_t version[]);
 
-  // Returns the threshold size (in bytes) which will triggers save/load warnings.
+  // Returns the threshold size (in bytes) which will trigger save/load warnings.
   size_t GetSizeWarningThresholdBytes() const;
   // Returns the threshold size (in bytes) which will cause save/load failures.
   size_t GetSizeErrorThresholdBytes() const;
