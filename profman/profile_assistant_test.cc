@@ -71,6 +71,13 @@ class ProfileAssistantTest : public CommonRuntimeTest {
                            flags);
   }
 
+  bool AddClass(ProfileCompilationInfo* info,
+                const DexFile* dex,
+                dex::TypeIndex type_index) {
+    std::vector<dex::TypeIndex> classes = {type_index};
+    return info->AddClassesForDex(dex, classes.begin(), classes.end());
+  }
+
   void SetupProfile(const DexFile* dex_file1,
                     const DexFile* dex_file2,
                     uint16_t number_of_methods,
@@ -94,10 +101,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
       }
     }
     for (uint16_t i = 0; i < number_of_classes; i++) {
-      ASSERT_TRUE(info->AddClassIndex(info->GetProfileDexFileKey(dex_file1->GetLocation()),
-                                      dex_file1->GetLocationChecksum(),
-                                      dex::TypeIndex(i),
-                                      dex_file1->NumMethodIds()));
+      ASSERT_TRUE(AddClass(info, dex_file1, dex::TypeIndex(i)));
     }
 
     ASSERT_TRUE(info->Save(GetFd(profile)));

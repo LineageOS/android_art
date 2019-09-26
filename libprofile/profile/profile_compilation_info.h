@@ -583,12 +583,6 @@ class ProfileCompilationInfo {
                                dex_file->NumMethodIds());
   }
 
-  // Add a class index to the profile.
-  bool AddClassIndex(const std::string& profile_key,
-                     uint32_t checksum,
-                     dex::TypeIndex type_idx,
-                     uint32_t num_method_ids);
-
   // Encode the known dex_files into a vector. The index of a dex_reference will
   // be the same as the profile index of the dex file (used to encode the ClassReferences).
   void DexFileToProfileIndex(/*out*/std::vector<DexReference>* dex_references) const;
