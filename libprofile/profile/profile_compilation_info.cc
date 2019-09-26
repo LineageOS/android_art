@@ -2158,4 +2158,13 @@ size_t ProfileCompilationInfo::GetSizeErrorThresholdBytes() const {
   return IsForBootImage() ?  kSizeErrorThresholdBootBytes : kSizeErrorThresholdBytes;
 }
 
+std::ostream& operator<<(std::ostream& stream,
+                         const ProfileCompilationInfo::DexReference& dex_ref) {
+  stream << "[profile_key=" << dex_ref.profile_key
+         << ",dex_checksum=" << std::hex << dex_ref.dex_checksum << std::dec
+         << ",num_method_ids=" << dex_ref.num_method_ids
+         << "]";
+  return stream;
+}
+
 }  // namespace art
