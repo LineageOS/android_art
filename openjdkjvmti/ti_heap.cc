@@ -1707,11 +1707,11 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
             const art::JavaFrameRootInfo& jfri =
                 art::down_cast<const art::JavaFrameRootInfo&>(info);
             if (jfri.GetVReg() == art::JavaFrameRootInfo::kMethodDeclaringClass) {
-              info.Describe(LOG_STREAM(INFO) << "Not changing declaring-class during stack walk. "
-                                                "Found obsolete java frame id ");
+              info.Describe(VLOG_STREAM(plugin) << "Not changing declaring-class during stack"
+                                                << " walk. Found obsolete java frame id ");
               continue;
             } else {
-              info.Describe(LOG_STREAM(INFO) << "Found java frame id ");
+              info.Describe(VLOG_STREAM(plugin) << "Found java frame id ");
               threads_with_roots_.insert(info.GetThreadId());
             }
           }
@@ -1733,11 +1733,11 @@ static void ReplaceStrongRoots(art::Thread* self, ObjectPtr old_obj_ptr, ObjectP
             const art::JavaFrameRootInfo& jfri =
                 art::down_cast<const art::JavaFrameRootInfo&>(info);
             if (jfri.GetVReg() == art::JavaFrameRootInfo::kMethodDeclaringClass) {
-              info.Describe(LOG_STREAM(INFO) << "Not changing declaring-class during stack walk. "
-                                                "Found obsolete java frame id ");
+              info.Describe(VLOG_STREAM(plugin) << "Not changing declaring-class during stack"
+                                                << " walk. Found obsolete java frame id ");
               continue;
             } else {
-              info.Describe(LOG_STREAM(INFO) << "Found java frame id ");
+              info.Describe(VLOG_STREAM(plugin) << "Found java frame id ");
               threads_with_roots_.insert(info.GetThreadId());
             }
           }
