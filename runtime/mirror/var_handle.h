@@ -36,6 +36,7 @@ struct ArrayElementVarHandleOffsets;
 struct ByteArrayViewVarHandleOffsets;
 struct ByteBufferViewVarHandleOffsets;
 
+class ReflectiveValueVisitor;
 class ShadowFrameGetter;
 
 namespace mirror {
@@ -198,8 +199,7 @@ class MANAGED FieldVarHandle : public VarHandle {
   ArtField* GetField() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Used for updating var-handles to obsolete fields.
-  template<typename Visitor>
-  inline void VisitTarget(Visitor&& v) REQUIRES(Locks::mutator_lock_);
+  void VisitTarget(ReflectiveValueVisitor* v) REQUIRES(Locks::mutator_lock_);
 
  private:
   static MemberOffset ArtFieldOffset() {

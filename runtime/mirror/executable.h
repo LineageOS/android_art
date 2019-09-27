@@ -25,6 +25,7 @@ namespace art {
 
 struct ExecutableOffsets;
 class ArtMethod;
+class ReflectiveValueVisitor;
 
 namespace mirror {
 
@@ -41,9 +42,8 @@ class MANAGED Executable : public AccessibleObject {
     return reinterpret_cast64<ArtMethod*>(GetField64<kVerifyFlags>(ArtMethodOffset()));
   }
 
-  template <typename Visitor,
-            VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
-  inline void VisitTarget(Visitor&& v) REQUIRES(Locks::mutator_lock_);
+  template <VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  inline void VisitTarget(ReflectiveValueVisitor* v) REQUIRES(Locks::mutator_lock_);
 
   template <bool kTransactionActive = false,
             bool kCheckTransaction = true,

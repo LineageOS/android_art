@@ -28,6 +28,7 @@ namespace art {
 
 struct MethodHandleOffsets;
 struct MethodHandleImplOffsets;
+class ReflectiveValueVisitor;
 
 namespace mirror {
 
@@ -89,8 +90,7 @@ class MANAGED MethodHandle : public Object {
 
   // Used when classes become structurally obsolete to change the MethodHandle to refer to the new
   // method or field.
-  template<typename Visitor>
-  void VisitTarget(Visitor&& v) REQUIRES(Locks::mutator_lock_);
+  void VisitTarget(ReflectiveValueVisitor* v) REQUIRES(Locks::mutator_lock_);
 
  protected:
   void Initialize(uintptr_t art_field_or_method, Kind kind, Handle<MethodType> method_type)
