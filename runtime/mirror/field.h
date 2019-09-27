@@ -29,6 +29,7 @@ namespace art {
 
 class ArtField;
 struct FieldOffsets;
+class ReflectiveValueVisitor;
 
 namespace mirror {
 
@@ -82,8 +83,7 @@ class MANAGED Field : public AccessibleObject {
 
   // Used to modify the target of this Field object, if required for structural redefinition or some
   // other purpose.
-  template<typename Visitor>
-  inline void VisitTarget(Visitor&& v) REQUIRES(Locks::mutator_lock_);
+  void VisitTarget(ReflectiveValueVisitor* v) REQUIRES(Locks::mutator_lock_);
 
  private:
   // Padding required for matching alignment with the Java peer.

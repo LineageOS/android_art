@@ -37,6 +37,7 @@ struct DexCacheOffsets;
 class DexFile;
 union JValue;
 class LinearAlloc;
+class ReflectiveValueVisitor;
 class Thread;
 
 namespace mirror {
@@ -475,6 +476,8 @@ class MANAGED DexCache final : public Object {
 
   // Returns true if we succeeded in adding the pre-resolved string array.
   bool AddPreResolvedStringsArray() REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void VisitReflectiveTargets(ReflectiveValueVisitor* visitor) REQUIRES(Locks::mutator_lock_);
 
  private:
   void Init(const DexFile* dex_file,

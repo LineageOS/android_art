@@ -24,6 +24,18 @@
 namespace art {
 namespace mirror {
 
+void Field::VisitTarget(ReflectiveValueVisitor* v) {
+  HeapReflectiveSourceInfo hrsi(kSourceJavaLangReflectField, this);
+  ArtField* orig = GetArtField(/*use_dex_cache*/false);
+  ArtField* new_value = v->VisitField(orig, hrsi);
+  if (orig != new_value) {
+    SetDexFieldIndex<false>(new_value->GetDexFieldIndex());
+    SetOffset<false>(new_value->GetOffset().Int32Value());
+    SetDeclaringClass<false>(new_value->GetDeclaringClass());
+  }
+  DCHECK_EQ(new_value, GetArtField(/*use_dex_cache*/false));
+}
+
 ArtField* Field::GetArtField(bool use_dex_cache) {
   ObjPtr<mirror::Class> declaring_class = GetDeclaringClass();
   if (UNLIKELY(declaring_class->IsProxyClass())) {

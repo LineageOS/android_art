@@ -2032,5 +2032,16 @@ bool ByteBufferViewVarHandle::Access(AccessMode access_mode,
   UNREACHABLE();
 }
 
+void FieldVarHandle::VisitTarget(ReflectiveValueVisitor* v) {
+  ArtField* orig = GetField();
+  ArtField* new_value =
+      v->VisitField(orig, HeapReflectiveSourceInfo(kSourceJavaLangInvokeFieldVarHandle, this));
+  if (orig != new_value) {
+    SetField64</*kTransactionActive*/ false>(ArtFieldOffset(),
+                                             reinterpret_cast<uintptr_t>(new_value));
+  }
+}
+
+
 }  // namespace mirror
 }  // namespace art

@@ -54,5 +54,20 @@ ObjPtr<mirror::MethodHandleImpl> MethodHandleImpl::Create(Thread* const self,
   return mh.Get();
 }
 
+void MethodHandle::VisitTarget(ReflectiveValueVisitor* v) {
+  void* target = GetTargetField();
+  void* result;
+  HeapReflectiveSourceInfo hrsi(kSourceJavaLangInvokeMethodHandle, this);
+  if (GetHandleKind() < kFirstAccessorKind) {
+    result = v->VisitMethod(GetTargetMethod(), hrsi);
+  } else {
+    result = v->VisitField(GetTargetField(), hrsi);
+  }
+  if (result != target) {
+    SetField64<false>(ArtFieldOrMethodOffset(), reinterpret_cast<uintptr_t>(result));
+  }
+}
+
+
 }  // namespace mirror
 }  // namespace art

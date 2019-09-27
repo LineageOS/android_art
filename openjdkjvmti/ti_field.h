@@ -71,6 +71,9 @@ class FieldUtil {
       REQUIRES(!ArtJvmTiEnv::event_info_mutex_);
   static jvmtiError ClearFieldAccessWatch(jvmtiEnv* env, jclass klass, jfieldID field)
       REQUIRES(!ArtJvmTiEnv::event_info_mutex_);
+
+  static void Register(EventHandler* eh);
+  static void Unregister();
 };
 
 }  // namespace openjdkjvmti

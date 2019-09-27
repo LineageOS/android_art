@@ -28,11 +28,13 @@
 #include "jni/jni_internal.h"
 #include "jni_id_type.h"
 #include "mirror/array-inl.h"
+#include "mirror/array.h"
 #include "mirror/class-inl.h"
 #include "mirror/class.h"
-#include "mirror/class_ext.h"
+#include "mirror/class_ext-inl.h"
 #include "mirror/object-inl.h"
 #include "obj_ptr-inl.h"
+#include "reflective_value_visitor.h"
 #include "thread-inl.h"
 #include "thread.h"
 #include <algorithm>
@@ -310,18 +312,80 @@ jmethodID JniIdManager::EncodeMethodId(ArtMethod* method) {
   return res;
 }
 
-void JniIdManager::VisitIds(Thread* self, JniIdManager::IdVisitor* visitor) {
-  art::WriterMutexLock mu(self, *Locks::jni_id_lock_);
-  if (visitor->ShouldVisitFields()) {
-    for (auto it = field_id_map_.begin(); it != field_id_map_.end(); ++it) {
-      visitor->VisitFieldId(
-          reinterpret_cast<jfieldID>(IndexToId(std::distance(field_id_map_.begin(), it))), &*it);
+void JniIdManager::VisitReflectiveTargets(ReflectiveValueVisitor* rvv) {
+  art::WriterMutexLock mu(Thread::Current(), *Locks::jni_id_lock_);
+  for (auto it = field_id_map_.begin(); it != field_id_map_.end(); ++it) {
+    ArtField* old_field = *it;
+    uintptr_t id = IndexToId(std::distance(field_id_map_.begin(), it));
+    ArtField* new_field =
+        rvv->VisitField(old_field, JniIdReflectiveSourceInfo(reinterpret_cast<jfieldID>(id)));
+    if (old_field != new_field) {
+      *it = new_field;
+      ObjPtr<mirror::Class> old_class(old_field->GetDeclaringClass());
+      ObjPtr<mirror::Class> new_class(new_field->GetDeclaringClass());
+      ObjPtr<mirror::ClassExt> old_ext_data(old_class->GetExtData());
+      ObjPtr<mirror::ClassExt> new_ext_data(new_class->GetExtData());
+      if (!old_ext_data.IsNull()) {
+        // Clear the old field mapping.
+        if (old_field->IsStatic()) {
+          size_t old_off = ArraySlice<ArtField>(old_class->GetSFieldsPtr()).OffsetOf(old_field);
+          ObjPtr<mirror::PointerArray> old_statics(old_ext_data->GetStaticJFieldIDs());
+          if (!old_statics.IsNull()) {
+            old_statics->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
+          }
+        } else {
+          size_t old_off = ArraySlice<ArtField>(old_class->GetIFieldsPtr()).OffsetOf(old_field);
+          ObjPtr<mirror::PointerArray> old_instances(old_ext_data->GetInstanceJFieldIDs());
+          if (!old_instances.IsNull()) {
+            old_instances->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
+          }
+        }
+      }
+      if (!new_ext_data.IsNull()) {
+        // Set the new field mapping.
+        if (new_field->IsStatic()) {
+          size_t new_off = ArraySlice<ArtField>(new_class->GetSFieldsPtr()).OffsetOf(new_field);
+          ObjPtr<mirror::PointerArray> new_statics(new_ext_data->GetStaticJFieldIDs());
+          if (!new_statics.IsNull()) {
+            new_statics->SetElementPtrSize(new_off, id, kRuntimePointerSize);
+          }
+        } else {
+          size_t new_off = ArraySlice<ArtField>(new_class->GetIFieldsPtr()).OffsetOf(new_field);
+          ObjPtr<mirror::PointerArray> new_instances(new_ext_data->GetInstanceJFieldIDs());
+          if (!new_instances.IsNull()) {
+            new_instances->SetElementPtrSize(new_off, id, kRuntimePointerSize);
+          }
+        }
+      }
     }
   }
-  if (visitor->ShouldVisitMethods()) {
-    for (auto it = method_id_map_.begin(); it != method_id_map_.end(); ++it) {
-      visitor->VisitMethodId(
-          reinterpret_cast<jmethodID>(IndexToId(std::distance(method_id_map_.begin(), it))), &*it);
+  for (auto it = method_id_map_.begin(); it != method_id_map_.end(); ++it) {
+    ArtMethod* old_method = *it;
+    uintptr_t id = IndexToId(std::distance(method_id_map_.begin(), it));
+    ArtMethod* new_method =
+        rvv->VisitMethod(old_method, JniIdReflectiveSourceInfo(reinterpret_cast<jmethodID>(id)));
+    if (old_method != new_method) {
+      *it = new_method;
+      ObjPtr<mirror::Class> old_class(old_method->GetDeclaringClass());
+      ObjPtr<mirror::Class> new_class(new_method->GetDeclaringClass());
+      ObjPtr<mirror::ClassExt> old_ext_data(old_class->GetExtData());
+      ObjPtr<mirror::ClassExt> new_ext_data(new_class->GetExtData());
+      if (!old_ext_data.IsNull()) {
+        // Clear the old method mapping.
+        size_t old_off = ArraySlice<ArtMethod>(old_class->GetMethodsPtr()).OffsetOf(old_method);
+        ObjPtr<mirror::PointerArray> old_methods(old_ext_data->GetJMethodIDs());
+        if (!old_methods.IsNull()) {
+          old_methods->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
+        }
+      }
+      if (!new_ext_data.IsNull()) {
+        // Set the new method mapping.
+        size_t new_off = ArraySlice<ArtMethod>(new_class->GetMethodsPtr()).OffsetOf(new_method);
+        ObjPtr<mirror::PointerArray> new_methods(new_ext_data->GetJMethodIDs());
+        if (!new_methods.IsNull()) {
+          new_methods->SetElementPtrSize(new_off, id, kRuntimePointerSize);
+        }
+      }
     }
   }
 }

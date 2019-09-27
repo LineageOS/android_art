@@ -1,0 +1,31 @@
+Dumping fields at start
+public static boolean art.Test1984$Transform.boom=false
+public static int art.Test1984$Transform.count_down=2
+public static boolean art.Test1984$Transform.tock=false
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static boolean art.Test1984$Transform.tock	Set to: true
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static boolean art.Test1984$Transform.tock	Set to: false
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static int art.Test1984$Transform.count_down	Set to: 1
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+REDEFINING TRANSFORM CLASS
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static boolean art.Test1984$Transform.tock	Set to: true
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static boolean art.Test1984$Transform.tock
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static boolean art.Test1984$Transform.tock	Set to: false
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static int art.Test1984$Transform.count_down	Set to: 0
+method: public static void art.Test1984$Transform.tick()	ACCESS: public static int art.Test1984$Transform.count_down
+method: public static void art.Test1984$Transform.tick()	MODIFY: public static boolean art.Test1984$Transform.boom	Set to: true
+Dumping fields at end
+public static int art.Test1984$Transform.aaa_INITIAL=0
+public static boolean art.Test1984$Transform.boom=true
+public static int art.Test1984$Transform.count_down=0
+public static boolean art.Test1984$Transform.tock=false

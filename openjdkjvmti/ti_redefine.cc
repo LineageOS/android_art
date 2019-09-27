@@ -107,7 +107,7 @@
 #include "mirror/object_array-inl.h"
 #include "mirror/object_array.h"
 #include "mirror/string.h"
-#include "mirror/var_handle-inl.h"
+#include "mirror/var_handle.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "non_debuggable_classes.h"
 #include "obj_ptr.h"
@@ -1967,65 +1967,6 @@ void Redefiner::ClassRedefinition::CollectNewFieldAndMethodMappings(
   }
 }
 
-namespace {
-
-template <typename T>
-struct FuncVisitor : public art::ClassVisitor {
- public:
-  explicit FuncVisitor(T f) : f_(f) {}
-  bool operator()(art::ObjPtr<art::mirror::Class> k) override REQUIRES(art::Locks::mutator_lock_) {
-    return f_(*this, k);
-  }
-
- private:
-  T f_;
-};
-
-// TODO We should put this in Runtime once we have full ArtMethod/ArtField updating.
-template <typename FieldVis, typename MethodVis>
-void VisitReflectiveObjects(art::Thread* self,
-                            art::gc::Heap* heap,
-                            FieldVis&& fv,
-                            MethodVis&& mv) REQUIRES(art::Locks::mutator_lock_) {
-  // Horray for captures!
-  auto get_visitor = [&mv, &fv](const char* desc) REQUIRES(art::Locks::mutator_lock_) {
-    return [&mv, &fv, desc](auto* v) REQUIRES(art::Locks::mutator_lock_) {
-      if constexpr (std::is_same_v<decltype(v), art::ArtMethod*>) {
-        return mv(v, desc);
-      } else {
-        static_assert(std::is_same_v<decltype(v), art::ArtField*>,
-                      "Visitor called with unexpected type");
-        return fv(v, desc);
-      }
-    };
-  };
-  heap->VisitObjectsPaused(
-    [&](art::mirror::Object* ref) NO_THREAD_SAFETY_ANALYSIS {
-      art::Locks::mutator_lock_->AssertExclusiveHeld(self);
-      art::ObjPtr<art::mirror::Class> klass(ref->GetClass());
-      // All these classes are in the BootstrapClassLoader.
-      if (!klass->IsBootStrapClassLoaded()) {
-        return;
-      }
-      if (art::GetClassRoot<art::mirror::Method>()->IsAssignableFrom(klass) ||
-          art::GetClassRoot<art::mirror::Constructor>()->IsAssignableFrom(klass)) {
-        art::down_cast<art::mirror::Executable*>(ref)->VisitTarget(
-            get_visitor("java.lang.reflect.Executable"));
-      } else if (art::GetClassRoot<art::mirror::Field>() == klass) {
-        art::down_cast<art::mirror::Field*>(ref)->VisitTarget(
-            get_visitor("java.lang.reflect.Field"));
-      } else if (art::GetClassRoot<art::mirror::MethodHandle>()->IsAssignableFrom(klass)) {
-        art::down_cast<art::mirror::MethodHandle*>(ref)->VisitTarget(
-            get_visitor("java.lang.invoke.MethodHandle"));
-      } else if (art::GetClassRoot<art::mirror::FieldVarHandle>()->IsAssignableFrom(klass)) {
-        art::down_cast<art::mirror::FieldVarHandle*>(ref)->VisitTarget(
-            get_visitor("java.lang.invoke.FieldVarHandle"));
-      }
-    });
-}
-
-}  // namespace
-
 void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDataIter& holder) {
   DCHECK(IsStructuralRedefinition());
   // LETS GO. We've got all new class structures so no need to do all the updating of the stacks.
@@ -2082,63 +2023,13 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
     m.SetDontCompile();
     DCHECK_EQ(orig, m.GetDeclaringClass());
   }
-  // TODO Update live pointers in ART code. Currently we just assume there aren't any
-  // ArtMethod/ArtField*s hanging around in the runtime that need to be updated to the new
-  // non-obsolete versions. This isn't a totally safe assumption and we need to fix this oversight.
-  // Update jni-ids
-  driver_->runtime_->GetJniIdManager()->VisitIds(
-      driver_->self_,
-      [&](jmethodID mid, art::ArtMethod** meth) REQUIRES(art::Locks::mutator_lock_) {
-        auto repl = method_map.find(*meth);
-        if (repl != method_map.end()) {
-          // Set the new method to have the same id.
-          // TODO This won't be true when we do updates with actual instances.
-          DCHECK_EQ(repl->second->GetDeclaringClass(), replacement)
-              << "different classes! " << repl->second->GetDeclaringClass()->PrettyClass()
-              << " vs " << replacement->PrettyClass();
-          VLOG(plugin) << "Updating jmethodID " << reinterpret_cast<uintptr_t>(mid) << " from "
-                       << (*meth)->PrettyMethod() << " to " << repl->second->PrettyMethod();
-          *meth = repl->second;
-          replacement->GetExtData()->GetJMethodIDs()->SetElementPtrSize(
-              replacement->GetMethodsSlice(art::kRuntimePointerSize).OffsetOf(repl->second),
-              mid,
-              art::kRuntimePointerSize);
-        }
-      },
-      [&](jfieldID fid, art::ArtField** field) REQUIRES(art::Locks::mutator_lock_) {
-        auto repl = field_map.find(*field);
-        if (repl != field_map.end()) {
-          // Set the new field to have the same id.
-          // TODO This won't be true when we do updates with actual instances.
-          DCHECK_EQ(repl->second->GetDeclaringClass(), replacement)
-              << "different classes! " << repl->second->GetDeclaringClass()->PrettyClass()
-              << " vs " << replacement->PrettyClass();
-          VLOG(plugin) << "Updating jfieldID " << reinterpret_cast<uintptr_t>(fid) << " from "
-                       << (*field)->PrettyField() << " to " << repl->second->PrettyField();
-          *field = repl->second;
-          if (repl->second->IsStatic()) {
-            replacement->GetExtData()->GetStaticJFieldIDs()->SetElementPtrSize(
-                art::ArraySlice<art::ArtField>(replacement->GetSFieldsPtr()).OffsetOf(repl->second),
-                fid,
-                art::kRuntimePointerSize);
-          } else {
-            replacement->GetExtData()->GetInstanceJFieldIDs()->SetElementPtrSize(
-                art::ArraySlice<art::ArtField>(replacement->GetIFieldsPtr()).OffsetOf(repl->second),
-                fid,
-                art::kRuntimePointerSize);
-          }
-        }
-      });
   // Copy the lock-word
   replacement->SetLockWord(orig->GetLockWord(false), false);
   orig->SetLockWord(art::LockWord::Default(), false);
-  // Fix up java.lang.reflect.{Method,Field} and java.lang.invoke.{Method,FieldVar}Handle objects
+  // Update live pointers in ART code.
   // TODO Performing 2 stack-walks back to back isn't the greatest. We might want to try to combine
   // it with the one ReplaceReferences does. Doing so would be rather complicated though.
-  // TODO We maybe should just give the Heap the ability to do this.
-  VisitReflectiveObjects(
-      driver_->self_,
-      driver_->runtime_->GetHeap(),
+  driver_->runtime_->VisitReflectiveTargets(
       [&](art::ArtField* f, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
         auto it = field_map.find(f);
         if (it == field_map.end()) {
@@ -2152,7 +2043,8 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
         if (it == method_map.end()) {
           return m;
         }
-        VLOG(plugin) << "Updating " << info << " object for (method) " << it->second->PrettyMethod();
+        VLOG(plugin) << "Updating " << info << " object for (method) "
+                     << it->second->PrettyMethod();
         return it->second;
       });
 
@@ -2192,80 +2084,6 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
     #undef UPDATE_FIELD
     }
   }
-
-  // Update dex-caches to point to new fields. We wait until here so that the new-class is known by
-  // the linker. At the same time reset all methods to have interpreter entrypoints, anything jitted
-  // might encode field/method offsets.
-  FuncVisitor fv([&](art::ClassVisitor& thiz,
-                     art::ObjPtr<art::mirror::Class> klass) REQUIRES(art::Locks::mutator_lock_) {
-    // Code to actually update a dex-cache. Since non-structural obsolete methods can lead to a
-    // single class having several dex-caches associated with it we factor this out a bit.
-    auto update_dex_cache = [&](art::ObjPtr<art::mirror::DexCache> dc,
-                                auto describe) REQUIRES(art::Locks::mutator_lock_) {
-      // Clear dex-cache. We don't need to do anything with resolved-types since those are already
-      // handled by ReplaceReferences.
-      if (dc.IsNull()) {
-        // We don't need to do anything if the class doesn't have a dex-cache. This is the case for
-        // things like arrays and primitives.
-        return;
-      }
-      for (size_t i = 0; art::kIsDebugBuild && i < dc->NumResolvedTypes(); i++) {
-        DCHECK_NE(dc->GetResolvedTypes()[i].load().object.Read(), orig)
-            << "Obsolete reference found in dex-cache of class " << klass->PrettyClass() << "!";
-      }
-      for (size_t i = 0; i < dc->NumResolvedFields(); i++) {
-        auto pair(dc->GetNativePairPtrSize(dc->GetResolvedFields(), i, art::kRuntimePointerSize));
-        auto new_val = field_map.find(pair.object);
-        if (new_val != field_map.end()) {
-          VLOG(plugin) << "Updating field dex-cache entry " << i << " of class "
-                       << klass->PrettyClass() << " dex cache " << describe();
-          pair.object = new_val->second;
-          dc->SetNativePairPtrSize(dc->GetResolvedFields(), i, pair, art::kRuntimePointerSize);
-        }
-      }
-      for (size_t i = 0; i < dc->NumResolvedMethods(); i++) {
-        auto pair(
-            dc->GetNativePairPtrSize(dc->GetResolvedMethods(), i, art::kRuntimePointerSize));
-        auto new_val = method_map.find(pair.object);
-        if (new_val != method_map.end()) {
-          VLOG(plugin) << "Updating method dex-cache entry " << i << " of class "
-                       << klass->PrettyClass() << " dex cache " << describe();
-          pair.object = new_val->second;
-          dc->SetNativePairPtrSize(dc->GetResolvedMethods(), i, pair, art::kRuntimePointerSize);
-        }
-      }
-    };
-    // Clear our own dex-cache.
-    update_dex_cache(klass->GetDexCache(), []() { return "Primary"; });
-    // Clear all the normal obsolete dex-caches.
-    art::ObjPtr<art::mirror::ClassExt> ext(klass->GetExtData());
-    if (!ext.IsNull()) {
-      art::ObjPtr<art::mirror::ObjectArray<art::mirror::DexCache>> obsolete_caches(
-          ext->GetObsoleteDexCaches());
-      // This contains the dex-cache associated with each obsolete method. Since each redefinition
-      // could cause many methods to become obsolete a single dex-cache might be in the array
-      // multiple times. We always add new obsoletes onto the end of this array so identical
-      // dex-caches are all right next to one another.
-      art::ObjPtr<art::mirror::DexCache> prev(nullptr);
-      for (int32_t i = 0; !obsolete_caches.IsNull() && i < obsolete_caches->GetLength(); i++) {
-        art::ObjPtr<art::mirror::DexCache> cur(obsolete_caches->Get(i));
-        if (!cur.IsNull() && cur != prev) {
-          prev = cur;
-          VLOG(plugin) << "Clearing obsolete dex cache " << i << " of " << klass->PrettyClass();
-          update_dex_cache(cur, [&i]() { return StringPrintf("Obsolete[%d]", i); });
-        }
-      }
-      if (!ext->GetObsoleteClass().IsNull()) {
-        VLOG(plugin) << "Recuring on obsolete class " << ext->GetObsoleteClass()->PrettyClass();
-        // Recur on any obsolete-classes. These aren't known about by the class-linker anymore so
-        // we need to visit it manually.
-        thiz(ext->GetObsoleteClass());
-      }
-    }
-    return true;
-  });
-  // TODO Rewrite VisitClasses to be able to take a lambda directly.
-  driver_->runtime_->GetClassLinker()->VisitClasses(&fv);
 
   art::jit::Jit* jit = driver_->runtime_->GetJit();
   if (jit != nullptr) {

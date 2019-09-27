@@ -319,4 +319,20 @@ void RuntimeCallbacks::RegisterNativeMethod(ArtMethod* method,
   }
 }
 
+void RuntimeCallbacks::AddReflectiveValueVisitCallback(ReflectiveValueVisitCallback *cb) {
+  WriterMutexLock mu(Thread::Current(), *callback_lock_);
+  reflective_value_visit_callbacks_.push_back(cb);
+}
+
+void RuntimeCallbacks::RemoveReflectiveValueVisitCallback(ReflectiveValueVisitCallback *cb) {
+  WriterMutexLock mu(Thread::Current(), *callback_lock_);
+  Remove(cb, &reflective_value_visit_callbacks_);
+}
+
+void RuntimeCallbacks::VisitReflectiveTargets(ReflectiveValueVisitor *visitor) {
+  for (ReflectiveValueVisitCallback* cb : COPY(reflective_value_visit_callbacks_)) {
+    cb->VisitReflectiveTargets(visitor);
+  }
+}
+
 }  // namespace art
