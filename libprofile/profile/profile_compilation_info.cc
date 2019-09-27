@@ -1699,35 +1699,6 @@ bool ProfileCompilationInfo::Equals(const ProfileCompilationInfo& other) {
   return true;
 }
 
-std::set<DexCacheResolvedClasses> ProfileCompilationInfo::GetResolvedClasses(
-    const std::vector<const DexFile*>& dex_files) const {
-  std::unordered_map<std::string, const DexFile* > key_to_dex_file;
-  for (const DexFile* dex_file : dex_files) {
-    key_to_dex_file.emplace(GetProfileDexFileKey(dex_file->GetLocation()), dex_file);
-  }
-  std::set<DexCacheResolvedClasses> ret;
-  for (const DexFileData* dex_data : info_) {
-    const auto it = key_to_dex_file.find(dex_data->profile_key);
-    if (it != key_to_dex_file.end()) {
-      const DexFile* dex_file = it->second;
-      const std::string& dex_location = dex_file->GetLocation();
-      if (dex_data->checksum != it->second->GetLocationChecksum()) {
-        LOG(ERROR) << "Dex checksum mismatch when getting resolved classes from profile for "
-            << "location " << dex_location << " (checksum=" << dex_file->GetLocationChecksum()
-            << ", profile checksum=" << dex_data->checksum;
-        return std::set<DexCacheResolvedClasses>();
-      }
-      DexCacheResolvedClasses classes(dex_location,
-                                      dex_location,
-                                      dex_data->checksum,
-                                      dex_data->num_method_ids);
-      classes.AddClasses(dex_data->class_set.begin(), dex_data->class_set.end());
-      ret.insert(classes);
-    }
-  }
-  return ret;
-}
-
 // Naive implementation to generate a random profile file suitable for testing.
 bool ProfileCompilationInfo::GenerateTestProfile(int fd,
                                                  uint16_t number_of_dex_files,
