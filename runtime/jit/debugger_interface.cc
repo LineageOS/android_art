@@ -361,10 +361,9 @@ void NativeDebugInfoPreFork() {
 }
 
 void NativeDebugInfoPostFork() {
+  CHECK(!Runtime::Current()->IsZygote());
   JITDescriptor& descriptor = JitNativeInfo::Descriptor();
-  if (!Runtime::Current()->IsZygote()) {
-    descriptor.free_entries_ = nullptr;  // Don't reuse zygote's entries.
-  }
+  descriptor.free_entries_ = nullptr;  // Don't reuse zygote's entries.
 }
 
 // Size of JIT code range covered by each packed JITCodeEntry.
