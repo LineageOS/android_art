@@ -20,6 +20,7 @@
 #include "executable.h"
 
 #include "object-inl.h"
+#include "reflective_value_visitor.h"
 #include "verify_object.h"
 
 namespace art {
@@ -37,10 +38,11 @@ inline ObjPtr<mirror::Class> Executable::GetDeclaringClass() {
   return GetFieldObject<mirror::Class>(DeclaringClassOffset());
 }
 
-template<typename Visitor, VerifyObjectFlags kVerifiyFlags>
-inline void Executable::VisitTarget(Visitor&& v) {
+template<VerifyObjectFlags kVerifiyFlags>
+inline void Executable::VisitTarget(ReflectiveValueVisitor* v) {
+  HeapReflectiveSourceInfo hrsi(kSourceJavaLangReflectExecutable, this);
   ArtMethod* orig = GetArtMethod<kVerifiyFlags>();
-  ArtMethod* new_target = v(orig);
+  ArtMethod* new_target = v->VisitMethod(orig, hrsi);
   if (orig != new_target) {
     SetArtMethod(new_target);
     SetDexMethodIndex(new_target->GetDexMethodIndex());

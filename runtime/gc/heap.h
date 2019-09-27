@@ -51,6 +51,7 @@ class ConditionVariable;
 enum class InstructionSet;
 class IsMarkedVisitor;
 class Mutex;
+class ReflectiveValueVisitor;
 class RootVisitor;
 class StackVisitor;
 class Thread;
@@ -284,6 +285,9 @@ class Heap {
       REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_);
   template <typename Visitor>
   ALWAYS_INLINE void VisitObjectsPaused(Visitor&& visitor)
+      REQUIRES(Locks::mutator_lock_, !Locks::heap_bitmap_lock_, !*gc_complete_lock_);
+
+  void VisitReflectiveTargets(ReflectiveValueVisitor* visitor)
       REQUIRES(Locks::mutator_lock_, !Locks::heap_bitmap_lock_, !*gc_complete_lock_);
 
   void CheckPreconditionsForAllocObject(ObjPtr<mirror::Class> c, size_t byte_count)

@@ -53,6 +53,69 @@
 
 namespace openjdkjvmti {
 
+class JvmtiBreakpointReflectionSource : public art::ReflectionSourceInfo {
+ public:
+  JvmtiBreakpointReflectionSource(size_t pc, art::ArtMethod* m)
+      : art::ReflectionSourceInfo(art::ReflectionSourceType::kSourceMiscInternal),
+        pc_(pc),
+        m_(m) {}
+
+  void Describe(std::ostream& os) const override REQUIRES_SHARED(art::Locks::mutator_lock_) {
+    art::ReflectionSourceInfo::Describe(os);
+    os << " jvmti Breakpoint Method=" << m_->PrettyMethod() << " PC=" << pc_;
+  }
+
+ private:
+  size_t pc_;
+  art::ArtMethod* m_;
+};
+
+class BreakpointReflectiveValueCallback : public art::ReflectiveValueVisitCallback {
+ public:
+  void VisitReflectiveTargets(art::ReflectiveValueVisitor* visitor)
+      REQUIRES(art::Locks::mutator_lock_) {
+    art::Thread* self = art::Thread::Current();
+    eh_->ForEachEnv(self, [&](ArtJvmTiEnv* env) NO_THREAD_SAFETY_ANALYSIS {
+      art::Locks::mutator_lock_->AssertExclusiveHeld(self);
+      art::WriterMutexLock mu(self, env->event_info_mutex_);
+      std::vector<std::pair<Breakpoint, Breakpoint>> updated_breakpoints;
+      for (auto it : env->breakpoints) {
+        art::ArtMethod* orig_method = it.GetMethod();
+        art::ArtMethod* am = visitor->VisitMethod(
+            orig_method, JvmtiBreakpointReflectionSource(it.GetLocation(), orig_method));
+        if (am != orig_method) {
+          updated_breakpoints.push_back({ Breakpoint { am, it.GetLocation() }, it });
+        }
+      }
+      for (auto it : updated_breakpoints) {
+        DCHECK(env->breakpoints.find(it.second) != env->breakpoints.end());
+        env->breakpoints.erase(it.second);
+        env->breakpoints.insert(it.first);
+      }
+    });
+  }
+
+  EventHandler* eh_;
+};
+
+static BreakpointReflectiveValueCallback gReflectiveValueCallback;
+void BreakpointUtil::Register(EventHandler* eh) {
+  gReflectiveValueCallback.eh_ = eh;
+  art::ScopedThreadStateChange stsc(art::Thread::Current(),
+                                    art::ThreadState::kWaitingForDebuggerToAttach);
+  art::ScopedSuspendAll ssa("Add breakpoint reflective value visit callback");
+  art::RuntimeCallbacks* callbacks = art::Runtime::Current()->GetRuntimeCallbacks();
+  callbacks->AddReflectiveValueVisitCallback(&gReflectiveValueCallback);
+}
+
+void BreakpointUtil::Unregister() {
+  art::ScopedThreadStateChange stsc(art::Thread::Current(),
+                                    art::ThreadState::kWaitingForDebuggerToAttach);
+  art::ScopedSuspendAll ssa("Remove reflective value visit callback");
+  art::RuntimeCallbacks* callbacks = art::Runtime::Current()->GetRuntimeCallbacks();
+  callbacks->RemoveReflectiveValueVisitCallback(&gReflectiveValueCallback);
+}
+
 size_t Breakpoint::hash() const {
   return std::hash<uintptr_t> {}(reinterpret_cast<uintptr_t>(method_))
       ^ std::hash<jlocation> {}(location_);
