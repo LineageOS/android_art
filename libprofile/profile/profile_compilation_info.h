@@ -411,10 +411,6 @@ class ProfileCompilationInfo {
   // Perform an equality test with the `other` profile information.
   bool Equals(const ProfileCompilationInfo& other);
 
-  // Return the class descriptors for all of the classes in the profiles' class sets.
-  std::set<DexCacheResolvedClasses> GetResolvedClasses(
-      const std::vector<const DexFile*>& dex_files_) const;
-
   // Return the profile key associated with the given dex location.
   std::string GetProfileDexFileKey(const std::string& dex_location) const;
   // Return the base profile key associated with the given dex location. The base profile key
