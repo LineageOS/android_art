@@ -1218,6 +1218,10 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
     // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.
     code_cache_->SetGarbageCollectCode(false);
   }
+
+  // We do this here instead of PostZygoteFork, as NativeDebugInfoPostFork only
+  // applies to a child.
+  NativeDebugInfoPostFork();
 }
 
 void Jit::PreZygoteFork() {
@@ -1234,8 +1238,6 @@ void Jit::PostZygoteFork() {
     return;
   }
   thread_pool_->CreateThreads();
-
-  NativeDebugInfoPostFork();
 }
 
 void Jit::BootCompleted() {

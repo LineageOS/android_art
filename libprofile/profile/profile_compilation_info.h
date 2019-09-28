@@ -181,26 +181,42 @@ class ProfileCompilationInfo {
   class MethodHotness {
    public:
     enum Flag {
+      // Marker flag used to simplify iterations.
       kFlagFirst = 1 << 0,
+      // The method is profile-hot (this is implementation specific, e.g. equivalent to JIT-warm)
       kFlagHot = 1 << 0,
+      // Executed during the app startup as determined by the runtime.
       kFlagStartup = 1 << 1,
+      // Executed after app startup as determined by the runtime.
       kFlagPostStartup = 1 << 2,
+      // Marker flag used to simplify iterations.
       kFlagLastRegular = 1 << 2,
+      // Executed during the app startup as determined by the framework (equivalent to am start).
       kFlagAmStartup = 1 << 3,
+      // Executed after the app startup as determined by the framework (equivalent to am start).
       kFlagAmPostStartup = 1 << 4,
+      // Executed during system boot.
       kFlagBoot = 1 << 5,
+      // Executed after the system has booted.
       kFlagPostBoot = 1 << 6,
+      // Executed while the app is in foreground.
       kFlagForeground = 1 << 7,
+      // Executed while the app is in background.
       kFlagBackground = 1 << 8,
+      // Executed by a 32bit process.
+      kFlag32bit = 1 << 9,
+      // Executed by a 64bit process.
+      kFlag64bit = 1 << 10,
       // The startup bins captured the relative order of when a method become hot. There are 8
       // total bins supported and each hot method will have at least one bit set. If the profile was
       // merged multiple times more than one bit may be set as a given method may become hot at
       // various times during subsequent executions.
       // The granularity of the bins is unspecified (i.e. the runtime is free to change the
       // values it uses - this may be 100ms, 200ms etc...).
-      kFlagStartupBin = 1 << 9,
-      kFlagStartupMaxBin = 1 << 16,
-      kFlagLastBoot = 1 << 16,
+      kFlagStartupBin = 1 << 11,
+      kFlagStartupMaxBin = 1 << 18,
+      // Marker flag used to simplify iterations.
+      kFlagLastBoot = 1 << 18,
     };
 
     bool IsHot() const {
@@ -255,6 +271,8 @@ class ProfileCompilationInfo {
         : inline_caches(inline_cache_map) {}
 
     bool operator==(const OfflineProfileMethodInfo& other) const;
+    // Checks that this offline represenation of inline caches matches the runtime view of the data.
+    bool operator==(const std::vector<ProfileMethodInfo::ProfileInlineCache>& other) const;
 
     const InlineCacheMap* const inline_caches;
     std::vector<DexReference> dex_references;
@@ -282,14 +300,6 @@ class ProfileCompilationInfo {
     data->class_set.insert(index_begin, index_end);
     return true;
   }
-
-  // Add a method index to the profile (without inline caches). The method flags determine if it is
-  // hot, startup, or post startup, or a combination of the previous.
-  bool AddMethodIndex(MethodHotness::Flag flags,
-                      const std::string& dex_location,
-                      uint32_t checksum,
-                      uint16_t method_idx,
-                      uint32_t num_method_ids);
 
   // Add a method to the profile using its online representation (containing runtime structures).
   bool AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags);
@@ -367,21 +377,17 @@ class ProfileCompilationInfo {
   uint32_t GetNumberOfResolvedClasses() const;
 
   // Returns the profile method info for a given method reference.
-  MethodHotness GetMethodHotness(const MethodReference& method_ref) const;
-  MethodHotness GetMethodHotness(const std::string& dex_location,
-                                 uint32_t dex_checksum,
-                                 uint16_t dex_method_index) const;
+  MethodHotness GetMethodHotness(const MethodReference& method_ref) const;;
 
   // Return true if the class's type is present in the profiling info.
   bool ContainsClass(const DexFile& dex_file, dex::TypeIndex type_idx) const;
 
-  // Return the method data for the given location and index from the profiling info.
+  // Return the hot method info for the given location and index from the profiling info.
   // If the method index is not found or the checksum doesn't match, null is returned.
   // Note: the inline cache map is a pointer to the map stored in the profile and
   // its allocation will go away if the profile goes out of scope.
-  std::unique_ptr<OfflineProfileMethodInfo> GetMethod(const std::string& dex_location,
-                                                      uint32_t dex_checksum,
-                                                      uint16_t dex_method_index) const;
+  std::unique_ptr<OfflineProfileMethodInfo> GetHotMethodInfo(
+      const MethodReference& method_ref) const;
 
   // Dump all the loaded profile info into a string and returns it.
   // If dex_files is not empty then the method indices will be resolved to their
@@ -404,10 +410,6 @@ class ProfileCompilationInfo {
 
   // Perform an equality test with the `other` profile information.
   bool Equals(const ProfileCompilationInfo& other);
-
-  // Return the class descriptors for all of the classes in the profiles' class sets.
-  std::set<DexCacheResolvedClasses> GetResolvedClasses(
-      const std::vector<const DexFile*>& dex_files_) const;
 
   // Return the profile key associated with the given dex location.
   std::string GetProfileDexFileKey(const std::string& dex_location) const;
@@ -565,7 +567,7 @@ class ProfileCompilationInfo {
     ArenaSet<dex::TypeIndex> class_set;
     // Find the inline caches of the the given method index. Add an empty entry if
     // no previous data is found.
-    InlineCacheMap* FindOrAddMethod(uint16_t method_index);
+    InlineCacheMap* FindOrAddHotMethod(uint16_t method_index);
     // Num method ids.
     uint32_t num_method_ids;
     ArenaVector<uint8_t> bitmap_storage;
@@ -588,21 +590,6 @@ class ProfileCompilationInfo {
                                dex_file->GetLocationChecksum(),
                                dex_file->NumMethodIds());
   }
-
-  // Add a method to the profile using its offline representation.
-  // This is mostly used to facilitate testing.
-  bool AddMethod(const std::string& dex_location,
-                 uint32_t dex_checksum,
-                 uint16_t method_index,
-                 uint32_t num_method_ids,
-                 const OfflineProfileMethodInfo& pmi,
-                 MethodHotness::Flag flags);
-
-  // Add a class index to the profile.
-  bool AddClassIndex(const std::string& profile_key,
-                     uint32_t checksum,
-                     dex::TypeIndex type_idx,
-                     uint32_t num_method_ids);
 
   // Encode the known dex_files into a vector. The index of a dex_reference will
   // be the same as the profile index of the dex file (used to encode the ClassReferences).
@@ -819,7 +806,7 @@ class ProfileCompilationInfo {
   // Initializes the profile version to the desired one.
   void InitProfileVersionInternal(const uint8_t version[]);
 
-  // Returns the threshold size (in bytes) which will triggers save/load warnings.
+  // Returns the threshold size (in bytes) which will trigger save/load warnings.
   size_t GetSizeWarningThresholdBytes() const;
   // Returns the threshold size (in bytes) which will cause save/load failures.
   size_t GetSizeErrorThresholdBytes() const;
@@ -846,6 +833,8 @@ class ProfileCompilationInfo {
   uint8_t version_[kProfileVersionSize];
 };
 
+std::ostream& operator<<(std::ostream& stream,
+                         const ProfileCompilationInfo::DexReference& dex_ref);
 }  // namespace art
 
 #endif  // ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_

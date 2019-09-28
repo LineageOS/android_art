@@ -14,27 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ART_RUNTIME_MIRROR_VAR_HANDLE_INL_H_
-#define ART_RUNTIME_MIRROR_VAR_HANDLE_INL_H_
-
-#include "var_handle.h"
-
-namespace art {
-class ArtField;
-
-namespace mirror {
-
-template<typename Visitor>
-inline void FieldVarHandle::VisitTarget(Visitor&& v) {
-  ArtField* orig = GetField();
-  ArtField* new_value = v(orig);
-  if (orig != new_value) {
-    SetField64</*kTransactionActive*/ false>(ArtFieldOffset(),
-                                             reinterpret_cast<uintptr_t>(new_value));
+public class Main {
+  public static void main(String[] args) throws Exception {
+    art.Test1984.run();
   }
 }
-
-}  // namespace mirror
-}  // namespace art
-
-#endif  // ART_RUNTIME_MIRROR_VAR_HANDLE_INL_H_

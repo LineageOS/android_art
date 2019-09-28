@@ -44,6 +44,7 @@ class MethodCallback;
 class Monitor;
 class ReaderWriterMutex;
 class ThreadLifecycleCallback;
+class ReflectiveValueVisitor;
 
 // Note: RuntimeCallbacks uses the mutator lock to synchronize the callback lists. A thread must
 //       hold the exclusive lock to add or remove a listener. A thread must hold the shared lock
@@ -156,6 +157,17 @@ class MethodInspectionCallback {
   virtual bool MethodNeedsDebugVersion(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) = 0;
 };
 
+// Callback to let something request to be notified when reflective objects are being visited and
+// updated to update any bare ArtMethod/ArtField pointers it might have.
+class ReflectiveValueVisitCallback {
+ public:
+  virtual ~ReflectiveValueVisitCallback() {}
+
+  // Called when something visits all reflective values with the update visitor.
+  virtual void VisitReflectiveTargets(ReflectiveValueVisitor* visitor)
+      REQUIRES(Locks::mutator_lock_) = 0;
+};
+
 class RuntimeCallbacks {
  public:
   RuntimeCallbacks();
@@ -257,6 +269,13 @@ class RuntimeCallbacks {
   void RemoveDebuggerControlCallback(DebuggerControlCallback* cb)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  void VisitReflectiveTargets(ReflectiveValueVisitor* visitor) REQUIRES(Locks::mutator_lock_);
+
+  void AddReflectiveValueVisitCallback(ReflectiveValueVisitCallback* cb)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  void RemoveReflectiveValueVisitCallback(ReflectiveValueVisitCallback* cb)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
  private:
   std::unique_ptr<ReaderWriterMutex> callback_lock_ BOTTOM_MUTEX_ACQUIRED_AFTER;
 
@@ -279,6 +298,8 @@ class RuntimeCallbacks {
   std::vector<DdmCallback*> ddm_callbacks_
       GUARDED_BY(callback_lock_);
   std::vector<DebuggerControlCallback*> debugger_control_callbacks_
+      GUARDED_BY(callback_lock_);
+  std::vector<ReflectiveValueVisitCallback*> reflective_value_visit_callbacks_
       GUARDED_BY(callback_lock_);
 };
 

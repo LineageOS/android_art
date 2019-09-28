@@ -47,6 +47,7 @@ class Class;
 namespace openjdkjvmti {
 
 struct ArtJvmTiEnv;
+class EventHandler;
 
 class Breakpoint {
  public:
@@ -74,6 +75,9 @@ class Breakpoint {
 
 class BreakpointUtil {
  public:
+  static void Register(EventHandler* eh);
+  static void Unregister();
+
   static jvmtiError SetBreakpoint(jvmtiEnv* env, jmethodID method, jlocation location);
   static jvmtiError ClearBreakpoint(jvmtiEnv* env, jmethodID method, jlocation location);
   // Used by class redefinition to remove breakpoints on redefined classes.
