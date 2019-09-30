@@ -146,8 +146,8 @@ art_global_defaults {
             ],
             header_libs: [
                 // We optimize Thread::Current() with a direct TLS access. This requires access to a
-                //  private Bionic header.
-                "bionic_libc_private_headers",
+                //  platform specific Bionic header.
+                "bionic_libc_platform_headers",
             ],
         },
         linux: {
@@ -160,8 +160,8 @@ art_global_defaults {
         linux_bionic: {
             header_libs: [
                 // We optimize Thread::Current() with a direct TLS access. This requires access to a
-                //  private Bionic header.
-                "bionic_libc_private_headers",
+                //  platform specific Bionic header.
+                "bionic_libc_platform_headers",
             ],
         },
         darwin: {
