@@ -20,7 +20,7 @@
 #include "thread.h"
 
 #ifdef __BIONIC__
-#include <bionic_tls.h>  // Access to our own TLS slot.
+#include <bionic/tls.h>  // Access to our own TLS slot.
 #endif
 
 #include <pthread.h>
