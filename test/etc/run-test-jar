@@ -65,7 +65,7 @@ SECONDARY_DEX=""
 TIME_OUT="timeout"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
 TIMEOUT_DUMPER=signal_dumper
 # Values in seconds.
-TIME_OUT_EXTRA=
+TIME_OUT_EXTRA=0
 TIME_OUT_VALUE=
 USE_GDB="n"
 USE_GDBSERVER="n"
@@ -143,7 +143,7 @@ while true; do
         shift
     elif [ "x$1" = "x--gc-stress" ]; then
         # Give an extra 5 mins if we are gc-stress.
-        TIME_OUT_EXTRA=300
+        TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 300))
         shift
     elif [ "x$1" = "x--testlib" ]; then
         shift
@@ -181,6 +181,10 @@ while true; do
         shift
         option="$1"
         FLAGS="${FLAGS} $option"
+        if [ "x$option" = "x-Xmethod-trace" ]; then
+            # Method tracing can slow some tests down a lot.
+            TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 600))
+        fi
         shift
     elif [ "x$1" = "x--boot" ]; then
         shift
@@ -455,9 +459,7 @@ if [ -z "$TIME_OUT_VALUE" ] ; then
     TIME_OUT_VALUE=1500  # 25 minutes.
   fi
 
-  if [ ! -z "$TIME_OUT_EXTRA" ] ; then
-    TIME_OUT_VALUE=$((${TIME_OUT_VALUE} + ${TIME_OUT_EXTRA}))
-  fi
+  TIME_OUT_VALUE=$((${TIME_OUT_VALUE} + ${TIME_OUT_EXTRA}))
 fi
 
 # Escape hatch for slow hosts or devices. Accept an environment variable as a timeout factor.
