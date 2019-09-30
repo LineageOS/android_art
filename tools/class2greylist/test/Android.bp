@@ -25,7 +25,4 @@ java_test_host {
         "junit-host",
         "objenesis",
     ],
-
-    // tag this module as a cts test artifact
-    test_suites: ["general-tests"],
 }
