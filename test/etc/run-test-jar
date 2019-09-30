@@ -462,8 +462,7 @@ fi
 
 # Escape hatch for slow hosts or devices. Accept an environment variable as a timeout factor.
 if [ ! -z "$ART_TIME_OUT_MULTIPLIER" ] ; then
-  # Use bc to support a fractional multiplier.
-  TIME_OUT_VALUE=$(echo "${TIME_OUT_VALUE} * ${ART_TIME_OUT_MULTIPLIER}" | bc)
+  TIME_OUT_VALUE=$((${TIME_OUT_VALUE} * ${ART_TIME_OUT_MULTIPLIER}))
 fi
 
 # The DEX_LOCATION with the chroot prefix, if any.
