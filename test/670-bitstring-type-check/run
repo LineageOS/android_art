@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This test can take 7-11 mins, so raise the default 10 min timeout a bit.
-export ART_TIME_OUT_MULTIPLIER=1.5
+# This test can take 7-11 mins, so raise the default 10 min timeout.
+export ART_TIME_OUT_MULTIPLIER=2
 
 exec ${RUN} "$@"
