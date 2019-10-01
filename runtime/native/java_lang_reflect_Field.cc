@@ -129,15 +129,17 @@ ALWAYS_INLINE inline static bool CheckReceiver(const ScopedFastNativeObjectAcces
   soa.Self()->AssertThreadSuspensionIsAllowable();
   ObjPtr<mirror::Class> declaring_class = (*f)->GetDeclaringClass();
   if ((*f)->IsStatic()) {
-    if (UNLIKELY(!declaring_class->IsInitialized())) {
-      StackHandleScope<2> hs(soa.Self());
+    if (UNLIKELY(!declaring_class->IsVisiblyInitialized())) {
+      Thread* self = soa.Self();
+      StackHandleScope<2> hs(self);
       HandleWrapperObjPtr<mirror::Field> h_f(hs.NewHandleWrapper(f));
       HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(&declaring_class));
-      ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
-      if (UNLIKELY(!class_linker->EnsureInitialized(soa.Self(), h_klass, true, true))) {
-        DCHECK(soa.Self()->IsExceptionPending());
+      if (UNLIKELY(!Runtime::Current()->GetClassLinker()->EnsureInitialized(
+                        self, h_klass, /*can_init_fields=*/ true, /*can_init_parents=*/ true))) {
+        DCHECK(self->IsExceptionPending());
         return false;
       }
+      DCHECK(h_klass->IsInitializing());
     }
     *class_or_rcvr = declaring_class;
     return true;
