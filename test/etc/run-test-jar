@@ -182,8 +182,9 @@ while true; do
         option="$1"
         FLAGS="${FLAGS} $option"
         if [ "x$option" = "x-Xmethod-trace" ]; then
-            # Method tracing can slow some tests down a lot.
-            TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 600))
+            # Method tracing can slow some tests down a lot, in particular
+            # 530-checker-lse2.
+            TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 1200))
         fi
         shift
     elif [ "x$1" = "x--boot" ]; then
