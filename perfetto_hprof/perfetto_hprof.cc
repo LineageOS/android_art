@@ -32,9 +32,11 @@
 #include "gc/scoped_gc_critical_section.h"
 #include "mirror/object-refvisitor-inl.h"
 #include "nativehelper/scoped_local_ref.h"
+#include "perfetto/profiling/normalize.h"
 #include "perfetto/trace/interned_data/interned_data.pbzero.h"
 #include "perfetto/trace/profiling/heap_graph.pbzero.h"
 #include "perfetto/trace/profiling/profile_common.pbzero.h"
+#include "perfetto/config/profiling/java_hprof_config.pbzero.h"
 #include "perfetto/tracing.h"
 #include "runtime-inl.h"
 #include "runtime_callbacks.h"
@@ -104,13 +106,70 @@ void ArmWatchdogOrDie() {
   }
 }
 
+constexpr size_t kMaxCmdlineSize = 512;
+
 class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
  public:
-  // TODO(fmayer): Change Client API and reject configs that do not target
-  // this process.
-  void OnSetup(const SetupArgs&) override {}
+  void OnSetup(const SetupArgs& args) override {
+    // This is on the heap as it triggers -Wframe-larger-than.
+    std::unique_ptr<perfetto::protos::pbzero::JavaHprofConfig::Decoder> cfg(
+        new perfetto::protos::pbzero::JavaHprofConfig::Decoder(
+          args.config->java_hprof_config_raw()));
+
+    uint64_t self_pid = static_cast<uint64_t>(getpid());
+    for (auto it = cfg->pid(); it; ++it) {
+      uint64_t pid = it->as_uint64();
+      if (pid == self_pid) {
+        enabled_ = true;
+        return;
+      }
+    }
+
+    if (cfg->has_process_cmdline()) {
+      int fd = open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
+      if (fd == -1) {
+        PLOG(ERROR) << "failed to open /proc/self/cmdline";
+        return;
+      }
+      char cmdline[kMaxCmdlineSize];
+      ssize_t rd = read(fd, cmdline, sizeof(cmdline) - 1);
+      if (rd == -1) {
+        PLOG(ERROR) << "failed to read /proc/self/cmdline";
+      }
+      close(fd);
+      if (rd == -1) {
+        return;
+      }
+      cmdline[rd] = '\0';
+      char* cmdline_ptr = cmdline;
+      ssize_t sz = perfetto::profiling::NormalizeCmdLine(&cmdline_ptr, static_cast<size_t>(rd + 1));
+      if (sz == -1) {
+        PLOG(ERROR) << "failed to normalize cmdline";
+      }
+      for (auto it = cfg->process_cmdline(); it; ++it) {
+        std::string other = it->as_std_string();
+        // Append \0 to make this a C string.
+        other.resize(other.size() + 1);
+        char* other_ptr = &(other[0]);
+        ssize_t other_sz = perfetto::profiling::NormalizeCmdLine(&other_ptr, other.size());
+        if (other_sz == -1) {
+          PLOG(ERROR) << "failed to normalize other cmdline";
+          continue;
+        }
+        if (sz == other_sz && strncmp(cmdline_ptr, other_ptr, static_cast<size_t>(sz)) == 0) {
+          enabled_ = true;
+          return;
+        }
+      }
+    }
+  }
+
+  bool enabled() { return enabled_; }
 
   void OnStart(const StartArgs&) override {
+    if (!enabled()) {
+      return;
+    }
     art::MutexLock lk(art_thread(), GetStateMutex());
     if (g_state == State::kWaitForStart) {
       g_state = State::kStart;
@@ -131,6 +190,7 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
   }
 
  private:
+  bool enabled_ = false;
   static art::Thread* self_;
 };
 
@@ -261,6 +321,13 @@ void DumpPerfetto(art::Thread* self) {
   JavaHprofDataSource::Trace(
       [parent_pid](JavaHprofDataSource::TraceContext ctx)
           NO_THREAD_SAFETY_ANALYSIS {
+            {
+              auto ds = ctx.GetDataSourceLocked();
+              if (!ds || !ds->enabled()) {
+                LOG(INFO) << "skipping irrelevant data source.";
+                return;
+              }
+            }
             LOG(INFO) << "dumping heap for " << parent_pid;
             Writer writer(parent_pid, &ctx);
             // Make sure that intern ID 0 (default proto value for a uint64_t) always maps to ""
