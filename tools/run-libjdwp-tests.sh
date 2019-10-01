@@ -118,6 +118,9 @@ function verbose_run() {
   env "$@"
 }
 
+# Tell run-jdwp-tests.sh it was called from run-libjdwp-tests.sh
+export RUN_JDWP_TESTS_CALLED_FROM_LIBJDWP=true
+
 verbose_run ./art/tools/run-jdwp-tests.sh \
             "${args[@]}"                  \
             --jdwp-path "libjdwp.so"      \
