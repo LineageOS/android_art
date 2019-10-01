@@ -1,3 +1,8 @@
+// ART APEX module
+//
+// Contains both the Android Managed Runtime (ART) and the Android Core Library
+// (Libcore).
+
 // Modules listed in LOCAL_REQUIRED_MODULES for module art-runtime in art/Android.mk.
 // - Base requirements (binaries for which both 32- and 64-bit versions are built, if relevant).
 art_runtime_base_binaries_both = [
@@ -52,13 +57,6 @@ bionic_native_shared_libs = [
     "libdl",
 ]
 
-bionic_native_device_only_shared_libs = [
-    // ... and their internal dependencies
-    // These are available only on device
-    "libc_malloc_debug",
-    "libc_malloc_hooks",
-]
-
 bionic_binaries_both = [
     "linker",
 ]
@@ -87,7 +85,7 @@ art_runtime_debug_native_shared_libs = [
 ]
 
 art_runtime_base_native_device_only_debug_shared_libs = [
-  "libperfetto_hprofd",
+    "libperfetto_hprofd",
 ]
 
 // Tools common to both device APEX and host APEX. Derived from art-tools in art/Android.mk.
@@ -185,52 +183,6 @@ art_runtime_libraries_zipapex = [
     "libnativehelper",
     "libcutils",
 ]
-
-// Runtime (Bionic) APEX module
-//
-// This used to consist of Bionic, ART and Libcore. Now it contains Bionic only,
-// but keeps /apex/com.android.runtime for app compat reasons.
-//
-// TODO(b/139176024): Move this to the Bionic tree.
-
-android_app_certificate {
-    name: "com.android.runtime.certificate",
-    certificate: "com.android.runtime",
-}
-
-apex_key {
-    name: "com.android.runtime.key",
-    public_key: "com.android.runtime.avbpubkey",
-    private_key: "com.android.runtime.pem",
-}
-
-prebuilt_etc {
-    name: "com.android.runtime.ld.config.txt",
-    src: "runtime-ld.config.txt",
-    filename: "ld.config.txt",
-    installable: false,
-}
-
-apex {
-    name: "com.android.runtime",
-    compile_multilib: "both",
-    manifest: "manifest-runtime.json",
-    native_shared_libs: bionic_native_shared_libs +
-        bionic_native_device_only_shared_libs,
-    multilib: {
-        both: {
-            binaries: bionic_binaries_both,
-        },
-    },
-    prebuilts: ["com.android.runtime.ld.config.txt"],
-    key: "com.android.runtime.key",
-    certificate: ":com.android.runtime.certificate",
-}
-
-// ART APEX module
-//
-// Contains both the Android Managed Runtime (ART) and the Android Core Library
-// (Libcore).
 
 android_app_certificate {
     name: "com.android.art.certificate",

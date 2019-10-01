@@ -926,9 +926,7 @@ class NoSuperfluousLibrariesChecker:
   def run(self):
     self._checker.check_no_superfluous_files('javalib')
     self._checker.check_no_superfluous_files('lib')
-    self._checker.check_no_superfluous_files('lib/bionic')
     self._checker.check_no_superfluous_files('lib64')
-    self._checker.check_no_superfluous_files('lib64/bionic')
 
 
 class NoSuperfluousArtTestsChecker:
