@@ -37,6 +37,7 @@ cc_defaults {
     defaults: ["art_defaults"],
     include_dirs: [
         "external/perfetto/include",
+        "external/perfetto/protos",
     ],
 
     // Note that this tool needs to be built for both 32-bit and 64-bit since it requires
@@ -55,6 +56,13 @@ cc_defaults {
         // longer depends on this.
         "libprotobuf-cpp-lite",
     ],
+    generated_sources: [
+        "perfetto_protos_perfetto_config_profiling_zero_gen",
+        "art_perfetto_hprof_operator_srcs",
+    ],
+    generated_headers: [
+        "perfetto_protos_perfetto_config_profiling_zero_gen_headers",
+    ],
     target: {
         darwin: {
             enabled: false,
@@ -63,7 +71,6 @@ cc_defaults {
     header_libs: [
         "libnativehelper_header_only",
     ],
-    generated_sources: ["art_perfetto_hprof_operator_srcs"],
 }
 
 art_cc_library {
