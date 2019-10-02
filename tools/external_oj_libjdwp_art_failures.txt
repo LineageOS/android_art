@@ -31,6 +31,8 @@
            "org.apache.harmony.jpda.tests.jdwp.ClassType_SetValues002Test#testSetValues002",
            "org.apache.harmony.jpda.tests.jdwp.Events_ClassPrepare002Test#testClassPrepareCausedByDebugger",
            "org.apache.harmony.jpda.tests.jdwp.Events_ExceptionCaughtTest#testExceptionEvent_ThrowLocation_FromNative",
+           "org.apache.harmony.jpda.tests.jdwp.Events_MonitorWaitedTest#testMonitorWaitedForClassMatchFirst",
+           "org.apache.harmony.jpda.tests.jdwp.Events_MonitorWaitTest#testMonitorWaitForClassMatchFirst",
            "org.apache.harmony.jpda.tests.jdwp.ObjectReference_DisableCollectionTest#testDisableCollection_null",
            "org.apache.harmony.jpda.tests.jdwp.ObjectReference_EnableCollectionTest#testEnableCollection_invalid",
            "org.apache.harmony.jpda.tests.jdwp.ObjectReference_EnableCollectionTest#testEnableCollection_null",
