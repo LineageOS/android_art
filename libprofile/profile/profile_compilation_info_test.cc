@@ -33,6 +33,7 @@ namespace art {
 
 using Hotness = ProfileCompilationInfo::MethodHotness;
 using ProfileInlineCache = ProfileMethodInfo::ProfileInlineCache;
+using ProfileSampleAnnotation = ProfileCompilationInfo::ProfileSampleAnnotation;
 
 static constexpr size_t kMaxMethodIds = 65535;
 static uint32_t kMaxHotnessFlagBootIndex =
@@ -67,32 +68,31 @@ class ProfileCompilationInfoTest : public CommonArtTest {
  protected:
   bool AddMethod(ProfileCompilationInfo* info,
                  const DexFile* dex,
-                 uint16_t method_idx) {
-    return AddMethod(info, dex, method_idx, Hotness::kFlagHot);
-  }
-
-  bool AddMethod(ProfileCompilationInfo* info,
-                 const DexFile* dex,
                  uint16_t method_idx,
-                 Hotness::Flag flags) {
+                 Hotness::Flag flags = Hotness::kFlagHot,
+                 const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
     return info->AddMethod(ProfileMethodInfo(MethodReference(dex, method_idx)),
-                           flags);
+                           flags,
+                           annotation);
   }
 
   bool AddMethod(ProfileCompilationInfo* info,
                 const DexFile* dex,
                 uint16_t method_idx,
-                const std::vector<ProfileInlineCache>& inline_caches) {
+                const std::vector<ProfileInlineCache>& inline_caches,
+                const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
     return info->AddMethod(
         ProfileMethodInfo(MethodReference(dex, method_idx), inline_caches),
-        Hotness::kFlagHot);
+        Hotness::kFlagHot,
+        annotation);
   }
 
   bool AddClass(ProfileCompilationInfo* info,
                 const DexFile* dex,
-                dex::TypeIndex type_index) {
+                dex::TypeIndex type_index,
+                const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
     std::vector<dex::TypeIndex> classes = {type_index};
-    return info->AddClassesForDex(dex, classes.begin(), classes.end());
+    return info->AddClassesForDex(dex, classes.begin(), classes.end(), annotation);
   }
 
   uint32_t GetFd(const ScratchFile& file) {
@@ -102,8 +102,9 @@ class ProfileCompilationInfoTest : public CommonArtTest {
   std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> GetMethod(
       const ProfileCompilationInfo& info,
       const DexFile* dex,
-      uint16_t method_idx) {
-    return info.GetHotMethodInfo(MethodReference(dex, method_idx));
+      uint16_t method_idx,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
+    return info.GetHotMethodInfo(MethodReference(dex, method_idx), annotation);
   }
 
   // Creates an inline cache which will be destructed at the end of the test.
@@ -1414,5 +1415,258 @@ TEST_F(ProfileCompilationInfoTest, AddMethodsProfileMethodInfoFail) {
 
   std::vector<ProfileMethodInfo> pmis = {ProfileMethodInfo(hot), ProfileMethodInfo(bad_ref)};
   ASSERT_FALSE(info.AddMethods(pmis, Hotness::kFlagHot));
+}
+
+// Verify that we can add methods with annotations.
+TEST_F(ProfileCompilationInfoTest, AddAnnotationsToMethods) {
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+  // Save a few methods using different annotations, some overlapping, some not.
+  for (uint16_t i = 0; i < 10; i++) {
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+  }
+  for (uint16_t i = 5; i < 15; i++) {
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+  }
+
+  auto run_test = [&dex1 = dex1, &psa1 = psa1, &psa2 = psa2](const ProfileCompilationInfo& info) {
+    // Check that all methods are in.
+    for (uint16_t i = 0; i < 10; i++) {
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
+      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i), psa1) != nullptr);
+    }
+    for (uint16_t i = 5; i < 15; i++) {
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
+      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i), psa2) != nullptr);
+    }
+    // Check that the non-overlapping methods are not added with a wrong annotation.
+    for (uint16_t i = 10; i < 15; i++) {
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
+      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i), psa1) != nullptr);
+    }
+    for (uint16_t i = 0; i < 5; i++) {
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
+      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i), psa2) != nullptr);
+    }
+    // Check that when querying without an annotation only the first one is searched.
+    for (uint16_t i = 0; i < 10; i++) {
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i)).IsInProfile());
+      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i)) != nullptr);
+    }
+    // ... this should be false because they belong the second appearance of dex1.
+    for (uint16_t i = 10; i < 15; i++) {
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i)).IsInProfile());
+      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i)) != nullptr);
+    }
+
+    // Sanity check that methods cannot be found with a non existing annotation.
+    MethodReference ref(dex1, 0);
+    ProfileSampleAnnotation not_exisiting("A");
+    EXPECT_FALSE(info.GetMethodHotness(ref, not_exisiting).IsInProfile());
+    EXPECT_FALSE(info.GetHotMethodInfo(ref, not_exisiting) != nullptr);
+  };
+
+  // Run the test before save.
+  run_test(info);
+
+  ScratchFile profile;
+  ASSERT_TRUE(info.Save(GetFd(profile)));
+  ASSERT_EQ(0, profile.GetFile()->Flush());
+
+  // Check that we get back what we saved.
+  ProfileCompilationInfo loaded_info;
+  ASSERT_TRUE(profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
+  ASSERT_TRUE(loaded_info.Equals(info));
+
+  // Run the test after save and load.
+  run_test(loaded_info);
+}
+
+// Verify that we can add classes with annotations.
+TEST_F(ProfileCompilationInfoTest, AddAnnotationsToClasses) {
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+  // Save a few classes using different annotations, some overlapping, some not.
+  for (uint16_t i = 0; i < 10; i++) {
+    ASSERT_TRUE(AddClass(&info, dex1, dex::TypeIndex(i), psa1));
+  }
+  for (uint16_t i = 5; i < 15; i++) {
+    ASSERT_TRUE(AddClass(&info, dex1, dex::TypeIndex(i), psa2));
+  }
+
+  auto run_test = [&dex1 = dex1, &psa1 = psa1, &psa2 = psa2](const ProfileCompilationInfo& info) {
+    // Check that all classes are in.
+    for (uint16_t i = 0; i < 10; i++) {
+      EXPECT_TRUE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa1));
+    }
+    for (uint16_t i = 5; i < 15; i++) {
+      EXPECT_TRUE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa2));
+    }
+    // Check that the non-overlapping classes are not added with a wrong annotation.
+    for (uint16_t i = 10; i < 15; i++) {
+      EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa1));
+    }
+    for (uint16_t i = 0; i < 5; i++) {
+      EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa2));
+    }
+    // Check that when querying without an annotation only the first one is searched.
+    for (uint16_t i = 0; i < 10; i++) {
+      EXPECT_TRUE(info.ContainsClass(*dex1, dex::TypeIndex(i)));
+    }
+    // ... this should be false because they belong the second appearance of dex1.
+    for (uint16_t i = 10; i < 15; i++) {
+      EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(i)));
+    }
+
+    // Sanity check that classes cannot be found with a non existing annotation.
+    EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(0), ProfileSampleAnnotation("new_test")));
+  };
+
+  // Run the test before save.
+  run_test(info);
+
+  ScratchFile profile;
+  ASSERT_TRUE(info.Save(GetFd(profile)));
+  ASSERT_EQ(0, profile.GetFile()->Flush());
+
+  // Check that we get back what we saved.
+  ProfileCompilationInfo loaded_info;
+  ASSERT_TRUE(profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
+  ASSERT_TRUE(loaded_info.Equals(info));
+
+  // Run the test after save and load.
+  run_test(loaded_info);
+}
+
+// Verify we can merge samples with annotations.
+TEST_F(ProfileCompilationInfoTest, MergeWithAnnotations) {
+  ProfileCompilationInfo info1;
+  ProfileCompilationInfo info2;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+
+  for (uint16_t i = 0; i < 10; i++) {
+    ASSERT_TRUE(AddMethod(&info1, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+    ASSERT_TRUE(AddClass(&info1, dex1, dex::TypeIndex(i), psa1));
+  }
+  for (uint16_t i = 5; i < 15; i++) {
+    ASSERT_TRUE(AddMethod(&info2, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+    ASSERT_TRUE(AddMethod(&info2, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+    ASSERT_TRUE(AddMethod(&info2, dex2, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+    ASSERT_TRUE(AddClass(&info2, dex1, dex::TypeIndex(i), psa1));
+    ASSERT_TRUE(AddClass(&info2, dex1, dex::TypeIndex(i), psa2));
+  }
+
+  ProfileCompilationInfo info;
+  ASSERT_TRUE(info.MergeWith(info1));
+  ASSERT_TRUE(info.MergeWith(info2));
+
+  // Check that all items are in.
+  for (uint16_t i = 0; i < 15; i++) {
+    EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
+    EXPECT_TRUE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa1));
+  }
+  for (uint16_t i = 5; i < 15; i++) {
+    EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
+    EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex2, i), psa2).IsInProfile());
+    EXPECT_TRUE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa2));
+  }
+
+  // Check that the non-overlapping items are not added with a wrong annotation.
+  for (uint16_t i = 0; i < 5; i++) {
+    EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
+    EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex2, i), psa2).IsInProfile());
+    EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(i), psa2));
+  }
+}
+
+// Verify the bulk extraction API.
+TEST_F(ProfileCompilationInfoTest, ExtractInfoWithAnnations) {
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+
+  std::set<dex::TypeIndex> expected_classes;
+  std::set<uint16_t> expected_hot_methods;
+  std::set<uint16_t> expected_startup_methods;
+  std::set<uint16_t> expected_post_startup_methods;
+
+  for (uint16_t i = 0; i < 10; i++) {
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+    ASSERT_TRUE(AddClass(&info, dex1, dex::TypeIndex(i), psa1));
+    expected_hot_methods.insert(i);
+    expected_classes.insert(dex::TypeIndex(i));
+  }
+  for (uint16_t i = 5; i < 15; i++) {
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagStartup, psa1));
+    expected_startup_methods.insert(i);
+  }
+
+  std::set<dex::TypeIndex> classes;
+  std::set<uint16_t> hot_methods;
+  std::set<uint16_t> startup_methods;
+  std::set<uint16_t> post_startup_methods;
+
+  EXPECT_TRUE(info.GetClassesAndMethods(
+      *dex1, &classes, &hot_methods, &startup_methods, &post_startup_methods, psa1));
+  EXPECT_EQ(expected_classes, classes);
+  EXPECT_EQ(expected_hot_methods, hot_methods);
+  EXPECT_EQ(expected_startup_methods, startup_methods);
+  EXPECT_EQ(expected_post_startup_methods, post_startup_methods);
+
+  EXPECT_FALSE(info.GetClassesAndMethods(
+      *dex1,
+      &classes,
+      &hot_methods,
+      &startup_methods,
+      &post_startup_methods,
+      ProfileSampleAnnotation("new_test")));
+}
+
+// Verify the behavior for adding methods with annotations and different dex checksums.
+TEST_F(ProfileCompilationInfoTest, AddMethodsWithAnnotationAndDifferentChecksum) {
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+
+  MethodReference ref(dex1, 0);
+  MethodReference ref_checksum_missmatch(dex1_checksum_missmatch, 1);
+
+  ASSERT_TRUE(info.AddMethod(ProfileMethodInfo(ref), Hotness::kFlagHot, psa1));
+  // Adding a method with a different dex checksum and the same annotation should fail.
+  ASSERT_FALSE(info.AddMethod(ProfileMethodInfo(ref_checksum_missmatch), Hotness::kFlagHot, psa1));
+  // However, a method with a different dex checksum and a different annotation should be ok.
+  ASSERT_TRUE(info.AddMethod(ProfileMethodInfo(ref_checksum_missmatch), Hotness::kFlagHot, psa2));
+}
+
+// Verify the behavior for searching method with annotations and different dex checksums.
+TEST_F(ProfileCompilationInfoTest, FindMethodsWithAnnotationAndDifferentChecksum) {
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+
+  MethodReference ref(dex1, 0);
+  MethodReference ref_checksum_missmatch(dex1_checksum_missmatch, 0);
+
+  ASSERT_TRUE(info.AddMethod(ProfileMethodInfo(ref), Hotness::kFlagHot, psa1));
+
+  // The method should be in the profile when searched with the correct data.
+  EXPECT_TRUE(info.GetMethodHotness(ref, psa1).IsInProfile());
+  // We should get a negative result if the dex checksum  does not match.
+  EXPECT_FALSE(info.GetMethodHotness(ref_checksum_missmatch, psa1).IsInProfile());
+
+  // If we search without annotation we should have the same behaviour.
+  EXPECT_TRUE(info.GetMethodHotness(ref).IsInProfile());
+  EXPECT_FALSE(info.GetMethodHotness(ref_checksum_missmatch).IsInProfile());
 }
 }  // namespace art
