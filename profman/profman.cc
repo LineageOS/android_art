@@ -159,8 +159,6 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("      the file passed with --profile-fd(file) to the profile passed with");
   UsageError("      --reference-profile-fd(file) and update at the same time the profile-key");
   UsageError("      of entries corresponding to the apks passed with --apk(-fd).");
-  // TODO(calin): remove after the flag is removed from installd.
-  UsageError("  --store-aggregation-counters: no-op");
   UsageError("");
 
   exit(EXIT_FAILURE);
@@ -316,8 +314,6 @@ class ProfMan final {
         ParseUintOption(raw_option, "--generate-test-profile-seed=", &test_profile_seed_);
       } else if (option == "--copy-and-update-profile-key") {
         copy_and_update_profile_key_ = true;
-      } else if (option == "--store-aggregation-counters") {
-        // TODO(calin): remove this branch
       } else {
         Usage("Unknown argument '%s'", raw_option);
       }
