@@ -356,7 +356,7 @@ ClassLoaderContext::ClassLoaderInfo* ClassLoaderContext::ParseInternal(
       // The class loader spec contains shared libraries. Find the matching closing
       // shared library marker for it.
 
-      uint32_t shared_library_close =
+      size_t shared_library_close =
           FindMatchingSharedLibraryCloseMarker(remaining, first_shared_library_open);
       if (shared_library_close == std::string::npos) {
         LOG(ERROR) << "Invalid class loader spec: " << class_loader_spec;
