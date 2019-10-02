@@ -568,10 +568,11 @@ def run_test(command, test, test_variant, test_name):
       test_skipped = False
       test_start_time = time.monotonic()
       if gdb:
-        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, universal_newlines=True)
+        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT,
+                                universal_newlines=True, start_new_session=True)
       else:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, stdout = subprocess.PIPE,
-                                universal_newlines=True)
+                                universal_newlines=True, start_new_session=True)
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
       test_time_seconds = time.monotonic() - test_start_time
@@ -594,9 +595,7 @@ def run_test(command, test, test_variant, test_name):
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
     # The python documentation states that it is necessary to actually kill the process.
-    # Note: This is not the correct solution, really, as it will not kill descendants. We would need
-    #       something more complex, e.g., killing by session ID (e.g., in a trap in run-test).
-    proc.kill()
+    os.killpg(proc.pid, signal.SIGKILL)
     script_output = proc.communicate()
 
     return (test_name, 'TIMEOUT', 'Timed out in %d seconds\n%s' % (timeout, command), test_time)
