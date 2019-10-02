@@ -102,6 +102,10 @@ class ProfileSaver {
   // and put the result in tracked_dex_base_locations_.
   void ResolveTrackedLocations() REQUIRES(!Locks::profiler_lock_);
 
+  // Get the profile metadata that should be associated with the profile session during the current
+  // profile saver session.
+  ProfileCompilationInfo::ProfileSampleAnnotation GetProfileSampleAnnotation();
+
   // The only instance of the saver.
   static ProfileSaver* instance_ GUARDED_BY(Locks::profiler_lock_);
   // Profile saver thread.
