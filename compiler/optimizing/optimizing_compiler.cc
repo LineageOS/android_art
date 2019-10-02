@@ -406,9 +406,7 @@ class OptimizingCompiler final : public Compiler {
                                 PassObserver* pass_observer,
                                 VariableSizedHandleScope* handles) const;
 
-  void GenerateJitDebugInfo(ArtMethod* method,
-                            const debug::MethodDebugInfo& method_debug_info)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+  void GenerateJitDebugInfo(const debug::MethodDebugInfo& method_debug_info);
 
   std::unique_ptr<OptimizingCompilerStats> compilation_stats_;
 
@@ -1297,26 +1295,9 @@ bool OptimizingCompiler::JitCompile(Thread* self,
       return false;
     }
 
-    const void* code = code_cache->CommitCode(
-        self,
-        region,
-        method,
-        jni_compiled_method.GetCode().data(),
-        jni_compiled_method.GetCode().size(),
-        stack_map.data(),
-        stack_map.size(),
-        roots_data,
-        roots,
-        osr,
-        /* has_should_deoptimize_flag= */ false,
-        cha_single_implementation_list);
-    if (code == nullptr) {
-      code_cache->ClearData(self, region, roots_data);
-      return false;
-    }
-
-    if (compiler_options.GenerateAnyDebugInfo()) {
-      const auto* method_header = reinterpret_cast<const OatQuickMethodHeader*>(code);
+    // Add debug info after we know the code location but before we update entry-point.
+    const std::function<void(const void*)> generate_debug_info = [&](const void* code) {
+      const OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code);
       const uintptr_t code_address = reinterpret_cast<uintptr_t>(method_header->GetCode());
       debug::MethodDebugInfo info = {};
       info.custom_name = "art_jni_trampoline";
@@ -1335,7 +1316,26 @@ bool OptimizingCompiler::JitCompile(Thread* self,
       info.frame_size_in_bytes = method_header->GetFrameSizeInBytes();
       info.code_info = nullptr;
       info.cfi = jni_compiled_method.GetCfi();
-      GenerateJitDebugInfo(method, info);
+      GenerateJitDebugInfo(info);
+    };
+
+    const void* code = code_cache->CommitCode(
+        self,
+        region,
+        method,
+        jni_compiled_method.GetCode().data(),
+        jni_compiled_method.GetCode().size(),
+        stack_map.data(),
+        stack_map.size(),
+        roots_data,
+        roots,
+        osr,
+        /* has_should_deoptimize_flag= */ false,
+        cha_single_implementation_list,
+        generate_debug_info);
+    if (code == nullptr) {
+      code_cache->ClearData(self, region, roots_data);
+      return false;
     }
 
     Runtime::Current()->GetJit()->AddMemoryUsage(method, allocator.BytesUsed());
@@ -1398,29 +1398,10 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                        return handles.Contains(root.GetReference());
                      }));
 
-  const void* code = code_cache->CommitCode(
-      self,
-      region,
-      method,
-      code_allocator.GetMemory().data(),
-      code_allocator.GetMemory().size(),
-      stack_map.data(),
-      stack_map.size(),
-      roots_data,
-      roots,
-      osr,
-      codegen->GetGraph()->HasShouldDeoptimizeFlag(),
-      codegen->GetGraph()->GetCHASingleImplementationList());
-
-  if (code == nullptr) {
-    MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
-    code_cache->ClearData(self, region, roots_data);
-    return false;
-  }
-
-  const CompilerOptions& compiler_options = GetCompilerOptions();
-  if (compiler_options.GenerateAnyDebugInfo()) {
-    const OatQuickMethodHeader* method_header = reinterpret_cast<const OatQuickMethodHeader*>(code);
+  // Add debug info after we know the code location but before we update entry-point.
+  const std::function<void(const void*)> generate_debug_info = [&](const void* code) {
+    const CompilerOptions& compiler_options = GetCompilerOptions();
+    const OatQuickMethodHeader* method_header = OatQuickMethodHeader::FromCodePointer(code);
     const uintptr_t code_address = reinterpret_cast<uintptr_t>(method_header->GetCode());
     debug::MethodDebugInfo info = {};
     DCHECK(info.custom_name.empty());
@@ -1439,7 +1420,28 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     info.frame_size_in_bytes = method_header->GetFrameSizeInBytes();
     info.code_info = stack_map.size() == 0 ? nullptr : method_header->GetOptimizedCodeInfoPtr();
     info.cfi = ArrayRef<const uint8_t>(*codegen->GetAssembler()->cfi().data());
-    GenerateJitDebugInfo(method, info);
+    GenerateJitDebugInfo(info);
+  };
+
+  const void* code = code_cache->CommitCode(
+      self,
+      region,
+      method,
+      code_allocator.GetMemory().data(),
+      code_allocator.GetMemory().size(),
+      stack_map.data(),
+      stack_map.size(),
+      roots_data,
+      roots,
+      osr,
+      codegen->GetGraph()->HasShouldDeoptimizeFlag(),
+      codegen->GetGraph()->GetCHASingleImplementationList(),
+      generate_debug_info);
+
+  if (code == nullptr) {
+    MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kJitOutOfMemoryForCommit);
+    code_cache->ClearData(self, region, roots_data);
+    return false;
   }
 
   Runtime::Current()->GetJit()->AddMemoryUsage(method, allocator.BytesUsed());
@@ -1463,14 +1465,9 @@ bool OptimizingCompiler::JitCompile(Thread* self,
   return true;
 }
 
-void OptimizingCompiler::GenerateJitDebugInfo(ArtMethod* method ATTRIBUTE_UNUSED,
-                                              const debug::MethodDebugInfo& info) {
+void OptimizingCompiler::GenerateJitDebugInfo(const debug::MethodDebugInfo& info) {
   const CompilerOptions& compiler_options = GetCompilerOptions();
-  DCHECK(compiler_options.GenerateAnyDebugInfo());
-  TimingLogger logger("Generate JIT debug info logger", true, VLOG_IS_ON(jit));
-  {
-    TimingLogger::ScopedTiming st("Generate JIT debug info", &logger);
-
+  if (compiler_options.GenerateAnyDebugInfo()) {
     // If both flags are passed, generate full debug info.
     const bool mini_debug_info = !compiler_options.GetGenerateDebugInfo();
 
@@ -1480,11 +1477,10 @@ void OptimizingCompiler::GenerateJitDebugInfo(ArtMethod* method ATTRIBUTE_UNUSED
     std::vector<uint8_t> elf = debug::MakeElfFileForJIT(isa, features, mini_debug_info, info);
 
     // NB: Don't allow packing of full info since it would remove non-backtrace data.
-    MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+    Locks::jit_lock_->AssertHeld(Thread::Current());
     const void* code_ptr = reinterpret_cast<const void*>(info.code_address);
     AddNativeDebugInfoForJit(code_ptr, elf, /*allow_packing=*/ mini_debug_info);
   }
-  Runtime::Current()->GetJit()->AddTimingLogger(logger);
 }
 
 }  // namespace art

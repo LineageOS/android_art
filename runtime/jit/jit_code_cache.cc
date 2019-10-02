@@ -334,7 +334,9 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
                                   const std::vector<Handle<mirror::Object>>& roots,
                                   bool osr,
                                   bool has_should_deoptimize_flag,
-                                  const ArenaSet<ArtMethod*>& cha_single_implementation_list) {
+                                  const ArenaSet<ArtMethod*>& cha_single_implementation_list,
+                                  const std::function<void(const uint8_t* code)>&
+                                      generate_debug_info) {
   uint8_t* result = CommitCodeInternal(self,
                                        region,
                                        method,
@@ -346,7 +348,8 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
                                        roots,
                                        osr,
                                        has_should_deoptimize_flag,
-                                       cha_single_implementation_list);
+                                       cha_single_implementation_list,
+                                       generate_debug_info);
   if (result == nullptr) {
     // Retry.
     GarbageCollectCache(self);
@@ -361,7 +364,8 @@ uint8_t* JitCodeCache::CommitCode(Thread* self,
                                 roots,
                                 osr,
                                 has_should_deoptimize_flag,
-                                cha_single_implementation_list);
+                                cha_single_implementation_list,
+                                generate_debug_info);
   }
   return result;
 }
@@ -680,7 +684,9 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
                                           bool osr,
                                           bool has_should_deoptimize_flag,
                                           const ArenaSet<ArtMethod*>&
-                                              cha_single_implementation_list) {
+                                              cha_single_implementation_list,
+                                          const std::function<void(const uint8_t* code)>&
+                                              generate_debug_info) {
   DCHECK(!method->IsNative() || !osr);
 
   if (!method->IsNative()) {
@@ -712,6 +718,9 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
   }
 
   number_of_compilations_++;
+
+  // Add debug info after we know the code location but before we update entry-point.
+  generate_debug_info(code_ptr);
 
   // We need to update the entry point in the runnable state for the instrumentation.
   {
