@@ -360,7 +360,7 @@ func artDebugDefaultsFactory() android.Module {
 func artDefaultsFactory() android.Module {
 	c := &codegenProperties{}
 	module := cc.DefaultsFactory(c)
-	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, true) })
+	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, staticAndSharedLibrary) })
 
 	return module
 }
@@ -368,7 +368,7 @@ func artDefaultsFactory() android.Module {
 func libartDefaultsFactory() android.Module {
 	c := &codegenProperties{}
 	module := cc.DefaultsFactory(c)
-	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, true) })
+	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, staticAndSharedLibrary) })
 
 	return module
 }
@@ -376,7 +376,7 @@ func libartDefaultsFactory() android.Module {
 func libartStaticDefaultsFactory() android.Module {
 	c := &codegenProperties{}
 	module := cc.DefaultsFactory(c)
-	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, true) })
+	android.AddLoadHook(module, func(ctx android.LoadHookContext) { codegen(ctx, c, staticLibrary) })
 
 	return module
 }
@@ -385,7 +385,7 @@ func artLibrary() android.Module {
 	m, _ := cc.NewLibrary(android.HostAndDeviceSupported)
 	module := m.Init()
 
-	installCodegenCustomizer(module, true)
+	installCodegenCustomizer(module, staticAndSharedLibrary)
 
 	return module
 }
@@ -395,7 +395,7 @@ func artStaticLibrary() android.Module {
 	library.BuildOnlyStatic()
 	module := m.Init()
 
-	installCodegenCustomizer(module, true)
+	installCodegenCustomizer(module, staticLibrary)
 
 	return module
 }
@@ -413,7 +413,7 @@ func artTest() android.Module {
 	test := cc.NewTest(android.HostAndDeviceSupported)
 	module := test.Init()
 
-	installCodegenCustomizer(module, false)
+	installCodegenCustomizer(module, binary)
 
 	android.AddLoadHook(module, customLinker)
 	android.AddLoadHook(module, prefer32Bit)
@@ -425,7 +425,7 @@ func artTestLibrary() android.Module {
 	test := cc.NewTestLibrary(android.HostAndDeviceSupported)
 	module := test.Init()
 
-	installCodegenCustomizer(module, false)
+	installCodegenCustomizer(module, staticAndSharedLibrary)
 
 	android.AddLoadHook(module, prefer32Bit)
 	android.AddInstallHook(module, testInstall)
