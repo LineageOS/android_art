@@ -68,6 +68,15 @@ static_assert(sizeof(ProfileCompilationInfo::kProfileVersionForBootImage) == 4,
 // DO NOT CHANGE THIS! (it's similar to classes.dex in the apk files).
 const char ProfileCompilationInfo::kDexMetadataProfileEntry[] = "primary.prof";
 
+// A synthetic annotations that can be used to denote that no annotation should
+// be associated with the profile samples. We use the empty string for the package name
+// because that's an invalid package name and should never occur in practice.
+const ProfileCompilationInfo::ProfileSampleAnnotation
+  ProfileCompilationInfo::ProfileSampleAnnotation::kNone =
+      ProfileCompilationInfo::ProfileSampleAnnotation("");
+
+static constexpr char kSampleMetdataSeparator = ':';
+
 static constexpr uint16_t kMaxDexFileKeyLength = PATH_MAX;
 
 // Debug flag to ignore checksums when testing if a method or a class is present in the profile.
@@ -149,12 +158,13 @@ void ProfileCompilationInfo::DexPcData::AddClass(uint16_t dex_profile_idx,
 
 // Transform the actual dex location into a key used to index the dex file in the profile.
 // See ProfileCompilationInfo#GetProfileDexFileBaseKey as well.
-// For regular profiles (non-boot) the profile key is the same as its base key.
-std::string ProfileCompilationInfo::GetProfileDexFileKey(const std::string& dex_location) const {
-  // TODO(calin): append the RuntimeInstructionSet to the key so we can capture arch-dependent data.
-  // This requires a bit of work as the ProfileSaver and various tests rely on this being a
-  // static public method.
-  return GetProfileDexFileBaseKey(dex_location);
+std::string ProfileCompilationInfo::GetProfileDexFileAugmentedKey(
+      const std::string& dex_location,
+      const ProfileSampleAnnotation& annotation) {
+  std::string base_key = GetProfileDexFileBaseKey(dex_location);
+  return annotation == ProfileSampleAnnotation::kNone
+      ? base_key
+      : base_key + kSampleMetdataSeparator + annotation.GetOriginPackageName();;
 }
 
 // Transform the actual dex location into a base profile key (represented as relative paths).
@@ -172,10 +182,26 @@ std::string ProfileCompilationInfo::GetProfileDexFileBaseKey(const std::string& 
   }
 }
 
+std::string ProfileCompilationInfo::GetBaseKeyFromAugmentedKey(
+    const std::string& profile_key) {
+  size_t pos = profile_key.rfind(kSampleMetdataSeparator);
+  return (pos == std::string::npos) ? profile_key : profile_key.substr(0, pos);
+}
+
+std::string ProfileCompilationInfo::MigrateAnnotationInfo(
+    const std::string& base_key,
+    const std::string& augmented_key) {
+  size_t pos = augmented_key.rfind(kSampleMetdataSeparator);
+  return (pos == std::string::npos)
+      ? base_key
+      : base_key + augmented_key.substr(pos);
+}
+
 bool ProfileCompilationInfo::AddMethods(const std::vector<ProfileMethodInfo>& methods,
-                                        MethodHotness::Flag flags) {
+                                        MethodHotness::Flag flags,
+                                        const ProfileSampleAnnotation& annotation) {
   for (const ProfileMethodInfo& method : methods) {
-    if (!AddMethod(method, flags)) {
+    if (!AddMethod(method, flags, annotation)) {
       return false;
     }
   }
@@ -641,8 +667,31 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
   return result;
 }
 
-bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags) {
-  DexFileData* const data = GetOrAddDexFileData(pmi.ref.dex_file);
+const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexDataUsingAnnotations(
+      const DexFile* dex_file,
+      const ProfileSampleAnnotation& annotation) const {
+  if (annotation == ProfileSampleAnnotation::kNone) {
+    std::string profile_key = GetProfileDexFileBaseKey(dex_file->GetLocation());
+    for (const DexFileData* dex_data : info_) {
+      if (profile_key == GetBaseKeyFromAugmentedKey(dex_data->profile_key)) {
+        if (!ChecksumMatch(dex_data->checksum, dex_file->GetLocationChecksum())) {
+          return nullptr;
+        }
+        return dex_data;
+      }
+    }
+  } else {
+    std::string profile_key = GetProfileDexFileAugmentedKey(dex_file->GetLocation(), annotation);
+    return FindDexData(profile_key, dex_file->GetLocationChecksum());
+  }
+
+  return nullptr;
+}
+
+bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
+                                       MethodHotness::Flag flags,
+                                       const ProfileSampleAnnotation& annotation) {
+  DexFileData* const data = GetOrAddDexFileData(pmi.ref.dex_file, annotation);
   if (data == nullptr) {  // checksum mismatch
     return false;
   }
@@ -664,7 +713,7 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi, MethodHotne
       continue;
     }
     for (const TypeReference& class_ref : cache.classes) {
-      DexFileData* class_dex_data = GetOrAddDexFileData(class_ref.dex_file);
+      DexFileData* class_dex_data = GetOrAddDexFileData(class_ref.dex_file, annotation);
       if (class_dex_data == nullptr) {  // checksum mismatch
         return false;
       }
@@ -1021,10 +1070,11 @@ bool ProfileCompilationInfo::Load(
 bool ProfileCompilationInfo::VerifyProfileData(const std::vector<const DexFile*>& dex_files) {
   std::unordered_map<std::string, const DexFile*> key_to_dex_file;
   for (const DexFile* dex_file : dex_files) {
-    key_to_dex_file.emplace(GetProfileDexFileKey(dex_file->GetLocation()), dex_file);
+    key_to_dex_file.emplace(GetProfileDexFileBaseKey(dex_file->GetLocation()), dex_file);
   }
   for (const DexFileData* dex_data : info_) {
-    const auto it = key_to_dex_file.find(dex_data->profile_key);
+    // We need to remove any annotation from the key during verification.
+    const auto it = key_to_dex_file.find(GetBaseKeyFromAugmentedKey(dex_data->profile_key));
     if (it == key_to_dex_file.end()) {
       // It is okay if profile contains data for additional dex files.
       continue;
@@ -1506,23 +1556,19 @@ bool ProfileCompilationInfo::MergeWith(const ProfileCompilationInfo& other,
   return true;
 }
 
-const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
-    const DexFile* dex_file) const {
-  return FindDexData(GetProfileDexFileKey(dex_file->GetLocation()),
-                     dex_file->GetLocationChecksum());
-}
-
 ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
-    const MethodReference& method_ref) const {
-  const DexFileData* dex_data = FindDexData(method_ref.dex_file);
+    const MethodReference& method_ref,
+    const ProfileSampleAnnotation& annotation) const {
+  const DexFileData* dex_data = FindDexDataUsingAnnotations(method_ref.dex_file, annotation);
   return dex_data != nullptr
       ? dex_data->GetHotnessInfo(method_ref.index)
       : MethodHotness();
 }
 
 std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo>
-ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref) const {
-  MethodHotness hotness(GetMethodHotness(method_ref));
+ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref,
+                                         const ProfileSampleAnnotation& annotation) const {
+  MethodHotness hotness(GetMethodHotness(method_ref, annotation));
   if (!hotness.IsHot()) {
     return nullptr;
   }
@@ -1541,8 +1587,10 @@ ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref) cons
 }
 
 
-bool ProfileCompilationInfo::ContainsClass(const DexFile& dex_file, dex::TypeIndex type_idx) const {
-  const DexFileData* dex_data = FindDexData(&dex_file);
+bool ProfileCompilationInfo::ContainsClass(const DexFile& dex_file,
+                                           dex::TypeIndex type_idx,
+                                           const ProfileSampleAnnotation& annotation) const {
+  const DexFileData* dex_data = FindDexDataUsingAnnotations(&dex_file, annotation);
   return (dex_data != nullptr) && dex_data->ContainsClass(type_idx);
 }
 
@@ -1579,14 +1627,15 @@ std::string ProfileCompilationInfo::DumpInfo(const std::vector<const DexFile*>& 
       os << dex_data->profile_key;
     } else {
       // Replace the (empty) multidex suffix of the first key with a substitute for easier reading.
-      std::string multidex_suffix = DexFileLoader::GetMultiDexSuffix(dex_data->profile_key);
+      std::string multidex_suffix = DexFileLoader::GetMultiDexSuffix(
+          GetBaseKeyFromAugmentedKey(dex_data->profile_key));
       os << (multidex_suffix.empty() ? kFirstDexFileKeySubstitute : multidex_suffix);
     }
     os << " [index=" << static_cast<uint32_t>(dex_data->profile_index) << "]";
     os << " [checksum=" << std::hex << dex_data->checksum << "]" << std::dec;
     const DexFile* dex_file = nullptr;
     for (const DexFile* current : dex_files) {
-      if (dex_data->profile_key == current->GetLocation() &&
+      if (GetBaseKeyFromAugmentedKey(dex_data->profile_key) == current->GetLocation() &&
           dex_data->checksum == current->GetLocationChecksum()) {
         dex_file = current;
       }
@@ -1651,9 +1700,10 @@ bool ProfileCompilationInfo::GetClassesAndMethods(
     /*out*/std::set<dex::TypeIndex>* class_set,
     /*out*/std::set<uint16_t>* hot_method_set,
     /*out*/std::set<uint16_t>* startup_method_set,
-    /*out*/std::set<uint16_t>* post_startup_method_method_set) const {
+    /*out*/std::set<uint16_t>* post_startup_method_method_set,
+    const ProfileSampleAnnotation& annotation) const {
   std::set<std::string> ret;
-  const DexFileData* dex_data = FindDexData(&dex_file);
+  const DexFileData* dex_data = FindDexDataUsingAnnotations(&dex_file, annotation);
   if (dex_data == nullptr) {
     return false;
   }
@@ -1722,7 +1772,7 @@ bool ProfileCompilationInfo::GenerateTestProfile(int fd,
 
   for (uint16_t i = 0; i < number_of_dex_files; i++) {
     std::string dex_location = DexFileLoader::GetMultiDexLocation(i, base_dex_location.c_str());
-    std::string profile_key = info.GetProfileDexFileKey(dex_location);
+    std::string profile_key = info.GetProfileDexFileBaseKey(dex_location);
 
     DexFileData* const data = info.GetOrAddDexFileData(profile_key, /*checksum=*/ 0, max_method);
     for (uint16_t m = 0; m < number_of_methods; m++) {
@@ -2021,10 +2071,11 @@ ProfileCompilationInfo::FindOrAddDexPc(InlineCacheMap* inline_cache, uint32_t de
 }
 
 HashSet<std::string> ProfileCompilationInfo::GetClassDescriptors(
-    const std::vector<const DexFile*>& dex_files) {
+    const std::vector<const DexFile*>& dex_files,
+    const ProfileSampleAnnotation& annotation) {
   HashSet<std::string> ret;
   for (const DexFile* dex_file : dex_files) {
-    const DexFileData* data = FindDexData(dex_file);
+    const DexFileData* data = FindDexDataUsingAnnotations(dex_file, annotation);
     if (data != nullptr) {
       for (dex::TypeIndex type_idx : data->class_set) {
         if (!dex_file->IsTypeIndexValid(type_idx)) {
@@ -2079,8 +2130,9 @@ bool ProfileCompilationInfo::UpdateProfileKeys(
     for (DexFileData* dex_data : info_) {
       if (dex_data->checksum == dex_file->GetLocationChecksum()
           && dex_data->num_method_ids == dex_file->NumMethodIds()) {
-        std::string new_profile_key = GetProfileDexFileKey(dex_file->GetLocation());
-        if (dex_data->profile_key != new_profile_key) {
+        std::string new_profile_key = GetProfileDexFileBaseKey(dex_file->GetLocation());
+        std::string dex_data_base_key = GetBaseKeyFromAugmentedKey(dex_data->profile_key);
+        if (dex_data_base_key != new_profile_key) {
           if (profile_key_map_.find(new_profile_key) != profile_key_map_.end()) {
             // We can't update the key if the new key belongs to a different dex file.
             LOG(ERROR) << "Cannot update profile key to " << new_profile_key
@@ -2088,7 +2140,10 @@ bool ProfileCompilationInfo::UpdateProfileKeys(
             return false;
           }
           profile_key_map_.erase(dex_data->profile_key);
-          profile_key_map_.Put(new_profile_key, dex_data->profile_index);
+          // Retain the annotation (if any) during the renaming by re-attaching the info
+          // form the old key.
+          profile_key_map_.Put(MigrateAnnotationInfo(new_profile_key, dex_data->profile_key),
+                               dex_data->profile_index);
           dex_data->profile_key = new_profile_key;
         }
       }
@@ -2140,4 +2195,8 @@ std::ostream& operator<<(std::ostream& stream,
   return stream;
 }
 
+bool ProfileCompilationInfo::ProfileSampleAnnotation::operator==(
+      const ProfileSampleAnnotation& other) const {
+  return origin_package_name_ == other.origin_package_name_;
+}
 }  // namespace art

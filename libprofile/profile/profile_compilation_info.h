@@ -271,11 +271,35 @@ class ProfileCompilationInfo {
         : inline_caches(inline_cache_map) {}
 
     bool operator==(const OfflineProfileMethodInfo& other) const;
-    // Checks that this offline represenation of inline caches matches the runtime view of the data.
+    // Checks that this offline representation of inline caches matches the runtime view of the
+    // data.
     bool operator==(const std::vector<ProfileMethodInfo::ProfileInlineCache>& other) const;
 
     const InlineCacheMap* const inline_caches;
     std::vector<DexReference> dex_references;
+  };
+
+  // Encapsulates metadata that can be associated with the methods and classes added to the profile.
+  // The additional metadata is serialized in the profile and becomes part of the profile key
+  // representation. It can be used to differentiate the samples that are added to the profile
+  // based on the supported criteria (e.g. keep track of which app generated what sample when
+  // constructing a boot profile.).
+  class ProfileSampleAnnotation {
+   public:
+    explicit ProfileSampleAnnotation(const std::string& package_name) :
+        origin_package_name_(package_name) {}
+
+    const std::string& GetOriginPackageName() const { return origin_package_name_; }
+
+    bool operator==(const ProfileSampleAnnotation& other) const;
+
+    // A convenient empty annotation object that can be used to denote that no annotation should
+    // be associated with the profile samples.
+    static const ProfileSampleAnnotation kNone;
+
+   private:
+    // The name of the package that generated the samples.
+    const std::string origin_package_name_;
   };
 
   // Public methods to create, extend or query the profile.
@@ -287,13 +311,24 @@ class ProfileCompilationInfo {
   ~ProfileCompilationInfo();
 
   // Add the given methods to the current profile object.
-  bool AddMethods(const std::vector<ProfileMethodInfo>& methods, MethodHotness::Flag flags);
+  //
+  // Note: if an annotation is provided, the methods/classes will be associated with the group
+  // (dex_file, sample_annotation). Each group keeps its unique set of methods/classes.
+  bool AddMethods(const std::vector<ProfileMethodInfo>& methods,
+                  MethodHotness::Flag flags,
+                  const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone);
 
   // Add multiple type ids for classes in a single dex file. Iterator is for type_ids not
   // class_defs.
+  //
+  // Note: see AddMethods docs for the handling of annotations.
   template <class Iterator>
-  bool AddClassesForDex(const DexFile* dex_file, Iterator index_begin, Iterator index_end) {
-    DexFileData* data = GetOrAddDexFileData(dex_file);
+  bool AddClassesForDex(
+      const DexFile* dex_file,
+      Iterator index_begin,
+      Iterator index_end,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
+    DexFileData* data = GetOrAddDexFileData(dex_file, annotation);
     if (data == nullptr) {
       return false;
     }
@@ -302,16 +337,24 @@ class ProfileCompilationInfo {
   }
 
   // Add a method to the profile using its online representation (containing runtime structures).
-  bool AddMethod(const ProfileMethodInfo& pmi, MethodHotness::Flag flags);
+  //
+  // Note: see AddMethods docs for the handling of annotations.
+  bool AddMethod(const ProfileMethodInfo& pmi,
+                 MethodHotness::Flag flags,
+                 const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone);
 
   // Bulk add sampled methods and/or hot methods for a single dex, fast since it only has one
   // GetOrAddDexFileData call.
+  //
+  // Note: see AddMethods docs for the handling of annotations.
   template <class Iterator>
-  bool AddMethodsForDex(MethodHotness::Flag flags,
-                        const DexFile* dex_file,
-                        Iterator index_begin,
-                        Iterator index_end) {
-    DexFileData* data = GetOrAddDexFileData(dex_file);
+  bool AddMethodsForDex(
+      MethodHotness::Flag flags,
+      const DexFile* dex_file,
+      Iterator index_begin,
+      Iterator index_end,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
+    DexFileData* data = GetOrAddDexFileData(dex_file, annotation);
     if (data == nullptr) {
       return false;
     }
@@ -377,17 +420,35 @@ class ProfileCompilationInfo {
   uint32_t GetNumberOfResolvedClasses() const;
 
   // Returns the profile method info for a given method reference.
-  MethodHotness GetMethodHotness(const MethodReference& method_ref) const;;
+  //
+  // Note that if the profile was built with annotations, the same dex file may be
+  // represented multiple times in the profile (due to different annotation associated with it).
+  // If so, and if no annotation is passed to this method, then only the first dex file is searched.
+  //
+  // Implementation details: It is suitable to pass kNone for regular profile guided compilation
+  // because during compilation we generally don't care about annotations. The metadata is
+  // useful for boot profiles which need the extra information.
+  MethodHotness GetMethodHotness(
+      const MethodReference& method_ref,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
 
   // Return true if the class's type is present in the profiling info.
-  bool ContainsClass(const DexFile& dex_file, dex::TypeIndex type_idx) const;
+  //
+  // Note: see GetMethodHotness docs for the handling of annotations.
+  bool ContainsClass(
+      const DexFile& dex_file,
+      dex::TypeIndex type_idx,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
 
   // Return the hot method info for the given location and index from the profiling info.
   // If the method index is not found or the checksum doesn't match, null is returned.
   // Note: the inline cache map is a pointer to the map stored in the profile and
   // its allocation will go away if the profile goes out of scope.
+  //
+  // Note: see GetMethodHotness docs for the handling of annotations.
   std::unique_ptr<OfflineProfileMethodInfo> GetHotMethodInfo(
-      const MethodReference& method_ref) const;
+      const MethodReference& method_ref,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
 
   // Dump all the loaded profile info into a string and returns it.
   // If dex_files is not empty then the method indices will be resolved to their
@@ -399,11 +460,15 @@ class ProfileCompilationInfo {
   // Return the classes and methods for a given dex file through out args. The out args are the set
   // of class as well as the methods and their associated inline caches. Returns true if the dex
   // file is register and has a matching checksum, false otherwise.
-  bool GetClassesAndMethods(const DexFile& dex_file,
-                            /*out*/std::set<dex::TypeIndex>* class_set,
-                            /*out*/std::set<uint16_t>* hot_method_set,
-                            /*out*/std::set<uint16_t>* startup_method_set,
-                            /*out*/std::set<uint16_t>* post_startup_method_method_set) const;
+  //
+  // Note: see GetMethodHotness docs for the handling of annotations.
+  bool GetClassesAndMethods(
+      const DexFile& dex_file,
+      /*out*/std::set<dex::TypeIndex>* class_set,
+      /*out*/std::set<uint16_t>* hot_method_set,
+      /*out*/std::set<uint16_t>* startup_method_set,
+      /*out*/std::set<uint16_t>* post_startup_method_method_set,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
 
   // Returns true iff both profiles have the same version.
   bool SameVersion(const ProfileCompilationInfo& other) const;
@@ -411,11 +476,9 @@ class ProfileCompilationInfo {
   // Perform an equality test with the `other` profile information.
   bool Equals(const ProfileCompilationInfo& other);
 
-  // Return the profile key associated with the given dex location.
-  std::string GetProfileDexFileKey(const std::string& dex_location) const;
   // Return the base profile key associated with the given dex location. The base profile key
   // is solely constructed based on the dex location (as opposed to the one produced by
-  // GetProfileDexFileKey which may include additional metadata like architecture or source
+  // GetProfileDexFileAugmentedKey which may include additional metadata like the origin
   // package name)
   static std::string GetProfileDexFileBaseKey(const std::string& dex_location);
 
@@ -442,7 +505,10 @@ class ProfileCompilationInfo {
   ArenaAllocator* GetAllocator() { return &allocator_; }
 
   // Return all of the class descriptors in the profile for a set of dex files.
-  HashSet<std::string> GetClassDescriptors(const std::vector<const DexFile*>& dex_files);
+  // Note: see GetMethodHotness docs for the handling of annotations..
+  HashSet<std::string> GetClassDescriptors(
+      const std::vector<const DexFile*>& dex_files,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone);
 
   // Return true if the fd points to a profile file.
   bool IsProfileFile(int fd);
@@ -585,8 +651,9 @@ class ProfileCompilationInfo {
                                    uint32_t checksum,
                                    uint32_t num_method_ids);
 
-  DexFileData* GetOrAddDexFileData(const DexFile* dex_file) {
-    return GetOrAddDexFileData(GetProfileDexFileKey(dex_file->GetLocation()),
+  DexFileData* GetOrAddDexFileData(const DexFile* dex_file,
+                                   const ProfileSampleAnnotation& annotation) {
+    return GetOrAddDexFileData(GetProfileDexFileAugmentedKey(dex_file->GetLocation(), annotation),
                                dex_file->GetLocationChecksum(),
                                dex_file->NumMethodIds());
   }
@@ -600,10 +667,14 @@ class ProfileCompilationInfo {
   const DexFileData* FindDexData(const std::string& profile_key,
                                  uint32_t checksum,
                                  bool verify_checksum = true) const;
-
-  // Return the dex data associated with the given dex file or null if the profile doesn't contain
-  // the key or the checksum mismatches.
-  const DexFileData* FindDexData(const DexFile* dex_file) const;
+  // Same as FindDexData but performs the searching using the given annotation:
+  //   - If the annotation is kNone then the search ignores it and only looks at the base keys.
+  //     In this case only the first matching dex is searched.
+  //   - If the annotation is not kNone, the augmented key is constructed and used to invoke
+  //     the regular FindDexData.
+  const DexFileData* FindDexDataUsingAnnotations(
+      const DexFile* dex_file,
+      const ProfileSampleAnnotation& annotation) const;
 
   // Inflate the input buffer (in_buffer) of size in_size. It returns a buffer of
   // compressed data for the input buffer of "compressed_data_size" size.
@@ -810,6 +881,21 @@ class ProfileCompilationInfo {
   size_t GetSizeWarningThresholdBytes() const;
   // Returns the threshold size (in bytes) which will cause save/load failures.
   size_t GetSizeErrorThresholdBytes() const;
+
+
+  // Returns the augmented profile key associated with the given dex location.
+  // The return key will contain a serialized form of the information from the provided
+  // annotation. If the annotation is ProfileSampleAnnotation::kNone then no extra info is
+  // added to the key and this method is equivalent to GetProfileDexFileBaseKey.
+  static std::string GetProfileDexFileAugmentedKey(const std::string& dex_location,
+                                                   const ProfileSampleAnnotation& annotation);
+
+  // Returns a base key without the annotation information.
+  static std::string GetBaseKeyFromAugmentedKey(const std::string& profile_key);
+
+  // Migrates the annotation from an augmented key to a base key.
+  static std::string MigrateAnnotationInfo(const std::string& base_key,
+                                           const std::string& augmented_key);
 
   friend class ProfileCompilationInfoTest;
   friend class CompilerDriverProfileTest;
