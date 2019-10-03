@@ -64,7 +64,7 @@ Note that using this chroot-based approach requires root access to the device
         ```
 3. Build ART and required dependencies:
     ```bash
-    art/tools/buildbot-build.sh --target -j40
+    art/tools/buildbot-build.sh --target
     ```
 4. Clean up the device:
     ```bash
@@ -87,7 +87,7 @@ Note that using this chroot-based approach requires root access to the device
     `test-art-target-gtest-image_space_test{32,64}` when using the full AOSP
     tree (b/119815008).
         * Workaround: Run `m clean-oat-host` before the build step
-        (`art/tools/buildbot-build.sh --target -j40`) above.
+        (`art/tools/buildbot-build.sh --target`) above.
     * Note: The `-j` option is not honored yet (b/129930445).
     * Specific tests to run can be passed on the command line, specified by
     their absolute paths beginning with "/apex/".
