@@ -88,6 +88,14 @@ art_runtime_base_native_device_only_debug_shared_libs = [
     "libperfetto_hprofd",
 ]
 
+// Libraries needed to execute ART run-tests.
+// TODO(b/124476339): When bug 124476339 is fixed, add these libraries as `runtime_libs`
+// dependencies of `libartd-compiler`, and remove `art_runtime_run_test_libs`.
+art_runtime_run_test_libs = [
+    "libart-disassembler",
+    "libartd-disassembler",
+]
+
 // Tools common to both device APEX and host APEX. Derived from art-tools in art/Android.mk.
 art_tools_common_binaries = [
     "dexdump",
@@ -126,11 +134,6 @@ art_tools_host_only_binaries = [
     // (same issue as for `libart_fake` above).
     //"ahat",
     "hprof-conv",
-]
-
-// Libraries needed to use com.android.art.host for zipapex run-tests
-art_runtime_host_run_test_libs = [
-    "libartd-disassembler",
 ]
 
 // Core Java libraries.
@@ -244,6 +247,7 @@ apex_defaults {
     name: "com.android.art-dev-defaults",
     defaults: ["com.android.art-defaults"],
     native_shared_libs: art_runtime_base_native_device_only_debug_shared_libs +
+        art_runtime_run_test_libs +
         art_runtime_debug_native_shared_libs +
         libcore_debug_native_shared_libs,
     multilib: {
@@ -334,7 +338,7 @@ art_apex_test_host {
         libcore_native_shared_libs +
         libcore_debug_native_shared_libs +
         art_runtime_libraries_zipapex +
-        art_runtime_host_run_test_libs,
+        art_runtime_run_test_libs,
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both +
