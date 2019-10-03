@@ -480,7 +480,7 @@ endif
 
 # Define a make rule for a target device gtest.
 # $(1): gtest name - the name of the test we're building such as leb128_test.
-# $(2): path relative to $OUT to the test binary
+# $(2): path to the test binary
 # $(3): 2ND_ or undefined - used to differentiate between the primary and secondary architecture.
 # $(4): LD_LIBRARY_PATH or undefined - used in case libartd.so is not in /system/lib/
 define define-art-gtest-rule-target
@@ -495,7 +495,7 @@ define define-art-gtest-rule-target
   endif
 
   gtest_rule := test-art-target-gtest-$(1)$$($(3)ART_PHONY_TEST_TARGET_SUFFIX)
-  gtest_exe := $(OUT_DIR)/$(2)
+  gtest_exe := $(2)
   gtest_target_exe := $$(patsubst $(PRODUCT_OUT)/%,/%,$$(gtest_exe))
 
   # Add the test dependencies to test-art-target-sync, which will be a prerequisite for the test
@@ -559,7 +559,7 @@ define define-art-gtest-rule-host
   gtest_rule := test-art-host-gtest-$$(gtest_suffix)
   gtest_output := $(call intermediates-dir-for,PACKAGING,art-host-gtest,HOST)/$$(gtest_suffix).xml
   $$(call dist-for-goals,$$(gtest_rule),$$(gtest_output):gtest/$$(gtest_suffix))
-  gtest_exe := $(OUT_DIR)/$(2)
+  gtest_exe := $(2)
   # Dependencies for all host gtests.
   gtest_deps := $$(HOST_CORE_DEX_LOCATIONS) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
