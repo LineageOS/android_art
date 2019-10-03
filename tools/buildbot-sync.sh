@@ -113,18 +113,20 @@ get_ld_guest_system_config_file_path() {
     exit 1
   fi
   local ld_config_file_location="$ANDROID_PRODUCT_OUT/system/etc"
-  local ld_config_file_path_number=$(find "$ld_config_file_location" -name "ld.*.txt" | wc -l)
+  local ld_config_file_paths=$(find "$ld_config_file_location" -name "ld.*.txt")
+  local ld_config_file_path_number=$(wc -l <<< "$ld_config_file_paths")
   if [[ "$ld_config_file_path_number" -eq 0 ]]; then
     echo -e "${red}No linker configuration file found in \`$ld_config_file_location\`${nc}" >&2
     exit 1
   fi
   if [[ "$ld_config_file_path_number" -gt 1 ]]; then
     echo -e \
-      "${red}More than one linker configuration file found in \`$ld_config_file_location\`${nc}" >&2
+      "${red}More than one linker configuration file found in \`$ld_config_file_location\`:" \
+      "\n${ld_config_file_paths}${nc}" >&2
     exit 1
   fi
   # Strip the build prefix to make the path name relative to the "guest root directory".
-  find "$ld_config_file_location" -name "ld.*.txt" | sed -e "s|^$ANDROID_PRODUCT_OUT||"
+  sed -e "s|^$ANDROID_PRODUCT_OUT||" <<< "$ld_config_file_paths"
 }
 
 
@@ -169,10 +171,10 @@ activate_apex com.android.tzdata
 # system". If these file names are different, rename the "guest system" linker
 # configuration file within the chroot environment using the "host system"
 # linker configuration file name.
-ld_host_system_config_file_path=$(get_ld_host_system_config_file_path)
+ld_host_system_config_file_path=$(get_ld_host_system_config_file_path) || exit 1
 echo -e "${green}Determining host system linker configuration:" \
   "\`$ld_host_system_config_file_path\`${nc}"
-ld_guest_system_config_file_path=$(get_ld_guest_system_config_file_path)
+ld_guest_system_config_file_path=$(get_ld_guest_system_config_file_path) || exit 1
 echo -e "${green}Determining guest system linker configuration:" \
   "\`$ld_guest_system_config_file_path\`${nc}"
 if [[ "$ld_host_system_config_file_path" != "$ld_guest_system_config_file_path" ]]; then
