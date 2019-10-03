@@ -16,6 +16,10 @@
 
 #include "jni_id_manager.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <type_traits>
+
 #include "android-base/macros.h"
 #include "art_field-inl.h"
 #include "art_method-inl.h"
@@ -34,12 +38,11 @@
 #include "mirror/class_ext-inl.h"
 #include "mirror/object-inl.h"
 #include "obj_ptr-inl.h"
+#include "reflective_handle_scope-inl.h"
+#include "reflective_handle_scope.h"
 #include "reflective_value_visitor.h"
 #include "thread-inl.h"
 #include "thread.h"
-#include <algorithm>
-#include <cstdint>
-#include <type_traits>
 
 namespace art {
 namespace jni {
@@ -60,65 +63,63 @@ static constexpr uintptr_t IndexToId(size_t index) {
 }
 
 template <typename ArtType>
-ObjPtr<mirror::PointerArray> GetOrCreateIds(Thread* self,
-                                            ObjPtr<mirror::Class> k,
-                                            ArtType* t,
-                                            /*out*/bool* allocation_failure)
+ObjPtr<mirror::PointerArray> GetIds(ObjPtr<mirror::Class> k, ArtType* t)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  if constexpr (std::is_same_v<ArtType, ArtField>) {
+    return t->IsStatic() ? k->GetStaticFieldIds() : k->GetInstanceFieldIds();
+  } else {
+    return k->GetMethodIds();
+  }
+}
+
+// Forces the appropriate id array to be present if possible. Returns true if allocation was
+// attempted but failed.
+template <typename ArtType>
+bool EnsureIdsArray(Thread* self, ObjPtr<mirror::Class> k, ArtType* t)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <>
-ObjPtr<mirror::PointerArray> GetOrCreateIds(Thread* self,
-                                            ObjPtr<mirror::Class> k,
-                                            ArtField* field,
-                                            /*out*/bool* allocation_failure) {
+bool EnsureIdsArray(Thread* self, ObjPtr<mirror::Class> k, ArtField* field) {
   ScopedExceptionStorage ses(self);
   StackHandleScope<1> hs(self);
   Handle<mirror::Class> h_k(hs.NewHandle(k));
-  ObjPtr<mirror::PointerArray> res;
   if (Locks::mutator_lock_->IsExclusiveHeld(self)) {
-    res = field->IsStatic() ? h_k->GetStaticFieldIds() : h_k->GetInstanceFieldIds();
+    return false;
   } else {
-    res = field->IsStatic() ? mirror::Class::GetOrCreateStaticFieldIds(h_k)
-                            : mirror::Class::GetOrCreateInstanceFieldIds(h_k);
+    // NB This modifies the class to allocate the ClassExt and the ids array.
+    field->IsStatic() ? mirror::Class::GetOrCreateStaticFieldIds(h_k)
+                      : mirror::Class::GetOrCreateInstanceFieldIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();
     ses.SuppressOldException("Failed to allocate maps for jmethodIDs. ");
-    *allocation_failure = true;
-  } else {
-    *allocation_failure = false;
+    return true;
   }
-  return res;
+  return false;
 }
 
 template <>
-ObjPtr<mirror::PointerArray> GetOrCreateIds(Thread* self,
-                                            ObjPtr<mirror::Class> k,
-                                            ArtMethod* method,
-                                            /*out*/bool* allocation_failure) {
+bool EnsureIdsArray(Thread* self, ObjPtr<mirror::Class> k, ArtMethod* method) {
   if (method->IsObsolete()) {
     if (kTraceIds) {
       LOG(INFO) << "jmethodID for Obsolete method " << method->PrettyMethod() << " requested!";
     }
     // No ids array for obsolete methods. Just do a linear scan.
-    *allocation_failure = false;
-    return nullptr;
+    return false;
   }
   StackHandleScope<1> hs(self);
   Handle<mirror::Class> h_k(hs.NewHandle(k));
-  ObjPtr<mirror::PointerArray> res;
   if (Locks::mutator_lock_->IsExclusiveHeld(self) || !Locks::mutator_lock_->IsSharedHeld(self)) {
-    res = h_k->GetMethodIds();
+    return false;
   } else {
-    res = mirror::Class::GetOrCreateMethodIds(h_k);
+    // NB This modifies the class to allocate the ClassExt and the ids array.
+    mirror::Class::GetOrCreateMethodIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();
-    *allocation_failure = true;
-  } else {
-    *allocation_failure = false;
+    return true;
   }
-  return res;
+  return false;
 }
 
 template <typename ArtType>
@@ -135,33 +136,49 @@ size_t GetIdOffset(ObjPtr<mirror::Class> k, ArtMethod* method, PointerSize point
 
 // Calls the relevant PrettyMethod/PrettyField on the input.
 template <typename ArtType>
-std::string PrettyGeneric(ArtType* t) REQUIRES_SHARED(Locks::mutator_lock_);
-template <> std::string PrettyGeneric(ArtMethod* f) {
+std::string PrettyGeneric(ArtType t) REQUIRES_SHARED(Locks::mutator_lock_);
+template <>
+std::string PrettyGeneric(ArtMethod* f) {
   return f->PrettyMethod();
 }
-template <> std::string PrettyGeneric(ArtField* f) {
+template <>
+std::string PrettyGeneric(ReflectiveHandle<ArtMethod> f) {
+  return f->PrettyMethod();
+}
+template <>
+std::string PrettyGeneric(ArtField* f) {
+  return f->PrettyField();
+}
+template <>
+std::string PrettyGeneric(ReflectiveHandle<ArtField> f) {
   return f->PrettyField();
 }
 
 // Checks if the field or method is obsolete.
-template <typename ArtType> bool IsObsolete(ArtType* t) REQUIRES_SHARED(Locks::mutator_lock_);
-template <> bool IsObsolete(ArtField* t ATTRIBUTE_UNUSED) {
+template <typename ArtType>
+bool IsObsolete(ReflectiveHandle<ArtType> t) REQUIRES_SHARED(Locks::mutator_lock_);
+template <>
+bool IsObsolete(ReflectiveHandle<ArtField> t ATTRIBUTE_UNUSED) {
   return false;
 }
-template <> bool IsObsolete(ArtMethod* t) {
+template <>
+bool IsObsolete(ReflectiveHandle<ArtMethod> t) {
   return t->IsObsolete();
 }
 
 // Get the canonical (non-copied) version of the field or method. Only relevant for methods.
-template <typename ArtType> ArtType* Canonicalize(ArtType* t) REQUIRES_SHARED(Locks::mutator_lock_);
-template <> ArtField* Canonicalize(ArtField* t) {
-  return t;
+template <typename ArtType>
+ArtType* Canonicalize(ReflectiveHandle<ArtType> t) REQUIRES_SHARED(Locks::mutator_lock_);
+template <>
+ArtField* Canonicalize(ReflectiveHandle<ArtField> t) {
+  return t.Get();
 }
-template <> ArtMethod* Canonicalize(ArtMethod* t) {
+template <>
+ArtMethod* Canonicalize(ReflectiveHandle<ArtMethod> t) {
   if (UNLIKELY(t->IsCopied())) {
-    t = t->GetCanonicalMethod();
+    return t->GetCanonicalMethod();
   }
-  return t;
+  return t.Get();
 }
 
 };  // namespace
@@ -169,7 +186,8 @@ template <> ArtMethod* Canonicalize(ArtMethod* t) {
 // We increment the id by 2 each time to allow us to use the LSB as a flag that the ID is an index
 // and not a pointer. This gives us 2**31 unique methods that can be addressed on 32-bit art, which
 // should be more than enough.
-template <> uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type, ArtField* f) {
+template <>
+uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type, ReflectiveHandle<ArtField> f) {
   if (LIKELY(type == JniIdType::kIndices)) {
     uintptr_t res = next_field_id_;
     next_field_id_ += 2;
@@ -177,11 +195,12 @@ template <> uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type, ArtField
     return res;
   } else {
     DCHECK_EQ(type, JniIdType::kSwapablePointer);
-    return reinterpret_cast<uintptr_t>(f);
+    return reinterpret_cast<uintptr_t>(f.Get());
   }
 }
 
-template <> uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type, ArtMethod* m) {
+template <>
+uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type, ReflectiveHandle<ArtMethod> m) {
   if (LIKELY(type == JniIdType::kIndices)) {
     uintptr_t res = next_method_id_;
     next_method_id_ += 2;
@@ -189,21 +208,26 @@ template <> uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type, ArtMeth
     return res;
   } else {
     DCHECK_EQ(type, JniIdType::kSwapablePointer);
-    return reinterpret_cast<uintptr_t>(m);
+    return reinterpret_cast<uintptr_t>(m.Get());
   }
 }
-template <> std::vector<ArtField*>& JniIdManager::GetGenericMap<ArtField>() {
+template <>
+std::vector<ArtField*>& JniIdManager::GetGenericMap<ArtField>() {
   return field_id_map_;
 }
 
-template <> std::vector<ArtMethod*>& JniIdManager::GetGenericMap<ArtMethod>() {
+template <>
+std::vector<ArtMethod*>& JniIdManager::GetGenericMap<ArtMethod>() {
   return method_id_map_;
 }
-template <> size_t JniIdManager::GetLinearSearchStartId<ArtField>(ArtField* t ATTRIBUTE_UNUSED) {
+template <>
+size_t JniIdManager::GetLinearSearchStartId<ArtField>(
+    ReflectiveHandle<ArtField> t ATTRIBUTE_UNUSED) {
   return deferred_allocation_field_id_start_;
 }
 
-template <> size_t JniIdManager::GetLinearSearchStartId<ArtMethod>(ArtMethod* m) {
+template <>
+size_t JniIdManager::GetLinearSearchStartId<ArtMethod>(ReflectiveHandle<ArtMethod> m) {
   if (m->IsObsolete()) {
     return 1;
   } else {
@@ -212,20 +236,24 @@ template <> size_t JniIdManager::GetLinearSearchStartId<ArtMethod>(ArtMethod* m)
 }
 
 // TODO need to fix races in here with visitors
-template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) {
+template <typename ArtType>
+uintptr_t JniIdManager::EncodeGenericId(ReflectiveHandle<ArtType> t) {
+  static_assert(std::is_same_v<ArtType, ArtField> || std::is_same_v<ArtType, ArtMethod>,
+                "Expected ArtField or ArtMethod");
   Runtime* runtime = Runtime::Current();
   JniIdType id_type = runtime->GetJniIdType();
   if (id_type == JniIdType::kPointer || t == nullptr) {
-    return reinterpret_cast<uintptr_t>(t);
+    return reinterpret_cast<uintptr_t>(t.Get());
   }
   Thread* self = Thread::Current();
   ScopedExceptionStorage ses(self);
-  t = Canonicalize(t);
   ObjPtr<mirror::Class> klass = t->GetDeclaringClass();
   DCHECK(!klass.IsNull()) << "Null declaring class " << PrettyGeneric(t);
-  size_t off = GetIdOffset(klass, t, kRuntimePointerSize);
-  bool allocation_failure = false;
-  ObjPtr<mirror::PointerArray> ids(GetOrCreateIds(self, klass, t, &allocation_failure));
+  size_t off = GetIdOffset(klass, Canonicalize(t), kRuntimePointerSize);
+  // Here is the earliest point we can suspend.
+  bool allocation_failure = EnsureIdsArray(self, klass, t.Get());
+  klass = t->GetDeclaringClass();
+  ObjPtr<mirror::PointerArray> ids(GetIds(klass, t.Get()));
   if (allocation_failure) {
     self->AssertPendingOOMException();
     ses.SuppressOldException("OOM exception while trying to allocate JNI ids.");
@@ -240,8 +268,20 @@ template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) 
     return cur_id;
   }
   WriterMutexLock mu(self, *Locks::jni_id_lock_);
+  ScopedAssertNoThreadSuspension sants("EncodeJniId critical section.");
   // Check the ids array for a racing id.
+  constexpr std::pair<size_t, size_t> counts {
+    std::is_same_v<ArtType, ArtField> ? 1 : 0,
+    std::is_same_v<ArtType, ArtField> ? 0 : 1,
+  };
+  StackReflectiveHandleScope<counts.first, counts.second> hs(self);
+  t = hs.NewHandle(Canonicalize(t));
   if (!ids.IsNull()) {
+    // It's possible we got suspended and structurally redefined during the EnsureIdsArray. We need
+    // to get the information again.
+    ids = GetIds(klass, t.Get());
+    off = GetIdOffset(klass, Canonicalize(t), kRuntimePointerSize);
+    CHECK(!ids.IsNull());
     cur_id = ids->GetElementPtrSize<uintptr_t>(off, kRuntimePointerSize);
     if (cur_id != 0) {
       // We were racing some other thread and lost.
@@ -259,17 +299,18 @@ template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) 
     size_t search_start_index = IdToIndex(GetLinearSearchStartId(t));
     size_t index = std::count_if(vec.cbegin() + search_start_index,
                                  vec.cend(),
-                                 [&found, t](const ArtType* candidate) {
-                                   found = found || candidate == t;
+                                 [&found, &self, t](const ArtType* candidate) {
+                                   Locks::mutator_lock_->AssertSharedHeld(self);
+                                   found = found || candidate == t.Get();
                                    return !found;
                                  }) +
                    search_start_index;
     if (found) {
       // We were either racing some other thread and lost or this thread was asked to encode the
       // same method multiple times while holding the mutator lock.
-      DCHECK_EQ(vec[index], t) << "Expected: " << PrettyGeneric(vec[index]) << " got "
-                               << PrettyGeneric(t) << " at index " << index
-                               << " (id: " << IndexToId(index) << ").";
+      DCHECK_EQ(vec[index], t.Get())
+          << "Expected: " << PrettyGeneric(vec[index]) << " got " << PrettyGeneric(t)
+          << " at index " << index << " (id: " << IndexToId(index) << ").";
       return IndexToId(index);
     }
   }
@@ -280,10 +321,10 @@ template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) 
     std::vector<ArtType*>& vec = GetGenericMap<ArtType>();
     vec.reserve(cur_index + 1);
     vec.resize(std::max(vec.size(), cur_index + 1), nullptr);
-    vec[cur_index] = t;
+    vec[cur_index] = t.Get();
   } else {
     DCHECK_EQ(cur_id % 2, 0u);
-    DCHECK_EQ(cur_id, reinterpret_cast<uintptr_t>(t));
+    DCHECK_EQ(cur_id, reinterpret_cast<uintptr_t>(t.Get()));
   }
   if (ids.IsNull()) {
     if (kIsDebugBuild && !IsObsolete(t)) {
@@ -298,13 +339,24 @@ template <typename ArtType> uintptr_t JniIdManager::EncodeGenericId(ArtType* t) 
 }
 
 jfieldID JniIdManager::EncodeFieldId(ArtField* field) {
+  StackArtFieldHandleScope<1> rhs(Thread::Current());
+  return EncodeFieldId(rhs.NewHandle(field));
+}
+
+jfieldID JniIdManager::EncodeFieldId(ReflectiveHandle<ArtField> field) {
   auto* res = reinterpret_cast<jfieldID>(EncodeGenericId(field));
   if (kTraceIds && field != nullptr) {
     LOG(INFO) << "Returning " << res << " for field " << field->PrettyField();
   }
   return res;
 }
+
 jmethodID JniIdManager::EncodeMethodId(ArtMethod* method) {
+  StackArtMethodHandleScope<1> rhs(Thread::Current());
+  return EncodeMethodId(rhs.NewHandle(method));
+}
+
+jmethodID JniIdManager::EncodeMethodId(ReflectiveHandle<ArtMethod> method) {
   auto* res = reinterpret_cast<jmethodID>(EncodeGenericId(method));
   if (kTraceIds && method != nullptr) {
     LOG(INFO) << "Returning " << res << " for method " << method->PrettyMethod();
@@ -445,17 +497,70 @@ void JniIdManager::StartDefer() {
   }
 }
 
+class JniIdDeferStackReflectiveScope : public BaseReflectiveHandleScope {
+ public:
+  JniIdDeferStackReflectiveScope() REQUIRES_SHARED(art::Locks::mutator_lock_)
+      : BaseReflectiveHandleScope(), methods_(), fields_() {
+    PushScope(Thread::Current());
+  }
+
+  void Initialize(const std::vector<ArtMethod*>& methods, const std::vector<ArtField*>& fields)
+      REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(Roles::uninterruptible_) {
+    methods_ = methods;
+    fields_ = fields;
+  }
+
+  ~JniIdDeferStackReflectiveScope() REQUIRES_SHARED(Locks::mutator_lock_) {
+    PopScope();
+  }
+
+  void VisitTargets(ReflectiveValueVisitor* visitor) override
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    for (auto it = methods_.begin(); it != methods_.end(); ++it) {
+      if (*it == nullptr) {
+        continue;
+      }
+      *it = visitor->VisitMethod(*it, ReflectiveHandleScopeSourceInfo(this));
+    }
+    for (auto it = fields_.begin(); it != fields_.end(); ++it) {
+      if (*it == nullptr) {
+        continue;
+      }
+      *it = visitor->VisitField(*it, ReflectiveHandleScopeSourceInfo(this));
+    }
+  }
+
+  ArtField** GetFieldPtr(size_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
+    return &fields_[idx];
+  }
+
+  ArtMethod** GetMethodPtr(size_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
+    return &methods_[idx];
+  }
+
+  size_t NumFields() const {
+    return fields_.size();
+  }
+  size_t NumMethods() const {
+    return methods_.size();
+  }
+
+ private:
+  std::vector<ArtMethod*> methods_;
+  std::vector<ArtField*> fields_;
+};
+
 void JniIdManager::EndDefer() {
   // Fixup the method->id map.
   Thread* self = Thread::Current();
-  auto set_id = [&](auto* t, uintptr_t id) REQUIRES_SHARED(Locks::mutator_lock_) {
+  auto set_id = [&](auto** t, uintptr_t id) REQUIRES_SHARED(Locks::mutator_lock_) {
     if (t == nullptr) {
       return;
     }
-    ObjPtr<mirror::Class> klass(t->GetDeclaringClass());
-    size_t off = GetIdOffset(klass, t, kRuntimePointerSize);
-    bool alloc_failure = false;
-    ObjPtr<mirror::PointerArray> ids = GetOrCreateIds(self, klass, t, &alloc_failure);
+    bool alloc_failure = EnsureIdsArray(self, (*t)->GetDeclaringClass(), *t);
+    ObjPtr<mirror::Class> klass((*t)->GetDeclaringClass());
+    size_t off = GetIdOffset(klass, (*t), kRuntimePointerSize);
+    ObjPtr<mirror::PointerArray> ids = GetIds(klass, (*t));
     CHECK(!alloc_failure) << "Could not allocate jni ids array!";
     if (ids.IsNull()) {
       return;
@@ -482,25 +587,24 @@ void JniIdManager::EndDefer() {
   // ids when it finishes.
   Locks::mutator_lock_->AssertNotExclusiveHeld(self);
   Locks::mutator_lock_->AssertSharedHeld(self);
-  std::vector<ArtMethod*> method_id_copy;
-  std::vector<ArtField*> field_id_copy;
+  JniIdDeferStackReflectiveScope jidsrs;
   uintptr_t method_start_id;
   uintptr_t field_start_id;
   {
     ReaderMutexLock mu(self, *Locks::jni_id_lock_);
-    method_id_copy = method_id_map_;
-    field_id_copy = field_id_map_;
+    ScopedAssertNoThreadSuspension sants(__FUNCTION__);
+    jidsrs.Initialize(method_id_map_, field_id_map_);
     method_start_id = deferred_allocation_method_id_start_;
     field_start_id = deferred_allocation_field_id_start_;
   }
 
-  for (size_t index = kIsDebugBuild ? 0 : IdToIndex(method_start_id); index < method_id_copy.size();
+  for (size_t index = kIsDebugBuild ? 0 : IdToIndex(method_start_id); index < jidsrs.NumMethods();
        ++index) {
-    set_id(method_id_copy[index], IndexToId(index));
+    set_id(jidsrs.GetMethodPtr(index), IndexToId(index));
   }
-  for (size_t index = kIsDebugBuild ? 0 : IdToIndex(field_start_id); index < field_id_copy.size();
+  for (size_t index = kIsDebugBuild ? 0 : IdToIndex(field_start_id); index < jidsrs.NumFields();
        ++index) {
-    set_id(field_id_copy[index], IndexToId(index));
+    set_id(jidsrs.GetFieldPtr(index), IndexToId(index));
   }
   WriterMutexLock mu(self, *Locks::jni_id_lock_);
   DCHECK_GE(deferred_allocation_refcount_, 1u);
