@@ -110,6 +110,8 @@ constexpr size_t kMaxCmdlineSize = 512;
 
 class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
  public:
+  constexpr static perfetto::BufferExhaustedPolicy kBufferExhaustedPolicy =
+    perfetto::BufferExhaustedPolicy::kStall;
   void OnSetup(const SetupArgs& args) override {
     // This is on the heap as it triggers -Wframe-larger-than.
     std::unique_ptr<perfetto::protos::pbzero::JavaHprofConfig::Decoder> cfg(
