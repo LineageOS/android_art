@@ -430,6 +430,16 @@ inline void ArtMethod::CalculateAndSetImtIndex() {
   imt_index_ = ~ImTable::GetImtIndex(this);
 }
 
+template <ReadBarrierOption kReadBarrierOption>
+bool ArtMethod::NeedsInitializationCheck() {
+  // Knowing if the class is visibly initialized is only for JIT/AOT compiled
+  // code to avoid the memory barrier. For callers of `NeedsInitializationCheck`
+  // it's enough to just check whether the class is initialized.
+  return IsStatic() &&
+      !IsConstructor() &&
+      !GetDeclaringClass<kReadBarrierOption>()->IsInitialized();
+}
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_ART_METHOD_INL_H_
