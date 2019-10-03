@@ -70,6 +70,27 @@
 //       3) Re-read both the current and next seqlock.
 //       4) Go to step 1 with using new entry and seqlock.
 //
+// 3) Asynchronously, using the global seqlock.
+//   * The seqlock is a monotonically increasing counter which is incremented
+//     before and after every modification of the linked list. Odd value of
+//     the counter means the linked list is being modified (it is locked).
+//   * The tool should read the value of the seqlock both before and after
+//     copying the linked list.  If the seqlock values match and are even,
+//     the copy is consistent.  Otherwise, the reader should try again.
+//     * Note that using the data directly while is it being modified
+//       might crash the tool.  Therefore, the only safe way is to make
+//       a copy and use the copy only after the seqlock has been checked.
+//     * Note that the process might even free and munmap the data while
+//       it is being copied, therefore the reader should either handle
+//       SEGV or use OS calls to read the memory (e.g. process_vm_readv).
+//   * The timestamps on the entry record the time when the entry was
+//     created which is relevant if the unwinding is not live and is
+//     postponed until much later.  All timestamps must be unique.
+//   * For full conformance with the C++ memory model, all seqlock
+//     protected accesses should be atomic. We currently do this in the
+//     more critical cases. The rest will have to be fixed before
+//     attempting to run TSAN on this code.
+//
 
 namespace art {
 
@@ -96,6 +117,7 @@ extern "C" {
     uint64_t symfile_size_ = 0;              // Note that the offset is 12 on x86, but 16 on ARM32.
 
     // Android-specific fields:
+    uint64_t timestamp_;                     // CLOCK_MONOTONIC time of entry registration.
     std::atomic_uint32_t seqlock_{1};        // Synchronization. Even value if entry is valid.
   };
 
@@ -118,6 +140,14 @@ extern "C" {
     uint32_t action_flag_ = JIT_NOACTION;             // One of the JITAction enum values.
     const JITCodeEntry* relevant_entry_ = nullptr;    // The entry affected by the action.
     std::atomic<const JITCodeEntry*> head_{nullptr};  // Head of link list of all entries.
+
+    // Android-specific fields:
+    uint8_t magic_[8] = {'A', 'n', 'd', 'r', 'o', 'i', 'd', '2'};
+    uint32_t flags_ = 0;  // Reserved for future use. Must be 0.
+    uint32_t sizeof_descriptor = sizeof(JITDescriptorPublic);
+    uint32_t sizeof_entry = sizeof(JITCodeEntryPublic);
+    std::atomic_uint32_t seqlock_{0};  // Incremented before and after any modification.
+    uint64_t timestamp_ = 1;           // CLOCK_MONOTONIC time of last action.
   };
 
   // Implementation-specific fields (which can be used only in this file).
@@ -199,6 +229,28 @@ ArrayRef<const uint8_t> GetJITCodeEntrySymFile(const JITCodeEntry* entry) {
   return ArrayRef<const uint8_t>(entry->symfile_addr_, entry->symfile_size_);
 }
 
+// Ensure the timestamp is monotonically increasing even in presence of low
+// granularity system timer.  This ensures each entry has unique timestamp.
+static uint64_t GetNextTimestamp(JITDescriptor& descriptor) {
+  return std::max(descriptor.timestamp_ + 1, NanoTime());
+}
+
+// Mark the descriptor as "locked", so native tools know the data is being modified.
+static void Seqlock(JITDescriptor& descriptor) {
+  DCHECK_EQ(descriptor.seqlock_.load(kNonRacingRelaxed) & 1, 0u) << "Already locked";
+  descriptor.seqlock_.fetch_add(1, std::memory_order_relaxed);
+  // Ensure that any writes within the locked section cannot be reordered before the increment.
+  std::atomic_thread_fence(std::memory_order_release);
+}
+
+// Mark the descriptor as "unlocked", so native tools know the data is safe to read.
+static void Sequnlock(JITDescriptor& descriptor) {
+  DCHECK_EQ(descriptor.seqlock_.load(kNonRacingRelaxed) & 1, 1u) << "Already unlocked";
+  // Ensure that any writes within the locked section cannot be reordered after the increment.
+  std::atomic_thread_fence(std::memory_order_release);
+  descriptor.seqlock_.fetch_add(1, std::memory_order_relaxed);
+}
+
 // This must be called with the appropriate lock taken (g_{jit,dex}_debug_lock).
 template<class NativeInfo>
 static const JITCodeEntry* CreateJITCodeEntryInternal(
@@ -230,6 +282,8 @@ static const JITCodeEntry* CreateJITCodeEntryInternal(
     symfile = ArrayRef<const uint8_t>(copy, symfile.size());
   }
 
+  uint64_t timestamp = GetNextTimestamp(descriptor);
+
   // Zygote must insert entries at specific place.  See NativeDebugInfoPreFork().
   std::atomic<const JITCodeEntry*>* head = &descriptor.head_;
   const JITCodeEntry* prev = nullptr;
@@ -253,15 +307,20 @@ static const JITCodeEntry* CreateJITCodeEntryInternal(
   writable_entry->addr_ = addr;
   writable_entry->allow_packing_ = allow_packing;
   writable_entry->is_compressed_ = is_compressed;
+  writable_entry->timestamp_ = timestamp;
   writable_entry->seqlock_.fetch_add(1, std::memory_order_release);  // Mark as valid.
 
   // Add the entry to the main link-list.
+  Seqlock(descriptor);
   if (next != nullptr) {
     NativeInfo::Writable(next)->prev_ = entry;
   }
   head->store(entry, std::memory_order_release);
   descriptor.relevant_entry_ = entry;
   descriptor.action_flag_ = JIT_REGISTER_FN;
+  descriptor.timestamp_ = timestamp;
+  Sequnlock(descriptor);
+
   NativeInfo::NotifyNativeDebugger();
 
   return entry;
@@ -270,10 +329,10 @@ static const JITCodeEntry* CreateJITCodeEntryInternal(
 template<class NativeInfo>
 static void DeleteJITCodeEntryInternal(const JITCodeEntry* entry) {
   CHECK(entry != nullptr);
-  const uint8_t* symfile = entry->symfile_addr_;
   JITDescriptor& descriptor = NativeInfo::Descriptor();
 
   // Remove the entry from the main linked-list.
+  Seqlock(descriptor);
   const JITCodeEntry* next = entry->next_.load(kNonRacingRelaxed);
   if (entry->prev_ != nullptr) {
     NativeInfo::Writable(entry->prev_)->next_.store(next, std::memory_order_relaxed);
@@ -285,6 +344,9 @@ static void DeleteJITCodeEntryInternal(const JITCodeEntry* entry) {
   }
   descriptor.relevant_entry_ = entry;
   descriptor.action_flag_ = JIT_UNREGISTER_FN;
+  descriptor.timestamp_ = GetNextTimestamp(descriptor);
+  Sequnlock(descriptor);
+
   NativeInfo::NotifyNativeDebugger();
 
   // Delete the entry.
@@ -294,12 +356,15 @@ static void DeleteJITCodeEntryInternal(const JITCodeEntry* entry) {
   writable_entry->seqlock_.fetch_add(1, std::memory_order_release);  // Mark as invalid.
   // Release: Ensures that the entry is seen as invalid before it's data is freed.
   std::atomic_thread_fence(std::memory_order_release);
+  const uint8_t* symfile = entry->symfile_addr_;
+  writable_entry->symfile_addr_ = nullptr;
   if (NativeInfo::kCopySymfileData && symfile != nullptr) {
     NativeInfo::Free(symfile);
   }
 
   // Push the entry to the free list.
   writable_entry->next_.store(descriptor.free_entries_, kNonRacingRelaxed);
+  writable_entry->prev_ = nullptr;
   descriptor.free_entries_ = entry;
 }
 
