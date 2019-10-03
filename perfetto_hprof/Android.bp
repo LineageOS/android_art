@@ -50,7 +50,6 @@ cc_defaults {
     ],
     static_libs: [
         "libperfetto_client_experimental",
-        "perfetto_src_tracing_ipc",
         "perfetto_trace_protos",
         // TODO(132880619): Remove this as soon as the Perfetto client API no
         // longer depends on this.
