@@ -59,16 +59,16 @@ ART_TEST_HOST_RUN_TEST_DEPENDENCIES := \
   $(ART_HOST_EXECUTABLES) \
   $(HOST_OUT_EXECUTABLES)/hprof-conv \
   $(HOST_OUT_EXECUTABLES)/signal_dumper \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagent) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagentd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtistress) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtistressd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libartagent) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libartagentd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libarttest) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libarttestd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libnativebridgetest) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libnativebridgetestd) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagent) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtiagentd) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtistress) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libtistressd) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libartagent) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libartagentd) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libarttest) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libarttestd) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libnativebridgetest) \
+  $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_libnativebridgetestd) \
   $(ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$(ART_HOST_SHLIB_EXTENSION) \
   $(ART_HOST_OUT_SHARED_LIBRARIES)/libopenjdk$(ART_HOST_SHLIB_EXTENSION) \
   $(ART_HOST_OUT_SHARED_LIBRARIES)/libopenjdkd$(ART_HOST_SHLIB_EXTENSION) \
@@ -78,16 +78,16 @@ ART_TEST_HOST_RUN_TEST_DEPENDENCIES := \
 
 ifneq ($(HOST_PREFER_32_BIT),true)
 ART_TEST_HOST_RUN_TEST_DEPENDENCIES += \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtiagent) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtiagentd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtistress) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtistressd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libartagent) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libartagentd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libarttest) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libarttestd) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libnativebridgetest) \
-  $(OUT_DIR)/$(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libnativebridgetestd) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtiagent) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtiagentd) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtistress) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libtistressd) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libartagent) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libartagentd) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libarttest) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libarttestd) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libnativebridgetest) \
+  $(ART_TEST_LIST_host_$(2ND_ART_HOST_ARCH)_libnativebridgetestd) \
   $(2ND_ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$(ART_HOST_SHLIB_EXTENSION) \
   $(2ND_ART_HOST_OUT_SHARED_LIBRARIES)/libopenjdk$(ART_HOST_SHLIB_EXTENSION) \
   $(2ND_ART_HOST_OUT_SHARED_LIBRARIES)/libopenjdkd$(ART_HOST_SHLIB_EXTENSION) \
