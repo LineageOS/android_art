@@ -42,4 +42,13 @@ void JniIdReflectiveSourceInfo<jmethodID>::Describe(std::ostream& os) const {
   os << " jmethodID=" << reinterpret_cast<uintptr_t>(id_);
 }
 
+void ReflectiveHandleScopeSourceInfo::Describe(std::ostream& os) const {
+  ReflectionSourceInfo::Describe(os);
+  os << " source= (" << source_ << ") ";
+  if (source_ == nullptr) {
+    os << "nullptr";
+  } else {
+    os << *source_;
+  }
+}
 }  // namespace art
