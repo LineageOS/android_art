@@ -39,6 +39,7 @@
 #include "mirror/object-inl.h"
 #include "mirror/throwable.h"
 #include "nth_caller_visitor.h"
+#include "reflective_handle_scope-inl.h"
 #include "runtime.h"
 #include "stack_map.h"
 #include "thread.h"
@@ -381,9 +382,11 @@ inline ArtField* FindFieldFromCode(uint32_t field_idx,
       return resolved_field;
     } else {
       StackHandleScope<1> hs(self);
+      StackArtFieldHandleScope<1> rhs(self);
+      ReflectiveHandle<ArtField> resolved_field_handle(rhs.NewHandle(resolved_field));
       if (LIKELY(class_linker->EnsureInitialized(self, hs.NewHandle(fields_class), true, true))) {
         // Otherwise let's ensure the class is initialized before resolving the field.
-        return resolved_field;
+        return resolved_field_handle.Get();
       }
       DCHECK(self->IsExceptionPending());  // Throw exception and unwind
       return nullptr;  // Failure.

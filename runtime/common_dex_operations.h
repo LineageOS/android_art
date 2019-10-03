@@ -35,6 +35,8 @@
 #include "mirror/class.h"
 #include "mirror/object.h"
 #include "obj_ptr-inl.h"
+#include "reflective_handle.h"
+#include "reflective_handle_scope.h"
 #include "runtime.h"
 #include "stack.h"
 #include "thread.h"
@@ -100,8 +102,10 @@ static ALWAYS_INLINE bool DoFieldGetCommon(Thread* self,
   instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
   if (UNLIKELY(instrumentation->HasFieldReadListeners())) {
     StackHandleScope<1> hs(self);
+    StackArtFieldHandleScope<1> rhs(self);
     // Wrap in handle wrapper in case the listener does thread suspension.
     HandleWrapperObjPtr<mirror::Object> h(hs.NewHandleWrapper(&obj));
+    ReflectiveHandleWrapper<ArtField> fh(rhs.NewReflectiveHandleWrapper(&field));
     ObjPtr<mirror::Object> this_object;
     if (!field->IsStatic()) {
       this_object = obj;
@@ -159,8 +163,10 @@ ALWAYS_INLINE bool DoFieldPutCommon(Thread* self,
   instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
   if (UNLIKELY(instrumentation->HasFieldWriteListeners())) {
     StackHandleScope<2> hs(self);
+    StackArtFieldHandleScope<1> rhs(self);
     // Save this and return value (if needed) in case the instrumentation causes a suspend.
     HandleWrapperObjPtr<mirror::Object> h(hs.NewHandleWrapper(&obj));
+    ReflectiveHandleWrapper<ArtField> fh(rhs.NewReflectiveHandleWrapper(&field));
     ObjPtr<mirror::Object> this_object = field->IsStatic() ? nullptr : obj;
     mirror::Object* fake_root = nullptr;
     HandleWrapper<mirror::Object> ret(hs.NewHandleWrapper<mirror::Object>(
@@ -210,8 +216,10 @@ ALWAYS_INLINE bool DoFieldPutCommon(Thread* self,
         ObjPtr<mirror::Class> field_class;
         {
           StackHandleScope<2> hs(self);
+          StackArtFieldHandleScope<1> rhs(self);
           HandleWrapperObjPtr<mirror::Object> h_reg(hs.NewHandleWrapper(&reg));
           HandleWrapperObjPtr<mirror::Object> h_obj(hs.NewHandleWrapper(&obj));
+          ReflectiveHandleWrapper<ArtField> fh(rhs.NewReflectiveHandleWrapper(&field));
           field_class = field->ResolveType();
         }
         // ArtField::ResolveType() may fail as evidenced with a dexing bug (b/78788577).
