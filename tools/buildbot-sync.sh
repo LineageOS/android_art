@@ -43,7 +43,8 @@ if [[ "$(build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)" != "true
   echo -e "${red}This script only works when  APEX packages are flattened, but the build" \
     "configuration is set up to use non-flattened APEX packages.${nc}"
   echo -e "${magenta}You can force APEX flattening by setting the environment variable" \
-    "\`TARGET_FLATTEN_APEX\` to \"true\" before starting the build and running this script.${nc}"
+    "\`OVERRIDE_TARGET_FLATTEN_APEX\` to \"true\" before starting the build and running this" \
+    "script.${nc}"
   exit 1
 fi
 
@@ -146,7 +147,7 @@ adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
 # chroot. $2 defaults to $1.
 #
 # TODO: Handle the case of build targets using non-flatted APEX packages.
-# As a workaround, one can run `export TARGET_FLATTEN_APEX=true` before building
+# As a workaround, one can run `export OVERRIDE_TARGET_FLATTEN_APEX=true` before building
 # a target to have its APEX packages flattened.
 activate_apex() {
   local src_apex=${1}
