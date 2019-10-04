@@ -40,7 +40,6 @@
 #include "managed_stack.h"
 #include "offsets.h"
 #include "read_barrier_config.h"
-#include "reflective_handle_scope.h"
 #include "runtime_globals.h"
 #include "runtime_stats.h"
 #include "thread_state.h"
@@ -636,9 +635,6 @@ class Thread {
   void VisitRoots(RootVisitor* visitor, VisitRootFlags flags)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void VisitReflectiveTargets(ReflectiveValueVisitor* visitor)
-      REQUIRES(Locks::mutator_lock_);
-
   void VerifyStack() REQUIRES_SHARED(Locks::mutator_lock_) {
     if (kVerifyStack) {
       VerifyStackImpl();
@@ -894,23 +890,6 @@ class Thread {
   static constexpr ThreadOffset<pointer_size> TopHandleScopeOffset() {
     return ThreadOffsetFromTlsPtr<pointer_size>(OFFSETOF_MEMBER(tls_ptr_sized_values,
                                                                 top_handle_scope));
-  }
-
-  BaseReflectiveHandleScope* GetTopReflectiveHandleScope() {
-    return tlsPtr_.top_reflective_handle_scope;
-  }
-
-  void PushReflectiveHandleScope(BaseReflectiveHandleScope* scope) {
-    DCHECK_EQ(scope->GetLink(), tlsPtr_.top_reflective_handle_scope);
-    DCHECK_EQ(scope->GetThread(), this);
-    tlsPtr_.top_reflective_handle_scope = scope;
-  }
-
-  BaseReflectiveHandleScope* PopReflectiveHandleScope() {
-    BaseReflectiveHandleScope* handle_scope = tlsPtr_.top_reflective_handle_scope;
-    DCHECK(handle_scope != nullptr);
-    tlsPtr_.top_reflective_handle_scope = tlsPtr_.top_reflective_handle_scope->GetLink();
-    return handle_scope;
   }
 
   DebugInvokeReq* GetInvokeReq() const {
@@ -1660,7 +1639,7 @@ class Thread {
       thread_local_objects(0), mterp_current_ibase(nullptr), thread_local_alloc_stack_top(nullptr),
       thread_local_alloc_stack_end(nullptr),
       flip_function(nullptr), method_verifier(nullptr), thread_local_mark_stack(nullptr),
-      async_exception(nullptr), top_reflective_handle_scope(nullptr) {
+      async_exception(nullptr) {
       std::fill(held_mutexes, held_mutexes + kLockLevelCount, nullptr);
     }
 
@@ -1818,9 +1797,6 @@ class Thread {
 
     // The pending async-exception or null.
     mirror::Throwable* async_exception;
-
-    // Top of the linked-list for reflective-handle scopes or null if none.
-    BaseReflectiveHandleScope* top_reflective_handle_scope;
   } tlsPtr_;
 
   // Small thread-local cache to be used from the interpreter.
