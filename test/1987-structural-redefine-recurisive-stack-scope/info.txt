@@ -1,0 +1,1 @@
+Tests StackReflectiveHandleScope works when there are several all in different recursive frames.
