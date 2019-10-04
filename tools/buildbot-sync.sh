@@ -135,6 +135,7 @@ get_ld_guest_system_config_file_path() {
 
 # Sync the system directory to the chroot.
 echo -e "${green}Syncing system directory...${nc}"
+adb shell mkdir -p "$ART_TEST_CHROOT/system"
 adb push "$ANDROID_PRODUCT_OUT/system" "$ART_TEST_CHROOT/"
 # Overwrite the default public.libraries.txt file with a smaller one that
 # contains only the public libraries pushed to the chroot directory.
@@ -155,8 +156,10 @@ activate_apex() {
   # the chroot directory, instead of simply using a symlink, as Bionic's linker
   # relies on the real path name of a binary (e.g.
   # `/apex/com.android.art/bin/dex2oat`) to select the linker configuration.
+  adb shell mkdir -p "$ART_TEST_CHROOT/apex"
   adb shell rm -rf "$ART_TEST_CHROOT/apex/${dst_apex}"
-  adb shell cp -a "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" || exit 1
+  adb shell cp -a "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" \
+    || exit 1
 }
 
 # "Activate" the required APEX modules.
@@ -187,4 +190,5 @@ fi
 
 # Sync the data directory to the chroot.
 echo -e "${green}Syncing data directory...${nc}"
+adb shell mkdir -p "$ART_TEST_CHROOT/data"
 adb push "$ANDROID_PRODUCT_OUT/data" "$ART_TEST_CHROOT/"
