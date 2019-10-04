@@ -48,7 +48,7 @@ jvmtiError GetClassLocation(ArtJvmTiEnv* env, jclass klass, /*out*/std::string* 
 
 class Transformer {
  public:
-  static void Setup();
+  static void Register(EventHandler* eh);
 
   template<ArtJvmtiEvent kEvent>
   static void TransformSingleClassDirect(
@@ -57,17 +57,12 @@ class Transformer {
       /*in-out*/ArtClassDefinition* def);
 
   static jvmtiError RetransformClassesDirect(
-      EventHandler* event_handler,
       art::Thread* self,
       /*in-out*/std::vector<ArtClassDefinition>* definitions);
 
-  static jvmtiError RetransformClasses(ArtJvmTiEnv* env,
-                                       EventHandler* event_handler,
-                                       art::Runtime* runtime,
-                                       art::Thread* self,
+  static jvmtiError RetransformClasses(jvmtiEnv* env,
                                        jint class_count,
-                                       const jclass* classes,
-                                       /*out*/std::string* error_msg);
+                                       const jclass* classes);
 };
 
 }  // namespace openjdkjvmti
