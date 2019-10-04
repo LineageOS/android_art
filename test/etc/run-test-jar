@@ -142,8 +142,8 @@ while true; do
         LIB="$1"
         shift
     elif [ "x$1" = "x--gc-stress" ]; then
-        # Give an extra 10 mins if we are gc-stress.
-        TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 600))
+        # Give an extra 20 mins if we are gc-stress.
+        TIME_OUT_EXTRA=$((${TIME_OUT_EXTRA} + 1200))
         shift
     elif [ "x$1" = "x--testlib" ]; then
         shift
