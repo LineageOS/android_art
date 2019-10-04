@@ -93,6 +93,7 @@ fi
 # continuous testing. This value can be adjusted to fit the configuration of the host machine(s).
 jdwp_test_timeout=10000
 
+skip_tests=
 gdb_target=
 has_gdb="no"
 
@@ -144,6 +145,14 @@ while true; do
     vm_command=""
     # We don't care about jit with the RI
     use_jit=false
+    shift
+  elif [[ $1 == --skip-test ]]; then
+    skip_tests="${skip_tests},${2}"
+    # remove the --skip-test
+    args=${args/$1}
+    shift
+    # remove the arg
+    args=${args/$1}
     shift
   elif [[ $1 == --force-run-test ]]; then
     run_internal_jdwp_test=true
@@ -422,6 +431,7 @@ vogar $vm_command \
       --vm-arg -Djpda.settings.transportAddress=127.0.0.1:55107 \
       --vm-arg -Djpda.settings.dumpProcess="$dump_command" \
       --vm-arg -Djpda.settings.debuggeeJavaPath="$art_debugee $plugin $debuggee_args" \
+      --vm-arg -Djpda.settings.badTestCases="$skip_tests" \
       --classpath "$test_jar" \
       $toolchain_args \
       $test
