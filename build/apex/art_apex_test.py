@@ -869,6 +869,7 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('parsed_options_test')
     self._checker.check_art_test_executable('prebuilt_tools_test')
     self._checker.check_art_test_executable('profiling_info_test')
+    self._checker.check_art_test_executable('profile_saver_test')
     self._checker.check_art_test_executable('proxy_test')
     self._checker.check_art_test_executable('quick_trampoline_entrypoints_test')
     self._checker.check_art_test_executable('reference_queue_test')
