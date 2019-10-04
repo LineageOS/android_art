@@ -106,6 +106,9 @@ class ProfileSaver {
   // profile saver session.
   ProfileCompilationInfo::ProfileSampleAnnotation GetProfileSampleAnnotation();
 
+  // Extends the given set of flags with global flags if necessary (e.g. the running architecture).
+  ProfileCompilationInfo::MethodHotness::Flag AnnotateSampleFlags(uint32_t flags);
+
   // The only instance of the saver.
   static ProfileSaver* instance_ GUARDED_BY(Locks::profiler_lock_);
   // Profile saver thread.
@@ -152,6 +155,10 @@ class ProfileSaver {
   uint64_t total_number_of_wake_ups_;
 
   const ProfileSaverOptions options_;
+
+  friend class ProfileSaverTest;
+  friend class ProfileSaverForBootTest;
+
   DISALLOW_COPY_AND_ASSIGN(ProfileSaver);
 };
 
