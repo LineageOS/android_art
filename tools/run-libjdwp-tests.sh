@@ -24,6 +24,17 @@ if [[ `uname` != 'Linux' ]];  then
   exit 2
 fi
 
+# See b/141907697. These tests all crash on both the RI and ART when using the libjdwp agent JDWP
+# implementation. To avoid them cluttering the log on the buildbot we explicitly skip them. This
+# list should not be added to.
+declare -a known_bad_tests=(
+  'org.apache.harmony.jpda.tests.jdwp.ClassType_NewInstanceTest#testNewInstance002'
+  'org.apache.harmony.jpda.tests.jdwp.ObjectReference_GetValues002Test#testGetValues002'
+  'org.apache.harmony.jpda.tests.jdwp.ObjectReference_SetValuesTest#testSetValues001'
+  'org.apache.harmony.jpda.tests.jdwp.ThreadGroupReference_NameTest#testName001_NullObject'
+  'org.apache.harmony.jpda.tests.jdwp.ThreadGroupReference_ParentTest#testParent_NullObject'
+)
+
 declare -a args=("$@")
 debug="no"
 has_variant="no"
@@ -56,6 +67,10 @@ while true; do
   elif [[ $1 == --verbose-all ]]; then
     has_verbose="yes"
     verbose_level=0xFFF
+    unset args[arg_idx]
+    shift
+  elif [[ $1 == --no-skips ]]; then
+    declare -a known_bad_tests=()
     unset args[arg_idx]
     shift
   elif [[ $1 == --verbose ]]; then
@@ -117,6 +132,10 @@ function verbose_run() {
   echo "$@"
   env "$@"
 }
+
+for skip in "${known_bad_tests[@]}"; do
+  args+=("--skip-test" "$skip")
+done
 
 # Tell run-jdwp-tests.sh it was called from run-libjdwp-tests.sh
 export RUN_JDWP_TESTS_CALLED_FROM_LIBJDWP=true
