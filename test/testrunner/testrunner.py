@@ -87,10 +87,10 @@ from device_config import device_config
 #       does not push the value to run-test. run-test is somewhat complicated:
 #                      base: 25m  (large for ASAN)
 #        + timeout handling:  2m
-#        +   gcstress extra:  5m
+#        +   gcstress extra: 20m
 #        -----------------------
-#                            32m
-timeout = 2100 # 35 minutes
+#                            47m
+timeout = 3600 # 60 minutes
 
 # DISABLED_TEST_CONTAINER holds information about the disabled tests. It is a map
 # that has key as the test name (like 001-HelloWorld), and value as set of
