@@ -98,6 +98,7 @@
 #include "quick_exception_handler.h"
 #include "read_barrier-inl.h"
 #include "reflection.h"
+#include "reflective_handle_scope-inl.h"
 #include "runtime-inl.h"
 #include "runtime.h"
 #include "runtime_callbacks.h"
@@ -3956,6 +3957,14 @@ class RootCallbackVisitor {
   RootVisitor* const visitor_;
   const uint32_t tid_;
 };
+
+void Thread::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
+  for (BaseReflectiveHandleScope* brhs = GetTopReflectiveHandleScope();
+       brhs != nullptr;
+       brhs = brhs->GetLink()) {
+    brhs->VisitTargets(visitor);
+  }
+}
 
 template <bool kPrecise>
 void Thread::VisitRoots(RootVisitor* visitor) {
