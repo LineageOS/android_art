@@ -465,10 +465,10 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
                      << " found=" << (locations.find(base_location) != locations.end())
                      << " indices size=" << indices.size();
       if (locations.find(base_location) != locations.end()) {
-        uint8_t flags = Hotness::kFlagHot;
+        uint32_t flags = Hotness::kFlagHot;
         flags |= startup ? Hotness::kFlagStartup : Hotness::kFlagPostStartup;
         cached_info->AddMethodsForDex(
-            static_cast<Hotness::Flag>(flags),
+            AnnotateSampleFlags(flags),
             dex_file,
             indices.begin(),
             indices.end(),
@@ -483,11 +483,12 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
                      << " found=" << (locations.find(base_location) != locations.end())
                      << " indices size=" << indices.size();
       if (locations.find(base_location) != locations.end()) {
-        cached_info->AddMethodsForDex(startup ? Hotness::kFlagStartup : Hotness::kFlagPostStartup,
-                                      dex_file,
-                                      indices.begin(),
-                                      indices.end(),
-                                      GetProfileSampleAnnotation());
+        cached_info->AddMethodsForDex(
+            AnnotateSampleFlags(startup ? Hotness::kFlagStartup : Hotness::kFlagPostStartup),
+            dex_file,
+            indices.begin(),
+            indices.end(),
+            GetProfileSampleAnnotation());
       }
     }
     for (const auto& pair : resolved_classes.GetMap()) {
@@ -576,7 +577,7 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
       // If this happens we clear the profile data and for the save to ensure the file is cleared.
       if (!info.AddMethods(
               profile_methods,
-              static_cast<Hotness::Flag>(Hotness::kFlagHot | Hotness::kFlagPostStartup),
+              AnnotateSampleFlags(Hotness::kFlagHot | Hotness::kFlagPostStartup),
               GetProfileSampleAnnotation())) {
         LOG(WARNING) << "Could not add methods to the existing profiler. "
             << "Clearing the profile data.";
@@ -702,7 +703,7 @@ static bool ShouldProfileLocation(const std::string& location, bool profile_aot_
   return true;
 }
 
-void ProfileSaver::Start(const ProfileSaverOptions& options,
+void  ProfileSaver::Start(const ProfileSaverOptions& options,
                          const std::string& output_filename,
                          jit::JitCodeCache* jit_code_cache,
                          const std::vector<std::string>& code_paths) {
@@ -987,4 +988,17 @@ ProfileCompilationInfo::ProfileSampleAnnotation ProfileSaver::GetProfileSampleAn
       ? ProfileCompilationInfo::ProfileSampleAnnotation(package_name)
       : ProfileCompilationInfo::ProfileSampleAnnotation::kNone;
 }
+
+Hotness::Flag ProfileSaver::AnnotateSampleFlags(uint32_t flags) {
+  uint32_t extra_flags = 0;
+  // We only add the extra flags for the boot image profile because individual apps do not use
+  // this information.
+  if (options_.GetProfileBootClassPath()) {
+    extra_flags = Is64BitInstructionSet(Runtime::Current()->GetInstructionSet())
+        ? Hotness::kFlag64bit
+        : Hotness::kFlag32bit;
+  }
+  return static_cast<Hotness::Flag>(flags | extra_flags);
+}
+
 }   // namespace art

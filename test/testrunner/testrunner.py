@@ -70,6 +70,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -86,10 +87,10 @@ from device_config import device_config
 #       does not push the value to run-test. run-test is somewhat complicated:
 #                      base: 25m  (large for ASAN)
 #        + timeout handling:  2m
-#        +   gcstress extra:  5m
+#        +   gcstress extra: 20m
 #        -----------------------
-#                            32m
-timeout = 2100 # 35 minutes
+#                            47m
+timeout = 3600 # 60 minutes
 
 # DISABLED_TEST_CONTAINER holds information about the disabled tests. It is a map
 # that has key as the test name (like 001-HelloWorld), and value as set of
@@ -568,10 +569,11 @@ def run_test(command, test, test_variant, test_name):
       test_skipped = False
       test_start_time = time.monotonic()
       if gdb:
-        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, universal_newlines=True)
+        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT,
+                                universal_newlines=True, start_new_session=True)
       else:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, stdout = subprocess.PIPE,
-                                universal_newlines=True)
+                                universal_newlines=True, start_new_session=True)
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
       test_time_seconds = time.monotonic() - test_start_time
@@ -594,9 +596,7 @@ def run_test(command, test, test_variant, test_name):
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
     # The python documentation states that it is necessary to actually kill the process.
-    # Note: This is not the correct solution, really, as it will not kill descendants. We would need
-    #       something more complex, e.g., killing by session ID (e.g., in a trap in run-test).
-    proc.kill()
+    os.killpg(proc.pid, signal.SIGKILL)
     script_output = proc.communicate()
 
     return (test_name, 'TIMEOUT', 'Timed out in %d seconds\n%s' % (timeout, command), test_time)

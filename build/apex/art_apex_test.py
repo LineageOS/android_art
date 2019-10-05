@@ -594,10 +594,12 @@ class DebugChecker:
 
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnectiond')
+    self._checker.check_native_library('libart-disassembler')
     self._checker.check_native_library('libartbased')
     self._checker.check_native_library('libartd')
     self._checker.check_native_library('libartd-compiler')
     self._checker.check_native_library('libartd-dexlayout')
+    self._checker.check_native_library('libartd-disassembler')
     self._checker.check_native_library('libdexfiled')
     self._checker.check_native_library('libopenjdkjvmd')
     self._checker.check_native_library('libopenjdkjvmtid')
@@ -621,7 +623,6 @@ class DebugTargetChecker:
 
     # Check ART internal libraries.
     self._checker.check_native_library('libdexfiled_external')
-    self._checker.check_prefer64_library('libartd-disassembler')
     self._checker.check_native_library('libperfetto_hprofd')
 
     # Check internal native library dependencies.
@@ -868,6 +869,7 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('parsed_options_test')
     self._checker.check_art_test_executable('prebuilt_tools_test')
     self._checker.check_art_test_executable('profiling_info_test')
+    self._checker.check_art_test_executable('profile_saver_test')
     self._checker.check_art_test_executable('proxy_test')
     self._checker.check_art_test_executable('quick_trampoline_entrypoints_test')
     self._checker.check_art_test_executable('reference_queue_test')
@@ -898,7 +900,6 @@ class TestingTargetChecker:
 
     # Check ART test (internal) libraries.
     self._checker.check_native_library('libart-gtest')
-    self._checker.check_native_library('libartd-disassembler')
     self._checker.check_native_library('libartd-simulator-container')
 
     # Check ART test tools.

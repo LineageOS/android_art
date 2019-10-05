@@ -22,6 +22,7 @@
 #include "base/mutex.h"
 #include "base/value_object.h"
 #include "jni.h"
+#include "reflective_handle_scope.h"
 #include "suspend_reason.h"
 
 #include <bitset>
@@ -172,6 +173,8 @@ class ThreadList {
   void VisitRootsForSuspendedThreads(RootVisitor* visitor)
       REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void VisitReflectiveTargets(ReflectiveValueVisitor* visitor) const REQUIRES(Locks::mutator_lock_);
 
   // Return a copy of the thread list.
   std::list<Thread*> GetList() REQUIRES(Locks::thread_list_lock_) {
