@@ -2198,6 +2198,7 @@ void Runtime::VisitRoots(RootVisitor* visitor, VisitRootFlags flags) {
 }
 
 void Runtime::VisitReflectiveTargets(ReflectiveValueVisitor *visitor) {
+  thread_list_->VisitReflectiveTargets(visitor);
   heap_->VisitReflectiveTargets(visitor);
   jni_id_manager_->VisitReflectiveTargets(visitor);
   callbacks_->VisitReflectiveTargets(visitor);

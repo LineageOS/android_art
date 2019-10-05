@@ -1542,6 +1542,13 @@ void ThreadList::VisitRoots(RootVisitor* visitor, VisitRootFlags flags) const {
   }
 }
 
+void ThreadList::VisitReflectiveTargets(ReflectiveValueVisitor *visitor) const {
+  MutexLock mu(Thread::Current(), *Locks::thread_list_lock_);
+  for (const auto& thread : list_) {
+    thread->VisitReflectiveTargets(visitor);
+  }
+}
+
 uint32_t ThreadList::AllocThreadId(Thread* self) {
   MutexLock mu(self, *Locks::allocated_thread_ids_lock_);
   for (size_t i = 0; i < allocated_ids_.size(); ++i) {
