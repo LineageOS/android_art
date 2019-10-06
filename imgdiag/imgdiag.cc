@@ -1467,6 +1467,10 @@ class ImgDiagDumper {
     backtrace_map_t boot_map = maybe_boot_map.value_or(backtrace_map_t{});
     // Sanity check boot_map_.
     CHECK(boot_map.end >= boot_map.start);
+
+    // Adjust the `end` of the mapping. Some other mappings may have been
+    // inserted within the image.
+    boot_map.end = RoundUp(boot_map.start + image_header.GetImageSize(), kPageSize);
     // The size of the boot image mapping.
     size_t boot_map_size = boot_map.end - boot_map.start;
 
@@ -1478,7 +1482,10 @@ class ImgDiagDumper {
         return false;
       }
       backtrace_map_t zygote_boot_map = maybe_zygote_boot_map.value_or(backtrace_map_t{});
-      if (zygote_boot_map.start != boot_map.start || zygote_boot_map.end != boot_map.end) {
+      // Adjust the `end` of the mapping. Some other mappings may have been
+      // inserted within the image.
+      zygote_boot_map.end = RoundUp(zygote_boot_map.start + image_header.GetImageSize(), kPageSize);
+      if (zygote_boot_map.start != boot_map.start) {
         os << "Zygote boot map does not match image boot map: "
            << "zygote begin " << reinterpret_cast<const void*>(zygote_boot_map.start)
            << ", zygote end " << reinterpret_cast<const void*>(zygote_boot_map.end)
