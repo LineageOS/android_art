@@ -1461,7 +1461,7 @@ extern "C" const void* artQuickResolutionTrampoline(
     Handle<mirror::Class> called_class(hs.NewHandle(called->GetDeclaringClass()));
     linker->EnsureInitialized(soa.Self(), called_class, true, true);
     bool force_interpreter = self->IsForceInterpreter() && !called->IsNative();
-    if (LIKELY(called_class->IsInitialized())) {
+    if (called_class->IsInitialized() || called_class->IsInitializing()) {
       if (UNLIKELY(force_interpreter ||
                    Dbg::IsForcedInterpreterNeededForResolution(self, called))) {
         // If we are single-stepping or the called method is deoptimized (by a
@@ -1480,21 +1480,16 @@ extern "C" const void* artQuickResolutionTrampoline(
         code = GetQuickInstrumentationEntryPoint();
       } else {
         code = called->GetEntryPointFromQuickCompiledCode();
-      }
-    } else if (called_class->IsInitializing()) {
-      if (UNLIKELY(force_interpreter ||
-                   Dbg::IsForcedInterpreterNeededForResolution(self, called))) {
-        // If we are single-stepping or the called method is deoptimized (by a
-        // breakpoint, for example), then we have to execute the called method
-        // with the interpreter.
-        code = GetQuickToInterpreterBridge();
-      } else if (invoke_type == kStatic) {
-        // Class is still initializing, go to JIT or oat and grab code (trampoline must be
-        // left in place until class is initialized to stop races between threads).
-        code = linker->GetQuickOatCodeFor(called);
-      } else {
-        // No trampoline for non-static methods.
-        code = called->GetEntryPointFromQuickCompiledCode();
+        if (linker->IsQuickResolutionStub(code)) {
+          DCHECK_EQ(invoke_type, kStatic);
+          // Go to JIT or oat and grab code.
+          code = linker->GetQuickOatCodeFor(called);
+          if (called_class->IsInitialized()) {
+            // Only update the entrypoint once the class is initialized. Other
+            // threads still need to go through the resolution stub.
+            Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(called, code);
+          }
+        }
       }
     } else {
       DCHECK(called_class->IsErroneous());
