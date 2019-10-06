@@ -88,7 +88,7 @@ using CodeCacheBitmap = gc::accounting::MemoryRangeBitmap<kJitCodeAccountingByte
 // This map is writable only by the zygote, and readable by all children.
 class ZygoteMap {
  public:
-  explicit ZygoteMap(JitMemoryRegion* region) : map_(), region_(region) {}
+  explicit ZygoteMap(JitMemoryRegion* region) : map_(), region_(region), done_(nullptr) {}
 
   // Initialize the data structure so it can hold `number_of_methods` mappings.
   // Note that the map is fixed size and never grows.
@@ -106,6 +106,14 @@ class ZygoteMap {
     return GetCodeFor(method) != nullptr;
   }
 
+  void SetCompilationDone() {
+    region_->WriteData(done_, true);
+  }
+
+  bool IsCompilationDone() const {
+    return *done_;
+  }
+
  private:
   struct Entry {
     ArtMethod* method;
@@ -120,6 +128,8 @@ class ZygoteMap {
 
   // The region in which the map is allocated.
   JitMemoryRegion* const region_;
+
+  const bool* done_;
 
   DISALLOW_COPY_AND_ASSIGN(ZygoteMap);
 };
