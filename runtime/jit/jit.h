@@ -374,6 +374,17 @@ class Jit {
   bool CanAssumeInitialized(ObjPtr<mirror::Class> cls, bool is_for_shared_region) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  const MemMap& GetZygoteMappingMethods() const {
+    return zygote_mapping_methods_;
+  }
+
+  const MemMap& GetChildMappingMethods() const {
+    return child_mapping_methods_;
+  }
+
+  // Map boot image methods after all compilation in zygote has been done.
+  void MapBootImageMethods();
+
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);
 
@@ -420,6 +431,19 @@ class Jit {
   CumulativeLogger cumulative_timings_;
   Histogram<uint64_t> memory_use_ GUARDED_BY(lock_);
   Mutex lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
+
+  // In the JIT zygote configuration, after all compilation is done, the zygote
+  // will copy its contents of the boot image to the zygote_mapping_methods_,
+  // which will be picked up by processes that will map child_mapping_methods_
+  // in-place within the boot image mapping.
+  //
+  // zygote_mapping_methods_ and child_mapping_methods_ point to the same memory
+  // (backed by a memfd). The difference between the two is that
+  // zygote_mapping_methods_ is shared memory only usable by the zygote and not
+  // inherited by child processes. child_mapping_methods_ is a private mapping
+  // that all processes will map.
+  MemMap zygote_mapping_methods_;
+  MemMap child_mapping_methods_;
 
   DISALLOW_COPY_AND_ASSIGN(Jit);
 };
