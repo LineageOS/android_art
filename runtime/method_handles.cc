@@ -20,6 +20,7 @@
 
 #include "class_root.h"
 #include "common_dex_operations.h"
+#include "common_throws.h"
 #include "interpreter/shadow_frame-inl.h"
 #include "jvalue-inl.h"
 #include "mirror/class-inl.h"
@@ -685,7 +686,14 @@ ArtMethod* RefineTargetMethod(Thread* self,
     if (referrer_class == declaring_class) {
       return target_method;
     }
-    if (!declaring_class->IsInterface()) {
+    if (declaring_class->IsInterface()) {
+      if (target_method->IsAbstract()) {
+        std::string msg =
+            "Method " + target_method->PrettyMethod() + " is abstract interface method!";
+        ThrowIllegalAccessException(msg.c_str());
+        return nullptr;
+      }
+    } else {
       ObjPtr<mirror::Class> super_class = referrer_class->GetSuperClass();
       uint16_t vtable_index = target_method->GetMethodIndex();
       DCHECK(super_class != nullptr);
