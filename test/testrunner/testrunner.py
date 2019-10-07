@@ -568,6 +568,8 @@ def run_test(command, test, test_variant, test_name):
     else:
       test_skipped = False
       test_start_time = time.monotonic()
+      if verbose:
+        print_text("Starting %s at %s\n" % (test_name, test_start_time))
       if gdb:
         proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT,
                                 universal_newlines=True, start_new_session=True)
@@ -591,6 +593,8 @@ def run_test(command, test, test_variant, test_name):
     else:
       return (test_name, 'PASS', None, test_time)
   except subprocess.TimeoutExpired as e:
+    if verbose:
+      print_text("Timeout of %s at %s\n" % (test_name, time.monotonic()))
     test_time_seconds = time.monotonic() - test_start_time
     test_time = datetime.timedelta(seconds=test_time_seconds)
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
