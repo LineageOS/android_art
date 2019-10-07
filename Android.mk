@@ -381,7 +381,7 @@ include $(BUILD_PHONY_PACKAGE)
 # file which is the file that is guaranteed to be created regardless of the
 # value of TARGET_FLATTEN_APEX.
 #
-# b/132413565: Also, when TARGET_FLATTEN_APEX, an empty directory
+# b/132413565: Also, when TARGET_FLATTEN_APEX is true, an empty directory
 # /system/apex/com.android.art is created. After the entire
 # /system/apex is mounted on /apex, the flattened ART APEX
 # (either com.android.art.debug or *.release) is mounted on the empty
