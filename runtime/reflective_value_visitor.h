@@ -124,10 +124,7 @@ class ReflectiveHandleScopeSourceInfo : public ReflectionSourceInfo {
   explicit ReflectiveHandleScopeSourceInfo(BaseReflectiveHandleScope* source)
       : ReflectionSourceInfo(kSourceThreadHandleScope), source_(source) {}
 
-  void Describe(std::ostream& os) const override {
-    ReflectionSourceInfo::Describe(os);
-    os << " source=" << source_;
-  }
+  void Describe(std::ostream& os) const override;
 
  private:
   BaseReflectiveHandleScope* source_;
