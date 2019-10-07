@@ -881,11 +881,4 @@ ALWAYS_INLINE static inline void DoGetAccessFlagsHelper(ArtMethod* method)
         method->GetDeclaringClass<kReadBarrierOption>()->IsErroneous());
 }
 
-bool ArtMethod::NeedsInitializationCheck() {
-  // Knowing if the class is visibly initialized is only for JIT/AOT compiled
-  // code to avoid the memory barrier. For callers of `NeedsInitializationCheck`
-  // it's enough to just check whether the class is initialized.
-  return IsStatic() && !IsConstructor() && !GetDeclaringClass()->IsInitialized();
-}
-
 }  // namespace art

@@ -757,8 +757,11 @@ uint8_t* JitCodeCache::CommitCodeInternal(Thread* self,
       data->SetCode(code_ptr);
       instrumentation::Instrumentation* instrum = Runtime::Current()->GetInstrumentation();
       for (ArtMethod* m : data->GetMethods()) {
-        if (!m->NeedsInitializationCheck()) {
-          instrum->UpdateMethodsCode(m, method_header->GetEntryPoint());
+        // Because `m` might be in the process of being deleted:
+        // - Call the dedicated method instead of the more generic UpdateMethodsCode
+        // - Check the class status without a read barrier.
+        if (!m->NeedsInitializationCheck<kWithoutReadBarrier>()) {
+          instrum->UpdateNativeMethodsCodeToJitCode(m, method_header->GetEntryPoint());
         }
       }
     } else {
@@ -1608,9 +1611,10 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
       // can avoid a few expensive GenericJNI calls.
       instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
       for (ArtMethod* m : data->GetMethods()) {
-        // Call the dedicated method instead of the more generic UpdateMethodsCode, because
-        // `m` might be in the process of being deleted.
-        if (!m->NeedsInitializationCheck()) {
+        // Because `m` might be in the process of being deleted:
+        // - Call the dedicated method instead of the more generic UpdateMethodsCode
+        // - Check the class status without a read barrier.
+        if (!m->NeedsInitializationCheck<kWithoutReadBarrier>()) {
           instrumentation->UpdateNativeMethodsCodeToJitCode(m, entrypoint);
         }
       }
