@@ -367,6 +367,7 @@ class ArtMethod final {
 
   // Returns whether the method can be invoked directly or needs a
   // class initialization check.
+  template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   bool NeedsInitializationCheck() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Returns true if this method could be overridden by a default method.
