@@ -71,8 +71,6 @@
 #include "oat_file.h"
 #include "obj_ptr-inl.h"
 #include "reflection.h"
-#include "reflective_handle.h"
-#include "reflective_handle_scope-inl.h"
 #include "runtime-inl.h"
 #include "scoped_thread_state_change-inl.h"
 #include "stack.h"
@@ -4058,19 +4056,18 @@ void Dbg::ExecuteMethodWithoutPendingException(ScopedObjectAccess& soa, DebugInv
   soa.Self()->AssertNoPendingException();
 
   // Translate the method through the vtable, unless the debugger wants to suppress it.
-  StackArtMethodHandleScope<2> rhs(soa.Self());
-  MutableReflectiveHandle<ArtMethod> m(rhs.NewHandle(pReq->method));
+  ArtMethod* m = pReq->method;
   PointerSize image_pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
   if ((pReq->options & JDWP::INVOKE_NONVIRTUAL) == 0 && pReq->receiver.Read() != nullptr) {
-    MutableReflectiveHandle<ArtMethod> actual_method(rhs.NewHandle(
-        pReq->klass.Read()->FindVirtualMethodForVirtualOrInterface(m.Get(), image_pointer_size)));
-    if (actual_method.Get() != m.Get()) {
-      VLOG(jdwp) << "ExecuteMethod translated " << m->PrettyMethod()
-                 << " to " << actual_method->PrettyMethod();
+    ArtMethod* actual_method =
+        pReq->klass.Read()->FindVirtualMethodForVirtualOrInterface(m, image_pointer_size);
+    if (actual_method != m) {
+      VLOG(jdwp) << "ExecuteMethod translated " << ArtMethod::PrettyMethod(m)
+                 << " to " << ArtMethod::PrettyMethod(actual_method);
       m = actual_method;
     }
   }
-  VLOG(jdwp) << "ExecuteMethod " << m->PrettyMethod()
+  VLOG(jdwp) << "ExecuteMethod " << ArtMethod::PrettyMethod(m)
              << " receiver=" << pReq->receiver.Read()
              << " arg_count=" << pReq->arg_count;
   CHECK(m != nullptr);
