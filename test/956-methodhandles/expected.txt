@@ -26,3 +26,14 @@ Expect Hi here: Hi
 Don't expect Hi now
 [3, 2, 1]
 [1, 2, 3]
+Trying to call public abstract void java.util.function.Consumer.accept(java.lang.Object)
+Called accept with foo
+Trying to call public default java.util.function.Consumer java.util.function.Consumer.andThen(java.util.function.Consumer)
+Trying to call public abstract void java.util.function.Consumer.accept(java.lang.Object)
+Called accept with bar
+and then bar
+Ignoring and then
+Got hello
+Got hello there
+Called and then with hello there
+Got expected IAE when invoke-special on an abstract interface method
