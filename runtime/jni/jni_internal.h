@@ -22,10 +22,7 @@
 
 #include "base/locks.h"
 #include "base/macros.h"
-#include "reflective_handle.h"
-#include "reflective_handle_scope.h"
 #include "runtime.h"
-#include "thread.h"
 
 namespace art {
 
@@ -90,33 +87,12 @@ static inline ArtField* DecodeArtField(jfieldID fid) {
 }
 
 template <bool kEnableIndexIds = true>
-ALWAYS_INLINE static inline jfieldID EncodeArtField(ReflectiveHandle<ArtField> field)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (kEnableIndexIds && Runtime::Current()->GetJniIdType() != JniIdType::kPointer) {
-    return Runtime::Current()->GetJniIdManager()->EncodeFieldId(field);
-  } else {
-    return reinterpret_cast<jfieldID>(field.Get());
-  }
-}
-
-template <bool kEnableIndexIds = true>
 ALWAYS_INLINE
 static inline jfieldID EncodeArtField(ArtField* field) REQUIRES_SHARED(Locks::mutator_lock_)  {
   if (kEnableIndexIds && Runtime::Current()->GetJniIdType() != JniIdType::kPointer) {
     return Runtime::Current()->GetJniIdManager()->EncodeFieldId(field);
   } else {
     return reinterpret_cast<jfieldID>(field);
-  }
-}
-
-template <bool kEnableIndexIds = true>
-ALWAYS_INLINE
-static inline jmethodID EncodeArtMethod(ReflectiveHandle<ArtMethod> art_method)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (kEnableIndexIds && Runtime::Current()->GetJniIdType() != JniIdType::kPointer) {
-    return Runtime::Current()->GetJniIdManager()->EncodeMethodId(art_method);
-  } else {
-    return reinterpret_cast<jmethodID>(art_method.Get());
   }
 }
 
