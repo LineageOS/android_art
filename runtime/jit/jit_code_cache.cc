@@ -119,6 +119,21 @@ class JitCodeCache::JniStubData {
     code_ = code;
   }
 
+  void UpdateEntryPoints(const void* entrypoint) REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(IsCompiled());
+    DCHECK(entrypoint == OatQuickMethodHeader::FromCodePointer(GetCode())->GetEntryPoint());
+    instrumentation::Instrumentation* instrum = Runtime::Current()->GetInstrumentation();
+    for (ArtMethod* m : GetMethods()) {
+      // Because `m` might be in the process of being deleted:
+      // - Call the dedicated method instead of the more generic UpdateMethodsCode
+      // - Check the class status without a read barrier.
+      // TODO: Use ReadBarrier::IsMarked() if not null to check the class status.
+      if (!m->NeedsInitializationCheck<kWithoutReadBarrier>()) {
+        instrum->UpdateNativeMethodsCodeToJitCode(m, entrypoint);
+      }
+    }
+  }
+
   const void* GetCode() const {
     return code_;
   }
@@ -705,15 +720,7 @@ bool JitCodeCache::Commit(Thread* self,
       DCHECK(ContainsElement(data->GetMethods(), method))
           << "Entry inserted in NotifyCompilationOf() should contain this method.";
       data->SetCode(code_ptr);
-      instrumentation::Instrumentation* instrum = Runtime::Current()->GetInstrumentation();
-      for (ArtMethod* m : data->GetMethods()) {
-        // Because `m` might be in the process of being deleted:
-        // - Call the dedicated method instead of the more generic UpdateMethodsCode
-        // - Check the class status without a read barrier.
-        if (!m->NeedsInitializationCheck<kWithoutReadBarrier>()) {
-          instrum->UpdateNativeMethodsCodeToJitCode(m, method_header->GetEntryPoint());
-        }
-      }
+      data->UpdateEntryPoints(method_header->GetEntryPoint());
     } else {
       if (method->IsPreCompiled() && IsSharedRegion(*region)) {
         zygote_map_.Put(code_ptr, method);
@@ -1555,6 +1562,12 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
   if (method->NeedsInitializationCheck() && !prejit) {
     // Unless we're pre-jitting, we currently don't save the JIT compiled code if we cannot
     // update the entrypoint due to needing an initialization check.
+    if (method->GetDeclaringClass()->IsInitialized()) {
+      // Request visible initialization but do not block to allow compiling other methods.
+      // Hopefully, this will complete by the time the method becomes hot again.
+      Runtime::Current()->GetClassLinker()->MakeInitializedClassesVisiblyInitialized(
+          self, /*wait=*/ false);
+    }
     VLOG(jit) << "Not compiling "
               << method->PrettyMethod()
               << " because it has the resolution stub";
@@ -1587,15 +1600,7 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
       // changed these entrypoints to GenericJNI in preparation for a full GC, we may
       // as well change them back as this stub shall not be collected anyway and this
       // can avoid a few expensive GenericJNI calls.
-      instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
-      for (ArtMethod* m : data->GetMethods()) {
-        // Because `m` might be in the process of being deleted:
-        // - Call the dedicated method instead of the more generic UpdateMethodsCode
-        // - Check the class status without a read barrier.
-        if (!m->NeedsInitializationCheck<kWithoutReadBarrier>()) {
-          instrumentation->UpdateNativeMethodsCodeToJitCode(m, entrypoint);
-        }
-      }
+      data->UpdateEntryPoints(entrypoint);
       if (collection_in_progress_) {
         if (!IsInZygoteExecSpace(data->GetCode())) {
           GetLiveBitmap()->AtomicTestAndSet(FromCodeToAllocation(data->GetCode()));

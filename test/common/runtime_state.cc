@@ -221,13 +221,27 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
       ThrowIllegalStateException(msg.c_str());
       return;
     }
-    // We force initialization of the declaring class to make sure the method doesn't keep
-    // the resolution stub as entrypoint.
+    // We force visible initialization of the declaring class to make sure the method
+    // doesn't keep the resolution stub as entrypoint.
     StackHandleScope<1> hs(self);
     Handle<mirror::Class> h_klass(hs.NewHandle(method->GetDeclaringClass()));
-    if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_klass, true, true)) {
+    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+    if (!class_linker->EnsureInitialized(self, h_klass, true, true)) {
       self->AssertPendingException();
       return;
+    }
+    if (UNLIKELY(!h_klass->IsInitialized())) {
+      // Must be initializing in this thread.
+      CHECK_EQ(h_klass->GetStatus(), ClassStatus::kInitializing);
+      CHECK_EQ(h_klass->GetClinitThreadId(), self->GetTid());
+      std::string msg(method->PrettyMethod());
+      msg += ": is not safe to jit because the class is being initialized in this thread!";
+      ThrowIllegalStateException(msg.c_str());
+      return;
+    }
+    if (!h_klass->IsVisiblyInitialized()) {
+      ScopedThreadSuspension sts(self, ThreadState::kNative);
+      class_linker->MakeInitializedClassesVisiblyInitialized(self, /*wait=*/ true);
     }
   }
   jit::Jit* jit = GetJitIfEnabled();
