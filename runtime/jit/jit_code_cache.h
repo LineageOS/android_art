@@ -197,7 +197,8 @@ class JitCodeCache {
                       const std::vector<Handle<mirror::Object>>& roots,
                       bool osr,
                       bool has_should_deoptimize_flag,
-                      const ArenaSet<ArtMethod*>& cha_single_implementation_list)
+                      const ArenaSet<ArtMethod*>& cha_single_implementation_list,
+                      const std::function<void(const uint8_t* code)>& generate_debug_info)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -369,7 +370,8 @@ class JitCodeCache {
                               const std::vector<Handle<mirror::Object>>& roots,
                               bool osr,
                               bool has_should_deoptimize_flag,
-                              const ArenaSet<ArtMethod*>& cha_single_implementation_list)
+                              const ArenaSet<ArtMethod*>& cha_single_implementation_list,
+                              const std::function<void(const uint8_t* code)>& generate_debug_info)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
