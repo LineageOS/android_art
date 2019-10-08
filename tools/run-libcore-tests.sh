@@ -198,6 +198,8 @@ fi
 # the default timeout.
 if $gcstress && $debug && $device_mode; then
   vogar_args="$vogar_args --timeout 1440"
+elif $gcstress && $device_mode; then
+  vogar_args="$vogar_args --timeout 900"
 else
   vogar_args="$vogar_args --timeout 480"
 fi
