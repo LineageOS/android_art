@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -e
+
 if [ ! -d art ]; then
   echo "Script needs to be run at the root of the android tree"
   exit 1
