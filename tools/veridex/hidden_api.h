@@ -30,6 +30,12 @@ namespace art {
 
 class DexFile;
 
+enum class SignatureSource {
+  UNKNOWN,
+  BOOT,
+  APP,
+};
+
 /**
  * Helper class for logging if a method/field is in a hidden API list.
  */
@@ -42,8 +48,33 @@ class HiddenApi {
     return (it == api_list_.end()) ? hiddenapi::ApiList() : it->second;
   }
 
-  bool IsInAnyList(const std::string& name) const {
-    return !GetApiList(name).IsEmpty();
+  bool ShouldReport(const std::string& signature) const {
+    return api_list_filter_.Matches(GetApiList(signature));
+  }
+
+  void AddSignatureSource(const std::string &signature, SignatureSource source) {
+    const auto type = GetApiClassName(signature);
+    auto it = source_.find(type);
+    if (it == source_.end() || it->second == SignatureSource::UNKNOWN) {
+      source_[type] = source;
+    } else if (it->second != source) {
+      LOG(WARNING) << type << "is present both in boot and in app.";
+      if (source == SignatureSource::BOOT) {
+        // Runtime resolves to boot type, so it takes precedence.
+        it->second = source;
+      }
+    } else {
+      // Already exists with the same source.
+    }
+  }
+
+  SignatureSource GetSignatureSource(const std::string& signature) const {
+    auto it = source_.find(GetApiClassName(signature));
+    return (it == source_.end()) ? SignatureSource::UNKNOWN : it->second;
+  }
+
+  bool IsInBoot(const std::string& signature) const {
+    return SignatureSource::BOOT == GetSignatureSource(signature);
   }
 
   static std::string GetApiMethodName(const DexFile& dex_file, uint32_t method_index);
@@ -63,15 +94,27 @@ class HiddenApi {
  private:
   void AddSignatureToApiList(const std::string& signature, hiddenapi::ApiList membership);
 
+  static std::string GetApiClassName(const std::string& signature) {
+    size_t pos = signature.find("->");
+    if (pos != std::string::npos) {
+      return signature.substr(0, pos);
+    }
+    return signature;
+  }
+
+  const ApiListFilter& api_list_filter_;
   std::map<std::string, hiddenapi::ApiList> api_list_;
+  std::map<std::string, SignatureSource> source_;
 };
 
 struct HiddenApiStats {
   uint32_t count = 0;
   uint32_t reflection_count = 0;
   uint32_t linking_count = 0;
-  uint32_t api_counts[hiddenapi::ApiList::kValueCount] = {};  // initialize all to zero
+  // Ensure enough space for kInvalid as well, and initialize all to zero
+  uint32_t api_counts[hiddenapi::ApiList::kValueSize] = {};
 };
+
 
 }  // namespace art
 
