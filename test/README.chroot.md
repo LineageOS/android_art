@@ -58,6 +58,7 @@ Note that using this chroot-based approach requires root access to the device
         ```
     * With a full Android (AOSP) `aosp/master` tree:
         ```bash
+        export OVERRIDE_TARGET_FLATTEN_APEX=true
         . ./build/envsetup.sh
         lunch aosp_arm64-eng  # or aosp_arm-eng for 32-bit ARM
         m adb

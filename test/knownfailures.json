@@ -444,10 +444,13 @@
             ".*var-handle.*",
             "716-jli-jit-samples",
             "1975-hello-structural-transformation",
-            "1976-hello-structural-static-methods"
+            "1976-hello-structural-static-methods",
+            "1985-structural-redefine-stack-scope",
+            "1986-structural-redefine-multi-thread-stack-scope",
+            "1987-structural-redefine-recursive-stack-scope"
         ],
         "description": [
-            "Tests for bytecodes introduced after DEX version 037 that are unsupported by",
+            "Tests for/using bytecodes introduced after DEX version 037 that are unsupported by",
             "dexter/slicer."
         ],
         "bug": "b/37272822",
