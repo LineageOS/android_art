@@ -174,6 +174,9 @@ class Veridex {
 
     // Resolve classes/methods/fields defined in each dex file.
 
+    ApiListFilter api_list_filter(options.exclude_api_lists);
+    HiddenApi hidden_api(options.flags_file, api_list_filter);
+
     // Cache of types we've seen, for quick class name lookups.
     TypeMap type_map;
     // Add internally defined primitives.
@@ -192,6 +195,9 @@ class Veridex {
 
     std::vector<std::unique_ptr<VeridexResolver>> boot_resolvers;
     Resolve(boot_dex_files, resolver_map, type_map, &boot_resolvers);
+    for (const auto &it : type_map) {
+        hidden_api.AddSignatureSource(it.first, SignatureSource::BOOT);
+    }
 
     if (options.precise) {
       // For precise mode we expect core-stubs to contain java.lang classes.
@@ -227,12 +233,15 @@ class Veridex {
 
     std::vector<std::unique_ptr<VeridexResolver>> app_resolvers;
     Resolve(app_dex_files, resolver_map, type_map, &app_resolvers);
+    for (const auto &it : type_map) {
+      if (!hidden_api.IsInBoot(it.first)) {
+        hidden_api.AddSignatureSource(it.first, SignatureSource::APP);
+      }
+    }
 
     ClassFilter app_class_filter(options.app_class_name_filter);
-    ApiListFilter api_list_filter(options.exclude_api_lists);
 
     // Find and log uses of hidden APIs.
-    HiddenApi hidden_api(options.flags_file, api_list_filter);
     HiddenApiStats stats;
 
     HiddenApiFinder api_finder(hidden_api);
@@ -259,15 +268,21 @@ class Veridex {
   static void DumpSummaryStats(std::ostream& os,
                                const HiddenApiStats& stats,
                                const ApiListFilter& api_list_filter) {
-    static const char* kPrefix = "       ";
     os << stats.count << " hidden API(s) used: "
        << stats.linking_count << " linked against, "
        << stats.reflection_count << " through reflection" << std::endl;
+    DumpApiListStats(os, stats, hiddenapi::ApiList(), api_list_filter);
     for (size_t i = 0; i < hiddenapi::ApiList::kValueCount; ++i) {
-      hiddenapi::ApiList api_list = hiddenapi::ApiList(i);
-      if (api_list_filter.Matches(api_list)) {
-        os << kPrefix << stats.api_counts[i] << " in " << api_list << std::endl;
-      }
+      DumpApiListStats(os, stats, hiddenapi::ApiList(i), api_list_filter);
+    }
+  }
+
+  static void DumpApiListStats(std::ostream& os,
+                               const HiddenApiStats& stats,
+                               const hiddenapi::ApiList& api_list,
+                               const ApiListFilter& api_list_filter) {
+    if (api_list_filter.Matches(api_list)) {
+      os << "\t" << stats.api_counts[api_list.GetIntValue()] << " in " << api_list << std::endl;
     }
   }
 
