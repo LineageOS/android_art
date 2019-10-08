@@ -8,7 +8,7 @@
 dir.art = /apex/com.android.art/bin/
 
 [art]
-additional.namespaces = platform,conscrypt,art
+additional.namespaces = platform,conscrypt,art,neuralnetworks
 
 # The default namespace here only links to other namespaces, in particular "art"
 # where the real library loading takes place. Any outgoing links from "art" also
@@ -41,12 +41,13 @@ namespace.art.permitted.paths = /data
 # odex files are in /system/framework. dalvikvm has to be able to dlopen the
 # files for CTS.
 namespace.art.permitted.paths += /system/framework
-namespace.art.links = platform
+namespace.art.links = platform,neuralnetworks
 # Need allow_all_shared_libs because libart.so can dlopen oat files in
 # /system/framework and /data.
 # TODO(b/130340935): Use a dynamically created linker namespace similar to
 # classloader-namespace for oat files, and tighten this up.
 namespace.art.link.platform.allow_all_shared_libs = true
+namespace.art.link.neuralnetworks.shared_libs = libneuralnetworks.so
 
 ###############################################################################
 # "platform" namespace
@@ -117,3 +118,24 @@ namespace.conscrypt.link.platform.shared_libs  = libc.so
 namespace.conscrypt.link.platform.shared_libs += libm.so
 namespace.conscrypt.link.platform.shared_libs += libdl.so
 namespace.conscrypt.link.platform.shared_libs += liblog.so
+
+###############################################################################
+# "neuralnetworks" APEX namespace
+#
+# This namespace is for libraries within the NNAPI APEX.
+###############################################################################
+namespace.neuralnetworks.isolated = true
+namespace.neuralnetworks.visible = true
+
+namespace.neuralnetworks.search.paths = /apex/com.android.neuralnetworks/${LIB}
+namespace.neuralnetworks.asan.search.paths = /apex/com.android.neuralnetworks/${LIB}
+namespace.neuralnetworks.links = platform
+namespace.neuralnetworks.link.platform.shared_libs  = libc.so
+namespace.neuralnetworks.link.platform.shared_libs += libcgrouprc.so
+namespace.neuralnetworks.link.platform.shared_libs += libdl.so
+namespace.neuralnetworks.link.platform.shared_libs += liblog.so
+namespace.neuralnetworks.link.platform.shared_libs += libm.so
+namespace.neuralnetworks.link.platform.shared_libs += libnativewindow.so
+namespace.neuralnetworks.link.platform.shared_libs += libneuralnetworks_packageinfo.so
+namespace.neuralnetworks.link.platform.shared_libs += libsync.so
+namespace.neuralnetworks.link.platform.shared_libs += libvndksupport.so
