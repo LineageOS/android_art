@@ -84,13 +84,9 @@ class Redefiner {
   // Redefine the given classes with the given dex data. Note this function does not take ownership
   // of the dex_data pointers. It is not used after this call however and may be freed if desired.
   // The caller is responsible for freeing it. The runtime makes its own copy of the data.
-  static jvmtiError RedefineClasses(ArtJvmTiEnv* env,
-                                    EventHandler* event_handler,
-                                    art::Runtime* runtime,
-                                    art::Thread* self,
+  static jvmtiError RedefineClasses(jvmtiEnv* env,
                                     jint class_count,
-                                    const jvmtiClassDefinition* definitions,
-                                    /*out*/std::string* error_msg);
+                                    const jvmtiClassDefinition* definitions);
 
   static jvmtiError IsModifiableClass(jvmtiEnv* env, jclass klass, jboolean* is_redefinable);
   static jvmtiError IsStructurallyModifiableClass(jvmtiEnv* env,
