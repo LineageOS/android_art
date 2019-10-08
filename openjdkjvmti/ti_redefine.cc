@@ -574,50 +574,56 @@ Redefiner::ClassRedefinition::~ClassRedefinition() {
   }
 }
 
-jvmtiError Redefiner::RedefineClasses(ArtJvmTiEnv* env,
-                                      EventHandler* event_handler,
-                                      art::Runtime* runtime,
-                                      art::Thread* self,
+jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
                                       jint class_count,
-                                      const jvmtiClassDefinition* definitions,
-                                      /*out*/std::string* error_msg) {
+                                      const jvmtiClassDefinition* definitions) {
+  art::Runtime* runtime = art::Runtime::Current();
+  art::Thread* self = art::Thread::Current();
+  ArtJvmTiEnv* env = ArtJvmTiEnv::AsArtJvmTiEnv(jenv);
   if (env == nullptr) {
-    *error_msg = "env was null!";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE env was null!";
     return ERR(INVALID_ENVIRONMENT);
   } else if (class_count < 0) {
-    *error_msg = "class_count was less then 0";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE class_count was less then 0";
     return ERR(ILLEGAL_ARGUMENT);
   } else if (class_count == 0) {
     // We don't actually need to do anything. Just return OK.
     return OK;
   } else if (definitions == nullptr) {
-    *error_msg = "null definitions!";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE null definitions!";
     return ERR(NULL_POINTER);
   }
+  std::string error_msg;
   std::vector<ArtClassDefinition> def_vector;
   def_vector.reserve(class_count);
   for (jint i = 0; i < class_count; i++) {
-    jvmtiError res = Redefiner::GetClassRedefinitionError(definitions[i].klass, error_msg);
+    jvmtiError res = Redefiner::GetClassRedefinitionError(definitions[i].klass, &error_msg);
     if (res != OK) {
+      JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
       return res;
     }
     ArtClassDefinition def;
     res = def.Init(self, definitions[i]);
     if (res != OK) {
+      JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE bad definition " << i;
       return res;
     }
     def_vector.push_back(std::move(def));
   }
   // Call all the transformation events.
-  jvmtiError res = Transformer::RetransformClassesDirect(event_handler,
-                                                         self,
+  jvmtiError res = Transformer::RetransformClassesDirect(self,
                                                          &def_vector);
   if (res != OK) {
     // Something went wrong with transformation!
+    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE unable to retransform classes";
     return res;
   }
-  return RedefineClassesDirect(
-      env, runtime, self, def_vector, RedefinitionType::kNormal, error_msg);
+  res = RedefineClassesDirect(
+      env, runtime, self, def_vector, RedefinitionType::kNormal, &error_msg);
+  if (res != OK) {
+    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
+  }
+  return res;
 }
 
 jvmtiError Redefiner::StructurallyRedefineClassDirect(jvmtiEnv* env,
