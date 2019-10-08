@@ -778,18 +778,7 @@ class JvmtiFunctions {
   static jvmtiError RetransformClasses(jvmtiEnv* env, jint class_count, const jclass* classes) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_retransform_classes);
-    std::string error_msg;
-    jvmtiError res = Transformer::RetransformClasses(ArtJvmTiEnv::AsArtJvmTiEnv(env),
-                                                     gEventHandler,
-                                                     art::Runtime::Current(),
-                                                     art::Thread::Current(),
-                                                     class_count,
-                                                     classes,
-                                                     &error_msg);
-    if (res != OK) {
-      JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANFORM " << error_msg;
-    }
-    return res;
+    return Transformer::RetransformClasses(env, class_count, classes);
   }
 
   static jvmtiError RedefineClasses(jvmtiEnv* env,
@@ -797,18 +786,7 @@ class JvmtiFunctions {
                                     const jvmtiClassDefinition* class_definitions) {
     ENSURE_VALID_ENV(env);
     ENSURE_HAS_CAP(env, can_redefine_classes);
-    std::string error_msg;
-    jvmtiError res = Redefiner::RedefineClasses(ArtJvmTiEnv::AsArtJvmTiEnv(env),
-                                                gEventHandler,
-                                                art::Runtime::Current(),
-                                                art::Thread::Current(),
-                                                class_count,
-                                                class_definitions,
-                                                &error_msg);
-    if (res != OK) {
-      JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
-    }
-    return res;
+    return Redefiner::RedefineClasses(env, class_count, class_definitions);
   }
 
   static jvmtiError GetObjectSize(jvmtiEnv* env, jobject object, jlong* size_ptr) {
@@ -1538,7 +1516,7 @@ extern "C" bool ArtPlugin_Initialize() {
   HeapUtil::Register();
   FieldUtil::Register(gEventHandler);
   BreakpointUtil::Register(gEventHandler);
-  Transformer::Setup();
+  Transformer::Register(gEventHandler);
 
   {
     // Make sure we can deopt anything we need to.
