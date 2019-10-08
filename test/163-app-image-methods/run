@@ -16,5 +16,6 @@
 
 # Use a profile to put specific classes in the app image.
 # Also run the compiler with -j1 to ensure specific class verification order.
+# And limit the managed heap to 16 MiB to speed up GCs.
 exec ${RUN} $@ --profile -Xcompiler-option --compiler-filter=speed-profile \
-    -Xcompiler-option -j1
+    -Xcompiler-option -j1 --runtime-option -Xmx16m
