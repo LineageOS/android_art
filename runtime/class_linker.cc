@@ -3771,34 +3771,41 @@ static void LinkCode(ClassLinker* class_linker,
     // The following code only applies to a non-compiler runtime.
     return;
   }
+
   // Method shouldn't have already been linked.
   DCHECK(method->GetEntryPointFromQuickCompiledCode() == nullptr);
-  if (oat_class != nullptr) {
-    // Every kind of method should at least get an invoke stub from the oat_method.
-    // non-abstract methods also get their code pointers.
-    const OatFile::OatMethod oat_method = oat_class->GetOatMethod(class_def_method_index);
-    oat_method.LinkMethod(method);
-  }
-
-  // Install entry point from interpreter.
-  const void* quick_code = method->GetEntryPointFromQuickCompiledCode();
-  bool enter_interpreter = class_linker->ShouldUseInterpreterEntrypoint(method, quick_code);
 
   if (!method->IsInvokable()) {
     EnsureThrowsInvocationError(class_linker, method);
     return;
   }
 
-  if (method->IsStatic() && !method->IsConstructor()) {
-    // For static methods excluding the class initializer, install the trampoline.
+  const void* quick_code = nullptr;
+  if (oat_class != nullptr) {
+    // Every kind of method should at least get an invoke stub from the oat_method.
+    // non-abstract methods also get their code pointers.
+    const OatFile::OatMethod oat_method = oat_class->GetOatMethod(class_def_method_index);
+    quick_code = oat_method.GetQuickCode();
+  }
+
+  bool enter_interpreter = class_linker->ShouldUseInterpreterEntrypoint(method, quick_code);
+
+  // Note: this mimics the logic in image_writer.cc that installs the resolution
+  // stub only if we have compiled code and the method needs a class initialization
+  // check.
+  if (quick_code == nullptr) {
+    method->SetEntryPointFromQuickCompiledCode(
+        method->IsNative() ? GetQuickGenericJniStub() : GetQuickToInterpreterBridge());
+  } else if (enter_interpreter) {
+    method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+  } else if (method->NeedsInitializationCheck()) {
+    // If there is compiled code, and the method needs to make sure the class is
+    // initialized before execution, install the resolution stub.
     // It will be replaced by the proper entry point by ClassLinker::FixupStaticTrampolines
     // after initializing class (see ClassLinker::InitializeClass method).
     method->SetEntryPointFromQuickCompiledCode(GetQuickResolutionStub());
-  } else if (quick_code == nullptr && method->IsNative()) {
-    method->SetEntryPointFromQuickCompiledCode(GetQuickGenericJniStub());
-  } else if (enter_interpreter) {
-    // Set entry point from compiled code if there's no code or in interpreter only mode.
-    method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+  } else {
+    method->SetEntryPointFromQuickCompiledCode(quick_code);
   }
 
   if (method->IsNative()) {
@@ -3806,12 +3813,10 @@ static void LinkCode(ClassLinker* class_linker,
     method->UnregisterNative();
 
     if (enter_interpreter || quick_code == nullptr) {
-      // We have a native method here without code. Then it should have either the generic JNI
-      // trampoline as entrypoint (non-static), or the resolution trampoline (static).
+      // We have a native method here without code. Then it should have the generic JNI
+      // trampoline as entrypoint.
       // TODO: this doesn't handle all the cases where trampolines may be installed.
-      const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
-      DCHECK(class_linker->IsQuickGenericJniStub(entry_point) ||
-             class_linker->IsQuickResolutionStub(entry_point));
+      DCHECK(class_linker->IsQuickGenericJniStub(method->GetEntryPointFromQuickCompiledCode()));
     }
   }
 }

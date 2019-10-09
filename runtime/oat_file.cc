@@ -2153,11 +2153,6 @@ const OatFile::OatMethod OatFile::OatClass::GetOatMethod(uint32_t method_index) 
   return OatMethod(oat_file_->Begin(), 0);
 }
 
-void OatFile::OatMethod::LinkMethod(ArtMethod* method) const {
-  CHECK(method != nullptr);
-  method->SetEntryPointFromQuickCompiledCode(GetQuickCode());
-}
-
 bool OatFile::IsDebuggable() const {
   return GetOatHeader().IsDebuggable();
 }
