@@ -112,7 +112,6 @@ cc_defaults {
         "//art:__subpackages__",
         // TODO(b/133140750): Clean this up.
         "//frameworks/base/startop/view_compiler",
-        "//system/extras/simpleperf",
     ],
     static_libs: ["libdexfile"],
 }
@@ -149,7 +148,6 @@ art_cc_library {
         "//cts/tests/tests/appop",
         "//frameworks/base/startop/view_compiler",
         "//frameworks/base/tests/net:__subpackages__",
-        "//system/extras/simpleperf",
     ],
     // Leave the symbols in the shared library so that stack unwinders can
     // produce meaningful name resolution.
