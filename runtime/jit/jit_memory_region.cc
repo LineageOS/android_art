@@ -350,37 +350,41 @@ void* JitMemoryRegion::MoreCore(const void* mspace, intptr_t increment) NO_THREA
   }
 }
 
-const uint8_t* JitMemoryRegion::CommitCode(ArrayRef<const uint8_t> reserved_code,
-                                           ArrayRef<const uint8_t> code,
-                                           const uint8_t* stack_map,
-                                           bool has_should_deoptimize_flag) {
-  DCHECK(IsInExecSpace(reserved_code.data()));
+const uint8_t* JitMemoryRegion::AllocateCode(const uint8_t* code,
+                                             size_t code_size,
+                                             const uint8_t* stack_map,
+                                             bool has_should_deoptimize_flag) {
   ScopedCodeCacheWrite scc(*this);
 
   size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
-  size_t header_size = OatQuickMethodHeader::InstructionAlignedSize();
-  size_t total_size = header_size + code.size();
+  // Ensure the header ends up at expected instruction alignment.
+  size_t header_size = RoundUp(sizeof(OatQuickMethodHeader), alignment);
+  size_t total_size = header_size + code_size;
 
   // Each allocation should be on its own set of cache lines.
   // `total_size` covers the OatQuickMethodHeader, the JIT generated machine code,
   // and any alignment padding.
   DCHECK_GT(total_size, header_size);
-  DCHECK_LE(total_size, reserved_code.size());
-  uint8_t* x_memory = const_cast<uint8_t*>(reserved_code.data());
-  uint8_t* w_memory = const_cast<uint8_t*>(GetNonExecutableAddress(x_memory));
+  uint8_t* w_memory = reinterpret_cast<uint8_t*>(
+      mspace_memalign(exec_mspace_, alignment, total_size));
+  if (UNLIKELY(w_memory == nullptr)) {
+    return nullptr;
+  }
+  uint8_t* x_memory = GetExecutableAddress(w_memory);
   // Ensure the header ends up at expected instruction alignment.
   DCHECK_ALIGNED_PARAM(reinterpret_cast<uintptr_t>(w_memory + header_size), alignment);
+  used_memory_for_code_ += mspace_usable_size(w_memory);
   const uint8_t* result = x_memory + header_size;
 
   // Write the code.
-  std::copy(code.begin(), code.end(), w_memory + header_size);
+  std::copy(code, code + code_size, w_memory + header_size);
 
   // Write the header.
   OatQuickMethodHeader* method_header =
       OatQuickMethodHeader::FromCodePointer(w_memory + header_size);
   new (method_header) OatQuickMethodHeader(
       (stack_map != nullptr) ? result - stack_map : 0u,
-      code.size());
+      code_size);
   if (has_should_deoptimize_flag) {
     method_header->SetHasShouldDeoptimizeFlag();
   }
@@ -415,6 +419,7 @@ const uint8_t* JitMemoryRegion::CommitCode(ArrayRef<const uint8_t> reserved_code
   // correctness of the instructions present in the processor caches.
   if (!cache_flush_success) {
     PLOG(ERROR) << "Cache flush failed triggering code allocation failure";
+    FreeCode(x_memory);
     return nullptr;
   }
 
@@ -447,33 +452,22 @@ static void FillRootTable(uint8_t* roots_data, const std::vector<Handle<mirror::
   reinterpret_cast<uint32_t*>(roots_data)[length] = length;
 }
 
-bool JitMemoryRegion::CommitData(ArrayRef<const uint8_t> reserved_data,
+bool JitMemoryRegion::CommitData(const uint8_t* readonly_roots_data,
                                  const std::vector<Handle<mirror::Object>>& roots,
-                                 ArrayRef<const uint8_t> stack_map) {
-  DCHECK(IsInDataSpace(reserved_data.data()));
-  uint8_t* roots_data = GetWritableDataAddress(reserved_data.data());
+                                 const uint8_t* stack_map,
+                                 size_t stack_map_size) {
+  uint8_t* roots_data = GetWritableDataAddress(readonly_roots_data);
   size_t root_table_size = ComputeRootTableSize(roots.size());
   uint8_t* stack_map_data = roots_data + root_table_size;
-  DCHECK_LE(root_table_size + stack_map.size(), reserved_data.size());
   FillRootTable(roots_data, roots);
-  memcpy(stack_map_data, stack_map.data(), stack_map.size());
+  memcpy(stack_map_data, stack_map, stack_map_size);
   // Flush data cache, as compiled code references literals in it.
   // TODO(oth): establish whether this is necessary.
-  if (UNLIKELY(!FlushCpuCaches(roots_data, roots_data + root_table_size + stack_map.size()))) {
+  if (UNLIKELY(!FlushCpuCaches(roots_data, roots_data + root_table_size + stack_map_size))) {
     VLOG(jit) << "Failed to flush data in CommitData";
     return false;
   }
   return true;
-}
-
-const uint8_t* JitMemoryRegion::AllocateCode(size_t size) {
-  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
-  void* result = mspace_memalign(exec_mspace_, alignment, size);
-  if (UNLIKELY(result == nullptr)) {
-    return nullptr;
-  }
-  used_memory_for_code_ += mspace_usable_size(result);
-  return reinterpret_cast<uint8_t*>(GetExecutableAddress(result));
 }
 
 void JitMemoryRegion::FreeCode(const uint8_t* code) {

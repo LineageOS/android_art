@@ -50,10 +50,6 @@ class PACKED(4) OatQuickMethodHeader {
     return FromCodePointer(EntryPointToCodePointer(entry_point));
   }
 
-  static size_t InstructionAlignedSize() {
-    return RoundUp(sizeof(OatQuickMethodHeader), GetInstructionSetAlignment(kRuntimeISA));
-  }
-
   OatQuickMethodHeader(const OatQuickMethodHeader&) = default;
   OatQuickMethodHeader& operator=(const OatQuickMethodHeader&) = default;
 
