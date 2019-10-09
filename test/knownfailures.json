@@ -1135,7 +1135,11 @@
                   "1980-obsolete-object-cleared",
                   "1981-structural-redef-private-method-handles",
                   "1982-no-virtuals-structural-redefinition",
-                  "1983-structural-redefinition-failures"
+                  "1983-structural-redefinition-failures",
+                  "1984-structural-redefine-field-trace",
+                  "1985-structural-redefine-stack-scope",
+                  "1986-structural-redefine-multi-thread-stack-scope",
+                  "1987-structural-redefine-recursive-stack-scope"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
