@@ -32,23 +32,19 @@ namespace art {
 void HiddenApiFinder::CheckMethod(uint32_t method_id,
                                   VeridexResolver* resolver,
                                   MethodReference ref) {
-  // Note: we always query whether a method is in a list, as the app
+  // Note: we always query whether a method is in boot, as the app
   // might define blacklisted APIs (which won't be used at runtime).
-  std::string name = HiddenApi::GetApiMethodName(resolver->GetDexFile(), method_id);
-  if (hidden_api_.IsInAnyList(name)) {
-    method_locations_[name].push_back(ref);
-  }
+  const auto& name = HiddenApi::GetApiMethodName(resolver->GetDexFile(), method_id);
+  method_locations_[name].push_back(ref);
 }
 
 void HiddenApiFinder::CheckField(uint32_t field_id,
                                  VeridexResolver* resolver,
                                  MethodReference ref) {
-  // Note: we always query whether a field is in a list, as the app
+  // Note: we always query whether a field is in a boot, as the app
   // might define blacklisted APIs (which won't be used at runtime).
-  std::string name = HiddenApi::GetApiFieldName(resolver->GetDexFile(), field_id);
-  if (hidden_api_.IsInAnyList(name)) {
-    field_locations_[name].push_back(ref);
-  }
+  const auto& name = HiddenApi::GetApiFieldName(resolver->GetDexFile(), field_id);
+  field_locations_[name].push_back(ref);
 }
 
 void HiddenApiFinder::CollectAccesses(VeridexResolver* resolver,
@@ -58,9 +54,7 @@ void HiddenApiFinder::CollectAccesses(VeridexResolver* resolver,
   // types can lead to being used through reflection.
   for (uint32_t i = 0; i < dex_file.NumTypeIds(); ++i) {
     std::string name(dex_file.StringByTypeIdx(dex::TypeIndex(i)));
-    if (hidden_api_.IsInAnyList(name)) {
-      classes_.insert(name);
-    }
+    classes_.insert(name);
   }
   // Note: we collect strings constants only referenced in code items as the string table
   // contains other kind of strings (eg types).
@@ -71,7 +65,7 @@ void HiddenApiFinder::CollectAccesses(VeridexResolver* resolver,
           switch (inst->Opcode()) {
             case Instruction::CONST_STRING: {
               dex::StringIndex string_index(inst->VRegB_21c());
-              std::string name = std::string(dex_file.StringDataByIdx(string_index));
+              const auto& name = std::string(dex_file.StringDataByIdx(string_index));
               // Cheap filtering on the string literal. We know it cannot be a field/method/class
               // if it contains a space.
               if (name.find(' ') == std::string::npos) {
@@ -83,9 +77,9 @@ void HiddenApiFinder::CollectAccesses(VeridexResolver* resolver,
                 // private methods and fields in them.
                 // We don't add class names to the `strings_` set as we know method/field names
                 // don't have '.' or '/'. All hidden API class names have a '/'.
-                if (hidden_api_.IsInAnyList(str)) {
+                if (hidden_api_.IsInBoot(str)) {
                   classes_.insert(str);
-                } else if (hidden_api_.IsInAnyList(name)) {
+                } else if (hidden_api_.IsInBoot(name)) {
                   // Could be something passed to JNI.
                   classes_.insert(name);
                 } else {
@@ -178,30 +172,36 @@ void HiddenApiFinder::Run(const std::vector<std::unique_ptr<VeridexResolver>>& r
 void HiddenApiFinder::Dump(std::ostream& os,
                            HiddenApiStats* stats,
                            bool dump_reflection) {
-  stats->linking_count = method_locations_.size() + field_locations_.size();
-
   // Dump methods from hidden APIs linked against.
   for (const std::pair<const std::string,
                        std::vector<MethodReference>>& pair : method_locations_) {
-    hiddenapi::ApiList api_list = hidden_api_.GetApiList(pair.first);
-    CHECK(api_list.IsValid());
-    stats->api_counts[api_list.GetIntValue()]++;
-    os << "#" << ++stats->count << ": Linking " << api_list << " " << pair.first << " use(s):";
-    os << std::endl;
-    HiddenApiFinder::DumpReferences(os, pair.second);
-    os << std::endl;
+    const auto& name = pair.first;
+    if (hidden_api_.GetSignatureSource(name) != SignatureSource::APP &&
+        hidden_api_.ShouldReport(name)) {
+      stats->linking_count++;
+      hiddenapi::ApiList api_list = hidden_api_.GetApiList(pair.first);
+      stats->api_counts[api_list.GetIntValue()]++;
+      os << "#" << ++stats->count << ": Linking " << api_list << " " << pair.first << " use(s):";
+      os << std::endl;
+      HiddenApiFinder::DumpReferences(os, pair.second);
+      os << std::endl;
+    }
   }
 
   // Dump fields from hidden APIs linked against.
   for (const std::pair<const std::string,
                        std::vector<MethodReference>>& pair : field_locations_) {
-    hiddenapi::ApiList api_list = hidden_api_.GetApiList(pair.first);
-    CHECK(api_list.IsValid());
-    stats->api_counts[api_list.GetIntValue()]++;
-    os << "#" << ++stats->count << ": Linking " << api_list << " " << pair.first << " use(s):";
-    os << std::endl;
-    HiddenApiFinder::DumpReferences(os, pair.second);
-    os << std::endl;
+    const auto& name = pair.first;
+    if (hidden_api_.GetSignatureSource(name) != SignatureSource::APP &&
+        hidden_api_.ShouldReport(name)) {
+      stats->linking_count++;
+      hiddenapi::ApiList api_list = hidden_api_.GetApiList(pair.first);
+      stats->api_counts[api_list.GetIntValue()]++;
+      os << "#" << ++stats->count << ": Linking " << api_list << " " << pair.first << " use(s):";
+      os << std::endl;
+      HiddenApiFinder::DumpReferences(os, pair.second);
+      os << std::endl;
+    }
   }
 
   if (dump_reflection) {
@@ -209,8 +209,9 @@ void HiddenApiFinder::Dump(std::ostream& os,
     for (const std::string& cls : classes_) {
       for (const std::string& name : strings_) {
         std::string full_name = cls + "->" + name;
-        hiddenapi::ApiList api_list = hidden_api_.GetApiList(full_name);
-        if (api_list.IsValid()) {
+        if (hidden_api_.GetSignatureSource(full_name) != SignatureSource::APP &&
+            hidden_api_.ShouldReport(full_name)) {
+          hiddenapi::ApiList api_list = hidden_api_.GetApiList(full_name);
           stats->api_counts[api_list.GetIntValue()]++;
           stats->reflection_count++;
           os << "#" << ++stats->count << ": Reflection " << api_list << " " << full_name

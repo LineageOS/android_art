@@ -29,6 +29,7 @@
  * questions.
  */
 
+#include <error.h>
 #include <stddef.h>
 #include <sys/types.h>
 
@@ -47,6 +48,7 @@
 #include "dex/dex_file_types.h"
 #include "dex/utf.h"
 #include "events-inl.h"
+#include "events.h"
 #include "fault_handler.h"
 #include "gc_root-inl.h"
 #include "handle_scope-inl.h"
@@ -64,6 +66,7 @@
 #include "stack.h"
 #include "thread_list.h"
 #include "ti_redefine.h"
+#include "ti_logging.h"
 #include "transform.h"
 #include "utils/dex_cache_arrays_layout-inl.h"
 
@@ -212,13 +215,16 @@ class TransformationFaultHandler final : public art::FaultHandler {
 };
 
 static TransformationFaultHandler* gTransformFaultHandler = nullptr;
+static EventHandler* gEventHandler = nullptr;
 
-void Transformer::Setup() {
+
+void Transformer::Register(EventHandler* eh) {
   // Although we create this the fault handler is actually owned by the 'art::fault_manager' which
   // will take care of destroying it.
   if (art::MemMap::kCanReplaceMapping && ArtClassDefinition::kEnableOnDemandDexDequicken) {
     gTransformFaultHandler = new TransformationFaultHandler(&art::fault_manager);
   }
+  gEventHandler = eh;
 }
 
 // Simple helper to add and remove the class definition from the fault handler.
@@ -280,58 +286,66 @@ void Transformer::TransformSingleClassDirect(EventHandler* event_handler,
 }
 
 jvmtiError Transformer::RetransformClassesDirect(
-      EventHandler* event_handler,
       art::Thread* self,
       /*in-out*/std::vector<ArtClassDefinition>* definitions) {
   for (ArtClassDefinition& def : *definitions) {
-    TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(event_handler,
-                                                                                 self,
-                                                                                 &def);
+    TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(
+        gEventHandler, self, &def);
   }
   return OK;
 }
 
-jvmtiError Transformer::RetransformClasses(ArtJvmTiEnv* env,
-                                           EventHandler* event_handler,
-                                           art::Runtime* runtime,
-                                           art::Thread* self,
+jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
                                            jint class_count,
-                                           const jclass* classes,
-                                           /*out*/std::string* error_msg) {
+                                           const jclass* classes) {
   if (env == nullptr) {
-    *error_msg = "env was null!";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM env was null!";
     return ERR(INVALID_ENVIRONMENT);
   } else if (class_count < 0) {
-    *error_msg = "class_count was less then 0";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM class_count was less then 0";
     return ERR(ILLEGAL_ARGUMENT);
   } else if (class_count == 0) {
     // We don't actually need to do anything. Just return OK.
     return OK;
   } else if (classes == nullptr) {
-    *error_msg = "null classes!";
+    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM null classes!";
     return ERR(NULL_POINTER);
   }
+  art::Thread* self = art::Thread::Current();
+  art::Runtime* runtime = art::Runtime::Current();
   // A holder that will Deallocate all the class bytes buffers on destruction.
+  std::string error_msg;
   std::vector<ArtClassDefinition> definitions;
   jvmtiError res = OK;
   for (jint i = 0; i < class_count; i++) {
-    res = Redefiner::GetClassRedefinitionError(classes[i], error_msg);
+    res = Redefiner::GetClassRedefinitionError(classes[i], &error_msg);
     if (res != OK) {
+      JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM " << error_msg;
       return res;
     }
     ArtClassDefinition def;
     res = def.Init(self, classes[i]);
     if (res != OK) {
+      JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM definition init failed";
       return res;
     }
     definitions.push_back(std::move(def));
   }
-  res = RetransformClassesDirect(event_handler, self, &definitions);
+  res = RetransformClassesDirect(self, &definitions);
   if (res != OK) {
+    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM direct retransform failed";
     return res;
   }
-  return Redefiner::RedefineClassesDirect(
-      env, runtime, self, definitions, RedefinitionType::kNormal, error_msg);
+  res = Redefiner::RedefineClassesDirect(ArtJvmTiEnv::AsArtJvmTiEnv(env),
+                                         runtime,
+                                         self,
+                                         definitions,
+                                         RedefinitionType::kNormal,
+                                         &error_msg);
+  if (res != OK) {
+    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM " << error_msg;
+  }
+  return res;
 }
 
 // TODO Move this somewhere else, ti_class?

@@ -99,23 +99,24 @@ void PreciseHiddenApiFinder::Dump(std::ostream& os, HiddenApiStats* stats) {
       std::string cls(info.cls.ToString());
       std::string name(info.name.ToString());
       std::string full_name = cls + "->" + name;
-      if (hidden_api_.IsInAnyList(full_name)) {
-        named_uses[full_name].push_back(ref);
-      }
+      named_uses[full_name].push_back(ref);
     }
   }
 
   for (auto& it : named_uses) {
-    ++stats->reflection_count;
     const std::string& full_name = it.first;
-    hiddenapi::ApiList api_list = hidden_api_.GetApiList(full_name);
-    stats->api_counts[api_list.GetIntValue()]++;
-    os << "#" << ++stats->count << ": Reflection " << api_list << " " << full_name << " use(s):";
-    os << std::endl;
-    for (const MethodReference& ref : it.second) {
-      os << kPrefix << HiddenApi::GetApiMethodName(ref) << std::endl;
+    if (hidden_api_.GetSignatureSource(full_name) != SignatureSource::APP &&
+        hidden_api_.ShouldReport(full_name)) {
+      stats->reflection_count++;
+      hiddenapi::ApiList api_list = hidden_api_.GetApiList(full_name);
+      stats->api_counts[api_list.GetIntValue()]++;
+      os << "#" << ++stats->count << ": Reflection " << api_list << " " << full_name << " use(s):";
+      os << std::endl;
+      for (const MethodReference& ref : it.second) {
+        os << kPrefix << HiddenApi::GetApiMethodName(ref) << std::endl;
+      }
+      os << std::endl;
     }
-    os << std::endl;
   }
 }
 

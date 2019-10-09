@@ -28,7 +28,15 @@ class ApiListFilter {
  public:
   explicit ApiListFilter(const std::vector<std::string>& exclude_api_lists) {
     std::set<hiddenapi::ApiList> exclude_set;
+    bool include_invalid_list = true;
     for (const std::string& name : exclude_api_lists) {
+      if (name.empty()) {
+        continue;
+      }
+      if (name == "invalid") {
+        include_invalid_list = false;
+        continue;
+      }
       hiddenapi::ApiList list = hiddenapi::ApiList::FromName(name);
       if (!list.IsValid()) {
         LOG(ERROR) << "Unknown ApiList::Value " << name
@@ -37,6 +45,9 @@ class ApiListFilter {
       exclude_set.insert(list);
     }
 
+    if (include_invalid_list) {
+      lists_.push_back(hiddenapi::ApiList());
+    }
     for (size_t i = 0; i < hiddenapi::ApiList::kValueCount; ++i) {
       hiddenapi::ApiList list = hiddenapi::ApiList(i);
       if (exclude_set.find(list) == exclude_set.end()) {

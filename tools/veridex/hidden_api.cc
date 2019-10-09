@@ -24,7 +24,8 @@
 
 namespace art {
 
-HiddenApi::HiddenApi(const char* filename, const ApiListFilter& api_list_filter) {
+HiddenApi::HiddenApi(const char* filename, const ApiListFilter& api_list_filter)
+    : api_list_filter_(api_list_filter) {
   CHECK(filename != nullptr);
 
   std::ifstream in(filename);
@@ -36,10 +37,6 @@ HiddenApi::HiddenApi(const char* filename, const ApiListFilter& api_list_filter)
     bool success = hiddenapi::ApiList::FromNames(values.begin() + 1, values.end(), &membership);
     CHECK(success) << "Unknown ApiList flag: " << str;
     CHECK(membership.IsValid()) << "Invalid ApiList: " << membership;
-
-    if (!api_list_filter.Matches(membership)) {
-      continue;
-    }
 
     AddSignatureToApiList(signature, membership);
     size_t pos = signature.find("->");

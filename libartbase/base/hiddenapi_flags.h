@@ -295,6 +295,11 @@ class ApiList {
   void Dump(std::ostream& os) const {
     bool is_first = true;
 
+    if (IsEmpty()) {
+      os << "invalid";
+      return;
+    }
+
     if (GetValue() != Value::kInvalid) {
       os << kValueNames[GetIntValue()];
       is_first = false;
@@ -315,8 +320,12 @@ class ApiList {
     DCHECK_EQ(IsEmpty(), is_first);
   }
 
+  // Number of valid enum values in Value.
   static constexpr uint32_t kValueCount = helper::NumValues<Value>();
+  // Number of valid enum values in DomainApi.
   static constexpr uint32_t kDomainApiCount = helper::NumValues<DomainApi>();
+  // Total number of possible enum values, including invalid, in Value.
+  static constexpr uint32_t kValueSize = (1u << kValueBitSize) + 1;
 
   // Check min and max values are calculated correctly.
   static_assert(Value::kMin == helper::GetEnumAt<Value>(0));
