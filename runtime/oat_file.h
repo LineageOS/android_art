@@ -154,8 +154,6 @@ class OatFile {
 
   class OatMethod final {
    public:
-    void LinkMethod(ArtMethod* method) const;
-
     uint32_t GetCodeOffset() const;
 
     const void* GetQuickCode() const;
