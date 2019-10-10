@@ -18,12 +18,13 @@
 
 #include "art_method.h"
 #include "base/arena_bit_vector.h"
+#include "base/macros.h"
 #include "base/malloc_arena_pool.h"
 #include "stack_map_stream.h"
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Check that the stack mask of given stack map is identical
 // to the given bit vector. Returns true if they are same.

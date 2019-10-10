@@ -17,10 +17,11 @@
 #ifndef ART_COMPILER_OPTIMIZING_PC_RELATIVE_FIXUPS_MIPS_H_
 #define ART_COMPILER_OPTIMIZING_PC_RELATIVE_FIXUPS_MIPS_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class CodeGenerator;
 

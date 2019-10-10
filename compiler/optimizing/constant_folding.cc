@@ -16,7 +16,7 @@
 
 #include "constant_folding.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // This visitor tries to simplify instructions that can be evaluated
 // as constants.

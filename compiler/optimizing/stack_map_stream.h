@@ -21,6 +21,7 @@
 #include "base/arena_bit_vector.h"
 #include "base/bit_table.h"
 #include "base/bit_vector-inl.h"
+#include "base/macros.h"
 #include "base/memory_region.h"
 #include "base/scoped_arena_containers.h"
 #include "base/value_object.h"
@@ -28,7 +29,7 @@
 #include "nodes.h"
 #include "stack_map.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Collects and builds stack maps for a method. All the stack maps

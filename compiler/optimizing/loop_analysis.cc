@@ -19,7 +19,7 @@
 #include "base/bit_vector-inl.h"
 #include "induction_var_range.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void LoopAnalysis::CalculateLoopBasicProperties(HLoopInformation* loop_info,
                                                 LoopAnalysisInfo* analysis_results,

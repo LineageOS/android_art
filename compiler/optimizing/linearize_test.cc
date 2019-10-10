@@ -17,6 +17,7 @@
 #include <fstream>
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "code_generator.h"
 #include "dex/dex_file.h"
@@ -28,7 +29,7 @@
 #include "pretty_printer.h"
 #include "ssa_liveness_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class LinearizeTest : public OptimizingUnitTest {
  protected:

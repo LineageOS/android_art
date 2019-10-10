@@ -36,7 +36,7 @@
 #include "utils/x86_64/assembler_x86_64.h"
 #include "utils/x86_64/constants_x86_64.h"
 
-namespace art {
+namespace art HIDDEN {
 
 namespace x86_64 {
 

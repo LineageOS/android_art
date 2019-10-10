@@ -21,11 +21,12 @@
 
 #include "base/intrusive_forward_list.h"
 #include "base/iteration_range.h"
+#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class CodeGenerator;
 class SsaLivenessAnalysis;

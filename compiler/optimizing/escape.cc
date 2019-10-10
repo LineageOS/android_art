@@ -18,7 +18,7 @@
 
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void CalculateEscape(HInstruction* reference,
                      bool (*no_escape)(HInstruction*, HInstruction*),

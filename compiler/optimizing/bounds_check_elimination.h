@@ -17,9 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_BOUNDS_CHECK_ELIMINATION_H_
 #define ART_COMPILER_OPTIMIZING_BOUNDS_CHECK_ELIMINATION_H_
 
+#include "base/macros.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class SideEffectsAnalysis;
 class HInductionVarAnalysis;

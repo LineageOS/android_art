@@ -19,12 +19,13 @@
 
 #include "base/arena_object.h"
 #include "base/array_ref.h"
+#include "base/macros.h"
 #include "dex/code_item_accessors.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class ArtMethod;
 class CodeGenerator;

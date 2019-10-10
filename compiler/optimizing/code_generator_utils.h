@@ -21,7 +21,9 @@
 #include <cstdlib>
 #include <limits>
 
-namespace art {
+#include "base/macros.h"
+
+namespace art HIDDEN {
 
 class HInstruction;
 

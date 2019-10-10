@@ -18,7 +18,7 @@
 #include "code_generator_mips.h"
 #include "intrinsics_mips.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace mips {
 
 /**

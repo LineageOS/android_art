@@ -17,7 +17,7 @@
 #include "induction_var_analysis.h"
 #include "induction_var_range.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Since graph traversal may enter a SCC at any position, an initial representation may be rotated,

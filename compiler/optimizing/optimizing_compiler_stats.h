@@ -26,8 +26,9 @@
 
 #include "base/atomic.h"
 #include "base/globals.h"
+#include "base/macros.h"
 
-namespace art {
+namespace art HIDDEN {
 
 enum class MethodCompilationStat {
   kAttemptBytecodeCompilation = 0,

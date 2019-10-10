@@ -18,7 +18,7 @@
 #include "code_generator_x86.h"
 #include "intrinsics_x86.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace x86 {
 
 /**

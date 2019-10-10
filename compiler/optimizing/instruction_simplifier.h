@@ -17,11 +17,12 @@
 #ifndef ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_H_
 #define ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 #include "optimizing_compiler_stats.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class CodeGenerator;
 

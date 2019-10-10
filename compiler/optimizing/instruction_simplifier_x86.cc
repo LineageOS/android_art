@@ -17,7 +17,7 @@
 #include "instruction_simplifier_x86_shared.h"
 #include "code_generator_x86.h"
 
-namespace art {
+namespace art HIDDEN {
 
 namespace x86 {
 
