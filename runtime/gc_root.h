@@ -94,13 +94,14 @@ inline std::ostream& operator<<(std::ostream& os, const RootInfo& root_info) {
 // The precise flag ensures that more metadata is supplied. An example is vreg data for compiled
 // method frames.
 enum VisitRootFlags : uint8_t {
-  kVisitRootFlagAllRoots = 0x1,
-  kVisitRootFlagNewRoots = 0x2,
-  kVisitRootFlagStartLoggingNewRoots = 0x4,
-  kVisitRootFlagStopLoggingNewRoots = 0x8,
-  kVisitRootFlagClearRootLog = 0x10,
-  kVisitRootFlagClassLoader = 0x20,
-  kVisitRootFlagPrecise = 0x80,
+  kVisitRootFlagAllRoots = (1 << 0),
+  kVisitRootFlagNewRoots = (1 << 1),
+  kVisitRootFlagStartLoggingNewRoots = (1 << 2),
+  kVisitRootFlagStopLoggingNewRoots = (1 << 3),
+  kVisitRootFlagClearRootLog = (1 << 4),
+  kVisitRootFlagClassLoader = (1 << 5),
+  // There is no (1 << 6).
+  kVisitRootFlagPrecise = (1 << 7),
 };
 
 class RootVisitor {
