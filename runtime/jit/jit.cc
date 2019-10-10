@@ -834,6 +834,12 @@ class JitProfileTask final : public Task {
   DISALLOW_COPY_AND_ASSIGN(JitProfileTask);
 };
 
+static void CopyIfDifferent(void* s1, const void* s2, size_t n) {
+  if (memcmp(s1, s2, n) != 0) {
+    memcpy(s1, s2, n);
+  }
+}
+
 void Jit::MapBootImageMethods() {
   if (!GetChildMappingMethods().IsValid()) {
     return;
@@ -911,9 +917,9 @@ void Jit::MapBootImageMethods() {
         //                            |/////////| -> copy -> |/////////|
         //                            |         |            |         |
         //
-        memcpy(GetChildMappingMethods().Begin() + offset,
-               page_start,
-               pointer + sizeof(ArtMethod) - page_start);
+        CopyIfDifferent(GetChildMappingMethods().Begin() + offset,
+                        page_start,
+                        pointer + sizeof(ArtMethod) - page_start);
       } else if (pointer < page_end && (pointer + sizeof(ArtMethod)) > page_end) {
         LOG(INFO) << "Copying parts of the contents of an ArtMethod spanning page_end";
         // If the method spans `page_end`, copy the contents of the child
@@ -926,9 +932,9 @@ void Jit::MapBootImageMethods() {
         //         section end   -->  -----------
         //
         size_t bytes_to_copy = (page_end - pointer);
-        memcpy(GetChildMappingMethods().Begin() + offset + capacity - bytes_to_copy,
-               page_end - bytes_to_copy,
-               bytes_to_copy);
+        CopyIfDifferent(GetChildMappingMethods().Begin() + offset + capacity - bytes_to_copy,
+                        page_end - bytes_to_copy,
+                        bytes_to_copy);
       }
     }, space->Begin(), kRuntimePointerSize);
 
