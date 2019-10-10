@@ -331,20 +331,36 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
     return GetFrameSize() - FrameEntrySpillSize() - kShouldDeoptimizeFlagSize;
   }
 
-  // Record native to dex mapping for a suspend point.  Required by runtime.
+  // Record native to dex mapping for a suspend point. Required by runtime.
+  void RecordPcInfo(HInstruction* instruction,
+                    uint32_t dex_pc,
+                    uint32_t native_pc,
+                    SlowPathCode* slow_path = nullptr,
+                    bool native_debug_info = false);
+
+  // Record native to dex mapping for a suspend point.
+  // The native_pc is used from Assembler::CodePosition.
+  //
+  // Note: As Assembler::CodePosition is target dependent, it does not guarantee the exact native_pc
+  // for the instruction. If the exact native_pc is required it must be provided explicitly.
   void RecordPcInfo(HInstruction* instruction,
                     uint32_t dex_pc,
                     SlowPathCode* slow_path = nullptr,
                     bool native_debug_info = false);
+
   // Check whether we have already recorded mapping at this PC.
   bool HasStackMapAtCurrentPc();
+
   // Record extra stack maps if we support native debugging.
+  //
+  // ARM specific behaviour: The recorded native PC might be a branch over pools to instructions
+  // corresponding the dex PC.
   void MaybeRecordNativeDebugInfo(HInstruction* instruction,
                                   uint32_t dex_pc,
                                   SlowPathCode* slow_path = nullptr);
 
   bool CanMoveNullCheckToUser(HNullCheck* null_check);
-  void MaybeRecordImplicitNullCheck(HInstruction* instruction);
+  virtual void MaybeRecordImplicitNullCheck(HInstruction* instruction);
   LocationSummary* CreateThrowingSlowPathLocations(
       HInstruction* instruction, RegisterSet caller_saves = RegisterSet::Empty());
   void GenerateNullCheck(HNullCheck* null_check);
