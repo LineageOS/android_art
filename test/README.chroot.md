@@ -20,9 +20,10 @@ untouched) and is as independent as possible from the Android system ("host
 system") running on the device. This has some benefits:
 
 * no need to build and flash a whole device to do ART testing (or "overwriting"
-  and existing ART by syncing the system partition);
-* the possibility to use a smaller AOSP Android manifest (`master-art`) to build
-  ART and the required dependencies for testing;
+  an existing ART by syncing the system partition);
+* the possibility to use a smaller AOSP Android manifest
+  ([`master-art`](https://android.googlesource.com/platform/manifest/+/refs/heads/master-art/default.xml))
+  to build ART and the required dependencies for testing;
 * no instability due to updating/replacing ART on the system partition (a
   functional Android Runtime is necessary to properly boot a device);
 * the possibility to have several standalone ART instances (one per directory,
@@ -91,7 +92,7 @@ Note that using this chroot-based approach requires root access to the device
         (`art/tools/buildbot-build.sh --target`) above.
     * Note: The `-j` option is not honored yet (b/129930445).
     * Specific tests to run can be passed on the command line, specified by
-    their absolute paths beginning with "/apex/".
+    their absolute paths beginning with `/apex/`.
 8. Run ART run-tests:
     * On a 64-bit target:
         ```bash
