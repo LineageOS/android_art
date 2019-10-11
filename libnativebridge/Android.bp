@@ -21,8 +21,12 @@ cc_library_headers {
 cc_library {
     name: "libnativebridge",
     defaults: ["libnativebridge-defaults"],
-    // TODO(oth): remove after moving under art/ (b/137364733)
-    visibility: ["//visibility:public"],
+    visibility: [
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/cmds/app_process",
+        "//frameworks/base/native/webview/loader/libwebviewchromium_loader",
+    ],
 
     host_supported: true,
     srcs: ["native_bridge.cc"],
@@ -54,8 +58,12 @@ cc_library {
 cc_library {
     name: "libnativebridge_lazy",
     defaults: ["libnativebridge-defaults"],
-    // TODO(oth): remove after moving under art/ (b/137364733)
-    visibility: ["//visibility:public"],
+    visibility: [
+        "//art/libnativebridge/tests",
+        "//frameworks/base/core/jni",
+        "//frameworks/native/opengl/libs",
+        "//frameworks/native/vulkan/libvulkan",
+    ],
 
     host_supported: false,
     srcs: ["native_bridge_lazy.cc"],

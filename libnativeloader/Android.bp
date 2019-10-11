@@ -16,8 +16,12 @@ cc_defaults {
 cc_library {
     name: "libnativeloader",
     defaults: ["libnativeloader-defaults"],
-    // TODO(oth): remove after moving under art/ (b/137364733)
-    visibility: ["//visibility:public"],
+    visibility: [
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
+        "//frameworks/base/cmds/app_process",
+        "//frameworks/base/native/webview/loader",
+    ],
     host_supported: true,
     srcs: [
         "native_loader.cpp",
@@ -54,8 +58,11 @@ cc_library {
 cc_library {
     name: "libnativeloader_lazy",
     defaults: ["libnativeloader-defaults"],
-    // TODO(oth): remove after moving under art/ (b/137364733)
-    visibility: ["//visibility:public"],
+    visibility: [
+        "//frameworks/base/core/jni",
+        "//frameworks/native/opengl/libs",
+        "//frameworks/native/vulkan/libvulkan",
+    ],
     host_supported: false,
     srcs: ["native_loader_lazy.cpp"],
     required: ["libnativeloader"],
@@ -63,8 +70,12 @@ cc_library {
 
 cc_library_headers {
     name: "libnativeloader-headers",
-    // TODO(oth): remove after moving under art/ (b/137364733)
-    visibility: ["//visibility:public"],
+    visibility: [
+        "//art/libnativeloader/test",
+        "//frameworks/av/media/libstagefright",
+        "//frameworks/native/libs/graphicsenv",
+        "//frameworks/native/vulkan/libvulkan",
+    ],
     host_supported: true,
     export_include_dirs: ["include"],
 }
