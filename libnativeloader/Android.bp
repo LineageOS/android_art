@@ -89,6 +89,8 @@ cc_test {
         "libnativebridge-headers",
         "libnativeloader-headers",
     ],
+    // native_loader_test.cpp mocks libdl APIs so system_shared_libs
+    // are used to include C libraries without libdl.
     system_shared_libs: [
         "libc",
         "libm",
