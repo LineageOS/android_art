@@ -1,11 +1,9 @@
 # ART Testing
 
-There are two suites of tests in the Android Runtime (ART): run-tests and
-gtests:
-* run-tests  
-  Tests of the ART runtime using Dex bytecode (mostly written in Java).
-* gtests  
-  C++ tests exercising various aspects of ART.
+There are two suites of tests in the Android Runtime (ART):
+* _ART run-tests_: Tests of the ART runtime using Dex bytecode (mostly written
+  in Java).
+* _ART gtests_: C++ tests exercising various aspects of ART.
 
 ## ART run-tests
 
@@ -70,10 +68,10 @@ some test Dex files and core images.
 
 ART gtests are defined in various directories within the ART project (usually in
 the same directory as the code they exercise). Their source files usually end
-with the suffix `_test.cc.`. The construction logic of these tests is
-implemented in ART's build system (`Android.bp` and `Android*.mk` files). On
-host, these gtests can be run by executing `m test-art-host-gtest`. On device,
-the recommended approach is to run these tests in a chroot environment (see
+with the suffix `_test.cc`. The construction logic of these tests is implemented
+in ART's build system (`Android.bp` and `Android*.mk` files). On host, these
+gtests can be run by executing `m test-art-host-gtest`. On device, the
+recommended approach is to run these tests in a chroot environment (see
 `README.chroot.md` in this directory).
 
 
