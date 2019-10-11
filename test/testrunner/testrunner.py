@@ -152,7 +152,6 @@ def gather_test_info():
   of disabled test. It also maps various variants to types.
   """
   global TOTAL_VARIANTS_SET
-  global DISABLED_TEST_CONTAINER
   # TODO: Avoid duplication of the variant names in different lists.
   VARIANT_TYPE_DICT['run'] = {'ndebug', 'debug'}
   VARIANT_TYPE_DICT['target'] = {'target', 'host', 'jvm'}
@@ -181,7 +180,6 @@ def gather_test_info():
   for f in os.listdir(test_dir):
     if fnmatch.fnmatch(f, '[0-9]*'):
       RUN_TEST_SET.add(f)
-  DISABLED_TEST_CONTAINER = get_disabled_test_info()
 
 
 def setup_test_env():
@@ -690,6 +688,7 @@ def verify_knownfailure_entry(entry):
       'description' : (list, str),
       'bug' : (str,),
       'variant' : (str,),
+      'devices': (list, str),
       'env_vars' : (dict,),
   }
   for field in entry:
@@ -700,7 +699,7 @@ def verify_knownfailure_entry(entry):
           field,
           str(entry)))
 
-def get_disabled_test_info():
+def get_disabled_test_info(device_name):
   """Generate set of known failures.
 
   It parses the art/test/knownfailures.json file to generate the list of
@@ -722,10 +721,23 @@ def get_disabled_test_info():
       tests = [tests]
     patterns = failure.get("test_patterns", [])
     if (not isinstance(patterns, list)):
-      raise ValueError("test_patters is not a list in %s" % failure)
+      raise ValueError("test_patterns is not a list in %s" % failure)
 
     tests += [f for f in RUN_TEST_SET if any(re.match(pat, f) is not None for pat in patterns)]
     variants = parse_variants(failure.get('variant'))
+
+    # Treat a '"devices": "<foo>"' equivalent to 'target' variant if
+    # "foo" is present in "devices".
+    device_names = failure.get('devices', [])
+    if isinstance(device_names, str):
+      device_names = [device_names]
+    if len(device_names) != 0:
+      if device_name in device_names:
+        variants.add('target')
+      else:
+        # Skip adding test info as device_name is not present in "devices" entry.
+        continue
+
     env_vars = failure.get('env_vars')
 
     if check_env_vars(env_vars):
@@ -739,6 +751,10 @@ def get_disabled_test_info():
           disabled_test_info[test] = variants
   return disabled_test_info
 
+def gather_disabled_test_info():
+  global DISABLED_TEST_CONTAINER
+  device_name = get_device_name() if 'target' in _user_input_variants['target'] else None
+  DISABLED_TEST_CONTAINER = get_disabled_test_info(device_name)
 
 def check_env_vars(env_vars):
   """Checks if the env variables are set as required to run the test.
@@ -1061,6 +1077,7 @@ def main():
   gather_test_info()
   user_requested_tests = parse_option()
   setup_test_env()
+  gather_disabled_test_info()
   if build:
     build_targets = ''
     if 'host' in _user_input_variants['target']:
