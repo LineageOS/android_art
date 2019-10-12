@@ -180,28 +180,6 @@ class JitCodeCache {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
-  // Allocate and write code and its metadata to the code cache.
-  // `cha_single_implementation_list` needs to be registered via CHA (if it's
-  // still valid), since the compiled code still needs to be invalidated if the
-  // single-implementation assumptions are violated later. This needs to be done
-  // even if `has_should_deoptimize_flag` is false, which can happen due to CHA
-  // guard elimination.
-  uint8_t* CommitCode(Thread* self,
-                      JitMemoryRegion* region,
-                      ArtMethod* method,
-                      const uint8_t* code,
-                      size_t code_size,
-                      const uint8_t* stack_map,
-                      size_t stack_map_size,
-                      const uint8_t* roots_data,
-                      const std::vector<Handle<mirror::Object>>& roots,
-                      bool osr,
-                      bool has_should_deoptimize_flag,
-                      const ArenaSet<ArtMethod*>& cha_single_implementation_list,
-                      const std::function<void(const uint8_t* code)>& generate_debug_info)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::jit_lock_);
-
   // Return true if the code cache contains this pc.
   bool ContainsPc(const void* pc) const;
 
@@ -215,20 +193,42 @@ class JitCodeCache {
   // Return the code pointer for a JNI-compiled stub if the method is in the cache, null otherwise.
   const void* GetJniStubCode(ArtMethod* method) REQUIRES(!Locks::jit_lock_);
 
-  // Allocate a region of data that will contain a stack map of size `stack_map_size` and
-  // `number_of_roots` roots accessed by the JIT code.
-  // Return a pointer to where roots will be stored.
-  const uint8_t* ReserveData(Thread* self,
-                             JitMemoryRegion* region,
-                             size_t stack_map_size,
-                             size_t number_of_roots,
-                             ArtMethod* method)
+  // Allocate a region for both code and data in the JIT code cache.
+  // The reserved memory is left completely uninitialized.
+  bool Reserve(Thread* self,
+               JitMemoryRegion* region,
+               size_t code_size,
+               size_t stack_map_size,
+               size_t number_of_roots,
+               ArtMethod* method,
+               /*out*/ArrayRef<const uint8_t>* reserved_code,
+               /*out*/ArrayRef<const uint8_t>* reserved_data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
-  // Clear data from the data portion of the code cache.
-  void ClearData(
-      Thread* self, JitMemoryRegion* region, const uint8_t* roots_data)
+  // Initialize code and data of previously allocated memory.
+  //
+  // `cha_single_implementation_list` needs to be registered via CHA (if it's
+  // still valid), since the compiled code still needs to be invalidated if the
+  // single-implementation assumptions are violated later. This needs to be done
+  // even if `has_should_deoptimize_flag` is false, which can happen due to CHA
+  // guard elimination.
+  bool Commit(Thread* self,
+              JitMemoryRegion* region,
+              ArtMethod* method,
+              ArrayRef<const uint8_t> reserved_code,  // Uninitialized destination.
+              ArrayRef<const uint8_t> code,           // Compiler output (source).
+              ArrayRef<const uint8_t> reserved_data,  // Uninitialized destination.
+              const std::vector<Handle<mirror::Object>>& roots,
+              ArrayRef<const uint8_t> stack_map,      // Compiler output (source).
+              bool osr,
+              bool has_should_deoptimize_flag,
+              const ArenaSet<ArtMethod*>& cha_single_implementation_list)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Locks::jit_lock_);
+
+  // Free the previously allocated memory regions.
+  void Free(Thread* self, JitMemoryRegion* region, const uint8_t* code, const uint8_t* data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -356,24 +356,6 @@ class JitCodeCache {
 
  private:
   JitCodeCache();
-
-  // Internal version of 'CommitCode' that will not retry if the
-  // allocation fails. Return null if the allocation fails.
-  uint8_t* CommitCodeInternal(Thread* self,
-                              JitMemoryRegion* region,
-                              ArtMethod* method,
-                              const uint8_t* code,
-                              size_t code_size,
-                              const uint8_t* stack_map,
-                              size_t stack_map_size,
-                              const uint8_t* roots_data,
-                              const std::vector<Handle<mirror::Object>>& roots,
-                              bool osr,
-                              bool has_should_deoptimize_flag,
-                              const ArenaSet<ArtMethod*>& cha_single_implementation_list,
-                              const std::function<void(const uint8_t* code)>& generate_debug_info)
-      REQUIRES(!Locks::jit_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   ProfilingInfo* AddProfilingInfoInternal(Thread* self,
                                           ArtMethod* method,

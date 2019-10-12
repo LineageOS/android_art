@@ -777,6 +777,15 @@ class CodeGeneratorARM64 : public CodeGenerator {
   void GenerateImplicitNullCheck(HNullCheck* instruction) override;
   void GenerateExplicitNullCheck(HNullCheck* instruction) override;
 
+  void MaybeRecordImplicitNullCheck(HInstruction* instr) final {
+    // The function must be only called within special scopes
+    // (EmissionCheckScope, ExactAssemblyScope) which prevent generation of
+    // veneer/literal pools by VIXL assembler.
+    CHECK_EQ(GetVIXLAssembler()->ArePoolsBlocked(), true)
+        << "The function must only be called within EmissionCheckScope or ExactAssemblyScope";
+    CodeGenerator::MaybeRecordImplicitNullCheck(instr);
+  }
+
  private:
   // Encoding of thunk type and data for link-time generated thunks for Baker read barriers.
 

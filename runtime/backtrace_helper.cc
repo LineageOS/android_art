@@ -81,11 +81,19 @@ struct UnwindHelper : public TLSData {
 };
 
 void BacktraceCollector::Collect() {
+  // HACK(b/142039427): Limit the number of unwinds while we diagnose timeout issues.
+  static uint32_t s_count = 0;
+  if (s_count > 1000) {
+    return;
+  }
+  s_count++;
+
   if (!CollectImpl()) {
     // Reparse process mmaps to detect newly loaded libraries and retry.
     UnwindHelper::Get(Thread::Current(), max_depth_)->Reparse();
     if (!CollectImpl()) {
       // Failed to unwind stack. Ignore for now.
+      s_count = std::numeric_limits<uint32_t>::max();  // Prevent future unwinds.
     }
   }
 }
