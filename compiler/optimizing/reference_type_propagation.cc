@@ -28,7 +28,7 @@
 #include "mirror/dex_cache.h"
 #include "scoped_thread_state_change-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 
 static inline ObjPtr<mirror::DexCache> FindDexCacheWithHint(
     Thread* self, const DexFile& dex_file, Handle<mirror::DexCache> hint_dex_cache)

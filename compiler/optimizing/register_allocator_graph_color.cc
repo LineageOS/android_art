@@ -22,7 +22,7 @@
 #include "ssa_liveness_analysis.h"
 #include "thread-current-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Highest number of registers that we support for any platform. This can be used for std::bitset,
 // for example, which needs to know its size at compile time.

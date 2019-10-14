@@ -17,10 +17,11 @@
 #ifndef ART_COMPILER_OPTIMIZING_INTRINSICS_ARM_VIXL_H_
 #define ART_COMPILER_OPTIMIZING_INTRINSICS_ARM_VIXL_H_
 
+#include "base/macros.h"
 #include "intrinsics.h"
 #include "utils/arm/assembler_arm_vixl.h"
 
-namespace art {
+namespace art HIDDEN {
 
 namespace arm {
 

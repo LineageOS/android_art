@@ -27,7 +27,7 @@
 #include "register_allocator_linear_scan.h"
 #include "ssa_liveness_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 RegisterAllocator::RegisterAllocator(ScopedArenaAllocator* allocator,
                                      CodeGenerator* codegen,

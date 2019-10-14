@@ -17,12 +17,13 @@
 #ifndef ART_COMPILER_OPTIMIZING_SSA_BUILDER_H_
 #define ART_COMPILER_OPTIMIZING_SSA_BUILDER_H_
 
+#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Transforms a graph into SSA form. The liveness guarantees of

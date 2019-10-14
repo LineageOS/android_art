@@ -17,9 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_COMMON_DOMINATOR_H_
 #define ART_COMPILER_OPTIMIZING_COMMON_DOMINATOR_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Helper class for finding common dominators of two or more blocks in a graph.
 // The domination information of a graph must not be modified while there is

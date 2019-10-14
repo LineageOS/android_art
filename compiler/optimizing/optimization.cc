@@ -62,7 +62,7 @@
 
 // Decide between default or alternative pass name.
 
-namespace art {
+namespace art HIDDEN {
 
 const char* OptimizationPassName(OptimizationPass pass) {
   switch (pass) {

@@ -23,7 +23,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace arm {
 
 using helpers::Int32ConstantFrom;

@@ -18,6 +18,7 @@
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_ARM64_H_
 
 #include "base/bit_field.h"
+#include "base/macros.h"
 #include "code_generator.h"
 #include "common_arm64.h"
 #include "dex/dex_file_types.h"
@@ -35,7 +36,7 @@
 #include "aarch64/macro-assembler-aarch64.h"
 #pragma GCC diagnostic pop
 
-namespace art {
+namespace art HIDDEN {
 
 namespace linker {
 class Arm64RelativePatcherTest;

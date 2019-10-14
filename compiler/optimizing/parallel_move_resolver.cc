@@ -19,7 +19,7 @@
 #include "base/stl_util.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void ParallelMoveResolver::BuildInitialMoveList(HParallelMove* parallel_move) {
   // Perform a linear sweep of the moves to add them to the initial list of

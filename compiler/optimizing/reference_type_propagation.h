@@ -18,12 +18,13 @@
 #define ART_COMPILER_OPTIMIZING_REFERENCE_TYPE_PROPAGATION_H_
 
 #include "base/arena_containers.h"
+#include "base/macros.h"
 #include "mirror/class-inl.h"
 #include "nodes.h"
 #include "obj_ptr.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Propagates reference types to instructions.

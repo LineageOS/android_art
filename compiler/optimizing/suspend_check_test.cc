@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "base/macros.h"
 #include "builder.h"
 #include "dex/dex_instruction.h"
 #include "nodes.h"
@@ -22,7 +23,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Check that the HGraphBuilder adds suspend checks to backward branches.

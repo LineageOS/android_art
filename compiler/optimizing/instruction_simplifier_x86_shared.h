@@ -16,13 +16,16 @@
 #ifndef ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_X86_SHARED_H_
 #define ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_X86_SHARED_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
+
 bool TryCombineAndNot(HAnd* instruction);
 bool TryGenerateResetLeastSetBit(HAnd* instruction);
 bool TryGenerateMaskUptoLeastSetBit(HXor* instruction);
 bool AreLeastSetBitInputs(HInstruction* to_test, HInstruction* other);
+
 }  // namespace art
 
 #endif  // ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_X86_SHARED_H_

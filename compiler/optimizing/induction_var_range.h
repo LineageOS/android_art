@@ -17,9 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_INDUCTION_VAR_RANGE_H_
 #define ART_COMPILER_OPTIMIZING_INDUCTION_VAR_RANGE_H_
 
+#include "base/macros.h"
 #include "induction_var_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * This class implements range analysis on expressions within loops. It takes the results

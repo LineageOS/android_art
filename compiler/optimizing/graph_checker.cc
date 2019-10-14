@@ -31,7 +31,7 @@
 #include "scoped_thread_state_change-inl.h"
 #include "subtype_check.h"
 
-namespace art {
+namespace art HIDDEN {
 
 using android::base::StringPrintf;
 

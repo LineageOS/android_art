@@ -17,9 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_CHA_GUARD_OPTIMIZATION_H_
 #define ART_COMPILER_OPTIMIZING_CHA_GUARD_OPTIMIZATION_H_
 
+#include "base/macros.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Optimize CHA guards by removing/moving them.

@@ -30,7 +30,7 @@
 #include "utils/mips/assembler_mips.h"
 #include "utils/mips/constants_mips.h"
 
-namespace art {
+namespace art HIDDEN {
 
 namespace mips {
 

@@ -16,7 +16,7 @@
 
 #include "load_store_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // A cap for the number of heap locations to prevent pathological time/space consumption.
 // The number of heap locations for most of the methods stays below this threshold.

@@ -31,7 +31,7 @@
 #include "scoped_thread_state_change-inl.h"
 #include "ssa_builder.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Enable floating-point static evaluation during constant folding
 // only if all floating-point operations and constants evaluate in the

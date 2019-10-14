@@ -21,7 +21,7 @@
 #include "linear_order.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void SsaLivenessAnalysis::Analyze() {
   // Compute the linear order directly in the graph's data structure

@@ -17,6 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_INTRINSICS_ARM64_H_
 #define ART_COMPILER_OPTIMIZING_INTRINSICS_ARM64_H_
 
+#include "base/macros.h"
 #include "intrinsics.h"
 
 namespace vixl {
@@ -27,7 +28,7 @@ class MacroAssembler;
 }  // namespace aarch64
 }  // namespace vixl
 
-namespace art {
+namespace art HIDDEN {
 
 class ArenaAllocator;
 class HInvokeStaticOrDirect;

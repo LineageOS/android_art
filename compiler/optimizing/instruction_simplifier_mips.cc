@@ -19,7 +19,7 @@
 #include "arch/mips/instruction_set_features_mips.h"
 #include "mirror/array-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace mips {
 
 class InstructionSimplifierMipsVisitor : public HGraphVisitor {

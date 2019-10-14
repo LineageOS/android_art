@@ -17,7 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_NODES_X86_H_
 #define ART_COMPILER_OPTIMIZING_NODES_X86_H_
 
-namespace art {
+namespace art HIDDEN {
 
 // Compute the address of the method for X86 Constant area support.
 class HX86ComputeBaseMethodAddress final : public HExpression<0> {

@@ -70,7 +70,7 @@
  *   the special block merging structure.
  */
 
-namespace art {
+namespace art HIDDEN {
 
 // An unknown heap value. Loads with such a value in the heap location cannot be eliminated.
 // A heap location can be set to kUnknownHeapValue when:

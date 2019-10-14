@@ -27,7 +27,7 @@
 #include "scoped_thread_state_change-inl.h"
 #include "ssa_phi_elimination.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void SsaBuilder::FixNullConstantType() {
   // The order doesn't matter here.

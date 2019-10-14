@@ -22,7 +22,7 @@
 #include "base/arena_object.h"
 #include "base/macros.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class CodeGenerator;
 class HBasicBlock;
