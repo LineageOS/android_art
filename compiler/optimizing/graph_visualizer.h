@@ -21,10 +21,9 @@
 
 #include "arch/instruction_set.h"
 #include "base/arena_containers.h"
-#include "base/macros.h"
 #include "base/value_object.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class CodeGenerator;
 class DexCompilationUnit;

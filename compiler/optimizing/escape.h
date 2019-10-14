@@ -17,9 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_ESCAPE_H_
 #define ART_COMPILER_OPTIMIZING_ESCAPE_H_
 
-#include "base/macros.h"
-
-namespace art HIDDEN {
+namespace art {
 
 class HInstruction;
 

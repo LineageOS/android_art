@@ -14,10 +14,9 @@
  */
 
 #include "instruction_simplifier_x86_shared.h"
-
 #include "nodes_x86.h"
 
-namespace art HIDDEN {
+namespace art {
 
 bool TryCombineAndNot(HAnd* instruction) {
   DataType::Type type = instruction->GetType();

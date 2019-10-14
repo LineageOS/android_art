@@ -22,7 +22,7 @@
 #include "optimizing_compiler_stats.h"
 #include "well_known_classes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 void PrepareForRegisterAllocation::Run() {
   // Order does not matter.

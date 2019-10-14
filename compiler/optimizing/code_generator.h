@@ -26,7 +26,6 @@
 #include "base/bit_utils.h"
 #include "base/enums.h"
 #include "base/globals.h"
-#include "base/macros.h"
 #include "base/memory_region.h"
 #include "dex/string_reference.h"
 #include "dex/type_reference.h"
@@ -38,7 +37,7 @@
 #include "stack.h"
 #include "utils/label.h"
 
-namespace art HIDDEN {
+namespace art {
 
 // Binary encoding of 2^32 for type double.
 static int64_t constexpr k2Pow32EncodingForDouble = INT64_C(0x41F0000000000000);

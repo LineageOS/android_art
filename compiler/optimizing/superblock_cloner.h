@@ -20,10 +20,9 @@
 #include "base/arena_bit_vector.h"
 #include "base/arena_containers.h"
 #include "base/bit_vector-inl.h"
-#include "base/macros.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class InductionVarRange;
 

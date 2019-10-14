@@ -17,7 +17,6 @@
 #ifndef ART_COMPILER_OPTIMIZING_COMMON_ARM64_H_
 #define ART_COMPILER_OPTIMIZING_COMMON_ARM64_H_
 
-#include "base/macros.h"
 #include "code_generator.h"
 #include "instruction_simplifier_shared.h"
 #include "locations.h"
@@ -32,7 +31,7 @@
 #include "aarch64/simulator-aarch64.h"
 #pragma GCC diagnostic pop
 
-namespace art HIDDEN {
+namespace art {
 
 using helpers::CanFitInShifterOperand;
 using helpers::HasShifterOperand;
