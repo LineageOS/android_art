@@ -15,13 +15,12 @@
  */
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "optimizing_unit_test.h"
 #include "ssa_liveness_analysis.h"
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 TEST(LiveInterval, GetStart) {
   ArenaPoolAndAllocator pool;

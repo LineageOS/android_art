@@ -26,7 +26,7 @@
 #include "scoped_thread_state_change-inl.h"
 #include "stack_map.h"
 
-namespace art HIDDEN {
+namespace art {
 
 constexpr static bool kVerifyStackMaps = kIsDebugBuild;
 

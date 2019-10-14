@@ -22,7 +22,7 @@
 
 #include <iostream>
 
-namespace art HIDDEN {
+namespace art {
 
 using HBasicBlockMap = SuperblockCloner::HBasicBlockMap;
 using HInstructionMap = SuperblockCloner::HInstructionMap;

@@ -22,7 +22,7 @@
 #include "base/macros.h"
 #include "register_allocator.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class CodeGenerator;
 class HBasicBlock;

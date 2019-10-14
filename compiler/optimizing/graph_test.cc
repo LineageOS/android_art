@@ -15,7 +15,6 @@
  */
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "builder.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
@@ -23,7 +22,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class GraphTest : public OptimizingUnitTest {
  protected:

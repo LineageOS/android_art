@@ -23,7 +23,7 @@
 
 #include "common_arm64.h"
 
-namespace art HIDDEN {
+namespace art {
 
 using helpers::CanFitInShifterOperand;
 

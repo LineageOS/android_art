@@ -19,11 +19,10 @@
 
 #include <string>
 
-#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /**
  * Induction variable analysis. This class does not have a direct public API.

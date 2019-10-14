@@ -17,11 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_X86_MEMORY_GEN_H_
 #define ART_COMPILER_OPTIMIZING_X86_MEMORY_GEN_H_
 
-#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 class CodeGenerator;
 
 namespace x86 {

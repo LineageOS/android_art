@@ -15,11 +15,10 @@
  */
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /**
  * Fixture class for testing vector nodes.

@@ -18,7 +18,6 @@
 
 #include "arch/x86/instruction_set_features_x86.h"
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "builder.h"
 #include "code_generator.h"
 #include "code_generator_x86.h"
@@ -32,7 +31,7 @@
 #include "ssa_liveness_analysis.h"
 #include "ssa_phi_elimination.h"
 
-namespace art HIDDEN {
+namespace art {
 
 using Strategy = RegisterAllocator::Strategy;
 

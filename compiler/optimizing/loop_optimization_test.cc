@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#include "base/macros.h"
 #include "loop_optimization.h"
 #include "optimizing_unit_test.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /**
  * Fixture class for the loop optimization tests. These unit tests focus

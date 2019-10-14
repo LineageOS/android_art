@@ -31,7 +31,7 @@
 #include "scheduler_arm.h"
 #endif
 
-namespace art HIDDEN {
+namespace art {
 
 void SchedulingGraph::AddDependency(SchedulingNode* node,
                                     SchedulingNode* dependency,

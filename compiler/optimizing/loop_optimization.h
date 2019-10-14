@@ -17,7 +17,6 @@
 #ifndef ART_COMPILER_OPTIMIZING_LOOP_OPTIMIZATION_H_
 #define ART_COMPILER_OPTIMIZING_LOOP_OPTIMIZATION_H_
 
-#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "induction_var_range.h"
@@ -26,7 +25,7 @@
 #include "optimization.h"
 #include "superblock_cloner.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class CompilerOptions;
 class ArchNoOptsLoopHelper;

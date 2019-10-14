@@ -34,7 +34,7 @@
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
 
-namespace art HIDDEN {
+namespace art {
 
 static bool IsInBootImage(ArtMethod* method) {
   gc::Heap* heap = Runtime::Current()->GetHeap();

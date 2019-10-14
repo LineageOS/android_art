@@ -18,7 +18,6 @@
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_ARM_VIXL_H_
 
 #include "base/enums.h"
-#include "base/macros.h"
 #include "code_generator.h"
 #include "common_arm.h"
 #include "dex/string_reference.h"
@@ -36,7 +35,7 @@
 #include "aarch32/macro-assembler-aarch32.h"
 #pragma GCC diagnostic pop
 
-namespace art HIDDEN {
+namespace art {
 
 namespace linker {
 class Thumb2RelativePatcherTest;

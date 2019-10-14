@@ -19,7 +19,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
-namespace art HIDDEN {
+namespace art {
 namespace x86_64 {
 
 // NOLINT on __ macro to suppress wrong warning/fix (misc-macro-parentheses) from clang-tidy.
