@@ -17,12 +17,13 @@
 #ifndef ART_COMPILER_OPTIMIZING_INTRINSICS_H_
 #define ART_COMPILER_OPTIMIZING_INTRINSICS_H_
 
+#include "base/macros.h"
 #include "code_generator.h"
 #include "nodes.h"
 #include "optimization.h"
 #include "parallel_move_resolver.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class DexFile;
 

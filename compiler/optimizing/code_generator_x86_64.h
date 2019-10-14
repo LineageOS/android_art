@@ -18,13 +18,14 @@
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_X86_64_H_
 
 #include "arch/x86_64/instruction_set_features_x86_64.h"
+#include "base/macros.h"
 #include "code_generator.h"
 #include "driver/compiler_options.h"
 #include "nodes.h"
 #include "parallel_move_resolver.h"
 #include "utils/x86_64/assembler_x86_64.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace x86_64 {
 
 // Use a local definition to prevent copying mistakes.

@@ -17,6 +17,7 @@
 #include "scheduler.h"
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "codegen_test_utils.h"
 #include "common_compiler_test.h"
@@ -34,7 +35,7 @@
 #include "scheduler_arm.h"
 #endif
 
-namespace art {
+namespace art HIDDEN {
 
 // Return all combinations of ISA and code generator that are executable on
 // hardware, or on simulator, and that we'd like to test.

@@ -17,12 +17,13 @@
 #ifndef ART_COMPILER_OPTIMIZING_INLINER_H_
 #define ART_COMPILER_OPTIMIZING_INLINER_H_
 
+#include "base/macros.h"
 #include "dex/dex_file_types.h"
 #include "dex/invoke_type.h"
 #include "optimization.h"
 #include "profile/profile_compilation_info.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class CodeGenerator;
 class DexCompilationUnit;

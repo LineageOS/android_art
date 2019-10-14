@@ -20,7 +20,7 @@
 #include "data_type.h"
 #include "dex/primitive.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Note: Not declared in data_type.h to avoid pulling in "primitive.h".
 constexpr DataType::Type DataTypeFromPrimitive(Primitive::Type type) {

@@ -47,7 +47,7 @@
 #include "ssa_phi_elimination.h"
 #include "thread.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Instruction limit to control memory.
 static constexpr size_t kMaximumNumberOfTotalInstructions = 1024;

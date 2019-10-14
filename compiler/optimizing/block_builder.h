@@ -17,13 +17,14 @@
 #ifndef ART_COMPILER_OPTIMIZING_BLOCK_BUILDER_H_
 #define ART_COMPILER_OPTIMIZING_BLOCK_BUILDER_H_
 
+#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "dex/code_item_accessors.h"
 #include "dex/dex_file.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class HBasicBlockBuilder : public ValueObject {
  public:

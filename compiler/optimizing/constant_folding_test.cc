@@ -17,6 +17,8 @@
 #include <functional>
 
 #include "constant_folding.h"
+
+#include "base/macros.h"
 #include "dead_code_elimination.h"
 #include "driver/compiler_options.h"
 #include "graph_checker.h"
@@ -25,7 +27,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Fixture class for the constant folding and dce tests.

@@ -17,12 +17,13 @@
 #include <regex>
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "induction_var_analysis.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Fixture class for the InductionVarAnalysis tests.

@@ -17,9 +17,10 @@
 #ifndef ART_COMPILER_OPTIMIZING_LOOP_ANALYSIS_H_
 #define ART_COMPILER_OPTIMIZING_LOOP_ANALYSIS_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class InductionVarRange;
 class LoopAnalysis;

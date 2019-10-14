@@ -457,12 +457,15 @@ art_cc_test {
 
     shared_libs: [
         "libprofiled",
-        "libartd-compiler",
         "libartd-simulator-container",
+        "libartpalette",
         "libvixld",
 
         "libbacktrace",
         "libnativeloader",
+    ],
+    static_libs: [
+        "libartd-compiler",
     ],
 
     target: {
@@ -511,7 +514,9 @@ art_cc_test {
         },
     },
     shared_libs: [
-        "libartd-compiler",
         "libvixld",
+    ],
+    static_libs: [
+        "libartd-compiler",
     ],
 }

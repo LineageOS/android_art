@@ -18,7 +18,7 @@
 
 #include "mirror/array-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 
 namespace {
 

@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/macros.h"
 #include "base/malloc_arena_pool.h"
 #include "base/scoped_arena_allocator.h"
 #include "builder.h"
@@ -40,7 +41,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 #define NUM_INSTRUCTIONS(...)  \
   (sizeof((uint16_t[]) {__VA_ARGS__}) /sizeof(uint16_t))

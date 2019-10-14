@@ -22,6 +22,7 @@
 #include "arch/mips/registers_mips.h"
 #include "arch/mips64/registers_mips64.h"
 #include "arch/x86/registers_x86.h"
+#include "base/macros.h"
 #include "code_simulator.h"
 #include "code_simulator_container.h"
 #include "common_compiler_test.h"
@@ -53,7 +54,7 @@
 #include "code_generator_mips64.h"
 #endif
 
-namespace art {
+namespace art HIDDEN {
 
 typedef CodeGenerator* (*CreateCodegenFn)(HGraph*, const CompilerOptions&);
 

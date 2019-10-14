@@ -15,6 +15,7 @@
  */
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "base/malloc_arena_pool.h"
 #include "nodes.h"
 #include "parallel_move_resolver.h"
@@ -22,7 +23,7 @@
 #include "gtest/gtest-typed-test.h"
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 constexpr int kScratchRegisterStartIndexForTest = 100;
 

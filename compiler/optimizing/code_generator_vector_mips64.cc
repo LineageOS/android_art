@@ -17,7 +17,7 @@
 #include "code_generator_mips64.h"
 #include "mirror/array-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace mips64 {
 
 // NOLINT on __ macro to suppress wrong warning/fix (misc-macro-parentheses) from clang-tidy.

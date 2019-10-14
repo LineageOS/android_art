@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
+#include "base/macros.h"
 #include "load_store_analysis.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class LoadStoreAnalysisTest : public OptimizingUnitTest {
  public:

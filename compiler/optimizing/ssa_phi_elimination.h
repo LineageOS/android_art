@@ -17,10 +17,11 @@
 #ifndef ART_COMPILER_OPTIMIZING_SSA_PHI_ELIMINATION_H_
 #define ART_COMPILER_OPTIMIZING_SSA_PHI_ELIMINATION_H_
 
+#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Optimization phase that removes dead phis from the graph. Dead phis are unused
