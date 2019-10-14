@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __ANDROID_DLEXT_NAMESPACES_H__
-#define __ANDROID_DLEXT_NAMESPACES_H__
+#ifndef ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_DLEXT_NAMESPACES_H_
+#define ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_DLEXT_NAMESPACES_H_
 
 #include <android/dlext.h>
 #include <stdbool.h>
@@ -111,4 +111,4 @@ extern struct android_namespace_t* android_get_exported_namespace(const char* na
 
 __END_DECLS
 
-#endif /* __ANDROID_DLEXT_NAMESPACES_H__ */
+#endif  // ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_DLEXT_NAMESPACES_H_

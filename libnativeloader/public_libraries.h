@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
+
+#ifndef ART_LIBNATIVELOADER_PUBLIC_LIBRARIES_H_
+#define ART_LIBNATIVELOADER_PUBLIC_LIBRARIES_H_
 
 #include <algorithm>
 #include <string>
@@ -54,3 +56,5 @@ Result<std::vector<std::string>> ParseConfig(
 }  // namespace internal
 
 }  // namespace android::nativeloader
+
+#endif  // ART_LIBNATIVELOADER_PUBLIC_LIBRARIES_H_
