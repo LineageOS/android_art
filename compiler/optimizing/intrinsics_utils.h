@@ -24,7 +24,7 @@
 #include "utils/assembler.h"
 #include "utils/label.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Default slow-path for fallback (calling the managed code to handle the intrinsic) in an
 // intrinsified call. This will copy the arguments into the positions for a regular call.

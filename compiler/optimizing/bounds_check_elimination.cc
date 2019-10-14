@@ -24,7 +24,7 @@
 #include "nodes.h"
 #include "side_effects_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class MonotonicValueRange;
 

@@ -20,7 +20,7 @@
 
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void CalculateMagicAndShiftForDivRem(int64_t divisor, bool is_long,
                                      int64_t* magic, int* shift) {

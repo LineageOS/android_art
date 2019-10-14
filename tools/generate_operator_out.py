@@ -65,7 +65,7 @@ def ProcessFile(filename):
                     continue
 
                 # Is this the start or end of a namespace?
-                m = re.search(r'^namespace (\S+) \{', raw_line)
+                m = re.search(r'^namespace (\S+) (HIDDEN |EXPORT )?\{', raw_line)
                 if m:
                     namespaces.append(m.group(1))
                     continue

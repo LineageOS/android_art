@@ -26,7 +26,7 @@
 #include "register_allocation_resolver.h"
 #include "ssa_liveness_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 static constexpr size_t kMaxLifetimePosition = -1;
 static constexpr size_t kDefaultNumberOfSpillSlots = 4;

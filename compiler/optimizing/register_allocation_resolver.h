@@ -18,10 +18,11 @@
 #define ART_COMPILER_OPTIMIZING_REGISTER_ALLOCATION_RESOLVER_H_
 
 #include "base/array_ref.h"
+#include "base/macros.h"
 #include "base/value_object.h"
 #include "data_type.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class ArenaAllocator;
 class CodeGenerator;

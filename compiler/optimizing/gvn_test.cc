@@ -17,12 +17,13 @@
 #include "gvn.h"
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
 #include "side_effects_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class GVNTest : public OptimizingUnitTest {};
 

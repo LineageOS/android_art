@@ -19,9 +19,10 @@
 
 #include <type_traits>
 
+#include "base/macros.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 void LinearizeGraphInternal(const HGraph* graph, ArrayRef<HBasicBlock*> linear_order);
 

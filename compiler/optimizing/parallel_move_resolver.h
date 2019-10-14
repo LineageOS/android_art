@@ -18,11 +18,12 @@
 #define ART_COMPILER_OPTIMIZING_PARALLEL_MOVE_RESOLVER_H_
 
 #include "base/arena_containers.h"
+#include "base/macros.h"
 #include "base/value_object.h"
 #include "data_type.h"
 #include "locations.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class HParallelMove;
 class MoveOperands;

@@ -16,7 +16,7 @@
 
 #include "side_effects_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 bool SideEffectsAnalysis::Run() {
   // Inlining might have created more blocks, so we need to increase the size

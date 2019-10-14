@@ -17,11 +17,12 @@
 #include "nodes.h"
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "optimizing_unit_test.h"
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class NodeTest : public OptimizingUnitTest {};
 

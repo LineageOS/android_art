@@ -18,7 +18,7 @@
 #include "code_generator.h"
 #include "driver/compiler_options.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace x86 {
 
 /**

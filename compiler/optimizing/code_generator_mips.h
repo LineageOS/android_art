@@ -17,6 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_CODE_GENERATOR_MIPS_H_
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_MIPS_H_
 
+#include "base/macros.h"
 #include "code_generator.h"
 #include "dex/dex_file_types.h"
 #include "dex/string_reference.h"
@@ -26,7 +27,7 @@
 #include "parallel_move_resolver.h"
 #include "utils/mips/assembler_mips.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace mips {
 
 // InvokeDexCallingConvention registers

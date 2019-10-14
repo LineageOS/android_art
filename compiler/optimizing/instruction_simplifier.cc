@@ -27,7 +27,7 @@
 #include "sharpening.h"
 #include "string_builder_append.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Whether to run an exhaustive test of individual HInstructions cloning when each instruction
 // is replaced with its copy if it is clonable.
