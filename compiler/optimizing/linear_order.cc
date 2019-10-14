@@ -19,7 +19,7 @@
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 
-namespace art {
+namespace art HIDDEN {
 
 static bool InSameLoop(HLoopInformation* first_loop, HLoopInformation* second_loop) {
   return first_loop == second_loop;

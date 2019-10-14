@@ -16,6 +16,7 @@
 
 #include "dead_code_elimination.h"
 
+#include "base/macros.h"
 #include "driver/compiler_options.h"
 #include "graph_checker.h"
 #include "optimizing_unit_test.h"
@@ -23,7 +24,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class DeadCodeEliminationTest : public OptimizingUnitTest {
  protected:

@@ -35,7 +35,7 @@
 #include "thread.h"
 #include "utils/dex_cache_arrays_layout-inl.h"
 
-namespace art {
+namespace art HIDDEN {
 
 HGraphBuilder::HGraphBuilder(HGraph* graph,
                              const CodeItemDebugInfoAccessor& accessor,

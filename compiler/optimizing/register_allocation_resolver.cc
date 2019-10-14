@@ -21,7 +21,7 @@
 #include "linear_order.h"
 #include "ssa_liveness_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 RegisterAllocationResolver::RegisterAllocationResolver(CodeGenerator* codegen,
                                                        const SsaLivenessAnalysis& liveness)

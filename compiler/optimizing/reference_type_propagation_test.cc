@@ -17,12 +17,13 @@
 #include "reference_type_propagation.h"
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "nodes.h"
 #include "object_lock.h"
 #include "optimizing_unit_test.h"
 
-namespace art {
+namespace art HIDDEN {
 
 /**
  * Fixture class for unit testing the ReferenceTypePropagation phase. Used to verify the

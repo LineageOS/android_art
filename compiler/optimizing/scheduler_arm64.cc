@@ -20,7 +20,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace arm64 {
 
 void SchedulingLatencyVisitorARM64::VisitBinaryOperation(HBinaryOperation* instr) {

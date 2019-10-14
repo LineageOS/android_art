@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
+#include "base/macros.h"
 #include "graph_checker.h"
 #include "optimizing_unit_test.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class GraphCheckerTest : public OptimizingUnitTest {
  protected:

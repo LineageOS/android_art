@@ -19,6 +19,7 @@
 
 #include <fstream>
 
+#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "base/stl_util.h"
@@ -28,7 +29,7 @@
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // General description of instruction scheduling.
 //

@@ -22,7 +22,7 @@
 // (defining `HInstruction` and co).
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class HMultiplyAccumulate final : public HExpression<3> {
  public:

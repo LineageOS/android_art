@@ -21,7 +21,7 @@
 // is included in the header file nodes.h itself. However it gives editing tools better context.
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Memory alignment, represented as an offset relative to a base, where 0 <= offset < base,
 // and base is a power of two. For example, the value Alignment(16, 0) means memory is

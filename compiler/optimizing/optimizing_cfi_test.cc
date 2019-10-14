@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "arch/instruction_set.h"
+#include "base/macros.h"
 #include "base/runtime_debug.h"
 #include "cfi_test.h"
 #include "driver/compiler_options.h"
@@ -34,7 +35,7 @@
 
 namespace vixl32 = vixl::aarch32;
 
-namespace art {
+namespace art HIDDEN {
 
 // Run the tests only on host.
 #ifndef ART_TARGET_ANDROID

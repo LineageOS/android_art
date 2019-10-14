@@ -21,6 +21,8 @@
 #include "base/bit_utils.h"
 #include "base/mutex.h"
 
+// TODO(b/142365358): Mark namespace as HIDDEN and functions used by dex2oat with EXPORT.
+// Refactor the code to reduce the number of functions needed by dex2oat.
 namespace art {
 
 class ClassLinker;

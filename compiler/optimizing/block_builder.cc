@@ -22,7 +22,7 @@
 #include "dex/dex_file_exception_helpers.h"
 #include "quicken_info.h"
 
-namespace art {
+namespace art HIDDEN {
 
 HBasicBlockBuilder::HBasicBlockBuilder(HGraph* graph,
                                        const DexFile* const dex_file,

@@ -18,7 +18,7 @@
 
 #include "side_effects_analysis.h"
 
-namespace art {
+namespace art HIDDEN {
 
 static bool IsPhiOf(HInstruction* instruction, HBasicBlock* block) {
   return instruction->IsPhi() && instruction->GetBlock() == block;

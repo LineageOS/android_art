@@ -17,10 +17,11 @@
 #ifndef ART_COMPILER_OPTIMIZING_SCHEDULER_ARM_H_
 #define ART_COMPILER_OPTIMIZING_SCHEDULER_ARM_H_
 
+#include "base/macros.h"
 #include "code_generator_arm_vixl.h"
 #include "scheduler.h"
 
-namespace art {
+namespace art HIDDEN {
 namespace arm {
 // TODO: Replace CodeGeneratorARMType with CodeGeneratorARMVIXL everywhere?
 typedef CodeGeneratorARMVIXL CodeGeneratorARMType;

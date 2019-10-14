@@ -17,6 +17,7 @@
 #include "pretty_printer.h"
 
 #include "base/arena_allocator.h"
+#include "base/macros.h"
 #include "builder.h"
 #include "dex/dex_file.h"
 #include "dex/dex_instruction.h"
@@ -25,7 +26,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class PrettyPrinterTest : public OptimizingUnitTest {
  protected:

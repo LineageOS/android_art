@@ -16,10 +16,11 @@
 
 #include <gtest/gtest.h>
 
+#include "base/macros.h"
 #include "data_type.h"
 #include "nodes.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Only runtime types other than void are allowed.
 static const DataType::Type kTestTypes[] = {

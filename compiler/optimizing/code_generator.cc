@@ -68,7 +68,7 @@
 #include "thread-current-inl.h"
 #include "utils/assembler.h"
 
-namespace art {
+namespace art HIDDEN {
 
 // Return whether a location is consistent with a type.
 static bool CheckType(DataType::Type type, Location location) {
