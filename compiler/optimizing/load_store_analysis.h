@@ -17,12 +17,11 @@
 #ifndef ART_COMPILER_OPTIMIZING_LOAD_STORE_ANALYSIS_H_
 #define ART_COMPILER_OPTIMIZING_LOAD_STORE_ANALYSIS_H_
 
-#include "base/macros.h"
 #include "escape.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 
 // A ReferenceInfo contains additional info about a reference such as
 // whether it's a singleton, returned, etc.

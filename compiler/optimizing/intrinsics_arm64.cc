@@ -41,7 +41,7 @@ using namespace vixl::aarch64;  // NOLINT(build/namespaces)
 #include "aarch64/macro-assembler-aarch64.h"
 #pragma GCC diagnostic pop
 
-namespace art HIDDEN {
+namespace art {
 
 namespace arm64 {
 

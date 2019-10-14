@@ -21,7 +21,7 @@
 #include "code_generator.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 // Verify that Location is trivially copyable.
 static_assert(std::is_trivially_copyable<Location>::value, "Location should be trivially copyable");

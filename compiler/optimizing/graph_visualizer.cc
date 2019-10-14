@@ -40,7 +40,7 @@
 #include "ssa_liveness_analysis.h"
 #include "utils/assembler.h"
 
-namespace art HIDDEN {
+namespace art {
 
 static bool HasWhitespace(const char* str) {
   DCHECK(str != nullptr);

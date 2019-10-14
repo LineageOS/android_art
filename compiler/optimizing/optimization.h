@@ -18,11 +18,10 @@
 #define ART_COMPILER_OPTIMIZING_OPTIMIZATION_H_
 
 #include "base/arena_object.h"
-#include "base/macros.h"
 #include "nodes.h"
 #include "optimizing_compiler_stats.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class CodeGenerator;
 class DexCompilationUnit;

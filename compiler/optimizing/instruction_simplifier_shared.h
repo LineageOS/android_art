@@ -17,10 +17,9 @@
 #ifndef ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_SHARED_H_
 #define ART_COMPILER_OPTIMIZING_INSTRUCTION_SIMPLIFIER_SHARED_H_
 
-#include "base/macros.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 namespace helpers {
 

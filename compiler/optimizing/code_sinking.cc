@@ -23,7 +23,7 @@
 #include "common_dominator.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 bool CodeSinking::Run() {
   HBasicBlock* exit = graph_->GetExitBlock();

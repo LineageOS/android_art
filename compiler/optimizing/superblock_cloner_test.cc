@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "base/macros.h"
 #include "graph_checker.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
@@ -22,7 +21,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 using HBasicBlockMap = SuperblockCloner::HBasicBlockMap;
 using HInstructionMap = SuperblockCloner::HInstructionMap;
