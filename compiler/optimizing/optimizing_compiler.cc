@@ -66,7 +66,7 @@
 #include "utils/assembler.h"
 #include "verifier/verifier_compiler_binding.h"
 
-namespace art HIDDEN {
+namespace art {
 
 static constexpr size_t kArenaAllocatorMemoryReportThreshold = 8 * MB;
 

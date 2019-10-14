@@ -20,13 +20,12 @@
 #include "arch/instruction_set_features.h"
 #include "base/arena_allocator.h"
 #include "base/arena_containers.h"
-#include "base/macros.h"
 #include "code_generator.h"
 #include "driver/compiler_options.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class SsaLivenessAnalysisTest : public OptimizingUnitTest {
  protected:

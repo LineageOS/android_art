@@ -16,7 +16,7 @@
 
 #include "data_type.h"
 
-namespace art HIDDEN {
+namespace art {
 
 static const char* kTypeNames[] = {
     "Reference",

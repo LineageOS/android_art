@@ -19,10 +19,9 @@
 
 #include "android-base/stringprintf.h"
 
-#include "base/macros.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class HPrettyPrinter : public HGraphVisitor {
  public:

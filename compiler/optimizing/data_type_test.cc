@@ -22,7 +22,7 @@
 #include "base/macros.h"
 #include "dex/primitive.h"
 
-namespace art HIDDEN {
+namespace art {
 
 template <DataType::Type data_type, Primitive::Type primitive_type>
 static void CheckConversion() {

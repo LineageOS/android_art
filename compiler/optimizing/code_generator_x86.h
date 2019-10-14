@@ -19,7 +19,6 @@
 
 #include "arch/x86/instruction_set_features_x86.h"
 #include "base/enums.h"
-#include "base/macros.h"
 #include "code_generator.h"
 #include "dex/dex_file_types.h"
 #include "driver/compiler_options.h"
@@ -27,7 +26,7 @@
 #include "parallel_move_resolver.h"
 #include "utils/x86/assembler_x86.h"
 
-namespace art HIDDEN {
+namespace art {
 namespace x86 {
 
 // Use a local definition to prevent copying mistakes.

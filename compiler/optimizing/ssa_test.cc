@@ -17,7 +17,6 @@
 #include "android-base/stringprintf.h"
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "builder.h"
 #include "dex/dex_file.h"
 #include "dex/dex_instruction.h"
@@ -28,7 +27,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class SsaTest : public OptimizingUnitTest {
  protected:

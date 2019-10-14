@@ -21,11 +21,10 @@
 
 #include "base/arena_bit_vector.h"
 #include "base/bit_vector-inl.h"
-#include "base/macros.h"
 #include "base/scoped_arena_allocator.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 // A control-flow graph visitor performing various checks.
 class GraphChecker : public HGraphDelegateVisitor {

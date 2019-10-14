@@ -20,7 +20,7 @@
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 
-namespace art HIDDEN {
+namespace art {
 
 static constexpr bool kCfreLogFenceInputCount = false;
 

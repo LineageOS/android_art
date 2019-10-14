@@ -38,7 +38,7 @@
 #include "utils/mips64/assembler_mips64.h"
 #include "utils/stack_checks.h"
 
-namespace art HIDDEN {
+namespace art {
 namespace mips64 {
 
 static constexpr int kCurrentMethodStackOffset = 0;

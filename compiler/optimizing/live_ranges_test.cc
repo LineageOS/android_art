@@ -15,7 +15,6 @@
  */
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "builder.h"
 #include "code_generator.h"
 #include "dex/dex_file.h"
@@ -26,7 +25,7 @@
 #include "prepare_for_register_allocation.h"
 #include "ssa_liveness_analysis.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class LiveRangesTest : public OptimizingUnitTest {
  public:

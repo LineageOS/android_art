@@ -31,7 +31,7 @@
 #include "scoped_thread_state_change-inl.h"
 #include "thread-current-inl.h"
 
-namespace art HIDDEN {
+namespace art {
 
 std::ostream& operator<<(std::ostream& os, const Intrinsics& intrinsic) {
   switch (intrinsic) {

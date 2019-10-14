@@ -23,7 +23,7 @@
 #include "base/utils.h"
 #include "side_effects_analysis.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /**
  * A ValueSet holds instructions that can replace other instructions. It is updated

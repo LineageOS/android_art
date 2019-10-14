@@ -22,7 +22,7 @@
 
 using namespace vixl::aarch64;  // NOLINT(build/namespaces)
 
-namespace art HIDDEN {
+namespace art {
 namespace arm64 {
 
 using helpers::ARM64EncodableConstantOrRegister;
