@@ -22,9 +22,8 @@
 #include <android-base/logging.h>
 
 #include "base/bit_utils.h"
-#include "base/macros.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class DataType {
  public:

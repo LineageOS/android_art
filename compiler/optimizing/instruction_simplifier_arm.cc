@@ -23,7 +23,7 @@
 #include "mirror/string.h"
 #include "nodes.h"
 
-namespace art HIDDEN {
+namespace art {
 
 using helpers::CanFitInShifterOperand;
 using helpers::HasShifterOperand;

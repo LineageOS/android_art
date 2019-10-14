@@ -22,10 +22,9 @@
 #include "base/bit_field.h"
 #include "base/bit_utils.h"
 #include "base/bit_vector.h"
-#include "base/macros.h"
 #include "base/value_object.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class HConstant;
 class HInstruction;

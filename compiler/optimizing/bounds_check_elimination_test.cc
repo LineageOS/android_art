@@ -17,7 +17,6 @@
 #include "bounds_check_elimination.h"
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "builder.h"
 #include "gvn.h"
 #include "induction_var_analysis.h"
@@ -28,7 +27,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /**
  * Fixture class for the BoundsCheckElimination tests.

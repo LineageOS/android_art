@@ -21,7 +21,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
-namespace art HIDDEN {
+namespace art {
 
 using helpers::CanFitInShifterOperand;
 using helpers::HasShifterOperand;

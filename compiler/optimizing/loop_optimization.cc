@@ -28,7 +28,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
-namespace art HIDDEN {
+namespace art {
 
 // Enables vectorization (SIMDization) in the loop optimizer.
 static constexpr bool kEnableVectorization = true;

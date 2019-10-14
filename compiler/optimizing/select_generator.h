@@ -57,10 +57,9 @@
 #ifndef ART_COMPILER_OPTIMIZING_SELECT_GENERATOR_H_
 #define ART_COMPILER_OPTIMIZING_SELECT_GENERATOR_H_
 
-#include "base/macros.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class HSelectGenerator : public HOptimization {
  public:

@@ -18,11 +18,10 @@
 #define ART_COMPILER_OPTIMIZING_SIDE_EFFECTS_ANALYSIS_H_
 
 #include "base/arena_containers.h"
-#include "base/macros.h"
 #include "nodes.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class SideEffectsAnalysis : public HOptimization {
  public:

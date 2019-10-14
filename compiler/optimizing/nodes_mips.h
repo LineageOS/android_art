@@ -17,7 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_NODES_MIPS_H_
 #define ART_COMPILER_OPTIMIZING_NODES_MIPS_H_
 
-namespace art HIDDEN {
+namespace art {
 
 // Compute the address of the method for MIPS Constant area support.
 class HMipsComputeBaseMethodAddress : public HExpression<0> {

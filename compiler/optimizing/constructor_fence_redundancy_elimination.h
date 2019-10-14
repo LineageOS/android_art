@@ -17,10 +17,9 @@
 #ifndef ART_COMPILER_OPTIMIZING_CONSTRUCTOR_FENCE_REDUNDANCY_ELIMINATION_H_
 #define ART_COMPILER_OPTIMIZING_CONSTRUCTOR_FENCE_REDUNDANCY_ELIMINATION_H_
 
-#include "base/macros.h"
 #include "optimization.h"
 
-namespace art HIDDEN {
+namespace art {
 
 /*
  * Constructor Fence Redundancy Elimination (CFRE).

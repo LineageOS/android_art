@@ -15,7 +15,6 @@
  */
 
 #include "base/arena_allocator.h"
-#include "base/macros.h"
 #include "code_generator_mips.h"
 #include "optimizing_unit_test.h"
 #include "parallel_move_resolver.h"
@@ -24,7 +23,7 @@
 
 #include "gtest/gtest.h"
 
-namespace art HIDDEN {
+namespace art {
 
 class EmitSwapMipsTest : public OptimizingUnitTest {
  public:

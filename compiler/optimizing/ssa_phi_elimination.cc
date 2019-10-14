@@ -21,7 +21,7 @@
 #include "base/scoped_arena_containers.h"
 #include "base/bit_vector-inl.h"
 
-namespace art HIDDEN {
+namespace art {
 
 bool SsaDeadPhiElimination::Run() {
   MarkDeadPhis();
