@@ -178,6 +178,8 @@ class OatTest : public CommonCompilerDriverTest {
     std::vector<std::unique_ptr<const DexFile>> opened_dex_files;
     if (!oat_writer.WriteAndOpenDexFiles(
         vdex_file,
+        oat_rodata,
+        &key_value_store,
         verify,
         /*update_input_vdex=*/ false,
         copy,
@@ -197,13 +199,7 @@ class OatTest : public CommonCompilerDriverTest {
     MultiOatRelativePatcher patcher(compiler_options_->GetInstructionSet(),
                                     compiler_options_->GetInstructionSetFeatures(),
                                     compiler_driver_->GetCompiledMethodStorage());
-    if (!oat_writer.StartRoData(compiler_driver_.get(),
-                                /*image_writer=*/ nullptr,
-                                dex_files,
-                                oat_rodata,
-                                &key_value_store)) {
-      return false;
-    }
+    oat_writer.Initialize(compiler_driver_.get(), nullptr, dex_files);
     oat_writer.PrepareLayout(&patcher);
     elf_writer->PrepareDynamicSection(oat_writer.GetOatHeader().GetExecutableOffset(),
                                       oat_writer.GetCodeSize(),
