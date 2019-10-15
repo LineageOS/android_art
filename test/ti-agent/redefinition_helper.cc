@@ -31,8 +31,13 @@
 
 namespace art {
 
+enum class RedefineType {
+  kNormal,
+  kStructural,
+};
+
 static void SetupCommonRedefine();
-static void SetupCommonRetransform();
+static void SetupCommonRetransform(RedefineType type);
 static void SetupCommonTransform();
 template <bool is_redefine>
 static void throwCommonRedefinitionError(jvmtiEnv* jvmti,
@@ -68,6 +73,7 @@ static void throwCommonRedefinitionError(jvmtiEnv* jvmti,
 #define CONFIGURATION_COMMON_REDEFINE 0
 #define CONFIGURATION_COMMON_RETRANSFORM 1
 #define CONFIGURATION_COMMON_TRANSFORM 2
+#define CONFIGURATION_STRUCTURAL_TRANSFORM 3
 
 extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_nativeSetTestConfiguration(JNIEnv*,
                                                                                    jclass,
@@ -78,11 +84,15 @@ extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_nativeSetTestConfigurati
       return;
     }
     case CONFIGURATION_COMMON_RETRANSFORM: {
-      SetupCommonRetransform();
+      SetupCommonRetransform(RedefineType::kNormal);
       return;
     }
     case CONFIGURATION_COMMON_TRANSFORM: {
       SetupCommonTransform();
+      return;
+    }
+    case CONFIGURATION_STRUCTURAL_TRANSFORM: {
+      SetupCommonRetransform(RedefineType::kStructural);
       return;
     }
     default: {
@@ -91,7 +101,36 @@ extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_nativeSetTestConfigurati
   }
 }
 
+template<RedefineType kType>
+static bool SupportsAndIsJVM() {
+  if constexpr (kType == RedefineType::kStructural) {
+    return false;
+  } else {
+    return IsJVM();
+  }
+}
+
+
 namespace common_redefine {
+
+template <RedefineType kType>
+static jvmtiError CallRedefineEntrypoint(JNIEnv* env,
+                                         jvmtiEnv* jvmti,
+                                         jint num_defs,
+                                         const jvmtiClassDefinition* defs) {
+  decltype(jvmti->functions->RedefineClasses) entrypoint = nullptr;
+  if constexpr (kType == RedefineType::kNormal) {
+    entrypoint = jvmti->functions->RedefineClasses;
+  } else {
+    entrypoint = GetExtensionFunction<decltype(entrypoint)>(
+        env, jvmti_env, "com.android.art.class.structurally_redefine_classes");
+  }
+  if (entrypoint == nullptr) {
+    LOG(INFO) << "Could not find entrypoint!";
+    return JVMTI_ERROR_NOT_AVAILABLE;
+  }
+  return entrypoint(jvmti, num_defs, defs);
+}
 
 static void throwRedefinitionError(jvmtiEnv* jvmti,
                                    JNIEnv* env,
@@ -101,6 +140,7 @@ static void throwRedefinitionError(jvmtiEnv* jvmti,
   return throwCommonRedefinitionError<true>(jvmti, env, num_targets, target, res);
 }
 
+template<RedefineType kType>
 static void DoMultiClassRedefine(jvmtiEnv* jvmti_env,
                                  JNIEnv* env,
                                  jint num_redefines,
@@ -109,24 +149,25 @@ static void DoMultiClassRedefine(jvmtiEnv* jvmti_env,
                                  jbyteArray* dex_file_bytes) {
   std::vector<jvmtiClassDefinition> defs;
   for (jint i = 0; i < num_redefines; i++) {
-    jbyteArray desired_array = IsJVM() ? class_file_bytes[i] : dex_file_bytes[i];
+    jbyteArray desired_array = SupportsAndIsJVM<kType>() ? class_file_bytes[i] : dex_file_bytes[i];
     jint len = static_cast<jint>(env->GetArrayLength(desired_array));
     const unsigned char* redef_bytes = reinterpret_cast<const unsigned char*>(
         env->GetByteArrayElements(desired_array, nullptr));
     defs.push_back({targets[i], static_cast<jint>(len), redef_bytes});
   }
-  jvmtiError res = jvmti_env->RedefineClasses(num_redefines, defs.data());
+  jvmtiError res = CallRedefineEntrypoint<kType>(env, jvmti_env, num_redefines, defs.data());
   if (res != JVMTI_ERROR_NONE) {
     throwRedefinitionError(jvmti_env, env, num_redefines, targets, res);
   }
 }
 
+template<RedefineType kType>
 static void DoClassRedefine(jvmtiEnv* jvmti_env,
                             JNIEnv* env,
                             jclass target,
                             jbyteArray class_file_bytes,
                             jbyteArray dex_file_bytes) {
-  return DoMultiClassRedefine(jvmti_env, env, 1, &target, &class_file_bytes, &dex_file_bytes);
+  return DoMultiClassRedefine<kType>(jvmti_env, env, 1, &target, &class_file_bytes, &dex_file_bytes);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -145,25 +186,44 @@ Java_art_Redefinition_isStructurallyModifiable(JNIEnv* env, jclass, jclass targe
 
 extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonStructuralClassRedefinition(
     JNIEnv* env, jclass, jclass target, jbyteArray dex_file_bytes) {
-  using ArtStructurallyRedefineClassDirect =
-      jvmtiError (*)(jvmtiEnv * env, jclass k, jbyte* data, jint len);
-  ArtStructurallyRedefineClassDirect redef =
-      GetExtensionFunction<ArtStructurallyRedefineClassDirect>(
-          env, jvmti_env, "com.android.art.UNSAFE.class.structurally_redefine_class_direct");
-  if (redef == nullptr || env->ExceptionCheck()) {
-    return;
-  }
-  jint len = env->GetArrayLength(dex_file_bytes);
-  std::vector<jbyte> v(len, 0);
-  env->GetByteArrayRegion(dex_file_bytes, 0, len, v.data());
-  JvmtiErrorToException(env, jvmti_env, redef(jvmti_env, target, v.data(), len));
+  DoClassRedefine<RedefineType::kStructural>(jvmti_env, env, target, nullptr, dex_file_bytes);
 }
 
 // Magic JNI export that classes can use for redefining classes.
 // To use classes should declare this as a native function with signature (Ljava/lang/Class;[B[B)V
 extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonClassRedefinition(
     JNIEnv* env, jclass, jclass target, jbyteArray class_file_bytes, jbyteArray dex_file_bytes) {
-  DoClassRedefine(jvmti_env, env, target, class_file_bytes, dex_file_bytes);
+  DoClassRedefine<RedefineType::kNormal>(jvmti_env, env, target, class_file_bytes, dex_file_bytes);
+}
+
+// Magic JNI export that classes can use for redefining classes.
+// To use classes should declare this as a native function with signature
+// ([Ljava/lang/Class;[[B[[B)V
+extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonMultiStructuralClassRedefinition(
+    JNIEnv* env,
+    jclass,
+    jobjectArray targets,
+    jobjectArray dex_file_bytes) {
+  std::vector<jclass> classes;
+  std::vector<jbyteArray> class_files;
+  std::vector<jbyteArray> dex_files;
+  jint len = env->GetArrayLength(targets);
+  if (len != env->GetArrayLength(dex_file_bytes)) {
+    env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"),
+                  "the three array arguments passed to this function have different lengths!");
+    return;
+  }
+  for (jint i = 0; i < len; i++) {
+    classes.push_back(static_cast<jclass>(env->GetObjectArrayElement(targets, i)));
+    dex_files.push_back(static_cast<jbyteArray>(env->GetObjectArrayElement(dex_file_bytes, i)));
+    class_files.push_back(nullptr);
+  }
+  return DoMultiClassRedefine<RedefineType::kStructural>(jvmti_env,
+                                                         env,
+                                                         len,
+                                                         classes.data(),
+                                                         class_files.data(),
+                                                         dex_files.data());
 }
 
 // Magic JNI export that classes can use for redefining classes.
@@ -189,12 +249,12 @@ extern "C" JNIEXPORT void JNICALL Java_art_Redefinition_doCommonMultiClassRedefi
     dex_files.push_back(static_cast<jbyteArray>(env->GetObjectArrayElement(dex_file_bytes, i)));
     class_files.push_back(static_cast<jbyteArray>(env->GetObjectArrayElement(class_file_bytes, i)));
   }
-  return DoMultiClassRedefine(jvmti_env,
-                              env,
-                              len,
-                              classes.data(),
-                              class_files.data(),
-                              dex_files.data());
+  return DoMultiClassRedefine<RedefineType::kNormal>(jvmti_env,
+                                                     env,
+                                                     len,
+                                                     classes.data(),
+                                                     class_files.data(),
+                                                     dex_files.data());
 }
 
 // Get all capabilities except those related to retransformation.
@@ -380,7 +440,7 @@ jint OnLoad(JavaVM* vm,
     printf("Unable to get jvmti env!\n");
     return 1;
   }
-  SetupCommonRetransform();
+  SetupCommonRetransform(RedefineType::kNormal);
   return 0;
 }
 
@@ -409,11 +469,20 @@ static void SetupCommonRedefine() {
   jvmti_env->AddCapabilities(&caps);
 }
 
-static void SetupCommonRetransform() {
+static void SetupCommonRetransform(RedefineType type) {
   SetStandardCapabilities(jvmti_env);
-  current_callbacks.ClassFileLoadHook = common_retransform::CommonClassFileLoadHookRetransformable;
-  jvmtiError res = jvmti_env->SetEventCallbacks(&current_callbacks, sizeof(current_callbacks));
-  CHECK_EQ(res, JVMTI_ERROR_NONE);
+  if (type == RedefineType::kNormal) {
+    current_callbacks.ClassFileLoadHook =
+        common_retransform::CommonClassFileLoadHookRetransformable;
+    jvmtiError res = jvmti_env->SetEventCallbacks(&current_callbacks, sizeof(current_callbacks));
+    CHECK_EQ(res, JVMTI_ERROR_NONE);
+  } else {
+    jvmtiError res = jvmti_env->SetExtensionEventCallback(
+        GetExtensionEventId(jvmti_env, "com.android.art.class.structural_dex_file_load_hook"),
+        reinterpret_cast<jvmtiExtensionEvent>(
+            common_retransform::CommonClassFileLoadHookRetransformable));
+    CHECK_EQ(res, JVMTI_ERROR_NONE);
+  }
   common_retransform::gTransformations.clear();
 }
 

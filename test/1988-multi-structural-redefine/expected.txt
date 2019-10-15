@@ -1,0 +1,5 @@
+hello - Transform 1
+hello - Transform 2
+Redefining both class art.Test1988$Transform1 and class art.Test1988$Transform2 to use each other.
+Transform1 says hi and Transform2 says bye!
+Transform2 says hi and Transform1 says bye!
