@@ -166,6 +166,7 @@ libcore_native_shared_libs = [
     "libexpat",
     "libicui18n",
     "libicuuc",
+    "libicu_jni",
     "libjavacore",
     "libopenjdk",
 ]
