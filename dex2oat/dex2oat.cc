@@ -1448,51 +1448,6 @@ class Dex2Oat final {
       return dex2oat::ReturnCode::kOther;
     }
 
-    {
-      TimingLogger::ScopedTiming t_dex("Writing and opening dex files", timings_);
-      for (size_t i = 0, size = oat_writers_.size(); i != size; ++i) {
-        // Unzip or copy dex files straight to the oat file.
-        std::vector<MemMap> opened_dex_files_map;
-        std::vector<std::unique_ptr<const DexFile>> opened_dex_files;
-        // No need to verify the dex file when we have a vdex file, which means it was already
-        // verified.
-        const bool verify = (input_vdex_file_ == nullptr);
-        if (!oat_writers_[i]->WriteAndOpenDexFiles(
-            vdex_files_[i].get(),
-            verify,
-            update_input_vdex_,
-            copy_dex_files_,
-            &opened_dex_files_map,
-            &opened_dex_files)) {
-          return dex2oat::ReturnCode::kOther;
-        }
-        dex_files_per_oat_file_.push_back(MakeNonOwningPointerVector(opened_dex_files));
-        if (opened_dex_files_map.empty()) {
-          DCHECK(opened_dex_files.empty());
-        } else {
-          for (MemMap& map : opened_dex_files_map) {
-            opened_dex_files_maps_.push_back(std::move(map));
-          }
-          for (std::unique_ptr<const DexFile>& dex_file : opened_dex_files) {
-            dex_file_oat_index_map_.emplace(dex_file.get(), i);
-            opened_dex_files_.push_back(std::move(dex_file));
-          }
-        }
-      }
-    }
-
-    compiler_options_->dex_files_for_oat_file_ = MakeNonOwningPointerVector(opened_dex_files_);
-    const std::vector<const DexFile*>& dex_files = compiler_options_->dex_files_for_oat_file_;
-
-    if (IsBootImage()) {
-      // For boot image, pass opened dex files to the Runtime::Create().
-      // Note: Runtime acquires ownership of these dex files.
-      runtime_options.Set(RuntimeArgumentMap::BootClassPathDexList, &opened_dex_files_);
-    }
-    if (!CreateRuntime(std::move(runtime_options))) {
-      return dex2oat::ReturnCode::kCreateRuntime;
-    }
-
     if (!compilation_reason_.empty()) {
       key_value_store_->Put(OatHeader::kCompilationReasonKey, compilation_reason_);
     }
@@ -1504,6 +1459,12 @@ class Dex2Oat final {
     }
 
     if (!IsBootImage()) {
+      // When compiling an app, create the runtime early to retrieve
+      // the boot image checksums needed for the oat header.
+      if (!CreateRuntime(std::move(runtime_options))) {
+        return dex2oat::ReturnCode::kCreateRuntime;
+      }
+
       if (CompilerFilter::DependsOnImageChecksum(compiler_options_->GetCompilerFilter())) {
         TimingLogger::ScopedTiming t3("Loading image checksum", timings_);
         Runtime* runtime = Runtime::Current();
@@ -1557,6 +1518,47 @@ class Dex2Oat final {
       key_value_store_->Put(OatHeader::kClassPathKey, class_path_key);
     }
 
+    // Now that we have finalized key_value_store_, start writing the oat file.
+    {
+      TimingLogger::ScopedTiming t_dex("Writing and opening dex files", timings_);
+      rodata_.reserve(oat_writers_.size());
+      for (size_t i = 0, size = oat_writers_.size(); i != size; ++i) {
+        rodata_.push_back(elf_writers_[i]->StartRoData());
+        // Unzip or copy dex files straight to the oat file.
+        std::vector<MemMap> opened_dex_files_map;
+        std::vector<std::unique_ptr<const DexFile>> opened_dex_files;
+        // No need to verify the dex file when we have a vdex file, which means it was already
+        // verified.
+        const bool verify = (input_vdex_file_ == nullptr);
+        if (!oat_writers_[i]->WriteAndOpenDexFiles(
+            vdex_files_[i].get(),
+            rodata_.back(),
+            (i == 0u) ? key_value_store_.get() : nullptr,
+            verify,
+            update_input_vdex_,
+            copy_dex_files_,
+            &opened_dex_files_map,
+            &opened_dex_files)) {
+          return dex2oat::ReturnCode::kOther;
+        }
+        dex_files_per_oat_file_.push_back(MakeNonOwningPointerVector(opened_dex_files));
+        if (opened_dex_files_map.empty()) {
+          DCHECK(opened_dex_files.empty());
+        } else {
+          for (MemMap& map : opened_dex_files_map) {
+            opened_dex_files_maps_.push_back(std::move(map));
+          }
+          for (std::unique_ptr<const DexFile>& dex_file : opened_dex_files) {
+            dex_file_oat_index_map_.emplace(dex_file.get(), i);
+            opened_dex_files_.push_back(std::move(dex_file));
+          }
+        }
+      }
+    }
+
+    compiler_options_->dex_files_for_oat_file_ = MakeNonOwningPointerVector(opened_dex_files_);
+    const std::vector<const DexFile*>& dex_files = compiler_options_->dex_files_for_oat_file_;
+
     // If we need to downgrade the compiler-filter for size reasons.
     if (!IsBootImage() && IsVeryLarge(dex_files)) {
       // Disable app image to make sure dex2oat unloading is enabled.
@@ -1600,6 +1602,14 @@ class Dex2Oat final {
       }
     }
     // Note that dex2oat won't close the swap_fd_. The compiler driver's swap space will do that.
+    if (IsBootImage()) {
+      // For boot image, pass opened dex files to the Runtime::Create().
+      // Note: Runtime acquires ownership of these dex files.
+      runtime_options.Set(RuntimeArgumentMap::BootClassPathDexList, &opened_dex_files_);
+      if (!CreateRuntime(std::move(runtime_options))) {
+        return dex2oat::ReturnCode::kOther;
+      }
+    }
 
     // If we're doing the image, override the compiler filter to force full compilation. Must be
     // done ahead of WellKnownClasses::Init that causes verification.  Note: doesn't force
@@ -1924,21 +1934,12 @@ class Dex2Oat final {
       }
     }
 
-    // Initialize the writers with the compiler driver, image writer and their dex files
-    // and start writing the .rodata sections.
-    {
-      TimingLogger::ScopedTiming t2("dex2oat Starting oat .rodata section(s)", timings_);
-      rodata_.reserve(oat_writers_.size());
-      for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
-        rodata_.push_back(elf_writers_[i]->StartRoData());
-        if (!oat_writers_[i]->StartRoData(driver_.get(),
-                                          image_writer_.get(),
-                                          dex_files_per_oat_file_[i],
-                                          rodata_.back(),
-                                          (i == 0u) ? key_value_store_.get() : nullptr)) {
-          return false;
-        }
-      }
+    // Initialize the writers with the compiler driver, image writer, and their
+    // dex files. The writers were created without those being there yet.
+    for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
+      std::unique_ptr<linker::OatWriter>& oat_writer = oat_writers_[i];
+      std::vector<const DexFile*>& dex_files = dex_files_per_oat_file_[i];
+      oat_writer->Initialize(driver_.get(), image_writer_.get(), dex_files);
     }
 
     {
@@ -2007,7 +2008,7 @@ class Dex2Oat final {
         debug::DebugInfo debug_info = oat_writer->GetDebugInfo();  // Keep the variable alive.
         elf_writer->PrepareDebugInfo(debug_info);  // Processes the data on background thread.
 
-        OutputStream* rodata = rodata_[i];
+        OutputStream*& rodata = rodata_[i];
         DCHECK(rodata != nullptr);
         if (!oat_writer->WriteRodata(rodata)) {
           LOG(ERROR) << "Failed to write .rodata section to the ELF file " << oat_file->GetPath();
