@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
+
+#ifndef ART_LIBNATIVELOADER_UTILS_H_
+#define ART_LIBNATIVELOADER_UTILS_H_
 
 namespace android::nativeloader {
 
@@ -24,3 +26,5 @@ namespace android::nativeloader {
 #endif
 
 }  // namespace android::nativeloader
+
+#endif  // ART_LIBNATIVELOADER_UTILS_H_
