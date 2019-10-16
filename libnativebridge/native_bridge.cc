@@ -276,7 +276,7 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
 
   // Create the path to the application code cache directory.
   // The memory will be release after Initialization or when the native bridge is closed.
-  const size_t len = strlen(app_data_dir_in) + strlen(kCodeCacheDir) + 2; // '\0' + '/'
+  const size_t len = strlen(app_data_dir_in) + strlen(kCodeCacheDir) + 2;  // '\0' + '/'
   app_code_cache_dir = new char[len];
   snprintf(app_code_cache_dir, len, "%s/%s", app_data_dir_in, kCodeCacheDir);
 
@@ -455,7 +455,7 @@ void UnloadNativeBridge() {
   // We expect only one place that calls UnloadNativeBridge: Runtime::DidForkFromZygote. At that
   // point we are not multi-threaded, so we do not need locking here.
 
-  switch(state) {
+  switch (state) {
     case NativeBridgeState::kOpened:
     case NativeBridgeState::kPreInitialized:
     case NativeBridgeState::kInitialized:

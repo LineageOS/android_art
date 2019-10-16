@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
+
+#ifndef ART_LIBNATIVELOADER_NATIVE_LOADER_NAMESPACE_H_
+#define ART_LIBNATIVELOADER_NATIVE_LOADER_NAMESPACE_H_
+
 #if defined(__ANDROID__)
 
 #include <string>
@@ -71,3 +74,5 @@ struct NativeLoaderNamespace {
 
 }  // namespace android
 #endif  // #if defined(__ANDROID__)
+
+#endif  // ART_LIBNATIVELOADER_NATIVE_LOADER_NAMESPACE_H_

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef NATIVE_BRIDGE_TEST_H_
-#define NATIVE_BRIDGE_TEST_H_
+#ifndef ART_LIBNATIVEBRIDGE_TESTS_NATIVEBRIDGETEST_H_
+#define ART_LIBNATIVEBRIDGE_TESTS_NATIVEBRIDGETEST_H_
 
 #define LOG_TAG "NativeBridge_test"
 
@@ -35,5 +35,5 @@ class NativeBridgeTest : public testing::Test {
 
 };  // namespace android
 
-#endif  // NATIVE_BRIDGE_H_
+#endif  // ART_LIBNATIVEBRIDGE_TESTS_NATIVEBRIDGETEST_H_
 
