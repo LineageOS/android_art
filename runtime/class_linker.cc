@@ -303,6 +303,7 @@ class ClassLinker::VisiblyInitializedCallback final
           vm->DeleteWeakGlobalRef(self, classes_[i]);
           if (klass != nullptr) {
             mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+            class_linker_->FixupStaticTrampolines(klass.Get());
           }
         }
         num_classes_ = 0u;
@@ -402,12 +403,14 @@ ClassLinker::VisiblyInitializedCallback* ClassLinker::MarkClassInitialized(
     // Thanks to the x86 memory model, we do not need any memory fences and
     // we can immediately mark the class as visibly initialized.
     mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+    FixupStaticTrampolines(klass.Get());
     return nullptr;
   }
   if (Runtime::Current()->IsActiveTransaction()) {
     // Transactions are single-threaded, so we can mark the class as visibly intialized.
     // (Otherwise we'd need to track the callback's entry in the transaction for rollback.)
     mirror::Class::SetStatus(klass, ClassStatus::kVisiblyInitialized, self);
+    FixupStaticTrampolines(klass.Get());
     return nullptr;
   }
   mirror::Class::SetStatus(klass, ClassStatus::kInitialized, self);
@@ -3697,9 +3700,12 @@ bool ClassLinker::ShouldUseInterpreterEntrypoint(ArtMethod* method, const void* 
 
 void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
   ScopedAssertNoThreadSuspension sants(__FUNCTION__);
-  DCHECK(klass->IsInitialized()) << klass->PrettyDescriptor();
+  DCHECK(klass->IsVisiblyInitialized()) << klass->PrettyDescriptor();
   if (klass->NumDirectMethods() == 0) {
     return;  // No direct methods => no static methods.
+  }
+  if (UNLIKELY(klass->IsProxyClass())) {
+    return;
   }
   Runtime* runtime = Runtime::Current();
   if (!runtime->IsStarted()) {
@@ -3735,7 +3741,7 @@ void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
       quick_code = oat_method.GetQuickCode();
     }
     // Check if we have JIT compiled code for it.
-    jit::Jit* jit = Runtime::Current()->GetJit();
+    jit::Jit* jit = runtime->GetJit();
     if (quick_code == nullptr && jit != nullptr) {
       quick_code = jit->GetCodeCache()->GetSavedEntryPointOfPreCompiledMethod(method);
     }
@@ -5671,8 +5677,6 @@ bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,
         LOG(INFO) << "Initialized class " << klass->GetDescriptor(&temp) << " from " <<
             klass->GetLocation();
       }
-      // Opportunistically set static method trampolines to their destination.
-      FixupStaticTrampolines(klass.Get());
     }
   }
   if (callback != nullptr) {

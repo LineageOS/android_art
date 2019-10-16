@@ -432,12 +432,12 @@ inline void ArtMethod::CalculateAndSetImtIndex() {
 
 template <ReadBarrierOption kReadBarrierOption>
 bool ArtMethod::NeedsInitializationCheck() {
-  // Knowing if the class is visibly initialized is only for JIT/AOT compiled
-  // code to avoid the memory barrier. For callers of `NeedsInitializationCheck`
-  // it's enough to just check whether the class is initialized.
+  // The class needs to be visibly initialized before we can use entrypoints to
+  // compiled code for static methods. See b/18161648 . The class initializer is
+  // special as it is invoked during initialization and does not need the check.
   return IsStatic() &&
       !IsConstructor() &&
-      !GetDeclaringClass<kReadBarrierOption>()->IsInitialized();
+      !GetDeclaringClass<kReadBarrierOption>()->IsVisiblyInitialized();
 }
 
 }  // namespace art
