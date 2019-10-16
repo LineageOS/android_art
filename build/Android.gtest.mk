@@ -504,6 +504,7 @@ define define-art-gtest-rule-target
     $$(ART_GTEST_$(1)_TARGET_DEPS) \
     $(foreach file,$(ART_GTEST_$(1)_DEX_DEPS),$(ART_TEST_TARGET_GTEST_$(file)_DEX)) \
     $$(gtest_exe) \
+    $$($(3)TARGET_OUT_SHARED_LIBRARIES)/libicu_jni.so \
     $$($(3)TARGET_OUT_SHARED_LIBRARIES)/libjavacore.so \
     $$($(3)TARGET_OUT_SHARED_LIBRARIES)/libopenjdkd.so \
     $$(foreach jar,$$(TARGET_TEST_CORE_JARS),$$(TARGET_OUT_JAVA_LIBRARIES)/$$(jar).jar)
@@ -562,6 +563,7 @@ define define-art-gtest-rule-host
   gtest_exe := $(2)
   # Dependencies for all host gtests.
   gtest_deps := $$(HOST_CORE_DEX_LOCATIONS) \
+    $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libicu_jni$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libopenjdkd$$(ART_HOST_SHLIB_EXTENSION) \
     $$(gtest_exe) \

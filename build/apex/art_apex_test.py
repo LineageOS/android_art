@@ -539,6 +539,7 @@ class ReleaseTargetChecker:
     self._checker.check_native_library('libexpat')
     self._checker.check_native_library('libicui18n')
     self._checker.check_native_library('libicuuc')
+    self._checker.check_native_library('libicu_jni')
     self._checker.check_native_library('libpac')
     self._checker.check_native_library('libz')
 
@@ -569,6 +570,7 @@ class ReleaseHostChecker:
     self._checker.check_native_library('libexpat-host')
     self._checker.check_native_library('libicui18n-host')
     self._checker.check_native_library('libicuuc-host')
+    self._checker.check_native_library('libicu_jni')
     self._checker.check_native_library('libz-host')
 
 

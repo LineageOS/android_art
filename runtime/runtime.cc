@@ -1856,9 +1856,10 @@ void Runtime::InitNativeMethods() {
   // methods to be loaded first.
   WellKnownClasses::Init(env);
 
-  // Then set up libjavacore / libopenjdk, which are just a regular JNI libraries with
-  // a regular JNI_OnLoad. Most JNI libraries can just use System.loadLibrary, but
-  // libcore can't because it's the library that implements System.loadLibrary!
+  // Then set up libjavacore / libopenjdk / libicu_jni ,which are just
+  // a regular JNI libraries with a regular JNI_OnLoad. Most JNI libraries can
+  // just use System.loadLibrary, but libcore can't because it's the library
+  // that implements System.loadLibrary!
   {
     std::string error_msg;
     if (!java_vm_->LoadNativeLibrary(
@@ -1874,6 +1875,13 @@ void Runtime::InitNativeMethods() {
     if (!java_vm_->LoadNativeLibrary(
           env, kOpenJdkLibrary, nullptr, WellKnownClasses::java_lang_Object, &error_msg)) {
       LOG(FATAL) << "LoadNativeLibrary failed for \"" << kOpenJdkLibrary << "\": " << error_msg;
+    }
+  }
+  {
+    std::string error_msg;
+    if (!java_vm_->LoadNativeLibrary(
+          env, "libicu_jni.so", nullptr, WellKnownClasses::java_lang_Object, &error_msg)) {
+      LOG(FATAL) << "LoadNativeLibrary failed for \"libicu_jni.so\": " << error_msg;
     }
   }
 
