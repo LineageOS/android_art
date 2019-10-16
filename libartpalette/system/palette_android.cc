@@ -19,7 +19,6 @@
 #include "palette/palette.h"
 
 #include <errno.h>
-#include <linux/ashmem.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -29,6 +28,7 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/macros.h>
+#include <cutils/ashmem.h>
 #include <cutils/sched_policy.h>
 #include <cutils/trace.h>
 #include <log/event_tag_map.h>
@@ -173,7 +173,21 @@ enum PaletteStatus PaletteTraceIntegerValue(const char* name, int32_t value) {
   return PaletteStatus::kOkay;
 }
 
+// Flag whether to use legacy ashmem or current (b/139855428)
+static std::atomic_bool g_assume_legacy_ashmemd(false);
+
 enum PaletteStatus PaletteAshmemCreateRegion(const char* name, size_t size, int* fd) {
+  if (g_assume_legacy_ashmemd.load(std::memory_order_acquire) == false) {
+    // Current platform behaviour which open ashmem fd in process (b/139855428)
+    *fd = ashmem_create_region(name, size);
+    if (*fd >= 0) {
+      return PaletteStatus::kOkay;
+    }
+  }
+
+  // Try legacy behavior just required for ART build bots which may be running tests on older
+  // platform builds.
+
   // We implement our own ashmem creation, as the libcutils implementation does
   // a binder call, and our only use of ashmem in ART is for zygote, which
   // cannot communicate to binder.
@@ -194,6 +208,7 @@ enum PaletteStatus PaletteAshmemCreateRegion(const char* name, size_t size, int*
     }
   }
 
+  g_assume_legacy_ashmemd.store(true, std::memory_order_release);
   return PaletteStatus::kOkay;
 
 error:
@@ -205,7 +220,13 @@ error:
 }
 
 enum PaletteStatus PaletteAshmemSetProtRegion(int fd, int prot) {
-  if (TEMP_FAILURE_RETRY(ioctl(fd, ASHMEM_SET_PROT_MASK, prot)) < 0) {
+  if (!g_assume_legacy_ashmemd.load(std::memory_order_acquire)) {
+    if (ashmem_set_prot_region(fd, prot) < 0) {
+      return PaletteStatus::kCheckErrno;
+    }
+  } else if (TEMP_FAILURE_RETRY(ioctl(fd, ASHMEM_SET_PROT_MASK, prot)) < 0) {
+    // Legacy behavior just required for ART build bots which may be running tests on older
+    // platform builds.
     return PaletteStatus::kCheckErrno;
   }
   return PaletteStatus::kOkay;
