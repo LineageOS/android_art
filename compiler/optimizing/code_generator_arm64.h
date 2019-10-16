@@ -63,7 +63,7 @@ static const vixl::aarch64::Register kParameterCoreRegisters[] = {
   vixl::aarch64::x7
 };
 static constexpr size_t kParameterCoreRegistersLength = arraysize(kParameterCoreRegisters);
-static const vixl::aarch64::FPRegister kParameterFPRegisters[] = {
+static const vixl::aarch64::VRegister kParameterFPRegisters[] = {
   vixl::aarch64::d0,
   vixl::aarch64::d1,
   vixl::aarch64::d2,
@@ -111,7 +111,7 @@ const vixl::aarch64::CPURegList callee_saved_core_registers(
          ? vixl::aarch64::x21.GetCode()
          : vixl::aarch64::x20.GetCode()),
      vixl::aarch64::x30.GetCode());
-const vixl::aarch64::CPURegList callee_saved_fp_registers(vixl::aarch64::CPURegister::kFPRegister,
+const vixl::aarch64::CPURegList callee_saved_fp_registers(vixl::aarch64::CPURegister::kVRegister,
                                                           vixl::aarch64::kDRegSize,
                                                           vixl::aarch64::d8.GetCode(),
                                                           vixl::aarch64::d15.GetCode());
@@ -162,7 +162,7 @@ static const vixl::aarch64::Register kRuntimeParameterCoreRegisters[] =
       vixl::aarch64::x7 };
 static constexpr size_t kRuntimeParameterCoreRegistersLength =
     arraysize(kRuntimeParameterCoreRegisters);
-static const vixl::aarch64::FPRegister kRuntimeParameterFpuRegisters[] =
+static const vixl::aarch64::VRegister kRuntimeParameterFpuRegisters[] =
     { vixl::aarch64::d0,
       vixl::aarch64::d1,
       vixl::aarch64::d2,
@@ -175,7 +175,7 @@ static constexpr size_t kRuntimeParameterFpuRegistersLength =
     arraysize(kRuntimeParameterCoreRegisters);
 
 class InvokeRuntimeCallingConvention : public CallingConvention<vixl::aarch64::Register,
-                                                                vixl::aarch64::FPRegister> {
+                                                                vixl::aarch64::VRegister> {
  public:
   static constexpr size_t kParameterCoreRegistersLength = arraysize(kParameterCoreRegisters);
 
@@ -193,7 +193,7 @@ class InvokeRuntimeCallingConvention : public CallingConvention<vixl::aarch64::R
 };
 
 class InvokeDexCallingConvention : public CallingConvention<vixl::aarch64::Register,
-                                                            vixl::aarch64::FPRegister> {
+                                                            vixl::aarch64::VRegister> {
  public:
   InvokeDexCallingConvention()
       : CallingConvention(kParameterCoreRegisters,
@@ -480,7 +480,7 @@ class CodeGeneratorARM64 : public CodeGenerator {
   // requirements, etc.). This also facilitates our task as all other registers
   // can easily be mapped via to or from their type and index or code.
   static const int kNumberOfAllocatableRegisters = vixl::aarch64::kNumberOfRegisters - 1;
-  static const int kNumberOfAllocatableFPRegisters = vixl::aarch64::kNumberOfFPRegisters;
+  static const int kNumberOfAllocatableFPRegisters = vixl::aarch64::kNumberOfVRegisters;
   static constexpr int kNumberOfAllocatableRegisterPairs = 0;
 
   void DumpCoreRegister(std::ostream& stream, int reg) const override;
