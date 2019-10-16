@@ -658,8 +658,6 @@ bool OatWriter::MayHaveCompiledMethods() const {
 
 bool OatWriter::WriteAndOpenDexFiles(
     File* vdex_file,
-    OutputStream* oat_rodata,
-    SafeMap<std::string, std::string>* key_value_store,
     bool verify,
     bool update_input_vdex,
     CopyOption copy_dex_files,
@@ -667,23 +665,9 @@ bool OatWriter::WriteAndOpenDexFiles(
     /*out*/ std::vector<std::unique_ptr<const DexFile>>* opened_dex_files) {
   CHECK(write_state_ == WriteState::kAddingDexFileSources);
 
-  // Record the ELF rodata section offset, i.e. the beginning of the OAT data.
-  if (!RecordOatDataOffset(oat_rodata)) {
-     return false;
-  }
-
-  // Record whether this is the primary oat file.
-  primary_oat_file_ = (key_value_store != nullptr);
-
-  // Initialize VDEX and OAT headers.
-
   // Reserve space for Vdex header and checksums.
   vdex_size_ = sizeof(VdexFile::VerifierDepsHeader) +
       oat_dex_files_.size() * sizeof(VdexFile::VdexChecksum);
-  oat_size_ = InitOatHeader(dchecked_integral_cast<uint32_t>(oat_dex_files_.size()),
-                            key_value_store);
-
-  ChecksumUpdatingOutputStream checksum_updating_rodata(oat_rodata, this);
 
   std::unique_ptr<BufferedOutputStream> vdex_out =
       std::make_unique<BufferedOutputStream>(std::make_unique<FileOutputStream>(vdex_file));
@@ -695,6 +679,37 @@ bool OatWriter::WriteAndOpenDexFiles(
     return false;
   }
 
+  *opened_dex_files_map = std::move(dex_files_map);
+  *opened_dex_files = std::move(dex_files);
+  write_state_ = WriteState::kStartRoData;
+  return true;
+}
+
+// Initialize the writer with the given parameters.
+bool OatWriter::StartRoData(const CompilerDriver* compiler_driver,
+                            ImageWriter* image_writer,
+                            const std::vector<const DexFile*>& dex_files,
+                            OutputStream* oat_rodata,
+                            SafeMap<std::string, std::string>* key_value_store) {
+  CHECK(write_state_ == WriteState::kStartRoData);
+  compiler_driver_ = compiler_driver;
+  image_writer_ = image_writer;
+  dex_files_ = &dex_files;
+
+  // Record the ELF rodata section offset, i.e. the beginning of the OAT data.
+  if (!RecordOatDataOffset(oat_rodata)) {
+     return false;
+  }
+
+  // Record whether this is the primary oat file.
+  primary_oat_file_ = (key_value_store != nullptr);
+
+  // Initialize OAT header.
+  oat_size_ = InitOatHeader(dchecked_integral_cast<uint32_t>(oat_dex_files_.size()),
+                            key_value_store);
+
+  ChecksumUpdatingOutputStream checksum_updating_rodata(oat_rodata, this);
+
   // Write type lookup tables into the oat file.
   if (!WriteTypeLookupTables(&checksum_updating_rodata, dex_files)) {
     return false;
@@ -705,19 +720,8 @@ bool OatWriter::WriteAndOpenDexFiles(
     return false;
   }
 
-  *opened_dex_files_map = std::move(dex_files_map);
-  *opened_dex_files = std::move(dex_files);
   write_state_ = WriteState::kPrepareLayout;
   return true;
-}
-
-// Initialize the writer with the given parameters.
-void OatWriter::Initialize(const CompilerDriver* compiler_driver,
-                           ImageWriter* image_writer,
-                           const std::vector<const DexFile*>& dex_files) {
-  compiler_driver_ = compiler_driver;
-  image_writer_ = image_writer;
-  dex_files_ = &dex_files;
 }
 
 void OatWriter::PrepareLayout(MultiOatRelativePatcher* relative_patcher) {
@@ -3768,9 +3772,8 @@ bool OatWriter::OpenDexFiles(
   return true;
 }
 
-bool OatWriter::WriteTypeLookupTables(
-    OutputStream* oat_rodata,
-    const std::vector<std::unique_ptr<const DexFile>>& opened_dex_files) {
+bool OatWriter::WriteTypeLookupTables(OutputStream* oat_rodata,
+                                      const std::vector<const DexFile*>& opened_dex_files) {
   TimingLogger::ScopedTiming split("WriteTypeLookupTables", timings_);
 
   uint32_t expected_offset = oat_data_offset_ + oat_size_;
@@ -3852,11 +3855,11 @@ bool OatWriter::WriteTypeLookupTables(
 
 bool OatWriter::WriteDexLayoutSections(
     OutputStream* oat_rodata,
-    const std::vector<std::unique_ptr<const DexFile>>& opened_dex_files) {
+    const std::vector<const DexFile*>& opened_dex_files) {
   TimingLogger::ScopedTiming split(__FUNCTION__, timings_);
 
   if (!kWriteDexLayoutInfo) {
-    return true;;
+    return true;
   }
 
   uint32_t expected_offset = oat_data_offset_ + oat_size_;
