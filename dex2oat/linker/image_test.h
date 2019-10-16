@@ -257,8 +257,6 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
         std::vector<std::unique_ptr<const DexFile>> cur_opened_dex_files;
         bool dex_files_ok = oat_writers[i]->WriteAndOpenDexFiles(
             out_helper.vdex_files[i].GetFile(),
-            rodata.back(),
-            (i == 0u) ? &key_value_store : nullptr,
             /* verify */ false,           // Dex files may be dex-to-dex-ed, don't verify.
             /* update_input_vdex */ false,
             /* copy_dex_files */ CopyOption::kOnlyIfCompressed,
@@ -289,7 +287,12 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
         OatWriter* const oat_writer = oat_writers[i].get();
         ElfWriter* const elf_writer = elf_writers[i].get();
         std::vector<const DexFile*> cur_dex_files(1u, class_path[i]);
-        oat_writer->Initialize(driver, writer.get(), cur_dex_files);
+        bool initialize_ok = oat_writer->StartRoData(driver,
+                                                     writer.get(),
+                                                     cur_dex_files,
+                                                     rodata[i],
+                                                     (i == 0u) ? &key_value_store : nullptr);
+        ASSERT_TRUE(initialize_ok);
 
         std::unique_ptr<BufferedOutputStream> vdex_out =
             std::make_unique<BufferedOutputStream>(
