@@ -2464,6 +2464,8 @@ Thread::~Thread() {
 
   if (kUseReadBarrier) {
     CHECK(tlsPtr_.thread_local_mark_stack == nullptr);
+    Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()
+        ->AssertNoThreadMarkStackMapping(this);
   }
   // Make sure we processed all deoptimization requests.
   CHECK(tlsPtr_.deoptimization_context_stack == nullptr) << "Missed deoptimization";
