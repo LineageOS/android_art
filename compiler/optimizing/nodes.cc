@@ -1594,7 +1594,7 @@ HConstant* HTypeConversion::TryStaticEvaluation() const {
       case DataType::Type::kInt32:
         if (std::isnan(value))
           return graph->GetIntConstant(0, GetDexPc());
-        if (value >= kPrimIntMax)
+        if (value >= static_cast<float>(kPrimIntMax))
           return graph->GetIntConstant(kPrimIntMax, GetDexPc());
         if (value <= kPrimIntMin)
           return graph->GetIntConstant(kPrimIntMin, GetDexPc());
@@ -1602,7 +1602,7 @@ HConstant* HTypeConversion::TryStaticEvaluation() const {
       case DataType::Type::kInt64:
         if (std::isnan(value))
           return graph->GetLongConstant(0, GetDexPc());
-        if (value >= kPrimLongMax)
+        if (value >= static_cast<float>(kPrimLongMax))
           return graph->GetLongConstant(kPrimLongMax, GetDexPc());
         if (value <= kPrimLongMin)
           return graph->GetLongConstant(kPrimLongMin, GetDexPc());
@@ -1626,7 +1626,7 @@ HConstant* HTypeConversion::TryStaticEvaluation() const {
       case DataType::Type::kInt64:
         if (std::isnan(value))
           return graph->GetLongConstant(0, GetDexPc());
-        if (value >= kPrimLongMax)
+        if (value >= static_cast<double>(kPrimLongMax))
           return graph->GetLongConstant(kPrimLongMax, GetDexPc());
         if (value <= kPrimLongMin)
           return graph->GetLongConstant(kPrimLongMin, GetDexPc());
