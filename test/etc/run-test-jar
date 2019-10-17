@@ -62,7 +62,7 @@ QUIET="n"
 RELOCATE="n"
 STRIP_DEX="n"
 SECONDARY_DEX=""
-TIME_OUT="timeout"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
+TIME_OUT="n"  # "n" (disabled), "timeout" (use timeout), "gdb" (use gdb)
 TIMEOUT_DUMPER=signal_dumper
 # Values in seconds.
 TIME_OUT_EXTRA=0

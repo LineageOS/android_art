@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef NATIVE_BRIDGE_H_
-#define NATIVE_BRIDGE_H_
+#ifndef ART_LIBNATIVEBRIDGE_INCLUDE_NATIVEBRIDGE_NATIVE_BRIDGE_H_
+#define ART_LIBNATIVEBRIDGE_INCLUDE_NATIVEBRIDGE_NATIVE_BRIDGE_H_
 
 #include <signal.h>
 #include <stdbool.h>
@@ -415,4 +415,4 @@ struct NativeBridgeRuntimeCallbacks {
 }  // namespace android
 #endif  // __cplusplus
 
-#endif  // NATIVE_BRIDGE_H_
+#endif  // ART_LIBNATIVEBRIDGE_INCLUDE_NATIVEBRIDGE_NATIVE_BRIDGE_H_

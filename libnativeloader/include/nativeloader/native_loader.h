@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef NATIVE_LOADER_H_
-#define NATIVE_LOADER_H_
+#ifndef ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_NATIVE_LOADER_H_
+#define ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_NATIVE_LOADER_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -75,4 +75,4 @@ void ResetNativeLoader();
 }  // namespace android
 #endif  // __cplusplus
 
-#endif  // NATIVE_BRIDGE_H_
+#endif  // ART_LIBNATIVELOADER_INCLUDE_NATIVELOADER_NATIVE_LOADER_H_
