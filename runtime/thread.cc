@@ -2462,6 +2462,9 @@ Thread::~Thread() {
   CHECK(tlsPtr_.flip_function == nullptr);
   CHECK_EQ(tls32_.is_transitioning_to_runnable, false);
 
+  if (kUseReadBarrier) {
+    CHECK(tlsPtr_.thread_local_mark_stack == nullptr);
+  }
   // Make sure we processed all deoptimization requests.
   CHECK(tlsPtr_.deoptimization_context_stack == nullptr) << "Missed deoptimization";
   CHECK(tlsPtr_.frame_id_to_shadow_frame == nullptr) <<
