@@ -597,6 +597,16 @@ def run_test(command, test, test_variant, test_name):
     test_time = datetime.timedelta(seconds=test_time_seconds)
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
+    # HACK(b/142039427): Print extra backtraces on timeout.
+    if "-target-" in test_name:
+      for i in range(8):
+        proc_name = "dalvikvm" + test_name[-2:]
+        pidof = subprocess.run(["adb", "shell", "pidof", proc_name], stdout=subprocess.PIPE)
+        for pid in pidof.stdout.decode("ascii").split():
+          print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
+          subprocess.run(["adb", "shell", "debuggerd", pid])
+        time.sleep(60)
+
     # The python documentation states that it is necessary to actually kill the process.
     os.killpg(proc.pid, signal.SIGKILL)
     script_output = proc.communicate()
