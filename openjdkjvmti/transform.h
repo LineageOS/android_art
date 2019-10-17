@@ -56,7 +56,7 @@ class Transformer {
       art::Thread* self,
       /*in-out*/ArtClassDefinition* def);
 
-  static jvmtiError RetransformClassesDirect(
+  static void RetransformClassesDirect(
       art::Thread* self,
       /*in-out*/std::vector<ArtClassDefinition>* definitions);
 
