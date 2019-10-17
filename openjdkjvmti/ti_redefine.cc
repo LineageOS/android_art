@@ -611,14 +611,8 @@ jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
     def_vector.push_back(std::move(def));
   }
   // Call all the transformation events.
-  jvmtiError res = Transformer::RetransformClassesDirect(self,
-                                                         &def_vector);
-  if (res != OK) {
-    // Something went wrong with transformation!
-    JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE unable to retransform classes";
-    return res;
-  }
-  res = RedefineClassesDirect(
+  Transformer::RetransformClassesDirect(self, &def_vector);
+  jvmtiError res = RedefineClassesDirect(
       env, runtime, self, def_vector, RedefinitionType::kNormal, &error_msg);
   if (res != OK) {
     JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
