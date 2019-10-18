@@ -31,6 +31,7 @@
 #include "debugger.h"
 #include "dex/type_lookup_table.h"
 #include "gc/space/image_space.h"
+#include "entrypoints/entrypoint_utils-inl.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
 #include "image-inl.h"
 #include "interpreter/interpreter.h"
@@ -1249,7 +1250,8 @@ bool Jit::MaybeCompileMethod(Thread* self,
     return false;
   }
   if (UNLIKELY(method->IsPreCompiled()) && !with_backedges /* don't check for OSR */) {
-    if (!method->NeedsInitializationCheck()) {
+    if (!NeedsClinitCheckBeforeCall(method) ||
+        method->GetDeclaringClass()->IsVisiblyInitialized()) {
       const void* entry_point = code_cache_->GetSavedEntryPointOfPreCompiledMethod(method);
       if (entry_point != nullptr) {
         Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(method, entry_point);
