@@ -20,6 +20,7 @@
 #include <android-base/stringprintf.h>
 
 #include "art_method-inl.h"
+#include "base/enums.h"
 #include "base/systrace.h"
 #include "base/utils.h"
 #include "class_linker.h"
@@ -28,11 +29,13 @@
 #include "dex/class_reference.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
+#include "handle.h"
 #include "handle_scope-inl.h"
 #include "method_verifier-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/dex_cache.h"
 #include "runtime.h"
+#include "thread.h"
 
 namespace art {
 namespace verifier {
@@ -42,6 +45,30 @@ using android::base::StringPrintf;
 // We print a warning blurb about "dx --no-optimize" when we find monitor-locking issues. Make
 // sure we only print this once.
 static bool gPrintedDxMonitorText = false;
+
+FailureKind ClassVerifier::ReverifyClass(Thread* self,
+                                         ObjPtr<mirror::Class> klass,
+                                         HardFailLogMode log_level,
+                                         uint32_t api_level,
+                                         std::string* error) {
+  DCHECK(!Runtime::Current()->IsAotCompiler());
+  StackHandleScope<1> hs(self);
+  Handle<mirror::Class> h_klass(hs.NewHandle(klass));
+  ScopedAssertNoThreadSuspension sants(__FUNCTION__);
+  FailureKind res = CommonVerifyClass(self,
+                                      h_klass.Get(),
+                                      /*callbacks=*/nullptr,
+                                      /*allow_soft_failures=*/false,
+                                      log_level,
+                                      api_level,
+                                      /*can_allocate=*/ false,
+                                      error);
+  if (res == FailureKind::kSoftFailure) {
+    // We cannot skip access checks since there was a soft failure.
+    h_klass->ClearSkipAccessChecksFlagOnAllMethods(kRuntimePointerSize);
+  }
+  return res;
+}
 
 FailureKind ClassVerifier::VerifyClass(Thread* self,
                                        ObjPtr<mirror::Class> klass,
@@ -53,6 +80,23 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
   if (klass->IsVerified()) {
     return FailureKind::kNoFailure;
   }
+  return CommonVerifyClass(self,
+                           klass,
+                           callbacks,
+                           allow_soft_failures,
+                           log_level,
+                           api_level,
+                           /*can_allocate=*/ true,
+                           error);
+}
+FailureKind ClassVerifier::CommonVerifyClass(Thread* self,
+                                             ObjPtr<mirror::Class> klass,
+                                             CompilerCallbacks* callbacks,
+                                             bool allow_soft_failures,
+                                             HardFailLogMode log_level,
+                                             uint32_t api_level,
+                                             bool can_allocate,
+                                             std::string* error) {
   bool early_failure = false;
   std::string failure_message;
   const DexFile& dex_file = klass->GetDexFile();
@@ -89,6 +133,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                      allow_soft_failures,
                      log_level,
                      api_level,
+                     can_allocate,
                      error);
 }
 
@@ -101,6 +146,30 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                                        bool allow_soft_failures,
                                        HardFailLogMode log_level,
                                        uint32_t api_level,
+                                       std::string* error) {
+  return VerifyClass(self,
+                     dex_file,
+                     dex_cache,
+                     class_loader,
+                     class_def,
+                     callbacks,
+                     allow_soft_failures,
+                     log_level,
+                     api_level,
+                     /*can_allocate=*/!Runtime::Current()->IsAotCompiler(),
+                     error);
+}
+
+FailureKind ClassVerifier::VerifyClass(Thread* self,
+                                       const DexFile* dex_file,
+                                       Handle<mirror::DexCache> dex_cache,
+                                       Handle<mirror::ClassLoader> class_loader,
+                                       const dex::ClassDef& class_def,
+                                       CompilerCallbacks* callbacks,
+                                       bool allow_soft_failures,
+                                       HardFailLogMode log_level,
+                                       uint32_t api_level,
+                                       bool can_allocate,
                                        std::string* error) {
   // A class must not be abstract and final.
   if ((class_def.access_flags_ & (kAccAbstract | kAccFinal)) == (kAccAbstract | kAccFinal)) {
@@ -156,6 +225,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                                      /*need_precise_constants=*/ false,
                                      api_level,
                                      Runtime::Current()->IsAotCompiler(),
+                                     can_allocate,
                                      &hard_failure_msg);
     if (result.kind == FailureKind::kHardFailure) {
       if (failure_data.kind == FailureKind::kHardFailure) {

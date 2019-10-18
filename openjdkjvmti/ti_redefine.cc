@@ -1496,7 +1496,14 @@ bool Redefiner::ClassRedefinition::CheckVerification(const RedefinitionDataIter&
                                                 &error);
   switch (failure) {
     case art::verifier::FailureKind::kNoFailure:
+      // TODO It is possible that by doing redefinition previous NO_COMPILE verification failures
+      // were fixed. It would be nice to reflect this in the new implementations.
+      return true;
     case art::verifier::FailureKind::kSoftFailure:
+      // Soft failures might require interpreter on some methods. It won't prevent redefinition but
+      // it does mean we need to run the verifier again and potentially update method flags after
+      // performing the swap.
+      needs_reverify_ = true;
       return true;
     case art::verifier::FailureKind::kHardFailure: {
       RecordFailure(ERR(FAILS_VERIFICATION), "Failed to verify class. Error was: " + error);
@@ -1881,7 +1888,35 @@ jvmtiError Redefiner::Run() {
   // TODO Do the dex_file release at a more reasonable place. This works but it muddles who really
   // owns the DexFile and when ownership is transferred.
   ReleaseAllDexFiles();
+  // By now the class-linker knows about all the classes so we can safetly retry verification and
+  // update method flags.
+  ReverifyClasses(holder);
   return OK;
+}
+
+void Redefiner::ReverifyClasses(RedefinitionDataHolder& holder) {
+  art::ScopedAssertNoThreadSuspension nts("Updating method flags");
+  for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
+    data.GetRedefinition().ReverifyClass(data);
+  }
+}
+
+void Redefiner::ClassRedefinition::ReverifyClass(const RedefinitionDataIter &cur_data) {
+  if (!needs_reverify_) {
+    return;
+  }
+  VLOG(plugin) << "Reverifying " << class_sig_ << " due to soft failures";
+  std::string error;
+  // TODO Make verification log level lower
+  art::verifier::FailureKind failure =
+      art::verifier::ClassVerifier::ReverifyClass(driver_->self_,
+                                                  cur_data.GetMirrorClass(),
+                                                  /*log_level=*/
+                                                  art::verifier::HardFailLogMode::kLogWarning,
+                                                  /*api_level=*/
+                                                  art::Runtime::Current()->GetTargetSdkVersion(),
+                                                  &error);
+  CHECK_NE(failure, art::verifier::FailureKind::kHardFailure);
 }
 
 void Redefiner::ClassRedefinition::UpdateMethods(art::ObjPtr<art::mirror::Class> mclass,
