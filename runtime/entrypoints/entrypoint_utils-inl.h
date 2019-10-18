@@ -771,6 +771,13 @@ inline INT_TYPE art_float_to_integral(FLOAT_TYPE f) {
   }
 }
 
+inline bool NeedsClinitCheckBeforeCall(ArtMethod* method) {
+  // The class needs to be visibly initialized before we can use entrypoints to
+  // compiled code for static methods. See b/18161648 . The class initializer is
+  // special as it is invoked during initialization and does not need the check.
+  return method->IsStatic() && !method->IsConstructor();
+}
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_ENTRYPOINTS_ENTRYPOINT_UTILS_INL_H_
