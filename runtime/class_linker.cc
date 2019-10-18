@@ -69,7 +69,7 @@
 #include "dex/dex_file_loader.h"
 #include "dex/signature-inl.h"
 #include "dex/utf.h"
-#include "entrypoints/entrypoint_utils.h"
+#include "entrypoints/entrypoint_utils-inl.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
 #include "experimental_flags.h"
 #include "gc/accounting/card_table-inl.h"
@@ -3804,9 +3804,10 @@ static void LinkCode(ClassLinker* class_linker,
         method->IsNative() ? GetQuickGenericJniStub() : GetQuickToInterpreterBridge());
   } else if (enter_interpreter) {
     method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
-  } else if (method->NeedsInitializationCheck()) {
-    // If there is compiled code, and the method needs to make sure the class is
-    // initialized before execution, install the resolution stub.
+  } else if (NeedsClinitCheckBeforeCall(method)) {
+    DCHECK(!method->GetDeclaringClass()->IsVisiblyInitialized());  // Actually ClassStatus::Idx.
+    // If we do have code but the method needs a class initialization check before calling
+    // that code, install the resolution stub that will perform the check.
     // It will be replaced by the proper entry point by ClassLinker::FixupStaticTrampolines
     // after initializing class (see ClassLinker::InitializeClass method).
     method->SetEntryPointFromQuickCompiledCode(GetQuickResolutionStub());
