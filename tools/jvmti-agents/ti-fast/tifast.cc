@@ -70,40 +70,37 @@ static void AddCapsForEvent(jvmtiEvent event, jvmtiCapabilities* caps) {
   }
 }
 
-// Setup for all supported events. Give a macro with fun(name, event_num, args)
-#define FOR_ALL_SUPPORTED_JNI_EVENTS(fun) \
-    fun(SingleStep, EVENT(SINGLE_STEP), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jlocation loc), (jvmti, jni, jthreadContainer{.thread = thread}, meth, loc)) \
-    fun(MethodEntry, EVENT(METHOD_ENTRY), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth), (jvmti, jni, jthreadContainer{.thread = thread}, meth)) \
-    fun(MethodExit, EVENT(METHOD_EXIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jboolean jb, jvalue jv), (jvmti, jni, jthreadContainer{.thread = thread}, meth, jb, jv)) \
-    fun(NativeMethodBind, EVENT(NATIVE_METHOD_BIND), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, void* v1, void** v2), (jvmti, jni, jthreadContainer{.thread = thread}, meth, v1, v2)) \
-    fun(Exception, EVENT(EXCEPTION), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth1, jlocation loc1, jobject obj, jmethodID meth2, jlocation loc2), (jvmti, jni, jthreadContainer{.thread = thread}, meth1, loc1, obj, meth2, loc2)) \
-    fun(ExceptionCatch, EVENT(EXCEPTION_CATCH), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jlocation loc, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, meth, loc, obj)) \
-    fun(ThreadStart, EVENT(THREAD_START), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
-    fun(ThreadEnd, EVENT(THREAD_END), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
-    fun(ClassLoad, EVENT(CLASS_LOAD), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jclass klass), (jvmti, jni, jthreadContainer{.thread = thread}, klass) ) \
-    fun(ClassPrepare, EVENT(CLASS_PREPARE), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jclass klass), (jvmti, jni, jthreadContainer{.thread = thread}, klass)) \
-    fun(ClassFileLoadHook, EVENT(CLASS_FILE_LOAD_HOOK), (jvmtiEnv* jvmti, JNIEnv* jni, jclass klass, jobject obj1, const char* c1, jobject obj2, jint i1, const unsigned char* c2, jint* ip1, unsigned char** cp1), (jvmti, jni, klass, obj1, c1, obj2, i1, c2, ip1, cp1)) \
-    fun(MonitorContendedEnter, EVENT(MONITOR_CONTENDED_ENTER), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, obj)) \
-    fun(MonitorContendedEntered, EVENT(MONITOR_CONTENDED_ENTERED), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, obj)) \
-    fun(MonitorWait, EVENT(MONITOR_WAIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jlong l1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, jlongContainer{.val = l1})) \
-    fun(MonitorWaited, EVENT(MONITOR_WAITED), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jboolean b1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, b1)) \
-    fun(ResourceExhausted, EVENT(RESOURCE_EXHAUSTED), (jvmtiEnv* jvmti, JNIEnv* jni, jint i1, const void* cv, const char* cc), (jvmti, jni, i1, cv, cc)) \
-    fun(VMObjectAlloc, EVENT(VM_OBJECT_ALLOC), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jclass klass, jlong l1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, klass, jlongContainer{.val = l1})) \
-    fun(VMInit, EVENT(VM_INIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
-    fun(VMStart, EVENT(VM_START), (jvmtiEnv* jvmti, JNIEnv* jni), (jvmti, jni)) \
-    fun(VMDeath, EVENT(VM_DEATH), (jvmtiEnv* jvmti, JNIEnv* jni), (jvmti, jni)) \
-
-#define FOR_ALL_SUPPORTED_NO_JNI_EVENTS(fun) \
-    fun(CompiledMethodLoad, EVENT(COMPILED_METHOD_LOAD), (jvmtiEnv* jvmti, jmethodID meth, jint i1, const void* cv1, jint i2, const jvmtiAddrLocationMap* alm, const void* cv2), (jvmti, meth, i1, cv1, i2, alm, cv2)) \
-    fun(CompiledMethodUnload, EVENT(COMPILED_METHOD_UNLOAD), (jvmtiEnv* jvmti, jmethodID meth, const void* cv1), (jvmti, meth, cv1)) \
-    fun(DynamicCodeGenerated, EVENT(DYNAMIC_CODE_GENERATED), (jvmtiEnv* jvmti, const char* cc, const void* cv, jint i1), (jvmti, cc, cv, i1)) \
-    fun(DataDumpRequest, EVENT(DATA_DUMP_REQUEST), (jvmtiEnv* jvmti), (jvmti)) \
-    fun(GarbageCollectionStart, EVENT(GARBAGE_COLLECTION_START), (jvmtiEnv* jvmti), (jvmti)) \
-    fun(GarbageCollectionFinish, EVENT(GARBAGE_COLLECTION_FINISH), (jvmtiEnv* jvmti), (jvmti))
+// Setup for all supported events. Give a macro with {non_}jni_fun(name, event_num, args)
+#define FOR_ALL_SUPPORTED_EVENTS_DIFFERENT(jni_fun, non_jni_fun)          \
+    jni_fun(VMInit, EVENT(VM_INIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
+    jni_fun(VMDeath, EVENT(VM_DEATH), (jvmtiEnv* jvmti, JNIEnv* jni), (jvmti, jni)) \
+    jni_fun(ThreadStart, EVENT(THREAD_START), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
+    jni_fun(ThreadEnd, EVENT(THREAD_END), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread), (jvmti, jni, jthreadContainer{.thread = thread})) \
+    jni_fun(ClassFileLoadHook, EVENT(CLASS_FILE_LOAD_HOOK), (jvmtiEnv* jvmti, JNIEnv* jni, jclass klass, jobject obj1, const char* c1, jobject obj2, jint i1, const unsigned char* c2, jint* ip1, unsigned char** cp1), (jvmti, jni, klass, obj1, c1, obj2, i1, c2, ip1, cp1)) \
+    jni_fun(ClassLoad, EVENT(CLASS_LOAD), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jclass klass), (jvmti, jni, jthreadContainer{.thread = thread}, klass) ) \
+    jni_fun(ClassPrepare, EVENT(CLASS_PREPARE), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jclass klass), (jvmti, jni, jthreadContainer{.thread = thread}, klass)) \
+    jni_fun(VMStart, EVENT(VM_START), (jvmtiEnv* jvmti, JNIEnv* jni), (jvmti, jni)) \
+    jni_fun(Exception, EVENT(EXCEPTION), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth1, jlocation loc1, jobject obj, jmethodID meth2, jlocation loc2), (jvmti, jni, jthreadContainer{.thread = thread}, meth1, loc1, obj, meth2, loc2)) \
+    jni_fun(ExceptionCatch, EVENT(EXCEPTION_CATCH), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jlocation loc, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, meth, loc, obj)) \
+    jni_fun(SingleStep, EVENT(SINGLE_STEP), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jlocation loc), (jvmti, jni, jthreadContainer{.thread = thread}, meth, loc)) \
+    jni_fun(MethodEntry, EVENT(METHOD_ENTRY), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth), (jvmti, jni, jthreadContainer{.thread = thread}, meth)) \
+    jni_fun(MethodExit, EVENT(METHOD_EXIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, jboolean jb, jvalue jv), (jvmti, jni, jthreadContainer{.thread = thread}, meth, jb, jv)) \
+    jni_fun(NativeMethodBind, EVENT(NATIVE_METHOD_BIND), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jmethodID meth, void* v1, void** v2), (jvmti, jni, jthreadContainer{.thread = thread}, meth, v1, v2)) \
+    non_jni_fun(CompiledMethodLoad, EVENT(COMPILED_METHOD_LOAD), (jvmtiEnv* jvmti, jmethodID meth, jint i1, const void* cv1, jint i2, const jvmtiAddrLocationMap* alm, const void* cv2), (jvmti, meth, i1, cv1, i2, alm, cv2)) \
+    non_jni_fun(CompiledMethodUnload, EVENT(COMPILED_METHOD_UNLOAD), (jvmtiEnv* jvmti, jmethodID meth, const void* cv1), (jvmti, meth, cv1)) \
+    non_jni_fun(DynamicCodeGenerated, EVENT(DYNAMIC_CODE_GENERATED), (jvmtiEnv* jvmti, const char* cc, const void* cv, jint i1), (jvmti, cc, cv, i1)) \
+    non_jni_fun(DataDumpRequest, EVENT(DATA_DUMP_REQUEST), (jvmtiEnv* jvmti), (jvmti)) \
+    jni_fun(MonitorWait, EVENT(MONITOR_WAIT), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jlong l1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, jlongContainer{.val = l1})) \
+    jni_fun(MonitorWaited, EVENT(MONITOR_WAITED), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jboolean b1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, b1)) \
+    jni_fun(MonitorContendedEnter, EVENT(MONITOR_CONTENDED_ENTER), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, obj)) \
+    jni_fun(MonitorContendedEntered, EVENT(MONITOR_CONTENDED_ENTERED), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj), (jvmti, jni, jthreadContainer{.thread = thread}, obj)) \
+    jni_fun(ResourceExhausted, EVENT(RESOURCE_EXHAUSTED), (jvmtiEnv* jvmti, JNIEnv* jni, jint i1, const void* cv, const char* cc), (jvmti, jni, i1, cv, cc)) \
+    non_jni_fun(GarbageCollectionStart, EVENT(GARBAGE_COLLECTION_START), (jvmtiEnv* jvmti), (jvmti)) \
+    non_jni_fun(GarbageCollectionFinish, EVENT(GARBAGE_COLLECTION_FINISH), (jvmtiEnv* jvmti), (jvmti)) \
+    jni_fun(VMObjectAlloc, EVENT(VM_OBJECT_ALLOC), (jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jobject obj, jclass klass, jlong l1), (jvmti, jni, jthreadContainer{.thread = thread}, obj, klass, jlongContainer{.val = l1})) \
 
 #define FOR_ALL_SUPPORTED_EVENTS(fun) \
-    FOR_ALL_SUPPORTED_JNI_EVENTS(fun) \
-    FOR_ALL_SUPPORTED_NO_JNI_EVENTS(fun)
+    FOR_ALL_SUPPORTED_EVENTS_DIFFERENT(fun, fun)
 
 static const jvmtiEvent kAllEvents[] = {
 #define GET_EVENT(a, event, b, c) event,
@@ -582,8 +579,7 @@ void LogPrinter::PrintRest(jvmtiEnv* jvmti, JNIEnv* jni, jmethodID meth, Args...
       LOG(INFO) << "Got event " << #name << "(" << printer.GetResult() << ")"; \
     } \
 
-FOR_ALL_SUPPORTED_JNI_EVENTS(GENERATE_LOG_FUNCTION_JNI)
-FOR_ALL_SUPPORTED_NO_JNI_EVENTS(GENERATE_LOG_FUNCTION_NO_JNI)
+FOR_ALL_SUPPORTED_EVENTS_DIFFERENT(GENERATE_LOG_FUNCTION_JNI, GENERATE_LOG_FUNCTION_NO_JNI)
 #undef GENERATE_LOG_FUNCTION
 
 static jvmtiEventCallbacks kLogCallbacks {
@@ -614,9 +610,8 @@ static jvmtiEvent NameToEvent(const std::string& desired_name) {
 #undef CHECK_NAME
 }
 
-#undef FOR_ALL_SUPPORTED_JNI_EVENTS
-#undef FOR_ALL_SUPPORTED_NO_JNI_EVENTS
 #undef FOR_ALL_SUPPORTED_EVENTS
+#undef FOR_ALL_SUPPORTED_EVENTS_DIFFERENT
 
 static std::vector<jvmtiEvent> GetAllAvailableEvents(jvmtiEnv* jvmti) {
   std::vector<jvmtiEvent> out;
