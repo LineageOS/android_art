@@ -605,6 +605,13 @@ def run_test(command, test, test_variant, test_name):
         for pid in pidof.stdout.decode("ascii").split():
           print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
           subprocess.run(["adb", "shell", "debuggerd", pid])
+          task_dir = "/proc/%s/task" % pid
+          tids = subprocess.run(["adb", "shell", "ls", task_dir], stdout=subprocess.PIPE)
+          for tid in tids.stdout.decode("ascii").split():
+            for status in ["stat", "status"]:
+              filename = "%s/%s/%s" % (task_dir, tid, status)
+              print_text("Content of %s\n" % (filename))
+              subprocess.run(["adb", "shell", "cat", filename])
         time.sleep(60)
 
     # The python documentation states that it is necessary to actually kill the process.
