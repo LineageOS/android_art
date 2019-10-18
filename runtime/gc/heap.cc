@@ -4220,5 +4220,14 @@ void Heap::VisitReflectiveTargets(ReflectiveValueVisitor *visit) {
   });
 }
 
+bool Heap::AddHeapTask(gc::HeapTask* task) {
+  Thread* const self = Thread::Current();
+  if (!CanAddHeapTask(self)) {
+    return false;
+  }
+  GetTaskProcessor()->AddTask(self, task);
+  return true;
+}
+
 }  // namespace gc
 }  // namespace art

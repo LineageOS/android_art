@@ -84,6 +84,7 @@
 #include "gc/space/image_space.h"
 #include "gc/space/space-inl.h"
 #include "gc/system_weak.h"
+#include "gc/task_processor.h"
 #include "handle_scope-inl.h"
 #include "hidden_api.h"
 #include "hidden_api_jni.h"
@@ -2878,6 +2879,54 @@ void Runtime::ResetStartupCompleted() {
   startup_completed_.store(false, std::memory_order_seq_cst);
 }
 
+class Runtime::NotifyStartupCompletedTask : public gc::HeapTask {
+ public:
+  NotifyStartupCompletedTask() : gc::HeapTask(/*target_run_time=*/ NanoTime()) {}
+
+  void Run(Thread* self) override {
+    VLOG(startup) << "NotifyStartupCompletedTask running";
+    Runtime* const runtime = Runtime::Current();
+    {
+      ScopedTrace trace("Releasing app image spaces metadata");
+      ScopedObjectAccess soa(Thread::Current());
+      for (gc::space::ContinuousSpace* space : runtime->GetHeap()->GetContinuousSpaces()) {
+        if (space->IsImageSpace()) {
+          gc::space::ImageSpace* image_space = space->AsImageSpace();
+          if (image_space->GetImageHeader().IsAppImage()) {
+            image_space->DisablePreResolvedStrings();
+          }
+        }
+      }
+      // Request empty checkpoints to make sure no threads are accessing the image space metadata
+      // section when we madvise it. Use GC exclusion to prevent deadlocks that may happen if
+      // multiple threads are attempting to run empty checkpoints at the same time.
+      {
+        // Avoid using ScopedGCCriticalSection since that does not allow thread suspension. This is
+        // not allowed to prevent allocations, but it's still safe to suspend temporarily for the
+        // checkpoint.
+        gc::ScopedInterruptibleGCCriticalSection sigcs(self,
+                                                       gc::kGcCauseRunEmptyCheckpoint,
+                                                       gc::kCollectorTypeCriticalSection);
+        runtime->GetThreadList()->RunEmptyCheckpoint();
+      }
+      for (gc::space::ContinuousSpace* space : runtime->GetHeap()->GetContinuousSpaces()) {
+        if (space->IsImageSpace()) {
+          gc::space::ImageSpace* image_space = space->AsImageSpace();
+          if (image_space->GetImageHeader().IsAppImage()) {
+            image_space->ReleaseMetadata();
+          }
+        }
+      }
+    }
+
+    {
+      // Delete the thread pool used for app image loading since startup is assumed to be completed.
+      ScopedTrace trace2("Delete thread pool");
+      runtime->DeleteThreadPool();
+    }
+  }
+};
+
 void Runtime::NotifyStartupCompleted() {
   bool expected = false;
   if (!startup_completed_.compare_exchange_strong(expected, true, std::memory_order_seq_cst)) {
@@ -2885,62 +2934,16 @@ void Runtime::NotifyStartupCompleted() {
     // once externally. For this reason there are no asserts.
     return;
   }
-  VLOG(startup) << "Startup completed notified";
 
-  {
-    ScopedTrace trace("Releasing app image spaces metadata");
-    ScopedObjectAccess soa(Thread::Current());
-    for (gc::space::ContinuousSpace* space : GetHeap()->GetContinuousSpaces()) {
-      if (space->IsImageSpace()) {
-        gc::space::ImageSpace* image_space = space->AsImageSpace();
-        if (image_space->GetImageHeader().IsAppImage()) {
-          image_space->DisablePreResolvedStrings();
-        }
-      }
-    }
-    // Request empty checkpoint to make sure no threads are accessing the section when we madvise
-    // it. Avoid using RunEmptyCheckpoint since only one concurrent caller is supported. We could
-    // add a GC critical section here but that may cause significant jank if the GC is running.
-    {
-      class EmptyClosure : public Closure {
-       public:
-        explicit EmptyClosure(Barrier* barrier) : barrier_(barrier) {}
-        void Run(Thread* thread ATTRIBUTE_UNUSED) override {
-          barrier_->Pass(Thread::Current());
-        }
-
-       private:
-        Barrier* const barrier_;
-      };
-      Barrier barrier(0);
-      EmptyClosure closure(&barrier);
-      size_t threads_running_checkpoint = GetThreadList()->RunCheckpoint(&closure);
-      // Now that we have run our checkpoint, move to a suspended state and wait
-      // for other threads to run the checkpoint.
-      Thread* self = Thread::Current();
-      ScopedThreadSuspension sts(self, kSuspended);
-      if (threads_running_checkpoint != 0) {
-        barrier.Increment(self, threads_running_checkpoint);
-      }
-    }
-    for (gc::space::ContinuousSpace* space : GetHeap()->GetContinuousSpaces()) {
-      if (space->IsImageSpace()) {
-        gc::space::ImageSpace* image_space = space->AsImageSpace();
-        if (image_space->GetImageHeader().IsAppImage()) {
-          image_space->ReleaseMetadata();
-        }
-      }
-    }
+  VLOG(startup) << "Adding NotifyStartupCompleted task";
+  // Use the heap task processor since we want to be exclusive with the GC and we don't want to
+  // block the caller if the GC is running.
+  if (!GetHeap()->AddHeapTask(new NotifyStartupCompletedTask)) {
+    VLOG(startup) << "Failed to add NotifyStartupCompletedTask";
   }
 
   // Notify the profiler saver that startup is now completed.
   ProfileSaver::NotifyStartupCompleted();
-
-  {
-    // Delete the thread pool used for app image loading startup is completed.
-    ScopedTrace trace2("Delete thread pool");
-    DeleteThreadPool();
-  }
 }
 
 bool Runtime::GetStartupCompleted() const {
