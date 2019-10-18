@@ -1,0 +1,6 @@
+hello without locks
+Goodbye before unlock
+Goodbye after unlock
+Got exception of type class java.lang.IllegalMonitorStateException
+Make sure locks aren't held
+Locks are good.
