@@ -62,6 +62,8 @@ enum GcCause {
   kGcCauseGetObjectsAllocated,
   // GC cause for the profile saver.
   kGcCauseProfileSaver,
+  // GC cause for running an empty checkpoint.
+  kGcCauseRunEmptyCheckpoint,
 };
 
 const char* PrettyCause(GcCause cause);
