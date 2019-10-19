@@ -147,7 +147,6 @@ art_cc_library {
         // TODO(b/133140750): Clean this up.
         "//cts/tests/tests/appop",
         "//frameworks/base/startop/view_compiler",
-        "//frameworks/base/tests/net:__subpackages__",
     ],
     // Leave the symbols in the shared library so that stack unwinders can
     // produce meaningful name resolution.
