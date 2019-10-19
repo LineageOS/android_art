@@ -24,6 +24,7 @@
 
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace art {
@@ -154,6 +155,8 @@ class ConcurrentCopying : public GarbageCollector {
 
   mirror::Object* IsMarked(mirror::Object* from_ref) override
       REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void AssertNoThreadMarkStackMapping(Thread* thread) REQUIRES(!mark_stack_lock_);
 
  private:
   void PushOntoMarkStack(Thread* const self, mirror::Object* obj)
@@ -322,6 +325,11 @@ class ConcurrentCopying : public GarbageCollector {
   void ProcessMarkStackForMarkingAndComputeLiveBytes() REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!mark_stack_lock_);
 
+  void RemoveThreadMarkStackMapping(Thread* thread, accounting::ObjectStack* tl_mark_stack)
+      REQUIRES(mark_stack_lock_);
+  void AddThreadMarkStackMapping(Thread* thread, accounting::ObjectStack* tl_mark_stack)
+      REQUIRES(mark_stack_lock_);
+
   space::RegionSpace* region_space_;      // The underlying region space.
   std::unique_ptr<Barrier> gc_barrier_;
   std::unique_ptr<accounting::ObjectStack> gc_mark_stack_;
@@ -358,6 +366,9 @@ class ConcurrentCopying : public GarbageCollector {
   static constexpr size_t kMarkStackSize = kPageSize;
   static constexpr size_t kMarkStackPoolSize = 256;
   std::vector<accounting::ObjectStack*> pooled_mark_stacks_
+      GUARDED_BY(mark_stack_lock_);
+  // TODO(lokeshgidra b/140119552): remove this after bug fix.
+  std::unordered_map<Thread*, accounting::ObjectStack*> thread_mark_stack_map_
       GUARDED_BY(mark_stack_lock_);
   Thread* thread_running_gc_;
   bool is_marking_;                       // True while marking is ongoing.

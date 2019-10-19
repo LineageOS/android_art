@@ -944,6 +944,27 @@ class ConcurrentCopying::CaptureRootsForMarkingVisitor : public RootVisitor {
   Thread* const self_;
 };
 
+void ConcurrentCopying::RemoveThreadMarkStackMapping(Thread* thread,
+                                                     accounting::ObjectStack* tl_mark_stack) {
+  CHECK(tl_mark_stack != nullptr);
+  auto it = thread_mark_stack_map_.find(thread);
+  CHECK(it != thread_mark_stack_map_.end());
+  CHECK(it->second == tl_mark_stack);
+  thread_mark_stack_map_.erase(it);
+}
+
+void ConcurrentCopying::AssertNoThreadMarkStackMapping(Thread* thread) {
+  MutexLock mu(Thread::Current(), mark_stack_lock_);
+  CHECK(thread_mark_stack_map_.find(thread) == thread_mark_stack_map_.end());
+}
+
+void ConcurrentCopying::AddThreadMarkStackMapping(Thread* thread,
+                                                  accounting::ObjectStack* tl_mark_stack) {
+  CHECK(tl_mark_stack != nullptr);
+  CHECK(thread_mark_stack_map_.find(thread) == thread_mark_stack_map_.end());
+  thread_mark_stack_map_.insert({thread, tl_mark_stack});
+}
+
 class ConcurrentCopying::RevokeThreadLocalMarkStackCheckpoint : public Closure {
  public:
   RevokeThreadLocalMarkStackCheckpoint(ConcurrentCopying* concurrent_copying,
@@ -963,6 +984,7 @@ class ConcurrentCopying::RevokeThreadLocalMarkStackCheckpoint : public Closure {
       MutexLock mu(self, concurrent_copying_->mark_stack_lock_);
       concurrent_copying_->revoked_mark_stacks_.push_back(tl_mark_stack);
       thread->SetThreadLocalMarkStack(nullptr);
+      concurrent_copying_->RemoveThreadMarkStackMapping(thread, tl_mark_stack);
     }
     // Disable weak ref access.
     if (disable_weak_ref_access_) {
@@ -1779,7 +1801,9 @@ void ConcurrentCopying::PushOntoMarkStack(Thread* const self, mirror::Object* to
         if (tl_mark_stack != nullptr) {
           // Store the old full stack into a vector.
           revoked_mark_stacks_.push_back(tl_mark_stack);
+          RemoveThreadMarkStackMapping(self, tl_mark_stack);
         }
+        AddThreadMarkStackMapping(self, new_tl_mark_stack);
       } else {
         tl_mark_stack->PushBack(to_ref);
       }
@@ -2006,6 +2030,7 @@ void ConcurrentCopying::RevokeThreadLocalMarkStack(Thread* thread) {
     CHECK(is_marking_);
     MutexLock mu(self, mark_stack_lock_);
     revoked_mark_stacks_.push_back(tl_mark_stack);
+    RemoveThreadMarkStackMapping(thread, tl_mark_stack);
     thread->SetThreadLocalMarkStack(nullptr);
   }
 }
@@ -2055,6 +2080,10 @@ bool ConcurrentCopying::ProcessMarkStackOnce() {
     {
       MutexLock mu(thread_running_gc_, mark_stack_lock_);
       CHECK(revoked_mark_stacks_.empty());
+      CHECK(thread_mark_stack_map_.empty()) << " size:"
+                                            << thread_mark_stack_map_.size()
+                                            << " pooled_mark_stacks size:"
+                                            << pooled_mark_stacks_.size();
       CHECK_EQ(pooled_mark_stacks_.size(), kMarkStackPoolSize);
     }
     while (true) {
@@ -2082,6 +2111,10 @@ bool ConcurrentCopying::ProcessMarkStackOnce() {
     {
       MutexLock mu(thread_running_gc_, mark_stack_lock_);
       CHECK(revoked_mark_stacks_.empty());
+      CHECK(thread_mark_stack_map_.empty()) << " size:"
+                                            << thread_mark_stack_map_.size()
+                                            << " pooled_mark_stacks size:"
+                                            << pooled_mark_stacks_.size();
       CHECK_EQ(pooled_mark_stacks_.size(), kMarkStackPoolSize);
     }
     // Process the GC mark stack in the exclusive mode. No need to take the lock.
@@ -2369,6 +2402,10 @@ void ConcurrentCopying::CheckEmptyMarkStack() {
     MutexLock mu(thread_running_gc_, mark_stack_lock_);
     CHECK(gc_mark_stack_->IsEmpty());
     CHECK(revoked_mark_stacks_.empty());
+    CHECK(thread_mark_stack_map_.empty()) << " size:"
+                                          << thread_mark_stack_map_.size()
+                                          << " pooled_mark_stacks size:"
+                                          << pooled_mark_stacks_.size();
     CHECK_EQ(pooled_mark_stacks_.size(), kMarkStackPoolSize);
   }
 }
@@ -3632,6 +3669,10 @@ void ConcurrentCopying::FinishPhase() {
   {
     MutexLock mu(self, mark_stack_lock_);
     CHECK(revoked_mark_stacks_.empty());
+    CHECK(thread_mark_stack_map_.empty()) << " size:"
+                                          << thread_mark_stack_map_.size()
+                                          << " pooled_mark_stacks size:"
+                                          << pooled_mark_stacks_.size();
     CHECK_EQ(pooled_mark_stacks_.size(), kMarkStackPoolSize);
   }
   // kVerifyNoMissingCardMarks relies on the region space cards not being cleared to avoid false
