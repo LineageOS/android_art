@@ -603,8 +603,10 @@ def run_test(command, test, test_variant, test_name):
         proc_name = "dalvikvm" + test_name[-2:]
         pidof = subprocess.run(["adb", "shell", "pidof", proc_name], stdout=subprocess.PIPE)
         for pid in pidof.stdout.decode("ascii").split():
-          print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
-          subprocess.run(["adb", "shell", "debuggerd", pid])
+          if i >= 4:
+            print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
+            subprocess.run(["adb", "shell", "debuggerd", pid])
+            time.sleep(10)
           task_dir = "/proc/%s/task" % pid
           tids = subprocess.run(["adb", "shell", "ls", task_dir], stdout=subprocess.PIPE)
           for tid in tids.stdout.decode("ascii").split():
