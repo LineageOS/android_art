@@ -99,9 +99,9 @@ static jvmtiEnv* SetupJvmti(JavaVM* vm, const char* options) {
   }
   jvmtiEventCallbacks cb {
         .VMInit = VmInitCb,
+        .VMDeath = VMDeathCb,
         .ClassPrepare = ClassPrepareJit,
         .DataDumpRequest = DataDumpRequestCb,
-        .VMDeath = VMDeathCb,
   };
   AgentOptions* ops;
   CHECK_CALL_SUCCESS(
