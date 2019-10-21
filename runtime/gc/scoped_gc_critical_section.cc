@@ -58,5 +58,17 @@ ScopedGCCriticalSection::~ScopedGCCriticalSection() {
   critical_section_.Exit(old_no_suspend_reason_);
 }
 
+ScopedInterruptibleGCCriticalSection::ScopedInterruptibleGCCriticalSection(
+    Thread* self,
+    GcCause cause,
+    CollectorType type) : self_(self) {
+  DCHECK(self != nullptr);
+  Runtime::Current()->GetHeap()->StartGC(self_, cause, type);
+}
+
+ScopedInterruptibleGCCriticalSection::~ScopedInterruptibleGCCriticalSection() {
+  Runtime::Current()->GetHeap()->FinishGC(self_, collector::kGcTypeNone);
+}
+
 }  // namespace gc
 }  // namespace art

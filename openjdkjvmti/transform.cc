@@ -285,14 +285,13 @@ void Transformer::TransformSingleClassDirect(EventHandler* event_handler,
   def->SetNewDexData(new_len, new_data);
 }
 
-jvmtiError Transformer::RetransformClassesDirect(
+void Transformer::RetransformClassesDirect(
       art::Thread* self,
       /*in-out*/std::vector<ArtClassDefinition>* definitions) {
   for (ArtClassDefinition& def : *definitions) {
     TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(
         gEventHandler, self, &def);
   }
-  return OK;
 }
 
 jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
@@ -331,11 +330,7 @@ jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
     }
     definitions.push_back(std::move(def));
   }
-  res = RetransformClassesDirect(self, &definitions);
-  if (res != OK) {
-    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM direct retransform failed";
-    return res;
-  }
+  RetransformClassesDirect(self, &definitions);
   res = Redefiner::RedefineClassesDirect(ArtJvmTiEnv::AsArtJvmTiEnv(env),
                                          runtime,
                                          self,

@@ -1295,6 +1295,7 @@ class Runtime {
   friend std::string GetFaultMessageForAbortLogging();
   friend class ScopedThreadPoolUsage;
   friend class OatFileAssistantTest;
+  class NotifyStartupCompletedTask;
 
   DISALLOW_COPY_AND_ASSIGN(Runtime);
 };

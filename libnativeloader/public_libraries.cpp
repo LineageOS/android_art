@@ -176,14 +176,10 @@ static std::string InitDefaultPublicLibraries(bool for_preload) {
     std::copy(vec.begin(), vec.end(), std::back_inserter(*sonames));
   }
 
-  // ARC R - Workaround for boot blocker b/142089311
-  //         Disabling preloading until we found the correct linker settings for
-  //         devices disabling treble.
   // If this is for preloading libs, don't remove the libs from APEXes.
-  //  if (for_preload) {
-  //    return android::base::Join(*sonames, ':');
-  //  }
-  // ARC R - here
+  if (for_preload) {
+    return android::base::Join(*sonames, ':');
+  }
 
   // Remove the public libs in the art namespace.
   // These libs are listed in public.android.txt, but we don't want the rest of android

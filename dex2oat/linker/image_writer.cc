@@ -42,6 +42,7 @@
 #include "driver/compiler_options.h"
 #include "elf/elf_utils.h"
 #include "elf_file.h"
+#include "entrypoints/entrypoint_utils-inl.h"
 #include "gc/accounting/card_table-inl.h"
 #include "gc/accounting/heap_bitmap.h"
 #include "gc/accounting/space_bitmap-inl.h"
@@ -3368,12 +3369,14 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method, const ImageInfo& ima
 
   if (quick_code == nullptr) {
     // If we don't have code, use generic jni / interpreter bridge.
+    // Both perform class initialization check if needed.
     quick_code = method->IsNative()
         ? GetOatAddress(StubType::kQuickGenericJNITrampoline)
         : GetOatAddress(StubType::kQuickToInterpreterBridge);
-  } else if (method->NeedsInitializationCheck()) {
-    // If we do have code and the method needs an initialization check, go through
-    // the resolution stub.
+  } else if (NeedsClinitCheckBeforeCall(method) &&
+             !method->GetDeclaringClass()->IsVisiblyInitialized()) {
+    // If we do have code but the method needs a class initialization check before calling
+    // that code, install the resolution stub that will perform the check.
     quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
   }
   return quick_code;

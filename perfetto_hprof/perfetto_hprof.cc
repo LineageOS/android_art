@@ -119,9 +119,8 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
           args.config->java_hprof_config_raw()));
 
     uint64_t self_pid = static_cast<uint64_t>(getpid());
-    for (auto it = cfg->pid(); it; ++it) {
-      uint64_t pid = it->as_uint64();
-      if (pid == self_pid) {
+    for (auto pid_it = cfg->pid(); pid_it; ++pid_it) {
+      if (*pid_it == self_pid) {
         enabled_ = true;
         return;
       }
@@ -149,7 +148,7 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
         PLOG(ERROR) << "failed to normalize cmdline";
       }
       for (auto it = cfg->process_cmdline(); it; ++it) {
-        std::string other = it->as_std_string();
+        std::string other = (*it).ToStdString();
         // Append \0 to make this a C string.
         other.resize(other.size() + 1);
         char* other_ptr = &(other[0]);

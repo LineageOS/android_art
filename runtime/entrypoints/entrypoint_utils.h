@@ -212,6 +212,10 @@ CallerAndOuterMethod GetCalleeSaveMethodCallerAndOuterMethod(Thread* self, Calle
 ArtMethod* GetCalleeSaveOuterMethod(Thread* self, CalleeSaveType type)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
+// Returns whether we need to do class initialization check before invoking the method.
+// The caller is responsible for performing that check.
+bool NeedsClinitCheckBeforeCall(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_ENTRYPOINTS_ENTRYPOINT_UTILS_H_

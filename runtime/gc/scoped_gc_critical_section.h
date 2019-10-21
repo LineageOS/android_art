@@ -59,6 +59,19 @@ class ScopedGCCriticalSection {
   const char* old_no_suspend_reason_;
 };
 
+// The use of ScopedGCCriticalSection should be preferred whenever possible.
+// This class allows thread suspension but should never be used with allocations because of the
+// deadlock risk. TODO: Add a new thread role for "no allocations" that still allows suspension.
+class ScopedInterruptibleGCCriticalSection {
+ public:
+  ScopedInterruptibleGCCriticalSection(Thread* self, GcCause cause, CollectorType type);
+  ~ScopedInterruptibleGCCriticalSection();
+
+ private:
+  Thread* const self_;
+};
+
+
 }  // namespace gc
 }  // namespace art
 

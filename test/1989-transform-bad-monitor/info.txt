@@ -1,0 +1,6 @@
+Tests basic functions in the jvmti plugin.
+
+b/142876078
+
+This tests that redefining a method to have unbalanced locks doesn't cause issues and the method
+is given lock-counting and not compiled.
