@@ -334,22 +334,43 @@ size_t ThreadList::RunCheckpoint(Closure* checkpoint_function, Closure* callback
     count = list_.size();
     for (const auto& thread : list_) {
       if (thread != self) {
+        bool requested_suspend = false;
         while (true) {
           if (thread->RequestCheckpoint(checkpoint_function)) {
             // This thread will run its checkpoint some time in the near future.
+            if (requested_suspend) {
+              // The suspend request is now unnecessary.
+              bool updated =
+                  thread->ModifySuspendCount(self, -1, nullptr, SuspendReason::kInternal);
+              DCHECK(updated);
+              requested_suspend = false;
+            }
             break;
           } else {
-            // We are probably suspended, try to make sure that we stay suspended.
-            // The thread switched back to runnable.
+            // The thread is probably suspended, try to make sure that it stays suspended.
             if (thread->GetState() == kRunnable) {
               // Spurious fail, try again.
               continue;
             }
-            bool updated = thread->ModifySuspendCount(self, +1, nullptr, SuspendReason::kInternal);
-            DCHECK(updated);
-            suspended_count_modified_threads.push_back(thread);
-            break;
+            if (!requested_suspend) {
+              bool updated =
+                  thread->ModifySuspendCount(self, +1, nullptr, SuspendReason::kInternal);
+              DCHECK(updated);
+              requested_suspend = true;
+              if (thread->IsSuspended()) {
+                break;
+              }
+              // The thread raced us to become Runnable. Try to RequestCheckpoint() again.
+            } else {
+              // The thread previously raced our suspend request to become Runnable but
+              // since it is suspended again, it must honor that suspend request now.
+              DCHECK(thread->IsSuspended());
+              break;
+            }
           }
+        }
+        if (requested_suspend) {
+          suspended_count_modified_threads.push_back(thread);
         }
       }
     }
@@ -364,26 +385,8 @@ size_t ThreadList::RunCheckpoint(Closure* checkpoint_function, Closure* callback
 
   // Run the checkpoint on the suspended threads.
   for (const auto& thread : suspended_count_modified_threads) {
-    if (!thread->IsSuspended()) {
-      ScopedTrace trace([&]() {
-        std::ostringstream oss;
-        thread->ShortDump(oss);
-        return std::string("Waiting for suspension of thread ") + oss.str();
-      });
-      // Busy wait until the thread is suspended.
-      const uint64_t start_time = NanoTime();
-      do {
-        ThreadSuspendSleep(kThreadSuspendInitialSleepUs);
-      } while (!thread->IsSuspended());
-      const uint64_t total_delay = NanoTime() - start_time;
-      // Shouldn't need to wait for longer than 1000 microseconds.
-      constexpr uint64_t kLongWaitThreshold = MsToNs(1);
-      if (UNLIKELY(total_delay > kLongWaitThreshold)) {
-        LOG(WARNING) << "Long wait of " << PrettyDuration(total_delay) << " for "
-            << *thread << " suspension!";
-      }
-    }
     // We know for sure that the thread is suspended at this point.
+    DCHECK(thread->IsSuspended());
     checkpoint_function->Run(thread);
     {
       MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
