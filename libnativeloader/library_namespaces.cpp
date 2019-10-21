@@ -33,8 +33,6 @@
 #include "public_libraries.h"
 #include "utils.h"
 
-using android::base::Error;
-
 namespace android::nativeloader {
 
 namespace {
@@ -71,11 +69,11 @@ const std::regex kVendorDexPathRegex("(^|:)/vendor/");
 const std::regex kProductDexPathRegex("(^|:)(/system)?/product/");
 
 // Define origin of APK if it is from vendor partition or product partition
-typedef enum {
+using ApkOrigin = enum {
   APK_ORIGIN_DEFAULT = 0,
   APK_ORIGIN_VENDOR = 1,
   APK_ORIGIN_PRODUCT = 2,
-} ApkOrigin;
+};
 
 jobject GetParentClassLoader(JNIEnv* env, jobject class_loader) {
   jclass class_loader_class = env->FindClass("java/lang/ClassLoader");
