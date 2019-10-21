@@ -2,10 +2,7 @@
 // ========================================================
 cc_defaults {
     name: "libnativeloader-defaults",
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
+    defaults: ["art_defaults"],
     cppflags: [
         "-fvisibility=hidden",
     ],
@@ -17,9 +14,8 @@ cc_library {
     name: "libnativeloader",
     defaults: ["libnativeloader-defaults"],
     visibility: [
-        "//art:__subpackages__",
-        // TODO(b/133140750): Clean this up.
         "//frameworks/base/cmds/app_process",
+        // TODO(b/133140750): Clean this up.
         "//frameworks/base/native/webview/loader",
     ],
     host_supported: true,
@@ -71,7 +67,8 @@ cc_library {
 cc_library_headers {
     name: "libnativeloader-headers",
     visibility: [
-        "//art/libnativeloader/test",
+        "//art:__subpackages__",
+        // TODO(b/133140750): Clean this up.
         "//frameworks/av/media/libstagefright",
         "//frameworks/native/libs/graphicsenv",
         "//frameworks/native/vulkan/libvulkan",
