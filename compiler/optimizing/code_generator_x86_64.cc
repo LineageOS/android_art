@@ -2906,7 +2906,7 @@ void InstructionCodeGeneratorX86_64::VisitTypeConversion(HTypeConversion* conver
 
           __ movl(output, Immediate(kPrimIntMax));
           // if input >= (float)INT_MAX goto done
-          __ comiss(input, codegen_->LiteralFloatAddress(kPrimIntMax));
+          __ comiss(input, codegen_->LiteralFloatAddress(static_cast<float>(kPrimIntMax)));
           __ j(kAboveEqual, &done);
           // if input == NaN goto nan
           __ j(kUnordered, &nan);
@@ -2967,7 +2967,7 @@ void InstructionCodeGeneratorX86_64::VisitTypeConversion(HTypeConversion* conver
 
           codegen_->Load64BitValue(output, kPrimLongMax);
           // if input >= (float)LONG_MAX goto done
-          __ comiss(input, codegen_->LiteralFloatAddress(kPrimLongMax));
+          __ comiss(input, codegen_->LiteralFloatAddress(static_cast<float>(kPrimLongMax)));
           __ j(kAboveEqual, &done);
           // if input == NaN goto nan
           __ j(kUnordered, &nan);
@@ -2988,7 +2988,8 @@ void InstructionCodeGeneratorX86_64::VisitTypeConversion(HTypeConversion* conver
 
           codegen_->Load64BitValue(output, kPrimLongMax);
           // if input >= (double)LONG_MAX goto done
-          __ comisd(input, codegen_->LiteralDoubleAddress(kPrimLongMax));
+          __ comisd(input, codegen_->LiteralDoubleAddress(
+                static_cast<double>(kPrimLongMax)));
           __ j(kAboveEqual, &done);
           // if input == NaN goto nan
           __ j(kUnordered, &nan);
