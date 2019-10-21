@@ -287,8 +287,8 @@ static jint AgentStart(JavaVM* vm, char* options, void* reserved ATTRIBUTE_UNUSE
     return JNI_ERR;
   }
   jvmtiEventCallbacks cb{
-    .ClassFileLoadHook = CbClassFileLoadHook,
     .VMInit = CbVmInit,
+    .ClassFileLoadHook = CbClassFileLoadHook,
   };
   jvmti->SetEventCallbacks(&cb, sizeof(cb));
   jvmti->SetEnvironmentLocalStorage(reinterpret_cast<void*>(ai));
