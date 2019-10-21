@@ -1,9 +1,6 @@
 cc_defaults {
     name: "libnativebridge-defaults",
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
+    defaults: ["art_defaults"],
     cppflags: [
         "-fvisibility=protected",
     ],
@@ -22,9 +19,8 @@ cc_library {
     name: "libnativebridge",
     defaults: ["libnativebridge-defaults"],
     visibility: [
-        "//art:__subpackages__",
-        // TODO(b/133140750): Clean this up.
         "//frameworks/base/cmds/app_process",
+        // TODO(b/133140750): Clean this up.
         "//frameworks/base/native/webview/loader/libwebviewchromium_loader",
     ],
 

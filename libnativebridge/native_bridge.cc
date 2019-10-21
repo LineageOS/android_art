@@ -350,7 +350,7 @@ static void SetCpuAbi(JNIEnv* env, jclass build_class, const char* field, const 
 }
 
 // Set up the environment for the bridged app.
-static void SetupEnvironment(const NativeBridgeCallbacks* callbacks, JNIEnv* env, const char* isa) {
+static void SetupEnvironment(const NativeBridgeCallbacks* cbs, JNIEnv* env, const char* isa) {
   // Need a JNIEnv* to do anything.
   if (env == nullptr) {
     ALOGW("No JNIEnv* to set up app environment.");
@@ -358,7 +358,7 @@ static void SetupEnvironment(const NativeBridgeCallbacks* callbacks, JNIEnv* env
   }
 
   // Query the bridge for environment values.
-  const struct NativeBridgeRuntimeValues* env_values = callbacks->getAppEnv(isa);
+  const struct NativeBridgeRuntimeValues* env_values = cbs->getAppEnv(isa);
   if (env_values == nullptr) {
     return;
   }
