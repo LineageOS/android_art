@@ -1134,6 +1134,9 @@ class MANAGED Class final : public Object {
   static ObjPtr<mirror::Class> GetPrimitiveClass(ObjPtr<mirror::String> name)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Clear the kAccSkipAccessChecks flag on each method, for class redefinition.
+  void ClearSkipAccessChecksFlagOnAllMethods(PointerSize pointer_size)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   // When class is verified, set the kAccSkipAccessChecks flag on each method.
   void SetSkipAccessChecksFlagOnAllMethods(PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
