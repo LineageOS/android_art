@@ -178,8 +178,8 @@ static jint AgentStart(JavaVM* vm, char* options, bool is_onload) {
   CHECK_JVMTI(jvmti->AddCapabilities(&caps));
   jvmtiEventCallbacks cb {
     .VMInit = VMInitCb,
-    .DataDumpRequest = DataDumpRequestCb,
     .VMDeath = VMDeathCb,
+    .DataDumpRequest = DataDumpRequestCb,
   };
   CHECK_JVMTI(jvmti->SetEventCallbacks(&cb, sizeof(cb)));
   if (is_onload) {
