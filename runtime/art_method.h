@@ -335,11 +335,6 @@ class ArtMethod final {
     DCHECK(!IsNative());
     AddAccessFlags(kAccSkipAccessChecks);
   }
-  void ClearSkipAccessChecks() {
-    // SkipAccessChecks() is applicable only to non-native methods.
-    DCHECK(!IsNative());
-    ClearAccessFlags(kAccSkipAccessChecks);
-  }
 
   bool PreviouslyWarm() {
     if (IsIntrinsic()) {
@@ -368,7 +363,6 @@ class ArtMethod final {
 
   void SetMustCountLocks() {
     AddAccessFlags(kAccMustCountLocks);
-    ClearAccessFlags(kAccSkipAccessChecks);
   }
 
   // Returns true if this method could be overridden by a default method.

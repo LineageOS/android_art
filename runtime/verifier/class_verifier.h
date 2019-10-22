@@ -50,14 +50,6 @@ namespace verifier {
 // Verifier that ensures the complete class is OK.
 class ClassVerifier {
  public:
-  // Redo verification on a loaded class. This is for use by class redefinition. Since the class is
-  // already loaded and in use this can only be performed with the mutator lock held.
-  static FailureKind ReverifyClass(Thread* self,
-                                   ObjPtr<mirror::Class> klass,
-                                   HardFailLogMode log_level,
-                                   uint32_t api_level,
-                                   std::string* error)
-      REQUIRES(Locks::mutator_lock_);
   // Verify a class. Returns "kNoFailure" on success.
   static FailureKind VerifyClass(Thread* self,
                                  ObjPtr<mirror::Class> klass,
@@ -78,18 +70,6 @@ class ClassVerifier {
                                  uint32_t api_level,
                                  std::string* error)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  static FailureKind VerifyClass(Thread* self,
-                                 const DexFile* dex_file,
-                                 Handle<mirror::DexCache> dex_cache,
-                                 Handle<mirror::ClassLoader> class_loader,
-                                 const dex::ClassDef& class_def,
-                                 CompilerCallbacks* callbacks,
-                                 bool allow_soft_failures,
-                                 HardFailLogMode log_level,
-                                 uint32_t api_level,
-                                 bool can_allocate,
-                                 std::string* error)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static void Shutdown();
@@ -98,16 +78,6 @@ class ClassVerifier {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
-  static FailureKind CommonVerifyClass(Thread* self,
-                                       ObjPtr<mirror::Class> klass,
-                                       CompilerCallbacks* callbacks,
-                                       bool allow_soft_failures,
-                                       HardFailLogMode log_level,
-                                       uint32_t api_level,
-                                       bool can_allocate,
-                                       std::string* error)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   DISALLOW_COPY_AND_ASSIGN(ClassVerifier);
 };
 

@@ -5112,7 +5112,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
                                                          bool aot_mode,
-                                                         bool allow_suspension,
                                                          std::string* hard_failure_msg) {
   if (VLOG_IS_ON(verifier_debug)) {
     return VerifyMethod<true>(self,
@@ -5132,7 +5131,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                               need_precise_constants,
                               api_level,
                               aot_mode,
-                              allow_suspension,
                               hard_failure_msg);
   } else {
     return VerifyMethod<false>(self,
@@ -5152,7 +5150,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                need_precise_constants,
                                api_level,
                                aot_mode,
-                               allow_suspension,
                                hard_failure_msg);
   }
 }
@@ -5175,7 +5172,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
                                                          bool aot_mode,
-                                                         bool allow_suspension,
                                                          std::string* hard_failure_msg) {
   MethodVerifier::FailureData result;
   uint64_t start_ns = kTimeVerifyMethod ? NanoTime() : 0;
@@ -5186,8 +5182,8 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 dex_file,
                                                 code_item,
                                                 method_idx,
-                                                /* can_load_classes= */ allow_suspension,
-                                                /* allow_thread_suspension= */ allow_suspension,
+                                                /* can_load_classes= */ true,
+                                                /* allow_thread_suspension= */ true,
                                                 allow_soft_failures,
                                                 aot_mode,
                                                 dex_cache,
