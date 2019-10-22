@@ -253,6 +253,7 @@ class MethodVerifier {
                                   bool need_precise_constants,
                                   uint32_t api_level,
                                   bool aot_mode,
+                                  bool allow_suspension,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -274,6 +275,7 @@ class MethodVerifier {
                                   bool need_precise_constants,
                                   uint32_t api_level,
                                   bool aot_mode,
+                                  bool allow_suspension,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
