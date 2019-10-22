@@ -96,12 +96,6 @@
                         "slowness of gcstress makes this bad."]
     },
     {
-        "tests": "137-cfi",
-        "devices": "fugu",
-        "description": ["Unwinder is broken on fugu."],
-        "bug": "http://b/142365899"
-    },
-    {
         "tests": "152-dead-large-object",
         "variant": "gcstress",
         "description": ["152-dead-large-object requires a heap larger than what gcstress uses."],
