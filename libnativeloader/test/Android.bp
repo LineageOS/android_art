@@ -73,7 +73,10 @@ cc_library {
 // Build the test for the C API.
 cc_test {
     name: "libnativeloader-api-tests",
-    host_supported: true,
+    defaults: [
+        "art_defaults",
+        "art_test_defaults",
+    ],
     test_per_src: true,
     srcs: [
         "api_test.c",
