@@ -251,13 +251,21 @@ bool ImageSpace::FindImageFilename(const char* image_location,
                                cache_filename);
 }
 
-static bool ReadSpecificImageHeader(const char* filename, ImageHeader* image_header) {
+static bool ReadSpecificImageHeader(const char* filename,
+                                    ImageHeader* image_header,
+                                    std::string* error_msg) {
     std::unique_ptr<File> image_file(OS::OpenFileForReading(filename));
     if (image_file.get() == nullptr) {
+      *error_msg = StringPrintf("Unable to open file \"%s\" for reading image header", filename);
       return false;
     }
     const bool success = image_file->ReadFully(image_header, sizeof(ImageHeader));
-    if (!success || !image_header->IsValid()) {
+    if (!success) {
+      *error_msg = StringPrintf("Unable to read image header from file \"%s\"", filename);
+      return false;
+    }
+    if (!image_header->IsValid()) {
+      *error_msg = StringPrintf("Image header from file \"%s\" is invalid", filename);
       return false;
     }
     return true;
@@ -266,8 +274,7 @@ static bool ReadSpecificImageHeader(const char* filename, ImageHeader* image_hea
 static std::unique_ptr<ImageHeader> ReadSpecificImageHeader(const char* filename,
                                                             std::string* error_msg) {
   std::unique_ptr<ImageHeader> hdr(new ImageHeader);
-  if (!ReadSpecificImageHeader(filename, hdr.get())) {
-    *error_msg = StringPrintf("Unable to read image header for %s", filename);
+  if (!ReadSpecificImageHeader(filename, hdr.get(), error_msg)) {
     return nullptr;
   }
   return hdr;
@@ -1481,8 +1488,7 @@ class ImageSpace::BootImageLoader {
       /*out*/MemMap* extra_reservation,
       /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_) {
     ImageHeader system_hdr;
-    if (!ReadSpecificImageHeader(filename.c_str(), &system_hdr)) {
-      *error_msg = StringPrintf("Cannot read header of %s", filename.c_str());
+    if (!ReadSpecificImageHeader(filename.c_str(), &system_hdr, error_msg)) {
       return false;
     }
     if (system_hdr.GetComponentCount() == 0u ||
@@ -2378,23 +2384,23 @@ std::string ImageSpace::GetBootClassPathChecksums(ArrayRef<const std::string> bo
   const std::string& filename = (order == ImageSpaceLoadingOrder::kSystemFirst)
       ? (has_system ? system_filename : cache_filename)
       : (has_cache ? cache_filename : system_filename);
-  std::unique_ptr<ImageHeader> header = ReadSpecificImageHeader(filename.c_str(), error_msg);
-  if (header == nullptr) {
+  ImageHeader header;
+  if (!ReadSpecificImageHeader(filename.c_str(), &header, error_msg)) {
     return std::string();
   }
-  if (header->GetComponentCount() == 0u || header->GetComponentCount() > boot_class_path.size()) {
+  if (header.GetComponentCount() == 0u || header.GetComponentCount() > boot_class_path.size()) {
     *error_msg = StringPrintf("Unexpected component count in %s, received %u, "
                                   "expected non-zero and <= %zu",
                               filename.c_str(),
-                              header->GetComponentCount(),
+                              header.GetComponentCount(),
                               boot_class_path.size());
     return std::string();
   }
 
   std::string boot_image_checksum =
-      StringPrintf("i;%d/%08x", header->GetComponentCount(), header->GetImageChecksum());
+      StringPrintf("i;%d/%08x", header.GetComponentCount(), header.GetImageChecksum());
   ArrayRef<const std::string> boot_class_path_tail =
-      ArrayRef<const std::string>(boot_class_path).SubArray(header->GetComponentCount());
+      ArrayRef<const std::string>(boot_class_path).SubArray(header.GetComponentCount());
   for (const std::string& bcp_filename : boot_class_path_tail) {
     std::vector<std::unique_ptr<const DexFile>> dex_files;
     const ArtDexFileLoader dex_file_loader;
