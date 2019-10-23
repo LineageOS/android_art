@@ -17,7 +17,6 @@
 import other.TestByte;
 import other.TestCharShort;
 import other.TestVarious;
-import other.TestFloatDouble;
 
 /**
  * Tests for dot product idiom vectorization.
@@ -27,7 +26,6 @@ public class Main {
      TestByte.run();
      TestCharShort.run();
      TestVarious.run();
-     TestFloatDouble.run();
      System.out.println("passed");
   }
 }
