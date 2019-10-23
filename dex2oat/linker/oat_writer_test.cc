@@ -197,13 +197,10 @@ class OatTest : public CommonCompilerDriverTest {
     MultiOatRelativePatcher patcher(compiler_options_->GetInstructionSet(),
                                     compiler_options_->GetInstructionSetFeatures(),
                                     compiler_driver_->GetCompiledMethodStorage());
-    if (!oat_writer.StartRoData(compiler_driver_.get(),
-                                /*image_writer=*/ nullptr,
-                                dex_files,
-                                oat_rodata,
-                                &key_value_store)) {
+    if (!oat_writer.StartRoData(dex_files, oat_rodata, &key_value_store)) {
       return false;
     }
+    oat_writer.Initialize(compiler_driver_.get(), /*image_writer=*/ nullptr, dex_files);
     oat_writer.PrepareLayout(&patcher);
     elf_writer->PrepareDynamicSection(oat_writer.GetOatHeader().GetExecutableOffset(),
                                       oat_writer.GetCodeSize(),
