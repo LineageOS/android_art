@@ -685,16 +685,10 @@ bool OatWriter::WriteAndOpenDexFiles(
   return true;
 }
 
-// Initialize the writer with the given parameters.
-bool OatWriter::StartRoData(const CompilerDriver* compiler_driver,
-                            ImageWriter* image_writer,
-                            const std::vector<const DexFile*>& dex_files,
+bool OatWriter::StartRoData(const std::vector<const DexFile*>& dex_files,
                             OutputStream* oat_rodata,
                             SafeMap<std::string, std::string>* key_value_store) {
   CHECK(write_state_ == WriteState::kStartRoData);
-  compiler_driver_ = compiler_driver;
-  image_writer_ = image_writer;
-  dex_files_ = &dex_files;
 
   // Record the ELF rodata section offset, i.e. the beginning of the OAT data.
   if (!RecordOatDataOffset(oat_rodata)) {
@@ -720,8 +714,19 @@ bool OatWriter::StartRoData(const CompilerDriver* compiler_driver,
     return false;
   }
 
-  write_state_ = WriteState::kPrepareLayout;
+  write_state_ = WriteState::kInitialize;
   return true;
+}
+
+// Initialize the writer with the given parameters.
+void OatWriter::Initialize(const CompilerDriver* compiler_driver,
+                           ImageWriter* image_writer,
+                           const std::vector<const DexFile*>& dex_files) {
+  CHECK(write_state_ == WriteState::kInitialize);
+  compiler_driver_ = compiler_driver;
+  image_writer_ = image_writer;
+  dex_files_ = &dex_files;
+  write_state_ = WriteState::kPrepareLayout;
 }
 
 void OatWriter::PrepareLayout(MultiOatRelativePatcher* relative_patcher) {
@@ -3801,6 +3806,8 @@ bool OatWriter::WriteTypeLookupTables(OutputStream* oat_rodata,
 
     // Create the lookup table. When `nullptr` is given as the storage buffer,
     // TypeLookupTable allocates its own and OatDexFile takes ownership.
+    // TODO: Create the table in an mmap()ed region of the output file to reduce dirty memory.
+    // (We used to do that when dex files were still copied into the oat file.)
     const DexFile& dex_file = *opened_dex_files[i];
     {
       TypeLookupTable type_lookup_table = TypeLookupTable::Create(dex_file);
@@ -3853,9 +3860,8 @@ bool OatWriter::WriteTypeLookupTables(OutputStream* oat_rodata,
   return true;
 }
 
-bool OatWriter::WriteDexLayoutSections(
-    OutputStream* oat_rodata,
-    const std::vector<const DexFile*>& opened_dex_files) {
+bool OatWriter::WriteDexLayoutSections(OutputStream* oat_rodata,
+                                       const std::vector<const DexFile*>& opened_dex_files) {
   TimingLogger::ScopedTiming split(__FUNCTION__, timings_);
 
   if (!kWriteDexLayoutInfo) {
