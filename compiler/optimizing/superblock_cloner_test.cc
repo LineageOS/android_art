@@ -292,29 +292,7 @@ TEST_F(SuperblockClonerTest, IsGraphConnected) {
 
 // Tests SuperblockCloner for loop peeling case.
 //
-// Control Flow of the example (ignoring critical edges splitting).
-//
-//       Before                    After
-//
-//         |B|                      |B|
-//          |                        |
-//          v                        v
-//         |1|                      |1|
-//          |                        |
-//          v                        v
-//         |2|<-\              (6) |2A|
-//         / \  /                   / \
-//        v   v/                   /   v
-//       |4|  |3|                 /   |3A| (7)
-//        |                      /     /
-//        v                     |     v
-//       |E|                     \   |2|<-\
-//                                \ / \   /
-//                                 v   v /
-//                                |4|  |3|
-//                                 |
-//                                 v
-//                                |E|
+// See an ASCII graphics example near LoopClonerHelper::DoPeeling.
 TEST_F(SuperblockClonerTest, LoopPeeling) {
   HBasicBlock* header = nullptr;
   HBasicBlock* loop_body = nullptr;
@@ -331,7 +309,7 @@ TEST_F(SuperblockClonerTest, LoopPeeling) {
       std::less<HInstruction*>(), graph_->GetAllocator()->Adapter(kArenaAllocSuperblockCloner));
 
   HLoopInformation* loop_info = header->GetLoopInformation();
-  PeelUnrollHelper helper(loop_info, &bb_map, &hir_map, /* induction_range= */ nullptr);
+  LoopClonerHelper helper(loop_info, &bb_map, &hir_map, /* induction_range= */ nullptr);
   EXPECT_TRUE(helper.IsLoopClonable());
   HBasicBlock* new_header = helper.DoPeeling();
   HLoopInformation* new_loop_info = new_header->GetLoopInformation();
@@ -351,29 +329,7 @@ TEST_F(SuperblockClonerTest, LoopPeeling) {
 
 // Tests SuperblockCloner for loop unrolling case.
 //
-// Control Flow of the example (ignoring critical edges splitting).
-//
-//       Before                    After
-//
-//         |B|                      |B|
-//          |                        |
-//          v                        v
-//         |1|                      |1|
-//          |                        |
-//          v                        v
-//         |2|<-\               (6) |2A|<-\
-//         / \  /                   / \    \
-//        v   v/                   /   v    \
-//       |4|  |3|                 /(7)|3A|   |
-//        |                      /     /    /
-//        v                     |     v    /
-//       |E|                     \   |2|  /
-//                                \ / \  /
-//                                 v   v/
-//                                |4| |3|
-//                                 |
-//                                 v
-//                                |E|
+// See an ASCII graphics example near LoopClonerHelper::DoUnrolling.
 TEST_F(SuperblockClonerTest, LoopUnrolling) {
   HBasicBlock* header = nullptr;
   HBasicBlock* loop_body = nullptr;
@@ -390,7 +346,7 @@ TEST_F(SuperblockClonerTest, LoopUnrolling) {
       std::less<HInstruction*>(), graph_->GetAllocator()->Adapter(kArenaAllocSuperblockCloner));
 
   HLoopInformation* loop_info = header->GetLoopInformation();
-  PeelUnrollHelper helper(loop_info, &bb_map, &hir_map, /* induction_range= */ nullptr);
+  LoopClonerHelper helper(loop_info, &bb_map, &hir_map, /* induction_range= */ nullptr);
   EXPECT_TRUE(helper.IsLoopClonable());
   HBasicBlock* new_header = helper.DoUnrolling();
 
@@ -406,6 +362,55 @@ TEST_F(SuperblockClonerTest, LoopUnrolling) {
   EXPECT_EQ(loop_info->GetHeader(), new_header);
   EXPECT_EQ(loop_info->GetBackEdges().size(), 1u);
   EXPECT_EQ(loop_info->GetBackEdges()[0], bb_map.Get(loop_body));
+}
+
+// Tests SuperblockCloner for loop versioning case.
+//
+// See an ASCII graphics example near LoopClonerHelper::DoVersioning.
+TEST_F(SuperblockClonerTest, LoopVersioning) {
+  HBasicBlock* header = nullptr;
+  HBasicBlock* loop_body = nullptr;
+
+  InitGraph();
+  CreateBasicLoopControlFlow(entry_block_, return_block_, &header, &loop_body);
+  CreateBasicLoopDataFlow(header, loop_body);
+  graph_->BuildDominatorTree();
+  EXPECT_TRUE(CheckGraph());
+
+  HBasicBlockMap bb_map(
+      std::less<HBasicBlock*>(), graph_->GetAllocator()->Adapter(kArenaAllocSuperblockCloner));
+  HInstructionMap hir_map(
+      std::less<HInstruction*>(), graph_->GetAllocator()->Adapter(kArenaAllocSuperblockCloner));
+
+  HLoopInformation* loop_info = header->GetLoopInformation();
+  HBasicBlock* original_preheader = loop_info->GetPreHeader();
+  LoopClonerHelper helper(loop_info, &bb_map, &hir_map, /* induction_range= */ nullptr);
+  EXPECT_TRUE(helper.IsLoopClonable());
+  HBasicBlock* new_header = helper.DoVersioning();
+  EXPECT_EQ(header, new_header);
+
+  EXPECT_TRUE(CheckGraph());
+
+  HBasicBlock* second_header = bb_map.Get(header);
+  HBasicBlock* second_body = bb_map.Get(loop_body);
+  HLoopInformation* second_loop_info = second_header->GetLoopInformation();
+
+  // Check loop body successors.
+  EXPECT_EQ(loop_body->GetSingleSuccessor(), header);
+  EXPECT_EQ(second_body->GetSingleSuccessor(), second_header);
+
+  // Check loop structure.
+  EXPECT_EQ(loop_info, header->GetLoopInformation());
+  EXPECT_EQ(loop_info->GetHeader(), header);
+  EXPECT_EQ(second_loop_info->GetHeader(), second_header);
+
+  EXPECT_EQ(loop_info->GetBackEdges().size(), 1u);
+  EXPECT_EQ(second_loop_info->GetBackEdges().size(), 1u);
+
+  EXPECT_EQ(loop_info->GetBackEdges()[0], loop_body);
+  EXPECT_EQ(second_loop_info->GetBackEdges()[0], second_body);
+
+  EXPECT_EQ(original_preheader->GetSuccessors().size(), 2u);
 }
 
 // Checks that loop unrolling works fine for a loop with multiple back edges. Tests that after
@@ -445,7 +450,7 @@ TEST_F(SuperblockClonerTest, LoopPeelingMultipleBackEdges) {
   EXPECT_TRUE(CheckGraph());
 
   HLoopInformation* loop_info = header->GetLoopInformation();
-  PeelUnrollSimpleHelper helper(loop_info, /* induction_range= */ nullptr);
+  LoopClonerSimpleHelper helper(loop_info, /* induction_range= */ nullptr);
   HBasicBlock* new_header = helper.DoPeeling();
   EXPECT_EQ(header, new_header);
 
@@ -494,7 +499,7 @@ TEST_F(SuperblockClonerTest, LoopPeelingNested) {
 
   // Check nested loops structure.
   CheckLoopStructureForLoopPeelingNested(loop1_header, loop2_header, loop3_header);
-  PeelUnrollSimpleHelper helper(loop1_header->GetLoopInformation(), /* induction_range= */ nullptr);
+  LoopClonerSimpleHelper helper(loop1_header->GetLoopInformation(), /* induction_range= */ nullptr);
   helper.DoPeeling();
   // Check that nested loops structure has not changed after the transformation.
   CheckLoopStructureForLoopPeelingNested(loop1_header, loop2_header, loop3_header);
@@ -540,7 +545,7 @@ TEST_F(SuperblockClonerTest, OuterLoopPopulationAfterInnerPeeled) {
   graph_->BuildDominatorTree();
   EXPECT_TRUE(CheckGraph());
 
-  PeelUnrollSimpleHelper helper(loop3_header->GetLoopInformation(), /* induction_range= */ nullptr);
+  LoopClonerSimpleHelper helper(loop3_header->GetLoopInformation(), /* induction_range= */ nullptr);
   helper.DoPeeling();
   HLoopInformation* loop1 = loop1_header->GetLoopInformation();
   HLoopInformation* loop2 = loop2_header->GetLoopInformation();
@@ -606,7 +611,7 @@ TEST_F(SuperblockClonerTest, NestedCaseExitToOutermost) {
   HBasicBlock* loop3_long_exit = loop3_extra_if_block->GetSuccessors()[0];
   EXPECT_TRUE(loop1_header->GetLoopInformation()->Contains(*loop3_long_exit));
 
-  PeelUnrollSimpleHelper helper(loop3_header->GetLoopInformation(), /* induction_range= */ nullptr);
+  LoopClonerSimpleHelper helper(loop3_header->GetLoopInformation(), /* induction_range= */ nullptr);
   helper.DoPeeling();
 
   HLoopInformation* loop1 = loop1_header->GetLoopInformation();
