@@ -2463,9 +2463,10 @@ Thread::~Thread() {
   CHECK_EQ(tls32_.is_transitioning_to_runnable, false);
 
   if (kUseReadBarrier) {
-    CHECK(tlsPtr_.thread_local_mark_stack == nullptr);
     Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()
         ->AssertNoThreadMarkStackMapping(this);
+    gc::accounting::AtomicStack<mirror::Object>* tl_mark_stack = GetThreadLocalMarkStack();
+    CHECK(tl_mark_stack == nullptr) << "mark-stack: " << tl_mark_stack;
   }
   // Make sure we processed all deoptimization requests.
   CHECK(tlsPtr_.deoptimization_context_stack == nullptr) << "Missed deoptimization";
