@@ -4006,10 +4006,10 @@ void Heap::CheckGcStressMode(Thread* self, ObjPtr<mirror::Object>* obj) {
     bool new_backtrace = false;
     {
       static constexpr size_t kMaxFrames = 16u;
+      MutexLock mu(self, *backtrace_lock_);
       FixedSizeBacktrace<kMaxFrames> backtrace;
       backtrace.Collect(/* skip_count= */ 2);
       uint64_t hash = backtrace.Hash();
-      MutexLock mu(self, *backtrace_lock_);
       new_backtrace = seen_backtraces_.find(hash) == seen_backtraces_.end();
       if (new_backtrace) {
         seen_backtraces_.insert(hash);
