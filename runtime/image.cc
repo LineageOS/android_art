@@ -29,7 +29,7 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-const uint8_t ImageHeader::kImageVersion[] = { '0', '7', '8', '\0' };  // FP16ToFloat intrinsic
+const uint8_t ImageHeader::kImageVersion[] = { '0', '7', '9', '\0' };  // FP16ToHalf intrinsic
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,
