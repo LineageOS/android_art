@@ -1234,12 +1234,6 @@
         "description": [ "Fails to eliminate dead reference when debuggable." ]
     },
     {
-        "tests": ["708-jit-cache-churn"],
-        "variant": "jit-on-first-use",
-        "bug": "b/120112467",
-        "description": [ "Fails on Android Build hosts with uncaught std::bad_alloc." ]
-    },
-    {
         "tests": ["719-dm-verify-redefinition"],
         "variant": "jvm | speed-profile | interp-ac | target | no-prebuild",
         "description": ["Doesn't run on RI because of boot class redefintion.",
