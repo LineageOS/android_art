@@ -74,9 +74,6 @@ void DexoptTest::GenerateOatForTest(const std::string& dex_location,
                                     bool with_alternate_image,
                                     const char* compilation_reason,
                                     const std::vector<std::string>& extra_args) {
-  std::string dalvik_cache = GetDalvikCache(GetInstructionSetString(kRuntimeISA));
-  std::string dalvik_cache_tmp = dalvik_cache + ".redirected";
-
   std::vector<std::string> args;
   args.push_back("--dex-file=" + dex_location);
   args.push_back("--oat-file=" + oat_location);
