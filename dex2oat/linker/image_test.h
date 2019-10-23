@@ -287,12 +287,11 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
         OatWriter* const oat_writer = oat_writers[i].get();
         ElfWriter* const elf_writer = elf_writers[i].get();
         std::vector<const DexFile*> cur_dex_files(1u, class_path[i]);
-        bool initialize_ok = oat_writer->StartRoData(driver,
-                                                     writer.get(),
-                                                     cur_dex_files,
-                                                     rodata[i],
-                                                     (i == 0u) ? &key_value_store : nullptr);
-        ASSERT_TRUE(initialize_ok);
+        bool start_rodata_ok = oat_writer->StartRoData(cur_dex_files,
+                                                       rodata[i],
+                                                       (i == 0u) ? &key_value_store : nullptr);
+        ASSERT_TRUE(start_rodata_ok);
+        oat_writer->Initialize(driver, writer.get(), cur_dex_files);
 
         std::unique_ptr<BufferedOutputStream> vdex_out =
             std::make_unique<BufferedOutputStream>(
