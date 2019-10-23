@@ -1585,6 +1585,21 @@ class Dex2Oat final {
       key_value_store_->Put(OatHeader::kClassPathKey, class_path_key);
     }
 
+    // Now that we have finalized key_value_store_, start writing the .rodata section.
+    // Among other things, this creates type lookup tables that speed up the compilation.
+    {
+      TimingLogger::ScopedTiming t_dex("Starting .rodata", timings_);
+      rodata_.reserve(oat_writers_.size());
+      for (size_t i = 0, size = oat_writers_.size(); i != size; ++i) {
+        rodata_.push_back(elf_writers_[i]->StartRoData());
+        if (!oat_writers_[i]->StartRoData(dex_files_per_oat_file_[i],
+                                          rodata_.back(),
+                                          (i == 0u) ? key_value_store_.get() : nullptr)) {
+          return dex2oat::ReturnCode::kOther;
+        }
+      }
+    }
+
     // We had to postpone the swap decision till now, as this is the point when we actually
     // know about the dex files we're going to use.
 
@@ -1925,21 +1940,12 @@ class Dex2Oat final {
       }
     }
 
-    // Initialize the writers with the compiler driver, image writer and their dex files
-    // and start writing the .rodata sections.
-    {
-      TimingLogger::ScopedTiming t2("dex2oat Starting oat .rodata section(s)", timings_);
-      rodata_.reserve(oat_writers_.size());
-      for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
-        rodata_.push_back(elf_writers_[i]->StartRoData());
-        if (!oat_writers_[i]->StartRoData(driver_.get(),
-                                          image_writer_.get(),
-                                          dex_files_per_oat_file_[i],
-                                          rodata_.back(),
-                                          (i == 0u) ? key_value_store_.get() : nullptr)) {
-          return false;
-        }
-      }
+    // Initialize the writers with the compiler driver, image writer, and their
+    // dex files. The writers were created without those being there yet.
+    for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
+      std::unique_ptr<linker::OatWriter>& oat_writer = oat_writers_[i];
+      std::vector<const DexFile*>& dex_files = dex_files_per_oat_file_[i];
+      oat_writer->Initialize(driver_.get(), image_writer_.get(), dex_files);
     }
 
     {
