@@ -72,6 +72,16 @@ enum RegisterTrackingMode {
   kTrackRegsAll,
 };
 
+// A class used by the verifier to tell users about what options need to be set for given methods.
+class VerifierCallback {
+ public:
+  virtual ~VerifierCallback() {}
+  virtual void SetDontCompile(ArtMethod* method, bool value)
+      REQUIRES_SHARED(Locks::mutator_lock_) = 0;
+  virtual void SetMustCountLocks(ArtMethod* method, bool value)
+      REQUIRES_SHARED(Locks::mutator_lock_) = 0;
+};
+
 // A mapping from a dex pc to the register line statuses as they are immediately prior to the
 // execution of that instruction.
 class PcToRegisterLineTable {
@@ -248,12 +258,12 @@ class MethodVerifier {
                                   ArtMethod* method,
                                   uint32_t method_access_flags,
                                   CompilerCallbacks* callbacks,
+                                  VerifierCallback* verifier_callback,
                                   bool allow_soft_failures,
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
                                   bool aot_mode,
-                                  bool allow_suspension,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -270,12 +280,12 @@ class MethodVerifier {
                                   ArtMethod* method,
                                   uint32_t method_access_flags,
                                   CompilerCallbacks* callbacks,
+                                  VerifierCallback* verifier_callback,
                                   bool allow_soft_failures,
                                   HardFailLogMode log_level,
                                   bool need_precise_constants,
                                   uint32_t api_level,
                                   bool aot_mode,
-                                  bool allow_suspension,
                                   std::string* hard_failure_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 

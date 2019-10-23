@@ -209,8 +209,11 @@ class Redefiner {
     void UpdateClass(const RedefinitionDataIter& cur_data)
         REQUIRES(art::Locks::mutator_lock_);
 
-    void ReverifyClass(const RedefinitionDataIter& cur_data)
+    void UpdateClassCommon(const RedefinitionDataIter& cur_data)
         REQUIRES(art::Locks::mutator_lock_);
+
+    void ReverifyClass(const RedefinitionDataIter& cur_data)
+        REQUIRES_SHARED(art::Locks::mutator_lock_);
 
     void CollectNewFieldAndMethodMappings(const RedefinitionDataIter& data,
                                           std::map<art::ArtMethod*, art::ArtMethod*>* method_map,
@@ -301,7 +304,7 @@ class Redefiner {
   bool FinishAllRemainingAllocations(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   void ReleaseAllDexFiles() REQUIRES_SHARED(art::Locks::mutator_lock_);
-  void ReverifyClasses(RedefinitionDataHolder& holder) REQUIRES(art::Locks::mutator_lock_);
+  void ReverifyClasses(RedefinitionDataHolder& holder) REQUIRES_SHARED(art::Locks::mutator_lock_);
   void UnregisterAllBreakpoints() REQUIRES_SHARED(art::Locks::mutator_lock_);
   // Restores the old obsolete methods maps if it turns out they weren't needed (ie there were no
   // new obsolete methods).
