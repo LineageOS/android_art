@@ -156,7 +156,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
                      allow_soft_failures,
                      log_level,
                      api_level,
-                     /*can_allocate=*/!Runtime::Current()->IsAotCompiler(),
+                     /*can_allocate=*/ true,
                      error);
 }
 
