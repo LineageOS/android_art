@@ -96,12 +96,6 @@
                         "slowness of gcstress makes this bad."]
     },
     {
-        "tests": "137-cfi",
-        "devices": "fugu",
-        "description": ["Unwinder is broken on fugu."],
-        "bug": "http://b/142365899"
-    },
-    {
         "tests": "152-dead-large-object",
         "variant": "gcstress",
         "description": ["152-dead-large-object requires a heap larger than what gcstress uses."],
@@ -1238,12 +1232,6 @@
         "tests": ["1339-dead-reference-safe"],
         "variant": "debuggable",
         "description": [ "Fails to eliminate dead reference when debuggable." ]
-    },
-    {
-        "tests": ["708-jit-cache-churn"],
-        "variant": "jit-on-first-use",
-        "bug": "b/120112467",
-        "description": [ "Fails on Android Build hosts with uncaught std::bad_alloc." ]
     },
     {
         "tests": ["719-dm-verify-redefinition"],
