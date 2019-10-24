@@ -166,6 +166,7 @@
   V(MemoryPokeLongNative, kStatic, kNeedsEnvironmentOrCache, kWriteSideEffects, kCanThrow, "Llibcore/io/Memory;", "pokeLongNative", "(JJ)V") \
   V(MemoryPokeShortNative, kStatic, kNeedsEnvironmentOrCache, kWriteSideEffects, kCanThrow, "Llibcore/io/Memory;", "pokeShortNative", "(JS)V") \
   V(FP16ToFloat, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toFloat", "(S)F") \
+  V(FP16ToHalf, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toHalf", "(F)S") \
   V(StringCharAt, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "charAt", "(I)C") \
   V(StringCompareTo, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "compareTo", "(Ljava/lang/String;)I") \
   V(StringEquals, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "equals", "(Ljava/lang/Object;)Z") \

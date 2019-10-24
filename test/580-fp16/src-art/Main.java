@@ -28,15 +28,14 @@ public class Main {
         return Float.floatToRawIntBits(f);
     }
 
-    public static void assertEquals(int expected, int actual) {
-        if (expected != actual) {
-            throw new Error("Expected: " + expected + ", found: " + actual);
+    public static void assertEquals(short expected, short calculated) {
+        if (expected != calculated) {
+            throw new Error("Expected: " + expected + ", Calculated: " + calculated);
         }
     }
-
-    public static void assertEquals(float expected, float actual) {
-        if (expected != actual) {
-            throw new Error("Expected: " + expected + ", found: " + actual);
+    public static void assertEquals(float expected, float calculated) {
+        if (expected != calculated) {
+            throw new Error("Expected: " + expected + ", Calculated: " + calculated);
         }
     }
 
@@ -47,8 +46,48 @@ public class Main {
                 // NaN inputs are tested below.
                 continue;
             }
-            assertEquals(FP16.toHalf(FP16.toFloat(h)), h);
+            assertEquals(h, FP16.toHalf(FP16.toFloat(h)));
         }
+
+        // These asserts check some known values and edge cases for FP16.toHalf
+        // and have been inspired by the cts HalfTest.
+        // Zeroes, NaN and infinities
+        assertEquals(FP16.POSITIVE_ZERO, FP16.toHalf(0.0f));
+        assertEquals(FP16.NEGATIVE_ZERO, FP16.toHalf(-0.0f));
+        assertEquals(FP16.NaN, FP16.toHalf(Float.NaN));
+        assertEquals(FP16.POSITIVE_INFINITY, FP16.toHalf(Float.POSITIVE_INFINITY));
+        assertEquals(FP16.NEGATIVE_INFINITY, FP16.toHalf(Float.NEGATIVE_INFINITY));
+        // Known values
+        assertEquals((short) 0x3c01, FP16.toHalf(1.0009765625f));
+        assertEquals((short) 0xc000, FP16.toHalf(-2.0f));
+        assertEquals((short) 0x0400, FP16.toHalf(6.10352e-5f));
+        assertEquals((short) 0x7bff, FP16.toHalf(65504.0f));
+        assertEquals((short) 0x3555, FP16.toHalf(1.0f / 3.0f));
+        // Subnormals
+        assertEquals((short) 0x03ff, FP16.toHalf(6.09756e-5f));
+        assertEquals(FP16.MIN_VALUE, FP16.toHalf(5.96046e-8f));
+        assertEquals((short) 0x83ff, FP16.toHalf(-6.09756e-5f));
+        assertEquals((short) 0x8001, FP16.toHalf(-5.96046e-8f));
+        // Subnormals (flushed to +/-0)
+        assertEquals(FP16.POSITIVE_ZERO, FP16.toHalf(5.96046e-9f));
+        assertEquals(FP16.NEGATIVE_ZERO, FP16.toHalf(-5.96046e-9f));
+        // Test for values that overflow the mantissa bits into exp bits
+        assertEquals(0x1000, FP16.toHalf(Float.intBitsToFloat(0x39fff000)));
+        assertEquals(0x0400, FP16.toHalf(Float.intBitsToFloat(0x387fe000)));
+        // Floats with absolute value above +/-65519 are rounded to +/-inf
+        // when using round-to-even
+        assertEquals(0x7bff, FP16.toHalf(65519.0f));
+        assertEquals(0x7bff, FP16.toHalf(65519.9f));
+        assertEquals(FP16.POSITIVE_INFINITY, FP16.toHalf(65520.0f));
+        assertEquals(FP16.NEGATIVE_INFINITY, FP16.toHalf(-65520.0f));
+        // Check if numbers are rounded to nearest even when they
+        // cannot be accurately represented by Half
+        assertEquals(0x6800, FP16.toHalf(2049.0f));
+        assertEquals(0x6c00, FP16.toHalf(4098.0f));
+        assertEquals(0x7000, FP16.toHalf(8196.0f));
+        assertEquals(0x7400, FP16.toHalf(16392.0f));
+        assertEquals(0x7800, FP16.toHalf(32784.0f));
+
         // FP16 SNaN/QNaN inputs to float
         // The most significant bit of mantissa:
         //                 V

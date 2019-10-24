@@ -3216,6 +3216,30 @@ void IntrinsicCodeGeneratorARM64::VisitFP16ToFloat(HInvoke* invoke) {
   __ Fcvt(out, half);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitFP16ToHalf(HInvoke* invoke) {
+  if (!codegen_->GetInstructionSetFeatures().HasFP16()) {
+    return;
+  }
+
+  LocationSummary* locations = new (allocator_) LocationSummary(invoke,
+                                                                LocationSummary::kNoCall,
+                                                                kIntrinsified);
+  locations->SetInAt(0, Location::RequiresFpuRegister());
+  locations->SetOut(Location::RequiresRegister());
+}
+
+void IntrinsicCodeGeneratorARM64::VisitFP16ToHalf(HInvoke* invoke) {
+  DCHECK(codegen_->GetInstructionSetFeatures().HasFP16());
+  MacroAssembler* masm = GetVIXLAssembler();
+  UseScratchRegisterScope scratch_scope(masm);
+  FPRegister in = SRegisterFrom(invoke->GetLocations()->InAt(0));
+  FPRegister half = scratch_scope.AcquireH();
+  Register out = WRegisterFrom(invoke->GetLocations()->Out());
+  __ Fcvt(half, in);
+  __ Fmov(out, half);
+  __ Sxth(out, out);  // sign extend due to returning a short type.
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
