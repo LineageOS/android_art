@@ -1045,35 +1045,11 @@ def art_apex_test_main(test_args):
   if test_args.host and test_args.flattened:
     logging.error("Both of --host and --flattened set")
     return 1
-  if test_args.tree and test_args.debug:
-    logging.error("Both of --tree and --debug set")
-    return 1
-  if test_args.tree and test_args.testing:
-    logging.error("Both of --tree and --testing set")
-    return 1
-  if test_args.list and test_args.debug:
-    logging.error("Both of --list and --debug set")
-    return 1
-  if test_args.list and test_args.testing:
-    logging.error("Both of --list and --testing set")
-    return 1
   if test_args.list and test_args.tree:
     logging.error("Both of --list and --tree set")
     return 1
   if test_args.size and not (test_args.list or test_args.tree):
     logging.error("--size set but neither --list nor --tree set")
-    return 1
-  if test_args.host and test_args.testing:
-    logging.error("Both of --host and --testing set")
-    return 1
-  if test_args.debug and test_args.testing:
-    logging.error("Both of --debug and --testing set")
-    return 1
-  if test_args.flavor and test_args.debug:
-    logging.error("Both of --flavor and --debug set")
-    return 1
-  if test_args.flavor and test_args.testing:
-    logging.error("Both of --flavor and --testing set")
     return 1
   if not test_args.flattened and not test_args.tmpdir:
     logging.error("Need a tmpdir.")
@@ -1082,15 +1058,6 @@ def art_apex_test_main(test_args):
     logging.error("Need debugfs.")
     return 1
 
-  # Handle legacy flavor flags.
-  if test_args.debug:
-    logging.warning('Using deprecated option --debug')
-    test_args.flavor = FLAVOR_DEBUG
-  if test_args.testing:
-    logging.warning('Using deprecated option --testing')
-    test_args.flavor = FLAVOR_TESTING
-
-  # Handle new flavor flag.
   if test_args.flavor == FLAVOR_AUTO:
     logging.warning('--flavor=auto, trying to autodetect. This may be incorrect!')
     for flavor in [ FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING ]:
@@ -1248,10 +1215,6 @@ if __name__ == "__main__":
 
   parser.add_argument('--flavor', help='Check as FLAVOR APEX', choices=FLAVORS_ALL,
                       default=FLAVOR_AUTO)
-  # Deprecated flavor flags.
-  # TODO: Stop supporting those flags eventually.
-  parser.add_argument('--debug', help='Check as debug APEX', action='store_true')
-  parser.add_argument('--testing', help='Check as testing APEX', action='store_true')
 
   parser.add_argument('--list', help='List all files', action='store_true')
   parser.add_argument('--tree', help='Print directory tree', action='store_true')
