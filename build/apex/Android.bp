@@ -231,7 +231,6 @@ apex_defaults {
     binaries: [
         "art_postinstall_hook",
         "art_preinstall_hook",
-        "art_preinstall_hook_boot",
         "art_preinstall_hook_system_server",
         "art_prepostinstall_utils",
     ],
@@ -269,7 +268,7 @@ apex_defaults {
 // Release version of the ART APEX module (not containing debug
 // variants nor tools), included in user builds. Also used for
 // storage-constrained devices in userdebug and eng builds.
-apex {
+art_apex {
     name: "com.android.art.release",
     defaults: ["com.android.art-defaults"],
     certificate: ":com.android.art.certificate",
@@ -278,7 +277,7 @@ apex {
 // "Debug" version of the ART APEX module (containing both release and
 // debug variants, as well as additional tools), included in userdebug and
 // eng build.
-apex {
+art_apex {
     name: "com.android.art.debug",
     defaults: ["com.android.art-dev-defaults"],
     certificate: ":com.android.art.certificate",
@@ -311,7 +310,7 @@ art_gtests = [
 // "Testing" version of the ART APEX module (containing both release
 // and debug variants, additional tools, and ART gtests), for testing
 // purposes only.
-apex_test {
+art_apex_test {
     name: "com.android.art.testing",
     defaults: ["com.android.art-dev-defaults"],
     file_contexts: "com.android.art.debug",
@@ -468,11 +467,6 @@ cc_prebuilt_binary {
 sh_binary {
     name: "art_preinstall_hook",
     src: "art_preinstall_hook.sh",
-}
-
-sh_binary {
-    name: "art_preinstall_hook_boot",
-    src: "art_preinstall_hook_boot.sh",
 }
 
 sh_binary {
