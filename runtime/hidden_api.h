@@ -358,6 +358,7 @@ ALWAYS_INLINE inline uint32_t GetRuntimeFlags(ArtMethod* method)
         return 0u;
       case Intrinsics::kUnsafeGetLong:
       case Intrinsics::kFP16ToFloat:
+      case Intrinsics::kFP16ToHalf:
         return kAccCorePlatformApi;
       default:
         // Remaining intrinsics are public API. We DCHECK that in SetIntrinsic().

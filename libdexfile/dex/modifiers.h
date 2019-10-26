@@ -62,6 +62,8 @@ static constexpr uint32_t kAccObsoleteObject =        0x00200000;  // class (run
 // that it was copied from its declaring class into another class. All methods marked kAccMiranda
 // and kAccDefaultConflict will have this bit set. Any kAccDefault method contained in the methods_
 // array of a concrete class will also have this bit set.
+// We need copies of the original method because the method may end up in
+// different places in classes vtables, and the vtable index is set in ArtMethod.method_index.
 static constexpr uint32_t kAccCopied =                0x00100000;  // method (runtime)
 static constexpr uint32_t kAccMiranda =               0x00200000;  // method (runtime, not native)
 static constexpr uint32_t kAccDefault =               0x00400000;  // method (runtime)
