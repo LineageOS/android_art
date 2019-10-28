@@ -39,8 +39,8 @@ public class Main {
         }
     }
 
-    public static void main(String args[]) {
-        // Test FP16 to float
+    public static void testHalfToFloatToHalfConversions(){
+        // Test FP16 to float and back to Half for all possible Short values
         for (short h = Short.MIN_VALUE; h < Short.MAX_VALUE; h++) {
             if (FP16.isNaN(h)) {
                 // NaN inputs are tested below.
@@ -48,7 +48,9 @@ public class Main {
             }
             assertEquals(h, FP16.toHalf(FP16.toFloat(h)));
         }
+    }
 
+    public static void testToHalf(){
         // These asserts check some known values and edge cases for FP16.toHalf
         // and have been inspired by the cts HalfTest.
         // Zeroes, NaN and infinities
@@ -88,6 +90,9 @@ public class Main {
         assertEquals(0x7400, FP16.toHalf(16392.0f));
         assertEquals(0x7800, FP16.toHalf(32784.0f));
 
+    }
+
+    public static void testToFloat(){
         // FP16 SNaN/QNaN inputs to float
         // The most significant bit of mantissa:
         //                 V
@@ -105,5 +110,11 @@ public class Main {
         assertEquals(0xffffe000, TestFP16ToFloatRawIntBits((short)(0xfdff)));  // SNaN->QNaN
         assertEquals(0xffc00000, TestFP16ToFloatRawIntBits((short)(0xfe00)));  // QNaN->QNaN
         assertEquals(0xffffe000, TestFP16ToFloatRawIntBits((short)(0xffff)));  // QNaN->QNaN
+    }
+
+    public static void main(String args[]) {
+        testHalfToFloatToHalfConversions();
+        testToHalf();
+        testToFloat();
     }
 }
