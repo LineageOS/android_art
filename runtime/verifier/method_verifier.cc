@@ -5107,12 +5107,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          ArtMethod* method,
                                                          uint32_t method_access_flags,
                                                          CompilerCallbacks* callbacks,
+                                                         VerifierCallback* verifier_callback,
                                                          bool allow_soft_failures,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
                                                          bool aot_mode,
-                                                         bool allow_suspension,
                                                          std::string* hard_failure_msg) {
   if (VLOG_IS_ON(verifier_debug)) {
     return VerifyMethod<true>(self,
@@ -5127,12 +5127,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                               method,
                               method_access_flags,
                               callbacks,
+                              verifier_callback,
                               allow_soft_failures,
                               log_level,
                               need_precise_constants,
                               api_level,
                               aot_mode,
-                              allow_suspension,
                               hard_failure_msg);
   } else {
     return VerifyMethod<false>(self,
@@ -5147,12 +5147,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                method,
                                method_access_flags,
                                callbacks,
+                               verifier_callback,
                                allow_soft_failures,
                                log_level,
                                need_precise_constants,
                                api_level,
                                aot_mode,
-                               allow_suspension,
                                hard_failure_msg);
   }
 }
@@ -5170,12 +5170,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                          ArtMethod* method,
                                                          uint32_t method_access_flags,
                                                          CompilerCallbacks* callbacks,
+                                                         VerifierCallback* verifier_callback,
                                                          bool allow_soft_failures,
                                                          HardFailLogMode log_level,
                                                          bool need_precise_constants,
                                                          uint32_t api_level,
                                                          bool aot_mode,
-                                                         bool allow_suspension,
                                                          std::string* hard_failure_msg) {
   MethodVerifier::FailureData result;
   uint64_t start_ns = kTimeVerifyMethod ? NanoTime() : 0;
@@ -5186,8 +5186,8 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
                                                 dex_file,
                                                 code_item,
                                                 method_idx,
-                                                /* can_load_classes= */ allow_suspension,
-                                                /* allow_thread_suspension= */ allow_suspension,
+                                                /* can_load_classes= */ true,
+                                                /* allow_thread_suspension= */ true,
                                                 allow_soft_failures,
                                                 aot_mode,
                                                 dex_cache,
@@ -5209,6 +5209,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
       callbacks->MethodVerified(&verifier);
     }
 
+    bool set_dont_compile = false;
     if (verifier.failures_.size() != 0) {
       if (VLOG_IS_ON(verifier)) {
         verifier.DumpFailures(VLOG_STREAM(verifier) << "Soft verification failures in "
@@ -5221,12 +5222,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
       result.kind = FailureKind::kSoftFailure;
       if (method != nullptr &&
           !CanCompilerHandleVerificationFailure(verifier.encountered_failure_types_)) {
-        method->SetDontCompile();
+        set_dont_compile = true;
       }
     }
     if (method != nullptr) {
       if (verifier.HasInstructionThatWillThrow()) {
-        method->SetDontCompile();
+        set_dont_compile = true;
         if (aot_mode && (callbacks != nullptr) && !callbacks->IsBootImage()) {
           // When compiling apps, make HasInstructionThatWillThrow a soft error to trigger
           // re-verification at runtime.
@@ -5240,9 +5241,12 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
           result.kind = FailureKind::kSoftFailure;
         }
       }
+      bool must_count_locks = false;
       if ((verifier.encountered_failure_types_ & VerifyError::VERIFY_ERROR_LOCKING) != 0) {
-        method->SetMustCountLocks();
+        must_count_locks = true;
       }
+      verifier_callback->SetDontCompile(method, set_dont_compile);
+      verifier_callback->SetMustCountLocks(method, must_count_locks);
     }
   } else {
     // Bad method data.
