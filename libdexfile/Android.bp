@@ -145,7 +145,6 @@ art_cc_library {
     defaults: ["libdexfile_defaults"],
     visibility: [
         // TODO(b/133140750): Clean this up.
-        "//cts/tests/tests/appop",
         "//frameworks/base/startop/view_compiler",
     ],
     // Leave the symbols in the shared library so that stack unwinders can
