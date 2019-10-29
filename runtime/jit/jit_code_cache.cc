@@ -1838,15 +1838,18 @@ void ZygoteMap::Initialize(uint32_t number_of_methods) {
   // Allocate for 40-80% capacity. This will offer OK lookup times, and termination
   // cases.
   size_t capacity = RoundUpToPowerOfTwo(number_of_methods * 100 / 80);
-  const Entry* data =
-      reinterpret_cast<const Entry*>(region_->AllocateData(capacity * sizeof(Entry)));
-  if (data != nullptr) {
-    region_->FillData(data, capacity, Entry { nullptr, nullptr });
-    map_ = ArrayRef(data, capacity);
+  const uint8_t* memory = region_->AllocateData(
+      capacity * sizeof(Entry) + sizeof(ZygoteCompilationState));
+  if (memory == nullptr) {
+    LOG(WARNING) << "Could not allocate data for the zygote map";
+    return;
   }
-  done_ = reinterpret_cast<const bool*>(region_->AllocateData(sizeof(bool)));
-  CHECK(done_ != nullptr) << "Could not allocate a single boolean in the JIT region";
-  region_->WriteData(done_, false);
+  const Entry* data = reinterpret_cast<const Entry*>(memory);
+  region_->FillData(data, capacity, Entry { nullptr, nullptr });
+  map_ = ArrayRef(data, capacity);
+  compilation_state_ = reinterpret_cast<const ZygoteCompilationState*>(
+      memory + capacity * sizeof(Entry));
+  region_->WriteData(compilation_state_, ZygoteCompilationState::kInProgress);
 }
 
 const void* ZygoteMap::GetCodeFor(ArtMethod* method, uintptr_t pc) const {

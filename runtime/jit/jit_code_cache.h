@@ -79,6 +79,22 @@ class MarkCodeClosure;
 // of garbage collecting code.
 using CodeCacheBitmap = gc::accounting::MemoryRangeBitmap<kJitCodeAccountingBytes>;
 
+// The state of profile-based compilation in the zygote.
+// - kInProgress:      JIT compilation is happening
+// - kDone:            JIT compilation is finished, and the zygote is preparing notifying
+//                     the other processes.
+// - kNotifiedOk:      the zygote has notified the other processes, which can start
+//                     sharing the boot image method mappings.
+// - kNotifiedFailure: the zygote has notified the other processes, but they
+//                     cannot share the boot image method mappings due to
+//                     unexpected errors
+enum class ZygoteCompilationState : uint8_t {
+  kInProgress = 0,
+  kDone = 1,
+  kNotifiedOk = 2,
+  kNotifiedFailure = 3,
+};
+
 // Class abstraction over a map of ArtMethod -> compiled code, where the
 // ArtMethod are compiled by the zygote, and the map acts as a communication
 // channel between the zygote and the other processes.
@@ -88,7 +104,8 @@ using CodeCacheBitmap = gc::accounting::MemoryRangeBitmap<kJitCodeAccountingByte
 // This map is writable only by the zygote, and readable by all children.
 class ZygoteMap {
  public:
-  explicit ZygoteMap(JitMemoryRegion* region) : map_(), region_(region), done_(nullptr) {}
+  explicit ZygoteMap(JitMemoryRegion* region)
+      : map_(), region_(region), compilation_state_(nullptr) {}
 
   // Initialize the data structure so it can hold `number_of_methods` mappings.
   // Note that the map is fixed size and never grows.
@@ -106,12 +123,16 @@ class ZygoteMap {
     return GetCodeFor(method) != nullptr;
   }
 
-  void SetCompilationDone() {
-    region_->WriteData(done_, true);
+  void SetCompilationState(ZygoteCompilationState state) {
+    region_->WriteData(compilation_state_, state);
   }
 
-  bool IsCompilationDone() const {
-    return *done_;
+  bool IsCompilationNotified() const {
+    return *compilation_state_ > ZygoteCompilationState::kDone;
+  }
+
+  bool CanMapBootImageMethods() const {
+    return *compilation_state_ == ZygoteCompilationState::kNotifiedOk;
   }
 
  private:
@@ -129,7 +150,9 @@ class ZygoteMap {
   // The region in which the map is allocated.
   JitMemoryRegion* const region_;
 
-  const bool* done_;
+  // The current state of compilation in the zygote. Starts with kInProgress,
+  // and should end with kNotifiedOk or kNotifiedFailure.
+  const ZygoteCompilationState* compilation_state_;
 
   DISALLOW_COPY_AND_ASSIGN(ZygoteMap);
 };
