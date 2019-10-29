@@ -239,6 +239,10 @@ class ArtMethod final {
     return (GetAccessFlags() & kAccCompileDontBother) == 0;
   }
 
+  void ClearDontCompile() {
+    DCHECK(!IsMiranda());
+    ClearAccessFlags(kAccCompileDontBother);
+  }
   void SetDontCompile() {
     DCHECK(!IsMiranda());
     AddAccessFlags(kAccCompileDontBother);
@@ -364,6 +368,10 @@ class ArtMethod final {
       return false;
     }
     return (GetAccessFlags() & kAccMustCountLocks) != 0;
+  }
+
+  void ClearMustCountLocks() {
+    ClearAccessFlags(kAccMustCountLocks);
   }
 
   void SetMustCountLocks() {
