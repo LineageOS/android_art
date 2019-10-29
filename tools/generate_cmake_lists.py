@@ -68,7 +68,7 @@ def main():
 
   ANDROID_BUILD_TOP = get_android_build_top()
 
-  subprocess.check_output('m -j64', shell=True, cwd=ANDROID_BUILD_TOP)
+  subprocess.check_output('build/soong/soong_ui.bash --make-mode', shell=True, cwd=ANDROID_BUILD_TOP)
 
   out_art_cmakelists_dir = os.path.join(ANDROID_BUILD_TOP,
                                         'out/development/ide/clion/art')
