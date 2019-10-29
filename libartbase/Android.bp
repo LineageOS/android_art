@@ -168,7 +168,6 @@ art_cc_library {
     defaults: ["libartbase_defaults"],
     visibility: [
         // TODO(b/133140750): Clean this up.
-        "//cts/tests/tests/appop",
         "//frameworks/base/startop/view_compiler",
         "//packages/modules/NetworkStack/tests:__subpackages__",
     ],

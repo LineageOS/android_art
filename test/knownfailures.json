@@ -1139,7 +1139,10 @@
                   "1984-structural-redefine-field-trace",
                   "1985-structural-redefine-stack-scope",
                   "1986-structural-redefine-multi-thread-stack-scope",
-                  "1987-structural-redefine-recursive-stack-scope"
+                  "1987-structural-redefine-recursive-stack-scope",
+                  "1989-transform-bad-monitor",
+                  "1990-structural-bad-verify",
+                  "1992-retransform-no-such-field"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]

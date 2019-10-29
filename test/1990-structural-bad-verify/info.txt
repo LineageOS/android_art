@@ -1,0 +1,6 @@
+Tests basic functions in the jvmti plugin.
+
+b/142876078
+
+This tests a crash that could occur which was caused by the dex-cache being in an unexpected
+state.

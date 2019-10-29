@@ -25,6 +25,8 @@
 #include "base/locks.h"
 #include "handle.h"
 #include "obj_ptr.h"
+#include "verifier/method_verifier.h"
+#include "verifier/reg_type_cache.h"
 #include "verifier_enums.h"
 
 namespace art {
@@ -50,14 +52,16 @@ namespace verifier {
 // Verifier that ensures the complete class is OK.
 class ClassVerifier {
  public:
-  // Redo verification on a loaded class. This is for use by class redefinition. Since the class is
-  // already loaded and in use this can only be performed with the mutator lock held.
+  // Redo verification on a loaded class. This is for use by class redefinition. This must be called
+  // with all methods already having all of kAccDontCompile and kAccCountLocks and not having
+  // kAccSkipAccessChecks. This will remove some of these flags from the method. The caller must
+  // ensure this cannot race with other changes to the verification class flags.
   static FailureKind ReverifyClass(Thread* self,
                                    ObjPtr<mirror::Class> klass,
                                    HardFailLogMode log_level,
                                    uint32_t api_level,
                                    std::string* error)
-      REQUIRES(Locks::mutator_lock_);
+      REQUIRES_SHARED(Locks::mutator_lock_);
   // Verify a class. Returns "kNoFailure" on success.
   static FailureKind VerifyClass(Thread* self,
                                  ObjPtr<mirror::Class> klass,
@@ -78,18 +82,6 @@ class ClassVerifier {
                                  uint32_t api_level,
                                  std::string* error)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  static FailureKind VerifyClass(Thread* self,
-                                 const DexFile* dex_file,
-                                 Handle<mirror::DexCache> dex_cache,
-                                 Handle<mirror::ClassLoader> class_loader,
-                                 const dex::ClassDef& class_def,
-                                 CompilerCallbacks* callbacks,
-                                 bool allow_soft_failures,
-                                 HardFailLogMode log_level,
-                                 uint32_t api_level,
-                                 bool can_allocate,
-                                 std::string* error)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   static void Init(ClassLinker* class_linker) REQUIRES_SHARED(Locks::mutator_lock_);
   static void Shutdown();
@@ -101,13 +93,25 @@ class ClassVerifier {
   static FailureKind CommonVerifyClass(Thread* self,
                                        ObjPtr<mirror::Class> klass,
                                        CompilerCallbacks* callbacks,
+                                       VerifierCallback* verifier_callback,
                                        bool allow_soft_failures,
                                        HardFailLogMode log_level,
                                        uint32_t api_level,
-                                       bool can_allocate,
                                        std::string* error)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  static FailureKind VerifyClass(Thread* self,
+                                 const DexFile* dex_file,
+                                 Handle<mirror::DexCache> dex_cache,
+                                 Handle<mirror::ClassLoader> class_loader,
+                                 const dex::ClassDef& class_def,
+                                 CompilerCallbacks* callbacks,
+                                 VerifierCallback* verifier_callback,
+                                 bool allow_soft_failures,
+                                 HardFailLogMode log_level,
+                                 uint32_t api_level,
+                                 std::string* error)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   DISALLOW_COPY_AND_ASSIGN(ClassVerifier);
 };
 
