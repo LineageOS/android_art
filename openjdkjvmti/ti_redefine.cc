@@ -663,6 +663,11 @@ jvmtiError Redefiner::RedefineClassesDirect(ArtJvmTiEnv* env,
     // We don't actually need to do anything. Just return OK.
     return OK;
   }
+  // We need to fiddle with the verification class flags. To do this we need to make sure there are
+  // no concurrent redefinitions of the same class at the same time. For simplicity and because
+  // this is not expected to be a common occurrence we will just wrap the whole thing in a TOP-level
+  // lock.
+
   // Stop JIT for the duration of this redefine since the JIT might concurrently compile a method we
   // are going to redefine.
   // TODO We should prevent user-code suspensions to make sure this isn't held for too long.
@@ -1863,31 +1868,33 @@ jvmtiError Redefiner::Run() {
   }
   UnregisterAllBreakpoints();
 
-  // Disable GC and wait for it to be done if we are a moving GC.  This is fine since we are done
-  // allocating so no deadlocks.
-  ScopedDisableConcurrentAndMovingGc sdcamgc(runtime_->GetHeap(), self_);
+  {
+    // Disable GC and wait for it to be done if we are a moving GC.  This is fine since we are done
+    // allocating so no deadlocks.
+    ScopedDisableConcurrentAndMovingGc sdcamgc(runtime_->GetHeap(), self_);
 
-  // Do transition to final suspension
-  // TODO We might want to give this its own suspended state!
-  // TODO This isn't right. We need to change state without any chance of suspend ideally!
-  art::ScopedThreadSuspension sts(self_, art::ThreadState::kNative);
-  art::ScopedSuspendAll ssa("Final installation of redefined Classes!", /*long_suspend=*/true);
-  for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
-    art::ScopedAssertNoThreadSuspension nts("Updating runtime objects for redefinition");
-    ClassRedefinition& redef = data.GetRedefinition();
-    if (data.GetSourceClassLoader() != nullptr) {
-      ClassLoaderHelper::UpdateJavaDexFile(data.GetJavaDexFile(), data.GetNewDexFileCookie());
+    // Do transition to final suspension
+    // TODO We might want to give this its own suspended state!
+    // TODO This isn't right. We need to change state without any chance of suspend ideally!
+    art::ScopedThreadSuspension sts(self_, art::ThreadState::kNative);
+    art::ScopedSuspendAll ssa("Final installation of redefined Classes!", /*long_suspend=*/true);
+    for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
+      art::ScopedAssertNoThreadSuspension nts("Updating runtime objects for redefinition");
+      ClassRedefinition& redef = data.GetRedefinition();
+      if (data.GetSourceClassLoader() != nullptr) {
+        ClassLoaderHelper::UpdateJavaDexFile(data.GetJavaDexFile(), data.GetNewDexFileCookie());
+      }
+      redef.UpdateClass(data);
     }
-    redef.UpdateClass(data);
+    RestoreObsoleteMethodMapsIfUnneeded(holder);
+    // TODO We should check for if any of the redefined methods are intrinsic methods here and, if
+    // any are, force a full-world deoptimization before finishing redefinition. If we don't do this
+    // then methods that have been jitted prior to the current redefinition being applied might
+    // continue to use the old versions of the intrinsics!
+    // TODO Do the dex_file release at a more reasonable place. This works but it muddles who really
+    // owns the DexFile and when ownership is transferred.
+    ReleaseAllDexFiles();
   }
-  RestoreObsoleteMethodMapsIfUnneeded(holder);
-  // TODO We should check for if any of the redefined methods are intrinsic methods here and, if any
-  // are, force a full-world deoptimization before finishing redefinition. If we don't do this then
-  // methods that have been jitted prior to the current redefinition being applied might continue
-  // to use the old versions of the intrinsics!
-  // TODO Do the dex_file release at a more reasonable place. This works but it muddles who really
-  // owns the DexFile and when ownership is transferred.
-  ReleaseAllDexFiles();
   // By now the class-linker knows about all the classes so we can safetly retry verification and
   // update method flags.
   ReverifyClasses(holder);
@@ -1895,7 +1902,6 @@ jvmtiError Redefiner::Run() {
 }
 
 void Redefiner::ReverifyClasses(RedefinitionDataHolder& holder) {
-  art::ScopedAssertNoThreadSuspension nts("Updating method flags");
   for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
     data.GetRedefinition().ReverifyClass(data);
   }
@@ -2208,6 +2214,25 @@ void Redefiner::ClassRedefinition::UpdateClass(const RedefinitionDataIter& holde
   } else {
     UpdateClassInPlace(holder);
   }
+  UpdateClassCommon(holder);
+}
+
+void Redefiner::ClassRedefinition::UpdateClassCommon(const RedefinitionDataIter &cur_data) {
+  // NB This is after we've already replaced all old-refs with new-refs in the structural case.
+  art::ObjPtr<art::mirror::Class> klass(cur_data.GetMirrorClass());
+  DCHECK(!IsStructuralRedefinition() || klass == cur_data.GetNewClassObject());
+  if (!needs_reverify_) {
+    return;
+  }
+  // Force the most restrictive interpreter environment. We don't know what the final verification
+  // will allow. We will clear these after retrying verification once we drop the mutator-lock.
+  klass->VisitMethods([](art::ArtMethod* m) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+    if (!m->IsNative() && m->IsInvokable() && !m->IsObsolete()) {
+      m->ClearSkipAccessChecks();
+      m->SetDontCompile();
+      m->SetMustCountLocks();
+    }
+  }, art::kRuntimePointerSize);
 }
 
 // Restores the old obsolete methods maps if it turns out they weren't needed (ie there were no new
