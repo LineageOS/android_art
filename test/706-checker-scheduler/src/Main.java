@@ -322,7 +322,7 @@ public class Main {
   // but has more complex chains of transforming the original references:
   // ParameterValue --> BoundType --> NullCheck --> ArrayGet.
   // ParameterValue --> BoundType --> NullCheck --> IntermediateAddress --> ArraySet.
-  // After using LSA to analyze the orginal references, the scheduler should be able
+  // After using LSA to analyze the original references, the scheduler should be able
   // to find out that 'a' and 'b' may alias, hence unable to schedule these ArraGet/Set.
 
   /// CHECK-START-ARM64: void Main.CrossOverLoop2(java.lang.Object, java.lang.Object) scheduler (before)
@@ -584,9 +584,126 @@ public class Main {
     }
   }
 
+  // Check that instructions having cross iteration dependencies are not
+  // reordered.
+  //
+  /// CHECK-START-{ARM,ARM64}: void Main.testCrossItersDependencies() scheduler (before)
+  /// CHECK:     <<ID1:i\d+>>  Phi [{{i\d+}},<<ID3:i\d+>>]
+  /// CHECK:     <<ID2:i\d+>>  Phi [{{i\d+}},<<ID4:i\d+>>]
+  //
+  /// CHECK:     <<ID3>>  Sub [<<ID1>>,<<ID2>>]
+  /// CHECK:     <<ID4>>  Add [<<ID2>>,{{i\d+}}]
+
+  /// CHECK-START-{ARM,ARM64}: void Main.testCrossItersDependencies() scheduler (after)
+  /// CHECK:     <<ID1:i\d+>>  Phi [{{i\d+}},<<ID3:i\d+>>]
+  /// CHECK:     <<ID2:i\d+>>  Phi [{{i\d+}},<<ID4:i\d+>>]
+  //
+  /// CHECK:     <<ID3>>  Sub [<<ID1>>,<<ID2>>]
+  /// CHECK:     <<ID4>>  Add [<<ID2>>,{{i\d+}}]
+
+  /// CHECK-START-ARM: void Main.testCrossItersDependencies() disassembly (after)
+  /// CHECK:     subs
+  /// CHECK:     add
+  /// CHECK:     adds
+  /// CHECK:     ldrh
+  /// CHECK:     cmp
+  /// CHECK:     beq
+
+  /// CHECK-START-ARM64: void Main.testCrossItersDependencies() disassembly (after)
+  /// CHECK:     sub
+  /// CHECK:     add
+  /// CHECK:     add
+  /// CHECK:     ldrh
+  /// CHECK:     cbz
+  private static void testCrossItersDependencies() {
+    int[] data = {1, 2, 3, 0};
+    int sub = 0;
+    int sum = data[0];
+    for (int i = 1; data[i] != 0; ++i) {
+      sub -= sum;
+      sum += data[i];
+    }
+    expectEquals(sub, -4);
+    expectEquals(sum, 6);
+  }
+
+  // Check instructions defining values for the next iteration don't become
+  // self-dependent in a scheduling graph which prevents valid reordering.
+  //
+  /// CHECK-START-{ARM,ARM64}: void Main.testNoSelfDependantSchedNode(int) scheduler (before)
+  /// CHECK:     IntermediateAddress
+  /// CHECK:     ArrayGet
+  /// CHECK:     LessThanOrEqual
+  /// CHECK:     Select
+  /// CHECK:     IntermediateAddress
+  /// CHECK:     ArraySet
+  /// CHECK:     Add
+
+  /// CHECK-START-{ARM,ARM64}: void Main.testNoSelfDependantSchedNode(int) scheduler (after)
+  /// CHECK:     IntermediateAddress
+  /// CHECK:     ArrayGet
+  /// CHECK:     IntermediateAddress
+  /// CHECK:     LessThanOrEqual
+  /// CHECK:     Select
+  /// CHECK:     ArraySet
+  /// CHECK:     Add
+  //
+  // Parameter n is to prevent unrolling of the main loop.
+  private static void testNoSelfDependantSchedNode(int n) {
+    final int MAX = 2;
+    int[] a = {1, 2, 3};
+    int[] b = new int[a.length];
+    n = Math.min(n, a.length);
+    for (int i = 0; i < n; ++i) {
+      int j = a[i];
+      b[i] = (j > MAX ? MAX : 0);
+    }
+    expectEquals(b[0], 0);
+    expectEquals(b[1], 0);
+    expectEquals(b[2], 2);
+  }
+
+  // In case of cross iteration dependencies when a value for the next iteration is also used on
+  // the current iteration a MOV instruction is generated anyway. In such cases setting dependency
+  // between scheduling nodes will not eliminate MOV.
+  // In the test 'i+1' is such an example.
+  // The test checks that a dependency between scheduling nodes (first ArrayGet and Add) is not
+  // setup and Add is scheduled before ArrayGet.
+  //
+  /// CHECK-START-{ARM,ARM64}: void Main.testNonPreventingSchedulingCrossItersDeps(int) scheduler (before)
+  /// CHECK:          IntermediateAddress
+  /// CHECK-NEXT:     ArrayGet
+  /// CHECK-NEXT:     Add
+  /// CHECK-NEXT:     ArrayGet
+
+  /// CHECK-START-{ARM,ARM64}: void Main.testNonPreventingSchedulingCrossItersDeps(int) scheduler (after)
+  /// CHECK:          IntermediateAddress
+  /// CHECK-NEXT:     Add
+  /// CHECK-NEXT:     ArrayGet
+  /// CHECK-NEXT:     ArrayGet
+  //
+  // Parameter n is to prevent unrolling of the main loop.
+  private static void testNonPreventingSchedulingCrossItersDeps(int n) {
+    int[] a = {1, 2, 3};
+    n = Math.min(n, a.length);
+    for (int i = 0; i < n - 1; ++i) {
+      if (a[i] < a[i + 1]) {
+        int tmp = a[i];
+        a[i] = a[i + 1];
+        a[i + 1] = tmp;
+      }
+    }
+    expectEquals(a[0], 2);
+    expectEquals(a[1], 3);
+    expectEquals(a[2], 1);
+  }
+
   public static void main(String[] args) {
     testVecSetScalars();
     testVecReplicateScalar();
+    testCrossItersDependencies();
+    testNoSelfDependantSchedNode(3);
+    testNonPreventingSchedulingCrossItersDeps(3);
     if ((arrayAccess() + intDiv(10)) != -35) {
       System.out.println("FAIL");
     }
