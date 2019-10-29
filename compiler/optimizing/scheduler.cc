@@ -282,6 +282,36 @@ static bool IsBetterCandidateWithMoreLikelyDependencies(HInstruction* new_candid
   }
 }
 
+void SchedulingGraph::AddCrossIterationDependencies(SchedulingNode* node) {
+  for (HInstruction* instruction : node->GetInstruction()->GetInputs()) {
+    // Having a phi-function from a loop header as an input means the current node of the
+    // scheduling graph has a cross-iteration dependency because such phi-functions bring values
+    // from the previous iteration to the current iteration.
+    if (!instruction->IsLoopHeaderPhi()) {
+      continue;
+    }
+    for (HInstruction* phi_input : instruction->GetInputs()) {
+      // As a scheduling graph of the current basic block is built by
+      // processing instructions bottom-up, nullptr returned by GetNode means
+      // an instruction defining a value for the phi is either before the
+      // instruction represented by node or it is in a different basic block.
+      SchedulingNode* def_node = GetNode(phi_input);
+
+      // We don't create a dependency if there are uses besides the use in phi.
+      // In such cases a register to hold phi_input is usually allocated and
+      // a MOV instruction is generated. In cases with multiple uses and no MOV
+      // instruction, reordering creating a MOV instruction can improve
+      // performance more than an attempt to avoid a MOV instruction.
+      if (def_node != nullptr && def_node != node && phi_input->GetUses().HasExactlyOneElement()) {
+        // We have an implicit data dependency between node and def_node.
+        // AddAddDataDependency cannot be used because it is for explicit data dependencies.
+        // So AddOtherDependency is used.
+        AddOtherDependency(def_node, node);
+      }
+    }
+  }
+}
+
 void SchedulingGraph::AddDependencies(SchedulingNode* instruction_node,
                                       bool is_scheduling_barrier) {
   HInstruction* instruction = instruction_node->GetInstruction();
@@ -340,7 +370,11 @@ void SchedulingGraph::AddDependencies(SchedulingNode* instruction_node,
       if (other_node->IsSchedulingBarrier()) {
         // We have reached a scheduling barrier so we can stop further
         // processing.
-        DCHECK(other_node->HasOtherDependency(instruction_node));
+        //
+        // As a "other" dependency is not set up if a data dependency exists, we need to check that
+        // one of them must exist.
+        DCHECK(other_node->HasOtherDependency(instruction_node)
+               || other_node->HasDataDependency(instruction_node));
         break;
       }
       if (side_effect_dependency_analysis_.HasSideEffectDependency(other, instruction)) {
@@ -372,6 +406,8 @@ void SchedulingGraph::AddDependencies(SchedulingNode* instruction_node,
       AddOtherDependency(GetNode(use.GetUser()->GetHolder()), instruction_node);
     }
   }
+
+  AddCrossIterationDependencies(instruction_node);
 }
 
 static const std::string InstructionTypeId(const HInstruction* instruction) {
