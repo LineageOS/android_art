@@ -267,6 +267,14 @@ class Checker:
       return False, '%s is a directory'
     return True, ''
 
+  def is_dir(self, path):
+    fs_object = self._provider.get(path)
+    if fs_object is None:
+      return False, 'Could not find %s'
+    if not fs_object.is_dir:
+      return False, '%s is not a directory'
+    return True, ''
+
   def check_file(self, path):
     ok, msg = self.is_file(path)
     if not ok:
@@ -294,27 +302,30 @@ class Checker:
       self.fail('%s is not a symlink', path)
     self._expected_file_globs.add(path)
 
-  def check_art_test_executable(self, filename):
-    # This is a simplistic implementation, as we declare victory as soon as the
-    # test binary is found for one of the supported (not built) architectures.
-    # Ideally we would propagate the built architectures from the build system
-    # to this script and require test binaries for all of them to be present.
-    # Note that this behavior is not specific to this method: there are other
-    # places in this script where we rely on this simplified strategy.
+  def arch_dirs_for_path(self, path):
+    # Look for target-specific subdirectories for the given directory path.
+    # This is needed because the list of build targets is not propagated
+    # to this script.
     #
-    # TODO: Implement the suggestion above (here and in other places in this
-    # script).
-    test_found = False
+    # TODO: Pass build target information to this script and fix all places
+    # where this function in used (or similar workarounds).
+    dirs = []
     for arch in ARCHS:
-      test_path = '%s/%s/%s' % (ART_TEST_DIR, arch, filename)
-      test_is_file, _ = self.is_file(test_path)
-      if test_is_file:
-        test_found = True
-        self._expected_file_globs.add(test_path)
-        if not self._provider.get(test_path).is_exec:
-          self.fail('%s is not executable', test_path)
-    if not test_found:
+      dir = '%s/%s' % (path, arch)
+      found, _ = self.is_dir(dir)
+      if found:
+        dirs.append(dir)
+    return dirs
+
+  def check_art_test_executable(self, filename):
+    dirs = self.arch_dirs_for_path(ART_TEST_DIR)
+    if not dirs:
       self.fail('ART test binary missing: %s', filename)
+    for dir in dirs:
+      test_path = '%s/%s' % (dir, filename)
+      self._expected_file_globs.add(test_path)
+      if not self._provider.get(test_path).is_exec:
+        self.fail('%s is not executable', test_path)
 
   def check_single_library(self, filename):
     lib_path = 'lib/%s' % filename
@@ -355,6 +366,14 @@ class Checker:
         expected_paths |= set(fnmatch.filter(paths, dir_prefix + subpath_first_segment))
     for unexpected_path in set(paths) - expected_paths:
       self.fail('Unexpected file \'%s\'', unexpected_path)
+
+  def check_dexpreopt(self, basename):
+    dirs = self.arch_dirs_for_path('dexpreopt')
+    if not dirs:
+      self.fail('Could not find dexpreopt directory for any arch.')
+    for dir in dirs:
+      for ext in ['art', 'oat', 'vdex']:
+        self.check_file('%s/%s.%s' % (dir, basename, ext))
 
   # Just here for docs purposes, even if it isn't good Python style.
 
@@ -522,6 +541,13 @@ class ReleaseChecker:
     self._checker.check_optional_native_library('libclang_rt.hwasan*')
     self._checker.check_optional_native_library('libclang_rt.ubsan*')
 
+    # Check dexpreopt files for libcore bootclasspath jars
+    self._checker.check_dexpreopt('boot-art')
+    self._checker.check_dexpreopt('boot-art-apache-xml')
+    self._checker.check_dexpreopt('boot-art-bouncycastle')
+    self._checker.check_dexpreopt('boot-art-core-icu4j')
+    self._checker.check_dexpreopt('boot-art-core-libart')
+    self._checker.check_dexpreopt('boot-art-okhttp')
 
 class ReleaseTargetChecker:
   def __init__(self, checker):
@@ -534,7 +560,6 @@ class ReleaseTargetChecker:
     # Check the APEX package scripts.
     self._checker.check_executable('art_postinstall_hook')
     self._checker.check_executable('art_preinstall_hook')
-    self._checker.check_executable('art_preinstall_hook_boot')
     self._checker.check_executable('art_preinstall_hook_system_server')
     self._checker.check_executable('art_prepostinstall_utils')
 
