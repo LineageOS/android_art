@@ -439,7 +439,7 @@ class OatFileAssistant {
   // File descriptor corresponding to apk, dex file, or zip.
   int zip_fd_;
 
-  size_t cached_boot_class_path_checksum_component_count_ = 0u;
+  std::string cached_boot_class_path_;
   std::string cached_boot_class_path_checksums_;
 
   friend class OatFileAssistantTest;

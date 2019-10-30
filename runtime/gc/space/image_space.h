@@ -137,24 +137,39 @@ class ImageSpace : public MemMapSpace {
   // The leading character in a dex file checksum part of boot class path checkums.
   static constexpr char kDexFileChecksumPrefix = 'd';
 
-  // Returns the checksums for the boot image and extra boot class path dex files,
-  // based on the boot class path, image location and ISA (may differ from the ISA of an
-  // initialized Runtime). The boot image and dex files do not need to be loaded in memory.
-  static std::string GetBootClassPathChecksums(ArrayRef<const std::string> boot_class_path,
-                                               const std::string& image_location,
-                                               InstructionSet image_isa,
-                                               ImageSpaceLoadingOrder order,
-                                               /*out*/std::string* error_msg);
+  // Returns the checksums for the boot image, extensions and extra boot class path dex files,
+  // based on the image spaces and boot class path dex files loaded in memory.
+  // The `image_spaces` must correspond to the head of the `boot_class_path`.
+  static std::string GetBootClassPathChecksums(ArrayRef<ImageSpace* const> image_spaces,
+                                               ArrayRef<const DexFile* const> boot_class_path);
 
-  // Returns the checksums for the boot image and extra boot class path dex files,
-  // based on the boot image and boot class path dex files loaded in memory.
-  static std::string GetBootClassPathChecksums(const std::vector<ImageSpace*>& image_spaces,
-                                               const std::vector<const DexFile*>& boot_class_path);
+  // Returns whether the checksums are valid for the given boot class path,
+  // image location and ISA (may differ from the ISA of an initialized Runtime).
+  // The boot image and dex files do not need to be loaded in memory.
+  static bool VerifyBootClassPathChecksums(std::string_view oat_checksums,
+                                           std::string_view oat_boot_class_path,
+                                           const std::string& image_location,
+                                           ArrayRef<const std::string> boot_class_path_locations,
+                                           ArrayRef<const std::string> boot_class_path,
+                                           InstructionSet image_isa,
+                                           ImageSpaceLoadingOrder order,
+                                           /*out*/std::string* error_msg);
+
+  // Returns whether the oat checksums and boot class path description are valid
+  // for the given boot image spaces and boot class path. Used for boot image extensions.
+  static bool VerifyBootClassPathChecksums(
+      std::string_view oat_checksums,
+      std::string_view oat_boot_class_path,
+      ArrayRef<const std::unique_ptr<ImageSpace>> image_spaces,
+      ArrayRef<const std::string> boot_class_path_locations,
+      ArrayRef<const std::string> boot_class_path,
+      /*out*/std::string* error_msg);
 
   // Expand a single image location to multi-image locations based on the dex locations.
   static std::vector<std::string> ExpandMultiImageLocations(
       const std::vector<std::string>& dex_locations,
-      const std::string& image_location);
+      const std::string& image_location,
+      bool boot_image_extension = false);
 
   // Returns true if the dex checksums in the given oat file match the
   // checksums of the original dex files on disk. This is intended to be used
@@ -221,7 +236,8 @@ class ImageSpace : public MemMapSpace {
   // Internal overload that takes ArrayRef<> instead of vector<>.
   static std::vector<std::string> ExpandMultiImageLocations(
       ArrayRef<const std::string> dex_locations,
-      const std::string& image_location);
+      const std::string& image_location,
+      bool boot_image_extension = false);
 
   class BootImageLoader;
   template <typename ReferenceVisitor>
