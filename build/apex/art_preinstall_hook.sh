@@ -36,8 +36,6 @@ for ARCH in $ARCHES ; do
   # Create OTA folders.
   mkdir -p /data/ota/dalvik-cache/$ARCH || exit 104
   rm -rf /data/ota/dalvik-cache/$ARCH/* || exit 105
-
-  `dirname $0`/art_preinstall_hook_boot $ARCH || exit 200
 done
 
 PRIMARY_ARCH=`echo $ARCHES | sed -e 's/ .*//'`
