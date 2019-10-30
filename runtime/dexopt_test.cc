@@ -116,24 +116,24 @@ void DexoptTest::GenerateOatForTest(const std::string& dex_location,
   ASSERT_TRUE(odex_file.get() != nullptr) << error_msg;
   EXPECT_EQ(filter, odex_file->GetCompilerFilter());
 
-  std::string boot_image_checksums = gc::space::ImageSpace::GetBootClassPathChecksums(
-      ArrayRef<const std::string>(Runtime::Current()->GetBootClassPath()),
-      image_location,
-      kRuntimeISA,
-      gc::space::ImageSpaceLoadingOrder::kSystemFirst,
-      &error_msg);
-  ASSERT_FALSE(boot_image_checksums.empty()) << error_msg;
-
-  const OatHeader& oat_header = odex_file->GetOatHeader();
-
   if (CompilerFilter::DependsOnImageChecksum(filter)) {
+    const OatHeader& oat_header = odex_file->GetOatHeader();
+    const char* oat_bcp = oat_header.GetStoreValueByKey(OatHeader::kBootClassPathKey);
+    ASSERT_TRUE(oat_bcp != nullptr);
+    ASSERT_EQ(oat_bcp, android::base::Join(Runtime::Current()->GetBootClassPathLocations(), ':'));
     const char* checksums = oat_header.GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
     ASSERT_TRUE(checksums != nullptr);
-    if (with_alternate_image) {
-      EXPECT_NE(boot_image_checksums, checksums);
-    } else {
-      EXPECT_EQ(boot_image_checksums, checksums);
-    }
+
+    bool match = gc::space::ImageSpace::VerifyBootClassPathChecksums(
+        checksums,
+        oat_bcp,
+        image_location,
+        ArrayRef<const std::string>(Runtime::Current()->GetBootClassPathLocations()),
+        ArrayRef<const std::string>(Runtime::Current()->GetBootClassPath()),
+        kRuntimeISA,
+        gc::space::ImageSpaceLoadingOrder::kSystemFirst,
+        &error_msg);
+    ASSERT_EQ(!with_alternate_image, match) << error_msg;
   }
 }
 
