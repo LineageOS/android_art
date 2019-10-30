@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -755,6 +756,14 @@ public class Main {
             Object[].class, MethodType.methodType(void.class));
         fail("Unexpected success for array class type for findConstructor");
     } catch (NoSuchMethodException e) {}
+
+    // Child class constructor (b/143343351)
+    {
+        MethodHandle handle = MethodHandles.lookup().findConstructor(
+            ArrayList.class, MethodType.methodType(void.class));
+        AbstractList list = (AbstractList) handle.asType(MethodType.methodType(AbstractList.class))
+                .invokeExact();
+    }
   }
 
   public static void testStringConstructors() throws Throwable {
@@ -874,6 +883,16 @@ public class Main {
       fail("Unexpected string constructor result: '" + s + "'");
     }
 
+    // Child class constructor (b/143343351)
+    {
+        MethodHandle handle = MethodHandles.lookup().findConstructor(
+            String.class, MethodType.methodType(void.class));
+        CharSequence o = (CharSequence) handle.asType(MethodType.methodType(CharSequence.class))
+                .invokeExact();
+        if (!o.equals("")) {
+            fail("Unexpected child class constructor result: '" + o + "'");
+        }
+    }
     System.out.println("String constructors done.");
   }
 
