@@ -710,6 +710,8 @@ void Jit::NotifyZygoteCompilationDone() {
     }
   }
 
+  LOG(INFO) << "Successfully notified child processes on sharing boot image methods";
+
   // Mark that compilation of boot classpath is done, and memory can now be
   // shared. Other processes will pick up this information.
   code_cache_->GetZygoteMap()->SetCompilationState(ZygoteCompilationState::kNotifiedOk);
@@ -821,9 +823,9 @@ class JitDoneCompilingProfileTask final : public SelfDeletingTask {
     }
 
     if (Runtime::Current()->IsZygote()) {
-      // Copy the boot image methods data to the mappings we created to share
-      // with the children.
-      Runtime::Current()->GetJit()->NotifyZygoteCompilationDone();
+      // Record that we are done compiling the profile.
+      Runtime::Current()->GetJit()->GetCodeCache()->GetZygoteMap()->SetCompilationState(
+          ZygoteCompilationState::kDone);
     }
   }
 
@@ -1623,6 +1625,15 @@ void Jit::PreZygoteFork() {
 void Jit::PostZygoteFork() {
   if (thread_pool_ == nullptr) {
     return;
+  }
+  if (Runtime::Current()->IsZygote() &&
+      code_cache_->GetZygoteMap()->IsCompilationDoneButNotNotified()) {
+    // Copy the boot image methods data to the mappings we created to share
+    // with the children. We do this here as we are the only thread running and
+    // we don't risk other threads concurrently updating the ArtMethod's.
+    CHECK_EQ(GetTaskCount(), 1);
+    NotifyZygoteCompilationDone();
+    CHECK(code_cache_->GetZygoteMap()->IsCompilationNotified());
   }
   thread_pool_->CreateThreads();
 }
