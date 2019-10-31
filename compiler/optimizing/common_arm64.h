@@ -87,36 +87,36 @@ inline vixl::aarch64::Register InputRegisterAt(HInstruction* instr, int input_in
                       instr->InputAt(input_index)->GetType());
 }
 
-inline vixl::aarch64::FPRegister DRegisterFrom(Location location) {
+inline vixl::aarch64::VRegister DRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::FPRegister::GetDRegFromCode(location.reg());
+  return vixl::aarch64::VRegister::GetDRegFromCode(location.reg());
 }
 
-inline vixl::aarch64::FPRegister QRegisterFrom(Location location) {
+inline vixl::aarch64::VRegister QRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::FPRegister::GetQRegFromCode(location.reg());
+  return vixl::aarch64::VRegister::GetQRegFromCode(location.reg());
 }
 
-inline vixl::aarch64::FPRegister VRegisterFrom(Location location) {
+inline vixl::aarch64::VRegister VRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::FPRegister::GetVRegFromCode(location.reg());
+  return vixl::aarch64::VRegister::GetVRegFromCode(location.reg());
 }
 
-inline vixl::aarch64::FPRegister SRegisterFrom(Location location) {
+inline vixl::aarch64::VRegister SRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::FPRegister::GetSRegFromCode(location.reg());
+  return vixl::aarch64::VRegister::GetSRegFromCode(location.reg());
 }
 
-inline vixl::aarch64::FPRegister FPRegisterFrom(Location location, DataType::Type type) {
+inline vixl::aarch64::VRegister FPRegisterFrom(Location location, DataType::Type type) {
   DCHECK(DataType::IsFloatingPointType(type)) << type;
   return type == DataType::Type::kFloat64 ? DRegisterFrom(location) : SRegisterFrom(location);
 }
 
-inline vixl::aarch64::FPRegister OutputFPRegister(HInstruction* instr) {
+inline vixl::aarch64::VRegister OutputFPRegister(HInstruction* instr) {
   return FPRegisterFrom(instr->GetLocations()->Out(), instr->GetType());
 }
 
-inline vixl::aarch64::FPRegister InputFPRegisterAt(HInstruction* instr, int input_index) {
+inline vixl::aarch64::VRegister InputFPRegisterAt(HInstruction* instr, int input_index) {
   return FPRegisterFrom(instr->GetLocations()->InAt(input_index),
                         instr->InputAt(input_index)->GetType());
 }
@@ -201,7 +201,7 @@ inline Location LocationFrom(const vixl::aarch64::Register& reg) {
   return Location::RegisterLocation(ARTRegCodeFromVIXL(reg.GetCode()));
 }
 
-inline Location LocationFrom(const vixl::aarch64::FPRegister& fpreg) {
+inline Location LocationFrom(const vixl::aarch64::VRegister& fpreg) {
   return Location::FpuRegisterLocation(fpreg.GetCode());
 }
 

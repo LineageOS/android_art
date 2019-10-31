@@ -689,7 +689,7 @@ void Arm64JNIMacroAssembler::BuildFrame(size_t frame_size,
                                         const ManagedRegisterEntrySpills& entry_spills) {
   // Setup VIXL CPURegList for callee-saves.
   CPURegList core_reg_list(CPURegister::kRegister, kXRegSize, 0);
-  CPURegList fp_reg_list(CPURegister::kFPRegister, kDRegSize, 0);
+  CPURegList fp_reg_list(CPURegister::kVRegister, kDRegSize, 0);
   for (auto r : callee_save_regs) {
     Arm64ManagedRegister reg = r.AsArm64();
     if (reg.IsXRegister()) {
@@ -745,7 +745,7 @@ void Arm64JNIMacroAssembler::RemoveFrame(size_t frame_size,
                                          bool may_suspend) {
   // Setup VIXL CPURegList for callee-saves.
   CPURegList core_reg_list(CPURegister::kRegister, kXRegSize, 0);
-  CPURegList fp_reg_list(CPURegister::kFPRegister, kDRegSize, 0);
+  CPURegList fp_reg_list(CPURegister::kVRegister, kDRegSize, 0);
   for (auto r : callee_save_regs) {
     Arm64ManagedRegister reg = r.AsArm64();
     if (reg.IsXRegister()) {
