@@ -71,6 +71,7 @@ bool X86_64Assembler::CpuHasAVXorAVX2FeatureFlag() {
   return false;
 }
 
+
 void X86_64Assembler::call(CpuRegister reg) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitOptionalRex32(reg);
@@ -758,7 +759,6 @@ void X86_64Assembler::movd(CpuRegister dst, XmmRegister src, bool is64bit) {
   EmitOperand(src.LowBits(), Operand(dst));
 }
 
-
 void X86_64Assembler::addss(XmmRegister dst, XmmRegister src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitUint8(0xF3);
@@ -767,7 +767,6 @@ void X86_64Assembler::addss(XmmRegister dst, XmmRegister src) {
   EmitUint8(0x58);
   EmitXmmRegisterOperand(dst.LowBits(), src);
 }
-
 
 void X86_64Assembler::addss(XmmRegister dst, const Address& src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
@@ -2633,7 +2632,6 @@ void X86_64Assembler::xorps(XmmRegister dst, XmmRegister src) {
   EmitXmmRegisterOperand(dst.LowBits(), src);
 }
 
-
 void X86_64Assembler::pxor(XmmRegister dst, XmmRegister src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitUint8(0x66);
@@ -3143,6 +3141,35 @@ void X86_64Assembler::pmaddwd(XmmRegister dst, XmmRegister src) {
   EmitUint8(0x0F);
   EmitUint8(0xF5);
   EmitXmmRegisterOperand(dst.LowBits(), src);
+}
+
+void X86_64Assembler::vpmaddwd(XmmRegister dst, XmmRegister src1, XmmRegister src2) {
+  DCHECK(CpuHasAVXorAVX2FeatureFlag());
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  bool is_twobyte_form = false;
+  uint8_t ByteZero = 0x00, ByteOne = 0x00, ByteTwo = 0x00;
+  if (!src2.NeedsRex()) {
+    is_twobyte_form = true;
+  }
+  ByteZero = EmitVexPrefixByteZero(is_twobyte_form);
+  X86_64ManagedRegister vvvv_reg =
+      X86_64ManagedRegister::FromXmmRegister(src1.AsFloatRegister());
+  if (is_twobyte_form) {
+    ByteOne = EmitVexPrefixByteOne(dst.NeedsRex(), vvvv_reg, SET_VEX_L_128, SET_VEX_PP_66);
+  } else {
+    ByteOne = EmitVexPrefixByteOne(dst.NeedsRex(),
+                                   /*X=*/ false,
+                                   src2.NeedsRex(),
+                                   SET_VEX_M_0F);
+    ByteTwo = EmitVexPrefixByteTwo(/*W=*/ false, vvvv_reg, SET_VEX_L_128, SET_VEX_PP_66);
+  }
+  EmitUint8(ByteZero);
+  EmitUint8(ByteOne);
+  if (!is_twobyte_form) {
+    EmitUint8(ByteTwo);
+  }
+  EmitUint8(0xF5);
+  EmitXmmRegisterOperand(dst.LowBits(), src2);
 }
 
 void X86_64Assembler::phaddw(XmmRegister dst, XmmRegister src) {
