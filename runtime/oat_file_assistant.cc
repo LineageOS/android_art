@@ -604,78 +604,55 @@ const std::vector<uint32_t>* OatFileAssistant::GetRequiredDexChecksums() {
 }
 
 bool OatFileAssistant::ValidateBootClassPathChecksums(const OatFile& oat_file) {
-  // Get the BCP from the oat file.
-  const char* oat_boot_class_path =
-      oat_file.GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathKey);
-  if (oat_boot_class_path == nullptr) {
-    return false;
-  }
-
-  // Check that the oat BCP is a prefix of current BCP locations and count components.
-  Runtime* runtime = Runtime::Current();
-  size_t component_count = 0u;
-  std::string_view remaining_bcp(oat_boot_class_path);
-  bool bcp_ok = false;
-  for (const std::string& location : runtime->GetBootClassPathLocations()) {
-    if (!StartsWith(remaining_bcp, location)) {
-      break;
-    }
-    remaining_bcp.remove_prefix(location.size());
-    ++component_count;
-    if (remaining_bcp.empty()) {
-      bcp_ok = true;
-      break;
-    }
-    if (!StartsWith(remaining_bcp, ":")) {
-      break;
-    }
-    remaining_bcp.remove_prefix(1u);
-  }
-  if (!bcp_ok) {
-    return false;
-  }
-
-  // Get the checksums.
+  // Get the checksums and the BCP from the oat file.
   const char* oat_boot_class_path_checksums =
       oat_file.GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
-  if (oat_boot_class_path_checksums == nullptr) {
+  const char* oat_boot_class_path =
+      oat_file.GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathKey);
+  if (oat_boot_class_path_checksums == nullptr || oat_boot_class_path == nullptr) {
     return false;
   }
-
-  // Retrieve checksums for this portion of the BCP if we do not have them cached.
-  if (cached_boot_class_path_checksum_component_count_ != component_count) {
-    ArrayRef<const std::string> boot_class_path(runtime->GetBootClassPath());
-    std::string error_msg;
-    std::string boot_class_path_checksums = gc::space::ImageSpace::GetBootClassPathChecksums(
-        boot_class_path.SubArray(/* pos= */ 0u, component_count),
-        runtime->GetImageLocation(),
-        isa_,
-        runtime->GetImageSpaceLoadingOrder(),
-        &error_msg);
-    if (boot_class_path_checksums.empty()) {
-      VLOG(oat) << "No image for oat image checksum to match against.";
-
-      if (HasOriginalDexFiles()) {
-        return false;
-      }
-
-      // If there is no original dex file to fall back to, grudgingly accept
-      // the oat file. This could technically lead to crashes, but there's no
-      // way we could find a better oat file to use for this dex location,
-      // and it's better than being stuck in a boot loop with no way out.
-      // The problem will hopefully resolve itself the next time the runtime
-      // starts up.
-      LOG(WARNING) << "Dex location " << dex_location_ << " does not seem to include dex file. "
-          << "Allow oat file use. This is potentially dangerous.";
-
-      return true;
-    }
-    cached_boot_class_path_checksum_component_count_ = component_count;
-    cached_boot_class_path_checksums_ = boot_class_path_checksums;
+  std::string_view oat_boot_class_path_checksums_view(oat_boot_class_path_checksums);
+  std::string_view oat_boot_class_path_view(oat_boot_class_path);
+  if (oat_boot_class_path_view == cached_boot_class_path_ &&
+      oat_boot_class_path_checksums_view == cached_boot_class_path_checksums_) {
+    return true;
   }
 
-  // Compare the checksums.
-  return cached_boot_class_path_checksums_ == oat_boot_class_path_checksums;
+  Runtime* runtime = Runtime::Current();
+  std::string error_msg;
+  bool result = gc::space::ImageSpace::VerifyBootClassPathChecksums(
+      oat_boot_class_path_checksums_view,
+      oat_boot_class_path_view,
+      runtime->GetImageLocation(),
+      ArrayRef<const std::string>(runtime->GetBootClassPathLocations()),
+      ArrayRef<const std::string>(runtime->GetBootClassPath()),
+      isa_,
+      runtime->GetImageSpaceLoadingOrder(),
+      &error_msg);
+  if (!result) {
+    VLOG(oat) << "Failed to verify checksums of oat file " << oat_file.GetLocation()
+        << " error: " << error_msg;
+
+    if (HasOriginalDexFiles()) {
+      return false;
+    }
+
+    // If there is no original dex file to fall back to, grudgingly accept
+    // the oat file. This could technically lead to crashes, but there's no
+    // way we could find a better oat file to use for this dex location,
+    // and it's better than being stuck in a boot loop with no way out.
+    // The problem will hopefully resolve itself the next time the runtime
+    // starts up.
+    LOG(WARNING) << "Dex location " << dex_location_ << " does not seem to include dex file. "
+        << "Allow oat file use. This is potentially dangerous.";
+    return true;
+  }
+
+  // This checksum has been validated, so save it.
+  cached_boot_class_path_ = oat_boot_class_path_view;
+  cached_boot_class_path_checksums_ = oat_boot_class_path_checksums_view;
+  return true;
 }
 
 OatFileAssistant::OatFileInfo& OatFileAssistant::GetBestInfo() {
