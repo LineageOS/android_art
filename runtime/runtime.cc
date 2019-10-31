@@ -2231,7 +2231,8 @@ void Runtime::VisitImageRoots(RootVisitor* visitor) {
   }
 }
 
-static ArtMethod* CreateRuntimeMethod(ClassLinker* class_linker, LinearAlloc* linear_alloc) {
+static ArtMethod* CreateRuntimeMethod(ClassLinker* class_linker, LinearAlloc* linear_alloc)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
   const PointerSize image_pointer_size = class_linker->GetImagePointerSize();
   const size_t method_alignment = ArtMethod::Alignment(image_pointer_size);
   const size_t method_size = ArtMethod::Size(image_pointer_size);
