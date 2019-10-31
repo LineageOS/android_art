@@ -83,7 +83,7 @@ static constexpr off_t kPacketCommandOff = 10;
 static constexpr uint8_t kDdmCommandSet = 199;
 static constexpr uint8_t kDdmChunkCommand = 1;
 
-static AdbConnectionState* gState;
+static std::optional<AdbConnectionState> gState;
 
 static bool IsDebuggingPossible() {
   return art::Dbg::IsJdwpAllowed();
@@ -155,6 +155,15 @@ AdbConnectionState::AdbConnectionState(const std::string& agent_name)
   art::Runtime::Current()->GetRuntimeCallbacks()->AddDebuggerControlCallback(&controller_);
 }
 
+AdbConnectionState::~AdbConnectionState() {
+  // Remove the startup callback.
+  art::Thread* self = art::Thread::Current();
+  if (self != nullptr) {
+    art::ScopedObjectAccess soa(self);
+    art::Runtime::Current()->GetRuntimeCallbacks()->RemoveDebuggerControlCallback(&controller_);
+  }
+}
+
 static jobject CreateAdbConnectionThread(art::Thread* thr) {
   JNIEnv* env = thr->GetJniEnv();
   // Move to native state to talk with the jnienv api.
@@ -179,7 +188,6 @@ struct CallbackData {
 
 static void* CallbackFunction(void* vdata) {
   std::unique_ptr<CallbackData> data(reinterpret_cast<CallbackData*>(vdata));
-  CHECK(data->this_ == gState);
   art::Thread* self = art::Thread::Attach(kAdbConnectionThreadName,
                                           true,
                                           data->thr_);
@@ -204,10 +212,6 @@ static void* CallbackFunction(void* vdata) {
   data->this_->RunPollLoop(self);
   int detach_result = art::Runtime::Current()->GetJavaVM()->DetachCurrentThread();
   CHECK_EQ(detach_result, 0);
-
-  // Get rid of the connection
-  gState = nullptr;
-  delete data->this_;
 
   return nullptr;
 }
@@ -830,17 +834,12 @@ void AdbConnectionState::StopDebuggerThreads() {
 extern "C" bool ArtPlugin_Initialize() {
   DCHECK(art::Runtime::Current()->GetJdwpProvider() == art::JdwpProvider::kAdbConnection);
   // TODO Provide some way for apps to set this maybe?
-  DCHECK(gState == nullptr);
-  gState = new AdbConnectionState(kDefaultJdwpAgentName);
+  gState.emplace(kDefaultJdwpAgentName);
   return ValidateJdwpOptions(art::Runtime::Current()->GetJdwpOptions());
 }
 
 extern "C" bool ArtPlugin_Deinitialize() {
   gState->StopDebuggerThreads();
-  if (!gState->DebuggerThreadsStarted()) {
-    // If debugger threads were started then those threads will delete the state once they are done.
-    delete gState;
-  }
   return true;
 }
 
