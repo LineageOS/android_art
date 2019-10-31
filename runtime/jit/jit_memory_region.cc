@@ -114,14 +114,12 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
     //       +---------------+
     //       | non exec code |\
     //       +---------------+ \
-    //       | writable data |\ \
-    //       +---------------+ \ \
-    //       :               :\ \ \
-    //       +---------------+.\.\.+---------------+
-    //       |  exec code    |  \ \|     code      |
-    //       +---------------+...\.+---------------+
-    //       | readonly data |    \|     data      |
-    //       +---------------+.....+---------------+
+    //       :               :\ \
+    //       +---------------+.\.+---------------+
+    //       |  exec code    |  \|     code      |
+    //       +---------------+...+---------------+
+    //       |      data     |   |     data      |
+    //       +---------------+...+---------------+
     //
     // In this configuration code updates are written to the non-executable view of the code
     // cache, and the executable view of the code cache has fixed RX memory protections.
@@ -134,7 +132,7 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
     base_flags = MAP_SHARED;
     data_pages = MemMap::MapFile(
         data_capacity + exec_capacity,
-        kProtR,
+        is_zygote ? kProtR : kProtRW,
         base_flags,
         mem_fd,
         /* start= */ 0,
@@ -216,34 +214,36 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
           return false;
         }
       }
-      // Create a dual view of the data cache.
-      name = data_cache_name + "-rw";
-      writable_data_pages = MemMap::MapFile(data_capacity,
-                                            kProtRW,
-                                            base_flags,
-                                            mem_fd,
-                                            /* start= */ 0,
-                                            /* low_4GB= */ false,
-                                            name.c_str(),
-                                            &error_str);
-      if (!writable_data_pages.IsValid()) {
-        std::ostringstream oss;
-        oss << "Failed to create dual data view: " << error_str;
-        *error_msg = oss.str();
-        return false;
-      }
-      if (writable_data_pages.MadviseDontFork() != 0) {
-        *error_msg = "Failed to madvise dont fork the writable data view";
-        return false;
-      }
-      if (non_exec_pages.MadviseDontFork() != 0) {
-        *error_msg = "Failed to madvise dont fork the writable code view";
-        return false;
-      }
-      // Now that we have created the writable and executable mappings, prevent creating any new
-      // ones.
-      if (is_zygote && !ProtectZygoteMemory(mem_fd.get(), error_msg)) {
-        return false;
+      // For the zygote, create a dual view of the data cache.
+      if (is_zygote) {
+        name = data_cache_name + "-rw";
+        writable_data_pages = MemMap::MapFile(data_capacity,
+                                              kProtRW,
+                                              base_flags,
+                                              mem_fd,
+                                              /* start= */ 0,
+                                              /* low_4GB= */ false,
+                                              name.c_str(),
+                                              &error_str);
+        if (!writable_data_pages.IsValid()) {
+          std::ostringstream oss;
+          oss << "Failed to create dual data view for zygote: " << error_str;
+          *error_msg = oss.str();
+          return false;
+        }
+        if (writable_data_pages.MadviseDontFork() != 0) {
+          *error_msg = "Failed to madvise dont fork the writable data view";
+          return false;
+        }
+        if (non_exec_pages.MadviseDontFork() != 0) {
+          *error_msg = "Failed to madvise dont fork the writable code view";
+          return false;
+        }
+        // Now that we have created the writable and executable mappings, prevent creating any new
+        // ones.
+        if (!ProtectZygoteMemory(mem_fd.get(), error_msg)) {
+          return false;
+        }
       }
     }
   } else {
