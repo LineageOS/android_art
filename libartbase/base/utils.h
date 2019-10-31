@@ -159,6 +159,9 @@ std::string GetProcessStatus(const char* key);
 // following accesses repopulate the memory or return zero.
 bool IsAddressKnownBackedByFileOrShared(const void* addr);
 
+// Returns the number of threads running.
+int GetTaskCount();
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_UTILS_H_
