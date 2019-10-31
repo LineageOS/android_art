@@ -40,6 +40,7 @@
 
 #include "base/array_ref.h"
 #include "base/mem_map.h"
+#include "events.h"
 
 namespace openjdkjvmti {
 
@@ -65,7 +66,8 @@ class ArtClassDefinition {
         current_dex_file_(),
         redefined_(false),
         from_class_ext_(false),
-        initialized_(false) {}
+        initialized_(false),
+        structural_transform_update_(false) {}
 
   void InitFirstLoad(const char* descriptor,
                      art::Handle<art::mirror::ClassLoader> klass_loader,
@@ -76,7 +78,7 @@ class ArtClassDefinition {
   ArtClassDefinition(ArtClassDefinition&& o) = default;
   ArtClassDefinition& operator=(ArtClassDefinition&& o) = default;
 
-  void SetNewDexData(jint new_dex_len, unsigned char* new_dex_data) {
+  void SetNewDexData(jint new_dex_len, unsigned char* new_dex_data, ArtJvmtiEvent event) {
     DCHECK(IsInitialized());
     if (new_dex_data == nullptr) {
       return;
@@ -86,8 +88,15 @@ class ArtClassDefinition {
         dex_data_memory_.resize(new_dex_len);
         memcpy(dex_data_memory_.data(), new_dex_data, new_dex_len);
         dex_data_ = art::ArrayRef<const unsigned char>(dex_data_memory_);
+        if (event == ArtJvmtiEvent::kStructuralDexFileLoadHook) {
+          structural_transform_update_ = true;
+        }
       }
     }
+  }
+
+  bool HasStructuralChanges() const {
+    return structural_transform_update_;
   }
 
   art::ArrayRef<const unsigned char> GetNewOriginalDexFile() const {
@@ -186,6 +195,9 @@ class ArtClassDefinition {
   bool from_class_ext_;
 
   bool initialized_;
+
+  // Set if we had a new dex from the given transform type.
+  bool structural_transform_update_;
 
   DISALLOW_COPY_AND_ASSIGN(ArtClassDefinition);
 };
