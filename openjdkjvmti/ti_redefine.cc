@@ -376,7 +376,7 @@ jvmtiError Redefiner::GetClassRedefinitionError(jclass klass, /*out*/ std::strin
     return ERR(INVALID_CLASS);
   }
   art::Handle<art::mirror::Class> h_klass(hs.NewHandle(obj->AsClass()));
-  return Redefiner::GetClassRedefinitionError(h_klass, error_msg);
+  return Redefiner::GetClassRedefinitionError<kType>(h_klass, error_msg);
 }
 
 template <RedefinitionType kType>
@@ -574,9 +574,10 @@ Redefiner::ClassRedefinition::~ClassRedefinition() {
   }
 }
 
-jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
-                                      jint class_count,
-                                      const jvmtiClassDefinition* definitions) {
+template<RedefinitionType kType>
+jvmtiError Redefiner::RedefineClassesGeneric(jvmtiEnv* jenv,
+                                             jint class_count,
+                                             const jvmtiClassDefinition* definitions) {
   art::Runtime* runtime = art::Runtime::Current();
   art::Thread* self = art::Thread::Current();
   ArtJvmTiEnv* env = ArtJvmTiEnv::AsArtJvmTiEnv(jenv);
@@ -597,7 +598,8 @@ jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
   std::vector<ArtClassDefinition> def_vector;
   def_vector.reserve(class_count);
   for (jint i = 0; i < class_count; i++) {
-    jvmtiError res = Redefiner::GetClassRedefinitionError(definitions[i].klass, &error_msg);
+    jvmtiError res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(
+        definitions[i].klass, &error_msg);
     if (res != OK) {
       JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
       return res;
@@ -611,13 +613,33 @@ jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
     def_vector.push_back(std::move(def));
   }
   // Call all the transformation events.
-  Transformer::RetransformClassesDirect(self, &def_vector);
-  jvmtiError res = RedefineClassesDirect(
-      env, runtime, self, def_vector, RedefinitionType::kNormal, &error_msg);
+  Transformer::RetransformClassesDirect<kType>(self, &def_vector);
+  if (kType == RedefinitionType::kStructural) {
+    Transformer::RetransformClassesDirect<RedefinitionType::kNormal>(self, &def_vector);
+  }
+  jvmtiError res = RedefineClassesDirect(env, runtime, self, def_vector, kType, &error_msg);
   if (res != OK) {
     JVMTI_LOG(WARNING, env) << "FAILURE TO REDEFINE " << error_msg;
   }
   return res;
+}
+
+jvmtiError Redefiner::StructurallyRedefineClasses(jvmtiEnv* jenv,
+                                                  jint class_count,
+                                                  const jvmtiClassDefinition* definitions) {
+  ArtJvmTiEnv* art_env = ArtJvmTiEnv::AsArtJvmTiEnv(jenv);
+  if (art_env == nullptr) {
+    return ERR(INVALID_ENVIRONMENT);
+  } else if (art_env->capabilities.can_redefine_classes != 1) {
+    return ERR(MUST_POSSESS_CAPABILITY);
+  }
+  return RedefineClassesGeneric<RedefinitionType::kStructural>(jenv, class_count, definitions);
+}
+
+jvmtiError Redefiner::RedefineClasses(jvmtiEnv* jenv,
+                                      jint class_count,
+                                      const jvmtiClassDefinition* definitions) {
+  return RedefineClassesGeneric<RedefinitionType::kNormal>(jenv, class_count, definitions);
 }
 
 jvmtiError Redefiner::StructurallyRedefineClassDirect(jvmtiEnv* env,
@@ -1154,13 +1176,10 @@ bool Redefiner::ClassRedefinition::CheckRedefinable() {
 
   art::Handle<art::mirror::Class> h_klass(hs.NewHandle(GetMirrorClass()));
   jvmtiError res;
-  switch (driver_->type_) {
-  case RedefinitionType::kNormal:
-    res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(h_klass, &err);
-    break;
-  case RedefinitionType::kStructural:
+  if (driver_->type_ == RedefinitionType::kStructural && this->IsStructuralRedefinition()) {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kStructural>(h_klass, &err);
-    break;
+  } else {
+    res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(h_klass, &err);
   }
   if (res != OK) {
     RecordFailure(res, err);
@@ -1171,7 +1190,7 @@ bool Redefiner::ClassRedefinition::CheckRedefinable() {
 }
 
 bool Redefiner::ClassRedefinition::CheckRedefinitionIsValid() {
-  return CheckRedefinable() && CheckClass() && CheckFields() && CheckMethods();
+  return CheckClass() && CheckFields() && CheckMethods() && CheckRedefinable();
 }
 
 class RedefinitionDataIter;

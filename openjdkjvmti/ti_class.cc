@@ -204,6 +204,9 @@ struct ClassCallback : public art::ClassLoadCallback {
       memcpy(post_non_retransform.data(), def.GetDexData().data(), post_non_retransform.size());
     }
 
+    // Call all structural transformation agents.
+    Transformer::TransformSingleClassDirect<ArtJvmtiEvent::kStructuralDexFileLoadHook>(
+        event_handler, self, &def);
     // Call all retransformable agents.
     Transformer::TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(
         event_handler, self, &def);

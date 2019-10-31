@@ -87,6 +87,9 @@ class Redefiner {
   static jvmtiError RedefineClasses(jvmtiEnv* env,
                                     jint class_count,
                                     const jvmtiClassDefinition* definitions);
+  static jvmtiError StructurallyRedefineClasses(jvmtiEnv* env,
+                                                jint class_count,
+                                                const jvmtiClassDefinition* definitions);
 
   static jvmtiError IsModifiableClass(jvmtiEnv* env, jclass klass, jboolean* is_redefinable);
   static jvmtiError IsStructurallyModifiableClass(jvmtiEnv* env,
@@ -285,6 +288,11 @@ class Redefiner {
 
   jvmtiError AddRedefinition(ArtJvmTiEnv* env, const ArtClassDefinition& def)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
+
+  template<RedefinitionType kType = RedefinitionType::kNormal>
+  static jvmtiError RedefineClassesGeneric(jvmtiEnv* env,
+                                           jint class_count,
+                                           const jvmtiClassDefinition* definitions);
 
   template<RedefinitionType kType = RedefinitionType::kNormal>
   static jvmtiError IsModifiableClassGeneric(jvmtiEnv* env, jclass klass, jboolean* is_redefinable);

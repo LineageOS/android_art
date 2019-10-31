@@ -94,6 +94,8 @@ template<typename T> T GetExtensionFunction(JNIEnv* env, jvmtiEnv* jvmti, const 
   return reinterpret_cast<T>(GetExtensionFunctionVoid(env, jvmti, name));
 }
 
+jint GetExtensionEventId(jvmtiEnv* jvmti, const std::string_view& name);
+
 }  // namespace art
 
 #endif  // ART_TEST_TI_AGENT_JVMTI_HELPER_H_
