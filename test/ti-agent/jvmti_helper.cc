@@ -238,6 +238,26 @@ void DeallocParams(jvmtiEnv* env, jvmtiParamInfo* params, jint n_params) {
   }
 }
 
+jint GetExtensionEventId(jvmtiEnv* jvmti, const std::string_view& name) {
+  jint n_ext = 0;
+  jint res = -1;
+  bool found_res = false;
+  jvmtiExtensionEventInfo* infos = nullptr;
+  CHECK_EQ(jvmti->GetExtensionEvents(&n_ext, &infos), JVMTI_ERROR_NONE);
+  for (jint i = 0; i < n_ext; i++) {
+    const jvmtiExtensionEventInfo& info = infos[i];
+    if (name == info.id) {
+      res = info.extension_event_index;
+      found_res = true;
+    }
+    DeallocParams(jvmti, info.params, info.param_count);
+    Dealloc(jvmti, info.short_description, info.id, info.params);
+  }
+  Dealloc(jvmti, infos);
+  CHECK(found_res);
+  return res;
+}
+
 void* GetExtensionFunctionVoid(JNIEnv* env, jvmtiEnv* jvmti, const std::string_view& name) {
   jint n_ext = 0;
   void* res = nullptr;

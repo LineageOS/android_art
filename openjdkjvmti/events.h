@@ -81,7 +81,8 @@ enum class ArtJvmtiEvent : jint {
     kClassFileLoadHookRetransformable = JVMTI_MAX_EVENT_TYPE_VAL + 1,
     kDdmPublishChunk = JVMTI_MAX_EVENT_TYPE_VAL + 2,
     kObsoleteObjectCreated = JVMTI_MAX_EVENT_TYPE_VAL + 3,
-    kMaxNormalEventTypeVal = kObsoleteObjectCreated,
+    kStructuralDexFileLoadHook = JVMTI_MAX_EVENT_TYPE_VAL + 4,
+    kMaxNormalEventTypeVal = kStructuralDexFileLoadHook,
 
     // All that follow are events used to implement internal JVMTI functions. They are not settable
     // directly by agents.
@@ -107,6 +108,17 @@ using ArtJvmtiEventObsoleteObjectCreated = void (*)(jvmtiEnv *jvmti_env,
                                                     jlong* obsolete_tag,
                                                     jlong* new_tag);
 
+using ArtJvmtiEventStructuralDexFileLoadHook = void (*)(jvmtiEnv *jvmti_env,
+                                                        JNIEnv* jni_env,
+                                                        jclass class_being_redefined,
+                                                        jobject loader,
+                                                        const char* name,
+                                                        jobject protection_domain,
+                                                        jint dex_data_len,
+                                                        const unsigned char* dex_data,
+                                                        jint* new_dex_data_len,
+                                                        unsigned char** new_dex_data);
+
 // It is not enough to store a Thread pointer, as these may be reused. Use the pointer and the
 // thread id.
 // Note: We could just use the tid like tracing does.
@@ -119,7 +131,10 @@ struct UniqueThreadHasher {
 };
 
 struct ArtJvmtiEventCallbacks : jvmtiEventCallbacks {
-  ArtJvmtiEventCallbacks() : DdmPublishChunk(nullptr), ObsoleteObjectCreated(nullptr) {
+  ArtJvmtiEventCallbacks()
+      : DdmPublishChunk(nullptr),
+        ObsoleteObjectCreated(nullptr),
+        StructuralDexFileLoadHook(nullptr) {
     memset(this, 0, sizeof(jvmtiEventCallbacks));
   }
 
@@ -131,6 +146,7 @@ struct ArtJvmtiEventCallbacks : jvmtiEventCallbacks {
 
   ArtJvmtiEventDdmPublishChunk DdmPublishChunk;
   ArtJvmtiEventObsoleteObjectCreated ObsoleteObjectCreated;
+  ArtJvmtiEventStructuralDexFileLoadHook StructuralDexFileLoadHook;
 };
 
 bool IsExtensionEvent(jint e);
