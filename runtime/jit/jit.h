@@ -377,7 +377,7 @@ class Jit {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Map boot image methods after all compilation in zygote has been done.
-  void MapBootImageMethods();
+  void MapBootImageMethods() REQUIRES(Locks::mutator_lock_);
 
   // Notify to other processes that the zygote is done profile compiling boot
   // class path methods.
