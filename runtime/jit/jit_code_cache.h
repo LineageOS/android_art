@@ -127,12 +127,17 @@ class ZygoteMap {
     region_->WriteData(compilation_state_, state);
   }
 
+  bool IsCompilationDoneButNotNotified() const {
+    return compilation_state_ != nullptr && *compilation_state_ == ZygoteCompilationState::kDone;
+  }
+
   bool IsCompilationNotified() const {
-    return *compilation_state_ > ZygoteCompilationState::kDone;
+    return compilation_state_ != nullptr && *compilation_state_ > ZygoteCompilationState::kDone;
   }
 
   bool CanMapBootImageMethods() const {
-    return *compilation_state_ == ZygoteCompilationState::kNotifiedOk;
+    return compilation_state_ != nullptr &&
+           *compilation_state_ == ZygoteCompilationState::kNotifiedOk;
   }
 
  private:

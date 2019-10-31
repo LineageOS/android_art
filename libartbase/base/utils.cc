@@ -16,6 +16,7 @@
 
 #include "utils.h"
 
+#include <dirent.h>
 #include <inttypes.h>
 #include <pthread.h>
 #include <sys/stat.h>
@@ -353,6 +354,24 @@ bool IsAddressKnownBackedByFileOrShared(const void* addr) {
   // From https://www.kernel.org/doc/Documentation/vm/pagemap.txt:
   //  * Bit  61    page is file-page or shared-anon (since 3.5)
   return (flags & (1LL << 61)) != 0;
+}
+
+int GetTaskCount() {
+  DIR* directory = opendir("/proc/self/task");
+  if (directory == nullptr) {
+    return -1;
+  }
+
+  uint32_t count = 0;
+  struct dirent* entry = nullptr;
+  while ((entry = readdir(directory)) != nullptr) {
+    if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0)) {
+      continue;
+    }
+    ++count;
+  }
+  closedir(directory);
+  return count;
 }
 
 }  // namespace art
