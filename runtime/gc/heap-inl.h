@@ -47,6 +47,12 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
                                                       size_t byte_count,
                                                       AllocatorType allocator,
                                                       const PreFenceVisitor& pre_fence_visitor) {
+  auto no_suspend_pre_fence_visitor =
+      [&pre_fence_visitor](auto... x) REQUIRES_SHARED(Locks::mutator_lock_) {
+        ScopedAssertNoThreadSuspension sants("No thread suspension during pre-fence visitor");
+        pre_fence_visitor(x...);
+      };
+
   if (kIsDebugBuild) {
     CheckPreconditionsForAllocObject(klass, byte_count);
     // Since allocation can cause a GC which will need to SuspendAll, make sure all allocations are
@@ -92,7 +98,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     }
     bytes_allocated = byte_count;
     usable_size = bytes_allocated;
-    pre_fence_visitor(obj, usable_size);
+    no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
   } else if (
       !kInstrumented && allocator == kAllocatorTypeRosAlloc &&
@@ -104,7 +110,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
       obj->AssertReadBarrierState();
     }
     usable_size = bytes_allocated;
-    pre_fence_visitor(obj, usable_size);
+    no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
   } else {
     // Bytes allocated that includes bulk thread-local buffer allocations in addition to direct
@@ -148,7 +154,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
       // case the object is non movable and points to a recently allocated movable class.
       WriteBarrier::ForFieldWrite(obj, mirror::Object::ClassOffset(), klass);
     }
-    pre_fence_visitor(obj, usable_size);
+    no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
     if (bytes_tl_bulk_allocated > 0) {
       size_t num_bytes_allocated_before =
