@@ -1611,7 +1611,7 @@ class OatWriter::InitImageMethodVisitor : public OatDexMethodVisitor {
 
   // Assign a pointer to quick code for copied methods
   // not handled in the method StartClass
-  void Postprocess() {
+  void Postprocess() REQUIRES_SHARED(Locks::mutator_lock_) {
     for (std::pair<ArtMethod*, ArtMethod*>& p : methods_to_process_) {
       ArtMethod* method = p.first;
       ArtMethod* origin = p.second;
@@ -2271,6 +2271,7 @@ size_t OatWriter::InitOatCodeDexFiles(size_t offset) {
   }
 
   if (HasImage()) {
+    ScopedObjectAccess soa(Thread::Current());
     ScopedAssertNoThreadSuspension sants("Init image method visitor", Thread::Current());
     InitImageMethodVisitor image_visitor(this, offset, dex_files_);
     success = VisitDexMethods(&image_visitor);
