@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: Boot image extension.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '7', '4', '\0' } };
+  // Last oat version changed reason: Optimize stack map decoding - interleave varints.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '7', '3', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";
