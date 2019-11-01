@@ -2227,6 +2227,7 @@ class ImageSpace::BootImageLoader {
                                                            simple_relocate_visitor);
 
     // Retrieve the Class.class, Method.class and Constructor.class needed in the loops below.
+    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots;
     ObjPtr<mirror::Class> class_class;
     ObjPtr<mirror::Class> method_class;
     ObjPtr<mirror::Class> constructor_class;
@@ -2241,9 +2242,8 @@ class ImageSpace::BootImageLoader {
           kExtension ? source_size - image_size : image_size);
       int32_t class_roots_index = enum_cast<int32_t>(ImageHeader::kClassRoots);
       DCHECK_LT(class_roots_index, image_roots->GetLength<kVerifyNone>());
-      ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots =
-          ObjPtr<mirror::ObjectArray<mirror::Class>>::DownCast(base_relocate_visitor(
-              image_roots->GetWithoutChecks<kVerifyNone>(class_roots_index).Ptr()));
+      class_roots = ObjPtr<mirror::ObjectArray<mirror::Class>>::DownCast(base_relocate_visitor(
+          image_roots->GetWithoutChecks<kVerifyNone>(class_roots_index).Ptr()));
       if (kExtension) {
         DCHECK(patched_objects->Test(class_roots.Ptr()));
         class_class = GetClassRoot<mirror::Class, kWithoutReadBarrier>(class_roots);
@@ -2374,6 +2374,12 @@ class ImageSpace::BootImageLoader {
         }
         pos += RoundUp(object->SizeOf<kVerifyNone>(), kObjectAlignment);
       }
+    }
+    if (kIsDebugBuild && !kExtension) {
+      // We used just Test() instead of Set() above but we need to use Set()
+      // for class roots to satisfy a DCHECK() for extensions.
+      DCHECK(!patched_objects->Test(class_roots.Ptr()));
+      patched_objects->Set(class_roots.Ptr());
     }
   }
 

@@ -283,10 +283,17 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
 
 TEST_F(Dex2oatImageTest, TestExtension) {
   constexpr size_t kReservationSize = 256 * MB;  // This should be enough for the compiled images.
+  // Extend to both directions for maximum relocation difference.
+  static_assert(ART_BASE_ADDRESS_MIN_DELTA < 0);
+  static_assert(ART_BASE_ADDRESS_MAX_DELTA > 0);
+  static_assert(IsAligned<kPageSize>(ART_BASE_ADDRESS_MIN_DELTA));
+  static_assert(IsAligned<kPageSize>(ART_BASE_ADDRESS_MAX_DELTA));
+  constexpr size_t kExtra = ART_BASE_ADDRESS_MAX_DELTA - ART_BASE_ADDRESS_MIN_DELTA;
+  uint32_t min_relocated_address = kBaseAddress + ART_BASE_ADDRESS_MIN_DELTA;
   std::string error_msg;
   MemMap reservation = MemMap::MapAnonymous("Reservation",
-                                            reinterpret_cast<uint8_t*>(kBaseAddress),
-                                            kReservationSize,
+                                            reinterpret_cast<uint8_t*>(min_relocated_address),
+                                            kReservationSize + kExtra,
                                             PROT_NONE,
                                             /*low_4gb=*/ true,
                                             /*reuse=*/ false,
@@ -393,6 +400,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   // Try to load the boot image with different image locations.
   std::vector<std::string> boot_class_path = libcore_dex_files;
   std::vector<std::unique_ptr<gc::space::ImageSpace>> boot_image_spaces;
+  bool relocate = false;
   MemMap extra_reservation;
   auto load = [&](const std::string& image_location) {
     boot_image_spaces.clear();
@@ -403,7 +411,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
                                                 image_location,
                                                 kRuntimeISA,
                                                 gc::space::ImageSpaceLoadingOrder::kSystemFirst,
-                                                /*relocate=*/ false,
+                                                relocate,
                                                 /*executable=*/ true,
                                                 /*is_zygote=*/ false,
                                                 /*extra_reservation_size=*/ 0u,
@@ -411,57 +419,61 @@ TEST_F(Dex2oatImageTest, TestExtension) {
                                                 &extra_reservation);
   };
 
-  // Load primary image with full path.
-  bool load_ok = load(base_location);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_FALSE(extra_reservation.IsValid());
-  ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+  for (bool r : { false, true}) {
+    relocate = r;
 
-  // Fail to load primary image with just the name.
-  load_ok = load(base_name);
-  ASSERT_FALSE(load_ok);
+    // Load primary image with full path.
+    bool load_ok = load(base_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_FALSE(extra_reservation.IsValid());
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
 
-  // Fail to load primary image with a search path.
-  load_ok = load("*");
-  ASSERT_FALSE(load_ok);
-  load_ok = load(scratch_dir + "*");
-  ASSERT_FALSE(load_ok);
+    // Fail to load primary image with just the name.
+    load_ok = load(base_name);
+    ASSERT_FALSE(load_ok);
 
-  // Load the primary and first extension with full path.
-  load_ok = load(base_location + ':' + mid_location);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+    // Fail to load primary image with a search path.
+    load_ok = load("*");
+    ASSERT_FALSE(load_ok);
+    load_ok = load(scratch_dir + "*");
+    ASSERT_FALSE(load_ok);
 
-  // Load the primary with full path and fail to load first extension without full path.
-  load_ok = load(base_location + ':' + mid_name);
-  ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
-  ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
+    // Load the primary and first extension with full path.
+    load_ok = load(base_location + ':' + mid_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
 
-  // Load all the libcore images with full paths.
-  load_ok = load(base_location + ':' + mid_location + ':' + tail_location);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+    // Load the primary with full path and fail to load first extension without full path.
+    load_ok = load(base_location + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
 
-  // Load the primary and first extension with full paths, fail to load second extension by name.
-  load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+    // Load all the libcore images with full paths.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
 
-  // Load the primary with full path and fail to load first extension without full path,
-  // fail to load second extension because it depends on the first.
-  load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
-  ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
-  ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
+    // Load the primary and first extension with full paths, fail to load second extension by name.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
 
-  // Load the primary with full path and extensions with a specified search path.
-  load_ok = load(base_location + ':' + scratch_dir + '*');
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+    // Load the primary with full path and fail to load first extension without full path,
+    // fail to load second extension because it depends on the first.
+    load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
 
-  // Load the primary with full path and fail to find extensions in BCP path.
-  load_ok = load(base_location + ":*");
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+    // Load the primary with full path and extensions with a specified search path.
+    load_ok = load(base_location + ':' + scratch_dir + '*');
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path and fail to find extensions in BCP path.
+    load_ok = load(base_location + ":*");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+  }
 
   // Now copy the libcore dex files to the `scratch_dir` and retry loading the boot image
   // with BCP in the scratch_dir so that the images can be found based on BCP paths.
@@ -475,52 +487,56 @@ TEST_F(Dex2oatImageTest, TestExtension) {
     bcp_component = new_location;
   }
 
-  // Loading the primary image with just the name now succeeds.
-  load_ok = load(base_name);
-  ASSERT_TRUE(load_ok) << error_msg;
+  for (bool r : { false, true}) {
+    relocate = r;
 
-  // Loading the primary image with a search path still fails.
-  load_ok = load("*");
-  ASSERT_FALSE(load_ok);
-  load_ok = load(scratch_dir + "*");
-  ASSERT_FALSE(load_ok);
+    // Loading the primary image with just the name now succeeds.
+    bool load_ok = load(base_name);
+    ASSERT_TRUE(load_ok) << error_msg;
 
-  // Load the primary and first extension without paths.
-  load_ok = load(base_name + ':' + mid_name);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+    // Loading the primary image with a search path still fails.
+    load_ok = load("*");
+    ASSERT_FALSE(load_ok);
+    load_ok = load(scratch_dir + "*");
+    ASSERT_FALSE(load_ok);
 
-  // Load the primary with full path and the first extension without full path.
-  load_ok = load(base_location + ':' + mid_name);
-  ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
-  ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());  // Including the extension.
+    // Load the primary and first extension without paths.
+    load_ok = load(base_name + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
 
-  // Load all the libcore images without paths.
-  load_ok = load(base_name + ':' + mid_name + ':' + tail_name);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+    // Load the primary with full path and the first extension without full path.
+    load_ok = load(base_location + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());  // Including the extension.
 
-  // Load the primary and first extension with full paths and second extension by name.
-  load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+    // Load all the libcore images without paths.
+    load_ok = load(base_name + ':' + mid_name + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
 
-  // Load the primary with full path, first extension without path,
-  // and second extension with full path.
-  load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
-  ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());  // Including both extensions.
+    // Load the primary and first extension with full paths and second extension by name.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
 
-  // Load the primary with full path and find both extensions in BCP path.
-  load_ok = load(base_location + ":*");
-  ASSERT_TRUE(load_ok) << error_msg;
-  ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+    // Load the primary with full path, first extension without path,
+    // and second extension with full path.
+    load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());  // Including both extensions.
 
-  // Fail to load any images with invalid image locations (named component after search paths).
-  load_ok = load(base_location + ":*:" + tail_location);
-  ASSERT_FALSE(load_ok);
-  load_ok = load(base_location + ':' + scratch_dir + "*:" + tail_location);
-  ASSERT_FALSE(load_ok);
+    // Load the primary with full path and find both extensions in BCP path.
+    load_ok = load(base_location + ":*");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Fail to load any images with invalid image locations (named component after search paths).
+    load_ok = load(base_location + ":*:" + tail_location);
+    ASSERT_FALSE(load_ok);
+    load_ok = load(base_location + ':' + scratch_dir + "*:" + tail_location);
+    ASSERT_FALSE(load_ok);
+  }
 
   ClearDirectory(scratch_dir.c_str());
   int rmdir_result = rmdir(scratch_dir.c_str());
