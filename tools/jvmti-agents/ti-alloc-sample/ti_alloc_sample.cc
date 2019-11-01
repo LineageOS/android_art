@@ -324,6 +324,7 @@ static std::string formatMethod(jvmtiEnv* jvmti, jmethodID method_id) {
 }
 
 static int sampling_rate = 10;
+static int stack_depth_limit = 50;
 
 static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
                                      JNIEnv* jni,
@@ -358,10 +359,13 @@ static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
                                           klass,
                                           jlongContainer{.val = size}) + ")";
 
-  static constexpr size_t kFrameDepthLimit = 20;
-  jvmtiFrameInfo stack_frames[kFrameDepthLimit];
+  std::unique_ptr<jvmtiFrameInfo[]> stack_frames(new jvmtiFrameInfo[stack_depth_limit]);
   jint stack_depth;
-  jvmtiError err = jvmti->GetStackTrace(thread, 0, kFrameDepthLimit, stack_frames, &stack_depth);
+  jvmtiError err = jvmti->GetStackTrace(thread,
+                                        0,
+                                        stack_depth_limit,
+                                        stack_frames.get(),
+                                        &stack_depth);
   if (err == JVMTI_ERROR_NONE) {
     for (int i = 0; i < stack_depth; ++i) {
       record += "\n    " + formatMethod(jvmti, stack_frames[i].method);
@@ -397,14 +401,23 @@ static jvmtiError SetupCapabilities(jvmtiEnv* jvmti) {
 static jint AgentStart(JavaVM* vm,
                        char* options,
                        void* reserved ATTRIBUTE_UNUSED) {
-  // options string should contain "sampling_rate,output_file_path".
+  // options string should contain "sampling_rate,stack_depth_limit,output_file_path".
   std::string args(options);
   size_t comma_pos = args.find(',');
   if (comma_pos == std::string::npos) {
     return JNI_ERR;
   }
   sampling_rate = std::stoi(args.substr(0, comma_pos));
+  args = args.substr(comma_pos + 1);
+  comma_pos = args.find(',');
+  if (comma_pos == std::string::npos) {
+    return JNI_ERR;
+  }
+  stack_depth_limit = std::stoi(args.substr(0, comma_pos));
   std::string output_file_path = args.substr(comma_pos + 1);
+
+  LOG(INFO) << "Starting allocation tracing: sampling_rate=" << sampling_rate
+            << ", stack_depth_limit=" << stack_depth_limit;
 
   // Create the environment.
   jvmtiEnv* jvmti = nullptr;

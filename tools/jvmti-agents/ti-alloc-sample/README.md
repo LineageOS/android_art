@@ -16,11 +16,13 @@ Use `libtiallocsamples` if you wish to build a version without non-NDK dynamic d
 
 The agent is loaded using -agentpath like normal. It takes arguments in the
 following format:
->     `sample_rate,log_path`
+>     `sample_rate,stack_depth_limit,log_path`
 
 * sample_rate is an integer specifying how frequently an event is reported.
   E.g., 10 means every tenth call to new will be logged.
-* log_path is an absolued file path specifying where the log is to be written.
+* stack_depth_limit is an integer that determines the number of frames the deepest stack trace
+  can contain.  It returns just the top portion if the limit is exceeded.
+* log_path is an absolute file path specifying where the log is to be written.
 
 #### Output Format
 
