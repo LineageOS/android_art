@@ -82,8 +82,6 @@ class MANAGED MethodHandle : public Object {
         GetField64(OFFSET_OF_OBJECT_MEMBER(MethodHandle, art_field_or_method_)));
   }
 
-  ALWAYS_INLINE ObjPtr<mirror::Class> GetTargetClass() REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Gets the return type for a named invoke method, or nullptr if the invoke method is not
   // supported.
   static const char* GetReturnTypeDescriptor(const char* invoke_method_name);

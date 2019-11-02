@@ -615,6 +615,7 @@ class X86_64Assembler final : public Assembler {
   void pavgw(XmmRegister dst, XmmRegister src);
   void psadbw(XmmRegister dst, XmmRegister src);
   void pmaddwd(XmmRegister dst, XmmRegister src);
+  void vpmaddwd(XmmRegister dst, XmmRegister src1, XmmRegister src2);
   void phaddw(XmmRegister dst, XmmRegister src);
   void phaddd(XmmRegister dst, XmmRegister src);
   void haddps(XmmRegister dst, XmmRegister src);

@@ -255,13 +255,17 @@ void Transformer::TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookNo
 template
 void Transformer::TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(
     EventHandler* event_handler, art::Thread* self, /*in-out*/ArtClassDefinition* def);
+template
+void Transformer::TransformSingleClassDirect<ArtJvmtiEvent::kStructuralDexFileLoadHook>(
+    EventHandler* event_handler, art::Thread* self, /*in-out*/ArtClassDefinition* def);
 
 template<ArtJvmtiEvent kEvent>
 void Transformer::TransformSingleClassDirect(EventHandler* event_handler,
                                              art::Thread* self,
                                              /*in-out*/ArtClassDefinition* def) {
   static_assert(kEvent == ArtJvmtiEvent::kClassFileLoadHookNonRetransformable ||
-                kEvent == ArtJvmtiEvent::kClassFileLoadHookRetransformable,
+                kEvent == ArtJvmtiEvent::kClassFileLoadHookRetransformable ||
+                kEvent == ArtJvmtiEvent::kStructuralDexFileLoadHook,
                 "bad event type");
   // We don't want to do transitions between calling the event and setting the new data so change to
   // native state early. This also avoids any problems that the FaultHandler might have in
@@ -282,25 +286,30 @@ void Transformer::TransformSingleClassDirect(EventHandler* event_handler,
       dex_data.data(),
       /*out*/&new_len,
       /*out*/&new_data);
-  def->SetNewDexData(new_len, new_data);
+  def->SetNewDexData(new_len, new_data, kEvent);
 }
 
+template <RedefinitionType kType>
 void Transformer::RetransformClassesDirect(
-      art::Thread* self,
-      /*in-out*/std::vector<ArtClassDefinition>* definitions) {
+    art::Thread* self,
+    /*in-out*/ std::vector<ArtClassDefinition>* definitions) {
+  constexpr ArtJvmtiEvent kEvent = kType == RedefinitionType::kNormal
+                                       ? ArtJvmtiEvent::kClassFileLoadHookRetransformable
+                                       : ArtJvmtiEvent::kStructuralDexFileLoadHook;
   for (ArtClassDefinition& def : *definitions) {
-    TransformSingleClassDirect<ArtJvmtiEvent::kClassFileLoadHookRetransformable>(
-        gEventHandler, self, &def);
+    TransformSingleClassDirect<kEvent>(gEventHandler, self, &def);
   }
 }
+
+template void Transformer::RetransformClassesDirect<RedefinitionType::kNormal>(
+      art::Thread* self, /*in-out*/std::vector<ArtClassDefinition>* definitions);
+template void Transformer::RetransformClassesDirect<RedefinitionType::kStructural>(
+      art::Thread* self, /*in-out*/std::vector<ArtClassDefinition>* definitions);
 
 jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
                                            jint class_count,
                                            const jclass* classes) {
-  if (env == nullptr) {
-    JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM env was null!";
-    return ERR(INVALID_ENVIRONMENT);
-  } else if (class_count < 0) {
+  if (class_count < 0) {
     JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM class_count was less then 0";
     return ERR(ILLEGAL_ARGUMENT);
   } else if (class_count == 0) {
@@ -317,7 +326,7 @@ jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
   std::vector<ArtClassDefinition> definitions;
   jvmtiError res = OK;
   for (jint i = 0; i < class_count; i++) {
-    res = Redefiner::GetClassRedefinitionError(classes[i], &error_msg);
+    res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(classes[i], &error_msg);
     if (res != OK) {
       JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM " << error_msg;
       return res;
@@ -330,13 +339,16 @@ jvmtiError Transformer::RetransformClasses(jvmtiEnv* env,
     }
     definitions.push_back(std::move(def));
   }
-  RetransformClassesDirect(self, &definitions);
-  res = Redefiner::RedefineClassesDirect(ArtJvmTiEnv::AsArtJvmTiEnv(env),
-                                         runtime,
-                                         self,
-                                         definitions,
-                                         RedefinitionType::kNormal,
-                                         &error_msg);
+  RetransformClassesDirect<RedefinitionType::kStructural>(self, &definitions);
+  RetransformClassesDirect<RedefinitionType::kNormal>(self, &definitions);
+  RedefinitionType redef_type =
+      std::any_of(definitions.cbegin(),
+                  definitions.cend(),
+                  [](const auto& it) { return it.HasStructuralChanges(); })
+          ? RedefinitionType::kStructural
+          : RedefinitionType::kNormal;
+  res = Redefiner::RedefineClassesDirect(
+      ArtJvmTiEnv::AsArtJvmTiEnv(env), runtime, self, definitions, redef_type, &error_msg);
   if (res != OK) {
     JVMTI_LOG(WARNING, env) << "FAILURE TO RETRANSFORM " << error_msg;
   }

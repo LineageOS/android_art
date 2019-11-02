@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "jvmti.h"
 #include "ti_extension.h"
 
 #include "art_jvmti.h"
@@ -45,6 +46,7 @@
 #include "ti_monitor.h"
 #include "ti_redefine.h"
 #include "ti_search.h"
+#include "transform.h"
 
 #include "thread-inl.h"
 
@@ -416,7 +418,40 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
       return error;
     }
 
-    // StructurallyRedefineClass
+    // StructurallyRedefineClasses
+    error = add_extension(
+        reinterpret_cast<jvmtiExtensionFunction>(Redefiner::StructurallyRedefineClasses),
+        "com.android.art.class.structurally_redefine_classes",
+        "Entrypoint for structural class redefinition. Has the same signature as RedefineClasses."
+        " Currently this only supports adding new static fields to a class without any instance"
+        " fields or methods. After calling this com.android.art.structural_dex_file_load_hook"
+        " events will be triggered, followed by re-transformable ClassFileLoadHook events. After"
+        " this method completes subsequent RetransformClasses calls will use the input to this"
+        " function as the initial class definition.",
+        {
+          { "num_classes", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
+          { "class_definitions", JVMTI_KIND_IN_BUF, JVMTI_TYPE_CVOID, false },
+        },
+        {
+          ERR(CLASS_LOADER_UNSUPPORTED),
+          ERR(FAILS_VERIFICATION),
+          ERR(ILLEGAL_ARGUMENT),
+          ERR(INVALID_CLASS),
+          ERR(MUST_POSSESS_CAPABILITY),
+          ERR(MUST_POSSESS_CAPABILITY),
+          ERR(NULL_POINTER),
+          ERR(OUT_OF_MEMORY),
+          ERR(UNMODIFIABLE_CLASS),
+          ERR(UNSUPPORTED_REDEFINITION_HIERARCHY_CHANGED),
+          ERR(UNSUPPORTED_REDEFINITION_METHOD_ADDED),
+          ERR(UNSUPPORTED_REDEFINITION_METHOD_DELETED),
+          ERR(UNSUPPORTED_REDEFINITION_SCHEMA_CHANGED),
+        });
+    if (error != ERR(NONE)) {
+      return error;
+    }
+
+    // StructurallyRedefineClassDirect
     error = add_extension(
         reinterpret_cast<jvmtiExtensionFunction>(Redefiner::StructurallyRedefineClassDirect),
         "com.android.art.UNSAFE.class.structurally_redefine_class_direct",
@@ -494,7 +529,7 @@ jvmtiError ExtensionUtil::GetExtensionEvents(jvmtiEnv* env,
                            const char* id,
                            const char* short_description,
                            const std::vector<CParamInfo>& params) {
-    DCHECK(IsExtensionEvent(extension_event_index));
+    DCHECK(IsExtensionEvent(extension_event_index)) << static_cast<jint>(extension_event_index);
     jvmtiExtensionEventInfo event_info;
     jvmtiError error;
 
@@ -592,7 +627,35 @@ jvmtiError ExtensionUtil::GetExtensionEvents(jvmtiEnv* env,
   if (error != OK) {
     return error;
   }
-
+  art::Runtime* runtime = art::Runtime::Current();
+  if (runtime->GetJniIdType() == art::JniIdType::kIndices &&
+      (runtime->GetInstrumentation()->IsForcedInterpretOnly() || runtime->IsJavaDebuggable())) {
+    error = add_extension(
+        ArtJvmtiEvent::kStructuralDexFileLoadHook,
+        "com.android.art.class.structural_dex_file_load_hook",
+        "Called during class load, after a 'RetransformClasses' call, or after a 'RedefineClasses'"
+        " call in order to allow the agent to modify the class. This event is called after any"
+        " non-can_retransform_classes ClassFileLoadHookEvents and before any"
+        " can_retransform_classes ClassFileLoadHookEvents. The transformations applied are"
+        " restricted in the same way that transformations applied via the "
+        " 'com.android.art.class.structurally_redefine_classes' extension function. The arguments"
+        " to the event are identical to the ones in the ClassFileLoadHook and have the same"
+        " semantics.",
+        {
+          { "jni_env", JVMTI_KIND_IN, JVMTI_TYPE_JNIENV, false },
+          { "class_being_redefined", JVMTI_KIND_IN, JVMTI_TYPE_JCLASS, true },
+          { "loader", JVMTI_KIND_IN, JVMTI_TYPE_JOBJECT, false },
+          { "name", JVMTI_KIND_IN_PTR, JVMTI_TYPE_CCHAR, false },
+          { "protection_domain", JVMTI_KIND_IN, JVMTI_TYPE_JOBJECT, true },
+          { "dex_data_len", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
+          { "dex_data", JVMTI_KIND_IN_BUF, JVMTI_TYPE_CCHAR, false },
+          { "new_dex_data_len", JVMTI_KIND_OUT, JVMTI_TYPE_JINT, false },
+          { "new_dex_data", JVMTI_KIND_ALLOC_BUF, JVMTI_TYPE_CCHAR, true },
+        });
+  } else {
+    LOG(INFO) << "debuggable & jni-type indices are required to implement structural "
+              << "class redefinition extensions.";
+  }
   // Copy into output buffer.
 
   *extension_count_ptr = ext_vector.size();

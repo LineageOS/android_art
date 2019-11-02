@@ -150,12 +150,12 @@ class Arm64Assembler final : public Assembler {
     return vixl::aarch64::Register::GetWRegFromCode(code);
   }
 
-  static vixl::aarch64::FPRegister reg_d(int code) {
-    return vixl::aarch64::FPRegister::GetDRegFromCode(code);
+  static vixl::aarch64::VRegister reg_d(int code) {
+    return vixl::aarch64::VRegister::GetDRegFromCode(code);
   }
 
-  static vixl::aarch64::FPRegister reg_s(int code) {
-    return vixl::aarch64::FPRegister::GetSRegFromCode(code);
+  static vixl::aarch64::VRegister reg_s(int code) {
+    return vixl::aarch64::VRegister::GetSRegFromCode(code);
   }
 
  private:

@@ -100,6 +100,9 @@ jvmtiError ArtJvmtiEventCallbacks::Set(jint index, jvmtiExtensionEvent cb) {
     case static_cast<jint>(ArtJvmtiEvent::kDdmPublishChunk):
       DdmPublishChunk = reinterpret_cast<ArtJvmtiEventDdmPublishChunk>(cb);
       return OK;
+    case static_cast<jint>(ArtJvmtiEvent::kStructuralDexFileLoadHook):
+      StructuralDexFileLoadHook = reinterpret_cast<ArtJvmtiEventStructuralDexFileLoadHook>(cb);
+      return OK;
     default:
       return ERR(ILLEGAL_ARGUMENT);
   }
@@ -116,6 +119,7 @@ bool IsExtensionEvent(ArtJvmtiEvent e) {
   switch (e) {
     case ArtJvmtiEvent::kDdmPublishChunk:
     case ArtJvmtiEvent::kObsoleteObjectCreated:
+    case ArtJvmtiEvent::kStructuralDexFileLoadHook:
       return true;
     default:
       return false;
@@ -1175,6 +1179,7 @@ static DeoptRequirement GetDeoptRequirement(ArtJvmtiEvent event, jthread thread)
     case ArtJvmtiEvent::kClassFileLoadHookRetransformable:
     case ArtJvmtiEvent::kDdmPublishChunk:
     case ArtJvmtiEvent::kObsoleteObjectCreated:
+    case ArtJvmtiEvent::kStructuralDexFileLoadHook:
       return DeoptRequirement::kNone;
   }
 }

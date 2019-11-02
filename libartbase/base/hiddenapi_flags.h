@@ -193,6 +193,7 @@ class ApiList {
   static ApiList Blacklist() { return ApiList(Value::kBlacklist); }
   static ApiList GreylistMaxO() { return ApiList(Value::kGreylistMaxO); }
   static ApiList GreylistMaxP() { return ApiList(Value::kGreylistMaxP); }
+  static ApiList GreylistMaxQ() { return ApiList(Value::kGreylistMaxQ); }
   static ApiList CorePlatformApi() { return ApiList(DomainApi::kCorePlatformApi); }
   static ApiList TestApi() { return ApiList(DomainApi::kTestApi); }
 

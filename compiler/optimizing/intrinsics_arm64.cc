@@ -90,8 +90,8 @@ static void MoveFromReturnRegister(Location trg,
     Register res_reg = RegisterFrom(ARM64ReturnLocation(type), type);
     __ Mov(trg_reg, res_reg, kDiscardForSameWReg);
   } else {
-    FPRegister trg_reg = FPRegisterFrom(trg, type);
-    FPRegister res_reg = FPRegisterFrom(ARM64ReturnLocation(type), type);
+    VRegister trg_reg = FPRegisterFrom(trg, type);
+    VRegister res_reg = FPRegisterFrom(ARM64ReturnLocation(type), type);
     __ Fmov(trg_reg, res_reg);
   }
 }
@@ -435,7 +435,7 @@ static void GenBitCount(HInvoke* instr, DataType::Type type, MacroAssembler* mas
 
   Register src = InputRegisterAt(instr, 0);
   Register dst = RegisterFrom(instr->GetLocations()->Out(), type);
-  FPRegister fpr = (type == DataType::Type::kInt64) ? temps.AcquireD() : temps.AcquireS();
+  VRegister fpr = (type == DataType::Type::kInt64) ? temps.AcquireD() : temps.AcquireS();
 
   __ Fmov(fpr, src);
   __ Cnt(fpr.V8B(), fpr.V8B());
@@ -591,8 +591,8 @@ static void GenMathRound(HInvoke* invoke, bool is_double, vixl::aarch64::MacroAs
   // For example, FCVTPS(-1.9) = -1 and FCVTPS(1.1) = 2.
   // If we were using this instruction, for most inputs, more handling code would be needed.
   LocationSummary* l = invoke->GetLocations();
-  FPRegister in_reg = is_double ? DRegisterFrom(l->InAt(0)) : SRegisterFrom(l->InAt(0));
-  FPRegister tmp_fp = is_double ? DRegisterFrom(l->GetTemp(0)) : SRegisterFrom(l->GetTemp(0));
+  VRegister in_reg = is_double ? DRegisterFrom(l->InAt(0)) : SRegisterFrom(l->InAt(0));
+  VRegister tmp_fp = is_double ? DRegisterFrom(l->GetTemp(0)) : SRegisterFrom(l->GetTemp(0));
   Register out_reg = is_double ? XRegisterFrom(l->Out()) : WRegisterFrom(l->Out());
   vixl::aarch64::Label done;
 
@@ -2015,7 +2015,7 @@ void IntrinsicCodeGeneratorARM64::VisitStringGetCharsNoCheck(HInvoke* invoke) {
 
   if (mirror::kUseStringCompression) {
     // For compressed strings, acquire a SIMD temporary register.
-    FPRegister vtmp1 = temps.AcquireVRegisterOfSize(kQRegSize);
+    VRegister vtmp1 = temps.AcquireVRegisterOfSize(kQRegSize);
     const size_t c_char_size = DataType::Size(DataType::Type::kInt8);
     DCHECK_EQ(c_char_size, 1u);
     __ Bind(&compressed_string_preloop);
@@ -3210,8 +3210,8 @@ void IntrinsicCodeGeneratorARM64::VisitFP16ToFloat(HInvoke* invoke) {
   MacroAssembler* masm = GetVIXLAssembler();
   UseScratchRegisterScope scratch_scope(masm);
   Register bits = InputRegisterAt(invoke, 0);
-  FPRegister out = SRegisterFrom(invoke->GetLocations()->Out());
-  FPRegister half = scratch_scope.AcquireH();
+  VRegister out = SRegisterFrom(invoke->GetLocations()->Out());
+  VRegister half = scratch_scope.AcquireH();
   __ Fmov(half, bits);  // ARMv8.2
   __ Fcvt(out, half);
 }
@@ -3232,8 +3232,8 @@ void IntrinsicCodeGeneratorARM64::VisitFP16ToHalf(HInvoke* invoke) {
   DCHECK(codegen_->GetInstructionSetFeatures().HasFP16());
   MacroAssembler* masm = GetVIXLAssembler();
   UseScratchRegisterScope scratch_scope(masm);
-  FPRegister in = SRegisterFrom(invoke->GetLocations()->InAt(0));
-  FPRegister half = scratch_scope.AcquireH();
+  VRegister in = SRegisterFrom(invoke->GetLocations()->InAt(0));
+  VRegister half = scratch_scope.AcquireH();
   Register out = WRegisterFrom(invoke->GetLocations()->Out());
   __ Fcvt(half, in);
   __ Fmov(out, half);
