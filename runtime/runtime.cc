@@ -1862,6 +1862,16 @@ void Runtime::InitNativeMethods() {
   // a regular JNI libraries with a regular JNI_OnLoad. Most JNI libraries can
   // just use System.loadLibrary, but libcore can't because it's the library
   // that implements System.loadLibrary!
+
+  // libicu_jni has to be initialized before libopenjdk{d} due to runtime dependency from
+  // libopenjdk{d} to Icu4cMetadata native methods in libicu_jni. See http://b/143888405
+  {
+    std::string error_msg;
+    if (!java_vm_->LoadNativeLibrary(
+          env, "libicu_jni.so", nullptr, WellKnownClasses::java_lang_Object, &error_msg)) {
+      LOG(FATAL) << "LoadNativeLibrary failed for \"libicu_jni.so\": " << error_msg;
+    }
+  }
   {
     std::string error_msg;
     if (!java_vm_->LoadNativeLibrary(
@@ -1877,13 +1887,6 @@ void Runtime::InitNativeMethods() {
     if (!java_vm_->LoadNativeLibrary(
           env, kOpenJdkLibrary, nullptr, WellKnownClasses::java_lang_Object, &error_msg)) {
       LOG(FATAL) << "LoadNativeLibrary failed for \"" << kOpenJdkLibrary << "\": " << error_msg;
-    }
-  }
-  {
-    std::string error_msg;
-    if (!java_vm_->LoadNativeLibrary(
-          env, "libicu_jni.so", nullptr, WellKnownClasses::java_lang_Object, &error_msg)) {
-      LOG(FATAL) << "LoadNativeLibrary failed for \"libicu_jni.so\": " << error_msg;
     }
   }
 
