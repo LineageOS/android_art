@@ -231,26 +231,6 @@ std::ostream& operator<<(std::ostream &os, ScopedClassInfo const& c) {
   }
 }
 
-class UniqueStringTable {
- public:
-  UniqueStringTable() = default;
-  ~UniqueStringTable() = default;
-  std::string Intern(const std::string& key) {
-    if (map_.find(key) != map_.end()) {
-      return std::string("#") + std::to_string(map_[key]);
-    } else {
-      map_[key] = next_index_;
-      ++next_index_;
-      return std::string("#") + std::to_string(map_[key]) + "(" + key + ")";
-    }
-  }
- private:
-  int32_t next_index_;
-  std::map<std::string, int32_t> map_;
-};
-
-static UniqueStringTable* string_table = nullptr;
-
 class LockedStream {
  public:
   explicit LockedStream(const std::string& filepath) {
@@ -272,18 +252,25 @@ class LockedStream {
 
 static LockedStream* stream = nullptr;
 
-// An RAII class to turn a boolean flag on/off.
-class ScopedFlag {
+class UniqueStringTable {
  public:
-  explicit ScopedFlag(bool* flag) : flag_(flag) {
-    *flag_ = true;
-  }
-  ~ScopedFlag() {
-    *flag_ = false;
+  UniqueStringTable() = default;
+  ~UniqueStringTable() = default;
+  std::string Intern(const std::string& header, const std::string& key) {
+    if (map_.find(key) == map_.end()) {
+      map_[key] = next_index_;
+      // Emit definition line.  E.g., =123,string
+      stream->Write(header + std::to_string(next_index_) + "," + key + "\n");
+      ++next_index_;
+    }
+    return std::to_string(map_[key]);
   }
  private:
-  bool* flag_;
+  int32_t next_index_;
+  std::map<std::string, int32_t> map_;
 };
+
+static UniqueStringTable* string_table = nullptr;
 
 // Formatter for the thread, type, and size of an allocation.
 static std::string formatAllocation(jvmtiEnv* jvmti,
@@ -301,7 +288,7 @@ static std::string formatAllocation(jvmtiEnv* jvmti,
     allocation << ", jclass[TYPE UNKNOWN]";
   }
   allocation << ", size[" << size.val << ", hex: 0x" << std::hex << size.val << "]";
-  return string_table->Intern(allocation.str());
+  return string_table->Intern("+", allocation.str());
 }
 
 // Formatter for a method entry on a call stack.
@@ -313,18 +300,16 @@ static std::string formatMethod(jvmtiEnv* jvmti, jmethodID method_id) {
                                         &method_name,
                                         &method_signature,
                                         &generic_pointer);
+  std::string method = "METHODERROR";
   if (err == JVMTI_ERROR_NONE) {
-    std::string method;
     method = ((method_name == nullptr) ? "UNKNOWN" : method_name);
     method += ((method_signature == nullptr) ? "(UNKNOWN)" : method_signature);
-    return string_table->Intern(method);
-  } else {
-    return "METHODERROR";
   }
+  return string_table->Intern("+", method);
 }
 
-static int sampling_rate = 10;
-static int stack_depth_limit = 50;
+static int sampling_rate;
+static int stack_depth_limit;
 
 static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
                                      JNIEnv* jni,
@@ -332,32 +317,23 @@ static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
                                      jobject obj ATTRIBUTE_UNUSED,
                                      jclass klass,
                                      jlong size) {
-  // Prevent recursive allocation tracking, and the stack overflow it causes.
-  static thread_local bool currently_logging;
-  if (currently_logging) {
+  // Sample only once out of sampling_rate tries, and prevent recursive allocation tracking,
+  static thread_local int sample_countdown = sampling_rate;
+  --sample_countdown;
+  if (sample_countdown != 0) {
     return;
   }
-  ScopedFlag sf(&currently_logging);
 
-  // Guard accesses to log skip count, string table, etc.
+  // Guard accesses to string table and emission.
   static std::mutex mutex;
   std::lock_guard<std::mutex> lg(mutex);
 
-  // Only process every nth log call.
-  static int logs_skipped = 0;
-  if (logs_skipped < sampling_rate) {
-    logs_skipped++;
-    return;
-  } else {
-    logs_skipped = 0;
-  }
-
   std::string record =
-      "VMObjectAlloc(" + formatAllocation(jvmti,
-                                          jni,
-                                          jthreadContainer{.thread = thread},
-                                          klass,
-                                          jlongContainer{.val = size}) + ")";
+      formatAllocation(jvmti,
+                       jni,
+                       jthreadContainer{.thread = thread},
+                       klass,
+                       jlongContainer{.val = size});
 
   std::unique_ptr<jvmtiFrameInfo[]> stack_frames(new jvmtiFrameInfo[stack_depth_limit]);
   jint stack_depth;
@@ -367,11 +343,15 @@ static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
                                         stack_frames.get(),
                                         &stack_depth);
   if (err == JVMTI_ERROR_NONE) {
-    for (int i = 0; i < stack_depth; ++i) {
-      record += "\n    " + formatMethod(jvmti, stack_frames[i].method);
+    // Emit stack frames in order from deepest in the stack to most recent.
+    // This simplifies post-collection processing.
+    for (int i = stack_depth - 1; i >= 0; --i) {
+      record += ";" + formatMethod(jvmti, stack_frames[i].method);
     }
   }
-  stream->Write(string_table->Intern(record) + "\n");
+  stream->Write(string_table->Intern("=", record) + "\n");
+
+  sample_countdown = sampling_rate;
 }
 
 static jvmtiEventCallbacks kLogCallbacks {
@@ -398,26 +378,46 @@ static jvmtiError SetupCapabilities(jvmtiEnv* jvmti) {
   return jvmti->AddCapabilities(&caps);
 }
 
+static bool ProcessOptions(std::string options) {
+  std::string output_file_path;
+  if (options.empty()) {
+    static constexpr int kDefaultSamplingRate = 10;
+    static constexpr int kDefaultStackDepthLimit = 50;
+    static constexpr const char* kDefaultOutputFilePath = "/data/local/tmp/logstream.txt";
+
+    sampling_rate = kDefaultSamplingRate;
+    stack_depth_limit = kDefaultStackDepthLimit;
+    output_file_path = kDefaultOutputFilePath;
+  } else {
+    // options string should contain "sampling_rate,stack_depth_limit,output_file_path".
+    size_t comma_pos = options.find(',');
+    if (comma_pos == std::string::npos) {
+      return false;
+    }
+    sampling_rate = std::stoi(options.substr(0, comma_pos));
+    options = options.substr(comma_pos + 1);
+    comma_pos = options.find(',');
+    if (comma_pos == std::string::npos) {
+      return false;
+    }
+    stack_depth_limit = std::stoi(options.substr(0, comma_pos));
+    output_file_path = options.substr(comma_pos + 1);
+  }
+  LOG(INFO) << "Starting allocation tracing: sampling_rate=" << sampling_rate
+            << ", stack_depth_limit=" << stack_depth_limit
+            << ", output_file_path=" << output_file_path;
+  stream = new LockedStream(output_file_path);
+
+  return true;
+}
+
 static jint AgentStart(JavaVM* vm,
                        char* options,
                        void* reserved ATTRIBUTE_UNUSED) {
-  // options string should contain "sampling_rate,stack_depth_limit,output_file_path".
-  std::string args(options);
-  size_t comma_pos = args.find(',');
-  if (comma_pos == std::string::npos) {
+  // Handle the sampling rate, depth limit, and output path, if set.
+  if (!ProcessOptions(options)) {
     return JNI_ERR;
   }
-  sampling_rate = std::stoi(args.substr(0, comma_pos));
-  args = args.substr(comma_pos + 1);
-  comma_pos = args.find(',');
-  if (comma_pos == std::string::npos) {
-    return JNI_ERR;
-  }
-  stack_depth_limit = std::stoi(args.substr(0, comma_pos));
-  std::string output_file_path = args.substr(comma_pos + 1);
-
-  LOG(INFO) << "Starting allocation tracing: sampling_rate=" << sampling_rate
-            << ", stack_depth_limit=" << stack_depth_limit;
 
   // Create the environment.
   jvmtiEnv* jvmti = nullptr;
@@ -447,8 +447,6 @@ static jint AgentStart(JavaVM* vm,
   }
 
   string_table = new UniqueStringTable();
-
-  stream = new LockedStream(output_file_path);
 
   return JNI_OK;
 }
