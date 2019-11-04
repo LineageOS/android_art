@@ -292,20 +292,32 @@ static std::string formatAllocation(jvmtiEnv* jvmti,
 }
 
 // Formatter for a method entry on a call stack.
-static std::string formatMethod(jvmtiEnv* jvmti, jmethodID method_id) {
+static std::string formatMethod(jvmtiEnv* jvmti, JNIEnv* jni, jmethodID method_id) {
+  jclass declaring_class;
+  jvmtiError err = jvmti->GetMethodDeclaringClass(method_id, &declaring_class);
+  std::string class_name = "";
+  if (err == JVMTI_ERROR_NONE) {
+    char* class_signature;
+    err = jvmti->GetClassSignature(declaring_class,
+                                   &class_signature,
+                                   /*generic_ptr*/ nullptr);
+    class_name = std::string(class_signature);
+    jvmti->Deallocate(reinterpret_cast<unsigned char*>(class_signature));
+    jni->DeleteLocalRef(declaring_class);
+  }
   char *method_name;
   char *method_signature;
   char *generic_pointer;
-  jvmtiError err = jvmti->GetMethodName(method_id,
-                                        &method_name,
-                                        &method_signature,
-                                        &generic_pointer);
+  err = jvmti->GetMethodName(method_id,
+                             &method_name,
+                             &method_signature,
+                             &generic_pointer);
   std::string method = "METHODERROR";
   if (err == JVMTI_ERROR_NONE) {
     method = ((method_name == nullptr) ? "UNKNOWN" : method_name);
     method += ((method_signature == nullptr) ? "(UNKNOWN)" : method_signature);
   }
-  return string_table->Intern("+", method);
+  return string_table->Intern("+", class_name + "::" + method);
 }
 
 static int sampling_rate;
@@ -346,7 +358,7 @@ static void JNICALL logVMObjectAlloc(jvmtiEnv* jvmti,
     // Emit stack frames in order from deepest in the stack to most recent.
     // This simplifies post-collection processing.
     for (int i = stack_depth - 1; i >= 0; --i) {
-      record += ";" + formatMethod(jvmti, stack_frames[i].method);
+      record += ";" + formatMethod(jvmti, jni, stack_frames[i].method);
     }
   }
   stream->Write(string_table->Intern("=", record) + "\n");
