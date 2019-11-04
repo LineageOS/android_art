@@ -97,6 +97,9 @@ $(call add-clean-step, rm -rf $(HOST_OUT)/apex)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/apex)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/symbols/apex)
 
+# Remove dex2oat artifacts for boot image extensions (workaround for broken dependencies).
+$(call add-clean-step, find $(OUT_DIR) -name "*.oat" -o -name "*.odex" -o -name "*.art" -o -name '*.vdex' | xargs rm -f)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
