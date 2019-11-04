@@ -30,51 +30,38 @@ The resulting file is a sequence of object allocations, with a limited form of
 text compression.  For example a single stack frame might look like:
 
 ```
-#20(VMObjectAlloc(#0(jthread[main], jclass[Ljava/lang/String; file: String.java], size[56, hex: 0x38
-> ]))
-    #1(nativeReadString(J)Ljava/lang/String;)
-    #2(readString(Landroid/os/Parcel;)Ljava/lang/String;)
-    #3(readString()Ljava/lang/String;)
-    #4(readParcelableCreator(Ljava/lang/ClassLoader;)Landroid/os/Parcelable$Creator;)
-    #5(readParcelable(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;)
-    #6(readFromParcel(Landroid/os/Parcel;)V)
-    #7(<init>(Landroid/os/Parcel;)V)
-    #8(<init>(Landroid/os/Parcel;Landroid/view/DisplayInfo$1;)V)
-    #9(createFromParcel(Landroid/os/Parcel;)Landroid/view/DisplayInfo;)
-    #10(createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;)
-    #11(getDisplayInfo(I)Landroid/view/DisplayInfo;)
-    #11
-    #12(updateDisplayInfoLocked()V)
-    #13(getState()I)
-    #14(onDisplayChanged(I)V)
-    #15(handleMessage(Landroid/os/Message;)V)
-    #16(dispatchMessage(Landroid/os/Message;)V)
-    #17(loop()V)
-    #18(main([Ljava/lang/String;)V)
-    #19(invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;))
++0,jthread[main], jclass[[I file: <UNKNOWN_FILE>], size[24, hex: 0x18]
++1,main([Ljava/lang/String;)V
++2,run()V
++3,invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
++4,loop()V
++5,dispatchMessage(Landroid/os/Message;)V
++6,handleMessage(Landroid/os/Message;)V
++7,onDisplayChanged(I)V
++8,getState()I
++9,updateDisplayInfoLocked()V
++10,getDisplayInfo(I)Landroid/view/DisplayInfo;
++11,createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
++12,createFromParcel(Landroid/os/Parcel;)Landroid/view/DisplayInfo;
++13,<init>(Landroid/os/Parcel;Landroid/view/DisplayInfo$1;)V
++14,<init>(Landroid/os/Parcel;)V
++15,readFromParcel(Landroid/os/Parcel;)V
+=16,0;1;2;3;1;4;5;6;7;8;9;10;10;11;12;13;14;15
+16
 ```
 
-The first line tells what thread the allocation occurred on, what type is
-allocated, and what size the allocation was.  The remaining lines are the call
-stack, starting with the function in which the allocation occured.  The depth
-limit is 20 frames.
-
-String compression is rudimentary.
-
+Lines starting with a + are key, value pairs.  So, for instance, key 2 stands for
 ```
-    #1(nativeReadString(J)Ljava/lang/String;)
+run()V
 ```
+.
 
-Indicates that the string inside the parenthesis is the first entry in a string
-table.  Later occurences in the printout of that string will print as
-
-```
-    #1
-```
-
-Stack frame entries are compressed by this method, as are entire allocation
-records.
-
+The line starting with 0 is the thread, type, and size (TTS) of an allocation.  The
+remaining lines starting with + are stack frames (SFs), containing function signatures.
+Lines starting with = are stack traces (STs), and are again key, value pairs.  In the
+example above, an ST called 16 is the TTS plus sequence of SFs.  Any line not starting
+with + or = is a sample.  It is a reference to an ST.  Hence repeated samples are
+represented as just numbers.
 
 #### ART
 >    `art -Xplugin:$ANDROID_HOST_OUT/lib64/libopenjdkjvmti.so '-agentpath:libtiallocsample.so=100' -cp tmp/java/helloworld.dex -Xint helloworld`
