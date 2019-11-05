@@ -92,6 +92,7 @@ class InternTable;
 class IsMarkedVisitor;
 class JavaVMExt;
 class LinearAlloc;
+class MethodInspectionCallback;
 class MonitorList;
 class MonitorPool;
 class NullPointerHandler;
@@ -941,6 +942,9 @@ class Runtime {
   bool IsVerifierMissingKThrowFatal() const {
     return verifier_missing_kthrow_fatal_;
   }
+
+  // Return true if we should load oat files as executable or not.
+  bool GetOatFilesExecutable() const;
 
  private:
   static void InitPlatformSignalHandlers();
