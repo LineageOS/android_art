@@ -2693,8 +2693,8 @@ void ImageWriter::CreateHeader(size_t oat_index) {
       PointerToLowMemUInt32(image_info.oat_data_begin_),
       PointerToLowMemUInt32(oat_data_end),
       PointerToLowMemUInt32(oat_file_end),
-      compiler_options_.IsAppImage() ? boot_image_begin_ : 0u,
-      compiler_options_.IsAppImage() ? boot_image_size_ : 0u,
+      boot_image_begin_,
+      boot_image_size_,
       static_cast<uint32_t>(target_ptr_size_));
 }
 
