@@ -91,17 +91,26 @@ public class Test906 {
   public static class Baz extends Bar {}
   public static class Alpha extends Bar {}
   public static class MISSING extends Baz {}
+  public interface Iface {}
+  public static class Beta implements Iface {}
+  public static class Gamma implements Iface {}
+  public static class Delta extends Beta {}
   private static void testIterateOverInstances() throws Exception {
     Object[] foos = GenTs(Foo.class);
     Object[] bars = GenTs(Bar.class);
     Object[] bazs = GenTs(Baz.class);
     Object[] alphas = GenTs(Alpha.class);
+    Object[] betas = GenTs(Beta.class);
+    Object[] gammas = GenTs(Gamma.class);
+    Object[] deltas = GenTs(Delta.class);
     checkEq(0, iterateOverInstancesCount(MISSING.class));
     checkEq(alphas.length, iterateOverInstancesCount(Alpha.class));
     checkEq(bazs.length, iterateOverInstancesCount(Baz.class));
     checkEq(bazs.length + alphas.length + bars.length, iterateOverInstancesCount(Bar.class));
     checkEq(bazs.length + alphas.length + bars.length + foos.length,
         iterateOverInstancesCount(Foo.class));
+    checkEq(betas.length + gammas.length + deltas.length,
+        iterateOverInstancesCount(Iface.class));
   }
 
   public static void doTest() throws Exception {
