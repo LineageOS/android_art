@@ -55,15 +55,25 @@ art_cc_library {
     ],
 }
 
+// We export a library to do the server-side socket handling that gets loaded
+// by adbd from the art apex, so that we can update the socket handling
+// independently from the adbd apex.
 cc_library {
     name: "libadbconnection_server",
-    visibility: [
-        // TODO(b/133140750): Clean this up.
-        "//system/core/adb",
-    ],
     srcs: ["adbconnection_server.cc"],
+
     export_include_dirs: ["include"],
     shared_libs: ["libbase"],
+
+    defaults: ["art_defaults"],
+    visibility: [
+        "//system/core/adb",
+    ],
+    stubs: {
+        symbol_file: "libadbconnection_server.map.txt",
+        versions: ["1"],
+    },
+
     host_supported: true,
     recovery_available: true,
 }

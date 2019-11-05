@@ -467,6 +467,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libnativebridge')
     self._checker.check_native_library('libnativehelper')
     self._checker.check_native_library('libnativeloader')
+    self._checker.check_native_library('libadbconnection_server')
 
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnection')

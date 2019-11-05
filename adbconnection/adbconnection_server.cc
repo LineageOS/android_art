@@ -72,12 +72,12 @@ void adbconnection_listen(void (*callback)(int fd, pid_t pid)) {
   }
 
   while (true) {
-    int rc = TEMP_FAILURE_RETRY(epoll_wait(epfd.get(), events.data(), events.size(), -1));
-    if (rc == -1) {
+    int epoll_rc = TEMP_FAILURE_RETRY(epoll_wait(epfd.get(), events.data(), events.size(), -1));
+    if (epoll_rc == -1) {
       PLOG(FATAL) << "epoll_wait failed";
     }
 
-    for (int i = 0; i < rc; ++i) {
+    for (int i = 0; i < epoll_rc; ++i) {
       const epoll_event& event = events[i];
       if (event.data.fd == -1) {
         unique_fd client(TEMP_FAILURE_RETRY(
