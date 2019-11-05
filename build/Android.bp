@@ -81,7 +81,8 @@ art_global_defaults {
 
         // Warn about thread safety violations with clang.
         "-Wthread-safety",
-        "-Wthread-safety-negative",
+        // TODO(b/144045034): turn on -Wthread-safety-negative
+        //"-Wthread-safety-negative",
 
         // Warn if switch fallthroughs aren't annotated.
         "-Wimplicit-fallthrough",
