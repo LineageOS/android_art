@@ -127,6 +127,7 @@ Arm64FeaturesUniquePtr Arm64InstructionSetFeatures::FromVariant(
         "exynos-m2",
         "exynos-m3",
         "kryo",
+        "kryo300",
         "kryo385",
     };
     if (!FindVariantInArray(arm64_known_variants, arraysize(arm64_known_variants), variant)) {
