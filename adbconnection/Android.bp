@@ -63,7 +63,10 @@ cc_library {
     srcs: ["adbconnection_server.cc"],
 
     export_include_dirs: ["include"],
-    shared_libs: ["libbase"],
+
+    stl: "libc++_static",
+    shared_libs: ["liblog"],
+    whole_static_libs: ["libbase"],
 
     defaults: ["art_defaults"],
     visibility: [
