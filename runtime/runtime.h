@@ -92,7 +92,6 @@ class InternTable;
 class IsMarkedVisitor;
 class JavaVMExt;
 class LinearAlloc;
-class MethodInspectionCallback;
 class MonitorList;
 class MonitorPool;
 class NullPointerHandler;
