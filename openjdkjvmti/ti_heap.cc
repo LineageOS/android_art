@@ -700,11 +700,6 @@ jvmtiError HeapUtil::IterateOverInstancesOfClass(jvmtiEnv* env,
     return ERR(INVALID_CLASS);
   }
   art::Handle<art::mirror::Class> filter_klass(hs.NewHandle(klass_ptr->AsClass()));
-  if (filter_klass->IsInterface()) {
-    // nothing is an 'instance' of an interface so just return without walking anything.
-    return OK;
-  }
-
   ObjectTagTable* tag_table = ArtJvmTiEnv::AsArtJvmTiEnv(env)->object_tag_table.get();
   bool stop_reports = false;
   auto visitor = [&](art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
