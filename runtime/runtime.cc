@@ -986,7 +986,6 @@ void Runtime::InitNonZygoteOrPostFork(
         UnloadNativeBridge();
         is_native_bridge_loaded_ = false;
         break;
-
       case NativeBridgeAction::kInitialize:
         InitializeNativeBridge(env, isa);
         break;
@@ -2963,6 +2962,10 @@ void Runtime::SetJniIdType(JniIdType t) {
   jni_ids_indirection_ = t;
   JNIEnvExt::ResetFunctionTable();
   WellKnownClasses::HandleJniIdTypeChange(Thread::Current()->GetJniEnv());
+}
+
+bool Runtime::GetOatFilesExecutable() const {
+  return !IsAotCompiler() && !(IsSystemServer() && jit_options_->GetSaveProfilingInfo());
 }
 
 }  // namespace art
