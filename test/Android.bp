@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+// ART gtests.
+
 art_cc_defaults {
     name: "art_test_defaults",
     host_supported: true,
@@ -167,6 +169,62 @@ art_cc_library {
         },
     },
 }
+
+// ART run-tests.
+
+art_cc_test_library {
+    name: "libarttest",
+    defaults: ["libarttest-defaults"],
+    shared_libs: [
+        "libart",
+        "libdexfile",
+        "libprofile",
+        "libartbase",
+    ],
+}
+
+art_cc_test_library {
+    name: "libarttestd",
+    defaults: [
+        "art_debug_defaults",
+        "libarttest-defaults",
+    ],
+    shared_libs: [
+        "libartd",
+        "libdexfiled",
+        "libprofiled",
+        "libartbased",
+    ],
+}
+
+art_cc_defaults {
+    name: "libnativebridgetest-defaults",
+    defaults: [
+        "art_test_defaults",
+        "art_defaults",
+    ],
+    header_libs: ["libnativebridge-headers"],
+    srcs: ["115-native-bridge/nativebridge.cc"],
+}
+
+art_cc_test_library {
+    name: "libnativebridgetest",
+    shared_libs: ["libart"],
+    defaults: [
+        "libnativebridgetest-defaults",
+    ],
+}
+
+art_cc_test_library {
+    name: "libnativebridgetestd",
+    shared_libs: ["libartd"],
+    defaults: [
+        "libnativebridgetest-defaults",
+        "art_debug_defaults",
+    ],
+}
+
+// ART JVMTI run-tests.
 
 cc_defaults {
     name: "libartagent-defaults",
@@ -526,58 +584,6 @@ cc_defaults {
         "libbacktrace",
         "libbase",
         "libnativehelper",
-    ],
-}
-
-art_cc_test_library {
-    name: "libarttest",
-    defaults: ["libarttest-defaults"],
-    shared_libs: [
-        "libart",
-        "libdexfile",
-        "libprofile",
-        "libartbase",
-    ],
-}
-
-art_cc_test_library {
-    name: "libarttestd",
-    defaults: [
-        "art_debug_defaults",
-        "libarttest-defaults",
-    ],
-    shared_libs: [
-        "libartd",
-        "libdexfiled",
-        "libprofiled",
-        "libartbased",
-    ],
-}
-
-art_cc_defaults {
-    name: "libnativebridgetest-defaults",
-    defaults: [
-        "art_test_defaults",
-        "art_defaults",
-    ],
-    header_libs: ["libnativebridge-headers"],
-    srcs: ["115-native-bridge/nativebridge.cc"],
-}
-
-art_cc_test_library {
-    name: "libnativebridgetest",
-    shared_libs: ["libart"],
-    defaults: [
-        "libnativebridgetest-defaults",
-    ],
-}
-
-art_cc_test_library {
-    name: "libnativebridgetestd",
-    shared_libs: ["libartd"],
-    defaults: [
-        "libnativebridgetest-defaults",
-        "art_debug_defaults",
     ],
 }
 

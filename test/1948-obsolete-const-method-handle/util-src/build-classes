@@ -38,7 +38,7 @@ if [[ ! -d "${BUILD_PATH}" ]]; then
 fi
 
 # Build the initial class files.
-(cd "${SRC_PATH}" && javac -cp "${ASM_CLASSPATH}" -d "${BUILD_PATH}" Main.java art/*.java art/constmethodhandle/*.java) || fail "javac error"
+(cd "${SRC_PATH}" && javac -source 8 -target 8 -cp "${ASM_CLASSPATH}" -d "${BUILD_PATH}" Main.java art/*.java art/constmethodhandle/*.java) || fail "javac error"
 # Modify the class files using ASM
 (cd "${SCRIPT_PATH}" && java -cp "${ASM_CLASSPATH}:${BUILD_PATH}" art.constmethodhandle.TestGenerator "${BUILD_PATH}" "$D8") || fail "generator failure"
 # Remove the modification classes. We don't need nor want them for the actual test.
