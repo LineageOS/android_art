@@ -553,13 +553,15 @@ class Heap {
   uint64_t GetBytesAllocatedEver() const;
 
   // Returns the total number of objects freed since the heap was created.
-  uint64_t GetObjectsFreedEver() const {
-    return total_objects_freed_ever_;
+  // With default memory order, this should be viewed only as a hint.
+  uint64_t GetObjectsFreedEver(std::memory_order mo = std::memory_order_relaxed) const {
+    return total_objects_freed_ever_.load(mo);
   }
 
   // Returns the total number of bytes freed since the heap was created.
-  uint64_t GetBytesFreedEver() const {
-    return total_bytes_freed_ever_;
+  // With default memory order, this should be viewed only as a hint.
+  uint64_t GetBytesFreedEver(std::memory_order mo = std::memory_order_relaxed) const {
+    return total_bytes_freed_ever_.load(mo);
   }
 
   space::RegionSpace* GetRegionSpace() const {
@@ -1189,6 +1191,9 @@ class Heap {
 
   ALWAYS_INLINE void IncrementNumberOfBytesFreedRevoke(size_t freed_bytes_revoke);
 
+  // Update *_freed_ever_ counters to reflect current GC values.
+  void IncrementFreedEver();
+
   // Remove a vlog code from heap-inl.h which is transitively included in half the world.
   static void VlogHeapGrowth(size_t max_allowed_footprint, size_t new_footprint, size_t alloc_size);
 
@@ -1342,10 +1347,10 @@ class Heap {
   size_t concurrent_start_bytes_;
 
   // Since the heap was created, how many bytes have been freed.
-  uint64_t total_bytes_freed_ever_;
+  std::atomic<uint64_t> total_bytes_freed_ever_;
 
   // Since the heap was created, how many objects have been freed.
-  uint64_t total_objects_freed_ever_;
+  std::atomic<uint64_t> total_objects_freed_ever_;
 
   // Number of bytes currently allocated and not yet reclaimed. Includes active
   // TLABS in their entirety, even if they have not yet been parceled out.
