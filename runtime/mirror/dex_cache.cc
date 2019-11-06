@@ -182,7 +182,11 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
     ArtField* new_val = visitor->VisitField(
         pair.object, DexCacheSourceInfo(kSourceDexCacheResolvedField, pair.index, this));
     if (UNLIKELY(new_val != pair.object)) {
-      pair.object = new_val;
+      if (new_val == nullptr) {
+        pair = FieldDexCachePair(nullptr, FieldDexCachePair::InvalidIndexForSlot(i));
+      } else {
+        pair.object = new_val;
+      }
       SetNativePairPtrSize(GetResolvedFields(), i, pair, kRuntimePointerSize);
     }
   }
@@ -194,7 +198,11 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
     ArtMethod* new_val = visitor->VisitMethod(
         pair.object, DexCacheSourceInfo(kSourceDexCacheResolvedMethod, pair.index, this));
     if (UNLIKELY(new_val != pair.object)) {
-      pair.object = new_val;
+      if (new_val == nullptr) {
+        pair = MethodDexCachePair(nullptr, MethodDexCachePair::InvalidIndexForSlot(i));
+      } else {
+        pair.object = new_val;
+      }
       SetNativePairPtrSize(GetResolvedMethods(), i, pair, kRuntimePointerSize);
     }
   }

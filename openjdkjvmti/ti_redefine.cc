@@ -112,6 +112,7 @@
 #include "non_debuggable_classes.h"
 #include "obj_ptr.h"
 #include "object_lock.h"
+#include "reflective_value_visitor.h"
 #include "runtime.h"
 #include "runtime_globals.h"
 #include "stack.h"
@@ -1640,6 +1641,11 @@ bool Redefiner::ClassRedefinition::FinishRemainingAllocations(
     }
 
     cur_data->SetNewClassObject(nc.Get());
+    // We really want to be able to resolve to the new class-object using this dex-cache for
+    // verification work. Since we haven't put it in the class-table yet we wll just manually add it
+    // to the dex-cache.
+    // TODO: We should maybe do this in a better spot.
+    cur_data->GetNewDexCache()->SetResolvedType(nc->GetDexTypeIndex(), nc.Get());
   }
   return true;
 }
@@ -2087,27 +2093,84 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   replacement->SetLockWord(orig->GetLockWord(false), false);
   orig->SetLockWord(art::LockWord::Default(), false);
   // Update live pointers in ART code.
+  auto could_change_resolution_of = [&](auto* field_or_method,
+                                        const auto& info) REQUIRES(art::Locks::mutator_lock_) {
+    constexpr bool is_method = std::is_same_v<art::ArtMethod*, decltype(field_or_method)>;
+    static_assert(is_method || std::is_same_v<art::ArtField*, decltype(field_or_method)>,
+                  "Input is not field or method!");
+    // Only dex-cache is used for resolution
+    if (LIKELY(info.GetType() != art::ReflectionSourceType::kSourceDexCacheResolvedField &&
+               info.GetType() != art::ReflectionSourceType::kSourceDexCacheResolvedMethod)) {
+      return false;
+    }
+    if constexpr (is_method) {
+      // Only direct methods are used without further indirection through a vtable/IFTable.
+      // Constructors cannot be shadowed.
+      if (LIKELY(!field_or_method->IsDirect() || field_or_method->IsConstructor())) {
+        return false;
+      }
+    } else {
+      // Only non-private fields can be shadowed in a manner that's visible.
+      if (LIKELY(field_or_method->IsPrivate())) {
+        return false;
+      }
+    }
+    // We can only shadow things from our superclasses
+    if (LIKELY(!field_or_method->GetDeclaringClass()->IsAssignableFrom(orig))) {
+      return false;
+    }
+    if constexpr (is_method) {
+      auto direct_methods = replacement->GetDirectMethods(art::kRuntimePointerSize);
+      return std::find_if(direct_methods.begin(),
+                          direct_methods.end(),
+                          [&](art::ArtMethod& m) REQUIRES(art::Locks::mutator_lock_) {
+                            return UNLIKELY(m.HasSameNameAndSignature(field_or_method));
+                          }) != direct_methods.end();
+    } else {
+      auto pred = [&](art::ArtField& f) REQUIRES(art::Locks::mutator_lock_) {
+        return std::string_view(f.GetName()) == std::string_view(field_or_method->GetName()) &&
+               std::string_view(f.GetTypeDescriptor()) ==
+                   std::string_view(field_or_method->GetTypeDescriptor());
+      };
+      if (field_or_method->IsStatic()) {
+        auto sfields = replacement->GetSFields();
+        return std::find_if(sfields.begin(), sfields.end(), pred) != sfields.end();
+      } else {
+        auto ifields = replacement->GetIFields();
+        return std::find_if(ifields.begin(), ifields.end(), pred) != ifields.end();
+      }
+    }
+  };
   // TODO Performing 2 stack-walks back to back isn't the greatest. We might want to try to combine
   // it with the one ReplaceReferences does. Doing so would be rather complicated though.
   driver_->runtime_->VisitReflectiveTargets(
       [&](art::ArtField* f, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
         DCHECK(f != nullptr) << info;
         auto it = field_map.find(f);
-        if (it == field_map.end()) {
-          return f;
+        if (it != field_map.end()) {
+          VLOG(plugin) << "Updating " << info << " object for (field) "
+                       << it->second->PrettyField();
+          return it->second;
+        } else if (UNLIKELY(could_change_resolution_of(f, info))) {
+          // Resolution might change. Just clear the resolved value.
+          VLOG(plugin) << "Clearing resolution " << info << " for (field) " << f->PrettyField();
+          return static_cast<art::ArtField*>(nullptr);
         }
-        VLOG(plugin) << "Updating " << info << " object for (field) " << it->second->PrettyField();
-        return it->second;
+        return f;
       },
       [&](art::ArtMethod* m, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
         DCHECK(m != nullptr) << info;
         auto it = method_map.find(m);
-        if (it == method_map.end()) {
-          return m;
+        if (it != method_map.end()) {
+          VLOG(plugin) << "Updating " << info << " object for (method) "
+                      << it->second->PrettyMethod();
+          return it->second;
+        } else if (UNLIKELY(could_change_resolution_of(m, info))) {
+          // Resolution might change. Just clear the resolved value.
+          VLOG(plugin) << "Clearing resolution " << info << " for (method) " << m->PrettyMethod();
+          return static_cast<art::ArtMethod*>(nullptr);
         }
-        VLOG(plugin) << "Updating " << info << " object for (method) "
-                     << it->second->PrettyMethod();
-        return it->second;
+        return m;
       });
 
   // Force every frame of every thread to deoptimize (any frame might have eg offsets compiled in).
