@@ -834,6 +834,7 @@ TEST_F(CodegenTest, ARM64IsaVIXLFeaturesA75) {
   EXPECT_TRUE(features->Has(vixl::CPUFeatures::kCRC32));
   EXPECT_TRUE(features->Has(vixl::CPUFeatures::kDotProduct));
   EXPECT_TRUE(features->Has(vixl::CPUFeatures::kFPHalf));
+  EXPECT_TRUE(features->Has(vixl::CPUFeatures::kNEONHalf));
   EXPECT_TRUE(features->Has(vixl::CPUFeatures::kAtomics));
 }
 
@@ -847,6 +848,7 @@ TEST_F(CodegenTest, ARM64IsaVIXLFeaturesA53) {
   EXPECT_TRUE(features->Has(vixl::CPUFeatures::kCRC32));
   EXPECT_FALSE(features->Has(vixl::CPUFeatures::kDotProduct));
   EXPECT_FALSE(features->Has(vixl::CPUFeatures::kFPHalf));
+  EXPECT_FALSE(features->Has(vixl::CPUFeatures::kNEONHalf));
   EXPECT_FALSE(features->Has(vixl::CPUFeatures::kAtomics));
 }
 
