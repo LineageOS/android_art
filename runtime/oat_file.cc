@@ -855,18 +855,14 @@ bool OatFileBase::Setup(int zip_fd, const char* abs_dex_location, std::string* e
     CheckedCall(mprotect, "protect relocations", reloc_begin, DataBimgRelRoSize(), PROT_READ);
     // Make sure the file lists a boot image dependency, otherwise the .data.bimg.rel.ro
     // section is bogus. The full dependency is checked before the code is executed.
-    // We cannot do this check if we do not have a key-value store, i.e. for secondary
-    // oat files for boot image extensions.
-    if (GetOatHeader().GetKeyValueStoreSize() != 0u) {
-      const char* boot_class_path_checksum =
-          GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
-      if (boot_class_path_checksum == nullptr ||
-          boot_class_path_checksum[0] != gc::space::ImageSpace::kImageChecksumPrefix) {
-        *error_msg = StringPrintf("Oat file '%s' contains .data.bimg.rel.ro section "
-                                      "without boot image dependency.",
-                                  GetLocation().c_str());
-        return false;
-      }
+    const char* boot_class_path_checksum =
+        GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
+    if (boot_class_path_checksum == nullptr ||
+        boot_class_path_checksum[0] != gc::space::ImageSpace::kImageChecksumPrefix) {
+      *error_msg = StringPrintf("Oat file '%s' contains .data.bimg.rel.ro section "
+                                    "without boot image dependency.",
+                                GetLocation().c_str());
+      return false;
     }
   }
 

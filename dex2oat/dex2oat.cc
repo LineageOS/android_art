@@ -63,7 +63,6 @@
 #include "debug/method_debug_info.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
-#include "dex/dex_file_loader.h"
 #include "dex/quick_compiler_callbacks.h"
 #include "dex/verification_results.h"
 #include "dex2oat_options.h"
@@ -281,14 +280,6 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("      Do not include the arch as part of the name, it is added automatically.");
   UsageError("      Example: --boot-image=/system/framework/boot.art");
   UsageError("               (specifies /system/framework/<arch>/boot.art as the image file)");
-  UsageError("      Example: --boot-image=boot.art:boot-framework.art");
-  UsageError("               (specifies <bcp-path1>/<arch>/boot.art as the image file and");
-  UsageError("               <bcp-path2>/<arch>/boot-framework.art as the image extension file");
-  UsageError("               with paths taken from corresponding boot class path components)");
-  UsageError("      Example: --boot-image=/apex/com.android.art/boot.art:/system/framework/*:*");
-  UsageError("               (specifies /apex/com.android.art/<arch>/boot.art as the image");
-  UsageError("               file and search for extensions in /framework/system and boot");
-  UsageError("               class path components' paths)");
   UsageError("      Default: $ANDROID_ROOT/system/framework/boot.art");
   UsageError("");
   UsageError("  --android-root=<path>: used to locate libraries for portable linking.");
@@ -761,31 +752,16 @@ class Dex2Oat final {
 
   void ProcessOptions(ParserOptions* parser_options) {
     compiler_options_->compile_pic_ = true;  // All AOT compilation is PIC.
-
-    if (android_root_.empty()) {
-      const char* android_root_env_var = getenv("ANDROID_ROOT");
-      if (android_root_env_var == nullptr) {
-        Usage("--android-root unspecified and ANDROID_ROOT not set");
-      }
-      android_root_ += android_root_env_var;
-    }
-
-    if (!parser_options->boot_image_filename.empty()) {
-      boot_image_filename_ = parser_options->boot_image_filename;
-    }
-
     DCHECK(compiler_options_->image_type_ == CompilerOptions::ImageType::kNone);
     if (!image_filenames_.empty()) {
-      if (!boot_image_filename_.empty()) {
-        compiler_options_->image_type_ = CompilerOptions::ImageType::kBootImageExtension;
-      } else if (android::base::EndsWith(image_filenames_[0], "apex.art")) {
+      if (android::base::EndsWith(image_filenames_[0], "apex.art")) {
         compiler_options_->image_type_ = CompilerOptions::ImageType::kApexBootImage;
       } else {
         compiler_options_->image_type_ = CompilerOptions::ImageType::kBootImage;
       }
     }
     if (app_image_fd_ != -1 || !app_image_file_name_.empty()) {
-      if (compiler_options_->IsBootImage() || compiler_options_->IsBootImageExtension()) {
+      if (compiler_options_->IsBootImage()) {
         Usage("Can't have both --image and (--app-image-fd or --app-image-file)");
       }
       compiler_options_->image_type_ = CompilerOptions::ImageType::kAppImage;
@@ -842,9 +818,19 @@ class Dex2Oat final {
       Usage("--oat-file arguments do not match --image arguments");
     }
 
-    if (!IsBootImage() && boot_image_filename_.empty()) {
-      DCHECK(!IsBootImageExtension());
-      boot_image_filename_ = GetDefaultBootImageLocation(android_root_);
+    if (android_root_.empty()) {
+      const char* android_root_env_var = getenv("ANDROID_ROOT");
+      if (android_root_env_var == nullptr) {
+        Usage("--android-root unspecified and ANDROID_ROOT not set");
+      }
+      android_root_ += android_root_env_var;
+    }
+
+    if (!IsBootImage() && parser_options->boot_image_filename.empty()) {
+      parser_options->boot_image_filename = GetDefaultBootImageLocation(android_root_);
+    }
+    if (!parser_options->boot_image_filename.empty()) {
+      boot_image_filename_ = parser_options->boot_image_filename;
     }
 
     if (dex_filenames_.empty() && zip_fd_ == -1) {
@@ -951,8 +937,8 @@ class Dex2Oat final {
     // Fill some values into the key-value store for the oat header.
     key_value_store_.reset(new SafeMap<std::string, std::string>());
 
-    // Automatically force determinism for the boot image and boot image extensions in a host build.
-    if (!kIsTargetBuild && (IsBootImage() || IsBootImageExtension())) {
+    // Automatically force determinism for the boot image in a host build.
+    if (!kIsTargetBuild && IsBootImage()) {
       force_determinism_ = true;
     }
     compiler_options_->force_determinism_ = force_determinism_;
@@ -975,21 +961,18 @@ class Dex2Oat final {
     if (image_filenames_[0].rfind('/') == std::string::npos) {
       Usage("Unusable boot image filename %s", image_filenames_[0].c_str());
     }
-    image_filenames_ = ImageSpace::ExpandMultiImageLocations(
-        ArrayRef<const std::string>(dex_locations_), image_filenames_[0], IsBootImageExtension());
+    image_filenames_ = ImageSpace::ExpandMultiImageLocations(dex_locations_, image_filenames_[0]);
 
     if (oat_filenames_[0].rfind('/') == std::string::npos) {
       Usage("Unusable boot image oat filename %s", oat_filenames_[0].c_str());
     }
-    oat_filenames_ = ImageSpace::ExpandMultiImageLocations(
-        ArrayRef<const std::string>(dex_locations_), oat_filenames_[0], IsBootImageExtension());
+    oat_filenames_ = ImageSpace::ExpandMultiImageLocations(dex_locations_, oat_filenames_[0]);
 
     if (!oat_unstripped_.empty()) {
       if (oat_unstripped_[0].rfind('/') == std::string::npos) {
         Usage("Unusable boot image symbol filename %s", oat_unstripped_[0].c_str());
       }
-      oat_unstripped_ = ImageSpace::ExpandMultiImageLocations(
-           ArrayRef<const std::string>(dex_locations_), oat_unstripped_[0], IsBootImageExtension());
+      oat_unstripped_ = ImageSpace::ExpandMultiImageLocations(dex_locations_, oat_unstripped_[0]);
     }
   }
 
@@ -1221,13 +1204,9 @@ class Dex2Oat final {
   bool OpenFile() {
     // Prune non-existent dex files now so that we don't create empty oat files for multi-image.
     PruneNonExistentDexFiles();
-    if (dex_locations_.empty()) {
-      LOG(ERROR) << "Nothing to compile after pruning non-existent dex files.";
-      return false;
-    }
 
     // Expand oat and image filenames for multi image.
-    if ((IsBootImage() || IsBootImageExtension()) && image_filenames_.size() == 1) {
+    if (IsBootImage() && image_filenames_.size() == 1) {
       ExpandOatAndImageFilenames();
     }
 
@@ -1452,13 +1431,12 @@ class Dex2Oat final {
       return dex2oat::ReturnCode::kOther;
     }
 
-    // Verification results are null since we don't know if we will need them yet as the compiler
+    // Verification results are null since we don't know if we will need them yet as the compler
     // filter may change.
     callbacks_.reset(new QuickCompilerCallbacks(
-        // For class verification purposes, boot image extension is the same as boot image.
-        (IsBootImage() || IsBootImageExtension())
-            ? CompilerCallbacks::CallbackMode::kCompileBootImage
-            : CompilerCallbacks::CallbackMode::kCompileApp));
+        IsBootImage() ?
+            CompilerCallbacks::CallbackMode::kCompileBootImage :
+            CompilerCallbacks::CallbackMode::kCompileApp));
 
     RuntimeArgumentMap runtime_options;
     if (!PrepareRuntimeOptions(&runtime_options, callbacks_.get())) {
@@ -1511,7 +1489,7 @@ class Dex2Oat final {
     //       store which is used for determining whether the oat file is up to date,
     //       together with the boot class path locations and checksums stored below.
     CompilerFilter::Filter original_compiler_filter = compiler_options_->GetCompilerFilter();
-    if (!IsBootImage() && !IsBootImageExtension() && IsVeryLarge(dex_files)) {
+    if (!IsBootImage() && IsVeryLarge(dex_files)) {
       // Disable app image to make sure dex2oat unloading is enabled.
       compiler_options_->image_type_ = CompilerOptions::ImageType::kNone;
 
@@ -1534,63 +1512,13 @@ class Dex2Oat final {
       callbacks_->SetVerificationResults(verification_results_.get());
     }
 
-    if (IsBootImage() || IsBootImageExtension()) {
-      // For boot image or boot image extension, pass opened dex files to the Runtime::Create().
+    if (IsBootImage()) {
+      // For boot image, pass opened dex files to the Runtime::Create().
       // Note: Runtime acquires ownership of these dex files.
       runtime_options.Set(RuntimeArgumentMap::BootClassPathDexList, &opened_dex_files_);
     }
     if (!CreateRuntime(std::move(runtime_options))) {
       return dex2oat::ReturnCode::kCreateRuntime;
-    }
-    ArrayRef<const DexFile* const> bcp_dex_files(runtime_->GetClassLinker()->GetBootClassPath());
-    if (IsBootImage() || IsBootImageExtension()) {
-      // Check boot class path dex files and, if compiling an extension, the images it depends on.
-      if ((IsBootImage() && bcp_dex_files.size() != dex_files.size()) ||
-          (IsBootImageExtension() && bcp_dex_files.size() <= dex_files.size())) {
-        LOG(ERROR) << "Unexpected number of boot class path dex files for boot image or extension, "
-            << bcp_dex_files.size() << (IsBootImage() ? " != " : " <= ") << dex_files.size();
-        return dex2oat::ReturnCode::kOther;
-      }
-      if (!std::equal(dex_files.begin(), dex_files.end(), bcp_dex_files.end() - dex_files.size())) {
-        LOG(ERROR) << "Boot class path dex files do not end with the compiled dex files.";
-        return dex2oat::ReturnCode::kOther;
-      }
-      size_t bcp_df_pos = 0u;
-      size_t bcp_df_end = bcp_dex_files.size();
-      for (const std::string& bcp_location : runtime_->GetBootClassPathLocations()) {
-        if (bcp_df_pos == bcp_df_end || bcp_dex_files[bcp_df_pos]->GetLocation() != bcp_location) {
-          LOG(ERROR) << "Missing dex file for boot class component " << bcp_location;
-          return dex2oat::ReturnCode::kOther;
-        }
-        CHECK(!DexFileLoader::IsMultiDexLocation(bcp_dex_files[bcp_df_pos]->GetLocation().c_str()));
-        ++bcp_df_pos;
-        while (bcp_df_pos != bcp_df_end &&
-            DexFileLoader::IsMultiDexLocation(bcp_dex_files[bcp_df_pos]->GetLocation().c_str())) {
-          ++bcp_df_pos;
-        }
-      }
-      if (bcp_df_pos != bcp_df_end) {
-        LOG(ERROR) << "Unexpected dex file in boot class path "
-            << bcp_dex_files[bcp_df_pos]->GetLocation();
-        return dex2oat::ReturnCode::kOther;
-      }
-      auto lacks_image = [](const DexFile* df) {
-        if (kIsDebugBuild && df->GetOatDexFile() != nullptr) {
-          const OatFile* oat_file = df->GetOatDexFile()->GetOatFile();
-          CHECK(oat_file != nullptr);
-          const auto& image_spaces = Runtime::Current()->GetHeap()->GetBootImageSpaces();
-          CHECK(std::any_of(image_spaces.begin(),
-                            image_spaces.end(),
-                            [=](const ImageSpace* space) {
-                              return oat_file == space->GetOatFile();
-                            }));
-        }
-        return df->GetOatDexFile() == nullptr;
-      };
-      if (std::any_of(bcp_dex_files.begin(), bcp_dex_files.end() - dex_files.size(), lacks_image)) {
-        LOG(ERROR) << "Missing required boot image(s) for boot image extension.";
-        return dex2oat::ReturnCode::kOther;
-      }
     }
 
     if (!compilation_reason_.empty()) {
@@ -1601,32 +1529,17 @@ class Dex2Oat final {
       // If we're compiling the boot image, store the boot classpath into the Key-Value store.
       // We use this when loading the boot image.
       key_value_store_->Put(OatHeader::kBootClassPathKey, android::base::Join(dex_locations_, ':'));
-    } else if (IsBootImageExtension()) {
-      // Validate the boot class path and record the dependency on the loaded boot images.
-      TimingLogger::ScopedTiming t3("Loading image checksum", timings_);
-      Runtime* runtime = Runtime::Current();
-      std::string full_bcp = android::base::Join(runtime->GetBootClassPathLocations(), ':');
-      std::string extension_part = ":" + android::base::Join(dex_locations_, ':');
-      if (!android::base::EndsWith(full_bcp, extension_part)) {
-        LOG(ERROR) << "Full boot class path does not end with extension parts, full: " << full_bcp
-            << ", extension: " << extension_part.substr(1u);
-        return dex2oat::ReturnCode::kOther;
-      }
-      std::string bcp_dependency = full_bcp.substr(0u, full_bcp.size() - extension_part.size());
-      key_value_store_->Put(OatHeader::kBootClassPathKey, bcp_dependency);
-      ArrayRef<const DexFile* const> bcp_dex_files_dependency =
-          bcp_dex_files.SubArray(/*pos=*/ 0u, bcp_dex_files.size() - dex_files.size());
-      ArrayRef<ImageSpace* const> image_spaces(runtime->GetHeap()->GetBootImageSpaces());
-      key_value_store_->Put(
-          OatHeader::kBootClassPathChecksumsKey,
-          gc::space::ImageSpace::GetBootClassPathChecksums(image_spaces, bcp_dex_files_dependency));
-    } else {
+    }
+
+    if (!IsBootImage()) {
       if (CompilerFilter::DependsOnImageChecksum(original_compiler_filter)) {
         TimingLogger::ScopedTiming t3("Loading image checksum", timings_);
         Runtime* runtime = Runtime::Current();
         key_value_store_->Put(OatHeader::kBootClassPathKey,
                               android::base::Join(runtime->GetBootClassPathLocations(), ':'));
         ArrayRef<ImageSpace* const> image_spaces(runtime->GetHeap()->GetBootImageSpaces());
+        ArrayRef<const DexFile* const> bcp_dex_files(
+            runtime->GetClassLinker()->GetBootClassPath());
         key_value_store_->Put(
             OatHeader::kBootClassPathChecksumsKey,
             gc::space::ImageSpace::GetBootClassPathChecksums(image_spaces, bcp_dex_files));
@@ -1694,7 +1607,7 @@ class Dex2Oat final {
     CHECK(driver_ == nullptr);
     // If we use a swap file, ensure we are above the threshold to make it necessary.
     if (swap_fd_ != -1) {
-      if (!UseSwap(IsBootImage() || IsBootImageExtension(), dex_files)) {
+      if (!UseSwap(IsBootImage(), dex_files)) {
         close(swap_fd_);
         swap_fd_ = -1;
         VLOG(compiler) << "Decided to run without swap.";
@@ -1711,7 +1624,7 @@ class Dex2Oat final {
     Thread* self = Thread::Current();
     WellKnownClasses::Init(self->GetJniEnv());
 
-    if (!IsBootImage() && !IsBootImageExtension()) {
+    if (!IsBootImage()) {
       constexpr bool kSaveDexInput = false;
       if (kSaveDexInput) {
         SaveDexInput();
@@ -1800,7 +1713,7 @@ class Dex2Oat final {
 
     if (!no_inline_filters.empty()) {
       std::vector<const DexFile*> class_path_files;
-      if (!IsBootImage() && !IsBootImageExtension()) {
+      if (!IsBootImage()) {
         // The class loader context is used only for apps.
         class_path_files = class_loader_context_->FlattenOpenedDexFiles();
       }
@@ -1845,7 +1758,7 @@ class Dex2Oat final {
                                      compiler_kind_,
                                      thread_count_,
                                      swap_fd_));
-    if (!IsBootImage() && !IsBootImageExtension()) {
+    if (!IsBootImage()) {
       driver_->SetClasspathDexFiles(class_loader_context_->FlattenOpenedDexFiles());
     }
 
@@ -1893,7 +1806,7 @@ class Dex2Oat final {
     ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
 
     jobject class_loader = nullptr;
-    if (!IsBootImage() && !IsBootImageExtension()) {
+    if (!IsBootImage()) {
       class_loader =
           class_loader_context_->CreateClassLoader(compiler_options_->dex_files_for_oat_file_);
       callbacks_->SetDexFiles(&dex_files);
@@ -2037,7 +1950,7 @@ class Dex2Oat final {
 
     {
       TimingLogger::ScopedTiming t2("dex2oat Write VDEX", timings_);
-      DCHECK(IsBootImage() || IsBootImageExtension() || oat_files_.size() == 1u);
+      DCHECK(IsBootImage() || oat_files_.size() == 1u);
       verifier::VerifierDeps* verifier_deps = callbacks_->GetVerifierDeps();
       for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
         File* vdex_file = vdex_files_[i].get();
@@ -2261,7 +2174,7 @@ class Dex2Oat final {
   }
 
   bool IsImage() const {
-    return IsAppImage() || IsBootImage() || IsBootImageExtension();
+    return IsAppImage() || IsBootImage();
   }
 
   bool IsAppImage() const {
@@ -2270,10 +2183,6 @@ class Dex2Oat final {
 
   bool IsBootImage() const {
     return compiler_options_->IsBootImage();
-  }
-
-  bool IsBootImageExtension() const {
-    return compiler_options_->IsBootImageExtension();
   }
 
   bool IsHost() const {
@@ -2480,7 +2389,7 @@ class Dex2Oat final {
   bool PrepareRuntimeOptions(RuntimeArgumentMap* runtime_options,
                              QuickCompilerCallbacks* callbacks) {
     RuntimeOptions raw_options;
-    if (IsBootImage()) {
+    if (boot_image_filename_.empty()) {
       std::string boot_class_path = "-Xbootclasspath:";
       boot_class_path += android::base::Join(dex_filenames_, ':');
       raw_options.push_back(std::make_pair(boot_class_path, nullptr));
@@ -2570,7 +2479,7 @@ class Dex2Oat final {
   bool CreateImageFile()
       REQUIRES(!Locks::mutator_lock_) {
     CHECK(image_writer_ != nullptr);
-    if (!IsBootImage() && !IsBootImageExtension()) {
+    if (!IsBootImage()) {
       CHECK(image_filenames_.empty());
       image_filenames_.push_back(app_image_file_name_);
     }
@@ -2953,10 +2862,7 @@ static dex2oat::ReturnCode Dex2oat(int argc, char** argv) {
   //   3) Compiling with --host
   //   4) Compiling on the host (not a target build)
   // Otherwise, print a stripped command line.
-  if (kIsDebugBuild ||
-      dex2oat->IsBootImage() || dex2oat->IsBootImageExtension() ||
-      dex2oat->IsHost() ||
-      !kIsTargetBuild) {
+  if (kIsDebugBuild || dex2oat->IsBootImage() || dex2oat->IsHost() || !kIsTargetBuild) {
     LOG(INFO) << CommandLine();
   } else {
     LOG(INFO) << StrippedCommandLine();
