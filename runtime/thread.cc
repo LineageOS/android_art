@@ -2439,13 +2439,19 @@ void Thread::Destroy() {
   {
     ScopedObjectAccess soa(self);
     Runtime::Current()->GetHeap()->RevokeThreadLocalBuffers(this);
-    if (kUseReadBarrier) {
-      Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()->RevokeThreadLocalMarkStack(this);
-    }
   }
 }
 
 Thread::~Thread() {
+  if (kUseReadBarrier) {
+    // It's a cheap operation so can be done in the destructor (instead of
+    // Destroy()).
+    // Doing it without mutator_lock mutual exclusion is also necessary as there
+    // is a checkpoint in ConcurrentCopying which scans the threads' stacks,
+    // thereby assigning a thread-local mark-stack to self, breaking some
+    // assumptions about how the GC works (see b/140119552).
+    Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()->RevokeThreadLocalMarkStack(this);
+  }
   CHECK(tlsPtr_.class_loader_override == nullptr);
   CHECK(tlsPtr_.jpeer == nullptr);
   CHECK(tlsPtr_.opeer == nullptr);
