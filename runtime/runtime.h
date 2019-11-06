@@ -942,6 +942,9 @@ class Runtime {
     return verifier_missing_kthrow_fatal_;
   }
 
+  // Return true if we should load oat files as executable or not.
+  bool GetOatFilesExecutable() const;
+
  private:
   static void InitPlatformSignalHandlers();
 
