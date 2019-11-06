@@ -1,0 +1,1 @@
+Tests that native methods in app image using compiled stubs or Generic JNI work correctly.

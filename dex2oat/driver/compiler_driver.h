@@ -121,7 +121,7 @@ class CompilerDriver {
   }
 
   // Generate the trampolines that are invoked by unresolved direct methods.
-  std::unique_ptr<const std::vector<uint8_t>> CreateJniDlsymLookup() const;
+  std::unique_ptr<const std::vector<uint8_t>> CreateJniDlsymLookupTrampoline() const;
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickGenericJniTrampoline() const;
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickImtConflictTrampoline() const;
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickResolutionTrampoline() const;
