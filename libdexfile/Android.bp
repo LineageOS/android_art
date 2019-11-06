@@ -110,8 +110,6 @@ cc_defaults {
     ],
     defaults_visibility: [
         "//art:__subpackages__",
-        // TODO(b/133140750): Clean this up.
-        "//frameworks/base/startop/view_compiler",
     ],
     static_libs: ["libdexfile"],
 }
@@ -143,10 +141,6 @@ gensrcs {
 art_cc_library {
     name: "libdexfile",
     defaults: ["libdexfile_defaults"],
-    visibility: [
-        // TODO(b/133140750): Clean this up.
-        "//frameworks/base/startop/view_compiler",
-    ],
     // Leave the symbols in the shared library so that stack unwinders can
     // produce meaningful name resolution.
     strip: {
