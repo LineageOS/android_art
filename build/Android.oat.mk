@@ -63,7 +63,6 @@ define create-core-oat-host-rules
     $$(error found $(1) expected interpreter, interp-ac, or optimizing)
   endif
 
-  core_image_location := $(HOST_OUT_JAVA_LIBRARIES)/core$$(core_infix)$(CORE_IMG_SUFFIX)
   core_image_name := $($(2)HOST_CORE_IMG_OUT_BASE)$$(core_infix)$(CORE_IMG_SUFFIX)
   core_oat_name := $($(2)HOST_CORE_OAT_OUT_BASE)$$(core_infix)$(CORE_OAT_SUFFIX)
 
@@ -77,46 +76,18 @@ define create-core-oat-host-rules
   HOST_CORE_OAT_OUTS += $$(core_oat_name)
 
 $$(core_image_name): PRIVATE_CORE_COMPILE_OPTIONS := $$(core_compile_options)
-$$(core_image_name): PRIVATE_CORE_IMAGE_LOCATION := $$(core_image_location)
 $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
 $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
-# In addition to the primary core image containing HOST_CORE_IMG_DEX_FILES,
-# also build a boot image extension for the remaining HOST_CORE_DEX_FILES.
-$$(core_image_name): $$(HOST_CORE_DEX_LOCATIONS) $$(core_dex2oat_dependency)
+$$(core_image_name): $$(HOST_CORE_IMG_DEX_LOCATIONS) $$(core_dex2oat_dependency)
 	@echo "host dex2oat: $$@"
 	@mkdir -p $$(dir $$@)
-	$$(hide) ANDROID_LOG_TAGS="*:e" $$(DEX2OAT) \
-	  --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
+	$$(hide) ANDROID_LOG_TAGS="*:e" $$(DEX2OAT) --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
 	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \
 	  $$(addprefix --dex-file=,$$(HOST_CORE_IMG_DEX_FILES)) \
 	  $$(addprefix --dex-location=,$$(HOST_CORE_IMG_DEX_LOCATIONS)) \
 	  --oat-file=$$(PRIVATE_CORE_OAT_NAME) \
-	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) \
-          --image=$$(PRIVATE_CORE_IMG_NAME) \
-	  --base=$$(LIBART_IMG_HOST_BASE_ADDRESS) \
-	  --instruction-set=$$($(2)ART_HOST_ARCH) \
-	  $$(LOCAL_$(2)DEX2OAT_HOST_INSTRUCTION_SET_FEATURES_OPTION) \
-	  --host --android-root=$$(HOST_OUT) \
-	  --generate-debug-info --generate-build-id \
-	  --runtime-arg -XX:SlowDebug=true \
-	  --no-inline-from=core-oj-hostdex.jar \
-	  $$(PRIVATE_CORE_COMPILE_OPTIONS) && \
-	ANDROID_LOG_TAGS="*:e" $$(DEX2OAT) \
-	  --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
-	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \
-	  --runtime-arg -Xbootclasspath:$$(subst $$(space),:,$$(strip \
-	        $$(HOST_CORE_DEX_FILES))) \
-	  --runtime-arg -Xbootclasspath-locations:$$(subst $$(space),:,$$(strip \
-	        $$(HOST_CORE_DEX_LOCATIONS))) \
-	  $$(addprefix --dex-file=, \
-	      $$(filter-out $$(HOST_CORE_IMG_DEX_FILES),$$(HOST_CORE_DEX_FILES))) \
-	  $$(addprefix --dex-location=, \
-	      $$(filter-out $$(HOST_CORE_IMG_DEX_LOCATIONS),$$(HOST_CORE_DEX_LOCATIONS))) \
-	  --oat-file=$$(PRIVATE_CORE_OAT_NAME) \
-	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) \
-	  --boot-image=$$(PRIVATE_CORE_IMAGE_LOCATION) \
-	  --image=$$(PRIVATE_CORE_IMG_NAME) \
-	  --instruction-set=$$($(2)ART_HOST_ARCH) \
+	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) --image=$$(PRIVATE_CORE_IMG_NAME) \
+	  --base=$$(LIBART_IMG_HOST_BASE_ADDRESS) --instruction-set=$$($(2)ART_HOST_ARCH) \
 	  $$(LOCAL_$(2)DEX2OAT_HOST_INSTRUCTION_SET_FEATURES_OPTION) \
 	  --host --android-root=$$(HOST_OUT) \
 	  --generate-debug-info --generate-build-id \
@@ -178,7 +149,6 @@ define create-core-oat-target-rules
     $$(error found $(1) expected interpreter, interp-ac, or optimizing)
   endif
 
-  core_image_location := $(ART_TARGET_TEST_OUT)/core$$(core_infix)$(CORE_IMG_SUFFIX)
   core_image_name := $($(2)TARGET_CORE_IMG_OUT_BASE)$$(core_infix)$(CORE_IMG_SUFFIX)
   core_oat_name := $($(2)TARGET_CORE_OAT_OUT_BASE)$$(core_infix)$(CORE_OAT_SUFFIX)
 
@@ -196,53 +166,24 @@ define create-core-oat-target-rules
   TARGET_CORE_OAT_OUTS += $$(core_oat_name)
 
 $$(core_image_name): PRIVATE_CORE_COMPILE_OPTIONS := $$(core_compile_options)
-$$(core_image_name): PRIVATE_CORE_IMAGE_LOCATION := $$(core_image_location)
 $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
 $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
-# In addition to the primary core image containing TARGET_CORE_IMG_DEX_FILES,
-# also build a boot image extension for the remaining TARGET_CORE_DEX_FILES.
-$$(core_image_name): $$(TARGET_CORE_DEX_FILES) $$(core_dex2oat_dependency)
+$$(core_image_name): $$(TARGET_CORE_IMG_DEX_FILES) $$(core_dex2oat_dependency)
 	@echo "target dex2oat: $$@"
 	@mkdir -p $$(dir $$@)
-	$$(hide) $$(DEX2OAT) \
-	  --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
+	$$(hide) $$(DEX2OAT) --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
 	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \
 	  $$(addprefix --dex-file=,$$(TARGET_CORE_IMG_DEX_FILES)) \
 	  $$(addprefix --dex-location=,$$(TARGET_CORE_IMG_DEX_LOCATIONS)) \
 	  --oat-file=$$(PRIVATE_CORE_OAT_NAME) \
-	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) \
-	  --image=$$(PRIVATE_CORE_IMG_NAME) \
-	  --base=$$(LIBART_IMG_TARGET_BASE_ADDRESS) \
-	  --instruction-set=$$($(2)TARGET_ARCH) \
+	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) --image=$$(PRIVATE_CORE_IMG_NAME) \
+	  --base=$$(LIBART_IMG_TARGET_BASE_ADDRESS) --instruction-set=$$($(2)TARGET_ARCH) \
 	  --instruction-set-variant=$$($(2)DEX2OAT_TARGET_CPU_VARIANT) \
 	  --instruction-set-features=$$($(2)DEX2OAT_TARGET_INSTRUCTION_SET_FEATURES) \
 	  --android-root=$$(PRODUCT_OUT)/system \
 	  --generate-debug-info --generate-build-id \
 	  --runtime-arg -XX:SlowDebug=true \
-	  $$(PRIVATE_CORE_COMPILE_OPTIONS) && \
-	$$(DEX2OAT) \
-	  --runtime-arg -Xms$(DEX2OAT_IMAGE_XMS) \
-	  --runtime-arg -Xmx$(DEX2OAT_IMAGE_XMX) \
-	  --runtime-arg -Xbootclasspath:$$(subst $$(space),:,$$(strip \
-	        $$(TARGET_CORE_DEX_FILES))) \
-	  --runtime-arg -Xbootclasspath-locations:$$(subst $$(space),:,$$(strip \
-	        $$(TARGET_CORE_DEX_LOCATIONS))) \
-	  $$(addprefix --dex-file=, \
-	       $$(filter-out $$(TARGET_CORE_IMG_DEX_FILES),$$(TARGET_CORE_DEX_FILES))) \
-	  $$(addprefix --dex-location=, \
-	       $$(filter-out $$(TARGET_CORE_IMG_DEX_LOCATIONS),$$(TARGET_CORE_DEX_LOCATIONS))) \
-	  --oat-file=$$(PRIVATE_CORE_OAT_NAME) \
-	  --oat-location=$$(PRIVATE_CORE_OAT_NAME) \
-	  --boot-image=$$(PRIVATE_CORE_IMAGE_LOCATION) \
-	  --image=$$(PRIVATE_CORE_IMG_NAME) \
-	  --instruction-set=$$($(2)TARGET_ARCH) \
-	  --instruction-set-variant=$$($(2)DEX2OAT_TARGET_CPU_VARIANT) \
-	  --instruction-set-features=$$($(2)DEX2OAT_TARGET_INSTRUCTION_SET_FEATURES) \
-	  --android-root=$$(PRODUCT_OUT)/system \
-	  --generate-debug-info --generate-build-id \
-	  --runtime-arg -XX:SlowDebug=true \
-	  $$(PRIVATE_CORE_COMPILE_OPTIONS) || \
-	(rm $$(PRIVATE_CORE_OAT_NAME); exit 1)
+	  $$(PRIVATE_CORE_COMPILE_OPTIONS) || (rm $$(PRIVATE_CORE_OAT_NAME); exit 1)
 
 $$(core_oat_name): $$(core_image_name)
 
