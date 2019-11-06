@@ -134,24 +134,25 @@ static void CollectNonDebuggableClasses() REQUIRES(!Locks::mutator_lock_) {
 
 // Must match values in com.android.internal.os.Zygote.
 enum {
-  DEBUG_ENABLE_JDWP                  = 1,
-  DEBUG_ENABLE_CHECKJNI              = 1 << 1,
-  DEBUG_ENABLE_ASSERT                = 1 << 2,
-  DEBUG_ENABLE_SAFEMODE              = 1 << 3,
-  DEBUG_ENABLE_JNI_LOGGING           = 1 << 4,
-  DEBUG_GENERATE_DEBUG_INFO          = 1 << 5,
-  DEBUG_ALWAYS_JIT                   = 1 << 6,
-  DEBUG_NATIVE_DEBUGGABLE            = 1 << 7,
-  DEBUG_JAVA_DEBUGGABLE              = 1 << 8,
-  DISABLE_VERIFIER                   = 1 << 9,
-  ONLY_USE_SYSTEM_OAT_FILES          = 1 << 10,
-  DEBUG_GENERATE_MINI_DEBUG_INFO     = 1 << 11,
-  HIDDEN_API_ENFORCEMENT_POLICY_MASK = (1 << 12)
-                                     | (1 << 13),
-  PROFILE_SYSTEM_SERVER              = 1 << 14,
-  PROFILE_FROM_SHELL                 = 1 << 15,
-  USE_APP_IMAGE_STARTUP_CACHE        = 1 << 16,
-  DEBUG_IGNORE_APP_SIGNAL_HANDLER    = 1 << 17,
+  DEBUG_ENABLE_JDWP                   = 1,
+  DEBUG_ENABLE_CHECKJNI               = 1 << 1,
+  DEBUG_ENABLE_ASSERT                 = 1 << 2,
+  DEBUG_ENABLE_SAFEMODE               = 1 << 3,
+  DEBUG_ENABLE_JNI_LOGGING            = 1 << 4,
+  DEBUG_GENERATE_DEBUG_INFO           = 1 << 5,
+  DEBUG_ALWAYS_JIT                    = 1 << 6,
+  DEBUG_NATIVE_DEBUGGABLE             = 1 << 7,
+  DEBUG_JAVA_DEBUGGABLE               = 1 << 8,
+  DISABLE_VERIFIER                    = 1 << 9,
+  ONLY_USE_SYSTEM_OAT_FILES           = 1 << 10,
+  DEBUG_GENERATE_MINI_DEBUG_INFO      = 1 << 11,
+  HIDDEN_API_ENFORCEMENT_POLICY_MASK  = (1 << 12)
+                                      | (1 << 13),
+  PROFILE_SYSTEM_SERVER               = 1 << 14,
+  PROFILE_FROM_SHELL                  = 1 << 15,
+  USE_APP_IMAGE_STARTUP_CACHE         = 1 << 16,
+  DEBUG_IGNORE_APP_SIGNAL_HANDLER     = 1 << 17,
+  DISABLE_TEST_API_ENFORCEMENT_POLICY = 1 << 18,
 
   // bits to shift (flags & HIDDEN_API_ENFORCEMENT_POLICY_MASK) by to get a value
   // corresponding to hiddenapi::EnforcementPolicy
@@ -318,6 +319,13 @@ static void ZygoteHooks_nativePostForkChild(JNIEnv* env,
   api_enforcement_policy = hiddenapi::EnforcementPolicyFromInt(
       (runtime_flags & HIDDEN_API_ENFORCEMENT_POLICY_MASK) >> API_ENFORCEMENT_POLICY_SHIFT);
   runtime_flags &= ~HIDDEN_API_ENFORCEMENT_POLICY_MASK;
+
+  if ((runtime_flags & DISABLE_TEST_API_ENFORCEMENT_POLICY) != 0u) {
+    runtime->SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kDisabled);
+  } else {
+    runtime->SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
+  }
+  runtime_flags &= ~DISABLE_TEST_API_ENFORCEMENT_POLICY;
 
   bool profile_system_server = (runtime_flags & PROFILE_SYSTEM_SERVER) == PROFILE_SYSTEM_SERVER;
   runtime_flags &= ~PROFILE_SYSTEM_SERVER;
