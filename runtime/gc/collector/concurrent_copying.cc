@@ -2027,9 +2027,7 @@ void ConcurrentCopying::RevokeThreadLocalMarkStack(Thread* thread) {
   CHECK_EQ(self, thread);
   accounting::AtomicStack<mirror::Object>* tl_mark_stack = thread->GetThreadLocalMarkStack();
   if (tl_mark_stack != nullptr) {
-    // With 2-phase CC change, we cannot assert that is_marking_ will always be true
-    // as we perform thread stack scan even before enabling the read-barrier.
-    CHECK(is_marking_ || (use_generational_cc_ && !young_gen_));
+    CHECK(is_marking_);
     MutexLock mu(self, mark_stack_lock_);
     revoked_mark_stacks_.push_back(tl_mark_stack);
     RemoveThreadMarkStackMapping(thread, tl_mark_stack);
