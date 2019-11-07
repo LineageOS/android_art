@@ -1205,8 +1205,8 @@ void Heap::ResetGcPerformanceInfo() {
   post_gc_last_process_cpu_time_ns_ = process_cpu_start_time_ns_;
   post_gc_weighted_allocated_bytes_ = 0u;
 
-  total_bytes_freed_ever_ = 0;
-  total_objects_freed_ever_ = 0;
+  total_bytes_freed_ever_.store(0);
+  total_objects_freed_ever_.store(0);
   total_wait_time_ = 0;
   blocking_gc_count_ = 0;
   blocking_gc_time_ = 0;
@@ -1903,7 +1903,21 @@ uint64_t Heap::GetObjectsAllocatedEver() const {
 }
 
 uint64_t Heap::GetBytesAllocatedEver() const {
-  return GetBytesFreedEver() + GetBytesAllocated();
+  // Force the returned value to be monotonically increasing, in the sense that if this is called
+  // at A and B, such that A happens-before B, then the call at B returns a value no smaller than
+  // that at A. This is not otherwise guaranteed, since num_bytes_allocated_ is decremented first,
+  // and total_bytes_freed_ever_ is incremented later.
+  static std::atomic<uint64_t> max_bytes_so_far(0);
+  uint64_t so_far = max_bytes_so_far.load(std::memory_order_relaxed);
+  uint64_t current_bytes = GetBytesFreedEver(std::memory_order_acquire);
+  current_bytes += GetBytesAllocated();
+  do {
+    if (current_bytes <= so_far) {
+      return so_far;
+    }
+  } while (!max_bytes_so_far.compare_exchange_weak(so_far /* updated */,
+                                                   current_bytes, std::memory_order_relaxed));
+  return current_bytes;
 }
 
 // Check whether the given object is an instance of the given class.
@@ -2239,6 +2253,19 @@ void Heap::UnBindBitmaps() {
   }
 }
 
+void Heap::IncrementFreedEver() {
+  // Counters are updated only by us, but may be read concurrently.
+  // The updates should become visible after the corresponding live object info.
+  total_objects_freed_ever_.store(total_objects_freed_ever_.load(std::memory_order_relaxed)
+                                  + GetCurrentGcIteration()->GetFreedObjects()
+                                  + GetCurrentGcIteration()->GetFreedLargeObjects(),
+                                  std::memory_order_release);
+  total_bytes_freed_ever_.store(total_bytes_freed_ever_.load(std::memory_order_relaxed)
+                                + GetCurrentGcIteration()->GetFreedBytes()
+                                + GetCurrentGcIteration()->GetFreedLargeObjectBytes(),
+                                std::memory_order_release);
+}
+
 void Heap::PreZygoteFork() {
   if (!HasZygoteSpace()) {
     // We still want to GC in case there is some unreachable non moving objects that could cause a
@@ -2313,10 +2340,7 @@ void Heap::PreZygoteFork() {
     if (temp_space_ != nullptr) {
       CHECK(temp_space_->IsEmpty());
     }
-    total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects() +
-        GetCurrentGcIteration()->GetFreedLargeObjects();
-    total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes() +
-        GetCurrentGcIteration()->GetFreedLargeObjectBytes();
+    IncrementFreedEver();
     // Update the end and write out image.
     non_moving_space_->SetEnd(target_space.End());
     non_moving_space_->SetLimit(target_space.Limit());
@@ -2588,10 +2612,7 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
       << "Could not find garbage collector with collector_type="
       << static_cast<size_t>(collector_type_) << " and gc_type=" << gc_type;
   collector->Run(gc_cause, clear_soft_references || runtime->IsZygote());
-  total_objects_freed_ever_ += GetCurrentGcIteration()->GetFreedObjects() +
-      GetCurrentGcIteration()->GetFreedLargeObjects();
-  total_bytes_freed_ever_ += GetCurrentGcIteration()->GetFreedBytes() +
-      GetCurrentGcIteration()->GetFreedLargeObjectBytes();
+  IncrementFreedEver();
   RequestTrim(self);
   // Collect cleared references.
   SelfDeletingTask* clear = reference_processor_->CollectClearedReferences(self);
