@@ -29,7 +29,6 @@
 #include "dex/string_reference.h"
 #include "driver/compiled_method_storage.h"
 #include "linker/relative_patcher.h"
-#include "oat.h"
 #include "oat_quick_method_header.h"
 #include "stream/vector_output_stream.h"
 

@@ -48,6 +48,7 @@
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
 #include "mirror/var_handle.h"
+#include "oat.h"
 #include "oat_file.h"
 #include "oat_quick_method_header.h"
 #include "quick_exception_handler.h"

@@ -61,6 +61,7 @@
 #include "mirror/class_loader.h"
 #include "mirror/dex_cache-inl.h"
 #include "mirror/object-inl.h"
+#include "oat.h"
 #include "oat_quick_method_header.h"
 #include "profile/profile_compilation_info.h"
 #include "quicken_info.h"

@@ -34,6 +34,7 @@
 #include "common_runtime_test.h"
 #include "dexopt_test.h"
 #include "hidden_api.h"
+#include "oat.h"
 #include "oat_file.h"
 #include "oat_file_manager.h"
 #include "scoped_thread_state_change-inl.h"
