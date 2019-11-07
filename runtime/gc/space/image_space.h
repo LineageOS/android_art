@@ -39,11 +39,61 @@ class ImageSpace : public MemMapSpace {
     return kSpaceTypeImageSpace;
   }
 
-  // Load boot image spaces from a primary image file for a specified instruction set.
+  // Load boot image spaces for specified boot class path, image location, instruction set, etc.
   //
   // On successful return, the loaded spaces are added to boot_image_spaces (which must be
   // empty on entry) and `extra_reservation` is set to the requested reservation located
   // after the end of the last loaded oat file.
+  //
+  // IMAGE LOCATION
+  //
+  // The "image location" is a colon-separated list that specifies one or more
+  // components by name and may also specify search paths for extensions
+  // corresponding to the remaining boot class path (BCP) extensions.
+  //
+  // The primary boot image can be specified as one of
+  //     <path>/<base-name>
+  //     <base-name>
+  // and the path of the first BCP component is used for the second form.
+  //
+  // Named extension specifications must correspond to an expansion of the
+  // <base-name> with a BCP component (for example boot.art with the BCP
+  // component name <jar-path>/framework.jar expands to boot-framework.art).
+  // They can be similarly specified as one of
+  //     <ext-path>/<ext-name>
+  //     <ext-name>
+  // and must be listed in the order of their corresponding BCP components.
+  //
+  // Search paths for remaining extensions can be specified after named
+  // components as one of
+  //     <search-path>/*
+  //     *
+  // where the second form means that the path of a particular BCP component
+  // should be used to search for that component's boot image extension. These
+  // paths will be searched in the specifed order.
+  //
+  // The actual filename shall be derived from the specified locations using
+  // `GetSystemImageFilename()` or `GetDalvikCacheFilename()`.
+  //
+  // Example image locations:
+  //     /system/framework/boot.art
+  //         - only primary boot image with full path.
+  //     boot.art:boot-framework.art
+  //         - primary and one extension, use BCP component paths.
+  //     /apex/com.android.art/boot.art:*
+  //         - primary with exact location, search for the rest based on BCP
+  //           component paths.
+  //     boot.art:/system/framework/*
+  //         - primary based on BCP component path, search for extensions in
+  //           /system/framework.
+  //     /apex/com.android.art/boot.art:/system/framework/*:*
+  //         - primary with exact location, search for extensions first in
+  //           /system/framework, then in the corresponding BCP component path.
+  //     /apex/com.android.art/boot.art:*:/system/framework/*
+  //         - primary with exact location, search for extensions first in the
+  //           corresponding BCP component path and then in /system/framework.
+  //     /apex/com.android.art/boot.art:*:boot-framework.jar
+  //         - invalid, named components may not follow search paths.
   static bool LoadBootImage(
       const std::vector<std::string>& boot_class_path,
       const std::vector<std::string>& boot_class_path_locations,
@@ -54,7 +104,7 @@ class ImageSpace : public MemMapSpace {
       bool executable,
       bool is_zygote,
       size_t extra_reservation_size,
-      /*out*/std::vector<std::unique_ptr<space::ImageSpace>>* boot_image_spaces,
+      /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
       /*out*/MemMap* extra_reservation) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try to open an existing app image space.
@@ -167,7 +217,7 @@ class ImageSpace : public MemMapSpace {
 
   // Expand a single image location to multi-image locations based on the dex locations.
   static std::vector<std::string> ExpandMultiImageLocations(
-      const std::vector<std::string>& dex_locations,
+      ArrayRef<const std::string> dex_locations,
       const std::string& image_location,
       bool boot_image_extension = false);
 
@@ -233,12 +283,7 @@ class ImageSpace : public MemMapSpace {
   friend class Space;
 
  private:
-  // Internal overload that takes ArrayRef<> instead of vector<>.
-  static std::vector<std::string> ExpandMultiImageLocations(
-      ArrayRef<const std::string> dex_locations,
-      const std::string& image_location,
-      bool boot_image_extension = false);
-
+  class BootImageLayout;
   class BootImageLoader;
   template <typename ReferenceVisitor>
   class ClassTableVisitor;

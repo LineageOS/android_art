@@ -14,30 +14,43 @@
  * limitations under the License.
  */
 
+#include <fstream>
 #include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <android-base/logging.h>
+#include <android-base/stringprintf.h>
+#include <android-base/strings.h>
 
 #include "common_runtime_test.h"
 
+#include "base/array_ref.h"
 #include "base/file_utils.h"
 #include "base/macros.h"
+#include "base/mem_map.h"
+#include "base/string_view_cpp20.h"
 #include "base/unix_file/fd_file.h"
 #include "base/utils.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_loader.h"
 #include "dex/method_reference.h"
+#include "gc/space/image_space.h"
 #include "profile/profile_compilation_info.h"
 #include "runtime.h"
+#include "scoped_thread_state_change-inl.h"
+#include "thread-current-inl.h"
 
 namespace art {
+
+// A suitable address for loading the core images.
+constexpr uint32_t kBaseAddress = ART_BASE_ADDRESS;
 
 struct ImageSizes {
   size_t art_size = 0;
@@ -132,8 +145,12 @@ class Dex2oatImageTest : public CommonRuntimeTest {
       scratch_dir.pop_back();
     }
     CHECK(!scratch_dir.empty()) << "No directory " << scratch.GetFilename();
+    std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
+    ArrayRef<const std::string> dex_files(libcore_dex_files);
+    std::vector<std::string> local_extra_args = extra_args;
+    local_extra_args.push_back(android::base::StringPrintf("--base=0x%08x", kBaseAddress));
     std::string error_msg;
-    if (!CompileBootImage(extra_args, scratch.GetFilename(), &error_msg)) {
+    if (!CompileBootImage(local_extra_args, scratch.GetFilename(), dex_files, &error_msg)) {
       LOG(ERROR) << "Failed to compile image " << scratch.GetFilename() << error_msg;
     }
     std::string art_file = scratch.GetFilename() + ".art";
@@ -151,19 +168,19 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     scratch.Close();
     // Clear image files since we compile the image multiple times and don't want to leave any
     // artifacts behind.
-    ClearDirectory(scratch_dir.c_str(), /*recursive*/ false);
+    ClearDirectory(scratch_dir.c_str(), /*recursive=*/ false);
     return ret;
   }
 
   bool CompileBootImage(const std::vector<std::string>& extra_args,
                         const std::string& image_file_name_prefix,
+                        ArrayRef<const std::string> dex_files,
                         std::string* error_msg) {
     Runtime* const runtime = Runtime::Current();
     std::vector<std::string> argv;
     argv.push_back(runtime->GetCompilerExecutable());
     AddRuntimeArg(argv, "-Xms64m");
     AddRuntimeArg(argv, "-Xmx64m");
-    std::vector<std::string> dex_files = GetLibCoreDexFileNames();
     for (const std::string& dex_file : dex_files) {
       argv.push_back("--dex-file=" + dex_file);
       argv.push_back("--dex-location=" + dex_file);
@@ -182,7 +199,6 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     argv.push_back("--image=" + image_file_name_prefix + ".art");
     argv.push_back("--oat-file=" + image_file_name_prefix + ".oat");
     argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
-    argv.push_back("--base=0x60000000");
 
     std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
     argv.insert(argv.end(), compiler_options.begin(), compiler_options.end());
@@ -263,6 +279,268 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
     classes.Close();
     std::cout << "Dirty image object sizes " << image_classes_sizes << std::endl;
   }
+}
+
+TEST_F(Dex2oatImageTest, TestExtension) {
+  constexpr size_t kReservationSize = 256 * MB;  // This should be enough for the compiled images.
+  // Extend to both directions for maximum relocation difference.
+  static_assert(ART_BASE_ADDRESS_MIN_DELTA < 0);
+  static_assert(ART_BASE_ADDRESS_MAX_DELTA > 0);
+  static_assert(IsAligned<kPageSize>(ART_BASE_ADDRESS_MIN_DELTA));
+  static_assert(IsAligned<kPageSize>(ART_BASE_ADDRESS_MAX_DELTA));
+  constexpr size_t kExtra = ART_BASE_ADDRESS_MAX_DELTA - ART_BASE_ADDRESS_MIN_DELTA;
+  uint32_t min_relocated_address = kBaseAddress + ART_BASE_ADDRESS_MIN_DELTA;
+  std::string error_msg;
+  MemMap reservation = MemMap::MapAnonymous("Reservation",
+                                            reinterpret_cast<uint8_t*>(min_relocated_address),
+                                            kReservationSize + kExtra,
+                                            PROT_NONE,
+                                            /*low_4gb=*/ true,
+                                            /*reuse=*/ false,
+                                            /*reservation=*/ nullptr,
+                                            &error_msg);
+  ASSERT_TRUE(reservation.IsValid());
+
+  ScratchFile scratch;
+  std::string scratch_dir = scratch.GetFilename() + "-d";
+  int mkdir_result = mkdir(scratch_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  scratch_dir += '/';
+  std::string image_dir = scratch_dir + GetInstructionSetString(kRuntimeISA);
+  mkdir_result = mkdir(image_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  std::string filename_prefix = image_dir + "/core";
+
+  // Copy the libcore dex files to a custom dir inside `scratch_dir` so that we do not
+  // accidentally load pre-compiled core images from their original directory based on BCP paths.
+  std::string jar_dir = scratch_dir + "jars";
+  mkdir_result = mkdir(jar_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  jar_dir += '/';
+  std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
+  for (std::string& dex_file : libcore_dex_files) {
+    size_t slash_pos = dex_file.rfind('/');
+    ASSERT_NE(std::string::npos, slash_pos);
+    std::string new_location = jar_dir + dex_file.substr(slash_pos + 1u);
+    std::ifstream src_stream(dex_file, std::ios::binary);
+    std::ofstream dst_stream(new_location, std::ios::binary);
+    dst_stream << src_stream.rdbuf();
+    dex_file = new_location;
+  }
+
+  ArrayRef<const std::string> full_bcp(libcore_dex_files);
+  size_t total_dex_files = full_bcp.size();
+  ASSERT_GE(total_dex_files, 4u);  // 2 for "head", 1 for "tail", at least one for "mid", see below.
+
+  // The primary image must contain at least core-oj and core-libart to initialize the runtime.
+  ASSERT_NE(std::string::npos, full_bcp[0].find("core-oj"));
+  ASSERT_NE(std::string::npos, full_bcp[1].find("core-libart"));
+  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 2u);
+  // Middle part is everything else except for conscrypt.
+  ASSERT_NE(std::string::npos, full_bcp[full_bcp.size() - 1u].find("conscrypt"));
+  ArrayRef<const std::string> mid_bcp =
+      full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ total_dex_files - 1u);
+  ArrayRef<const std::string> mid_dex_files = mid_bcp.SubArray(/*pos=*/ 2u);
+  // Tail is just the conscrypt.
+  ArrayRef<const std::string> tail_dex_files =
+      full_bcp.SubArray(/*pos=*/ total_dex_files - 1u, /*length=*/ 1u);
+
+  // Prepare the "head", "mid" and "tail" names and locations.
+  std::string base_name = "core.art";
+  std::string base_location = scratch_dir + base_name;
+  std::vector<std::string> expanded_mid = gc::space::ImageSpace::ExpandMultiImageLocations(
+      mid_dex_files.SubArray(/*pos=*/ 0u, /*length=*/ 1u),
+      base_location,
+      /*boot_image_extension=*/ true);
+  CHECK_EQ(1u, expanded_mid.size());
+  std::string mid_location = expanded_mid[0];
+  size_t mid_slash_pos = mid_location.rfind('/');
+  ASSERT_NE(std::string::npos, mid_slash_pos);
+  std::string mid_name = mid_location.substr(mid_slash_pos + 1u);
+  CHECK_EQ(1u, tail_dex_files.size());
+  std::vector<std::string> expanded_tail = gc::space::ImageSpace::ExpandMultiImageLocations(
+      tail_dex_files, base_location, /*boot_image_extension=*/ true);
+  CHECK_EQ(1u, expanded_tail.size());
+  std::string tail_location = expanded_tail[0];
+  size_t tail_slash_pos = tail_location.rfind('/');
+  ASSERT_NE(std::string::npos, tail_slash_pos);
+  std::string tail_name = tail_location.substr(tail_slash_pos + 1u);
+
+  // Compile the "head", i.e. the primary boot image.
+  std::string base = android::base::StringPrintf("--base=0x%08x", kBaseAddress);
+  bool head_ok = CompileBootImage({base}, filename_prefix, head_dex_files, &error_msg);
+  ASSERT_TRUE(head_ok) << error_msg;
+
+  // Compile the "mid", i.e. the first extension.
+  std::string mid_bcp_string = android::base::Join(mid_bcp, ':');
+  std::vector<std::string> extra_args;
+  AddRuntimeArg(extra_args, "-Xbootclasspath:" + mid_bcp_string);
+  AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + mid_bcp_string);
+  extra_args.push_back("--boot-image=" + base_location);
+  bool mid_ok = CompileBootImage(extra_args, filename_prefix, mid_dex_files, &error_msg);
+  ASSERT_TRUE(mid_ok) << error_msg;
+
+  // Try to compile the "tail" without specifying the "mid" extension. This shall fail.
+  std::string full_bcp_string = android::base::Join(full_bcp, ':');
+  extra_args.clear();
+  AddRuntimeArg(extra_args, "-Xbootclasspath:" + full_bcp_string);
+  AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + full_bcp_string);
+  extra_args.push_back("--boot-image=" + base_location);
+  bool tail_ok = CompileBootImage(extra_args, filename_prefix, tail_dex_files, &error_msg);
+  ASSERT_FALSE(tail_ok) << error_msg;
+
+  // Now compile the tail against both "head" and "mid".
+  CHECK(StartsWith(extra_args.back(), "--boot-image="));
+  extra_args.back() = "--boot-image=" + base_location + ':' + mid_location;
+  tail_ok = CompileBootImage(extra_args, filename_prefix, tail_dex_files, &error_msg);
+  ASSERT_TRUE(tail_ok) << error_msg;
+
+  reservation = MemMap::Invalid();  // Free the reserved memory for loading images.
+
+  // Try to load the boot image with different image locations.
+  std::vector<std::string> boot_class_path = libcore_dex_files;
+  std::vector<std::unique_ptr<gc::space::ImageSpace>> boot_image_spaces;
+  bool relocate = false;
+  MemMap extra_reservation;
+  auto load = [&](const std::string& image_location) {
+    boot_image_spaces.clear();
+    extra_reservation = MemMap::Invalid();
+    ScopedObjectAccess soa(Thread::Current());
+    return gc::space::ImageSpace::LoadBootImage(/*boot_class_path=*/ boot_class_path,
+                                                /*boot_class_path_locations=*/ libcore_dex_files,
+                                                image_location,
+                                                kRuntimeISA,
+                                                gc::space::ImageSpaceLoadingOrder::kSystemFirst,
+                                                relocate,
+                                                /*executable=*/ true,
+                                                /*is_zygote=*/ false,
+                                                /*extra_reservation_size=*/ 0u,
+                                                &boot_image_spaces,
+                                                &extra_reservation);
+  };
+
+  for (bool r : { false, true}) {
+    relocate = r;
+
+    // Load primary image with full path.
+    bool load_ok = load(base_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_FALSE(extra_reservation.IsValid());
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+
+    // Fail to load primary image with just the name.
+    load_ok = load(base_name);
+    ASSERT_FALSE(load_ok);
+
+    // Fail to load primary image with a search path.
+    load_ok = load("*");
+    ASSERT_FALSE(load_ok);
+    load_ok = load(scratch_dir + "*");
+    ASSERT_FALSE(load_ok);
+
+    // Load the primary and first extension with full path.
+    load_ok = load(base_location + ':' + mid_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path and fail to load first extension without full path.
+    load_ok = load(base_location + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
+
+    // Load all the libcore images with full paths.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary and first extension with full paths, fail to load second extension by name.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path and fail to load first extension without full path,
+    // fail to load second extension because it depends on the first.
+    load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;  // Primary image loaded successfully.
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());  // But only the primary image.
+
+    // Load the primary with full path and extensions with a specified search path.
+    load_ok = load(base_location + ':' + scratch_dir + '*');
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path and fail to find extensions in BCP path.
+    load_ok = load(base_location + ":*");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+  }
+
+  // Now copy the libcore dex files to the `scratch_dir` and retry loading the boot image
+  // with BCP in the scratch_dir so that the images can be found based on BCP paths.
+  for (std::string& bcp_component : boot_class_path) {
+    size_t slash_pos = bcp_component.rfind('/');
+    ASSERT_NE(std::string::npos, slash_pos);
+    std::string new_location = scratch_dir + bcp_component.substr(slash_pos + 1u);
+    std::ifstream src_stream(bcp_component, std::ios::binary);
+    std::ofstream dst_stream(new_location, std::ios::binary);
+    dst_stream << src_stream.rdbuf();
+    bcp_component = new_location;
+  }
+
+  for (bool r : { false, true}) {
+    relocate = r;
+
+    // Loading the primary image with just the name now succeeds.
+    bool load_ok = load(base_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+
+    // Loading the primary image with a search path still fails.
+    load_ok = load("*");
+    ASSERT_FALSE(load_ok);
+    load_ok = load(scratch_dir + "*");
+    ASSERT_FALSE(load_ok);
+
+    // Load the primary and first extension without paths.
+    load_ok = load(base_name + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path and the first extension without full path.
+    load_ok = load(base_location + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());  // Including the extension.
+
+    // Load all the libcore images without paths.
+    load_ok = load(base_name + ':' + mid_name + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary and first extension with full paths and second extension by name.
+    load_ok = load(base_location + ':' + mid_location + ':' + tail_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary with full path, first extension without path,
+    // and second extension with full path.
+    load_ok = load(base_location + ':' + mid_name + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;  // Loaded successfully.
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());  // Including both extensions.
+
+    // Load the primary with full path and find both extensions in BCP path.
+    load_ok = load(base_location + ":*");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(full_bcp.size(), boot_image_spaces.size());
+
+    // Fail to load any images with invalid image locations (named component after search paths).
+    load_ok = load(base_location + ":*:" + tail_location);
+    ASSERT_FALSE(load_ok);
+    load_ok = load(base_location + ':' + scratch_dir + "*:" + tail_location);
+    ASSERT_FALSE(load_ok);
+  }
+
+  ClearDirectory(scratch_dir.c_str());
+  int rmdir_result = rmdir(scratch_dir.c_str());
+  ASSERT_EQ(0, rmdir_result);
 }
 
 }  // namespace art
