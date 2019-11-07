@@ -411,9 +411,4 @@ void OatHeader::Flatten(const SafeMap<std::string, std::string>* key_value_store
   key_value_store_size_ = data_ptr - reinterpret_cast<char*>(&key_value_store_);
 }
 
-OatMethodOffsets::OatMethodOffsets(uint32_t code_offset) : code_offset_(code_offset) {
-}
-
-OatMethodOffsets::~OatMethodOffsets() {}
-
 }  // namespace art

@@ -87,6 +87,7 @@
 #include "mirror/class_loader.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
+#include "oat.h"
 #include "oat_file.h"
 #include "oat_file_assistant.h"
 #include "profile/profile_compilation_info.h"
