@@ -354,11 +354,7 @@ class PACKED(8) ImageHeader {
     return data_size_;
   }
 
-  bool IsAppImage() const {
-    // App images currently require a boot image, if the size is non zero then it is an app image
-    // header.
-    return boot_image_size_ != 0u;
-  }
+  bool IsAppImage() const;
 
   // Visit mirror::Objects in the section starting at base.
   // TODO: Delete base parameter if it is always equal to GetImageBegin.
