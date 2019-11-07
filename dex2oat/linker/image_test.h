@@ -171,8 +171,9 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
     // Create a generic tmp file, to be the base of the .art and .oat temporary files.
     ScratchFile location;
     std::vector<std::string> image_locations =
-        gc::space::ImageSpace::ExpandMultiImageLocations(out_helper.dex_file_locations,
-                                                         location.GetFilename() + ".art");
+        gc::space::ImageSpace::ExpandMultiImageLocations(
+            ArrayRef<const std::string>(out_helper.dex_file_locations),
+            location.GetFilename() + ".art");
     for (size_t i = 0u; i != class_path.size(); ++i) {
       out_helper.image_locations.push_back(ScratchFile(image_locations[i]));
     }
