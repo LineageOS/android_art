@@ -35,7 +35,6 @@
 #include "dex/type_reference.h"
 #include "linker/relative_patcher.h"  // For RelativePatcherTargetProvider.
 #include "mirror/class.h"
-#include "oat.h"
 
 namespace art {
 
@@ -44,6 +43,7 @@ class CompiledMethod;
 class CompilerDriver;
 class CompilerOptions;
 class DexContainer;
+class OatHeader;
 class OutputStream;
 class ProfileCompilationInfo;
 class TimingLogger;

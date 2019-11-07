@@ -146,6 +146,7 @@
 #include "native_bridge_art_interface.h"
 #include "native_stack_dump.h"
 #include "nativehelper/scoped_local_ref.h"
+#include "oat.h"
 #include "oat_file.h"
 #include "oat_file_manager.h"
 #include "object_callbacks.h"

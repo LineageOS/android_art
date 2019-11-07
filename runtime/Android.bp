@@ -497,7 +497,7 @@ gensrcs {
         "jdwp/jdwp_constants.h",
         "jni_id_type.h",
         "lock_word.h",
-        "oat.h",
+        "oat_file.h",
         "object_callbacks.h",
         "process_state.h",
         "reflective_value_visitor.h",
