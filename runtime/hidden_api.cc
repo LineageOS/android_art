@@ -435,14 +435,9 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
   DCHECK(member != nullptr);
   Runtime* runtime = Runtime::Current();
 
-  EnforcementPolicy policy = runtime->GetHiddenApiEnforcementPolicy();
-  DCHECK(policy != EnforcementPolicy::kDisabled)
+  EnforcementPolicy hiddenApiPolicy = runtime->GetHiddenApiEnforcementPolicy();
+  DCHECK(hiddenApiPolicy != EnforcementPolicy::kDisabled)
       << "Should never enter this function when access checks are completely disabled";
-
-  const bool deny_access =
-      (policy == EnforcementPolicy::kEnabled) &&
-      IsSdkVersionSetAndMoreThan(runtime->GetTargetSdkVersion(),
-                                 api_list.GetMaxAllowedSdkVersion());
 
   MemberSignature member_signature(member);
 
@@ -453,6 +448,18 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
     // Exemptions effectively adds new members to the whitelist.
     MaybeUpdateAccessFlags(runtime, member, kAccPublicApi);
     return false;
+  }
+
+  EnforcementPolicy testApiPolicy = runtime->GetTestApiEnforcementPolicy();
+
+  bool deny_access = false;
+  if (hiddenApiPolicy == EnforcementPolicy::kEnabled) {
+    if (testApiPolicy == EnforcementPolicy::kDisabled && api_list.IsTestApi()) {
+      deny_access = false;
+    } else {
+      deny_access = IsSdkVersionSetAndMoreThan(runtime->GetTargetSdkVersion(),
+                                               api_list.GetMaxAllowedSdkVersion());
+    }
   }
 
   if (access_method != AccessMethod::kNone) {
