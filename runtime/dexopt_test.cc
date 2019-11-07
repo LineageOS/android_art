@@ -30,6 +30,7 @@
 #include "dexopt_test.h"
 #include "gc/space/image_space.h"
 #include "hidden_api.h"
+#include "oat.h"
 
 namespace art {
 void DexoptTest::SetUp() {

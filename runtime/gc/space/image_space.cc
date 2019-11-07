@@ -54,6 +54,7 @@
 #include "mirror/executable-inl.h"
 #include "mirror/object-inl.h"
 #include "mirror/object-refvisitor-inl.h"
+#include "oat.h"
 #include "oat_file.h"
 #include "runtime.h"
 #include "space-inl.h"

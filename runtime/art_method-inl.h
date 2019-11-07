@@ -39,7 +39,6 @@
 #include "mirror/object-inl.h"
 #include "mirror/object_array.h"
 #include "mirror/string.h"
-#include "oat.h"
 #include "obj_ptr-inl.h"
 #include "quick/quick_method_frame_info.h"
 #include "read_barrier-inl.h"
