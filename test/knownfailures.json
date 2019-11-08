@@ -1267,5 +1267,11 @@
         "env_vars": {"ART_READ_BARRIER_TYPE": "TABLELOOKUP"},
         "bug": "b/140507091",
         "description": ["Test containing Checker assertions expecting Baker read barriers."]
+    },
+    {
+        "tests": ["689-zygote-jit-deopt"],
+        "variant": "gcstress",
+        "bug": "b/137887811",
+        "description": ["Occasional timeouts."]
     }
 ]
