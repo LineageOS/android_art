@@ -819,6 +819,10 @@ class ImageSpace::Loader {
                                   image_filename);
         return nullptr;
       }
+      if (!ValidateBootImageChecksum(image_filename, *image_header, oat_file, error_msg)) {
+        DCHECK(!error_msg->empty());
+        return nullptr;
+      }
     }
 
     if (VLOG_IS_ON(startup)) {
@@ -942,6 +946,72 @@ class ImageSpace::Loader {
   }
 
  private:
+  static bool ValidateBootImageChecksum(const char* image_filename,
+                                        const ImageHeader& image_header,
+                                        const OatFile* oat_file,
+                                        /*out*/std::string* error_msg) {
+    // Use the boot image component count to calculate the checksum from
+    // the appropriate number of boot image chunks.
+    const std::vector<ImageSpace*>& image_spaces =
+        Runtime::Current()->GetHeap()->GetBootImageSpaces();
+    uint32_t boot_image_component_count = image_header.GetBootImageComponentCount();
+    size_t image_spaces_size = image_spaces.size();
+    if (boot_image_component_count > image_spaces_size) {
+      *error_msg = StringPrintf("Too many boot image dependencies (%u > %zu) in image %s",
+                                boot_image_component_count,
+                                image_spaces_size,
+                                image_filename);
+      return false;
+    }
+    uint32_t checksum = 0u;
+    size_t chunk_count = 0u;
+    for (size_t component_count = 0u; component_count != boot_image_component_count; ) {
+      const ImageHeader& current_header = image_spaces[component_count]->GetImageHeader();
+      if (current_header.GetComponentCount() > boot_image_component_count - component_count) {
+        *error_msg = StringPrintf("Boot image component count in %s ends in the middle of a chunk, "
+                                      "%u is between %zu and %zu",
+                                  image_filename,
+                                  boot_image_component_count,
+                                  component_count,
+                                  component_count + current_header.GetComponentCount());
+        return false;
+      }
+      component_count += current_header.GetComponentCount();
+      checksum ^= current_header.GetImageChecksum();
+      chunk_count += 1u;
+    }
+    if (image_header.GetBootImageChecksum() != checksum) {
+      *error_msg = StringPrintf("Boot image checksum mismatch (0x%x != 0x%x) in image %s",
+                                image_header.GetBootImageChecksum(),
+                                checksum,
+                                image_filename);
+      return false;
+    }
+    // Oat checksums, if present, have already been validated, so we know that
+    // they match the loaded image spaces. Therefore, we just verify that they
+    // are consistent in the number of boot image chunks they list by looking
+    // for the kImageChecksumPrefix at the start of each component.
+    const char* oat_boot_class_path_checksums =
+        oat_file->GetOatHeader().GetStoreValueByKey(OatHeader::kBootClassPathChecksumsKey);
+    if (oat_boot_class_path_checksums != nullptr) {
+      size_t oat_bcp_chunk_count = 0u;
+      while (*oat_boot_class_path_checksums == kImageChecksumPrefix) {
+        oat_bcp_chunk_count += 1u;
+        // Find the start of the next component if any.
+        const char* separator = strchr(oat_boot_class_path_checksums, ':');
+        oat_boot_class_path_checksums = (separator != nullptr) ? separator + 1u : "";
+      }
+      if (oat_bcp_chunk_count != chunk_count) {
+        *error_msg = StringPrintf("Boot image chunk count mismatch (%zu != %zu) in image %s",
+                                  oat_bcp_chunk_count,
+                                  chunk_count,
+                                  image_filename);
+        return false;
+      }
+    }
+    return true;
+  }
+
   static MemMap LoadImageFile(const char* image_filename,
                               const char* image_location,
                               const ImageHeader& image_header,
@@ -1413,6 +1483,8 @@ class ImageSpace::BootImageLayout {
     size_t component_count;
     size_t reservation_size;
     uint32_t checksum;
+    uint32_t boot_image_component_count;
+    uint32_t boot_image_checksum;
   };
 
   BootImageLayout(const std::string& image_location, ArrayRef<const std::string> boot_class_path)
@@ -1492,6 +1564,10 @@ class ImageSpace::BootImageLayout {
       ArrayRef<const std::string> named_components,
       /*out*/std::vector<std::pair<std::string, size_t>>* base_locations_and_bcp_indexes,
       /*out*/std::string* error_msg);
+
+  bool ValidateBootImageChecksum(const std::string& actual_filename,
+                                 const ImageHeader& header,
+                                 /*out*/std::string* error_msg);
 
   bool ReadHeader(const std::string& base_location,
                   const std::string& base_filename,
@@ -1671,6 +1747,56 @@ bool ImageSpace::BootImageLayout::MatchNamedComponents(
   return true;
 }
 
+bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& actual_filename,
+                                                            const ImageHeader& header,
+                                                            /*out*/std::string* error_msg) {
+  uint32_t boot_image_component_count = header.GetBootImageComponentCount();
+  if (chunks_.empty() != (boot_image_component_count == 0u)) {
+    *error_msg = StringPrintf("Unexpected boot image component count in %s: %u, %s",
+                              actual_filename.c_str(),
+                              header.GetImageReservationSize(),
+                              chunks_.empty() ? "should be 0" : "should not be 0");
+    return false;
+  }
+  uint32_t component_count = 0u;
+  uint32_t composite_checksum = 0u;
+  for (const ImageChunk& chunk : chunks_) {
+    if (component_count == boot_image_component_count) {
+      break;  // Hit the component count.
+    }
+    if (chunk.start_index != component_count) {
+      break;  // End of contiguous chunks, fail below; same as reaching end of `chunks_`.
+    }
+    if (chunk.component_count > boot_image_component_count - component_count) {
+      *error_msg = StringPrintf("Boot image component count in %s ends in the middle of a chunk, "
+                                    "%u is between %u and %zu",
+                                actual_filename.c_str(),
+                                boot_image_component_count,
+                                component_count,
+                                component_count + chunk.component_count);
+      return false;
+    }
+    component_count += chunk.component_count;
+    composite_checksum ^= chunk.checksum;
+  }
+  DCHECK_LE(component_count, boot_image_component_count);
+  if (component_count != boot_image_component_count) {
+    *error_msg = StringPrintf("Missing boot image components for checksum in %s: %u > %u",
+                              actual_filename.c_str(),
+                              boot_image_component_count,
+                              component_count);
+    return false;
+  }
+  if (composite_checksum != header.GetBootImageChecksum()) {
+    *error_msg = StringPrintf("Boot image checksum mismatch in %s: 0x%08x != 0x%08x",
+                              actual_filename.c_str(),
+                              header.GetBootImageChecksum(),
+                              composite_checksum);
+    return false;
+  }
+  return true;
+}
+
 bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
                                              const std::string& base_filename,
                                              size_t bcp_index,
@@ -1703,6 +1829,9 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
                               allowed_reservation_size);
     return false;
   }
+  if (!ValidateBootImageChecksum(actual_filename, header, error_msg)) {
+    return false;
+  }
 
   if (chunks_.empty()) {
     base_address_ = reinterpret_cast32<uint32_t>(header.GetImageBegin());
@@ -1714,6 +1843,8 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
   chunk.component_count = header.GetComponentCount();
   chunk.reservation_size = header.GetImageReservationSize();
   chunk.checksum = header.GetImageChecksum();
+  chunk.boot_image_component_count = header.GetBootImageComponentCount();
+  chunk.boot_image_checksum = header.GetBootImageChecksum();
   chunks_.push_back(std::move(chunk));
   next_bcp_index_ = bcp_index + header.GetComponentCount();
   total_component_count_ += header.GetComponentCount();
@@ -2448,7 +2579,7 @@ class ImageSpace::BootImageLoader {
   bool OpenOatFile(ImageSpace* space,
                    const std::string& dex_filename,
                    bool validate_oat_file,
-                   ArrayRef<const std::unique_ptr<ImageSpace>> available_dependencies,
+                   ArrayRef<const std::unique_ptr<ImageSpace>> dependencies,
                    TimingLogger* logger,
                    /*inout*/MemMap* image_reservation,
                    /*out*/std::string* error_msg) {
@@ -2509,7 +2640,7 @@ class ImageSpace::BootImageLoader {
                                     space->GetName());
           return false;
         }
-      } else if (available_dependencies.empty()) {
+      } else if (dependencies.empty()) {
         std::string expected_boot_class_path = android::base::Join(ArrayRef<const std::string>(
               boot_class_path_locations_).SubArray(0u, component_count), ':');
         if (expected_boot_class_path != oat_boot_class_path) {
@@ -2525,7 +2656,7 @@ class ImageSpace::BootImageLoader {
         if (!VerifyBootClassPathChecksums(
                  oat_boot_class_path_checksums,
                  oat_boot_class_path,
-                 available_dependencies,
+                 dependencies,
                  ArrayRef<const std::string>(boot_class_path_locations_),
                  ArrayRef<const std::string>(boot_class_path_),
                  &local_error_msg)) {
@@ -2592,6 +2723,14 @@ class ImageSpace::BootImageLoader {
 
     bool is_extension = (chunk.start_index != 0u);
     DCHECK_NE(spaces->empty(), is_extension);
+    if (max_image_space_dependencies < chunk.boot_image_component_count) {
+      DCHECK(is_extension);
+      *error_msg = StringPrintf("Missing dependencies for extension component %s, %zu < %u",
+                                boot_class_path_locations_[chunk.start_index].c_str(),
+                                max_image_space_dependencies,
+                                chunk.boot_image_component_count);
+      return false;
+    }
     ArrayRef<const std::string> requested_bcp_locations =
         ArrayRef<const std::string>(boot_class_path_locations_).SubArray(
             chunk.start_index, chunk.component_count);
@@ -2612,24 +2751,34 @@ class ImageSpace::BootImageLoader {
           !Loader::CheckImageComponentCount(*space, expected_component_count, error_msg)) {
         return false;
       }
-      if (i == 0 && chunk.checksum != space->GetImageHeader().GetImageChecksum()) {
-        *error_msg = StringPrintf("Image checksum modified since previously read from %s, "
-                                      "received %u, expected %u",
+      const ImageHeader& header = space->GetImageHeader();
+      if (i == 0 && (chunk.checksum != header.GetImageChecksum() ||
+                     chunk.boot_image_component_count != header.GetBootImageComponentCount() ||
+                     chunk.boot_image_checksum != header.GetBootImageChecksum())) {
+        *error_msg = StringPrintf("Image header modified since previously read from %s; "
+                                      "checksum: 0x%08x -> 0x%08x,"
+                                      "boot_image_component_count: %u -> %u, "
+                                      "boot_image_checksum: 0x%08x -> 0x%08x",
                                   space->GetImageFilename().c_str(),
-                                  space->GetImageHeader().GetImageChecksum(),
-                                  chunk.checksum);
+                                  chunk.checksum,
+                                  header.GetImageChecksum(),
+                                  chunk.boot_image_component_count,
+                                  header.GetBootImageComponentCount(),
+                                  chunk.boot_image_checksum,
+                                  header.GetBootImageChecksum());
         return false;
       }
     }
-    ArrayRef<const std::unique_ptr<ImageSpace>> available_dependencies =
-        ArrayRef<const std::unique_ptr<ImageSpace>>(*spaces).SubArray(/*pos=*/ 0u,
-                                                                      max_image_space_dependencies);
+    DCHECK_GE(max_image_space_dependencies, chunk.boot_image_component_count);
+    ArrayRef<const std::unique_ptr<ImageSpace>> dependencies =
+        ArrayRef<const std::unique_ptr<ImageSpace>>(*spaces).SubArray(
+            /*pos=*/ 0u, chunk.boot_image_component_count);
     for (std::size_t i = 0u, size = locations.size(); i != size; ++i) {
       ImageSpace* space = (*spaces)[spaces->size() - chunk.component_count + i].get();
       if (!OpenOatFile(space,
                        boot_class_path_[chunk.start_index + i],
                        validate_oat_file,
-                       available_dependencies,
+                       dependencies,
                        logger,
                        image_reservation,
                        error_msg)) {
@@ -3259,10 +3408,17 @@ bool ImageSpace::VerifyBootClassPathChecksums(
     DCHECK(!error_msg->empty());
     return false;
   }
+  const size_t num_image_spaces = image_spaces.size();
+  if (num_image_spaces != oat_bcp_size) {
+    *error_msg = StringPrintf("Image header records more dependencies (%zu) than BCP (%zu)",
+                              num_image_spaces,
+                              oat_bcp_size);
+    return false;
+  }
 
   // Verify image checksums.
   size_t image_pos = 0u;
-  while (image_pos != image_spaces.size() && StartsWith(oat_checksums, "i")) {
+  while (image_pos != num_image_spaces && StartsWith(oat_checksums, "i")) {
     // Verify the current image checksum.
     const ImageHeader& current_header = image_spaces[image_pos]->GetImageHeader();
     uint32_t component_count = current_header.GetComponentCount();
