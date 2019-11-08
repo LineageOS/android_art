@@ -87,6 +87,8 @@ TEST_F(ImageTest, ImageHeaderIsValid) {
                              oat_file_end,
                              /*boot_image_begin=*/ 0u,
                              /*boot_image_size=*/ 0u,
+                             /*boot_image_component_count=*/ 0u,
+                             /*boot_image_checksum=*/ 0u,
                              sizeof(void*));
 
     ASSERT_TRUE(image_header.IsValid());

@@ -2653,6 +2653,22 @@ void ImageWriter::CreateHeader(size_t oat_index) {
     }
   }
 
+  // Compute boot image checksums for the primary component, leave as 0 otherwise.
+  uint32_t boot_image_components = 0u;
+  uint32_t boot_image_checksums = 0u;
+  if (oat_index == 0u) {
+    const std::vector<gc::space::ImageSpace*>& image_spaces =
+        Runtime::Current()->GetHeap()->GetBootImageSpaces();
+    boot_image_components = dchecked_integral_cast<uint32_t>(image_spaces.size());
+    DCHECK_EQ(boot_image_components == 0u, compiler_options_.IsBootImage());
+    for (uint32_t i = 0; i != boot_image_components; ) {
+      const ImageHeader& header = image_spaces[i]->GetImageHeader();
+      boot_image_checksums ^= header.GetImageChecksum();
+      DCHECK_LE(header.GetComponentCount(), boot_image_components - i);
+      i += header.GetComponentCount();
+    }
+  }
+
   // Create the image sections.
   auto section_info_pair = image_info.CreateImageSections();
   const size_t image_end = section_info_pair.first;
@@ -2695,6 +2711,8 @@ void ImageWriter::CreateHeader(size_t oat_index) {
       PointerToLowMemUInt32(oat_file_end),
       boot_image_begin_,
       boot_image_size_,
+      boot_image_components,
+      boot_image_checksums,
       static_cast<uint32_t>(target_ptr_size_));
 }
 

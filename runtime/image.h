@@ -137,6 +137,8 @@ class PACKED(8) ImageHeader {
               uint32_t oat_file_end,
               uint32_t boot_image_begin,
               uint32_t boot_image_size,
+              uint32_t boot_image_component_count,
+              uint32_t boot_image_checksum,
               uint32_t pointer_size);
 
   bool IsValid() const;
@@ -350,6 +352,14 @@ class PACKED(8) ImageHeader {
     return boot_image_size_;
   }
 
+  uint32_t GetBootImageComponentCount() const {
+    return boot_image_component_count_;
+  }
+
+  uint32_t GetBootImageChecksum() const {
+    return boot_image_checksum_;
+  }
+
   uint64_t GetDataSize() const {
     return data_size_;
   }
@@ -461,9 +471,14 @@ class PACKED(8) ImageHeader {
   // .so files. Used for positioning a following alloc spaces.
   uint32_t oat_file_end_ = 0u;
 
-  // Boot image begin and end (app image headers only).
+  // Boot image begin and end (only applies to boot image extension and app image headers).
   uint32_t boot_image_begin_ = 0u;
   uint32_t boot_image_size_ = 0u;  // Includes heap (*.art) and code (.oat).
+
+  // Number of boot image components that this image depends on and their composite checksum
+  // (only applies to boot image extension and app image headers).
+  uint32_t boot_image_component_count_ = 0u;
+  uint32_t boot_image_checksum_ = 0u;
 
   // Absolute address of an Object[] of objects needed to reinitialize from an image.
   uint32_t image_roots_ = 0u;
