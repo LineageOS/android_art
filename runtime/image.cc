@@ -29,7 +29,7 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-const uint8_t ImageHeader::kImageVersion[] = { '0', '7', '9', '\0' };  // FP16ToHalf intrinsic
+const uint8_t ImageHeader::kImageVersion[] = { '0', '8', '0', '\0' };  // Chained checksums.
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,
@@ -44,6 +44,8 @@ ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t oat_file_end,
                          uint32_t boot_image_begin,
                          uint32_t boot_image_size,
+                         uint32_t boot_image_component_count,
+                         uint32_t boot_image_checksum,
                          uint32_t pointer_size)
   : image_reservation_size_(image_reservation_size),
     component_count_(component_count),
@@ -57,6 +59,8 @@ ImageHeader::ImageHeader(uint32_t image_reservation_size,
     oat_file_end_(oat_file_end),
     boot_image_begin_(boot_image_begin),
     boot_image_size_(boot_image_size),
+    boot_image_component_count_(boot_image_component_count),
+    boot_image_checksum_(boot_image_checksum),
     image_roots_(image_roots),
     pointer_size_(pointer_size) {
   CHECK_EQ(image_begin, RoundUp(image_begin, kPageSize));
