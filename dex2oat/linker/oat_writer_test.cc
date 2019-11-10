@@ -41,6 +41,7 @@
 #include "mirror/class-inl.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
+#include "oat.h"
 #include "oat_file-inl.h"
 #include "oat_writer.h"
 #include "profile/profile_compilation_info.h"

@@ -672,12 +672,12 @@ if [ "$runtime" = "dalvik" ]; then
 elif [ "$runtime" = "art" ]; then
     if [ "$target_mode" = "no" ]; then
         guess_host_arch_name
-        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core${image_suffix}.art")
+        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core${image_suffix}.art:*")
         run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
         run_args+=(--runtime-option "-Djava.library.path=/data/nativetest${suffix64}/art/${target_arch_name}")
-        run_args+=(--boot "/data/art-test/core${image_suffix}.art")
+        run_args+=(--boot "/data/art-test/core${image_suffix}.art:/data/art-test/*")
     fi
     if [ "$relocate" = "yes" ]; then
       run_args+=(--relocate)

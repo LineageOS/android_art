@@ -746,13 +746,13 @@ class ElfBuilder final {
     hash_.AllocateVirtualMemory(hash_.GetCacheSize());
 
     Elf_Dyn dyns[] = {
-      { .d_tag = DT_HASH, .d_un.d_ptr = hash_.GetAddress() },
-      { .d_tag = DT_STRTAB, .d_un.d_ptr = dynstr_.GetAddress() },
-      { .d_tag = DT_SYMTAB, .d_un.d_ptr = dynsym_.GetAddress() },
-      { .d_tag = DT_SYMENT, .d_un.d_ptr = sizeof(Elf_Sym) },
-      { .d_tag = DT_STRSZ, .d_un.d_ptr = dynstr_.GetCacheSize() },
-      { .d_tag = DT_SONAME, .d_un.d_ptr = soname_offset },
-      { .d_tag = DT_NULL, .d_un.d_ptr = 0 },
+      { .d_tag = DT_HASH,   .d_un = { .d_ptr = hash_.GetAddress() }, },
+      { .d_tag = DT_STRTAB, .d_un = { .d_ptr = dynstr_.GetAddress() }, },
+      { .d_tag = DT_SYMTAB, .d_un = { .d_ptr = dynsym_.GetAddress() }, },
+      { .d_tag = DT_SYMENT, .d_un = { .d_ptr = sizeof(Elf_Sym) }, },
+      { .d_tag = DT_STRSZ,  .d_un = { .d_ptr = dynstr_.GetCacheSize() }, },
+      { .d_tag = DT_SONAME, .d_un = { .d_ptr = soname_offset }, },
+      { .d_tag = DT_NULL,   .d_un = { .d_ptr = 0 }, },
     };
     dynamic_.Add(&dyns, sizeof(dyns));
     dynamic_.AllocateVirtualMemory(dynamic_.GetCacheSize());
