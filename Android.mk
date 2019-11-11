@@ -574,7 +574,7 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
 .PHONY: standalone-apex-files
-standalone-apex-files: libc.bootstrap libdl.bootstrap libm.bootstrap linker $(DEBUG_ART_APEX)
+standalone-apex-files: libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap linker $(DEBUG_ART_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
