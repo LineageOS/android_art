@@ -312,6 +312,10 @@ func init() {
 	android.RegisterModuleType("art_global_defaults", artGlobalDefaultsFactory)
 	android.RegisterModuleType("art_debug_defaults", artDebugDefaultsFactory)
 
+	// ART apex is special because it must include dexpreopt files for bootclasspath jars.
+	android.RegisterModuleType("art_apex", artApexBundleFactory)
+	android.RegisterModuleType("art_apex_test", artTestApexBundleFactory)
+
 	// TODO: This makes the module disable itself for host if HOST_PREFER_32_BIT is
 	// set. We need this because the multilib types of binaries listed in the apex
 	// rule must match the declared type. This is normally not difficult but HOST_PREFER_32_BIT
@@ -321,8 +325,16 @@ func init() {
 	android.RegisterModuleType("art_apex_test_host", artHostTestApexBundleFactory)
 }
 
+func artApexBundleFactory() android.Module {
+	return apex.ApexBundleFactory(false /*testApex*/, true /*artApex*/)
+}
+
+func artTestApexBundleFactory() android.Module {
+	return apex.ApexBundleFactory(true /*testApex*/, true /*artApex*/)
+}
+
 func artHostTestApexBundleFactory() android.Module {
-	module := apex.ApexBundleFactory( /*testApex*/ true)
+	module := apex.ApexBundleFactory(true /*testApex*/, true /*artApex*/)
 	android.AddLoadHook(module, func(ctx android.LoadHookContext) {
 		if envTrue(ctx, "HOST_PREFER_32_BIT") {
 			type props struct {
