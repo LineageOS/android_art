@@ -2091,6 +2091,7 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   // it with the one ReplaceReferences does. Doing so would be rather complicated though.
   driver_->runtime_->VisitReflectiveTargets(
       [&](art::ArtField* f, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
+        DCHECK(f != nullptr) << info;
         auto it = field_map.find(f);
         if (it == field_map.end()) {
           return f;
@@ -2099,6 +2100,7 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
         return it->second;
       },
       [&](art::ArtMethod* m, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
+        DCHECK(m != nullptr) << info;
         auto it = method_map.find(m);
         if (it == method_map.end()) {
           return m;
