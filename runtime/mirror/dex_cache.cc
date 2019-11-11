@@ -176,6 +176,9 @@ void DexCache::InitializeDexCache(Thread* self,
 void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
   for (size_t i = 0; i < NumResolvedFields(); i++) {
     auto pair(GetNativePairPtrSize(GetResolvedFields(), i, kRuntimePointerSize));
+    if (pair.index == FieldDexCachePair::InvalidIndexForSlot(i)) {
+      continue;
+    }
     ArtField* new_val = visitor->VisitField(
         pair.object, DexCacheSourceInfo(kSourceDexCacheResolvedField, pair.index, this));
     if (UNLIKELY(new_val != pair.object)) {
@@ -185,6 +188,9 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
   }
   for (size_t i = 0; i < NumResolvedMethods(); i++) {
     auto pair(GetNativePairPtrSize(GetResolvedMethods(), i, kRuntimePointerSize));
+    if (pair.index == MethodDexCachePair::InvalidIndexForSlot(i)) {
+      continue;
+    }
     ArtMethod* new_val = visitor->VisitMethod(
         pair.object, DexCacheSourceInfo(kSourceDexCacheResolvedMethod, pair.index, this));
     if (UNLIKELY(new_val != pair.object)) {
