@@ -109,6 +109,10 @@ class ReflectionSourceInfo : public ValueObject {
     os << "Type=" << type_;
   }
 
+  ReflectionSourceType GetType() const {
+    return type_;
+  }
+
  private:
   const ReflectionSourceType type_;
 

@@ -1145,7 +1145,9 @@
                   "1990-structural-bad-verify",
                   "1991-hello-structural-retransform",
                   "1992-retransform-no-such-field",
-                  "1993-fallback-non-structural"
+                  "1993-fallback-non-structural",
+                  "1997-structural-shadow-method",
+                  "1998-structural-shadow-field"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]

@@ -1,0 +1,1 @@
+Test structural redefinition when the method being added was resolvable previously.
