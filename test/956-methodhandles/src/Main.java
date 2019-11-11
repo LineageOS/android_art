@@ -95,6 +95,11 @@ public class Main {
     }
   }
 
+  public static class I {
+    public static void someVoidMethod() {
+    }
+  }
+
   public static void main(String[] args) throws Throwable {
     testfindSpecial_invokeSuperBehaviour();
     testfindSpecial_invokeDirectBehaviour();
@@ -634,6 +639,30 @@ public class Main {
       mh.asType(MethodType.methodType(String.class, int.class, String.class));
       fail();
     } catch (WrongMethodTypeException expected) {
+    }
+
+    // Zero / null introduction
+    MethodHandle voidMH = MethodHandles.lookup().findStatic(I.class, "someVoidMethod",
+                                                            MethodType.methodType(void.class));
+    {
+      MethodHandle booleanMH = voidMH.asType(MethodType.methodType(boolean.class));
+      assertEquals(boolean.class, booleanMH.type().returnType());
+      assertEquals(false, booleanMH.invoke());
+    }
+    {
+      MethodHandle intMH = voidMH.asType(MethodType.methodType(int.class));
+      assertEquals(int.class, intMH.type().returnType());
+      assertEquals(0, intMH.invoke());
+    }
+    {
+      MethodHandle longMH = voidMH.asType(MethodType.methodType(long.class));
+      assertEquals(long.class, longMH.type().returnType());
+      assertEquals(0L, longMH.invoke());
+    }
+    {
+      MethodHandle objMH = voidMH.asType(MethodType.methodType(Object.class));
+      assertEquals(Object.class, objMH.type().returnType());
+      assertEquals(null, objMH.invoke());
     }
   }
 
