@@ -38,6 +38,17 @@ public class Main {
             throw new Error("Expected: " + expected + ", Calculated: " + calculated);
         }
     }
+    static public void assertTrue(boolean condition) {
+        if (!condition) {
+            throw new Error("condition not true");
+        }
+    }
+
+    static public void assertFalse(boolean condition) {
+        if (condition) {
+            throw new Error("condition not false");
+        }
+    }
 
     public static void testHalfToFloatToHalfConversions(){
         // Test FP16 to float and back to Half for all possible Short values
@@ -190,6 +201,150 @@ public class Main {
 
     }
 
+    public static void testGreater() {
+        assertTrue(FP16.greater(FP16.POSITIVE_INFINITY, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.greater(FP16.POSITIVE_INFINITY, FP16.MAX_VALUE));
+        assertFalse(FP16.greater(FP16.MAX_VALUE, FP16.POSITIVE_INFINITY));
+        assertFalse(FP16.greater(FP16.NEGATIVE_INFINITY, FP16.LOWEST_VALUE));
+        assertTrue(FP16.greater(FP16.LOWEST_VALUE, FP16.NEGATIVE_INFINITY));
+        assertFalse(FP16.greater(FP16.NEGATIVE_ZERO, FP16.POSITIVE_ZERO));
+        assertFalse(FP16.greater(FP16.POSITIVE_ZERO, FP16.NEGATIVE_ZERO));
+        assertFalse(FP16.greater(FP16.toHalf(12.3f), FP16.NaN));
+        assertFalse(FP16.greater(FP16.NaN, FP16.toHalf(12.3f)));
+        assertTrue(FP16.greater(FP16.MIN_NORMAL, FP16.MIN_VALUE));
+        assertFalse(FP16.greater(FP16.MIN_VALUE, FP16.MIN_NORMAL));
+        assertTrue(FP16.greater(FP16.toHalf(12.4f), FP16.toHalf(12.3f)));
+        assertFalse(FP16.greater(FP16.toHalf(12.3f), FP16.toHalf(12.4f)));
+        assertFalse(FP16.greater(FP16.toHalf(-12.4f), FP16.toHalf(-12.3f)));
+        assertTrue(FP16.greater(FP16.toHalf(-12.3f), FP16.toHalf(-12.4f)));
+        assertTrue(FP16.greater((short) 0x3ff, FP16.MIN_VALUE));
+
+        assertFalse(FP16.greater(FP16.toHalf(-1.0f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.greater(FP16.toHalf(0.0f), FP16.toHalf(-1.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(-1.0f), FP16.toHalf(-1.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(-1.3f), FP16.toHalf(-1.3f)));
+        assertTrue(FP16.greater(FP16.toHalf(1.0f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(0.0f), FP16.toHalf(1.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(1.0f), FP16.toHalf(1.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(1.3f), FP16.toHalf(1.3f)));
+        assertFalse(FP16.greater(FP16.toHalf(-0.1f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.greater(FP16.toHalf(0.0f), FP16.toHalf(-0.1f)));
+        assertFalse(FP16.greater(FP16.toHalf(-0.1f), FP16.toHalf(-0.1f)));
+        assertTrue(FP16.greater(FP16.toHalf(0.1f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.greater(FP16.toHalf(0.0f), FP16.toHalf(0.1f)));
+        assertFalse(FP16.greater(FP16.toHalf(0.1f), FP16.toHalf(0.1f)));
+    }
+
+    public static void testGreaterEquals() {
+        assertTrue(FP16.greaterEquals(FP16.POSITIVE_INFINITY, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.greaterEquals(FP16.POSITIVE_INFINITY, FP16.MAX_VALUE));
+        assertFalse(FP16.greaterEquals(FP16.MAX_VALUE, FP16.POSITIVE_INFINITY));
+        assertFalse(FP16.greaterEquals(FP16.NEGATIVE_INFINITY, FP16.LOWEST_VALUE));
+        assertTrue(FP16.greaterEquals(FP16.LOWEST_VALUE, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.greaterEquals(FP16.NEGATIVE_ZERO, FP16.POSITIVE_ZERO));
+        assertTrue(FP16.greaterEquals(FP16.POSITIVE_ZERO, FP16.NEGATIVE_ZERO));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(12.3f), FP16.NaN));
+        assertFalse(FP16.greaterEquals(FP16.NaN, FP16.toHalf(12.3f)));
+        assertTrue(FP16.greaterEquals(FP16.MIN_NORMAL, FP16.MIN_VALUE));
+        assertFalse(FP16.greaterEquals(FP16.MIN_VALUE, FP16.MIN_NORMAL));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(12.4f), FP16.toHalf(12.3f)));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(12.3f), FP16.toHalf(12.4f)));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(-12.4f), FP16.toHalf(-12.3f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(-12.3f), FP16.toHalf(-12.4f)));
+        assertTrue(FP16.greaterEquals((short) 0x3ff, FP16.MIN_VALUE));
+        assertTrue(FP16.greaterEquals(FP16.NEGATIVE_INFINITY, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.greaterEquals(FP16.POSITIVE_INFINITY, FP16.POSITIVE_INFINITY));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(12.12356f), FP16.toHalf(12.12356f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(-12.12356f), FP16.toHalf(-12.12356f)));
+
+        assertFalse(FP16.greaterEquals(FP16.toHalf(-1.0f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(0.0f), FP16.toHalf(-1.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(-1.0f), FP16.toHalf(-1.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(-1.3f), FP16.toHalf(-1.3f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(1.0f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(0.0f), FP16.toHalf(1.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(1.0f), FP16.toHalf(1.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(1.3f), FP16.toHalf(1.3f)));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(-0.1f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(0.0f), FP16.toHalf(-0.1f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(-0.1f), FP16.toHalf(-0.1f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(0.1f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.greaterEquals(FP16.toHalf(0.0f), FP16.toHalf(0.1f)));
+        assertTrue(FP16.greaterEquals(FP16.toHalf(0.1f), FP16.toHalf(0.1f)));
+    }
+
+    public static void testLess() {
+        assertTrue(FP16.less(FP16.NEGATIVE_INFINITY, FP16.POSITIVE_INFINITY));
+        assertTrue(FP16.less(FP16.MAX_VALUE, FP16.POSITIVE_INFINITY));
+        assertFalse(FP16.less(FP16.POSITIVE_INFINITY, FP16.MAX_VALUE));
+        assertFalse(FP16.less(FP16.LOWEST_VALUE, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.less(FP16.NEGATIVE_INFINITY, FP16.LOWEST_VALUE));
+        assertFalse(FP16.less(FP16.POSITIVE_ZERO, FP16.NEGATIVE_ZERO));
+        assertFalse(FP16.less(FP16.NEGATIVE_ZERO, FP16.POSITIVE_ZERO));
+        assertFalse(FP16.less(FP16.NaN, FP16.toHalf(12.3f)));
+        assertFalse(FP16.less(FP16.toHalf(12.3f), FP16.NaN));
+        assertTrue(FP16.less(FP16.MIN_VALUE, FP16.MIN_NORMAL));
+        assertFalse(FP16.less(FP16.MIN_NORMAL, FP16.MIN_VALUE));
+        assertTrue(FP16.less(FP16.toHalf(12.3f), FP16.toHalf(12.4f)));
+        assertFalse(FP16.less(FP16.toHalf(12.4f), FP16.toHalf(12.3f)));
+        assertFalse(FP16.less(FP16.toHalf(-12.3f), FP16.toHalf(-12.4f)));
+        assertTrue(FP16.less(FP16.toHalf(-12.4f), FP16.toHalf(-12.3f)));
+        assertTrue(FP16.less(FP16.MIN_VALUE, (short) 0x3ff));
+
+        assertTrue(FP16.less(FP16.toHalf(-1.0f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.less(FP16.toHalf(0.0f), FP16.toHalf(-1.0f)));
+        assertFalse(FP16.less(FP16.toHalf(-1.0f), FP16.toHalf(-1.0f)));
+        assertFalse(FP16.less(FP16.toHalf(-1.3f), FP16.toHalf(-1.3f)));
+        assertFalse(FP16.less(FP16.toHalf(1.0f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.less(FP16.toHalf(0.0f), FP16.toHalf(1.0f)));
+        assertFalse(FP16.less(FP16.toHalf(1.0f), FP16.toHalf(1.0f)));
+        assertFalse(FP16.less(FP16.toHalf(1.3f), FP16.toHalf(1.3f)));
+        assertTrue(FP16.less(FP16.toHalf(-0.1f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.less(FP16.toHalf(0.0f), FP16.toHalf(-0.1f)));
+        assertFalse(FP16.less(FP16.toHalf(-0.1f), FP16.toHalf(-0.1f)));
+        assertFalse(FP16.less(FP16.toHalf(0.1f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.less(FP16.toHalf(0.0f), FP16.toHalf(0.1f)));
+        assertFalse(FP16.less(FP16.toHalf(0.1f), FP16.toHalf(0.1f)));
+    }
+
+    public static void testLessEquals() {
+        assertTrue(FP16.lessEquals(FP16.NEGATIVE_INFINITY, FP16.POSITIVE_INFINITY));
+        assertTrue(FP16.lessEquals(FP16.MAX_VALUE, FP16.POSITIVE_INFINITY));
+        assertFalse(FP16.lessEquals(FP16.POSITIVE_INFINITY, FP16.MAX_VALUE));
+        assertFalse(FP16.lessEquals(FP16.LOWEST_VALUE, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.lessEquals(FP16.NEGATIVE_INFINITY, FP16.LOWEST_VALUE));
+        assertTrue(FP16.lessEquals(FP16.POSITIVE_ZERO, FP16.NEGATIVE_ZERO));
+        assertTrue(FP16.lessEquals(FP16.NEGATIVE_ZERO, FP16.POSITIVE_ZERO));
+        assertFalse(FP16.lessEquals(FP16.NaN, FP16.toHalf(12.3f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(12.3f), FP16.NaN));
+        assertTrue(FP16.lessEquals(FP16.MIN_VALUE, FP16.MIN_NORMAL));
+        assertFalse(FP16.lessEquals(FP16.MIN_NORMAL, FP16.MIN_VALUE));
+        assertTrue(FP16.lessEquals(FP16.toHalf(12.3f), FP16.toHalf(12.4f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(12.4f), FP16.toHalf(12.3f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(-12.3f), FP16.toHalf(-12.4f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-12.4f), FP16.toHalf(-12.3f)));
+        assertTrue(FP16.lessEquals(FP16.MIN_VALUE, (short) 0x3ff));
+        assertTrue(FP16.lessEquals(FP16.NEGATIVE_INFINITY, FP16.NEGATIVE_INFINITY));
+        assertTrue(FP16.lessEquals(FP16.POSITIVE_INFINITY, FP16.POSITIVE_INFINITY));
+        assertTrue(FP16.lessEquals(FP16.toHalf(12.12356f), FP16.toHalf(12.12356f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-12.12356f), FP16.toHalf(-12.12356f)));
+
+        assertTrue(FP16.lessEquals(FP16.toHalf(-1.0f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(0.0f), FP16.toHalf(-1.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-1.0f), FP16.toHalf(-1.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-1.3f), FP16.toHalf(-1.3f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(1.0f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(0.0f), FP16.toHalf(1.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(1.0f), FP16.toHalf(1.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(1.3f), FP16.toHalf(1.3f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-0.1f), FP16.toHalf(0.0f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(0.0f), FP16.toHalf(-0.1f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(-0.1f), FP16.toHalf(-0.1f)));
+        assertFalse(FP16.lessEquals(FP16.toHalf(0.1f), FP16.toHalf(0.0f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(0.0f), FP16.toHalf(0.1f)));
+        assertTrue(FP16.lessEquals(FP16.toHalf(0.1f), FP16.toHalf(0.1f)));
+    }
+
     public static void main(String args[]) {
         testHalfToFloatToHalfConversions();
         testToHalf();
@@ -197,5 +352,9 @@ public class Main {
         testFloor();
         testCeil();
         testRint();
+        testGreater();
+        testGreaterEquals();
+        testLessEquals();
+        testLess();
     }
 }
