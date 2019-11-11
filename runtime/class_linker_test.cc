@@ -479,6 +479,7 @@ struct CheckOffsets {
     ObjPtr<mirror::Class> klass =
         Runtime::Current()->GetClassLinker()->FindSystemClass(self, class_descriptor.c_str());
     CHECK(klass != nullptr) << class_descriptor;
+    CHECK(klass->IsMirrored()) << class_descriptor;
 
     bool error = false;
 

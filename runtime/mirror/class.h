@@ -191,6 +191,9 @@ class MANAGED Class final : public Object {
     return status == ClassStatus::kVisiblyInitialized;
   }
 
+  // Returns true if this class is ever accessed through a C++ mirror.
+  bool IsMirrored() REQUIRES_SHARED(Locks::mutator_lock_);
+
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   ALWAYS_INLINE uint32_t GetAccessFlags() REQUIRES_SHARED(Locks::mutator_lock_) {
     if (kIsDebugBuild) {
