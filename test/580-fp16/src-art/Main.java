@@ -162,11 +162,40 @@ public class Main {
         assertEquals((short) 0xff00, FP16.floor((short) 0xfd00));
     }
 
+    public static void testRint() {
+        assertEquals(FP16.POSITIVE_INFINITY, FP16.rint(FP16.POSITIVE_INFINITY));
+        assertEquals(FP16.NEGATIVE_INFINITY, FP16.rint(FP16.NEGATIVE_INFINITY));
+        assertEquals(FP16.POSITIVE_ZERO, FP16.rint(FP16.POSITIVE_ZERO));
+        assertEquals(FP16.NEGATIVE_ZERO, FP16.rint(FP16.NEGATIVE_ZERO));
+        assertEquals(FP16.NaN, FP16.rint(FP16.NaN));
+        assertEquals(FP16.LOWEST_VALUE, FP16.rint(FP16.LOWEST_VALUE));
+        assertEquals(FP16.POSITIVE_ZERO, FP16.rint(FP16.MIN_VALUE));
+        assertEquals(FP16.POSITIVE_ZERO, FP16.rint((short) 0x200));
+        assertEquals(FP16.POSITIVE_ZERO, FP16.rint((short) 0x3ff));
+        assertEquals(FP16.POSITIVE_ZERO, FP16.rint(FP16.toHalf(0.2f)));
+        assertEquals(FP16.NEGATIVE_ZERO, FP16.rint(FP16.toHalf(-0.2f)));
+        assertEquals(1.0f, FP16.toFloat(FP16.rint(FP16.toHalf(0.7f))));
+        assertEquals(-1.0f, FP16.toFloat(FP16.rint(FP16.toHalf(-0.7f))));
+        assertEquals(0.0f, FP16.toFloat(FP16.rint(FP16.toHalf(0.5f))));
+        assertEquals(-0.0f, FP16.toFloat(FP16.rint(FP16.toHalf(-0.5f))));
+        assertEquals(125.0f, FP16.toFloat(FP16.rint(FP16.toHalf(124.7f))));
+        assertEquals(-125.0f, FP16.toFloat(FP16.rint(FP16.toHalf(-124.7f))));
+        assertEquals(124.0f, FP16.toFloat(FP16.rint(FP16.toHalf(124.2f))));
+        assertEquals(-124.0f, FP16.toFloat(FP16.rint(FP16.toHalf(-124.2f))));
+        // floor for NaN values
+        assertEquals((short) 0x7e01, FP16.floor((short) 0x7c01));
+        assertEquals((short) 0x7f00, FP16.floor((short) 0x7d00));
+        assertEquals((short) 0xfe01, FP16.floor((short) 0xfc01));
+        assertEquals((short) 0xff00, FP16.floor((short) 0xfd00));
+
+    }
+
     public static void main(String args[]) {
         testHalfToFloatToHalfConversions();
         testToHalf();
         testToFloat();
         testFloor();
         testCeil();
+        testRint();
     }
 }
