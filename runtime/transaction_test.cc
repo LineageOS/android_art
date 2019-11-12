@@ -606,7 +606,7 @@ TEST_F(TransactionTest, FinalizableAbortClass) {
 
 TEST_F(TransactionTest, Constraints) {
   ScopedObjectAccess soa(Thread::Current());
-  StackHandleScope<4> hs(soa.Self());
+  StackHandleScope<5> hs(soa.Self());
   Handle<mirror::ClassLoader> class_loader(
       hs.NewHandle(soa.Decode<mirror::ClassLoader>(LoadDex("Transaction"))));
 
@@ -629,19 +629,30 @@ TEST_F(TransactionTest, Constraints) {
       mirror::Class::FindField(soa.Self(), static_field_class.Get(), "intField", "I");
   ASSERT_TRUE(int_field != nullptr);
 
+  Handle<mirror::Class> long_array_dim2 = hs.NewHandle(
+      class_linker_->FindClass(soa.Self(), "[[J", class_loader));
+  ASSERT_TRUE(long_array_dim2 != nullptr);
+  gc::Heap* heap = Runtime::Current()->GetHeap();
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(long_array_dim2.Get()));
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(long_array_dim2->GetComponentType()));
+
   // Test non-strict transaction.
   Transaction transaction(/*strict=*/ false, /*root=*/ nullptr);
   // Static field in boot image.
-  ASSERT_TRUE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(boolean_class.Get()));
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(boolean_class.Get()));
   EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), boolean_class.Get(), true_field));
   EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), boolean_class.Get(), true_field));
   // Instance field in boot image. Do not check ReadConstraint(), it expects only static fields.
-  ASSERT_TRUE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(true_value.Get()));
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(true_value.Get()));
   EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), true_value.Get(), value_field));
   // Static field not in boot image.
-  ASSERT_FALSE(Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(static_field_class.Get()));
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(static_field_class.Get()));
   EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
   EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+  // Write value constraints.
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), static_field_class.Get()));
+  EXPECT_TRUE(transaction.WriteValueConstraint(soa.Self(), long_array_dim2.Get()));
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetComponentType()));
 
   // Test strict transaction.
   Transaction strict_transaction(/*strict=*/ true, /*root=*/ static_field_class.Get());
@@ -653,6 +664,11 @@ TEST_F(TransactionTest, Constraints) {
   // Static field in the same class.
   EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
   EXPECT_FALSE(strict_transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+  // Write value constraints.
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), static_field_class.Get()));
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2.Get()));
+  EXPECT_FALSE(
+      strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetComponentType()));
 }
 
 }  // namespace art
