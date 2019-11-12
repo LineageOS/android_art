@@ -3240,6 +3240,38 @@ void IntrinsicCodeGeneratorARM64::VisitFP16ToHalf(HInvoke* invoke) {
   __ Sxth(out, out);  // sign extend due to returning a short type.
 }
 
+template<typename OP>
+void GenerateFP16Round(HInvoke* invoke,
+                       CodeGeneratorARM64* const codegen_,
+                       MacroAssembler* masm,
+                       const OP roundOp) {
+  DCHECK(codegen_->GetInstructionSetFeatures().HasFP16());
+  LocationSummary* locations = invoke->GetLocations();
+  UseScratchRegisterScope scratch_scope(masm);
+  Register out = WRegisterFrom(locations->Out());
+  VRegister half = scratch_scope.AcquireH();
+  __ Fmov(half, WRegisterFrom(locations->InAt(0)));
+  roundOp(half, half);
+  __ Fmov(out, half);
+  __ Sxth(out, out);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitFP16Floor(HInvoke* invoke) {
+  if (!codegen_->GetInstructionSetFeatures().HasFP16()) {
+    return;
+  }
+
+  CreateIntToIntLocations(allocator_, invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitFP16Floor(HInvoke* invoke) {
+  MacroAssembler* masm = GetVIXLAssembler();
+  auto roundOp = [masm](const VRegister& out, const VRegister& in) {
+    __ Frintm(out, in);  // Round towards Minus infinity
+  };
+  GenerateFP16Round(invoke, codegen_, masm, roundOp);
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);

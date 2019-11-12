@@ -357,6 +357,7 @@ ALWAYS_INLINE inline uint32_t GetRuntimeFlags(ArtMethod* method)
       case Intrinsics::kVarHandleWeakCompareAndSetRelease:
         return 0u;
       case Intrinsics::kUnsafeGetLong:
+      case Intrinsics::kFP16Floor:
       case Intrinsics::kFP16ToFloat:
       case Intrinsics::kFP16ToHalf:
         return kAccCorePlatformApi;
