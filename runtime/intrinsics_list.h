@@ -165,6 +165,7 @@
   V(MemoryPokeIntNative, kStatic, kNeedsEnvironmentOrCache, kWriteSideEffects, kCanThrow, "Llibcore/io/Memory;", "pokeIntNative", "(JI)V") \
   V(MemoryPokeLongNative, kStatic, kNeedsEnvironmentOrCache, kWriteSideEffects, kCanThrow, "Llibcore/io/Memory;", "pokeLongNative", "(JJ)V") \
   V(MemoryPokeShortNative, kStatic, kNeedsEnvironmentOrCache, kWriteSideEffects, kCanThrow, "Llibcore/io/Memory;", "pokeShortNative", "(JS)V") \
+  V(FP16Ceil, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "ceil", "(S)S") \
   V(FP16Floor, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "floor", "(S)S") \
   V(FP16ToFloat, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toFloat", "(S)F") \
   V(FP16ToHalf, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toHalf", "(F)S") \
