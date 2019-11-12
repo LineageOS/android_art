@@ -32,13 +32,20 @@ static constexpr const uint32_t kMinNewClassesPercentChangeForCompilation = 2;
 ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfilesInternal(
         const std::vector<ScopedFlock>& profile_files,
         const ScopedFlock& reference_profile_file,
-        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn) {
+        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn,
+        const Options& options) {
   DCHECK(!profile_files.empty());
 
-  ProfileCompilationInfo info;
+  ProfileCompilationInfo info(options.IsBootImageMerge());
+
   // Load the reference profile.
   if (!info.Load(reference_profile_file->Fd(), /*merge_classes=*/ true, filter_fn)) {
     LOG(WARNING) << "Could not load reference profile file";
+    return kErrorBadProfiles;
+  }
+
+  if (options.IsBootImageMerge() && !info.IsForBootImage()) {
+    LOG(WARNING) << "Requested merge for boot image profile but the reference profile is regular.";
     return kErrorBadProfiles;
   }
 
@@ -53,23 +60,31 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfilesInternal(
       LOG(WARNING) << "Could not load profile file at index " << i;
       return kErrorBadProfiles;
     }
+    if (options.IsBootImageMerge() != cur_info.IsForBootImage()) {
+      // The app profile was not configured for boot image merging. Ignore.
+      continue;
+    }
+
     if (!info.MergeWith(cur_info)) {
       LOG(WARNING) << "Could not merge profile file at index " << i;
       return kErrorBadProfiles;
     }
   }
 
-  uint32_t min_change_in_methods_for_compilation = std::max(
-      (kMinNewMethodsPercentChangeForCompilation * number_of_methods) / 100,
-      kMinNewMethodsForCompilation);
-  uint32_t min_change_in_classes_for_compilation = std::max(
-      (kMinNewClassesPercentChangeForCompilation * number_of_classes) / 100,
-      kMinNewClassesForCompilation);
-  // Check if there is enough new information added by the current profiles.
-  if (((info.GetNumberOfMethods() - number_of_methods) < min_change_in_methods_for_compilation) &&
-      ((info.GetNumberOfResolvedClasses() - number_of_classes)
-          < min_change_in_classes_for_compilation)) {
-    return kSkipCompilation;
+  // If we perform a forced merge do not analyze the difference between profiles.
+  if (!options.IsForceMerge()) {
+    uint32_t min_change_in_methods_for_compilation = std::max(
+        (kMinNewMethodsPercentChangeForCompilation * number_of_methods) / 100,
+        kMinNewMethodsForCompilation);
+    uint32_t min_change_in_classes_for_compilation = std::max(
+        (kMinNewClassesPercentChangeForCompilation * number_of_classes) / 100,
+        kMinNewClassesForCompilation);
+    // Check if there is enough new information added by the current profiles.
+    if (((info.GetNumberOfMethods() - number_of_methods) < min_change_in_methods_for_compilation) &&
+        ((info.GetNumberOfResolvedClasses() - number_of_classes)
+            < min_change_in_classes_for_compilation)) {
+      return kSkipCompilation;
+    }
   }
 
   // We were successful in merging all profile information. Update the reference profile.
@@ -82,7 +97,7 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfilesInternal(
     return kErrorIO;
   }
 
-  return kCompile;
+  return options.IsForceMerge() ? kSuccess : kCompile;
 }
 
 class ScopedFlockList {
@@ -124,7 +139,8 @@ class ScopedFlockList {
 ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfiles(
         const std::vector<int>& profile_files_fd,
         int reference_profile_file_fd,
-        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn) {
+        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn,
+        const Options& options) {
   DCHECK_GE(reference_profile_file_fd, 0);
 
   std::string error;
@@ -147,13 +163,15 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfiles(
 
   return ProcessProfilesInternal(profile_files.Get(),
                                  reference_profile_file,
-                                 filter_fn);
+                                 filter_fn,
+                                 options);
 }
 
 ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfiles(
         const std::vector<std::string>& profile_files,
         const std::string& reference_profile_file,
-        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn) {
+        const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn,
+        const Options& options) {
   std::string error;
 
   ScopedFlockList profile_files_list(profile_files.size());
@@ -171,7 +189,8 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfiles(
 
   return ProcessProfilesInternal(profile_files_list.Get(),
                                  locked_reference_profile_file,
-                                 filter_fn);
+                                 filter_fn,
+                                 options);
 }
 
 }  // namespace art

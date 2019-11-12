@@ -34,7 +34,34 @@ class ProfileAssistant {
     kSkipCompilation = 1,
     kErrorBadProfiles = 2,
     kErrorIO = 3,
-    kErrorCannotLock = 4
+    kErrorCannotLock = 4,
+    kSuccess = 5,  // Generic success code for non-analysis runs.
+  };
+
+  class Options {
+   public:
+    static constexpr bool kForceMergeDefault = false;
+    static constexpr bool kBootImageMergeDefault = false;
+
+    Options()
+        : force_merge_(kForceMergeDefault),
+          boot_image_merge_(kBootImageMergeDefault) {
+    }
+
+    bool IsForceMerge() const { return force_merge_; }
+    bool IsBootImageMerge() const { return boot_image_merge_; }
+
+    void SetForceMerge(bool value) { force_merge_ = value; }
+    void SetBootImageMerge(bool value) { boot_image_merge_ = value; }
+
+   private:
+    // If true, performs a forced merge, without analyzing if there is a
+    // significant difference between the current profile and the reference profile.
+    // See ProfileAssistant#ProcessProfile.
+    bool force_merge_;
+    // Signals that the merge is for boot image profiles. It will ignore differences
+    // in profile versions (instead of aborting).
+    bool boot_image_merge_;
   };
 
   // Process the profile information present in the given files. Returns one of
@@ -55,19 +82,22 @@ class ProfileAssistant {
       const std::vector<std::string>& profile_files,
       const std::string& reference_profile_file,
       const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn
-          = ProfileCompilationInfo::ProfileFilterFnAcceptAll);
+          = ProfileCompilationInfo::ProfileFilterFnAcceptAll,
+      const Options& options = Options());
 
   static ProcessingResult ProcessProfiles(
       const std::vector<int>& profile_files_fd_,
       int reference_profile_file_fd,
       const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn
-          = ProfileCompilationInfo::ProfileFilterFnAcceptAll);
+          = ProfileCompilationInfo::ProfileFilterFnAcceptAll,
+      const Options& options = Options());
 
  private:
   static ProcessingResult ProcessProfilesInternal(
       const std::vector<ScopedFlock>& profile_files,
       const ScopedFlock& reference_profile_file,
-      const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn);
+      const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn,
+      const Options& options);
 
   DISALLOW_COPY_AND_ASSIGN(ProfileAssistant);
 };
