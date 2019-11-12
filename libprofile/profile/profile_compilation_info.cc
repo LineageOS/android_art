@@ -2175,6 +2175,13 @@ void ProfileCompilationInfo::ClearData() {
   profile_key_map_.clear();
 }
 
+void ProfileCompilationInfo::ClearDataAndAdjustVersion(bool for_boot_image) {
+  ClearData();
+  memcpy(version_,
+         for_boot_image ? kProfileVersionForBootImage : kProfileVersion,
+         kProfileVersionSize);
+}
+
 bool ProfileCompilationInfo::IsForBootImage() const {
   return memcmp(version_, kProfileVersionForBootImage, sizeof(kProfileVersionForBootImage)) == 0;
 }

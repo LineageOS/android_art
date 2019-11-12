@@ -530,6 +530,9 @@ class ProfileCompilationInfo {
   // Clears all the data from the profile.
   void ClearData();
 
+  // Clears all the data from the profile and adjust the object version.
+  void ClearDataAndAdjustVersion(bool for_boot_image);
+
   // Prepare the profile to store aggregation counters.
   // This will change the profile version and allocate extra storage for the counters.
   // It allocates 2 bytes for every possible method and class, so do not use in performance
