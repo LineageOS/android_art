@@ -3288,6 +3288,22 @@ void IntrinsicCodeGeneratorARM64::VisitFP16Ceil(HInvoke* invoke) {
   GenerateFP16Round(invoke, codegen_, masm, roundOp);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitFP16Rint(HInvoke* invoke) {
+  if (!codegen_->GetInstructionSetFeatures().HasFP16()) {
+    return;
+  }
+
+  CreateIntToIntLocations(allocator_, invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitFP16Rint(HInvoke* invoke) {
+  MacroAssembler* masm = GetVIXLAssembler();
+  auto roundOp = [masm](const FPRegister& out, const FPRegister& in) {
+    __ Frintn(out, in);  // Round to nearest, with ties to even
+  };
+  GenerateFP16Round(invoke, codegen_, masm, roundOp);
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
