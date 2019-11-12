@@ -575,6 +575,7 @@ bool MterpHandleIntrinsic(ShadowFrame* shadow_frame,
     UNIMPLEMENTED_CASE(CRC32UpdateByteBuffer /* (IJII)I */)
     UNIMPLEMENTED_CASE(FP16ToFloat /* (S)F */)
     UNIMPLEMENTED_CASE(FP16ToHalf /* (F)S */)
+    UNIMPLEMENTED_CASE(FP16Floor /* (S)S */)
     INTRINSIC_CASE(VarHandleFullFence)
     INTRINSIC_CASE(VarHandleAcquireFence)
     INTRINSIC_CASE(VarHandleReleaseFence)

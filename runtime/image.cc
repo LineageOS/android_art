@@ -29,7 +29,7 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-const uint8_t ImageHeader::kImageVersion[] = { '0', '8', '0', '\0' };  // Chained checksums.
+const uint8_t ImageHeader::kImageVersion[] = { '0', '8', '1', '\0' };  // FP16Floor intrinsic
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,
