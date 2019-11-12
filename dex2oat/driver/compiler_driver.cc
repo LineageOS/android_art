@@ -1044,7 +1044,7 @@ class RecordImageClassesVisitor : public ClassVisitor {
 void CompilerDriver::LoadImageClasses(TimingLogger* timings,
                                       /*inout*/ HashSet<std::string>* image_classes) {
   CHECK(timings != nullptr);
-  if (!GetCompilerOptions().IsBootImage()) {
+  if (!GetCompilerOptions().IsBootImage() && !GetCompilerOptions().IsBootImageExtension()) {
     return;
   }
 
@@ -1061,7 +1061,7 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
         hs.NewHandle(class_linker->FindSystemClass(self, descriptor.c_str())));
     if (klass == nullptr) {
       VLOG(compiler) << "Failed to find class " << descriptor;
-      it = image_classes->erase(it);
+      it = image_classes->erase(it);  // May cause some descriptors to be revisited.
       self->ClearException();
     } else {
       ++it;
@@ -1122,9 +1122,15 @@ static void MaybeAddToImageClasses(Thread* self,
                                    HashSet<std::string>* image_classes)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   DCHECK_EQ(self, Thread::Current());
-  StackHandleScope<1> hs(self);
+  Runtime* runtime = Runtime::Current();
+  gc::Heap* heap = runtime->GetHeap();
+  if (heap->ObjectIsInBootImageSpace(klass)) {
+    // We're compiling a boot image extension and the class is already
+    // in the boot image we're compiling against.
+    return;
+  }
+  const PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
   std::string temp;
-  const PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
   while (!klass->IsObjectClass()) {
     const char* descriptor = klass->GetDescriptor(&temp);
     if (image_classes->find(std::string_view(descriptor)) != image_classes->end()) {
@@ -1151,15 +1157,15 @@ static void MaybeAddToImageClasses(Thread* self,
 // Note: we can use object pointers because we suspend all threads.
 class ClinitImageUpdate {
  public:
-  static ClinitImageUpdate* Create(VariableSizedHandleScope& hs,
-                                   HashSet<std::string>* image_class_descriptors,
-                                   Thread* self,
-                                   ClassLinker* linker) {
-    std::unique_ptr<ClinitImageUpdate> res(new ClinitImageUpdate(hs,
-                                                                 image_class_descriptors,
-                                                                 self,
-                                                                 linker));
-    return res.release();
+  ClinitImageUpdate(HashSet<std::string>* image_class_descriptors,
+                    Thread* self) REQUIRES_SHARED(Locks::mutator_lock_)
+      : hs_(self),
+        image_class_descriptors_(image_class_descriptors),
+        self_(self) {
+    CHECK(image_class_descriptors != nullptr);
+
+    // Make sure nobody interferes with us.
+    old_cause_ = self->StartAssertNoThreadSuspension("Boot image closure");
   }
 
   ~ClinitImageUpdate() {
@@ -1188,42 +1194,49 @@ class ClinitImageUpdate {
   void VisitRoot(mirror::CompressedReference<mirror::Object>* root ATTRIBUTE_UNUSED) const {}
 
   void Walk() REQUIRES_SHARED(Locks::mutator_lock_) {
+    // Find all the already-marked classes.
+    WriterMutexLock mu(self_, *Locks::heap_bitmap_lock_);
+    FindImageClassesVisitor visitor(this);
+    Runtime::Current()->GetClassLinker()->VisitClasses(&visitor);
+
     // Use the initial classes as roots for a search.
     for (Handle<mirror::Class> klass_root : image_classes_) {
       VisitClinitClassesObject(klass_root.Get());
     }
-    Thread* self = Thread::Current();
     ScopedAssertNoThreadSuspension ants(__FUNCTION__);
     for (Handle<mirror::Class> h_klass : to_insert_) {
-      MaybeAddToImageClasses(self, h_klass.Get(), image_class_descriptors_);
+      MaybeAddToImageClasses(self_, h_klass.Get(), image_class_descriptors_);
     }
   }
 
  private:
   class FindImageClassesVisitor : public ClassVisitor {
    public:
-    explicit FindImageClassesVisitor(VariableSizedHandleScope& hs,
-                                     ClinitImageUpdate* data)
-        : data_(data),
-          hs_(hs) {}
+    explicit FindImageClassesVisitor(ClinitImageUpdate* data)
+        : data_(data) {}
 
     bool operator()(ObjPtr<mirror::Class> klass) override REQUIRES_SHARED(Locks::mutator_lock_) {
+      bool resolved = klass->IsResolved();
+      DCHECK(resolved || klass->IsErroneousUnresolved());
+      bool can_include_in_image = LIKELY(resolved) && CanIncludeInCurrentImage(klass);
       std::string temp;
       std::string_view name(klass->GetDescriptor(&temp));
       auto it = data_->image_class_descriptors_->find(name);
       if (it != data_->image_class_descriptors_->end()) {
-        if (LIKELY(klass->IsResolved())) {
-          data_->image_classes_.push_back(hs_.NewHandle(klass));
+        if (can_include_in_image) {
+          data_->image_classes_.push_back(data_->hs_.NewHandle(klass));
         } else {
-          DCHECK(klass->IsErroneousUnresolved());
-          VLOG(compiler) << "Removing unresolved class from image classes: " << name;
+          VLOG(compiler) << "Removing " << (resolved ? "unsuitable" : "unresolved")
+              << " class from image classes: " << name;
           data_->image_class_descriptors_->erase(it);
         }
-      } else {
+      } else if (can_include_in_image) {
         // Check whether it is initialized and has a clinit. They must be kept, too.
         if (klass->IsInitialized() && klass->FindClassInitializer(
             Runtime::Current()->GetClassLinker()->GetImagePointerSize()) != nullptr) {
-          data_->image_classes_.push_back(hs_.NewHandle(klass));
+          DCHECK(!Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(klass->GetDexCache()))
+              << klass->PrettyDescriptor();
+          data_->image_classes_.push_back(data_->hs_.NewHandle(klass));
         }
       }
       return true;
@@ -1231,27 +1244,7 @@ class ClinitImageUpdate {
 
    private:
     ClinitImageUpdate* const data_;
-    VariableSizedHandleScope& hs_;
   };
-
-  ClinitImageUpdate(VariableSizedHandleScope& hs,
-                    HashSet<std::string>* image_class_descriptors,
-                    Thread* self,
-                    ClassLinker* linker) REQUIRES_SHARED(Locks::mutator_lock_)
-      : hs_(hs),
-        image_class_descriptors_(image_class_descriptors),
-        self_(self) {
-    CHECK(linker != nullptr);
-    CHECK(image_class_descriptors != nullptr);
-
-    // Make sure nobody interferes with us.
-    old_cause_ = self->StartAssertNoThreadSuspension("Boot image closure");
-
-    // Find all the already-marked classes.
-    WriterMutexLock mu(self, *Locks::heap_bitmap_lock_);
-    FindImageClassesVisitor visitor(hs_, this);
-    linker->VisitClasses(&visitor);
-  }
 
   void VisitClinitClassesObject(mirror::Object* object) const
       REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -1279,7 +1272,79 @@ class ClinitImageUpdate {
     }
   }
 
-  VariableSizedHandleScope& hs_;
+  static bool CanIncludeInCurrentImage(ObjPtr<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(klass != nullptr);
+    gc::Heap* heap = Runtime::Current()->GetHeap();
+    if (heap->GetBootImageSpaces().empty()) {
+      return true;  // We can include any class when compiling the primary boot image.
+    }
+    if (heap->ObjectIsInBootImageSpace(klass)) {
+      return false;  // Already included in the boot image we're compiling against.
+    }
+
+    // When compiling a boot image extension, we must not include classes
+    // that are defined in dex files belonging to the boot image we're
+    // compiling against but not actually present in that boot image.
+
+    // Treat arrays and primitive types specially because they do not have a DexCache that we
+    // can use to check whether the dex file belongs to the boot image we're compiling against.
+    DCHECK(!klass->IsPrimitive());  // Primitive classes must be in the primary boot image.
+    if (klass->IsArrayClass()) {
+      DCHECK(heap->ObjectIsInBootImageSpace(klass->GetIfTable()));  // IfTable is OK.
+      // Arrays of all dimensions are tied to the dex file of the non-array component type.
+      ObjPtr<mirror::Class> component_type = klass;
+      do {
+        component_type = component_type->GetComponentType();
+      } while (component_type->IsArrayClass());
+      return !component_type->IsPrimitive() &&
+             !heap->ObjectIsInBootImageSpace(component_type->GetDexCache());
+    }
+
+    // Check the class itself.
+    if (heap->ObjectIsInBootImageSpace(klass->GetDexCache())) {
+      return false;
+    }
+
+    // Check superclasses.
+    ObjPtr<mirror::Class> superclass = klass->GetSuperClass();
+    while (!heap->ObjectIsInBootImageSpace(superclass)) {
+      DCHECK(superclass != nullptr);  // Cannot skip Object which is in the primary boot image.
+      if (heap->ObjectIsInBootImageSpace(superclass->GetDexCache())) {
+        return false;
+      }
+      superclass = superclass->GetSuperClass();
+    }
+
+    // Check IfTable. This includes direct and indirect interfaces.
+    ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
+    for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
+      ObjPtr<mirror::Class> interface = if_table->GetInterface(i);
+      DCHECK(interface != nullptr);
+      if (!heap->ObjectIsInBootImageSpace(interface) &&
+          heap->ObjectIsInBootImageSpace(interface->GetDexCache())) {
+        return false;
+      }
+    }
+
+    if (kIsDebugBuild) {
+      // All virtual methods must come from classes we have already checked above.
+      PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+      ObjPtr<mirror::Class> k = klass;
+      while (!heap->ObjectIsInBootImageSpace(k)) {
+        for (auto& m : k->GetVirtualMethods(pointer_size)) {
+          ObjPtr<mirror::Class> declaring_class = m.GetDeclaringClass();
+          CHECK(heap->ObjectIsInBootImageSpace(declaring_class) ||
+                !heap->ObjectIsInBootImageSpace(declaring_class->GetDexCache()));
+        }
+        k = k->GetSuperClass();
+      }
+    }
+
+    return true;
+  }
+
+  mutable VariableSizedHandleScope hs_;
   mutable std::vector<Handle<mirror::Class>> to_insert_;
   mutable std::unordered_set<mirror::Object*> marked_objects_;
   HashSet<std::string>* const image_class_descriptors_;
@@ -1292,23 +1357,16 @@ class ClinitImageUpdate {
 
 void CompilerDriver::UpdateImageClasses(TimingLogger* timings,
                                         /*inout*/ HashSet<std::string>* image_classes) {
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     TimingLogger::ScopedTiming t("UpdateImageClasses", timings);
-
-    Runtime* runtime = Runtime::Current();
 
     // Suspend all threads.
     ScopedSuspendAll ssa(__FUNCTION__);
 
-    VariableSizedHandleScope hs(Thread::Current());
-    std::string error_msg;
-    std::unique_ptr<ClinitImageUpdate> update(ClinitImageUpdate::Create(hs,
-                                                                        image_classes,
-                                                                        Thread::Current(),
-                                                                        runtime->GetClassLinker()));
+    ClinitImageUpdate update(image_classes, Thread::Current());
 
     // Do the marking.
-    update->Walk();
+    update.Walk();
   }
 }
 
@@ -2132,15 +2190,24 @@ class InitializeClassVisitor : public CompilationVisitor {
     StackHandleScope<3> hs(soa.Self());
     ClassLinker* const class_linker = manager_->GetClassLinker();
     Runtime* const runtime = Runtime::Current();
-    const bool is_boot_image = manager_->GetCompiler()->GetCompilerOptions().IsBootImage();
-    const bool is_app_image = manager_->GetCompiler()->GetCompilerOptions().IsAppImage();
+    const CompilerOptions& compiler_options = manager_->GetCompiler()->GetCompilerOptions();
+    const bool is_boot_image = compiler_options.IsBootImage();
+    const bool is_boot_image_extension = compiler_options.IsBootImageExtension();
+    const bool is_app_image = compiler_options.IsAppImage();
 
-    ClassStatus old_status = klass->GetStatus();
-    // Don't initialize classes in boot space when compiling app image
-    if (is_app_image && klass->IsBootStrapClassLoaded()) {
+    // For boot image extension, do not initialize classes defined
+    // in dex files belonging to the boot image we're compiling against.
+    if (is_boot_image_extension &&
+        runtime->GetHeap()->ObjectIsInBootImageSpace(klass->GetDexCache())) {
       // Also return early and don't store the class status in the recorded class status.
       return;
     }
+    // Do not initialize classes in boot space when compiling app (with or without image).
+    if ((!is_boot_image && !is_boot_image_extension) && klass->IsBootStrapClassLoaded()) {
+      // Also return early and don't store the class status in the recorded class status.
+      return;
+    }
+    ClassStatus old_status = klass->GetStatus();
     // Only try to initialize classes that were successfully verified.
     if (klass->IsVerified()) {
       // Attempt to initialize the class but bail if we either need to initialize the super-class
@@ -2160,30 +2227,32 @@ class InitializeClassVisitor : public CompilationVisitor {
         ObjectLock<mirror::Class> lock(soa.Self(), h_klass);
         // Attempt to initialize allowing initialization of parent classes but still not static
         // fields.
-        // Initialize dependencies first only for app image, to make TryInitialize recursive.
-        bool is_superclass_initialized = !is_app_image ? true :
-            InitializeDependencies(klass, class_loader, soa.Self());
-        if (!is_app_image || (is_app_image && is_superclass_initialized)) {
+        // Initialize dependencies first only for app or boot image extension,
+        // to make TryInitializeClass() recursive.
+        bool try_initialize_with_superclasses =
+            is_boot_image ? true : InitializeDependencies(klass, class_loader, soa.Self());
+        if (try_initialize_with_superclasses) {
           class_linker->EnsureInitialized(soa.Self(), klass, false, true);
           // It's OK to clear the exception here since the compiler is supposed to be fault
           // tolerant and will silently not initialize classes that have exceptions.
           soa.Self()->ClearException();
         }
-        // Otherwise it's in app image but superclasses can't be initialized, no need to proceed.
+        // Otherwise it's in app image or boot image extension but superclasses
+        // cannot be initialized, no need to proceed.
         old_status = klass->GetStatus();
 
-        bool too_many_encoded_fields = !is_boot_image &&
+        bool too_many_encoded_fields = (!is_boot_image && !is_boot_image_extension) &&
             klass->NumStaticFields() > kMaxEncodedFields;
 
         // If the class was not initialized, we can proceed to see if we can initialize static
         // fields. Limit the max number of encoded fields.
         if (!klass->IsInitialized() &&
-            (is_app_image || is_boot_image) &&
-            is_superclass_initialized &&
+            (is_app_image || is_boot_image || is_boot_image_extension) &&
+            try_initialize_with_superclasses &&
             !too_many_encoded_fields &&
-            manager_->GetCompiler()->GetCompilerOptions().IsImageClass(descriptor)) {
+            compiler_options.IsImageClass(descriptor)) {
           bool can_init_static_fields = false;
-          if (is_boot_image) {
+          if (is_boot_image || is_boot_image_extension) {
             // We need to initialize static fields, we only do this for image classes that aren't
             // marked with the $NoPreloadHolder (which implies this should not be initialized
             // early).
@@ -2198,9 +2267,8 @@ class InitializeClassVisitor : public CompilationVisitor {
             can_init_static_fields =
                 ClassLinker::kAppImageMayContainStrings &&
                 !soa.Self()->IsExceptionPending() &&
-                is_superclass_initialized &&
-                !manager_->GetCompiler()->GetCompilerOptions().GetDebuggable() &&
-                (manager_->GetCompiler()->GetCompilerOptions().InitializeAppImageClasses() ||
+                !compiler_options.GetDebuggable() &&
+                (compiler_options.InitializeAppImageClasses() ||
                  NoClinitInDependency(klass, soa.Self(), &class_loader));
             // TODO The checking for clinit can be removed since it's already
             // checked when init superclass. Currently keep it because it contains
@@ -2220,7 +2288,7 @@ class InitializeClassVisitor : public CompilationVisitor {
             // TransactionAbortError is not initialized ant not in boot image, needed only by
             // compiler and will be pruned by ImageWriter.
             Handle<mirror::Class> exception_class =
-                hs.NewHandle(class_linker->FindClass(Thread::Current(),
+                hs.NewHandle(class_linker->FindClass(soa.Self(),
                                                      Transaction::kAbortExceptionSignature,
                                                      class_loader));
             bool exception_initialized =
@@ -2242,9 +2310,10 @@ class InitializeClassVisitor : public CompilationVisitor {
                 runtime->ExitTransactionMode();
                 DCHECK(!runtime->IsActiveTransaction());
 
-                if (is_boot_image) {
-                  // For boot image, we want to put the updated status in the oat class since we
-                  // can't reject the image anyways.
+                if (is_boot_image || is_boot_image_extension) {
+                  // For boot image and boot image extension, we want to put the updated
+                  // status in the oat class. This is not the case for app image as we
+                  // want to keep the ability to load the oat file without the app image.
                   old_status = klass->GetStatus();
                 }
               } else {
@@ -2264,12 +2333,12 @@ class InitializeClassVisitor : public CompilationVisitor {
               }
             }
 
-            if (!success && is_boot_image) {
+            if (!success && (is_boot_image || is_boot_image_extension)) {
               // On failure, still intern strings of static fields and seen in <clinit>, as these
               // will be created in the zygote. This is separated from the transaction code just
               // above as we will allocate strings, so must be allowed to suspend.
-              // We only need to intern strings for boot image because classes that failed to be
-              // initialized will not appear in app image.
+              // We only need to intern strings for boot image and boot image extension
+              // because classes that failed to be initialized will not appear in app image.
               if (&klass->GetDexFile() == manager_->GetDexFile()) {
                 InternStrings(klass, class_loader);
               } else {
@@ -2307,7 +2376,8 @@ class InitializeClassVisitor : public CompilationVisitor {
  private:
   void InternStrings(Handle<mirror::Class> klass, Handle<mirror::ClassLoader> class_loader)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(manager_->GetCompiler()->GetCompilerOptions().IsBootImage());
+    DCHECK(manager_->GetCompiler()->GetCompilerOptions().IsBootImage() ||
+           manager_->GetCompiler()->GetCompilerOptions().IsBootImageExtension());
     DCHECK(klass->IsVerified());
     DCHECK(!klass->IsInitialized());
 
@@ -2410,35 +2480,34 @@ class InitializeClassVisitor : public CompilationVisitor {
   }
 
   // Initialize the klass's dependencies recursively before initializing itself.
-  // Checking for interfaces is also necessary since interfaces can contain
-  // both default methods and static encoded fields.
+  // Checking for interfaces is also necessary since interfaces that contain
+  // default methods must be initialized before the class.
   bool InitializeDependencies(const Handle<mirror::Class>& klass,
                               Handle<mirror::ClassLoader> class_loader,
                               Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     if (klass->HasSuperClass()) {
-      ObjPtr<mirror::Class> super_class = klass->GetSuperClass();
       StackHandleScope<1> hs(self);
-      Handle<mirror::Class> handle_scope_super(hs.NewHandle(super_class));
-      if (!handle_scope_super->IsInitialized()) {
-        this->TryInitializeClass(handle_scope_super, class_loader);
-        if (!handle_scope_super->IsInitialized()) {
+      Handle<mirror::Class> super_class = hs.NewHandle(klass->GetSuperClass());
+      if (!super_class->IsInitialized()) {
+        this->TryInitializeClass(super_class, class_loader);
+        if (!super_class->IsInitialized()) {
           return false;
         }
       }
     }
 
-    uint32_t num_if = klass->NumDirectInterfaces();
-    for (size_t i = 0; i < num_if; i++) {
-      ObjPtr<mirror::Class>
-          interface = mirror::Class::GetDirectInterface(self, klass.Get(), i);
-      StackHandleScope<1> hs(self);
-      Handle<mirror::Class> handle_interface(hs.NewHandle(interface));
-
-      TryInitializeClass(handle_interface, class_loader);
-
-      if (!handle_interface->IsInitialized()) {
-        return false;
+    if (!klass->IsInterface()) {
+      size_t num_interfaces = klass->GetIfTableCount();
+      for (size_t i = 0; i < num_interfaces; ++i) {
+        StackHandleScope<1> hs(self);
+        Handle<mirror::Class> iface = hs.NewHandle(klass->GetIfTable()->GetInterface(i));
+        if (iface->HasDefaultMethods() && !iface->IsInitialized()) {
+          TryInitializeClass(iface, class_loader);
+          if (!iface->IsInitialized()) {
+            return false;
+          }
+        }
       }
     }
 
