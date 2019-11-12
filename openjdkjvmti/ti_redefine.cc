@@ -443,21 +443,11 @@ jvmtiError Redefiner::GetClassRedefinitionError(art::Handle<art::mirror::Class> 
       self->ClearException();
       return ERR(INVALID_CLASS);
     }
-    art::StackHandleScope<2> hs(self);
-    art::Handle<art::mirror::ObjectArray<art::mirror::Class>> roots(
-        hs.NewHandle(art::Runtime::Current()->GetClassLinker()->GetClassRoots()));
-    art::MutableHandle<art::mirror::Class> obj(hs.NewHandle<art::mirror::Class>(nullptr));
-    for (int32_t i = 0; i < roots->GetLength(); i++) {
-      obj.Assign(roots->Get(i));
-      // check if the redefined class is a superclass of any root (i.e. mirror plus a few other
-      // important types).
-      if (klass->IsAssignableFrom(obj.Get())) {
-        std::string pc(klass->PrettyClass());
-        *error_msg = StringPrintf("Class %s is an important runtime class and cannot be "
-                                  "structurally redefined.",
-                                  pc.c_str());
-        return ERR(UNMODIFIABLE_CLASS);
-      }
+    if (klass->IsMirrored()) {
+      std::string pc(klass->PrettyClass());
+      *error_msg = StringPrintf("Class %s is a mirror class and cannot be structurally redefined.",
+                                pc.c_str());
+      return ERR(UNMODIFIABLE_CLASS);
     }
     // Check Thread specifically since it's not a root but too many things reach into it with Unsafe
     // too allow structural redefinition.
