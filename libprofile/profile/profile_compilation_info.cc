@@ -1613,11 +1613,20 @@ uint32_t ProfileCompilationInfo::GetNumberOfResolvedClasses() const {
 std::string ProfileCompilationInfo::DumpInfo(const std::vector<const DexFile*>& dex_files,
                                              bool print_full_dex_location) const {
   std::ostringstream os;
-  if (info_.empty()) {
-    return "ProfileInfo: empty";
-  }
 
-  os << "ProfileInfo:";
+  os << "ProfileInfo [";
+
+  for (size_t k = 0; k <  kProfileVersionSize - 1; k++) {
+    // Iterate to 'kProfileVersionSize - 1' because the version_ ends with '\0'
+    // which we don't want to print.
+    os << static_cast<char>(version_[k]);
+  }
+  os << "]\n";
+
+  if (info_.empty()) {
+    os << "-empty-";
+    return os.str();
+  }
 
   const std::string kFirstDexFileKeySubstitute = "!classes.dex";
 
