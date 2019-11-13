@@ -187,7 +187,10 @@ class ProfileAssistantTest : public CommonRuntimeTest {
   }
 
   // Runs test with given arguments.
-  int ProcessProfiles(const std::vector<int>& profiles_fd, int reference_profile_fd) {
+  int ProcessProfiles(
+      const std::vector<int>& profiles_fd,
+      int reference_profile_fd,
+      std::vector<const std::string> extra_args = std::vector<const std::string>()) {
     std::string profman_cmd = GetProfmanCmd();
     std::vector<std::string> argv_str;
     argv_str.push_back(profman_cmd);
@@ -195,6 +198,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
       argv_str.push_back("--profile-file-fd=" + std::to_string(profiles_fd[k]));
     }
     argv_str.push_back("--reference-profile-file-fd=" + std::to_string(reference_profile_fd));
+    argv_str.insert(argv_str.end(), extra_args.begin(), extra_args.end());
 
     std::string error;
     return ExecAndReturnCode(argv_str, &error);
@@ -1284,4 +1288,71 @@ TEST_F(ProfileAssistantTest, CopyAndUpdateProfileKey) {
   }
 }
 
+TEST_F(ProfileAssistantTest, BootImageMerge) {
+  ScratchFile profile;
+  ScratchFile reference_profile;
+  std::vector<int> profile_fds({GetFd(profile)});
+  int reference_profile_fd = GetFd(reference_profile);
+  std::vector<uint32_t> hot_methods_cur;
+  std::vector<uint32_t> hot_methods_ref;
+  std::vector<uint32_t> empty_vector;
+  size_t num_methods = 100;
+  for (size_t i = 0; i < num_methods; ++i) {
+    hot_methods_cur.push_back(i);
+  }
+  for (size_t i = 0; i < num_methods; ++i) {
+    hot_methods_ref.push_back(i);
+  }
+  ProfileCompilationInfo info1;
+  SetupBasicProfile(dex1, hot_methods_cur, empty_vector, empty_vector,
+      profile, &info1);
+  ProfileCompilationInfo info2(/*for_boot_image=*/true);
+  SetupBasicProfile(dex1, hot_methods_ref, empty_vector, empty_vector,
+      reference_profile, &info2);
+
+  std::vector<const std::string> extra_args({"--force-merge", "--boot-image-merge"});
+
+  int return_code = ProcessProfiles(profile_fds, reference_profile_fd, extra_args);
+
+  ASSERT_EQ(return_code, ProfileAssistant::kSuccess);
+
+  // Verify the result: it should be equal to info2 since info1 is a regular profile
+  // and should be ignored.
+  ProfileCompilationInfo result;
+  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(result.Load(reference_profile.GetFd()));
+  ASSERT_TRUE(result.Equals(info2));
+}
+
+// Under default behaviour we should not advice compilation
+// and the reference profile should not be updated.
+// However we pass --force-merge to force aggregation and in this case
+// we should see an update.
+TEST_F(ProfileAssistantTest, ForceMerge) {
+  const uint16_t kNumberOfClassesInRefProfile = 6000;
+  const uint16_t kNumberOfClassesInCurProfile = 6110;  // Threshold is 2%.
+
+  ScratchFile profile;
+  ScratchFile reference_profile;
+
+  std::vector<int> profile_fds({ GetFd(profile)});
+  int reference_profile_fd = GetFd(reference_profile);
+
+  ProfileCompilationInfo info1;
+  SetupProfile(dex1, dex2, 0, kNumberOfClassesInRefProfile, profile,  &info1);
+  ProfileCompilationInfo info2;
+  SetupProfile(dex1, dex2, 0, kNumberOfClassesInCurProfile, reference_profile, &info2);
+
+  std::vector<const std::string> extra_args({"--force-merge"});
+  int return_code = ProcessProfiles(profile_fds, reference_profile_fd, extra_args);
+
+  ASSERT_EQ(return_code, ProfileAssistant::kSuccess);
+
+  // Check that the result is the aggregation.
+  ProfileCompilationInfo result;
+  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(result.Load(reference_profile.GetFd()));
+  ASSERT_TRUE(info1.MergeWith(info2));
+  ASSERT_TRUE(result.Equals(info1));
+}
 }  // namespace art
