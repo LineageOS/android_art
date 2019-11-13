@@ -470,8 +470,8 @@ class ReleaseChecker:
     return 'Release Checker'
 
   def run(self):
-    # Check the APEX manifest.
-    self._checker.check_file('apex_manifest.json')
+    # Check the Protocol Buffers APEX manifest.
+    self._checker.check_file('apex_manifest.pb')
 
     # Check binaries for ART.
     self._checker.check_executable('dex2oat')
@@ -562,6 +562,11 @@ class ReleaseTargetChecker:
     return 'Release (Target) Checker'
 
   def run(self):
+    # We don't check for the presence of the JSON APEX manifest (file
+    # `apex_manifest.json`, only present in target APEXes), as it is only
+    # included for compatibility reasons with Android Q and will likely be
+    # removed in Android R.
+
     # Check binaries for ART.
     self._checker.check_executable('oatdump')
 
