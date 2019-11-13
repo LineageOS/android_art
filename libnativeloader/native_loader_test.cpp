@@ -24,6 +24,7 @@
 #include <jni.h>
 
 #include "native_loader_namespace.h"
+#include "nativehelper/scoped_utf_chars.h"
 #include "nativeloader/dlext_namespaces.h"
 #include "nativeloader/native_loader.h"
 #include "public_libraries.h"
@@ -414,7 +415,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
         env()->NewStringUTF(permitted_path.c_str()));
 
     // no error
-    EXPECT_EQ(err, nullptr);
+    EXPECT_EQ(err, nullptr) << "Error is: " << std::string(ScopedUtfChars(env(), err).c_str());
 
     if (!IsBridged()) {
       struct android_namespace_t* ns =
@@ -444,6 +445,7 @@ TEST_P(NativeLoaderTest_Create, BundledSystemApp) {
   dex_path = "/system/app/foo/foo.apk";
   is_shared = true;
 
+  expected_namespace_name = "classloader-namespace-shared";
   expected_namespace_flags |= ANDROID_NAMESPACE_TYPE_SHARED;
   SetExpectations();
   RunTest();
@@ -453,6 +455,7 @@ TEST_P(NativeLoaderTest_Create, BundledVendorApp) {
   dex_path = "/vendor/app/foo/foo.apk";
   is_shared = true;
 
+  expected_namespace_name = "classloader-namespace-shared";
   expected_namespace_flags |= ANDROID_NAMESPACE_TYPE_SHARED;
   SetExpectations();
   RunTest();
@@ -476,6 +479,7 @@ TEST_P(NativeLoaderTest_Create, BundledProductApp_pre30) {
   dex_path = "/product/app/foo/foo.apk";
   is_shared = true;
 
+  expected_namespace_name = "classloader-namespace-shared";
   expected_namespace_flags |= ANDROID_NAMESPACE_TYPE_SHARED;
   SetExpectations();
   RunTest();
@@ -486,6 +490,7 @@ TEST_P(NativeLoaderTest_Create, BundledProductApp_post30) {
   is_shared = true;
   target_sdk_version = 30;
 
+  expected_namespace_name = "classloader-namespace-shared";
   expected_namespace_flags |= ANDROID_NAMESPACE_TYPE_SHARED;
   SetExpectations();
   RunTest();
@@ -568,7 +573,7 @@ TEST_P(NativeLoaderTest_Create, TwoApks) {
       env()->NewStringUTF(second_app_permitted_path.c_str()));
 
   // success
-  EXPECT_EQ(err, nullptr);
+  EXPECT_EQ(err, nullptr) << "Error is: " << std::string(ScopedUtfChars(env(), err).c_str());
 
   if (!IsBridged()) {
     struct android_namespace_t* ns =
