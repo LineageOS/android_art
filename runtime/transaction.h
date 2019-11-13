@@ -148,6 +148,10 @@ class Transaction final {
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  bool WriteValueConstraint(Thread* self, ObjPtr<mirror::Object> value)
+      REQUIRES(!log_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
  private:
   class ObjectLog : public ValueObject {
    public:
