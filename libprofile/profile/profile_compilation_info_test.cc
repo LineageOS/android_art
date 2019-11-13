@@ -1669,4 +1669,25 @@ TEST_F(ProfileCompilationInfoTest, FindMethodsWithAnnotationAndDifferentChecksum
   EXPECT_TRUE(info.GetMethodHotness(ref).IsInProfile());
   EXPECT_FALSE(info.GetMethodHotness(ref_checksum_missmatch).IsInProfile());
 }
+
+TEST_F(ProfileCompilationInfoTest, ClearDataAndAdjustVersionRegularToBoot) {
+  ProfileCompilationInfo info;
+
+  AddMethod(&info, dex1, /* method_idx= */ 0, Hotness::kFlagHot);
+
+  info.ClearDataAndAdjustVersion(/*for_boot_image=*/true);
+  ASSERT_TRUE(info.IsEmpty());
+  ASSERT_TRUE(info.IsForBootImage());
+}
+
+TEST_F(ProfileCompilationInfoTest, ClearDataAndAdjustVersionBootToRegular) {
+  ProfileCompilationInfo info(/*for_boot_image=*/true);
+
+  AddMethod(&info, dex1, /* method_idx= */ 0, Hotness::kFlagHot);
+
+  info.ClearDataAndAdjustVersion(/*for_boot_image=*/false);
+  ASSERT_TRUE(info.IsEmpty());
+  ASSERT_FALSE(info.IsForBootImage());
+}
+
 }  // namespace art
