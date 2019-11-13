@@ -28,11 +28,15 @@
 #include "nativeloader/native_loader.h"
 #include "public_libraries.h"
 
-using namespace ::testing;
-using namespace ::android::nativeloader::internal;
-
 namespace android {
 namespace nativeloader {
+
+using ::testing::Eq;
+using ::testing::Return;
+using ::testing::StrEq;
+using ::testing::_;
+using internal::ConfigEntry;
+using internal::ParseConfig;
 
 // gmock interface that represents interested platform APIs on libdl and libnativebridge
 class Platform {
@@ -96,7 +100,7 @@ class MockPlatform : public Platform {
     ON_CALL(*this, NativeBridgeIsSupported(_)).WillByDefault(Return(is_bridged_));
     ON_CALL(*this, NativeBridgeIsPathSupported(_)).WillByDefault(Return(is_bridged_));
     ON_CALL(*this, mock_get_exported_namespace(_, _))
-        .WillByDefault(Invoke([](bool, const char* name) -> mock_namespace_handle {
+        .WillByDefault(testing::Invoke([](bool, const char* name) -> mock_namespace_handle {
           if (namespaces.find(name) != namespaces.end()) {
             return namespaces[name];
           }
@@ -282,7 +286,7 @@ class NativeLoaderTest : public ::testing::TestWithParam<bool> {
   bool IsBridged() { return GetParam(); }
 
   void SetUp() override {
-    mock = std::make_unique<NiceMock<MockPlatform>>(IsBridged());
+    mock = std::make_unique<testing::NiceMock<MockPlatform>>(IsBridged());
 
     env = std::make_unique<JNIEnv>();
     env->functions = CreateJNINativeInterface();
@@ -355,8 +359,8 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
 
     ON_CALL(*mock, JniObject_getParent(StrEq(class_loader))).WillByDefault(Return(nullptr));
 
-    EXPECT_CALL(*mock, NativeBridgeIsPathSupported(_)).Times(AnyNumber());
-    EXPECT_CALL(*mock, NativeBridgeInitialized()).Times(AnyNumber());
+    EXPECT_CALL(*mock, NativeBridgeIsPathSupported(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(*mock, NativeBridgeInitialized()).Times(testing::AnyNumber());
 
     EXPECT_CALL(*mock, mock_create_namespace(
                            Eq(IsBridged()), StrEq(expected_namespace_name), nullptr,
