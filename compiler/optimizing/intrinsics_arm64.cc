@@ -3282,7 +3282,7 @@ void IntrinsicLocationsBuilderARM64::VisitFP16Ceil(HInvoke* invoke) {
 
 void IntrinsicCodeGeneratorARM64::VisitFP16Ceil(HInvoke* invoke) {
   MacroAssembler* masm = GetVIXLAssembler();
-  auto roundOp = [masm](const FPRegister& out, const FPRegister& in) {
+  auto roundOp = [masm](const VRegister& out, const VRegister& in) {
     __ Frintp(out, in);  // Round towards Plus infinity
   };
   GenerateFP16Round(invoke, codegen_, masm, roundOp);
@@ -3298,7 +3298,7 @@ void IntrinsicLocationsBuilderARM64::VisitFP16Rint(HInvoke* invoke) {
 
 void IntrinsicCodeGeneratorARM64::VisitFP16Rint(HInvoke* invoke) {
   MacroAssembler* masm = GetVIXLAssembler();
-  auto roundOp = [masm](const FPRegister& out, const FPRegister& in) {
+  auto roundOp = [masm](const VRegister& out, const VRegister& in) {
     __ Frintn(out, in);  // Round to nearest, with ties to even
   };
   GenerateFP16Round(invoke, codegen_, masm, roundOp);
