@@ -28,11 +28,21 @@
 #include "nativeloader/native_loader.h"
 #include "public_libraries.h"
 
-using namespace ::testing;
-using namespace ::android::nativeloader::internal;
-
 namespace android {
 namespace nativeloader {
+
+using ::testing::Eq;
+using ::testing::Return;
+using ::testing::StrEq;
+using ::testing::_;
+using internal::ConfigEntry;
+using internal::ParseConfig;
+
+#if defined(__LP64__)
+#define LIB_DIR "lib64"
+#else
+#define LIB_DIR "lib"
+#endif
 
 // gmock interface that represents interested platform APIs on libdl and libnativebridge
 class Platform {
@@ -96,7 +106,7 @@ class MockPlatform : public Platform {
     ON_CALL(*this, NativeBridgeIsSupported(_)).WillByDefault(Return(is_bridged_));
     ON_CALL(*this, NativeBridgeIsPathSupported(_)).WillByDefault(Return(is_bridged_));
     ON_CALL(*this, mock_get_exported_namespace(_, _))
-        .WillByDefault(Invoke([](bool, const char* name) -> mock_namespace_handle {
+        .WillByDefault(testing::Invoke([](bool, const char* name) -> mock_namespace_handle {
           if (namespaces.find(name) != namespaces.end()) {
             return namespaces[name];
           }
@@ -282,7 +292,7 @@ class NativeLoaderTest : public ::testing::TestWithParam<bool> {
   bool IsBridged() { return GetParam(); }
 
   void SetUp() override {
-    mock = std::make_unique<NiceMock<MockPlatform>>(IsBridged());
+    mock = std::make_unique<testing::NiceMock<MockPlatform>>(IsBridged());
 
     env = std::make_unique<JNIEnv>();
     env->functions = CreateJNINativeInterface();
@@ -327,8 +337,8 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   std::string class_loader = "my_classloader";
   bool is_shared = false;
   std::string dex_path = "/data/app/foo/classes.dex";
-  std::string library_path = "/data/app/foo/lib/arm";
-  std::string permitted_path = "/data/app/foo/lib";
+  std::string library_path = "/data/app/foo/" LIB_DIR "/arm";
+  std::string permitted_path = "/data/app/foo/" LIB_DIR;
 
   // expected output (.. for the default test inputs)
   std::string expected_namespace_name = "classloader-namespace";
@@ -355,8 +365,8 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
 
     ON_CALL(*mock, JniObject_getParent(StrEq(class_loader))).WillByDefault(Return(nullptr));
 
-    EXPECT_CALL(*mock, NativeBridgeIsPathSupported(_)).Times(AnyNumber());
-    EXPECT_CALL(*mock, NativeBridgeInitialized()).Times(AnyNumber());
+    EXPECT_CALL(*mock, NativeBridgeIsPathSupported(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(*mock, NativeBridgeInitialized()).Times(testing::AnyNumber());
 
     EXPECT_CALL(*mock, mock_create_namespace(
                            Eq(IsBridged()), StrEq(expected_namespace_name), nullptr,
@@ -453,8 +463,8 @@ TEST_P(NativeLoaderTest_Create, UnbundledVendorApp) {
   is_shared = false;
 
   expected_namespace_name = "vendor-classloader-namespace";
-  expected_library_path = expected_library_path + ":/vendor/lib";
-  expected_permitted_path = expected_permitted_path + ":/vendor/lib";
+  expected_library_path = expected_library_path + ":/vendor/" LIB_DIR;
+  expected_permitted_path = expected_permitted_path + ":/vendor/" LIB_DIR;
   expected_shared_libs_to_platform_ns =
       expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
   expected_link_with_vndk_ns = true;
@@ -494,8 +504,9 @@ TEST_P(NativeLoaderTest_Create, UnbundledProductApp_post30) {
   target_sdk_version = 30;
 
   expected_namespace_name = "vendor-classloader-namespace";
-  expected_library_path = expected_library_path + ":/product/lib:/system/product/lib";
-  expected_permitted_path = expected_permitted_path + ":/product/lib:/system/product/lib";
+  expected_library_path = expected_library_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
+  expected_permitted_path =
+      expected_permitted_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
   expected_shared_libs_to_platform_ns =
       expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
   expected_link_with_vndk_ns = true;
@@ -525,8 +536,8 @@ TEST_P(NativeLoaderTest_Create, TwoApks) {
   const std::string second_app_class_loader = "second_app_classloader";
   const bool second_app_is_shared = false;
   const std::string second_app_dex_path = "/data/app/bar/classes.dex";
-  const std::string second_app_library_path = "/data/app/bar/lib/arm";
-  const std::string second_app_permitted_path = "/data/app/bar/lib";
+  const std::string second_app_library_path = "/data/app/bar/" LIB_DIR "/arm";
+  const std::string second_app_permitted_path = "/data/app/bar/" LIB_DIR;
   const std::string expected_second_app_permitted_path =
       std::string("/data:/mnt/expand:") + second_app_permitted_path;
   const std::string expected_second_app_parent_namespace = "classloader-namespace";
