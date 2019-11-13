@@ -159,6 +159,10 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("      the file passed with --profile-fd(file) to the profile passed with");
   UsageError("      --reference-profile-fd(file) and update at the same time the profile-key");
   UsageError("      of entries corresponding to the apks passed with --apk(-fd).");
+  UsageError("  --boot-image-merge: indicates that this merge is for a boot image profile.");
+  UsageError("      In this case, the reference profile must have a boot profile version.");
+  UsageError("  --force-merge: performs a forced merge, without analyzing if there is a");
+  UsageError("      significant difference between the current profile and the reference profile.");
   UsageError("");
 
   exit(EXIT_FAILURE);
@@ -230,7 +234,8 @@ class ProfMan final {
       test_profile_class_percentage_(kDefaultTestProfileClassPercentage),
       test_profile_seed_(NanoTime()),
       start_ns_(NanoTime()),
-      copy_and_update_profile_key_(false) {}
+      copy_and_update_profile_key_(false),
+      profile_assistant_options_(ProfileAssistant::Options()) {}
 
   ~ProfMan() {
     LogCompletionTime();
@@ -314,6 +319,10 @@ class ProfMan final {
         ParseUintOption(raw_option, "--generate-test-profile-seed=", &test_profile_seed_);
       } else if (option == "--copy-and-update-profile-key") {
         copy_and_update_profile_key_ = true;
+      } else if (option == "--boot-image-merge") {
+        profile_assistant_options_.SetBootImageMerge(true);
+      } else if (option == "--force-merge") {
+        profile_assistant_options_.SetForceMerge(true);
       } else {
         Usage("Unknown argument '%s'", raw_option);
       }
@@ -390,12 +399,14 @@ class ProfMan final {
       File file(reference_profile_file_fd_, false);
       result = ProfileAssistant::ProcessProfiles(profile_files_fd_,
                                                  reference_profile_file_fd_,
-                                                 filter_fn);
+                                                 filter_fn,
+                                                 profile_assistant_options_);
       CloseAllFds(profile_files_fd_, "profile_files_fd_");
     } else {
       result = ProfileAssistant::ProcessProfiles(profile_files_,
                                                  reference_profile_file_,
-                                                 filter_fn);
+                                                 filter_fn,
+                                                 profile_assistant_options_);
     }
     return result;
   }
@@ -1409,6 +1420,7 @@ class ProfMan final {
   uint32_t test_profile_seed_;
   uint64_t start_ns_;
   bool copy_and_update_profile_key_;
+  ProfileAssistant::Options profile_assistant_options_;
 };
 
 // See ProfileAssistant::ProcessingResult for return codes.
