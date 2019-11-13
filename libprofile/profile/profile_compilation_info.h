@@ -482,6 +482,9 @@ class ProfileCompilationInfo {
   // package name)
   static std::string GetProfileDexFileBaseKey(const std::string& dex_location);
 
+  // Returns a base key without the annotation information.
+  static std::string GetBaseKeyFromAugmentedKey(const std::string& profile_key);
+
   // Generate a test profile which will contain a percentage of the total maximum
   // number of methods and classes (method_ratio and class_ratio).
   static bool GenerateTestProfile(int fd,
@@ -892,9 +895,6 @@ class ProfileCompilationInfo {
   // added to the key and this method is equivalent to GetProfileDexFileBaseKey.
   static std::string GetProfileDexFileAugmentedKey(const std::string& dex_location,
                                                    const ProfileSampleAnnotation& annotation);
-
-  // Returns a base key without the annotation information.
-  static std::string GetBaseKeyFromAugmentedKey(const std::string& profile_key);
 
   // Migrates the annotation from an augmented key to a base key.
   static std::string MigrateAnnotationInfo(const std::string& base_key,

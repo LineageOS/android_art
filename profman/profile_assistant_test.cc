@@ -66,9 +66,12 @@ class ProfileAssistantTest : public CommonRuntimeTest {
   bool AddMethod(ProfileCompilationInfo* info,
                  const DexFile* dex,
                  uint16_t method_idx,
-                 Hotness::Flag flags) {
+                 Hotness::Flag flags,
+                 const ProfileCompilationInfo::ProfileSampleAnnotation& annotation
+                    = ProfileCompilationInfo::ProfileSampleAnnotation::kNone) {
     return info->AddMethod(ProfileMethodInfo(MethodReference(dex, method_idx)),
-                           flags);
+                           flags,
+                           annotation);
   }
 
   bool AddClass(ProfileCompilationInfo* info,
@@ -1354,5 +1357,51 @@ TEST_F(ProfileAssistantTest, ForceMerge) {
   ASSERT_TRUE(result.Load(reference_profile.GetFd()));
   ASSERT_TRUE(info1.MergeWith(info2));
   ASSERT_TRUE(result.Equals(info1));
+}
+
+// Test that we consider the annations when we merge boot image profiles.
+TEST_F(ProfileAssistantTest, BootImageMergeWithAnnotations) {
+  ScratchFile profile;
+  ScratchFile reference_profile;
+
+  std::vector<int> profile_fds({GetFd(profile)});
+  int reference_profile_fd = GetFd(reference_profile);
+
+  // Use a real dex file to generate profile test data so that we can pass descriptors to profman.
+  std::vector<std::unique_ptr<const DexFile>> dex_files = OpenTestDexFiles("ProfileTestMultiDex");
+  const DexFile& d1 = *dex_files[0];
+  const DexFile& d2 = *dex_files[1];
+  // The new profile info will contain the methods with indices 0-100.
+  ProfileCompilationInfo info(/*for_boot_image*/ true);
+  ProfileCompilationInfo::ProfileSampleAnnotation psa1("package1");
+  ProfileCompilationInfo::ProfileSampleAnnotation psa2("package2");
+
+  AddMethod(&info, &d1, 0, Hotness::kFlagHot, psa1);
+  AddMethod(&info, &d2, 0, Hotness::kFlagHot, psa2);
+  info.Save(profile.GetFd());
+  profile.GetFile()->ResetOffset();
+
+  // Run profman and pass the dex file with --apk-fd.
+  android::base::unique_fd apk_fd(
+      open(GetTestDexFileName("ProfileTestMultiDex").c_str(), O_RDONLY));  // NOLINT
+  ASSERT_GE(apk_fd.get(), 0);
+
+  std::string profman_cmd = GetProfmanCmd();
+  std::vector<std::string> argv_str;
+  argv_str.push_back(profman_cmd);
+  argv_str.push_back("--profile-file-fd=" + std::to_string(profile.GetFd()));
+  argv_str.push_back("--reference-profile-file-fd=" + std::to_string(reference_profile.GetFd()));
+  argv_str.push_back("--apk-fd=" + std::to_string(apk_fd.get()));
+  argv_str.push_back("--force-merge");
+  argv_str.push_back("--boot-image-merge");
+  std::string error;
+
+  EXPECT_EQ(ExecAndReturnCode(argv_str, &error), ProfileAssistant::kSuccess) << error;
+
+  // Verify that we can load the result and that it equals to what we saved.
+  ProfileCompilationInfo result;
+  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(result.Load(reference_profile_fd));
+  ASSERT_TRUE(info.Equals(result));
 }
 }  // namespace art
