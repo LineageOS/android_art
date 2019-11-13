@@ -1087,24 +1087,26 @@ def art_apex_test_main(test_args):
     logging.error("Need debugfs.")
     return 1
 
-  if test_args.flavor == FLAVOR_AUTO:
-    logging.warning('--flavor=auto, trying to autodetect. This may be incorrect!')
-    for flavor in [ FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING ]:
-      flavor_pattern = '*.%s*' % flavor
-      if fnmatch.fnmatch(test_args.apex, flavor_pattern):
-        test_args.flavor = flavor
-        break
-    if test_args.flavor == FLAVOR_AUTO:
-      logging.error('  Could not detect APEX flavor, neither \'%s\', \'%s\' nor \'%s\' in \'%s\'',
-                  FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING, test_args.apex)
+  if test_args.host:
+    # Host APEX.
+    if test_args.flavor not in [FLAVOR_DEBUG, FLAVOR_AUTO]:
+      logging.error("Using option --host with non-Debug APEX")
       return 1
-
-  if test_args.host and test_args.flavor == FLAVOR_RELEASE:
-    logging.error("Using option --host with Release APEX")
-    return 1
-  if test_args.host and test_args.flavor == FLAVOR_TESTING:
-    logging.error("Using option --host with Testing APEX")
-    return 1
+    # Host APEX is always a debug flavor (for now).
+    test_args.flavor = FLAVOR_DEBUG
+  else:
+    # Device APEX.
+    if test_args.flavor == FLAVOR_AUTO:
+      logging.warning('--flavor=auto, trying to autodetect. This may be incorrect!')
+      for flavor in [ FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING ]:
+        flavor_pattern = '*.%s*' % flavor
+        if fnmatch.fnmatch(test_args.apex, flavor_pattern):
+          test_args.flavor = flavor
+          break
+      if test_args.flavor == FLAVOR_AUTO:
+        logging.error('  Could not detect APEX flavor, neither \'%s\', \'%s\' nor \'%s\' in \'%s\'',
+                    FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING, test_args.apex)
+        return 1
 
   try:
     if test_args.host:
