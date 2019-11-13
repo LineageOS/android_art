@@ -380,14 +380,15 @@ class ProfMan final {
     // Build the profile filter function. If the set of keys is empty it means we
     // don't have any apks; as such we do not filter anything.
     const ProfileCompilationInfo::ProfileLoadFilterFn& filter_fn =
-        [profile_filter_keys](const std::string& dex_location, uint32_t checksum) {
+        [profile_filter_keys](const std::string& profile_key, uint32_t checksum) {
             if (profile_filter_keys.empty()) {
               // No --apk was specified. Accept all dex files.
               return true;
             } else {
-              bool res = profile_filter_keys.find(
-                  ProfileFilterKey(dex_location, checksum)) != profile_filter_keys.end();
-              return res;
+              // Remove any annotations from the profile key before comparing with the keys we get from apks.
+              std::string base_key = ProfileCompilationInfo::GetBaseKeyFromAugmentedKey(profile_key);
+              return profile_filter_keys.find(ProfileFilterKey(base_key, checksum)) !=
+                  profile_filter_keys.end();
             }
         };
 
