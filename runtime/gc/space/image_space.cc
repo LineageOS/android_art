@@ -3378,6 +3378,7 @@ bool ImageSpace::VerifyBootClassPathChecksums(std::string_view oat_checksums,
                                   std::string(oat_checksums).c_str());
         return false;
       }
+      oat_checksums.remove_prefix(1u);
     }
   }
   if (!oat_checksums.empty()) {
