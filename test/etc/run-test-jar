@@ -954,10 +954,10 @@ if [ "$HOST" = "n" ]; then
 fi
 
 # The build servers have an ancient version of bash so we cannot use @Q.
-if [ "$INVOKE_WITH" == "" ] && [ "$GDB" == "" ]; then
-  QUOTED_DALVIKVM_BOOT_OPT="$DALVIKVM_BOOT_OPT"
+if [ "$USE_GDBSERVER" == "y" ]; then
+  printf -v QUOTED_DALVIKVM_BOOT_OPT "%q" "$DALVIKVM_BOOT_OPT"
 else
-  printf -v QUOTED_DALVIKVM_BOOT_OPT '%q' "$DALVIKVM_BOOT_OPT"
+  QUOTED_DALVIKVM_BOOT_OPT="$DALVIKVM_BOOT_OPT"
 fi
 
 # We set DumpNativeStackOnSigQuit to false to avoid stressing libunwind.
