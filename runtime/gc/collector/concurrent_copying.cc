@@ -1016,6 +1016,9 @@ class ConcurrentCopying::CaptureThreadRootsForMarkingAndCheckpoint :
     // only.
     CaptureRootsForMarkingVisitor</*kAtomicTestAndSet*/ true> visitor(concurrent_copying_, self);
     thread->VisitRoots(&visitor, kVisitRootFlagAllRoots);
+    // If thread_running_gc_ performed the root visit then its thread-local
+    // mark-stack should be null as we directly push to gc_mark_stack_.
+    CHECK(self == thread || self->GetThreadLocalMarkStack() == nullptr);
     // Barrier handling is done in the base class' Run() below.
     RevokeThreadLocalMarkStackCheckpoint::Run(thread);
   }
@@ -1242,6 +1245,15 @@ void ConcurrentCopying::ProcessMarkStackForMarkingAndComputeLiveBytes() {
                                    REQUIRES_SHARED(Locks::mutator_lock_) {
                                  AddLiveBytesAndScanRef(ref);
                                });
+  {
+    MutexLock mu(thread_running_gc_, mark_stack_lock_);
+    CHECK(revoked_mark_stacks_.empty());
+    CHECK(thread_mark_stack_map_.empty()) << " size:"
+                                          << thread_mark_stack_map_.size()
+                                          << " pooled_mark_stacks size:"
+                                          << pooled_mark_stacks_.size();
+    CHECK_EQ(pooled_mark_stacks_.size(), kMarkStackPoolSize);
+  }
 
   while (!gc_mark_stack_->IsEmpty()) {
     mirror::Object* ref = gc_mark_stack_->PopBack();
@@ -1336,6 +1348,7 @@ void ConcurrentCopying::MarkingPhase() {
   }
   accounting::CardTable* const card_table = heap_->GetCardTable();
   Thread* const self = Thread::Current();
+  CHECK_EQ(self, thread_running_gc_);
   // Clear live_bytes_ of every non-free region, except the ones that are newly
   // allocated.
   region_space_->SetAllRegionLiveBytesZero();
