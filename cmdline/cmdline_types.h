@@ -405,6 +405,39 @@ struct CmdlineType<ParseStringList<Separator>> : CmdlineTypeParser<ParseStringLi
   static const char* Name() { return "ParseStringList<Separator>"; }
 };
 
+template <>
+struct CmdlineType<std::vector<int32_t>> : CmdlineTypeParser<std::vector<int32_t>> {
+  using Result = CmdlineParseResult<std::vector<int32_t>>;
+
+  Result Parse(const std::string& args) {
+    std::vector<int32_t> list;
+    const char* pos = args.c_str();
+    errno = 0;
+
+    while (true) {
+      char* end = nullptr;
+      int64_t value = strtol(pos, &end, 10);
+      if (pos == end ||  errno == EINVAL) {
+        return Result::Failure("Failed to parse integer from " + args);
+      } else if ((errno == ERANGE) ||  // NOLINT [runtime/int] [4]
+                 value < std::numeric_limits<int32_t>::min() ||
+                 value > std::numeric_limits<int32_t>::max()) {
+        return Result::OutOfRange("Failed to parse integer from " + args + "; out of range");
+      }
+      list.push_back(static_cast<int32_t>(value));
+      if (*end == '\0') {
+        break;
+      } else if (*end != ',') {
+        return Result::Failure(std::string("Unexpected character: ") + *end);
+      }
+      pos = end + 1;
+    }
+    return Result::Success(std::move(list));
+  }
+
+  static const char* Name() { return "std::vector<int32_t>"; }
+};
+
 static gc::CollectorType ParseCollectorType(const std::string& option) {
   if (option == "MS" || option == "nonconcurrent") {
     return gc::kCollectorTypeMS;
