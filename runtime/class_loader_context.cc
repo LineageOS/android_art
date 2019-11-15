@@ -33,6 +33,7 @@
 #include "handle_scope-inl.h"
 #include "jni/jni_internal.h"
 #include "mirror/class_loader-inl.h"
+#include "mirror/object.h"
 #include "mirror/object_array-alloc-inl.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "oat_file_assistant.h"
@@ -940,8 +941,7 @@ static bool CollectDexFilesFromSupportedClassLoader(ScopedObjectAccessAlreadyRun
     StackHandleScope<1> hs(soa.Self());
     Handle<mirror::ObjectArray<mirror::Object>> dex_elements(
         hs.NewHandle(dex_elements_obj->AsObjectArray<mirror::Object>()));
-    for (int32_t i = 0; i < dex_elements->GetLength(); ++i) {
-      ObjPtr<mirror::Object> element = dex_elements->GetWithoutChecks(i);
+    for (auto element : dex_elements.Iterate<mirror::Object>()) {
       if (element == nullptr) {
         // Should never happen, log an error and break.
         // TODO(calin): It's unclear if we should just assert here.
@@ -975,8 +975,7 @@ static bool GetDexFilesFromDexElementsArray(
   const ObjPtr<mirror::Class> dexfile_class = soa.Decode<mirror::Class>(
       WellKnownClasses::dalvik_system_DexFile);
 
-  for (int32_t i = 0; i < dex_elements->GetLength(); ++i) {
-    ObjPtr<mirror::Object> element = dex_elements->GetWithoutChecks(i);
+  for (auto element : dex_elements.Iterate<mirror::Object>()) {
     // We can hit a null element here because this is invoked with a partially filled dex_elements
     // array from DexPathList. DexPathList will open each dex sequentially, each time passing the
     // list of dex files which were opened before.
@@ -1086,8 +1085,8 @@ bool ClassLoaderContext::CreateInfoFromClassLoader(
     Handle<mirror::ObjectArray<mirror::ClassLoader>> shared_libraries =
         hs.NewHandle(raw_shared_libraries->AsObjectArray<mirror::ClassLoader>());
     MutableHandle<mirror::ClassLoader> temp_loader = hs.NewHandle<mirror::ClassLoader>(nullptr);
-    for (int32_t i = 0; i < shared_libraries->GetLength(); ++i) {
-      temp_loader.Assign(shared_libraries->Get(i));
+    for (auto library : shared_libraries.Iterate<mirror::ClassLoader>()) {
+      temp_loader.Assign(library);
       if (!CreateInfoFromClassLoader(
               soa, temp_loader, null_dex_elements, info, /*is_shared_library=*/ true)) {
         return false;

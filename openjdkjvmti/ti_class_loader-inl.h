@@ -57,10 +57,8 @@ inline void ClassLoaderHelper::VisitDexFileObjects(art::Thread* self,
     return;
   }
 
-  size_t num_elements = dex_elements_list->GetLength();
   // Iterate over the DexPathList$Element to find the right one
-  for (size_t i = 0; i < num_elements; i++) {
-    art::ObjPtr<art::mirror::Object> current_element = dex_elements_list->Get(i);
+  for (auto current_element : dex_elements_list.Iterate<art::mirror::Object>()) {
     CHECK(!current_element.IsNull());
     art::ObjPtr<art::mirror::Object> dex_file(element_dex_file_field->GetObject(current_element));
     if (!dex_file.IsNull()) {
