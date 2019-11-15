@@ -705,7 +705,11 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
     return true;
   }
 
-  // Add inline caches.
+  // Add inline caches. Do this only for regular profiles. The boot image profiles don't use
+  // them and they take up useless space.
+  if (IsForBootImage()) {
+    return true;  // early success return.
+  }
   InlineCacheMap* inline_cache = data->FindOrAddHotMethod(pmi.ref.index);
   DCHECK(inline_cache != nullptr);
 
@@ -2056,17 +2060,16 @@ static_assert(ProfileCompilationInfo::MethodHotness::kFlagHot == 1 << 0);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartup == 1 << 1);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagPostStartup == 1 << 2);
 static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastRegular == 1 << 2);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagAmStartup == 1 << 3);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagAmPostStartup == 1 << 4);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagBoot == 1 << 5);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagPostBoot == 1 << 6);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagForeground == 1 << 7);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagBackground == 1 << 8);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlag32bit == 1 << 9);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlag64bit == 1 << 10);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupBin == 1 << 11);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupMaxBin == 1 << 18);
-static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastBoot == 1 << 18);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlag32bit == 1 << 3);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlag64bit == 1 << 4);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagSensitiveThread == 1 << 5);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagAmStartup == 1 << 6);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagAmPostStartup == 1 << 7);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagBoot == 1 << 8);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagPostBoot == 1 << 9);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupBin == 1 << 10);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagStartupMaxBin == 1 << 15);
+static_assert(ProfileCompilationInfo::MethodHotness::kFlagLastBoot == 1 << 15);
 
 size_t ProfileCompilationInfo::DexFileData::MethodFlagBitmapIndex(
       MethodHotness::Flag flag, size_t method_index) const {
