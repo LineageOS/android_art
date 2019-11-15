@@ -1158,8 +1158,8 @@ bool ImageWriter::KeepClass(ObjPtr<mirror::Class> klass) {
   if (!compiler_options_.IsImageClass(klass->GetDescriptor(&temp))) {
     return false;
   }
-  if (compiler_options_.IsAppImage() || compiler_options_.IsBootImageExtension()) {
-    // For app images and boot image extensions, we need to prune classes that
+  if (compiler_options_.IsAppImage()) {
+    // For app images, we need to prune classes that
     // are defined by the boot class path we're compiling against but not in
     // the boot image spaces since these may have already been loaded at
     // run time when this image is loaded. Keep classes in the boot image
@@ -1872,7 +1872,7 @@ class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
         class_def_index = enum_cast<uint32_t>(component_type->GetPrimitiveType());
       } else {
         auto it = std::find(dex_files_.begin(), dex_files_.end(), &component_type->GetDexFile());
-        DCHECK(it != dex_files_.end());
+        DCHECK(it != dex_files_.end()) << klass->PrettyDescriptor();
         dex_file_index = std::distance(dex_files_.begin(), it) + 1u;  // 0 is for primitive types.
         class_def_index = component_type->GetDexClassDefIndex();
       }
