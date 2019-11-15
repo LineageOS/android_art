@@ -50,7 +50,7 @@ if [[ "x${BCPL}" == "x" ]]; then
   exit 1
 fi
 
-MANIFEST=/apex_manifest.json
+MANIFEST=/apex_manifest.pb
 ART_APEX=/apex/com.android.art
 ART_APEX_SELECTED=
 for m in `ls -1 -d ${ANDROID_PRODUCT_OUT}{,/system}${ART_APEX}*${MANIFEST} 2>/dev/null`; do
