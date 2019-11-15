@@ -206,32 +206,31 @@ class ProfileCompilationInfo {
       kFlagPostStartup = 1 << 2,
       // Marker flag used to simplify iterations.
       kFlagLastRegular = 1 << 2,
-      // Executed during the app startup as determined by the framework (equivalent to am start).
-      kFlagAmStartup = 1 << 3,
-      // Executed after the app startup as determined by the framework (equivalent to am start).
-      kFlagAmPostStartup = 1 << 4,
-      // Executed during system boot.
-      kFlagBoot = 1 << 5,
-      // Executed after the system has booted.
-      kFlagPostBoot = 1 << 6,
-      // Executed while the app is in foreground.
-      kFlagForeground = 1 << 7,
-      // Executed while the app is in background.
-      kFlagBackground = 1 << 8,
       // Executed by a 32bit process.
-      kFlag32bit = 1 << 9,
+      kFlag32bit = 1 << 3,
       // Executed by a 64bit process.
-      kFlag64bit = 1 << 10,
-      // The startup bins captured the relative order of when a method become hot. There are 8
+      kFlag64bit = 1 << 4,
+      // Executed on sensitive thread (e.g. UI).
+      kFlagSensitiveThread = 1 << 5,
+      // Executed during the app startup as determined by the framework (equivalent to am start).
+      kFlagAmStartup = 1 << 6,
+      // Executed after the app startup as determined by the framework (equivalent to am start).
+      kFlagAmPostStartup = 1 << 7,
+      // Executed during system boot.
+      kFlagBoot = 1 << 8,
+      // Executed after the system has booted.
+      kFlagPostBoot = 1 << 9,
+
+      // The startup bins captured the relative order of when a method become hot. There are 6
       // total bins supported and each hot method will have at least one bit set. If the profile was
       // merged multiple times more than one bit may be set as a given method may become hot at
       // various times during subsequent executions.
       // The granularity of the bins is unspecified (i.e. the runtime is free to change the
       // values it uses - this may be 100ms, 200ms etc...).
-      kFlagStartupBin = 1 << 11,
-      kFlagStartupMaxBin = 1 << 18,
+      kFlagStartupBin = 1 << 10,
+      kFlagStartupMaxBin = 1 << 15,
       // Marker flag used to simplify iterations.
-      kFlagLastBoot = 1 << 18,
+      kFlagLastBoot = 1 << 15,
     };
 
     bool IsHot() const {
