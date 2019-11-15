@@ -47,15 +47,28 @@ bool AotClassLinker::InitializeClass(Thread* self,
                                      bool can_init_statics,
                                      bool can_init_parents) {
   Runtime* const runtime = Runtime::Current();
-  bool strict_mode_ = runtime->IsActiveStrictTransactionMode();
+  bool strict_mode = runtime->IsActiveStrictTransactionMode();
 
   DCHECK(klass != nullptr);
   if (klass->IsInitialized() || klass->IsInitializing()) {
     return ClassLinker::InitializeClass(self, klass, can_init_statics, can_init_parents);
   }
 
+  // When compiling a boot image extension, do not initialize a class defined
+  // in a dex file belonging to the boot image we're compiling against.
+  // However, we must allow the initialization of TransactionAbortError,
+  // VerifyError, etc. outside of a transaction.
+  if (!strict_mode && runtime->GetHeap()->ObjectIsInBootImageSpace(klass->GetDexCache())) {
+    if (runtime->IsActiveTransaction()) {
+      runtime->AbortTransactionAndThrowAbortError(self, "Can't initialize " + klass->PrettyTypeOf()
+           + " because it is defined in a boot image dex file.");
+      return false;
+    }
+    CHECK(klass->IsThrowableClass()) << klass->PrettyDescriptor();
+  }
+
   // When in strict_mode, don't initialize a class if it belongs to boot but not initialized.
-  if (strict_mode_ && klass->IsBootStrapClassLoaded()) {
+  if (strict_mode && klass->IsBootStrapClassLoaded()) {
     runtime->AbortTransactionAndThrowAbortError(self, "Can't resolve "
         + klass->PrettyTypeOf() + " because it is an uninitialized boot class.");
     return false;
@@ -63,7 +76,7 @@ bool AotClassLinker::InitializeClass(Thread* self,
 
   // Don't initialize klass if it's superclass is not initialized, because superclass might abort
   // the transaction and rolled back after klass's change is commited.
-  if (strict_mode_ && !klass->IsInterface() && klass->HasSuperClass()) {
+  if (strict_mode && !klass->IsInterface() && klass->HasSuperClass()) {
     if (klass->GetSuperClass()->GetStatus() == ClassStatus::kInitializing) {
       runtime->AbortTransactionAndThrowAbortError(self, "Can't resolve "
           + klass->PrettyTypeOf() + " because it's superclass is not initialized.");
@@ -71,12 +84,12 @@ bool AotClassLinker::InitializeClass(Thread* self,
     }
   }
 
-  if (strict_mode_) {
+  if (strict_mode) {
     runtime->EnterTransactionMode(/*strict=*/ true, klass.Get());
   }
   bool success = ClassLinker::InitializeClass(self, klass, can_init_statics, can_init_parents);
 
-  if (strict_mode_) {
+  if (strict_mode) {
     if (success) {
       // Exit Transaction if success.
       runtime->ExitTransactionMode();
