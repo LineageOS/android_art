@@ -34,6 +34,8 @@ namespace art {
 using Hotness = ProfileCompilationInfo::MethodHotness;
 using ProfileInlineCache = ProfileMethodInfo::ProfileInlineCache;
 using ProfileSampleAnnotation = ProfileCompilationInfo::ProfileSampleAnnotation;
+using ProfileIndexType = ProfileCompilationInfo::ProfileIndexType;
+using ProfileIndexTypeRegular = ProfileCompilationInfo::ProfileIndexTypeRegular;
 
 static constexpr size_t kMaxMethodIds = 65535;
 static uint32_t kMaxHotnessFlagBootIndex =
@@ -689,18 +691,33 @@ TEST_F(ProfileCompilationInfoTest, MergeInlineCacheTriggerReindex) {
   }
 }
 
-TEST_F(ProfileCompilationInfoTest, AddMoreDexFileThanLimit) {
+TEST_F(ProfileCompilationInfoTest, AddMoreDexFileThanLimitRegular) {
   FakeDexStorage local_storage;
   ProfileCompilationInfo info;
   // Save a few methods.
-  for (uint16_t i = 0; i < std::numeric_limits<uint8_t>::max(); i++) {
+  for (uint16_t i = 0; i < std::numeric_limits<ProfileIndexTypeRegular>::max(); i++) {
     std::string location = std::to_string(i);
     const DexFile* dex = local_storage.AddFakeDex(
         location, /* checksum= */ 1, /* num_method_ids= */ 1);
     ASSERT_TRUE(AddMethod(&info, dex, /* method_idx= */ 0));
   }
-  // We only support at most 255 dex files.
-  const DexFile* dex = local_storage.AddFakeDex("256", /* checksum= */ 1, /* num_method_ids= */ 1);
+  // Add an extra dex file.
+  const DexFile* dex = local_storage.AddFakeDex("-1", /* checksum= */ 1, /* num_method_ids= */ 1);
+  ASSERT_FALSE(AddMethod(&info, dex, /* method_idx= */ 0));
+}
+
+TEST_F(ProfileCompilationInfoTest, AddMoreDexFileThanLimitBoot) {
+  FakeDexStorage local_storage;
+  ProfileCompilationInfo info(/*for_boot_image=*/true);
+  // Save a few methods.
+  for (uint16_t i = 0; i < std::numeric_limits<ProfileIndexType>::max(); i++) {
+    std::string location = std::to_string(i);
+    const DexFile* dex = local_storage.AddFakeDex(
+        location, /* checksum= */ 1, /* num_method_ids= */ 1);
+    ASSERT_TRUE(AddMethod(&info, dex, /* method_idx= */ 0));
+  }
+  // Add an extra dex file.
+  const DexFile* dex = local_storage.AddFakeDex("-1", /* checksum= */ 1, /* num_method_ids= */ 1);
   ASSERT_FALSE(AddMethod(&info, dex, /* method_idx= */ 0));
 }
 

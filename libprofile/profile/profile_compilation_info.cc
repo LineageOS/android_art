@@ -97,8 +97,8 @@ static_assert(ProfileCompilationInfo::kIndividualInlineCacheSize < kIsMissingTyp
 static constexpr uint32_t kSizeWarningThresholdBytes = 500000U;
 static constexpr uint32_t kSizeErrorThresholdBytes = 1500000U;
 
-static constexpr uint32_t kSizeWarningThresholdBootBytes = 3000000U;
-static constexpr uint32_t kSizeErrorThresholdBootBytes = 6000000U;
+static constexpr uint32_t kSizeWarningThresholdBootBytes = 25000000U;
+static constexpr uint32_t kSizeErrorThresholdBootBytes = 50000000U;
 
 static bool ChecksumMatch(uint32_t dex_file_checksum, uint32_t checksum) {
   return kDebugIgnoreChecksum || dex_file_checksum == checksum;
@@ -391,8 +391,9 @@ bool ProfileCompilationInfo::Save(int fd) {
   if (!WriteBuffer(fd, version_, sizeof(version_))) {
     return false;
   }
-  DCHECK_LE(info_.size(), std::numeric_limits<uint8_t>::max());
-  AddUintToBuffer(&buffer, static_cast<uint8_t>(info_.size()));
+
+  DCHECK_LE(info_.size(), MaxProfileIndex());
+  WriteProfileIndex(&buffer, static_cast<ProfileIndexType>(info_.size()));
 
   uint32_t required_capacity = 0;
   for (const DexFileData* dex_data_ptr : info_) {
@@ -543,7 +544,7 @@ void ProfileCompilationInfo::AddInlineCacheToBuffer(std::vector<uint8_t>* buffer
     DCHECK_LT(classes.size(), ProfileCompilationInfo::kIndividualInlineCacheSize);
     DCHECK_NE(classes.size(), 0u) << "InlineCache contains a dex_pc with 0 classes";
 
-    SafeMap<uint8_t, std::vector<dex::TypeIndex>> dex_to_classes_map;
+    SafeMap<ProfileIndexType, std::vector<dex::TypeIndex>> dex_to_classes_map;
     // Group the classes by dex. We expect that most of the classes will come from
     // the same dex, so this will be more efficient than encoding the dex index
     // for each class reference.
@@ -551,10 +552,10 @@ void ProfileCompilationInfo::AddInlineCacheToBuffer(std::vector<uint8_t>* buffer
     // Add the dex map size.
     AddUintToBuffer(buffer, static_cast<uint8_t>(dex_to_classes_map.size()));
     for (const auto& dex_it : dex_to_classes_map) {
-      uint8_t dex_profile_index = dex_it.first;
+      ProfileIndexType dex_profile_index = dex_it.first;
       const std::vector<dex::TypeIndex>& dex_classes = dex_it.second;
       // Add the dex profile index.
-      AddUintToBuffer(buffer, dex_profile_index);
+      WriteProfileIndex(buffer, dex_profile_index);
       // Add the the number of classes for each dex profile index.
       AddUintToBuffer(buffer, static_cast<uint8_t>(dex_classes.size()));
       for (size_t i = 0; i < dex_classes.size(); i++) {
@@ -573,11 +574,11 @@ uint32_t ProfileCompilationInfo::GetMethodsRegionSize(const DexFileData& dex_dat
     size += sizeof(uint16_t) * inline_cache.size();  // dex_pc
     for (const auto& inline_cache_it : inline_cache) {
       const ClassSet& classes = inline_cache_it.second.classes;
-      SafeMap<uint8_t, std::vector<dex::TypeIndex>> dex_to_classes_map;
+      SafeMap<ProfileIndexType, std::vector<dex::TypeIndex>> dex_to_classes_map;
       GroupClassesByDex(classes, &dex_to_classes_map);
       size += sizeof(uint8_t);  // dex_to_classes_map size
       for (const auto& dex_it : dex_to_classes_map) {
-        size += sizeof(uint8_t);  // dex profile index
+        size += SizeOfProfileIndexType();  // dex profile index
         size += sizeof(uint8_t);  // number of classes
         const std::vector<dex::TypeIndex>& dex_classes = dex_it.second;
         size += sizeof(uint16_t) * dex_classes.size();  // the actual classes
@@ -589,7 +590,7 @@ uint32_t ProfileCompilationInfo::GetMethodsRegionSize(const DexFileData& dex_dat
 
 void ProfileCompilationInfo::GroupClassesByDex(
     const ClassSet& classes,
-    /*out*/SafeMap<uint8_t, std::vector<dex::TypeIndex>>* dex_to_classes_map) {
+    /*out*/SafeMap<ProfileIndexType, std::vector<dex::TypeIndex>>* dex_to_classes_map) {
   for (const auto& classes_it : classes) {
     auto dex_it = dex_to_classes_map->FindOrAdd(classes_it.dex_profile_index);
     dex_it->second.push_back(classes_it.type_index);
@@ -601,17 +602,18 @@ ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::GetOrAddDexFileData
     uint32_t checksum,
     uint32_t num_method_ids) {
   const auto profile_index_it = profile_key_map_.FindOrAdd(profile_key, profile_key_map_.size());
-  if (profile_key_map_.size() > std::numeric_limits<uint8_t>::max()) {
-    // Allow only 255 dex files to be profiled. This allows us to save bytes
-    // when encoding. The number is well above what we expect for normal applications.
+  if (profile_key_map_.size() > MaxProfileIndex()) {
+    // Allow only a limited number dex files to be profiled. This allows us to save bytes
+    // when encoding. For regular profiles this 2^8, and for boot profiles is 2^16
+    // (well above what we expect for normal applications).
     if (kIsDebugBuild) {
-      LOG(ERROR) << "Exceeded the maximum number of dex files (255). Something went wrong";
+      LOG(ERROR) << "Exceeded the maximum number of dex file. Something went wrong";
     }
     profile_key_map_.erase(profile_key);
     return nullptr;
   }
 
-  uint8_t profile_index = profile_index_it->second;
+  ProfileIndexType profile_index = profile_index_it->second;
   if (info_.size() <= profile_index) {
     // This is a new addition. Add it to the info_ array.
     DexFileData* dex_file_data = new (&allocator_) DexFileData(
@@ -657,7 +659,7 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexData(
     return nullptr;
   }
 
-  uint8_t profile_index = profile_index_it->second;
+  ProfileIndexType profile_index = profile_index_it->second;
   const DexFileData* result = info_[profile_index];
   if (verify_checksum && !ChecksumMatch(result->checksum, checksum)) {
     return nullptr;
@@ -739,8 +741,8 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
 
 bool ProfileCompilationInfo::ReadInlineCache(
     SafeBuffer& buffer,
-    uint8_t number_of_dex_files,
-    const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
+    ProfileIndexType number_of_dex_files,
+    const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
     /*out*/ InlineCacheMap* inline_cache,
     /*out*/ std::string* error) {
   uint16_t inline_cache_size;
@@ -760,9 +762,12 @@ bool ProfileCompilationInfo::ReadInlineCache(
       continue;
     }
     for (; dex_to_classes_map_size > 0; dex_to_classes_map_size--) {
-      uint8_t dex_profile_index;
+      ProfileIndexType dex_profile_index;
       uint8_t dex_classes_size;
-      READ_UINT(uint8_t, buffer, dex_profile_index, error);
+      if (!ReadProfileIndex(buffer, &dex_profile_index)) {
+        *error = "Cannot read profile index";
+        return false;
+      }
       READ_UINT(uint8_t, buffer, dex_classes_size, error);
       if (dex_profile_index >= number_of_dex_files) {
         *error = "dex_profile_index out of bounds ";
@@ -786,11 +791,12 @@ bool ProfileCompilationInfo::ReadInlineCache(
   return true;
 }
 
-bool ProfileCompilationInfo::ReadMethods(SafeBuffer& buffer,
-                                         uint8_t number_of_dex_files,
-                                         const ProfileLineHeader& line_header,
-                                         const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
-                                         /*out*/std::string* error) {
+bool ProfileCompilationInfo::ReadMethods(
+    SafeBuffer& buffer,
+    ProfileIndexType number_of_dex_files,
+    const ProfileLineHeader& line_header,
+    const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
+    /*out*/std::string* error) {
   uint32_t unread_bytes_before_operation = buffer.CountUnreadBytes();
   if (unread_bytes_before_operation < line_header.method_region_size_bytes) {
     *error += "Profile EOF reached prematurely for ReadMethod";
@@ -919,50 +925,56 @@ void ProfileCompilationInfo::SafeBuffer::Advance(size_t data_size) {
 
 ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileHeader(
       ProfileSource& source,
-      /*out*/uint8_t* number_of_dex_files,
+      /*out*/ProfileIndexType* number_of_dex_files,
       /*out*/uint32_t* uncompressed_data_size,
       /*out*/uint32_t* compressed_data_size,
       /*out*/std::string* error) {
   // Read magic and version
   const size_t kMagicVersionSize =
     sizeof(kProfileMagic) +
-    kProfileVersionSize +
-    sizeof(uint8_t) +  // number of dex files
-    sizeof(uint32_t) +  // size of uncompressed profile data
-    sizeof(uint32_t);  // size of compressed profile data
+    kProfileVersionSize;
+  SafeBuffer safe_buffer_version(kMagicVersionSize);
 
-  SafeBuffer safe_buffer(kMagicVersionSize);
-
-  ProfileLoadStatus status = safe_buffer.Fill(source, "ReadProfileHeader", error);
+  ProfileLoadStatus status = safe_buffer_version.Fill(source, "ReadProfileHeaderVersion", error);
   if (status != kProfileLoadSuccess) {
     return status;
   }
 
-  if (!safe_buffer.CompareAndAdvance(kProfileMagic, sizeof(kProfileMagic))) {
+  if (!safe_buffer_version.CompareAndAdvance(kProfileMagic, sizeof(kProfileMagic))) {
     *error = "Profile missing magic";
     return kProfileLoadVersionMismatch;
   }
-  if (safe_buffer.CountUnreadBytes() < kProfileVersionSize) {
+  if (safe_buffer_version.CountUnreadBytes() < kProfileVersionSize) {
      *error = "Cannot read profile version";
      return kProfileLoadBadData;
   }
-  memcpy(version_, safe_buffer.GetCurrentPtr(), kProfileVersionSize);
-  safe_buffer.Advance(kProfileVersionSize);
+  memcpy(version_, safe_buffer_version.GetCurrentPtr(), kProfileVersionSize);
   if ((memcmp(version_, kProfileVersion, kProfileVersionSize) != 0) &&
       (memcmp(version_, kProfileVersionForBootImage, kProfileVersionSize) != 0)) {
     *error = "Profile version mismatch";
     return kProfileLoadVersionMismatch;
   }
 
-  if (!safe_buffer.ReadUintAndAdvance<uint8_t>(number_of_dex_files)) {
+  const size_t kProfileHeaderDataSize =
+    SizeOfProfileIndexType() +  // number of dex files
+    sizeof(uint32_t) +  // size of uncompressed profile data
+    sizeof(uint32_t);  // size of compressed profile data
+  SafeBuffer safe_buffer_header_data(kProfileHeaderDataSize);
+
+  status = safe_buffer_header_data.Fill(source, "ReadProfileHeaderData", error);
+  if (status != kProfileLoadSuccess) {
+    return status;
+  }
+
+  if (!ReadProfileIndex(safe_buffer_header_data, number_of_dex_files)) {
     *error = "Cannot read the number of dex files";
     return kProfileLoadBadData;
   }
-  if (!safe_buffer.ReadUintAndAdvance<uint32_t>(uncompressed_data_size)) {
+  if (!safe_buffer_header_data.ReadUintAndAdvance<uint32_t>(uncompressed_data_size)) {
     *error = "Cannot read the size of uncompressed data";
     return kProfileLoadBadData;
   }
-  if (!safe_buffer.ReadUintAndAdvance<uint32_t>(compressed_data_size)) {
+  if (!safe_buffer_header_data.ReadUintAndAdvance<uint32_t>(compressed_data_size)) {
     *error = "Cannot read the size of compressed data";
     return kProfileLoadBadData;
   }
@@ -1014,9 +1026,9 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileLin
 
 ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileLine(
       SafeBuffer& buffer,
-      uint8_t number_of_dex_files,
+      ProfileIndexType number_of_dex_files,
       const ProfileLineHeader& line_header,
-      const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
+      const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
       bool merge_classes,
       /*out*/std::string* error) {
   DexFileData* data = GetOrAddDexFileData(line_header.profile_key,
@@ -1117,13 +1129,13 @@ bool ProfileCompilationInfo::VerifyProfileData(const std::vector<const DexFile*>
         }
 
         const ClassSet &classes = dex_pc_data.classes;
-        SafeMap<uint8_t, std::vector<dex::TypeIndex>> dex_to_classes_map;
+        SafeMap<ProfileIndexType, std::vector<dex::TypeIndex>> dex_to_classes_map;
         // Group the classes by dex. We expect that most of the classes will come from
         // the same dex, so this will be more efficient than encoding the dex index
         // for each class reference.
         GroupClassesByDex(classes, &dex_to_classes_map);
         for (const auto &dex_it : dex_to_classes_map) {
-          uint8_t dex_profile_index = dex_it.first;
+          ProfileIndexType dex_profile_index = dex_it.first;
           const auto dex_file_inline_cache_it = key_to_dex_file.find(
               info_[dex_profile_index]->profile_key);
           if (dex_file_inline_cache_it == key_to_dex_file.end()) {
@@ -1273,7 +1285,7 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
   }
 
   // Read profile header: magic + version + number_of_dex_files.
-  uint8_t number_of_dex_files;
+  ProfileIndexType number_of_dex_files;
   uint32_t uncompressed_data_size;
   uint32_t compressed_data_size;
   status = ReadProfileHeader(*source,
@@ -1325,7 +1337,7 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
 
   std::vector<ProfileLineHeader> profile_line_headers;
   // Read profile line headers.
-  for (uint8_t k = 0; k < number_of_dex_files; k++) {
+  for (ProfileIndexType k = 0; k < number_of_dex_files; k++) {
     ProfileLineHeader line_header;
 
     // First, read the line header to get the amount of data we need to read.
@@ -1336,12 +1348,12 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
     profile_line_headers.push_back(line_header);
   }
 
-  SafeMap<uint8_t, uint8_t> dex_profile_index_remap;
+  SafeMap<ProfileIndexType, ProfileIndexType> dex_profile_index_remap;
   if (!RemapProfileIndex(profile_line_headers, filter_fn, &dex_profile_index_remap)) {
     return kProfileLoadBadData;
   }
 
-  for (uint8_t k = 0; k < number_of_dex_files; k++) {
+  for (ProfileIndexType k = 0; k < number_of_dex_files; k++) {
     if (!filter_fn(profile_line_headers[k].profile_key, profile_line_headers[k].checksum)) {
       // We have to skip the line. Advanced the current pointer of the buffer.
       size_t profile_line_size =
@@ -1377,7 +1389,7 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
 bool ProfileCompilationInfo::RemapProfileIndex(
     const std::vector<ProfileLineHeader>& profile_line_headers,
     const ProfileLoadFilterFn& filter_fn,
-    /*out*/SafeMap<uint8_t, uint8_t>* dex_profile_index_remap) {
+    /*out*/SafeMap<ProfileIndexType, ProfileIndexType>* dex_profile_index_remap) {
   // First verify that all checksums match. This will avoid adding garbage to
   // the current profile info.
   // Note that the number of elements should be very small, so this should not
@@ -1501,7 +1513,7 @@ bool ProfileCompilationInfo::MergeWith(const ProfileCompilationInfo& other,
 
   // First, build a mapping from other_dex_profile_index to this_dex_profile_index.
   // This will make sure that the ClassReferences  will point to the correct dex file.
-  SafeMap<uint8_t, uint8_t> dex_profile_index_remap;
+  SafeMap<ProfileIndexType, ProfileIndexType> dex_profile_index_remap;
   for (const DexFileData* other_dex_data : other.info_) {
     const DexFileData* dex_data = GetOrAddDexFileData(other_dex_data->profile_key,
                                                       other_dex_data->checksum,
@@ -2214,5 +2226,38 @@ std::ostream& operator<<(std::ostream& stream,
 bool ProfileCompilationInfo::ProfileSampleAnnotation::operator==(
       const ProfileSampleAnnotation& other) const {
   return origin_package_name_ == other.origin_package_name_;
+}
+
+void ProfileCompilationInfo::WriteProfileIndex(
+    std::vector<uint8_t>* buffer, ProfileIndexType value) const {
+  if (IsForBootImage()) {
+    AddUintToBuffer(buffer, value);
+  } else {
+    AddUintToBuffer(buffer, static_cast<ProfileIndexTypeRegular>(value));
+  }
+}
+
+bool ProfileCompilationInfo::ReadProfileIndex(
+    SafeBuffer& safe_buffer, ProfileIndexType* value) const {
+  if (IsForBootImage()) {
+    return safe_buffer.ReadUintAndAdvance<ProfileIndexType>(value);
+  } else {
+    ProfileIndexTypeRegular out;
+    bool result = safe_buffer.ReadUintAndAdvance<ProfileIndexTypeRegular>(&out);
+    *value = out;
+    return result;
+  }
+}
+
+ProfileCompilationInfo::ProfileIndexType ProfileCompilationInfo::MaxProfileIndex() const {
+  return IsForBootImage()
+      ? std::numeric_limits<ProfileIndexType>::max()
+      : std::numeric_limits<ProfileIndexTypeRegular>::max();
+}
+
+uint32_t ProfileCompilationInfo::SizeOfProfileIndexType() const {
+  return IsForBootImage()
+    ? sizeof(ProfileIndexType)
+    : sizeof(ProfileIndexTypeRegular);
 }
 }  // namespace art
