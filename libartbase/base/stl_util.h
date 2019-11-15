@@ -18,9 +18,12 @@
 #define ART_LIBARTBASE_BASE_STL_UTIL_H_
 
 #include <algorithm>
+#include <iterator>
 #include <sstream>
 
 #include <android-base/logging.h>
+
+#include "base/iteration_range.h"
 
 namespace art {
 
@@ -144,6 +147,80 @@ static inline std::vector<T*> MakeNonOwningPointerVector(const std::vector<std::
     result.push_back(t.get());
   }
   return result;
+}
+
+template <typename IterLeft, typename IterRight>
+class ZipLeftIter : public std::iterator<
+                        std::forward_iterator_tag,
+                        std::pair<typename IterLeft::value_type, typename IterRight::value_type>> {
+ public:
+  ZipLeftIter(IterLeft left, IterRight right) : left_iter_(left), right_iter_(right) {}
+  ZipLeftIter<IterLeft, IterRight>& operator++() {
+    ++left_iter_;
+    ++right_iter_;
+    return *this;
+  }
+  ZipLeftIter<IterLeft, IterRight> operator++(int) {
+    ZipLeftIter<IterLeft, IterRight> ret(left_iter_, right_iter_);
+    ++(*this);
+    return ret;
+  }
+  bool operator==(const ZipLeftIter<IterLeft, IterRight>& other) const {
+    return left_iter_ == other.left_iter_;
+  }
+  bool operator!=(const ZipLeftIter<IterLeft, IterRight>& other) const {
+    return !(*this == other);
+  }
+  std::pair<typename IterLeft::value_type, typename IterRight::value_type> operator*() const {
+    return std::make_pair(*left_iter_, *right_iter_);
+  }
+
+ private:
+  IterLeft left_iter_;
+  IterRight right_iter_;
+};
+
+class CountIter : public std::iterator<std::forward_iterator_tag, size_t, size_t, size_t, size_t> {
+ public:
+  CountIter() : count_(0) {}
+  explicit CountIter(size_t count) : count_(count) {}
+  CountIter& operator++() {
+    ++count_;
+    return *this;
+  }
+  CountIter operator++(int) {
+    size_t ret = count_;
+    ++count_;
+    return CountIter(ret);
+  }
+  bool operator==(const CountIter& other) const {
+    return count_ == other.count_;
+  }
+  bool operator!=(const CountIter& other) const {
+    return !(*this == other);
+  }
+  size_t operator*() const {
+    return count_;
+  }
+
+ private:
+  size_t count_;
+};
+
+// Make an iteration range that returns a pair of the element and the index of the element.
+template <typename Iter>
+static inline IterationRange<ZipLeftIter<Iter, CountIter>> ZipCount(IterationRange<Iter> iter) {
+  return IterationRange(ZipLeftIter(iter.begin(), CountIter(0)),
+                        ZipLeftIter(iter.end(), CountIter(-1)));
+}
+
+// Make an iteration range that returns a pair of the outputs of two iterators. Stops when the first
+// (left) one is exhausted. The left iterator must be at least as long as the right one.
+template <typename IterLeft, typename IterRight>
+static inline IterationRange<ZipLeftIter<IterLeft, IterRight>> ZipLeft(
+    IterationRange<IterLeft> iter_left, IterationRange<IterRight> iter_right) {
+  return IterationRange(ZipLeftIter(iter_left.begin(), iter_right.begin()),
+                        ZipLeftIter(iter_left.end(), iter_right.end()));
 }
 
 }  // namespace art

@@ -207,8 +207,7 @@ static void GetChildThreadGroups(art::Handle<art::mirror::Object> thread_group,
       groups_array->AsObjectArray<art::mirror::Object>();
 
   // Copy all non-null elements.
-  for (int32_t i = 0; i < groups_array_as_array->GetLength(); ++i) {
-    art::ObjPtr<art::mirror::Object> entry = groups_array_as_array->Get(i);
+  for (auto entry : groups_array_as_array->Iterate()) {
     if (entry != nullptr) {
       thread_groups->push_back(entry);
     }
