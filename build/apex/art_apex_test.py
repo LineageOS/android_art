@@ -307,8 +307,8 @@ class Checker:
     # This is needed because the list of build targets is not propagated
     # to this script.
     #
-    # TODO: Pass build target information to this script and fix all places
-    # where this function in used (or similar workarounds).
+    # TODO(b/123602136): Pass build target information to this script and fix
+    # all places where this function in used (or similar workarounds).
     dirs = []
     for arch in ARCHS:
       dir = '%s/%s' % (path, arch)
