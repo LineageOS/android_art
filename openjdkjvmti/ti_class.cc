@@ -726,8 +726,8 @@ jvmtiError ClassUtil::GetClassSignature(jvmtiEnv* env,
           art::annotations::GetSignatureAnnotationForClass(h_klass);
       if (str_array != nullptr) {
         std::ostringstream oss;
-        for (int32_t i = 0; i != str_array->GetLength(); ++i) {
-          oss << str_array->Get(i)->ToModifiedUtf8();
+        for (auto str : str_array->Iterate()) {
+          oss << str->ToModifiedUtf8();
         }
         std::string output_string = oss.str();
         jvmtiError ret;

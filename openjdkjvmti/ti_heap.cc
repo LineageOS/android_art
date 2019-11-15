@@ -1166,16 +1166,14 @@ class FollowReferencesHelper final {
     if (array->IsObjectArray()) {
       art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> obj_array =
           array->AsObjectArray<art::mirror::Object>();
-      int32_t length = obj_array->GetLength();
-      for (int32_t i = 0; i != length; ++i) {
-        art::ObjPtr<art::mirror::Object> elem = obj_array->GetWithoutChecks(i);
-        if (elem != nullptr) {
+      for (auto elem_pair : art::ZipCount(obj_array->Iterate())) {
+        if (elem_pair.first != nullptr) {
           jvmtiHeapReferenceInfo reference_info;
-          reference_info.array.index = i;
+          reference_info.array.index = elem_pair.second;
           stop_reports_ = !ReportReferenceMaybeEnqueue(JVMTI_HEAP_REFERENCE_ARRAY_ELEMENT,
                                                        &reference_info,
                                                        array,
-                                                       elem.Ptr());
+                                                       elem_pair.first.Ptr());
           if (stop_reports_) {
             break;
           }

@@ -32,6 +32,14 @@ namespace art {
 class Thread;
 
 template<class T> class Handle;
+template<typename T> class IterationRange;
+
+namespace mirror {
+template<typename T> class ObjectArray;
+template<typename T, typename C> class ArrayIter;
+template<typename T> using HandleArrayIter = ArrayIter<T, Handle<ObjectArray<T>>>;
+template<typename T> using ConstHandleArrayIter = ArrayIter<T, const Handle<ObjectArray<T>>>;
+}  // namespace mirror
 
 // Handles are memory locations that contain GC roots. As the mirror::Object*s within a handle are
 // GC visible then the GC may move the references within them, something that couldn't be done with
@@ -65,6 +73,19 @@ class Handle : public ValueObject {
 
   ALWAYS_INLINE T* Get() const REQUIRES_SHARED(Locks::mutator_lock_) {
     return down_cast<T*>(reference_->AsMirrorPtr());
+  }
+
+  template <typename Type,
+            typename = typename std::enable_if_t<std::is_same_v<mirror::ObjectArray<Type>, T>>>
+  ALWAYS_INLINE IterationRange<mirror::ConstHandleArrayIter<Type>> ConstIterate() const
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    return T::ConstIterate(*this);
+  }
+  template <typename Type,
+            typename = typename std::enable_if_t<std::is_same_v<mirror::ObjectArray<Type>, T>>>
+  ALWAYS_INLINE IterationRange<mirror::HandleArrayIter<Type>> Iterate()
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    return T::Iterate(*this);
   }
 
   ALWAYS_INLINE bool IsNull() const {
