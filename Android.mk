@@ -377,7 +377,7 @@ include $(BUILD_PHONY_PACKAGE)
 # regardless of which variant is installed, create a symlink so that
 # $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art is linked to
 # $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_ART_APEX).
-# Note that installation of the symlink is triggered by the apex_manifest.json
+# Note that installation of the symlink is triggered by the apex_manifest.pb
 # file which is the file that is guaranteed to be created regardless of the
 # value of TARGET_FLATTEN_APEX.
 #
@@ -388,9 +388,9 @@ include $(BUILD_PHONY_PACKAGE)
 # directory so that the APEX is accessible via the canonical path
 # /apex/com.android.art
 ifeq ($(TARGET_FLATTEN_APEX),true)
-art_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_ART_APEX)/apex_manifest.json
+art_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_ART_APEX)/apex_manifest.pb
 else
-art_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_ART_APEX)/apex_manifest.json
+art_apex_manifest_file := $(PRODUCT_OUT)/apex/$(TARGET_ART_APEX)/apex_manifest.pb
 endif
 
 art_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)/symlink.timestamp
