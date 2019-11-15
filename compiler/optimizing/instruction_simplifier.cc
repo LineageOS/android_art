@@ -2630,10 +2630,12 @@ static bool TryReplaceStringBuilderAppend(HInvoke* invoke) {
   block->InsertInstructionBefore(append, invoke);
   invoke->ReplaceWith(append);
   // Copy environment, except for the StringBuilder uses.
-  for (size_t i = 0, size = invoke->GetEnvironment()->Size(); i != size; ++i) {
-    if (invoke->GetEnvironment()->GetInstructionAt(i) == sb) {
-      invoke->GetEnvironment()->RemoveAsUserOfInput(i);
-      invoke->GetEnvironment()->SetRawEnvAt(i, nullptr);
+  for (HEnvironment* env = invoke->GetEnvironment(); env != nullptr; env = env->GetParent()) {
+    for (size_t i = 0, size = env->Size(); i != size; ++i) {
+      if (env->GetInstructionAt(i) == sb) {
+        env->RemoveAsUserOfInput(i);
+        env->SetRawEnvAt(i, /*instruction=*/ nullptr);
+      }
     }
   }
   append->CopyEnvironmentFrom(invoke->GetEnvironment());

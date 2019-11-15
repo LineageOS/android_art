@@ -21,6 +21,7 @@ public class Main {
         testAppendStringAndString();
         testMiscelaneous();
         testNoArgs();
+        testInline();
         System.out.println("passed");
     }
 
@@ -231,6 +232,24 @@ public class Main {
                      $noinline$appendSLILC("x", 1L, 7, 424242L, 'q'));
         assertEquals("x17-1\u0131",
                      $noinline$appendSLILC("x", 1L, 7, -1L, '\u0131'));
+    }
+
+    public static String $inline$testInlineInner(StringBuilder sb, String s, int i) {
+        return sb.append(s).append(i).toString();
+    }
+
+    /// CHECK-START: java.lang.String Main.$noinline$testInlineOuter(java.lang.String, int) instruction_simplifier$after_inlining (before)
+    /// CHECK-NOT:              StringBuilderAppend
+
+    /// CHECK-START: java.lang.String Main.$noinline$testInlineOuter(java.lang.String, int) instruction_simplifier$after_inlining (after)
+    /// CHECK:                  StringBuilderAppend
+    public static String $noinline$testInlineOuter(String s, int i) {
+        StringBuilder sb = new StringBuilder();
+        return $inline$testInlineInner(sb, s, i);
+    }
+
+    public static void testInline() {
+        assertEquals("x42", $noinline$testInlineOuter("x", 42));
     }
 
     /// CHECK-START: java.lang.String Main.$noinline$appendNothing() instruction_simplifier (before)
