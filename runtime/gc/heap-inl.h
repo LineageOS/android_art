@@ -65,10 +65,30 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     HandleWrapperObjPtr<mirror::Class> h = hs.NewHandleWrapper(&klass);
     self->PoisonObjectPointers();
   }
+  auto send_pre_object_allocated = [&]() REQUIRES_SHARED(Locks::mutator_lock_)
+                                         ACQUIRE(Roles::uninterruptible_) {
+    if constexpr (kInstrumented) {
+      AllocationListener* l = nullptr;
+      l = alloc_listener_.load(std::memory_order_seq_cst);
+      if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
+        StackHandleScope<1> hs(self);
+        HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(&klass));
+        l->PreObjectAllocated(self, h_klass, &byte_count);
+      }
+    }
+    return self->StartAssertNoThreadSuspension("Called PreObjectAllocated, no suspend until alloc");
+  };
+  // Do the initial pre-alloc
+  const char* old_cause = send_pre_object_allocated();
+  // We shouldn't have any NoThreadSuspension here!
+  DCHECK(old_cause == nullptr) << old_cause;
+
   // Need to check that we aren't the large object allocator since the large object allocation code
   // path includes this function. If we didn't check we would have an infinite loop.
   ObjPtr<mirror::Object> obj;
   if (kCheckLargeObject && UNLIKELY(ShouldAllocLargeObject(klass, byte_count))) {
+    // AllocLargeObject can suspend and will recall PreObjectAllocated if needed.
+    self->EndAssertNoThreadSuspension(old_cause);
     obj = AllocLargeObject<kInstrumented, PreFenceVisitor>(self, &klass, byte_count,
                                                            pre_fence_visitor);
     if (obj != nullptr) {
@@ -80,6 +100,8 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     // If the large object allocation failed, try to use the normal spaces (main space,
     // non moving space). This can happen if there is significant virtual address space
     // fragmentation.
+    // We need to send the PreObjectAllocated again, we might have suspended during our failure.
+    old_cause = send_pre_object_allocated();
   }
   // bytes allocated for the (individual) object.
   size_t bytes_allocated;
@@ -100,6 +122,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     usable_size = bytes_allocated;
     no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
+    self->EndAssertNoThreadSuspension(old_cause);
   } else if (
       !kInstrumented && allocator == kAllocatorTypeRosAlloc &&
       (obj = rosalloc_space_->AllocThreadLocal(self, byte_count, &bytes_allocated)) != nullptr &&
@@ -112,6 +135,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     usable_size = bytes_allocated;
     no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
+    self->EndAssertNoThreadSuspension(old_cause);
   } else {
     // Bytes allocated that includes bulk thread-local buffer allocations in addition to direct
     // non-TLAB object allocations.
@@ -121,14 +145,19 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     if (UNLIKELY(obj == nullptr)) {
       // AllocateInternalWithGc can cause thread suspension, if someone instruments the entrypoints
       // or changes the allocator in a suspend point here, we need to retry the allocation.
+      // It will send the pre-alloc event again.
+      self->EndAssertNoThreadSuspension(old_cause);
       obj = AllocateInternalWithGc(self,
                                    allocator,
                                    kInstrumented,
                                    byte_count,
                                    &bytes_allocated,
                                    &usable_size,
-                                   &bytes_tl_bulk_allocated, &klass);
+                                   &bytes_tl_bulk_allocated,
+                                   &klass,
+                                   &old_cause);
       if (obj == nullptr) {
+        self->EndAssertNoThreadSuspension(old_cause);
         // The only way that we can get a null return if there is no pending exception is if the
         // allocator or instrumentation changed.
         if (!self->IsExceptionPending()) {
@@ -156,6 +185,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     }
     no_suspend_pre_fence_visitor(obj, usable_size);
     QuasiAtomic::ThreadFenceForConstructor();
+    self->EndAssertNoThreadSuspension(old_cause);
     if (bytes_tl_bulk_allocated > 0) {
       size_t num_bytes_allocated_before =
           num_bytes_allocated_.fetch_add(bytes_tl_bulk_allocated, std::memory_order_relaxed);
