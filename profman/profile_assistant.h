@@ -30,12 +30,13 @@ class ProfileAssistant {
   // These also serve as return codes of profman and are processed by installd
   // (frameworks/native/cmds/installd/commands.cpp)
   enum ProcessingResult {
-    kCompile = 0,
-    kSkipCompilation = 1,
-    kErrorBadProfiles = 2,
-    kErrorIO = 3,
-    kErrorCannotLock = 4,
-    kSuccess = 5,  // Generic success code for non-analysis runs.
+    kSuccess = 0,  // Generic success code for non-analysis runs.
+    kCompile = 1,
+    kSkipCompilation = 2,
+    kErrorBadProfiles = 3,
+    kErrorIO = 4,
+    kErrorCannotLock = 5,
+    kErrorDifferentVersions = 6,
   };
 
   class Options {
