@@ -193,7 +193,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
   int ProcessProfiles(
       const std::vector<int>& profiles_fd,
       int reference_profile_fd,
-      std::vector<const std::string> extra_args = std::vector<const std::string>()) {
+      const std::vector<const std::string>& extra_args = std::vector<const std::string>()) {
     std::string profman_cmd = GetProfmanCmd();
     std::vector<std::string> argv_str;
     argv_str.push_back(profman_cmd);
@@ -1195,7 +1195,7 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithFilter) {
   argv_str.push_back("--apk-fd=" + std::to_string(apk_fd.get()));
   std::string error;
 
-  EXPECT_EQ(ExecAndReturnCode(argv_str, &error), 0) << error;
+  EXPECT_EQ(ExecAndReturnCode(argv_str, &error), ProfileAssistant::kCompile) << error;
 
   // Verify that we can load the result.
 
@@ -1403,5 +1403,31 @@ TEST_F(ProfileAssistantTest, BootImageMergeWithAnnotations) {
   ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
   ASSERT_TRUE(info.Equals(result));
+}
+
+TEST_F(ProfileAssistantTest, DifferentProfileVersions) {
+  ScratchFile profile1;
+  ScratchFile profile2;
+
+  ProfileCompilationInfo info1(/*for_boot_image*/ false);
+  info1.Save(profile1.GetFd());
+  profile1.GetFile()->ResetOffset();
+
+  ProfileCompilationInfo info2(/*for_boot_image*/ true);
+  info2.Save(profile2.GetFd());
+  profile2.GetFile()->ResetOffset();
+
+  std::vector<int> profile_fds({ GetFd(profile1)});
+  int reference_profile_fd = GetFd(profile2);
+  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd),
+            ProfileAssistant::kErrorDifferentVersions);
+
+  // Reverse the order of the profiles to verify we get the same behaviour.
+  profile_fds[0] = GetFd(profile2);
+  reference_profile_fd = GetFd(profile1);
+  profile1.GetFile()->ResetOffset();
+  profile2.GetFile()->ResetOffset();
+  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd),
+            ProfileAssistant::kErrorDifferentVersions);
 }
 }  // namespace art
