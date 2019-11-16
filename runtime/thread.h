@@ -355,6 +355,21 @@ class Thread {
     Roles::uninterruptible_.Release();  // No-op.
   }
 
+  // End region where no thread suspension is expected. Returns the current open region in case we
+  // want to reopen it. Used for ScopedAllowThreadSuspension. Not supported if no_thread_suspension
+  // is larger than one.
+  const char* EndAssertNoThreadSuspension() RELEASE(Roles::uninterruptible_) WARN_UNUSED {
+    const char* ret = nullptr;
+    if (kIsDebugBuild) {
+      CHECK_EQ(tls32_.no_thread_suspension, 1u);
+      tls32_.no_thread_suspension--;
+      ret = tlsPtr_.last_no_thread_suspension_cause;
+      tlsPtr_.last_no_thread_suspension_cause = nullptr;
+    }
+    Roles::uninterruptible_.Release();  // No-op.
+    return ret;
+  }
+
   void AssertThreadSuspensionIsAllowable(bool check_locks = true) const;
 
   // Return true if thread suspension is allowable.
@@ -1909,6 +1924,30 @@ class SCOPED_CAPABILITY ScopedAssertNoThreadSuspension {
   const bool enabled_;
   const char* old_cause_;
 };
+
+class ScopedAllowThreadSuspension {
+ public:
+  ALWAYS_INLINE ScopedAllowThreadSuspension() RELEASE(Roles::uninterruptible_) {
+    if (kIsDebugBuild) {
+      self_ = Thread::Current();
+      old_cause_ = self_->EndAssertNoThreadSuspension();
+    } else {
+      Roles::uninterruptible_.Release();  // No-op.
+    }
+  }
+  ALWAYS_INLINE ~ScopedAllowThreadSuspension() ACQUIRE(Roles::uninterruptible_) {
+    if (kIsDebugBuild) {
+      CHECK(self_->StartAssertNoThreadSuspension(old_cause_) == nullptr);
+    } else {
+      Roles::uninterruptible_.Acquire();  // No-op.
+    }
+  }
+
+ private:
+  Thread* self_;
+  const char* old_cause_;
+};
+
 
 class ScopedStackedShadowFramePusher {
  public:
