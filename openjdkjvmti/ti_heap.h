@@ -17,6 +17,8 @@
 #ifndef ART_OPENJDKJVMTI_TI_HEAP_H_
 #define ART_OPENJDKJVMTI_TI_HEAP_H_
 
+#include <unordered_map>
+
 #include "jvmti.h"
 
 #include "base/locks.h"
@@ -24,6 +26,7 @@
 namespace art {
 class Thread;
 template<typename T> class ObjPtr;
+class HashObjPtr;
 namespace mirror {
 class Object;
 }  // namespace mirror
@@ -87,6 +90,13 @@ class HeapExtensions {
                                                   const void* user_data);
 
   static jvmtiError JNICALL ChangeArraySize(jvmtiEnv* env, jobject arr, jsize new_size);
+
+  static void ReplaceReferences(
+      art::Thread* self,
+      const std::unordered_map<art::ObjPtr<art::mirror::Object>,
+                               art::ObjPtr<art::mirror::Object>,
+                               art::HashObjPtr>& refs)
+        REQUIRES(art::Locks::mutator_lock_, art::Roles::uninterruptible_);
 
   static void ReplaceReference(art::Thread* self,
                                art::ObjPtr<art::mirror::Object> original,
