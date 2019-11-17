@@ -113,6 +113,7 @@
 #include "mirror/method_type.h"
 #include "mirror/object-inl.h"
 #include "mirror/object-refvisitor-inl.h"
+#include "mirror/object.h"
 #include "mirror/object_array-alloc-inl.h"
 #include "mirror/object_array-inl.h"
 #include "mirror/object_reference.h"
@@ -1468,11 +1469,11 @@ static bool CompareClassLoaders(ScopedObjectAccessUnchecked& soa,
       return false;
     }
 
-    for (int32_t i = 0; i < array1->GetLength(); ++i) {
+    for (auto clp : ZipLeft(array1->Iterate(), array2->Iterate())) {
       // Do a full comparison of the class loaders, including comparing their dex files.
       if (!CompareClassLoaders(soa,
-                               array1->Get(i),
-                               array2->Get(i),
+                               clp.first,
+                               clp.second,
                                /*check_dex_file_names=*/ true,
                                error_msg)) {
         return false;
@@ -1774,9 +1775,7 @@ void AppImageLoadingHelper::Update(
   {
     // Register dex caches with the class loader.
     WriterMutexLock mu(self, *Locks::classlinker_classes_lock_);
-    const size_t num_dex_caches = dex_caches->GetLength();
-    for (size_t i = 0; i < num_dex_caches; i++) {
-      ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
+    for (auto dex_cache : dex_caches.Iterate<mirror::DexCache>()) {
       const DexFile* const dex_file = dex_cache->GetDexFile();
       {
         WriterMutexLock mu2(self, *Locks::dex_lock_);
@@ -1968,8 +1967,7 @@ bool ClassLinker::OpenImageDexFiles(gc::space::ImageSpace* space,
   ObjPtr<mirror::ObjectArray<mirror::DexCache>> dex_caches =
       dex_caches_object->AsObjectArray<mirror::DexCache>();
   const OatFile* oat_file = space->GetOatFile();
-  for (int32_t i = 0, length = dex_caches->GetLength(); i != length; ++i) {
-    ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
+  for (auto dex_cache : dex_caches->Iterate()) {
     std::string dex_file_location(dex_cache->GetLocation()->ToModifiedUtf8());
     std::unique_ptr<const DexFile> dex_file = OpenOatDexFile(oat_file,
                                                              dex_file_location.c_str(),
@@ -2158,8 +2156,7 @@ static void VerifyAppImage(const ImageHeader& header,
     }
   }
   // Check that all non-primitive classes in dex caches are also in the class table.
-  for (int32_t i = 0; i < dex_caches->GetLength(); i++) {
-    ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
+  for (auto dex_cache : dex_caches.ConstIterate<mirror::DexCache>()) {
     mirror::TypeDexCacheType* const types = dex_cache->GetResolvedTypes();
     for (int32_t j = 0, num_types = dex_cache->NumResolvedTypes(); j < num_types; j++) {
       ObjPtr<mirror::Class> klass = types[j].load(std::memory_order_relaxed).object.Read();
@@ -2233,8 +2230,7 @@ bool ClassLinker::AddImageSpace(
     return false;
   }
 
-  for (int32_t i = 0; i < dex_caches->GetLength(); i++) {
-    ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
+  for (auto dex_cache : dex_caches.Iterate<mirror::DexCache>()) {
     std::string dex_file_location = dex_cache->GetLocation()->ToModifiedUtf8();
     if (class_loader == nullptr) {
       // For app images, we'll see the relative location. b/130666977.
@@ -2292,8 +2288,7 @@ bool ClassLinker::AddImageSpace(
     // comparisons for their shared libraries and parent.
     auto elements = soa.Decode<mirror::ObjectArray<mirror::Object>>(dex_elements);
     std::list<ObjPtr<mirror::String>> loader_dex_file_names;
-    for (size_t i = 0, num_elems = elements->GetLength(); i < num_elems; ++i) {
-      ObjPtr<mirror::Object> element = elements->GetWithoutChecks(i);
+    for (auto element : elements->Iterate()) {
       if (element != nullptr) {
         // If we are somewhere in the middle of the array, there may be nulls at the end.
         ObjPtr<mirror::String> name;
@@ -2329,8 +2324,7 @@ bool ClassLinker::AddImageSpace(
   }
 
   if (kSanityCheckObjects) {
-    for (int32_t i = 0; i < dex_caches->GetLength(); i++) {
-      ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
+    for (auto dex_cache : dex_caches.Iterate<mirror::DexCache>()) {
       for (size_t j = 0; j < dex_cache->NumResolvedFields(); ++j) {
         auto* field = dex_cache->GetResolvedField(j, image_pointer_size_);
         if (field != nullptr) {
@@ -2983,8 +2977,8 @@ bool ClassLinker::FindClassInSharedLibraries(ScopedObjectAccessAlreadyRunnable& 
   Handle<mirror::ObjectArray<mirror::ClassLoader>> shared_libraries(
       hs.NewHandle(raw_shared_libraries->AsObjectArray<mirror::ClassLoader>()));
   MutableHandle<mirror::ClassLoader> temp_loader = hs.NewHandle<mirror::ClassLoader>(nullptr);
-  for (int32_t i = 0; i < shared_libraries->GetLength(); ++i) {
-    temp_loader.Assign(shared_libraries->Get(i));
+  for (auto loader : shared_libraries.Iterate<mirror::ClassLoader>()) {
+    temp_loader.Assign(loader);
     if (!FindClassInBaseDexClassLoader(soa, self, descriptor, hash, temp_loader, result)) {
       return false;  // One of the shared libraries is not supported.
     }
@@ -5361,14 +5355,15 @@ bool ClassLinker::CanWeInitializeClass(ObjPtr<mirror::Class> klass, bool can_ini
         return false;
       }
     }
-    // If we are a class we need to initialize all interfaces with default methods when we are
-    // initialized. Check all of them.
-    if (!klass->IsInterface()) {
-      size_t num_interfaces = klass->GetIfTableCount();
-      for (size_t i = 0; i < num_interfaces; i++) {
-        ObjPtr<mirror::Class> iface = klass->GetIfTable()->GetInterface(i);
-        if (iface->HasDefaultMethods() &&
-            !CanWeInitializeClass(iface, can_init_statics, can_init_parents)) {
+  }
+  // If we are a class we need to initialize all interfaces with default methods when we are
+  // initialized. Check all of them.
+  if (!klass->IsInterface()) {
+    size_t num_interfaces = klass->GetIfTableCount();
+    for (size_t i = 0; i < num_interfaces; i++) {
+      ObjPtr<mirror::Class> iface = klass->GetIfTable()->GetInterface(i);
+      if (iface->HasDefaultMethods() && !iface->IsInitialized()) {
+        if (!can_init_parents || !CanWeInitializeClass(iface, can_init_statics, can_init_parents)) {
           return false;
         }
       }
@@ -5378,10 +5373,10 @@ bool ClassLinker::CanWeInitializeClass(ObjPtr<mirror::Class> klass, bool can_ini
     return true;
   }
   ObjPtr<mirror::Class> super_class = klass->GetSuperClass();
-  if (!can_init_parents && !super_class->IsInitialized()) {
-    return false;
+  if (super_class->IsInitialized()) {
+    return true;
   }
-  return CanWeInitializeClass(super_class, can_init_statics, can_init_parents);
+  return can_init_parents && CanWeInitializeClass(super_class, can_init_statics, can_init_parents);
 }
 
 bool ClassLinker::InitializeClass(Thread* self, Handle<mirror::Class> klass,

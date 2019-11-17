@@ -23,6 +23,7 @@
 #include "jni/jni_internal.h"
 #include "mirror/class_loader.h"
 #include "mirror/object-inl.h"
+#include "mirror/object.h"
 #include "native/dalvik_system_DexFile.h"
 #include "scoped_thread_state_change-inl.h"
 #include "well_known_classes.h"
@@ -86,8 +87,7 @@ inline RetType VisitClassLoaderDexElements(ScopedObjectAccessAlreadyRunnable& so
       StackHandleScope<1> hs(self);
       Handle<mirror::ObjectArray<mirror::Object>> dex_elements =
           hs.NewHandle(dex_elements_obj->AsObjectArray<mirror::Object>());
-      for (int32_t i = 0; i < dex_elements->GetLength(); ++i) {
-        ObjPtr<mirror::Object> element = dex_elements->GetWithoutChecks(i);
+      for (auto element : dex_elements.Iterate<mirror::Object>()) {
         if (element == nullptr) {
           // Should never happen, fail.
           break;

@@ -106,6 +106,21 @@ class ProfileCompilationInfo {
     uint32_t num_method_ids;
   };
 
+  // The types used to manipulate the profile index of dex files.
+  // They set an upper limit to how many dex files a given profile can recored.
+  //
+  // Boot profiles have more needs than regular profiles as they contain data from
+  // many apps merged together. As such they set the default type for data manipulation.
+  //
+  // Regular profiles don't record a lot of dex files, and use a smaller data type
+  // in order to save disk and ram.
+  //
+  // In-memory all profiles will use ProfileIndexType to represent the indices. However,
+  // when serialized, the profile type (boot or regular) will determine which data type
+  // is used to write the data.
+  using ProfileIndexType = uint16_t;
+  using ProfileIndexTypeRegular = uint8_t;
+
   // Encodes a class reference in the profile.
   // The owning dex file is encoded as the index (dex_profile_index) it has in the
   // profile rather than as a full DexRefence(location,checksum).
@@ -118,7 +133,7 @@ class ProfileCompilationInfo {
   // data from multiple splits. This means that a profile may contain a classes2.dex from split-A
   // and one from split-B.
   struct ClassReference : public ValueObject {
-    ClassReference(uint8_t dex_profile_idx, const dex::TypeIndex type_idx) :
+    ClassReference(ProfileIndexType dex_profile_idx, const dex::TypeIndex type_idx) :
       dex_profile_index(dex_profile_idx), type_index(type_idx) {}
 
     bool operator==(const ClassReference& other) const {
@@ -130,7 +145,7 @@ class ProfileCompilationInfo {
           : dex_profile_index < other.dex_profile_index;
     }
 
-    uint8_t dex_profile_index;  // the index of the owning dex in the profile info
+    ProfileIndexType dex_profile_index;  // the index of the owning dex in the profile info
     dex::TypeIndex type_index;  // the type index of the class
   };
 
@@ -191,32 +206,31 @@ class ProfileCompilationInfo {
       kFlagPostStartup = 1 << 2,
       // Marker flag used to simplify iterations.
       kFlagLastRegular = 1 << 2,
-      // Executed during the app startup as determined by the framework (equivalent to am start).
-      kFlagAmStartup = 1 << 3,
-      // Executed after the app startup as determined by the framework (equivalent to am start).
-      kFlagAmPostStartup = 1 << 4,
-      // Executed during system boot.
-      kFlagBoot = 1 << 5,
-      // Executed after the system has booted.
-      kFlagPostBoot = 1 << 6,
-      // Executed while the app is in foreground.
-      kFlagForeground = 1 << 7,
-      // Executed while the app is in background.
-      kFlagBackground = 1 << 8,
       // Executed by a 32bit process.
-      kFlag32bit = 1 << 9,
+      kFlag32bit = 1 << 3,
       // Executed by a 64bit process.
-      kFlag64bit = 1 << 10,
-      // The startup bins captured the relative order of when a method become hot. There are 8
+      kFlag64bit = 1 << 4,
+      // Executed on sensitive thread (e.g. UI).
+      kFlagSensitiveThread = 1 << 5,
+      // Executed during the app startup as determined by the framework (equivalent to am start).
+      kFlagAmStartup = 1 << 6,
+      // Executed after the app startup as determined by the framework (equivalent to am start).
+      kFlagAmPostStartup = 1 << 7,
+      // Executed during system boot.
+      kFlagBoot = 1 << 8,
+      // Executed after the system has booted.
+      kFlagPostBoot = 1 << 9,
+
+      // The startup bins captured the relative order of when a method become hot. There are 6
       // total bins supported and each hot method will have at least one bit set. If the profile was
       // merged multiple times more than one bit may be set as a given method may become hot at
       // various times during subsequent executions.
       // The granularity of the bins is unspecified (i.e. the runtime is free to change the
       // values it uses - this may be 100ms, 200ms etc...).
-      kFlagStartupBin = 1 << 11,
-      kFlagStartupMaxBin = 1 << 18,
+      kFlagStartupBin = 1 << 10,
+      kFlagStartupMaxBin = 1 << 15,
       // Marker flag used to simplify iterations.
-      kFlagLastBoot = 1 << 18,
+      kFlagLastBoot = 1 << 15,
     };
 
     bool IsHot() const {
@@ -629,7 +643,7 @@ class ProfileCompilationInfo {
     // The profile key this data belongs to.
     std::string profile_key;
     // The profile index of this dex file (matches ClassReference#dex_profile_index).
-    uint8_t profile_index;
+    ProfileIndexType profile_index;
     // The dex checksum.
     uint32_t checksum;
     // The methods' profile information.
@@ -813,7 +827,7 @@ class ProfileCompilationInfo {
   // Read the profile header from the given fd and store the number of profile
   // lines into number_of_dex_files.
   ProfileLoadStatus ReadProfileHeader(ProfileSource& source,
-                                      /*out*/uint8_t* number_of_dex_files,
+                                      /*out*/ProfileIndexType* number_of_dex_files,
                                       /*out*/uint32_t* size_uncompressed_data,
                                       /*out*/uint32_t* size_compressed_data,
                                       /*out*/std::string* error);
@@ -830,12 +844,13 @@ class ProfileCompilationInfo {
                                      /*out*/std::string* error);
 
   // Read a single profile line from the given fd.
-  ProfileLoadStatus ReadProfileLine(SafeBuffer& buffer,
-                                    uint8_t number_of_dex_files,
-                                    const ProfileLineHeader& line_header,
-                                    const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
-                                    bool merge_classes,
-                                    /*out*/std::string* error);
+  ProfileLoadStatus ReadProfileLine(
+      SafeBuffer& buffer,
+      ProfileIndexType number_of_dex_files,
+      const ProfileLineHeader& line_header,
+      const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
+      bool merge_classes,
+      /*out*/std::string* error);
 
   // Read all the classes from the buffer into the profile `info_` structure.
   bool ReadClasses(SafeBuffer& buffer,
@@ -844,21 +859,22 @@ class ProfileCompilationInfo {
 
   // Read all the methods from the buffer into the profile `info_` structure.
   bool ReadMethods(SafeBuffer& buffer,
-                   uint8_t number_of_dex_files,
+                   ProfileIndexType number_of_dex_files,
                    const ProfileLineHeader& line_header,
-                   const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
+                   const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
                    /*out*/std::string* error);
 
   // The method generates mapping of profile indices while merging a new profile
   // data into current data. It returns true, if the mapping was successful.
-  bool RemapProfileIndex(const std::vector<ProfileLineHeader>& profile_line_headers,
-                         const ProfileLoadFilterFn& filter_fn,
-                         /*out*/SafeMap<uint8_t, uint8_t>* dex_profile_index_remap);
+  bool RemapProfileIndex(
+      const std::vector<ProfileLineHeader>& profile_line_headers,
+      const ProfileLoadFilterFn& filter_fn,
+      /*out*/SafeMap<ProfileIndexType, ProfileIndexType>* dex_profile_index_remap);
 
   // Read the inline cache encoding from line_bufer into inline_cache.
   bool ReadInlineCache(SafeBuffer& buffer,
-                       uint8_t number_of_dex_files,
-                       const SafeMap<uint8_t, uint8_t>& dex_profile_index_remap,
+                       ProfileIndexType number_of_dex_files,
+                       const SafeMap<ProfileIndexType, ProfileIndexType>& dex_profile_index_remap,
                        /*out*/InlineCacheMap* inline_cache,
                        /*out*/std::string* error);
 
@@ -874,7 +890,7 @@ class ProfileCompilationInfo {
   // `dex_to_classes_map`.
   void GroupClassesByDex(
       const ClassSet& classes,
-      /*out*/SafeMap<uint8_t, std::vector<dex::TypeIndex>>* dex_to_classes_map);
+      /*out*/SafeMap<ProfileIndexType, std::vector<dex::TypeIndex>>* dex_to_classes_map);
 
   // Find the data for the dex_pc in the inline cache. Adds an empty entry
   // if no previous data exists.
@@ -900,6 +916,18 @@ class ProfileCompilationInfo {
   static std::string MigrateAnnotationInfo(const std::string& base_key,
                                            const std::string& augmented_key);
 
+  // Returns the maximum value for the profile index. It depends on the profile type.
+  // Boot profiles can store more dex files than regular profiles.
+  ProfileIndexType MaxProfileIndex() const;
+  // Returns the size of the profile index type used for serialization.
+  uint32_t SizeOfProfileIndexType() const;
+  // Writes the profile index to the buffer. The type of profile will determine the
+  // number of bytes used for serialization.
+  void WriteProfileIndex(std::vector<uint8_t>* buffer, ProfileIndexType value) const;
+  // Read the profile index from the buffer. The type of profile will determine the
+  // number of bytes used for serialization.
+  bool ReadProfileIndex(SafeBuffer& safe_buffer, ProfileIndexType* value) const;
+
   friend class ProfileCompilationInfoTest;
   friend class CompilerDriverProfileTest;
   friend class ProfileAssistantTest;
@@ -916,7 +944,7 @@ class ProfileCompilationInfo {
   // Cache mapping profile keys to profile index.
   // This is used to speed up searches since it avoids iterating
   // over the info_ vector when searching by profile key.
-  ArenaSafeMap<const std::string, uint8_t> profile_key_map_;
+  ArenaSafeMap<const std::string, ProfileIndexType> profile_key_map_;
 
   // The version of the profile.
   uint8_t version_[kProfileVersionSize];

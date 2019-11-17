@@ -37,6 +37,7 @@
 #include "perfetto/trace/profiling/heap_graph.pbzero.h"
 #include "perfetto/trace/profiling/profile_common.pbzero.h"
 #include "perfetto/config/profiling/java_hprof_config.pbzero.h"
+#include "perfetto/protozero/packed_repeated_fields.h"
 #include "perfetto/tracing.h"
 #include "runtime-inl.h"
 #include "runtime_callbacks.h"
@@ -389,6 +390,8 @@ void DumpPerfetto(art::Thread* self) {
             std::map<art::RootType, std::vector<art::mirror::Object*>> root_objects;
             RootFinder rcf(&root_objects);
             art::Runtime::Current()->VisitRoots(&rcf);
+            std::unique_ptr<protozero::PackedVarInt> object_ids(
+                new protozero::PackedVarInt);
             for (const auto& p : root_objects) {
               const art::RootType root_type = p.first;
               const std::vector<art::mirror::Object*>& children = p.second;
@@ -396,11 +399,19 @@ void DumpPerfetto(art::Thread* self) {
                 writer.GetHeapGraph()->add_roots();
               root_proto->set_root_type(ToProtoType(root_type));
               for (art::mirror::Object* obj : children)
-                root_proto->add_object_ids(reinterpret_cast<uintptr_t>(obj));
+                object_ids->Append(reinterpret_cast<uintptr_t>(obj));
+              root_proto->set_object_ids(*object_ids);
+              object_ids->Reset();
             }
 
+            std::unique_ptr<protozero::PackedVarInt> reference_field_ids(
+                new protozero::PackedVarInt);
+            std::unique_ptr<protozero::PackedVarInt> reference_object_ids(
+                new protozero::PackedVarInt);
+
             art::Runtime::Current()->GetHeap()->VisitObjectsPaused(
-                [&writer, &interned_types, &interned_fields](
+                [&writer, &interned_types, &interned_fields,
+                &reference_field_ids, &reference_object_ids](
                     art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                   perfetto::protos::pbzero::HeapGraphObject* object_proto =
                     writer.GetHeapGraph()->add_objects();
@@ -414,11 +425,13 @@ void DumpPerfetto(art::Thread* self) {
                   ReferredObjectsFinder objf(&referred_objects);
                   obj->VisitReferences(objf, art::VoidFunctor());
                   for (const auto& p : referred_objects) {
-                    object_proto->add_reference_field_id(
-                        FindOrAppend(&interned_fields, p.first));
-                    object_proto->add_reference_object_id(
-                        reinterpret_cast<uintptr_t>(p.second));
+                    reference_field_ids->Append(FindOrAppend(&interned_fields, p.first));
+                    reference_object_ids->Append(reinterpret_cast<uintptr_t>(p.second));
                   }
+                  object_proto->set_reference_field_id(*reference_field_ids);
+                  object_proto->set_reference_object_id(*reference_object_ids);
+                  reference_field_ids->Reset();
+                  reference_object_ids->Reset();
                 });
 
             for (const auto& p : interned_fields) {

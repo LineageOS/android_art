@@ -26,6 +26,7 @@ cc_defaults {
     defaults: ["art_defaults"],
     host_supported: true,
     srcs: [
+        "alloc_manager.cc",
         "deopt_manager.cc",
         "events.cc",
         "fixed_up_dex_file.cc",

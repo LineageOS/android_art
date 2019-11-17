@@ -41,6 +41,7 @@
 #include "art_jvmti.h"
 #include "base/array_ref.h"
 #include "base/globals.h"
+#include "dex/class_accessor.h"
 #include "dex/dex_file.h"
 #include "dex/dex_file_structs.h"
 #include "jni/jni_env_ext-inl.h"
@@ -155,6 +156,9 @@ class Redefiner {
     bool FinishRemainingAllocations(/*out*/RedefinitionDataIter* cur_data)
         REQUIRES_SHARED(art::Locks::mutator_lock_);
 
+    bool CollectAndCreateNewInstances(/*out*/RedefinitionDataIter* cur_data)
+        REQUIRES_SHARED(art::Locks::mutator_lock_);
+
     bool AllocateAndRememberNewDexFileCookie(
         art::Handle<art::mirror::ClassLoader> source_class_loader,
         art::Handle<art::mirror::Object> dex_file_obj,
@@ -234,8 +238,14 @@ class Redefiner {
 
     void RecordNewMethodAdded();
     void RecordNewFieldAdded();
+    void RecordHasVirtualMembers() {
+      has_virtuals_ = true;
+    }
 
-   private:
+    bool HasVirtualMembers() const {
+      return has_virtuals_;
+    }
+
     bool IsStructuralRedefinition() const {
       DCHECK(!(added_fields_ || added_methods_) || driver_->IsStructuralRedefinition())
           << "added_fields_: " << added_fields_ << " added_methods_: " << added_methods_
@@ -243,6 +253,7 @@ class Redefiner {
       return driver_->IsStructuralRedefinition() && (added_fields_ || added_methods_);
     }
 
+   private:
     void UpdateClassStructurally(const RedefinitionDataIter& cur_data)
         REQUIRES(art::Locks::mutator_lock_);
 
@@ -257,6 +268,7 @@ class Redefiner {
 
     bool added_fields_ = false;
     bool added_methods_ = false;
+    bool has_virtuals_ = false;
 
     // Does the class need to be reverified due to verification soft-fails possibly forcing
     // interpreter or lock-counting?
@@ -310,6 +322,8 @@ class Redefiner {
   bool EnsureAllClassAllocationsFinished(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool FinishAllRemainingAllocations(RedefinitionDataHolder& holder)
+      REQUIRES_SHARED(art::Locks::mutator_lock_);
+  bool CollectAndCreateNewInstances(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   void ReleaseAllDexFiles() REQUIRES_SHARED(art::Locks::mutator_lock_);
   void ReverifyClasses(RedefinitionDataHolder& holder) REQUIRES_SHARED(art::Locks::mutator_lock_);
