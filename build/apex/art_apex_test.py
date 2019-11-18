@@ -542,17 +542,13 @@ class ReleaseChecker:
     self._checker.check_optional_native_library('libclang_rt.hwasan*')
     self._checker.check_optional_native_library('libclang_rt.ubsan*')
 
-    # Check dexpreopt files for libcore bootclasspath jars, unless this is a
-    # coverage build with EMMA_INSTRUMENT_FRAMEWORK=true (in that case we do not
-    # generate dexpreopt files because ART boot jars depend on framework and
-    # cannot be dexpreopted in isolation).
-    if 'EMMA_INSTRUMENT_FRAMEWORK' not in os.environ or not os.environ['EMMA_INSTRUMENT_FRAMEWORK']:
-      self._checker.check_dexpreopt('boot')
-      self._checker.check_dexpreopt('boot-apache-xml')
-      self._checker.check_dexpreopt('boot-bouncycastle')
-      self._checker.check_dexpreopt('boot-core-icu4j')
-      self._checker.check_dexpreopt('boot-core-libart')
-      self._checker.check_dexpreopt('boot-okhttp')
+    # Check dexpreopt files for libcore bootclasspath jars
+    self._checker.check_dexpreopt('boot')
+    self._checker.check_dexpreopt('boot-apache-xml')
+    self._checker.check_dexpreopt('boot-bouncycastle')
+    self._checker.check_dexpreopt('boot-core-icu4j')
+    self._checker.check_dexpreopt('boot-core-libart')
+    self._checker.check_dexpreopt('boot-okhttp')
 
 class ReleaseTargetChecker:
   def __init__(self, checker):
