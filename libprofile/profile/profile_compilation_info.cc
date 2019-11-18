@@ -57,7 +57,7 @@ const uint8_t ProfileCompilationInfo::kProfileMagic[] = { 'p', 'r', 'o', '\0' };
 // profile_compilation_info object. All the profile line headers are now placed together
 // before corresponding method_encodings and class_ids.
 const uint8_t ProfileCompilationInfo::kProfileVersion[] = { '0', '1', '0', '\0' };
-const uint8_t ProfileCompilationInfo::kProfileVersionForBootImage[] = { '0', '1', '1', '\0' };
+const uint8_t ProfileCompilationInfo::kProfileVersionForBootImage[] = { '0', '1', '2', '\0' };
 
 static_assert(sizeof(ProfileCompilationInfo::kProfileVersion) == 4,
               "Invalid profile version size");
