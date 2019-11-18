@@ -34,7 +34,7 @@
 namespace openjdkjvmti {
 
 struct ArtJvmTiEnv;
-class JvmtiAllocationListener;
+class JvmtiEventAllocationListener;
 class JvmtiDdmChunkListener;
 class JvmtiGcPauseListener;
 class JvmtiMethodTraceListener;
@@ -425,7 +425,7 @@ class EventHandler {
   // A union of all enabled events, anywhere.
   EventMask global_mask;
 
-  std::unique_ptr<JvmtiAllocationListener> alloc_listener_;
+  std::unique_ptr<JvmtiEventAllocationListener> alloc_listener_;
   std::unique_ptr<JvmtiDdmChunkListener> ddm_listener_;
   std::unique_ptr<JvmtiGcPauseListener> gc_pause_listener_;
   std::unique_ptr<JvmtiMethodTraceListener> method_trace_listener_;
