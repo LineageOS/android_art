@@ -37,6 +37,9 @@ class Offset {
   constexpr size_t SizeValue() const {
     return val_;
   }
+  constexpr bool operator==(Offset o) const {
+    return SizeValue() == o.SizeValue();
+  }
 
  protected:
   size_t val_;

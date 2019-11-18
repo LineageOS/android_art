@@ -1011,8 +1011,10 @@ class Heap {
                                          size_t* bytes_allocated,
                                          size_t* usable_size,
                                          size_t* bytes_tl_bulk_allocated,
-                                         ObjPtr<mirror::Class>* klass)
+                                         ObjPtr<mirror::Class>* klass,
+                                         /*out*/const char** old_no_thread_suspend_cause)
       REQUIRES(!Locks::thread_suspend_count_lock_, !*gc_complete_lock_, !*pending_task_lock_)
+      ACQUIRE(Roles::uninterruptible_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Allocate into a specific space.
