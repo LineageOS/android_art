@@ -1,0 +1,4 @@
+Tests structural redefinition with multiple threads.
+
+Tests that using the structural redefinition while concurrently using the class being redefined
+doesn't cause any unexpected problems.
