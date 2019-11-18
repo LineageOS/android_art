@@ -597,24 +597,43 @@ def run_test(command, test, test_variant, test_name):
     test_time = datetime.timedelta(seconds=test_time_seconds)
     failed_tests.append((test_name, 'Timed out in %d seconds' % timeout))
 
-    # HACK(b/142039427): Print extra backtraces on timeout.
-    if "-target-" in test_name:
-      for i in range(8):
-        proc_name = "dalvikvm" + test_name[-2:]
-        pidof = subprocess.run(["adb", "shell", "pidof", proc_name], stdout=subprocess.PIPE)
-        for pid in pidof.stdout.decode("ascii").split():
-          if i >= 4:
-            print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
+    # HACK(b/142039427, b/144333851, b/144360582): Print extra backtraces on timeout.
+    target_test = "-target-" in test_name
+    # Print the backtrace every minute (see the `time.sleep(60)` call below),
+    # eight times, to see if the test is making progress.
+    for i in range(8):
+      # Deduce the name of the ART binary (`dalvikvm32` or `dalvikvm64`) from
+      # the last two characters of the test name (`32` or `64`).
+      proc_name = "dalvikvm" + test_name[-2:]
+      pidof_command = ["pidof", proc_name]
+      if target_test:
+        pidof_command = ["adb", "shell"] + pidof_command
+      pidof = subprocess.run(pidof_command, stdout=subprocess.PIPE)
+      for pid in pidof.stdout.decode("ascii").split():
+        if i >= 4:
+          print_text("Backtrace of %s at %s\n" % (pid, time.monotonic()))
+          if target_test:
             subprocess.run(["adb", "shell", "debuggerd", pid])
-            time.sleep(10)
-          task_dir = "/proc/%s/task" % pid
-          tids = subprocess.run(["adb", "shell", "ls", task_dir], stdout=subprocess.PIPE)
-          for tid in tids.stdout.decode("ascii").split():
-            for status in ["stat", "status"]:
-              filename = "%s/%s/%s" % (task_dir, tid, status)
-              print_text("Content of %s\n" % (filename))
-              subprocess.run(["adb", "shell", "cat", filename])
-        time.sleep(60)
+          else:
+            # There is no `debuggerd` on host, and `gdb` may require root
+            # permissions to run `ptrace()`. Send `SIGQUIT` to ART to ask it to
+            # dump information via its signal handler instead.
+            os.kill(pid, signal.SIGQUIT)
+          time.sleep(10)
+        task_dir = "/proc/%s/task" % pid
+        list_tasks_command = ["ls", task_dir]
+        if target_test:
+          list_tasks_command = ["adb", "shell"] + list_tasks_command
+        tids = subprocess.run(list_tasks_command, stdout=subprocess.PIPE)
+        for tid in tids.stdout.decode("ascii").split():
+          for status in ["stat", "status"]:
+            filename = "%s/%s/%s" % (task_dir, tid, status)
+            print_text("Content of %s\n" % (filename))
+            print_status_command = ["cat", filename]
+            if target_test:
+              print_status_command = ["adb", "shell"] + print_status_command
+            subprocess.run(print_status_command)
+      time.sleep(60)
 
     # The python documentation states that it is necessary to actually kill the process.
     os.killpg(proc.pid, signal.SIGKILL)
