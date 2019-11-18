@@ -1,0 +1,4 @@
+Checks that monitor-protected increments at various granularities are indeed
+atomic. Also checks j.u.c. increments. Can be configured to print execution
+times for contended and uncontentended monitor acquisition under different
+cicumstances.
