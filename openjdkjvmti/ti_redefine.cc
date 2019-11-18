@@ -42,8 +42,6 @@
 #include <android-base/logging.h>
 #include <android-base/stringprintf.h>
 
-#include "alloc_manager.h"
-#include "android-base/macros.h"
 #include "android-base/thread_annotations.h"
 #include "art_field-inl.h"
 #include "art_field.h"
@@ -117,7 +115,6 @@
 #include "reflective_value_visitor.h"
 #include "runtime.h"
 #include "runtime_globals.h"
-#include "scoped_thread_state_change.h"
 #include "stack.h"
 #include "thread.h"
 #include "thread_list.h"
@@ -463,33 +460,30 @@ jvmtiError Redefiner::GetClassRedefinitionError(art::Handle<art::mirror::Class> 
     }
     // Check for already existing non-static fields/methods.
     // TODO Remove this once we support generic method/field addition.
-    if (!klass->IsFinal()) {
-      bool non_static_method = false;
-      klass->VisitMethods([&](art::ArtMethod* m) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-        // Since direct-methods (ie privates + <init> are not in any vtable/iftable we can update
-        // them).
-        if (!m->IsDirect()) {
-          non_static_method = true;
-          *error_msg = StringPrintf("%s has a non-direct function %s",
-                                    klass->PrettyClass().c_str(),
-                                    m->PrettyMethod().c_str());
-        }
-      }, art::kRuntimePointerSize);
-      if (non_static_method) {
-        return ERR(UNMODIFIABLE_CLASS);
+    bool non_static_method = false;
+    klass->VisitMethods([&](art::ArtMethod* m) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+      // Since direct-methods (ie privates + <init> are not in any vtable/iftable we can update
+      // them).
+      if (!m->IsDirect()) {
+        non_static_method = true;
+        *error_msg = StringPrintf("%s has a non-direct function %s",
+                                  klass->PrettyClass().c_str(),
+                                  m->PrettyMethod().c_str());
       }
-      bool non_static_field = false;
-      klass->VisitFields([&](art::ArtField* f) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-        if (!f->IsStatic()) {
-          non_static_field = true;
-          *error_msg = StringPrintf("%s has a non-static field %s",
-                                    klass->PrettyClass().c_str(),
-                                    f->PrettyField().c_str());
-        }
-      });
-      if (non_static_field) {
-        return ERR(UNMODIFIABLE_CLASS);
+    }, art::kRuntimePointerSize);
+    if (non_static_method) {
+      return ERR(UNMODIFIABLE_CLASS);
+    }
+    bool non_static_field = false;
+    klass->VisitFields([&](art::ArtField* f) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+      if (!f->IsStatic()) {
+        non_static_field = true;
+        *error_msg = StringPrintf(
+            "%s has a non-static field %s", klass->PrettyClass().c_str(), f->PrettyField().c_str());
       }
+    });
+    if (non_static_field) {
+      return ERR(UNMODIFIABLE_CLASS);
     }
     // Check for fields/methods which were returned before moving to index jni id type.
     // TODO We might want to rework how this is done. Once full redefinition is implemented we will
@@ -991,12 +985,9 @@ bool Redefiner::ClassRedefinition::CheckMethods() {
           return old_method_id == new_method_id;
         });
 
-    if (!new_method.IsStaticOrDirect()) {
-      RecordHasVirtualMembers();
-    }
     if (old_iter == old_methods.cend()) {
       // TODO Support adding non-static methods.
-      if (is_structural && (new_method.IsStaticOrDirect() || h_klass->IsFinal())) {
+      if (is_structural && new_method.IsStaticOrDirect()) {
         RecordNewMethodAdded();
       } else {
         RecordFailure(
@@ -1055,12 +1046,9 @@ bool Redefiner::ClassRedefinition::CheckFields() {
           FieldNameAndSignature old_field_id(&old_dex_file, old_iter.GetIndex());
           return old_field_id == new_field_id;
         });
-    if (!new_field.IsStatic()) {
-      RecordHasVirtualMembers();
-    }
     if (old_iter == old_fields.cend()) {
       // TODO Support adding non-static fields.
-      if (driver_->IsStructuralRedefinition() && (new_field.IsStatic() || h_klass->IsFinal())) {
+      if (driver_->IsStructuralRedefinition() && new_field.IsStatic()) {
         RecordNewFieldAdded();
       } else {
         RecordFailure(ERR(UNSUPPORTED_REDEFINITION_SCHEMA_CHANGED),
@@ -1181,10 +1169,6 @@ bool Redefiner::ClassRedefinition::CheckRedefinable() {
   jvmtiError res;
   if (driver_->type_ == RedefinitionType::kStructural && this->IsStructuralRedefinition()) {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kStructural>(h_klass, &err);
-    if (res == OK && HasVirtualMembers() && h_klass->IsFinalizable()) {
-      res = ERR(INTERNAL);
-      err = "Cannot redefine finalizable objects at this time.";
-    }
   } else {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(h_klass, &err);
   }
@@ -1217,11 +1201,9 @@ class RedefinitionDataHolder {
     kSlotOldObsoleteMethods = 6,
     kSlotOldDexCaches = 7,
     kSlotNewClassObject = 8,
-    kSlotOldInstanceObjects = 9,
-    kSlotNewInstanceObjects = 10,
 
     // Must be last one.
-    kNumSlots = 11,
+    kNumSlots = 9,
   };
 
   // This needs to have a HandleScope passed in that is capable of creating a new Handle without
@@ -1287,18 +1269,6 @@ class RedefinitionDataHolder {
     return art::ObjPtr<art::mirror::Class>::DownCast(GetSlot(klass_index, kSlotNewClassObject));
   }
 
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> GetOldInstanceObjects(
-      jint klass_index) const REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    return art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>>::DownCast(
-        GetSlot(klass_index, kSlotOldInstanceObjects));
-  }
-
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> GetNewInstanceObjects(
-      jint klass_index) const REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    return art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>>::DownCast(
-        GetSlot(klass_index, kSlotNewInstanceObjects));
-  }
-
   void SetSourceClassLoader(jint klass_index, art::ObjPtr<art::mirror::ClassLoader> loader)
       REQUIRES_SHARED(art::Locks::mutator_lock_) {
     SetSlot(klass_index, kSlotSourceClassLoader, loader);
@@ -1338,16 +1308,6 @@ class RedefinitionDataHolder {
     SetSlot(klass_index, kSlotNewClassObject, klass);
   }
 
-  void SetOldInstanceObjects(jint klass_index,
-                             art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> objs)
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    SetSlot(klass_index, kSlotOldInstanceObjects, objs);
-  }
-  void SetNewInstanceObjects(jint klass_index,
-                             art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> objs)
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    SetSlot(klass_index, kSlotNewInstanceObjects, objs);
-  }
   int32_t Length() const REQUIRES_SHARED(art::Locks::mutator_lock_) {
     return arr_->GetLength() / kNumSlots;
   }
@@ -1432,11 +1392,6 @@ class RedefinitionDataIter {
     return *this;
   }
 
-  // Compat for STL iterators.
-  RedefinitionDataIter& operator*() {
-    return *this;
-  }
-
   Redefiner::ClassRedefinition& GetRedefinition() REQUIRES_SHARED(art::Locks::mutator_lock_) {
     return (*holder_.GetRedefinitions())[idx_];
   }
@@ -1483,14 +1438,6 @@ class RedefinitionDataIter {
     return holder_.GetNewClassObject(idx_);
   }
 
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> GetOldInstanceObjects() const
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    return holder_.GetOldInstanceObjects(idx_);
-  }
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> GetNewInstanceObjects() const
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    return holder_.GetNewInstanceObjects(idx_);
-  }
   int32_t GetIndex() const {
     return idx_;
   }
@@ -1530,14 +1477,6 @@ class RedefinitionDataIter {
   void SetNewClassObject(art::ObjPtr<art::mirror::Class> klass)
       REQUIRES_SHARED(art::Locks::mutator_lock_) {
     holder_.SetNewClassObject(idx_, klass);
-  }
-  void SetOldInstanceObjects(art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> objs)
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    holder_.SetOldInstanceObjects(idx_, objs);
-  }
-  void SetNewInstanceObjects(art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> objs)
-      REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    holder_.SetNewInstanceObjects(idx_, objs);
   }
 
  private:
@@ -1638,75 +1577,6 @@ bool Redefiner::ClassRedefinition::AllocateAndRememberNewDexFileCookie(
     }
   }
 
-  return true;
-}
-
-bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
-    /*out*/ RedefinitionDataIter* cur_data) {
-  if (!IsStructuralRedefinition()) {
-    return true;
-  }
-  art::VariableSizedHandleScope hs(driver_->self_);
-  art::Handle<art::mirror::Class> old_klass(hs.NewHandle(cur_data->GetMirrorClass()));
-  std::vector<art::Handle<art::mirror::Object>> old_instances;
-  art::gc::Heap* heap = driver_->runtime_->GetHeap();
-  auto is_instance = [&](art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    if (HasVirtualMembers()) {
-      return old_klass->IsAssignableFrom(obj->GetClass());
-    } else {
-      // We don't need to deal with objects of subtypes when we don't modify virtuals since the
-      // vtable + field layout will remain the same.
-      return old_klass.Get() == obj->GetClass();
-    }
-  };
-  heap->VisitObjects([&](art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    if (is_instance(obj)) {
-      CHECK(old_klass.Get() == obj->GetClass()) << "No support for subtypes yet!";
-      old_instances.push_back(hs.NewHandle(obj));
-    }
-  });
-  VLOG(plugin) << "Collected " << old_instances.size() << " instances to recreate!";
-
-  art::Handle<art::mirror::Class> obj_array_class(
-      hs.NewHandle(art::GetClassRoot<art::mirror::ObjectArray<art::mirror::Object>>(
-          driver_->runtime_->GetClassLinker())));
-  art::Handle<art::mirror::ObjectArray<art::mirror::Object>> old_instances_arr(
-      hs.NewHandle(art::mirror::ObjectArray<art::mirror::Object>::Alloc(
-          driver_->self_, obj_array_class.Get(), old_instances.size())));
-  if (old_instances_arr.IsNull()) {
-    driver_->self_->AssertPendingOOMException();
-    driver_->self_->ClearException();
-    RecordFailure(ERR(OUT_OF_MEMORY), "Could not allocate old_instance arrays!");
-    return false;
-  }
-  for (uint32_t i = 0; i < old_instances.size(); ++i) {
-    old_instances_arr->Set(i, old_instances[i].Get());
-  }
-  cur_data->SetOldInstanceObjects(old_instances_arr.Get());
-
-  art::Handle<art::mirror::ObjectArray<art::mirror::Object>> new_instances_arr(
-      hs.NewHandle(art::mirror::ObjectArray<art::mirror::Object>::Alloc(
-          driver_->self_, obj_array_class.Get(), old_instances.size())));
-  if (new_instances_arr.IsNull()) {
-    driver_->self_->AssertPendingOOMException();
-    driver_->self_->ClearException();
-    RecordFailure(ERR(OUT_OF_MEMORY), "Could not allocate new_instance arrays!");
-    return false;
-  }
-  art::Handle<art::mirror::Class> new_klass(hs.NewHandle(cur_data->GetNewClassObject()));
-  for (uint32_t i = 0; i < old_instances.size(); ++i) {
-    art::ObjPtr<art::mirror::Object> new_instance(new_klass->AllocObject(driver_->self_));
-    if (new_instance.IsNull()) {
-      driver_->self_->AssertPendingOOMException();
-      driver_->self_->ClearException();
-      std::string msg(
-          StringPrintf("Could not allocate instance %d of %zu", i, old_instances.size()));
-      RecordFailure(ERR(OUT_OF_MEMORY), msg);
-      return false;
-    }
-    new_instances_arr->Set(i, new_instance);
-  }
-  cur_data->SetNewInstanceObjects(new_instances_arr.Get());
   return true;
 }
 
@@ -1931,16 +1801,6 @@ bool Redefiner::EnsureAllClassAllocationsFinished(RedefinitionDataHolder& holder
   return true;
 }
 
-bool Redefiner::CollectAndCreateNewInstances(RedefinitionDataHolder& holder) {
-  for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
-    // Allocate the data this redefinition requires.
-    if (!data.GetRedefinition().CollectAndCreateNewInstances(&data)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 bool Redefiner::FinishAllRemainingAllocations(RedefinitionDataHolder& holder) {
   for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
     // Allocate the data this redefinition requires.
@@ -1989,36 +1849,6 @@ class ScopedDisableConcurrentAndMovingGc {
   art::Thread* self_;
 };
 
-class ScopedSuspendAllocations {
- public:
-  ScopedSuspendAllocations(art::Runtime* runtime, RedefinitionDataHolder& h)
-      REQUIRES_SHARED(art::Locks::mutator_lock_)
-      : paused_(false) {
-    if (std::any_of(h.begin(),
-                    h.end(),
-                    [](auto r) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-                      return r.GetRedefinition().IsStructuralRedefinition();
-                    })) {
-      VLOG(plugin) << "Pausing allocations for structural redefinition.";
-      paused_ = true;
-      AllocationManager::Get()->PauseAllocations(art::Thread::Current());
-      // Collect garbage so we don't need to recreate as much.
-      runtime->GetHeap()->CollectGarbage(/*clear_soft_references=*/false);
-    }
-  }
-
-  ~ScopedSuspendAllocations() REQUIRES_SHARED(art::Locks::mutator_lock_) {
-    if (paused_) {
-      AllocationManager::Get()->ResumeAllocations(art::Thread::Current());
-    }
-  }
-
- private:
-  bool paused_;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedSuspendAllocations);
-};
-
 jvmtiError Redefiner::Run() {
   art::StackHandleScope<1> hs(self_);
   // Allocate an array to hold onto all java temporary objects associated with this redefinition.
@@ -2040,11 +1870,6 @@ jvmtiError Redefiner::Run() {
       !EnsureAllClassAllocationsFinished(holder) ||
       !FinishAllRemainingAllocations(holder) ||
       !CheckAllClassesAreVerified(holder)) {
-    return result_;
-  }
-
-  ScopedSuspendAllocations suspend_alloc(runtime_, holder);
-  if (!CollectAndCreateNewInstances(holder)) {
     return result_;
   }
 
@@ -2198,120 +2023,6 @@ void Redefiner::ClassRedefinition::CollectNewFieldAndMethodMappings(
   }
 }
 
-static void CopyField(art::ObjPtr<art::mirror::Object> target,
-                      art::ArtField* new_field,
-                      art::ObjPtr<art::mirror::Object> source,
-                      art::ArtField& old_field) REQUIRES(art::Locks::mutator_lock_) {
-  art::Primitive::Type ftype = old_field.GetTypeAsPrimitiveType();
-  CHECK_EQ(ftype, new_field->GetTypeAsPrimitiveType())
-      << old_field.PrettyField() << " vs " << new_field->PrettyField();
-  if (ftype == art::Primitive::kPrimNot) {
-    new_field->SetObject<false>(target, old_field.GetObject(source));
-  } else {
-    switch (ftype) {
-#define UPDATE_FIELD(TYPE)                                            \
-  case art::Primitive::kPrim##TYPE:                                   \
-    new_field->Set##TYPE<false>(target, old_field.Get##TYPE(source)); \
-    break
-      UPDATE_FIELD(Int);
-      UPDATE_FIELD(Float);
-      UPDATE_FIELD(Long);
-      UPDATE_FIELD(Double);
-      UPDATE_FIELD(Short);
-      UPDATE_FIELD(Char);
-      UPDATE_FIELD(Byte);
-      UPDATE_FIELD(Boolean);
-      case art::Primitive::kPrimNot:
-      case art::Primitive::kPrimVoid:
-        LOG(FATAL) << "Unexpected field with type " << ftype << " found!";
-        UNREACHABLE();
-#undef UPDATE_FIELD
-    }
-  }
-}
-
-static void CopyFields(bool is_static,
-                       art::ObjPtr<art::mirror::Object> target,
-                       art::ObjPtr<art::mirror::Class> target_class,
-                       art::ObjPtr<art::mirror::Object> source,
-                       art::ObjPtr<art::mirror::Class> source_class)
-    REQUIRES(art::Locks::mutator_lock_) {
-  DCHECK(!source_class->IsObjectClass() && !target_class->IsObjectClass())
-      << "Should not be overriding object class fields. Target: " << target_class->PrettyClass()
-      << " Source: " << source_class->PrettyClass();
-  for (art::ArtField& f : (is_static ? source_class->GetSFields() : source_class->GetIFields())) {
-    art::ArtField* new_field =
-        (is_static ? target_class->FindDeclaredStaticField(f.GetName(), f.GetTypeDescriptor())
-                   : target_class->FindDeclaredInstanceField(f.GetName(), f.GetTypeDescriptor()));
-    CHECK(new_field != nullptr) << "could not find new version of " << f.PrettyField();
-    CopyField(target, new_field, source, f);
-  }
-  if (!is_static && !target_class->GetSuperClass()->IsObjectClass()) {
-    CopyFields(
-        is_static, target, target_class->GetSuperClass(), source, source_class->GetSuperClass());
-  }
-}
-
-static void ClearField(art::ObjPtr<art::mirror::Object> target, art::ArtField& field)
-    REQUIRES(art::Locks::mutator_lock_) {
-  art::Primitive::Type ftype = field.GetTypeAsPrimitiveType();
-  if (ftype == art::Primitive::kPrimNot) {
-    field.SetObject<false>(target, nullptr);
-  } else {
-    switch (ftype) {
-#define UPDATE_FIELD(TYPE)             \
-  case art::Primitive::kPrim##TYPE:    \
-    field.Set##TYPE<false>(target, 0); \
-    break
-      UPDATE_FIELD(Int);
-      UPDATE_FIELD(Float);
-      UPDATE_FIELD(Long);
-      UPDATE_FIELD(Double);
-      UPDATE_FIELD(Short);
-      UPDATE_FIELD(Char);
-      UPDATE_FIELD(Byte);
-      UPDATE_FIELD(Boolean);
-      case art::Primitive::kPrimNot:
-      case art::Primitive::kPrimVoid:
-        LOG(FATAL) << "Unexpected field with type " << ftype << " found!";
-        UNREACHABLE();
-#undef UPDATE_FIELD
-    }
-  }
-}
-
-static void ClearFields(bool is_static,
-                        art::ObjPtr<art::mirror::Object> target,
-                        art::ObjPtr<art::mirror::Class> target_class)
-    REQUIRES(art::Locks::mutator_lock_) {
-  DCHECK(!target_class->IsObjectClass());
-  for (art::ArtField& f : (is_static ? target_class->GetSFields() : target_class->GetIFields())) {
-    ClearField(target, f);
-  }
-  if (!is_static && !target_class->GetSuperClass()->IsObjectClass()) {
-    ClearFields(is_static, target, target_class->GetSuperClass());
-  }
-}
-
-static void CopyAndClearFields(bool is_static,
-                               art::ObjPtr<art::mirror::Object> target,
-                               art::ObjPtr<art::mirror::Class> target_class,
-                               art::ObjPtr<art::mirror::Object> source,
-                               art::ObjPtr<art::mirror::Class> source_class)
-    REQUIRES(art::Locks::mutator_lock_) {
-  // Copy all non-j.l.Object fields
-  CopyFields(is_static, target, target_class, source, source_class);
-  // Copy the lock-word.
-  target->SetLockWord(source->GetLockWord(false), false);
-  // Clear (reset) the old one.
-  source->SetLockWord(art::LockWord::Default(), false);
-  art::WriteBarrier::ForEveryFieldWrite(target);
-
-  // Clear the fields from the old class. We don't need it anymore.
-  ClearFields(is_static, source, source_class);
-  art::WriteBarrier::ForEveryFieldWrite(source);
-}
-
 void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDataIter& holder) {
   DCHECK(IsStructuralRedefinition());
   // LETS GO. We've got all new class structures so no need to do all the updating of the stacks.
@@ -2325,24 +2036,40 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   std::map<art::ArtMethod*, art::ArtMethod*> method_map;
   std::map<art::ArtField*, art::ArtField*> field_map;
   CollectNewFieldAndMethodMappings(holder, &method_map, &field_map);
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> new_instances(
-      holder.GetNewInstanceObjects());
-  art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> old_instances(
-      holder.GetOldInstanceObjects());
+  // Copy over the fields of the object.
   CHECK(!orig.IsNull());
   CHECK(!replacement.IsNull());
-  // Copy over the static fields of the class and all the instance fields.
-  CopyAndClearFields(/*is_static=*/true, replacement, replacement, orig, orig);
+  for (art::ArtField& f : orig->GetSFields()) {
+    art::ArtField* new_field =
+        replacement->FindDeclaredStaticField(f.GetName(), f.GetTypeDescriptor());
+    CHECK(new_field != nullptr) << "could not find new version of " << f.PrettyField();
+    art::Primitive::Type ftype = f.GetTypeAsPrimitiveType();
+    CHECK_EQ(ftype, new_field->GetTypeAsPrimitiveType())
+        << f.PrettyField() << " vs " << new_field->PrettyField();
+    if (ftype == art::Primitive::kPrimNot) {
+      new_field->SetObject<false>(replacement, f.GetObject(orig));
+    } else {
+      switch (ftype) {
+#define UPDATE_FIELD(TYPE)                                       \
+  case art::Primitive::kPrim##TYPE:                              \
+    new_field->Set##TYPE<false>(replacement, f.Get##TYPE(orig)); \
+    break
 
-  // Copy and clear the fields of the old-instances.
-  for (int32_t i = 0; i < old_instances->GetLength(); i++) {
-    art::ObjPtr<art::mirror::Object> old_instance(old_instances->Get(i));
-    art::ObjPtr<art::mirror::Object> new_instance(new_instances->Get(i));
-    CopyAndClearFields(/*is_static=*/false,
-                       new_instance,
-                       new_instance->GetClass(),
-                       old_instance,
-                       old_instance->GetClass());
+        UPDATE_FIELD(Int);
+        UPDATE_FIELD(Float);
+        UPDATE_FIELD(Long);
+        UPDATE_FIELD(Double);
+        UPDATE_FIELD(Short);
+        UPDATE_FIELD(Char);
+        UPDATE_FIELD(Byte);
+        UPDATE_FIELD(Boolean);
+        case art::Primitive::kPrimNot:
+        case art::Primitive::kPrimVoid:
+          LOG(FATAL) << "Unexpected field with type " << ftype << " found!";
+          UNREACHABLE();
+#undef UPDATE_FIELD
+      }
+    }
   }
   // Mark old class obsolete.
   orig->SetObsoleteObject();
@@ -2352,6 +2079,9 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
     m.SetDontCompile();
     DCHECK_EQ(orig, m.GetDeclaringClass());
   }
+  // Copy the lock-word
+  replacement->SetLockWord(orig->GetLockWord(false), false);
+  orig->SetLockWord(art::LockWord::Default(), false);
   // Update live pointers in ART code.
   auto could_change_resolution_of = [&](auto* field_or_method,
                                         const auto& info) REQUIRES(art::Locks::mutator_lock_) {
@@ -2436,23 +2166,39 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   // Force every frame of every thread to deoptimize (any frame might have eg offsets compiled in).
   driver_->runtime_->GetInstrumentation()->DeoptimizeAllThreadFrames();
 
-  std::unordered_map<art::ObjPtr<art::mirror::Object>,
-                     art::ObjPtr<art::mirror::Object>,
-                     art::HashObjPtr> map;
-  map.emplace(orig, replacement);
-  for (int32_t i = 0; i < old_instances->GetLength(); i++) {
-    map.emplace(old_instances->Get(i), new_instances->Get(i));
-  }
-
-  // Actually perform the general replacement. This doesn't affect ArtMethod/ArtFields. It does
-  // affect the declaring_class field of all the obsolete objects, which is unfortunate and needs to
-  // be undone. This replaces the mirror::Class in 'holder' as well. It's magic!
-  HeapExtensions::ReplaceReferences(driver_->self_, map);
+  // Actually perform the general replacement. This doesn't affect ArtMethod/ArtFields.
+  // This replaces the mirror::Class in 'holder' as well. It's magic!
+  HeapExtensions::ReplaceReference(driver_->self_, orig, replacement);
 
   // Save the old class so that the JIT gc doesn't get confused by it being collected before the
   // jit code. This is also needed to keep the dex-caches of any obsolete methods live.
   replacement->GetExtData()->SetObsoleteClass(orig);
 
+  // Clear the static fields of the old-class.
+  for (art::ArtField& f : orig->GetSFields()) {
+    switch (f.GetTypeAsPrimitiveType()) {
+    #define UPDATE_FIELD(TYPE)            \
+      case art::Primitive::kPrim ## TYPE: \
+        f.Set ## TYPE <false>(orig, 0);   \
+        break
+
+      UPDATE_FIELD(Int);
+      UPDATE_FIELD(Float);
+      UPDATE_FIELD(Long);
+      UPDATE_FIELD(Double);
+      UPDATE_FIELD(Short);
+      UPDATE_FIELD(Char);
+      UPDATE_FIELD(Byte);
+      UPDATE_FIELD(Boolean);
+      case art::Primitive::kPrimNot:
+        f.SetObject<false>(orig, nullptr);
+        break;
+      case art::Primitive::kPrimVoid:
+        LOG(FATAL) << "Unexpected field with type void found!";
+        UNREACHABLE();
+    #undef UPDATE_FIELD
+    }
+  }
 
   art::jit::Jit* jit = driver_->runtime_->GetJit();
   if (jit != nullptr) {
