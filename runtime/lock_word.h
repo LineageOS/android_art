@@ -42,6 +42,7 @@ class Monitor;
  *  |10|9|8|765432109876|5432109876543210|
  *  |00|m|r| lock count |thread id owner |
  *
+ * The lock count is zero, but the owner is nonzero for a simply held lock.
  * When the lock word is in the "fat" state and its bits are formatted as follows:
  *
  *  |33|2|2|2222222211111111110000000000|
@@ -72,7 +73,8 @@ class LockWord {
     kMarkBitStateSize = 1,
     // Number of bits to encode the thin lock owner.
     kThinLockOwnerSize = 16,
-    // Remaining bits are the recursive lock count.
+    // Remaining bits are the recursive lock count. Zero means it is locked exactly once
+    // and not recursively.
     kThinLockCountSize = 32 - kThinLockOwnerSize - kStateSize - kReadBarrierStateSize -
         kMarkBitStateSize,
 
@@ -234,7 +236,8 @@ class LockWord {
   // Return the owner thin lock thread id.
   uint32_t ThinLockOwner() const;
 
-  // Return the number of times a lock value has been locked.
+  // Return the number of times a lock value has been re-locked. Only valid in thin-locked state.
+  // If the lock is held only once the return value is zero.
   uint32_t ThinLockCount() const;
 
   // Return the Monitor encoded in a fat lock.
