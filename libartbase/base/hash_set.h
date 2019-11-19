@@ -35,8 +35,14 @@
 namespace art {
 
 template <class Elem, class HashSetType>
-class HashSetIterator : std::iterator<std::forward_iterator_tag, Elem> {
+class HashSetIterator {
  public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Elem;
+  using difference_type = std::ptrdiff_t;
+  using pointer = Elem*;
+  using reference = Elem&;
+
   HashSetIterator(const HashSetIterator&) = default;
   HashSetIterator(HashSetIterator&&) = default;
   HashSetIterator(HashSetType* hash_set, size_t index) : index_(index), hash_set_(hash_set) {}
@@ -436,32 +442,39 @@ class HashSet {
   // Insert an element with hint, allows duplicates.
   // Note: The hint is not very useful for a HashSet<> unless there are many hash conflicts
   // and in that case the use of HashSet<> itself should be reconsidered.
-  iterator insert(const_iterator hint ATTRIBUTE_UNUSED, const T& element) {
+  std::pair<iterator, bool> insert(const_iterator hint ATTRIBUTE_UNUSED, const T& element) {
     return insert(element);
   }
-  iterator insert(const_iterator hint ATTRIBUTE_UNUSED, T&& element) {
+  std::pair<iterator, bool> insert(const_iterator hint ATTRIBUTE_UNUSED, T&& element) {
     return insert(std::move(element));
   }
 
   // Insert an element, allows duplicates.
-  iterator insert(const T& element) {
+  std::pair<iterator, bool> insert(const T& element) {
     return InsertWithHash(element, hashfn_(element));
   }
-  iterator insert(T&& element) {
+  std::pair<iterator, bool> insert(T&& element) {
     return InsertWithHash(std::move(element), hashfn_(element));
   }
 
   template <typename U, typename = typename std::enable_if<std::is_convertible<U, T>::value>::type>
-  iterator InsertWithHash(U&& element, size_t hash) {
+  std::pair<iterator, bool> InsertWithHash(U&& element, size_t hash) {
     DCHECK_EQ(hash, hashfn_(element));
     if (num_elements_ >= elements_until_expand_) {
       Expand();
       DCHECK_LT(num_elements_, elements_until_expand_);
     }
-    const size_t index = FirstAvailableSlot(IndexForHash(hash));
-    data_[index] = std::forward<U>(element);
-    ++num_elements_;
-    return iterator(this, index);
+    bool find_failed = false;
+    auto find_fail_fn = [&](size_t index) {
+      find_failed = true;
+      return index;
+    };
+    size_t index = FindIndexImpl(element, hash, find_fail_fn);
+    if (find_failed) {
+      data_[index] = std::forward<U>(element);
+      ++num_elements_;
+    }
+    return std::make_pair(iterator(this, index), find_failed);
   }
 
   void swap(HashSet& other) {
@@ -615,12 +628,20 @@ class HashSet {
     if (UNLIKELY(NumBuckets() == 0)) {
       return 0;
     }
+    auto fail_fn = [&](size_t index ATTRIBUTE_UNUSED) { return NumBuckets(); };
+    return FindIndexImpl(element, hash, fail_fn);
+  }
+
+  // Find the hash table slot for an element, or return an empty slot index if not found.
+  template <typename K, typename FailFn>
+  size_t FindIndexImpl(const K& element, size_t hash, FailFn fail_fn) const {
+    DCHECK_NE(NumBuckets(), 0u);
     DCHECK_EQ(hashfn_(element), hash);
     size_t index = IndexForHash(hash);
     while (true) {
       const T& slot = ElementForIndex(index);
       if (emptyfn_.IsEmpty(slot)) {
-        return NumBuckets();
+        return fail_fn(index);
       }
       if (pred_(slot, element)) {
         return index;
