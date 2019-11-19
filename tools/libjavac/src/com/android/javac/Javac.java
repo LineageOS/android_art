@@ -16,6 +16,7 @@
 
 package com.android.javac;
 
+import com.google.common.collect.Lists;
 import com.google.common.io.Files;
 
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import javax.annotation.processing.Processor;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
@@ -78,6 +80,10 @@ public class Javac {
     }
 
     public void compile() {
+        compileWithAnnotationProcessor(null);
+    }
+
+    public void compileWithAnnotationProcessor(Processor processor) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         JavaCompiler.CompilationTask task = mJavac.getTask(
                 null,
@@ -86,24 +92,31 @@ public class Javac {
                 null,
                 null,
                 mCompilationUnits);
+        if (processor != null) {
+            task.setProcessors(Lists.newArrayList(processor));
+        }
         boolean result = task.call();
         if (!result) {
             throw new IllegalStateException(
-                "Compilation failed:" +
-                    diagnosticCollector.getDiagnostics()
-                        .stream()
-                        .map(Object::toString)
-                        .collect(Collectors.joining("\n")));
+                    "Compilation failed:" +
+                            diagnosticCollector.getDiagnostics()
+                                    .stream()
+                                    .map(Object::toString)
+                                    .collect(Collectors.joining("\n")));
         }
     }
 
-    public InputStream getClassFile(String classname) throws IOException {
+    public InputStream getOutputFile(String filename) throws IOException {
         Iterable<? extends JavaFileObject> objs = mFileMan.getJavaFileObjects(
-                new File(mClassOutDir, String.format("%s.class", classToFileName(classname))));
+                new File(mClassOutDir, filename));
         if (!objs.iterator().hasNext()) {
             return null;
         }
         return objs.iterator().next().openInputStream();
+    }
+
+    public InputStream getClassFile(String classname) throws IOException {
+        return getOutputFile(String.format("%s.class", classToFileName(classname)));
     }
 
     public JavaClass getCompiledClass(String classname) throws IOException {
