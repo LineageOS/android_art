@@ -129,6 +129,9 @@ enum LockLevel : uint8_t {
 
   kMutatorLock,
   kInstrumentEntrypointsLock,
+  // This is a generic lock level for a top-level lock meant to be gained after having the
+  // UserCodeSuspensionLock.
+  kPostUserCodeSuspensionTopLevelLock,
   kUserCodeSuspensionLock,
   kZygoteCreationLock,
 
