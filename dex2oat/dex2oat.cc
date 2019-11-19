@@ -1936,6 +1936,8 @@ class Dex2Oat final {
     if (!IsBootImage() && !IsBootImageExtension()) {
       class_loader =
           class_loader_context_->CreateClassLoader(compiler_options_->dex_files_for_oat_file_);
+    }
+    if (!IsBootImage()) {
       callbacks_->SetDexFiles(&dex_files);
     }
 
