@@ -16,11 +16,14 @@
 
 # Push ART artifacts and its dependencies to a chroot directory for on-device testing.
 
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-magenta='\033[0;35m'
-nc='\033[0m'
+if [ -t 1 ]; then
+  # Color sequences if terminal is a tty.
+  red='\033[0;31m'
+  green='\033[0;32m'
+  yellow='\033[0;33m'
+  magenta='\033[0;35m'
+  nc='\033[0m'
+fi
 
 adb wait-for-device
 
