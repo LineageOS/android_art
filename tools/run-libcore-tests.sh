@@ -231,6 +231,11 @@ if $getrandom; then :; else
   expectations="$expectations --expectations art/tools/libcore_no_getrandom_failures.txt"
 fi
 
+if [ ! -t 1 ] ; then
+  # Suppress color codes if not attached to a terminal
+  vogar_args="$vogar_args --no-color"
+fi
+
 # Run the tests using vogar.
 echo "Running tests for the following test packages:"
 echo ${working_packages[@]} | tr " " "\n"

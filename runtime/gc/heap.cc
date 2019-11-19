@@ -1730,6 +1730,10 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
   // Make sure there is no pending exception since we may need to throw an OOME.
   self->AssertNoPendingException();
   DCHECK(klass != nullptr);
+
+  StackHandleScope<1> hs(self);
+  HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(klass));
+
   auto release_no_suspend = [&]() RELEASE(Roles::uninterruptible_) {
     self->EndAssertNoThreadSuspension(*old_no_thread_suspend_cause);
   };
@@ -1739,8 +1743,6 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
     AllocationListener* l = nullptr;
     l = alloc_listener_.load(std::memory_order_seq_cst);
     if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
-      StackHandleScope<1> hs(self);
-      HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(klass));
       l->PreObjectAllocated(self, h_klass, &alloc_size);
     }
   }
@@ -1755,8 +1757,6 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
     return res;                                                                   \
   }()
 
-  StackHandleScope<1> hs(self);
-  HandleWrapperObjPtr<mirror::Class> h(hs.NewHandleWrapper(klass));
   // The allocation failed. If the GC is running, block until it completes, and then retry the
   // allocation.
   collector::GcType last_gc = WaitForGcToComplete(kGcCauseForAlloc, self);
@@ -2301,6 +2301,12 @@ void Heap::IncrementFreedEver() {
                                 std::memory_order_release);
 }
 
+#pragma clang diagnostic push
+#if !ART_USE_FUTEXES
+// Frame gets too large, perhaps due to Bionic pthread_mutex_lock size. We don't care.
+#  pragma clang diagnostic ignored "-Wframe-larger-than="
+#endif
+// This has a large frame, but shouldn't be run anywhere near the stack limit.
 void Heap::PreZygoteFork() {
   if (!HasZygoteSpace()) {
     // We still want to GC in case there is some unreachable non moving objects that could cause a
@@ -2461,6 +2467,7 @@ void Heap::PreZygoteFork() {
     AddRememberedSet(post_zygote_non_moving_space_rem_set);
   }
 }
+#pragma clang diagnostic pop
 
 void Heap::FlushAllocStack() {
   MarkAllocStackAsLive(allocation_stack_.get());
