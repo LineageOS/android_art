@@ -1,3 +1,0 @@
-Tests basic functions in the jvmti plugin.
-
-Tests that using the structural redefinition allows one to override a superclass method.
