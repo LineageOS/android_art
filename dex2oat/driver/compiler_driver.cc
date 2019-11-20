@@ -1050,7 +1050,7 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
   }
 
   TimingLogger::ScopedTiming t("LoadImageClasses", timings);
-  // Make a first class to load all classes explicitly listed in the file
+  // Make a first pass to load all classes explicitly listed in the file
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
