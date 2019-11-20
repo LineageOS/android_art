@@ -218,7 +218,7 @@ TEST_F(HashSetTest, TestLoadFactor) {
 
 TEST_F(HashSetTest, TestStress) {
   HashSet<std::string, IsEmptyFnString> hash_set;
-  std::unordered_multiset<std::string> std_set;
+  std::unordered_set<std::string> std_set;
   std::vector<std::string> strings;
   static constexpr size_t string_count = 2000;
   static constexpr size_t operations = 100000;
@@ -277,7 +277,7 @@ TEST_F(HashSetTest, TestHashMap) {
   ASSERT_EQ(it->second, 123);
   hash_map.erase(it);
   it = hash_map.find(std::string("abcd"));
-  ASSERT_EQ(it->second, 124);
+  ASSERT_EQ(it, hash_map.end());
 }
 
 struct IsEmptyFnVectorInt {
@@ -359,18 +359,26 @@ TEST_F(HashSetTest, TestReserve) {
 TEST_F(HashSetTest, IteratorConversion) {
   const char* test_string = "dummy";
   HashSet<std::string> hash_set;
-  HashSet<std::string>::iterator it = hash_set.insert(test_string);
+  HashSet<std::string>::iterator it = hash_set.insert(test_string).first;
   HashSet<std::string>::const_iterator cit = it;
   ASSERT_TRUE(it == cit);
   ASSERT_EQ(*it, *cit);
 }
 
-TEST_F(HashSetTest, StringSearchyStringView) {
+TEST_F(HashSetTest, StringSearchStringView) {
   const char* test_string = "dummy";
   HashSet<std::string> hash_set;
-  HashSet<std::string>::iterator insert_pos = hash_set.insert(test_string);
+  HashSet<std::string>::iterator insert_pos = hash_set.insert(test_string).first;
   HashSet<std::string>::iterator it = hash_set.find(std::string_view(test_string));
   ASSERT_TRUE(it == insert_pos);
+}
+
+TEST_F(HashSetTest, DoubleInsert) {
+  const char* test_string = "dummy";
+  HashSet<std::string> hash_set;
+  hash_set.insert(test_string);
+  hash_set.insert(test_string);
+  ASSERT_EQ(1u, hash_set.size());
 }
 
 }  // namespace art
