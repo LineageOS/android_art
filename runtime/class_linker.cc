@@ -4957,10 +4957,6 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
   // tell us about the latter.
   if (Runtime::Current()->IsAotCompiler()) {
     CompilerCallbacks* callbacks = Runtime::Current()->GetCompilerCallbacks();
-    // Are we compiling the bootclasspath?
-    if (callbacks->IsBootImage()) {
-      return false;
-    }
     // We are compiling an app (not the image).
     if (!callbacks->CanUseOatStatusForVerification(klass.Ptr())) {
       return false;
