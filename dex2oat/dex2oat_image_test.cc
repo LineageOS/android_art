@@ -74,9 +74,20 @@ class Dex2oatImageTest : public CommonRuntimeTest {
                          const ClassVisitor& class_visitor,
                          size_t method_frequency = 1,
                          size_t class_frequency = 1) {
+    std::vector<std::string> dexes = GetLibCoreDexFileNames();
+    VisitDexes(dexes, method_visitor, class_visitor, method_frequency, class_frequency);
+  }
+
+  // Visitors take method and type references
+  template <typename MethodVisitor, typename ClassVisitor>
+  void VisitDexes(const std::vector<std::string>& dexes,
+                  const MethodVisitor& method_visitor,
+                  const ClassVisitor& class_visitor,
+                  size_t method_frequency = 1,
+                  size_t class_frequency = 1) {
     size_t method_counter = 0;
     size_t class_counter = 0;
-    for (const std::string& dex : GetLibCoreDexFileNames()) {
+    for (const std::string& dex : dexes) {
       std::vector<std::unique_ptr<const DexFile>> dex_files;
       std::string error_msg;
       const ArtDexFileLoader dex_file_loader;
@@ -107,19 +118,27 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     EXPECT_TRUE(file->WriteFully(&line[0], line.length()));
   }
 
-  void GenerateProfile(File* out_file, size_t method_frequency,  size_t type_frequency) {
+  void GenerateProfile(const std::vector<std::string>& dexes,
+                       File* out_file,
+                       size_t method_frequency,
+                       size_t type_frequency) {
     ProfileCompilationInfo profile;
-    VisitLibcoreDexes([&profile](MethodReference ref) {
-      uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
-          ProfileCompilationInfo::MethodHotness::kFlagStartup;
-      EXPECT_TRUE(profile.AddMethod(
-          ProfileMethodInfo(ref),
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags)));
-    }, [&profile](TypeReference ref) {
-      std::set<dex::TypeIndex> classes;
-      classes.insert(ref.TypeIndex());
-      EXPECT_TRUE(profile.AddClassesForDex(ref.dex_file, classes.begin(), classes.end()));
-    }, method_frequency, type_frequency);
+    VisitDexes(
+        dexes,
+        [&profile](MethodReference ref) {
+          uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
+              ProfileCompilationInfo::MethodHotness::kFlagStartup;
+          EXPECT_TRUE(profile.AddMethod(
+              ProfileMethodInfo(ref),
+              static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags)));
+        },
+        [&profile](TypeReference ref) {
+          std::set<dex::TypeIndex> classes;
+          classes.insert(ref.TypeIndex());
+          EXPECT_TRUE(profile.AddClassesForDex(ref.dex_file, classes.begin(), classes.end()));
+        },
+        method_frequency,
+        type_frequency);
     ScratchFile profile_file;
     profile.Save(out_file->Fd());
     EXPECT_EQ(out_file->Flush(), 0);
@@ -241,7 +260,10 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   // Compile all methods and classes
   {
     ScratchFile profile_file;
-    GenerateProfile(profile_file.GetFile(), /*method_frequency=*/ 1u, /*type_frequency=*/ 1u);
+    GenerateProfile(GetLibCoreDexFileNames(),
+                    profile_file.GetFile(),
+                    /*method_frequency=*/ 1u,
+                    /*type_frequency=*/ 1u);
     everything_sizes = CompileImageAndGetSizes(
         {"--profile-file=" + profile_file.GetFilename(),
          "--compiler-filter=speed-profile"});
@@ -257,7 +279,10 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   // Test compiling fewer methods and classes.
   {
     ScratchFile profile_file;
-    GenerateProfile(profile_file.GetFile(), kMethodFrequency, kTypeFrequency);
+    GenerateProfile(GetLibCoreDexFileNames(),
+                    profile_file.GetFile(),
+                    kMethodFrequency,
+                    kTypeFrequency);
     filter_sizes = CompileImageAndGetSizes(
         {"--profile-file=" + profile_file.GetFilename(),
          "--compiler-filter=speed-profile"});
@@ -328,19 +353,30 @@ TEST_F(Dex2oatImageTest, TestExtension) {
     dex_file = new_location;
   }
 
+  // Create a profile.
+  ScratchFile profile_file;
+  GenerateProfile(libcore_dex_files,
+                  profile_file.GetFile(),
+                  /*method_frequency=*/ 1u,
+                  /*type_frequency=*/ 1u);
+  std::vector<std::string> extra_args;
+  extra_args.push_back("--profile-file=" + profile_file.GetFilename());
+
   ArrayRef<const std::string> full_bcp(libcore_dex_files);
   size_t total_dex_files = full_bcp.size();
-  ASSERT_GE(total_dex_files, 4u);  // 2 for "head", 1 for "tail", at least one for "mid", see below.
+  ASSERT_GE(total_dex_files, 5u);  // 3 for "head", 1 for "tail", at least one for "mid", see below.
 
-  // The primary image must contain at least core-oj and core-libart to initialize the runtime.
+  // The primary image must contain at least core-oj and core-libart to initialize the runtime
+  // and we also need the core-icu4j if we want to compile these with full profile.
   ASSERT_NE(std::string::npos, full_bcp[0].find("core-oj"));
   ASSERT_NE(std::string::npos, full_bcp[1].find("core-libart"));
-  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 2u);
+  ASSERT_NE(std::string::npos, full_bcp[2].find("core-icu4j"));
+  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 3u);
   // Middle part is everything else except for conscrypt.
   ASSERT_NE(std::string::npos, full_bcp[full_bcp.size() - 1u].find("conscrypt"));
   ArrayRef<const std::string> mid_bcp =
       full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ total_dex_files - 1u);
-  ArrayRef<const std::string> mid_dex_files = mid_bcp.SubArray(/*pos=*/ 2u);
+  ArrayRef<const std::string> mid_dex_files = mid_bcp.SubArray(/*pos=*/ 3u);
   // Tail is just the conscrypt.
   ArrayRef<const std::string> tail_dex_files =
       full_bcp.SubArray(/*pos=*/ total_dex_files - 1u, /*length=*/ 1u);
@@ -367,13 +403,13 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   std::string tail_name = tail_location.substr(tail_slash_pos + 1u);
 
   // Compile the "head", i.e. the primary boot image.
-  std::string base = android::base::StringPrintf("--base=0x%08x", kBaseAddress);
-  bool head_ok = CompileBootImage({base}, filename_prefix, head_dex_files, &error_msg);
+  extra_args.push_back(android::base::StringPrintf("--base=0x%08x", kBaseAddress));
+  bool head_ok = CompileBootImage(extra_args, filename_prefix, head_dex_files, &error_msg);
   ASSERT_TRUE(head_ok) << error_msg;
+  extra_args.pop_back();
 
   // Compile the "mid", i.e. the first extension.
   std::string mid_bcp_string = android::base::Join(mid_bcp, ':');
-  std::vector<std::string> extra_args;
   AddRuntimeArg(extra_args, "-Xbootclasspath:" + mid_bcp_string);
   AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + mid_bcp_string);
   extra_args.push_back("--boot-image=" + base_location);
