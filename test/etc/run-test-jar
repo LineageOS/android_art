@@ -449,6 +449,11 @@ while true; do
     fi
 done
 
+# HACK: Force the use of `signal_dumper` on host.
+if [[ "$HOST" = "y" ]]; then
+  TIME_OUT="timeout"
+fi
+
 # If you change this, update the timeout in testrunner.py as well.
 if [ -z "$TIME_OUT_VALUE" ] ; then
   # 10 minutes is the default.
