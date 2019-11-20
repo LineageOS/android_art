@@ -49,6 +49,7 @@ static void SetVIXLCPUFeaturesFromART(vixl::aarch64::MacroAssembler* vixl_masm_,
   }
   if (art_features->HasFP16()) {
     features->Combine(vixl::CPUFeatures::kFPHalf);
+    features->Combine(vixl::CPUFeatures::kNEONHalf);
   }
   if (art_features->HasLSE()) {
     features->Combine(vixl::CPUFeatures::kAtomics);
