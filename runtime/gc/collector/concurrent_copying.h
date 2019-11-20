@@ -329,6 +329,7 @@ class ConcurrentCopying : public GarbageCollector {
       REQUIRES(mark_stack_lock_);
   void AddThreadMarkStackMapping(Thread* thread, accounting::ObjectStack* tl_mark_stack)
       REQUIRES(mark_stack_lock_);
+  void AssertEmptyThreadMarkStackMap() REQUIRES(mark_stack_lock_);
 
   space::RegionSpace* region_space_;      // The underlying region space.
   std::unique_ptr<Barrier> gc_barrier_;
