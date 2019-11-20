@@ -40,6 +40,7 @@
 
 #include "jvmti.h"
 
+#include "alloc_manager.h"
 #include "art_jvmti.h"
 #include "base/logging.h"  // For gLogVerbosity.
 #include "base/mutex.h"
@@ -79,6 +80,7 @@ namespace openjdkjvmti {
 // These should never be null.
 EventHandler* gEventHandler;
 DeoptManager* gDeoptManager;
+AllocationManager* gAllocManager;
 
 #define ENSURE_NON_NULL(n)      \
   do {                          \
@@ -1497,6 +1499,7 @@ static jint GetEnvHandler(art::JavaVMExt* vm, /*out*/void** env, jint version) {
 extern "C" bool ArtPlugin_Initialize() {
   art::Runtime* runtime = art::Runtime::Current();
 
+  gAllocManager = new AllocationManager;
   gDeoptManager = new DeoptManager;
   gEventHandler = new EventHandler;
 

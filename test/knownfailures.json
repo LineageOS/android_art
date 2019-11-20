@@ -1146,6 +1146,9 @@
                   "1991-hello-structural-retransform",
                   "1992-retransform-no-such-field",
                   "1993-fallback-non-structural",
+                  "1994-final-virtual-structural",
+                  "1995-final-virtual-structural-multithread",
+                  "1996-final-override-virtual-structural",
                   "1997-structural-shadow-method",
                   "1998-structural-shadow-field"
                 ],

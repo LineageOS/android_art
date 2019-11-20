@@ -291,6 +291,15 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
     return false;
   }
 
+  if (!method->IsCompilable()) {
+    DCHECK(method->GetDeclaringClass()->IsObsoleteObject() ||
+           method->IsProxyMethod()) << method->PrettyMethod();
+    VLOG(jit) << "JIT not compiling " << method->PrettyMethod() << " due to method being made "
+              << "obsolete while waiting for JIT task to run. This probably happened due to "
+              << "concurrent structural class redefinition.";
+    return false;
+  }
+
   // Don't compile the method if we are supposed to be deoptimized.
   instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
   if (instrumentation->AreAllMethodsDeoptimized() || instrumentation->IsDeoptimized(method)) {

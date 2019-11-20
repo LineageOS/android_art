@@ -31,6 +31,7 @@
 
 #include <android-base/thread_annotations.h>
 
+#include "alloc_manager.h"
 #include "base/locks.h"
 #include "base/mutex.h"
 #include "events-inl.h"
@@ -312,9 +313,9 @@ class JvmtiDdmChunkListener : public art::DdmCallback {
   DISALLOW_COPY_AND_ASSIGN(JvmtiDdmChunkListener);
 };
 
-class JvmtiAllocationListener : public art::gc::AllocationListener {
+class JvmtiEventAllocationListener : public AllocationManager::AllocationCallback {
  public:
-  explicit JvmtiAllocationListener(EventHandler* handler) : handler_(handler) {}
+  explicit JvmtiEventAllocationListener(EventHandler* handler) : handler_(handler) {}
 
   void ObjectAllocated(art::Thread* self, art::ObjPtr<art::mirror::Object>* obj, size_t byte_count)
       override REQUIRES_SHARED(art::Locks::mutator_lock_) {
@@ -349,15 +350,14 @@ class JvmtiAllocationListener : public art::gc::AllocationListener {
   EventHandler* handler_;
 };
 
-static void SetupObjectAllocationTracking(art::gc::AllocationListener* listener, bool enable) {
+static void SetupObjectAllocationTracking(bool enable) {
   // We must not hold the mutator lock here, but if we're in FastJNI, for example, we might. For
   // now, do a workaround: (possibly) acquire and release.
   art::ScopedObjectAccess soa(art::Thread::Current());
-  art::ScopedThreadSuspension sts(soa.Self(), art::ThreadState::kSuspended);
   if (enable) {
-    art::Runtime::Current()->GetHeap()->SetAllocationListener(listener);
+    AllocationManager::Get()->EnableAllocationCallback(soa.Self());
   } else {
-    art::Runtime::Current()->GetHeap()->RemoveAllocationListener();
+    AllocationManager::Get()->DisableAllocationCallback(soa.Self());
   }
 }
 
@@ -1327,7 +1327,7 @@ void EventHandler::HandleEventType(ArtJvmtiEvent event, bool enable) {
       SetupDdmTracking(ddm_listener_.get(), enable);
       return;
     case ArtJvmtiEvent::kVmObjectAlloc:
-      SetupObjectAllocationTracking(alloc_listener_.get(), enable);
+      SetupObjectAllocationTracking(enable);
       return;
     case ArtJvmtiEvent::kGarbageCollectionStart:
     case ArtJvmtiEvent::kGarbageCollectionFinish:
@@ -1665,13 +1665,15 @@ void EventHandler::Shutdown() {
   art::ScopedSuspendAll ssa("jvmti method tracing uninstallation");
   // Just remove every possible event.
   art::Runtime::Current()->GetInstrumentation()->RemoveListener(method_trace_listener_.get(), ~0);
+  AllocationManager::Get()->RemoveAllocListener();
 }
 
 EventHandler::EventHandler()
   : envs_lock_("JVMTI Environment List Lock", art::LockLevel::kPostMutatorTopLockLevel),
     frame_pop_enabled(false),
     internal_event_refcount_({0}) {
-  alloc_listener_.reset(new JvmtiAllocationListener(this));
+  alloc_listener_.reset(new JvmtiEventAllocationListener(this));
+  AllocationManager::Get()->SetAllocListener(alloc_listener_.get());
   ddm_listener_.reset(new JvmtiDdmChunkListener(this));
   gc_pause_listener_.reset(new JvmtiGcPauseListener(this));
   method_trace_listener_.reset(new JvmtiMethodTraceListener(this));
