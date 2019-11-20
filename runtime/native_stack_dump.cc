@@ -234,12 +234,17 @@ static void Addr2line(const std::string& map_src,
                       std::ostream& os,
                       const char* prefix,
                       std::unique_ptr<Addr2linePipe>* pipe /* inout */) {
-  DCHECK(pipe != nullptr);
-
-  if (map_src == "[vdso]" || android::base::EndsWith(map_src, ".vdex")) {
+  std::array<const char*, 3> kIgnoreSuffixes{ ".dex", ".jar", ".vdex" };
+  for (const char* ignore_suffix : kIgnoreSuffixes) {
+    if (android::base::EndsWith(map_src, ignore_suffix)) {
+      // Ignore file names that do not have map information addr2line can consume. e.g. vdex
+      // files are special frames injected for the interpreter so they don't have any line
+      // number information available.
+      return;
+    }
+  }
+  if (map_src == "[vdso]") {
     // addr2line will not work on the vdso.
-    // vdex files are special frames injected for the interpreter
-    // so they don't have any line number information available.
     return;
   }
 
