@@ -178,11 +178,231 @@ class Arm64LoopHelper : public ArchDefaultLoopHelper {
   }
 };
 
+// Custom implementation of loop helper for X86_64 target. Enables heuristics for scalar loop
+// peeling and unrolling and supports SIMD loop unrolling.
+class X86_64LoopHelper : public ArchDefaultLoopHelper {
+  // mapping of machine instruction count for most used IR instructions
+  // Few IRs generate different number of instructions based on input and result type.
+  // We checked top java apps, benchmarks and used the most generated instruction count.
+  uint32_t GetMachineInstructionCount(HInstruction* inst) const {
+    switch (inst->GetKind()) {
+      case HInstruction::InstructionKind::kAbs:
+        return 3;
+      case HInstruction::InstructionKind::kAdd:
+        return 1;
+      case HInstruction::InstructionKind::kAnd:
+        return 1;
+      case HInstruction::InstructionKind::kArrayLength:
+        return 1;
+      case HInstruction::InstructionKind::kArrayGet:
+        return 1;
+      case HInstruction::InstructionKind::kArraySet:
+        return 1;
+      case HInstruction::InstructionKind::kBoundsCheck:
+        return 2;
+      case HInstruction::InstructionKind::kCheckCast:
+        return 9;
+      case HInstruction::InstructionKind::kDiv:
+        return 8;
+      case HInstruction::InstructionKind::kDivZeroCheck:
+        return 2;
+      case HInstruction::InstructionKind::kEqual:
+        return 3;
+      case HInstruction::InstructionKind::kGreaterThan:
+        return 3;
+      case HInstruction::InstructionKind::kGreaterThanOrEqual:
+        return 3;
+      case HInstruction::InstructionKind::kIf:
+        return 2;
+      case HInstruction::InstructionKind::kInstanceFieldGet:
+        return 2;
+      case HInstruction::InstructionKind::kInstanceFieldSet:
+        return 1;
+      case HInstruction::InstructionKind::kLessThan:
+        return 3;
+      case HInstruction::InstructionKind::kLessThanOrEqual:
+        return 3;
+      case HInstruction::InstructionKind::kMax:
+        return 2;
+      case HInstruction::InstructionKind::kMin:
+        return 2;
+      case HInstruction::InstructionKind::kMul:
+        return 1;
+      case HInstruction::InstructionKind::kNotEqual:
+        return 3;
+      case HInstruction::InstructionKind::kOr:
+        return 1;
+      case HInstruction::InstructionKind::kRem:
+        return 11;
+      case HInstruction::InstructionKind::kSelect:
+        return 2;
+      case HInstruction::InstructionKind::kShl:
+        return 1;
+      case HInstruction::InstructionKind::kShr:
+        return 1;
+      case HInstruction::InstructionKind::kSub:
+        return 1;
+      case HInstruction::InstructionKind::kTypeConversion:
+        return 1;
+      case HInstruction::InstructionKind::kUShr:
+        return 1;
+      case HInstruction::InstructionKind::kVecReplicateScalar:
+        return 2;
+      case HInstruction::InstructionKind::kVecExtractScalar:
+       return 1;
+      case HInstruction::InstructionKind::kVecReduce:
+        return 4;
+      case HInstruction::InstructionKind::kVecNeg:
+        return 2;
+      case HInstruction::InstructionKind::kVecAbs:
+        return 4;
+      case HInstruction::InstructionKind::kVecNot:
+        return 3;
+      case HInstruction::InstructionKind::kVecAdd:
+        return 1;
+      case HInstruction::InstructionKind::kVecSub:
+        return 1;
+      case HInstruction::InstructionKind::kVecMul:
+        return 1;
+      case HInstruction::InstructionKind::kVecDiv:
+        return 1;
+      case HInstruction::InstructionKind::kVecMax:
+        return 1;
+      case HInstruction::InstructionKind::kVecMin:
+        return 1;
+      case HInstruction::InstructionKind::kVecOr:
+        return 1;
+      case HInstruction::InstructionKind::kVecXor:
+        return 1;
+      case HInstruction::InstructionKind::kVecShl:
+        return 1;
+      case HInstruction::InstructionKind::kVecShr:
+        return 1;
+      case HInstruction::InstructionKind::kVecLoad:
+        return 1;
+      case HInstruction::InstructionKind::kVecStore:
+        return 1;
+      case HInstruction::InstructionKind::kXor:
+        return 1;
+      default:
+        return 1;
+    }
+  }
+
+  // Maximum possible unrolling factor.
+  static constexpr uint32_t kX86_64MaxUnrollFactor = 2;  // pow(2,2) = 4
+
+  // According to Intel® 64 and IA-32 Architectures Optimization Reference Manual,
+  // avoid excessive loop unrolling to ensure LSD (loop stream decoder) is operating efficiently.
+  // This variable takes care that unrolled loop instructions should not exceed LSD size.
+  // For Intel Atom processors (silvermont & goldmont), LSD size is 28
+  // TODO - identify architecture and LSD size at runtime
+  static constexpr uint32_t kX86_64UnrolledMaxBodySizeInstr = 28;
+
+  // Loop's maximum basic block count. Loops with higher count will not be partial
+  // unrolled (unknown iterations).
+  static constexpr uint32_t kX86_64UnknownIterMaxBodySizeBlocks = 2;
+
+  uint32_t GetUnrollingFactor(HLoopInformation* loop_info, HBasicBlock* header) const;
+
+ public:
+  uint32_t GetSIMDUnrollingFactor(HBasicBlock* block,
+                                  int64_t trip_count,
+                                  uint32_t max_peel,
+                                  uint32_t vector_length) const override {
+    DCHECK_NE(vector_length, 0u);
+    HLoopInformation* loop_info = block->GetLoopInformation();
+    DCHECK(loop_info);
+    HBasicBlock* header = loop_info->GetHeader();
+    DCHECK(header);
+    uint32_t unroll_factor = 0;
+
+    if ((trip_count == 0) || (trip_count == LoopAnalysisInfo::kUnknownTripCount)) {
+      // Don't unroll for large loop body size.
+      unroll_factor = GetUnrollingFactor(loop_info, header);
+      if (unroll_factor <= 1) {
+        return LoopAnalysisInfo::kNoUnrollingFactor;
+      }
+    } else {
+      // Don't unroll with insufficient iterations.
+      if (trip_count < (2 * vector_length + max_peel)) {
+        return LoopAnalysisInfo::kNoUnrollingFactor;
+      }
+
+      // Don't unroll for large loop body size.
+      uint32_t unroll_cnt = GetUnrollingFactor(loop_info, header);
+      if (unroll_cnt <= 1) {
+        return LoopAnalysisInfo::kNoUnrollingFactor;
+      }
+
+      // Find a beneficial unroll factor with the following restrictions:
+      //  - At least one iteration of the transformed loop should be executed.
+      //  - The loop body shouldn't be "too big" (heuristic).
+      uint32_t uf2 = (trip_count - max_peel) / vector_length;
+      unroll_factor = TruncToPowerOfTwo(std::min(uf2, unroll_cnt));
+      DCHECK_GE(unroll_factor, 1u);
+    }
+
+    return unroll_factor;
+  }
+};
+
+uint32_t X86_64LoopHelper::GetUnrollingFactor(HLoopInformation* loop_info,
+                                              HBasicBlock* header) const {
+  uint32_t num_inst = 0, num_inst_header = 0, num_inst_loop_body = 0;
+  for (HBlocksInLoopIterator it(*loop_info); !it.Done(); it.Advance()) {
+    HBasicBlock* block = it.Current();
+    DCHECK(block);
+    num_inst = 0;
+
+    for (HInstructionIterator it1(block->GetInstructions()); !it1.Done(); it1.Advance()) {
+      HInstruction* inst = it1.Current();
+      DCHECK(inst);
+
+      // SuspendCheck inside loop is handled with Goto.
+      // Ignoring SuspendCheck & Goto as partially unrolled loop body will have only one Goto.
+      // Instruction count for Goto is being handled during unroll factor calculation below.
+      if (inst->IsSuspendCheck() || inst->IsGoto()) {
+        continue;
+      }
+
+      num_inst += GetMachineInstructionCount(inst);
+    }
+
+    if (block == header) {
+      num_inst_header = num_inst;
+    } else {
+      num_inst_loop_body += num_inst;
+    }
+  }
+
+  // Calculate actual unroll factor.
+  uint32_t unrolling_factor = kX86_64MaxUnrollFactor;
+  uint32_t unrolling_inst = kX86_64UnrolledMaxBodySizeInstr;
+  // "-3" for one Goto instruction.
+  uint32_t desired_size = unrolling_inst - num_inst_header - 3;
+  if (desired_size < (2 * num_inst_loop_body)) {
+    return 1;
+  }
+
+  while (unrolling_factor > 0) {
+    if ((desired_size >> unrolling_factor) >= num_inst_loop_body) {
+      break;
+    }
+    unrolling_factor--;
+  }
+
+  return (1 << unrolling_factor);
+}
+
 ArchNoOptsLoopHelper* ArchNoOptsLoopHelper::Create(InstructionSet isa,
                                                    ArenaAllocator* allocator) {
   switch (isa) {
     case InstructionSet::kArm64: {
       return new (allocator) Arm64LoopHelper;
+    }
+    case InstructionSet::kX86_64: {
+      return new (allocator) X86_64LoopHelper;
     }
     default: {
       return new (allocator) ArchDefaultLoopHelper;
