@@ -20,6 +20,7 @@
 #include "dex_cache-inl.h"
 #include "object-inl.h"
 #include "object_array-inl.h"
+#include "write_barrier.h"
 
 namespace art {
 namespace mirror {
@@ -32,6 +33,7 @@ void Field::VisitTarget(ReflectiveValueVisitor* v) {
     SetDexFieldIndex<false>(new_value->GetDexFieldIndex());
     SetOffset<false>(new_value->GetOffset().Int32Value());
     SetDeclaringClass<false>(new_value->GetDeclaringClass());
+    WriteBarrier::ForEveryFieldWrite(this);
   }
   DCHECK_EQ(new_value, GetArtField(/*use_dex_cache*/false));
 }

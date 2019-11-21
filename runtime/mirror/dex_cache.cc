@@ -31,6 +31,7 @@
 #include "string.h"
 #include "thread.h"
 #include "utils/dex_cache_arrays_layout-inl.h"
+#include "write_barrier.h"
 
 namespace art {
 namespace mirror {
@@ -174,6 +175,7 @@ void DexCache::InitializeDexCache(Thread* self,
 }
 
 void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
+  bool wrote = false;
   for (size_t i = 0; i < NumResolvedFields(); i++) {
     auto pair(GetNativePairPtrSize(GetResolvedFields(), i, kRuntimePointerSize));
     if (pair.index == FieldDexCachePair::InvalidIndexForSlot(i)) {
@@ -188,6 +190,7 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
         pair.object = new_val;
       }
       SetNativePairPtrSize(GetResolvedFields(), i, pair, kRuntimePointerSize);
+      wrote = true;
     }
   }
   for (size_t i = 0; i < NumResolvedMethods(); i++) {
@@ -204,7 +207,11 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
         pair.object = new_val;
       }
       SetNativePairPtrSize(GetResolvedMethods(), i, pair, kRuntimePointerSize);
+      wrote = true;
     }
+  }
+  if (wrote) {
+    WriteBarrier::ForEveryFieldWrite(this);
   }
 }
 
