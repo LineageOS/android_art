@@ -17,10 +17,13 @@
 # The work does by this script is (mostly) undone by tools/teardown-buildbot-device.sh.
 # Make sure to keep these files in sync.
 
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-nc='\033[0m'
+if [ -t 1 ]; then
+  # Color sequences if terminal is a tty.
+  red='\033[0;31m'
+  green='\033[0;32m'
+  yellow='\033[0;33m'
+  nc='\033[0m'
+fi
 
 if [ "$1" = --verbose ]; then
   verbose=true

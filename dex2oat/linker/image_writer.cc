@@ -2181,6 +2181,16 @@ void ImageWriter::LayoutHelper::VerifyImageBinSlotsAssigned() {
           CHECK(field->GetObject(ref) == nullptr);
           return;
         }
+        if (obj->IsString()) {
+          // Ignore interned strings. These may come from reflection interning method names.
+          // TODO: Make dex file strings weak interns and GC them before writing the image.
+          Runtime* runtime = Runtime::Current();
+          ObjPtr<mirror::String> interned =
+              runtime->GetInternTable()->LookupStrong(Thread::Current(), obj->AsString());
+          if (interned == obj) {
+            return;
+          }
+        }
         LOG(FATAL) << "Image object without assigned bin slot: "
             << mirror::Object::PrettyTypeOf(obj) << " " << obj;
       }

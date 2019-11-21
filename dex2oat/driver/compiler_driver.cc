@@ -326,9 +326,9 @@ void CompilerDriver::CompileAll(jobject class_loader,
   CheckThreadPools();
 
   if (GetCompilerOptions().IsBootImage()) {
-    // We don't need to setup the intrinsics for non boot image compilation, as
-    // those compilations will pick up a boot image that have the ArtMethod already
-    // set with the intrinsics flag.
+    // All intrinsics must be in the primary boot image, so we don't need to setup
+    // the intrinsics for any other compilation, as those compilations will pick up
+    // a boot image that have the ArtMethod already set with the intrinsics flag.
     InitializeIntrinsics();
   }
   // Compile:
@@ -888,7 +888,8 @@ void CompilerDriver::PreCompile(jobject class_loader,
   Verify(class_loader, dex_files, timings, verification_results);
   VLOG(compiler) << "Verify: " << GetMemoryUsageString(false);
 
-  if (GetCompilerOptions().IsForceDeterminism() && GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsForceDeterminism() &&
+      (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension())) {
     // Resolve strings from const-string. Do this now to have a deterministic image.
     ResolveConstStrings(dex_files, /*only_startup_strings=*/ false, timings);
     VLOG(compiler) << "Resolve const-strings: " << GetMemoryUsageString(false);
@@ -1049,7 +1050,7 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
   }
 
   TimingLogger::ScopedTiming t("LoadImageClasses", timings);
-  // Make a first class to load all classes explicitly listed in the file
+  // Make a first pass to load all classes explicitly listed in the file
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
@@ -1744,7 +1745,7 @@ void CompilerDriver::ResolveDexFile(jobject class_loader,
 
   ParallelCompilationManager context(class_linker, class_loader, this, &dex_file, dex_files,
                                      thread_pool);
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     // For images we resolve all types, such as array, whereas for applications just those with
     // classdefs are resolved by ResolveClassFieldsAndMethods.
     TimingLogger::ScopedTiming t("Resolve Types", timings);
@@ -1888,7 +1889,7 @@ void CompilerDriver::Verify(jobject jclass_loader,
   // the existing `verifier_deps` is not valid anymore, create a new one for
   // non boot image compilation. The verifier will need it to record the new dependencies.
   // Then dex2oat can update the vdex file with these new dependencies.
-  if (!GetCompilerOptions().IsBootImage()) {
+  if (!GetCompilerOptions().IsBootImage() && !GetCompilerOptions().IsBootImageExtension()) {
     // Dex2oat creates the verifier deps.
     // Create the main VerifierDeps, and set it to this thread.
     verifier::VerifierDeps* verifier_deps =
@@ -1918,7 +1919,7 @@ void CompilerDriver::Verify(jobject jclass_loader,
                   timings);
   }
 
-  if (!GetCompilerOptions().IsBootImage()) {
+  if (!GetCompilerOptions().IsBootImage() && !GetCompilerOptions().IsBootImageExtension()) {
     // Merge all VerifierDeps into the main one.
     verifier::VerifierDeps* verifier_deps = Thread::Current()->GetVerifierDeps();
     for (ThreadPoolWorker* worker : parallel_thread_pool_->GetWorkers()) {
@@ -2034,7 +2035,8 @@ class VerifyClassVisitor : public CompilationVisitor {
       //   --abort-on-hard-verifier-error --abort-on-soft-verifier-error
       // which is the default build system configuration.
       if (kIsDebugBuild) {
-        if (manager_->GetCompiler()->GetCompilerOptions().IsBootImage()) {
+        if (manager_->GetCompiler()->GetCompilerOptions().IsBootImage() ||
+            manager_->GetCompiler()->GetCompilerOptions().IsBootImageExtension()) {
           if (!klass->IsResolved() || klass->IsErroneous()) {
             LOG(FATAL) << "Boot classpath class " << klass->PrettyClass()
                        << " failed to resolve/is erroneous: state= " << klass->GetStatus();
@@ -2569,8 +2571,10 @@ void CompilerDriver::InitializeClasses(jobject jni_class_loader,
   ParallelCompilationManager context(class_linker, jni_class_loader, this, &dex_file, dex_files,
                                      init_thread_pool);
 
-  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsAppImage()) {
-    // Set the concurrency thread to 1 to support initialization for App Images since transaction
+  if (GetCompilerOptions().IsBootImage() ||
+      GetCompilerOptions().IsBootImageExtension() ||
+      GetCompilerOptions().IsAppImage()) {
+    // Set the concurrency thread to 1 to support initialization for images since transaction
     // doesn't support multithreading now.
     // TODO: remove this when transactional mode supports multithreading.
     init_thread_count = 1U;
@@ -2640,7 +2644,9 @@ void CompilerDriver::InitializeClasses(jobject class_loader,
     CHECK(dex_file != nullptr);
     InitializeClasses(class_loader, *dex_file, dex_files, timings);
   }
-  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsAppImage()) {
+  if (GetCompilerOptions().IsBootImage() ||
+      GetCompilerOptions().IsBootImageExtension() ||
+      GetCompilerOptions().IsAppImage()) {
     // Make sure that we call EnsureIntiailized on all the array classes to call
     // SetVerificationAttempted so that the access flags are set. If we do not do this they get
     // changed at runtime resulting in more dirty image pages.
@@ -2652,7 +2658,7 @@ void CompilerDriver::InitializeClasses(jobject class_loader,
     Runtime::Current()->GetClassLinker()->VisitClassesWithoutClassesLock(&visitor);
     visitor.FillAllIMTAndConflictTables();
   }
-  if (GetCompilerOptions().IsBootImage()) {
+  if (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension()) {
     // Prune garbage objects created during aborted transactions.
     Runtime::Current()->GetHeap()->CollectGarbage(/* clear_soft_references= */ true);
   }

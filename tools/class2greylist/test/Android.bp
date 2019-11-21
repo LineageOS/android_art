@@ -20,6 +20,7 @@ java_test_host {
 
     static_libs: [
         "class2greylistlib",
+        "libjavac",
         "truth-host-prebuilt",
         "mockito-host",
         "junit-host",
