@@ -198,7 +198,8 @@ class Dex2oatImageTest : public CommonRuntimeTest {
   bool CompileBootImage(const std::vector<std::string>& extra_args,
                         const std::string& image_file_name_prefix,
                         ArrayRef<const std::string> dex_files,
-                        std::string* error_msg) {
+                        std::string* error_msg,
+                        const std::string& use_fd_prefix = "") {
     Runtime* const runtime = Runtime::Current();
     std::vector<std::string> argv;
     argv.push_back(runtime->GetCompilerExecutable());
@@ -219,9 +220,22 @@ class Dex2oatImageTest : public CommonRuntimeTest {
       argv.push_back("--host");
     }
 
-    argv.push_back("--image=" + image_file_name_prefix + ".art");
-    argv.push_back("--oat-file=" + image_file_name_prefix + ".oat");
-    argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
+    std::unique_ptr<File> art_file;
+    std::unique_ptr<File> vdex_file;
+    std::unique_ptr<File> oat_file;
+    if (!use_fd_prefix.empty()) {
+      art_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".art").c_str()));
+      vdex_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".vdex").c_str()));
+      oat_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".oat").c_str()));
+      argv.push_back("--image-fd=" + std::to_string(art_file->Fd()));
+      argv.push_back("--output-vdex-fd=" + std::to_string(vdex_file->Fd()));
+      argv.push_back("--oat-fd=" + std::to_string(oat_file->Fd()));
+      argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
+    } else {
+      argv.push_back("--image=" + image_file_name_prefix + ".art");
+      argv.push_back("--oat-file=" + image_file_name_prefix + ".oat");
+      argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
+    }
 
     std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
     argv.insert(argv.end(), compiler_options.begin(), compiler_options.end());
@@ -232,7 +246,17 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     argv.push_back("--android-root=" + std::string(android_root));
     argv.insert(argv.end(), extra_args.begin(), extra_args.end());
 
-    return RunDex2Oat(argv, error_msg);
+    bool result = RunDex2Oat(argv, error_msg);
+    if (art_file != nullptr) {
+      CHECK_EQ(0, art_file->FlushClose());
+    }
+    if (vdex_file != nullptr) {
+      CHECK_EQ(0, vdex_file->FlushClose());
+    }
+    if (oat_file != nullptr) {
+      CHECK_EQ(0, oat_file->FlushClose());
+    }
+    return result;
   }
 
   bool RunDex2Oat(const std::vector<std::string>& args, std::string* error_msg) {
@@ -276,6 +300,20 @@ class Dex2oatImageTest : public CommonRuntimeTest {
       dst_stream << src_stream.rdbuf();
       dex_file = new_location;
     }
+  }
+
+  bool CompareFiles(const std::string& filename1, const std::string& filename2) {
+    std::unique_ptr<File> file1(OS::OpenFileForReading(filename1.c_str()));
+    std::unique_ptr<File> file2(OS::OpenFileForReading(filename2.c_str()));
+    // Did we open the files?
+    if (file1 == nullptr || file2 == nullptr) {
+      return false;
+    }
+    // Are they non-empty and the same length?
+    if (file1->GetLength() <= 0 || file2->GetLength() != file1->GetLength()) {
+      return false;
+    }
+    return file1->Compare(file2.get()) == 0;
   }
 };
 
@@ -595,6 +633,144 @@ TEST_F(Dex2oatImageTest, TestExtension) {
     load_ok = silent_load(base_location + ':' + scratch_dir + "*:" + tail_location);
     ASSERT_FALSE(load_ok);
   }
+
+  ClearDirectory(scratch_dir.c_str());
+  int rmdir_result = rmdir(scratch_dir.c_str());
+  ASSERT_EQ(0, rmdir_result);
+}
+
+TEST_F(Dex2oatImageTest, TestExtensionSingleImage) {
+  std::string error_msg;
+  MemMap reservation = ReserveCoreImageAddressSpace(&error_msg);
+  ASSERT_TRUE(reservation.IsValid()) << error_msg;
+
+  ScratchFile scratch;
+  std::string scratch_dir = scratch.GetFilename() + "-d";
+  int mkdir_result = mkdir(scratch_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  scratch_dir += '/';
+  std::string image_dir = scratch_dir + GetInstructionSetString(kRuntimeISA);
+  mkdir_result = mkdir(image_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  std::string filename_prefix = image_dir + "/core";
+
+  // Copy the libcore dex files to a custom dir inside `scratch_dir` so that we do not
+  // accidentally load pre-compiled core images from their original directory based on BCP paths.
+  std::string jar_dir = scratch_dir + "jars";
+  mkdir_result = mkdir(jar_dir.c_str(), 0700);
+  ASSERT_EQ(0, mkdir_result);
+  jar_dir += '/';
+  std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
+  CopyDexFiles(jar_dir, &libcore_dex_files);
+
+  // Create a smaller profile compared to the TestExtension test.
+  ScratchFile profile_file;
+  GenerateProfile(libcore_dex_files,
+                  profile_file.GetFile(),
+                  /*method_frequency=*/ 5u,
+                  /*type_frequency=*/ 4u);
+  std::vector<std::string> extra_args;
+  extra_args.push_back("--profile-file=" + profile_file.GetFilename());
+
+  ArrayRef<const std::string> full_bcp(libcore_dex_files);
+  size_t total_dex_files = full_bcp.size();
+  ASSERT_GE(total_dex_files, 5u);  // 3 for "head", at least 2 for "tail".
+
+  // The primary image must contain at least core-oj and core-libart to initialize the runtime
+  // and we also need the core-icu4j if we want to compile these with full profile.
+  ASSERT_NE(std::string::npos, full_bcp[0].find("core-oj"));
+  ASSERT_NE(std::string::npos, full_bcp[1].find("core-libart"));
+  ASSERT_NE(std::string::npos, full_bcp[2].find("core-icu4j"));
+  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 3u);
+  ArrayRef<const std::string> tail_dex_files = full_bcp.SubArray(/*pos=*/ 3u);
+
+  // Prepare the "head" and "tail" names and locations.
+  std::string base_name = "core.art";
+  std::string base_location = scratch_dir + base_name;
+  CHECK_GE(tail_dex_files.size(), 2u);
+  std::vector<std::string> expanded_tail = gc::space::ImageSpace::ExpandMultiImageLocations(
+      tail_dex_files.SubArray(/*pos=*/ 0u, /*length=*/ 1u),
+      base_location,
+      /*boot_image_extension=*/ true);
+  CHECK_EQ(1u, expanded_tail.size());
+  std::string tail_location = expanded_tail[0];
+  size_t tail_slash_pos = tail_location.rfind('/');
+  ASSERT_NE(std::string::npos, tail_slash_pos);
+  std::string tail_name = tail_location.substr(tail_slash_pos + 1u);
+
+  // Compile the "head", i.e. the primary boot image.
+  extra_args.push_back(android::base::StringPrintf("--base=0x%08x", kBaseAddress));
+  bool head_ok = CompileBootImage(extra_args, filename_prefix, head_dex_files, &error_msg);
+  ASSERT_TRUE(head_ok) << error_msg;
+  extra_args.pop_back();
+
+  // Compile the "tail" against the primary boot image.
+  std::string full_bcp_string = android::base::Join(full_bcp, ':');
+  AddRuntimeArg(extra_args, "-Xbootclasspath:" + full_bcp_string);
+  AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + full_bcp_string);
+  extra_args.push_back("--boot-image=" + base_location);
+  extra_args.push_back("--single-image");
+  extra_args.push_back("--avoid-storing-invocation");  // For comparison below.
+  error_msg.clear();
+  bool tail_ok = CompileBootImage(extra_args, filename_prefix, tail_dex_files, &error_msg);
+  ASSERT_TRUE(tail_ok) << error_msg;
+
+  reservation = MemMap::Invalid();  // Free the reserved memory for loading images.
+
+  // Try to load the boot image with different image locations.
+  std::vector<std::string> boot_class_path = libcore_dex_files;
+  std::vector<std::unique_ptr<gc::space::ImageSpace>> boot_image_spaces;
+  bool relocate = false;
+  MemMap extra_reservation;
+  auto load = [&](const std::string& image_location) {
+    boot_image_spaces.clear();
+    extra_reservation = MemMap::Invalid();
+    ScopedObjectAccess soa(Thread::Current());
+    return gc::space::ImageSpace::LoadBootImage(/*boot_class_path=*/ boot_class_path,
+                                                /*boot_class_path_locations=*/ libcore_dex_files,
+                                                image_location,
+                                                kRuntimeISA,
+                                                gc::space::ImageSpaceLoadingOrder::kSystemFirst,
+                                                relocate,
+                                                /*executable=*/ true,
+                                                /*is_zygote=*/ false,
+                                                /*extra_reservation_size=*/ 0u,
+                                                &boot_image_spaces,
+                                                &extra_reservation);
+  };
+
+  for (bool r : { false, true }) {
+    relocate = r;
+
+    // Load the primary and first extension with full path.
+    bool load_ok = load(base_location + ':' + tail_location);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size() + 1u, boot_image_spaces.size());
+
+    // Load the primary with full path and extension with a specified search path.
+    load_ok = load(base_location + ':' + scratch_dir + '*');
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size() + 1u, boot_image_spaces.size());
+  }
+
+  // Recompile using file descriptors and compare contents.
+  std::vector<std::string> expanded_oat_filename = gc::space::ImageSpace::ExpandMultiImageLocations(
+      tail_dex_files.SubArray(/*pos=*/ 0u, /*length=*/ 1u),
+      filename_prefix,
+      /*boot_image_extension=*/ true);
+  CHECK_EQ(1u, expanded_oat_filename.size());
+  std::string extension_filename_prefix = expanded_oat_filename[0];
+  std::string filename_prefix2 = extension_filename_prefix + "2";
+  error_msg.clear();
+  tail_ok = CompileBootImage(extra_args,
+                             filename_prefix,
+                             tail_dex_files,
+                             &error_msg,
+                             /*use_fd_prefix=*/ filename_prefix2);
+  ASSERT_TRUE(tail_ok) << error_msg;
+  EXPECT_TRUE(CompareFiles(extension_filename_prefix + ".art", filename_prefix2 + ".art"));
+  EXPECT_TRUE(CompareFiles(extension_filename_prefix + ".vdex", filename_prefix2 + ".vdex"));
+  EXPECT_TRUE(CompareFiles(extension_filename_prefix + ".oat", filename_prefix2 + ".oat"));
 
   ClearDirectory(scratch_dir.c_str());
   int rmdir_result = rmdir(scratch_dir.c_str());

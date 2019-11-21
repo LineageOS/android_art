@@ -144,7 +144,7 @@ class ImageWriter final {
   // the names in oat_filenames.
   bool Write(int image_fd,
              const std::vector<std::string>& image_filenames,
-             const std::vector<std::string>& oat_filenames)
+             size_t component_count)
       REQUIRES(!Locks::mutator_lock_);
 
   uintptr_t GetOatDataBegin(size_t oat_index) {
@@ -470,7 +470,7 @@ class ImageWriter final {
   // Lays out where the image objects will be at runtime.
   void CalculateNewObjectOffsets()
       REQUIRES_SHARED(Locks::mutator_lock_);
-  void CreateHeader(size_t oat_index)
+  void CreateHeader(size_t oat_index, size_t component_count)
       REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<mirror::ObjectArray<mirror::Object>> CollectDexCaches(Thread* self, size_t oat_index) const
       REQUIRES_SHARED(Locks::mutator_lock_);

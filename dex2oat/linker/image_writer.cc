@@ -401,21 +401,21 @@ class ImageWriter::ImageFileGuard {
 
 bool ImageWriter::Write(int image_fd,
                         const std::vector<std::string>& image_filenames,
-                        const std::vector<std::string>& oat_filenames) {
+                        size_t component_count) {
   // If image_fd or oat_fd are not kInvalidFd then we may have empty strings in image_filenames or
   // oat_filenames.
   CHECK(!image_filenames.empty());
   if (image_fd != kInvalidFd) {
     CHECK_EQ(image_filenames.size(), 1u);
   }
-  CHECK(!oat_filenames.empty());
-  CHECK_EQ(image_filenames.size(), oat_filenames.size());
+  DCHECK(!oat_filenames_.empty());
+  CHECK_EQ(image_filenames.size(), oat_filenames_.size());
 
   Thread* const self = Thread::Current();
   {
     ScopedObjectAccess soa(self);
-    for (size_t i = 0; i < oat_filenames.size(); ++i) {
-      CreateHeader(i);
+    for (size_t i = 0; i < oat_filenames_.size(); ++i) {
+      CreateHeader(i, component_count);
       CopyAndFixupNativeData(i);
     }
   }
@@ -444,15 +444,12 @@ bool ImageWriter::Write(int image_fd,
     ImageInfo& image_info = GetImageInfo(i);
     ImageFileGuard image_file;
     if (image_fd != kInvalidFd) {
-      if (image_filename.empty()) {
-        image_file.reset(new File(image_fd, unix_file::kCheckSafeUsage));
-        // Empty the file in case it already exists.
-        if (image_file != nullptr) {
-          TEMP_FAILURE_RETRY(image_file->SetLength(0));
-          TEMP_FAILURE_RETRY(image_file->Flush());
-        }
-      } else {
-        LOG(ERROR) << "image fd " << image_fd << " name " << image_filename;
+      // Ignore image_filename, it is supplied only for better diagnostic.
+      image_file.reset(new File(image_fd, unix_file::kCheckSafeUsage));
+      // Empty the file in case it already exists.
+      if (image_file != nullptr) {
+        TEMP_FAILURE_RETRY(image_file->SetLength(0));
+        TEMP_FAILURE_RETRY(image_file->Flush());
       }
     } else {
       image_file.reset(OS::CreateEmptyFile(image_filename.c_str()));
@@ -2640,7 +2637,7 @@ std::pair<size_t, std::vector<ImageSection>> ImageWriter::ImageInfo::CreateImage
   return make_pair(metadata_section.End(), std::move(sections));
 }
 
-void ImageWriter::CreateHeader(size_t oat_index) {
+void ImageWriter::CreateHeader(size_t oat_index, size_t component_count) {
   ImageInfo& image_info = GetImageInfo(oat_index);
   const uint8_t* oat_file_begin = image_info.oat_file_begin_;
   const uint8_t* oat_file_end = oat_file_begin + image_info.oat_loaded_size_;
@@ -2648,18 +2645,23 @@ void ImageWriter::CreateHeader(size_t oat_index) {
 
   uint32_t image_reservation_size = image_info.image_size_;
   DCHECK_ALIGNED(image_reservation_size, kPageSize);
-  uint32_t component_count = 1u;
-  if (!compiler_options_.IsAppImage()) {
+  uint32_t current_component_count = 1u;
+  if (compiler_options_.IsAppImage()) {
+    DCHECK_EQ(oat_index, 0u);
+    DCHECK_EQ(component_count, current_component_count);
+  } else {
+    DCHECK(image_infos_.size() == 1u || image_infos_.size() == component_count)
+        << image_infos_.size() << " " << component_count;
     if (oat_index == 0u) {
       const ImageInfo& last_info = image_infos_.back();
       const uint8_t* end = last_info.oat_file_begin_ + last_info.oat_loaded_size_;
       DCHECK_ALIGNED(image_info.image_begin_, kPageSize);
       image_reservation_size =
           dchecked_integral_cast<uint32_t>(RoundUp(end - image_info.image_begin_, kPageSize));
-      component_count = image_infos_.size();
+      current_component_count = component_count;
     } else {
       image_reservation_size = 0u;
-      component_count = 0u;
+      current_component_count = 0u;
     }
   }
 
@@ -2669,13 +2671,13 @@ void ImageWriter::CreateHeader(size_t oat_index) {
   if (oat_index == 0u) {
     const std::vector<gc::space::ImageSpace*>& image_spaces =
         Runtime::Current()->GetHeap()->GetBootImageSpaces();
-    boot_image_components = dchecked_integral_cast<uint32_t>(image_spaces.size());
-    DCHECK_EQ(boot_image_components == 0u, compiler_options_.IsBootImage());
-    for (uint32_t i = 0; i != boot_image_components; ) {
+    DCHECK_EQ(image_spaces.empty(), compiler_options_.IsBootImage());
+    for (size_t i = 0u, size = image_spaces.size(); i != size; ) {
       const ImageHeader& header = image_spaces[i]->GetImageHeader();
+      boot_image_components += header.GetComponentCount();
       boot_image_checksums ^= header.GetImageChecksum();
-      DCHECK_LE(header.GetComponentCount(), boot_image_components - i);
-      i += header.GetComponentCount();
+      DCHECK_LE(header.GetImageSpaceCount(), size - i);
+      i += header.GetImageSpaceCount();
     }
   }
 
@@ -2709,7 +2711,7 @@ void ImageWriter::CreateHeader(size_t oat_index) {
   // image.
   new (image_info.image_.Begin()) ImageHeader(
       image_reservation_size,
-      component_count,
+      current_component_count,
       PointerToLowMemUInt32(image_info.image_begin_),
       image_end,
       sections.data(),
