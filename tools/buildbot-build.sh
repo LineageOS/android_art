@@ -94,7 +94,7 @@ elif [[ $mode == "target" ]]; then
   # These targets create these symlinks:
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
   # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
-  make_command+=" linker libc.bootstrap libdl.bootstrap libm.bootstrap"
+  make_command+=" linker libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap"
   # Build the i18n APEX.
   make_command+=" com.android.i18n"
   # Build the Time Zone Data APEX.
