@@ -166,10 +166,13 @@ template <bool kImage, bool kRelocate, bool kImageDex2oat>
 class ImageSpaceLoadingTest : public CommonRuntimeTest {
  protected:
   void SetUpRuntimeOptions(RuntimeOptions* options) override {
-    if (kImage) {
-      options->emplace_back(android::base::StringPrintf("-Ximage:%s", GetCoreArtLocation().c_str()),
-                            nullptr);
+    std::string image_location = GetCoreArtLocation();
+    if (!kImage) {
+      missing_image_base_ = std::make_unique<ScratchFile>();
+      image_location = missing_image_base_->GetFilename() + ".art";
     }
+    options->emplace_back(android::base::StringPrintf("-Ximage:%s", image_location.c_str()),
+                          nullptr);
     options->emplace_back(kRelocate ? "-Xrelocate" : "-Xnorelocate", nullptr);
     options->emplace_back(kImageDex2oat ? "-Ximage-dex2oat" : "-Xnoimage-dex2oat", nullptr);
 
@@ -194,9 +197,11 @@ class ImageSpaceLoadingTest : public CommonRuntimeTest {
       CHECK_EQ(result, 0);
       old_dex2oat_bcp_.reset();
     }
+    missing_image_base_.reset();
   }
 
  private:
+  std::unique_ptr<ScratchFile> missing_image_base_;
   UniqueCPtr<const char[]> old_dex2oat_bcp_;
 };
 
@@ -238,13 +243,13 @@ class NoAccessAndroidDataTest : public ImageSpaceLoadingTest<false, true, true> 
   }
 
   void TearDown() override {
+    ImageSpaceLoadingTest<false, true, true>::TearDown();
     int result = unlink(bad_dalvik_cache_.c_str());
     CHECK_EQ(result, 0) << strerror(errno);
     result = rmdir(bad_android_data_.c_str());
     CHECK_EQ(result, 0) << strerror(errno);
     result = setenv("ANDROID_DATA", old_android_data_.c_str(), /* replace */ 1);
     CHECK_EQ(result, 0) << strerror(errno);
-    ImageSpaceLoadingTest<false, true, true>::TearDown();
   }
 
  private:
