@@ -1375,7 +1375,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                    &code_allocator,
                    dex_compilation_unit,
                    method,
-                   baseline,
+                   baseline || GetCompilerOptions().IsBaseline(),
                    osr,
                    /* is_shared_jit_code= */ code_cache->IsSharedRegion(*region),
                    &handles));
