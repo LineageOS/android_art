@@ -308,7 +308,7 @@ art_gtests = [
 art_apex_test {
     name: "com.android.art.testing",
     defaults: ["com.android.art-dev-defaults"],
-    file_contexts: "com.android.art.debug",
+    file_contexts: ":com.android.art.debug-file_contexts",
     certificate: ":com.android.art.certificate",
     tests: art_gtests,
     binaries: ["signal_dumper"], // Need signal_dumper for run-tests.
