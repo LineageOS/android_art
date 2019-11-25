@@ -1724,8 +1724,7 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
                                              size_t* bytes_allocated,
                                              size_t* usable_size,
                                              size_t* bytes_tl_bulk_allocated,
-                                             ObjPtr<mirror::Class>* klass,
-                                             /*out*/const char** old_no_thread_suspend_cause) {
+                                             ObjPtr<mirror::Class>* klass) {
   bool was_default_allocator = allocator == GetCurrentAllocator();
   // Make sure there is no pending exception since we may need to throw an OOME.
   self->AssertNoPendingException();
@@ -1734,24 +1733,17 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
   StackHandleScope<1> hs(self);
   HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(klass));
 
-  auto release_no_suspend = [&]() RELEASE(Roles::uninterruptible_) {
-    self->EndAssertNoThreadSuspension(*old_no_thread_suspend_cause);
-  };
-  auto send_object_pre_alloc = [&]() ACQUIRE(Roles::uninterruptible_)
-                                     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (UNLIKELY(instrumented)) {
-    AllocationListener* l = nullptr;
-    l = alloc_listener_.load(std::memory_order_seq_cst);
-    if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
-      l->PreObjectAllocated(self, h_klass, &alloc_size);
+  auto send_object_pre_alloc = [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (UNLIKELY(instrumented)) {
+      AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
+      if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
+        l->PreObjectAllocated(self, h_klass, &alloc_size);
+      }
     }
-  }
-  *old_no_thread_suspend_cause =
-      self->StartAssertNoThreadSuspension("Called PreObjectAllocated, no suspend until alloc");
-};
+  };
 #define PERFORM_SUSPENDING_OPERATION(op)                                          \
   [&]() REQUIRES(Roles::uninterruptible_) REQUIRES_SHARED(Locks::mutator_lock_) { \
-    release_no_suspend();                                                         \
+    ScopedAllowThreadSuspension ats;                                              \
     auto res = (op);                                                              \
     send_object_pre_alloc();                                                      \
     return res;                                                                   \
@@ -1759,7 +1751,8 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
 
   // The allocation failed. If the GC is running, block until it completes, and then retry the
   // allocation.
-  collector::GcType last_gc = WaitForGcToComplete(kGcCauseForAlloc, self);
+  collector::GcType last_gc =
+      PERFORM_SUSPENDING_OPERATION(WaitForGcToComplete(kGcCauseForAlloc, self));
   // If we were the default allocator but the allocator changed while we were suspended,
   // abort the allocation.
   // We just waited, call the pre-alloc again.
@@ -1896,10 +1889,8 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
 #undef PERFORM_SUSPENDING_OPERATION
   // If the allocation hasn't succeeded by this point, throw an OOM error.
   if (ptr == nullptr) {
-    release_no_suspend();
+    ScopedAllowThreadSuspension ats;
     ThrowOutOfMemoryError(self, alloc_size, allocator);
-    *old_no_thread_suspend_cause =
-        self->StartAssertNoThreadSuspension("Failed allocation fallback");
   }
   return ptr;
 }
