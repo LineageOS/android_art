@@ -20,12 +20,20 @@
 #include "class_linker.h"
 
 namespace art {
+
+namespace gc {
+class Heap;
+}  // namespace gc
+
 // AotClassLinker is only used for AOT compiler, which includes some logic for class initialization
 // which will only be used in pre-compilation.
 class AotClassLinker : public ClassLinker {
  public:
   explicit AotClassLinker(InternTable *intern_table);
   ~AotClassLinker();
+
+  static bool CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klass, gc::Heap* heap)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  protected:
   // Overridden version of PerformClassVerification allows skipping verification if the class was

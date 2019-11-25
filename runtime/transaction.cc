@@ -18,6 +18,7 @@
 
 #include <android-base/logging.h>
 
+#include "aot_class_linker.h"
 #include "base/mutex-inl.h"
 #include "base/stl_util.h"
 #include "gc/accounting/card_table-inl.h"
@@ -141,26 +142,8 @@ bool Transaction::WriteValueConstraint(Thread* self, ObjPtr<mirror::Object> valu
     return false;  // No constraints for boot image.
   } else {
     // Boot image extension.
-    // Do not allow storing references to a class or instances of a class defined in a dex file
-    // belonging to the boot image we're compiling against but not itself in the boot image.
-    // Allowing this could yield duplicate class objects from multiple extensions.
-    if (heap->ObjectIsInBootImageSpace(value)) {
-      return false;  // References to boot image objects are OK.
-    }
     ObjPtr<mirror::Class> klass = value->IsClass() ? value->AsClass() : value->GetClass();
-    if (!value->IsClass() && heap->ObjectIsInBootImageSpace(klass)) {
-      // Instances of boot image classes are OK.
-      DCHECK(klass->IsInitialized());
-      return false;
-    }
-    // For arrays we need to determine the dex file based on the element type.
-    while (klass->IsArrayClass()) {
-      klass = klass->GetComponentType();
-    }
-    if (klass->IsPrimitive() || heap->ObjectIsInBootImageSpace(klass->GetDexCache())) {
-      return true;  // Boot image dex file but not boot image `klass`.
-    }
-    return false;
+    return !AotClassLinker::CanReferenceInBootImageExtension(klass, heap);
   }
 }
 
