@@ -19,6 +19,7 @@
 #include "class_status.h"
 #include "compiler_callbacks.h"
 #include "dex/class_reference.h"
+#include "gc/heap.h"
 #include "handle_scope-inl.h"
 #include "mirror/class-inl.h"
 #include "runtime.h"
@@ -122,6 +123,77 @@ verifier::FailureKind AotClassLinker::PerformClassVerification(Thread* self,
   }
   // Do the actual work.
   return ClassLinker::PerformClassVerification(self, klass, log_level, error_msg);
+}
+
+bool AotClassLinker::CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klass, gc::Heap* heap) {
+  // Do not allow referencing a class or instance of a class defined in a dex file
+  // belonging to the boot image we're compiling against but not itself in the boot image;
+  // or a class referencing such classes as component type, superclass or interface.
+  // Allowing this could yield duplicate class objects from multiple extensions.
+
+  if (heap->ObjectIsInBootImageSpace(klass)) {
+    return true;  // Already included in the boot image we're compiling against.
+  }
+
+  // Treat arrays and primitive types specially because they do not have a DexCache that we
+  // can use to check whether the dex file belongs to the boot image we're compiling against.
+  DCHECK(!klass->IsPrimitive());  // Primitive classes must be in the primary boot image.
+  if (klass->IsArrayClass()) {
+    DCHECK(heap->ObjectIsInBootImageSpace(klass->GetIfTable()));  // IfTable is OK.
+    // Arrays of all dimensions are tied to the dex file of the non-array component type.
+    do {
+      klass = klass->GetComponentType();
+    } while (klass->IsArrayClass());
+    if (klass->IsPrimitive()) {
+      return false;
+    }
+    // Do not allow arrays of erroneous classes (the array class is not itself erroneous).
+    if (klass->IsErroneous()) {
+      return false;
+    }
+  }
+
+  // Check the class itself.
+  if (heap->ObjectIsInBootImageSpace(klass->GetDexCache())) {
+    return false;
+  }
+
+  // Check superclasses.
+  ObjPtr<mirror::Class> superclass = klass->GetSuperClass();
+  while (!heap->ObjectIsInBootImageSpace(superclass)) {
+    DCHECK(superclass != nullptr);  // Cannot skip Object which is in the primary boot image.
+    if (heap->ObjectIsInBootImageSpace(superclass->GetDexCache())) {
+      return false;
+    }
+    superclass = superclass->GetSuperClass();
+  }
+
+  // Check IfTable. This includes direct and indirect interfaces.
+  ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
+  for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
+    ObjPtr<mirror::Class> interface = if_table->GetInterface(i);
+    DCHECK(interface != nullptr);
+    if (!heap->ObjectIsInBootImageSpace(interface) &&
+        heap->ObjectIsInBootImageSpace(interface->GetDexCache())) {
+      return false;
+    }
+  }
+
+  if (kIsDebugBuild) {
+    // All virtual methods must come from classes we have already checked above.
+    PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+    ObjPtr<mirror::Class> k = klass;
+    while (!heap->ObjectIsInBootImageSpace(k)) {
+      for (auto& m : k->GetVirtualMethods(pointer_size)) {
+        ObjPtr<mirror::Class> declaring_class = m.GetDeclaringClass();
+        CHECK(heap->ObjectIsInBootImageSpace(declaring_class) ||
+              !heap->ObjectIsInBootImageSpace(declaring_class->GetDexCache()));
+      }
+      k = k->GetSuperClass();
+    }
+  }
+
+  return true;
 }
 
 }  // namespace art
