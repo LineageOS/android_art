@@ -2519,5 +2519,58 @@ DEFINE_FUNCTION ExecuteSwitchImplAsm
     ret
 END_FUNCTION ExecuteSwitchImplAsm
 
+// On entry: eax is the class, ebp is the inline cache.
+DEFINE_FUNCTION art_quick_update_inline_cache
+#if (INLINE_CACHE_SIZE != 5)
+#error "INLINE_CACHE_SIZE not as expected."
+#endif
+    PUSH ecx
+    movl %eax, %ecx // eax will be used for cmpxchg
+.Lentry1:
+    movl INLINE_CACHE_CLASSES_OFFSET(%ebp), %eax
+    cmpl %ecx, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry2
+    lock cmpxchg %ecx, INLINE_CACHE_CLASSES_OFFSET(%ebp)
+    jz .Ldone
+    jmp .Lentry1
+.Lentry2:
+    movl (INLINE_CACHE_CLASSES_OFFSET+4)(%ebp), %eax
+    cmpl %ecx, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry3
+    lock cmpxchg %ecx, (INLINE_CACHE_CLASSES_OFFSET+4)(%ebp)
+    jz .Ldone
+    jmp .Lentry2
+.Lentry3:
+    movl (INLINE_CACHE_CLASSES_OFFSET+8)(%ebp), %eax
+    cmpl %ecx, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry4
+    lock cmpxchg %ecx, (INLINE_CACHE_CLASSES_OFFSET+8)(%ebp)
+    jz .Ldone
+    jmp .Lentry3
+.Lentry4:
+    movl (INLINE_CACHE_CLASSES_OFFSET+12)(%ebp), %eax
+    cmpl %ecx, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry5
+    lock cmpxchg %ecx, (INLINE_CACHE_CLASSES_OFFSET+12)(%ebp)
+    jz .Ldone
+    jmp .Lentry4
+.Lentry5:
+    // Unconditionally store, the cache is megamorphic.
+    movl %ecx, (INLINE_CACHE_CLASSES_OFFSET+16)(%ebp)
+.Ldone:
+    // Restore registers
+    movl %ecx, %eax
+    POP ecx
+    ret
+END_FUNCTION art_quick_update_inline_cache
+
     // TODO: implement these!
 UNIMPLEMENTED art_quick_memcmp16
