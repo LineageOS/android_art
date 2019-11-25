@@ -29,6 +29,7 @@
 #include "android-base/logging.h"
 #include "android-base/strings.h"
 
+#include "aot_class_linker.h"
 #include "art_field-inl.h"
 #include "art_method-inl.h"
 #include "base/arena_allocator.h"
@@ -1283,66 +1284,7 @@ class ClinitImageUpdate {
     if (heap->ObjectIsInBootImageSpace(klass)) {
       return false;  // Already included in the boot image we're compiling against.
     }
-
-    // When compiling a boot image extension, we must not include classes
-    // that are defined in dex files belonging to the boot image we're
-    // compiling against but not actually present in that boot image.
-
-    // Treat arrays and primitive types specially because they do not have a DexCache that we
-    // can use to check whether the dex file belongs to the boot image we're compiling against.
-    DCHECK(!klass->IsPrimitive());  // Primitive classes must be in the primary boot image.
-    if (klass->IsArrayClass()) {
-      DCHECK(heap->ObjectIsInBootImageSpace(klass->GetIfTable()));  // IfTable is OK.
-      // Arrays of all dimensions are tied to the dex file of the non-array component type.
-      ObjPtr<mirror::Class> component_type = klass;
-      do {
-        component_type = component_type->GetComponentType();
-      } while (component_type->IsArrayClass());
-      return !component_type->IsPrimitive() &&
-             !heap->ObjectIsInBootImageSpace(component_type->GetDexCache());
-    }
-
-    // Check the class itself.
-    if (heap->ObjectIsInBootImageSpace(klass->GetDexCache())) {
-      return false;
-    }
-
-    // Check superclasses.
-    ObjPtr<mirror::Class> superclass = klass->GetSuperClass();
-    while (!heap->ObjectIsInBootImageSpace(superclass)) {
-      DCHECK(superclass != nullptr);  // Cannot skip Object which is in the primary boot image.
-      if (heap->ObjectIsInBootImageSpace(superclass->GetDexCache())) {
-        return false;
-      }
-      superclass = superclass->GetSuperClass();
-    }
-
-    // Check IfTable. This includes direct and indirect interfaces.
-    ObjPtr<mirror::IfTable> if_table = klass->GetIfTable();
-    for (size_t i = 0, num_interfaces = klass->GetIfTableCount(); i < num_interfaces; ++i) {
-      ObjPtr<mirror::Class> interface = if_table->GetInterface(i);
-      DCHECK(interface != nullptr);
-      if (!heap->ObjectIsInBootImageSpace(interface) &&
-          heap->ObjectIsInBootImageSpace(interface->GetDexCache())) {
-        return false;
-      }
-    }
-
-    if (kIsDebugBuild) {
-      // All virtual methods must come from classes we have already checked above.
-      PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-      ObjPtr<mirror::Class> k = klass;
-      while (!heap->ObjectIsInBootImageSpace(k)) {
-        for (auto& m : k->GetVirtualMethods(pointer_size)) {
-          ObjPtr<mirror::Class> declaring_class = m.GetDeclaringClass();
-          CHECK(heap->ObjectIsInBootImageSpace(declaring_class) ||
-                !heap->ObjectIsInBootImageSpace(declaring_class->GetDexCache()));
-        }
-        k = k->GetSuperClass();
-      }
-    }
-
-    return true;
+    return AotClassLinker::CanReferenceInBootImageExtension(klass, heap);
   }
 
   mutable VariableSizedHandleScope hs_;
