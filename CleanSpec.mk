@@ -102,6 +102,9 @@ $(call add-clean-step, find $(OUT_DIR) -name "*.oat" -o -name "*.odex" -o -name 
 $(call add-clean-step, find $(OUT_DIR) -name "*.oat" -o -name "*.odex" -o -name "*.art" -o -name '*.vdex' | xargs rm -f)
 $(call add-clean-step, find $(OUT_DIR) -name "*.oat" -o -name "*.odex" -o -name "*.art" -o -name '*.vdex' | xargs rm -f)
 
+# Remove empty dir for art APEX because it will be created on demand while mounting release|debug
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex/com.android.art)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
