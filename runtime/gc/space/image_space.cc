@@ -2241,6 +2241,13 @@ class ImageSpace::BootImageLoader {
       return raw_ptr - begin_ < size_;
     }
 
+    template <typename T>
+    ALWAYS_INLINE bool InDest(T* ptr) const {
+      uint32_t raw_ptr = reinterpret_cast32<uint32_t>(ptr);
+      uint32_t src_ptr = raw_ptr - diff_;
+      return src_ptr - begin_ < size_;
+    }
+
    private:
     const uint32_t diff_;
     const uint32_t begin_;
@@ -2450,7 +2457,7 @@ class ImageSpace::BootImageLoader {
           // Then patch the non-embedded vtable and iftable.
           ObjPtr<mirror::PointerArray> vtable =
               klass->GetVTable<kVerifyNone, kWithoutReadBarrier>();
-          if ((kExtension ? simple_relocate_visitor.InSource(vtable.Ptr()) : vtable != nullptr) &&
+          if ((kExtension ? simple_relocate_visitor.InDest(vtable.Ptr()) : vtable != nullptr) &&
               !patched_objects->Set(vtable.Ptr())) {
             main_patch_object_visitor.VisitPointerArray(vtable);
           }
