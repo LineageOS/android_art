@@ -1201,38 +1201,11 @@ void InstructionCodeGeneratorX86::VisitVecSADAccumulate(HVecSADAccumulate* instr
 }
 
 void LocationsBuilderX86::VisitVecDotProd(HVecDotProd* instruction) {
-  LocationSummary* locations = new (GetGraph()->GetAllocator()) LocationSummary(instruction);
-  locations->SetInAt(0, Location::RequiresFpuRegister());
-  locations->SetInAt(1, Location::RequiresFpuRegister());
-  locations->SetInAt(2, Location::RequiresFpuRegister());
-  locations->SetOut(Location::SameAsFirstInput());
-  locations->AddTemp(Location::RequiresFpuRegister());
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
 }
 
 void InstructionCodeGeneratorX86::VisitVecDotProd(HVecDotProd* instruction) {
-  bool cpu_has_avx = CpuHasAvxFeatureFlag();
-  LocationSummary* locations = instruction->GetLocations();
-  XmmRegister acc = locations->InAt(0).AsFpuRegister<XmmRegister>();
-  XmmRegister left = locations->InAt(1).AsFpuRegister<XmmRegister>();
-  XmmRegister right = locations->InAt(2).AsFpuRegister<XmmRegister>();
-  switch (instruction->GetPackedType()) {
-    case DataType::Type::kInt32: {
-      DCHECK_EQ(4u, instruction->GetVectorLength());
-      XmmRegister tmp = locations->GetTemp(0).AsFpuRegister<XmmRegister>();
-      if (!cpu_has_avx) {
-        __ movaps(tmp, right);
-        __ pmaddwd(tmp, left);
-        __ paddd(acc, tmp);
-      } else {
-        __ vpmaddwd(tmp, left, right);
-        __ vpaddd(acc, acc, tmp);
-      }
-      break;
-    }
-    default:
-      LOG(FATAL) << "Unsupported SIMD Type" << instruction->GetPackedType();
-      UNREACHABLE();
-  }
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
 }
 
 // Helper to set up locations for vector memory operations.
