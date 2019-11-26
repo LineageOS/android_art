@@ -709,6 +709,7 @@ def verify_knownfailure_entry(entry):
       'variant' : (str,),
       'devices': (list, str),
       'env_vars' : (dict,),
+      'zipapex' : (bool,),
   }
   for field in entry:
     field_type = type(entry[field])
@@ -768,6 +769,17 @@ def get_disabled_test_info(device_name):
           disabled_test_info[test] = disabled_test_info[test].union(variants)
         else:
           disabled_test_info[test] = variants
+
+    zipapex_disable = failure.get("zipapex", False)
+    if zipapex_disable and zipapex_loc is not None:
+      for test in tests:
+        if test not in RUN_TEST_SET:
+          raise ValueError('%s is not a valid run-test' % (test))
+        if test in disabled_test_info:
+          disabled_test_info[test] = disabled_test_info[test].union(variants)
+        else:
+          disabled_test_info[test] = variants
+
   return disabled_test_info
 
 def gather_disabled_test_info():
