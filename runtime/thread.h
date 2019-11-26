@@ -263,17 +263,6 @@ class Thread {
         (state_and_flags.as_struct.flags & kSuspendRequest) != 0;
   }
 
-  void DecrDefineClassCount() {
-    tls32_.define_class_counter--;
-  }
-
-  void IncrDefineClassCount() {
-    tls32_.define_class_counter++;
-  }
-  uint32_t GetDefineClassCount() const {
-    return tls32_.define_class_counter;
-  }
-
   // If delta > 0 and (this != self or suspend_barrier is not null), this function may temporarily
   // release thread_suspend_count_lock_ internally.
   ALWAYS_INLINE
@@ -1561,8 +1550,7 @@ class Thread {
           user_code_suspend_count(0),
           force_interpreter_count(0),
           use_mterp(0),
-          make_visibly_initialized_counter(0),
-          define_class_counter(0) {}
+          make_visibly_initialized_counter(0) {}
 
     union StateAndFlags state_and_flags;
     static_assert(sizeof(union StateAndFlags) == sizeof(int32_t),
@@ -1660,10 +1648,6 @@ class Thread {
     // initialized but not visibly initialized for a long time even if no more classes are
     // being initialized anymore.
     uint32_t make_visibly_initialized_counter;
-
-    // Counter for how many nested define-classes are ongoing in this thread. Used to allow waiting
-    // for threads to be done with class-definition work.
-    uint32_t define_class_counter;
   } tls32_;
 
   struct PACKED(8) tls_64bit_sized_values {
