@@ -381,6 +381,10 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
                          {"indices", JniIdType::kIndices},
                          {"default", JniIdType::kDefault}})
           .IntoKey(M::OpaqueJniIds)
+      .Define("-Xauto-promote-opaque-jni-ids:_")
+          .WithType<bool>()
+          .WithValueMap({{"true", true}, {"false", false}})
+          .IntoKey(M::AutoPromoteOpaqueJniIds)
       .Define("-XX:VerifierMissingKThrowFatal=_")
           .WithType<bool>()
           .WithValueMap({{"false", false}, {"true", true}})
