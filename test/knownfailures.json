@@ -1278,5 +1278,11 @@
         "variant": "gcstress",
         "bug": "b/137887811",
         "description": ["Occasional timeouts."]
+    },
+    {
+        "tests": ["909-attach-agent", "126-miranda-multidex"],
+        "zipapex": true,
+        "bug": "b/135507613",
+        "description": ["These tests run dalvikvm multiple times, this can messup the zipapex runner"]
     }
 ]
