@@ -49,6 +49,14 @@ public class Main {
         System.out.println("App method not hot in profile " +
                 getHotnessCounter(Main.class, methodName));
       }
+      if (getHotnessCounter(Main.class, methodName) == 0) {
+        System.out.println("Hotness should be non zero " +
+                getHotnessCounter(Main.class, methodName));
+      }
+      VMRuntime.resetJitCounters();
+      if (getHotnessCounter(Main.class, methodName) != 0) {
+        System.out.println("Hotness should be zero " + getHotnessCounter(Main.class, methodName));
+      }
     } finally {
       if (file != null) {
         file.delete();

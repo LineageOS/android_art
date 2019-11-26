@@ -733,6 +733,34 @@ static void VMRuntime_bootCompleted(JNIEnv* env ATTRIBUTE_UNUSED,
   }
 }
 
+class ClearJitCountersVisitor : public ClassVisitor {
+ public:
+  bool operator()(ObjPtr<mirror::Class> klass) override REQUIRES_SHARED(Locks::mutator_lock_) {
+    // Avoid some types of classes that don't need their methods visited.
+    if (klass->IsProxyClass() ||
+        klass->IsArrayClass() ||
+        klass->IsPrimitive() ||
+        !klass->IsResolved() ||
+        klass->IsErroneousResolved()) {
+      return true;
+    }
+    for (ArtMethod& m : klass->GetMethods(kRuntimePointerSize)) {
+      if (!m.IsAbstract()) {
+        if (m.GetCounter() != 0) {
+          m.SetCounter(0);
+        }
+      }
+    }
+    return true;
+  }
+};
+
+static void VMRuntime_resetJitCounters(JNIEnv* env, jclass klass ATTRIBUTE_UNUSED) {
+  ScopedObjectAccess soa(env);
+  ClearJitCountersVisitor visitor;
+  Runtime::Current()->GetClassLinker()->VisitClasses(&visitor);
+}
+
 static JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(VMRuntime, addressOf, "(Ljava/lang/Object;)J"),
   NATIVE_METHOD(VMRuntime, bootClassPath, "()Ljava/lang/String;"),
@@ -783,6 +811,7 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMRuntime, setProcessPackageName, "(Ljava/lang/String;)V"),
   NATIVE_METHOD(VMRuntime, setProcessDataDirectory, "(Ljava/lang/String;)V"),
   NATIVE_METHOD(VMRuntime, bootCompleted, "()V"),
+  NATIVE_METHOD(VMRuntime, resetJitCounters, "()V"),
 };
 
 void register_dalvik_system_VMRuntime(JNIEnv* env) {
