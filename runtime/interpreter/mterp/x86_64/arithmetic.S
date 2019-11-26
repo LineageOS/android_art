@@ -1,4 +1,4 @@
-%def bindiv(result="", second="", wide="", suffix="", rem="0", ext="cdq"):
+%def bindiv(result="", second="", tmp="", wide="", suffix="", rem="0", ext="cdq"):
 /*
  * 32-bit binary div/rem operation.  Handles special case of op1=-1.
  */
@@ -16,6 +16,8 @@
     jz      common_errDivideByZero
     cmp${suffix}  $$-1, $second
     je      2f
+    cmp${suffix}  $$2, $second
+    je 3f
     $ext                                    # rdx:rax <- sign-extended of rax
     idiv${suffix}   $second
 1:
@@ -32,8 +34,31 @@
     neg${suffix} $result
     .endif
     jmp     1b
+3:
+    .if $rem
+    mov${suffix} $tmp, $result
+    .if $wide
+    shr${suffix} $$63, $result
+    .else
+    shr${suffix} $$31, $result
+    .endif
+    add${suffix} $tmp, $result
+    and${suffix} $$-2, $result
+    sub${suffix} $result, $tmp
+    mov${suffix} $tmp, $result
+    .else
+    mov${suffix} $result, $tmp
+    .if $wide
+    shr${suffix} $$63, $tmp
+    .else
+    shr${suffix} $$31, $tmp
+    .endif
+    add${suffix} $tmp, $result
+    sar${suffix} $result
+    .endif
+    jmp     1b
 
-%def bindiv2addr(result="", second="", wide="", suffix="", rem="0", ext="cdq"):
+%def bindiv2addr(result="", second="", tmp="", wide="", suffix="", rem="0", ext="cdq"):
 /*
  * 32-bit binary div/rem operation.  Handles special case of op1=-1.
  */
@@ -52,6 +77,8 @@
     jz      common_errDivideByZero
     cmp${suffix}  $$-1, $second
     je      2f
+    cmp${suffix}  $$2, $second
+    je      3f
     $ext                                    # rdx:rax <- sign-extended of rax
     idiv${suffix}   $second
 1:
@@ -66,6 +93,29 @@
     xor${suffix} $result, $result
     .else
     neg${suffix} $result
+    .endif
+    jmp     1b
+3:
+    .if $rem
+    mov${suffix} $tmp, $result
+    .if $wide
+    shr${suffix} $$63, $result
+    .else
+    shr${suffix} $$31, $result
+    .endif
+    add${suffix} $tmp, $result
+    and${suffix} $$-2, $result
+    sub${suffix} $result, $tmp
+    mov${suffix} $tmp, $result
+    .else
+    mov${suffix} $result, $tmp
+    .if $wide
+    shr${suffix} $$63, $tmp
+    .else
+    shr${suffix} $$31, $tmp
+    .endif
+    add${suffix} $tmp, $result
+    sar${suffix} $result
     .endif
     jmp     1b
 
@@ -372,10 +422,10 @@ $instr
     ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 
 %def op_div_int():
-%  bindiv(result="%eax", second="%ecx", wide="0", suffix="l")
+%  bindiv(result="%eax", second="%ecx", tmp="%edx", wide="0", suffix="l")
 
 %def op_div_int_2addr():
-%  bindiv2addr(result="%eax", second="%ecx", wide="0", suffix="l")
+%  bindiv2addr(result="%eax", second="%ecx", tmp="%edx", wide="0", suffix="l")
 
 %def op_div_int_lit16():
 %  bindivLit16(result="%eax")
@@ -384,10 +434,10 @@ $instr
 %  bindivLit8(result="%eax")
 
 %def op_div_long():
-%  bindiv(result="%rax", second="%rcx", wide="1", suffix="q", ext="cqo")
+%  bindiv(result="%rax", second="%rcx", tmp="%rdx", wide="1", suffix="q", ext="cqo")
 
 %def op_div_long_2addr():
-%  bindiv2addr(result="%rax", second="%rcx", wide="1", suffix="q", ext="cqo")
+%  bindiv2addr(result="%rax", second="%rcx", tmp="%rdx", wide="1", suffix="q", ext="cqo")
 
 %def op_int_to_byte():
 %  unop(instr="movsbl  %al, %eax")
@@ -475,10 +525,10 @@ $instr
 %  binopWide2addr(instr="orq")
 
 %def op_rem_int():
-%  bindiv(result="%edx", second="%ecx", wide="0", suffix="l", rem="1")
+%  bindiv(result="%edx", second="%ecx", tmp="%eax", wide="0", suffix="l", rem="1")
 
 %def op_rem_int_2addr():
-%  bindiv2addr(result="%edx", second="%ecx", wide="0", suffix="l", rem="1")
+%  bindiv2addr(result="%edx", second="%ecx", tmp="%eax", wide="0", suffix="l", rem="1")
 
 %def op_rem_int_lit16():
 %  bindivLit16(result="%edx", rem="1")
@@ -487,10 +537,10 @@ $instr
 %  bindivLit8(result="%edx", rem="1")
 
 %def op_rem_long():
-%  bindiv(result="%rdx", second="%rcx", wide="1", suffix="q", ext="cqo", rem="1")
+%  bindiv(result="%rdx", second="%rcx", tmp="%rax", wide="1", suffix="q", ext="cqo", rem="1")
 
 %def op_rem_long_2addr():
-%  bindiv2addr(result="%rdx", second="%rcx", wide="1", suffix="q", rem="1", ext="cqo")
+%  bindiv2addr(result="%rdx", second="%rcx", tmp="%rax", wide="1", suffix="q", rem="1", ext="cqo")
 
 %def op_rsub_int():
 /* this op is "rsub-int", but can be thought of as "rsub-int/lit16" */
