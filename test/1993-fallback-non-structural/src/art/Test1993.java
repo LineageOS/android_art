@@ -17,7 +17,6 @@
 package art;
 
 import java.util.Base64;
-import java.lang.reflect.*;
 public class Test1993 {
 
   static class Transform {
@@ -62,25 +61,17 @@ public class Test1993 {
     "AAAASAEAAAMgAAACAAAAgAEAAAEQAAABAAAAjAEAAAIgAAAVAAAAkgEAAAQgAAACAAAALAMAAAAg" +
     "AAABAAAAOwMAAAMQAAACAAAATAMAAAYgAAABAAAAXAMAAAAQAAABAAAAbAMAAA==");
 
-  public static void run() throws Exception {
+  public static void run() {
     Redefinition.setTestConfiguration(Redefinition.Config.COMMON_REDEFINE);
     doTest(new Transform());
   }
 
-  public static void doTest(Transform t) throws Exception {
+  public static void doTest(Transform t) {
+    // TODO Remove this once the class is structurally modifiable.
     System.out.println("Can structurally Redefine: " +
       Redefinition.isStructurallyModifiable(Transform.class));
     t.sayHi();
     Redefinition.doCommonStructuralClassRedefinition(Transform.class, DEX_BYTES);
     t.sayHi();
-    // Check and make sure we didn't structurally redefine by looking for ClassExt.obsoleteClass
-    Field ext_data_field = Class.class.getDeclaredField("extData");
-    ext_data_field.setAccessible(true);
-    Object ext_data = ext_data_field.get(Transform.class);
-    Field obsolete_class_field = ext_data.getClass().getDeclaredField("obsoleteClass");
-    obsolete_class_field.setAccessible(true);
-    if (obsolete_class_field.get(ext_data) != null)  {
-      System.out.println("Expected no ClassExt.obsoleteClass but got " + obsolete_class_field.get(ext_data));
-    }
   }
 }
