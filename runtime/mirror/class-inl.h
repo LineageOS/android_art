@@ -550,6 +550,22 @@ inline bool Class::CheckResolvedMethodAccess(ObjPtr<Class> access_to,
       access_to, method, dex_cache, method_idx, throw_invoke_type);
 }
 
+inline bool Class::IsObsoleteVersionOf(ObjPtr<Class> klass) {
+  DCHECK(!klass->IsObsoleteObject()) << klass->PrettyClass() << " is obsolete!";
+  if (LIKELY(!IsObsoleteObject())) {
+    return false;
+  }
+  ObjPtr<Class> current(klass);
+  do {
+    if (UNLIKELY(current == this)) {
+      return true;
+    } else {
+      current = current->GetObsoleteClass();
+    }
+  } while (!current.IsNull());
+  return false;
+}
+
 inline bool Class::IsSubClass(ObjPtr<Class> klass) {
   // Since the SubtypeCheck::IsSubtypeOf needs to lookup the Depth,
   // it is always O(Depth) in terms of speed to do the check.

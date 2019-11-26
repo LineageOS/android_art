@@ -228,6 +228,19 @@ void RuntimeCallbacks::ClassLoad(Handle<mirror::Class> klass) {
   }
 }
 
+void RuntimeCallbacks::EndDefineClass() {
+  for (ClassLoadCallback* cb : COPY(class_callbacks_)) {
+    cb->EndDefineClass();
+  }
+}
+
+void RuntimeCallbacks::BeginDefineClass() {
+  for (ClassLoadCallback* cb : COPY(class_callbacks_)) {
+    cb->BeginDefineClass();
+  }
+}
+
+
 void RuntimeCallbacks::ClassPreDefine(const char* descriptor,
                                       Handle<mirror::Class> temp_class,
                                       Handle<mirror::ClassLoader> loader,

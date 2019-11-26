@@ -3366,12 +3366,57 @@ static bool IsReservedBootClassPathDescriptor(const char* descriptor) {
       StartsWith(descriptor_sv, "Landroid/media/");
 }
 
+// Helper for maintaining DefineClass counting. We need to notify callbacks when we start/end a
+// define-class and how many recursive DefineClasses we are at in order to allow for doing  things
+// like pausing class definition.
+struct ScopedDefiningClass {
+ public:
+  explicit ScopedDefiningClass(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_)
+      : self_(self), returned_(false) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+    Runtime::Current()->GetRuntimeCallbacks()->BeginDefineClass();
+    self_->IncrDefineClassCount();
+  }
+  ~ScopedDefiningClass() REQUIRES_SHARED(Locks::mutator_lock_) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+    CHECK(returned_);
+  }
+
+  ObjPtr<mirror::Class> Finish(Handle<mirror::Class> h_klass)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    CHECK(!returned_);
+    self_->DecrDefineClassCount();
+    Runtime::Current()->GetRuntimeCallbacks()->EndDefineClass();
+    Thread::PoisonObjectPointersIfDebug();
+    returned_ = true;
+    return h_klass.Get();
+  }
+
+  ObjPtr<mirror::Class> Finish(ObjPtr<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    StackHandleScope<1> hs(self_);
+    Handle<mirror::Class> h_klass(hs.NewHandle(klass));
+    return Finish(h_klass);
+  }
+
+  ObjPtr<mirror::Class> Finish(nullptr_t np ATTRIBUTE_UNUSED)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    ScopedNullHandle<mirror::Class> snh;
+    return Finish(snh);
+  }
+
+ private:
+  Thread* self_;
+  bool returned_;
+};
+
 ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
                                                const char* descriptor,
                                                size_t hash,
                                                Handle<mirror::ClassLoader> class_loader,
                                                const DexFile& dex_file,
                                                const dex::ClassDef& dex_class_def) {
+  ScopedDefiningClass sdc(self);
   StackHandleScope<3> hs(self);
   auto klass = hs.NewHandle<mirror::Class>(nullptr);
 
@@ -3402,7 +3447,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     ObjPtr<mirror::Throwable> pre_allocated =
         Runtime::Current()->GetPreAllocatedNoClassDefFoundError();
     self->SetException(pre_allocated);
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
 
   // This is to prevent the calls to ClassLoad and ClassPrepare which can cause java/user-supplied
@@ -3413,7 +3458,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     ObjPtr<mirror::Throwable> pre_allocated =
         Runtime::Current()->GetPreAllocatedNoClassDefFoundError();
     self->SetException(pre_allocated);
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
 
   if (klass == nullptr) {
@@ -3424,12 +3469,12 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     if (CanAllocClass()) {
       klass.Assign(AllocClass(self, SizeOfClassWithoutEmbeddedTables(dex_file, dex_class_def)));
     } else {
-      return nullptr;
+      return sdc.Finish(nullptr);
     }
   }
   if (UNLIKELY(klass == nullptr)) {
     self->AssertPendingOOMException();
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
   // Get the real dex file. This will return the input if there aren't any callbacks or they do
   // nothing.
@@ -3446,12 +3491,12 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
                                                             &new_class_def);
   // Check to see if an exception happened during runtime callbacks. Return if so.
   if (self->IsExceptionPending()) {
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
   ObjPtr<mirror::DexCache> dex_cache = RegisterDexFile(*new_dex_file, class_loader.Get());
   if (dex_cache == nullptr) {
     self->AssertPendingException();
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
   klass->SetDexCache(dex_cache);
   SetupClass(*new_dex_file, *new_class_def, klass, class_loader.Get());
@@ -3473,7 +3518,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
   if (existing != nullptr) {
     // We failed to insert because we raced with another thread. Calling EnsureResolved may cause
     // this thread to block.
-    return EnsureResolved(self, descriptor, existing);
+    return sdc.Finish(EnsureResolved(self, descriptor, existing));
   }
 
   // Load the fields and other things after we are inserted in the table. This is so that we don't
@@ -3488,7 +3533,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     if (!klass->IsErroneous()) {
       mirror::Class::SetStatus(klass, ClassStatus::kErrorUnresolved, self);
     }
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
 
   // Finish loading (if necessary) by finding parents
@@ -3498,7 +3543,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     if (!klass->IsErroneous()) {
       mirror::Class::SetStatus(klass, ClassStatus::kErrorUnresolved, self);
     }
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
   CHECK(klass->IsLoaded());
 
@@ -3517,7 +3562,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
     if (!klass->IsErroneous()) {
       mirror::Class::SetStatus(klass, ClassStatus::kErrorUnresolved, self);
     }
-    return nullptr;
+    return sdc.Finish(nullptr);
   }
   self->AssertNoPendingException();
   CHECK(h_new_class != nullptr) << descriptor;
@@ -3551,7 +3596,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
   // Notify native debugger of the new class and its layout.
   jit::Jit::NewTypeLoadedIfUsingJit(h_new_class.Get());
 
-  return h_new_class.Get();
+  return sdc.Finish(h_new_class);
 }
 
 uint32_t ClassLinker::SizeOfClassWithoutEmbeddedTables(const DexFile& dex_file,
