@@ -617,6 +617,11 @@ class MANAGED Class final : public Object {
   // to themselves. Classes for primitive types may not assign to each other.
   ALWAYS_INLINE bool IsAssignableFrom(ObjPtr<Class> src) REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Checks if 'klass' is a redefined version of this.
+  bool IsObsoleteVersionOf(ObjPtr<Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  ObjPtr<Class> GetObsoleteClass() REQUIRES_SHARED(Locks::mutator_lock_);
+
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   ALWAYS_INLINE ObjPtr<Class> GetSuperClass() REQUIRES_SHARED(Locks::mutator_lock_);
