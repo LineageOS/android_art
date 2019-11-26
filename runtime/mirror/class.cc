@@ -336,15 +336,6 @@ void Class::SetClassSize(uint32_t new_class_size) {
   SetField32Transaction(OFFSET_OF_OBJECT_MEMBER(Class, class_size_), new_class_size);
 }
 
-ObjPtr<Class> Class::GetObsoleteClass() {
-  ObjPtr<ClassExt> ext(GetExtData());
-  if (ext.IsNull()) {
-    return nullptr;
-  } else {
-    return ext->GetObsoleteClass();
-  }
-}
-
 // Return the class' name. The exact format is bizarre, but it's the specified behavior for
 // Class.getName: keywords for primitive types, regular "[I" form for primitive arrays (so "int"
 // but "[I"), and arrays of reference types written between "L" and ";" but with dots rather than
