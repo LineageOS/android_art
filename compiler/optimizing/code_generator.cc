@@ -395,7 +395,8 @@ void CodeGenerator::Compile(CodeAllocator* allocator) {
   GetStackMapStream()->BeginMethod(HasEmptyFrame() ? 0 : frame_size_,
                                    core_spill_mask_,
                                    fpu_spill_mask_,
-                                   GetGraph()->GetNumberOfVRegs());
+                                   GetGraph()->GetNumberOfVRegs(),
+                                   GetGraph()->IsCompilingBaseline());
 
   size_t frame_start = GetAssembler()->CodeSize();
   GenerateFrameEntry();

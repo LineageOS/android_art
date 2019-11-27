@@ -2511,3 +2511,13 @@ DEFINE_FUNCTION art_quick_update_inline_cache
 .Ldone:
     ret
 END_FUNCTION art_quick_update_inline_cache
+
+// On entry, method is at the bottom of the stack.
+DEFINE_FUNCTION art_quick_compile_optimized
+    SETUP_SAVE_EVERYTHING_FRAME
+    movq FRAME_SIZE_SAVE_EVERYTHING(%rsp), %rdi // pass ArtMethod
+    movq %gs:THREAD_SELF_OFFSET, %rsi           // pass Thread::Current()
+    call SYMBOL(artCompileOptimized)            // (ArtMethod*, Thread*)
+    RESTORE_SAVE_EVERYTHING_FRAME               // restore frame up to return address
+    ret
+END_FUNCTION art_quick_compile_optimized
