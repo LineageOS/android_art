@@ -22,9 +22,6 @@ public class Main {
   public static void main(String[] args) throws Exception {
     System.loadLibrary(args[0]);
 
-    if (!checkAppImageLoaded()) {
-      System.out.println("AppImage not loaded.");
-    }
     // To avoid going through resolution trampoline, make test classes visibly initialized.
     new Test();
     new TestFast();
@@ -157,7 +154,6 @@ public class Main {
     }
   }
 
-  public static native boolean checkAppImageLoaded();
   public static native void makeVisiblyInitialized();
 }
 
