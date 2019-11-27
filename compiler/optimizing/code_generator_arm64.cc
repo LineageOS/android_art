@@ -18,7 +18,7 @@
 
 #include "arch/arm64/asm_support_arm64.h"
 #include "arch/arm64/instruction_set_features_arm64.h"
-#include "art_method.h"
+#include "art_method-inl.h"
 #include "base/bit_utils.h"
 #include "base/bit_utils_iterator.h"
 #include "class_table.h"
@@ -4041,6 +4041,26 @@ void LocationsBuilderARM64::VisitInvokeInterface(HInvokeInterface* invoke) {
   HandleInvoke(invoke);
 }
 
+void CodeGeneratorARM64::MaybeGenerateInlineCacheCheck(HInstruction* instruction,
+                                                       Register klass) {
+  DCHECK_EQ(klass.GetCode(), 0u);
+  if (GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+    uint64_t address = reinterpret_cast64<uint64_t>(cache);
+    vixl::aarch64::Label done;
+    __ Mov(x8, address);
+    __ Ldr(x9, MemOperand(x8, InlineCache::ClassesOffset().Int32Value()));
+    // Fast path for a monomorphic cache.
+    __ Cmp(klass, x9);
+    __ B(eq, &done);
+    InvokeRuntime(kQuickUpdateInlineCache, instruction, instruction->GetDexPc());
+    __ Bind(&done);
+  }
+}
+
 void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invoke) {
   // TODO: b/18116999, our IMTs can miss an IncompatibleClassChangeError.
   LocationSummary* locations = invoke->GetLocations();
@@ -4048,13 +4068,6 @@ void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invok
   Location receiver = locations->InAt(0);
   Offset class_offset = mirror::Object::ClassOffset();
   Offset entry_point = ArtMethod::EntryPointFromQuickCompiledCodeOffset(kArm64PointerSize);
-
-  // The register ip1 is required to be used for the hidden argument in
-  // art_quick_imt_conflict_trampoline, so prevent VIXL from using it.
-  MacroAssembler* masm = GetVIXLAssembler();
-  UseScratchRegisterScope scratch_scope(masm);
-  scratch_scope.Exclude(ip1);
-  __ Mov(ip1, invoke->GetDexMethodIndex());
 
   // Ensure that between load and MaybeRecordImplicitNullCheck there are no pools emitted.
   if (receiver.IsStackSlot()) {
@@ -4080,6 +4093,17 @@ void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invok
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   GetAssembler()->MaybeUnpoisonHeapReference(temp.W());
+
+  // If we're compiling baseline, update the inline cache.
+  codegen_->MaybeGenerateInlineCacheCheck(invoke, temp);
+
+  // The register ip1 is required to be used for the hidden argument in
+  // art_quick_imt_conflict_trampoline, so prevent VIXL from using it.
+  MacroAssembler* masm = GetVIXLAssembler();
+  UseScratchRegisterScope scratch_scope(masm);
+  scratch_scope.Exclude(ip1);
+  __ Mov(ip1, invoke->GetDexMethodIndex());
+
   __ Ldr(temp,
       MemOperand(temp, mirror::Class::ImtPtrOffset(kArm64PointerSize).Uint32Value()));
   uint32_t method_offset = static_cast<uint32_t>(ImTable::OffsetOfElement(
@@ -4260,6 +4284,10 @@ void CodeGeneratorARM64::GenerateVirtualCall(
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   GetAssembler()->MaybeUnpoisonHeapReference(temp.W());
+
+  // If we're compiling baseline, update the inline cache.
+  MaybeGenerateInlineCacheCheck(invoke, temp);
+
   // temp = temp->GetMethodAt(method_offset);
   __ Ldr(temp, MemOperand(temp, method_offset));
   // lr = temp->GetEntryPoint();
