@@ -16,7 +16,7 @@
 
 #include "code_generator_x86_64.h"
 
-#include "art_method.h"
+#include "art_method-inl.h"
 #include "class_table.h"
 #include "code_generator_utils.h"
 #include "compiled_method.h"
@@ -26,11 +26,13 @@
 #include "heap_poisoning.h"
 #include "intrinsics.h"
 #include "intrinsics_x86_64.h"
+#include "jit/profiling_info.h"
 #include "linker/linker_patch.h"
 #include "lock_word.h"
 #include "mirror/array-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/object_reference.h"
+#include "scoped_thread_state_change-inl.h"
 #include "thread.h"
 #include "utils/assembler.h"
 #include "utils/stack_checks.h"
@@ -1068,6 +1070,9 @@ void CodeGeneratorX86_64::GenerateVirtualCall(
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
+
+  MaybeGenerateInlineCacheCheck(invoke->GetDexPc(), temp);
+
   // temp = temp->GetMethodAt(method_offset);
   __ movq(temp, Address(temp, method_offset));
   // call temp->GetEntryPoint();
@@ -2520,6 +2525,24 @@ void LocationsBuilderX86_64::VisitInvokeInterface(HInvokeInterface* invoke) {
   invoke->GetLocations()->AddTemp(Location::RegisterLocation(RAX));
 }
 
+void CodeGeneratorX86_64::MaybeGenerateInlineCacheCheck(uint32_t dex_pc, CpuRegister klass) {
+  DCHECK_EQ(RDI, klass.AsRegister());
+  if (GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    InlineCache* cache = info->GetInlineCache(dex_pc);
+    uint64_t address = reinterpret_cast64<uint64_t>(cache);
+    NearLabel done;
+    __ movq(CpuRegister(TMP), Immediate(address));
+    // Fast path for a monomorphic cache.
+    __ cmpl(Address(CpuRegister(TMP), InlineCache::ClassesOffset().Int32Value()), klass);
+    __ j(kEqual, &done);
+    GenerateInvokeRuntime(
+        GetThreadOffset<kX86_64PointerSize>(kQuickUpdateInlineCache).Int32Value());
+    __ Bind(&done);
+  }
+}
+
 void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invoke) {
   // TODO: b/18116999, our IMTs can miss an IncompatibleClassChangeError.
   LocationSummary* locations = invoke->GetLocations();
@@ -2527,11 +2550,6 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
   CpuRegister hidden_reg = locations->GetTemp(1).AsRegister<CpuRegister>();
   Location receiver = locations->InAt(0);
   size_t class_offset = mirror::Object::ClassOffset().SizeValue();
-
-  // Set the hidden argument. This is safe to do this here, as RAX
-  // won't be modified thereafter, before the `call` instruction.
-  DCHECK_EQ(RAX, hidden_reg.AsRegister());
-  codegen_->Load64BitValue(hidden_reg, invoke->GetDexMethodIndex());
 
   if (receiver.IsStackSlot()) {
     __ movl(temp, Address(CpuRegister(RSP), receiver.GetStackIndex()));
@@ -2550,6 +2568,15 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
+
+  codegen_->MaybeGenerateInlineCacheCheck(invoke->GetDexPc(), temp);
+
+  // Set the hidden argument. This is safe to do this here, as RAX
+  // won't be modified thereafter, before the `call` instruction.
+  // We also di it after MaybeGenerateInlineCache that may use RAX.
+  DCHECK_EQ(RAX, hidden_reg.AsRegister());
+  codegen_->Load64BitValue(hidden_reg, invoke->GetDexMethodIndex());
+
   // temp = temp->GetAddressOfIMT()
   __ movq(temp,
       Address(temp, mirror::Class::ImtPtrOffset(kX86_64PointerSize).Uint32Value()));

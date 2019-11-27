@@ -130,4 +130,7 @@ extern "C" void art_quick_throw_null_pointer_exception_from_signal(uintptr_t add
 extern "C" void art_quick_throw_stack_overflow(void*);
 extern "C" void art_quick_throw_string_bounds(int32_t index, int32_t limit);
 
+// Inline cache.
+extern "C" void art_quick_update_inline_cache();
+
 #endif  // ART_RUNTIME_ENTRYPOINTS_QUICK_QUICK_DEFAULT_EXTERNS_H_
