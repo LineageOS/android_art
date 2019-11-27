@@ -1404,6 +1404,7 @@ class ClassLinker {
 
   // Trampolines within the image the bounce to runtime entrypoints. Done so that there is a single
   // patch point within the image. TODO: make these proper relocations.
+  const void* jni_dlsym_lookup_trampoline_;
   const void* quick_resolution_trampoline_;
   const void* quick_imt_conflict_trampoline_;
   const void* quick_generic_jni_trampoline_;

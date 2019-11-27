@@ -1,0 +1,6 @@
+JNI_OnLoad called
+test
+testMissing
+JNI_OnLoad called
+test
+testMissing

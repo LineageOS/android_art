@@ -2389,7 +2389,7 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
       // Ensure static method's class is initialized.
       StackHandleScope<1> hs(self);
       Handle<mirror::Class> h_class(hs.NewHandle(declaring_class));
-      if (!Runtime::Current()->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
+      if (!runtime->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
         DCHECK(Thread::Current()->IsExceptionPending()) << called->PrettyMethod();
         self->PopHandleScope();
         // A negative value denotes an error.
@@ -2432,7 +2432,11 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
   // In the second case, we need to execute the binding and continue with the actual native function
   // pointer.
   DCHECK(nativeCode != nullptr);
-  if (nativeCode == GetJniDlsymLookupStub()) {
+  if (runtime->GetClassLinker()->IsJniDlsymLookupStub(nativeCode)) {
+    // FIXME: This is broken for @FastNative and @CriticalNative as we're still runnable.
+    // Calls from compiled stubs are also broken.
+    // TODO: We could just let the GenericJNI stub call the ArtFindNativeMethod()
+    // rather than calling it explicitly here.
     nativeCode = artFindNativeMethod(self);
 
     if (nativeCode == nullptr) {

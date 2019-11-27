@@ -195,7 +195,7 @@ class OatSymbolizer final {
         info.code_size = 0;  /* The symbol lasts until the next symbol. */        \
         method_debug_infos_.push_back(std::move(info));                           \
       }
-    DO_TRAMPOLINE(JniDlsymLookup);
+    DO_TRAMPOLINE(JniDlsymLookupTrampoline);
     DO_TRAMPOLINE(QuickGenericJniTrampoline);
     DO_TRAMPOLINE(QuickImtConflictTrampoline);
     DO_TRAMPOLINE(QuickResolutionTrampoline);
@@ -445,8 +445,8 @@ class OatDumper {
     os << StringPrintf("\n\n");
 
     DUMP_OAT_HEADER_OFFSET("EXECUTABLE", GetExecutableOffset);
-    DUMP_OAT_HEADER_OFFSET("JNI DLSYM LOOKUP",
-                           GetJniDlsymLookupOffset);
+    DUMP_OAT_HEADER_OFFSET("JNI DLSYM LOOKUP TRAMPOLINE",
+                           GetJniDlsymLookupTrampolineOffset);
     DUMP_OAT_HEADER_OFFSET("QUICK GENERIC JNI TRAMPOLINE",
                            GetQuickGenericJniTrampolineOffset);
     DUMP_OAT_HEADER_OFFSET("QUICK IMT CONFLICT TRAMPOLINE",

@@ -1,0 +1,8 @@
+LMain;
+LTest;
+HSPLMain;->test()V
+HSPLMain;->testFast()V
+HSPLMain;->testCritical()V
+HSPLMain;->testMissing()V
+HSPLMain;->testMissingFast()V
+HSPLMain;->testMissingCritical()V
