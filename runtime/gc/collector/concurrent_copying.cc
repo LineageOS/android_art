@@ -1286,7 +1286,7 @@ class ConcurrentCopying::ImmuneSpaceCaptureRefsVisitor {
   }
 
   static void Callback(mirror::Object* obj, void* arg) REQUIRES_SHARED(Locks::mutator_lock_) {
-    reinterpret_cast<ImmuneSpaceScanObjVisitor*>(arg)->operator()(obj);
+    reinterpret_cast<ImmuneSpaceCaptureRefsVisitor*>(arg)->operator()(obj);
   }
 
  private:

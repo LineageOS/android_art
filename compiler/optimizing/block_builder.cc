@@ -398,6 +398,48 @@ void HBasicBlockBuilder::InsertTryBoundaryBlocks() {
   }
 }
 
+void HBasicBlockBuilder::InsertSynthesizedLoopsForOsr() {
+  ArenaSet<uint32_t> targets(allocator_->Adapter(kArenaAllocGraphBuilder));
+  // Collect basic blocks that are targets of a negative branch.
+  for (const DexInstructionPcPair& pair : code_item_accessor_) {
+    const uint32_t dex_pc = pair.DexPc();
+    const Instruction& instruction = pair.Inst();
+    if (instruction.IsBranch()) {
+      uint32_t target_dex_pc = dex_pc + instruction.GetTargetOffset();
+      if (target_dex_pc < dex_pc) {
+        HBasicBlock* block = GetBlockAt(target_dex_pc);
+        CHECK_NE(kNoDexPc, block->GetDexPc());
+        targets.insert(block->GetBlockId());
+      }
+    } else if (instruction.IsSwitch()) {
+      DexSwitchTable table(instruction, dex_pc);
+      for (DexSwitchTableIterator s_it(table); !s_it.Done(); s_it.Advance()) {
+        uint32_t target_dex_pc = dex_pc + s_it.CurrentTargetOffset();
+        if (target_dex_pc < dex_pc) {
+          HBasicBlock* block = GetBlockAt(target_dex_pc);
+          CHECK_NE(kNoDexPc, block->GetDexPc());
+          targets.insert(block->GetBlockId());
+        }
+      }
+    }
+  }
+
+  // Insert synthesized loops before the collected blocks.
+  for (uint32_t block_id : targets) {
+    HBasicBlock* block = graph_->GetBlocks()[block_id];
+    HBasicBlock* loop_block = new (allocator_) HBasicBlock(graph_, block->GetDexPc());
+    graph_->AddBlock(loop_block);
+    while (!block->GetPredecessors().empty()) {
+      block->GetPredecessors()[0]->ReplaceSuccessor(block, loop_block);
+    }
+    loop_block->AddSuccessor(loop_block);
+    loop_block->AddSuccessor(block);
+    // We loop on false - we know this won't be optimized later on as the loop
+    // is marked irreducible, which disables loop optimizations.
+    loop_block->AddInstruction(new (allocator_) HIf(graph_->GetIntConstant(0), kNoDexPc));
+  }
+}
+
 bool HBasicBlockBuilder::Build() {
   DCHECK(code_item_accessor_.HasCodeItem());
   DCHECK(graph_->GetBlocks().empty());
@@ -412,6 +454,10 @@ bool HBasicBlockBuilder::Build() {
 
   ConnectBasicBlocks();
   InsertTryBoundaryBlocks();
+
+  if (graph_->IsCompilingOsr()) {
+    InsertSynthesizedLoopsForOsr();
+  }
 
   return true;
 }

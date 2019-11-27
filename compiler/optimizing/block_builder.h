@@ -59,6 +59,11 @@ class HBasicBlockBuilder : public ValueObject {
   void ConnectBasicBlocks();
   void InsertTryBoundaryBlocks();
 
+  // To ensure branches with negative offsets can always OSR jump to compiled
+  // code, we insert synthesized loops before each block that is the target of a
+  // negative branch.
+  void InsertSynthesizedLoopsForOsr();
+
   // Helper method which decides whether `catch_block` may have live normal
   // predecessors and thus whether a synthetic catch block needs to be created
   // to avoid mixing normal and exceptional predecessors.

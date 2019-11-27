@@ -65,141 +65,136 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     HandleWrapperObjPtr<mirror::Class> h = hs.NewHandleWrapper(&klass);
     self->PoisonObjectPointers();
   }
-  auto send_pre_object_allocated = [&]() REQUIRES_SHARED(Locks::mutator_lock_)
-                                         ACQUIRE(Roles::uninterruptible_) {
+  auto pre_object_allocated = [&]() REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Roles::uninterruptible_) {
     if constexpr (kInstrumented) {
-      AllocationListener* l = nullptr;
-      l = alloc_listener_.load(std::memory_order_seq_cst);
+      AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
       if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
         StackHandleScope<1> hs(self);
         HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(&klass));
         l->PreObjectAllocated(self, h_klass, &byte_count);
       }
     }
-    return self->StartAssertNoThreadSuspension("Called PreObjectAllocated, no suspend until alloc");
   };
-  // Do the initial pre-alloc
-  const char* old_cause = send_pre_object_allocated();
-  // We shouldn't have any NoThreadSuspension here!
-  DCHECK(old_cause == nullptr) << old_cause;
-
-  // Need to check that we aren't the large object allocator since the large object allocation code
-  // path includes this function. If we didn't check we would have an infinite loop.
   ObjPtr<mirror::Object> obj;
-  if (kCheckLargeObject && UNLIKELY(ShouldAllocLargeObject(klass, byte_count))) {
-    // AllocLargeObject can suspend and will recall PreObjectAllocated if needed.
-    self->EndAssertNoThreadSuspension(old_cause);
-    obj = AllocLargeObject<kInstrumented, PreFenceVisitor>(self, &klass, byte_count,
-                                                           pre_fence_visitor);
-    if (obj != nullptr) {
-      return obj.Ptr();
-    } else {
-      // There should be an OOM exception, since we are retrying, clear it.
-      self->ClearException();
-    }
-    // If the large object allocation failed, try to use the normal spaces (main space,
-    // non moving space). This can happen if there is significant virtual address space
-    // fragmentation.
-    // We need to send the PreObjectAllocated again, we might have suspended during our failure.
-    old_cause = send_pre_object_allocated();
-  }
   // bytes allocated for the (individual) object.
   size_t bytes_allocated;
   size_t usable_size;
   size_t new_num_bytes_allocated = 0;
-  if (IsTLABAllocator(allocator)) {
-    byte_count = RoundUp(byte_count, space::BumpPointerSpace::kAlignment);
-  }
-  // If we have a thread local allocation we don't need to update bytes allocated.
-  if (IsTLABAllocator(allocator) && byte_count <= self->TlabSize()) {
-    obj = self->AllocTlab(byte_count);
-    DCHECK(obj != nullptr) << "AllocTlab can't fail";
-    obj->SetClass(klass);
-    if (kUseBakerReadBarrier) {
-      obj->AssertReadBarrierState();
-    }
-    bytes_allocated = byte_count;
-    usable_size = bytes_allocated;
-    no_suspend_pre_fence_visitor(obj, usable_size);
-    QuasiAtomic::ThreadFenceForConstructor();
-    self->EndAssertNoThreadSuspension(old_cause);
-  } else if (
-      !kInstrumented && allocator == kAllocatorTypeRosAlloc &&
-      (obj = rosalloc_space_->AllocThreadLocal(self, byte_count, &bytes_allocated)) != nullptr &&
-      LIKELY(obj != nullptr)) {
-    DCHECK(!is_running_on_memory_tool_);
-    obj->SetClass(klass);
-    if (kUseBakerReadBarrier) {
-      obj->AssertReadBarrierState();
-    }
-    usable_size = bytes_allocated;
-    no_suspend_pre_fence_visitor(obj, usable_size);
-    QuasiAtomic::ThreadFenceForConstructor();
-    self->EndAssertNoThreadSuspension(old_cause);
-  } else {
-    // Bytes allocated that includes bulk thread-local buffer allocations in addition to direct
-    // non-TLAB object allocations.
-    size_t bytes_tl_bulk_allocated = 0u;
-    obj = TryToAllocate<kInstrumented, false>(self, allocator, byte_count, &bytes_allocated,
-                                              &usable_size, &bytes_tl_bulk_allocated);
-    if (UNLIKELY(obj == nullptr)) {
-      // AllocateInternalWithGc can cause thread suspension, if someone instruments the entrypoints
-      // or changes the allocator in a suspend point here, we need to retry the allocation.
-      // It will send the pre-alloc event again.
-      self->EndAssertNoThreadSuspension(old_cause);
-      obj = AllocateInternalWithGc(self,
-                                   allocator,
-                                   kInstrumented,
-                                   byte_count,
-                                   &bytes_allocated,
-                                   &usable_size,
-                                   &bytes_tl_bulk_allocated,
-                                   &klass,
-                                   &old_cause);
-      if (obj == nullptr) {
-        self->EndAssertNoThreadSuspension(old_cause);
-        // The only way that we can get a null return if there is no pending exception is if the
-        // allocator or instrumentation changed.
-        if (!self->IsExceptionPending()) {
-          // AllocObject will pick up the new allocator type, and instrumented as true is the safe
-          // default.
-          return AllocObject</*kInstrumented=*/true>(self,
-                                                     klass,
-                                                     byte_count,
-                                                     pre_fence_visitor);
-        }
-        return nullptr;
+  {
+    // Do the initial pre-alloc
+    pre_object_allocated();
+    ScopedAssertNoThreadSuspension ants("Called PreObjectAllocated, no suspend until alloc");
+
+    // Need to check that we aren't the large object allocator since the large object allocation
+    // code path includes this function. If we didn't check we would have an infinite loop.
+    if (kCheckLargeObject && UNLIKELY(ShouldAllocLargeObject(klass, byte_count))) {
+      // AllocLargeObject can suspend and will recall PreObjectAllocated if needed.
+      ScopedAllowThreadSuspension ats;
+      obj = AllocLargeObject<kInstrumented, PreFenceVisitor>(self, &klass, byte_count,
+                                                             pre_fence_visitor);
+      if (obj != nullptr) {
+        return obj.Ptr();
       }
+      // There should be an OOM exception, since we are retrying, clear it.
+      self->ClearException();
+
+      // If the large object allocation failed, try to use the normal spaces (main space,
+      // non moving space). This can happen if there is significant virtual address space
+      // fragmentation.
+      pre_object_allocated();
     }
-    DCHECK_GT(bytes_allocated, 0u);
-    DCHECK_GT(usable_size, 0u);
-    obj->SetClass(klass);
-    if (kUseBakerReadBarrier) {
-      obj->AssertReadBarrierState();
+    if (IsTLABAllocator(allocator)) {
+      byte_count = RoundUp(byte_count, space::BumpPointerSpace::kAlignment);
     }
-    if (collector::SemiSpace::kUseRememberedSet && UNLIKELY(allocator == kAllocatorTypeNonMoving)) {
-      // (Note this if statement will be constant folded away for the fast-path quick entry
-      // points.) Because SetClass() has no write barrier, the GC may need a write barrier in the
-      // case the object is non movable and points to a recently allocated movable class.
-      WriteBarrier::ForFieldWrite(obj, mirror::Object::ClassOffset(), klass);
-    }
-    no_suspend_pre_fence_visitor(obj, usable_size);
-    QuasiAtomic::ThreadFenceForConstructor();
-    self->EndAssertNoThreadSuspension(old_cause);
-    if (bytes_tl_bulk_allocated > 0) {
-      size_t num_bytes_allocated_before =
-          num_bytes_allocated_.fetch_add(bytes_tl_bulk_allocated, std::memory_order_relaxed);
-      new_num_bytes_allocated = num_bytes_allocated_before + bytes_tl_bulk_allocated;
-      // Only trace when we get an increase in the number of bytes allocated. This happens when
-      // obtaining a new TLAB and isn't often enough to hurt performance according to golem.
-      if (region_space_) {
-        // With CC collector, during a GC cycle, the heap usage increases as
-        // there are two copies of evacuated objects. Therefore, add evac-bytes
-        // to the heap size. When the GC cycle is not running, evac-bytes
-        // are 0, as required.
-        TraceHeapSize(new_num_bytes_allocated + region_space_->EvacBytes());
-      } else {
-        TraceHeapSize(new_num_bytes_allocated);
+    // If we have a thread local allocation we don't need to update bytes allocated.
+    if (IsTLABAllocator(allocator) && byte_count <= self->TlabSize()) {
+      obj = self->AllocTlab(byte_count);
+      DCHECK(obj != nullptr) << "AllocTlab can't fail";
+      obj->SetClass(klass);
+      if (kUseBakerReadBarrier) {
+        obj->AssertReadBarrierState();
+      }
+      bytes_allocated = byte_count;
+      usable_size = bytes_allocated;
+      no_suspend_pre_fence_visitor(obj, usable_size);
+      QuasiAtomic::ThreadFenceForConstructor();
+    } else if (
+        !kInstrumented && allocator == kAllocatorTypeRosAlloc &&
+        (obj = rosalloc_space_->AllocThreadLocal(self, byte_count, &bytes_allocated)) != nullptr &&
+        LIKELY(obj != nullptr)) {
+      DCHECK(!is_running_on_memory_tool_);
+      obj->SetClass(klass);
+      if (kUseBakerReadBarrier) {
+        obj->AssertReadBarrierState();
+      }
+      usable_size = bytes_allocated;
+      no_suspend_pre_fence_visitor(obj, usable_size);
+      QuasiAtomic::ThreadFenceForConstructor();
+    } else {
+      // Bytes allocated that includes bulk thread-local buffer allocations in addition to direct
+      // non-TLAB object allocations.
+      size_t bytes_tl_bulk_allocated = 0u;
+      obj = TryToAllocate<kInstrumented, false>(self, allocator, byte_count, &bytes_allocated,
+                                                &usable_size, &bytes_tl_bulk_allocated);
+      if (UNLIKELY(obj == nullptr)) {
+        // AllocateInternalWithGc can cause thread suspension, if someone instruments the
+        // entrypoints or changes the allocator in a suspend point here, we need to retry the
+        // allocation. It will send the pre-alloc event again.
+        obj = AllocateInternalWithGc(self,
+                                     allocator,
+                                     kInstrumented,
+                                     byte_count,
+                                     &bytes_allocated,
+                                     &usable_size,
+                                     &bytes_tl_bulk_allocated,
+                                     &klass);
+        if (obj == nullptr) {
+          // The only way that we can get a null return if there is no pending exception is if the
+          // allocator or instrumentation changed.
+          if (!self->IsExceptionPending()) {
+            // Since we are restarting, allow thread suspension.
+            ScopedAllowThreadSuspension ats;
+            // AllocObject will pick up the new allocator type, and instrumented as true is the safe
+            // default.
+            return AllocObject</*kInstrumented=*/true>(self,
+                                                       klass,
+                                                       byte_count,
+                                                       pre_fence_visitor);
+          }
+          return nullptr;
+        }
+      }
+      DCHECK_GT(bytes_allocated, 0u);
+      DCHECK_GT(usable_size, 0u);
+      obj->SetClass(klass);
+      if (kUseBakerReadBarrier) {
+        obj->AssertReadBarrierState();
+      }
+      if (collector::SemiSpace::kUseRememberedSet &&
+          UNLIKELY(allocator == kAllocatorTypeNonMoving)) {
+        // (Note this if statement will be constant folded away for the fast-path quick entry
+        // points.) Because SetClass() has no write barrier, the GC may need a write barrier in the
+        // case the object is non movable and points to a recently allocated movable class.
+        WriteBarrier::ForFieldWrite(obj, mirror::Object::ClassOffset(), klass);
+      }
+      no_suspend_pre_fence_visitor(obj, usable_size);
+      QuasiAtomic::ThreadFenceForConstructor();
+      if (bytes_tl_bulk_allocated > 0) {
+        size_t num_bytes_allocated_before =
+            num_bytes_allocated_.fetch_add(bytes_tl_bulk_allocated, std::memory_order_relaxed);
+        new_num_bytes_allocated = num_bytes_allocated_before + bytes_tl_bulk_allocated;
+        // Only trace when we get an increase in the number of bytes allocated. This happens when
+        // obtaining a new TLAB and isn't often enough to hurt performance according to golem.
+        if (region_space_) {
+          // With CC collector, during a GC cycle, the heap usage increases as
+          // there are two copies of evacuated objects. Therefore, add evac-bytes
+          // to the heap size. When the GC cycle is not running, evac-bytes
+          // are 0, as required.
+          TraceHeapSize(new_num_bytes_allocated + region_space_->EvacBytes());
+        } else {
+          TraceHeapSize(new_num_bytes_allocated);
+        }
       }
     }
   }
