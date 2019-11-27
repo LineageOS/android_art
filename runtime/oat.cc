@@ -72,7 +72,7 @@ OatHeader::OatHeader(InstructionSet instruction_set,
       dex_file_count_(dex_file_count),
       oat_dex_files_offset_(0),
       executable_offset_(0),
-      jni_dlsym_lookup_offset_(0),
+      jni_dlsym_lookup_trampoline_offset_(0),
       quick_generic_jni_trampoline_offset_(0),
       quick_imt_conflict_trampoline_offset_(0),
       quick_resolution_trampoline_offset_(0),
@@ -200,20 +200,20 @@ static const void* GetTrampoline(const OatHeader& header, uint32_t offset) {
   return (offset != 0u) ? reinterpret_cast<const uint8_t*>(&header) + offset : nullptr;
 }
 
-const void* OatHeader::GetJniDlsymLookup() const {
-  return GetTrampoline(*this, GetJniDlsymLookupOffset());
+const void* OatHeader::GetJniDlsymLookupTrampoline() const {
+  return GetTrampoline(*this, GetJniDlsymLookupTrampolineOffset());
 }
 
-uint32_t OatHeader::GetJniDlsymLookupOffset() const {
+uint32_t OatHeader::GetJniDlsymLookupTrampolineOffset() const {
   DCHECK(IsValid());
-  return jni_dlsym_lookup_offset_;
+  return jni_dlsym_lookup_trampoline_offset_;
 }
 
-void OatHeader::SetJniDlsymLookupOffset(uint32_t offset) {
+void OatHeader::SetJniDlsymLookupTrampolineOffset(uint32_t offset) {
   DCHECK(IsValid());
-  DCHECK_EQ(jni_dlsym_lookup_offset_, 0U) << offset;
+  DCHECK_EQ(jni_dlsym_lookup_trampoline_offset_, 0U) << offset;
 
-  jni_dlsym_lookup_offset_ = offset;
+  jni_dlsym_lookup_trampoline_offset_ = offset;
 }
 
 const void* OatHeader::GetQuickGenericJniTrampoline() const {
@@ -222,12 +222,12 @@ const void* OatHeader::GetQuickGenericJniTrampoline() const {
 
 uint32_t OatHeader::GetQuickGenericJniTrampolineOffset() const {
   DCHECK(IsValid());
-  CHECK_GE(quick_generic_jni_trampoline_offset_, jni_dlsym_lookup_offset_);
+  CHECK_GE(quick_generic_jni_trampoline_offset_, jni_dlsym_lookup_trampoline_offset_);
   return quick_generic_jni_trampoline_offset_;
 }
 
 void OatHeader::SetQuickGenericJniTrampolineOffset(uint32_t offset) {
-  CHECK(offset == 0 || offset >= jni_dlsym_lookup_offset_);
+  CHECK(offset == 0 || offset >= jni_dlsym_lookup_trampoline_offset_);
   DCHECK(IsValid());
   DCHECK_EQ(quick_generic_jni_trampoline_offset_, 0U) << offset;
 
