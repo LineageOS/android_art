@@ -112,13 +112,13 @@ bool OatHeader::IsValid() const {
 std::string OatHeader::GetValidationErrorMessage() const {
   if (magic_ != kOatMagic) {
     static_assert(sizeof(kOatMagic) == 4, "kOatMagic has unexpected length");
-    return StringPrintf("Invalid oat magic, expected 0x%x%x%x%x, got 0x%x%x%x%x.",
+    return StringPrintf("Invalid oat magic, expected 0x%02x%02x%02x%02x, got 0x%02x%02x%02x%02x.",
                         kOatMagic[0], kOatMagic[1], kOatMagic[2], kOatMagic[3],
                         magic_[0], magic_[1], magic_[2], magic_[3]);
   }
   if (version_ != kOatVersion) {
     static_assert(sizeof(kOatVersion) == 4, "kOatVersion has unexpected length");
-    return StringPrintf("Invalid oat version, expected 0x%x%x%x%x, got 0x%x%x%x%x.",
+    return StringPrintf("Invalid oat version, expected 0x%02x%02x%02x%02x, got 0x%02x%02x%02x%02x.",
                         kOatVersion[0], kOatVersion[1], kOatVersion[2], kOatVersion[3],
                         version_[0], version_[1], version_[2], version_[3]);
   }
@@ -136,7 +136,8 @@ std::string OatHeader::GetValidationErrorMessage() const {
 void OatHeader::CheckOatVersion(std::array<uint8_t, 4> version) {
   constexpr std::array<uint8_t, 4> expected = kOatVersion;  // Runtime oat version.
   if (version != kOatVersion) {
-    LOG(FATAL) << StringPrintf("Invalid oat version, expected 0x%x%x%x%x, got 0x%x%x%x%x.",
+    LOG(FATAL) << StringPrintf("Invalid oat version, expected 0x%02x%02x%02x%02x, "
+                                   "got 0x%02x%02x%02x%02x.",
                                expected[0], expected[1], expected[2], expected[3],
                                version[0], version[1], version[2], version[3]);
   }
