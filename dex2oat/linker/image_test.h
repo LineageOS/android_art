@@ -156,7 +156,7 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
     {
       ScopedObjectAccess soa(Thread::Current());
       // Inject in boot class path so that the compiler driver can see it.
-      class_linker->AppendToBootClassPath(soa.Self(), *dex_file.get());
+      class_linker->AppendToBootClassPath(soa.Self(), dex_file.get());
     }
     class_path.push_back(dex_file.get());
   }

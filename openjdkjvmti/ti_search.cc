@@ -249,7 +249,7 @@ jvmtiError SearchUtil::AddToBootstrapClassLoaderSearch(jvmtiEnv* env,
 
   art::ScopedObjectAccess soa(art::Thread::Current());
   for (std::unique_ptr<const art::DexFile>& dex_file : dex_files) {
-    current->GetClassLinker()->AppendToBootClassPath(art::Thread::Current(), *dex_file.release());
+    current->GetClassLinker()->AppendToBootClassPath(art::Thread::Current(), dex_file.release());
   }
 
   return ERR(NONE);
