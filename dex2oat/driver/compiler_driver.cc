@@ -294,7 +294,7 @@ CompilerDriver::~CompilerDriver() {
                                 type ## _ENTRYPOINT_OFFSET(PointerSize::k32, offset));  \
     }
 
-std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateJniDlsymLookup() const {
+std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateJniDlsymLookupTrampoline() const {
   CREATE_TRAMPOLINE(JNI, kJniAbi, pDlsymLookup)
 }
 
