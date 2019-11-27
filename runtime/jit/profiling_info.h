@@ -21,6 +21,7 @@
 
 #include "base/macros.h"
 #include "gc_root.h"
+#include "offsets.h"
 
 namespace art {
 
@@ -39,7 +40,12 @@ class Class;
 // Once the classes_ array is full, we consider the INVOKE to be megamorphic.
 class InlineCache {
  public:
+  // This is hard coded in the assembly stub art_quick_update_inline_cache.
   static constexpr uint8_t kIndividualCacheSize = 5;
+
+  static constexpr MemberOffset ClassesOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(InlineCache, classes_));
+  }
 
  private:
   uint32_t dex_pc_;
@@ -97,15 +103,6 @@ class ProfilingInfo {
 
   const void* GetSavedEntryPoint() const {
     return saved_entry_point_;
-  }
-
-  void ClearGcRootsInInlineCaches() {
-    for (size_t i = 0; i < number_of_inline_caches_; ++i) {
-      InlineCache* cache = &cache_[i];
-      memset(&cache->classes_[0],
-             0,
-             InlineCache::kIndividualCacheSize * sizeof(GcRoot<mirror::Class>));
-    }
   }
 
   // Increments the number of times this method is currently being inlined.

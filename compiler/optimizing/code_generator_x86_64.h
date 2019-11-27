@@ -600,6 +600,8 @@ class CodeGeneratorX86_64 : public CodeGenerator {
   void GenerateNop() override;
   void GenerateImplicitNullCheck(HNullCheck* instruction) override;
   void GenerateExplicitNullCheck(HNullCheck* instruction) override;
+  void MaybeGenerateInlineCacheCheck(uint32_t dex_pc, CpuRegister cls);
+
 
   // When we don't know the proper offset for the value, we use kDummy32BitOffset.
   // We will fix this up in the linker later to have the right value.
