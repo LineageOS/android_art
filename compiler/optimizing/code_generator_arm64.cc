@@ -4044,7 +4044,11 @@ void LocationsBuilderARM64::VisitInvokeInterface(HInvokeInterface* invoke) {
 void CodeGeneratorARM64::MaybeGenerateInlineCacheCheck(HInstruction* instruction,
                                                        Register klass) {
   DCHECK_EQ(klass.GetCode(), 0u);
-  if (GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+  // We know the destination of an intrinsic, so no need to record inline
+  // caches.
+  if (!instruction->GetLocations()->Intrinsified() &&
+      GetCompilerOptions().IsBaseline() &&
+      !Runtime::Current()->IsAotCompiler()) {
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
