@@ -1071,7 +1071,7 @@ void CodeGeneratorX86_64::GenerateVirtualCall(
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
 
-  MaybeGenerateInlineCacheCheck(invoke->GetDexPc(), temp);
+  MaybeGenerateInlineCacheCheck(invoke, temp);
 
   // temp = temp->GetMethodAt(method_offset);
   __ movq(temp, Address(temp, method_offset));
@@ -2525,12 +2525,17 @@ void LocationsBuilderX86_64::VisitInvokeInterface(HInvokeInterface* invoke) {
   invoke->GetLocations()->AddTemp(Location::RegisterLocation(RAX));
 }
 
-void CodeGeneratorX86_64::MaybeGenerateInlineCacheCheck(uint32_t dex_pc, CpuRegister klass) {
+void CodeGeneratorX86_64::MaybeGenerateInlineCacheCheck(HInstruction* instruction,
+                                                        CpuRegister klass) {
   DCHECK_EQ(RDI, klass.AsRegister());
-  if (GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+  // We know the destination of an intrinsic, so no need to record inline
+  // caches.
+  if (!instruction->GetLocations()->Intrinsified() &&
+      GetCompilerOptions().IsBaseline() &&
+      !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    InlineCache* cache = info->GetInlineCache(dex_pc);
+    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
     uint64_t address = reinterpret_cast64<uint64_t>(cache);
     NearLabel done;
     __ movq(CpuRegister(TMP), Immediate(address));
@@ -2569,7 +2574,7 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
 
-  codegen_->MaybeGenerateInlineCacheCheck(invoke->GetDexPc(), temp);
+  codegen_->MaybeGenerateInlineCacheCheck(invoke, temp);
 
   // Set the hidden argument. This is safe to do this here, as RAX
   // won't be modified thereafter, before the `call` instruction.

@@ -3301,7 +3301,11 @@ void LocationsBuilderARMVIXL::VisitInvokeInterface(HInvokeInterface* invoke) {
 void CodeGeneratorARMVIXL::MaybeGenerateInlineCacheCheck(HInstruction* instruction,
                                                          vixl32::Register klass) {
   DCHECK_EQ(r0.GetCode(), klass.GetCode());
-  if (GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+  // We know the destination of an intrinsic, so no need to record inline
+  // caches.
+  if (!instruction->GetLocations()->Intrinsified() &&
+      GetCompilerOptions().IsBaseline() &&
+      !Runtime::Current()->IsAotCompiler()) {
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
