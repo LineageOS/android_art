@@ -359,6 +359,10 @@ ALWAYS_INLINE inline uint32_t GetRuntimeFlags(ArtMethod* method)
       case Intrinsics::kUnsafeGetLong:
       case Intrinsics::kFP16Ceil:
       case Intrinsics::kFP16Floor:
+      case Intrinsics::kFP16Greater:
+      case Intrinsics::kFP16GreaterEquals:
+      case Intrinsics::kFP16Less:
+      case Intrinsics::kFP16LessEquals:
       case Intrinsics::kFP16ToFloat:
       case Intrinsics::kFP16ToHalf:
       case Intrinsics::kFP16Rint:
