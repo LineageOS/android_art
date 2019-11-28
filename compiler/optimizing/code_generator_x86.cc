@@ -16,7 +16,7 @@
 
 #include "code_generator_x86.h"
 
-#include "art_method.h"
+#include "art_method-inl.h"
 #include "class_table.h"
 #include "code_generator_utils.h"
 #include "compiled_method.h"
@@ -27,10 +27,12 @@
 #include "heap_poisoning.h"
 #include "intrinsics.h"
 #include "intrinsics_x86.h"
+#include "jit/profiling_info.h"
 #include "linker/linker_patch.h"
 #include "lock_word.h"
 #include "mirror/array-inl.h"
 #include "mirror/class-inl.h"
+#include "scoped_thread_state_change-inl.h"
 #include "thread.h"
 #include "utils/assembler.h"
 #include "utils/stack_checks.h"
@@ -2260,6 +2262,10 @@ void LocationsBuilderX86::VisitInvokeVirtual(HInvokeVirtual* invoke) {
   }
 
   HandleInvoke(invoke);
+  if (codegen_->GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    // Add one temporary for inline cache update.
+    invoke->GetLocations()->AddTemp(Location::RegisterLocation(EBP));
+  }
 }
 
 void LocationsBuilderX86::HandleInvoke(HInvoke* invoke) {
@@ -2283,6 +2289,39 @@ void LocationsBuilderX86::VisitInvokeInterface(HInvokeInterface* invoke) {
   HandleInvoke(invoke);
   // Add the hidden argument.
   invoke->GetLocations()->AddTemp(Location::FpuRegisterLocation(XMM7));
+
+  if (codegen_->GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    // Add one temporary for inline cache update.
+    invoke->GetLocations()->AddTemp(Location::RegisterLocation(EBP));
+  }
+}
+
+void CodeGeneratorX86::MaybeGenerateInlineCacheCheck(HInstruction* instruction, Register klass) {
+  DCHECK_EQ(EAX, klass);
+  // We know the destination of an intrinsic, so no need to record inline
+  // caches (also the intrinsic location builder doesn't request an additional
+  // temporary).
+  if (!instruction->GetLocations()->Intrinsified() &&
+      GetCompilerOptions().IsBaseline() &&
+      !Runtime::Current()->IsAotCompiler()) {
+    DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+    uint32_t address = reinterpret_cast32<uint32_t>(cache);
+    if (kIsDebugBuild) {
+      uint32_t temp_index = instruction->GetLocations()->GetTempCount() - 1u;
+      CHECK_EQ(EBP, instruction->GetLocations()->GetTemp(temp_index).AsRegister<Register>());
+    }
+    Register temp = EBP;
+    NearLabel done;
+    __ movl(temp, Immediate(address));
+    // Fast path for a monomorphic cache.
+    __ cmpl(klass, Address(temp, InlineCache::ClassesOffset().Int32Value()));
+    __ j(kEqual, &done);
+    GenerateInvokeRuntime(GetThreadOffset<kX86PointerSize>(kQuickUpdateInlineCache).Int32Value());
+    __ Bind(&done);
+  }
 }
 
 void InstructionCodeGeneratorX86::VisitInvokeInterface(HInvokeInterface* invoke) {
@@ -2316,6 +2355,9 @@ void InstructionCodeGeneratorX86::VisitInvokeInterface(HInvokeInterface* invoke)
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
+
+  codegen_->MaybeGenerateInlineCacheCheck(invoke, temp);
+
   // temp = temp->GetAddressOfIMT()
   __ movl(temp,
       Address(temp, mirror::Class::ImtPtrOffset(kX86PointerSize).Uint32Value()));
@@ -4939,6 +4981,9 @@ void CodeGeneratorX86::GenerateVirtualCall(
   // intact/accessible until the end of the marking phase (the
   // concurrent copying collector may not in the future).
   __ MaybeUnpoisonHeapReference(temp);
+
+  MaybeGenerateInlineCacheCheck(invoke, temp);
+
   // temp = temp->GetMethodAt(method_offset);
   __ movl(temp, Address(temp, method_offset));
   // call temp->GetEntryPoint();

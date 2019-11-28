@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: Revert^4 Boot image extension.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '7', '6', '\0' } };
+  // Last oat version changed reason: pUpdateInlineCache entrypoint.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '7', '7', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";
@@ -69,9 +69,9 @@ class PACKED(4) OatHeader {
   uint32_t GetExecutableOffset() const;
   void SetExecutableOffset(uint32_t executable_offset);
 
-  const void* GetJniDlsymLookup() const;
-  uint32_t GetJniDlsymLookupOffset() const;
-  void SetJniDlsymLookupOffset(uint32_t offset);
+  const void* GetJniDlsymLookupTrampoline() const;
+  uint32_t GetJniDlsymLookupTrampolineOffset() const;
+  void SetJniDlsymLookupTrampolineOffset(uint32_t offset);
 
   const void* GetQuickGenericJniTrampoline() const;
   uint32_t GetQuickGenericJniTrampolineOffset() const;
@@ -122,7 +122,7 @@ class PACKED(4) OatHeader {
   uint32_t dex_file_count_;
   uint32_t oat_dex_files_offset_;
   uint32_t executable_offset_;
-  uint32_t jni_dlsym_lookup_offset_;
+  uint32_t jni_dlsym_lookup_trampoline_offset_;
   uint32_t quick_generic_jni_trampoline_offset_;
   uint32_t quick_imt_conflict_trampoline_offset_;
   uint32_t quick_resolution_trampoline_offset_;

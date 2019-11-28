@@ -2742,3 +2742,67 @@ ENTRY ExecuteSwitchImplAsm
     blx r1                                        // Call the wrapped method.
     pop {r4, pc}
 END ExecuteSwitchImplAsm
+
+// r0 contains the class, r4 contains the inline cache. We can use ip as temporary.
+ENTRY art_quick_update_inline_cache
+#if (INLINE_CACHE_SIZE != 5)
+#error "INLINE_CACHE_SIZE not as expected."
+#endif
+.Lentry1:
+    ldr ip, [r4, #INLINE_CACHE_CLASSES_OFFSET]
+    cmp ip, r0
+    beq .Ldone
+    cmp ip, #0
+    bne .Lentry2
+    ldrex ip, [r4, #INLINE_CACHE_CLASSES_OFFSET]
+    cmp ip, #0
+    bne .Lentry1
+    strex  ip, r0, [r4, #INLINE_CACHE_CLASSES_OFFSET]
+    cmp ip, #0
+    bne .Ldone
+    b .Lentry1
+.Lentry2:
+    ldr ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+4]
+    cmp ip, r0
+    beq .Ldone
+    cmp ip, #0
+    bne .Lentry3
+    ldrex ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+4]
+    cmp ip, #0
+    bne .Lentry2
+    strex  ip, r0, [r4, #INLINE_CACHE_CLASSES_OFFSET+4]
+    cmp ip, #0
+    bne .Ldone
+    b .Lentry2
+.Lentry3:
+    ldr ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+8]
+    cmp ip, r0
+    beq .Ldone
+    cmp ip, #0
+    bne .Lentry4
+    ldrex ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+8]
+    cmp ip, #0
+    bne .Lentry3
+    strex  ip, r0, [r4, #INLINE_CACHE_CLASSES_OFFSET+8]
+    cmp ip, #0
+    bne .Ldone
+    b .Lentry3
+.Lentry4:
+    ldr ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+12]
+    cmp ip, r0
+    beq .Ldone
+    cmp ip, #0
+    bne .Lentry5
+    ldrex ip, [r4, #INLINE_CACHE_CLASSES_OFFSET+12]
+    cmp ip, #0
+    bne .Lentry4
+    strex  ip, r0, [r4, #INLINE_CACHE_CLASSES_OFFSET+12]
+    cmp ip, #0
+    bne .Ldone
+    b .Lentry4
+.Lentry5:
+    // Unconditionally store, the inline cache is megamorphic.
+    str  r0, [r4, #INLINE_CACHE_CLASSES_OFFSET+16]
+.Ldone:
+    blx lr
+END art_quick_update_inline_cache

@@ -849,9 +849,9 @@ class RegionSpecializedBase<ArtMethod> : public RegionCommon<ArtMethod> {
     std::vector<const OatFile*> boot_oat_files = oat_file_manager.GetBootOatFiles();
     for (const OatFile* oat_file : boot_oat_files) {
       const OatHeader& oat_header = oat_file->GetOatHeader();
-      const void* jdl = oat_header.GetJniDlsymLookup();
+      const void* jdl = oat_header.GetJniDlsymLookupTrampoline();
       if (jdl != nullptr) {
-        entry_point_names_[jdl] = "JniDlsymLookup (from boot oat file)";
+        entry_point_names_[jdl] = "JniDlsymLookupTrampoline (from boot oat file)";
       }
       const void* qgjt = oat_header.GetQuickGenericJniTrampoline();
       if (qgjt != nullptr) {

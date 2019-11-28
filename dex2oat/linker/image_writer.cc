@@ -3355,8 +3355,8 @@ const uint8_t* ImageWriter::GetOatAddress(StubType type) const {
       // TODO: We could maybe clean this up if we stored them in an array in the oat header.
       case StubType::kQuickGenericJNITrampoline:
         return static_cast<const uint8_t*>(header.GetQuickGenericJniTrampoline());
-      case StubType::kJNIDlsymLookup:
-        return static_cast<const uint8_t*>(header.GetJniDlsymLookup());
+      case StubType::kJNIDlsymLookupTrampoline:
+        return static_cast<const uint8_t*>(header.GetJniDlsymLookupTrampoline());
       case StubType::kQuickIMTConflictTrampoline:
         return static_cast<const uint8_t*>(header.GetQuickImtConflictTrampoline());
       case StubType::kQuickResolutionTrampoline:
@@ -3471,7 +3471,7 @@ void ImageWriter::CopyAndFixupMethod(ArtMethod* orig,
         // The native method's pointer is set to a stub to lookup via dlsym.
         // Note this is not the code_ pointer, that is handled above.
         copy->SetEntryPointFromJniPtrSize(
-            GetOatAddress(StubType::kJNIDlsymLookup), target_ptr_size_);
+            GetOatAddress(StubType::kJNIDlsymLookupTrampoline), target_ptr_size_);
       } else {
         CHECK(copy->GetDataPtrSize(target_ptr_size_) == nullptr);
       }
@@ -3606,8 +3606,8 @@ void ImageWriter::UpdateOatFileHeader(size_t oat_index, const OatHeader& oat_hea
 
   if (oat_index == GetDefaultOatIndex()) {
     // Primary oat file, read the trampolines.
-    cur_image_info.SetStubOffset(StubType::kJNIDlsymLookup,
-                                 oat_header.GetJniDlsymLookupOffset());
+    cur_image_info.SetStubOffset(StubType::kJNIDlsymLookupTrampoline,
+                                 oat_header.GetJniDlsymLookupTrampolineOffset());
     cur_image_info.SetStubOffset(StubType::kQuickGenericJNITrampoline,
                                  oat_header.GetQuickGenericJniTrampolineOffset());
     cur_image_info.SetStubOffset(StubType::kQuickIMTConflictTrampoline,

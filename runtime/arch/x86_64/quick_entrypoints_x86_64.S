@@ -2467,3 +2467,51 @@ DEFINE_FUNCTION ExecuteSwitchImplAsm
     POP rbx                  // Restore RBX
     ret
 END_FUNCTION ExecuteSwitchImplAsm
+
+// On entry: edi is the class, r11 is the inline cache. r10 and rax are available.
+DEFINE_FUNCTION art_quick_update_inline_cache
+#if (INLINE_CACHE_SIZE != 5)
+#error "INLINE_CACHE_SIZE not as expected."
+#endif
+.Lentry1:
+    movl INLINE_CACHE_CLASSES_OFFSET(%r11), %eax
+    cmpl %edi, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry2
+    lock cmpxchg %edi, INLINE_CACHE_CLASSES_OFFSET(%r11)
+    jz .Ldone
+    jmp .Lentry1
+.Lentry2:
+    movl (INLINE_CACHE_CLASSES_OFFSET+4)(%r11), %eax
+    cmpl %edi, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry3
+    lock cmpxchg %edi, (INLINE_CACHE_CLASSES_OFFSET+4)(%r11)
+    jz .Ldone
+    jmp .Lentry2
+.Lentry3:
+    movl (INLINE_CACHE_CLASSES_OFFSET+8)(%r11), %eax
+    cmpl %edi, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry4
+    lock cmpxchg %edi, (INLINE_CACHE_CLASSES_OFFSET+8)(%r11)
+    jz .Ldone
+    jmp .Lentry3
+.Lentry4:
+    movl (INLINE_CACHE_CLASSES_OFFSET+12)(%r11), %eax
+    cmpl %edi, %eax
+    je .Ldone
+    cmpl LITERAL(0), %eax
+    jne .Lentry5
+    lock cmpxchg %edi, (INLINE_CACHE_CLASSES_OFFSET+12)(%r11)
+    jz .Ldone
+    jmp .Lentry4
+.Lentry5:
+    // Unconditionally store, the cache is megamorphic.
+    movl %edi, (INLINE_CACHE_CLASSES_OFFSET+16)(%r11)
+.Ldone:
+    ret
+END_FUNCTION art_quick_update_inline_cache

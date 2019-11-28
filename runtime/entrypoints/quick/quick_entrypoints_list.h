@@ -171,6 +171,8 @@
 \
   V(StringBuilderAppend, void*, uint32_t) \
 \
+  V(UpdateInlineCache, void, void) \
+\
   V(ReadBarrierJni, void, mirror::CompressedReference<mirror::Object>*, Thread*) \
   V(ReadBarrierMarkReg00, mirror::Object*, mirror::Object*) \
   V(ReadBarrierMarkReg01, mirror::Object*, mirror::Object*) \
