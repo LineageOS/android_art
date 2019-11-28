@@ -767,6 +767,11 @@ bool JitCodeCache::Commit(Thread* self,
             method, method_header->GetEntryPoint());
       }
     }
+    if (collection_in_progress_) {
+      // We need to update the live bitmap if there is a GC to ensure it sees this new
+      // code.
+      GetLiveBitmap()->AtomicTestAndSet(FromCodeToAllocation(code_ptr));
+    }
     VLOG(jit)
         << "JIT added (osr=" << std::boolalpha << osr << std::noboolalpha << ") "
         << ArtMethod::PrettyMethod(method) << "@" << method
