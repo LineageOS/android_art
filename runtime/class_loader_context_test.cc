@@ -1402,7 +1402,18 @@ TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextMatchAfterEncodingMultide
 
   std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader);
 
-  ASSERT_EQ(context->VerifyClassLoaderContextMatch(context->EncodeContextForOatFile("")),
+  std::string context_with_no_base_dir = context->EncodeContextForOatFile("");
+  ASSERT_EQ(context->VerifyClassLoaderContextMatch(context_with_no_base_dir),
+            ClassLoaderContext::VerificationResult::kVerifies);
+
+  std::string dex_location = GetTestDexFileName("MultiDex");
+  size_t pos = dex_location.rfind('/');
+  ASSERT_NE(std::string::npos, pos);
+  std::string parent = dex_location.substr(0, pos);
+
+  std::string context_with_base_dir = context->EncodeContextForOatFile(parent);
+  ASSERT_NE(context_with_base_dir, context_with_no_base_dir);
+  ASSERT_EQ(context->VerifyClassLoaderContextMatch(context_with_base_dir),
             ClassLoaderContext::VerificationResult::kVerifies);
 }
 

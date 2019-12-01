@@ -170,6 +170,10 @@
   V(FP16Rint, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "rint", "(S)S") \
   V(FP16ToFloat, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toFloat", "(S)F") \
   V(FP16ToHalf, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "toHalf", "(F)S") \
+  V(FP16Greater, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "greater", "(SS)Z") \
+  V(FP16GreaterEquals, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "greaterEquals", "(SS)Z") \
+  V(FP16Less, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "less", "(SS)Z") \
+  V(FP16LessEquals, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Llibcore/util/FP16;", "lessEquals", "(SS)Z") \
   V(StringCharAt, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "charAt", "(I)C") \
   V(StringCompareTo, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "compareTo", "(Ljava/lang/String;)I") \
   V(StringEquals, kVirtual, kNeedsEnvironmentOrCache, kReadSideEffects, kCanThrow, "Ljava/lang/String;", "equals", "(Ljava/lang/Object;)Z") \
