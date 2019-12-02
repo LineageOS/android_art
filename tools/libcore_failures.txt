@@ -252,5 +252,12 @@
   description: "Test fails on host with: `/home/dalvik-prebuild/OASIS/XSLT-Conformance-TC/TESTS/catalog.xml: open failed: ENOENT (No such file or directory)`",
   result: EXEC_FAILED,
   names: ["libcore.xml.XsltXPathConformanceTestSuite#suite"]
+},
+{
+  description: "Fails on device",
+  result: EXEC_FAILED,
+  modes: [device_testdex],
+  bug: 145348591,
+  names: ["libcore.android.system.OsTest#test_if_nametoindex_if_indextoname"]
 }
 ]
