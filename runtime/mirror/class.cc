@@ -1670,7 +1670,7 @@ void Class::SetAccessFlagsDCheck(uint32_t new_access_flags) {
         (new_access_flags & kAccVerificationAttempted) != 0);
 }
 
-ObjPtr<PointerArray> Class::GetMethodIds() {
+ObjPtr<Object> Class::GetMethodIds() {
   ObjPtr<ClassExt> ext(GetExtData());
   if (ext.IsNull()) {
     return nullptr;
@@ -1678,18 +1678,18 @@ ObjPtr<PointerArray> Class::GetMethodIds() {
     return ext->GetJMethodIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateMethodIds(Handle<Class> h_this) {
+bool Class::EnsureMethodIds(Handle<Class> h_this) {
   DCHECK_NE(Runtime::Current()->GetJniIdType(), JniIdType::kPointer) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
-    return nullptr;
+    return false;
   }
   return ext->EnsureJMethodIDsArrayPresent(h_this->NumMethods());
 }
 
-ObjPtr<PointerArray> Class::GetStaticFieldIds() {
+ObjPtr<Object> Class::GetStaticFieldIds() {
   ObjPtr<ClassExt> ext(GetExtData());
   if (ext.IsNull()) {
     return nullptr;
@@ -1697,17 +1697,17 @@ ObjPtr<PointerArray> Class::GetStaticFieldIds() {
     return ext->GetStaticJFieldIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateStaticFieldIds(Handle<Class> h_this) {
+bool Class::EnsureStaticFieldIds(Handle<Class> h_this) {
   DCHECK_NE(Runtime::Current()->GetJniIdType(), JniIdType::kPointer) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
-    return nullptr;
+    return false;
   }
   return ext->EnsureStaticJFieldIDsArrayPresent(h_this->NumStaticFields());
 }
-ObjPtr<PointerArray> Class::GetInstanceFieldIds() {
+ObjPtr<Object> Class::GetInstanceFieldIds() {
   ObjPtr<ClassExt> ext(GetExtData());
   if (ext.IsNull()) {
     return nullptr;
@@ -1715,13 +1715,13 @@ ObjPtr<PointerArray> Class::GetInstanceFieldIds() {
     return ext->GetInstanceJFieldIDs();
   }
 }
-ObjPtr<PointerArray> Class::GetOrCreateInstanceFieldIds(Handle<Class> h_this) {
+bool Class::EnsureInstanceFieldIds(Handle<Class> h_this) {
   DCHECK_NE(Runtime::Current()->GetJniIdType(), JniIdType::kPointer) << "JNI Ids are pointers!";
   Thread* self = Thread::Current();
   ObjPtr<ClassExt> ext(EnsureExtDataPresent(h_this, self));
   if (ext.IsNull()) {
     self->AssertPendingOOMException();
-    return nullptr;
+    return false;
   }
   return ext->EnsureInstanceJFieldIDsArrayPresent(h_this->NumInstanceFields());
 }
