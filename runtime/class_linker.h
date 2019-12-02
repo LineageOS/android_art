@@ -1441,6 +1441,10 @@ class ClassLoadCallback {
  public:
   virtual ~ClassLoadCallback() {}
 
+  // Called immediately before beginning class-definition and immediately before returning from it.
+  virtual void BeginDefineClass() REQUIRES_SHARED(Locks::mutator_lock_) {}
+  virtual void EndDefineClass() REQUIRES_SHARED(Locks::mutator_lock_) {}
+
   // If set we will replace initial_class_def & initial_dex_file with the final versions. The
   // callback author is responsible for ensuring these are allocated in such a way they can be
   // cleaned up if another transformation occurs. Note that both must be set or null/unchanged on
