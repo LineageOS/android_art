@@ -1286,15 +1286,15 @@ class MANAGED Class final : public Object {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get or create the various jni id arrays in a lock-less thread safe manner.
-  static ObjPtr<PointerArray> GetOrCreateMethodIds(Handle<Class> h_this)
+  static bool EnsureMethodIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  static ObjPtr<PointerArray> GetOrCreateStaticFieldIds(Handle<Class> h_this)
+  ObjPtr<Object> GetMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static bool EnsureStaticFieldIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  static ObjPtr<PointerArray> GetOrCreateInstanceFieldIds(Handle<Class> h_this)
+  ObjPtr<Object> GetStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static bool EnsureInstanceFieldIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<Object> GetInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Calculate the index in the ifields_, methods_ or sfields_ arrays a method is located at. This
   // is to be used with the above Get{,OrCreate}...Ids functions.
