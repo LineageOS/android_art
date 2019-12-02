@@ -820,11 +820,11 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
     return false;
   }
   for (auto& dex_file : boot_class_path) {
-    if (dex_file.get() == nullptr) {
+    if (dex_file == nullptr) {
       *error_msg = "Null dex file.";
       return false;
     }
-    AppendToBootClassPath(self, *dex_file);
+    AppendToBootClassPath(self, dex_file.get());
     boot_dex_files_.push_back(std::move(dex_file));
   }
 
@@ -1299,7 +1299,7 @@ void ClassLinker::AddExtraBootDexFiles(
     Thread* self,
     std::vector<std::unique_ptr<const DexFile>>&& additional_dex_files) {
   for (std::unique_ptr<const DexFile>& dex_file : additional_dex_files) {
-    AppendToBootClassPath(self, *dex_file);
+    AppendToBootClassPath(self, dex_file.get());
     boot_dex_files_.push_back(std::move(dex_file));
   }
 }
@@ -2269,7 +2269,7 @@ bool ClassLinker::AddImageSpace(
                                                        dex_cache->NumResolvedMethods());
       }
       // Register dex files, keep track of existing ones that are conflicts.
-      AppendToBootClassPath(*dex_file.get(), dex_cache);
+      AppendToBootClassPath(dex_file.get(), dex_cache);
     }
     out_dex_files->push_back(std::move(dex_file));
   }
@@ -2959,6 +2959,7 @@ using ClassPathEntry = std::pair<const DexFile*, const dex::ClassDef*>;
 ClassPathEntry FindInClassPath(const char* descriptor,
                                size_t hash, const std::vector<const DexFile*>& class_path) {
   for (const DexFile* dex_file : class_path) {
+    DCHECK(dex_file != nullptr);
     const dex::ClassDef* dex_class_def = OatDexFile::FindClassDef(*dex_file, descriptor, hash);
     if (dex_class_def != nullptr) {
       return ClassPathEntry(dex_file, dex_class_def);
@@ -4139,21 +4140,22 @@ void ClassLinker::LoadMethod(const DexFile& dex_file,
   }
 }
 
-void ClassLinker::AppendToBootClassPath(Thread* self, const DexFile& dex_file) {
+void ClassLinker::AppendToBootClassPath(Thread* self, const DexFile* dex_file) {
   ObjPtr<mirror::DexCache> dex_cache = AllocAndInitializeDexCache(
       self,
-      dex_file,
+      *dex_file,
       Runtime::Current()->GetLinearAlloc());
-  CHECK(dex_cache != nullptr) << "Failed to allocate dex cache for " << dex_file.GetLocation();
+  CHECK(dex_cache != nullptr) << "Failed to allocate dex cache for " << dex_file->GetLocation();
   AppendToBootClassPath(dex_file, dex_cache);
 }
 
-void ClassLinker::AppendToBootClassPath(const DexFile& dex_file,
+void ClassLinker::AppendToBootClassPath(const DexFile* dex_file,
                                         ObjPtr<mirror::DexCache> dex_cache) {
-  CHECK(dex_cache != nullptr) << dex_file.GetLocation();
-  boot_class_path_.push_back(&dex_file);
+  CHECK(dex_file != nullptr);
+  CHECK(dex_cache != nullptr) << dex_file->GetLocation();
+  boot_class_path_.push_back(dex_file);
   WriterMutexLock mu(Thread::Current(), *Locks::dex_lock_);
-  RegisterDexFileLocked(dex_file, dex_cache, /* class_loader= */ nullptr);
+  RegisterDexFileLocked(*dex_file, dex_cache, /* class_loader= */ nullptr);
 }
 
 void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,

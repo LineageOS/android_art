@@ -76,7 +76,7 @@ extern "C" JNIEXPORT jint JNICALL Java_Main_appendToBootClassLoader(
 
   ScopedObjectAccess soa(Thread::Current());
   for (std::unique_ptr<const DexFile>& dex_file : opened_dex_files[index]) {
-    Runtime::Current()->GetClassLinker()->AppendToBootClassPath(Thread::Current(), *dex_file.get());
+    Runtime::Current()->GetClassLinker()->AppendToBootClassPath(Thread::Current(), dex_file.get());
   }
 
   return int_index;
