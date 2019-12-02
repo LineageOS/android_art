@@ -1685,6 +1685,9 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
                                     "no stack trace available");
   }
 
+  // Class-roots are setup, we can now finish initializing the JniIdManager.
+  GetJniIdManager()->Init(self);
+
   // Runtime initialization is largely done now.
   // We load plugins first since that can modify the runtime state slightly.
   // Load all plugins
@@ -2168,6 +2171,7 @@ void Runtime::VisitConstantRoots(RootVisitor* visitor) {
 void Runtime::VisitConcurrentRoots(RootVisitor* visitor, VisitRootFlags flags) {
   intern_table_->VisitRoots(visitor, flags);
   class_linker_->VisitRoots(visitor, flags);
+  jni_id_manager_->VisitRoots(visitor);
   heap_->VisitAllocationRecords(visitor);
   if ((flags & kVisitRootFlagNewRoots) == 0) {
     // Guaranteed to have no new roots in the constant roots.
