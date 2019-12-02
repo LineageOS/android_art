@@ -48,58 +48,36 @@ class MANAGED ClassExt : public Object {
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool EnsureInstanceJFieldIDsArrayPresent(size_t count)
+  ObjPtr<PointerArray> EnsureInstanceJFieldIDsArrayPresent(size_t count)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<PointerArray> GetInstanceJFieldIDsPointerArray() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<Object> GetInstanceJFieldIDs() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool HasInstanceFieldPointerIdMarker() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<PointerArray> GetInstanceJFieldIDs() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool EnsureStaticJFieldIDsArrayPresent(size_t count)
+  ObjPtr<PointerArray> EnsureStaticJFieldIDsArrayPresent(size_t count)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<PointerArray> GetStaticJFieldIDsPointerArray() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<Object> GetStaticJFieldIDs() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool HasStaticFieldPointerIdMarker() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<PointerArray> GetStaticJFieldIDs() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool EnsureJMethodIDsArrayPresent(size_t count)
+  ObjPtr<PointerArray> EnsureJMethodIDsArrayPresent(size_t count)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<Object> GetJMethodIDs() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  ObjPtr<PointerArray> GetJMethodIDsPointerArray() REQUIRES_SHARED(Locks::mutator_lock_);
-  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
-           ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool HasMethodPointerIdMarker() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<PointerArray> GetJMethodIDs() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   ObjPtr<PointerArray> GetObsoleteMethods() REQUIRES_SHARED(Locks::mutator_lock_);
 
   ObjPtr<Object> GetOriginalDexFile() REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Used to manually initialize the ext-ids arrays for the ClassExt associated
-  // with the Class<ClassExt>. This simplifies the id allocation path.
-  void SetIdsArraysForClassExtExtData(ObjPtr<Object> marker) REQUIRES_SHARED(Locks::mutator_lock_);
 
   void SetOriginalDexFile(ObjPtr<Object> bytes) REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -151,7 +129,7 @@ class MANAGED ClassExt : public Object {
  private:
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-  bool EnsureJniIdsArrayPresent(MemberOffset off, size_t count)
+  ObjPtr<PointerArray> EnsureJniIdsArrayPresent(MemberOffset off, size_t count)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Field order required by test "ValidateFieldOrderOfJavaCppUnionClasses".
