@@ -24,7 +24,18 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
     CFI_ADJUST_CFA_OFFSET(8)
     pushl %fs:THREAD_SELF_OFFSET  // pass Thread::Current()
     CFI_ADJUST_CFA_OFFSET(4)
+    // Call artFindNativeMethod() for normal native and artFindNativeMethodRunnable for @FastNative.
+    movl (%esp), %eax                                // Thread* self
+    movl THREAD_TOP_QUICK_FRAME_OFFSET(%eax), %eax   // uintptr_t tagged_quick_frame
+    andl LITERAL(0xfffffffe), %eax                   // ArtMethod** sp
+    movl (%eax), %eax                                // ArtMethod* method
+    testl LITERAL(ACCESS_FLAGS_METHOD_IS_FAST_NATIVE), ART_METHOD_ACCESS_FLAGS_OFFSET(%eax)
+    jne .Llookup_stub_fast_native
     call SYMBOL(artFindNativeMethod)  // (Thread*)
+    jmp .Llookup_stub_continue
+.Llookup_stub_fast_native:
+    call SYMBOL(artFindNativeMethodRunnable)  // (Thread*)
+.Llookup_stub_continue:
     addl LITERAL(12), %esp        // remove argument & padding
     CFI_ADJUST_CFA_OFFSET(-12)
     testl %eax, %eax              // check if returned method code is null
