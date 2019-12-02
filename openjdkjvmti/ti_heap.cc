@@ -1653,6 +1653,10 @@ static void ReplaceObjectReferences(const ObjectMap& map)
                 // We don't want to update the declaring class of any objects. They will be replaced
                 // in the heap and we need the declaring class to know its size.
                 return;
+              } else if (UNLIKELY(!is_static && off == art::mirror::Class::SuperClassOffset() &&
+                                  obj->IsClass())) {
+                // We don't want to be messing with the class hierarcy either.
+                return;
               }
               VLOG(plugin) << "Updating field at offset " << off.Uint32Value() << " of type "
                            << obj->GetClass()->PrettyClass();

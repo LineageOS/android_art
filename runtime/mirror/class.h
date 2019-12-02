@@ -105,6 +105,10 @@ class MANAGED Class final : public Object {
   static void SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
+  // Used for structural redefinition to directly set the class-status while
+  // holding a strong mutator-lock.
+  void SetStatusLocked(ClassStatus new_status) REQUIRES(Locks::mutator_lock_);
+
   void SetStatusForPrimitiveOrArray(ClassStatus new_status) REQUIRES_SHARED(Locks::mutator_lock_);
 
   static constexpr MemberOffset StatusOffset() {
@@ -616,6 +620,11 @@ class MANAGED Class final : public Object {
   // that extends) another can be assigned to its parent, but not vice-versa. All Classes may assign
   // to themselves. Classes for primitive types may not assign to each other.
   ALWAYS_INLINE bool IsAssignableFrom(ObjPtr<Class> src) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Checks if 'klass' is a redefined version of this.
+  bool IsObsoleteVersionOf(ObjPtr<Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  ObjPtr<Class> GetObsoleteClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
