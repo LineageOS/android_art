@@ -25,10 +25,15 @@
 #include "art_field.h"
 #include "art_method.h"
 #include "base/mutex.h"
+#include "gc_root.h"
 #include "jni_id_type.h"
 #include "reflective_value_visitor.h"
 
 namespace art {
+namespace mirror {
+class Object;
+class ClassExt;
+}  // namespace mirror
 template<typename RT> class ReflectiveHandle;
 
 namespace jni {
@@ -42,6 +47,8 @@ class JniIdManager {
   static constexpr bool IsIndexId(T val) {
     return val == nullptr || reinterpret_cast<uintptr_t>(val) % 2 == 1;
   }
+
+  void Init(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
 
   ArtMethod* DecodeMethodId(jmethodID method) REQUIRES(!Locks::jni_id_lock_);
   ArtField* DecodeFieldId(jfieldID field) REQUIRES(!Locks::jni_id_lock_);
@@ -57,6 +64,10 @@ class JniIdManager {
   void VisitReflectiveTargets(ReflectiveValueVisitor* rvv)
       REQUIRES(Locks::mutator_lock_, !Locks::jni_id_lock_);
 
+  void VisitRoots(RootVisitor* visitor) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  ObjPtr<mirror::Object> GetPointerMarker() REQUIRES_SHARED(Locks::mutator_lock_);
+
  private:
   template <typename ArtType>
   uintptr_t EncodeGenericId(ReflectiveHandle<ArtType> t) REQUIRES(!Locks::jni_id_lock_)
@@ -65,8 +76,7 @@ class JniIdManager {
   ArtType* DecodeGenericId(uintptr_t input) REQUIRES(!Locks::jni_id_lock_);
   template <typename ArtType> std::vector<ArtType*>& GetGenericMap()
       REQUIRES(Locks::jni_id_lock_);
-  template <typename ArtType>
-  uintptr_t GetNextId(JniIdType id, ReflectiveHandle<ArtType> t)
+  template <typename ArtType> uintptr_t GetNextId(JniIdType id)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(Locks::jni_id_lock_);
   template <typename ArtType>
@@ -92,7 +102,11 @@ class JniIdManager {
   // min jfieldID that might not have it's field->id mapping filled in.
   uintptr_t deferred_allocation_field_id_start_ GUARDED_BY(Locks::jni_id_lock_) = 0u;
 
+  GcRoot<mirror::Object> pointer_marker_;
+
   friend class ScopedEnableSuspendAllJniIdQueries;
+  // For GetPointerMarker
+  friend class mirror::ClassExt;
 };
 
 // A scope that will enable using the Encode/Decode JNI id functions with all threads suspended.
