@@ -33,6 +33,7 @@
 #include "jni_id_type.h"
 #include "mirror/array-inl.h"
 #include "mirror/array.h"
+#include "mirror/class-alloc-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/class.h"
 #include "mirror/class_ext-inl.h"
@@ -65,12 +66,48 @@ static constexpr uintptr_t IndexToId(size_t index) {
 template <typename ArtType>
 ObjPtr<mirror::PointerArray> GetIds(ObjPtr<mirror::Class> k, ArtType* t)
     REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Object> ret;
   if constexpr (std::is_same_v<ArtType, ArtField>) {
-    return t->IsStatic() ? k->GetStaticFieldIds() : k->GetInstanceFieldIds();
+    ret = t->IsStatic() ? k->GetStaticFieldIds() : k->GetInstanceFieldIds();
   } else {
-    return t->IsObsolete() ? nullptr : k->GetMethodIds();
+    ret = t->IsObsolete() ? nullptr : k->GetMethodIds();
   }
+  DCHECK(ret.IsNull() || ret->IsArrayInstance()) << "Should have bailed out early!";
+  if (kIsDebugBuild && !ret.IsNull()) {
+    if (kRuntimePointerSize == PointerSize::k32) {
+      CHECK(ret->IsIntArray());
+    } else {
+      CHECK(ret->IsLongArray());
+    }
+  }
+  return down_cast<mirror::PointerArray*>(ret.Ptr());
 }
+
+template <typename ArtType>
+bool ShouldReturnPointer(ObjPtr<mirror::Class> klass, ArtType* t)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+template <>
+bool ShouldReturnPointer(ObjPtr<mirror::Class> klass, ArtMethod* t ATTRIBUTE_UNUSED) {
+  ObjPtr<mirror::ClassExt> ext(klass->GetExtData());
+  if (ext.IsNull()) {
+    return true;
+  }
+  ObjPtr<mirror::Object> arr = ext->GetJMethodIDs();
+  return arr.IsNull() || !arr->IsArrayInstance();
+}
+
+template<>
+bool ShouldReturnPointer(ObjPtr<mirror::Class> klass, ArtField* t) {
+  ObjPtr<mirror::ClassExt> ext(klass->GetExtData());
+  if (ext.IsNull()) {
+    return true;
+  }
+  ObjPtr<mirror::Object> arr = t->IsStatic() ? ext->GetStaticJFieldIDs()
+                                             : ext->GetInstanceJFieldIDs();
+  return arr.IsNull() || !arr->IsArrayInstance();
+}
+
 
 // Forces the appropriate id array to be present if possible. Returns true if allocation was
 // attempted but failed.
@@ -87,8 +124,8 @@ bool EnsureIdsArray(Thread* self, ObjPtr<mirror::Class> k, ArtField* field) {
     return false;
   } else {
     // NB This modifies the class to allocate the ClassExt and the ids array.
-    field->IsStatic() ? mirror::Class::GetOrCreateStaticFieldIds(h_k)
-                      : mirror::Class::GetOrCreateInstanceFieldIds(h_k);
+    field->IsStatic() ? mirror::Class::EnsureStaticFieldIds(h_k)
+                      : mirror::Class::EnsureInstanceFieldIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();
@@ -113,7 +150,7 @@ bool EnsureIdsArray(Thread* self, ObjPtr<mirror::Class> k, ArtMethod* method) {
     return false;
   } else {
     // NB This modifies the class to allocate the ClassExt and the ids array.
-    mirror::Class::GetOrCreateMethodIds(h_k);
+    mirror::Class::EnsureMethodIds(h_k);
   }
   if (self->IsExceptionPending()) {
     self->AssertPendingOOMException();
@@ -187,29 +224,21 @@ ArtMethod* Canonicalize(ReflectiveHandle<ArtMethod> t) {
 // and not a pointer. This gives us 2**31 unique methods that can be addressed on 32-bit art, which
 // should be more than enough.
 template <>
-uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type, ReflectiveHandle<ArtField> f) {
-  if (LIKELY(type == JniIdType::kIndices)) {
-    uintptr_t res = next_field_id_;
-    next_field_id_ += 2;
-    CHECK_GT(next_field_id_, res) << "jfieldID Overflow";
-    return res;
-  } else {
-    DCHECK_EQ(type, JniIdType::kSwapablePointer);
-    return reinterpret_cast<uintptr_t>(f.Get());
-  }
+uintptr_t JniIdManager::GetNextId<ArtField>(JniIdType type) {
+  DCHECK_EQ(type, JniIdType::kIndices);
+  uintptr_t res = next_field_id_;
+  next_field_id_ += 2;
+  CHECK_GT(next_field_id_, res) << "jfieldID Overflow";
+  return res;
 }
 
 template <>
-uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type, ReflectiveHandle<ArtMethod> m) {
-  if (LIKELY(type == JniIdType::kIndices)) {
-    uintptr_t res = next_method_id_;
-    next_method_id_ += 2;
-    CHECK_GT(next_method_id_, res) << "jmethodID Overflow";
-    return res;
-  } else {
-    DCHECK_EQ(type, JniIdType::kSwapablePointer);
-    return reinterpret_cast<uintptr_t>(m.Get());
-  }
+uintptr_t JniIdManager::GetNextId<ArtMethod>(JniIdType type) {
+  DCHECK_EQ(type, JniIdType::kIndices);
+  uintptr_t res = next_method_id_;
+  next_method_id_ += 2;
+  CHECK_GT(next_method_id_, res) << "jmethodID Overflow";
+  return res;
 }
 template <>
 std::vector<ArtField*>& JniIdManager::GetGenericMap<ArtField>() {
@@ -247,18 +276,19 @@ uintptr_t JniIdManager::EncodeGenericId(ReflectiveHandle<ArtType> t) {
   }
   Thread* self = Thread::Current();
   ScopedExceptionStorage ses(self);
-  ObjPtr<mirror::Class> klass = t->GetDeclaringClass();
-  DCHECK(!klass.IsNull()) << "Null declaring class " << PrettyGeneric(t);
-  size_t off = GetIdOffset(klass, Canonicalize(t), kRuntimePointerSize);
+  DCHECK(!t->GetDeclaringClass().IsNull()) << "Null declaring class " << PrettyGeneric(t);
+  size_t off = GetIdOffset(t->GetDeclaringClass(), Canonicalize(t), kRuntimePointerSize);
   // Here is the earliest point we can suspend.
-  bool allocation_failure = EnsureIdsArray(self, klass, t.Get());
-  klass = t->GetDeclaringClass();
-  ObjPtr<mirror::PointerArray> ids(GetIds(klass, t.Get()));
+  bool allocation_failure = EnsureIdsArray(self, t->GetDeclaringClass(), t.Get());
   if (allocation_failure) {
     self->AssertPendingOOMException();
     ses.SuppressOldException("OOM exception while trying to allocate JNI ids.");
     return 0u;
+  } else if (ShouldReturnPointer(t->GetDeclaringClass(), t.Get())) {
+    return reinterpret_cast<uintptr_t>(t.Get());
   }
+  ObjPtr<mirror::Class> klass = t->GetDeclaringClass();
+  ObjPtr<mirror::PointerArray> ids(GetIds(klass, t.Get()));
   uintptr_t cur_id = 0;
   if (!ids.IsNull()) {
     DCHECK_GT(ids->GetLength(), static_cast<int32_t>(off)) << " is " << PrettyGeneric(t);
@@ -315,18 +345,13 @@ uintptr_t JniIdManager::EncodeGenericId(ReflectiveHandle<ArtType> t) {
       return IndexToId(index);
     }
   }
-  cur_id = GetNextId(id_type, t);
-  if (UNLIKELY(id_type == JniIdType::kIndices)) {
-    DCHECK_EQ(cur_id % 2, 1u);
-    size_t cur_index = IdToIndex(cur_id);
-    std::vector<ArtType*>& vec = GetGenericMap<ArtType>();
-    vec.reserve(cur_index + 1);
-    vec.resize(std::max(vec.size(), cur_index + 1), nullptr);
-    vec[cur_index] = t.Get();
-  } else {
-    DCHECK_EQ(cur_id % 2, 0u);
-    DCHECK_EQ(cur_id, reinterpret_cast<uintptr_t>(t.Get()));
-  }
+  cur_id = GetNextId<ArtType>(id_type);
+  DCHECK_EQ(cur_id % 2, 1u);
+  size_t cur_index = IdToIndex(cur_id);
+  std::vector<ArtType*>& vec = GetGenericMap<ArtType>();
+  vec.reserve(cur_index + 1);
+  vec.resize(std::max(vec.size(), cur_index + 1), nullptr);
+  vec[cur_index] = t.Get();
   if (ids.IsNull()) {
     if (kIsDebugBuild && !IsObsolete(t)) {
       CHECK_NE(deferred_allocation_refcount_, 0u)
@@ -365,6 +390,29 @@ jmethodID JniIdManager::EncodeMethodId(ReflectiveHandle<ArtMethod> method) {
   return res;
 }
 
+void JniIdManager::VisitRoots(RootVisitor *visitor) {
+  pointer_marker_.VisitRootIfNonNull(visitor, RootInfo(kRootVMInternal));
+}
+
+void JniIdManager::Init(Thread* self) {
+  // When compiling we don't want to have anything to do with any of this, which is fine since JNI
+  // ids won't be created during AOT compilation. This also means we don't need to do any
+  // complicated stuff with the image-writer.
+  if (!Runtime::Current()->IsAotCompiler()) {
+    // Allocate the marker
+    StackHandleScope<3> hs(self);
+    Handle<mirror::Object> marker_obj(
+        hs.NewHandle(GetClassRoot<mirror::Object>()->AllocObject(self)));
+    CHECK(!marker_obj.IsNull());
+    pointer_marker_ = GcRoot<mirror::Object>(marker_obj.Get());
+    // Manually mark class-ext as having all pointer-ids to avoid any annoying loops.
+    Handle<mirror::Class> class_ext_class(hs.NewHandle(GetClassRoot<mirror::ClassExt>()));
+    mirror::Class::EnsureExtDataPresent(class_ext_class, self);
+    Handle<mirror::ClassExt> class_ext_ext(hs.NewHandle(class_ext_class->GetExtData()));
+    class_ext_ext->SetIdsArraysForClassExtExtData(marker_obj.Get());
+  }
+}
+
 void JniIdManager::VisitReflectiveTargets(ReflectiveValueVisitor* rvv) {
   art::WriterMutexLock mu(Thread::Current(), *Locks::jni_id_lock_);
   for (auto it = field_id_map_.begin(); it != field_id_map_.end(); ++it) {
@@ -379,32 +427,40 @@ void JniIdManager::VisitReflectiveTargets(ReflectiveValueVisitor* rvv) {
       ObjPtr<mirror::ClassExt> old_ext_data(old_class->GetExtData());
       ObjPtr<mirror::ClassExt> new_ext_data(new_class->GetExtData());
       if (!old_ext_data.IsNull()) {
+        CHECK(!old_ext_data->HasInstanceFieldPointerIdMarker() &&
+              !old_ext_data->HasStaticFieldPointerIdMarker())
+            << old_class->PrettyClass();
         // Clear the old field mapping.
         if (old_field->IsStatic()) {
           size_t old_off = ArraySlice<ArtField>(old_class->GetSFieldsPtr()).OffsetOf(old_field);
-          ObjPtr<mirror::PointerArray> old_statics(old_ext_data->GetStaticJFieldIDs());
+          ObjPtr<mirror::PointerArray> old_statics(old_ext_data->GetStaticJFieldIDsPointerArray());
           if (!old_statics.IsNull()) {
             old_statics->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
           }
         } else {
           size_t old_off = ArraySlice<ArtField>(old_class->GetIFieldsPtr()).OffsetOf(old_field);
-          ObjPtr<mirror::PointerArray> old_instances(old_ext_data->GetInstanceJFieldIDs());
+          ObjPtr<mirror::PointerArray> old_instances(
+              old_ext_data->GetInstanceJFieldIDsPointerArray());
           if (!old_instances.IsNull()) {
             old_instances->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
           }
         }
       }
       if (!new_ext_data.IsNull()) {
+        CHECK(!new_ext_data->HasInstanceFieldPointerIdMarker() &&
+              !new_ext_data->HasStaticFieldPointerIdMarker())
+            << new_class->PrettyClass();
         // Set the new field mapping.
         if (new_field->IsStatic()) {
           size_t new_off = ArraySlice<ArtField>(new_class->GetSFieldsPtr()).OffsetOf(new_field);
-          ObjPtr<mirror::PointerArray> new_statics(new_ext_data->GetStaticJFieldIDs());
+          ObjPtr<mirror::PointerArray> new_statics(new_ext_data->GetStaticJFieldIDsPointerArray());
           if (!new_statics.IsNull()) {
             new_statics->SetElementPtrSize(new_off, id, kRuntimePointerSize);
           }
         } else {
           size_t new_off = ArraySlice<ArtField>(new_class->GetIFieldsPtr()).OffsetOf(new_field);
-          ObjPtr<mirror::PointerArray> new_instances(new_ext_data->GetInstanceJFieldIDs());
+          ObjPtr<mirror::PointerArray> new_instances(
+              new_ext_data->GetInstanceJFieldIDsPointerArray());
           if (!new_instances.IsNull()) {
             new_instances->SetElementPtrSize(new_off, id, kRuntimePointerSize);
           }
@@ -424,17 +480,19 @@ void JniIdManager::VisitReflectiveTargets(ReflectiveValueVisitor* rvv) {
       ObjPtr<mirror::ClassExt> old_ext_data(old_class->GetExtData());
       ObjPtr<mirror::ClassExt> new_ext_data(new_class->GetExtData());
       if (!old_ext_data.IsNull()) {
+        CHECK(!old_ext_data->HasMethodPointerIdMarker()) << old_class->PrettyClass();
         // Clear the old method mapping.
         size_t old_off = ArraySlice<ArtMethod>(old_class->GetMethodsPtr()).OffsetOf(old_method);
-        ObjPtr<mirror::PointerArray> old_methods(old_ext_data->GetJMethodIDs());
+        ObjPtr<mirror::PointerArray> old_methods(old_ext_data->GetJMethodIDsPointerArray());
         if (!old_methods.IsNull()) {
           old_methods->SetElementPtrSize(old_off, 0, kRuntimePointerSize);
         }
       }
       if (!new_ext_data.IsNull()) {
+        CHECK(!new_ext_data->HasMethodPointerIdMarker()) << new_class->PrettyClass();
         // Set the new method mapping.
         size_t new_off = ArraySlice<ArtMethod>(new_class->GetMethodsPtr()).OffsetOf(new_method);
-        ObjPtr<mirror::PointerArray> new_methods(new_ext_data->GetJMethodIDs());
+        ObjPtr<mirror::PointerArray> new_methods(new_ext_data->GetJMethodIDsPointerArray());
         if (!new_methods.IsNull()) {
           new_methods->SetElementPtrSize(new_off, id, kRuntimePointerSize);
         }
@@ -461,6 +519,10 @@ ArtMethod* JniIdManager::DecodeMethodId(jmethodID method) {
 
 ArtField* JniIdManager::DecodeFieldId(jfieldID field) {
   return DecodeGenericId<ArtField>(reinterpret_cast<uintptr_t>(field));
+}
+
+ObjPtr<mirror::Object> JniIdManager::GetPointerMarker() {
+  return pointer_marker_.Read();
 }
 
 // This whole defer system is an annoying requirement to allow us to generate IDs during heap-walks

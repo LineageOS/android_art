@@ -51,6 +51,13 @@ void ClassExt::SetObsoleteArrays(ObjPtr<PointerArray> methods,
   SetFieldObject<false>(obsolete_methods_off, methods);
 }
 
+void ClassExt::SetIdsArraysForClassExtExtData(ObjPtr<Object> marker) {
+  CHECK(!marker.IsNull());
+  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(ClassExt, instance_jfield_ids_), marker);
+  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(ClassExt, static_jfield_ids_), marker);
+  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(ClassExt, jmethod_ids_), marker);
+}
+
 // We really need to be careful how we update this. If we ever in the future make it so that
 // these arrays are written into without all threads being suspended we have a race condition! This
 // race could cause obsolete methods to be missed.
