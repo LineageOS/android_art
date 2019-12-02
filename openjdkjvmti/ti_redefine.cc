@@ -469,30 +469,9 @@ jvmtiError Redefiner::GetClassRedefinitionError(art::Handle<art::mirror::Class> 
     // need to check any subtypes too.
     art::ObjPtr<art::mirror::ClassExt> ext(klass->GetExtData());
     if (!ext.IsNull()) {
-      bool non_index_id = false;
-      ext->VisitJFieldIDs([&](jfieldID id, uint32_t idx, bool is_static)
-          REQUIRES_SHARED(art::Locks::mutator_lock_) {
-        if (!art::jni::JniIdManager::IsIndexId(id)) {
-          non_index_id = true;
-          *error_msg =
-              StringPrintf("%s Field %d (%s) has non-index jni-ids.",
-                           (is_static ? "static" : "non-static"),
-                           idx,
-                           (is_static ? klass->GetStaticField(idx)
-                                      : klass->GetInstanceField(idx))->PrettyField().c_str());
-        }
-      });
-      ext->VisitJMethodIDs([&](jmethodID id, uint32_t idx)
-          REQUIRES_SHARED(art::Locks::mutator_lock_) {
-        if (!art::jni::JniIdManager::IsIndexId(id)) {
-          non_index_id = true;
-          *error_msg = StringPrintf(
-              "method %d (%s) has non-index jni-ids.",
-              idx,
-              klass->GetDeclaredMethodsSlice(art::kRuntimePointerSize)[idx].PrettyMethod().c_str());
-        }
-      });
-      if (non_index_id) {
+      if (ext->HasInstanceFieldPointerIdMarker() ||
+          ext->HasMethodPointerIdMarker() ||
+          ext->HasStaticFieldPointerIdMarker()) {
         return ERR(UNMODIFIABLE_CLASS);
       }
     }
@@ -1988,9 +1967,9 @@ art::ObjPtr<art::mirror::Class> Redefiner::ClassRedefinition::AllocateNewClassOb
   // Make sure we have ext-data space for method & field ids. We won't know if we need them until
   // it's too late to create them.
   // TODO We might want to remove these arrays if they're not needed.
-  if (art::mirror::Class::GetOrCreateInstanceFieldIds(linked_class).IsNull() ||
-      art::mirror::Class::GetOrCreateStaticFieldIds(linked_class).IsNull() ||
-      art::mirror::Class::GetOrCreateMethodIds(linked_class).IsNull()) {
+  if (!art::mirror::Class::EnsureInstanceFieldIds(linked_class) ||
+      !art::mirror::Class::EnsureStaticFieldIds(linked_class) ||
+      !art::mirror::Class::EnsureMethodIds(linked_class)) {
     driver_->self_->AssertPendingOOMException();
     driver_->self_->ClearException();
     RecordFailure(
