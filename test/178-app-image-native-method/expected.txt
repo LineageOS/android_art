@@ -1,6 +1,10 @@
 JNI_OnLoad called
 test
+testFast
 testMissing
+testMissingFast
 JNI_OnLoad called
 test
+testFast
 testMissing
+testMissingFast
