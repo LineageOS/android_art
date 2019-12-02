@@ -54,9 +54,9 @@ static std::pair<jclass, jfieldID> SplitField(JNIEnv* env, const std::string& fi
 
   jclass klass = reinterpret_cast<jclass>(
       env->NewGlobalRef(env->FindClass(class_name.substr(1, class_name.size() - 2).c_str())));
+  CHECK(klass != nullptr) << class_name;
   jfieldID field = env->GetFieldID(klass, field_name.c_str(), field_type.c_str());
-  CHECK(klass != nullptr);
-  CHECK(field != nullptr);
+  CHECK(field != nullptr) << field_name;
   LOG(INFO) << "listing field " << field_id;
   env->PopLocalFrame(nullptr);
   return std::make_pair(klass, field);
@@ -125,10 +125,41 @@ static void DataDumpRequestCb(jvmtiEnv* jvmti) {
     std::unordered_map<std::string, size_t> class_sizes;
     std::unordered_map<std::string, size_t> class_counts;
     size_t total_size = 0;
+    // Mark all the referenced objects with a single tag value, this way we can dedup them.
+    jlong referenced_object_tag = static_cast<jlong>(reinterpret_cast<intptr_t>(klass) + 1);
+    std::string null_class_name("<null>");
+    class_counts[null_class_name] = 0;
+    class_sizes[null_class_name] = 0;
     for (jint i = 0; i < obj_len; i++) {
       ScopedLocalRef<jobject> cur_thiz(env, obj_list[i]);
       ScopedLocalRef<jobject> obj(env, env->GetObjectField(cur_thiz.get(), field));
-      std::string class_name("<null>");
+      std::string class_name(null_class_name);
+      if (obj == nullptr) {
+        class_counts[null_class_name]++;
+      } else {
+        CHECK_JVMTI(jvmti->SetTag(obj.get(), referenced_object_tag));
+        jlong size = 0;
+        if (obj.get() != nullptr) {
+          char* class_name_tmp;
+          ScopedLocalRef<jclass> obj_klass(env, env->GetObjectClass(obj.get()));
+          CHECK_JVMTI(jvmti->GetClassSignature(obj_klass.get(), &class_name_tmp, nullptr));
+          CHECK_JVMTI(jvmti->GetObjectSize(obj.get(), &size));
+          class_name = class_name_tmp;
+          CHECK_JVMTI(jvmti->Deallocate(reinterpret_cast<unsigned char*>(class_name_tmp)));
+        }
+        if (class_sizes.find(class_name) == class_counts.end()) {
+          class_sizes[class_name] = 0;
+          class_counts[class_name] = 0;
+        }
+        class_counts[class_name]++;
+      }
+    }
+    jobject* ref_list;
+    jint ref_len;
+    CHECK_JVMTI(jvmti->GetObjectsWithTags(1, &referenced_object_tag, &ref_len, &ref_list, nullptr));
+    for (jint i = 0; i < ref_len; i++) {
+      ScopedLocalRef<jobject> obj(env, ref_list[i]);
+      std::string class_name(null_class_name);
       jlong size = 0;
       if (obj.get() != nullptr) {
         char* class_name_tmp;
@@ -139,12 +170,7 @@ static void DataDumpRequestCb(jvmtiEnv* jvmti) {
         CHECK_JVMTI(jvmti->Deallocate(reinterpret_cast<unsigned char*>(class_name_tmp)));
       }
       total_size += static_cast<size_t>(size);
-      if (class_counts.find(class_name) == class_counts.end()) {
-        class_counts[class_name] = 1;
-        class_sizes[class_name] = 0;
-      }
       class_sizes[class_name] += static_cast<size_t>(size);
-      class_counts[class_name]++;
     }
 
     char* field_name;
