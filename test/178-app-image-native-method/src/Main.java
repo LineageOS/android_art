@@ -33,10 +33,10 @@ public class Main {
 
     // FIXME: @FastNative and @CriticalNative fail a state check in artFindNativeMethod().
     test();
-    // testFast();
+    testFast();
     // testCritical();
     testMissing();
-    // testMissingFast();
+    testMissingFast();
     // testMissingCritical();
   }
 

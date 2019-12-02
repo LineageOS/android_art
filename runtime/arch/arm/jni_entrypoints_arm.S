@@ -20,6 +20,7 @@
      * Jni dlsym lookup stub.
      */
     .extern artFindNativeMethod
+    .extern artFindNativeMethodRunnable
 ENTRY art_jni_dlsym_lookup_stub
     push   {r0, r1, r2, r3, lr}           @ spill regs
     .cfi_adjust_cfa_offset 20
@@ -30,9 +31,22 @@ ENTRY art_jni_dlsym_lookup_stub
     .cfi_rel_offset lr, 16
     sub    sp, #12                        @ pad stack pointer to align frame
     .cfi_adjust_cfa_offset 12
+
     mov    r0, rSELF                      @ pass Thread::Current()
+    // Call artFindNativeMethod() for normal native and artFindNativeMethodRunnable for @FastNative.
+    ldr    ip, [r0, #THREAD_TOP_QUICK_FRAME_OFFSET]   // uintptr_t tagged_quick_frame
+    bic    ip, #1                                     // ArtMethod** sp
+    ldr    ip, [ip]                                   // ArtMethod* method
+    ldr    ip, [ip, #ART_METHOD_ACCESS_FLAGS_OFFSET]  // uint32_t access_flags
+    tst    ip, #ACCESS_FLAGS_METHOD_IS_FAST_NATIVE
+    bne    .Llookup_stub_fast_native
     blx    artFindNativeMethod
+    b      .Llookup_stub_continue
+.Llookup_stub_fast_native:
+    blx    artFindNativeMethodRunnable
+.Llookup_stub_continue:
     mov    r12, r0                        @ save result in r12
+
     add    sp, #12                        @ restore stack pointer
     .cfi_adjust_cfa_offset -12
     cbz    r0, 1f                         @ is method code null?
