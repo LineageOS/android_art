@@ -2352,7 +2352,7 @@ jvmtiError Redefiner::Run() {
     art::ClassLinker* cl = runtime_->GetClassLinker();
     cl->RegisterExistingDexCache(data.GetNewDexCache(), data.GetSourceClassLoader());
     if (data.GetSourceClassLoader() == nullptr) {
-      cl->AppendToBootClassPath(self_, data.GetRedefinition().GetDexFile());
+      cl->AppendToBootClassPath(self_, &data.GetRedefinition().GetDexFile());
     }
   }
   UnregisterAllBreakpoints();
