@@ -61,7 +61,8 @@ class StackMapStream : public DeletableArenaObject<kArenaAllocStackMapStream> {
   void BeginMethod(size_t frame_size_in_bytes,
                    size_t core_spill_mask,
                    size_t fp_spill_mask,
-                   uint32_t num_dex_registers);
+                   uint32_t num_dex_registers,
+                   bool baseline = false);
   void EndMethod();
 
   void BeginStackMapEntry(uint32_t dex_pc,
@@ -119,6 +120,7 @@ class StackMapStream : public DeletableArenaObject<kArenaAllocStackMapStream> {
   uint32_t core_spill_mask_ = 0;
   uint32_t fp_spill_mask_ = 0;
   uint32_t num_dex_registers_ = 0;
+  bool baseline_;
   BitTableBuilder<StackMap> stack_maps_;
   BitTableBuilder<RegisterMask> register_masks_;
   BitmapTableBuilder stack_masks_;

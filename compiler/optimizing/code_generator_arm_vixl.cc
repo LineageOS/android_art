@@ -2080,27 +2080,79 @@ void CodeGeneratorARMVIXL::ComputeSpillMask() {
   }
 }
 
+void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
+  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
+    UseScratchRegisterScope temps(GetVIXLAssembler());
+    vixl32::Register temp = temps.Acquire();
+    static_assert(ArtMethod::MaxCounter() == 0xFFFF, "asm is probably wrong");
+    if (!is_frame_entry) {
+      __ Push(vixl32::Register(kMethodRegister));
+      GetAssembler()->LoadFromOffset(kLoadWord, kMethodRegister, sp, kArmWordSize);
+    }
+    // Load with zero extend to clear the high bits for integer overflow check.
+    __ Ldrh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
+    __ Add(temp, temp, 1);
+    // Subtract one if the counter would overflow.
+    __ Sub(temp, temp, Operand(temp, ShiftType::LSR, 16));
+    __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
+    if (!is_frame_entry) {
+      __ Pop(vixl32::Register(kMethodRegister));
+    }
+  }
+
+  if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    uint32_t address = reinterpret_cast32<uint32_t>(info);
+    vixl::aarch32::Label done;
+    UseScratchRegisterScope temps(GetVIXLAssembler());
+    temps.Exclude(ip);
+    if (!is_frame_entry) {
+      __ Push(r4);  // Will be used as temporary. For frame entry, r4 is always available.
+    }
+    __ Mov(r4, address);
+    __ Ldrh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+    __ Add(ip, ip, 1);
+    __ Strh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+    if (!is_frame_entry) {
+      __ Pop(r4);
+    }
+    __ Lsls(ip, ip, 16);
+    __ B(ne, &done);
+    uint32_t entry_point_offset =
+        GetThreadOffset<kArmPointerSize>(kQuickCompileOptimized).Int32Value();
+    if (HasEmptyFrame()) {
+      CHECK(is_frame_entry);
+      // For leaf methods, we need to spill lr and r0. Also spill r1 and r2 for
+      // alignment.
+      uint32_t core_spill_mask =
+          (1 << lr.GetCode()) | (1 << r0.GetCode()) | (1 << r1.GetCode()) | (1 << r2.GetCode());
+      __ Push(RegisterList(core_spill_mask));
+      __ Ldr(lr, MemOperand(tr, entry_point_offset));
+      __ Blx(lr);
+      __ Pop(RegisterList(core_spill_mask));
+    } else {
+      if (!RequiresCurrentMethod()) {
+        CHECK(is_frame_entry);
+        GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
+      }
+    __ Ldr(lr, MemOperand(tr, entry_point_offset));
+    __ Blx(lr);
+    }
+    __ Bind(&done);
+  }
+}
+
 void CodeGeneratorARMVIXL::GenerateFrameEntry() {
   bool skip_overflow_check =
       IsLeafMethod() && !FrameNeedsStackCheck(GetFrameSize(), InstructionSet::kArm);
   DCHECK(GetCompilerOptions().GetImplicitStackOverflowChecks());
   __ Bind(&frame_entry_label_);
 
-  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
-    UseScratchRegisterScope temps(GetVIXLAssembler());
-    vixl32::Register temp = temps.Acquire();
-    static_assert(ArtMethod::MaxCounter() == 0xFFFF, "asm is probably wrong");
-    // Load with sign extend to set the high bits for integer overflow check.
-    __ Ldrh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-    __ Add(temp, temp, 1);
-    // Subtract one if the counter would overflow.
-    __ Sub(temp, temp, Operand(temp, ShiftType::LSR, 16));
-    __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-  }
-
   if (HasEmptyFrame()) {
     // Ensure that the CFI opcode list is not empty.
     GetAssembler()->cfi().Nop();
+    MaybeIncrementHotness(/* is_frame_entry= */ true);
     return;
   }
 
@@ -2201,6 +2253,7 @@ void CodeGeneratorARMVIXL::GenerateFrameEntry() {
     GetAssembler()->StoreToOffset(kStoreWord, temp, sp, GetStackOffsetOfShouldDeoptimizeFlag());
   }
 
+  MaybeIncrementHotness(/* is_frame_entry= */ true);
   MaybeGenerateMarkingRegisterCheck(/* code= */ 1);
 }
 
@@ -2498,19 +2551,7 @@ void InstructionCodeGeneratorARMVIXL::HandleGoto(HInstruction* got, HBasicBlock*
   HLoopInformation* info = block->GetLoopInformation();
 
   if (info != nullptr && info->IsBackEdge(*block) && info->HasSuspendCheck()) {
-    if (codegen_->GetCompilerOptions().CountHotnessInCompiledCode()) {
-      UseScratchRegisterScope temps(GetVIXLAssembler());
-      vixl32::Register temp = temps.Acquire();
-      __ Push(vixl32::Register(kMethodRegister));
-      GetAssembler()->LoadFromOffset(kLoadWord, kMethodRegister, sp, kArmWordSize);
-      // Load with sign extend to set the high bits for integer overflow check.
-      __ Ldrh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-      __ Add(temp, temp, 1);
-      // Subtract one if the counter would overflow.
-      __ Sub(temp, temp, Operand(temp, ShiftType::LSR, 16));
-      __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-      __ Pop(vixl32::Register(kMethodRegister));
-    }
+    codegen_->MaybeIncrementHotness(/* is_frame_entry= */ false);
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
     return;
   }

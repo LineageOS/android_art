@@ -26,7 +26,8 @@
 namespace art {
 
 ProfilingInfo::ProfilingInfo(ArtMethod* method, const std::vector<uint32_t>& entries)
-      : method_(method),
+      : baseline_hotness_count_(0),
+        method_(method),
         saved_entry_point_(nullptr),
         number_of_inline_caches_(entries.size()),
         current_inline_uses_(0),
