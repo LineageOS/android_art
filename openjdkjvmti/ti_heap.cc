@@ -58,6 +58,7 @@
 #include "object_callbacks.h"
 #include "object_tagging.h"
 #include "offsets.h"
+#include "read_barrier.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
 #include "stack.h"
@@ -1625,7 +1626,8 @@ static void ReplaceObjectReferences(const ObjectMap& map)
         class ResizeReferenceVisitor {
          public:
           using CompressedObj = art::mirror::CompressedReference<art::mirror::Object>;
-          explicit ResizeReferenceVisitor(const ObjectMap& map) : map_(map) {}
+          explicit ResizeReferenceVisitor(const ObjectMap& map, ObjectPtr ref)
+              : map_(map), ref_(ref) {}
 
           // Ignore class roots.
           void VisitRootIfNonNull(CompressedObj* root) const
@@ -1638,7 +1640,7 @@ static void ReplaceObjectReferences(const ObjectMap& map)
             auto it = map_.find(root->AsMirrorPtr());
             if (it != map_.end()) {
               root->Assign(it->second);
-              art::WriteBarrier::ForEveryFieldWrite(it->second);
+              art::WriteBarrier::ForEveryFieldWrite(ref_);
             }
           }
 
@@ -1670,9 +1672,10 @@ static void ReplaceObjectReferences(const ObjectMap& map)
 
          private:
           const ObjectMap& map_;
+          ObjectPtr ref_;
         };
 
-        ResizeReferenceVisitor rrv(map);
+        ResizeReferenceVisitor rrv(map, ref);
         if (ref->IsClass()) {
           // Class object native roots are the ArtField and ArtMethod 'declaring_class_' fields
           // which we don't want to be messing with as it would break ref-visitor assumptions about
