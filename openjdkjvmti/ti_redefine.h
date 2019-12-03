@@ -52,7 +52,6 @@
 #include "obj_ptr.h"
 
 namespace art {
-class ClassAccessor;
 namespace dex {
 struct ClassDef;
 }  // namespace dex
@@ -169,15 +168,10 @@ class Redefiner {
     void FindAndAllocateObsoleteMethods(art::ObjPtr<art::mirror::Class> art_klass)
         REQUIRES(art::Locks::mutator_lock_);
 
-    art::ObjPtr<art::mirror::Class> AllocateNewClassObject(
-        art::Handle<art::mirror::Class> old_class,
-        art::Handle<art::mirror::Class> super_class,
-        art::Handle<art::mirror::DexCache> cache,
-        uint16_t dex_class_def_index) REQUIRES_SHARED(art::Locks::mutator_lock_);
     art::ObjPtr<art::mirror::Class> AllocateNewClassObject(art::Handle<art::mirror::DexCache> cache)
         REQUIRES_SHARED(art::Locks::mutator_lock_);
 
-    uint32_t GetNewClassSize(art::ClassAccessor& accessor)
+    uint32_t GetNewClassSize(bool with_embedded_tables, art::Handle<art::mirror::Class> old_class)
         REQUIRES_SHARED(art::Locks::mutator_lock_);
 
     // Checks that the dex file contains only the single expected class and that the top-level class
@@ -323,7 +317,6 @@ class Redefiner {
   jvmtiError Run() REQUIRES_SHARED(art::Locks::mutator_lock_);
 
   bool CheckAllRedefinitionAreValid() REQUIRES_SHARED(art::Locks::mutator_lock_);
-  bool CheckClassHierarchy() REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool CheckAllClassesAreVerified(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool EnsureAllClassAllocationsFinished(RedefinitionDataHolder& holder)
