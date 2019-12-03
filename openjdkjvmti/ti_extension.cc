@@ -423,29 +423,31 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
         reinterpret_cast<jvmtiExtensionFunction>(Redefiner::StructurallyRedefineClasses),
         "com.android.art.class.structurally_redefine_classes",
         "Entrypoint for structural class redefinition. Has the same signature as RedefineClasses."
-        " Currently this only supports adding new static fields to a class without any instance"
-        " fields or methods. After calling this com.android.art.structural_dex_file_load_hook"
-        " events will be triggered, followed by re-transformable ClassFileLoadHook events. After"
-        " this method completes subsequent RetransformClasses calls will use the input to this"
-        " function as the initial class definition.",
+        " Currently does not support redefining a class and any of its supertypes at the same time."
+        " Only supports additive changes, methods and fields may not be removed. Supertypes and"
+        " implemented interfaces may not be changed. After calling this"
+        " com.android.art.structural_dex_file_load_hook events will be triggered, followed by"
+        " re-transformable ClassFileLoadHook events. After this method completes subsequent"
+        " RetransformClasses calls will use the input to this function as the initial class"
+        " definition.",
         {
-          { "num_classes", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
-          { "class_definitions", JVMTI_KIND_IN_BUF, JVMTI_TYPE_CVOID, false },
+            { "num_classes", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
+            { "class_definitions", JVMTI_KIND_IN_BUF, JVMTI_TYPE_CVOID, false },
         },
         {
-          ERR(CLASS_LOADER_UNSUPPORTED),
-          ERR(FAILS_VERIFICATION),
-          ERR(ILLEGAL_ARGUMENT),
-          ERR(INVALID_CLASS),
-          ERR(MUST_POSSESS_CAPABILITY),
-          ERR(MUST_POSSESS_CAPABILITY),
-          ERR(NULL_POINTER),
-          ERR(OUT_OF_MEMORY),
-          ERR(UNMODIFIABLE_CLASS),
-          ERR(UNSUPPORTED_REDEFINITION_HIERARCHY_CHANGED),
-          ERR(UNSUPPORTED_REDEFINITION_METHOD_ADDED),
-          ERR(UNSUPPORTED_REDEFINITION_METHOD_DELETED),
-          ERR(UNSUPPORTED_REDEFINITION_SCHEMA_CHANGED),
+            ERR(CLASS_LOADER_UNSUPPORTED),
+            ERR(FAILS_VERIFICATION),
+            ERR(ILLEGAL_ARGUMENT),
+            ERR(INVALID_CLASS),
+            ERR(MUST_POSSESS_CAPABILITY),
+            ERR(MUST_POSSESS_CAPABILITY),
+            ERR(NULL_POINTER),
+            ERR(OUT_OF_MEMORY),
+            ERR(UNMODIFIABLE_CLASS),
+            ERR(UNSUPPORTED_REDEFINITION_HIERARCHY_CHANGED),
+            ERR(UNSUPPORTED_REDEFINITION_METHOD_ADDED),
+            ERR(UNSUPPORTED_REDEFINITION_METHOD_DELETED),
+            ERR(UNSUPPORTED_REDEFINITION_SCHEMA_CHANGED),
         });
     if (error != ERR(NONE)) {
       return error;

@@ -66,7 +66,7 @@ bool ClassLoaderHelper::AddToClassLoader(art::Thread* self,
   art::ScopedObjectAccessUnchecked soa(self);
   art::StackHandleScope<3> hs(self);
   if (art::ClassLinker::IsBootClassLoader(soa, loader.Get())) {
-    art::Runtime::Current()->GetClassLinker()->AppendToBootClassPath(self, *dex_file);
+    art::Runtime::Current()->GetClassLinker()->AppendToBootClassPath(self, dex_file);
     return true;
   }
   art::Handle<art::mirror::Object> java_dex_file_obj(

@@ -11,6 +11,15 @@ Linking _add (int,int)int
 100
 -9000
 9000
+Linking _add (int,int,int,int,int,int)int
+15
+188
+5728
+Linking _multiply (Double,Double,Double,Double,Double,Double)Double
+1.0
+111.0
+12543.0
+2310.0
 TestLinkerUnrelatedBSM
 Winners 1 Votes 16
 TestInvocationKinds

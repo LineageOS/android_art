@@ -45,8 +45,17 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
     movq %xmm15, 88(%rsp)
     // prepare call
     movq %gs:THREAD_SELF_OFFSET, %rdi      // RDI := Thread::Current()
-    // call
-    call PLT_SYMBOL(artFindNativeMethod)  // (Thread*)
+    // Call artFindNativeMethod() for normal native and artFindNativeMethodRunnable for @FastNative.
+    movq THREAD_TOP_QUICK_FRAME_OFFSET(%rdi), %rax   // uintptr_t tagged_quick_frame
+    andq LITERAL(0xfffffffffffffffe), %rax           // ArtMethod** sp
+    movq (%rax), %rax                                // ArtMethod* method
+    testl LITERAL(ACCESS_FLAGS_METHOD_IS_FAST_NATIVE), ART_METHOD_ACCESS_FLAGS_OFFSET(%rax)
+    jne .Llookup_stub_fast_native
+    call SYMBOL(artFindNativeMethod)  // (Thread*)
+    jmp .Llookup_stub_continue
+.Llookup_stub_fast_native:
+    call SYMBOL(artFindNativeMethodRunnable)  // (Thread*)
+.Llookup_stub_continue:
     // restore arguments
     movq 0(%rsp), %xmm0
     movq 8(%rsp), %xmm1

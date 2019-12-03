@@ -49,6 +49,11 @@ inline IterationRange<Iter> MakeIterationRange(const Iter& begin_it, const Iter&
   return IterationRange<Iter>(begin_it, end_it);
 }
 
+template<typename List>
+inline IterationRange<typename List::iterator> MakeIterationRange(List& list) {
+  return IterationRange<typename List::iterator>(list.begin(), list.end());
+}
+
 template <typename Iter>
 inline IterationRange<Iter> MakeEmptyIterationRange(const Iter& it) {
   return IterationRange<Iter>(it, it);

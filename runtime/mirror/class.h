@@ -105,6 +105,10 @@ class MANAGED Class final : public Object {
   static void SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
+  // Used for structural redefinition to directly set the class-status while
+  // holding a strong mutator-lock.
+  void SetStatusLocked(ClassStatus new_status) REQUIRES(Locks::mutator_lock_);
+
   void SetStatusForPrimitiveOrArray(ClassStatus new_status) REQUIRES_SHARED(Locks::mutator_lock_);
 
   static constexpr MemberOffset StatusOffset() {
@@ -616,6 +620,11 @@ class MANAGED Class final : public Object {
   // that extends) another can be assigned to its parent, but not vice-versa. All Classes may assign
   // to themselves. Classes for primitive types may not assign to each other.
   ALWAYS_INLINE bool IsAssignableFrom(ObjPtr<Class> src) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Checks if 'klass' is a redefined version of this.
+  bool IsObsoleteVersionOf(ObjPtr<Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  ObjPtr<Class> GetObsoleteClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
            ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
@@ -1277,15 +1286,15 @@ class MANAGED Class final : public Object {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get or create the various jni id arrays in a lock-less thread safe manner.
-  static ObjPtr<PointerArray> GetOrCreateMethodIds(Handle<Class> h_this)
+  static bool EnsureMethodIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  static ObjPtr<PointerArray> GetOrCreateStaticFieldIds(Handle<Class> h_this)
+  ObjPtr<Object> GetMethodIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static bool EnsureStaticFieldIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
-  static ObjPtr<PointerArray> GetOrCreateInstanceFieldIds(Handle<Class> h_this)
+  ObjPtr<Object> GetStaticFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  static bool EnsureInstanceFieldIds(Handle<Class> h_this)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ObjPtr<PointerArray> GetInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
+  ObjPtr<Object> GetInstanceFieldIds() REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Calculate the index in the ifields_, methods_ or sfields_ arrays a method is located at. This
   // is to be used with the above Get{,OrCreate}...Ids functions.
