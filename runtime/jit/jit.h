@@ -114,6 +114,10 @@ class JitOptions {
     return use_jit_compilation_;
   }
 
+  bool UseTieredJitCompilation() const {
+    return use_tiered_jit_compilation_;
+  }
+
   void SetUseJitCompilation(bool b) {
     use_jit_compilation_ = b;
   }
@@ -137,6 +141,7 @@ class JitOptions {
   static uint32_t RoundUpThreshold(uint32_t threshold);
 
   bool use_jit_compilation_;
+  bool use_tiered_jit_compilation_;
   size_t code_cache_initial_capacity_;
   size_t code_cache_max_capacity_;
   uint32_t compile_threshold_;
@@ -382,6 +387,8 @@ class Jit {
   // Notify to other processes that the zygote is done profile compiling boot
   // class path methods.
   void NotifyZygoteCompilationDone();
+
+  void EnqueueOptimizedCompilation(ArtMethod* method, Thread* self);
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);

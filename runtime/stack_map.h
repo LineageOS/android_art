@@ -429,6 +429,10 @@ class CodeInfo {
     return (*code_info_data & kHasInlineInfo) != 0;
   }
 
+  ALWAYS_INLINE static bool IsBaseline(const uint8_t* code_info_data) {
+    return (*code_info_data & kIsBaseline) != 0;
+  }
+
  private:
   // Scan backward to determine dex register locations at given stack map.
   void DecodeDexRegisterMap(uint32_t stack_map_index,
@@ -472,6 +476,7 @@ class CodeInfo {
 
   enum Flags {
     kHasInlineInfo = 1 << 0,
+    kIsBaseline = 1 << 1,
   };
 
   // The CodeInfo starts with sequence of variable-length bit-encoded integers.
