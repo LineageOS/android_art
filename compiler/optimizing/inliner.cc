@@ -1813,6 +1813,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
       graph_->IsDebuggable(),
       /* osr= */ false,
       /* is_shared_jit_code= */ graph_->IsCompilingForSharedJitCode(),
+      /* baseline= */ graph_->IsCompilingBaseline(),
       /* start_instruction_id= */ caller_instruction_counter);
   callee_graph->SetArtMethod(resolved_method);
 

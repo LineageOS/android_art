@@ -42,7 +42,8 @@ void StackMapStream::SetStackMapNativePcOffset(size_t i, uint32_t native_pc_offs
 void StackMapStream::BeginMethod(size_t frame_size_in_bytes,
                                  size_t core_spill_mask,
                                  size_t fp_spill_mask,
-                                 uint32_t num_dex_registers) {
+                                 uint32_t num_dex_registers,
+                                 bool baseline) {
   DCHECK(!in_method_) << "Mismatched Begin/End calls";
   in_method_ = true;
   DCHECK_EQ(packed_frame_size_, 0u) << "BeginMethod was already called";
@@ -52,6 +53,7 @@ void StackMapStream::BeginMethod(size_t frame_size_in_bytes,
   core_spill_mask_ = core_spill_mask;
   fp_spill_mask_ = fp_spill_mask;
   num_dex_registers_ = num_dex_registers;
+  baseline_ = baseline;
 
   if (kVerifyStackMaps) {
     dchecks_.emplace_back([=](const CodeInfo& code_info) {
@@ -299,6 +301,7 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
   DCHECK(in_inline_info_ == false) << "Mismatched Begin/End calls";
 
   uint32_t flags = (inline_infos_.size() > 0) ? CodeInfo::kHasInlineInfo : 0;
+  flags |= baseline_ ? CodeInfo::kIsBaseline : 0;
   uint32_t bit_table_flags = 0;
   ForEachBitTable([&bit_table_flags](size_t i, auto bit_table) {
     if (bit_table->size() != 0) {  // Record which bit-tables are stored.

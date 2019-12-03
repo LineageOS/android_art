@@ -1346,6 +1346,53 @@ static dwarf::Reg DWARFReg(FloatRegister reg) {
   return dwarf::Reg::X86_64Fp(static_cast<int>(reg));
 }
 
+void CodeGeneratorX86_64::MaybeIncrementHotness(bool is_frame_entry) {
+  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
+    NearLabel overflow;
+    Register method = kMethodRegisterArgument;
+    if (!is_frame_entry) {
+      CHECK(RequiresCurrentMethod());
+      method = TMP;
+      __ movq(CpuRegister(method), Address(CpuRegister(RSP), kCurrentMethodStackOffset));
+    }
+    __ cmpw(Address(CpuRegister(method), ArtMethod::HotnessCountOffset().Int32Value()),
+            Immediate(ArtMethod::MaxCounter()));
+    __ j(kEqual, &overflow);
+    __ addw(Address(CpuRegister(method), ArtMethod::HotnessCountOffset().Int32Value()),
+            Immediate(1));
+    __ Bind(&overflow);
+  }
+
+  if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    uint64_t address = reinterpret_cast64<uint64_t>(info);
+    NearLabel done;
+    __ movq(CpuRegister(TMP), Immediate(address));
+    __ addw(Address(CpuRegister(TMP), ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+            Immediate(1));
+    __ j(kCarryClear, &done);
+    if (HasEmptyFrame()) {
+      CHECK(is_frame_entry);
+      // Frame alignment, and the stub expects the method on the stack.
+      __ pushq(CpuRegister(RDI));
+      __ cfi().AdjustCFAOffset(kX86_64WordSize);
+      __ cfi().RelOffset(DWARFReg(RDI), 0);
+    } else if (!RequiresCurrentMethod()) {
+      CHECK(is_frame_entry);
+      __ movq(Address(CpuRegister(RSP), kCurrentMethodStackOffset), CpuRegister(RDI));
+    }
+    GenerateInvokeRuntime(
+        GetThreadOffset<kX86_64PointerSize>(kQuickCompileOptimized).Int32Value());
+    if (HasEmptyFrame()) {
+      __ popq(CpuRegister(RDI));
+      __ cfi().AdjustCFAOffset(-static_cast<int>(kX86_64WordSize));
+      __ cfi().Restore(DWARFReg(RDI));
+    }
+    __ Bind(&done);
+  }
+}
+
 void CodeGeneratorX86_64::GenerateFrameEntry() {
   __ cfi().SetCurrentCFAOffset(kX86_64WordSize);  // return address
   __ Bind(&frame_entry_label_);
@@ -1353,17 +1400,6 @@ void CodeGeneratorX86_64::GenerateFrameEntry() {
       && !FrameNeedsStackCheck(GetFrameSize(), InstructionSet::kX86_64);
   DCHECK(GetCompilerOptions().GetImplicitStackOverflowChecks());
 
-  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
-    NearLabel overflow;
-    __ cmpw(Address(CpuRegister(kMethodRegisterArgument),
-                    ArtMethod::HotnessCountOffset().Int32Value()),
-            Immediate(ArtMethod::MaxCounter()));
-    __ j(kEqual, &overflow);
-    __ addw(Address(CpuRegister(kMethodRegisterArgument),
-                    ArtMethod::HotnessCountOffset().Int32Value()),
-            Immediate(1));
-    __ Bind(&overflow);
-  }
 
   if (!skip_overflow_check) {
     size_t reserved_bytes = GetStackOverflowReservedBytes(InstructionSet::kX86_64);
@@ -1371,45 +1407,47 @@ void CodeGeneratorX86_64::GenerateFrameEntry() {
     RecordPcInfo(nullptr, 0);
   }
 
-  if (HasEmptyFrame()) {
-    return;
-  }
+  if (!HasEmptyFrame()) {
+    for (int i = arraysize(kCoreCalleeSaves) - 1; i >= 0; --i) {
+      Register reg = kCoreCalleeSaves[i];
+      if (allocated_registers_.ContainsCoreRegister(reg)) {
+        __ pushq(CpuRegister(reg));
+        __ cfi().AdjustCFAOffset(kX86_64WordSize);
+        __ cfi().RelOffset(DWARFReg(reg), 0);
+      }
+    }
 
-  for (int i = arraysize(kCoreCalleeSaves) - 1; i >= 0; --i) {
-    Register reg = kCoreCalleeSaves[i];
-    if (allocated_registers_.ContainsCoreRegister(reg)) {
-      __ pushq(CpuRegister(reg));
-      __ cfi().AdjustCFAOffset(kX86_64WordSize);
-      __ cfi().RelOffset(DWARFReg(reg), 0);
+    int adjust = GetFrameSize() - GetCoreSpillSize();
+    __ subq(CpuRegister(RSP), Immediate(adjust));
+    __ cfi().AdjustCFAOffset(adjust);
+    uint32_t xmm_spill_location = GetFpuSpillStart();
+    size_t xmm_spill_slot_size = GetCalleePreservedFPWidth();
+
+    for (int i = arraysize(kFpuCalleeSaves) - 1; i >= 0; --i) {
+      if (allocated_registers_.ContainsFloatingPointRegister(kFpuCalleeSaves[i])) {
+        int offset = xmm_spill_location + (xmm_spill_slot_size * i);
+        __ movsd(Address(CpuRegister(RSP), offset), XmmRegister(kFpuCalleeSaves[i]));
+        __ cfi().RelOffset(DWARFReg(kFpuCalleeSaves[i]), offset);
+      }
+    }
+
+    // Save the current method if we need it. Note that we do not
+    // do this in HCurrentMethod, as the instruction might have been removed
+    // in the SSA graph.
+    if (RequiresCurrentMethod()) {
+      CHECK(!HasEmptyFrame());
+      __ movq(Address(CpuRegister(RSP), kCurrentMethodStackOffset),
+              CpuRegister(kMethodRegisterArgument));
+    }
+
+    if (GetGraph()->HasShouldDeoptimizeFlag()) {
+      CHECK(!HasEmptyFrame());
+      // Initialize should_deoptimize flag to 0.
+      __ movl(Address(CpuRegister(RSP), GetStackOffsetOfShouldDeoptimizeFlag()), Immediate(0));
     }
   }
 
-  int adjust = GetFrameSize() - GetCoreSpillSize();
-  __ subq(CpuRegister(RSP), Immediate(adjust));
-  __ cfi().AdjustCFAOffset(adjust);
-  uint32_t xmm_spill_location = GetFpuSpillStart();
-  size_t xmm_spill_slot_size = GetCalleePreservedFPWidth();
-
-  for (int i = arraysize(kFpuCalleeSaves) - 1; i >= 0; --i) {
-    if (allocated_registers_.ContainsFloatingPointRegister(kFpuCalleeSaves[i])) {
-      int offset = xmm_spill_location + (xmm_spill_slot_size * i);
-      __ movsd(Address(CpuRegister(RSP), offset), XmmRegister(kFpuCalleeSaves[i]));
-      __ cfi().RelOffset(DWARFReg(kFpuCalleeSaves[i]), offset);
-    }
-  }
-
-  // Save the current method if we need it. Note that we do not
-  // do this in HCurrentMethod, as the instruction might have been removed
-  // in the SSA graph.
-  if (RequiresCurrentMethod()) {
-    __ movq(Address(CpuRegister(RSP), kCurrentMethodStackOffset),
-            CpuRegister(kMethodRegisterArgument));
-  }
-
-  if (GetGraph()->HasShouldDeoptimizeFlag()) {
-    // Initialize should_deoptimize flag to 0.
-    __ movl(Address(CpuRegister(RSP), GetStackOffsetOfShouldDeoptimizeFlag()), Immediate(0));
-  }
+  MaybeIncrementHotness(/* is_frame_entry= */ true);
 }
 
 void CodeGeneratorX86_64::GenerateFrameExit() {
@@ -1556,16 +1594,7 @@ void InstructionCodeGeneratorX86_64::HandleGoto(HInstruction* got, HBasicBlock* 
 
   HLoopInformation* info = block->GetLoopInformation();
   if (info != nullptr && info->IsBackEdge(*block) && info->HasSuspendCheck()) {
-    if (codegen_->GetCompilerOptions().CountHotnessInCompiledCode()) {
-      __ movq(CpuRegister(TMP), Address(CpuRegister(RSP), 0));
-      NearLabel overflow;
-      __ cmpw(Address(CpuRegister(TMP), ArtMethod::HotnessCountOffset().Int32Value()),
-              Immediate(ArtMethod::MaxCounter()));
-      __ j(kEqual, &overflow);
-      __ addw(Address(CpuRegister(TMP), ArtMethod::HotnessCountOffset().Int32Value()),
-              Immediate(1));
-      __ Bind(&overflow);
-    }
+    codegen_->MaybeIncrementHotness(/* is_frame_entry= */ false);
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
     return;
   }
