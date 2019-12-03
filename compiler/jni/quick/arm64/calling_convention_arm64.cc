@@ -59,6 +59,8 @@ static constexpr ManagedRegister kCalleeSaveRegisters[] = {
     // Jni function is the native function which the java code wants to call.
     // Jni method is the method that is compiled by jni compiler.
     // Call chain: managed code(java) --> jni method --> jni function.
+    // This does not apply to the @CriticalNative.
+
     // Thread register(X19) is saved on stack.
     Arm64ManagedRegister::FromXRegister(X19),
     Arm64ManagedRegister::FromXRegister(X20),
@@ -86,58 +88,73 @@ static constexpr ManagedRegister kCalleeSaveRegisters[] = {
     Arm64ManagedRegister::FromDRegister(D15),
 };
 
-static constexpr uint32_t CalculateCoreCalleeSpillMask() {
+template <size_t size>
+static constexpr uint32_t CalculateCoreCalleeSpillMask(
+    const ManagedRegister (&callee_saves)[size]) {
   uint32_t result = 0u;
-  for (auto&& r : kCalleeSaveRegisters) {
+  for (auto&& r : callee_saves) {
     if (r.AsArm64().IsXRegister()) {
-      result |= (1 << r.AsArm64().AsXRegister());
+      result |= (1u << r.AsArm64().AsXRegister());
     }
   }
   return result;
 }
 
-static constexpr uint32_t CalculateFpCalleeSpillMask() {
-  uint32_t result = 0;
-  for (auto&& r : kCalleeSaveRegisters) {
+template <size_t size>
+static constexpr uint32_t CalculateFpCalleeSpillMask(const ManagedRegister (&callee_saves)[size]) {
+  uint32_t result = 0u;
+  for (auto&& r : callee_saves) {
     if (r.AsArm64().IsDRegister()) {
-      result |= (1 << r.AsArm64().AsDRegister());
+      result |= (1u << r.AsArm64().AsDRegister());
     }
   }
   return result;
 }
 
-static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask();
-static constexpr uint32_t kFpCalleeSpillMask = CalculateFpCalleeSpillMask();
+static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask(kCalleeSaveRegisters);
+static constexpr uint32_t kFpCalleeSpillMask = CalculateFpCalleeSpillMask(kCalleeSaveRegisters);
+
+// The AAPCS64 requires 16-byte alignement. This is the same as the Managed ABI stack alignment.
+static constexpr size_t kAapcs64StackAlignment = 16u;
+static_assert(kAapcs64StackAlignment == kStackAlignment);
+
+static constexpr ManagedRegister kAapcs64CalleeSaveRegisters[] = {
+    // Core registers.
+    Arm64ManagedRegister::FromXRegister(X19),
+    Arm64ManagedRegister::FromXRegister(X20),
+    Arm64ManagedRegister::FromXRegister(X21),
+    Arm64ManagedRegister::FromXRegister(X22),
+    Arm64ManagedRegister::FromXRegister(X23),
+    Arm64ManagedRegister::FromXRegister(X24),
+    Arm64ManagedRegister::FromXRegister(X25),
+    Arm64ManagedRegister::FromXRegister(X26),
+    Arm64ManagedRegister::FromXRegister(X27),
+    Arm64ManagedRegister::FromXRegister(X28),
+    Arm64ManagedRegister::FromXRegister(X29),
+    Arm64ManagedRegister::FromXRegister(LR),
+    // Hard float registers.
+    Arm64ManagedRegister::FromDRegister(D8),
+    Arm64ManagedRegister::FromDRegister(D9),
+    Arm64ManagedRegister::FromDRegister(D10),
+    Arm64ManagedRegister::FromDRegister(D11),
+    Arm64ManagedRegister::FromDRegister(D12),
+    Arm64ManagedRegister::FromDRegister(D13),
+    Arm64ManagedRegister::FromDRegister(D14),
+    Arm64ManagedRegister::FromDRegister(D15),
+};
+
+static constexpr uint32_t kAapcs64CoreCalleeSpillMask =
+    CalculateCoreCalleeSpillMask(kAapcs64CalleeSaveRegisters);
+static constexpr uint32_t kAapcs64FpCalleeSpillMask =
+    CalculateFpCalleeSpillMask(kAapcs64CalleeSaveRegisters);
 
 // Calling convention
-ManagedRegister Arm64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() {
-  // X20 is safe to use as a scratch register:
-  // - with Baker read barriers (in the case of a non-critical native
-  //   method), it is reserved as Marking Register, and thus does not
-  //   actually need to be saved/restored; it is refreshed on exit
-  //   (see Arm64JNIMacroAssembler::RemoveFrame);
-  // - in other cases, it is saved on entry (in
-  //   Arm64JNIMacroAssembler::BuildFrame) and restored on exit (in
-  //   Arm64JNIMacroAssembler::RemoveFrame). This is also expected in
-  //   the case of a critical native method in the Baker read barrier
-  //   configuration, where the value of MR must be preserved across
-  //   the JNI call (as there is no MR refresh in that case).
-  return Arm64ManagedRegister::FromXRegister(X20);
+ManagedRegister Arm64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
+  return Arm64ManagedRegister::FromXRegister(IP0);  // X16
 }
 
-ManagedRegister Arm64JniCallingConvention::InterproceduralScratchRegister() {
-  // X20 is safe to use as a scratch register:
-  // - with Baker read barriers (in the case of a non-critical native
-  //   method), it is reserved as Marking Register, and thus does not
-  //   actually need to be saved/restored; it is refreshed on exit
-  //   (see Arm64JNIMacroAssembler::RemoveFrame);
-  // - in other cases, it is saved on entry (in
-  //   Arm64JNIMacroAssembler::BuildFrame) and restored on exit (in
-  //   Arm64JNIMacroAssembler::RemoveFrame). This is also expected in
-  //   the case of a critical native method in the Baker read barrier
-  //   configuration, where the value of MR must be preserved across
-  //   the JNI call (as there is no MR refresh in that case).
-  return Arm64ManagedRegister::FromXRegister(X20);
+ManagedRegister Arm64JniCallingConvention::InterproceduralScratchRegister() const {
+  return Arm64ManagedRegister::FromXRegister(IP0);  // X16
 }
 
 static ManagedRegister ReturnRegisterForShorty(const char* shorty) {
@@ -187,11 +204,9 @@ ManagedRegister Arm64ManagedRuntimeCallingConvention::CurrentParamRegister() {
 
 FrameOffset Arm64ManagedRuntimeCallingConvention::CurrentParamStackOffset() {
   CHECK(IsCurrentParamOnStack());
-  FrameOffset result =
-      FrameOffset(displacement_.Int32Value() +  // displacement
-                  kFramePointerSize +  // Method ref
-                  (itr_slots_ * sizeof(uint32_t)));  // offset into in args
-  return result;
+  return FrameOffset(displacement_.Int32Value() +  // displacement
+                     kFramePointerSize +  // Method ref
+                     (itr_slots_ * sizeof(uint32_t)));  // offset into in args
 }
 
 const ManagedRegisterEntrySpills& Arm64ManagedRuntimeCallingConvention::EntrySpills() {
@@ -243,6 +258,7 @@ const ManagedRegisterEntrySpills& Arm64ManagedRuntimeCallingConvention::EntrySpi
 }
 
 // JNI calling convention
+
 Arm64JniCallingConvention::Arm64JniCallingConvention(bool is_static,
                                                      bool is_synchronized,
                                                      bool is_critical_native,
@@ -255,52 +271,88 @@ Arm64JniCallingConvention::Arm64JniCallingConvention(bool is_static,
 }
 
 uint32_t Arm64JniCallingConvention::CoreSpillMask() const {
-  return kCoreCalleeSpillMask;
+  return is_critical_native_ ? 0u : kCoreCalleeSpillMask;
 }
 
 uint32_t Arm64JniCallingConvention::FpSpillMask() const {
-  return kFpCalleeSpillMask;
+  return is_critical_native_ ? 0u : kFpCalleeSpillMask;
 }
 
 ManagedRegister Arm64JniCallingConvention::ReturnScratchRegister() const {
   return ManagedRegister::NoRegister();
 }
 
-size_t Arm64JniCallingConvention::FrameSize() {
+size_t Arm64JniCallingConvention::FrameSize() const {
+  if (is_critical_native_) {
+    CHECK(!SpillsMethod());
+    CHECK(!HasLocalReferenceSegmentState());
+    CHECK(!HasHandleScope());
+    CHECK(!SpillsReturnValue());
+    return 0u;  // There is no managed frame for @CriticalNative.
+  }
+
   // Method*, callee save area size, local reference segment state
-  //
-  // (Unlike x86_64, do not include return address, and the segment state is uint32
-  // instead of pointer).
+  CHECK(SpillsMethod());
   size_t method_ptr_size = static_cast<size_t>(kFramePointerSize);
   size_t callee_save_area_size = CalleeSaveRegisters().size() * kFramePointerSize;
+  size_t total_size = method_ptr_size + callee_save_area_size;
 
-  size_t frame_data_size = method_ptr_size + callee_save_area_size;
-  if (LIKELY(HasLocalReferenceSegmentState())) {
-    frame_data_size += sizeof(uint32_t);
-  }
-  // References plus 2 words for HandleScope header
-  size_t handle_scope_size = HandleScope::SizeOf(kArm64PointerSize, ReferenceCount());
+  CHECK(HasLocalReferenceSegmentState());
+  total_size += sizeof(uint32_t);
 
-  size_t total_size = frame_data_size;
-  if (LIKELY(HasHandleScope())) {
-    // HandleScope is sometimes excluded.
-    total_size += handle_scope_size;                                 // handle scope size
-  }
+  CHECK(HasHandleScope());
+  total_size += HandleScope::SizeOf(kArm64PointerSize, ReferenceCount());
 
   // Plus return value spill area size
+  CHECK(SpillsReturnValue());
   total_size += SizeOfReturnValue();
 
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t Arm64JniCallingConvention::OutArgSize() {
-  // Same as X86_64
-  return RoundUp(NumberOfOutgoingStackArgs() * kFramePointerSize, kStackAlignment);
+size_t Arm64JniCallingConvention::OutArgSize() const {
+  // Count param args, including JNIEnv* and jclass*.
+  size_t all_args = NumberOfExtraArgumentsForJni() + NumArgs();
+  size_t num_fp_args = NumFloatOrDoubleArgs();
+  DCHECK_GE(all_args, num_fp_args);
+  size_t num_non_fp_args = all_args - num_fp_args;
+  // Account for FP arguments passed through v0-v7.
+  size_t num_stack_fp_args =
+      num_fp_args - std::min(kMaxFloatOrDoubleRegisterArguments, num_fp_args);
+  // Account for other (integer and pointer) arguments passed through GPR (x0-x7).
+  size_t num_stack_non_fp_args =
+      num_non_fp_args - std::min(kMaxIntLikeRegisterArguments, num_non_fp_args);
+  // The size of outgoing arguments.
+  size_t size = (num_stack_fp_args + num_stack_non_fp_args) * kFramePointerSize;
+
+  // @CriticalNative can use tail call as all managed callee saves are preserved by AAPCS64.
+  static_assert((kCoreCalleeSpillMask & ~kAapcs64CoreCalleeSpillMask) == 0u);
+  static_assert((kFpCalleeSpillMask & ~kAapcs64FpCalleeSpillMask) == 0u);
+
+  // For @CriticalNative, we can make a tail call if there are no stack args and
+  // we do not need to extend the result. Otherwise, add space for return PC.
+  if (is_critical_native_ && (size != 0u || RequiresSmallResultTypeExtension())) {
+    size += kFramePointerSize;  // We need to spill LR with the args.
+  }
+  return RoundUp(size, kStackAlignment);
 }
 
 ArrayRef<const ManagedRegister> Arm64JniCallingConvention::CalleeSaveRegisters() const {
-  // Same as X86_64
-  return ArrayRef<const ManagedRegister>(kCalleeSaveRegisters);
+  if (UNLIKELY(IsCriticalNative())) {
+    if (UseTailCall()) {
+      return ArrayRef<const ManagedRegister>();  // Do not spill anything.
+    } else {
+      // Spill LR with out args.
+      static_assert((kCoreCalleeSpillMask >> LR) == 1u);  // Contains LR as the highest bit.
+      constexpr size_t lr_index = POPCOUNT(kCoreCalleeSpillMask) - 1u;
+      static_assert(kCalleeSaveRegisters[lr_index].Equals(
+                        Arm64ManagedRegister::FromXRegister(LR)));
+      return ArrayRef<const ManagedRegister>(kCalleeSaveRegisters).SubArray(
+          /*pos*/ lr_index, /*length=*/ 1u);
+    }
+  } else {
+    return ArrayRef<const ManagedRegister>(kCalleeSaveRegisters);
+  }
 }
 
 bool Arm64JniCallingConvention::IsCurrentParamInRegister() {
@@ -347,25 +399,28 @@ FrameOffset Arm64JniCallingConvention::CurrentParamStackOffset() {
   size_t offset = displacement_.Int32Value() - OutArgSize() + (args_on_stack * kFramePointerSize);
   CHECK_LT(offset, OutArgSize());
   return FrameOffset(offset);
-  // TODO: Seems identical to X86_64 code.
 }
 
-size_t Arm64JniCallingConvention::NumberOfOutgoingStackArgs() {
-  // all arguments including JNI args
-  size_t all_args = NumArgs() + NumberOfExtraArgumentsForJni();
+ManagedRegister Arm64JniCallingConvention::HiddenArgumentRegister() const {
+  CHECK(IsCriticalNative());
+  // X15 is neither managed callee-save, nor argument register, nor scratch register.
+  // TODO: Change to static_assert; std::none_of should be constexpr since C++20.
+  DCHECK(std::none_of(kCalleeSaveRegisters,
+                      kCalleeSaveRegisters + std::size(kCalleeSaveRegisters),
+                      [](ManagedRegister callee_save) constexpr {
+                        return callee_save.Equals(Arm64ManagedRegister::FromXRegister(X15));
+                      }));
+  DCHECK(std::none_of(kXArgumentRegisters,
+                      kXArgumentRegisters + std::size(kXArgumentRegisters),
+                      [](XRegister reg) { return reg == X15; }));
+  DCHECK(!InterproceduralScratchRegister().Equals(Arm64ManagedRegister::FromXRegister(X15)));
+  return Arm64ManagedRegister::FromXRegister(X15);
+}
 
-  DCHECK_GE(all_args, NumFloatOrDoubleArgs());
-
-  size_t all_stack_args =
-      all_args
-      - std::min(kMaxFloatOrDoubleRegisterArguments,
-                 static_cast<size_t>(NumFloatOrDoubleArgs()))
-      - std::min(kMaxIntLikeRegisterArguments,
-                 static_cast<size_t>((all_args - NumFloatOrDoubleArgs())));
-
-  // TODO: Seems similar to X86_64 code except it doesn't count return pc.
-
-  return all_stack_args;
+// Whether to use tail call (used only for @CriticalNative).
+bool Arm64JniCallingConvention::UseTailCall() const {
+  CHECK(IsCriticalNative());
+  return OutArgSize() == 0u;
 }
 
 }  // namespace arm64
