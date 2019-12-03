@@ -1227,8 +1227,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
                                                     system_oat_location,
                                                     /*executable=*/ false,
                                                     /*low_4gb=*/ false,
-                                                    /*abs_dex_location=*/ nullptr,
-                                                    /*reservation=*/ nullptr,
                                                     &error_msg));
     if (oat_file == nullptr) {
       LOG(ERROR) << "Could not open boot oat file for extracting boot class path: " << error_msg;

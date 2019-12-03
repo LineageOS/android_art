@@ -68,8 +68,6 @@ class DexDiagTest : public CommonArtTest {
                                                oat_location.c_str(),
                                                /*executable=*/ false,
                                                /*low_4gb=*/ false,
-                                               /*abs_dex_location=*/ nullptr,
-                                               /*reservation=*/ nullptr,
                                                &error_msg));
     EXPECT_TRUE(oat != nullptr) << error_msg;
     return oat;
