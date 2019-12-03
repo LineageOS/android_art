@@ -66,6 +66,10 @@ class ManagedRegister : public ValueObject {
     return id_ == other.id_;
   }
 
+  constexpr bool IsRegister() const {
+    return id_ != kNoRegister;
+  }
+
   constexpr bool IsNoRegister() const {
     return id_ == kNoRegister;
   }

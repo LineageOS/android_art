@@ -2410,7 +2410,7 @@ std::string increaseframe_test_fn(
 
   // Construct assembly text counterpart.
   std::ostringstream str;
-  str << "addq $0, %rsp\n";
+  // Increase by 0 is a NO-OP and ignored by the assembler.
   str << "addq $-" << kStackAlignment << ", %rsp\n";
   str << "addq $-" << 10 * kStackAlignment << ", %rsp\n";
 
@@ -2430,7 +2430,7 @@ std::string decreaseframe_test_fn(
 
   // Construct assembly text counterpart.
   std::ostringstream str;
-  str << "addq $0, %rsp\n";
+  // Decrease by 0 is a NO-OP and ignored by the assembler.
   str << "addq $" << kStackAlignment << ", %rsp\n";
   str << "addq $" << 10 * kStackAlignment << ", %rsp\n";
 
