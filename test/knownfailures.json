@@ -1150,11 +1150,7 @@
                   "1995-final-virtual-structural-multithread",
                   "1996-final-override-virtual-structural",
                   "1997-structural-shadow-method",
-                  "1998-structural-shadow-field",
-                  "1999-virtual-structural",
-                  "2000-virtual-list-structural",
-                  "2001-virtual-structural-multithread",
-                  "2002-virtual-structural-initializing"
+                  "1998-structural-shadow-field"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
