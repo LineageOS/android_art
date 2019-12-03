@@ -354,7 +354,7 @@ class QuickArgumentVisitor {
         return stack_map.GetDexPc();
       }
     } else {
-      return current_code->ToDexPc(*caller_sp, outer_pc);
+      return current_code->ToDexPc(caller_sp, outer_pc);
     }
   }
 

@@ -991,10 +991,6 @@ inline IterationRange<StrideIterator<ArtField>> Class::GetSFieldsUnchecked() {
   return MakeIterationRangeFromLengthPrefixedArray(GetSFieldsPtrUnchecked());
 }
 
-inline MemberOffset Class::EmbeddedVTableOffset(PointerSize pointer_size) {
-  return MemberOffset(ImtPtrOffset(pointer_size).Uint32Value() + static_cast<size_t>(pointer_size));
-}
-
 inline void Class::CheckPointerSize(PointerSize pointer_size) {
   DCHECK_EQ(pointer_size, Runtime::Current()->GetClassLinker()->GetImagePointerSize());
 }

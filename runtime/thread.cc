@@ -4037,6 +4037,20 @@ void Thread::VisitRoots(RootVisitor* visitor) {
   for (instrumentation::InstrumentationStackFrame& frame : *GetInstrumentationStack()) {
     visitor->VisitRootIfNonNull(&frame.this_object_, RootInfo(kRootVMInternal, thread_id));
   }
+  for (InterpreterCache::Entry& entry : GetInterpreterCache()->GetArray()) {
+    const Instruction* inst = reinterpret_cast<const Instruction*>(entry.first);
+    if (inst != nullptr &&
+        (inst->Opcode() == Instruction::NEW_INSTANCE ||
+         inst->Opcode() == Instruction::CHECK_CAST ||
+         inst->Opcode() == Instruction::INSTANCE_OF ||
+         inst->Opcode() == Instruction::NEW_ARRAY ||
+         inst->Opcode() == Instruction::CONST_CLASS ||
+         inst->Opcode() == Instruction::CONST_STRING ||
+         inst->Opcode() == Instruction::CONST_STRING_JUMBO)) {
+      visitor->VisitRootIfNonNull(reinterpret_cast<mirror::Object**>(&entry.second),
+                                  RootInfo(kRootThreadObject, thread_id));
+    }
+  }
 }
 
 void Thread::VisitRoots(RootVisitor* visitor, VisitRootFlags flags) {

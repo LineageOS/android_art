@@ -72,3 +72,5 @@ ASM_DEFINE(STACK_REFERENCE_SIZE,
            sizeof(art::StackReference<art::mirror::Object>))
 ASM_DEFINE(STD_MEMORY_ORDER_RELAXED,
            std::memory_order_relaxed)
+ASM_DEFINE(STACK_OVERFLOW_RESERVED_BYTES,
+           GetStackOverflowReservedBytes(art::kRuntimeISA))

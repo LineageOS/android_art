@@ -35,6 +35,22 @@ class StandardDexFile : public DexFile {
   struct CodeItem : public dex::CodeItem {
     static constexpr size_t kAlignment = 4;
 
+    static constexpr size_t InsSizeOffset() {
+      return OFFSETOF_MEMBER(CodeItem, ins_size_);
+    }
+
+    static constexpr size_t OutsSizeOffset() {
+      return OFFSETOF_MEMBER(CodeItem, outs_size_);
+    }
+
+    static constexpr size_t RegistersSizeOffset() {
+      return OFFSETOF_MEMBER(CodeItem, registers_size_);
+    }
+
+    static constexpr size_t InsnsOffset() {
+      return OFFSETOF_MEMBER(CodeItem, insns_);
+    }
+
    private:
     CodeItem() = default;
 

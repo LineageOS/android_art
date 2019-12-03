@@ -365,9 +365,9 @@ void InstrumentationInstallStack(Thread* thread, void* arg)
           std::string thread_name;
           GetThread()->GetThreadName(thread_name);
           uint32_t dex_pc = dex::kDexNoIndex;
-          if (last_return_pc_ != 0 &&
-              GetCurrentOatQuickMethodHeader() != nullptr) {
-            dex_pc = GetCurrentOatQuickMethodHeader()->ToDexPc(m, last_return_pc_);
+          if (last_return_pc_ != 0 && GetCurrentOatQuickMethodHeader() != nullptr) {
+            dex_pc = GetCurrentOatQuickMethodHeader()->ToDexPc(
+                GetCurrentQuickFrame(), last_return_pc_);
           }
           LOG(FATAL) << "While walking " << thread_name << " found unexpected non-runtime method"
                      << " without instrumentation exit return or interpreter frame."
@@ -400,9 +400,8 @@ void InstrumentationInstallStack(Thread* thread, void* arg)
         SetReturnPc(instrumentation_exit_pc_);
       }
       uint32_t dex_pc = dex::kDexNoIndex;
-      if (last_return_pc_ != 0 &&
-          GetCurrentOatQuickMethodHeader() != nullptr) {
-        dex_pc = GetCurrentOatQuickMethodHeader()->ToDexPc(m, last_return_pc_);
+      if (last_return_pc_ != 0 && GetCurrentOatQuickMethodHeader() != nullptr) {
+        dex_pc = GetCurrentOatQuickMethodHeader()->ToDexPc(GetCurrentQuickFrame(), last_return_pc_);
       }
       dex_pcs_.push_back(dex_pc);
       last_return_pc_ = return_pc;
