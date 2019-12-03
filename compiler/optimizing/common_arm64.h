@@ -107,9 +107,9 @@ inline vixl::aarch64::VRegister SRegisterFrom(Location location) {
   return vixl::aarch64::VRegister::GetSRegFromCode(location.reg());
 }
 
-inline vixl::aarch64::FPRegister HRegisterFrom(Location location) {
+inline vixl::aarch64::VRegister HRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::FPRegister::GetHRegFromCode(location.reg());
+  return vixl::aarch64::VRegister::GetHRegFromCode(location.reg());
 }
 
 inline vixl::aarch64::VRegister FPRegisterFrom(Location location, DataType::Type type) {
