@@ -37,6 +37,10 @@ namespace arm {
 #define ___   asm_.GetVIXLAssembler()->
 #endif
 
+// The AAPCS requires 8-byte alignement. This is not as strict as the Managed ABI stack alignment.
+static constexpr size_t kAapcsStackAlignment = 8u;
+static_assert(kAapcsStackAlignment < kStackAlignment);
+
 vixl::aarch32::Register AsVIXLRegister(ArmManagedRegister reg) {
   CHECK(reg.IsCoreRegister());
   return vixl::aarch32::Register(reg.RegId());
@@ -74,11 +78,16 @@ void ArmVIXLJNIMacroAssembler::BuildFrame(size_t frame_size,
                                           ManagedRegister method_reg,
                                           ArrayRef<const ManagedRegister> callee_save_regs,
                                           const ManagedRegisterEntrySpills& entry_spills) {
-  CHECK_ALIGNED(frame_size, kStackAlignment);
-  CHECK(r0.Is(AsVIXLRegister(method_reg.AsArm())));
+  // If we're creating an actual frame with the method, enforce managed stack alignment,
+  // otherwise only the native stack alignment.
+  if (method_reg.IsNoRegister()) {
+    CHECK_ALIGNED_PARAM(frame_size, kAapcsStackAlignment);
+  } else {
+    CHECK_ALIGNED_PARAM(frame_size, kStackAlignment);
+  }
 
   // Push callee saves and link register.
-  RegList core_spill_mask = 1 << LR;
+  RegList core_spill_mask = 0;
   uint32_t fp_spill_mask = 0;
   for (const ManagedRegister& reg : callee_save_regs) {
     if (reg.AsArm().IsCoreRegister()) {
@@ -87,9 +96,11 @@ void ArmVIXLJNIMacroAssembler::BuildFrame(size_t frame_size,
       fp_spill_mask |= 1 << reg.AsArm().AsSRegister();
     }
   }
-  ___ Push(RegisterList(core_spill_mask));
-  cfi().AdjustCFAOffset(POPCOUNT(core_spill_mask) * kFramePointerSize);
-  cfi().RelOffsetForMany(DWARFReg(r0), 0, core_spill_mask, kFramePointerSize);
+  if (core_spill_mask != 0u) {
+    ___ Push(RegisterList(core_spill_mask));
+    cfi().AdjustCFAOffset(POPCOUNT(core_spill_mask) * kFramePointerSize);
+    cfi().RelOffsetForMany(DWARFReg(r0), 0, core_spill_mask, kFramePointerSize);
+  }
   if (fp_spill_mask != 0) {
     uint32_t first = CTZ(fp_spill_mask);
 
@@ -103,12 +114,15 @@ void ArmVIXLJNIMacroAssembler::BuildFrame(size_t frame_size,
 
   // Increase frame to required size.
   int pushed_values = POPCOUNT(core_spill_mask) + POPCOUNT(fp_spill_mask);
-  // Must at least have space for Method*.
-  CHECK_GT(frame_size, pushed_values * kFramePointerSize);
+  // Must at least have space for Method* if we're going to spill it.
+  CHECK_GE(frame_size, (pushed_values + (method_reg.IsRegister() ? 1u : 0u)) * kFramePointerSize);
   IncreaseFrameSize(frame_size - pushed_values * kFramePointerSize);  // handles CFI as well.
 
-  // Write out Method*.
-  asm_.StoreToOffset(kStoreWord, r0, sp, 0);
+  if (method_reg.IsRegister()) {
+    // Write out Method*.
+    CHECK(r0.Is(AsVIXLRegister(method_reg.AsArm())));
+    asm_.StoreToOffset(kStoreWord, r0, sp, 0);
+  }
 
   // Write out entry spills.
   int32_t offset = frame_size + kFramePointerSize;
@@ -133,27 +147,27 @@ void ArmVIXLJNIMacroAssembler::BuildFrame(size_t frame_size,
 void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
                                            ArrayRef<const ManagedRegister> callee_save_regs,
                                            bool may_suspend) {
-  CHECK_ALIGNED(frame_size, kStackAlignment);
+  CHECK_ALIGNED(frame_size, kAapcsStackAlignment);
   cfi().RememberState();
 
-  // Compute callee saves to pop and LR.
-  RegList core_spill_mask = 1 << LR;
-  uint32_t fp_spill_mask = 0;
+  // Compute callee saves to pop.
+  RegList core_spill_mask = 0u;
+  uint32_t fp_spill_mask = 0u;
   for (const ManagedRegister& reg : callee_save_regs) {
     if (reg.AsArm().IsCoreRegister()) {
-      core_spill_mask |= 1 << reg.AsArm().AsCoreRegister();
+      core_spill_mask |= 1u << reg.AsArm().AsCoreRegister();
     } else {
-      fp_spill_mask |= 1 << reg.AsArm().AsSRegister();
+      fp_spill_mask |= 1u << reg.AsArm().AsSRegister();
     }
   }
 
   // Decrease frame to start of callee saves.
-  int pop_values = POPCOUNT(core_spill_mask) + POPCOUNT(fp_spill_mask);
-  CHECK_GT(frame_size, pop_values * kFramePointerSize);
+  size_t pop_values = POPCOUNT(core_spill_mask) + POPCOUNT(fp_spill_mask);
+  CHECK_GE(frame_size, pop_values * kFramePointerSize);
   DecreaseFrameSize(frame_size - (pop_values * kFramePointerSize));  // handles CFI as well.
 
   // Pop FP callee saves.
-  if (fp_spill_mask != 0) {
+  if (fp_spill_mask != 0u) {
     uint32_t first = CTZ(fp_spill_mask);
     // Check that list is contiguous.
      DCHECK_EQ(fp_spill_mask >> CTZ(fp_spill_mask), ~0u >> (32 - POPCOUNT(fp_spill_mask)));
@@ -164,7 +178,9 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
   }
 
   // Pop core callee saves and LR.
-  ___ Pop(RegisterList(core_spill_mask));
+  if (core_spill_mask != 0u) {
+    ___ Pop(RegisterList(core_spill_mask));
+  }
 
   if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
     if (may_suspend) {
@@ -173,11 +189,8 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
     } else {
       // The method shall not be suspended; no need to refresh the Marking Register.
 
-      // Check that the Marking Register is a callee-save register,
-      // and thus has been preserved by native code following the
-      // AAPCS calling convention.
-      DCHECK_NE(core_spill_mask & (1 << MR), 0)
-          << "core_spill_mask should contain Marking Register R" << MR;
+      // The Marking Register is a callee-save register, and thus has been
+      // preserved by native code following the AAPCS calling convention.
 
       // The following condition is a compile-time one, so it does not have a run-time cost.
       if (kIsDebugBuild) {
@@ -206,13 +219,17 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
 
 
 void ArmVIXLJNIMacroAssembler::IncreaseFrameSize(size_t adjust) {
-  asm_.AddConstant(sp, -adjust);
-  cfi().AdjustCFAOffset(adjust);
+  if (adjust != 0u) {
+    asm_.AddConstant(sp, -adjust);
+    cfi().AdjustCFAOffset(adjust);
+  }
 }
 
 void ArmVIXLJNIMacroAssembler::DecreaseFrameSize(size_t adjust) {
-  asm_.AddConstant(sp, adjust);
-  cfi().AdjustCFAOffset(-adjust);
+  if (adjust != 0u) {
+    asm_.AddConstant(sp, adjust);
+    cfi().AdjustCFAOffset(-adjust);
+  }
 }
 
 void ArmVIXLJNIMacroAssembler::Store(FrameOffset dest, ManagedRegister m_src, size_t size) {
@@ -562,6 +579,17 @@ void ArmVIXLJNIMacroAssembler::VerifyObject(FrameOffset src ATTRIBUTE_UNUSED,
   // TODO: not validating references.
 }
 
+void ArmVIXLJNIMacroAssembler::Jump(ManagedRegister mbase,
+                                    Offset offset,
+                                    ManagedRegister mscratch) {
+  vixl::aarch32::Register base = AsVIXLRegister(mbase.AsArm());
+  vixl::aarch32::Register scratch = AsVIXLRegister(mscratch.AsArm());
+  UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
+  temps.Exclude(scratch);
+  asm_.LoadFromOffset(kLoadWord, scratch, base, offset.Int32Value());
+  ___ Bx(scratch);
+}
+
 void ArmVIXLJNIMacroAssembler::Call(ManagedRegister mbase,
                                     Offset offset,
                                     ManagedRegister mscratch) {
@@ -602,7 +630,7 @@ void ArmVIXLJNIMacroAssembler::GetCurrentThread(FrameOffset dest_offset,
 }
 
 void ArmVIXLJNIMacroAssembler::ExceptionPoll(ManagedRegister mscratch, size_t stack_adjust) {
-  CHECK_ALIGNED(stack_adjust, kStackAlignment);
+  CHECK_ALIGNED(stack_adjust, kAapcsStackAlignment);
   vixl::aarch32::Register scratch = AsVIXLRegister(mscratch.AsArm());
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   temps.Exclude(scratch);

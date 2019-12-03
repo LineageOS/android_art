@@ -49,12 +49,7 @@ class CallingConvention : public DeletableArenaObject<kArenaAllocCallingConventi
   // Register that holds result of this method invocation.
   virtual ManagedRegister ReturnRegister() = 0;
   // Register reserved for scratch usage during procedure calls.
-  virtual ManagedRegister InterproceduralScratchRegister() = 0;
-
-  // Offset of Method within the frame.
-  FrameOffset MethodStackOffset() {
-    return displacement_;
-  }
+  virtual ManagedRegister InterproceduralScratchRegister() const = 0;
 
   // Iterator interface
 
@@ -68,6 +63,14 @@ class CallingConvention : public DeletableArenaObject<kArenaAllocCallingConventi
     itr_refs_ = 0;
     itr_longs_and_doubles_ = 0;
     itr_float_and_doubles_ = 0;
+  }
+
+  FrameOffset GetDisplacement() const {
+    return displacement_;
+  }
+
+  PointerSize GetFramePointerSize() const {
+    return frame_pointer_size_;
   }
 
   virtual ~CallingConvention() {}
@@ -239,6 +242,11 @@ class ManagedRuntimeCallingConvention : public CallingConvention {
                                                                  const char* shorty,
                                                                  InstructionSet instruction_set);
 
+  // Offset of Method within the managed frame.
+  FrameOffset MethodStackOffset() {
+    return FrameOffset(0u);
+  }
+
   // Register that holds the incoming method argument
   virtual ManagedRegister MethodRegister() = 0;
 
@@ -296,10 +304,10 @@ class JniCallingConvention : public CallingConvention {
   // Size of frame excluding space for outgoing args (its assumed Method* is
   // always at the bottom of a frame, but this doesn't work for outgoing
   // native args). Includes alignment.
-  virtual size_t FrameSize() = 0;
+  virtual size_t FrameSize() const = 0;
   // Size of outgoing arguments (stack portion), including alignment.
   // -- Arguments that are passed via registers are excluded from this size.
-  virtual size_t OutArgSize() = 0;
+  virtual size_t OutArgSize() const = 0;
   // Number of references in stack indirect reference table
   size_t ReferenceCount() const;
   // Location where the segment state of the local indirect reference table is saved
@@ -365,6 +373,32 @@ class JniCallingConvention : public CallingConvention {
 
   virtual ~JniCallingConvention() {}
 
+  bool IsCriticalNative() const {
+    return is_critical_native_;
+  }
+
+  // Does the transition have a method pointer in the stack frame?
+  bool SpillsMethod() const {
+    // Exclude method pointer for @CriticalNative methods for optimization speed.
+    return !IsCriticalNative();
+  }
+
+  // Hidden argument register, used to pass the method pointer for @CriticalNative call.
+  virtual ManagedRegister HiddenArgumentRegister() const = 0;
+
+  // Whether to use tail call (used only for @CriticalNative).
+  virtual bool UseTailCall() const = 0;
+
+  // Whether the return type is small. Used for RequiresSmallResultTypeExtension()
+  // on architectures that require the sign/zero extension.
+  bool HasSmallReturnType() const {
+    Primitive::Type return_type = GetReturnType();
+    return return_type == Primitive::kPrimByte ||
+           return_type == Primitive::kPrimShort ||
+           return_type == Primitive::kPrimBoolean ||
+           return_type == Primitive::kPrimChar;
+  }
+
  protected:
   // Named iterator positions
   enum IteratorPos {
@@ -380,24 +414,41 @@ class JniCallingConvention : public CallingConvention {
       : CallingConvention(is_static, is_synchronized, shorty, frame_pointer_size),
         is_critical_native_(is_critical_native) {}
 
-  // Number of stack slots for outgoing arguments, above which the handle scope is
-  // located
-  virtual size_t NumberOfOutgoingStackArgs() = 0;
-
  protected:
   size_t NumberOfExtraArgumentsForJni() const;
 
   // Does the transition have a StackHandleScope?
-  bool HasHandleScope() const;
+  bool HasHandleScope() const {
+    // Exclude HandleScope for @CriticalNative methods for optimization speed.
+    return !IsCriticalNative();
+  }
+
   // Does the transition have a local reference segment state?
-  bool HasLocalReferenceSegmentState() const;
-  // Has a JNIEnv* parameter implicitly?
-  bool HasJniEnv() const;
-  // Has a 'jclass' parameter implicitly?
-  bool HasSelfClass() const;
+  bool HasLocalReferenceSegmentState() const {
+    // Exclude local reference segment states for @CriticalNative methods for optimization speed.
+    return !IsCriticalNative();
+  }
+
+  // Does the transition back spill the return value in the stack frame?
+  bool SpillsReturnValue() const {
+    // Exclude return value for @CriticalNative methods for optimization speed.
+    return !IsCriticalNative();
+  }
 
   // Are there extra JNI arguments (JNIEnv* and maybe jclass)?
-  bool HasExtraArgumentsForJni() const;
+  bool HasExtraArgumentsForJni() const {
+    // @CriticalNative jni implementations exclude both JNIEnv* and the jclass/jobject parameters.
+    return !IsCriticalNative();
+  }
+
+  // Has a JNIEnv* parameter implicitly?
+  bool HasJniEnv() const {
+    // Exclude "JNIEnv*" parameter for @CriticalNative methods.
+    return HasExtraArgumentsForJni();
+  }
+
+  // Has a 'jclass' parameter implicitly?
+  bool HasSelfClass() const;
 
   // Returns the position of itr_args_, fixed up by removing the offset of extra JNI arguments.
   unsigned int GetIteratorPositionWithinShorty() const;

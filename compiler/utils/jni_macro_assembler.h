@@ -197,6 +197,9 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void VerifyObject(ManagedRegister src, bool could_be_null) = 0;
   virtual void VerifyObject(FrameOffset src, bool could_be_null) = 0;
 
+  // Jump to address held at [base+offset] (used for tail calls).
+  virtual void Jump(ManagedRegister base, Offset offset, ManagedRegister scratch) = 0;
+
   // Call to address held at [base+offset]
   virtual void Call(ManagedRegister base, Offset offset, ManagedRegister scratch) = 0;
   virtual void Call(FrameOffset base, Offset offset, ManagedRegister scratch) = 0;

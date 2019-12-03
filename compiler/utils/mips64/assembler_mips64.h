@@ -1424,6 +1424,9 @@ class Mips64Assembler final : public Assembler, public JNIMacroAssembler<Pointer
   void VerifyObject(ManagedRegister src, bool could_be_null) override;
   void VerifyObject(FrameOffset src, bool could_be_null) override;
 
+  // Jump to address held at [base+offset] (used for tail calls).
+  void Jump(ManagedRegister base, Offset offset, ManagedRegister scratch) override;
+
   // Call to address held at [base+offset].
   void Call(ManagedRegister base, Offset offset, ManagedRegister mscratch) override;
   void Call(FrameOffset base, Offset offset, ManagedRegister mscratch) override;

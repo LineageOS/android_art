@@ -64,11 +64,11 @@ static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask();
 static constexpr uint32_t kFpCalleeSpillMask = 0u;
 
 // Calling convention
-ManagedRegister Mips64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() {
+ManagedRegister Mips64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
   return Mips64ManagedRegister::FromGpuRegister(T9);
 }
 
-ManagedRegister Mips64JniCallingConvention::InterproceduralScratchRegister() {
+ManagedRegister Mips64JniCallingConvention::InterproceduralScratchRegister() const {
   return Mips64ManagedRegister::FromGpuRegister(T9);
 }
 
@@ -178,7 +178,7 @@ ManagedRegister Mips64JniCallingConvention::ReturnScratchRegister() const {
   return Mips64ManagedRegister::FromGpuRegister(AT);
 }
 
-size_t Mips64JniCallingConvention::FrameSize() {
+size_t Mips64JniCallingConvention::FrameSize() const {
   // ArtMethod*, RA and callee save area size, local reference segment state.
   size_t method_ptr_size = static_cast<size_t>(kFramePointerSize);
   size_t ra_and_callee_save_area_size = (CalleeSaveRegisters().size() + 1) * kFramePointerSize;
@@ -203,8 +203,14 @@ size_t Mips64JniCallingConvention::FrameSize() {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t Mips64JniCallingConvention::OutArgSize() {
-  return RoundUp(NumberOfOutgoingStackArgs() * kFramePointerSize, kStackAlignment);
+size_t Mips64JniCallingConvention::OutArgSize() const {
+  // all arguments including JNI args
+  size_t all_args = NumArgs() + NumberOfExtraArgumentsForJni();
+
+  // Nothing on the stack unless there are more than 8 arguments
+  size_t stack_args = (all_args > kMaxRegisterArguments) ? all_args - kMaxRegisterArguments : 0;
+
+  return RoundUp(stack_args * kFramePointerSize, kStackAlignment);
 }
 
 ArrayRef<const ManagedRegister> Mips64JniCallingConvention::CalleeSaveRegisters() const {
@@ -236,12 +242,15 @@ FrameOffset Mips64JniCallingConvention::CurrentParamStackOffset() {
   return FrameOffset(offset);
 }
 
-size_t Mips64JniCallingConvention::NumberOfOutgoingStackArgs() {
-  // all arguments including JNI args
-  size_t all_args = NumArgs() + NumberOfExtraArgumentsForJni();
-
-  // Nothing on the stack unless there are more than 8 arguments
-  return (all_args > kMaxRegisterArguments) ? all_args - kMaxRegisterArguments : 0;
+ManagedRegister Mips64JniCallingConvention::HiddenArgumentRegister() const {
+  UNIMPLEMENTED(FATAL);
+  UNREACHABLE();
 }
+
+bool Mips64JniCallingConvention::UseTailCall() const {
+  UNIMPLEMENTED(FATAL);
+  UNREACHABLE();
+}
+
 }  // namespace mips64
 }  // namespace art

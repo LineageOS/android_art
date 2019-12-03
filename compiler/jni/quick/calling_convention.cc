@@ -347,21 +347,6 @@ size_t JniCallingConvention::NumberOfExtraArgumentsForJni() const {
   }
 }
 
-bool JniCallingConvention::HasHandleScope() const {
-  // Exclude HandleScope for @CriticalNative methods for optimization speed.
-  return is_critical_native_ == false;
-}
-
-bool JniCallingConvention::HasLocalReferenceSegmentState() const {
-  // Exclude local reference segment states for @CriticalNative methods for optimization speed.
-  return is_critical_native_ == false;
-}
-
-bool JniCallingConvention::HasJniEnv() const {
-  // Exclude "JNIEnv*" parameter for @CriticalNative methods.
-  return HasExtraArgumentsForJni();
-}
-
 bool JniCallingConvention::HasSelfClass() const {
   if (!IsStatic()) {
     // Virtual functions: There is never an implicit jclass parameter.
@@ -370,11 +355,6 @@ bool JniCallingConvention::HasSelfClass() const {
     // Static functions: There is an implicit jclass parameter unless it's @CriticalNative.
     return HasExtraArgumentsForJni();
   }
-}
-
-bool JniCallingConvention::HasExtraArgumentsForJni() const {
-  // @CriticalNative jni implementations exclude both JNIEnv* and the jclass/jobject parameters.
-  return is_critical_native_ == false;
 }
 
 unsigned int JniCallingConvention::GetIteratorPositionWithinShorty() const {
