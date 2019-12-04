@@ -196,7 +196,8 @@ static constexpr double kNormalMaxLoadFactor = 0.7;
 // barrier config.
 static constexpr double kExtraDefaultHeapGrowthMultiplier = kUseReadBarrier ? 1.0 : 0.0;
 
-static constexpr const char* kApexBootImageLocation = "/system/framework/apex.art";
+static constexpr const char* kApexBootImageLocation =
+    "/apex/com.android.art/javalib/apex.art:/system/framework/apex-framework.art";
 
 Runtime* Runtime::instance_ = nullptr;
 
