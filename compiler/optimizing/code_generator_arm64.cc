@@ -4084,7 +4084,7 @@ void CodeGeneratorARM64::MaybeGenerateInlineCacheCheck(HInstruction* instruction
   // We know the destination of an intrinsic, so no need to record inline
   // caches.
   if (!instruction->GetLocations()->Intrinsified() &&
-      GetCompilerOptions().IsBaseline() &&
+      GetGraph()->IsCompilingBaseline() &&
       !Runtime::Current()->IsAotCompiler()) {
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
