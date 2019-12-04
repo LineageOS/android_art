@@ -1430,4 +1430,38 @@ TEST_F(ProfileAssistantTest, DifferentProfileVersions) {
   ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd),
             ProfileAssistant::kErrorDifferentVersions);
 }
+
+// Under default behaviour we will abort if we cannot load a profile during a merge
+// operation. However, if we pass --force-merge to force aggregation we should
+// ignore files we cannot load
+TEST_F(ProfileAssistantTest, ForceMergeIgnoreProfilesItCannotLoad) {
+  ScratchFile profile1;
+  ScratchFile profile2;
+
+  // Write corrupt data in the first file.
+  std::string content = "giberish";
+  ASSERT_TRUE(profile1.GetFile()->WriteFully(content.c_str(), content.length()));
+  profile1.GetFile()->ResetOffset();
+
+  ProfileCompilationInfo info2(/*for_boot_image*/ true);
+  info2.Save(profile2.GetFd());
+  profile2.GetFile()->ResetOffset();
+
+  std::vector<int> profile_fds({ GetFd(profile1)});
+  int reference_profile_fd = GetFd(profile2);
+
+  // With force-merge we should merge successfully.
+  std::vector<const std::string> extra_args({"--force-merge"});
+  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd, extra_args),
+            ProfileAssistant::kSuccess);
+
+  ProfileCompilationInfo result;
+  ASSERT_TRUE(profile2.GetFile()->ResetOffset());
+  ASSERT_TRUE(result.Load(reference_profile_fd));
+  ASSERT_TRUE(info2.Equals(result));
+
+  // Without force-merge we should fail.
+  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd, extra_args),
+            ProfileAssistant::kErrorBadProfiles);
+}
 }  // namespace art
