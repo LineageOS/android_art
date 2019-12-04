@@ -2305,7 +2305,8 @@ void LocationsBuilderX86::VisitInvokeVirtual(HInvokeVirtual* invoke) {
   }
 
   HandleInvoke(invoke);
-  if (codegen_->GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+
+  if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     // Add one temporary for inline cache update.
     invoke->GetLocations()->AddTemp(Location::RegisterLocation(EBP));
   }
@@ -2333,7 +2334,7 @@ void LocationsBuilderX86::VisitInvokeInterface(HInvokeInterface* invoke) {
   // Add the hidden argument.
   invoke->GetLocations()->AddTemp(Location::FpuRegisterLocation(XMM7));
 
-  if (codegen_->GetCompilerOptions().IsBaseline() && !Runtime::Current()->IsAotCompiler()) {
+  if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     // Add one temporary for inline cache update.
     invoke->GetLocations()->AddTemp(Location::RegisterLocation(EBP));
   }
@@ -2345,7 +2346,7 @@ void CodeGeneratorX86::MaybeGenerateInlineCacheCheck(HInstruction* instruction, 
   // caches (also the intrinsic location builder doesn't request an additional
   // temporary).
   if (!instruction->GetLocations()->Intrinsified() &&
-      GetCompilerOptions().IsBaseline() &&
+      GetGraph()->IsCompilingBaseline() &&
       !Runtime::Current()->IsAotCompiler()) {
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
