@@ -37,6 +37,7 @@ class GarbageCollector;
 class GcPauseListener;
 }  // namespace gc
 class Closure;
+class IsMarkedVisitor;
 class RootVisitor;
 class Thread;
 class TimingLogger;
@@ -187,6 +188,10 @@ class ThreadList {
   Barrier* EmptyCheckpointBarrier() {
     return empty_checkpoint_barrier_.get();
   }
+
+  void SweepInterpreterCaches(IsMarkedVisitor* visitor) const
+      REQUIRES(!Locks::thread_list_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   uint32_t AllocThreadId(Thread* self);
