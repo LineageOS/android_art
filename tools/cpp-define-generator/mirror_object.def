@@ -24,3 +24,10 @@ ASM_DEFINE(MIRROR_OBJECT_HEADER_SIZE,
            sizeof(art::mirror::Object))
 ASM_DEFINE(MIRROR_OBJECT_LOCK_WORD_OFFSET,
            art::mirror::Object::MonitorOffset().Int32Value())
+ASM_DEFINE(GRAY_BYTE_OFFSET,
+           art::mirror::Object::MonitorOffset().Int32Value() +
+               art::LockWord::kReadBarrierStateShift / art::kBitsPerByte)
+ASM_DEFINE(GRAY_BIT_POSITION,
+           art::LockWord::kReadBarrierStateShift % art::kBitsPerByte)
+ASM_DEFINE(READ_BARRIER_TEST_VALUE,
+           static_cast<int8_t>(1 << (art::LockWord::kReadBarrierStateShift % art::kBitsPerByte)))

@@ -45,10 +45,10 @@ class Thread;
 // Aligned to 16-bytes to make it easier to get the address of the cache
 // from assembly (it ensures that the offset is valid immediate value).
 class ALIGNED(16) InterpreterCache {
+ public:
   // Aligned since we load the whole entry in single assembly instruction.
   typedef std::pair<const void*, size_t> Entry ALIGNED(2 * sizeof(size_t));
 
- public:
   // 2x size increase/decrease corresponds to ~0.5% interpreter performance change.
   // Value of 256 has around 75% cache hit rate.
   static constexpr size_t kSize = 256;
@@ -75,6 +75,10 @@ class ALIGNED(16) InterpreterCache {
   ALWAYS_INLINE void Set(const void* key, size_t value) {
     DCHECK(IsCalledFromOwningThread());
     data_[IndexOf(key)] = Entry{key, value};
+  }
+
+  std::array<Entry, kSize>& GetArray() {
+    return data_;
   }
 
  private:
