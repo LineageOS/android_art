@@ -277,14 +277,17 @@ void InstructionSimplifierArm64Visitor::VisitXor(HXor* instruction) {
 }
 
 void InstructionSimplifierArm64Visitor::VisitVecLoad(HVecLoad* instruction) {
-  if (!instruction->IsStringCharAt()
-      && TryExtractVecArrayAccessAddress(instruction, instruction->GetIndex())) {
+  // TODO: Extract regular HIntermediateAddress.
+  if (!instruction->IsPredicated() && !instruction->IsStringCharAt() &&
+      TryExtractVecArrayAccessAddress(instruction, instruction->GetIndex())) {
     RecordSimplification();
   }
 }
 
 void InstructionSimplifierArm64Visitor::VisitVecStore(HVecStore* instruction) {
-  if (TryExtractVecArrayAccessAddress(instruction, instruction->GetIndex())) {
+  // TODO: Extract regular HIntermediateAddress.
+  if (!instruction->IsPredicated() &&
+      TryExtractVecArrayAccessAddress(instruction, instruction->GetIndex())) {
     RecordSimplification();
   }
 }

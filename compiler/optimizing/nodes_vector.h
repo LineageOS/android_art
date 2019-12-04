@@ -145,6 +145,15 @@ class HVecOperation : public HVariableInputSizeInstruction {
     return pred_input->AsVecPredSetOperation();
   }
 
+  // Returns whether two vector operations are predicated by the same vector predicate
+  // with the same predication type.
+  static bool HaveSamePredicate(HVecOperation* instr0, HVecOperation* instr1) {
+    HVecPredSetOperation* instr0_predicate = instr0->GetGoverningPredicate();
+    HVecOperation::PredicationKind instr0_predicate_kind = instr0->GetPredicationKind();
+    return instr1->GetGoverningPredicate() == instr0_predicate &&
+           instr1->GetPredicationKind() == instr0_predicate_kind;
+  }
+
   // Returns the number of elements packed in a vector.
   size_t GetVectorLength() const {
     return vector_length_;
