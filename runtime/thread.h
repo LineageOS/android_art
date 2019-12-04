@@ -718,7 +718,14 @@ class Thread {
   }
 
  public:
-  static uint32_t QuickEntryPointOffsetWithSize(size_t quick_entrypoint_offset,
+  template<PointerSize pointer_size>
+  static constexpr ThreadOffset<pointer_size> QuickEntryPointOffset(
+      size_t quick_entrypoint_offset) {
+    return ThreadOffsetFromTlsPtr<pointer_size>(
+        OFFSETOF_MEMBER(tls_ptr_sized_values, quick_entrypoints) + quick_entrypoint_offset);
+  }
+
+  static constexpr uint32_t QuickEntryPointOffsetWithSize(size_t quick_entrypoint_offset,
                                                 PointerSize pointer_size) {
     if (pointer_size == PointerSize::k32) {
       return QuickEntryPointOffset<PointerSize::k32>(quick_entrypoint_offset).
@@ -730,12 +737,6 @@ class Thread {
   }
 
   template<PointerSize pointer_size>
-  static ThreadOffset<pointer_size> QuickEntryPointOffset(size_t quick_entrypoint_offset) {
-    return ThreadOffsetFromTlsPtr<pointer_size>(
-        OFFSETOF_MEMBER(tls_ptr_sized_values, quick_entrypoints) + quick_entrypoint_offset);
-  }
-
-  template<PointerSize pointer_size>
   static ThreadOffset<pointer_size> JniEntryPointOffset(size_t jni_entrypoint_offset) {
     return ThreadOffsetFromTlsPtr<pointer_size>(
         OFFSETOF_MEMBER(tls_ptr_sized_values, jni_entrypoints) + jni_entrypoint_offset);
@@ -743,7 +744,7 @@ class Thread {
 
   // Return the entry point offset integer value for ReadBarrierMarkRegX, where X is `reg`.
   template <PointerSize pointer_size>
-  static int32_t ReadBarrierMarkEntryPointsOffset(size_t reg) {
+  static constexpr int32_t ReadBarrierMarkEntryPointsOffset(size_t reg) {
     // The entry point list defines 30 ReadBarrierMarkRegX entry points.
     DCHECK_LT(reg, 30u);
     // The ReadBarrierMarkRegX entry points are ordered by increasing

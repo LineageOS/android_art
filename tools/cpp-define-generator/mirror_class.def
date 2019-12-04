@@ -36,3 +36,11 @@ ASM_DEFINE(MIRROR_CLASS_STATUS_OFFSET,
            art::mirror::Class::StatusOffset().Int32Value())
 ASM_DEFINE(PRIMITIVE_TYPE_SIZE_SHIFT_SHIFT,
            art::mirror::Class::kPrimitiveTypeSizeShiftShift)
+ASM_DEFINE(MIRROR_CLASS_VTABLE_OFFSET_32,
+           art::mirror::Class::EmbeddedVTableOffset(art::PointerSize::k32).Int32Value())
+ASM_DEFINE(MIRROR_CLASS_VTABLE_OFFSET_64,
+           art::mirror::Class::EmbeddedVTableOffset(art::PointerSize::k64).Int32Value())
+ASM_DEFINE(MIRROR_CLASS_IMT_PTR_OFFSET_32,
+           art::mirror::Class::ImtPtrOffset(art::PointerSize::k32).Int32Value())
+ASM_DEFINE(MIRROR_CLASS_IMT_PTR_OFFSET_64,
+           art::mirror::Class::ImtPtrOffset(art::PointerSize::k64).Int32Value())

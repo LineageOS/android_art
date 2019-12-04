@@ -55,8 +55,12 @@ class FaultManager {
   // The IsInGeneratedCode() function checks that the mutator lock is held before it
   // calls GetMethodAndReturnPCAndSP().
   // TODO: think about adding lock assertions and fake lock and unlock functions.
-  void GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context, ArtMethod** out_method,
-                                 uintptr_t* out_return_pc, uintptr_t* out_sp)
+  void GetMethodAndReturnPcAndSp(siginfo_t* siginfo,
+                                 void* context,
+                                 ArtMethod** out_method,
+                                 uintptr_t* out_return_pc,
+                                 uintptr_t* out_sp,
+                                 bool* out_is_stack_overflow)
                                  NO_THREAD_SAFETY_ANALYSIS;
   bool IsInGeneratedCode(siginfo_t* siginfo, void *context, bool check_dex_pc)
                          NO_THREAD_SAFETY_ANALYSIS;
