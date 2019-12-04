@@ -2466,9 +2466,7 @@ Thread::~Thread() {
     Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()
         ->AssertNoThreadMarkStackMapping(this);
     gc::accounting::AtomicStack<mirror::Object>* tl_mark_stack = GetThreadLocalMarkStack();
-    CHECK(tl_mark_stack == nullptr
-          || tl_mark_stack == reinterpret_cast<gc::accounting::AtomicStack<mirror::Object>*>(0x1))
-        << "mark-stack: " << tl_mark_stack;
+    CHECK(tl_mark_stack == nullptr) << "mark-stack: " << tl_mark_stack;
   }
   // Make sure we processed all deoptimization requests.
   CHECK(tlsPtr_.deoptimization_context_stack == nullptr) << "Missed deoptimization";
