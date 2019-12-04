@@ -603,6 +603,8 @@ class CodeGeneratorX86_64 : public CodeGenerator {
   void MaybeGenerateInlineCacheCheck(HInstruction* instruction, CpuRegister cls);
 
 
+  void MaybeIncrementHotness(bool is_frame_entry);
+
   // When we don't know the proper offset for the value, we use kDummy32BitOffset.
   // We will fix this up in the linker later to have the right value.
   static constexpr int32_t kDummy32BitOffset = 256;

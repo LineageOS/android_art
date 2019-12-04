@@ -1061,19 +1061,66 @@ void ParallelMoveResolverARM64::EmitMove(size_t index) {
   codegen_->MoveLocation(move->GetDestination(), move->GetSource(), DataType::Type::kVoid);
 }
 
+void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
+  MacroAssembler* masm = GetVIXLAssembler();
+  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
+    UseScratchRegisterScope temps(masm);
+    Register counter = temps.AcquireX();
+    Register method = is_frame_entry ? kArtMethodRegister : temps.AcquireX();
+    if (!is_frame_entry) {
+      __ Ldr(method, MemOperand(sp, 0));
+    }
+    __ Ldrh(counter, MemOperand(method, ArtMethod::HotnessCountOffset().Int32Value()));
+    __ Add(counter, counter, 1);
+    // Subtract one if the counter would overflow.
+    __ Sub(counter, counter, Operand(counter, LSR, 16));
+    __ Strh(counter, MemOperand(method, ArtMethod::HotnessCountOffset().Int32Value()));
+  }
+
+  if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
+    ScopedObjectAccess soa(Thread::Current());
+    ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
+    uint32_t address = reinterpret_cast32<uint32_t>(info);
+    vixl::aarch64::Label done;
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireX();
+    Register counter = temps.AcquireW();
+    __ Mov(temp, address);
+    __ Ldrh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+    __ Add(counter, counter, 1);
+    __ Strh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+    __ Tst(counter, 0xffff);
+    __ B(ne, &done);
+    if (is_frame_entry) {
+      if (HasEmptyFrame()) {
+        // The entyrpoint expects the method at the bottom of the stack. We
+        // claim stack space necessary for alignment.
+        __ Claim(kStackAlignment);
+        __ Stp(kArtMethodRegister, lr, MemOperand(sp, 0));
+      } else if (!RequiresCurrentMethod()) {
+        __ Str(kArtMethodRegister, MemOperand(sp, 0));
+      }
+    } else {
+      CHECK(RequiresCurrentMethod());
+    }
+    uint32_t entrypoint_offset =
+        GetThreadOffset<kArm64PointerSize>(kQuickCompileOptimized).Int32Value();
+    __ Ldr(lr, MemOperand(tr, entrypoint_offset));
+    // Note: we don't record the call here (and therefore don't generate a stack
+    // map), as the entrypoint should never be suspended.
+    __ Blr(lr);
+    if (HasEmptyFrame()) {
+      CHECK(is_frame_entry);
+      __ Ldr(lr, MemOperand(sp, 8));
+      __ Drop(kStackAlignment);
+    }
+    __ Bind(&done);
+  }
+}
+
 void CodeGeneratorARM64::GenerateFrameEntry() {
   MacroAssembler* masm = GetVIXLAssembler();
   __ Bind(&frame_entry_label_);
-
-  if (GetCompilerOptions().CountHotnessInCompiledCode()) {
-    UseScratchRegisterScope temps(masm);
-    Register temp = temps.AcquireX();
-    __ Ldrh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-    __ Add(temp, temp, 1);
-      // Subtract one if the counter would overflow.
-    __ Sub(temp, temp, Operand(temp, LSR, 16));
-    __ Strh(temp, MemOperand(kArtMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
-  }
 
   bool do_overflow_check =
       FrameNeedsStackCheck(GetFrameSize(), InstructionSet::kArm64) || !IsLeafMethod();
@@ -1136,7 +1183,7 @@ void CodeGeneratorARM64::GenerateFrameEntry() {
       __ Str(wzr, MemOperand(sp, GetStackOffsetOfShouldDeoptimizeFlag()));
     }
   }
-
+  MaybeIncrementHotness(/* is_frame_entry= */ true);
   MaybeGenerateMarkingRegisterCheck(/* code= */ __LINE__);
 }
 
@@ -3177,17 +3224,7 @@ void InstructionCodeGeneratorARM64::HandleGoto(HInstruction* got, HBasicBlock* s
   HLoopInformation* info = block->GetLoopInformation();
 
   if (info != nullptr && info->IsBackEdge(*block) && info->HasSuspendCheck()) {
-    if (codegen_->GetCompilerOptions().CountHotnessInCompiledCode()) {
-      UseScratchRegisterScope temps(GetVIXLAssembler());
-      Register temp1 = temps.AcquireX();
-      Register temp2 = temps.AcquireX();
-      __ Ldr(temp1, MemOperand(sp, 0));
-      __ Ldrh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
-      __ Add(temp2, temp2, 1);
-      // Subtract one if the counter would overflow.
-      __ Sub(temp2, temp2, Operand(temp2, LSR, 16));
-      __ Strh(temp2, MemOperand(temp1, ArtMethod::HotnessCountOffset().Int32Value()));
-    }
+    codegen_->MaybeIncrementHotness(/* is_frame_entry= */ false);
     GenerateSuspendCheck(info->GetSuspendCheck(), successor);
     return;
   }

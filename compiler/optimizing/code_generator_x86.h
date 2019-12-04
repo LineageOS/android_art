@@ -625,6 +625,7 @@ class CodeGeneratorX86 : public CodeGenerator {
   void GenerateExplicitNullCheck(HNullCheck* instruction) override;
 
   void MaybeGenerateInlineCacheCheck(HInstruction* instruction, Register klass);
+  void MaybeIncrementHotness(bool is_frame_entry);
 
   // When we don't know the proper offset for the value, we use kDummy32BitOffset.
   // The correct value will be inserted when processing Assembler fixups.

@@ -172,6 +172,7 @@
   V(StringBuilderAppend, void*, uint32_t) \
 \
   V(UpdateInlineCache, void, void) \
+  V(CompileOptimized, void, ArtMethod*, Thread*) \
 \
   V(ReadBarrierJni, void, mirror::CompressedReference<mirror::Object>*, Thread*) \
   V(ReadBarrierMarkReg00, mirror::Object*, mirror::Object*) \

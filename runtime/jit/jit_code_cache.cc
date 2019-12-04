@@ -1581,9 +1581,19 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
                                        Thread* self,
                                        bool osr,
                                        bool prejit,
+                                       bool baseline,
                                        JitMemoryRegion* region) {
-  if (!osr && ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
-    return false;
+  const void* existing_entry_point = method->GetEntryPointFromQuickCompiledCode();
+  if (!osr && ContainsPc(existing_entry_point)) {
+    OatQuickMethodHeader* method_header =
+        OatQuickMethodHeader::FromEntryPoint(existing_entry_point);
+    if (CodeInfo::IsBaseline(method_header->GetOptimizedCodeInfoPtr()) == baseline) {
+      VLOG(jit) << "Not compiling "
+                << method->PrettyMethod()
+                << " because it has already been compiled"
+                << " baseline=" << std::boolalpha << baseline;
+      return false;
+    }
   }
 
   if (NeedsClinitCheckBeforeCall(method) && !prejit) {

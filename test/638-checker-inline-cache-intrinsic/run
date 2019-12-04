@@ -18,4 +18,5 @@
 # Pass --verbose-methods to only generate the CFG of these methods.
 # The test is for JIT, but we run in "optimizing" (AOT) mode, so that the Checker
 # stanzas in test/638-checker-inline-cache-intrinsic/src/Main.java will be checked.
-exec ${RUN} --jit --runtime-option -Xjitthreshold:1000 -Xcompiler-option --verbose-methods=inlineMonomorphic,knownReceiverType,stringEquals $@
+# Also pass a large JIT code cache size to avoid getting the inline caches GCed.
+exec ${RUN} --jit --runtime-option -Xjitinitialsize:32M --runtime-option -Xjitthreshold:1000 -Xcompiler-option --verbose-methods=inlineMonomorphic,knownReceiverType,stringEquals $@

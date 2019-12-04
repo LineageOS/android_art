@@ -126,8 +126,17 @@ class ProfilingInfo {
         (current_inline_uses_ > 0);
   }
 
+  static constexpr MemberOffset BaselineHotnessCountOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(ProfilingInfo, baseline_hotness_count_));
+  }
+
  private:
   ProfilingInfo(ArtMethod* method, const std::vector<uint32_t>& entries);
+
+  // Hotness count for methods compiled with the JIT baseline compiler. Once
+  // a threshold is hit (currentily the maximum value of uint16_t), we will
+  // JIT compile optimized the method.
+  uint16_t baseline_hotness_count_;
 
   // Method this profiling info is for.
   // Not 'const' as JVMTI introduces obsolete methods that we implement by creating new ArtMethods.

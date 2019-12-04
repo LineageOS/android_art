@@ -184,6 +184,7 @@ class JitCodeCache {
                            Thread* self,
                            bool osr,
                            bool prejit,
+                           bool baseline,
                            JitMemoryRegion* region)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);

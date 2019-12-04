@@ -89,6 +89,8 @@ JitCompilerInterface* (*Jit::jit_load_)(void) = nullptr;
 JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& options) {
   auto* jit_options = new JitOptions;
   jit_options->use_jit_compilation_ = options.GetOrDefault(RuntimeArgumentMap::UseJitCompilation);
+  jit_options->use_tiered_jit_compilation_ =
+      options.GetOrDefault(RuntimeArgumentMap::UseTieredJitCompilation);
 
   jit_options->code_cache_initial_capacity_ =
       options.GetOrDefault(RuntimeArgumentMap::JITCodeCacheInitialCapacity);
@@ -318,13 +320,14 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
   ArtMethod* method_to_compile = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
-  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit, region)) {
+  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit, baseline, region)) {
     return false;
   }
 
   VLOG(jit) << "Compiling method "
             << ArtMethod::PrettyMethod(method_to_compile)
-            << " osr=" << std::boolalpha << osr;
+            << " osr=" << std::boolalpha << osr
+            << " baseline=" << std::boolalpha << baseline;
   bool success = jit_compiler_->CompileMethod(self, region, method_to_compile, baseline, osr);
   code_cache_->DoneCompiling(method_to_compile, self, osr);
   if (!success) {
@@ -1449,7 +1452,10 @@ bool Jit::MaybeCompileMethod(Thread* self,
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
       if (!code_cache_->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
         DCHECK(thread_pool_ != nullptr);
-        thread_pool_->AddTask(self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+        JitCompileTask::TaskKind kind = options_->UseTieredJitCompilation()
+            ? JitCompileTask::TaskKind::kCompileBaseline
+            : JitCompileTask::TaskKind::kCompile;
+        thread_pool_->AddTask(self, new JitCompileTask(method, kind));
       }
     }
     if (old_count < OSRMethodThreshold() && new_count >= OSRMethodThreshold()) {
@@ -1465,6 +1471,11 @@ bool Jit::MaybeCompileMethod(Thread* self,
     }
   }
   return true;
+}
+
+void Jit::EnqueueOptimizedCompilation(ArtMethod* method, Thread* self) {
+  thread_pool_->AddTask(
+      self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
 }
 
 class ScopedSetRuntimeThread {
