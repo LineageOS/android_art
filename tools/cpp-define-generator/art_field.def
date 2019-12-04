@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,11 @@
  * limitations under the License.
  */
 
-#if !defined(ASM_DEFINE_INCLUDE_DEPENDENCIES)
-#define ASM_DEFINE_INCLUDE_DEPENDENCIES 1
+#if ASM_DEFINE_INCLUDE_DEPENDENCIES
+#include "art_field.h"
 #endif
 
-#include "globals.def"
-#include "art_field.def"
-#include "art_method.def"
-#include "code_item.def"
-#include "lockword.def"
-#include "mirror_array.def"
-#include "mirror_class.def"
-#include "mirror_dex_cache.def"
-#include "mirror_object.def"
-#include "mirror_string.def"
-#include "profiling_info.def"
-#include "rosalloc.def"
-#include "runtime.def"
-#include "shadow_frame.def"
-#include "thread.def"
+ASM_DEFINE(ART_FIELD_OFFSET_OFFSET,
+           art::ArtField::OffsetOffset().Int32Value())
+ASM_DEFINE(ART_FIELD_DECLARING_CLASS_OFFSET,
+           art::ArtField::DeclaringClassOffset().Int32Value())

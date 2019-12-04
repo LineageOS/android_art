@@ -38,9 +38,12 @@ extern "C" void art_quick_throw_null_pointer_exception_from_signal();
 
 namespace art {
 
-void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context,
+void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo,
+                                             void* context,
                                              ArtMethod** out_method,
-                                             uintptr_t* out_return_pc, uintptr_t* out_sp) {
+                                             uintptr_t* out_return_pc,
+                                             uintptr_t* out_sp,
+                                             bool* out_is_stack_overflow) {
   struct ucontext* uc = reinterpret_cast<struct ucontext*>(context);
   struct sigcontext *sc = reinterpret_cast<struct sigcontext*>(&uc->uc_mcontext);
   *out_sp = static_cast<uintptr_t>(sc->sc_regs[mips64::SP]);
@@ -56,9 +59,11 @@ void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context,
       reinterpret_cast<uint8_t*>(*out_sp) - GetStackOverflowReservedBytes(InstructionSet::kMips64));
   if (overflow_addr == fault_addr) {
     *out_method = reinterpret_cast<ArtMethod*>(sc->sc_regs[mips64::A0]);
+    *out_is_stack_overflow = true;
   } else {
     // The method is at the top of the stack.
     *out_method = *reinterpret_cast<ArtMethod**>(*out_sp);
+    *out_is_stack_overflow = false;
   }
 
   // Work out the return PC.  This will be the address of the instruction

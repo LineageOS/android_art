@@ -24,9 +24,10 @@
 
 namespace art {
 
-uint32_t OatQuickMethodHeader::ToDexPc(ArtMethod* method,
+uint32_t OatQuickMethodHeader::ToDexPc(ArtMethod** frame,
                                        const uintptr_t pc,
                                        bool abort_on_failure) const {
+  ArtMethod* method = *frame;
   const void* entry_point = GetEntryPoint();
   uint32_t sought_offset = pc - reinterpret_cast<uintptr_t>(entry_point);
   if (method->IsNative()) {

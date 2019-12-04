@@ -15,6 +15,7 @@
  */
 
 #if ASM_DEFINE_INCLUDE_DEPENDENCIES
+#include "entrypoints/quick/quick_entrypoints_enum.h"
 #include "thread.h"
 #endif
 
@@ -36,6 +37,8 @@ ASM_DEFINE(THREAD_INTERPRETER_CACHE_OFFSET,
            art::Thread::InterpreterCacheOffset<art::kRuntimePointerSize>().Int32Value())
 ASM_DEFINE(THREAD_INTERPRETER_CACHE_SIZE_LOG2,
            art::Thread::InterpreterCacheSizeLog2())
+ASM_DEFINE(THREAD_INTERPRETER_CACHE_SIZE_MASK,
+           (sizeof(art::InterpreterCache::Entry) * (art::InterpreterCache::kSize - 1)))
 ASM_DEFINE(THREAD_IS_GC_MARKING_OFFSET,
            art::Thread::IsGcMarkingOffset<art::kRuntimePointerSize>().Int32Value())
 ASM_DEFINE(THREAD_LOCAL_ALLOC_STACK_END_OFFSET,
@@ -60,3 +63,11 @@ ASM_DEFINE(THREAD_USE_MTERP_OFFSET,
            art::Thread::UseMterpOffset<art::kRuntimePointerSize>().Int32Value())
 ASM_DEFINE(THREAD_TOP_QUICK_FRAME_OFFSET,
            art::Thread::TopOfManagedStackOffset<art::kRuntimePointerSize>().Int32Value())
+ASM_DEFINE(THREAD_ALLOC_OBJECT_ENTRYPOINT_OFFSET,
+           art::GetThreadOffset<art::kRuntimePointerSize>(art::kQuickAllocObjectInitialized)
+               .Int32Value())
+ASM_DEFINE(THREAD_ALLOC_ARRAY_ENTRYPOINT_OFFSET,
+           art::GetThreadOffset<art::kRuntimePointerSize>(art::kQuickAllocArrayResolved)
+               .Int32Value())
+ASM_DEFINE(THREAD_READ_BARRIER_MARK_REG00_OFFSET,
+           art::Thread::ReadBarrierMarkEntryPointsOffset<art::kRuntimePointerSize>(0))

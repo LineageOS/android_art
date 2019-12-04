@@ -411,6 +411,10 @@ class ArtMethod final {
     return MemberOffset(OFFSETOF_MEMBER(ArtMethod, method_index_));
   }
 
+  static constexpr MemberOffset ImtIndexOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(ArtMethod, imt_index_));
+  }
+
   uint32_t GetCodeItemOffset() const {
     return dex_code_item_offset_;
   }

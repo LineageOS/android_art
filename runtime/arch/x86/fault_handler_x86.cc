@@ -279,7 +279,9 @@ static uint32_t GetInstructionSize(const uint8_t* pc) {
 
 void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context,
                                              ArtMethod** out_method,
-                                             uintptr_t* out_return_pc, uintptr_t* out_sp) {
+                                             uintptr_t* out_return_pc,
+                                             uintptr_t* out_sp,
+                                             bool* out_is_stack_overflow) {
   struct ucontext* uc = reinterpret_cast<struct ucontext*>(context);
   *out_sp = static_cast<uintptr_t>(uc->CTX_ESP);
   VLOG(signals) << "sp: " << std::hex << *out_sp;
@@ -298,9 +300,11 @@ void FaultManager::GetMethodAndReturnPcAndSp(siginfo_t* siginfo, void* context,
 #endif
   if (overflow_addr == fault_addr) {
     *out_method = reinterpret_cast<ArtMethod*>(uc->CTX_METHOD);
+    *out_is_stack_overflow = true;
   } else {
     // The method is at the top of the stack.
     *out_method = *reinterpret_cast<ArtMethod**>(*out_sp);
+    *out_is_stack_overflow = false;
   }
 
   uint8_t* pc = reinterpret_cast<uint8_t*>(uc->CTX_EIP);

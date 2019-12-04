@@ -128,7 +128,7 @@ uint32_t StackVisitor::GetDexPc(bool abort_on_failure) const {
       return stack_map->GetDexPc();
     } else {
       return cur_oat_quick_method_header_->ToDexPc(
-          GetMethod(), cur_quick_frame_pc_, abort_on_failure);
+          GetCurrentQuickFrame(), cur_quick_frame_pc_, abort_on_failure);
     }
   } else {
     return 0;

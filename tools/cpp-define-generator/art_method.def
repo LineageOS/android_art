@@ -20,6 +20,8 @@
 
 ASM_DEFINE(ART_METHOD_ACCESS_FLAGS_OFFSET,
            art::ArtMethod::AccessFlagsOffset().Int32Value())
+ASM_DEFINE(ART_METHOD_IS_STATIC_FLAG,
+           art::kAccStatic)
 ASM_DEFINE(ART_METHOD_DECLARING_CLASS_OFFSET,
            art::ArtMethod::DeclaringClassOffset().Int32Value())
 ASM_DEFINE(ART_METHOD_JNI_OFFSET_32,
@@ -30,3 +32,9 @@ ASM_DEFINE(ART_METHOD_QUICK_CODE_OFFSET_32,
            art::ArtMethod::EntryPointFromQuickCompiledCodeOffset(art::PointerSize::k32).Int32Value())
 ASM_DEFINE(ART_METHOD_QUICK_CODE_OFFSET_64,
            art::ArtMethod::EntryPointFromQuickCompiledCodeOffset(art::PointerSize::k64).Int32Value())
+ASM_DEFINE(ART_METHOD_METHOD_INDEX_OFFSET,
+           art::ArtMethod::MethodIndexOffset().Int32Value())
+ASM_DEFINE(ART_METHOD_IMT_INDEX_OFFSET,
+           art::ArtMethod::ImtIndexOffset().Int32Value())
+ASM_DEFINE(ART_METHOD_HOTNESS_COUNT_OFFSET,
+           art::ArtMethod::HotnessCountOffset().Int32Value())

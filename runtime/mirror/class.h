@@ -794,6 +794,11 @@ class MANAGED Class final : public Object {
                 static_cast<size_t>(pointer_size)));
   }
 
+  static constexpr MemberOffset EmbeddedVTableOffset(PointerSize pointer_size) {
+    return MemberOffset(
+        ImtPtrOffset(pointer_size).Uint32Value() + static_cast<size_t>(pointer_size));
+  }
+
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool ShouldHaveImt() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -1357,7 +1362,6 @@ class MANAGED Class final : public Object {
   // Check that the pointer size matches the one in the class linker.
   ALWAYS_INLINE static void CheckPointerSize(PointerSize pointer_size);
 
-  static MemberOffset EmbeddedVTableOffset(PointerSize pointer_size);
   template <bool kVisitNativeRoots,
             VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags,
             ReadBarrierOption kReadBarrierOption = kWithReadBarrier,
