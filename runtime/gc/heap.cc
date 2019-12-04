@@ -2506,10 +2506,16 @@ void Heap::TraceHeapSize(size_t heap_size) {
   ATraceIntegerValue("Heap size (KB)", heap_size / KB);
 }
 
+#if defined(__GLIBC__)
+# define IF_GLIBC(x) x
+#else
+# define IF_GLIBC(x)
+#endif
+
 size_t Heap::GetNativeBytes() {
   size_t malloc_bytes;
 #if defined(__BIONIC__) || defined(__GLIBC__)
-  size_t mmapped_bytes;
+  IF_GLIBC(size_t mmapped_bytes;)
   struct mallinfo mi = mallinfo();
   // In spite of the documentation, the jemalloc version of this call seems to do what we want,
   // and it is thread-safe.
@@ -2517,17 +2523,24 @@ size_t Heap::GetNativeBytes() {
     // Shouldn't happen, but glibc declares uordblks as int.
     // Avoiding sign extension gets us correct behavior for another 2 GB.
     malloc_bytes = (unsigned int)mi.uordblks;
-    mmapped_bytes = (unsigned int)mi.hblkhd;
+    IF_GLIBC(mmapped_bytes = (unsigned int)mi.hblkhd;)
   } else {
     malloc_bytes = mi.uordblks;
-    mmapped_bytes = mi.hblkhd;
+    IF_GLIBC(mmapped_bytes = mi.hblkhd;)
   }
-  // From the spec, we clearly have mmapped_bytes <= malloc_bytes. Reality is sometimes
-  // dramatically different. (b/119580449) If so, fudge it.
+  // From the spec, it appeared mmapped_bytes <= malloc_bytes. Reality was sometimes
+  // dramatically different. (b/119580449 was an early bug.) If so, we try to fudge it.
+  // However, malloc implementations seem to interpret hblkhd differently, namely as
+  // mapped blocks backing the entire heap (e.g. jemalloc) vs. large objects directly
+  // allocated via mmap (e.g. glibc). Thus we now only do this for glibc, where it
+  // previously helped, and which appears to use a reading of the spec compatible
+  // with our adjustment.
+#if defined(__GLIBC__)
   if (mmapped_bytes > malloc_bytes) {
     malloc_bytes = mmapped_bytes;
   }
-#else
+#endif  // GLIBC
+#else  // Neither Bionic nor Glibc
   // We should hit this case only in contexts in which GC triggering is not critical. Effectively
   // disable GC triggering based on malloc().
   malloc_bytes = 1000;
@@ -3915,6 +3928,8 @@ void Heap::NotifyNativeAllocations(JNIEnv* env) {
 // This should only be done for large allocations of non-malloc memory, which we wouldn't
 // otherwise see.
 void Heap::RegisterNativeAllocation(JNIEnv* env, size_t bytes) {
+  // Cautiously check for a wrapped negative bytes argument.
+  DCHECK(sizeof(size_t) < 8 || bytes < (std::numeric_limits<size_t>::max() / 2));
   native_bytes_registered_.fetch_add(bytes, std::memory_order_relaxed);
   uint32_t objects_notified =
       native_objects_notified_.fetch_add(1, std::memory_order_relaxed);
