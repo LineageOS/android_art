@@ -118,6 +118,10 @@ class JitOptions {
     return use_tiered_jit_compilation_;
   }
 
+  bool CanCompileBaseline() const {
+    return use_tiered_jit_compilation_ || use_baseline_compiler_;
+  }
+
   void SetUseJitCompilation(bool b) {
     use_jit_compilation_ = b;
   }
@@ -135,6 +139,14 @@ class JitOptions {
     compile_threshold_ = 0;
   }
 
+  void SetUseBaselineCompiler() {
+    use_baseline_compiler_ = true;
+  }
+
+  bool UseBaselineCompiler() const {
+    return use_baseline_compiler_;
+  }
+
  private:
   // We add the sample in batches of size kJitSamplesBatchSize.
   // This method rounds the threshold so that it is multiple of the batch size.
@@ -142,6 +154,7 @@ class JitOptions {
 
   bool use_jit_compilation_;
   bool use_tiered_jit_compilation_;
+  bool use_baseline_compiler_;
   size_t code_cache_initial_capacity_;
   size_t code_cache_max_capacity_;
   uint32_t compile_threshold_;
@@ -155,6 +168,8 @@ class JitOptions {
 
   JitOptions()
       : use_jit_compilation_(false),
+        use_tiered_jit_compilation_(false),
+        use_baseline_compiler_(false),
         code_cache_initial_capacity_(0),
         code_cache_max_capacity_(0),
         compile_threshold_(0),

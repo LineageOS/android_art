@@ -249,6 +249,15 @@ Jit* Jit::Create(JitCodeCache* code_cache, JitOptions* options) {
       << ", compile_threshold=" << options->GetCompileThreshold()
       << ", profile_saver_options=" << options->GetProfileSaverOptions();
 
+  // We want to know whether the compiler is compiling baseline, as this
+  // affects how we GC ProfilingInfos.
+  for (const std::string& option : Runtime::Current()->GetCompilerOptions()) {
+    if (option == "--baseline") {
+      options->SetUseBaselineCompiler();
+      break;
+    }
+  }
+
   // Notify native debugger about the classes already loaded before the creation of the jit.
   jit->DumpTypeInfoForLoadedTypes(Runtime::Current()->GetClassLinker());
   return jit.release();
@@ -1421,7 +1430,8 @@ bool Jit::MaybeCompileMethod(Thread* self,
     // Note: Native method have no "warm" state or profiling info.
     if (!method->IsNative() &&
         (method->GetProfilingInfo(kRuntimePointerSize) == nullptr) &&
-        code_cache_->CanAllocateProfilingInfo()) {
+        code_cache_->CanAllocateProfilingInfo() &&
+        !options_->UseTieredJitCompilation()) {
       bool success = ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
       if (success) {
         VLOG(jit) << "Start profiling " << method->PrettyMethod();
@@ -1452,9 +1462,10 @@ bool Jit::MaybeCompileMethod(Thread* self,
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
       if (!code_cache_->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
         DCHECK(thread_pool_ != nullptr);
-        JitCompileTask::TaskKind kind = options_->UseTieredJitCompilation()
-            ? JitCompileTask::TaskKind::kCompileBaseline
-            : JitCompileTask::TaskKind::kCompile;
+        JitCompileTask::TaskKind kind =
+            (options_->UseTieredJitCompilation() || options_->UseBaselineCompiler())
+                ? JitCompileTask::TaskKind::kCompileBaseline
+                : JitCompileTask::TaskKind::kCompile;
         thread_pool_->AddTask(self, new JitCompileTask(method, kind));
       }
     }
@@ -1474,8 +1485,13 @@ bool Jit::MaybeCompileMethod(Thread* self,
 }
 
 void Jit::EnqueueOptimizedCompilation(ArtMethod* method, Thread* self) {
-  thread_pool_->AddTask(
-      self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+  // We arrive here after a baseline compiled code has reached its baseline
+  // hotness threshold. If tiered compilation is enabled, enqueue a compilation
+  // task that will compile optimize the method.
+  if (options_->UseTieredJitCompilation()) {
+    thread_pool_->AddTask(
+        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+  }
 }
 
 class ScopedSetRuntimeThread {
