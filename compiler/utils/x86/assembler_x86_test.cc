@@ -965,6 +965,11 @@ TEST_F(AssemblerX86Test, PMAddWD) {
   DriverStr(RepeatFF(&x86::X86Assembler::pmaddwd, "pmaddwd %{reg2}, %{reg1}"), "pmaddwd");
 }
 
+TEST_F(AssemblerX86AVXTest, VPMAddWD) {
+  DriverStr(
+      RepeatFFF(&x86::X86Assembler::vpmaddwd, "vpmaddwd %{reg3}, %{reg2}, %{reg1}"), "vpmaddwd");
+}
+
 TEST_F(AssemblerX86Test, PHAddW) {
   DriverStr(RepeatFF(&x86::X86Assembler::phaddw, "phaddw %{reg2}, %{reg1}"), "phaddw");
 }
