@@ -2439,9 +2439,11 @@ void Thread::Destroy() {
   {
     ScopedObjectAccess soa(self);
     Runtime::Current()->GetHeap()->RevokeThreadLocalBuffers(this);
-    if (kUseReadBarrier) {
-      Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()->RevokeThreadLocalMarkStack(this);
-    }
+  }
+  // Mark-stack revocation must be performed at the very end. No
+  // checkpoint/flip-function or read-barrier should be called after this.
+  if (kUseReadBarrier) {
+    Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()->RevokeThreadLocalMarkStack(this);
   }
 }
 
