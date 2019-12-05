@@ -89,6 +89,7 @@ struct DebugInvokeReq;
 class DeoptimizationContextRecord;
 class DexFile;
 class FrameIdToShadowFrame;
+class IsMarkedVisitor;
 class JavaVMExt;
 class JNIEnvExt;
 class Monitor;
@@ -726,7 +727,7 @@ class Thread {
   }
 
   static constexpr uint32_t QuickEntryPointOffsetWithSize(size_t quick_entrypoint_offset,
-                                                PointerSize pointer_size) {
+                                                          PointerSize pointer_size) {
     if (pointer_size == PointerSize::k32) {
       return QuickEntryPointOffset<PointerSize::k32>(quick_entrypoint_offset).
           Uint32Value();
@@ -1469,6 +1470,8 @@ class Thread {
 
   template <bool kPrecise>
   void VisitRoots(RootVisitor* visitor) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void SweepInterpreterCache(IsMarkedVisitor* visitor) REQUIRES_SHARED(Locks::mutator_lock_);
 
   static bool IsAotCompiler();
 
