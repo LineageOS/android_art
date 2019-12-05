@@ -199,9 +199,6 @@ inline mirror::Object* ConcurrentCopying::Mark(Thread* const self,
 inline mirror::Object* ConcurrentCopying::MarkFromReadBarrier(mirror::Object* from_ref) {
   mirror::Object* ret;
   Thread* const self = Thread::Current();
-  // TODO (lokeshgidra): Remove the check once b/140119552 is fixed.
-  CHECK(self->GetThreadLocalMarkStack()
-        != reinterpret_cast<accounting::AtomicStack<mirror::Object>*>(0x1));
   // We can get here before marking starts since we gray immune objects before the marking phase.
   if (from_ref == nullptr || !self->GetIsGcMarking()) {
     return from_ref;
