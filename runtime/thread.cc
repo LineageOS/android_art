@@ -2466,9 +2466,7 @@ Thread::~Thread() {
     Runtime::Current()->GetHeap()->ConcurrentCopyingCollector()
         ->AssertNoThreadMarkStackMapping(this);
     gc::accounting::AtomicStack<mirror::Object>* tl_mark_stack = GetThreadLocalMarkStack();
-    CHECK(tl_mark_stack == nullptr
-          || tl_mark_stack == reinterpret_cast<gc::accounting::AtomicStack<mirror::Object>*>(0x1))
-        << "mark-stack: " << tl_mark_stack;
+    CHECK(tl_mark_stack == nullptr) << "mark-stack: " << tl_mark_stack;
   }
   // Make sure we processed all deoptimization requests.
   CHECK(tlsPtr_.deoptimization_context_stack == nullptr) << "Missed deoptimization";
@@ -4036,6 +4034,20 @@ void Thread::VisitRoots(RootVisitor* visitor) {
   mapper.template WalkStack<StackVisitor::CountTransitions::kNo>(false);
   for (instrumentation::InstrumentationStackFrame& frame : *GetInstrumentationStack()) {
     visitor->VisitRootIfNonNull(&frame.this_object_, RootInfo(kRootVMInternal, thread_id));
+  }
+  for (InterpreterCache::Entry& entry : GetInterpreterCache()->GetArray()) {
+    const Instruction* inst = reinterpret_cast<const Instruction*>(entry.first);
+    if (inst != nullptr &&
+        (inst->Opcode() == Instruction::NEW_INSTANCE ||
+         inst->Opcode() == Instruction::CHECK_CAST ||
+         inst->Opcode() == Instruction::INSTANCE_OF ||
+         inst->Opcode() == Instruction::NEW_ARRAY ||
+         inst->Opcode() == Instruction::CONST_CLASS ||
+         inst->Opcode() == Instruction::CONST_STRING ||
+         inst->Opcode() == Instruction::CONST_STRING_JUMBO)) {
+      visitor->VisitRootIfNonNull(reinterpret_cast<mirror::Object**>(&entry.second),
+                                  RootInfo(kRootThreadObject, thread_id));
+    }
   }
 }
 

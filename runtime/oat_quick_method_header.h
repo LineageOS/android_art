@@ -83,7 +83,7 @@ class PACKED(4) OatQuickMethodHeader {
     // ART compiled method are prefixed with header, but we can also easily
     // accidentally use a function pointer to one of the stubs/trampolines.
     // We prefix those with 0xFF in the aseembly so that we can do DCHECKs.
-    CHECK_NE(code_size_, 0xFFFFFFFF) << code_;
+    CHECK_NE(code_size_, 0xFFFFFFFF) << code_size_;
     return code_size_ & kCodeSizeMask;
   }
 
@@ -148,7 +148,9 @@ class PACKED(4) OatQuickMethodHeader {
                             bool is_for_catch_handler,
                             bool abort_on_failure = true) const;
 
-  uint32_t ToDexPc(ArtMethod* method, const uintptr_t pc, bool abort_on_failure = true) const;
+  uint32_t ToDexPc(ArtMethod** frame,
+                   const uintptr_t pc,
+                   bool abort_on_failure = true) const;
 
   void SetHasShouldDeoptimizeFlag() {
     DCHECK_EQ(code_size_ & kShouldDeoptimizeMask, 0u);

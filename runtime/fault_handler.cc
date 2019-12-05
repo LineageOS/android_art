@@ -291,10 +291,11 @@ bool FaultManager::IsInGeneratedCode(siginfo_t* siginfo, void* context, bool che
   ArtMethod* method_obj = nullptr;
   uintptr_t return_pc = 0;
   uintptr_t sp = 0;
+  bool is_stack_overflow = false;
 
   // Get the architecture specific method address and return address.  These
   // are in architecture specific files in arch/<arch>/fault_handler_<arch>.
-  GetMethodAndReturnPcAndSp(siginfo, context, &method_obj, &return_pc, &sp);
+  GetMethodAndReturnPcAndSp(siginfo, context, &method_obj, &return_pc, &sp, &is_stack_overflow);
 
   // If we don't have a potential method, we're outta here.
   VLOG(signals) << "potential method: " << method_obj;
@@ -336,7 +337,15 @@ bool FaultManager::IsInGeneratedCode(siginfo_t* siginfo, void* context, bool che
         reinterpret_cast<uintptr_t>(method_header->GetEntryPoint());
     VLOG(signals) << "pc offset: " << std::hex << sought_offset;
   }
-  uint32_t dexpc = method_header->ToDexPc(method_obj, return_pc, false);
+  uint32_t dexpc = dex::kDexNoIndex;
+  if (is_stack_overflow) {
+    // If it's an implicit stack overflow check, the frame is not setup, so we
+    // just infer the dex PC as zero.
+    dexpc = 0;
+  } else {
+    CHECK_EQ(*reinterpret_cast<ArtMethod**>(sp), method_obj);
+    dexpc = method_header->ToDexPc(reinterpret_cast<ArtMethod**>(sp), return_pc, false);
+  }
   VLOG(signals) << "dexpc: " << dexpc;
   return !check_dex_pc || dexpc != dex::kDexNoIndex;
 }
@@ -380,9 +389,11 @@ bool JavaStackTraceHandler::Action(int sig ATTRIBUTE_UNUSED, siginfo_t* siginfo,
     ArtMethod* method = nullptr;
     uintptr_t return_pc = 0;
     uintptr_t sp = 0;
+    bool is_stack_overflow = false;
     Thread* self = Thread::Current();
 
-    manager_->GetMethodAndReturnPcAndSp(siginfo, context, &method, &return_pc, &sp);
+    manager_->GetMethodAndReturnPcAndSp(
+        siginfo, context, &method, &return_pc, &sp, &is_stack_overflow);
     // Inside of generated code, sp[0] is the method, so sp is the frame.
     self->SetTopOfStack(reinterpret_cast<ArtMethod**>(sp));
     self->DumpJavaStack(LOG_STREAM(ERROR));

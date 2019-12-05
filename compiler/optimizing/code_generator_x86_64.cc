@@ -2560,7 +2560,7 @@ void CodeGeneratorX86_64::MaybeGenerateInlineCacheCheck(HInstruction* instructio
   // We know the destination of an intrinsic, so no need to record inline
   // caches.
   if (!instruction->GetLocations()->Intrinsified() &&
-      GetCompilerOptions().IsBaseline() &&
+      GetGraph()->IsCompilingBaseline() &&
       !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
