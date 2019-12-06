@@ -234,6 +234,7 @@ class Heap {
       REQUIRES(!*gc_complete_lock_,
                !*pending_task_lock_,
                !*backtrace_lock_,
+               !process_state_update_lock_,
                !Roles::uninterruptible_) {
     return AllocObjectWithAllocator<kInstrumented>(self,
                                                    klass,
@@ -251,6 +252,7 @@ class Heap {
       REQUIRES(!*gc_complete_lock_,
                !*pending_task_lock_,
                !*backtrace_lock_,
+               !process_state_update_lock_,
                !Roles::uninterruptible_) {
     return AllocObjectWithAllocator<kInstrumented>(self,
                                                    klass,
@@ -269,6 +271,7 @@ class Heap {
       REQUIRES(!*gc_complete_lock_,
                !*pending_task_lock_,
                !*backtrace_lock_,
+               !process_state_update_lock_,
                !Roles::uninterruptible_);
 
   AllocatorType GetCurrentAllocator() const {
@@ -297,14 +300,14 @@ class Heap {
   // Inform the garbage collector of a non-malloc allocated native memory that might become
   // reclaimable in the future as a result of Java garbage collection.
   void RegisterNativeAllocation(JNIEnv* env, size_t bytes)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
   void RegisterNativeFree(JNIEnv* env, size_t bytes);
 
   // Notify the garbage collector of malloc allocations that might be reclaimable
   // as a result of Java garbage collection. Each such call represents approximately
   // kNotifyNativeInterval such allocations.
   void NotifyNativeAllocations(JNIEnv* env)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
   uint32_t GetNotifyNativeInterval() {
     return kNotifyNativeInterval;
@@ -370,12 +373,13 @@ class Heap {
 
   // Initiates an explicit garbage collection.
   void CollectGarbage(bool clear_soft_references, GcCause cause = kGcCauseExplicit)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
   // Does a concurrent GC, should only be called by the GC daemon thread
   // through runtime.
   void ConcurrentGC(Thread* self, GcCause cause, bool force_full)
-      REQUIRES(!Locks::runtime_shutdown_lock_, !*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!Locks::runtime_shutdown_lock_, !*gc_complete_lock_,
+               !*pending_task_lock_, !process_state_update_lock_);
 
   // Implements VMDebug.countInstancesOfClass and JDWP VM_InstanceCount.
   // The boolean decides whether to use IsAssignableFrom or == when comparing classes.
@@ -465,7 +469,7 @@ class Heap {
 
   // Update the heap's process state to a new value, may cause compaction to occur.
   void UpdateProcessState(ProcessState old_process_state, ProcessState new_process_state)
-      REQUIRES(!*pending_task_lock_, !*gc_complete_lock_);
+      REQUIRES(!*pending_task_lock_, !*gc_complete_lock_, !process_state_update_lock_);
 
   bool HaveContinuousSpaces() const NO_THREAD_SAFETY_ANALYSIS {
     // No lock since vector empty is thread safe.
@@ -625,7 +629,8 @@ class Heap {
   void DumpForSigQuit(std::ostream& os) REQUIRES(!*gc_complete_lock_);
 
   // Do a pending collector transition.
-  void DoPendingCollectorTransition() REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+  void DoPendingCollectorTransition()
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
   // Deflate monitors, ... and trim the spaces.
   void Trim(Thread* self) REQUIRES(!*gc_complete_lock_);
@@ -886,7 +891,8 @@ class Heap {
   void DisableGCForShutdown() REQUIRES(!*gc_complete_lock_);
 
   // Create a new alloc space and compact default alloc space to it.
-  HomogeneousSpaceCompactResult PerformHomogeneousSpaceCompact() REQUIRES(!*gc_complete_lock_);
+  HomogeneousSpaceCompactResult PerformHomogeneousSpaceCompact()
+      REQUIRES(!*gc_complete_lock_, !process_state_update_lock_);
   bool SupportHomogeneousSpaceCompactAndCollectorTransitions() const;
 
   // Install an allocation listener.
@@ -987,7 +993,7 @@ class Heap {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!*pending_task_lock_, !*gc_complete_lock_);
   void CheckGCForNative(Thread* self)
-      REQUIRES(!*pending_task_lock_, !*gc_complete_lock_);
+      REQUIRES(!*pending_task_lock_, !*gc_complete_lock_, !process_state_update_lock_);
 
   accounting::ObjectStack* GetMarkStack() {
     return mark_stack_.get();
@@ -1000,7 +1006,8 @@ class Heap {
                                    size_t byte_count,
                                    const PreFenceVisitor& pre_fence_visitor)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !*backtrace_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_,
+               !*backtrace_lock_, !process_state_update_lock_);
 
   // Handles Allocate()'s slow allocation path with GC involved after
   // an initial allocation attempt failed.
@@ -1080,7 +1087,7 @@ class Heap {
                                            GcCause gc_cause,
                                            bool clear_soft_references)
       REQUIRES(!*gc_complete_lock_, !Locks::heap_bitmap_lock_, !Locks::thread_suspend_count_lock_,
-               !*pending_task_lock_);
+               !*pending_task_lock_, !process_state_update_lock_);
 
   void PreGcVerification(collector::GarbageCollector* gc)
       REQUIRES(!Locks::mutator_lock_, !*gc_complete_lock_);
@@ -1117,7 +1124,8 @@ class Heap {
   // collection. bytes_allocated_before_gc is used to measure bytes / second for the period which
   // the GC was run.
   void GrowForUtilization(collector::GarbageCollector* collector_ran,
-                          size_t bytes_allocated_before_gc = 0);
+                          size_t bytes_allocated_before_gc = 0)
+      REQUIRES(!process_state_update_lock_);
 
   size_t GetPercentFree();
 
@@ -1136,13 +1144,13 @@ class Heap {
   // Push an object onto the allocation stack.
   void PushOnAllocationStack(Thread* self, ObjPtr<mirror::Object>* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
   void PushOnAllocationStackWithInternalGC(Thread* self, ObjPtr<mirror::Object>* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
   void PushOnThreadLocalAllocationStackWithInternalGC(Thread* thread, ObjPtr<mirror::Object>* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
   void ClearConcurrentGCRequest();
   void ClearPendingTrim(Thread* self) REQUIRES(!*pending_task_lock_);
@@ -1175,7 +1183,8 @@ class Heap {
   // GC stress mode attempts to do one GC per unique backtrace.
   void CheckGcStressMode(Thread* self, ObjPtr<mirror::Object>* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !*backtrace_lock_);
+      REQUIRES(!*gc_complete_lock_, !*pending_task_lock_,
+               !*backtrace_lock_, !process_state_update_lock_);
 
   collector::GcType NonStickyGcType() const {
     return HasZygoteSpace() ? collector::kGcTypePartial : collector::kGcTypeFull;
@@ -1191,6 +1200,10 @@ class Heap {
   }
 
   ALWAYS_INLINE void IncrementNumberOfBytesFreedRevoke(size_t freed_bytes_revoke);
+
+  // On switching app from background to foreground, grow the heap size
+  // to incorporate foreground heap growth multiplier.
+  void GrowHeapOnJankPerceptibleSwitch() REQUIRES(!process_state_update_lock_);
 
   // Update *_freed_ever_ counters to reflect current GC values.
   void IncrementFreedEver();
@@ -1340,6 +1353,12 @@ class Heap {
   // non-concurrent GC. Used as a guideline for computing concurrent_start_bytes_ in the
   // concurrent GC case.
   Atomic<size_t> target_footprint_;
+
+  // Computed with foreground-multiplier in GrowForUtilization() when run in
+  // jank non-perceptible state. On update to process state from background to
+  // foreground we set target_footprint_ to this value.
+  Mutex process_state_update_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
+  size_t min_foreground_target_footprint_ GUARDED_BY(process_state_update_lock_);
 
   // When num_bytes_allocated_ exceeds this amount then a concurrent GC should be requested so that
   // it completes ahead of an allocation failing.
