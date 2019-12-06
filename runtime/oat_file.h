@@ -104,20 +104,55 @@ class OatFile {
                                   ElfFile* elf_file,
                                   VdexFile* vdex_file,
                                   const std::string& location,
-                                  const char* abs_dex_location,
+                                  ArrayRef<const std::string> dex_filenames,
                                   std::string* error_msg);
-  // Open an oat file. Returns null on failure.  Requested base can
-  // optionally be used to request where the file should be loaded.
-  // See the ResolveRelativeEncodedDexLocation for a description of how the
-  // abs_dex_location argument is used.
+  // Open an oat file. Returns null on failure.
+  // The `dex_filenames` argument, if provided, specifies dex files to
+  // open if they are not embedded in the vdex file. This may differ
+  // from dex file locations in the oat file for cross-compilation
+  // (the dex file name is the host path and dex location is the future
+  // path on target) and testing.
   static OatFile* Open(int zip_fd,
                        const std::string& filename,
                        const std::string& location,
                        bool executable,
                        bool low_4gb,
-                       const char* abs_dex_location,
+                       ArrayRef<const std::string> dex_filenames,
                        /*inout*/MemMap* reservation,  // Where to load if not null.
                        /*out*/std::string* error_msg);
+  // Helper overload that takes a single dex filename and no reservation.
+  static OatFile* Open(int zip_fd,
+                       const std::string& filename,
+                       const std::string& location,
+                       bool executable,
+                       bool low_4gb,
+                       const std::string& dex_filename,
+                       /*out*/std::string* error_msg) {
+    return Open(zip_fd,
+                filename,
+                location,
+                executable,
+                low_4gb,
+                ArrayRef<const std::string>(&dex_filename, /*size=*/ 1u),
+                /*reservation=*/ nullptr,
+                error_msg);
+  }
+  // Helper overload that takes no dex filename and no reservation.
+  static OatFile* Open(int zip_fd,
+                       const std::string& filename,
+                       const std::string& location,
+                       bool executable,
+                       bool low_4gb,
+                       /*out*/std::string* error_msg) {
+    return Open(zip_fd,
+                filename,
+                location,
+                executable,
+                low_4gb,
+                ArrayRef<const std::string>(),
+                /*reservation=*/ nullptr,
+                error_msg);
+  }
 
   // Similar to OatFile::Open(const std::string...), but accepts input vdex and
   // odex files as file descriptors. We also take zip_fd in case the vdex does not
@@ -128,7 +163,7 @@ class OatFile {
                        const std::string& oat_location,
                        bool executable,
                        bool low_4gb,
-                       const char* abs_dex_location,
+                       ArrayRef<const std::string> dex_filenames,
                        /*inout*/MemMap* reservation,  // Where to load if not null.
                        /*out*/std::string* error_msg);
 
@@ -140,13 +175,13 @@ class OatFile {
   static OatFile* OpenWritable(int zip_fd,
                                File* file,
                                const std::string& location,
-                               const char* abs_dex_location,
+                               ArrayRef<const std::string> dex_filenames,
                                std::string* error_msg);
   // Open an oat file from an already opened File. Maps it PROT_READ, MAP_PRIVATE.
   static OatFile* OpenReadable(int zip_fd,
                                File* file,
                                const std::string& location,
-                               const char* abs_dex_location,
+                               ArrayRef<const std::string> dex_filenames,
                                std::string* error_msg);
 
   // Initialize OatFile instance from an already loaded VdexFile. This assumes
@@ -357,28 +392,6 @@ class OatFile {
   // Initialize relocation sections (.data.bimg.rel.ro and .bss).
   void InitializeRelocations() const;
 
-  // Constructs the absolute dex location and/or dex file name for the relative dex
-  // location (`rel_dex_location`) in the oat file, using the `abs_dex_location` of
-  // the dex file this oat belongs to.
-  //
-  // The dex file name and dex location differ when cross compiling where the dex file
-  // name is the host path (for opening files) and dex location is the future path on target.
-  //
-  // If not null, abs_dex_location is used to resolve the absolute dex
-  // location of relative dex locations encoded in the oat file.
-  // For example, given absolute location "/data/app/foo/base.apk", encoded
-  // dex locations "base.apk", "base.apk!classes2.dex", etc. would be resolved
-  // to "/data/app/foo/base.apk", "/data/app/foo/base.apk!classes2.dex", etc.
-  // Relative encoded dex locations that don't match the given abs_dex_location
-  // are left unchanged.
-  //
-  // Computation of both `dex_file_location` and `dex_file_name` can be skipped
-  // by setting the corresponding out parameter to `nullptr`.
-  static void ResolveRelativeEncodedDexLocation(const char* abs_dex_location,
-                                                const std::string& rel_dex_location,
-                                                /* out */ std::string* dex_file_location,
-                                                /* out */ std::string* dex_file_name = nullptr);
-
   // Finds the associated oat class for a dex_file and descriptor. Returns an invalid OatClass on
   // error and sets found to false.
   static OatClass FindOatClass(const DexFile& dex_file, uint16_t class_def_idx, bool* found);
@@ -389,7 +402,7 @@ class OatFile {
 
   // Whether the OatFile embeds the Dex code.
   bool ContainsDexCode() const {
-    return uncompressed_dex_files_ == nullptr;
+    return external_dex_files_.empty();
   }
 
  protected:
@@ -470,9 +483,9 @@ class OatFile {
   // elements. std::list<> and std::deque<> satisfy this requirement, std::vector<> doesn't.
   mutable std::list<std::string> string_cache_ GUARDED_BY(secondary_lookup_lock_);
 
-  // Cache of dex files mapped directly from a location, in case the OatFile does
-  // not embed the dex code.
-  std::unique_ptr<std::vector<std::unique_ptr<const DexFile>>> uncompressed_dex_files_;
+  // Dex files opened directly from a file referenced from the oat file or specifed
+  // by the `dex_filenames` parameter, in case the OatFile does not embed the dex code.
+  std::vector<std::unique_ptr<const DexFile>> external_dex_files_;
 
   friend class gc::collector::DummyOatFile;  // For modifying begin_ and end_.
   friend class OatClass;
