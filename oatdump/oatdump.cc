@@ -2796,7 +2796,10 @@ static int DumpImages(Runtime* runtime, OatDumperOptions* options, std::ostream*
   }
 
   gc::Heap* heap = runtime->GetHeap();
-  CHECK(heap->HasBootImageSpace()) << "No image spaces";
+  if (!heap->HasBootImageSpace()) {
+    LOG(ERROR) << "No image spaces";
+    return EXIT_FAILURE;
+  }
   for (gc::space::ImageSpace* image_space : heap->GetBootImageSpaces()) {
     int result = DumpImage(image_space, options, os);
     if (result != EXIT_SUCCESS) {

@@ -269,6 +269,10 @@ struct CmdlineArgs {
     // Checks for --boot-image location.
     {
       std::string boot_image_location = boot_image_location_;
+      size_t separator_pos = boot_image_location.find(':');
+      if (separator_pos != std::string::npos) {
+        boot_image_location = boot_image_location.substr(/*pos*/ 0u, /*size*/ separator_pos);
+      }
       size_t file_name_idx = boot_image_location.rfind('/');
       if (file_name_idx == std::string::npos) {  // Prevent a InsertIsaDirectory check failure.
         *error_msg = "Boot image location must have a / in it";
