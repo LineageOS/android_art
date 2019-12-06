@@ -150,8 +150,7 @@ class ConcurrentCopying : public GarbageCollector {
   bool IsWeakRefAccessEnabled() REQUIRES(Locks::thread_list_lock_) {
     return weak_ref_access_enabled_;
   }
-  void RevokeThreadLocalMarkStack(Thread* thread) REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!mark_stack_lock_);
+  void RevokeThreadLocalMarkStack(Thread* thread) REQUIRES(!mark_stack_lock_);
 
   mirror::Object* IsMarked(mirror::Object* from_ref) override
       REQUIRES_SHARED(Locks::mutator_lock_);

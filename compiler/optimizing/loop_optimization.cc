@@ -1623,13 +1623,19 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
                              kNoDotProd;
             return TrySetVectorLength(16);
           case DataType::Type::kUint16:
+            *restrictions |= kNoDiv |
+                             kNoAbs |
+                             kNoSignedHAdd |
+                             kNoUnroundedHAdd |
+                             kNoSAD |
+                             kNoDotProd;
+            return TrySetVectorLength(8);
           case DataType::Type::kInt16:
             *restrictions |= kNoDiv |
                              kNoAbs |
                              kNoSignedHAdd |
                              kNoUnroundedHAdd |
-                             kNoSAD|
-                             kNoDotProd;
+                             kNoSAD;
             return TrySetVectorLength(8);
           case DataType::Type::kInt32:
             *restrictions |= kNoDiv | kNoSAD;
@@ -2166,7 +2172,7 @@ bool HLoopOptimization::VectorizeDotProdIdiom(LoopNode* node,
                                               bool generate_code,
                                               DataType::Type reduction_type,
                                               uint64_t restrictions) {
-  if (!instruction->IsAdd() || (reduction_type != DataType::Type::kInt32)) {
+  if (!instruction->IsAdd() || reduction_type != DataType::Type::kInt32) {
     return false;
   }
 
