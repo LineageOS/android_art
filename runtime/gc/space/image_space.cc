@@ -1754,7 +1754,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& a
   if (chunks_.empty() != (boot_image_component_count == 0u)) {
     *error_msg = StringPrintf("Unexpected boot image component count in %s: %u, %s",
                               actual_filename.c_str(),
-                              header.GetImageReservationSize(),
+                              boot_image_component_count,
                               chunks_.empty() ? "should be 0" : "should not be 0");
     return false;
   }
