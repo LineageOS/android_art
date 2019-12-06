@@ -275,6 +275,22 @@ static void VMRuntime_setTargetSdkVersionNative(JNIEnv*, jobject, jint target_sd
 #endif
 }
 
+static void VMRuntime_setDisabledCompatChangesNative(JNIEnv* env, jobject,
+    jlongArray disabled_compat_changes) {
+  if (disabled_compat_changes == nullptr) {
+    return;
+  }
+  std::set<uint64_t> disabled_compat_changes_vec;
+  int length = env->GetArrayLength(disabled_compat_changes);
+  jlong* elements = env->GetLongArrayElements(disabled_compat_changes, /*isCopy*/nullptr);
+  for (int i = 0; i < length; i++) {
+    disabled_compat_changes_vec.insert(static_cast<uint64_t>(elements[i]));
+  }
+  Runtime::Current()->SetDisabledCompatChanges(disabled_compat_changes_vec);
+
+  // TODO(145743810): pipe into libc as well.
+}
+
 static inline size_t clamp_to_size_t(jlong n) {
   if (sizeof(jlong) > sizeof(size_t)
       && UNLIKELY(n > static_cast<jlong>(std::numeric_limits<size_t>::max()))) {
@@ -781,6 +797,7 @@ static JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(VMRuntime, newUnpaddedArray, "(Ljava/lang/Class;I)Ljava/lang/Object;"),
   NATIVE_METHOD(VMRuntime, properties, "()[Ljava/lang/String;"),
   NATIVE_METHOD(VMRuntime, setTargetSdkVersionNative, "(I)V"),
+  NATIVE_METHOD(VMRuntime, setDisabledCompatChangesNative, "([J)V"),
   NATIVE_METHOD(VMRuntime, registerNativeAllocation, "(J)V"),
   NATIVE_METHOD(VMRuntime, registerNativeFree, "(J)V"),
   NATIVE_METHOD(VMRuntime, getNotifyNativeInterval, "()I"),

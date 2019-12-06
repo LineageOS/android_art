@@ -677,6 +677,19 @@ class Runtime {
     return target_sdk_version_;
   }
 
+  void SetDisabledCompatChanges(const std::set<uint64_t>& disabled_changes) {
+    disabled_compat_changes_ = disabled_changes;
+  }
+
+  std::set<uint64_t> GetDisabledCompatChanges() const {
+    return disabled_compat_changes_;
+  }
+
+  bool isChangeEnabled(uint64_t change_id) const {
+    // TODO(145743810): add an up call to java to log to statsd
+    return disabled_compat_changes_.count(change_id) == 0;
+  }
+
   uint32_t GetZygoteMaxFailedBoots() const {
     return zygote_max_failed_boots_;
   }
@@ -1166,6 +1179,9 @@ class Runtime {
 
   // Specifies target SDK version to allow workarounds for certain API levels.
   uint32_t target_sdk_version_;
+
+  // A set of disabled compat changes for the running app, all other changes are enabled.
+  std::set<uint64_t> disabled_compat_changes_;
 
   // Implicit checks flags.
   bool implicit_null_checks_;       // NullPointer checks are implicit.
