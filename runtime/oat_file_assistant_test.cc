@@ -1407,7 +1407,7 @@ TEST_F(OatFileAssistantTest, GetDexLocation) {
       /*dex_elements=*/nullptr,
       &oat_file,
       &error_msgs);
-  EXPECT_EQ(dex_files.size(), 1u);
+  ASSERT_EQ(dex_files.size(), 1u) << android::base::Join(error_msgs, "\n");
   EXPECT_EQ(oat_file, nullptr);
   std::string stored_dex_location = dex_files[0]->GetLocation();
   {
@@ -1425,8 +1425,8 @@ TEST_F(OatFileAssistantTest, GetDexLocation) {
       /*dex_elements=*/nullptr,
       &oat_file,
       &error_msgs);
-  EXPECT_EQ(dex_files.size(), 1u);
-  EXPECT_NE(oat_file, nullptr);
+  ASSERT_EQ(dex_files.size(), 1u) << android::base::Join(error_msgs, "\n");
+  ASSERT_NE(oat_file, nullptr);
   std::string oat_stored_dex_location = dex_files[0]->GetLocation();
   EXPECT_EQ(oat_stored_dex_location, stored_dex_location);
 }
@@ -1461,7 +1461,7 @@ TEST_F(OatFileAssistantTest, SystemFrameworkDir) {
       /*dex_elements=*/nullptr,
       &oat_file,
       &error_msgs);
-  EXPECT_EQ(dex_files_first.size(), 1u);
+  ASSERT_EQ(dex_files_first.size(), 1u) << android::base::Join(error_msgs, "\n");
   EXPECT_EQ(oat_file, nullptr) << dex_location;
   EXPECT_EQ(dex_files_first[0]->GetOatDexFile(), nullptr);
 
@@ -1489,8 +1489,8 @@ TEST_F(OatFileAssistantTest, SystemFrameworkDir) {
       /*dex_elements=*/nullptr,
       &oat_file,
       &error_msgs);
-  EXPECT_EQ(dex_files_second.size(), 1u);
-  EXPECT_NE(oat_file, nullptr);
+  ASSERT_EQ(dex_files_second.size(), 1u) << android::base::Join(error_msgs, "\n");
+  ASSERT_NE(oat_file, nullptr);
   EXPECT_NE(dex_files_second[0]->GetOatDexFile(), nullptr);
   EXPECT_NE(dex_files_second[0]->GetOatDexFile()->GetOatFile(), nullptr);
 
