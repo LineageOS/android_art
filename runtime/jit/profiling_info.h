@@ -130,6 +130,14 @@ class ProfilingInfo {
     return MemberOffset(OFFSETOF_MEMBER(ProfilingInfo, baseline_hotness_count_));
   }
 
+  void SetBaselineHotnessCount(uint16_t count) {
+    baseline_hotness_count_ = count;
+  }
+
+  uint16_t GetBaselineHotnessCount() const {
+    return baseline_hotness_count_;
+  }
+
  private:
   ProfilingInfo(ArtMethod* method, const std::vector<uint32_t>& entries);
 
