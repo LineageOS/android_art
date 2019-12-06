@@ -155,11 +155,13 @@ std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
     mmap_reuse = false;
   }
   CHECK(!mmap_reuse || mmap_addr != nullptr);
+  CHECK(!(writable && unquicken)) << "We don't want to be writing unquickened files out to disk!";
+  // Start as PROT_WRITE so we can mprotect back to it if we want to.
   MemMap mmap = MemMap::MapFileAtAddress(
       mmap_addr,
       vdex_length,
-      (writable || unquicken) ? PROT_READ | PROT_WRITE : PROT_READ,
-      unquicken ? MAP_PRIVATE : MAP_SHARED,
+      PROT_READ | PROT_WRITE,
+      writable ? MAP_SHARED : MAP_PRIVATE,
       file_fd,
       /* start= */ 0u,
       low_4gb,
@@ -183,11 +185,17 @@ std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
     if (!vdex->OpenAllDexFiles(&unique_ptr_dex_files, error_msg)) {
       return nullptr;
     }
+    // TODO: It would be nice to avoid doing the return-instruction stuff but then we end up not
+    // being able to tell if we need dequickening later. Instead just get rid of that too.
     vdex->Unquicken(MakeNonOwningPointerVector(unique_ptr_dex_files),
-                    /* decompile_return_instruction= */ false);
+                    /* decompile_return_instruction= */ true);
     // Update the quickening info size to pretend there isn't any.
     size_t offset = vdex->GetDexSectionHeaderOffset();
     reinterpret_cast<DexSectionHeader*>(vdex->mmap_.Begin() + offset)->quickening_info_size_ = 0;
+  }
+
+  if (!writable) {
+    vdex->AllowWriting(false);
   }
 
   return vdex;
@@ -209,8 +217,12 @@ const uint8_t* VdexFile::GetNextDexFileData(const uint8_t* cursor) const {
   }
 }
 
+void VdexFile::AllowWriting(bool val) const {
+  CHECK(mmap_.Protect(val ? (PROT_READ | PROT_WRITE) : PROT_READ));
+}
+
 bool VdexFile::OpenAllDexFiles(std::vector<std::unique_ptr<const DexFile>>* dex_files,
-                               std::string* error_msg) {
+                               std::string* error_msg) const {
   const ArtDexFileLoader dex_file_loader;
   size_t i = 0;
   for (const uint8_t* dex_file_start = GetNextDexFileData(nullptr);
@@ -237,6 +249,23 @@ bool VdexFile::OpenAllDexFiles(std::vector<std::unique_ptr<const DexFile>>* dex_
     dex_files->push_back(std::move(dex));
   }
   return true;
+}
+
+void VdexFile::UnquickenInPlace(bool decompile_return_instruction) const {
+  CHECK_NE(mmap_.GetProtect() & PROT_WRITE, 0)
+      << "File not mapped writable. Cannot unquicken! " << mmap_;
+  if (HasDexSection()) {
+    std::vector<std::unique_ptr<const DexFile>> unique_ptr_dex_files;
+    std::string error_msg;
+    if (!OpenAllDexFiles(&unique_ptr_dex_files, &error_msg)) {
+      return;
+    }
+    Unquicken(MakeNonOwningPointerVector(unique_ptr_dex_files),
+              decompile_return_instruction);
+    // Update the quickening info size to pretend there isn't any.
+    size_t offset = GetDexSectionHeaderOffset();
+    reinterpret_cast<DexSectionHeader*>(mmap_.Begin() + offset)->quickening_info_size_ = 0;
+  }
 }
 
 void VdexFile::Unquicken(const std::vector<const DexFile*>& target_dex_files,
@@ -279,7 +308,8 @@ static ArrayRef<const uint8_t> GetQuickeningInfoAt(const ArrayRef<const uint8_t>
 void VdexFile::UnquickenDexFile(const DexFile& target_dex_file,
                                 const DexFile& source_dex_file,
                                 bool decompile_return_instruction) const {
-  UnquickenDexFile(target_dex_file, source_dex_file.Begin(), decompile_return_instruction);
+  UnquickenDexFile(
+      target_dex_file, source_dex_file.Begin(), decompile_return_instruction);
 }
 
 void VdexFile::UnquickenDexFile(const DexFile& target_dex_file,
