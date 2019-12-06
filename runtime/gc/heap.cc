@@ -99,8 +99,8 @@ static constexpr size_t kCollectorTransitionStressWait = 10 * 1000;  // Microsec
 DEFINE_RUNTIME_DEBUG_FLAG(Heap, kStressCollectorTransition);
 
 // Minimum amount of remaining bytes before a concurrent GC is triggered.
-static constexpr size_t kMinConcurrentRemainingBytes = 128 * KB;
-static constexpr size_t kMaxConcurrentRemainingBytes = 512 * KB;
+static constexpr size_t kMinConcurrentRemainingBytes = 32 * MB;
+static constexpr size_t kMaxConcurrentRemainingBytes = 64 * MB;
 // Sticky GC throughput adjustment, divided by 4. Increasing this causes sticky GC to occur more
 // relative to partial/full GC. This may be desirable since sticky GCs interfere less with mutator
 // threads (lower pauses, use less memory bandwidth).
@@ -568,7 +568,9 @@ Heap::Heap(size_t initial_size,
   pending_task_lock_ = new Mutex("Pending task lock");
   if (ignore_max_footprint_) {
     SetIdealFootprint(std::numeric_limits<size_t>::max());
-    concurrent_start_bytes_ = std::numeric_limits<size_t>::max();
+    concurrent_start_bytes_ =
+        UnsignedDifference(target_footprint_.load(std::memory_order_relaxed),
+                           kMinConcurrentRemainingBytes);
   }
   CHECK_NE(max_allowed_footprint_, 0U);
   // Create our garbage collectors.
