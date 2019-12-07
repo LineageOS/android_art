@@ -410,39 +410,6 @@ static const uint8_t* GetRootTable(const void* code_ptr, uint32_t* number_of_roo
   return data - ComputeRootTableSize(roots);
 }
 
-// Use a sentinel for marking entries in the JIT table that have been cleared.
-// This helps diagnosing in case the compiled code tries to wrongly access such
-// entries.
-static mirror::Class* const weak_sentinel =
-    reinterpret_cast<mirror::Class*>(Context::kBadGprBase + 0xff);
-
-// Helper for the GC to process a weak class in a JIT root table.
-static inline void ProcessWeakClass(GcRoot<mirror::Class>* root_ptr,
-                                    IsMarkedVisitor* visitor,
-                                    mirror::Class* update)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  // This does not need a read barrier because this is called by GC.
-  mirror::Class* cls = root_ptr->Read<kWithoutReadBarrier>();
-  if (cls != nullptr && cls != weak_sentinel) {
-    DCHECK((cls->IsClass<kDefaultVerifyFlags>()));
-    // Look at the classloader of the class to know if it has been unloaded.
-    // This does not need a read barrier because this is called by GC.
-    ObjPtr<mirror::Object> class_loader =
-        cls->GetClassLoader<kDefaultVerifyFlags, kWithoutReadBarrier>();
-    if (class_loader == nullptr || visitor->IsMarked(class_loader.Ptr()) != nullptr) {
-      // The class loader is live, update the entry if the class has moved.
-      mirror::Class* new_cls = down_cast<mirror::Class*>(visitor->IsMarked(cls));
-      // Note that new_object can be null for CMS and newly allocated objects.
-      if (new_cls != nullptr && new_cls != cls) {
-        *root_ptr = GcRoot<mirror::Class>(new_cls);
-      }
-    } else {
-      // The class loader is not live, clear the entry.
-      *root_ptr = GcRoot<mirror::Class>(update);
-    }
-  }
-}
-
 void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
   for (const auto& entry : method_code_map_) {
@@ -455,7 +422,7 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
     for (uint32_t i = 0; i < number_of_roots; ++i) {
       // This does not need a read barrier because this is called by GC.
       mirror::Object* object = roots[i].Read<kWithoutReadBarrier>();
-      if (object == nullptr || object == weak_sentinel) {
+      if (object == nullptr || object == Runtime::GetWeakClassSentinel()) {
         // entry got deleted in a previous sweep.
       } else if (object->IsString<kDefaultVerifyFlags>()) {
         mirror::Object* new_object = visitor->IsMarked(object);
@@ -470,8 +437,10 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
           roots[i] = GcRoot<mirror::Object>(new_object);
         }
       } else {
-        ProcessWeakClass(
-            reinterpret_cast<GcRoot<mirror::Class>*>(&roots[i]), visitor, weak_sentinel);
+        Runtime::ProcessWeakClass(
+            reinterpret_cast<GcRoot<mirror::Class>*>(&roots[i]),
+            visitor,
+            Runtime::GetWeakClassSentinel());
       }
     }
   }
@@ -480,7 +449,7 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
     for (size_t i = 0; i < info->number_of_inline_caches_; ++i) {
       InlineCache* cache = &info->cache_[i];
       for (size_t j = 0; j < InlineCache::kIndividualCacheSize; ++j) {
-        ProcessWeakClass(&cache->classes_[j], visitor, nullptr);
+        Runtime::ProcessWeakClass(&cache->classes_[j], visitor, nullptr);
       }
     }
   }
@@ -1150,18 +1119,24 @@ void JitCodeCache::GarbageCollectCache(Thread* self) {
 
       // Start polling the liveness of compiled code to prepare for the next full collection.
       if (next_collection_will_be_full) {
-        // Save the entry point of methods we have compiled, and update the entry
-        // point of those methods to the interpreter. If the method is invoked, the
-        // interpreter will update its entry point to the compiled code and call it.
-        for (ProfilingInfo* info : profiling_infos_) {
-          const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
-          if (!IsInZygoteDataSpace(info) && ContainsPc(entry_point)) {
-            info->SetSavedEntryPoint(entry_point);
-            // Don't call Instrumentation::UpdateMethodsCode(), as it can check the declaring
-            // class of the method. We may be concurrently running a GC which makes accessing
-            // the class unsafe. We know it is OK to bypass the instrumentation as we've just
-            // checked that the current entry point is JIT compiled code.
-            info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+        if (Runtime::Current()->GetJITOptions()->CanCompileBaseline()) {
+          for (ProfilingInfo* info : profiling_infos_) {
+            info->SetBaselineHotnessCount(0);
+          }
+        } else {
+          // Save the entry point of methods we have compiled, and update the entry
+          // point of those methods to the interpreter. If the method is invoked, the
+          // interpreter will update its entry point to the compiled code and call it.
+          for (ProfilingInfo* info : profiling_infos_) {
+            const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
+            if (!IsInZygoteDataSpace(info) && ContainsPc(entry_point)) {
+              info->SetSavedEntryPoint(entry_point);
+              // Don't call Instrumentation::UpdateMethodsCode(), as it can check the declaring
+              // class of the method. We may be concurrently running a GC which makes accessing
+              // the class unsafe. We know it is OK to bypass the instrumentation as we've just
+              // checked that the current entry point is JIT compiled code.
+              info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+            }
           }
         }
 
@@ -1250,28 +1225,50 @@ void JitCodeCache::DoCollection(Thread* self, bool collect_profiling_info) {
   ScopedTrace trace(__FUNCTION__);
   {
     MutexLock mu(self, *Locks::jit_lock_);
-    if (collect_profiling_info) {
-      // Clear the profiling info of methods that do not have compiled code as entrypoint.
-      // Also remove the saved entry point from the ProfilingInfo objects.
-      for (ProfilingInfo* info : profiling_infos_) {
-        const void* ptr = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
-        if (!ContainsPc(ptr) && !info->IsInUseByCompiler() && !IsInZygoteDataSpace(info)) {
-          info->GetMethod()->SetProfilingInfo(nullptr);
-        }
 
-        if (info->GetSavedEntryPoint() != nullptr) {
-          info->SetSavedEntryPoint(nullptr);
-          // We are going to move this method back to interpreter. Clear the counter now to
-          // give it a chance to be hot again.
-          ClearMethodCounter(info->GetMethod(), /*was_warm=*/ true);
+    if (Runtime::Current()->GetJITOptions()->CanCompileBaseline()) {
+      // Update to interpreter the methods that have baseline entrypoints and whose baseline
+      // hotness count is zero.
+      // Note that these methods may be in thread stack or concurrently revived
+      // between. That's OK, as the thread executing it will mark it.
+      for (ProfilingInfo* info : profiling_infos_) {
+        if (info->GetBaselineHotnessCount() == 0) {
+          const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
+          if (ContainsPc(entry_point)) {
+            OatQuickMethodHeader* method_header =
+                OatQuickMethodHeader::FromEntryPoint(entry_point);
+            if (CodeInfo::IsBaseline(method_header->GetOptimizedCodeInfoPtr())) {
+              info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+            }
+          }
         }
       }
-    } else if (kIsDebugBuild) {
-      // Sanity check that the profiling infos do not have a dangling entry point.
-      for (ProfilingInfo* info : profiling_infos_) {
-        DCHECK(!Runtime::Current()->IsZygote());
-        const void* entry_point = info->GetSavedEntryPoint();
-        DCHECK(entry_point == nullptr || IsInZygoteExecSpace(entry_point));
+      // TODO: collect profiling info
+      // TODO: collect optimized code?
+    } else {
+      if (collect_profiling_info) {
+        // Clear the profiling info of methods that do not have compiled code as entrypoint.
+        // Also remove the saved entry point from the ProfilingInfo objects.
+        for (ProfilingInfo* info : profiling_infos_) {
+          const void* ptr = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
+          if (!ContainsPc(ptr) && !info->IsInUseByCompiler() && !IsInZygoteDataSpace(info)) {
+            info->GetMethod()->SetProfilingInfo(nullptr);
+          }
+
+          if (info->GetSavedEntryPoint() != nullptr) {
+            info->SetSavedEntryPoint(nullptr);
+            // We are going to move this method back to interpreter. Clear the counter now to
+            // give it a chance to be hot again.
+            ClearMethodCounter(info->GetMethod(), /*was_warm=*/ true);
+          }
+        }
+      } else if (kIsDebugBuild) {
+        // Sanity check that the profiling infos do not have a dangling entry point.
+        for (ProfilingInfo* info : profiling_infos_) {
+          DCHECK(!Runtime::Current()->IsZygote());
+          const void* entry_point = info->GetSavedEntryPoint();
+          DCHECK(entry_point == nullptr || IsInZygoteExecSpace(entry_point));
+        }
       }
     }
 
@@ -1653,6 +1650,12 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
     return new_compilation;
   } else {
     ProfilingInfo* info = method->GetProfilingInfo(kRuntimePointerSize);
+    if (CanAllocateProfilingInfo() && baseline && info == nullptr) {
+      // We can retry allocation here as we're the JIT thread.
+      if (ProfilingInfo::Create(self, method, /* retry_allocation= */ true)) {
+        info = method->GetProfilingInfo(kRuntimePointerSize);
+      }
+    }
     if (info == nullptr) {
       // When prejitting, we don't allocate a profiling info.
       if (!prejit && !IsSharedRegion(*region)) {

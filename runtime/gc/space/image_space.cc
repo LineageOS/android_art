@@ -1754,7 +1754,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& a
   if (chunks_.empty() != (boot_image_component_count == 0u)) {
     *error_msg = StringPrintf("Unexpected boot image component count in %s: %u, %s",
                               actual_filename.c_str(),
-                              header.GetImageReservationSize(),
+                              boot_image_component_count,
                               chunks_.empty() ? "should be 0" : "should not be 0");
     return false;
   }
@@ -2584,7 +2584,7 @@ class ImageSpace::BootImageLoader {
   }
 
   bool OpenOatFile(ImageSpace* space,
-                   const std::string& dex_filename,
+                   ArrayRef<const std::string> dex_filenames,
                    bool validate_oat_file,
                    ArrayRef<const std::unique_ptr<ImageSpace>> dependencies,
                    TimingLogger* logger,
@@ -2609,7 +2609,7 @@ class ImageSpace::BootImageLoader {
                                    oat_location,
                                    executable_,
                                    /*low_4gb=*/ false,
-                                   /*abs_dex_location=*/ dex_filename.c_str(),
+                                   dex_filenames,
                                    image_reservation,
                                    error_msg));
       if (oat_file == nullptr) {
@@ -2783,7 +2783,7 @@ class ImageSpace::BootImageLoader {
     for (std::size_t i = 0u, size = locations.size(); i != size; ++i) {
       ImageSpace* space = (*spaces)[spaces->size() - chunk.component_count + i].get();
       if (!OpenOatFile(space,
-                       boot_class_path_[chunk.start_index + i],
+                       boot_class_path_.SubArray(/*pos=*/ chunk.start_index + i, /*length=*/ 1u),
                        validate_oat_file,
                        dependencies,
                        logger,
@@ -3444,9 +3444,7 @@ bool ImageSpace::VerifyBootClassPathChecksums(
         size_t num_dex_files = oat_file->GetOatDexFiles().size();
         CHECK_NE(num_dex_files, 0u);
         const std::string main_location = oat_file->GetOatDexFiles()[0]->GetDexFileLocation();
-        // TODO: Get rid of the weird ResolveRelativeEncodedDexLocation() stuff from oat_file.cc
-        // and enable this check:
-        // CHECK_EQ(main_location, boot_class_path_locations[image_pos + component_index]);
+        CHECK_EQ(main_location, boot_class_path_locations[image_pos + component_index]);
         CHECK(!DexFileLoader::IsMultiDexLocation(main_location.c_str()));
         for (size_t i = 1u; i != num_dex_files; ++i) {
           CHECK(DexFileLoader::IsMultiDexLocation(

@@ -51,10 +51,22 @@ TEST_F(DexoptTest, ValidateOatFile) {
                                              oat_location.c_str(),
                                              /*executable=*/ false,
                                              /*low_4gb=*/ false,
-                                             /*abs_dex_location=*/ nullptr,
-                                             /*reservation=*/ nullptr,
                                              &error_msg));
   ASSERT_TRUE(oat != nullptr) << error_msg;
+
+  {
+    // Test opening the oat file also with explicit dex filenames.
+    std::vector<std::string> dex_filenames{ dex1, multidex1, dex2 };
+    std::unique_ptr<OatFile> oat2(OatFile::Open(/*zip_fd=*/ -1,
+                                                oat_location.c_str(),
+                                                oat_location.c_str(),
+                                                /*executable=*/ false,
+                                                /*low_4gb=*/ false,
+                                                ArrayRef<const std::string>(dex_filenames),
+                                                /*reservation=*/ nullptr,
+                                                &error_msg));
+    ASSERT_TRUE(oat2 != nullptr) << error_msg;
+  }
 
   // Originally all the dex checksums should be up to date.
   EXPECT_TRUE(ImageSpace::ValidateOatFile(*oat, &error_msg)) << error_msg;

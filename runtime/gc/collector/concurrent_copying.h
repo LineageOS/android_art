@@ -360,6 +360,10 @@ class ConcurrentCopying : public GarbageCollector {
   // (see use case in ConcurrentCopying::MarkFromReadBarrier).
   bool rb_mark_bit_stack_full_;
 
+  // Guards access to pooled_mark_stacks_ and revoked_mark_stacks_ vectors.
+  // Also guards destruction and revocations of thread-local mark-stacks.
+  // Clearing thread-local mark-stack (by other threads or during destruction)
+  // should be guarded by it.
   Mutex mark_stack_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
   std::vector<accounting::ObjectStack*> revoked_mark_stacks_
       GUARDED_BY(mark_stack_lock_);
