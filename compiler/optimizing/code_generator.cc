@@ -1011,6 +1011,20 @@ CodeGenerator::CodeGenerator(HGraph* graph,
       is_leaf_(true),
       requires_current_method_(false),
       code_generation_data_() {
+  if (GetGraph()->IsCompilingOsr()) {
+    // Make OSR methods have all registers spilled, this simplifies the logic of
+    // jumping to the compiled code directly.
+    for (size_t i = 0; i < number_of_core_registers_; ++i) {
+      if (IsCoreCalleeSaveRegister(i)) {
+        AddAllocatedRegister(Location::RegisterLocation(i));
+      }
+    }
+    for (size_t i = 0; i < number_of_fpu_registers_; ++i) {
+      if (IsFloatingPointCalleeSaveRegister(i)) {
+        AddAllocatedRegister(Location::FpuRegisterLocation(i));
+      }
+    }
+  }
 }
 
 CodeGenerator::~CodeGenerator() {}
