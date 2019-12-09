@@ -1039,6 +1039,13 @@ void Runtime::InitNonZygoteOrPostFork(
       LOG(WARNING) << "Failed to load perfetto_hprof: " << err;
     }
   }
+  if (LIKELY(automatically_set_jni_ids_indirection_) && CanSetJniIdType()) {
+    if (IsJavaDebuggable()) {
+      SetJniIdType(JniIdType::kIndices);
+    } else {
+      SetJniIdType(JniIdType::kPointer);
+    }
+  }
 }
 
 void Runtime::StartSignalCatcher() {
@@ -1317,6 +1324,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   madvise_random_access_ = runtime_options.GetOrDefault(Opt::MadviseRandomAccess);
 
   jni_ids_indirection_ = runtime_options.GetOrDefault(Opt::OpaqueJniIds);
+  automatically_set_jni_ids_indirection_ =
+      runtime_options.GetOrDefault(Opt::AutoPromoteOpaqueJniIds);
 
   plugins_ = runtime_options.ReleaseOrDefault(Opt::Plugins);
   agent_specs_ = runtime_options.ReleaseOrDefault(Opt::AgentPath);

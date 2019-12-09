@@ -16,4 +16,4 @@
 
 args=$(echo "$@" | sed  's/--runtime-option -Xopaque-jni-ids\:true//g')
 
-./default-run $args --android-runtime-option -Xopaque-jni-ids:swapable
+./default-run $args --android-runtime-option -Xopaque-jni-ids:swapable --android-runtime-option -Xauto-promote-opaque-jni-ids:false
