@@ -1043,7 +1043,9 @@ void Jit::MapBootImageMethods() {
 
 
       uint8_t* pointer = reinterpret_cast<uint8_t*>(&method);
-      if (pointer >= page_start && pointer < page_end) {
+      // Note: We could refactor this to only check if the ArtMethod entrypoint is inside the
+      // page region. This would remove the need for the edge case handling below.
+      if (pointer >= page_start && pointer + sizeof(ArtMethod) < page_end) {
         // For all the methods in the mapping, put the entrypoint to the
         // resolution stub.
         ArtMethod* new_method = reinterpret_cast<ArtMethod*>(
