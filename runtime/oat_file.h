@@ -107,11 +107,10 @@ class OatFile {
                                   ArrayRef<const std::string> dex_filenames,
                                   std::string* error_msg);
   // Open an oat file. Returns null on failure.
-  // The `dex_filenames` argument, if provided, specifies dex files to
-  // open if they are not embedded in the vdex file. This may differ
-  // from dex file locations in the oat file for cross-compilation
-  // (the dex file name is the host path and dex location is the future
-  // path on target) and testing.
+  // The `dex_filenames` argument, if provided, overrides the dex locations
+  // from oat file when opening the dex files if they are not embedded in the
+  // vdex file. These may differ for cross-compilation (the dex file name is
+  // the host path and dex location is the future path on target) and testing.
   static OatFile* Open(int zip_fd,
                        const std::string& filename,
                        const std::string& location,
