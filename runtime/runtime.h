@@ -1283,6 +1283,10 @@ class Runtime {
   // pointers. This is set by -Xopaque-jni-ids:{true,false}.
   JniIdType jni_ids_indirection_;
 
+  // Set to false in cases where we want to directly control when jni-id
+  // indirection is changed. This is intended only for testing JNI id swapping.
+  bool automatically_set_jni_ids_indirection_;
+
   // Saved environment.
   class EnvSnapshot {
    public:
