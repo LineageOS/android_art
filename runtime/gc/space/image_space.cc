@@ -548,6 +548,7 @@ class ImageSpace::PatchObjectVisitor final {
 
   void VisitDexCacheArrays(ObjPtr<mirror::DexCache> dex_cache)
       REQUIRES_SHARED(Locks::mutator_lock_) {
+    ScopedTrace st("VisitDexCacheArrays");
     FixupDexCacheArray<mirror::StringDexCacheType>(dex_cache,
                                                    mirror::DexCache::StringsOffset(),
                                                    dex_cache->NumStrings<kVerifyNone>());
