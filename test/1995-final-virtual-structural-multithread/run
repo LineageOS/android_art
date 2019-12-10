@@ -18,4 +18,4 @@
 # iget-object-quick during dex2dex compilation. This breaks the test since the
 # -quick opcode encodes the exact byte offset of fields. Since this test changes
 # the offset this causes problems.
-./default-run "$@" --jvmti --runtime-option -Xopaque-jni-ids:true -Xcompiler-option --debuggable
+./default-run "$@" --jvmti --runtime-option -Xopaque-jni-ids:true
