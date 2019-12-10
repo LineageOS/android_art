@@ -164,6 +164,9 @@ art_global_defaults {
                 //  platform specific Bionic header.
                 "bionic_libc_platform_headers",
             ],
+            strip: {
+                none: true,
+            },
         },
         darwin: {
             enabled: false,
