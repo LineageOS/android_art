@@ -745,7 +745,7 @@ define define-test-art-gtest-combination
   dependencies := $$(ART_TEST_$(2)_GTEST$(3)_RULES)
 
 .PHONY: $$(rule_name)
-$$(rule_name): $$(dependencies) d8 d8-compat-dx
+$$(rule_name): $$(dependencies) d8
 	$(hide) $$(call ART_TEST_PREREQ_FINISHED,$$@)
 
   # Clear locally defined variables.
