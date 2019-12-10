@@ -92,11 +92,6 @@ EOF
   ) | sed -e 's/^  //' >&2 # Strip leading whitespace from heredoc.
 }
 
-emulator="no"
-if [ "$ANDROID_SERIAL" = "emulator-5554" ]; then
-  emulator="yes"
-fi
-
 # Packages that currently work correctly with the expectation files.
 working_packages=("libcore.android.system"
                   "libcore.build"
