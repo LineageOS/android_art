@@ -9,6 +9,14 @@
 
 [
 {
+  description: "Os.memfd_create() only supports bionic-based platforms.",
+  result: EXEC_FAILED,
+  modes: [host],
+  names: ["libcore.android.system.OsTest#testMemfdCreate",
+          "libcore.android.system.OsTest#testMemfdCreateErrno",
+          "libcore.android.system.OsTest#testMemfdCreateFlags"]
+},
+{
   description: "Assert.java differences between vogar and junit.",
   result: EXEC_FAILED,
   modes: [host],
