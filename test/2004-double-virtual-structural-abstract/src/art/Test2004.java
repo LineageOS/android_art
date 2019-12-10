@@ -1,0 +1,114 @@
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package art;
+
+import java.util.Base64;
+public class Test2004 {
+
+  public static abstract class Transform {
+    public String getGreeting() {
+      return "Hi";
+    }
+  }
+
+  public static class SubTransform extends Transform {
+    public void sayHi() {
+      System.out.println(getGreeting());
+    }
+  }
+  /**
+   * base64 encoded class/dex file for
+   * public static class SubTransform extends Transform {
+   *   private int count = 0;
+   *   public void sayHi() {
+   *     System.out.println(getGreeting());
+   *   }
+   *   public string getName() {
+   *     return "Alex";
+   *   }
+   * }
+   */
+  private static final byte[] SUBTRANSFORM_DEX_BYTES = Base64.getDecoder().decode(
+"ZGV4CjAzNQA5zD9gOMLav7UxQjoS9LNQj2bnqGOL4VrcBAAAcAAAAHhWNBIAAAAAAAAAABgEAAAa" +
+"AAAAcAAAAAoAAADYAAAAAwAAAAABAAACAAAAJAEAAAYAAAA0AQAAAQAAAGQBAABYAwAAhAEAAPYB" +
+"AAD+AQAABAIAAAcCAAAKAgAAJwIAAEECAABRAgAAdQIAAJUCAACsAgAAwAIAANQCAADiAgAA8QIA" +
+"APQCAAD4AgAABQMAAAwDAAAZAwAAIgMAACgDAAAtAwAANgMAAD0DAABEAwAAAgAAAAQAAAAFAAAA" +
+"BgAAAAcAAAAIAAAACQAAAAoAAAALAAAADgAAAAMAAAAHAAAAAAAAAA4AAAAJAAAAAAAAAA8AAAAJ" +
+"AAAA8AEAAAEAAAARAAAACAAGABUAAAABAAEAAAAAAAEAAAASAAAAAQAAABMAAAABAAEAFwAAAAIA" +
+"AQAAAAAABgACABYAAAABAAAAAQAAAAIAAAAAAAAADQAAAAgEAADhAwAAAAAAAAIAAQAAAAAA5QEA" +
+"AAMAAAAaAAEAEQAAAAIAAQABAAAA4AEAAAcAAABwEAQAAQASAFkQAAAOAAAAAwABAAIAAADpAQAA" +
+"CgAAAGIAAQBuEAEAAgAMAW4gBQAQAA4ACgAOPAAQAA4ADQAOlgAAAAEAAAAHAAY8aW5pdD4ABEFs" +
+"ZXgAAUkAAUwAG0xhcnQvVGVzdDIwMDQkU3ViVHJhbnNmb3JtOwAYTGFydC9UZXN0MjAwNCRUcmFu" +
+"c2Zvcm07AA5MYXJ0L1Rlc3QyMDA0OwAiTGRhbHZpay9hbm5vdGF0aW9uL0VuY2xvc2luZ0NsYXNz" +
+"OwAeTGRhbHZpay9hbm5vdGF0aW9uL0lubmVyQ2xhc3M7ABVMamF2YS9pby9QcmludFN0cmVhbTsA" +
+"EkxqYXZhL2xhbmcvU3RyaW5nOwASTGphdmEvbGFuZy9TeXN0ZW07AAxTdWJUcmFuc2Zvcm0ADVRl" +
+"c3QyMDA0LmphdmEAAVYAAlZMAAthY2Nlc3NGbGFncwAFY291bnQAC2dldEdyZWV0aW5nAAdnZXRO" +
+"YW1lAARuYW1lAANvdXQAB3ByaW50bG4ABXNheUhpAAV2YWx1ZQCLAX5+RDh7ImNvbXBpbGF0aW9u" +
+"LW1vZGUiOiJkZWJ1ZyIsImhhcy1jaGVja3N1bXMiOmZhbHNlLCJtaW4tYXBpIjoxLCJzaGEtMSI6" +
+"Ijg1YmYxNmM3NTY1M2Q0MDRhNGMzZWQ0MzYwN2M3N2I4NWJhZjMxZWUiLCJ2ZXJzaW9uIjoiMi4w" +
+"LjUtZGV2In0AAgQBGBgDAgUCEAQJFBcMAAEBAgACAIGABJwDAgGEAwEBvAMAAAAAAAAAAgAAANID" +
+"AADYAwAA/AMAAAAAAAAAAAAAAAAAABAAAAAAAAAAAQAAAAAAAAABAAAAGgAAAHAAAAACAAAACgAA" +
+"ANgAAAADAAAAAwAAAAABAAAEAAAAAgAAACQBAAAFAAAABgAAADQBAAAGAAAAAQAAAGQBAAABIAAA" +
+"AwAAAIQBAAADIAAAAwAAAOABAAABEAAAAQAAAPABAAACIAAAGgAAAPYBAAAEIAAAAgAAANIDAAAA" +
+"IAAAAQAAAOEDAAADEAAAAgAAAPgDAAAGIAAAAQAAAAgEAAAAEAAAAQAAABgEAAA=");
+
+  /**
+   * base64 encoded class/dex file for
+   * public static abstract class Transform {
+   *   public String getGreeting() {
+   *     return "Hello " + getName();
+   *   }
+   *   public abstract string getName();
+   * }
+   */
+  private static final byte[] TRANSFORM_DEX_BYTES = Base64.getDecoder().decode(
+"ZGV4CjAzNQDtwEbrWZHwf9ALLXnPJ2zRU6kQs/yHTCJ4BAAAcAAAAHhWNBIAAAAAAAAAAMADAAAW" +
+"AAAAcAAAAAgAAADIAAAAAwAAAOgAAAAAAAAAAAAAAAcAAAAMAQAAAQAAAEQBAAAUAwAAZAEAAMYB" +
+"AADOAQAA1gEAANkBAADdAQAA9wEAAAcCAAArAgAASwIAAF8CAABzAgAAjgIAAJ0CAACoAgAAqwIA" +
+"ALgCAADAAgAAzQIAANYCAADcAgAA5gIAAO0CAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAA" +
+"DQAAAAIAAAAFAAAAAAAAAAMAAAAGAAAAwAEAAA0AAAAHAAAAAAAAAAAAAgAAAAAAAAAAABAAAAAA" +
+"AAAAEQAAAAQAAgAAAAAABgACAAAAAAAGAAEADwAAAAYAAAATAAAAAAAAAAEEAAAEAAAAAAAAAAsA" +
+"AACwAwAAiwMAAAAAAAAEAAEAAgAAALwBAAAWAAAAbhACAAMADAAiAQYAcBAEAAEAGgIBAG4gBQAh" +
+"AG4gBQABAG4QBgABAAwAEQABAAEAAQAAALgBAAAEAAAAcBADAAAADgAEAA4ABgAOAAEAAAAFAAY8" +
+"aW5pdD4ABkhlbGxvIAABTAACTEwAGExhcnQvVGVzdDIwMDQkVHJhbnNmb3JtOwAOTGFydC9UZXN0" +
+"MjAwNDsAIkxkYWx2aWsvYW5ub3RhdGlvbi9FbmNsb3NpbmdDbGFzczsAHkxkYWx2aWsvYW5ub3Rh" +
+"dGlvbi9Jbm5lckNsYXNzOwASTGphdmEvbGFuZy9PYmplY3Q7ABJMamF2YS9sYW5nL1N0cmluZzsA" +
+"GUxqYXZhL2xhbmcvU3RyaW5nQnVpbGRlcjsADVRlc3QyMDA0LmphdmEACVRyYW5zZm9ybQABVgAL" +
+"YWNjZXNzRmxhZ3MABmFwcGVuZAALZ2V0R3JlZXRpbmcAB2dldE5hbWUABG5hbWUACHRvU3RyaW5n" +
+"AAV2YWx1ZQCLAX5+RDh7ImNvbXBpbGF0aW9uLW1vZGUiOiJkZWJ1ZyIsImhhcy1jaGVja3N1bXMi" +
+"OmZhbHNlLCJtaW4tYXBpIjoxLCJzaGEtMSI6Ijg1YmYxNmM3NTY1M2Q0MDRhNGMzZWQ0MzYwN2M3" +
+"N2I4NWJhZjMxZWUiLCJ2ZXJzaW9uIjoiMi4wLjUtZGV2In0AAgIBFBgBAgMCDiQJBBIXDAAAAQIA" +
+"gYAEoAMBAeQCAYEIAAAAAAAAAAACAAAAewMAAIEDAACkAwAAAAAAAAAAAAAAAAAADwAAAAAAAAAB" +
+"AAAAAAAAAAEAAAAWAAAAcAAAAAIAAAAIAAAAyAAAAAMAAAADAAAA6AAAAAUAAAAHAAAADAEAAAYA" +
+"AAABAAAARAEAAAEgAAACAAAAZAEAAAMgAAACAAAAuAEAAAEQAAABAAAAwAEAAAIgAAAWAAAAxgEA" +
+"AAQgAAACAAAAewMAAAAgAAABAAAAiwMAAAMQAAACAAAAoAMAAAYgAAABAAAAsAMAAAAQAAABAAAA" +
+"wAMAAA==");
+
+
+  public static void run() {
+    Redefinition.setTestConfiguration(Redefinition.Config.COMMON_REDEFINE);
+    doTest(new SubTransform());
+  }
+
+  public static void doTest(SubTransform t) {
+    t.sayHi();
+    Redefinition.doMultiStructuralClassRedefinition(
+        new Redefinition.CommonClassDefinition(SubTransform.class, null, SUBTRANSFORM_DEX_BYTES),
+        new Redefinition.CommonClassDefinition(Transform.class, null, TRANSFORM_DEX_BYTES));
+    t.sayHi();
+  }
+}
