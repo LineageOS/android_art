@@ -437,7 +437,11 @@ class DeoptimizeStackVisitor final : public StackVisitor {
         updated_vregs = GetThread()->GetUpdatedVRegFlags(frame_id);
         DCHECK(updated_vregs != nullptr);
       }
-      HandleOptimizingDeoptimization(method, new_frame, updated_vregs);
+      if (GetCurrentOatQuickMethodHeader()->IsNterpMethodHeader()) {
+        HandleNterpDeoptimization(method, new_frame, updated_vregs);
+      } else {
+        HandleOptimizingDeoptimization(method, new_frame, updated_vregs);
+      }
       if (updated_vregs != nullptr) {
         // Calling Thread::RemoveDebuggerShadowFrameMapping will also delete the updated_vregs
         // array so this must come after we processed the frame.
@@ -467,6 +471,35 @@ class DeoptimizeStackVisitor final : public StackVisitor {
   }
 
  private:
+  void HandleNterpDeoptimization(ArtMethod* m,
+                                 ShadowFrame* new_frame,
+                                 const bool* updated_vregs)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    ArtMethod** cur_quick_frame = GetCurrentQuickFrame();
+    StackReference<mirror::Object>* vreg_ref_base =
+        reinterpret_cast<StackReference<mirror::Object>*>(NterpGetReferenceArray(cur_quick_frame));
+    int32_t* vreg_int_base =
+        reinterpret_cast<int32_t*>(NterpGetRegistersArray(cur_quick_frame));
+    CodeItemDataAccessor accessor(m->DexInstructionData());
+    const uint16_t num_regs = accessor.RegistersSize();
+    // An nterp frame has two arrays: a dex register array and a reference array
+    // that shadows the dex register array but only containing references
+    // (non-reference dex registers have nulls). See nterp_helpers.cc.
+    for (size_t reg = 0; reg < num_regs; ++reg) {
+      if (updated_vregs != nullptr && updated_vregs[reg]) {
+        // Keep the value set by debugger.
+        continue;
+      }
+      StackReference<mirror::Object>* ref_addr = vreg_ref_base + reg;
+      mirror::Object* ref = ref_addr->AsMirrorPtr();
+      if (ref != nullptr) {
+        new_frame->SetVRegReference(reg, ref);
+      } else {
+        new_frame->SetVReg(reg, vreg_int_base[reg]);
+      }
+    }
+  }
+
   void HandleOptimizingDeoptimization(ArtMethod* m,
                                       ShadowFrame* new_frame,
                                       const bool* updated_vregs)

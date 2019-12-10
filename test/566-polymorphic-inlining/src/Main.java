@@ -47,7 +47,7 @@ public class Main implements Itf {
     // Make testInvokeVirtual and testInvokeInterface hot to get them jitted.
     // We pass Main and Subclass to get polymorphic inlining based on calling
     // the same method.
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 1000000; ++i) {
       testInvokeVirtual(mains[0]);
       testInvokeVirtual(mains[1]);
       testInvokeInterface(itfs[0]);
@@ -78,7 +78,7 @@ public class Main implements Itf {
 
     // Run this once to make sure we execute the JITted code.
     $noinline$testInlineToSameTarget(mains[0]);
-    assertEquals(20001, counter);
+    assertEquals(2000001, counter);
   }
 
   public Class<?> sameInvokeVirtual() {

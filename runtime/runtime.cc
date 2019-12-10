@@ -150,6 +150,7 @@
 #include "oat.h"
 #include "oat_file.h"
 #include "oat_file_manager.h"
+#include "oat_quick_method_header.h"
 #include "object_callbacks.h"
 #include "parsed_options.h"
 #include "quick/quick_method_frame_info.h"
@@ -850,13 +851,15 @@ bool Runtime::Start() {
 
   if (!IsImageDex2OatEnabled() || !GetHeap()->HasBootImageSpace()) {
     ScopedObjectAccess soa(self);
-    StackHandleScope<2> hs(soa.Self());
+    StackHandleScope<3> hs(soa.Self());
 
     ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots = GetClassLinker()->GetClassRoots();
     auto class_class(hs.NewHandle<mirror::Class>(GetClassRoot<mirror::Class>(class_roots)));
+    auto string_class(hs.NewHandle<mirror::Class>(GetClassRoot<mirror::String>(class_roots)));
     auto field_class(hs.NewHandle<mirror::Class>(GetClassRoot<mirror::Field>(class_roots)));
 
     class_linker_->EnsureInitialized(soa.Self(), class_class, true, true);
+    class_linker_->EnsureInitialized(soa.Self(), string_class, true, true);
     self->AssertNoPendingException();
     // Field class is needed for register_java_net_InetAddress in libcore, b/28153851.
     class_linker_->EnsureInitialized(soa.Self(), field_class, true, true);
@@ -2727,6 +2730,11 @@ bool Runtime::IsVerificationSoftFail() const {
 }
 
 bool Runtime::IsAsyncDeoptimizeable(uintptr_t code) const {
+  if (OatQuickMethodHeader::NterpMethodHeader != nullptr) {
+    if (OatQuickMethodHeader::NterpMethodHeader->Contains(code)) {
+      return true;
+    }
+  }
   // We only support async deopt (ie the compiled code is not explicitly asking for
   // deopt, but something else like the debugger) in debuggable JIT code.
   // We could look at the oat file where `code` is being defined,

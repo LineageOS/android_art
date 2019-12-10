@@ -20,6 +20,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "base/globals.h"
+
 /*
  * Mterp assembly handler bases
  */
@@ -31,6 +33,7 @@ extern "C" void* artNterpAsmInstructionEnd[];
 
 namespace art {
 
+class ArtMethod;
 class Thread;
 
 namespace interpreter {
@@ -40,6 +43,8 @@ void CheckMterpAsmConstants();
 void CheckNterpAsmConstants();
 bool CanUseMterp();
 bool IsNterpSupported();
+bool CanRuntimeUseNterp();
+bool CanMethodUseNterp(ArtMethod* method);
 const void* GetNterpEntryPoint();
 
 // Poison value for TestExportPC.  If we segfault with this value, it means that a mterp
@@ -50,6 +55,9 @@ constexpr uintptr_t kExportPCPoison = 0xdead00ff;
 constexpr bool kTestExportPC = false;
 
 constexpr size_t kMterpHandlerSize = 128;
+
+// The maximum we will allow an nterp frame to be.
+constexpr size_t kMaxNterpFrame = 3 * KB;
 
 }  // namespace interpreter
 }  // namespace art

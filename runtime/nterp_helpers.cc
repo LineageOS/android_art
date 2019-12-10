@@ -92,7 +92,7 @@ static constexpr size_t NterpGetFrameEntrySize() {
   return (POPCOUNT(core_spills) + POPCOUNT(fp_spills)) * kPointerSize;
 }
 
-static size_t NterpGetFrameSize(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
+size_t NterpGetFrameSize(ArtMethod* method) {
   CodeItemDataAccessor accessor(method->DexInstructionData());
   const uint16_t num_regs = accessor.RegistersSize();
   const uint16_t out_regs = accessor.OutsSize();
