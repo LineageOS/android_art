@@ -309,7 +309,7 @@ class VdexFile {
 
   // Open all the dex files contained in this vdex file.
   bool OpenAllDexFiles(std::vector<std::unique_ptr<const DexFile>>* dex_files,
-                       std::string* error_msg);
+                       std::string* error_msg) const;
 
   // In-place unquicken the given `dex_files` based on `quickening_info`.
   // `decompile_return_instruction` controls if RETURN_VOID_BARRIER instructions are
@@ -318,6 +318,8 @@ class VdexFile {
   // Always unquickens using the vdex dex files as the source for quicken tables.
   void Unquicken(const std::vector<const DexFile*>& target_dex_files,
                  bool decompile_return_instruction) const;
+
+  void UnquickenInPlace(bool decompile_return_instruction) const;
 
   // Fully unquicken `target_dex_file` based on `quickening_info`.
   void UnquickenDexFile(const DexFile& target_dex_file,
@@ -354,6 +356,10 @@ class VdexFile {
   // Returns true if the class loader context stored in the vdex matches `context`.
   bool MatchesClassLoaderContext(const ClassLoaderContext& context) const;
 
+  // Make the Vdex file & underlying dex-files RW or RO. Should only be used for in-place
+  // dequickening.
+  void AllowWriting(bool value) const;
+
  private:
   uint32_t GetQuickeningInfoTableOffset(const uint8_t* source_dex_begin) const;
 
@@ -382,7 +388,8 @@ class VdexFile {
     return DexBegin() + GetDexSectionHeader().GetDexSize();
   }
 
-  MemMap mmap_;
+  // mutable for AllowWriting()
+  mutable MemMap mmap_;
 
   DISALLOW_COPY_AND_ASSIGN(VdexFile);
 };

@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <limits>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include "android-base/strings.h"
@@ -104,7 +105,7 @@
 #include "mirror/class-alloc-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/class_ext.h"
-#include "mirror/class_loader.h"
+#include "mirror/class_loader-inl.h"
 #include "mirror/emulated_stack_frame.h"
 #include "mirror/field.h"
 #include "mirror/method.h"
@@ -2850,6 +2851,27 @@ void Runtime::DeoptimizeBootImage() {
       // Code JITted by the zygote is not compiled debuggable.
       jit->GetCodeCache()->ClearEntryPointsInZygoteExecSpace();
     }
+  }
+  // Also de-quicken all -quick opcodes. We do this for both BCP and non-bcp so if we are swapping
+  // debuggable during startup by a plugin (eg JVMTI) even non-BCP code has its vdex files deopted.
+  std::unordered_set<const VdexFile*> vdexs;
+  GetClassLinker()->VisitKnownDexFiles(Thread::Current(), [&](const art::DexFile* df) {
+    const OatDexFile* odf = df->GetOatDexFile();
+    if (odf == nullptr) {
+      return;
+    }
+    const OatFile* of = odf->GetOatFile();
+    if (of == nullptr || of->IsDebuggable()) {
+      // no Oat or already debuggable so no -quick.
+      return;
+    }
+    vdexs.insert(of->GetVdexFile());
+  });
+  LOG(INFO) << "Unquickening " << vdexs.size() << " vdex files!";
+  for (const VdexFile* vf : vdexs) {
+    vf->AllowWriting(true);
+    vf->UnquickenInPlace(/*decompile_return_instruction=*/true);
+    vf->AllowWriting(false);
   }
 }
 

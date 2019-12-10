@@ -183,6 +183,10 @@ class OatFileBase : public OatFile {
   }
 
  private:
+  // Returns true if we want to remove quickened opcodes before loading the VDEX file, false
+  // otherwise.
+  bool ShouldUnquickenVDex() const;
+
   DISALLOW_COPY_AND_ASSIGN(OatFileBase);
 };
 
@@ -267,6 +271,13 @@ OatFileBase* OatFileBase::OpenOatFile(int zip_fd,
   return ret.release();
 }
 
+bool OatFileBase::ShouldUnquickenVDex() const {
+  // We sometimes load oat files without a runtime (eg oatdump) and don't want to do anything in
+  // that case. If we are debuggable there are no -quick opcodes to unquicken. If the runtime is not
+  // debuggable we don't care whether there are -quick opcodes or not so no need to do anything.
+  return Runtime::Current() != nullptr && !IsDebuggable() && Runtime::Current()->IsJavaDebuggable();
+}
+
 bool OatFileBase::LoadVdex(const std::string& vdex_filename,
                            bool writable,
                            bool low_4gb,
@@ -277,7 +288,7 @@ bool OatFileBase::LoadVdex(const std::string& vdex_filename,
                                   vdex_filename,
                                   writable,
                                   low_4gb,
-                                  /* unquicken=*/ false,
+                                  ShouldUnquickenVDex(),
                                   error_msg);
   if (vdex_.get() == nullptr) {
     *error_msg = StringPrintf("Failed to load vdex file '%s' %s",
@@ -299,16 +310,17 @@ bool OatFileBase::LoadVdex(int vdex_fd,
     if (rc == -1) {
       PLOG(WARNING) << "Failed getting length of vdex file";
     } else {
-      vdex_ = VdexFile::OpenAtAddress(vdex_begin_,
-                                      vdex_end_ - vdex_begin_,
-                                      /*mmap_reuse=*/ vdex_begin_ != nullptr,
-                                      vdex_fd,
-                                      s.st_size,
-                                      vdex_filename,
-                                      writable,
-                                      low_4gb,
-                                      /*unquicken=*/ false,
-                                      error_msg);
+      vdex_ = VdexFile::OpenAtAddress(
+          vdex_begin_,
+          vdex_end_ - vdex_begin_,
+          /*mmap_reuse=*/ vdex_begin_ != nullptr,
+          vdex_fd,
+          s.st_size,
+          vdex_filename,
+          writable,
+          low_4gb,
+          ShouldUnquickenVDex(),
+          error_msg);
       if (vdex_.get() == nullptr) {
         *error_msg = "Failed opening vdex file.";
         return false;
