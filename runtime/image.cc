@@ -29,7 +29,7 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-const uint8_t ImageHeader::kImageVersion[] = { '0', '8', '4', '\0' };  // FP16 gt/ge/lt/le intrinsic
+const uint8_t ImageHeader::kImageVersion[] = { '0', '8', '5', '\0' };  // Single-image.
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,
@@ -102,6 +102,14 @@ bool ImageHeader::IsAppImage() const {
   // oat files in their reservation size, app images are loaded separately from oat
   // files and their reservation size is the image size rounded up to full page.
   return image_reservation_size_ == RoundUp(image_size_, kPageSize);
+}
+
+uint32_t ImageHeader::GetImageSpaceCount() const {
+  DCHECK(!IsAppImage());
+  DCHECK_NE(component_count_, 0u);  // Must be the header for the first component.
+  // For images compiled with --single-image, there is only one oat file. To detect
+  // that, check whether the reservation ends at the end of the first oat file.
+  return (image_begin_ + image_reservation_size_ == oat_file_end_) ? 1u : component_count_;
 }
 
 bool ImageHeader::IsValid() const {

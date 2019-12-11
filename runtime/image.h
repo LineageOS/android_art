@@ -366,6 +366,8 @@ class PACKED(8) ImageHeader {
 
   bool IsAppImage() const;
 
+  uint32_t GetImageSpaceCount() const;
+
   // Visit mirror::Objects in the section starting at base.
   // TODO: Delete base parameter if it is always equal to GetImageBegin.
   void VisitObjects(ObjectVisitor* visitor,
