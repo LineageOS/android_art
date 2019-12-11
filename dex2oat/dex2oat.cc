@@ -251,6 +251,9 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("  --oat-file=<file.oat>: specifies an oat output destination via a filename.");
   UsageError("      Example: --oat-file=/system/framework/boot.oat");
   UsageError("");
+  UsageError("  --oat-symbols=<file.oat>: specifies a symbolized oat output destination.");
+  UsageError("      Example: --oat-file=symbols/system/framework/boot.oat");
+  UsageError("");
   UsageError("  --oat-fd=<number>: specifies the oat output destination via a file descriptor.");
   UsageError("      Example: --oat-fd=6");
   UsageError("");
@@ -277,6 +280,9 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("");
   UsageError("  --image=<file.art>: specifies an output image filename.");
   UsageError("      Example: --image=/system/framework/boot.art");
+  UsageError("");
+  UsageError("  --image-fd=<number>: same as --image but accepts a file descriptor instead.");
+  UsageError("      Cannot be used together with --image.");
   UsageError("");
   UsageError("  --image-format=(uncompressed|lz4|lz4hc):");
   UsageError("      Which format to store the image.");
@@ -430,7 +436,11 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("  --app-image-file=<file-name>: specify a file name for app image.");
   UsageError("      Example: --app-image-file=/data/dalvik-cache/system@app@Calculator.apk.art");
   UsageError("");
-  UsageError("  --multi-image: obsolete, ignored");
+  UsageError("  --multi-image: specify that separate oat and image files be generated for ");
+  UsageError("      each input dex file; the default for boot image and boot image extension.");
+  UsageError("");
+  UsageError("  --single-image: specify that a single oat and image file be generated for ");
+  UsageError("      all input dex files; the default for app image.");
   UsageError("");
   UsageError("  --force-determinism: force the compiler to emit a deterministic output.");
   UsageError("");
@@ -706,6 +716,9 @@ class Dex2Oat final {
       input_vdex_file_(nullptr),
       dm_fd_(-1),
       zip_fd_(-1),
+      image_fd_(-1),
+      have_multi_image_arg_(false),
+      multi_image_(false),
       image_base_(0U),
       image_storage_mode_(ImageHeader::kStorageModeUncompressed),
       passes_to_run_filename_(nullptr),
@@ -814,7 +827,7 @@ class Dex2Oat final {
     }
 
     DCHECK(compiler_options_->image_type_ == CompilerOptions::ImageType::kNone);
-    if (!image_filenames_.empty()) {
+    if (!image_filenames_.empty() || image_fd_ != -1) {
       if (!boot_image_filename_.empty()) {
         compiler_options_->image_type_ = CompilerOptions::ImageType::kBootImageExtension;
       } else if (android::base::EndsWith(image_filenames_[0], "apex.art")) {
@@ -825,9 +838,13 @@ class Dex2Oat final {
     }
     if (app_image_fd_ != -1 || !app_image_file_name_.empty()) {
       if (compiler_options_->IsBootImage() || compiler_options_->IsBootImageExtension()) {
-        Usage("Can't have both --image and (--app-image-fd or --app-image-file)");
+        Usage("Can't have both (--image or --image-fd) and (--app-image-fd or --app-image-file)");
       }
       compiler_options_->image_type_ = CompilerOptions::ImageType::kAppImage;
+    }
+
+    if (!image_filenames_.empty() && image_fd_ != -1) {
+      Usage("Can't have both --image and --image-fd");
     }
 
     if (oat_filenames_.empty() && oat_fd_ == -1) {
@@ -849,6 +866,10 @@ class Dex2Oat final {
     if ((output_vdex_fd_ == -1) != (oat_fd_ == -1)) {
       Usage("VDEX and OAT output must be specified either with one --oat-file "
             "or with --oat-fd and --output-vdex-fd file descriptors");
+    }
+
+    if ((image_fd_ != -1) && (oat_fd_ == -1)) {
+      Usage("--image-fd must be used with --oat_fd and --output_vdex_fd");
     }
 
     if (!parser_options->oat_symbols.empty() && oat_fd_ != -1) {
@@ -922,6 +943,25 @@ class Dex2Oat final {
       if (image_base_ != 0) {
         Usage("Non-zero --base specified for app image or boot image extension");
       }
+    }
+
+    if (have_multi_image_arg_) {
+      if (!IsImage()) {
+        Usage("--multi-image or --single-image specified for non-image compilation");
+      }
+    } else {
+      // Use the default, i.e. multi-image for boot image and boot image extension.
+      multi_image_ = IsBootImage() || IsBootImageExtension();  // Shall pass checks below.
+    }
+    if (IsBootImage() && !multi_image_) {
+      Usage("--single-image specified for primary boot image");
+    }
+    if (IsAppImage() && multi_image_) {
+      Usage("--multi-image specified for app image");
+    }
+
+    if (image_fd_ != -1 && multi_image_) {
+      Usage("--single-image not specified for --image-fd");
     }
 
     const bool have_profile_file = !profile_file_.empty();
@@ -1015,24 +1055,36 @@ class Dex2Oat final {
   }
 
   void ExpandOatAndImageFilenames() {
-    if (image_filenames_[0].rfind('/') == std::string::npos) {
-      Usage("Unusable boot image filename %s", image_filenames_[0].c_str());
+    ArrayRef<const std::string> locations(dex_locations_);
+    if (!multi_image_) {
+      locations = locations.SubArray(/*pos=*/ 0u, /*length=*/ 1u);
     }
-    image_filenames_ = ImageSpace::ExpandMultiImageLocations(
-        ArrayRef<const std::string>(dex_locations_), image_filenames_[0], IsBootImageExtension());
+    if (image_fd_ == -1) {
+      if (image_filenames_[0].rfind('/') == std::string::npos) {
+        Usage("Unusable boot image filename %s", image_filenames_[0].c_str());
+      }
+      image_filenames_ = ImageSpace::ExpandMultiImageLocations(
+          locations, image_filenames_[0], IsBootImageExtension());
 
-    if (oat_filenames_[0].rfind('/') == std::string::npos) {
-      Usage("Unusable boot image oat filename %s", oat_filenames_[0].c_str());
+      if (oat_filenames_[0].rfind('/') == std::string::npos) {
+        Usage("Unusable boot image oat filename %s", oat_filenames_[0].c_str());
+      }
+      oat_filenames_ = ImageSpace::ExpandMultiImageLocations(
+          locations, oat_filenames_[0], IsBootImageExtension());
+    } else {
+      DCHECK(!multi_image_);
+      std::vector<std::string> oat_locations = ImageSpace::ExpandMultiImageLocations(
+          locations, oat_location_, IsBootImageExtension());
+      DCHECK_EQ(1u, oat_locations.size());
+      oat_location_ = oat_locations[0];
     }
-    oat_filenames_ = ImageSpace::ExpandMultiImageLocations(
-        ArrayRef<const std::string>(dex_locations_), oat_filenames_[0], IsBootImageExtension());
 
     if (!oat_unstripped_.empty()) {
       if (oat_unstripped_[0].rfind('/') == std::string::npos) {
         Usage("Unusable boot image symbol filename %s", oat_unstripped_[0].c_str());
       }
       oat_unstripped_ = ImageSpace::ExpandMultiImageLocations(
-           ArrayRef<const std::string>(dex_locations_), oat_unstripped_[0], IsBootImageExtension());
+           locations, oat_unstripped_[0], IsBootImageExtension());
     }
   }
 
@@ -1111,6 +1163,15 @@ class Dex2Oat final {
     }
   }
 
+  void AssignIfExists(Dex2oatArgumentMap& map,
+                      const Dex2oatArgumentMap::Key<std::string>& key,
+                      std::vector<std::string>* out) {
+    DCHECK(out->empty());
+    if (map.Exists(key)) {
+      out->push_back(*map.Get(key));
+    }
+  }
+
   // Parse the arguments from the command line. In case of an unrecognized option or impossible
   // values/combinations, a usage error will be displayed and exit() is called. Thus, if the method
   // returns, arguments have been successfully parsed.
@@ -1138,10 +1199,11 @@ class Dex2Oat final {
     AssignIfExists(args, M::CompactDexLevel, &compact_dex_level_);
     AssignIfExists(args, M::DexFiles, &dex_filenames_);
     AssignIfExists(args, M::DexLocations, &dex_locations_);
-    AssignIfExists(args, M::OatFiles, &oat_filenames_);
+    AssignIfExists(args, M::OatFile, &oat_filenames_);
     AssignIfExists(args, M::OatSymbols, &parser_options->oat_symbols);
     AssignTrueIfExists(args, M::Strip, &strip_);
-    AssignIfExists(args, M::ImageFilenames, &image_filenames_);
+    AssignIfExists(args, M::ImageFilename, &image_filenames_);
+    AssignIfExists(args, M::ImageFd, &image_fd_);
     AssignIfExists(args, M::ZipFd, &zip_fd_);
     AssignIfExists(args, M::ZipLocation, &zip_location_);
     AssignIfExists(args, M::InputVdexFd, &input_vdex_fd_);
@@ -1197,6 +1259,9 @@ class Dex2Oat final {
       }
     }
     AssignIfExists(args, M::CopyDexFiles, &copy_dex_files_);
+
+    AssignTrueIfExists(args, M::MultiImage, &have_multi_image_arg_);
+    AssignIfExists(args, M::MultiImage, &multi_image_);
 
     if (args.Exists(M::ForceDeterminism)) {
       force_determinism_ = true;
@@ -1266,8 +1331,9 @@ class Dex2Oat final {
     // Prune non-existent dex files now so that we don't create empty oat files for multi-image.
     PruneNonExistentDexFiles();
 
-    // Expand oat and image filenames for multi image.
-    if ((IsBootImage() || IsBootImageExtension()) && image_filenames_.size() == 1) {
+    // Expand oat and image filenames for boot image and boot image extension.
+    // This is mostly for multi-image but single-image also needs some processing.
+    if (IsBootImage() || IsBootImageExtension()) {
       ExpandOatAndImageFilenames();
     }
 
@@ -2612,13 +2678,21 @@ class Dex2Oat final {
   bool CreateImageFile()
       REQUIRES(!Locks::mutator_lock_) {
     CHECK(image_writer_ != nullptr);
-    if (!IsBootImage() && !IsBootImageExtension()) {
-      CHECK(image_filenames_.empty());
-      image_filenames_.push_back(app_image_file_name_);
+    if (IsAppImage()) {
+      DCHECK(image_filenames_.empty());
+      if (app_image_fd_ != -1) {
+        image_filenames_.push_back(StringPrintf("FileDescriptor[%d]", app_image_fd_));
+      } else {
+        image_filenames_.push_back(app_image_file_name_);
+      }
     }
-    if (!image_writer_->Write(app_image_fd_,
+    if (image_fd_ != -1) {
+      DCHECK(image_filenames_.empty());
+      image_filenames_.push_back(StringPrintf("FileDescriptor[%d]", image_fd_));
+    }
+    if (!image_writer_->Write(IsAppImage() ? app_image_fd_ : image_fd_,
                               image_filenames_,
-                              oat_filenames_)) {
+                              IsAppImage() ? 1u : dex_locations_.size())) {
       LOG(ERROR) << "Failure during image file creation";
       return false;
     }
@@ -2781,6 +2855,9 @@ class Dex2Oat final {
   std::string boot_image_filename_;
   std::vector<const char*> runtime_args_;
   std::vector<std::string> image_filenames_;
+  int image_fd_;
+  bool have_multi_image_arg_;
+  bool multi_image_;
   uintptr_t image_base_;
   ImageHeader::StorageMode image_storage_mode_;
   const char* passes_to_run_filename_;

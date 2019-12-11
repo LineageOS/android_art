@@ -345,7 +345,7 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
 
     bool success_image = writer->Write(kInvalidFd,
                                        image_filenames,
-                                       oat_filenames);
+                                       image_filenames.size());
     ASSERT_TRUE(success_image);
 
     for (size_t i = 0, size = oat_filenames.size(); i != size; ++i) {
