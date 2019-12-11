@@ -602,6 +602,18 @@ bool OatFileBase::Setup(int zip_fd,
     std::string_view oat_dex_file_location(dex_file_location_data, dex_file_location_size);
     std::string dex_file_location(oat_dex_file_location);
     bool is_multidex = DexFileLoader::IsMultiDexLocation(dex_file_location.c_str());
+    // Check that `is_multidex` does not clash with other indicators. The first dex location
+    // must be primary location and, if we're opening external dex files, the location must
+    // be multi-dex if and only if we already have a dex file opened for it.
+    if ((i == 0 && is_multidex) ||
+        (!external_dex_files_.empty() && (is_multidex != (i < external_dex_files_.size())))) {
+      *error_msg = StringPrintf("In oat file '%s' found unexpected %s location '%s'",
+                                GetLocation().c_str(),
+                                is_multidex ? "multi-dex" : "primary",
+                                dex_file_location.c_str());
+      return false;
+    }
+    // Remember the primary location and, if provided, the replacement from `dex_filenames`.
     if (!is_multidex) {
       primary_location = oat_dex_file_location;
       if (!dex_filenames.empty()) {
@@ -617,14 +629,7 @@ bool OatFileBase::Setup(int zip_fd,
         ++dex_filenames_pos;
       }
     }
-    if ((i == 0 && is_multidex) ||
-        (!external_dex_files_.empty() && (is_multidex != (i < external_dex_files_.size())))) {
-      *error_msg = StringPrintf("In oat file '%s' found unexpected %s location '%s'",
-                                GetLocation().c_str(),
-                                is_multidex ? "multi-dex" : "primary",
-                                dex_file_location.c_str());
-      return false;
-    }
+    // Check that the base location of a multidex location matches the last seen primary location.
     if (is_multidex &&
         (!StartsWith(dex_file_location, primary_location) ||
              dex_file_location[primary_location.size()] != DexFileLoader::kMultiDexSeparator)) {
