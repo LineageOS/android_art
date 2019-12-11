@@ -257,6 +257,9 @@ if [ $execution_mode = "device" ]; then
 fi  # $execution_mode = "device"
 
 if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
+  # Use default expectations
+  expectations="--expectations art/tools/libcore_failures.txt"
+
   # set the toolchain to use.
   vogar_args="$vogar_args --toolchain d8 --language CUR"
 
