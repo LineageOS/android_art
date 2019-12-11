@@ -1,0 +1,16 @@
+--- ../../../libcore/ojluni/src/main/java/java/util/AbstractCollection.java	2019-05-31 10:36:26.634361294 -0700
++++ src-ex/java/util/AbstractCollection.java	2019-11-18 13:04:48.253575013 -0800
+@@ -63,7 +63,13 @@
+      * Sole constructor.  (For invocation by subclass constructors, typically
+      * implicit.)
+      */
++    public static volatile int TOTAL_COUNT;
++    public int cnt;
++
+     protected AbstractCollection() {
++      synchronized (Collection.class) {
++        cnt = ++TOTAL_COUNT;
++      }
+     }
+ 
+     // Query Operations
