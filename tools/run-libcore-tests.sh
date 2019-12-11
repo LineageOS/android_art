@@ -14,12 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Exit on errors.
-set -e
-
 if [ ! -d libcore ]; then
   echo "Script needs to be run at the root of the android tree"
   exit 1
+fi
+
+source build/envsetup.sh >&/dev/null # for get_build_var, setpaths
+setpaths # include platform prebuilt java, javac, etc in $PATH.
+
+if [ -z "$ANDROID_PRODUCT_OUT" ] ; then
+  JAVA_LIBRARIES=out/target/common/obj/JAVA_LIBRARIES
+else
+  JAVA_LIBRARIES=${ANDROID_PRODUCT_OUT}/../../common/obj/JAVA_LIBRARIES
 fi
 
 # "Root" (actually "system") directory on device (in the case of
@@ -29,12 +35,8 @@ android_root=${ART_TEST_ANDROID_ROOT:-/system}
 function classes_jar_path {
   local var="$1"
   local suffix="jar"
-  if [ -z "$ANDROID_PRODUCT_OUT" ] ; then
-    local java_libraries=out/target/common/obj/JAVA_LIBRARIES
-  else
-    local java_libraries=${ANDROID_PRODUCT_OUT}/../../common/obj/JAVA_LIBRARIES
-  fi
-  echo "${java_libraries}/${var}_intermediates/classes.${suffix}"
+
+  echo "${JAVA_LIBRARIES}/${var}_intermediates/classes.${suffix}"
 }
 
 function cparg {
@@ -55,40 +57,30 @@ function boot_classpath_arg {
   done
 }
 
-function usage {
-  local me=$(basename "${BASH_SOURCE[0]}")
-  (
-    cat << EOF
-  Usage: ${me} --mode=<mode> [options]
+# Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
+# because that's what we use for compiling the core.art image.
+# It may contain additional modules from TEST_CORE_JARS.
+BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
 
-  Run libcore tests using the vogar testing tool.
+DEPS="core-tests jsr166-tests mockito-target"
 
-  Required parameters:
-    --mode=device|host     Specify where tests should be run.
+for lib in $DEPS
+do
+  if [[ ! -f "$(classes_jar_path "$lib")" ]]; then
+    echo "${lib} is missing. Before running, you must run art/tools/buildbot-build.sh"
+    exit 1
+  fi
+done
 
-  Optional parameters:
-    --debug                Use debug version of ART (device|host only).
-    --no-getrandom         Ignore failures from getrandom() (for kernel < 3.17).
-    --no-jit               Disable JIT (device|host only).
-    --Xgc:gcstress         Enable GC stress configuration (device|host only).
-
-  The script passes unrecognized options to the command-line created for vogar.
-
-  Examples:
-
-    1. Run full test suite on host:
-      ${me} --mode=host
-
-    2. Run full test suite on device:
-      ${me} --mode=device
-EOF
-  ) | sed -e 's/^  //' >&2 # Strip leading whitespace from heredoc.
-}
+expectations="--expectations art/tools/libcore_failures.txt"
 
 emulator="no"
 if [ "$ANDROID_SERIAL" = "emulator-5554" ]; then
   emulator="yes"
 fi
+
+# Use JIT compiling by default.
+use_jit=true
 
 # Packages that currently work correctly with the expectation files.
 working_packages=("libcore.android.system"
@@ -135,89 +127,59 @@ working_packages=("libcore.android.system"
 # changes in case of failures.
 # "org.apache.harmony.security"
 
-# Use JIT compiling by default.
-use_jit=true
-
+vogar_args=$@
 gcstress=false
 debug=false
 
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
 
-# Execution mode specifies where to run tests (device|host).
-execution_mode=""
+# Don't use device mode by default.
+device_mode=false
 
-vogar_args=""
-while [ -n "$1" ]; do
-  case "$1" in
-    --mode=device)
-      # Use --mode=device_testdex not --mode=device for buildbot-build.sh.
-      # See commit 191cae33c7c24e for more details.
-      vogar_args="$vogar_args --mode=device_testdex"
-      vogar_args="$vogar_args --vm-arg -Ximage:/data/art-test/core.art"
-      execution_mode="device"
-      ;;
-    --mode=host)
-      # We explicitly give a wrong path for the image, to ensure vogar
-      # will create a boot image with the default compiler. Note that
-      # giving an existing image on host does not work because of
-      # classpath/resources differences when compiling the boot image.
-      vogar_args="$vogar_args $1 --vm-arg -Ximage:/non/existent/vogar.art"
-      execution_mode="host"
-      ;;
-    --no-getrandom)
-      getrandom=false
-      ;;
-    --no-jit)
-      use_jit=false
-      ;;
-    --debug)
-      vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
-      debug=true
-      ;;
-    -Xgc:gcstress)
-      vogar_args="$vogar_args $1"
-      gcstress=true
-      ;;
-    --help)
-      usage
-      exit 1
-      ;;
-    *)
-      vogar_args="$vogar_args $arg"
-      ;;
-  esac
-  shift
-done
-
-if [ -z "$execution_mode" ]; then
-  usage
-  exit 1
-fi
-
-#
-# Setup environment for running tests.
-#
-source build/envsetup.sh >&/dev/null # for get_build_var, setpaths
-setpaths # include platform prebuilt java, javac, etc in $PATH.
-
-# Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
-# because that's what we use for compiling the core.art image.
-# It may contain additional modules from TEST_CORE_JARS.
-BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
-DEPS="core-tests jsr166-tests mockito-target"
-
-for lib in $DEPS
-do
-  if [[ ! -f "$(classes_jar_path "$lib")" ]]; then
-    echo "${lib} is missing. Before running, you must run art/tools/buildbot-build.sh"
-    exit 1
+while true; do
+  if [[ "$1" == "--mode=device" ]]; then
+    device_mode=true
+    # Remove the --mode=device from the arguments and replace it with --mode=device_testdex
+    vogar_args=${vogar_args/$1}
+    vogar_args="$vogar_args --mode=device_testdex"
+    vogar_args="$vogar_args --vm-arg -Ximage:/data/art-test/core.art"
+    vogar_args="$vogar_args $(boot_classpath_arg /system/framework -testdex $BOOT_CLASSPATH_JARS)"
+    shift
+  elif [[ "$1" == "--mode=host" ]]; then
+    # We explicitly give a wrong path for the image, to ensure vogar
+    # will create a boot image with the default compiler. Note that
+    # giving an existing image on host does not work because of
+    # classpath/resources differences when compiling the boot image.
+    vogar_args="$vogar_args --vm-arg -Ximage:/non/existent/vogar.art"
+    shift
+  elif [[ "$1" == "--no-jit" ]]; then
+    # Remove the --no-jit from the arguments.
+    vogar_args=${vogar_args/$1}
+    use_jit=false
+    shift
+  elif [[ "$1" == "--debug" ]]; then
+    # Remove the --debug from the arguments.
+    vogar_args=${vogar_args/$1}
+    vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
+    debug=true
+    shift
+  elif [[ "$1" == "-Xgc:gcstress" ]]; then
+    gcstress=true
+    shift
+  elif [[ "$1" == "--no-getrandom" ]]; then
+    # Remove the option from Vogar arguments.
+    vogar_args=${vogar_args/$1}
+    getrandom=false
+    shift
+  elif [[ "$1" == "" ]]; then
+    break
+  else
+    shift
   fi
 done
 
-if [ $execution_mode = "device" ]; then
-  vogar_args="$vogar_args $(boot_classpath_arg /system/framework -testdex $BOOT_CLASSPATH_JARS)"
-
+if $device_mode; then
   # Honor environment variable ART_TEST_CHROOT.
   if [[ -n "$ART_TEST_CHROOT" ]]; then
     # Set Vogar's `--chroot` option.
@@ -229,20 +191,18 @@ if [ $execution_mode = "device" ]; then
     vogar_args="$vogar_args --device-dir=/data/local/tmp"
   fi
   vogar_args="$vogar_args --vm-command=$android_root/bin/art"
+fi
 
-  # Increase the timeout, as vogar cannot set individual test
-  # timeout when being asked to run packages, and some tests go above
-  # the default timeout.
-  if $gcstress; then
-    if $debug; then
-       vogar_args="$vogar_args --timeout 1440"
-    else
-      vogar_args="$vogar_args --timeout 900"
-    fi
-  else
-    vogar_args="$vogar_args --timeout 480"
-  fi
-fi  # $execution_mode = "device"
+# Increase the timeout, as vogar cannot set individual test
+# timeout when being asked to run packages, and some tests go above
+# the default timeout.
+if $gcstress && $debug && $device_mode; then
+  vogar_args="$vogar_args --timeout 1440"
+elif $gcstress && $device_mode; then
+  vogar_args="$vogar_args --timeout 900"
+else
+  vogar_args="$vogar_args --timeout 480"
+fi
 
 # set the toolchain to use.
 vogar_args="$vogar_args --toolchain d8 --language CUR"
