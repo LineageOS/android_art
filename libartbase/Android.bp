@@ -165,17 +165,15 @@ gensrcs {
 
 art_cc_library {
     name: "libartbase",
-    defaults: ["libartbase_defaults"],
+    defaults: [
+        "libartbase_defaults",
+        "libart_nativeunwind_defaults",
+    ],
     visibility: [
         // TODO(b/133140750): Clean this up.
         "//packages/modules/NetworkStack/tests:__subpackages__",
     ],
 
-    // Leave the symbols in the shared library so that stack unwinders can
-    // produce meaningful name resolution.
-    strip: {
-        keep_symbols: true,
-    },
     shared_libs: [
         "libbase",
         "libziparchive",
