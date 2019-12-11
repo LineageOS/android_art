@@ -111,6 +111,18 @@ class ClassLoaderVisitor {
       REQUIRES_SHARED(Locks::classlinker_classes_lock_, Locks::mutator_lock_) = 0;
 };
 
+template <typename Func>
+class ClassLoaderFuncVisitor final : public ClassLoaderVisitor {
+ public:
+  explicit ClassLoaderFuncVisitor(Func func) : func_(func) {}
+  void Visit(ObjPtr<mirror::ClassLoader> cl) override REQUIRES_SHARED(Locks::mutator_lock_) {
+    func_(cl);
+  }
+
+ private:
+  Func func_;
+};
+
 class AllocatorVisitor {
  public:
   virtual ~AllocatorVisitor() {}
@@ -461,6 +473,9 @@ class ClassLinker {
   void VisitRoots(RootVisitor* visitor, VisitRootFlags flags)
       REQUIRES(!Locks::dex_lock_, !Locks::classlinker_classes_lock_, !Locks::trace_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
+  // Visits all dex-files accessible by any class-loader or the BCP.
+  template<typename Visitor>
+  void VisitKnownDexFiles(Thread* self, Visitor visitor) REQUIRES(Locks::mutator_lock_);
 
   bool IsDexFileRegistered(Thread* self, const DexFile& dex_file)
       REQUIRES(!Locks::dex_lock_)

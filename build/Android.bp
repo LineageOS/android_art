@@ -164,6 +164,11 @@ art_global_defaults {
                 //  platform specific Bionic header.
                 "bionic_libc_platform_headers",
             ],
+            strip: {
+                // Do not strip art libs when building for linux-bionic.
+                // Otherwise we can't get any symbols out of crashes.
+                none: true,
+            },
         },
         darwin: {
             enabled: false,
