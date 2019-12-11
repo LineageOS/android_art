@@ -181,6 +181,8 @@ class RuntimeCallbacks {
   void AddClassLoadCallback(ClassLoadCallback* cb) REQUIRES(Locks::mutator_lock_);
   void RemoveClassLoadCallback(ClassLoadCallback* cb) REQUIRES(Locks::mutator_lock_);
 
+  void BeginDefineClass() REQUIRES_SHARED(Locks::mutator_lock_);
+  void EndDefineClass() REQUIRES_SHARED(Locks::mutator_lock_);
   void ClassLoad(Handle<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
   void ClassPrepare(Handle<mirror::Class> temp_klass, Handle<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);
