@@ -178,12 +178,12 @@ static void VerifyBootImagesContiguity(const std::vector<gc::space::ImageSpace*>
   for (size_t i = 0u, num_spaces = image_spaces.size(); i != num_spaces; ) {
     const ImageHeader& image_header = image_spaces[i]->GetImageHeader();
     uint32_t reservation_size = image_header.GetImageReservationSize();
-    uint32_t component_count = image_header.GetComponentCount();
+    uint32_t image_count = image_header.GetImageSpaceCount();
 
-    CHECK_NE(component_count, 0u);
-    CHECK_LE(component_count, num_spaces - i);
+    CHECK_NE(image_count, 0u);
+    CHECK_LE(image_count, num_spaces - i);
     CHECK_NE(reservation_size, 0u);
-    for (size_t j = 1u; j != image_header.GetComponentCount(); ++j) {
+    for (size_t j = 1u; j != image_count; ++j) {
       CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetComponentCount(), 0u);
       CHECK_EQ(image_spaces[i + j]->GetImageHeader().GetImageReservationSize(), 0u);
     }
@@ -193,7 +193,7 @@ static void VerifyBootImagesContiguity(const std::vector<gc::space::ImageSpace*>
     // Check contiguous layout of images and oat files.
     const uint8_t* current_heap = image_spaces[i]->Begin();
     const uint8_t* current_oat = image_spaces[i]->GetImageHeader().GetOatFileBegin();
-    for (size_t j = 0u; j != image_header.GetComponentCount(); ++j) {
+    for (size_t j = 0u; j != image_count; ++j) {
       const ImageHeader& current_header = image_spaces[i + j]->GetImageHeader();
       CHECK_EQ(current_heap, image_spaces[i + j]->Begin());
       CHECK_EQ(current_oat, current_header.GetOatFileBegin());
@@ -207,7 +207,7 @@ static void VerifyBootImagesContiguity(const std::vector<gc::space::ImageSpace*>
     CHECK_EQ(reservation_size, static_cast<size_t>(current_oat - image_spaces[i]->Begin()));
 
     boot_image_size += reservation_size;
-    i += component_count;
+    i += image_count;
   }
 }
 

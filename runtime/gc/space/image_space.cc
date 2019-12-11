@@ -966,8 +966,9 @@ class ImageSpace::Loader {
     }
     uint32_t checksum = 0u;
     size_t chunk_count = 0u;
+    size_t space_pos = 0u;
     for (size_t component_count = 0u; component_count != boot_image_component_count; ) {
-      const ImageHeader& current_header = image_spaces[component_count]->GetImageHeader();
+      const ImageHeader& current_header = image_spaces[space_pos]->GetImageHeader();
       if (current_header.GetComponentCount() > boot_image_component_count - component_count) {
         *error_msg = StringPrintf("Boot image component count in %s ends in the middle of a chunk, "
                                       "%u is between %zu and %zu",
@@ -980,6 +981,7 @@ class ImageSpace::Loader {
       component_count += current_header.GetComponentCount();
       checksum ^= current_header.GetImageChecksum();
       chunk_count += 1u;
+      space_pos += current_header.GetImageSpaceCount();
     }
     if (image_header.GetBootImageChecksum() != checksum) {
       *error_msg = StringPrintf("Boot image checksum mismatch (0x%x != 0x%x) in image %s",
@@ -1481,10 +1483,12 @@ class ImageSpace::BootImageLayout {
     std::string base_location;
     std::string base_filename;
     size_t start_index;
-    size_t component_count;
-    size_t reservation_size;
+    uint32_t component_count;
+    uint32_t image_space_count;
+    uint32_t reservation_size;
     uint32_t checksum;
     uint32_t boot_image_component_count;
+    uint32_t boot_image_space_count;
     uint32_t boot_image_checksum;
   };
 
@@ -1568,6 +1572,7 @@ class ImageSpace::BootImageLayout {
 
   bool ValidateBootImageChecksum(const std::string& actual_filename,
                                  const ImageHeader& header,
+                                 /*out*/uint32_t* boot_image_space_count,
                                  /*out*/std::string* error_msg);
 
   bool ReadHeader(const std::string& base_location,
@@ -1750,6 +1755,7 @@ bool ImageSpace::BootImageLayout::MatchNamedComponents(
 
 bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& actual_filename,
                                                             const ImageHeader& header,
+                                                            /*out*/uint32_t* boot_image_space_count,
                                                             /*out*/std::string* error_msg) {
   uint32_t boot_image_component_count = header.GetBootImageComponentCount();
   if (chunks_.empty() != (boot_image_component_count == 0u)) {
@@ -1761,6 +1767,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& a
   }
   uint32_t component_count = 0u;
   uint32_t composite_checksum = 0u;
+  *boot_image_space_count = 0u;
   for (const ImageChunk& chunk : chunks_) {
     if (component_count == boot_image_component_count) {
       break;  // Hit the component count.
@@ -1770,7 +1777,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& a
     }
     if (chunk.component_count > boot_image_component_count - component_count) {
       *error_msg = StringPrintf("Boot image component count in %s ends in the middle of a chunk, "
-                                    "%u is between %u and %zu",
+                                    "%u is between %u and %u",
                                 actual_filename.c_str(),
                                 boot_image_component_count,
                                 component_count,
@@ -1779,6 +1786,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const std::string& a
     }
     component_count += chunk.component_count;
     composite_checksum ^= chunk.checksum;
+    *boot_image_space_count += chunk.image_space_count;
   }
   DCHECK_LE(component_count, boot_image_component_count);
   if (component_count != boot_image_component_count) {
@@ -1830,7 +1838,8 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
                               allowed_reservation_size);
     return false;
   }
-  if (!ValidateBootImageChecksum(actual_filename, header, error_msg)) {
+  uint32_t boot_image_space_count;
+  if (!ValidateBootImageChecksum(actual_filename, header, &boot_image_space_count, error_msg)) {
     return false;
   }
 
@@ -1842,9 +1851,11 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
   chunk.base_filename = base_filename;
   chunk.start_index = bcp_index;
   chunk.component_count = header.GetComponentCount();
+  chunk.image_space_count = header.GetImageSpaceCount();
   chunk.reservation_size = header.GetImageReservationSize();
   chunk.checksum = header.GetImageChecksum();
   chunk.boot_image_component_count = header.GetBootImageComponentCount();
+  chunk.boot_image_space_count = boot_image_space_count;
   chunk.boot_image_checksum = header.GetBootImageChecksum();
   chunks_.push_back(std::move(chunk));
   next_bcp_index_ = bcp_index + header.GetComponentCount();
@@ -2308,22 +2319,22 @@ class ImageSpace::BootImageLoader {
             spaces.front()->Begin(),
             spaces.back()->End() - spaces.front()->Begin()));
     const ImageHeader& base_header = spaces[0]->GetImageHeader();
-    size_t base_component_count = base_header.GetComponentCount();
-    DCHECK_LE(base_component_count, spaces.size());
+    size_t base_image_space_count = base_header.GetImageSpaceCount();
+    DCHECK_LE(base_image_space_count, spaces.size());
     DoRelocateSpaces<kPointerSize, /*kExtension=*/ false>(
-        spaces.SubArray(/*pos=*/ 0u, base_component_count),
+        spaces.SubArray(/*pos=*/ 0u, base_image_space_count),
         base_diff64,
         &patched_objects);
 
-    for (size_t i = base_component_count, size = spaces.size(); i != size; ) {
+    for (size_t i = base_image_space_count, size = spaces.size(); i != size; ) {
       const ImageHeader& ext_header = spaces[i]->GetImageHeader();
-      size_t ext_component_count = ext_header.GetComponentCount();
-      DCHECK_LE(ext_component_count, size - i);
+      size_t ext_image_space_count = ext_header.GetImageSpaceCount();
+      DCHECK_LE(ext_image_space_count, size - i);
       DoRelocateSpaces<kPointerSize, /*kExtension=*/ true>(
-          spaces.SubArray(/*pos=*/ i, ext_component_count),
+          spaces.SubArray(/*pos=*/ i, ext_image_space_count),
           base_diff64,
           &patched_objects);
-      i += ext_component_count;
+      i += ext_image_space_count;
     }
   }
 
@@ -2741,7 +2752,7 @@ class ImageSpace::BootImageLoader {
     }
     ArrayRef<const std::string> requested_bcp_locations =
         ArrayRef<const std::string>(boot_class_path_locations_).SubArray(
-            chunk.start_index, chunk.component_count);
+            chunk.start_index, chunk.image_space_count);
     std::vector<std::string> locations =
         ExpandMultiImageLocations(requested_bcp_locations, chunk.base_location, is_extension);
     std::vector<std::string> filenames =
@@ -2761,14 +2772,18 @@ class ImageSpace::BootImageLoader {
       }
       const ImageHeader& header = space->GetImageHeader();
       if (i == 0 && (chunk.checksum != header.GetImageChecksum() ||
+                     chunk.image_space_count != header.GetImageSpaceCount() ||
                      chunk.boot_image_component_count != header.GetBootImageComponentCount() ||
                      chunk.boot_image_checksum != header.GetBootImageChecksum())) {
         *error_msg = StringPrintf("Image header modified since previously read from %s; "
                                       "checksum: 0x%08x -> 0x%08x,"
+                                      "image_space_count: %u -> %u"
                                       "boot_image_component_count: %u -> %u, "
                                       "boot_image_checksum: 0x%08x -> 0x%08x",
                                   space->GetImageFilename().c_str(),
                                   chunk.checksum,
+                                  chunk.image_space_count,
+                                  header.GetImageSpaceCount(),
                                   header.GetImageChecksum(),
                                   chunk.boot_image_component_count,
                                   header.GetBootImageComponentCount(),
@@ -2782,9 +2797,10 @@ class ImageSpace::BootImageLoader {
         ArrayRef<const std::unique_ptr<ImageSpace>>(*spaces).SubArray(
             /*pos=*/ 0u, chunk.boot_image_component_count);
     for (std::size_t i = 0u, size = locations.size(); i != size; ++i) {
-      ImageSpace* space = (*spaces)[spaces->size() - chunk.component_count + i].get();
+      ImageSpace* space = (*spaces)[spaces->size() - chunk.image_space_count + i].get();
+      size_t bcp_chunk_size = (chunk.image_space_count == 1u) ? chunk.component_count : 1u;
       if (!OpenOatFile(space,
-                       boot_class_path_.SubArray(/*pos=*/ chunk.start_index + i, /*length=*/ 1u),
+                       boot_class_path_.SubArray(/*pos=*/ chunk.start_index + i, bcp_chunk_size),
                        validate_oat_file,
                        dependencies,
                        logger,
@@ -3220,15 +3236,16 @@ std::string ImageSpace::GetBootClassPathChecksums(
     DCHECK_EQ(main_space->oat_file_non_owned_->GetOatDexFiles()[0]->GetDexFileLocation(),
               boot_class_path[bcp_pos]->GetLocation());
     const ImageHeader& current_header = main_space->GetImageHeader();
-    uint32_t component_count = current_header.GetComponentCount();
-    DCHECK_NE(component_count, 0u);
-    DCHECK_LE(component_count, image_spaces.size() - image_pos);
+    uint32_t image_space_count = current_header.GetImageSpaceCount();
+    DCHECK_NE(image_space_count, 0u);
+    DCHECK_LE(image_space_count, image_spaces.size() - image_pos);
     if (image_pos != 0u) {
       boot_image_checksum += ':';
     }
+    uint32_t component_count = current_header.GetComponentCount();
     AppendImageChecksum(component_count, current_header.GetImageChecksum(), &boot_image_checksum);
-    for (size_t component_index = 0; component_index != component_count; ++component_index) {
-      const ImageSpace* space = image_spaces[image_pos + component_index];
+    for (size_t space_index = 0; space_index != image_space_count; ++space_index) {
+      const ImageSpace* space = image_spaces[image_pos + space_index];
       const OatFile* oat_file = space->oat_file_non_owned_;
       size_t num_dex_files = oat_file->GetOatDexFiles().size();
       if (kIsDebugBuild) {
@@ -3241,7 +3258,7 @@ std::string ImageSpace::GetBootClassPathChecksums(
       }
       bcp_pos += num_dex_files;
     }
-    image_pos += component_count;
+    image_pos += image_space_count;
   }
 
   ArrayRef<const DexFile* const> boot_class_path_tail =
@@ -3426,13 +3443,15 @@ bool ImageSpace::VerifyBootClassPathChecksums(
   }
 
   // Verify image checksums.
+  size_t bcp_pos = 0u;
   size_t image_pos = 0u;
   while (image_pos != num_image_spaces && StartsWith(oat_checksums, "i")) {
     // Verify the current image checksum.
     const ImageHeader& current_header = image_spaces[image_pos]->GetImageHeader();
+    uint32_t image_space_count = current_header.GetImageSpaceCount();
+    DCHECK_NE(image_space_count, 0u);
+    DCHECK_LE(image_space_count, image_spaces.size() - image_pos);
     uint32_t component_count = current_header.GetComponentCount();
-    DCHECK_NE(component_count, 0u);
-    DCHECK_LE(component_count, image_spaces.size() - image_pos);
     uint32_t checksum = current_header.GetImageChecksum();
     if (!CheckAndRemoveImageChecksum(component_count, checksum, &oat_checksums, error_msg)) {
       DCHECK(!error_msg->empty());
@@ -3440,21 +3459,29 @@ bool ImageSpace::VerifyBootClassPathChecksums(
     }
 
     if (kIsDebugBuild) {
-      for (size_t component_index = 0; component_index != component_count; ++component_index) {
-        const OatFile* oat_file = image_spaces[image_pos + component_index]->oat_file_non_owned_;
+      for (size_t space_index = 0; space_index != image_space_count; ++space_index) {
+        const OatFile* oat_file = image_spaces[image_pos + space_index]->oat_file_non_owned_;
         size_t num_dex_files = oat_file->GetOatDexFiles().size();
         CHECK_NE(num_dex_files, 0u);
         const std::string main_location = oat_file->GetOatDexFiles()[0]->GetDexFileLocation();
-        CHECK_EQ(main_location, boot_class_path_locations[image_pos + component_index]);
+        CHECK_EQ(main_location, boot_class_path_locations[bcp_pos + space_index]);
         CHECK(!DexFileLoader::IsMultiDexLocation(main_location.c_str()));
+        size_t num_base_locations = 1u;
         for (size_t i = 1u; i != num_dex_files; ++i) {
-          CHECK(DexFileLoader::IsMultiDexLocation(
-                    oat_file->GetOatDexFiles()[i]->GetDexFileLocation().c_str()));
+          if (DexFileLoader::IsMultiDexLocation(
+                  oat_file->GetOatDexFiles()[i]->GetDexFileLocation().c_str())) {
+            CHECK_EQ(image_space_count, 1u);  // We can find base locations only for --single-image.
+            ++num_base_locations;
+          }
+        }
+        if (image_space_count == 1u) {
+          CHECK_EQ(num_base_locations, component_count);
         }
       }
     }
 
-    image_pos += component_count;
+    image_pos += image_space_count;
+    bcp_pos += component_count;
 
     if (!StartsWith(oat_checksums, ":")) {
       // Check that we've reached the end of checksums and BCP.
