@@ -9,12 +9,12 @@
 
 [
 {
-  description: "Os.memfd_create() only supports bionic-based platforms.",
+  description: "Os.memfd_create needs kernel version >= 3.17 and bionic-based platform.",
   result: EXEC_FAILED,
-  modes: [host],
   names: ["libcore.android.system.OsTest#testMemfdCreate",
           "libcore.android.system.OsTest#testMemfdCreateErrno",
-          "libcore.android.system.OsTest#testMemfdCreateFlags"]
+          "libcore.android.system.OsTest#testMemfdCreateFlags"],
+  bug: 146113753
 },
 {
   description: "Assert.java differences between vogar and junit.",
