@@ -511,6 +511,7 @@ class Runtime {
   void InitNonZygoteOrPostFork(
       JNIEnv* env,
       bool is_system_server,
+      bool is_child_zygote,
       NativeBridgeAction action,
       const char* isa,
       bool profile_system_server = false);

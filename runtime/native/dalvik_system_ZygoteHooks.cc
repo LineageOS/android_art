@@ -413,13 +413,6 @@ static void ZygoteHooks_nativePostForkChild(JNIEnv* env,
     std::srand(static_cast<uint32_t>(NanoTime()));
   }
 
-  if (is_zygote) {
-    // If creating a child-zygote, do not call into the runtime's post-fork logic.
-    // Doing so would spin up threads for Binder and JDWP. Instead, the Java side
-    // of the child process will call a static main in a class specified by the parent.
-    return;
-  }
-
   if (instruction_set != nullptr && !is_system_server) {
     ScopedUtfChars isa_string(env, instruction_set);
     InstructionSet isa = GetInstructionSetFromString(isa_string.c_str());
@@ -427,11 +420,12 @@ static void ZygoteHooks_nativePostForkChild(JNIEnv* env,
     if (isa != InstructionSet::kNone && isa != kRuntimeISA) {
       action = Runtime::NativeBridgeAction::kInitialize;
     }
-    runtime->InitNonZygoteOrPostFork(env, is_system_server, action, isa_string.c_str());
+    runtime->InitNonZygoteOrPostFork(env, is_system_server, is_zygote, action, isa_string.c_str());
   } else {
     runtime->InitNonZygoteOrPostFork(
         env,
         is_system_server,
+        is_zygote,
         Runtime::NativeBridgeAction::kUnload,
         /*isa=*/ nullptr,
         profile_system_server);
