@@ -1361,6 +1361,10 @@ class Thread {
   ~Thread() REQUIRES(!Locks::mutator_lock_, !Locks::thread_suspend_count_lock_);
   void Destroy();
 
+  // Deletes and clears the tlsPtr_.jpeer field. Done in a way so that both it and opeer cannot be
+  // observed to be set at the same time by instrumentation.
+  void DeleteJPeer(JNIEnv* env);
+
   void NotifyInTheadList()
       REQUIRES_SHARED(Locks::thread_list_lock_);
 
