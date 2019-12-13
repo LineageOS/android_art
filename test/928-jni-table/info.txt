@@ -1,1 +1,5 @@
 Tests basic functions in the jvmti plugin.
+
+Tests that we can do basic things by replacing the JNIEnv vtable.
+
+TODO: We should really do more with this test.
