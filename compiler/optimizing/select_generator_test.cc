@@ -25,6 +25,14 @@
 namespace art {
 
 class SelectGeneratorTest : public ImprovedOptimizingUnitTest {
+ private:
+  void CreateParameters() override {
+    parameters_.push_back(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
+                                                               dex::TypeIndex(0),
+                                                               0,
+                                                               DataType::Type::kInt32));
+  }
+
  public:
   void ConstructBasicGraphForSelect(HInstruction* instr) {
     HBasicBlock* if_block = new (GetAllocator()) HBasicBlock(graph_);
@@ -75,10 +83,10 @@ class SelectGeneratorTest : public ImprovedOptimizingUnitTest {
 // HDivZeroCheck might throw and should not be hoisted from the conditional to an unconditional.
 TEST_F(SelectGeneratorTest, testZeroCheck) {
   InitGraph();
-  HDivZeroCheck* instr = new (GetAllocator()) HDivZeroCheck(parameter_, 0);
+  HDivZeroCheck* instr = new (GetAllocator()) HDivZeroCheck(parameters_[0], 0);
   ConstructBasicGraphForSelect(instr);
 
-  ArenaVector<HInstruction*> current_locals({parameter_, graph_->GetIntConstant(1)},
+  ArenaVector<HInstruction*> current_locals({parameters_[0], graph_->GetIntConstant(1)},
                                             GetAllocator()->Adapter(kArenaAllocInstruction));
   ManuallyBuildEnvFor(instr, &current_locals);
 
@@ -88,7 +96,9 @@ TEST_F(SelectGeneratorTest, testZeroCheck) {
 // Test that SelectGenerator succeeds with HAdd.
 TEST_F(SelectGeneratorTest, testAdd) {
   InitGraph();
-  HAdd* instr = new (GetAllocator()) HAdd(DataType::Type::kInt32, parameter_, parameter_, 0);
+  HAdd* instr = new (GetAllocator()) HAdd(DataType::Type::kInt32,
+                                          parameters_[0],
+                                          parameters_[0], 0);
   ConstructBasicGraphForSelect(instr);
   EXPECT_TRUE(CheckGraphAndTrySelectGenerator());
 }
