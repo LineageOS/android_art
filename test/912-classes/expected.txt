@@ -91,3 +91,7 @@ Load: L$Proxy21; on ClassEvents
 Prepare: L$Proxy21; on ClassEvents (cur=ClassEvents)
 Load: [Lart/Test912; on ClassEvents
 Prepare: [Lart/Test912; on ClassEvents (cur=ClassEvents)
+class-prepare event START!
+class-prepare event START!
+class-prepare event END!
+class-prepare event END!
