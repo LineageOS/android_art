@@ -1,15 +1,27 @@
 /*
- * This file contains expectations for ART's Buildbot when running on devices
- * whose kernel does not support the getrandom() syscall (available from
- * Linux 3.17).
+ * This file contains expectations for ART's Buildbot when running on fugu devices
+ * (Nexus Player, kernel 3.10).
+ *
  * The script that uses this file is art/tools/run-libcore-tests.sh.
  */
 
 [
 {
+  description: "Test using memfd_create() syscall, only available from Linux 3.17.",
+  result: EXEC_FAILED,
+  bug: 146113753,
+  modes: [device_testdex],
+  names: [
+    "libcore.android.system.OsTest#testMemfdCreate",
+    "libcore.android.system.OsTest#testMemfdCreateErrno",
+    "libcore.android.system.OsTest#testMemfdCreateFlags"
+  ]
+},
+{
   description: "Test using the getrandom() syscall, only available from Linux 3.17.",
   result: EXEC_FAILED,
   bug: 141230711,
+  modes: [device_testdex],
   names: [
     "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
     "libcore.java.math.BigIntegerTest#test_probablePrime",
