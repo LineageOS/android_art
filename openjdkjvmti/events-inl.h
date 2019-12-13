@@ -453,8 +453,10 @@ struct ScopedDisablePopFrame {
         thread_, art::StackVisitor::StackWalkKind::kIncludeInlinedFrames);
     old_disable_frame_pop_depth_ = data->disable_pop_frame_depth;
     data->disable_pop_frame_depth = current_top_frame_;
+    // Check that we cleaned up any old disables. This should only increase (or be equals if we do
+    // another ClassLoad/Prepare recursively).
     DCHECK(old_disable_frame_pop_depth_ == JvmtiGlobalTLSData::kNoDisallowedPopFrame ||
-           current_top_frame_ > old_disable_frame_pop_depth_)
+           current_top_frame_ >= old_disable_frame_pop_depth_)
         << "old: " << old_disable_frame_pop_depth_ << " current: " << current_top_frame_;
   }
 
