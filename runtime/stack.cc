@@ -710,7 +710,8 @@ void StackVisitor::SanityCheckFrame() const {
       // Check class linker linear allocs.
       // We get the canonical method as copied methods may have their declaring
       // class from another class loader.
-      ArtMethod* canonical = method->GetCanonicalMethod();
+      const PointerSize ptrSize = runtime->GetClassLinker()->GetImagePointerSize();
+      ArtMethod* canonical = method->GetCanonicalMethod(ptrSize);
       ObjPtr<mirror::Class> klass = canonical->GetDeclaringClass();
       LinearAlloc* const class_linear_alloc = (klass != nullptr)
           ? runtime->GetClassLinker()->GetAllocatorForClassLoader(klass->GetClassLoader())
