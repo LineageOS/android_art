@@ -225,10 +225,9 @@ else
 fi
 
 if $getrandom; then :; else
-  # Ignore failures in tests that use the getrandom() syscall (which requires
-  # Linux 3.17+). This is needed on fugu (Nexus Player) devices, where the
-  # kernel is Linux 3.10.
-  expectations="$expectations --expectations art/tools/libcore_no_getrandom_failures.txt"
+  # Ignore failures in tests that use the system calls not supported
+  # on fugu (Nexus Player, kernel version Linux 3.10).
+  expectations="$expectations --expectations art/tools/libcore_fugu_failures.txt"
 fi
 
 if [ ! -t 1 ] ; then

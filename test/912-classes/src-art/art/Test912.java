@@ -105,6 +105,9 @@ public class Test912 {
     };
     classEventsThread.start();
     classEventsThread.join();
+
+    // b/146170757
+    TestRecursiveClassPrepareEvents();
   }
 
   private static void testClass(String className) throws Exception {
@@ -393,6 +396,32 @@ public class Test912 {
 
   private static native void setEqualityEventStorageClass(Class<?> c);
   private static native void enableClassLoadPrepareEqualityEvents(boolean b);
+
+  private static native void runRecursiveClassPrepareEvents(Runnable forceLoad);
+
+  private static void TestRecursiveClassPrepareEvents() {
+    final int[] called = new int[] { 0 };
+    runRecursiveClassPrepareEvents(() -> {
+      if (called[0] == 2) {
+        return;
+      } else {
+        called[0]++;
+      }
+      try {
+        System.out.println("class-prepare event START!");
+        // Load a new class in a new class-loader.
+        Class<?> class_loader_class = Class.forName("dalvik.system.InMemoryDexClassLoader");
+        Constructor<?> ctor = class_loader_class.getConstructor(ByteBuffer.class, ClassLoader.class);
+        Class<?> target = ((ClassLoader)ctor.newInstance(
+            ByteBuffer.wrap(DEX_BYTES), Test912.class.getClassLoader())).loadClass("Transform");
+        target.newInstance();
+      } catch (Exception e) { }
+      System.out.println("class-prepare event END!");
+    });
+    if (called[0] != 2) {
+      System.out.println("Failed to cause recursive Class prepare.");
+    }
+  }
 
   private static class TestForNonInit {
     public static double dummy = Math.random();  // So it can't be compile-time initialized.

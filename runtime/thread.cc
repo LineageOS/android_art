@@ -585,6 +585,14 @@ void Thread::InitAfterFork() {
   InitTid();
 }
 
+void Thread::DeleteJPeer(JNIEnv* env) {
+  // Make sure nothing can observe both opeer and jpeer set at the same time.
+  jobject old_jpeer = tlsPtr_.jpeer;
+  CHECK(old_jpeer != nullptr);
+  tlsPtr_.jpeer = nullptr;
+  env->DeleteGlobalRef(old_jpeer);
+}
+
 void* Thread::CreateCallback(void* arg) {
   Thread* self = reinterpret_cast<Thread*>(arg);
   Runtime* runtime = Runtime::Current();
@@ -614,8 +622,8 @@ void* Thread::CreateCallback(void* arg) {
     // Copy peer into self, deleting global reference when done.
     CHECK(self->tlsPtr_.jpeer != nullptr);
     self->tlsPtr_.opeer = soa.Decode<mirror::Object>(self->tlsPtr_.jpeer).Ptr();
-    self->GetJniEnv()->DeleteGlobalRef(self->tlsPtr_.jpeer);
-    self->tlsPtr_.jpeer = nullptr;
+    // Make sure nothing can observe both opeer and jpeer set at the same time.
+    self->DeleteJPeer(self->GetJniEnv());
     self->SetThreadName(self->GetThreadName()->ToModifiedUtf8().c_str());
 
     ArtField* priorityField = jni::DecodeArtField(WellKnownClasses::java_lang_Thread_priority);
@@ -892,9 +900,9 @@ void Thread::CreateNativeThread(JNIEnv* env, jobject java_peer, size_t stack_siz
     MutexLock mu(self, *Locks::runtime_shutdown_lock_);
     runtime->EndThreadBirth();
   }
-  // Manually delete the global reference since Thread::Init will not have been run.
-  env->DeleteGlobalRef(child_thread->tlsPtr_.jpeer);
-  child_thread->tlsPtr_.jpeer = nullptr;
+  // Manually delete the global reference since Thread::Init will not have been run. Make sure
+  // nothing can observe both opeer and jpeer set at the same time.
+  child_thread->DeleteJPeer(env);
   delete child_thread;
   child_thread = nullptr;
   // TODO: remove from thread group?

@@ -447,7 +447,8 @@
             "1976-hello-structural-static-methods",
             "1985-structural-redefine-stack-scope",
             "1986-structural-redefine-multi-thread-stack-scope",
-            "1987-structural-redefine-recursive-stack-scope"
+            "1987-structural-redefine-recursive-stack-scope",
+            "2000-virtual-list-structural"
         ],
         "description": [
             "Tests for/using bytecodes introduced after DEX version 037 that are unsupported by",
