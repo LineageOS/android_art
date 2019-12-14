@@ -596,5 +596,30 @@ extern "C" JNIEXPORT void JNICALL Java_art_Test912_enableClassLoadPrepareEqualit
   }
 }
 
+static jobject gRunnableGlobal = nullptr;
+extern "C" JNIEXPORT void JNICALL Java_art_Test912_runRecursiveClassPrepareEvents(
+    JNIEnv* env, jclass klass ATTRIBUTE_UNUSED, jobject runnable) {
+  CHECK(gRunnableGlobal == nullptr);
+  gRunnableGlobal = env->NewGlobalRef(runnable);
+  EnableEvents(
+      env,
+      true,
+      nullptr,
+      [](jvmtiEnv* jenv ATTRIBUTE_UNUSED,
+         JNIEnv* jni_env,
+         jthread thread ATTRIBUTE_UNUSED,
+         jclass klass ATTRIBUTE_UNUSED) -> void {
+        jclass runnable_class = jni_env->FindClass("java/lang/Runnable");
+        jni_env->CallVoidMethod(
+            gRunnableGlobal, jni_env->GetMethodID(runnable_class, "run", "()V"));
+      });
+  jclass runnable_class = env->FindClass("java/lang/Runnable");
+  env->CallVoidMethod(
+      runnable, env->GetMethodID(runnable_class, "run", "()V"));
+  EnableEvents(env, false, nullptr, nullptr);
+  env->DeleteGlobalRef(gRunnableGlobal);
+  gRunnableGlobal = nullptr;
+}
+
 }  // namespace Test912Classes
 }  // namespace art
