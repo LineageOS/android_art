@@ -23,5 +23,15 @@ public class Test928 {
     System.out.println("Done");
   }
 
+  // Called by native code.
+  public static void runThreadTest() throws Exception {
+    Thread t = new Thread(() -> {
+      doOtherThreadTest();
+    });
+    t.start();
+    t.join();
+  }
+
   public static native void doJNITableTest();
+  public static native void doOtherThreadTest();
 }
