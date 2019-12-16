@@ -64,7 +64,7 @@ function usage {
   Run libcore tests using the vogar testing tool.
 
   Required parameters:
-    --mode=device|host     Specify where tests should be run.
+    --mode=device|host|jvm Specify where tests should be run.
 
   Optional parameters:
     --debug                Use debug version of ART (device|host only).
@@ -178,7 +178,7 @@ dry_run=false
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
 
-# Execution mode specifies where to run tests (device|host).
+# Execution mode specifies where to run tests (device|host|jvm).
 execution_mode=""
 
 # Default expectations file.
@@ -202,6 +202,10 @@ while [ -n "$1" ]; do
       # classpath/resources differences when compiling the boot image.
       vogar_args="$vogar_args $1 --vm-arg -Ximage:/non/existent/vogar.art"
       execution_mode="host"
+      ;;
+    --mode=jvm)
+      vogar_args="$vogar_args $1"
+      execution_mode="jvm"
       ;;
     --no-getrandom)
       getrandom=false
@@ -270,35 +274,37 @@ if [ $execution_mode = "device" ]; then
   fi
 fi  # $execution_mode = "device"
 
-# Add timeout to vogar command-line.
-vogar_args="$vogar_args --timeout $timeout_secs"
+if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
+  # Add timeout to vogar command-line.
+  vogar_args="$vogar_args --timeout $timeout_secs"
 
-# set the toolchain to use.
-vogar_args="$vogar_args --toolchain d8 --language CUR"
+  # set the toolchain to use.
+  vogar_args="$vogar_args --toolchain d8 --language CUR"
 
-# JIT settings.
-if $use_jit; then
-  vogar_args="$vogar_args --vm-arg -Xcompiler-option --vm-arg --compiler-filter=quicken"
-fi
-vogar_args="$vogar_args --vm-arg -Xusejit:$use_jit"
-
-# gcstress may lead to timeouts, so we need dedicated expectations files for it.
-if $gcstress; then
-  expectations="$expectations --expectations art/tools/libcore_gcstress_failures.txt"
-  if $debug; then
-    expectations="$expectations --expectations art/tools/libcore_gcstress_debug_failures.txt"
+  # JIT settings.
+  if $use_jit; then
+    vogar_args="$vogar_args --vm-arg -Xcompiler-option --vm-arg --compiler-filter=quicken"
   fi
-else
-  # We only run this package when user has not specified packages
-  # to run and not under gcstress as it can cause timeouts. See
-  # b/78228743.
-  working_packages+=("libcore.libcore.icu")
-fi
+  vogar_args="$vogar_args --vm-arg -Xusejit:$use_jit"
 
-if $getrandom; then :; else
-  # Ignore failures in tests that use the system calls not supported
-  # on fugu (Nexus Player, kernel version Linux 3.10).
-  expectations="$expectations --expectations art/tools/libcore_fugu_failures.txt"
+  # gcstress may lead to timeouts, so we need dedicated expectations files for it.
+  if $gcstress; then
+    expectations="$expectations --expectations art/tools/libcore_gcstress_failures.txt"
+    if $debug; then
+      expectations="$expectations --expectations art/tools/libcore_gcstress_debug_failures.txt"
+    fi
+  else
+    # We only run this package when user has not specified packages
+    # to run and not under gcstress as it can cause timeouts. See
+    # b/78228743.
+    working_packages+=("libcore.libcore.icu")
+  fi
+
+  if $getrandom; then :; else
+    # Ignore failures in tests that use the system calls not supported
+    # on fugu (Nexus Player, kernel version Linux 3.10).
+    expectations="$expectations --expectations art/tools/libcore_fugu_failures.txt"
+  fi
 fi
 
 if [ ! -t 1 ] ; then
