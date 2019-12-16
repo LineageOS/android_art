@@ -130,6 +130,7 @@ working_packages=("libcore.android.system"
 vogar_args=$@
 gcstress=false
 debug=false
+dry_run=false
 
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
@@ -171,6 +172,11 @@ while true; do
     # Remove the option from Vogar arguments.
     vogar_args=${vogar_args/$1}
     getrandom=false
+    shift
+  elif [[ "$1" == "--dry-run" ]]; then
+    # Remove the option from Vogar arguments.
+    vogar_args=${vogar_args/$1}
+    dry_run=true
     shift
   elif [[ "$1" == "" ]]; then
     break
@@ -241,4 +247,4 @@ echo ${working_packages[@]} | tr " " "\n"
 
 cmd="vogar $vogar_args $expectations $(cparg $DEPS) ${working_packages[@]}"
 echo "Running $cmd"
-eval $cmd
+$dry_run || eval $cmd
