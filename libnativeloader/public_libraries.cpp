@@ -232,13 +232,15 @@ static std::string InitVendorPublicLibraries() {
   return android::base::Join(*sonames, ':');
 }
 
-// read /system/etc/public.libraries-<companyname>.txt and
+// read /system/etc/public.libraries-<companyname>.txt,
+// /system_ext/etc/public.libraries-<companyname>.txt and
 // /product/etc/public.libraries-<companyname>.txt which contain partner defined
 // system libs that are exposed to apps. The libs in the txt files must be
 // named as lib<name>.<companyname>.so.
 static std::string InitExtendedPublicLibraries() {
   std::vector<std::string> sonames;
   ReadExtensionLibraries("/system/etc", &sonames);
+  ReadExtensionLibraries("/system_ext/etc", &sonames);
   ReadExtensionLibraries("/product/etc", &sonames);
   return android::base::Join(sonames, ':');
 }
