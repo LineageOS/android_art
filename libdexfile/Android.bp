@@ -140,12 +140,10 @@ gensrcs {
 
 art_cc_library {
     name: "libdexfile",
-    defaults: ["libdexfile_defaults"],
-    // Leave the symbols in the shared library so that stack unwinders can
-    // produce meaningful name resolution.
-    strip: {
-        keep_symbols: true,
-    },
+    defaults: [
+        "libdexfile_defaults",
+        "libart_nativeunwind_defaults",
+    ],
     target: {
         android: {
             shared_libs: [
