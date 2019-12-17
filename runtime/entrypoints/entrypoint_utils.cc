@@ -202,8 +202,8 @@ static inline ArtMethod* DoGetCalleeSaveMethodCaller(ArtMethod* outer_method,
     if (outer_method != nullptr) {
       const OatQuickMethodHeader* current_code = outer_method->GetOatQuickMethodHeader(caller_pc);
       DCHECK(current_code != nullptr);
-      DCHECK(current_code->IsOptimized());
-      if (CodeInfo::HasInlineInfo(current_code->GetOptimizedCodeInfoPtr())) {
+      if (current_code->IsOptimized() &&
+          CodeInfo::HasInlineInfo(current_code->GetOptimizedCodeInfoPtr())) {
         uintptr_t native_pc_offset = current_code->NativeQuickPcOffset(caller_pc);
         CodeInfo code_info = CodeInfo::DecodeInlineInfoOnly(current_code);
         StackMap stack_map = code_info.GetStackMapForNativePcOffset(native_pc_offset);
