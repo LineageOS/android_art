@@ -98,6 +98,7 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
     {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
     {"neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("neuralnetworks"))},
+    {"cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("cronet"))},
 };
 
 // The actual gmock object
@@ -354,12 +355,14 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_vndk_ns = false;
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
+  bool expected_link_with_cronet_ns = true;
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
   std::string expected_shared_libs_to_art_ns = art_public_libraries();
   std::string expected_shared_libs_to_sphal_ns = vendor_public_libraries();
   std::string expected_shared_libs_to_vndk_ns = vndksp_libraries();
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
   std::string expected_shared_libs_to_neuralnetworks_ns = neuralnetworks_public_libraries();
+  std::string expected_shared_libs_to_cronet_ns = cronet_public_libraries();
 
   void SetExpectations() {
     NativeLoaderTest::SetExpectations();
@@ -402,6 +405,11 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_neuralnetworks_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
+          .WillOnce(Return(true));
+    }
+    if (expected_link_with_cronet_ns) {
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("cronet"),
+                                              StrEq(expected_shared_libs_to_cronet_ns)))
           .WillOnce(Return(true));
     }
   }
