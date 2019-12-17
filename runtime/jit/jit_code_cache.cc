@@ -1616,12 +1616,15 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
     }
   }
 
-  MutexLock mu(self, *Locks::jit_lock_);
-  if (osr && (osr_code_map_.find(method) != osr_code_map_.end())) {
-    return false;
+  if (osr) {
+    MutexLock mu(self, *Locks::jit_lock_);
+    if (osr_code_map_.find(method) != osr_code_map_.end()) {
+      return false;
+    }
   }
 
   if (UNLIKELY(method->IsNative())) {
+    MutexLock mu(self, *Locks::jit_lock_);
     JniStubKey key(method);
     auto it = jni_stubs_map_.find(key);
     bool new_compilation = false;
@@ -1666,6 +1669,7 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
         return false;
       }
     } else {
+      MutexLock mu(self, *Locks::jit_lock_);
       if (info->IsMethodBeingCompiled(osr)) {
         return false;
       }

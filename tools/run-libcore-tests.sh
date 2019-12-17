@@ -14,18 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Exit on errors.
+set -e
+
 if [ ! -d libcore ]; then
   echo "Script needs to be run at the root of the android tree"
   exit 1
-fi
-
-source build/envsetup.sh >&/dev/null # for get_build_var, setpaths
-setpaths # include platform prebuilt java, javac, etc in $PATH.
-
-if [ -z "$ANDROID_PRODUCT_OUT" ] ; then
-  JAVA_LIBRARIES=out/target/common/obj/JAVA_LIBRARIES
-else
-  JAVA_LIBRARIES=${ANDROID_PRODUCT_OUT}/../../common/obj/JAVA_LIBRARIES
 fi
 
 # "Root" (actually "system") directory on device (in the case of
@@ -35,8 +29,12 @@ android_root=${ART_TEST_ANDROID_ROOT:-/system}
 function classes_jar_path {
   local var="$1"
   local suffix="jar"
-
-  echo "${JAVA_LIBRARIES}/${var}_intermediates/classes.${suffix}"
+  if [ -z "$ANDROID_PRODUCT_OUT" ] ; then
+    local java_libraries=out/target/common/obj/JAVA_LIBRARIES
+  else
+    local java_libraries=${ANDROID_PRODUCT_OUT}/../../common/obj/JAVA_LIBRARIES
+  fi
+  echo "${java_libraries}/${var}_intermediates/classes.${suffix}"
 }
 
 function cparg {
@@ -57,30 +55,43 @@ function boot_classpath_arg {
   done
 }
 
-# Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
-# because that's what we use for compiling the core.art image.
-# It may contain additional modules from TEST_CORE_JARS.
-BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
+function usage {
+  local me=$(basename "${BASH_SOURCE[0]}")
+  (
+    cat << EOF
+  Usage: ${me} --mode=<mode> [options] [-- <package_to_test> ...]
 
-DEPS="core-tests jsr166-tests mockito-target"
+  Run libcore tests using the vogar testing tool.
 
-for lib in $DEPS
-do
-  if [[ ! -f "$(classes_jar_path "$lib")" ]]; then
-    echo "${lib} is missing. Before running, you must run art/tools/buildbot-build.sh"
-    exit 1
-  fi
-done
+  Required parameters:
+    --mode=device|host|jvm Specify where tests should be run.
 
-expectations="--expectations art/tools/libcore_failures.txt"
+  Optional parameters:
+    --debug                Use debug version of ART (device|host only).
+    --dry-run              Print vogar command-line, but do not run.
+    --no-getrandom         Ignore failures from getrandom() (for kernel < 3.17).
+    --no-jit               Disable JIT (device|host only).
+    --Xgc:gcstress         Enable GC stress configuration (device|host only).
 
-emulator="no"
-if [ "$ANDROID_SERIAL" = "emulator-5554" ]; then
-  emulator="yes"
-fi
+  The script passes unrecognized options to the command-line created for vogar.
 
-# Use JIT compiling by default.
-use_jit=true
+  The script runs a hardcoded list of libcore test packages by default. The user
+  may run a subset of packages by appending '--' followed by a list of package
+  names.
+
+  Examples:
+
+    1. Run full test suite on host:
+      ${me} --mode=host
+
+    2. Run full test suite on device:
+      ${me} --mode=device
+
+    3. Run tests only from the libcore.java.lang package on device:
+      ${me} --mode=device -- libcore.java.lang
+EOF
+  ) | sed -e 's/^  //' >&2 # Strip leading whitespace from heredoc.
+}
 
 # Packages that currently work correctly with the expectation files.
 working_packages=("libcore.android.system"
@@ -127,59 +138,113 @@ working_packages=("libcore.android.system"
 # changes in case of failures.
 # "org.apache.harmony.security"
 
-vogar_args=$@
+#
+# Setup environment for running tests.
+#
+source build/envsetup.sh >&/dev/null # for get_build_var, setpaths
+setpaths # include platform prebuilt java, javac, etc in $PATH.
+
+# Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
+# because that's what we use for compiling the core.art image.
+# It may contain additional modules from TEST_CORE_JARS.
+BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
+
+DEPS="core-tests jsr166-tests mockito-target"
+
+for lib in $DEPS
+do
+  if [[ ! -f "$(classes_jar_path "$lib")" ]]; then
+    echo "${lib} is missing. Before running, you must run art/tools/buildbot-build.sh"
+    exit 1
+  fi
+done
+
+#
+# Defaults affected by command-line parsing
+#
+
+# Use JIT compiling by default.
+use_jit=true
+
 gcstress=false
 debug=false
+dry_run=false
 
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
 
-# Don't use device mode by default.
-device_mode=false
+# Execution mode specifies where to run tests (device|host|jvm).
+execution_mode=""
 
-while true; do
-  if [[ "$1" == "--mode=device" ]]; then
-    device_mode=true
-    # Remove the --mode=device from the arguments and replace it with --mode=device_testdex
-    vogar_args=${vogar_args/$1}
-    vogar_args="$vogar_args --mode=device_testdex"
-    vogar_args="$vogar_args --vm-arg -Ximage:/data/art-test/core.art"
-    vogar_args="$vogar_args $(boot_classpath_arg /system/framework -testdex $BOOT_CLASSPATH_JARS)"
-    shift
-  elif [[ "$1" == "--mode=host" ]]; then
-    # We explicitly give a wrong path for the image, to ensure vogar
-    # will create a boot image with the default compiler. Note that
-    # giving an existing image on host does not work because of
-    # classpath/resources differences when compiling the boot image.
-    vogar_args="$vogar_args --vm-arg -Ximage:/non/existent/vogar.art"
-    shift
-  elif [[ "$1" == "--no-jit" ]]; then
-    # Remove the --no-jit from the arguments.
-    vogar_args=${vogar_args/$1}
-    use_jit=false
-    shift
-  elif [[ "$1" == "--debug" ]]; then
-    # Remove the --debug from the arguments.
-    vogar_args=${vogar_args/$1}
-    vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
-    debug=true
-    shift
-  elif [[ "$1" == "-Xgc:gcstress" ]]; then
-    gcstress=true
-    shift
-  elif [[ "$1" == "--no-getrandom" ]]; then
-    # Remove the option from Vogar arguments.
-    vogar_args=${vogar_args/$1}
-    getrandom=false
-    shift
-  elif [[ "$1" == "" ]]; then
-    break
-  else
-    shift
-  fi
+# Default expectations file.
+expectations="--expectations art/tools/libcore_failures.txt"
+
+vogar_args=""
+while [ -n "$1" ]; do
+  case "$1" in
+    --mode=device)
+      # Use --mode=device_testdex not --mode=device for buildbot-build.sh.
+      # See commit 191cae33c7c24e for more details.
+      vogar_args="$vogar_args --mode=device_testdex"
+      vogar_args="$vogar_args --vm-arg -Ximage:/data/art-test/core.art"
+      vogar_args="$vogar_args $(boot_classpath_arg /system/framework -testdex $BOOT_CLASSPATH_JARS)"
+      execution_mode="device"
+      ;;
+    --mode=host)
+      # We explicitly give a wrong path for the image, to ensure vogar
+      # will create a boot image with the default compiler. Note that
+      # giving an existing image on host does not work because of
+      # classpath/resources differences when compiling the boot image.
+      vogar_args="$vogar_args $1 --vm-arg -Ximage:/non/existent/vogar.art"
+      execution_mode="host"
+      ;;
+    --mode=jvm)
+      vogar_args="$vogar_args $1"
+      execution_mode="jvm"
+      ;;
+    --no-getrandom)
+      getrandom=false
+      ;;
+    --no-jit)
+      use_jit=false
+      ;;
+    --debug)
+      vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
+      debug=true
+      ;;
+    -Xgc:gcstress)
+      vogar_args="$vogar_args $1"
+      gcstress=true
+      ;;
+    --dry-run)
+      dry_run=true
+      ;;
+    --)
+      shift
+      # Assume remaining elements are packages to test.
+      user_packages=("$@")
+      break
+      ;;
+    --help)
+      usage
+      exit 1
+      ;;
+    *)
+      vogar_args="$vogar_args $1"
+      ;;
+  esac
+  shift
 done
 
-if $device_mode; then
+if [ -z "$execution_mode" ]; then
+  usage
+  exit 1
+fi
+
+# Default timeout, gets overridden on device under gcstress.
+timeout_secs=480
+
+if [ $execution_mode = "device" ]; then
   # Honor environment variable ART_TEST_CHROOT.
   if [[ -n "$ART_TEST_CHROOT" ]]; then
     # Set Vogar's `--chroot` option.
@@ -191,48 +256,61 @@ if $device_mode; then
     vogar_args="$vogar_args --device-dir=/data/local/tmp"
   fi
   vogar_args="$vogar_args --vm-command=$android_root/bin/art"
-fi
 
-# Increase the timeout, as vogar cannot set individual test
-# timeout when being asked to run packages, and some tests go above
-# the default timeout.
-if $gcstress && $debug && $device_mode; then
-  vogar_args="$vogar_args --timeout 1440"
-elif $gcstress && $device_mode; then
-  vogar_args="$vogar_args --timeout 900"
-else
-  vogar_args="$vogar_args --timeout 480"
-fi
-
-# set the toolchain to use.
-vogar_args="$vogar_args --toolchain d8 --language CUR"
-
-# JIT settings.
-if $use_jit; then
-  vogar_args="$vogar_args --vm-arg -Xcompiler-option --vm-arg --compiler-filter=quicken"
-fi
-vogar_args="$vogar_args --vm-arg -Xusejit:$use_jit"
-
-# gcstress may lead to timeouts, so we need dedicated expectations files for it.
-if $gcstress; then
-  expectations="$expectations --expectations art/tools/libcore_gcstress_failures.txt"
-  if $debug; then
-    expectations="$expectations --expectations art/tools/libcore_gcstress_debug_failures.txt"
+  # Increase the timeout, as vogar cannot set individual test
+  # timeout when being asked to run packages, and some tests go above
+  # the default timeout.
+  if $gcstress; then
+    if $debug; then
+      timeout_secs=1440
+    else
+      timeout_secs=900
+    fi
   fi
-else
-  # We only run this package when not under gcstress as it can cause timeouts. See b/78228743.
-  working_packages+=("libcore.libcore.icu")
-fi
+fi  # $execution_mode = "device"
 
-if $getrandom; then :; else
-  # Ignore failures in tests that use the system calls not supported
-  # on fugu (Nexus Player, kernel version Linux 3.10).
-  expectations="$expectations --expectations art/tools/libcore_fugu_failures.txt"
+if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
+  # Add timeout to vogar command-line.
+  vogar_args="$vogar_args --timeout $timeout_secs"
+
+  # set the toolchain to use.
+  vogar_args="$vogar_args --toolchain d8 --language CUR"
+
+  # JIT settings.
+  if $use_jit; then
+    vogar_args="$vogar_args --vm-arg -Xcompiler-option --vm-arg --compiler-filter=quicken"
+  fi
+  vogar_args="$vogar_args --vm-arg -Xusejit:$use_jit"
+
+  # gcstress may lead to timeouts, so we need dedicated expectations files for it.
+  if $gcstress; then
+    expectations="$expectations --expectations art/tools/libcore_gcstress_failures.txt"
+    if $debug; then
+      expectations="$expectations --expectations art/tools/libcore_gcstress_debug_failures.txt"
+    fi
+  else
+    # We only run this package when user has not specified packages
+    # to run and not under gcstress as it can cause timeouts. See
+    # b/78228743.
+    working_packages+=("libcore.libcore.icu")
+  fi
+
+  if $getrandom; then :; else
+    # Ignore failures in tests that use the system calls not supported
+    # on fugu (Nexus Player, kernel version Linux 3.10).
+    expectations="$expectations --expectations art/tools/libcore_fugu_failures.txt"
+  fi
 fi
 
 if [ ! -t 1 ] ; then
   # Suppress color codes if not attached to a terminal
   vogar_args="$vogar_args --no-color"
+fi
+
+# Override working_packages if user provided specific packages to
+# test.
+if [[ ${#user_packages[@]} != 0 ]] ; then
+  working_packages=("${user_packages[@]}")
 fi
 
 # Run the tests using vogar.
@@ -241,4 +319,4 @@ echo ${working_packages[@]} | tr " " "\n"
 
 cmd="vogar $vogar_args $expectations $(cparg $DEPS) ${working_packages[@]}"
 echo "Running $cmd"
-eval $cmd
+$dry_run || eval $cmd

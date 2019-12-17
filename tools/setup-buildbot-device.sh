@@ -111,7 +111,7 @@ else
 fi
 
 echo -e "${green}Set sys.linker.use_generated_config to false if file is absent"
-adb shell "test -f /dev/linkerconfig/ld.config.txt || setprop sys.linker.use_generated_config false"
+adb shell "test -f /linkerconfig/ld.config.txt || setprop sys.linker.use_generated_config false"
 
 # Chroot environment.
 # ===================
