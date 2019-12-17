@@ -361,6 +361,7 @@ art_cc_defaults {
         "1974-resize-array/resize_array.cc",
         "1975-hello-structural-transformation/structural_transform.cc",
         "1976-hello-structural-static-methods/structural_transform_methods.cc",
+        "2005-pause-all-redefine-multithreaded/pause-all.cc",
     ],
     // Use NDK-compatible headers for ctstiagent.
     header_libs: [
