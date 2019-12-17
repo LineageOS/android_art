@@ -1,0 +1,1 @@
+Test for calling String.<init> with invoke-range.

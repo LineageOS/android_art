@@ -1119,6 +1119,7 @@
                   "691-hiddenapi-proxy",
                   "692-vdex-inmem-loader",
                   "693-vdex-inmem-loader-evict",
+                  "723-string-init-range",
                   "999-redefine-hiddenapi",
                   "1000-non-moving-space-stress",
                   "1001-app-image-regions",
