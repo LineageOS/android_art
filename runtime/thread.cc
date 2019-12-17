@@ -89,6 +89,7 @@
 #include "native_stack_dump.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "nativehelper/scoped_utf_chars.h"
+#include "nterp_helpers.h"
 #include "nth_caller_visitor.h"
 #include "oat_quick_method_header.h"
 #include "obj_ptr-inl.h"
@@ -3713,6 +3714,8 @@ class ReferenceMapVisitor : public StackVisitor {
     ShadowFrame* shadow_frame = GetCurrentShadowFrame();
     if (shadow_frame != nullptr) {
       VisitShadowFrame(shadow_frame);
+    } else if (GetCurrentOatQuickMethodHeader()->IsNterpMethodHeader()) {
+      VisitNterpFrame();
     } else {
       VisitQuickFrame();
     }
@@ -3777,6 +3780,32 @@ class ReferenceMapVisitor : public StackVisitor {
       visitor_(&new_ref, /* vreg= */ JavaFrameRootInfo::kMethodDeclaringClass, this);
       if (new_ref != klass) {
         method->CASDeclaringClass(klass.Ptr(), new_ref->AsClass());
+      }
+    }
+  }
+
+  void VisitNterpFrame() REQUIRES_SHARED(Locks::mutator_lock_) {
+    ArtMethod** cur_quick_frame = GetCurrentQuickFrame();
+    StackReference<mirror::Object>* vreg_ref_base =
+        reinterpret_cast<StackReference<mirror::Object>*>(NterpGetReferenceArray(cur_quick_frame));
+    StackReference<mirror::Object>* vreg_int_base =
+        reinterpret_cast<StackReference<mirror::Object>*>(NterpGetRegistersArray(cur_quick_frame));
+    CodeItemDataAccessor accessor((*cur_quick_frame)->DexInstructionData());
+    const uint16_t num_regs = accessor.RegistersSize();
+    // An nterp frame has two arrays: a dex register array and a reference array
+    // that shadows the dex register array but only containing references
+    // (non-reference dex registers have nulls). See nterp_helpers.cc.
+    for (size_t reg = 0; reg < num_regs; ++reg) {
+      StackReference<mirror::Object>* ref_addr = vreg_ref_base + reg;
+      mirror::Object* ref = ref_addr->AsMirrorPtr();
+      if (ref != nullptr) {
+        mirror::Object* new_ref = ref;
+        visitor_(&new_ref, reg, this);
+        if (new_ref != ref) {
+          ref_addr->Assign(new_ref);
+          StackReference<mirror::Object>* int_addr = vreg_int_base + reg;
+          int_addr->Assign(new_ref);
+        }
       }
     }
   }
