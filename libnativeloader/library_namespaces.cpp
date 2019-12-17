@@ -44,6 +44,7 @@ constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
 constexpr const char* kArtNamespaceName = "art";
 constexpr const char* kNeuralNetworksNamespaceName = "neuralnetworks";
+constexpr const char* kCronetNamespaceName = "cronet";
 
 // classloader-namespace is a linker namespace that is created for the loaded
 // app. To be specific, it is created for the app classloader. When
@@ -276,6 +277,16 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
       if (!linked) {
         return linked.error();
       }
+    }
+  }
+
+  // TODO(b/143733063): Remove it after library path of apex module is supported.
+  auto cronet_ns =
+      NativeLoaderNamespace::GetExportedNamespace(kCronetNamespaceName, is_bridged);
+  if (cronet_ns) {
+    linked = app_ns->Link(*cronet_ns, cronet_public_libraries());
+    if (!linked) {
+      return linked.error();
     }
   }
 

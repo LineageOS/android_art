@@ -32,6 +32,7 @@ using android::base::Result;
 const std::string& preloadable_public_libraries();
 const std::string& default_public_libraries();
 const std::string& art_public_libraries();
+const std::string& cronet_public_libraries();
 const std::string& vendor_public_libraries();
 const std::string& extended_public_libraries();
 const std::string& neuralnetworks_public_libraries();
