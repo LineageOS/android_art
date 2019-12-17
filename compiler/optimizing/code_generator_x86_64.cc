@@ -2364,28 +2364,41 @@ void LocationsBuilderX86_64::VisitReturn(HReturn* ret) {
 }
 
 void InstructionCodeGeneratorX86_64::VisitReturn(HReturn* ret) {
-  if (kIsDebugBuild) {
-    switch (ret->InputAt(0)->GetType()) {
-      case DataType::Type::kReference:
-      case DataType::Type::kBool:
-      case DataType::Type::kUint8:
-      case DataType::Type::kInt8:
-      case DataType::Type::kUint16:
-      case DataType::Type::kInt16:
-      case DataType::Type::kInt32:
-      case DataType::Type::kInt64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<CpuRegister>().AsRegister(), RAX);
-        break;
+  switch (ret->InputAt(0)->GetType()) {
+    case DataType::Type::kReference:
+    case DataType::Type::kBool:
+    case DataType::Type::kUint8:
+    case DataType::Type::kInt8:
+    case DataType::Type::kUint16:
+    case DataType::Type::kInt16:
+    case DataType::Type::kInt32:
+    case DataType::Type::kInt64:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<CpuRegister>().AsRegister(), RAX);
+      break;
 
-      case DataType::Type::kFloat32:
-      case DataType::Type::kFloat64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
-                  XMM0);
-        break;
-
-      default:
-        LOG(FATAL) << "Unexpected return type " << ret->InputAt(0)->GetType();
+    case DataType::Type::kFloat32: {
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
+                XMM0);
+      // To simplify callers of an OSR method, we put the return value in both
+      // floating point and core register.
+      if (GetGraph()->IsCompilingOsr()) {
+        __ movd(CpuRegister(RAX), XmmRegister(XMM0), /* is64bit= */ false);
+      }
+      break;
     }
+    case DataType::Type::kFloat64: {
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
+                XMM0);
+      // To simplify callers of an OSR method, we put the return value in both
+      // floating point and core register.
+      if (GetGraph()->IsCompilingOsr()) {
+        __ movd(CpuRegister(RAX), XmmRegister(XMM0), /* is64bit= */ true);
+      }
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected return type " << ret->InputAt(0)->GetType();
   }
   codegen_->GenerateFrameExit();
 }
