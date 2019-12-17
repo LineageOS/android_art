@@ -33,6 +33,7 @@
 #include "mirror/class-inl.h"
 #include "mirror/class_loader.h"
 #include "mirror/throwable.h"
+#include "nterp_helpers.h"
 #include "oat_quick_method_header.h"
 #include "stack.h"
 #include "stack_map.h"
@@ -662,6 +663,12 @@ void QuickExceptionHandler::DoLongJump(bool smash_caller_saves) {
   context_->SetArg0(handler_quick_arg0_);
   if (smash_caller_saves) {
     context_->SmashCallerSaves();
+  }
+  if (handler_method_ != nullptr &&
+      handler_method_header_ != nullptr &&
+      handler_method_header_->IsNterpMethodHeader()) {
+    context_->SetNterpDexPC(reinterpret_cast<uintptr_t>(
+        handler_method_->DexInstructions().Insns() + handler_dex_pc_));
   }
   context_->DoLongJump();
   UNREACHABLE();
