@@ -2253,17 +2253,7 @@ DEFINE_FUNCTION art_quick_osr_stub
     POP r8
     POP rcx
     POP rbp
-    cmpb LITERAL(68), (%r8)        // Test if result type char == 'D'.
-    je .Losr_return_double_quick
-    cmpb LITERAL(70), (%r8)        // Test if result type char == 'F'.
-    je .Losr_return_float_quick
-    movq %rax, (%rcx)              // Store the result assuming its a long, int or Object*
-    ret
-.Losr_return_double_quick:
-    movsd %xmm0, (%rcx)            // Store the double floating point result.
-    ret
-.Losr_return_float_quick:
-    movss %xmm0, (%rcx)            // Store the floating point result.
+    movq %rax, (%rcx)              // Store the result.
     ret
 .Losr_entry:
     CFI_RESTORE_STATE_AND_DEF_CFA(rsp, 80)
