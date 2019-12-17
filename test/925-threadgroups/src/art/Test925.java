@@ -124,7 +124,16 @@ public class Test925 {
     for (int i = 0; i <  timeoutS; i++) {
       Object[] data = getThreadGroupChildren(tg);
       Thread[] threads = (Thread[])data[0];
-      if (threads.length == expectedChildCount) {
+      List<Thread> lthreads = new ArrayList<>(Arrays.asList(threads));
+      Iterator<Thread> it = lthreads.iterator();
+      while (it.hasNext()) {
+        Thread t = it.next();
+        if (t.getName().startsWith("Jit thread pool worker")) {
+          it.remove();
+          break;
+        }
+      }
+      if (lthreads.size() == expectedChildCount) {
         return;
       }
       Thread.sleep(1000);
