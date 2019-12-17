@@ -1096,44 +1096,48 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
   if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    uint32_t address = reinterpret_cast32<uint32_t>(info);
-    NearLabel done;
-    if (HasEmptyFrame()) {
-      CHECK(is_frame_entry);
-      // Alignment
-      __ subl(ESP, Immediate(8));
-      __ cfi().AdjustCFAOffset(8);
-      // We need a temporary. The stub also expects the method at bottom of stack.
-      __ pushl(EAX);
-      __ cfi().AdjustCFAOffset(4);
-      __ movl(EAX, Immediate(address));
-      __ addw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()), Immediate(1));
-      __ j(kCarryClear, &done);
-      GenerateInvokeRuntime(
-          GetThreadOffset<kX86PointerSize>(kQuickCompileOptimized).Int32Value());
-      __ Bind(&done);
-      // We don't strictly require to restore EAX, but this makes the generated
-      // code easier to reason about.
-      __ popl(EAX);
-      __ cfi().AdjustCFAOffset(-4);
-      __ addl(ESP, Immediate(8));
-      __ cfi().AdjustCFAOffset(-8);
-    } else {
-      if (!RequiresCurrentMethod()) {
+    if (info != nullptr) {
+      uint32_t address = reinterpret_cast32<uint32_t>(info);
+      NearLabel done;
+      if (HasEmptyFrame()) {
         CHECK(is_frame_entry);
-        __ movl(Address(ESP, kCurrentMethodStackOffset), kMethodRegisterArgument);
+        // Alignment
+        __ subl(ESP, Immediate(8));
+        __ cfi().AdjustCFAOffset(8);
+        // We need a temporary. The stub also expects the method at bottom of stack.
+        __ pushl(EAX);
+        __ cfi().AdjustCFAOffset(4);
+        __ movl(EAX, Immediate(address));
+        __ addw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+                Immediate(1));
+        __ j(kCarryClear, &done);
+        GenerateInvokeRuntime(
+            GetThreadOffset<kX86PointerSize>(kQuickCompileOptimized).Int32Value());
+        __ Bind(&done);
+        // We don't strictly require to restore EAX, but this makes the generated
+        // code easier to reason about.
+        __ popl(EAX);
+        __ cfi().AdjustCFAOffset(-4);
+        __ addl(ESP, Immediate(8));
+        __ cfi().AdjustCFAOffset(-8);
+      } else {
+        if (!RequiresCurrentMethod()) {
+          CHECK(is_frame_entry);
+          __ movl(Address(ESP, kCurrentMethodStackOffset), kMethodRegisterArgument);
+        }
+        // We need a temporary.
+        __ pushl(EAX);
+        __ cfi().AdjustCFAOffset(4);
+        __ movl(EAX, Immediate(address));
+        __ addw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+                Immediate(1));
+        __ popl(EAX);  // Put stack as expected before exiting or calling stub.
+        __ cfi().AdjustCFAOffset(-4);
+        __ j(kCarryClear, &done);
+        GenerateInvokeRuntime(
+            GetThreadOffset<kX86PointerSize>(kQuickCompileOptimized).Int32Value());
+        __ Bind(&done);
       }
-      // We need a temporary.
-      __ pushl(EAX);
-      __ cfi().AdjustCFAOffset(4);
-      __ movl(EAX, Immediate(address));
-      __ addw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()), Immediate(1));
-      __ popl(EAX);  // Put stack as expected before exiting or calling stub.
-      __ cfi().AdjustCFAOffset(-4);
-      __ j(kCarryClear, &done);
-      GenerateInvokeRuntime(
-          GetThreadOffset<kX86PointerSize>(kQuickCompileOptimized).Int32Value());
-      __ Bind(&done);
     }
   }
 }
@@ -2366,20 +2370,22 @@ void CodeGeneratorX86::MaybeGenerateInlineCacheCheck(HInstruction* instruction, 
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
-    uint32_t address = reinterpret_cast32<uint32_t>(cache);
-    if (kIsDebugBuild) {
-      uint32_t temp_index = instruction->GetLocations()->GetTempCount() - 1u;
-      CHECK_EQ(EBP, instruction->GetLocations()->GetTemp(temp_index).AsRegister<Register>());
+    if (info != nullptr) {
+      InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+      uint32_t address = reinterpret_cast32<uint32_t>(cache);
+      if (kIsDebugBuild) {
+        uint32_t temp_index = instruction->GetLocations()->GetTempCount() - 1u;
+        CHECK_EQ(EBP, instruction->GetLocations()->GetTemp(temp_index).AsRegister<Register>());
+      }
+      Register temp = EBP;
+      NearLabel done;
+      __ movl(temp, Immediate(address));
+      // Fast path for a monomorphic cache.
+      __ cmpl(klass, Address(temp, InlineCache::ClassesOffset().Int32Value()));
+      __ j(kEqual, &done);
+      GenerateInvokeRuntime(GetThreadOffset<kX86PointerSize>(kQuickUpdateInlineCache).Int32Value());
+      __ Bind(&done);
     }
-    Register temp = EBP;
-    NearLabel done;
-    __ movl(temp, Immediate(address));
-    // Fast path for a monomorphic cache.
-    __ cmpl(klass, Address(temp, InlineCache::ClassesOffset().Int32Value()));
-    __ j(kEqual, &done);
-    GenerateInvokeRuntime(GetThreadOffset<kX86PointerSize>(kQuickUpdateInlineCache).Int32Value());
-    __ Bind(&done);
   }
 }
 
