@@ -2425,19 +2425,8 @@ DEFINE_FUNCTION art_quick_osr_stub
     POP ebx
     POP ebp
     mov 16(%esp), %ecx            // Get JValue result
-    mov %eax, (%ecx)              // Store the result assuming it is a long, int or Object*
-    mov %edx, 4(%ecx)             // Store the other half of the result
-    mov 20(%esp), %edx            // Get the shorty
-    cmpb LITERAL(68), (%edx)      // Test if result type char == 'D'
-    je .Losr_return_double_quick
-    cmpb LITERAL(70), (%edx)      // Test if result type char == 'F'
-    je .Losr_return_float_quick
-    ret
-.Losr_return_double_quick:
-    movsd %xmm0, (%ecx)           // Store the floating point result
-    ret
-.Losr_return_float_quick:
-    movss %xmm0, (%ecx)           // Store the floating point result
+    mov %eax, (%ecx)              // Store the result.
+    mov %edx, 4(%ecx)             // Store the other half of the result.
     ret
 .Losr_entry:
     CFI_RESTORE_STATE_AND_DEF_CFA(ebp, SAVE_SIZE)  // CFA = ebp + SAVE_SIZE

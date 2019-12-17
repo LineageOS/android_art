@@ -1031,29 +1031,8 @@ ENTRY art_quick_osr_stub
     RESTORE_TWO_REGS xFP, xLR, 96
     RESTORE_TWO_REGS_DECREASE_FRAME x3, x4, SAVE_SIZE
 
-    // Store result (w0/x0/s0/d0) appropriately, depending on resultType.
-    ldrb w10, [x4]
-
-    // Check the return type and store the correct register into the jvalue in memory.
-
-    // Don't set anything for a void type.
-    cmp w10, #'V'
-    beq .Losr_exit
-    // Is it a double?
-    cmp w10, #'D'
-    beq .Losr_return_double
-    // Is it a float?
-    cmp w10, #'F'
-    beq .Losr_return_float
-    // Just store x0. Doesn't matter if it is 64 or 32 bits.
+    // The compiler put the result in x0. Doesn't matter if it is 64 or 32 bits.
     str x0, [x3]
-.Losr_exit:
-    ret
-.Losr_return_double:
-    str d0, [x3]
-    ret
-.Losr_return_float:
-    str s0, [x3]
     ret
 
 .Losr_entry:

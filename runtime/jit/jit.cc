@@ -459,36 +459,15 @@ extern "C" void art_quick_osr_stub(void** stack,
                                    const char* shorty,
                                    Thread* self);
 
-bool Jit::MaybeDoOnStackReplacement(Thread* thread,
-                                    ArtMethod* method,
-                                    uint32_t dex_pc,
-                                    int32_t dex_pc_offset,
-                                    JValue* result) {
+OsrData* Jit::PrepareForOsr(ArtMethod* method, uint32_t dex_pc, uint32_t* vregs) {
   if (!kEnableOnStackReplacement) {
-    return false;
+    return nullptr;
   }
-
-  Jit* jit = Runtime::Current()->GetJit();
-  if (jit == nullptr) {
-    return false;
-  }
-
-  if (UNLIKELY(__builtin_frame_address(0) < thread->GetStackEnd())) {
-    // Don't attempt to do an OSR if we are close to the stack limit. Since
-    // the interpreter frames are still on stack, OSR has the potential
-    // to stack overflow even for a simple loop.
-    // b/27094810.
-    return false;
-  }
-
-  // Get the actual Java method if this method is from a proxy class. The compiler
-  // and the JIT code cache do not expect methods from proxy classes.
-  method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
 
   // Cheap check if the method has been compiled already. That's an indicator that we should
   // osr into it.
-  if (!jit->GetCodeCache()->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
-    return false;
+  if (!GetCodeCache()->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
+    return nullptr;
   }
 
   // Fetch some data before looking up for an OSR method. We don't want thread
@@ -496,36 +475,25 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
   // method while we are being suspended.
   CodeItemDataAccessor accessor(method->DexInstructionData());
   const size_t number_of_vregs = accessor.RegistersSize();
-  const char* shorty = method->GetShorty();
   std::string method_name(VLOG_IS_ON(jit) ? method->PrettyMethod() : "");
-  void** memory = nullptr;
-  size_t frame_size = 0;
-  ShadowFrame* shadow_frame = nullptr;
-  const uint8_t* native_pc = nullptr;
+  OsrData* osr_data = nullptr;
 
   {
     ScopedAssertNoThreadSuspension sts("Holding OSR method");
-    const OatQuickMethodHeader* osr_method = jit->GetCodeCache()->LookupOsrMethodHeader(method);
+    const OatQuickMethodHeader* osr_method = GetCodeCache()->LookupOsrMethodHeader(method);
     if (osr_method == nullptr) {
       // No osr method yet, just return to the interpreter.
-      return false;
+      return nullptr;
     }
 
     CodeInfo code_info(osr_method);
 
     // Find stack map starting at the target dex_pc.
-    StackMap stack_map = code_info.GetOsrStackMapForDexPc(dex_pc + dex_pc_offset);
+    StackMap stack_map = code_info.GetOsrStackMapForDexPc(dex_pc);
     if (!stack_map.IsValid()) {
       // There is no OSR stack map for this dex pc offset. Just return to the interpreter in the
       // hope that the next branch has one.
-      return false;
-    }
-
-    // Before allowing the jump, make sure no code is actively inspecting the method to avoid
-    // jumping from interpreter to OSR while e.g. single stepping. Note that we could selectively
-    // disable OSR when single stepping, but that's currently hard to know at this point.
-    if (Runtime::Current()->GetRuntimeCallbacks()->IsMethodBeingInspected(method)) {
-      return false;
+      return nullptr;
     }
 
     // We found a stack map, now fill the frame with dex register values from the interpreter's
@@ -533,20 +501,22 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
     DexRegisterMap vreg_map = code_info.GetDexRegisterMapOf(stack_map);
     DCHECK_EQ(vreg_map.size(), number_of_vregs);
 
-    frame_size = osr_method->GetFrameSizeInBytes();
+    size_t frame_size = osr_method->GetFrameSizeInBytes();
 
     // Allocate memory to put shadow frame values. The osr stub will copy that memory to
     // stack.
     // Note that we could pass the shadow frame to the stub, and let it copy the values there,
     // but that is engineering complexity not worth the effort for something like OSR.
-    memory = reinterpret_cast<void**>(malloc(frame_size));
-    CHECK(memory != nullptr);
-    memset(memory, 0, frame_size);
+    osr_data = reinterpret_cast<OsrData*>(malloc(sizeof(OsrData) + frame_size));
+    if (osr_data == nullptr) {
+      return nullptr;
+    }
+    memset(osr_data, 0, sizeof(OsrData) + frame_size);
+    osr_data->frame_size = frame_size;
 
     // Art ABI: ArtMethod is at the bottom of the stack.
-    memory[0] = method;
+    osr_data->memory[0] = method;
 
-    shadow_frame = thread->PopShadowFrame();
     if (vreg_map.empty()) {
       // If we don't have a dex register map, then there are no live dex registers at
       // this dex pc.
@@ -565,30 +535,71 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
 
         DCHECK_EQ(location, DexRegisterLocation::Kind::kInStack);
 
-        int32_t vreg_value = shadow_frame->GetVReg(vreg);
+        int32_t vreg_value = vregs[vreg];
         int32_t slot_offset = vreg_map[vreg].GetStackOffsetInBytes();
         DCHECK_LT(slot_offset, static_cast<int32_t>(frame_size));
         DCHECK_GT(slot_offset, 0);
-        (reinterpret_cast<int32_t*>(memory))[slot_offset / sizeof(int32_t)] = vreg_value;
+        (reinterpret_cast<int32_t*>(osr_data->memory))[slot_offset / sizeof(int32_t)] = vreg_value;
       }
     }
 
-    native_pc = stack_map.GetNativePcOffset(kRuntimeISA) +
+    osr_data->native_pc = stack_map.GetNativePcOffset(kRuntimeISA) +
         osr_method->GetEntryPoint();
     VLOG(jit) << "Jumping to "
               << method_name
               << "@"
-              << std::hex << reinterpret_cast<uintptr_t>(native_pc);
+              << std::hex << reinterpret_cast<uintptr_t>(osr_data->native_pc);
+  }
+  return osr_data;
+}
+
+bool Jit::MaybeDoOnStackReplacement(Thread* thread,
+                                    ArtMethod* method,
+                                    uint32_t dex_pc,
+                                    int32_t dex_pc_offset,
+                                    JValue* result) {
+  Jit* jit = Runtime::Current()->GetJit();
+  if (jit == nullptr) {
+    return false;
+  }
+
+  if (UNLIKELY(__builtin_frame_address(0) < thread->GetStackEnd())) {
+    // Don't attempt to do an OSR if we are close to the stack limit. Since
+    // the interpreter frames are still on stack, OSR has the potential
+    // to stack overflow even for a simple loop.
+    // b/27094810.
+    return false;
+  }
+
+  // Get the actual Java method if this method is from a proxy class. The compiler
+  // and the JIT code cache do not expect methods from proxy classes.
+  method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
+
+  // Before allowing the jump, make sure no code is actively inspecting the method to avoid
+  // jumping from interpreter to OSR while e.g. single stepping. Note that we could selectively
+  // disable OSR when single stepping, but that's currently hard to know at this point.
+  if (Runtime::Current()->GetRuntimeCallbacks()->IsMethodBeingInspected(method)) {
+    return false;
+  }
+
+  ShadowFrame* shadow_frame = thread->GetManagedStack()->GetTopShadowFrame();
+  OsrData* osr_data = jit->PrepareForOsr(method,
+                                         dex_pc + dex_pc_offset,
+                                         shadow_frame->GetVRegArgs(0));
+
+  if (osr_data == nullptr) {
+    return false;
   }
 
   {
+    thread->PopShadowFrame();
     ManagedStack fragment;
     thread->PushManagedStackFragment(&fragment);
-    (*art_quick_osr_stub)(memory,
-                          frame_size,
-                          native_pc,
+    (*art_quick_osr_stub)(osr_data->memory,
+                          osr_data->frame_size,
+                          osr_data->native_pc,
                           result,
-                          shorty,
+                          method->GetShorty(),
                           thread);
 
     if (UNLIKELY(thread->GetException() == Thread::GetDeoptimizationException())) {
@@ -596,9 +607,9 @@ bool Jit::MaybeDoOnStackReplacement(Thread* thread,
     }
     thread->PopManagedStackFragment(fragment);
   }
-  free(memory);
+  free(osr_data);
   thread->PushShadowFrame(shadow_frame);
-  VLOG(jit) << "Done running OSR code for " << method_name;
+  VLOG(jit) << "Done running OSR code for " << method->PrettyMethod();
   return true;
 }
 

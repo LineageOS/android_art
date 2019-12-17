@@ -2212,31 +2212,46 @@ void LocationsBuilderX86::VisitReturn(HReturn* ret) {
 }
 
 void InstructionCodeGeneratorX86::VisitReturn(HReturn* ret) {
-  if (kIsDebugBuild) {
-    switch (ret->InputAt(0)->GetType()) {
-      case DataType::Type::kReference:
-      case DataType::Type::kBool:
-      case DataType::Type::kUint8:
-      case DataType::Type::kInt8:
-      case DataType::Type::kUint16:
-      case DataType::Type::kInt16:
-      case DataType::Type::kInt32:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<Register>(), EAX);
-        break;
+  switch (ret->InputAt(0)->GetType()) {
+    case DataType::Type::kReference:
+    case DataType::Type::kBool:
+    case DataType::Type::kUint8:
+    case DataType::Type::kInt8:
+    case DataType::Type::kUint16:
+    case DataType::Type::kInt16:
+    case DataType::Type::kInt32:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<Register>(), EAX);
+      break;
 
-      case DataType::Type::kInt64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegisterPairLow<Register>(), EAX);
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegisterPairHigh<Register>(), EDX);
-        break;
+    case DataType::Type::kInt64:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegisterPairLow<Register>(), EAX);
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegisterPairHigh<Register>(), EDX);
+      break;
 
-      case DataType::Type::kFloat32:
-      case DataType::Type::kFloat64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>(), XMM0);
-        break;
+    case DataType::Type::kFloat32:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>(), XMM0);
+      if (GetGraph()->IsCompilingOsr()) {
+        // To simplify callers of an OSR method, we put the return value in both
+        // floating point and core registers.
+        __ movd(EAX, XMM0);
+      }
+      break;
 
-      default:
-        LOG(FATAL) << "Unknown return type " << ret->InputAt(0)->GetType();
-    }
+    case DataType::Type::kFloat64:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>(), XMM0);
+      if (GetGraph()->IsCompilingOsr()) {
+        // To simplify callers of an OSR method, we put the return value in both
+        // floating point and core registers.
+        __ movd(EAX, XMM0);
+        // Use XMM1 as temporary register to not clobber XMM0.
+        __ movaps(XMM1, XMM0);
+        __ psrlq(XMM1, Immediate(32));
+        __ movd(EDX, XMM1);
+      }
+      break;
+
+    default:
+      LOG(FATAL) << "Unknown return type " << ret->InputAt(0)->GetType();
   }
   codegen_->GenerateFrameExit();
 }
