@@ -1733,14 +1733,15 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
   StackHandleScope<1> hs(self);
   HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(klass));
 
-  auto send_object_pre_alloc = [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (UNLIKELY(instrumented)) {
-      AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
-      if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
-        l->PreObjectAllocated(self, h_klass, &alloc_size);
-      }
-    }
-  };
+  auto send_object_pre_alloc =
+      [&]() REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_) {
+        if (UNLIKELY(instrumented)) {
+          AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
+          if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
+            l->PreObjectAllocated(self, h_klass, &alloc_size);
+          }
+        }
+      };
 #define PERFORM_SUSPENDING_OPERATION(op)                                          \
   [&]() REQUIRES(Roles::uninterruptible_) REQUIRES_SHARED(Locks::mutator_lock_) { \
     ScopedAllowThreadSuspension ats;                                              \
@@ -1755,8 +1756,6 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
       PERFORM_SUSPENDING_OPERATION(WaitForGcToComplete(kGcCauseForAlloc, self));
   // If we were the default allocator but the allocator changed while we were suspended,
   // abort the allocation.
-  // We just waited, call the pre-alloc again.
-  send_object_pre_alloc();
   if ((was_default_allocator && allocator != GetCurrentAllocator()) ||
       (!instrumented && EntrypointsInstrumented())) {
     return nullptr;
