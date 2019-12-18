@@ -1080,41 +1080,43 @@ void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
   if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    uint32_t address = reinterpret_cast32<uint32_t>(info);
-    vixl::aarch64::Label done;
-    UseScratchRegisterScope temps(masm);
-    Register temp = temps.AcquireX();
-    Register counter = temps.AcquireW();
-    __ Mov(temp, address);
-    __ Ldrh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
-    __ Add(counter, counter, 1);
-    __ Strh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
-    __ Tst(counter, 0xffff);
-    __ B(ne, &done);
-    if (is_frame_entry) {
-      if (HasEmptyFrame()) {
-        // The entyrpoint expects the method at the bottom of the stack. We
-        // claim stack space necessary for alignment.
-        __ Claim(kStackAlignment);
-        __ Stp(kArtMethodRegister, lr, MemOperand(sp, 0));
-      } else if (!RequiresCurrentMethod()) {
-        __ Str(kArtMethodRegister, MemOperand(sp, 0));
+    if (info != nullptr) {
+      uint32_t address = reinterpret_cast32<uint32_t>(info);
+      vixl::aarch64::Label done;
+      UseScratchRegisterScope temps(masm);
+      Register temp = temps.AcquireX();
+      Register counter = temps.AcquireW();
+      __ Mov(temp, address);
+      __ Ldrh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+      __ Add(counter, counter, 1);
+      __ Strh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+      __ Tst(counter, 0xffff);
+      __ B(ne, &done);
+      if (is_frame_entry) {
+        if (HasEmptyFrame()) {
+          // The entyrpoint expects the method at the bottom of the stack. We
+          // claim stack space necessary for alignment.
+          __ Claim(kStackAlignment);
+          __ Stp(kArtMethodRegister, lr, MemOperand(sp, 0));
+        } else if (!RequiresCurrentMethod()) {
+          __ Str(kArtMethodRegister, MemOperand(sp, 0));
+        }
+      } else {
+        CHECK(RequiresCurrentMethod());
       }
-    } else {
-      CHECK(RequiresCurrentMethod());
+      uint32_t entrypoint_offset =
+          GetThreadOffset<kArm64PointerSize>(kQuickCompileOptimized).Int32Value();
+      __ Ldr(lr, MemOperand(tr, entrypoint_offset));
+      // Note: we don't record the call here (and therefore don't generate a stack
+      // map), as the entrypoint should never be suspended.
+      __ Blr(lr);
+      if (HasEmptyFrame()) {
+        CHECK(is_frame_entry);
+        __ Ldr(lr, MemOperand(sp, 8));
+        __ Drop(kStackAlignment);
+      }
+      __ Bind(&done);
     }
-    uint32_t entrypoint_offset =
-        GetThreadOffset<kArm64PointerSize>(kQuickCompileOptimized).Int32Value();
-    __ Ldr(lr, MemOperand(tr, entrypoint_offset));
-    // Note: we don't record the call here (and therefore don't generate a stack
-    // map), as the entrypoint should never be suspended.
-    __ Blr(lr);
-    if (HasEmptyFrame()) {
-      CHECK(is_frame_entry);
-      __ Ldr(lr, MemOperand(sp, 8));
-      __ Drop(kStackAlignment);
-    }
-    __ Bind(&done);
   }
 }
 
@@ -4089,16 +4091,18 @@ void CodeGeneratorARM64::MaybeGenerateInlineCacheCheck(HInstruction* instruction
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
-    uint64_t address = reinterpret_cast64<uint64_t>(cache);
-    vixl::aarch64::Label done;
-    __ Mov(x8, address);
-    __ Ldr(x9, MemOperand(x8, InlineCache::ClassesOffset().Int32Value()));
-    // Fast path for a monomorphic cache.
-    __ Cmp(klass, x9);
-    __ B(eq, &done);
-    InvokeRuntime(kQuickUpdateInlineCache, instruction, instruction->GetDexPc());
-    __ Bind(&done);
+    if (info != nullptr) {
+      InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+      uint64_t address = reinterpret_cast64<uint64_t>(cache);
+      vixl::aarch64::Label done;
+      __ Mov(x8, address);
+      __ Ldr(x9, MemOperand(x8, InlineCache::ClassesOffset().Int32Value()));
+      // Fast path for a monomorphic cache.
+      __ Cmp(klass, x9);
+      __ B(eq, &done);
+      InvokeRuntime(kQuickUpdateInlineCache, instruction, instruction->GetDexPc());
+      __ Bind(&done);
+    }
   }
 }
 
@@ -5530,7 +5534,21 @@ void LocationsBuilderARM64::VisitReturn(HReturn* instruction) {
   locations->SetInAt(0, ARM64ReturnLocation(return_type));
 }
 
-void InstructionCodeGeneratorARM64::VisitReturn(HReturn* instruction ATTRIBUTE_UNUSED) {
+void InstructionCodeGeneratorARM64::VisitReturn(HReturn* ret) {
+  if (GetGraph()->IsCompilingOsr()) {
+    // To simplify callers of an OSR method, we put the return value in both
+    // floating point and core register.
+    switch (ret->InputAt(0)->GetType()) {
+      case DataType::Type::kFloat32:
+        __ Fmov(w0, s0);
+        break;
+      case DataType::Type::kFloat64:
+        __ Fmov(x0, d0);
+        break;
+      default:
+        break;
+    }
+  }
   codegen_->GenerateFrameExit();
 }
 

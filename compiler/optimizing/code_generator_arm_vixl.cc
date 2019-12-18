@@ -2103,43 +2103,45 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
   if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    uint32_t address = reinterpret_cast32<uint32_t>(info);
-    vixl::aarch32::Label done;
-    UseScratchRegisterScope temps(GetVIXLAssembler());
-    temps.Exclude(ip);
-    if (!is_frame_entry) {
-      __ Push(r4);  // Will be used as temporary. For frame entry, r4 is always available.
-    }
-    __ Mov(r4, address);
-    __ Ldrh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
-    __ Add(ip, ip, 1);
-    __ Strh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
-    if (!is_frame_entry) {
-      __ Pop(r4);
-    }
-    __ Lsls(ip, ip, 16);
-    __ B(ne, &done);
-    uint32_t entry_point_offset =
-        GetThreadOffset<kArmPointerSize>(kQuickCompileOptimized).Int32Value();
-    if (HasEmptyFrame()) {
-      CHECK(is_frame_entry);
-      // For leaf methods, we need to spill lr and r0. Also spill r1 and r2 for
-      // alignment.
-      uint32_t core_spill_mask =
-          (1 << lr.GetCode()) | (1 << r0.GetCode()) | (1 << r1.GetCode()) | (1 << r2.GetCode());
-      __ Push(RegisterList(core_spill_mask));
+    if (info != nullptr) {
+      uint32_t address = reinterpret_cast32<uint32_t>(info);
+      vixl::aarch32::Label done;
+      UseScratchRegisterScope temps(GetVIXLAssembler());
+      temps.Exclude(ip);
+      if (!is_frame_entry) {
+        __ Push(r4);  // Will be used as temporary. For frame entry, r4 is always available.
+      }
+      __ Mov(r4, address);
+      __ Ldrh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+      __ Add(ip, ip, 1);
+      __ Strh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
+      if (!is_frame_entry) {
+        __ Pop(r4);
+      }
+      __ Lsls(ip, ip, 16);
+      __ B(ne, &done);
+      uint32_t entry_point_offset =
+          GetThreadOffset<kArmPointerSize>(kQuickCompileOptimized).Int32Value();
+      if (HasEmptyFrame()) {
+        CHECK(is_frame_entry);
+        // For leaf methods, we need to spill lr and r0. Also spill r1 and r2 for
+        // alignment.
+        uint32_t core_spill_mask =
+            (1 << lr.GetCode()) | (1 << r0.GetCode()) | (1 << r1.GetCode()) | (1 << r2.GetCode());
+        __ Push(RegisterList(core_spill_mask));
+        __ Ldr(lr, MemOperand(tr, entry_point_offset));
+        __ Blx(lr);
+        __ Pop(RegisterList(core_spill_mask));
+      } else {
+        if (!RequiresCurrentMethod()) {
+          CHECK(is_frame_entry);
+          GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
+        }
       __ Ldr(lr, MemOperand(tr, entry_point_offset));
       __ Blx(lr);
-      __ Pop(RegisterList(core_spill_mask));
-    } else {
-      if (!RequiresCurrentMethod()) {
-        CHECK(is_frame_entry);
-        GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
       }
-    __ Ldr(lr, MemOperand(tr, entry_point_offset));
-    __ Blx(lr);
+      __ Bind(&done);
     }
-    __ Bind(&done);
   }
 }
 
@@ -3252,7 +3254,21 @@ void LocationsBuilderARMVIXL::VisitReturn(HReturn* ret) {
   locations->SetInAt(0, parameter_visitor_.GetReturnLocation(ret->InputAt(0)->GetType()));
 }
 
-void InstructionCodeGeneratorARMVIXL::VisitReturn(HReturn* ret ATTRIBUTE_UNUSED) {
+void InstructionCodeGeneratorARMVIXL::VisitReturn(HReturn* ret) {
+  if (GetGraph()->IsCompilingOsr()) {
+    // To simplify callers of an OSR method, we put the return value in both
+    // floating point and core registers.
+    switch (ret->InputAt(0)->GetType()) {
+      case DataType::Type::kFloat32:
+        __ Vmov(r0, s0);
+        break;
+      case DataType::Type::kFloat64:
+        __ Vmov(r0, r1, d0);
+        break;
+      default:
+        break;
+    }
+  }
   codegen_->GenerateFrameExit();
 }
 
@@ -3350,18 +3366,20 @@ void CodeGeneratorARMVIXL::MaybeGenerateInlineCacheCheck(HInstruction* instructi
     DCHECK(!instruction->GetEnvironment()->IsFromInlinedInvoke());
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
-    uint32_t address = reinterpret_cast32<uint32_t>(cache);
-    vixl32::Label done;
-    UseScratchRegisterScope temps(GetVIXLAssembler());
-    temps.Exclude(ip);
-    __ Mov(r4, address);
-    __ Ldr(ip, MemOperand(r4, InlineCache::ClassesOffset().Int32Value()));
-    // Fast path for a monomorphic cache.
-    __ Cmp(klass, ip);
-    __ B(eq, &done, /* is_far_target= */ false);
-    InvokeRuntime(kQuickUpdateInlineCache, instruction, instruction->GetDexPc());
-    __ Bind(&done);
+    if (info != nullptr) {
+      InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+      uint32_t address = reinterpret_cast32<uint32_t>(cache);
+      vixl32::Label done;
+      UseScratchRegisterScope temps(GetVIXLAssembler());
+      temps.Exclude(ip);
+      __ Mov(r4, address);
+      __ Ldr(ip, MemOperand(r4, InlineCache::ClassesOffset().Int32Value()));
+      // Fast path for a monomorphic cache.
+      __ Cmp(klass, ip);
+      __ B(eq, &done, /* is_far_target= */ false);
+      InvokeRuntime(kQuickUpdateInlineCache, instruction, instruction->GetDexPc());
+      __ Bind(&done);
+    }
   }
 }
 

@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <thread>
+#include <time.h>
 
 #include "gc/heap-visit-objects-inl.h"
 #include "gc/heap.h"
@@ -218,8 +219,8 @@ void WaitForDataSource(art::Thread* self) {
 
 class Writer {
  public:
-  Writer(pid_t parent_pid, JavaHprofDataSource::TraceContext* ctx)
-      : parent_pid_(parent_pid), ctx_(ctx) {}
+  Writer(pid_t parent_pid, JavaHprofDataSource::TraceContext* ctx, uint64_t timestamp)
+      : parent_pid_(parent_pid), ctx_(ctx), timestamp_(timestamp) {}
 
   perfetto::protos::pbzero::HeapGraph* GetHeapGraph() {
     if (!heap_graph_ || ++objects_written_ % kObjectsPerPacket == 0) {
@@ -229,6 +230,7 @@ class Writer {
       Finalize();
 
       trace_packet_ = ctx_->NewTracePacket();
+      trace_packet_->set_timestamp(timestamp_);
       heap_graph_ = trace_packet_->set_heap_graph();
       heap_graph_->set_pid(parent_pid_);
       heap_graph_->set_index(index_++);
@@ -248,6 +250,7 @@ class Writer {
  private:
   const pid_t parent_pid_;
   JavaHprofDataSource::TraceContext* const ctx_;
+  const uint64_t timestamp_;
 
   perfetto::DataSource<JavaHprofDataSource>::TraceContext::TracePacketHandle
       trace_packet_;
@@ -368,10 +371,16 @@ void DumpPerfetto(art::Thread* self) {
   // below hangs, the fork will go away from the watchdog.
   ArmWatchdogOrDie();
 
+  struct timespec ts = {};
+  if (clock_gettime(CLOCK_BOOTTIME, &ts) != 0) {
+    LOG(FATAL) << "Failed to get boottime.";
+  }
+  uint64_t timestamp = ts.tv_sec * 1000000000LL + ts.tv_nsec;
+
   WaitForDataSource(self);
 
   JavaHprofDataSource::Trace(
-      [parent_pid](JavaHprofDataSource::TraceContext ctx)
+      [parent_pid, timestamp](JavaHprofDataSource::TraceContext ctx)
           NO_THREAD_SAFETY_ANALYSIS {
             {
               auto ds = ctx.GetDataSourceLocked();
@@ -381,7 +390,7 @@ void DumpPerfetto(art::Thread* self) {
               }
             }
             LOG(INFO) << "dumping heap for " << parent_pid;
-            Writer writer(parent_pid, &ctx);
+            Writer writer(parent_pid, &ctx, timestamp);
             // Make sure that intern ID 0 (default proto value for a uint64_t) always maps to ""
             // (default proto value for a string).
             std::map<std::string, uint64_t> interned_fields{{"", 0}};

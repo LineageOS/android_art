@@ -25,6 +25,7 @@
 #include "base/runtime_debug.h"
 #include "base/timing_logger.h"
 #include "handle.h"
+#include "offsets.h"
 #include "jit/debugger_interface.h"
 #include "jit/profile_saver_options.h"
 #include "obj_ptr.h"
@@ -201,6 +202,30 @@ class JitCompilerInterface {
                                                  /*out*/ size_t* num_symbols) = 0;
 };
 
+// Data structure holding information to perform an OSR.
+struct OsrData {
+  // The native PC to jump to.
+  const uint8_t* native_pc;
+
+  // The frame size of the compiled code to jump to.
+  size_t frame_size;
+
+  // The dynamically allocated memory of size `frame_size` to copy to stack.
+  void* memory[0];
+
+  static constexpr MemberOffset NativePcOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(OsrData, native_pc));
+  }
+
+  static constexpr MemberOffset FrameSizeOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(OsrData, frame_size));
+  }
+
+  static constexpr MemberOffset MemoryOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(OsrData, memory));
+  }
+};
+
 class Jit {
  public:
   static constexpr size_t kDefaultPriorityThreadWeightRatio = 1000;
@@ -323,6 +348,11 @@ class Jit {
 
   // Return whether the runtime should use a priority thread weight when sampling.
   static bool ShouldUsePriorityThreadWeight(Thread* self);
+
+  // Return the information required to do an OSR jump. Return null if the OSR
+  // cannot be done.
+  OsrData* PrepareForOsr(ArtMethod* method, uint32_t dex_pc, uint32_t* vregs)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // If an OSR compiled version is available for `method`,
   // and `dex_pc + dex_pc_offset` is an entry point of that compiled

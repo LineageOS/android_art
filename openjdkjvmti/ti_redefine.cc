@@ -980,7 +980,7 @@ bool Redefiner::ClassRedefinition::CheckMethods() {
     RecordFailure(
         ERR(UNSUPPORTED_REDEFINITION_METHOD_DELETED),
         StringPrintf("Method %s missing!",
-                     FieldNameAndSignature(&old_dex_file, fail->GetIndex()).ToString().c_str()));
+                     MethodNameAndSignature(&old_dex_file, fail->GetIndex()).ToString().c_str()));
     return false;
   }
   return true;

@@ -57,6 +57,8 @@ const std::vector<const std::string> kArtApexPublicLibraries = {
 constexpr const char* kArtApexLibPath = "/apex/com.android.art/" LIB;
 
 constexpr const char* kNeuralNetworksApexPublicLibrary = "libneuralnetworks.so";
+// STOPSHIP(b/146420818): Figure out how to use stub or non-specific lib name for libcronet.
+constexpr const char* kCronetApexPublicLibrary = "libcronet.80.0.3986.0.so";
 
 // TODO(b/130388701): do we need this?
 std::string root_dir() {
@@ -232,13 +234,15 @@ static std::string InitVendorPublicLibraries() {
   return android::base::Join(*sonames, ':');
 }
 
-// read /system/etc/public.libraries-<companyname>.txt and
+// read /system/etc/public.libraries-<companyname>.txt,
+// /system_ext/etc/public.libraries-<companyname>.txt and
 // /product/etc/public.libraries-<companyname>.txt which contain partner defined
 // system libs that are exposed to apps. The libs in the txt files must be
 // named as lib<name>.<companyname>.so.
 static std::string InitExtendedPublicLibraries() {
   std::vector<std::string> sonames;
   ReadExtensionLibraries("/system/etc", &sonames);
+  ReadExtensionLibraries("/system_ext/etc", &sonames);
   ReadExtensionLibraries("/product/etc", &sonames);
   return android::base::Join(sonames, ':');
 }
@@ -267,6 +271,10 @@ static std::string InitVndkspLibraries() {
 
 static std::string InitNeuralNetworksPublicLibraries() {
   return kNeuralNetworksApexPublicLibrary;
+}
+
+static std::string InitCronetPublicLibraries() {
+  return kCronetApexPublicLibrary;
 }
 
 }  // namespace
@@ -298,6 +306,11 @@ const std::string& extended_public_libraries() {
 
 const std::string& neuralnetworks_public_libraries() {
   static std::string list = InitNeuralNetworksPublicLibraries();
+  return list;
+}
+
+const std::string& cronet_public_libraries() {
+  static std::string list = InitCronetPublicLibraries();
   return list;
 }
 

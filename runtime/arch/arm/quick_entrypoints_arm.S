@@ -632,17 +632,7 @@ ENTRY art_quick_osr_stub
     ldr    r10, [sp, #8]                   @ Restore JValue* result
     ldr    sp, [sp, #4]                    @ Restore saved stack pointer
     .cfi_def_cfa sp, SAVE_SIZE             @ CFA = sp + SAVE_SIZE
-    ldr    r4, [sp, #SAVE_SIZE]            @ load shorty
-    ldrb   r4, [r4, #0]                    @ load return type
-    cmp    r4, #68                         @ Test if result type char == 'D'.
-    beq    .Losr_fp_result
-    cmp    r4, #70                         @ Test if result type char == 'F'.
-    beq    .Losr_fp_result
     strd r0, [r10]                         @ Store r0/r1 into result pointer
-    b    .Losr_exit
-.Losr_fp_result:
-    vstr d0, [r10]                         @ Store s0-s1/d0 into result pointer
-.Losr_exit:
     vpop   {s16-s31}
     .cfi_adjust_cfa_offset -64
     pop    {r4, r5, r6, r7, r8, r9, r10, r11, pc}

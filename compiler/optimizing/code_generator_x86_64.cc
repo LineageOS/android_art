@@ -1366,30 +1366,32 @@ void CodeGeneratorX86_64::MaybeIncrementHotness(bool is_frame_entry) {
   if (GetGraph()->IsCompilingBaseline() && !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    uint64_t address = reinterpret_cast64<uint64_t>(info);
-    NearLabel done;
-    __ movq(CpuRegister(TMP), Immediate(address));
-    __ addw(Address(CpuRegister(TMP), ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
-            Immediate(1));
-    __ j(kCarryClear, &done);
-    if (HasEmptyFrame()) {
-      CHECK(is_frame_entry);
-      // Frame alignment, and the stub expects the method on the stack.
-      __ pushq(CpuRegister(RDI));
-      __ cfi().AdjustCFAOffset(kX86_64WordSize);
-      __ cfi().RelOffset(DWARFReg(RDI), 0);
-    } else if (!RequiresCurrentMethod()) {
-      CHECK(is_frame_entry);
-      __ movq(Address(CpuRegister(RSP), kCurrentMethodStackOffset), CpuRegister(RDI));
+    if (info != nullptr) {
+      uint64_t address = reinterpret_cast64<uint64_t>(info);
+      NearLabel done;
+      __ movq(CpuRegister(TMP), Immediate(address));
+      __ addw(Address(CpuRegister(TMP), ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+              Immediate(1));
+      __ j(kCarryClear, &done);
+      if (HasEmptyFrame()) {
+        CHECK(is_frame_entry);
+        // Frame alignment, and the stub expects the method on the stack.
+        __ pushq(CpuRegister(RDI));
+        __ cfi().AdjustCFAOffset(kX86_64WordSize);
+        __ cfi().RelOffset(DWARFReg(RDI), 0);
+      } else if (!RequiresCurrentMethod()) {
+        CHECK(is_frame_entry);
+        __ movq(Address(CpuRegister(RSP), kCurrentMethodStackOffset), CpuRegister(RDI));
+      }
+      GenerateInvokeRuntime(
+          GetThreadOffset<kX86_64PointerSize>(kQuickCompileOptimized).Int32Value());
+      if (HasEmptyFrame()) {
+        __ popq(CpuRegister(RDI));
+        __ cfi().AdjustCFAOffset(-static_cast<int>(kX86_64WordSize));
+        __ cfi().Restore(DWARFReg(RDI));
+      }
+      __ Bind(&done);
     }
-    GenerateInvokeRuntime(
-        GetThreadOffset<kX86_64PointerSize>(kQuickCompileOptimized).Int32Value());
-    if (HasEmptyFrame()) {
-      __ popq(CpuRegister(RDI));
-      __ cfi().AdjustCFAOffset(-static_cast<int>(kX86_64WordSize));
-      __ cfi().Restore(DWARFReg(RDI));
-    }
-    __ Bind(&done);
   }
 }
 
@@ -2364,28 +2366,41 @@ void LocationsBuilderX86_64::VisitReturn(HReturn* ret) {
 }
 
 void InstructionCodeGeneratorX86_64::VisitReturn(HReturn* ret) {
-  if (kIsDebugBuild) {
-    switch (ret->InputAt(0)->GetType()) {
-      case DataType::Type::kReference:
-      case DataType::Type::kBool:
-      case DataType::Type::kUint8:
-      case DataType::Type::kInt8:
-      case DataType::Type::kUint16:
-      case DataType::Type::kInt16:
-      case DataType::Type::kInt32:
-      case DataType::Type::kInt64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<CpuRegister>().AsRegister(), RAX);
-        break;
+  switch (ret->InputAt(0)->GetType()) {
+    case DataType::Type::kReference:
+    case DataType::Type::kBool:
+    case DataType::Type::kUint8:
+    case DataType::Type::kInt8:
+    case DataType::Type::kUint16:
+    case DataType::Type::kInt16:
+    case DataType::Type::kInt32:
+    case DataType::Type::kInt64:
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsRegister<CpuRegister>().AsRegister(), RAX);
+      break;
 
-      case DataType::Type::kFloat32:
-      case DataType::Type::kFloat64:
-        DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
-                  XMM0);
-        break;
-
-      default:
-        LOG(FATAL) << "Unexpected return type " << ret->InputAt(0)->GetType();
+    case DataType::Type::kFloat32: {
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
+                XMM0);
+      // To simplify callers of an OSR method, we put the return value in both
+      // floating point and core register.
+      if (GetGraph()->IsCompilingOsr()) {
+        __ movd(CpuRegister(RAX), XmmRegister(XMM0), /* is64bit= */ false);
+      }
+      break;
     }
+    case DataType::Type::kFloat64: {
+      DCHECK_EQ(ret->GetLocations()->InAt(0).AsFpuRegister<XmmRegister>().AsFloatRegister(),
+                XMM0);
+      // To simplify callers of an OSR method, we put the return value in both
+      // floating point and core register.
+      if (GetGraph()->IsCompilingOsr()) {
+        __ movd(CpuRegister(RAX), XmmRegister(XMM0), /* is64bit= */ true);
+      }
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "Unexpected return type " << ret->InputAt(0)->GetType();
   }
   codegen_->GenerateFrameExit();
 }
@@ -2564,16 +2579,18 @@ void CodeGeneratorX86_64::MaybeGenerateInlineCacheCheck(HInstruction* instructio
       !Runtime::Current()->IsAotCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
-    InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
-    uint64_t address = reinterpret_cast64<uint64_t>(cache);
-    NearLabel done;
-    __ movq(CpuRegister(TMP), Immediate(address));
-    // Fast path for a monomorphic cache.
-    __ cmpl(Address(CpuRegister(TMP), InlineCache::ClassesOffset().Int32Value()), klass);
-    __ j(kEqual, &done);
-    GenerateInvokeRuntime(
-        GetThreadOffset<kX86_64PointerSize>(kQuickUpdateInlineCache).Int32Value());
-    __ Bind(&done);
+    if (info != nullptr) {
+      InlineCache* cache = info->GetInlineCache(instruction->GetDexPc());
+      uint64_t address = reinterpret_cast64<uint64_t>(cache);
+      NearLabel done;
+      __ movq(CpuRegister(TMP), Immediate(address));
+      // Fast path for a monomorphic cache.
+      __ cmpl(Address(CpuRegister(TMP), InlineCache::ClassesOffset().Int32Value()), klass);
+      __ j(kEqual, &done);
+      GenerateInvokeRuntime(
+          GetThreadOffset<kX86_64PointerSize>(kQuickUpdateInlineCache).Int32Value());
+      __ Bind(&done);
+    }
   }
 }
 
