@@ -838,7 +838,9 @@ bool Runtime::Start() {
   // Only 64-bit as prctl() may fail in 32 bit userspace on a 64-bit kernel.
 #if defined(__linux__) && !defined(ART_TARGET_ANDROID) && defined(__x86_64__)
   if (kIsDebugBuild) {
-    CHECK_EQ(prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY), 0);
+    if (prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY) != 0) {
+      PLOG(WARNING) << "Failed setting PR_SET_PTRACER to PR_SET_PTRACER_ANY";
+    }
   }
 #endif
 
