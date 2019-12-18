@@ -1,0 +1,5 @@
+Tests structural redefinition with multiple threads.
+
+Tests that using the structural redefinition while pausing all other (main thread-group) threads
+doesn't cause problems. This also tests that we can update the newly created fields while the
+other threads are suspended, thus making them look initialized.
