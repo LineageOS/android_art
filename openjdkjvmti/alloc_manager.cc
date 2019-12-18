@@ -165,7 +165,7 @@ void AllocationManager::PauseAllocations(art::Thread* self) {
   IncrListenerInstall(self);
   do {
     PauseForAllocation(self, []() { return "request to pause allocations on other threads"; });
-  } while (allocations_paused_thread_.compare_exchange_strong(
+  } while (!allocations_paused_thread_.compare_exchange_strong(
       null_thr, self, std::memory_order_seq_cst));
   // Make sure everything else can see this and isn't in the middle of final allocation.
   // Force every thread to either be suspended or pass through a barrier.
