@@ -76,7 +76,7 @@ elif [[ $mode == "target" ]]; then
   fi
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
   make_command+=" libjavacrypto-target libnetd_client-target toybox toolbox sh"
-  make_command+=" debuggerd su"
+  make_command+=" debuggerd su gdbserver"
   make_command+=" libstdc++ "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   if [[ -n "$ART_TEST_CHROOT" ]]; then
@@ -131,4 +131,9 @@ if [[ $mode == "target" ]]; then
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
   echo "Executing $link_command"
   bash -c "$link_command"
+  find $ANDROID_PRODUCT_OUT/symbols/apex/com.android.runtime/bin -type f | while read target; do
+    cmd="ln -sf $target  $ANDROID_PRODUCT_OUT/symbols/system/bin/$(basename $target)"
+    echo "Executing $cmd"
+    bash -c "$cmd"
+  done
 fi
