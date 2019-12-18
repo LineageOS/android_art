@@ -38,7 +38,7 @@ bool IsNterpSupported() {
 
 bool CanRuntimeUseNterp() REQUIRES_SHARED(Locks::mutator_lock_) {
   // Nterp has the same restrictions as Mterp.
-  return CanUseMterp();
+  return IsNterpSupported() && CanUseMterp();
 }
 
 bool CanMethodUseNterp(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
