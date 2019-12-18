@@ -45,6 +45,10 @@ class X86_64Context final : public Context {
     rip_ = new_pc;
   }
 
+  void SetNterpDexPC(uintptr_t dex_pc_ptr) override {
+    SetGPR(R12, dex_pc_ptr);
+  }
+
   void SetArg0(uintptr_t new_arg0_value) override {
     SetGPR(RDI, new_arg0_value);
   }
