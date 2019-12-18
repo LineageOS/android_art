@@ -3573,12 +3573,6 @@ bool Dbg::IsForcedInterpreterNeededForUpcallImpl(Thread* thread, ArtMethod* m) {
   if (m == nullptr) {
     return false;
   }
-  instrumentation::Instrumentation* const instrumentation =
-      Runtime::Current()->GetInstrumentation();
-  // If we are in interpreter only mode, then we don't have to force interpreter.
-  if (instrumentation->InterpretOnly()) {
-    return false;
-  }
   // We can only interpret pure Java method.
   if (m->IsNative() || m->IsProxyMethod()) {
     return false;
@@ -3599,7 +3593,7 @@ bool Dbg::IsForcedInterpreterNeededForUpcallImpl(Thread* thread, ArtMethod* m) {
     return true;
   }
   // We have to require stack deoptimization if the upcall is deoptimized.
-  return instrumentation->IsDeoptimized(m);
+  return Runtime::Current()->GetInstrumentation()->IsDeoptimized(m);
 }
 
 // Do we need to deoptimize the stack to handle an exception?
