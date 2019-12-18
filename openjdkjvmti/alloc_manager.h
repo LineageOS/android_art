@@ -100,6 +100,7 @@ class AllocationManager {
 
   AllocationCallback* callback_ = nullptr;
   uint32_t listener_refcount_ GUARDED_BY(alloc_listener_mutex_) = 0;
+  std::atomic<bool> allocations_paused_ever_ = false;
   std::atomic<art::Thread*> allocations_paused_thread_ = nullptr;
   std::atomic<bool> callback_enabled_ = false;
   std::unique_ptr<JvmtiAllocationListener> alloc_listener_ = nullptr;
