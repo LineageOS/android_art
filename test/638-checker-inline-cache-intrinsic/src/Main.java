@@ -64,10 +64,10 @@ public class Main {
 
   public static void test() {
     // Warm up inline cache.
-    for (int i = 0; i < 450; i++) {
+    for (int i = 0; i < 600000; i++) {
       $noinline$inlineMonomorphic(str);
     }
-    for (int i = 0; i < 600; i++) {
+    for (int i = 0; i < 600000; i++) {
       $noinline$stringEquals(str);
     }
     ensureJitCompiled(Main.class, "$noinline$stringEquals");

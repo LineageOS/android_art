@@ -44,9 +44,16 @@
     0x0c /* DW_OP_const4u */, 0x44, 0x45, 0x58, 0x31, /* magic = "DEX1" */     \
     0x13 /* DW_OP_drop */,                                                     \
     0x92 /* DW_OP_bregx */, dexReg, (dexOffset & 0x7F) /* 1-byte SLEB128 */
+
+  #define CFI_DEFINE_CFA_DEREF(reg, offset, size) .cfi_escape                  \
+    0x0f /* DW_CFA_expression */, 6 /* size */,                                \
+    0x92 /* bregx */, reg, (offset & 0x7F),                                    \
+    0x06 /* DW_OP_DEREF */,                                                    \
+    0x23 /* DW_OP_plus_uconst */, size
 #else
   // Mac OS doesn't like cfi_* directives.
   #define CFI_DEFINE_DEX_PC_WITH_OFFSET(tmpReg, dexReg, dexOffset)
+  #define CFI_DEFINE_CFA_DEREF(reg, offset)
 #endif
 
 #endif  // ART_RUNTIME_INTERPRETER_CFI_ASM_SUPPORT_H_

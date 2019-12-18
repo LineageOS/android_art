@@ -82,6 +82,7 @@
     // The restored CFA state should match the CFA state during CFI_REMEMBER_STATE.
     // `objdump -Wf libart.so | egrep "_cfa|_state"` is useful to audit the opcodes.
     #define CFI_RESTORE_STATE_AND_DEF_CFA(reg,off) .cfi_restore_state .cfi_def_cfa reg,off
+    #define CFI_RESTORE_STATE .cfi_restore_state
 #else
     // Mac OS' doesn't like cfi_* directives.
     #define CFI_STARTPROC
@@ -93,6 +94,7 @@
     #define CFI_REL_OFFSET(reg,size)
     #define CFI_REMEMBER_STATE
     #define CFI_RESTORE_STATE_AND_DEF_CFA(off)
+    #define CFI_RESTORE_STATE
 #endif
 
     // Symbols.

@@ -24,6 +24,12 @@ namespace art {
 class ArtMethod;
 
 /**
+ * The frame size nterp will use for the given method.
+ */
+size_t NterpGetFrameSize(ArtMethod* method)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+/**
  * Returns the QuickMethodFrameInfo of the given frame corresponding to the
  * given method.
  */

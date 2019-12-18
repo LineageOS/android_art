@@ -21,10 +21,25 @@
  */
 
 namespace art {
+
+class ArtMethod;
+
 namespace interpreter {
 
 bool IsNterpSupported() {
   return false;
+}
+
+bool CanRuntimeUseNterp() {
+  return false;
+}
+
+bool CanMethodUseNterp(ArtMethod* method ATTRIBUTE_UNUSED) {
+  return false;
+}
+
+const void* GetNterpEntryPoint() {
+  return nullptr;
 }
 
 void CheckNterpAsmConstants() {
@@ -32,10 +47,6 @@ void CheckNterpAsmConstants() {
 
 extern "C" void ExecuteNterpImpl() REQUIRES_SHARED(Locks::mutator_lock_) {
   UNIMPLEMENTED(FATAL);
-}
-
-const void* GetNterpEntryPoint() {
-  return nullptr;
 }
 
 extern "C" void* artNterpAsmInstructionStart[] = { nullptr };

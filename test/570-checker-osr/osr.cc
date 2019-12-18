@@ -90,7 +90,8 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_isInInterpreter(JNIEnv* env,
         const OatQuickMethodHeader* header =
             Runtime::Current()->GetJit()->GetCodeCache()->LookupOsrMethodHeader(m);
         if ((header == nullptr || header != stack_visitor->GetCurrentOatQuickMethodHeader()) &&
-            stack_visitor->IsShadowFrame()) {
+            (stack_visitor->IsShadowFrame() ||
+             stack_visitor->GetCurrentOatQuickMethodHeader()->IsNterpMethodHeader())) {
           in_interpreter = true;
         }
       });

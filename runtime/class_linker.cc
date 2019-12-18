@@ -143,6 +143,8 @@
 #include "verifier/class_verifier.h"
 #include "well_known_classes.h"
 
+#include "interpreter/interpreter_mterp_impl.h"
+
 namespace art {
 
 using android::base::StringPrintf;
@@ -224,16 +226,25 @@ static void HandleEarlierVerifyError(Thread* self,
 // Ensures that methods have the kAccSkipAccessChecks bit set. We use the
 // kAccVerificationAttempted bit on the class access flags to determine whether this has been done
 // before.
-template <bool kNeedsVerified = false>
 static void EnsureSkipAccessChecksMethods(Handle<mirror::Class> klass, PointerSize pointer_size)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (kNeedsVerified) {
-    // To not fail access-flags access checks, push a minimal state.
-    mirror::Class::SetStatus(klass, ClassStatus::kVerified, Thread::Current());
-  }
+  Runtime* runtime = Runtime::Current();
+  ClassLinker* class_linker = runtime->GetClassLinker();
   if (!klass->WasVerificationAttempted()) {
     klass->SetSkipAccessChecksFlagOnAllMethods(pointer_size);
     klass->SetVerificationAttempted();
+    // Now that the class has passed verification, try to set nterp entrypoints
+    // to methods that currently use the switch interpreter.
+    if (interpreter::CanRuntimeUseNterp()) {
+      for (ArtMethod& m : klass->GetMethods(pointer_size)) {
+        if (class_linker->IsQuickToInterpreterBridge(m.GetEntryPointFromQuickCompiledCode()) &&
+            interpreter::CanMethodUseNterp(&m)) {
+          if (klass->IsVisiblyInitialized() || !NeedsClinitCheckBeforeCall(&m)) {
+            runtime->GetInstrumentation()->UpdateMethodsCode(&m, interpreter::GetNterpEntryPoint());
+          }
+        }
+      }
+    }
   }
 }
 
@@ -3681,6 +3692,11 @@ const void* ClassLinker::GetQuickOatCodeFor(ArtMethod* method) {
     // No code and native? Use generic trampoline.
     return GetQuickGenericJniStub();
   }
+
+  if (interpreter::CanRuntimeUseNterp() && interpreter::CanMethodUseNterp(method)) {
+    return interpreter::GetNterpEntryPoint();
+  }
+
   return GetQuickToInterpreterBridge();
 }
 
@@ -3778,27 +3794,41 @@ void ClassLinker::FixupStaticTrampolines(ObjPtr<mirror::Class> klass) {
       // Only update static methods.
       continue;
     }
-    if (!IsQuickResolutionStub(method->GetEntryPointFromQuickCompiledCode())) {
-      // Only update methods whose entrypoint is the resolution stub.
-      continue;
-    }
     const void* quick_code = nullptr;
+
+    // In order:
+    // 1) Check if we have AOT Code.
+    // 2) Check if we have JIT Code.
+    // 3) Check if we can use Nterp.
     if (has_oat_class) {
       OatFile::OatMethod oat_method = oat_class.GetOatMethod(method_index);
       quick_code = oat_method.GetQuickCode();
     }
-    // Check if we have JIT compiled code for it.
+
     jit::Jit* jit = runtime->GetJit();
     if (quick_code == nullptr && jit != nullptr) {
       quick_code = jit->GetCodeCache()->GetSavedEntryPointOfPreCompiledMethod(method);
     }
+
+    if (quick_code == nullptr &&
+        interpreter::CanRuntimeUseNterp() &&
+        interpreter::CanMethodUseNterp(method)) {
+      quick_code = interpreter::GetNterpEntryPoint();
+    }
+
     // Check whether the method is native, in which case it's generic JNI.
     if (quick_code == nullptr && method->IsNative()) {
       quick_code = GetQuickGenericJniStub();
     } else if (ShouldUseInterpreterEntrypoint(method, quick_code)) {
       // Use interpreter entry point.
+      if (IsQuickToInterpreterBridge(method->GetEntryPointFromQuickCompiledCode())) {
+        // If we have the trampoline or the bridge already, no need to update.
+        // This saves in not dirtying boot image memory.
+        continue;
+      }
       quick_code = GetQuickToInterpreterBridge();
     }
+    CHECK(quick_code != nullptr);
     runtime->GetInstrumentation()->UpdateMethodsCode(method, quick_code);
   }
   // Ignore virtual methods on the iterator.
