@@ -95,6 +95,7 @@ RANDOM_PROFILE="n"
 DEX2OAT_TIMEOUT="300" # 5 mins
 # The *hard* timeout where we really start trying to kill the dex2oat.
 DEX2OAT_RT_TIMEOUT="360" # 6 mins
+CREATE_RUNNER="n"
 
 # if "y", run 'sync' before dalvikvm to make sure all files from
 # build step (e.g. dex2oat) were finished writing.
@@ -171,6 +172,9 @@ while true; do
         option="$1"
         FLAGS="${FLAGS} -Xcompiler-option $option"
         COMPILE_FLAGS="${COMPILE_FLAGS} $option"
+        shift
+    elif [ "x$1" = "x--create-runner" ]; then
+        CREATE_RUNNER="y"
         shift
     elif [ "x$1" = "x--android-runtime-option" ]; then
         shift
@@ -653,7 +657,15 @@ if [ "$USE_JVM" = "y" ]; then
   if [ "$DEV_MODE" = "y" ]; then
     echo $cmdline
   fi
-  $cmdline
+  if [ "$CREATE_RUNNER" = "y" ]; then
+    echo "#!/bin/bash" > runit.sh
+    echo "export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\""
+    echo $cmdline "2>&1" >> runit.sh
+    chmod u+x runit.sh
+    echo "Runnable test script written to $PWD/runit.sh"
+  else
+    $cmdline
+  fi
   exit
 fi
 
@@ -1252,6 +1264,15 @@ else
     $strip_cmdline || { echo "Strip failed." >&2 ; exit 3; }
     $sync_cmdline || { echo "Sync failed." >&2 ; exit 4; }
 
+    if [ "$CREATE_RUNNER" = "y" ]; then
+      echo "#!/bin/bash" > ${DEX_LOCATION}/runit.sh
+      for var in ANDROID_PRINTF_LOG ANDROID_DATA ANDROID_ROOT ANDROID_I18N_ROOT ANDROID_TZDATA_ROOT ANDROID_ART_ROOT LD_LIBRARY_PATH DYLD_LIBRARY_PATH PATH LD_USE_LOAD_BIAS; do
+        echo export $var="${!var}" >> ${DEX_LOCATION}/runit.sh
+      done
+      echo $cmdline "2>&1" >> ${DEX_LOCATION}/runit.sh
+      chmod u+x $DEX_LOCATION/runit.sh
+      echo "Runnable test script written to ${DEX_LOCATION}/runit.sh"
+    fi
     if [ "$DRY_RUN" = "y" ]; then
       exit 0
     fi
