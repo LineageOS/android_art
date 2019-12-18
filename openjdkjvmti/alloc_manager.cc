@@ -41,6 +41,7 @@
 #include "handle.h"
 #include "mirror/class-inl.h"
 #include "runtime.h"
+#include "runtime_globals.h"
 #include "scoped_thread_state_change-inl.h"
 #include "scoped_thread_state_change.h"
 #include "thread-current-inl.h"
@@ -104,7 +105,9 @@ void JvmtiAllocationListener::PreObjectAllocated(art::Thread* self,
     return oss.str();
   });
   if (!type->IsVariableSize()) {
-    *byte_count = type->GetObjectSize();
+    *byte_count =
+        std::max(art::RoundUp(static_cast<size_t>(type->GetObjectSize()), art::kObjectAlignment),
+                 *byte_count);
   }
 }
 
