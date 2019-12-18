@@ -307,11 +307,6 @@ while true; do
         USE_GDBSERVER="y"
         DEV_MODE="y"
         TIME_OUT="n"
-        HOST="y"
-        ANDROID_ROOT="${ANDROID_HOST_OUT}"
-        ANDROID_ART_ROOT="${ANDROID_HOST_OUT}/com.android.art"
-        ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-        ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         shift
     elif [ "x$1" = "x--gdb" ]; then
         USE_GDB="y"
@@ -718,7 +713,8 @@ if [ "$USE_GDB" = "y" ]; then
     echo "Cannot pass both --gdb and --gdbserver at the same time!" >&2
     exit 1
   elif [ "$HOST" = "n" ]; then
-    GDB="$GDBSERVER_DEVICE $GDBSERVER_PORT"
+    # We might not have any hostname resolution if we are using a chroot.
+    GDB="$GDBSERVER_DEVICE --no-startup-with-shell 127.0.0.1$GDBSERVER_PORT"
   else
     if [ `uname` = "Darwin" ]; then
         GDB=lldb
@@ -733,10 +729,11 @@ if [ "$USE_GDB" = "y" ]; then
   fi
 elif [ "$USE_GDBSERVER" = "y" ]; then
   if [ "$HOST" = "n" ]; then
-    echo "Cannot use --gdbserver in non-host configs" >&2
-    exit 1
+    # We might not have any hostname resolution if we are using a chroot.
+    GDB="$GDBSERVER_DEVICE --no-startup-with-shell 127.0.0.1$GDBSERVER_PORT"
+  else
+    GDB="$GDBSERVER_HOST $GDBSERVER_PORT"
   fi
-  GDB="$GDBSERVER_HOST $GDBSERVER_PORT"
 fi
 
 if [ "$INTERPRETER" = "y" ]; then
@@ -1149,6 +1146,9 @@ if [ "$HOST" = "n" ]; then
 
     if [ "$DEV_MODE" = "y" ]; then
       echo $cmdline
+      if [ "$USE_GDB" = "y" ] || [ "$USE_GDBSERVER" = "y" ]; then
+        echo "Forward ${GDBSERVER_PORT} to local port and connect GDB"
+      fi
     fi
 
     if [ "$QUIET" = "n" ]; then
