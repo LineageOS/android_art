@@ -358,8 +358,7 @@ inline ArtField* FindFieldFromCode(uint32_t field_idx,
       DCHECK(self->IsExceptionPending());  // Throw exception and unwind.
       return nullptr;  // Failure.
     }
-    if (UNLIKELY(is_set && resolved_field->IsFinal() && (fields_class != referring_class) &&
-                 !referring_class->IsObsoleteVersionOf(fields_class))) {
+    if (UNLIKELY(is_set && !resolved_field->CanBeChangedBy(referrer))) {
       ThrowIllegalAccessErrorFinalField(referrer, resolved_field);
       return nullptr;  // Failure.
     } else {
@@ -630,7 +629,7 @@ inline ArtField* FindFieldFast(uint32_t field_idx, ArtMethod* referrer, FindFiel
   ObjPtr<mirror::Class> referring_class = referrer->GetDeclaringClass();
   if (UNLIKELY(!referring_class->CanAccess(fields_class) ||
                !referring_class->CanAccessMember(fields_class, resolved_field->GetAccessFlags()) ||
-               (is_set && resolved_field->IsFinal() && (fields_class != referring_class)))) {
+               (is_set && !resolved_field->CanBeChangedBy(referrer)))) {
     // Illegal access.
     return nullptr;
   }
