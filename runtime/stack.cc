@@ -218,22 +218,26 @@ bool StackVisitor::GetVReg(ArtMethod* m,
     if (GetVRegFromDebuggerShadowFrame(vreg, kind, val)) {
       return true;
     }
+    bool result = false;
     if (cur_oat_quick_method_header_->IsNterpMethodHeader()) {
-      *val = NterpGetVReg(cur_quick_frame_, vreg);
-      return true;
+      result = true;
+      *val = (kind == kReferenceVReg)
+          ? NterpGetVRegReference(cur_quick_frame_, vreg)
+          : NterpGetVReg(cur_quick_frame_, vreg);
+    } else {
+      DCHECK(cur_oat_quick_method_header_->IsOptimized());
+      if (location.has_value() && kind != kReferenceVReg) {
+        uint32_t val2 = *val;
+        // The caller already known the register location, so we can use the faster overload
+        // which does not decode the stack maps.
+        result = GetVRegFromOptimizedCode(location.value(), kind, val);
+        // Compare to the slower overload.
+        DCHECK_EQ(result, GetVRegFromOptimizedCode(m, vreg, kind, &val2));
+        DCHECK_EQ(*val, val2);
+      } else {
+        result = GetVRegFromOptimizedCode(m, vreg, kind, val);
+      }
     }
-    DCHECK(cur_oat_quick_method_header_->IsOptimized());
-    if (location.has_value() && kind != kReferenceVReg) {
-      uint32_t val2 = *val;
-      // The caller already known the register location, so we can use the faster overload
-      // which does not decode the stack maps.
-      bool ok = GetVRegFromOptimizedCode(location.value(), kind, val);
-      // Compare to the slower overload.
-      DCHECK_EQ(ok, GetVRegFromOptimizedCode(m, vreg, kind, &val2));
-      DCHECK_EQ(*val, val2);
-      return ok;
-    }
-    bool res = GetVRegFromOptimizedCode(m, vreg, kind, val);
     if (kind == kReferenceVReg) {
       // Perform a read barrier in case we are in a different thread and GC is ongoing.
       mirror::Object* out = reinterpret_cast<mirror::Object*>(static_cast<uintptr_t>(*val));
@@ -241,7 +245,7 @@ bool StackVisitor::GetVReg(ArtMethod* m,
       DCHECK_LT(ptr_out, std::numeric_limits<uint32_t>::max());
       *val = static_cast<uint32_t>(ptr_out);
     }
-    return res;
+    return result;
   } else {
     DCHECK(cur_shadow_frame_ != nullptr);
     if (kind == kReferenceVReg) {
