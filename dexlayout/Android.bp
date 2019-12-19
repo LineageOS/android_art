@@ -94,10 +94,6 @@ art_cc_library {
             ],
         },
     },
-    apex_available: [
-        "com.android.art.release",
-        "com.android.art.debug",
-    ],
 }
 
 cc_defaults {
@@ -140,9 +136,6 @@ art_cc_library {
             ],
         },
     },
-    apex_available: [
-        "com.android.art.debug",
-    ],
 }
 
 cc_defaults {
@@ -174,10 +167,6 @@ art_cc_binary {
         "libprofile",
         "libartbase",
         "libart-dexlayout",
-    ],
-    apex_available: [
-        "com.android.art.release",
-        "com.android.art.debug",
     ],
 }
 
@@ -217,9 +206,6 @@ art_cc_binary {
         "libartbased",
         "libartd-dexlayout",
     ],
-    apex_available: [
-        "com.android.art.debug",
-    ],
 }
 
 art_cc_test {
@@ -252,10 +238,6 @@ art_cc_binary {
             ],
         },
     },
-    apex_available: [
-        "com.android.art.release",
-        "com.android.art.debug",
-    ],
 }
 
 art_cc_test {
