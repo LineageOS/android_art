@@ -37,6 +37,10 @@ art_cc_binary {
         "libprofile",
         "libbase",
     ],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_binary {
@@ -54,6 +58,9 @@ art_cc_binary {
         "libartbased",
         "libprofiled",
         "libbase",
+    ],
+    apex_available: [
+        "com.android.art.debug",
     ],
 }
 

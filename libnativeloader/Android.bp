@@ -18,6 +18,10 @@ cc_library {
         // TODO(b/133140750): Clean this up.
         "//frameworks/base/native/webview/loader",
     ],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
     host_supported: true,
     srcs: [
         "native_loader.cpp",
