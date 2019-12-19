@@ -233,6 +233,9 @@ class ArtField final {
   std::string PrettyField(bool with_type = true)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Returns true if a set-* instruction in the given method is allowable.
+  ALWAYS_INLINE inline bool CanBeChangedBy(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
+
  private:
   bool IsProxyField() REQUIRES_SHARED(Locks::mutator_lock_);
 

@@ -245,13 +245,14 @@ static ALWAYS_INLINE bool DoInvoke(Thread* self,
   const uint32_t vregC = (is_range) ? inst->VRegC_3rc() : inst->VRegC_35c();
   ArtMethod* sf_method = shadow_frame.GetMethod();
 
-  // Try to find the method in small thread-local cache first.
+  // Try to find the method in small thread-local cache first (only used when
+  // nterp is not used as mterp and nterp use the cache in an incompatible way).
   InterpreterCache* tls_cache = self->GetInterpreterCache();
   size_t tls_value;
   ArtMethod* resolved_method;
   if (is_quick) {
     resolved_method = nullptr;  // We don't know/care what the original method was.
-  } else if (LIKELY(tls_cache->Get(inst, &tls_value))) {
+  } else if (!IsNterpSupported() && LIKELY(tls_cache->Get(inst, &tls_value))) {
     resolved_method = reinterpret_cast<ArtMethod*>(tls_value);
   } else {
     ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
@@ -264,7 +265,9 @@ static ALWAYS_INLINE bool DoInvoke(Thread* self,
       result->SetJ(0);
       return false;
     }
-    tls_cache->Set(inst, reinterpret_cast<size_t>(resolved_method));
+    if (!IsNterpSupported()) {
+      tls_cache->Set(inst, reinterpret_cast<size_t>(resolved_method));
+    }
   }
 
   // Null pointer check and virtual method resolution.

@@ -92,7 +92,7 @@ static constexpr size_t NterpGetFrameEntrySize() {
   return (POPCOUNT(core_spills) + POPCOUNT(fp_spills)) * kPointerSize;
 }
 
-static size_t NterpGetFrameSize(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
+size_t NterpGetFrameSize(ArtMethod* method) {
   CodeItemDataAccessor accessor(method->DexInstructionData());
   const uint16_t num_regs = accessor.RegistersSize();
   const uint16_t out_regs = accessor.OutsSize();
@@ -141,6 +141,10 @@ uint32_t NterpGetDexPC(ArtMethod** frame) {
 
 uint32_t NterpGetVReg(ArtMethod** frame, uint16_t vreg) {
   return reinterpret_cast<uint32_t*>(NterpGetRegistersArray(frame))[vreg];
+}
+
+uint32_t NterpGetVRegReference(ArtMethod** frame, uint16_t vreg) {
+  return reinterpret_cast<uint32_t*>(NterpGetReferenceArray(frame))[vreg];
 }
 
 uintptr_t NterpGetCatchHandler() {

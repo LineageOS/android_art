@@ -41,6 +41,7 @@
 #include "handle.h"
 #include "mirror/class-inl.h"
 #include "runtime.h"
+#include "runtime_globals.h"
 #include "scoped_thread_state_change-inl.h"
 #include "scoped_thread_state_change.h"
 #include "thread-current-inl.h"
@@ -92,7 +93,7 @@ void JvmtiAllocationListener::ObjectAllocated(art::Thread* self,
 }
 
 bool JvmtiAllocationListener::HasPreAlloc() const {
-  return manager_->allocations_paused_thread_.load(std::memory_order_seq_cst) != nullptr;
+  return manager_->allocations_paused_ever_.load(std::memory_order_seq_cst);
 }
 
 void JvmtiAllocationListener::PreObjectAllocated(art::Thread* self,
@@ -104,7 +105,9 @@ void JvmtiAllocationListener::PreObjectAllocated(art::Thread* self,
     return oss.str();
   });
   if (!type->IsVariableSize()) {
-    *byte_count = type->GetObjectSize();
+    *byte_count =
+        std::max(art::RoundUp(static_cast<size_t>(type->GetObjectSize()), art::kObjectAlignment),
+                 *byte_count);
   }
 }
 
@@ -159,10 +162,37 @@ void AllocationManager::IncrListenerInstall(art::Thread* self) {
 
 void AllocationManager::PauseAllocations(art::Thread* self) {
   art::Thread* null_thr = nullptr;
-  IncrListenerInstall(self);
+  // Unfortunately once we've paused allocations once we have to leave the listener and
+  // PreObjectAlloc event enabled forever. This is to avoid an instance of the ABA problem. We need
+  // to make sure that every thread gets a chance to see the PreObjectAlloc event at least once or
+  // else it could miss the fact that the object its allocating had its size changed.
+  //
+  // Consider the following 2 threads. T1 is allocating an object of class K. It is suspended (by
+  // user code) somewhere in the AllocObjectWithAllocator function, perhaps while doing a GC to
+  // attempt to clear space. With that thread suspended on thread T2 we decide to structurally
+  // redefine 'K', changing its size. To do this we insert this PreObjectAlloc event to check and
+  // update the size of the class being allocated. This is done successfully. Now imagine if T2
+  // removed the listener event then T1 subsequently resumes. T1 would see there is no
+  // PreObjectAlloc event and so allocate using the old object size. This leads to it not allocating
+  // enough. To prevent this we simply force every allocation after our first pause to go through
+  // the PreObjectAlloc event.
+  //
+  // TODO Technically we could do better than this. We just need to be able to require that all
+  // threads within allocation functions go through the PreObjectAlloc at least once after we turn
+  // it on. This is easier said than done though since we don't want to place a marker on threads
+  // (allocation is just too common) and we can't just have every thread go through the event since
+  // there are some threads that never or almost never allocate. We would also need to ensure that
+  // this thread doesn't pause waiting for all threads to pass the barrier since the other threads
+  // might be suspended. We could accomplish this by storing callbacks on each thread that would do
+  // the work. Honestly though this is a debug feature and it doesn't slow things down very much so
+  // simply leaving it on forever is simpler and safer.
+  bool expected = false;
+  if (allocations_paused_ever_.compare_exchange_strong(expected, true, std::memory_order_seq_cst)) {
+    IncrListenerInstall(self);
+  }
   do {
     PauseForAllocation(self, []() { return "request to pause allocations on other threads"; });
-  } while (allocations_paused_thread_.compare_exchange_strong(
+  } while (!allocations_paused_thread_.compare_exchange_strong(
       null_thr, self, std::memory_order_seq_cst));
   // Make sure everything else can see this and isn't in the middle of final allocation.
   // Force every thread to either be suspended or pass through a barrier.
@@ -177,7 +207,8 @@ void AllocationManager::PauseAllocations(art::Thread* self) {
 
 void AllocationManager::ResumeAllocations(art::Thread* self) {
   CHECK_EQ(allocations_paused_thread_.load(), self) << "not paused! ";
-  DecrListenerInstall(self);
+  // See above for why we don't decr the install count.
+  CHECK(allocations_paused_ever_.load(std::memory_order_seq_cst));
   art::ScopedThreadSuspension sts(self, art::ThreadState::kSuspended);
   art::MutexLock mu(self, alloc_listener_mutex_);
   allocations_paused_thread_.store(nullptr, std::memory_order_seq_cst);

@@ -26,6 +26,7 @@
 #include "base/timing_logger.h"
 #include "handle.h"
 #include "offsets.h"
+#include "interpreter/mterp/mterp.h"
 #include "jit/debugger_interface.h"
 #include "jit/profile_saver_options.h"
 #include "obj_ptr.h"
@@ -120,7 +121,9 @@ class JitOptions {
   }
 
   bool CanCompileBaseline() const {
-    return use_tiered_jit_compilation_ || use_baseline_compiler_;
+    return use_tiered_jit_compilation_ ||
+           use_baseline_compiler_ ||
+           interpreter::IsNterpSupported();
   }
 
   void SetUseJitCompilation(bool b) {
@@ -434,6 +437,9 @@ class Jit {
   void NotifyZygoteCompilationDone();
 
   void EnqueueOptimizedCompilation(ArtMethod* method, Thread* self);
+
+  void EnqueueCompilationFromNterp(ArtMethod* method, Thread* self)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);

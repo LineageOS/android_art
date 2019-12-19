@@ -282,6 +282,10 @@ Heap::Heap(size_t initial_size,
       capacity_(capacity),
       growth_limit_(growth_limit),
       target_footprint_(initial_size),
+      // Using kPostMonitorLock as a lock at kDefaultMutexLevel is acquired after
+      // this one.
+      process_state_update_lock_("process state update lock", kPostMonitorLock),
+      min_foreground_target_footprint_(0),
       concurrent_start_bytes_(std::numeric_limits<size_t>::max()),
       total_bytes_freed_ever_(0),
       total_objects_freed_ever_(0),
@@ -976,12 +980,24 @@ void Heap::ThreadFlipEnd(Thread* self) {
   thread_flip_cond_->Broadcast(self);
 }
 
+void Heap::GrowHeapOnJankPerceptibleSwitch() {
+  MutexLock mu(Thread::Current(), process_state_update_lock_);
+  size_t orig_target_footprint = target_footprint_.load(std::memory_order_relaxed);
+  if (orig_target_footprint < min_foreground_target_footprint_) {
+    target_footprint_.compare_exchange_strong(orig_target_footprint,
+                                              min_foreground_target_footprint_,
+                                              std::memory_order_relaxed);
+  }
+  min_foreground_target_footprint_ = 0;
+}
+
 void Heap::UpdateProcessState(ProcessState old_process_state, ProcessState new_process_state) {
   if (old_process_state != new_process_state) {
     const bool jank_perceptible = new_process_state == kProcessStateJankPerceptible;
     if (jank_perceptible) {
       // Transition back to foreground right away to prevent jank.
       RequestCollectorTransition(foreground_collector_type_, 0);
+      GrowHeapOnJankPerceptibleSwitch();
     } else {
       // Don't delay for debug builds since we may want to stress test the GC.
       // If background_collector_type_ is kCollectorTypeHomogeneousSpaceCompact then we have
@@ -1733,14 +1749,15 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
   StackHandleScope<1> hs(self);
   HandleWrapperObjPtr<mirror::Class> h_klass(hs.NewHandleWrapper(klass));
 
-  auto send_object_pre_alloc = [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (UNLIKELY(instrumented)) {
-      AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
-      if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
-        l->PreObjectAllocated(self, h_klass, &alloc_size);
-      }
-    }
-  };
+  auto send_object_pre_alloc =
+      [&]() REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_) {
+        if (UNLIKELY(instrumented)) {
+          AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
+          if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
+            l->PreObjectAllocated(self, h_klass, &alloc_size);
+          }
+        }
+      };
 #define PERFORM_SUSPENDING_OPERATION(op)                                          \
   [&]() REQUIRES(Roles::uninterruptible_) REQUIRES_SHARED(Locks::mutator_lock_) { \
     ScopedAllowThreadSuspension ats;                                              \
@@ -1755,8 +1772,6 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
       PERFORM_SUSPENDING_OPERATION(WaitForGcToComplete(kGcCauseForAlloc, self));
   // If we were the default allocator but the allocator changed while we were suspended,
   // abort the allocation.
-  // We just waited, call the pre-alloc again.
-  send_object_pre_alloc();
   if ((was_default_allocator && allocator != GetCurrentAllocator()) ||
       (!instrumented && EntrypointsInstrumented())) {
     return nullptr;
@@ -3500,23 +3515,19 @@ void Heap::GrowForUtilization(collector::GarbageCollector* collector_ran,
   const size_t bytes_allocated = GetBytesAllocated();
   // Trace the new heap size after the GC is finished.
   TraceHeapSize(bytes_allocated);
-  uint64_t target_size;
+  uint64_t target_size, grow_bytes;
   collector::GcType gc_type = collector_ran->GetGcType();
+  MutexLock mu(Thread::Current(), process_state_update_lock_);
   // Use the multiplier to grow more for foreground.
-  const double multiplier = HeapGrowthMultiplier();  // Use the multiplier to grow more for
-  // foreground.
-  const size_t adjusted_min_free = static_cast<size_t>(min_free_ * multiplier);
-  const size_t adjusted_max_free = static_cast<size_t>(max_free_ * multiplier);
+  const double multiplier = HeapGrowthMultiplier();
   if (gc_type != collector::kGcTypeSticky) {
     // Grow the heap for non sticky GC.
     uint64_t delta = bytes_allocated * (1.0 / GetTargetHeapUtilization() - 1.0);
     DCHECK_LE(delta, std::numeric_limits<size_t>::max()) << "bytes_allocated=" << bytes_allocated
         << " target_utilization_=" << target_utilization_;
-    target_size = bytes_allocated + delta * multiplier;
-    target_size = std::min(target_size,
-                           static_cast<uint64_t>(bytes_allocated + adjusted_max_free));
-    target_size = std::max(target_size,
-                           static_cast<uint64_t>(bytes_allocated + adjusted_min_free));
+    grow_bytes = std::min(delta, static_cast<uint64_t>(max_free_));
+    grow_bytes = std::max(grow_bytes, static_cast<uint64_t>(min_free_));
+    target_size = bytes_allocated + static_cast<uint64_t>(grow_bytes * multiplier);
     next_gc_type_ = collector::kGcTypeSticky;
   } else {
     collector::GcType non_sticky_gc_type = NonStickyGcType();
@@ -3546,15 +3557,28 @@ void Heap::GrowForUtilization(collector::GarbageCollector* collector_ran,
       next_gc_type_ = non_sticky_gc_type;
     }
     // If we have freed enough memory, shrink the heap back down.
+    const size_t adjusted_max_free = static_cast<size_t>(max_free_ * multiplier);
     if (bytes_allocated + adjusted_max_free < target_footprint) {
       target_size = bytes_allocated + adjusted_max_free;
+      grow_bytes = max_free_;
     } else {
       target_size = std::max(bytes_allocated, target_footprint);
+      // The same whether jank perceptible or not; just avoid the adjustment.
+      grow_bytes = 0;
     }
   }
   CHECK_LE(target_size, std::numeric_limits<size_t>::max());
   if (!ignore_target_footprint_) {
     SetIdealFootprint(target_size);
+    // Store target size (computed with foreground heap growth multiplier) for updating
+    // target_footprint_ when process state switches to foreground.
+    // target_size = 0 ensures that target_footprint_ is not updated on
+    // process-state switch.
+    min_foreground_target_footprint_ =
+        (multiplier <= 1.0 && grow_bytes > 0)
+        ? bytes_allocated + static_cast<size_t>(grow_bytes * foreground_heap_growth_multiplier_)
+        : 0;
+
     if (IsGcConcurrent()) {
       const uint64_t freed_bytes = current_gc_iteration_.GetFreedBytes() +
           current_gc_iteration_.GetFreedLargeObjectBytes() +

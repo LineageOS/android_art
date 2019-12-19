@@ -44,16 +44,16 @@ public class Main implements Itf {
     // Create the profiling info eagerly to make sure they are filled.
     ensureProfilingInfo566();
 
-    // Make testInvokeVirtual and testInvokeInterface hot to get them jitted.
+    // Make $noinline$testInvokeVirtual and $noinline$testInvokeInterface hot to get them jitted.
     // We pass Main and Subclass to get polymorphic inlining based on calling
     // the same method.
-    for (int i = 0; i < 10000; ++i) {
-      testInvokeVirtual(mains[0]);
-      testInvokeVirtual(mains[1]);
-      testInvokeInterface(itfs[0]);
-      testInvokeInterface(itfs[1]);
-      testInvokeInterface2(itfs[0]);
-      testInvokeInterface2(itfs[1]);
+    for (int i = 0; i < 1000000; ++i) {
+      $noinline$testInvokeVirtual(mains[0]);
+      $noinline$testInvokeVirtual(mains[1]);
+      $noinline$testInvokeInterface(itfs[0]);
+      $noinline$testInvokeInterface(itfs[1]);
+      $noinline$testInvokeInterface2(itfs[0]);
+      $noinline$testInvokeInterface2(itfs[1]);
       $noinline$testInlineToSameTarget(mains[0]);
       $noinline$testInlineToSameTarget(mains[1]);
     }
@@ -62,23 +62,23 @@ public class Main implements Itf {
 
     // At this point, the JIT should have compiled both methods, and inline
     // sameInvokeVirtual and sameInvokeInterface.
-    assertEquals(Main.class, testInvokeVirtual(mains[0]));
-    assertEquals(Main.class, testInvokeVirtual(mains[1]));
+    assertEquals(Main.class, $noinline$testInvokeVirtual(mains[0]));
+    assertEquals(Main.class, $noinline$testInvokeVirtual(mains[1]));
 
-    assertEquals(Itf.class, testInvokeInterface(itfs[0]));
-    assertEquals(Itf.class, testInvokeInterface(itfs[1]));
+    assertEquals(Itf.class, $noinline$testInvokeInterface(itfs[0]));
+    assertEquals(Itf.class, $noinline$testInvokeInterface(itfs[1]));
 
-    assertEquals(Itf.class, testInvokeInterface2(itfs[0]));
-    assertEquals(Itf.class, testInvokeInterface2(itfs[1]));
+    assertEquals(Itf.class, $noinline$testInvokeInterface2(itfs[0]));
+    assertEquals(Itf.class, $noinline$testInvokeInterface2(itfs[1]));
 
     // This will trigger a deoptimization of the compiled code.
-    assertEquals(OtherSubclass.class, testInvokeVirtual(mains[2]));
-    assertEquals(OtherSubclass.class, testInvokeInterface(itfs[2]));
-    assertEquals(null, testInvokeInterface2(itfs[2]));
+    assertEquals(OtherSubclass.class, $noinline$testInvokeVirtual(mains[2]));
+    assertEquals(OtherSubclass.class, $noinline$testInvokeInterface(itfs[2]));
+    assertEquals(null, $noinline$testInvokeInterface2(itfs[2]));
 
     // Run this once to make sure we execute the JITted code.
     $noinline$testInlineToSameTarget(mains[0]);
-    assertEquals(20001, counter);
+    assertEquals(2000001, counter);
   }
 
   public Class<?> sameInvokeVirtual() {
@@ -101,11 +101,11 @@ public class Main implements Itf {
     return Itf.class;
   }
 
-  public static Class<?> testInvokeInterface(Itf i) {
+  public static Class<?> $noinline$testInvokeInterface(Itf i) {
     return i.sameInvokeInterface();
   }
 
-  public static Class<?> testInvokeInterface2(Itf i) {
+  public static Class<?> $noinline$testInvokeInterface2(Itf i) {
     // Make three interface calls that will do a ClassTableGet to ensure bogus code
     // generation of ClassTableGet will crash.
     i.sameInvokeInterface();
@@ -113,7 +113,7 @@ public class Main implements Itf {
     return i.sameInvokeInterface3();
   }
 
-  public static Class<?> testInvokeVirtual(Main m) {
+  public static Class<?> $noinline$testInvokeVirtual(Main m) {
     return m.sameInvokeVirtual();
   }
 
