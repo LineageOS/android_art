@@ -1,0 +1,4 @@
+Tests basic functions in the jvmti plugin.
+
+Tests that using the structural redefinition can add new virtual methods and fields that are
+accessed by a subtype undergoing non-structural redefinition simultaneously.

@@ -1,0 +1,6 @@
+Hi(SubTransform called 1 times)
+Hi(SubTransform called 2 times)
+Hi(SubTransform called 3 times)
+Hello(SubTransform called 4 times, Transform called 1 times)
+Hello(SubTransform called 5 times, Transform called 2 times)
+Hello(SubTransform called 6 times, Transform called 3 times)
