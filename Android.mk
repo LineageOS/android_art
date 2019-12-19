@@ -407,16 +407,16 @@ LOCAL_MODULE := art-runtime
 
 # Base requirements.
 LOCAL_REQUIRED_MODULES := \
-    dalvikvm \
-    dex2oat \
-    dexoptanalyzer \
-    libart \
-    libart-compiler \
-    libopenjdkjvm \
-    libopenjdkjvmti \
-    profman \
-    libadbconnection \
-    libperfetto_hprof \
+    dalvikvm.com.android.art.release \
+    dex2oat.com.android.art.release \
+    dexoptanalyzer.com.android.art.release \
+    libart.com.android.art.release \
+    libart-compiler.com.android.art.release \
+    libopenjdkjvm.com.android.art.release \
+    libopenjdkjvmti.com.android.art.release \
+    profman.com.android.art.release \
+    libadbconnection.com.android.art.release \
+    libperfetto_hprof.com.android.art.release \
 
 # Potentially add in debug variants:
 #
@@ -430,16 +430,16 @@ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 endif
 ifeq (true,$(art_target_include_debug_build))
 LOCAL_REQUIRED_MODULES += \
-    dex2oatd \
-    dexoptanalyzerd \
-    libartd \
-    libartd-compiler \
-    libopenjdkd \
-    libopenjdkjvmd \
-    libopenjdkjvmtid \
-    profmand \
-    libadbconnectiond \
-    libperfetto_hprofd \
+    dex2oatd.com.android.art.debug \
+    dexoptanalyzerd.com.android.art.debug \
+    libartd.com.android.art.debug \
+    libartd-compiler.com.android.art.debug \
+    libopenjdkd.com.android.art.debug \
+    libopenjdkjvmd.com.android.art.debug \
+    libopenjdkjvmtid.com.android.art.debug \
+    profmand.com.android.art.debug \
+    libadbconnectiond.com.android.art.debug \
+    libperfetto_hprofd.com.android.art.debug \
 
 endif
 endif
@@ -625,7 +625,7 @@ build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
                         $(TARGET_OUT_EXECUTABLES)/art \
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_DEX_DEPENDENCIES) \
-                        $(ART_TARGET_SHARED_LIBRARY_DEPENDENCIES) \
+                        $(ART_DEBUG_TARGET_SHARED_LIBRARY_DEPENDENCIES) \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(TARGET_CORE_IMG_OUT_BASE).art \
                         $(TARGET_CORE_IMG_OUT_BASE)-interpreter.art \
