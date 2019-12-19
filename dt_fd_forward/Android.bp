@@ -48,6 +48,10 @@ cc_defaults {
 art_cc_library {
     name: "libdt_fd_forward",
     defaults: ["dt_fd_forward-defaults"],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_library {
