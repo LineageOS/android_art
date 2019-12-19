@@ -125,6 +125,17 @@ class Redefiner {
     // NO_THREAD_SAFETY_ANALYSIS so we can unlock the class in the destructor.
     ~ClassRedefinition() NO_THREAD_SAFETY_ANALYSIS;
 
+    // Move assignment so we can sort these in a vector.
+    ClassRedefinition& operator=(ClassRedefinition&& other) {
+      driver_ = other.driver_;
+      klass_ = other.klass_;
+      dex_file_ = std::move(other.dex_file_);
+      class_sig_ = std::move(other.class_sig_);
+      original_dex_file_ = other.original_dex_file_;
+      other.driver_ = nullptr;
+      return *this;
+    }
+
     // Move constructor so we can put these into a vector.
     ClassRedefinition(ClassRedefinition&& other)
         : driver_(other.driver_),
@@ -134,6 +145,10 @@ class Redefiner {
           original_dex_file_(other.original_dex_file_) {
       other.driver_ = nullptr;
     }
+
+    // No copy!
+    ClassRedefinition(ClassRedefinition&) = delete;
+    ClassRedefinition& operator=(ClassRedefinition&) = delete;
 
     art::ObjPtr<art::mirror::Class> GetMirrorClass() REQUIRES_SHARED(art::Locks::mutator_lock_);
     art::ObjPtr<art::mirror::ClassLoader> GetClassLoader()
@@ -154,9 +169,12 @@ class Redefiner {
       driver_->RecordFailure(e, class_sig_, err);
     }
 
-    bool FinishRemainingAllocations(/*out*/RedefinitionDataIter* cur_data)
+    bool FinishRemainingCommonAllocations(/*out*/RedefinitionDataIter* cur_data)
         REQUIRES_SHARED(art::Locks::mutator_lock_);
 
+    bool FinishNewClassAllocations(RedefinitionDataHolder& holder,
+                                   /*out*/RedefinitionDataIter* cur_data)
+        REQUIRES_SHARED(art::Locks::mutator_lock_);
     bool CollectAndCreateNewInstances(/*out*/RedefinitionDataIter* cur_data)
         REQUIRES_SHARED(art::Locks::mutator_lock_);
 
@@ -323,12 +341,15 @@ class Redefiner {
   jvmtiError Run() REQUIRES_SHARED(art::Locks::mutator_lock_);
 
   bool CheckAllRedefinitionAreValid() REQUIRES_SHARED(art::Locks::mutator_lock_);
-  bool CheckClassHierarchy() REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool CheckAllClassesAreVerified(RedefinitionDataHolder& holder)
+      REQUIRES_SHARED(art::Locks::mutator_lock_);
+  void MarkStructuralChanges(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool EnsureAllClassAllocationsFinished(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
-  bool FinishAllRemainingAllocations(RedefinitionDataHolder& holder)
+  bool FinishAllRemainingCommonAllocations(RedefinitionDataHolder& holder)
+      REQUIRES_SHARED(art::Locks::mutator_lock_);
+  bool FinishAllNewClassAllocations(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);
   bool CollectAndCreateNewInstances(RedefinitionDataHolder& holder)
       REQUIRES_SHARED(art::Locks::mutator_lock_);

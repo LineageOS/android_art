@@ -423,7 +423,6 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
         reinterpret_cast<jvmtiExtensionFunction>(Redefiner::StructurallyRedefineClasses),
         "com.android.art.class.structurally_redefine_classes",
         "Entrypoint for structural class redefinition. Has the same signature as RedefineClasses."
-        " Currently does not support redefining a class and any of its supertypes at the same time."
         " Only supports additive changes, methods and fields may not be removed. Supertypes and"
         " implemented interfaces may not be changed. After calling this"
         " com.android.art.structural_dex_file_load_hook events will be triggered, followed by"
