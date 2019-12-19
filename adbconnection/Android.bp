@@ -53,10 +53,6 @@ art_cc_library {
         "libart",
         "libartbase",
     ],
-    apex_available: [
-        "com.android.art.release",
-        "com.android.art.debug",
-    ],
 }
 
 // We export a library to do the server-side socket handling that gets loaded
@@ -94,8 +90,5 @@ art_cc_library {
     shared_libs: [
         "libartd",
         "libartbased",
-    ],
-    apex_available: [
-        "com.android.art.debug",
     ],
 }

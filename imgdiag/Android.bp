@@ -57,10 +57,6 @@ art_cc_binary {
         "libartbase",
         "libart-compiler",
     ],
-    apex_available: [
-        "com.android.art.release",
-        "com.android.art.debug",
-    ],
 }
 
 art_cc_binary {
@@ -73,9 +69,6 @@ art_cc_binary {
         "libartd",
         "libartbased",
         "libartd-compiler",
-    ],
-    apex_available: [
-        "com.android.art.debug",
     ],
 }
 
