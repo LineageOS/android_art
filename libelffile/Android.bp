@@ -39,6 +39,9 @@ art_cc_library_static {
     shared_libs: [
         "libartbase",
     ],
+    apex_available: [
+        "com.android.art.release",
+    ],
 }
 
 art_cc_library_static {
@@ -49,5 +52,8 @@ art_cc_library_static {
     ],
     shared_libs: [
         "libartbased",
+    ],
+    apex_available: [
+        "com.android.art.debug",
     ],
 }

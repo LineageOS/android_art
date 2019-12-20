@@ -52,6 +52,11 @@ art_cc_binary {
             enabled: true,
         },
     },
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+        "//apex_available:platform", // for SDK
+    ],
 }
 
 art_cc_test {

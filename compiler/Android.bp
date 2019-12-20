@@ -266,6 +266,10 @@ art_cc_library {
             },
         },
     },
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 cc_defaults {
@@ -330,6 +334,9 @@ art_cc_library {
         "libdexfiled",
     ],
     whole_static_libs: ["libelffiled"],
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
 
 cc_defaults {

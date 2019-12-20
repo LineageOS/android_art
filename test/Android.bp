@@ -45,6 +45,9 @@ art_cc_defaults {
     cflags: [
         "-Wno-frame-larger-than=",
     ],
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_defaults {
@@ -143,6 +146,9 @@ art_cc_defaults {
             enabled: false,
         },
     },
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_library {
@@ -168,6 +174,9 @@ art_cc_library {
             enabled: false,
         },
     },
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
 
 // ART run-tests.
