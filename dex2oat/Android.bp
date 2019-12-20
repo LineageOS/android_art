@@ -118,6 +118,9 @@ art_cc_library_static {
         "libartpalette",
         "libprofile",
     ],
+    apex_available: [
+        "com.android.art.release",
+    ],
 }
 
 cc_defaults {
@@ -146,6 +149,9 @@ art_cc_library_static {
         "libartd",
         "libartpalette",
         "libprofiled",
+    ],
+    apex_available: [
+        "com.android.art.debug",
     ],
 }
 
@@ -283,6 +289,10 @@ art_cc_binary {
             ],
         },
     },
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_binary {
@@ -330,6 +340,9 @@ art_cc_binary {
             suffix: "64",
         },
     },
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
 
 cc_defaults {
