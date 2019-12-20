@@ -43,6 +43,13 @@ cc_library {
     },
 
     export_include_dirs: ["."],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+        // TODO(b/142944931) Clean this up. This is due to the dependency from
+        // app_process
+        "//apex_available:platform",
+    ],
 }
 
 // Create a dummy version of libsigchain which expose the necessary symbols

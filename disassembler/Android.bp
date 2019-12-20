@@ -58,6 +58,10 @@ art_cc_library {
         // For disassembler_arm*.
         "libvixl",
     ],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 art_cc_library {

@@ -31,6 +31,7 @@ cc_object {
     // Produce text file rather than binary.
     cflags: ["-S"],
     srcs: ["asm_defines.cc"],
+    apex_available: ["//apex_available:platform"],
 }
 
 // This extracts the compile-time constants from asm_defines.s and creates the header.
