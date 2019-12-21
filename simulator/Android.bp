@@ -97,4 +97,7 @@ art_cc_library {
         "libartbased",
         "libartd",
     ],
+    apex_available: [
+        "com.android.art.debug",
+    ],
 }
