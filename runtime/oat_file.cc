@@ -1992,7 +1992,7 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
   const uint8_t* status_pointer = oat_class_pointer;
   CHECK_LT(status_pointer, oat_file_->End()) << oat_file_->GetLocation();
   ClassStatus status = enum_cast<ClassStatus>(*reinterpret_cast<const int16_t*>(status_pointer));
-  CHECK_LE(status, ClassStatus::kLast);
+  CHECK_LE(status, ClassStatus::kLast) << static_cast<uint32_t>(status);
 
   const uint8_t* type_pointer = status_pointer + sizeof(uint16_t);
   CHECK_LT(type_pointer, oat_file_->End()) << oat_file_->GetLocation();
