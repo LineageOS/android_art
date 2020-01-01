@@ -19,9 +19,10 @@ package art
 // arches on the device.
 
 import (
-	"android/soong/android"
 	"sort"
 	"strings"
+
+	"android/soong/android"
 )
 
 type moduleType struct {
@@ -40,14 +41,14 @@ var (
 func codegen(ctx android.LoadHookContext, c *codegenProperties, t moduleType) {
 	var hostArches, deviceArches []string
 
-	e := envDefault(ctx, "ART_HOST_CODEGEN_ARCHS", "")
+	e := ctx.Config().Getenv("ART_HOST_CODEGEN_ARCHS")
 	if e == "" {
 		hostArches = supportedArches
 	} else {
 		hostArches = strings.Split(e, " ")
 	}
 
-	e = envDefault(ctx, "ART_TARGET_CODEGEN_ARCHS", "")
+	e = ctx.Config().Getenv("ART_TARGET_CODEGEN_ARCHS")
 	if e == "" {
 		deviceArches = defaultDeviceCodegenArches(ctx)
 	} else {
