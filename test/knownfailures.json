@@ -308,6 +308,11 @@
         "variant": "interp-ac"
     },
     {
+        "tests": "597-app-images-same-classloader",
+        "description": "not generated when using the access check configuration",
+        "variant": "interp-ac"
+    },
+    {
         "tests": "055-enum-performance",
         "variant": "optimizing | regalloc_gc",
         "description": ["055: Exceeds run time limits due to heap poisoning ",
