@@ -1351,17 +1351,15 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
       thread->GetJniEnv()->SetFunctionsToRuntimeShutdownFunctions();
     }
   }
-  if (daemons_left == 0) {
-    // No threads left; safe to shut down.
-    return;
+  // If we have any daemons left, wait 200ms to ensure they are not stuck in a place where they
+  // are about to access runtime state and are not in a runnable state. Examples: Monitor code
+  // or waking up from a condition variable. TODO: Try and see if there is a better way to wait
+  // for daemon threads to be in a blocked state.
+  if (daemons_left > 0) {
+    static constexpr size_t kDaemonSleepTime = 200 * 1000;
+    usleep(kDaemonSleepTime);
   }
-  // If we have any daemons left, wait until they are (a) suspended and (b) they are not stuck
-  // in a place where they are about to access runtime state and are not in a runnable state.
-  // We attempt to do the latter by just waiting long enough for things to
-  // quiesce. Examples: Monitor code or waking up from a condition variable.
-  // TODO: Try and see if there is a better way to wait for daemon threads to be in a
-  // blocked state.
-  // Give the threads a chance to suspend, complaining if they're slow. (a)
+  // Give the threads a chance to suspend, complaining if they're slow.
   bool have_complained = false;
   static constexpr size_t kTimeoutMicroseconds = 2000 * 1000;
   static constexpr size_t kSleepMicroseconds = 1000;
@@ -1380,9 +1378,6 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
       }
     }
     if (all_suspended) {
-      // One final wait for all the now "suspended" threads to actually quiesce. (b)
-      static constexpr size_t kDaemonSleepTime = 200 * 1000;
-      usleep(kDaemonSleepTime);
       return;
     }
     usleep(kSleepMicroseconds);
