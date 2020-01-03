@@ -57,7 +57,7 @@ class LOCKABLE Mutex;
 constexpr bool kDebugLocking = kIsDebugBuild;
 
 // Record Log contention information, dumpable via SIGQUIT.
-#ifdef ART_USE_FUTEXES
+#if ART_USE_FUTEXES
 // To enable lock contention logging, set this to true.
 constexpr bool kLogLockContentions = false;
 // FUTEX_WAKE first argument:
@@ -102,7 +102,11 @@ class BaseMutex {
 
   BaseMutex(const char* name, LockLevel level);
   virtual ~BaseMutex();
+
+  // Add this mutex to those owned by self, and perform appropriate checking.
+  // For this call only, self may also be another suspended thread.
   void RegisterAsLocked(Thread* self);
+
   void RegisterAsUnlocked(Thread* self);
   void CheckSafeToWait(Thread* self);
 
@@ -156,8 +160,14 @@ class BaseMutex {
 // -------------------------------------------
 // Free      | Exclusive     | error
 // Exclusive | Block*        | Free
-// * Mutex is not reentrant and so an attempt to ExclusiveLock on the same thread will result in
-//   an error. Being non-reentrant simplifies Waiting on ConditionVariables.
+// * Mutex is not reentrant unless recursive is true. An attempt to ExclusiveLock on a
+// recursive=false Mutex on a thread already owning the Mutex results in an error.
+//
+// TODO(b/140590186): Remove support for recursive == true.
+//
+// Some mutexes, including those associated with Java monitors may be accessed (in particular
+// acquired) by a thread in suspended state. Suspending all threads does NOT prevent mutex state
+// from changing.
 std::ostream& operator<<(std::ostream& os, const Mutex& mu);
 class LOCKABLE Mutex : public BaseMutex {
  public:
@@ -173,6 +183,8 @@ class LOCKABLE Mutex : public BaseMutex {
   // Returns true if acquires exclusive access, false otherwise.
   bool ExclusiveTryLock(Thread* self) TRY_ACQUIRE(true);
   bool TryLock(Thread* self) TRY_ACQUIRE(true) { return ExclusiveTryLock(self); }
+  // Equivalent to ExclusiveTryLock, but retry for a short period before giving up.
+  bool ExclusiveTryLockWithSpinning(Thread* self) TRY_ACQUIRE(true);
 
   // Release exclusive access.
   void ExclusiveUnlock(Thread* self) RELEASE();
@@ -200,7 +212,9 @@ class LOCKABLE Mutex : public BaseMutex {
   // whether we hold the lock; any other information may be invalidated before we return.
   pid_t GetExclusiveOwnerTid() const;
 
-  // Returns how many times this Mutex has been locked, it is better to use AssertHeld/NotHeld.
+  // Returns how many times this Mutex has been locked, it is typically better to use
+  // AssertHeld/NotHeld. For a simply held mutex this method returns 1. Should only be called
+  // while holding the mutex or threads are suspended.
   unsigned int GetDepth() const {
     return recursion_count_;
   }
@@ -211,6 +225,18 @@ class LOCKABLE Mutex : public BaseMutex {
   const Mutex& operator!() const { return *this; }
 
   void WakeupToRespondToEmptyCheckpoint() override;
+
+#if ART_USE_FUTEXES
+  // Acquire the mutex, possibly on behalf of another thread. Acquisition must be
+  // uncontended. New_owner must be current thread or suspended.
+  // Mutex must be at level kMonitorLock.
+  // Not implementable for the pthreads version, so we must avoid calling it there.
+  void ExclusiveLockUncontendedFor(Thread* new_owner);
+
+  // Undo the effect of the previous calling, setting the mutex back to unheld.
+  // Still assumes no concurrent access.
+  void ExclusiveUnlockUncontended();
+#endif  // ART_USE_FUTEXES
 
  private:
 #if ART_USE_FUTEXES
