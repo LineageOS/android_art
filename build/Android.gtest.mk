@@ -274,7 +274,7 @@ ART_GTEST_oat_file_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dex2oatd
 ART_GTEST_oat_file_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
-  $(TARGET_OUT_EXECUTABLES)/dex2oatd
+  dex2oatd.com.android.art.debug
 
 ART_GTEST_oat_file_assistant_test_HOST_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_HOST_DEPS)
@@ -323,7 +323,7 @@ ART_GTEST_dexdump_test_HOST_DEPS := \
 ART_GTEST_dexdump_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TARGET_OUT_EXECUTABLES)/dexdump
+  dexdump.com.android.art.debug
 
 # The dexanalyze test requires an image and the dexanalyze utility.
 ART_GTEST_dexanalyze_test_HOST_DEPS := \
@@ -333,7 +333,7 @@ ART_GTEST_dexanalyze_test_HOST_DEPS := \
 ART_GTEST_dexanalyze_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TARGET_OUT_EXECUTABLES)/dexanalyze
+  dexanalyze.com.android.art.debug
 
 # The dexlayout test requires an image and the dexlayout utility.
 # TODO: rename into dexdump when migration completes
@@ -345,8 +345,8 @@ ART_GTEST_dexlayout_test_HOST_DEPS := \
 ART_GTEST_dexlayout_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TARGET_OUT_EXECUTABLES)/dexlayoutd \
-  $(TARGET_OUT_EXECUTABLES)/dexdump
+  dexlayoutd.com.android.art.debug \
+  dexdump.com.android.art.debug
 
 # The dexlist test requires an image and the dexlist utility.
 ART_GTEST_dexlist_test_HOST_DEPS := \
@@ -368,13 +368,13 @@ ART_GTEST_imgdiag_test_HOST_DEPS := \
 ART_GTEST_imgdiag_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  $(TARGET_OUT_EXECUTABLES)/imgdiagd
+  imgdiagd.com.android.art.debug
 
 # Dex analyze test requires dexanalyze.
 ART_GTEST_dexanalyze_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dexanalyze
 ART_GTEST_dexanalyze_test_TARGET_DEPS := \
-  $(TARGET_OUT_EXECUTABLES)/dexanalyze
+  dexanalyze.com.android.art.debug
 
 # Oatdump test requires an image and oatfile to dump.
 ART_GTEST_oatdump_test_HOST_DEPS := \
@@ -432,12 +432,205 @@ ART_TEST_MODULES := \
     art_runtime_tests \
     art_sigchain_tests \
 
-ART_TARGET_GTEST_FILES := $(foreach m,$(ART_TEST_MODULES),\
-    $(ART_TEST_LIST_device_$(TARGET_ARCH)_$(m)))
+# TODO: We used to rely on a test being "soong installable" to get the list below. However,
+# this now only works for host, so for target we manually list them here. See b/146995717.
+ART_TARGET_GTEST_FILES := \
+    arch_test \
+    arena_allocator_test \
+    art_dex_file_loader_test \
+    art_libdexfile_support_tests \
+    atomic_dex_ref_map_test \
+    barrier_test \
+    bit_field_test \
+    bit_memory_region_test \
+    bit_string_test \
+    bit_struct_test \
+    bit_table_test \
+    bit_utils_test \
+    bit_vector_test \
+    bounds_check_elimination_test \
+    card_table_test \
+    cha_test \
+    class_accessor_test \
+    class_linker_test \
+    class_loader_context_test \
+    class_table_test \
+    cmdline_parser_test \
+    code_item_accessors_test \
+    codegen_test \
+    compact_dex_file_test \
+    compact_offset_table_test \
+    compiled_method_storage_test \
+    compiler_driver_test \
+    compiler_filter_test \
+    data_type_test \
+    dedupe_set_test \
+    descriptors_names_test \
+    dex2oat_image_test \
+    dex2oat_test \
+    dex_cache_test \
+    dex_file_loader_test \
+    dex_file_verifier_test \
+    dex_instruction_test \
+    dex_to_dex_decompiler_test \
+    dexanalyze_test \
+    dexdiag_test \
+    dexdump_test \
+    dexlayout_test \
+    dexlist_test \
+    dexoptanalyzer_test \
+    dlmalloc_space_random_test \
+    dlmalloc_space_static_test \
+    dominator_test \
+    dwarf_test \
+    elf_writer_test \
+    entrypoints_order_test \
+    exception_test \
+    exec_utils_test \
+    fd_file_test \
+    file_utils_test \
+    find_loops_test \
+    graph_checker_test \
+    graph_test \
+    gtest_test \
+    gvn_test \
+    handle_scope_test \
+    hash_set_test \
+    heap_test \
+    heap_verification_test \
+    hex_dump_test \
+    hidden_api_test \
+    histogram_test \
+    image_space_test \
+    image_test \
+    image_write_read_test \
+    imgdiag_test \
+    immune_spaces_test \
+    imtable_test \
+    indenter_test \
+    index_bss_mapping_encoder_test \
+    indirect_reference_table_test \
+    induction_var_analysis_test \
+    induction_var_range_test \
+    instruction_set_features_arm64_test \
+    instruction_set_features_arm_test \
+    instruction_set_features_mips64_test \
+    instruction_set_features_mips_test \
+    instruction_set_features_test \
+    instruction_set_features_x86_64_test \
+    instruction_set_features_x86_test \
+    instruction_set_test \
+    instrumentation_test \
+    intern_table_test \
+    intrusive_forward_list_test \
+    java_vm_ext_test \
+    jdwp_options_test \
+    jit_memory_region_test \
+    jni_cfi_test \
+    jni_compiler_test \
+    jni_internal_test \
+    large_object_space_test \
+    leb128_test \
+    licm_test \
+    linker_patch_test \
+    live_interval_test \
+    load_store_analysis_test \
+    logging_test \
+    loop_optimization_test \
+    managed_register_arm_test \
+    math_entrypoints_test \
+    mem_map_test \
+    membarrier_test \
+    memcmp16_test \
+    memfd_test \
+    memory_region_test \
+    memory_type_table_test \
+    method_handles_test \
+    method_type_test \
+    method_verifier_test \
+    mod_union_table_test \
+    module_exclusion_test \
+    monitor_pool_test \
+    monitor_test \
+    multi_oat_relative_patcher_test \
+    mutex_test \
+    nodes_test \
+    nodes_vector_test \
+    oat_file_assistant_test \
+    oat_file_test \
+    oat_writer_test \
+    oatdump_app_test \
+    oatdump_image_test \
+    oatdump_test \
+    object_test \
+    optimizing_cfi_test \
+    output_stream_test \
+    palette_test \
+    parallel_move_test \
+    parsed_options_test \
+    prebuilt_tools_test \
+    pretty_printer_test \
+    primitive_test \
+    profile_assistant_test \
+    profile_boot_info_test \
+    profile_compilation_info_test \
+    profile_saver_test \
+    profiling_info_test \
+    proxy_test \
+    quick_trampoline_entrypoints_test \
+    reference_queue_test \
+    reference_table_test \
+    reference_type_propagation_test \
+    reflection_test \
+    reg_type_test \
+    relative_patcher_thumb2_test \
+    rosalloc_space_random_test \
+    rosalloc_space_static_test \
+    runtime_callbacks_test \
+    runtime_test \
+    safe_copy_test \
+    safe_math_test \
+    scheduler_test \
+    scoped_flock_test \
+    select_generator_test \
+    side_effects_test \
+    sigchain_test \
+    space_bitmap_test \
+    space_create_test \
+    src_map_elem_test \
+    ssa_liveness_analysis_test \
+    ssa_test \
+    stack_map_test \
+    string_reference_test \
+    stub_test \
+    subtype_check_info_test \
+    subtype_check_test \
+    superblock_cloner_test \
+    suspend_check_test \
+    swap_space_test \
+    system_weak_test \
+    task_processor_test \
+    test_dex_file_builder_test \
+    thread_pool_test \
+    time_utils_test \
+    timing_logger_test \
+    transaction_test \
+    transform_array_ref_test \
+    transform_iterator_test \
+    two_runtimes_test \
+    type_lookup_table_test \
+    unstarted_runtime_test \
+    utf_test \
+    utils_test \
+    var_handle_test \
+    variant_map_test \
+    vdex_file_test \
+    verifier_deps_test \
+    zip_archive_test \
+
 
 ifdef TARGET_2ND_ARCH
-2ND_ART_TARGET_GTEST_FILES := $(foreach m,$(ART_TEST_MODULES),\
-    $(ART_TEST_LIST_device_$(2ND_TARGET_ARCH)_$(m)))
+2ND_ART_TARGET_GTEST_FILES := $(ART_TARGET_GTEST_FILES)
 endif
 
 ART_HOST_GTEST_FILES := $(foreach m,$(ART_TEST_MODULES),\
@@ -477,81 +670,6 @@ ART_GTEST_TARGET_ANDROID_TZDATA_ROOT := '/apex/com.android.tzdata'
 ifneq ($(ART_TEST_ANDROID_TZDATA_ROOT),)
   ART_GTEST_TARGET_ANDROID_TZDATA_ROOT := $(ART_TEST_ANDROID_TZDATA_ROOT)
 endif
-
-# Define a make rule for a target device gtest.
-# $(1): gtest name - the name of the test we're building such as leb128_test.
-# $(2): path to the test binary
-# $(3): 2ND_ or undefined - used to differentiate between the primary and secondary architecture.
-# $(4): LD_LIBRARY_PATH or undefined - used in case libartd.so is not in /system/lib/
-define define-art-gtest-rule-target
-  ifeq ($(ART_TEST_CHROOT),)
-    # Non-chroot configuration.
-    maybe_art_test_chroot :=
-    maybe_chroot_command :=
-  else
-    # Chroot configuration.
-    maybe_art_test_chroot := $(ART_TEST_CHROOT)
-    maybe_chroot_command := chroot $(ART_TEST_CHROOT)
-  endif
-
-  gtest_rule := test-art-target-gtest-$(1)$$($(3)ART_PHONY_TEST_TARGET_SUFFIX)
-  gtest_exe := $(2)
-  gtest_target_exe := $$(patsubst $(PRODUCT_OUT)/%,/%,$$(gtest_exe))
-
-  # Add the test dependencies to test-art-target-sync, which will be a prerequisite for the test
-  # to ensure files are pushed to the device.
-  # Note that, both the primary and the secondary arches of the libs are built by depending
-  # on the module name.
-  gtest_deps := \
-    $$(ART_GTEST_$(1)_TARGET_DEPS) \
-    $(foreach file,$(ART_GTEST_$(1)_DEX_DEPS),$(ART_TEST_TARGET_GTEST_$(file)_DEX)) \
-    $$(gtest_exe) \
-    libicu_jni.com.android.art.debug \
-    libjavacore.com.android.art.debug \
-    libopenjdkd.com.android.art.debug \
-    $$(foreach jar,$$(TARGET_TEST_CORE_JARS),$$(TARGET_OUT_JAVA_LIBRARIES)/$$(jar).jar)
-
-  ART_TEST_TARGET_GTEST_DEPENDENCIES += $$(gtest_deps)
-
-$$(gtest_rule): PRIVATE_TARGET_EXE := $$(gtest_target_exe)
-$$(gtest_rule): PRIVATE_MAYBE_CHROOT_COMMAND := $$(maybe_chroot_command)
-
-# File witnessing the success of the gtest, the presence of which means the gtest's success.
-gtest_witness := \
-  $$(maybe_art_test_chroot)$(ART_TARGET_TEST_DIR)/$(TARGET_$(3)ARCH)/$$(gtest_rule)-$$$$PPID
-
-$$(gtest_rule): PRIVATE_GTEST_WITNESS := $$(gtest_witness)
-
-.PHONY: $$(gtest_rule)
-$$(gtest_rule): test-art-target-sync
-	$(hide) $(ADB) shell touch $$(PRIVATE_GTEST_WITNESS)
-	$(hide) $(ADB) shell rm $$(PRIVATE_GTEST_WITNESS)
-	$(hide) $(ADB) shell $$(PRIVATE_MAYBE_CHROOT_COMMAND) chmod 755 $$(PRIVATE_TARGET_EXE)
-	$(hide) $$(call ART_TEST_SKIP,$$@) && \
-	  ($(ADB) shell "$$(PRIVATE_MAYBE_CHROOT_COMMAND) env $(GCOV_ENV) LD_LIBRARY_PATH=$(4) \
-	       ANDROID_ROOT=$(ART_GTEST_TARGET_ANDROID_ROOT) \
-	       ANDROID_I18N_ROOT=$(ART_GTEST_TARGET_ANDROID_I18N_ROOT) \
-	       ANDROID_ART_ROOT=$(ART_GTEST_TARGET_ANDROID_ART_ROOT) \
-	       ANDROID_TZDATA_ROOT=$(ART_GTEST_TARGET_ANDROID_TZDATA_ROOT) \
-	       $$(PRIVATE_TARGET_EXE) \
-	     && touch $$(PRIVATE_GTEST_WITNESS)" \
-	   && ($(ADB) pull $$(PRIVATE_GTEST_WITNESS) /tmp/ && $$(call ART_TEST_PASSED,$$@)) \
-	   || $$(call ART_TEST_FAILED,$$@))
-	$(hide) rm -f /tmp/$$@-$$$$PPID
-
-  ART_TEST_TARGET_GTEST$($(3)ART_PHONY_TEST_TARGET_SUFFIX)_RULES += $$(gtest_rule)
-  ART_TEST_TARGET_GTEST_RULES += $$(gtest_rule)
-  ART_TEST_TARGET_GTEST_$(1)_RULES += $$(gtest_rule)
-
-  # Clear locally defined variables.
-  gtest_witness :=
-  maybe_chroot_command :=
-  maybe_art_test_chroot :=
-  gtest_target_exe :=
-  gtest_deps :=
-  gtest_exe :=
-  gtest_rule :=
-endef  # define-art-gtest-rule-target
 
 # Define make rules for a host gtests.
 # $(1): gtest name - the name of the test we're building such as leb128_test.
@@ -620,40 +738,23 @@ endif
   gtest_suffix :=
 endef  # define-art-gtest-rule-host
 
-# Define the rules to build and run host and target gtests.
-# $(1): file name
-# $(2): 2ND_ or undefined - used to differentiate between the primary and secondary architecture.
+# Define the rules to build target gtests.
+# $(1): test name
 define define-art-gtest-target
-  art_gtest_filename := $(1)
+  # Note that, both the primary and the secondary arches of the libs are built by depending
+  # on the module name.
+  gtest_deps := \
+    $$(ART_GTEST_$(1)_TARGET_DEPS) \
+    $(foreach file,$(ART_GTEST_$(1)_DEX_DEPS),$(ART_TEST_TARGET_GTEST_$(file)_DEX)) \
+    libicu_jni.com.android.art.debug \
+    libjavacore.com.android.art.debug \
+    libopenjdkd.com.android.art.debug \
+    $$(foreach jar,$$(TARGET_TEST_CORE_JARS),$$(TARGET_OUT_JAVA_LIBRARIES)/$$(jar).jar)
 
-  include $$(CLEAR_VARS)
-  art_gtest_name := $$(notdir $$(basename $$(art_gtest_filename)))
-
-  library_path :=
-  2ND_library_path :=
-  ifneq ($$(ART_TEST_ANDROID_ROOT),)
-    ifdef TARGET_2ND_ARCH
-      2ND_library_path := $$(ART_TEST_ANDROID_ROOT)/lib
-      library_path := $$(ART_TEST_ANDROID_ROOT)/lib64
-    else
-      ifneq ($(filter %64,$(TARGET_ARCH)),)
-        library_path := $$(ART_TEST_ANDROID_ROOT)/lib64
-      else
-        library_path := $$(ART_TEST_ANDROID_ROOT)/lib
-      endif
-    endif
-  endif
-
-  ifndef ART_TEST_TARGET_GTEST_$$(art_gtest_name)_RULES
-    ART_TEST_TARGET_GTEST_$$(art_gtest_name)_RULES :=
-  endif
-  $$(eval $$(call define-art-gtest-rule-target,$$(art_gtest_name),$$(art_gtest_filename),$(2),$$($(2)library_path)))
+  ART_TEST_TARGET_GTEST_DEPENDENCIES += $$(gtest_deps)
 
   # Clear locally defined variables.
-  art_gtest_filename :=
-  art_gtest_name :=
-  library_path :=
-  2ND_library_path :=
+  gtest_deps :=
 endef  # define-art-gtest-target
 
 # $(1): file name
@@ -673,21 +774,6 @@ define define-art-gtest-host
   art_gtest_name :=
 endef  # define-art-gtest-host
 
-# Define the rules to build and run gtests for both archs on target.
-# $(1): test name
-define define-art-gtest-target-both
-  art_gtest_name := $(1)
-
-    # A rule to run the different architecture versions of the gtest.
-.PHONY: test-art-target-gtest-$$(art_gtest_name)
-test-art-target-gtest-$$(art_gtest_name): $$(ART_TEST_TARGET_GTEST_$$(art_gtest_name)_RULES)
-	$$(hide) $$(call ART_TEST_PREREQ_FINISHED,$$@)
-
-  # Clear now unused variables.
-  ART_TEST_TARGET_GTEST_$$(art_gtest_name)_RULES :=
-  art_gtest_name :=
-endef  # define-art-gtest-target-both
-
 # Define the rules to build and run gtests for both archs on host.
 # $(1): test name
 define define-art-gtest-host-both
@@ -704,11 +790,6 @@ endef  # define-art-gtest-host-both
 
 ifeq ($(ART_BUILD_TARGET),true)
   $(foreach file,$(ART_TARGET_GTEST_FILES), $(eval $(call define-art-gtest-target,$(file),)))
-  ifdef 2ND_ART_PHONY_TEST_TARGET_SUFFIX
-    $(foreach file,$(2ND_ART_TARGET_GTEST_FILES), $(eval $(call define-art-gtest-target,$(file),2ND_)))
-  endif
-  # Rules to run the different architecture versions of the gtest.
-  $(foreach file,$(ART_TARGET_GTEST_FILES), $(eval $(call define-art-gtest-target-both,$$(notdir $$(basename $$(file))))))
 endif
 ifeq ($(ART_BUILD_HOST),true)
   $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),)))
