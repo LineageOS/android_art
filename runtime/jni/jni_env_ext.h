@@ -110,7 +110,8 @@ class JNIEnvExt : public JNIEnv {
   }
   JavaVMExt* GetVm() const { return vm_; }
 
-  bool IsRuntimeDeleted() const { return runtime_deleted_; }
+  void SetRuntimeDeleted() { runtime_deleted_.store(true, std::memory_order_relaxed); }
+  bool IsRuntimeDeleted() const { return runtime_deleted_.load(std::memory_order_relaxed); }
   bool IsCheckJniEnabled() const { return check_jni_; }
 
 
@@ -206,7 +207,7 @@ class JNIEnvExt : public JNIEnv {
   bool check_jni_;
 
   // If we are a JNI env for a daemon thread with a deleted runtime.
-  bool runtime_deleted_;
+  std::atomic<bool> runtime_deleted_;
 
   template<bool kEnableIndexIds> friend class JNI;
   friend class ScopedJniEnvLocalRefState;
