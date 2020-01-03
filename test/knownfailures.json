@@ -1289,12 +1289,6 @@
         "tests": ["909-attach-agent", "126-miranda-multidex"],
         "zipapex": true,
         "bug": "b/135507613",
-        "description": ["These tests run dalvikvm multiple times, this can mess up the",
-                        "zipapex runner."]
-    },
-    {
-        "tests": ["2029-contended-monitors"],
-        "variant": "interpreter | interp-ac | gcstress | trace",
-        "description": ["Slow test. Prone to timeouts."]
+        "description": ["These tests run dalvikvm multiple times, this can messup the zipapex runner"]
     }
 ]

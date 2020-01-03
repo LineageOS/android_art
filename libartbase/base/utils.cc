@@ -309,7 +309,7 @@ void GetTaskStats(pid_t tid, char* state, int* utime, int* stime, int* task_cpu)
 
 void SleepForever() {
   while (true) {
-    sleep(100000000);
+    usleep(1000000);
   }
 }
 
