@@ -416,7 +416,7 @@ Runtime::~Runtime() {
   // Shutdown any trace running.
   Trace::Shutdown();
 
-  // Report death. Clients me require a working thread, still, so do it before GC completes and
+  // Report death. Clients may require a working thread, still, so do it before GC completes and
   // all non-daemon threads are done.
   {
     ScopedObjectAccess soa(self);
@@ -439,9 +439,14 @@ Runtime::~Runtime() {
 
   // Make sure our internal threads are dead before we start tearing down things they're using.
   GetRuntimeCallbacks()->StopDebugger();
+  // Deletion ordering is tricky. Null out everything we've deleted.
   delete signal_catcher_;
+  signal_catcher_ = nullptr;
 
   // Make sure all other non-daemon threads have terminated, and all daemon threads are suspended.
+  // Also wait for daemon threads to quiesce, so that in addition to being "suspended", they
+  // no longer access monitor and thread list data structures. We leak user daemon threads
+  // themselves, since we have no mechanism for shutting them down.
   {
     ScopedTrace trace2("Delete thread list");
     thread_list_->ShutDown();
@@ -458,7 +463,10 @@ Runtime::~Runtime() {
   }
 
   // Finally delete the thread list.
+  // Thread_list_ can be accessed by "suspended" threads, e.g. in InflateThinLocked.
+  // We assume that by this point, we've waited long enough for things to quiesce.
   delete thread_list_;
+  thread_list_ = nullptr;
 
   // Delete the JIT after thread list to ensure that there is no remaining threads which could be
   // accessing the instrumentation when we delete it.
@@ -473,11 +481,17 @@ Runtime::~Runtime() {
 
   ScopedTrace trace2("Delete state");
   delete monitor_list_;
+  monitor_list_ = nullptr;
   delete monitor_pool_;
+  monitor_pool_ = nullptr;
   delete class_linker_;
+  class_linker_ = nullptr;
   delete heap_;
+  heap_ = nullptr;
   delete intern_table_;
+  intern_table_ = nullptr;
   delete oat_file_manager_;
+  oat_file_manager_ = nullptr;
   Thread::Shutdown();
   QuasiAtomic::Shutdown();
   verifier::ClassVerifier::Shutdown();
