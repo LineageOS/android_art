@@ -138,6 +138,7 @@ debuggable="no"
 prebuild_mode="yes"
 target_mode="yes"
 dev_mode="no"
+create_runner="no"
 update_mode="no"
 debug_mode="no"
 relocate="no"
@@ -364,6 +365,13 @@ while true; do
             break
         fi
         run_args+=(--invoke-with "${what}")
+        shift
+    elif [ "x$1" = "x--create-runner" ]; then
+        run_args+=(--create-runner --dry-run)
+        dev_mode="yes"
+        never_clean="yes"
+        create_runner="yes"
+        shift
         shift
     elif [ "x$1" = "x--dev" ]; then
         run_args+=(--dev)
@@ -697,6 +705,11 @@ if [ "$have_image" = "no" ]; then
     run_args+=(--no-image)
 fi
 
+if [ "$create_runner" = "yes" -a "$target_mode" = "yes" ]; then
+    err_echo "--create-runner does not function for non --host tests"
+    usage="yes"
+fi
+
 if [ "$dev_mode" = "yes" -a "$update_mode" = "yes" ]; then
     err_echo "--dev and --update are mutually exclusive"
     usage="yes"
@@ -746,6 +759,11 @@ if [ "$usage" = "yes" ]; then
         echo "  $prog [options] [test-name]           Run test normally."
         echo "  $prog --dev [options] [test-name]     Development mode" \
              "(dumps to stdout)."
+        echo "  $prog --create-runner [options] [test-name]"
+        echo "              Creates a runner script for use with other " \
+             "tools (e.g. parallel_run.py)."
+        echo "              The script will only run the test portion, and " \
+             "share oat and dex files."
         echo "  $prog --update [options] [test-name]  Update mode" \
              "(replaces expected.txt)."
         echo '  Omitting the test name or specifying "-" will use the' \
