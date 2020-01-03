@@ -894,26 +894,15 @@ class ArtMethod final {
 
   // This setter guarantees atomicity.
   void AddAccessFlags(uint32_t flag) REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(!IsIntrinsic() ||
-           !OverlapsIntrinsicBits(flag) ||
-           IsValidIntrinsicUpdate(flag));
-    uint32_t old_access_flags;
-    uint32_t new_access_flags;
-    do {
-      old_access_flags = access_flags_.load(std::memory_order_relaxed);
-      new_access_flags = old_access_flags | flag;
-    } while (!access_flags_.compare_exchange_weak(old_access_flags, new_access_flags));
+    DCHECK(!IsIntrinsic() || !OverlapsIntrinsicBits(flag) || IsValidIntrinsicUpdate(flag));
+    // None of the readers rely ordering.
+    access_flags_.fetch_or(flag, std::memory_order_relaxed);
   }
 
   // This setter guarantees atomicity.
   void ClearAccessFlags(uint32_t flag) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK(!IsIntrinsic() || !OverlapsIntrinsicBits(flag) || IsValidIntrinsicUpdate(flag));
-    uint32_t old_access_flags;
-    uint32_t new_access_flags;
-    do {
-      old_access_flags = access_flags_.load(std::memory_order_relaxed);
-      new_access_flags = old_access_flags & ~flag;
-    } while (!access_flags_.compare_exchange_weak(old_access_flags, new_access_flags));
+    access_flags_.fetch_and(~flag, std::memory_order_relaxed);
   }
 
   // Used by GetName and GetNameView to share common code.
