@@ -434,7 +434,7 @@ ART_TEST_MODULES := \
 
 # TODO: We used to rely on a test being "soong installable" to get the list below. However,
 # this now only works for host, so for target we manually list them here. See b/146995717.
-ART_TARGET_GTEST_FILES := \
+ART_TARGET_GTEST_NAMES := \
     arch_test \
     arena_allocator_test \
     art_dex_file_loader_test \
@@ -628,11 +628,6 @@ ART_TARGET_GTEST_FILES := \
     verifier_deps_test \
     zip_archive_test \
 
-
-ifdef TARGET_2ND_ARCH
-2ND_ART_TARGET_GTEST_FILES := $(ART_TARGET_GTEST_FILES)
-endif
-
 ART_HOST_GTEST_FILES := $(foreach m,$(ART_TEST_MODULES),\
     $(ART_TEST_LIST_host_$(ART_HOST_ARCH)_$(m)))
 
@@ -738,24 +733,20 @@ endif
   gtest_suffix :=
 endef  # define-art-gtest-rule-host
 
-# Define the rules to build target gtests.
+# Add the additional dependencies for the specified test
 # $(1): test name
-define define-art-gtest-target
+define add-art-gtest-dependencies
   # Note that, both the primary and the secondary arches of the libs are built by depending
   # on the module name.
   gtest_deps := \
     $$(ART_GTEST_$(1)_TARGET_DEPS) \
     $(foreach file,$(ART_GTEST_$(1)_DEX_DEPS),$(ART_TEST_TARGET_GTEST_$(file)_DEX)) \
-    libicu_jni.com.android.art.debug \
-    libjavacore.com.android.art.debug \
-    libopenjdkd.com.android.art.debug \
-    $$(foreach jar,$$(TARGET_TEST_CORE_JARS),$$(TARGET_OUT_JAVA_LIBRARIES)/$$(jar).jar)
 
   ART_TEST_TARGET_GTEST_DEPENDENCIES += $$(gtest_deps)
 
   # Clear locally defined variables.
   gtest_deps :=
-endef  # define-art-gtest-target
+endef  # add-art-gtest-dependencies
 
 # $(1): file name
 # $(2): 2ND_ or undefined - used to differentiate between the primary and secondary architecture.
@@ -789,7 +780,12 @@ test-art-host-gtest-$$(art_gtest_name): $$(ART_TEST_HOST_GTEST_$$(art_gtest_name
 endef  # define-art-gtest-host-both
 
 ifeq ($(ART_BUILD_TARGET),true)
-  $(foreach file,$(ART_TARGET_GTEST_FILES), $(eval $(call define-art-gtest-target,$(file),)))
+  $(foreach name,$(ART_TARGET_GTEST_NAMES), $(eval $(call add-art-gtest-dependencies,$(name),)))
+  ART_TEST_TARGET_GTEST_DEPENDENCIES += \
+    libicu_jni.com.android.art.debug \
+    libjavacore.com.android.art.debug \
+    libopenjdkd.com.android.art.debug \
+    $(foreach jar,$(TARGET_TEST_CORE_JARS),$(TARGET_OUT_JAVA_LIBRARIES)/$(jar).jar)
 endif
 ifeq ($(ART_BUILD_HOST),true)
   $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),)))
@@ -802,8 +798,11 @@ endif
 
 # Used outside the art project to get a list of the current tests
 RUNTIME_TARGET_GTEST_MAKE_TARGETS :=
-$(foreach file, $(ART_TARGET_GTEST_FILES), $(eval RUNTIME_TARGET_GTEST_MAKE_TARGETS += $$(notdir $$(patsubst %/,%,$$(dir $$(file))))_$$(notdir $$(basename $$(file)))))
-COMPILER_TARGET_GTEST_MAKE_TARGETS :=
+art_target_gtest_files := $(foreach m,$(ART_TEST_MODULES),$(ART_TEST_LIST_device_$(TARGET_ARCH)_$(m)))
+$(foreach file,$(art_target_gtest_files),\
+  $(eval RUNTIME_TARGET_GTEST_MAKE_TARGETS += $$(notdir $$(patsubst %/,%,$$(dir $$(file))))_$$(notdir $$(basename $$(file))))\
+)
+art_target_gtest_files :=
 
 # Define all the combinations of host/target and suffix such as:
 # test-art-host-gtest or test-art-host-gtest64
