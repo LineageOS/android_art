@@ -75,7 +75,7 @@ elif [[ $mode == "target" ]]; then
     exit 1
   fi
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
-  make_command+=" libjavacrypto libnetd_client-target toybox toolbox sh"
+  make_command+=" libnetd_client-target toybox toolbox sh"
   make_command+=" debuggerd su gdbserver"
   make_command+=" libstdc++ "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
@@ -92,6 +92,8 @@ elif [[ $mode == "target" ]]; then
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
   # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
   make_command+=" linker libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap"
+  # Build the Conscrypt APEX.
+  make_command+=" com.android.conscrypt"
   # Build the i18n APEX.
   make_command+=" com.android.i18n"
   # Build the Time Zone Data APEX.
@@ -108,20 +110,19 @@ echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
 bash -c "$make_command"
 
-
-# Create canonical name -> file name symlink in the symbol directory for the
-# Testing ART APEX.
-#
-# This mimics the logic from `art/Android.mk`. We made the choice not to
-# implement this in `art/Android.mk`, as the Testing ART APEX is a test artifact
-# that should never ship with an actual product, and we try to keep it out of
-# standard build recipes
-#
-# TODO(b/141004137, b/129534335): Remove this, expose the Testing ART APEX in
-# the `art/Android.mk` build logic, and add absence checks (e.g. in
-# `build/make/core/main.mk`) to prevent the Testing ART APEX from ending up in a
-# system image.
 if [[ $mode == "target" ]]; then
+  # Create canonical name -> file name symlink in the symbol directory for the
+  # Testing ART APEX.
+  #
+  # This mimics the logic from `art/Android.mk`. We made the choice not to
+  # implement this in `art/Android.mk`, as the Testing ART APEX is a test artifact
+  # that should never ship with an actual product, and we try to keep it out of
+  # standard build recipes
+  #
+  # TODO(b/141004137, b/129534335): Remove this, expose the Testing ART APEX in
+  # the `art/Android.mk` build logic, and add absence checks (e.g. in
+  # `build/make/core/main.mk`) to prevent the Testing ART APEX from ending up in a
+  # system image.
   target_out_unstripped="$ANDROID_PRODUCT_OUT/symbols"
   link_name="$target_out_unstripped/apex/com.android.art"
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
@@ -131,5 +132,27 @@ if [[ $mode == "target" ]]; then
     cmd="ln -sf $target  $ANDROID_PRODUCT_OUT/symbols/system/bin/$(basename $target)"
     echo "Executing $cmd"
     bash -c "$cmd"
+  done
+
+  # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
+  conscrypt_apex="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
+  conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
+  if [ ! -d "${conscrypt_apex}" ]; then
+    echo -e "Missing conscrypt APEX in build output: ${conscrypt_apex}"
+    exit 1
+  fi
+  for l in lib lib64; do
+    if [ ! -d "${conscrypt_apex}/$l" ]; then
+      continue
+    fi
+    for so in $conscrypt_libs; do
+      src="${conscrypt_apex}/${l}/${so}"
+      dst="$ANDROID_PRODUCT_OUT/system/${l}/${so}"
+      if [ "${src}" -nt "${dst}" ]; then
+        cmd="cp -p \"${src}\" \"${dst}\""
+        echo "Executing $cmd"
+        bash -c "$cmd"
+      fi
+    done
   done
 fi
