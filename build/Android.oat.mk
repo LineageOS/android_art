@@ -44,11 +44,10 @@ define create-core-oat-host-rules
   core_image_name :=
   core_oat_name :=
   core_infix :=
-  core_dex2oat_dependency := $(DEX2OAT_DEPENDENCY)
+  core_dex2oat_dependency := $(DEX2OAT)
 
   ifeq ($(1),optimizing)
     core_compile_options += --compiler-backend=Optimizing
-    core_dex2oat_dependency := $(DEX2OAT)
   endif
   ifeq ($(1),interpreter)
     core_compile_options += --compiler-filter=quicken
@@ -157,13 +156,10 @@ define create-core-oat-target-rules
   core_image_name :=
   core_oat_name :=
   core_infix :=
-  core_dex2oat_dependency := $(DEX2OAT_DEPENDENCY)
+  core_dex2oat_dependency := $(DEX2OAT)
 
   ifeq ($(1),optimizing)
     core_compile_options += --compiler-backend=Optimizing
-    # With the optimizing compiler, we want to rerun dex2oat whenever there is
-    # a dex2oat change to catch regressions early.
-    core_dex2oat_dependency := $(DEX2OAT)
   endif
   ifeq ($(1),interpreter)
     core_compile_options += --compiler-filter=quicken
