@@ -30,6 +30,10 @@
 #include <android-base/strings.h>
 #include <log/log.h>
 
+#if defined(__ANDROID__)
+#include <android/sysprop/VndkProperties.sysprop.h>
+#endif
+
 #include "utils.h"
 
 namespace android::nativeloader {
@@ -322,6 +326,14 @@ const std::string& llndk_libraries() {
 const std::string& vndksp_libraries() {
   static std::string list = InitVndkspLibraries();
   return list;
+}
+
+bool is_product_vndk_version_defined() {
+#if defined(__ANDROID__)
+  return android::sysprop::VndkProperties::product_vndk_version().has_value();
+#else
+  return false;
+#endif
 }
 
 namespace internal {
