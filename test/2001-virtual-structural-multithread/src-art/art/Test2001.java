@@ -25,6 +25,8 @@ import java.util.function.Supplier;
 
 public class Test2001 {
   private static final int NUM_THREADS = 20;
+  // Don't perform more than this many repeats per thread to prevent OOMEs
+  private static final int TASK_COUNT_LIMIT = 1000;
 
   public static class Transform {
     public String greetingEnglish;
@@ -167,14 +169,14 @@ public class Test2001 {
     public MyThread(CountDownLatch delay, int id) {
       super("Thread: " + id);
       this.thr_id = id;
-      this.results = new ArrayList<>(1000);
+      this.results = new ArrayList<>(TASK_COUNT_LIMIT);
       this.finish = false;
       this.delay = delay;
     }
 
     public void run() {
       delay.countDown();
-      while (!finish) {
+      while (!finish && results.size() < TASK_COUNT_LIMIT) {
         Supplier<String> t = mkTransform();
         results.add(t.get());
       }
