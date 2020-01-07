@@ -483,7 +483,7 @@ TEST_P(NativeLoaderTest_Create, UnbundledVendorApp) {
   RunTest();
 }
 
-TEST_P(NativeLoaderTest_Create, BundledProductApp_pre30) {
+TEST_P(NativeLoaderTest_Create, BundledProductApp) {
   dex_path = "/product/app/foo/foo.apk";
   is_shared = true;
 
@@ -493,36 +493,19 @@ TEST_P(NativeLoaderTest_Create, BundledProductApp_pre30) {
   RunTest();
 }
 
-TEST_P(NativeLoaderTest_Create, BundledProductApp_post30) {
-  dex_path = "/product/app/foo/foo.apk";
-  is_shared = true;
-  target_sdk_version = 30;
-
-  expected_namespace_name = "classloader-namespace-shared";
-  expected_namespace_flags |= ANDROID_NAMESPACE_TYPE_SHARED;
-  SetExpectations();
-  RunTest();
-}
-
-TEST_P(NativeLoaderTest_Create, UnbundledProductApp_pre30) {
+TEST_P(NativeLoaderTest_Create, UnbundledProductApp) {
   dex_path = "/product/app/foo/foo.apk";
   is_shared = false;
-  SetExpectations();
-  RunTest();
-}
 
-TEST_P(NativeLoaderTest_Create, UnbundledProductApp_post30) {
-  dex_path = "/product/app/foo/foo.apk";
-  is_shared = false;
-  target_sdk_version = 30;
-
-  expected_namespace_name = "vendor-classloader-namespace";
-  expected_library_path = expected_library_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
-  expected_permitted_path =
-      expected_permitted_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
-  expected_shared_libs_to_platform_ns =
-      expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
-  expected_link_with_vndk_ns = true;
+  if (is_product_vndk_version_defined()) {
+    expected_namespace_name = "vendor-classloader-namespace";
+    expected_library_path = expected_library_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
+    expected_permitted_path =
+        expected_permitted_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
+    expected_shared_libs_to_platform_ns =
+        expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
+    expected_link_with_vndk_ns = true;
+  }
   SetExpectations();
   RunTest();
 }
