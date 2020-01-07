@@ -156,4 +156,7 @@ DEBUG_ART_APEX := com.android.art.debug
 # Testing ART APEX, used in ART device testing.
 TESTING_ART_APEX := com.android.art.testing
 
+# Conscrypt APEX
+CONSCRYPT_APEX := com.android.conscrypt
+
 endif # ART_ANDROID_COMMON_PATH_MK
