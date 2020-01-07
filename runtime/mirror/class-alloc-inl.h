@@ -46,13 +46,19 @@ inline void Class::CheckObjectAlloc() {
   DCHECK_GE(this->object_size_, sizeof(Object));
 }
 
-template<bool kIsInstrumented, bool kCheckAddFinalizer>
+template<bool kIsInstrumented, Class::AddFinalizer kAddFinalizer, bool kCheckAddFinalizer>
 inline ObjPtr<Object> Class::Alloc(Thread* self, gc::AllocatorType allocator_type) {
   CheckObjectAlloc();
   gc::Heap* heap = Runtime::Current()->GetHeap();
-  const bool add_finalizer = kCheckAddFinalizer && IsFinalizable();
-  if (!kCheckAddFinalizer) {
-    DCHECK(!IsFinalizable());
+  bool add_finalizer;
+  switch (kAddFinalizer) {
+    case Class::AddFinalizer::kUseClassTag:
+      add_finalizer = IsFinalizable();
+      break;
+    case Class::AddFinalizer::kNoAddFinalizer:
+      add_finalizer = false;
+      DCHECK(!kCheckAddFinalizer || !IsFinalizable());
+      break;
   }
   // Note that the `this` pointer may be invalidated after the allocation.
   ObjPtr<Object> obj =
