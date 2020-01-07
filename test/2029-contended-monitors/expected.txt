@@ -1,0 +1,10 @@
+Starting
+Atomic increments
+Hold time 2, shared lock
+Hold time 20, shared lock
+Hold time 200, shared lock
+Hold time 2000, shared lock
+Hold time 20000, shared lock
+Hold time 200000, shared lock
+Hold for 2 msecs while sleeping, shared lock
+Hold for 2 msecs while sleeping, private lock
