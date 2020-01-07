@@ -1351,15 +1351,21 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
       thread->GetJniEnv()->SetFunctionsToRuntimeShutdownFunctions();
     }
   }
-  // If we have any daemons left, wait 200ms to ensure they are not stuck in a place where they
-  // are about to access runtime state and are not in a runnable state. Examples: Monitor code
-  // or waking up from a condition variable. TODO: Try and see if there is a better way to wait
-  // for daemon threads to be in a blocked state.
-  if (daemons_left > 0) {
-    static constexpr size_t kDaemonSleepTime = 200 * 1000;
-    usleep(kDaemonSleepTime);
+  if (daemons_left == 0) {
+    // No threads left; safe to shut down.
+    return;
   }
-  // Give the threads a chance to suspend, complaining if they're slow.
+  // There is not a clean way to shut down if we have daemons left. We have no mechanism for
+  // killing them and reclaiming thread stacks. We also have no mechanism for waiting until they
+  // have truly finished touching the memory we are about to deallocate. We do the best we can with
+  // timeouts.
+  //
+  // If we have any daemons left, wait until they are (a) suspended and (b) they are not stuck
+  // in a place where they are about to access runtime state and are not in a runnable state.
+  // We attempt to do the latter by just waiting long enough for things to
+  // quiesce. Examples: Monitor code or waking up from a condition variable.
+  //
+  // Give the threads a chance to suspend, complaining if they're slow. (a)
   bool have_complained = false;
   static constexpr size_t kTimeoutMicroseconds = 2000 * 1000;
   static constexpr size_t kSleepMicroseconds = 1000;
@@ -1378,6 +1384,26 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
       }
     }
     if (all_suspended) {
+      // Wait again for all the now "suspended" threads to actually quiesce. (b)
+      static constexpr size_t kDaemonSleepTime = 200 * 1000;
+      usleep(kDaemonSleepTime);
+      std::list<Thread*> list_copy;
+      {
+        MutexLock mu(self, *Locks::thread_list_lock_);
+        // Half-way through the wait, set the "runtime deleted" flag, causing any newly awoken
+        // threads to immediately go back to sleep without touching memory. This prevents us from
+        // touching deallocated memory, but it also prevents mutexes from getting released. Thus we
+        // only do this once we're reasonably sure that no system mutexes are still held.
+        for (const auto& thread : list_) {
+          DCHECK(thread == self || thread->GetState() != kRunnable);
+          thread->GetJniEnv()->SetRuntimeDeleted();
+          // Possibly contended Mutex acquisitions are unsafe after this.
+          // Releasing thread_list_lock_ is OK, since it can't block.
+        }
+      }
+      // Finally wait for any threads woken before we set the "runtime deleted" flags to finish
+      // touching memory.
+      usleep(kDaemonSleepTime);
       return;
     }
     usleep(kSleepMicroseconds);

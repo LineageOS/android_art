@@ -61,6 +61,28 @@ static bool ComputeRelativeTimeSpec(timespec* result_ts, const timespec& lhs, co
 }
 #endif
 
+#if ART_USE_FUTEXES
+// If we wake up from a futex wake, and the runtime disappeared while we were asleep,
+// it's important to stop in our tracks before we touch deallocated memory.
+static inline void SleepIfRuntimeDeleted(Thread* self) {
+  if (self != nullptr) {
+    JNIEnvExt* const env = self->GetJniEnv();
+    if (UNLIKELY(env != nullptr && env->IsRuntimeDeleted())) {
+      DCHECK(self->IsDaemon());
+      // If the runtime has been deleted, then we cannot proceed. Just sleep forever. This may
+      // occur for user daemon threads that get a spurious wakeup. This occurs for test 132 with
+      // --host and --gdb.
+      // After we wake up, the runtime may have been shutdown, which means that this condition may
+      // have been deleted. It is not safe to retry the wait.
+      SleepForever();
+    }
+  }
+}
+#else
+// We should be doing this for pthreads to, but it seems to be impossible for something
+// like a condition variable wait. Thus we don't bother trying.
+#endif
+
 // Wait for an amount of time that roughly increases in the argument i.
 // Spin for small arguments and yield/sleep for longer ones.
 static void BackOff(uint32_t i) {
@@ -80,6 +102,34 @@ static void BackOff(uint32_t i) {
   } else {
     NanoSleep(1000ull * (i - kYieldMax));
   }
+}
+
+// Wait until pred(testLoc->load(std::memory_order_relaxed)) holds, or until a
+// short time interval, on the order of kernel context-switch time, passes.
+// Return true if the predicate test succeeded, false if we timed out.
+template<typename Pred>
+static inline bool WaitBrieflyFor(AtomicInteger* testLoc, Thread* self, Pred pred) {
+  // TODO: Tune these parameters correctly. BackOff(3) should take on the order of 100 cycles. So
+  // this should result in retrying <= 10 times, usually waiting around 100 cycles each. The
+  // maximum delay should be significantly less than the expected futex() context switch time, so
+  // there should be little danger of this worsening things appreciably. If the lock was only
+  // held briefly by a running thread, this should help immensely.
+  static constexpr uint32_t kMaxBackOff = 3;  // Should probably be <= kSpinMax above.
+  static constexpr uint32_t kMaxIters = 50;
+  JNIEnvExt* const env = self == nullptr ? nullptr : self->GetJniEnv();
+  for (uint32_t i = 1; i <= kMaxIters; ++i) {
+    BackOff(std::min(i, kMaxBackOff));
+    if (pred(testLoc->load(std::memory_order_relaxed))) {
+      return true;
+    }
+    if (UNLIKELY(env != nullptr && env->IsRuntimeDeleted())) {
+      // This returns true once we've started shutting down. We then try to reach a quiescent
+      // state as soon as possible to avoid touching data that may be deallocated by the shutdown
+      // process. It currently relies on a timeout.
+      return false;
+    }
+  }
+  return false;
 }
 
 class ScopedAllMutexesLock final {
@@ -381,24 +431,35 @@ void Mutex::ExclusiveLock(Thread* self) {
       } else {
         // Failed to acquire, hang up.
         ScopedContentionRecorder scr(this, SafeGetTid(self), GetExclusiveOwnerTid());
-        // Increment contender count. We can't create enough threads for this to overflow.
-        increment_contenders();
-        // Make cur_state again reflect the expected value of state_and_contenders.
-        cur_state += kContenderIncrement;
-        if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
-          self->CheckEmptyCheckpointFromMutex();
-        }
-        if (futex(state_and_contenders_.Address(), FUTEX_WAIT_PRIVATE, cur_state,
-                  nullptr, nullptr, 0) != 0) {
-          // We only went to sleep after incrementing and contenders and checking that the lock
-          // is still held by someone else.
-          // EAGAIN and EINTR both indicate a spurious failure, try again from the beginning.
-          // We don't use TEMP_FAILURE_RETRY so we can intentionally retry to acquire the lock.
-          if ((errno != EAGAIN) && (errno != EINTR)) {
-            PLOG(FATAL) << "futex wait failed for " << name_;
+        // Empirically, it appears important to spin again each time through the loop; if we
+        // bother to go to sleep and wake up, we should be fairly persistent in trying for the
+        // lock.
+        if (!WaitBrieflyFor(&state_and_contenders_, self,
+                            [](int32_t v) { return (v & kHeldMask) == 0; })) {
+          // Increment contender count. We can't create enough threads for this to overflow.
+          increment_contenders();
+          // Make cur_state again reflect the expected value of state_and_contenders.
+          cur_state += kContenderIncrement;
+          if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
+            self->CheckEmptyCheckpointFromMutex();
           }
+          do {
+            if (futex(state_and_contenders_.Address(), FUTEX_WAIT_PRIVATE, cur_state,
+                      nullptr, nullptr, 0) != 0) {
+              // We only went to sleep after incrementing and contenders and checking that the
+              // lock is still held by someone else.  EAGAIN and EINTR both indicate a spurious
+              // failure, try again from the beginning.  We don't use TEMP_FAILURE_RETRY so we can
+              // intentionally retry to acquire the lock.
+              if ((errno != EAGAIN) && (errno != EINTR)) {
+                PLOG(FATAL) << "futex wait failed for " << name_;
+              }
+            }
+            SleepIfRuntimeDeleted(self);
+            // Retry until not held. In heavy contention situations we otherwise get redundant
+            // futex wakeups as a result of repeatedly decrementing and incrementing contenders.
+          } while ((state_and_contenders_.load(std::memory_order_relaxed) & kHeldMask) != 0);
+          decrement_contenders();
         }
-        decrement_contenders();
       }
     } while (!done);
     // Confirm that lock is now held.
@@ -406,7 +467,8 @@ void Mutex::ExclusiveLock(Thread* self) {
 #else
     CHECK_MUTEX_CALL(pthread_mutex_lock, (&mutex_));
 #endif
-    DCHECK_EQ(GetExclusiveOwnerTid(), 0);
+    DCHECK_EQ(GetExclusiveOwnerTid(), 0) << " my tid = " << SafeGetTid(self)
+                                         << " recursive_ = " << recursive_;
     exclusive_owner_.store(SafeGetTid(self), std::memory_order_relaxed);
     RegisterAsLocked(self);
   }
@@ -458,6 +520,48 @@ bool Mutex::ExclusiveTryLock(Thread* self) {
   }
   return true;
 }
+
+bool Mutex::ExclusiveTryLockWithSpinning(Thread* self) {
+  // Spin a small number of times, since this affects our ability to respond to suspension
+  // requests. We spin repeatedly only if the mutex repeatedly becomes available and unavailable
+  // in rapid succession, and then we will typically not spin for the maximal period.
+  const int kMaxSpins = 5;
+  for (int i = 0; i < kMaxSpins; ++i) {
+    if (ExclusiveTryLock(self)) {
+      return true;
+    }
+#if ART_USE_FUTEXES
+    if (!WaitBrieflyFor(&state_and_contenders_, self,
+            [](int32_t v) { return (v & kHeldMask) == 0; })) {
+      return false;
+    }
+#endif
+  }
+  return ExclusiveTryLock(self);
+}
+
+#if ART_USE_FUTEXES
+void Mutex::ExclusiveLockUncontendedFor(Thread* new_owner) {
+  DCHECK_EQ(level_, kMonitorLock);
+  DCHECK(!recursive_);
+  state_and_contenders_.store(kHeldMask, std::memory_order_relaxed);
+  recursion_count_ = 1;
+  exclusive_owner_.store(SafeGetTid(new_owner), std::memory_order_relaxed);
+  // Don't call RegisterAsLocked(). It wouldn't register anything anyway.  And
+  // this happens as we're inflating a monitor, which doesn't logically affect
+  // held "locks"; it effectively just converts a thin lock to a mutex.  By doing
+  // this while the lock is already held, we're delaying the acquisition of a
+  // logically held mutex, which can introduce bogus lock order violations.
+}
+
+void Mutex::ExclusiveUnlockUncontended() {
+  DCHECK_EQ(level_, kMonitorLock);
+  state_and_contenders_.store(0, std::memory_order_relaxed);
+  recursion_count_ = 0;
+  exclusive_owner_.store(0 /* pid */, std::memory_order_relaxed);
+  // Skip RegisterAsUnlocked(), which wouldn't do anything anyway.
+}
+#endif  // ART_USE_FUTEXES
 
 void Mutex::ExclusiveUnlock(Thread* self) {
   if (kIsDebugBuild && self != nullptr && self != Thread::Current()) {
@@ -589,18 +693,21 @@ void ReaderWriterMutex::ExclusiveLock(Thread* self) {
     } else {
       // Failed to acquire, hang up.
       ScopedContentionRecorder scr(this, SafeGetTid(self), GetExclusiveOwnerTid());
-      num_contenders_.fetch_add(1);
-      if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
-        self->CheckEmptyCheckpointFromMutex();
-      }
-      if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, nullptr, nullptr, 0) != 0) {
-        // EAGAIN and EINTR both indicate a spurious failure, try again from the beginning.
-        // We don't use TEMP_FAILURE_RETRY so we can intentionally retry to acquire the lock.
-        if ((errno != EAGAIN) && (errno != EINTR)) {
-          PLOG(FATAL) << "futex wait failed for " << name_;
+      if (!WaitBrieflyFor(&state_, self, [](int32_t v) { return v == 0; })) {
+        num_contenders_.fetch_add(1);
+        if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
+          self->CheckEmptyCheckpointFromMutex();
         }
+        if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, nullptr, nullptr, 0) != 0) {
+          // EAGAIN and EINTR both indicate a spurious failure, try again from the beginning.
+          // We don't use TEMP_FAILURE_RETRY so we can intentionally retry to acquire the lock.
+          if ((errno != EAGAIN) && (errno != EINTR)) {
+            PLOG(FATAL) << "futex wait failed for " << name_;
+          }
+        }
+        SleepIfRuntimeDeleted(self);
+        num_contenders_.fetch_sub(1);
       }
-      num_contenders_.fetch_sub(1);
     }
   } while (!done);
   DCHECK_EQ(state_.load(std::memory_order_relaxed), -1);
@@ -665,22 +772,25 @@ bool ReaderWriterMutex::ExclusiveLockWithTimeout(Thread* self, int64_t ms, int32
         return false;  // Timed out.
       }
       ScopedContentionRecorder scr(this, SafeGetTid(self), GetExclusiveOwnerTid());
-      num_contenders_.fetch_add(1);
-      if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
-        self->CheckEmptyCheckpointFromMutex();
-      }
-      if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, &rel_ts, nullptr, 0) != 0) {
-        if (errno == ETIMEDOUT) {
-          num_contenders_.fetch_sub(1);
-          return false;  // Timed out.
-        } else if ((errno != EAGAIN) && (errno != EINTR)) {
-          // EAGAIN and EINTR both indicate a spurious failure,
-          // recompute the relative time out from now and try again.
-          // We don't use TEMP_FAILURE_RETRY so we can recompute rel_ts;
-          PLOG(FATAL) << "timed futex wait failed for " << name_;
+      if (!WaitBrieflyFor(&state_, self, [](int32_t v) { return v == 0; })) {
+        num_contenders_.fetch_add(1);
+        if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
+          self->CheckEmptyCheckpointFromMutex();
         }
+        if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, &rel_ts, nullptr, 0) != 0) {
+          if (errno == ETIMEDOUT) {
+            num_contenders_.fetch_sub(1);
+            return false;  // Timed out.
+          } else if ((errno != EAGAIN) && (errno != EINTR)) {
+            // EAGAIN and EINTR both indicate a spurious failure,
+            // recompute the relative time out from now and try again.
+            // We don't use TEMP_FAILURE_RETRY so we can recompute rel_ts;
+            PLOG(FATAL) << "timed futex wait failed for " << name_;
+          }
+        }
+        SleepIfRuntimeDeleted(self);
+        num_contenders_.fetch_sub(1);
       }
-      num_contenders_.fetch_sub(1);
     }
   } while (!done);
 #else
@@ -706,16 +816,19 @@ bool ReaderWriterMutex::ExclusiveLockWithTimeout(Thread* self, int64_t ms, int32
 void ReaderWriterMutex::HandleSharedLockContention(Thread* self, int32_t cur_state) {
   // Owner holds it exclusively, hang up.
   ScopedContentionRecorder scr(this, SafeGetTid(self), GetExclusiveOwnerTid());
-  num_contenders_.fetch_add(1);
-  if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
-    self->CheckEmptyCheckpointFromMutex();
-  }
-  if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, nullptr, nullptr, 0) != 0) {
-    if (errno != EAGAIN && errno != EINTR) {
-      PLOG(FATAL) << "futex wait failed for " << name_;
+  if (!WaitBrieflyFor(&state_, self, [](int32_t v) { return v >= 0; })) {
+    num_contenders_.fetch_add(1);
+    if (UNLIKELY(should_respond_to_empty_checkpoint_request_)) {
+      self->CheckEmptyCheckpointFromMutex();
     }
+    if (futex(state_.Address(), FUTEX_WAIT_PRIVATE, cur_state, nullptr, nullptr, 0) != 0) {
+      if (errno != EAGAIN && errno != EINTR) {
+        PLOG(FATAL) << "futex wait failed for " << name_;
+      }
+    }
+    SleepIfRuntimeDeleted(self);
+    num_contenders_.fetch_sub(1);
   }
-  num_contenders_.fetch_sub(1);
 }
 #endif
 
@@ -895,18 +1008,7 @@ void ConditionVariable::WaitHoldingLocks(Thread* self) {
       PLOG(FATAL) << "futex wait failed for " << name_;
     }
   }
-  if (self != nullptr) {
-    JNIEnvExt* const env = self->GetJniEnv();
-    if (UNLIKELY(env != nullptr && env->IsRuntimeDeleted())) {
-      CHECK(self->IsDaemon());
-      // If the runtime has been deleted, then we cannot proceed. Just sleep forever. This may
-      // occur for user daemon threads that get a spurious wakeup. This occurs for test 132 with
-      // --host and --gdb.
-      // After we wake up, the runtime may have been shutdown, which means that this condition may
-      // have been deleted. It is not safe to retry the wait.
-      SleepForever();
-    }
-  }
+  SleepIfRuntimeDeleted(self);
   guard_.ExclusiveLock(self);
   CHECK_GT(num_waiters_, 0);
   num_waiters_--;
@@ -948,6 +1050,7 @@ bool ConditionVariable::TimedWait(Thread* self, int64_t ms, int32_t ns) {
       PLOG(FATAL) << "timed futex wait failed for " << name_;
     }
   }
+  SleepIfRuntimeDeleted(self);
   guard_.ExclusiveLock(self);
   CHECK_GT(num_waiters_, 0);
   num_waiters_--;

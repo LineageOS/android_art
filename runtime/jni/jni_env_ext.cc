@@ -90,7 +90,6 @@ JNIEnvExt::JNIEnvExt(Thread* self_in, JavaVMExt* vm_in, std::string* error_msg)
 
 void JNIEnvExt::SetFunctionsToRuntimeShutdownFunctions() {
   functions = GetRuntimeShutdownNativeInterface();
-  runtime_deleted_ = true;
 }
 
 JNIEnvExt::~JNIEnvExt() {
