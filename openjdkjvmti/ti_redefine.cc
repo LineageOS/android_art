@@ -1131,6 +1131,10 @@ bool Redefiner::ClassRedefinition::CheckRedefinable() {
   jvmtiError res;
   if (driver_->type_ == RedefinitionType::kStructural && this->IsStructuralRedefinition()) {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kStructural>(h_klass, &err);
+    if (res == OK && HasVirtualMembers() && h_klass->IsFinalizable()) {
+      res = ERR(INTERNAL);
+      err = "Cannot redefine finalizable objects at this time.";
+    }
   } else {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(h_klass, &err);
   }
@@ -1746,21 +1750,7 @@ bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
                        [&](auto class_pair) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                          return class_pair.first == hinstance->GetClass();
                        }));
-    // Make sure when allocating the new instance we don't add it's finalizer since we will directly
-    // replace the old object in the finalizer reference. If we added it here to we would call
-    // finalize twice.
-    // NB If a type is changed from being non-finalizable to finalizable the finalizers on any
-    //    objects created before the redefine will never be called. This is (sort of) allowable by
-    //    the spec and greatly simplifies implementation.
-    // TODO Make it so we will always call all finalizers, even if the object when it was created
-    // wasn't finalizable. To do this we need to be careful of handling failure correctly and making
-    // sure that objects aren't finalized multiple times and that instances of failed redefinitions
-    // aren't finalized.
-    art::ObjPtr<art::mirror::Object> new_instance(
-        new_type->Alloc</*kIsInstrumented=*/true,
-                        art::mirror::Class::AddFinalizer::kNoAddFinalizer,
-                        /*kCheckAddFinalizer=*/false>(
-            driver_->self_, driver_->runtime_->GetHeap()->GetCurrentAllocator()));
+    art::ObjPtr<art::mirror::Object> new_instance(new_type->AllocObject(driver_->self_));
     if (new_instance.IsNull()) {
       driver_->self_->AssertPendingOOMException();
       driver_->self_->ClearException();

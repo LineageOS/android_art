@@ -1,3 +1,0 @@
-Finalizing
-start_counter: 1
-Finish_counter: 1
