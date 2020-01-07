@@ -818,9 +818,11 @@ genrule {
 genrule {
     name: "libart_mterp.x86_64ng",
     out: ["mterp_x86_64ng.S"],
-    srcs: ["interpreter/mterp/x86_64ng/*.S",
-           "interpreter/mterp/x86_64/arithmetic.S",
-           "interpreter/mterp/x86_64/floating_point.S"],
+    srcs: [
+        "interpreter/mterp/x86_64ng/*.S",
+        "interpreter/mterp/x86_64/arithmetic.S",
+        "interpreter/mterp/x86_64/floating_point.S",
+    ],
     tool_files: [
         "interpreter/mterp/gen_mterp.py",
         "interpreter/mterp/common/gen_setup.py",
