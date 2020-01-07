@@ -1,0 +1,21 @@
+Initial: class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading field BAR using (ID: 2) MethodHandle()Object = (ID: 3) value of <BAR FIELD>
+Redefining Transform class
+Post redefinition : class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: null]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading field BAR using (ID: 2) MethodHandle()Object = (ID: 3) value of <BAR FIELD>
+Reading new field BAZ using (ID: 4) MethodHandle()Object = (ID: 5) <NULL>
+Reading new field FOO using (ID: 6) MethodHandle()Object = (ID: 1) value of <FOO FIELD>
+Reading new field BAR using (ID: 7) MethodHandle()Object = (ID: 3) value of <BAR FIELD>
+Setting BAZ to (ID: 8) foo with new mh.
+Post set with new mh: class art.Test1981$Transform[FOO: value of <FOO FIELD>, BAR: value of <BAR FIELD>, BAZ: foo]
+Setting FOO to (ID: 9) class art.Test1981$Transform with old mh.
+Post set with old mh: class art.Test1981$Transform[FOO: class art.Test1981$Transform, BAR: value of <BAR FIELD>, BAZ: foo]
+Using mh to call new private method.
+Post reinit with mh: class art.Test1981$Transform[FOO: class art.Test1981$Transform, BAR: value of <BAR FIELD>, BAZ: 42]
+Reading field FOO using (ID: 0) MethodHandle()Object = (ID: 9) class art.Test1981$Transform
+Reading field BAR using (ID: 2) MethodHandle()Object = (ID: 3) value of <BAR FIELD>
+Reading new field BAZ using (ID: 4) MethodHandle()Object = (ID: 10) 42
+Reading new field FOO using (ID: 6) MethodHandle()Object = (ID: 9) class art.Test1981$Transform
+Reading new field BAR using (ID: 7) MethodHandle()Object = (ID: 3) value of <BAR FIELD>
