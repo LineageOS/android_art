@@ -527,19 +527,134 @@ PRIVATE_BIONIC_FILES := \
   lib64/bootstrap/libdl.so \
   lib64/bootstrap/libdl_android.so \
 
+PRIVATE_ART_APEX_DEPENDENCY_FILES := \
+  bin/dalvikvm32 \
+  bin/dalvikvm64 \
+  bin/dalvikvm \
+  bin/dex2oat \
+  bin/dex2oatd \
+
 PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
-  lib/libnativebridge.so \
-  lib64/libnativebridge.so \
-  lib/libnativehelper.so \
-  lib64/libnativehelper.so \
-  lib/libdexfile_external.so \
-  lib64/libdexfile_external.so \
-  lib/libdexfiled_external.so \
-  lib64/libdexfiled_external.so \
-  lib/libnativeloader.so \
-  lib64/libnativeloader.so \
+  lib/libadbconnectiond.so \
+  lib/libadbconnection_server.so \
+  lib/libadbconnection.so \
+  lib/libandroidicu.so \
   lib/libandroidio.so \
+  lib/libartbased.so \
+  lib/libartbase.so \
+  lib/libart-compiler.so \
+  lib/libartd-compiler.so \
+  lib/libartd-dexlayout.so \
+  lib/libartd-disassembler.so \
+  lib/libart-dexlayout.so \
+  lib/libart-disassembler.so \
+  lib/libartd.so \
+  lib/libartpalette.so \
+  lib/libart.so \
+  lib/libbacktrace.so \
+  lib/libbase.so \
+  lib/libcrypto.so \
+  lib/libdexfiled_external.so \
+  lib/libdexfiled.so \
+  lib/libdexfile_external.so \
+  lib/libdexfile.so \
+  lib/libdexfile_support.so \
+  lib/libdt_fd_forward.so \
+  lib/libdt_socket.so \
+  lib/libexpat.so \
+  lib/libicui18n.so \
+  lib/libicu_jni.so \
+  lib/libicuuc.so \
+  lib/libjavacore.so \
+  lib/libjdwp.so \
+  lib/liblzma.so \
+  lib/libmeminfo.so \
+  lib/libnativebridge.so \
+  lib/libnativehelper.so \
+  lib/libnativeloader.so \
+  lib/libnpt.so \
+  lib/libopenjdkd.so \
+  lib/libopenjdkjvmd.so \
+  lib/libopenjdkjvm.so \
+  lib/libopenjdkjvmtid.so \
+  lib/libopenjdkjvmti.so \
+  lib/libopenjdk.so \
+  lib/libpac.so \
+  lib/libperfetto_hprofd.so \
+  lib/libperfetto_hprof.so \
+  lib/libprocinfo.so \
+  lib/libprofiled.so \
+  lib/libprofile.so \
+  lib/libsigchain.so \
+  lib/libunwindstack.so \
+  lib/libvixld.so \
+  lib/libvixl.so \
+  lib/libziparchive.so \
+  lib/libz.so \
+  lib64/libadbconnectiond.so \
+  lib64/libadbconnection_server.so \
+  lib64/libadbconnection.so \
+  lib64/libandroidicu.so \
   lib64/libandroidio.so \
+  lib64/libartbased.so \
+  lib64/libartbase.so \
+  lib64/libart-compiler.so \
+  lib64/libartd-compiler.so \
+  lib64/libartd-dexlayout.so \
+  lib64/libartd-disassembler.so \
+  lib64/libart-dexlayout.so \
+  lib64/libart-disassembler.so \
+  lib64/libartd.so \
+  lib64/libartpalette.so \
+  lib64/libart.so \
+  lib64/libbacktrace.so \
+  lib64/libbase.so \
+  lib64/libcrypto.so \
+  lib64/libdexfiled_external.so \
+  lib64/libdexfiled.so \
+  lib64/libdexfile_external.so \
+  lib64/libdexfile.so \
+  lib64/libdexfile_support.so \
+  lib64/libdt_fd_forward.so \
+  lib64/libdt_socket.so \
+  lib64/libexpat.so \
+  lib64/libicui18n.so \
+  lib64/libicu_jni.so \
+  lib64/libicuuc.so \
+  lib64/libjavacore.so \
+  lib64/libjdwp.so \
+  lib64/liblzma.so \
+  lib64/libmeminfo.so \
+  lib64/libnativebridge.so \
+  lib64/libnativehelper.so \
+  lib64/libnativeloader.so \
+  lib64/libnpt.so \
+  lib64/libopenjdkd.so \
+  lib64/libopenjdkjvmd.so \
+  lib64/libopenjdkjvm.so \
+  lib64/libopenjdkjvmtid.so \
+  lib64/libopenjdkjvmti.so \
+  lib64/libopenjdk.so \
+  lib64/libpac.so \
+  lib64/libperfetto_hprofd.so \
+  lib64/libperfetto_hprof.so \
+  lib64/libprocinfo.so \
+  lib64/libprofiled.so \
+  lib64/libprofile.so \
+  lib64/libsigchain.so \
+  lib64/libunwindstack.so \
+  lib64/libvixld.so \
+  lib64/libvixl.so \
+  lib64/libziparchive.so \
+  lib64/libz.so \
+
+PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
+  lib/libcrypto.so \
+  lib/libjavacrypto.so \
+  lib/libssl.so \
+  lib64/libcrypto.so \
+  lib64/libjavacrypto.so \
+  lib64/libssl.so \
 
 # Generate copies of Bionic bootstrap artifacts and ART APEX
 # libraries in the `system` (TARGET_OUT) directory. This is dangerous
@@ -560,26 +675,39 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
 #   `$(TARGET_OUT)/../apex/com.android.art.debug` (the local
 #   directory under the build tree containing the (Debug) ART APEX
 #   artifacts, which is not sync'd to the target).
+# - Libraries from the Conscrypt APEX may be loaded during golem runs.
 #
 # This target is only used by Golem now.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
 .PHONY: standalone-apex-files
-standalone-apex-files: libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap linker $(DEBUG_ART_APEX)
+standalone-apex-files: libc.bootstrap \
+                       libdl.bootstrap \
+                       libdl_android.bootstrap \
+                       libm.bootstrap \
+                       linker \
+                       $(DEBUG_ART_APEX) \
+                       $(CONSCRYPT_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
 	done
 	if [ "x$(TARGET_FLATTEN_APEX)" = xtrue ]; then \
-	  art_apex_orig_dir=$(TARGET_OUT)/apex/$(DEBUG_ART_APEX); \
+          apex_orig_dir=$(TARGET_OUT)/apex; \
 	else \
-	  art_apex_orig_dir=$(TARGET_OUT)/../apex/$(DEBUG_ART_APEX); \
+          apex_orig_dir=""; \
 	fi; \
-	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS); do \
+	art_apex_orig_dir=$$apex_orig_dir/$(DEBUG_ART_APEX); \
+	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES); do \
 	  tf="$$art_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
-	done
+	  if [ -f $$tf ]; then cp -fH $$tf $(TARGET_OUT)/$$f; fi; \
+	done; \
+	conscrypt_apex_orig_dir=$$apex_orig_dir/$(CONSCRYPT_APEX); \
+	for f in $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS); do \
+	  tf="$$conscrypt_apex_orig_dir/$$f"; \
+	  if [ -f $$tf ]; then cp -fH $$tf $(TARGET_OUT)/$$f; fi; \
+	done; \
 
 ########################################################################
 # Phony target for only building what go/lem requires for pushing ART on /data.
@@ -629,6 +757,7 @@ build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(TARGET_CORE_IMG_OUT_BASE).art \
                         $(TARGET_CORE_IMG_OUT_BASE)-interpreter.art \
+                        libartpalette-system \
                         libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap \
                         icu-data-art-test-i18n \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
