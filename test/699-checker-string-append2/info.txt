@@ -1,0 +1,1 @@
+Regression tests for String append pattern recognition bugs. b/146014745
