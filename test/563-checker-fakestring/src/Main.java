@@ -22,6 +22,7 @@ public class Main {
   class Inner {}
 
   public static native void assertIsInterpreted();
+  public static native void ensureJitCompiled(Class<?> cls, String methodName);
 
   public static void assertEqual(String expected, String actual) {
     if (!expected.equals(actual)) {
@@ -53,6 +54,8 @@ public class Main {
     }
 
     {
+      // If the JIT is enabled, ensure it has compiled the method to force the deopt.
+      ensureJitCompiled(c, "deoptimizeNewInstance");
       Method m = c.getMethod("deoptimizeNewInstance", int[].class, byte[].class);
       try {
         m.invoke(null, new Object[] { new int[] { 1, 2, 3 }, testData });
@@ -114,6 +117,8 @@ public class Main {
       assertEqual(testString, result);
     }
     {
+      // If the JIT is enabled, ensure it has compiled the method to force the deopt.
+      ensureJitCompiled(c, "deoptimizeNewInstanceAfterLoop");
       Method m = c.getMethod(
           "deoptimizeNewInstanceAfterLoop", int[].class, byte[].class, int.class);
       try {
