@@ -533,6 +533,7 @@ PRIVATE_ART_APEX_DEPENDENCY_FILES := \
   bin/dalvikvm \
   bin/dex2oat \
   bin/dex2oatd \
+  bin/dexdump \
 
 PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libadbconnectiond.so \
@@ -667,7 +668,7 @@ PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
 # - Bionic bootstrap libraries, copied from
 #   `$(TARGET_OUT)/lib(64)/bootstrap` (the `/system/lib(64)/bootstrap`
 #   directory to be sync'd to the target);
-# - Some libraries which are part of the ART APEX; if the product
+# - Programs and libraries from the ART APEX; if the product
 #   to build uses flattened APEXes, these libraries are copied from
 #   `$(TARGET_OUT)/apex/com.android.art.debug` (the flattened
 #   (Debug) ART APEX directory to be sync'd to the target);
@@ -678,6 +679,10 @@ PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
 # - Libraries from the Conscrypt APEX may be loaded during golem runs.
 #
 # This target is only used by Golem now.
+#
+# NB Android build does not use cp from:
+#  $ANDROID_BUILD_TOP/prebuilts/build-tools/path/{linux-x86,darwin-x86}
+# which has a non-standard set of command-line flags.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
@@ -701,12 +706,16 @@ standalone-apex-files: libc.bootstrap \
 	art_apex_orig_dir=$$apex_orig_dir/$(DEBUG_ART_APEX); \
 	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES); do \
 	  tf="$$art_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -fH $$tf $(TARGET_OUT)/$$f; fi; \
+	  df="$(TARGET_OUT)/$$f"; \
+	  if [ -f $$tf ]; then \
+            if [ -h $$df ]; then rm $$df; fi; \
+            cp -fd $$tf $$df; \
+          fi; \
 	done; \
 	conscrypt_apex_orig_dir=$$apex_orig_dir/$(CONSCRYPT_APEX); \
 	for f in $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS); do \
 	  tf="$$conscrypt_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -fH $$tf $(TARGET_OUT)/$$f; fi; \
+	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
 	done; \
 
 ########################################################################
