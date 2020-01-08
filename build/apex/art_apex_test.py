@@ -51,6 +51,12 @@ ARCHS = ["arm", "arm64", "x86", "x86_64"]
 # package.
 ART_TEST_DIR = 'bin/art'
 
+
+# Test if a given variable is set to a string "true".
+def isEnvTrue(var):
+  return var in os.environ and os.environ[var] == 'true'
+
+
 class FSObject:
   def __init__(self, name, is_dir, is_exec, is_symlink, size):
     self.name = name
@@ -509,6 +515,9 @@ class ReleaseChecker:
     self._checker.check_java_library('core-libart')
     self._checker.check_java_library('core-oj')
     self._checker.check_java_library('okhttp')
+    if isEnvTrue('EMMA_INSTRUMENT_FRAMEWORK'):
+      # In coverage builds jacoco is added to the list of ART apex jars.
+      self._checker.check_java_library('jacocoagent')
 
     # Check internal native libraries for Managed Core Library.
     self._checker.check_native_library('libjavacore')
@@ -542,17 +551,16 @@ class ReleaseChecker:
     self._checker.check_optional_native_library('libclang_rt.hwasan*')
     self._checker.check_optional_native_library('libclang_rt.ubsan*')
 
-    # Check dexpreopt files for libcore bootclasspath jars, unless this is a
-    # coverage build with EMMA_INSTRUMENT_FRAMEWORK=true (in that case we do not
-    # generate dexpreopt files because ART boot jars depend on framework and
-    # cannot be dexpreopted in isolation).
-    if 'EMMA_INSTRUMENT_FRAMEWORK' not in os.environ or not os.environ['EMMA_INSTRUMENT_FRAMEWORK']:
-      self._checker.check_dexpreopt('boot')
-      self._checker.check_dexpreopt('boot-apache-xml')
-      self._checker.check_dexpreopt('boot-bouncycastle')
-      self._checker.check_dexpreopt('boot-core-icu4j')
-      self._checker.check_dexpreopt('boot-core-libart')
-      self._checker.check_dexpreopt('boot-okhttp')
+    # Check dexpreopt files for libcore bootclasspath jars.
+    self._checker.check_dexpreopt('boot')
+    self._checker.check_dexpreopt('boot-apache-xml')
+    self._checker.check_dexpreopt('boot-bouncycastle')
+    self._checker.check_dexpreopt('boot-core-icu4j')
+    self._checker.check_dexpreopt('boot-core-libart')
+    self._checker.check_dexpreopt('boot-okhttp')
+    if isEnvTrue('EMMA_INSTRUMENT_FRAMEWORK'):
+      # In coverage builds the ART boot image includes jacoco.
+      self._checker.check_dexpreopt('boot-jacocoagent')
 
 class ReleaseTargetChecker:
   def __init__(self, checker):
