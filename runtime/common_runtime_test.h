@@ -221,6 +221,12 @@ class CheckJniAbortCatcher {
   DISALLOW_COPY_AND_ASSIGN(CheckJniAbortCatcher);
 };
 
+#define TEST_DISABLED() \
+  do { \
+    printf("WARNING: TEST DISABLED\n"); \
+    return; \
+  } while (false)
+
 #define TEST_DISABLED_FOR_ARM() \
   if (kRuntimeISA == InstructionSet::kArm || kRuntimeISA == InstructionSet::kThumb2) { \
     printf("WARNING: TEST DISABLED FOR ARM\n"); \
