@@ -497,7 +497,7 @@ void GraphChecker::VisitInstruction(HInstruction* instruction) {
   }
 
   // Ensure that reference type instructions have reference type info.
-  if (instruction->GetType() == DataType::Type::kReference) {
+  if (check_reference_type_info_ && instruction->GetType() == DataType::Type::kReference) {
     if (!instruction->GetReferenceTypeInfo().IsValid()) {
       AddError(StringPrintf("Reference type instruction %s:%d does not have "
                             "valid reference type information.",
