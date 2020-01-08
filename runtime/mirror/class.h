@@ -498,8 +498,21 @@ class MANAGED Class final : public Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool IsPrimitiveArray() REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Enum used to control whether we try to add a finalizer-reference for object alloc or not.
+  enum class AddFinalizer {
+    // Don't create a finalizer reference regardless of what the class-flags say.
+    kNoAddFinalizer,
+    // Use the class-flags to figure out if we should make a finalizer reference.
+    kUseClassTag,
+  };
+
   // Creates a raw object instance but does not invoke the default constructor.
-  template<bool kIsInstrumented = true, bool kCheckAddFinalizer = true>
+  // kCheckAddFinalizer controls whether we use a DCHECK to sanity check that we create a
+  // finalizer-reference if needed. This should only be disabled when doing structural class
+  // redefinition.
+  template <bool kIsInstrumented = true,
+            AddFinalizer kAddFinalizer = AddFinalizer::kUseClassTag,
+            bool kCheckAddFinalizer = true>
   ALWAYS_INLINE ObjPtr<Object> Alloc(Thread* self, gc::AllocatorType allocator_type)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
