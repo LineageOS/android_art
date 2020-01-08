@@ -415,6 +415,10 @@ class AssemblerMIPS64Test : public AssemblerTest<mips64::Mips64Assembler,
 };
 
 TEST_F(AssemblerMIPS64Test, Toolchain) {
+  // This test is disabled as `gcc` (used as MIPS64 assembler, see
+  // `AssemblerMIPS64Test.GetAssemblerCmdName`) is being removed from Android
+  // (see b/147336214 and b/147240075).
+  TEST_DISABLED();
   EXPECT_TRUE(CheckTools());
 }
 
