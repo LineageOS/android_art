@@ -2509,6 +2509,9 @@ DEFINE_FUNCTION art_quick_update_inline_cache
 #if (INLINE_CACHE_SIZE != 5)
 #error "INLINE_CACHE_SIZE not as expected."
 #endif
+    // Don't update the cache if we are marking.
+    cmpl LITERAL(0), %fs:THREAD_IS_GC_MARKING_OFFSET
+    jnz .Lret
     PUSH ecx
     movl %eax, %ecx // eax will be used for cmpxchg
 .Lentry1:
@@ -2554,6 +2557,7 @@ DEFINE_FUNCTION art_quick_update_inline_cache
     // Restore registers
     movl %ecx, %eax
     POP ecx
+.Lret:
     ret
 END_FUNCTION art_quick_update_inline_cache
 
