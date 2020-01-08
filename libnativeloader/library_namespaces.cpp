@@ -173,7 +173,8 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   std::string namespace_name = kClassloaderNamespaceName;
   bool unbundled_vendor_or_product_app = false;
   if ((apk_origin == APK_ORIGIN_VENDOR ||
-       (apk_origin == APK_ORIGIN_PRODUCT && target_sdk_version > 29)) &&
+       (apk_origin == APK_ORIGIN_PRODUCT &&
+        is_product_vndk_version_defined())) &&
       !is_shared) {
     unbundled_vendor_or_product_app = true;
     // For vendor / product apks, give access to the vendor / product lib even though

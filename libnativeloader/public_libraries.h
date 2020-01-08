@@ -39,6 +39,10 @@ const std::string& neuralnetworks_public_libraries();
 const std::string& llndk_libraries();
 const std::string& vndksp_libraries();
 
+// Returns true if libnativeloader is running on devices and the device has
+// ro.product.vndk.version property. It returns falso for host.
+bool is_product_vndk_version_defined();
+
 // These are exported for testing
 namespace internal {
 

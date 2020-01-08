@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <atomic>
 #include <iosfwd>
 #include <list>
 #include <vector>
@@ -129,12 +130,14 @@ class Monitor {
 
   void SetObject(ObjPtr<mirror::Object> object);
 
-  Thread* GetOwner() const NO_THREAD_SAFETY_ANALYSIS {
-    return owner_;
+  // Provides no memory ordering guarantees.
+  Thread* GetOwner() const {
+    return owner_.load(std::memory_order_relaxed);
   }
 
   int32_t GetHashCode();
 
+  // Is the monitor currently locked? Debug only, provides no memory ordering guarantees.
   bool IsLocked() REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!monitor_lock_);
 
   bool HasHashCode() const {
@@ -176,7 +179,7 @@ class Monitor {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Install the monitor into its object, may fail if another thread installs a different monitor
-  // first.
+  // first. Monitor remains in the same logical state as before, i.e. held the same # of times.
   bool Install(Thread* self)
       REQUIRES(!monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -189,7 +192,10 @@ class Monitor {
   // this routine.
   void RemoveFromWaitSet(Thread* thread) REQUIRES(monitor_lock_);
 
-  void SignalContendersAndReleaseMonitorLock(Thread* self) RELEASE(monitor_lock_);
+  // Release the monitor lock and signal a waiting thread that has been notified and now needs the
+  // lock. Assumes the monitor lock is held exactly once, and the owner_ field has been reset to
+  // null. Caller may be suspended (Wait) or runnable (MonitorExit).
+  void SignalWaiterAndReleaseMonitorLock(Thread* self) RELEASE(monitor_lock_);
 
   // Changes the shape of a monitor from thin to fat, preserving the internal lock state. The
   // calling thread must own the lock or the owner must be suspended. There's a race with other
@@ -210,37 +216,33 @@ class Monitor {
                            uint32_t expected_owner_thread_id,
                            uint32_t found_owner_thread_id,
                            Monitor* mon)
-      REQUIRES(!Locks::thread_list_lock_,
-               !monitor_lock_)
+      REQUIRES(!Locks::thread_list_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try to lock without blocking, returns true if we acquired the lock.
-  bool TryLock(Thread* self)
-      REQUIRES(!monitor_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  // Variant for already holding the monitor lock.
-  bool TryLockLocked(Thread* self)
-      REQUIRES(monitor_lock_)
+  // If spin is true, then we spin for a short period before failing.
+  bool TryLock(Thread* self, bool spin = false)
+      TRY_ACQUIRE(true, monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   template<LockReason reason = LockReason::kForLock>
   void Lock(Thread* self)
-      REQUIRES(!monitor_lock_)
+      ACQUIRE(monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool Unlock(Thread* thread)
-      REQUIRES(!monitor_lock_)
+      RELEASE(monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   static void DoNotify(Thread* self, ObjPtr<mirror::Object> obj, bool notify_all)
       REQUIRES_SHARED(Locks::mutator_lock_) NO_THREAD_SAFETY_ANALYSIS;  // For mon->Notify.
 
   void Notify(Thread* self)
-      REQUIRES(!monitor_lock_)
+      REQUIRES(monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   void NotifyAll(Thread* self)
-      REQUIRES(!monitor_lock_)
+      REQUIRES(monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   static std::string PrettyContentionInfo(const std::string& owner_name,
@@ -270,7 +272,7 @@ class Monitor {
   // Since we're allowed to wake up "early", we clamp extremely long durations to return at the end
   // of the 32-bit time epoch.
   void Wait(Thread* self, int64_t msec, int32_t nsec, bool interruptShouldThrow, ThreadState why)
-      REQUIRES(!monitor_lock_)
+      REQUIRES(monitor_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Translates the provided method and pc into its declaring class' source file and line number.
@@ -279,7 +281,17 @@ class Monitor {
                                 int32_t* line_number)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Provides no memory ordering guarantees.
   uint32_t GetOwnerThreadId() REQUIRES(!monitor_lock_);
+
+  // Set locking_method_ and locking_dex_pc_ corresponding to owner's current stack.
+  // owner is either self or suspended.
+  void SetLockingMethod(Thread* owner) REQUIRES(monitor_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // The same, but without checking for a proxy method. Currently requires owner == self.
+  void SetLockingMethodNoProxy(Thread* owner) REQUIRES(monitor_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Support for systrace output of monitor operations.
   ALWAYS_INLINE static void AtraceMonitorLock(Thread* self,
@@ -294,19 +306,27 @@ class Monitor {
 
   static uint32_t lock_profiling_threshold_;
   static uint32_t stack_dump_lock_profiling_threshold_;
+  static bool capture_method_eagerly_;
 
+  // Holding the monitor N times is represented by holding monitor_lock_ N times.
   Mutex monitor_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
 
-  ConditionVariable monitor_contenders_ GUARDED_BY(monitor_lock_);
+  // Pretend to unlock monitor lock.
+  void FakeUnlockMonitorLock() RELEASE(monitor_lock_) NO_THREAD_SAFETY_ANALYSIS {}
 
-  // Number of people waiting on the condition.
-  size_t num_waiters_ GUARDED_BY(monitor_lock_);
+  // Number of threads either waiting on the condition or waiting on a contended
+  // monitor acquisition. Prevents deflation.
+  std::atomic<size_t> num_waiters_;
 
-  // Which thread currently owns the lock?
-  Thread* volatile owner_ GUARDED_BY(monitor_lock_);
+  // Which thread currently owns the lock? monitor_lock_ only keeps the tid.
+  // Only set while holding monitor_lock_. Non-locking readers only use it to
+  // compare to self or for debugging.
+  std::atomic<Thread*> owner_;
 
-  // Owner's recursive lock depth.
-  int lock_count_ GUARDED_BY(monitor_lock_);
+  // Owner's recursive lock depth. Owner_ non-null, and lock_count_ == 0 ==> held once.
+  unsigned int lock_count_ GUARDED_BY(monitor_lock_);
+
+  // Owner's recursive lock depth is given by monitor_lock_.GetDepth().
 
   // What object are we part of. This is a weak root. Do not access
   // this directly, use GetObject() to read it so it will be guarded
@@ -322,11 +342,76 @@ class Monitor {
   // Stored object hash code, generated lazily by GetHashCode.
   AtomicInteger hash_code_;
 
-  // Method and dex pc where the lock owner acquired the lock, used when lock
-  // sampling is enabled. locking_method_ may be null if the lock is currently
-  // unlocked, or if the lock is acquired by the system when the stack is empty.
-  ArtMethod* locking_method_ GUARDED_BY(monitor_lock_);
-  uint32_t locking_dex_pc_ GUARDED_BY(monitor_lock_);
+  // Data structure used to remember the method and dex pc of a recent holder of the
+  // lock. Used for tracing and contention reporting. Setting these is expensive, since it
+  // involves a partial stack walk. We set them only as follows, to minimize the cost:
+  // - If tracing is enabled, they are needed immediately when we first notice contention, so we
+  //   set them unconditionally when a monitor is acquired.
+  // - If contention reporting is enabled, we use the lock_owner_request_ field to have the
+  //   contending thread request them. The current owner then sets them when releasing the monitor,
+  //   making them available when the contending thread acquires the monitor.
+  // - If both are enabled, we blindly do both. This usually prevents us from switching between
+  //   reporting the end and beginning of critical sections for contention logging when tracing is
+  //   enabled.  We expect that tracing overhead is normally much higher than for contention
+  //   logging, so the added cost should be small. It also minimizes glitches when enabling and
+  //   disabling traces.
+  // We're tolerant of missing information. E.g. when tracing is initially turned on, we may
+  // not have the lock holder information if the holder acquired the lock with tracing off.
+  //
+  // We make this data unconditionally atomic; for contention logging all accesses are in fact
+  // protected by the monitor, but for tracing, reads are not. Writes are always
+  // protected by the monitor.
+  //
+  // The fields are always accessed without memory ordering. We store a checksum, and reread if
+  // the checksum doesn't correspond to the values.  This results in values that are correct with
+  // very high probability, but not certainty.
+  //
+  // If we need lock_owner information for a certain thread for contenion logging, we store its
+  // tid in lock_owner_request_. To satisfy the request, we store lock_owner_tid_,
+  // lock_owner_method_, and lock_owner_dex_pc_ and the corresponding checksum while holding the
+  // monitor.
+  //
+  // At all times, either lock_owner_ is zero, the checksum is valid, or a thread is actively
+  // in the process of establishing one of those states. Only one thread at a time can be actively
+  // establishing such a state, since writes are protected by the monitor.
+  std::atomic<Thread*> lock_owner_;  // *lock_owner_ may no longer exist!
+  std::atomic<ArtMethod*> lock_owner_method_;
+  std::atomic<uint32_t> lock_owner_dex_pc_;
+  std::atomic<uintptr_t> lock_owner_sum_;
+
+  // Request lock owner save method and dex_pc. Written asynchronously.
+  std::atomic<Thread*> lock_owner_request_;
+
+  // Compute method, dex pc, and tid "checksum".
+  uintptr_t LockOwnerInfoChecksum(ArtMethod* m, uint32_t dex_pc, Thread* t);
+
+  // Set owning method, dex pc, and tid. owner_ field is set and points to current thread.
+  void SetLockOwnerInfo(ArtMethod* method, uint32_t dex_pc, Thread* t)
+      REQUIRES(monitor_lock_);
+
+  // Get owning method and dex pc for the given thread, if available.
+  void GetLockOwnerInfo(/*out*/ArtMethod** method, /*out*/uint32_t* dex_pc, Thread* t);
+
+  // Do the same, while holding the monitor. There are no concurrent updates.
+  void GetLockOwnerInfoLocked(/*out*/ArtMethod** method, /*out*/uint32_t* dex_pc,
+                              uint32_t thread_id)
+      REQUIRES(monitor_lock_);
+
+  // We never clear lock_owner method and dex pc. Since it often reflects
+  // ownership when we last detected contention, it may be inconsistent with owner_
+  // and not 100% reliable. For lock contention monitoring, in the absence of tracing,
+  // there is a small risk that the current owner may finish before noticing the request,
+  // or the information will be overwritten by another intervening request and monitor
+  // release, so it's also not 100% reliable. But if we report information at all, it
+  // should generally (modulo accidental checksum matches) pertain to to an acquisition of the
+  // right monitor by the right thread, so it's extremely unlikely to be seriously misleading.
+  // Since we track threads by a pointer to the Thread structure, there is a small chance we may
+  // confuse threads allocated at the same exact address, if a contending thread dies before
+  // we inquire about it.
+
+  // Check for and act on a pending lock_owner_request_
+  void CheckLockOwnerRequest(Thread* self)
+      REQUIRES(monitor_lock_) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // The denser encoded version of this monitor as stored in the lock word.
   MonitorId monitor_id_;
