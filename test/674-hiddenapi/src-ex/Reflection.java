@@ -16,6 +16,7 @@
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -186,7 +187,45 @@ public class Reflection {
     }
   }
 
+  public static boolean canDiscoverMethodWithMetaReflection(Class<?> klass, String name,
+      boolean hardeningEnabled) {
+    try {
+      setHiddenApiCheckHardening(hardeningEnabled);
+      Method metaGetDeclaredMethod =
+          Class.class.getDeclaredMethod("getDeclaredMethod", String.class, Class[].class);
+      // Assumes method without parameters.
+      return ((Method)metaGetDeclaredMethod.invoke(klass, name,  null)) != null;
+    } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+      return false;
+    }
+  }
+
+  public static boolean canDiscoverFieldWithMetaReflection(Class<?> klass, String name,
+      boolean hardeningEnabled) {
+    try {
+      setHiddenApiCheckHardening(hardeningEnabled);
+      Method metaGetDeclaredField =
+          Class.class.getDeclaredMethod("getDeclaredField", String.class);
+      return ((Field)metaGetDeclaredField.invoke(klass, name)) != null;
+    } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+      return false;
+    }
+  }
+
+  public static boolean canDiscoverConstructorWithMetaReflection(Class<?> klass, Class<?> args[],
+      boolean hardeningEnabled) {
+    try {
+      setHiddenApiCheckHardening(hardeningEnabled);
+      Method metaGetDeclaredConstructor =
+          Class.class.getDeclaredMethod("getDeclaredConstructor", Class[].class);
+      return ((Constructor<?>)metaGetDeclaredConstructor.invoke(klass, (Object)args)) != null;
+    } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+      return false;
+    }
+  }
+
   private static native int getHiddenApiAccessFlags();
+  private static native void setHiddenApiCheckHardening(boolean value);
 
   public static boolean canObserveFieldHiddenAccessFlags(Class<?> klass, String name)
       throws Exception {
