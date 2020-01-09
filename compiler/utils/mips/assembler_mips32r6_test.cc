@@ -425,6 +425,10 @@ class AssemblerMIPS32r6Test : public AssemblerTest<mips::MipsAssembler,
 
 
 TEST_F(AssemblerMIPS32r6Test, Toolchain) {
+  // This test is disabled as `gcc` (used as MIPS32 assembler, see
+  // `AssemblerMIPS32r6Test.GetAssemblerCmdName`) is being removed from Android
+  // (see b/147336214 and b/147240075).
+  TEST_DISABLED();
   EXPECT_TRUE(CheckTools());
 }
 

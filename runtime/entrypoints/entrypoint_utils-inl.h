@@ -199,14 +199,15 @@ inline ObjPtr<mirror::Object> AllocObjectFromCodeResolved(ObjPtr<mirror::Class> 
       return nullptr;
     }
     gc::Heap* heap = Runtime::Current()->GetHeap();
-    // Pass in false since the object cannot be finalizable.
+    // Pass in kNoAddFinalizer since the object cannot be finalizable.
     // CheckClassInitializedForObjectAlloc can cause thread suspension which means we may now be
     // instrumented.
-    return klass->Alloc</*kInstrumented=*/true, /*kCheckAddFinalizer=*/false>(
+    return klass->Alloc</*kInstrumented=*/true, mirror::Class::AddFinalizer::kNoAddFinalizer>(
         self, heap->GetCurrentAllocator());
   }
-  // Pass in false since the object cannot be finalizable.
-  return klass->Alloc<kInstrumented, /*kCheckAddFinalizer=*/false>(self, allocator_type);
+  // Pass in kNoAddFinalizer since the object cannot be finalizable.
+  return klass->Alloc<kInstrumented,
+                      mirror::Class::AddFinalizer::kNoAddFinalizer>(self, allocator_type);
 }
 
 // Given the context of a calling Method and an initialized class, create an instance.
@@ -216,8 +217,9 @@ inline ObjPtr<mirror::Object> AllocObjectFromCodeInitialized(ObjPtr<mirror::Clas
                                                              Thread* self,
                                                              gc::AllocatorType allocator_type) {
   DCHECK(klass != nullptr);
-  // Pass in false since the object cannot be finalizable.
-  return klass->Alloc<kInstrumented, /*kCheckAddFinalizer=*/false>(self, allocator_type);
+  // Pass in kNoAddFinalizer since the object cannot be finalizable.
+  return klass->Alloc<kInstrumented,
+                      mirror::Class::AddFinalizer::kNoAddFinalizer>(self, allocator_type);
 }
 
 

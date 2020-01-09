@@ -105,6 +105,7 @@
 #include "mirror/dex_cache.h"
 #include "mirror/executable-inl.h"
 #include "mirror/field-inl.h"
+#include "mirror/field.h"
 #include "mirror/method.h"
 #include "mirror/method_handle_impl-inl.h"
 #include "mirror/object.h"
@@ -1131,10 +1132,6 @@ bool Redefiner::ClassRedefinition::CheckRedefinable() {
   jvmtiError res;
   if (driver_->type_ == RedefinitionType::kStructural && this->IsStructuralRedefinition()) {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kStructural>(h_klass, &err);
-    if (res == OK && HasVirtualMembers() && h_klass->IsFinalizable()) {
-      res = ERR(INTERNAL);
-      err = "Cannot redefine finalizable objects at this time.";
-    }
   } else {
     res = Redefiner::GetClassRedefinitionError<RedefinitionType::kNormal>(h_klass, &err);
   }
@@ -1750,7 +1747,21 @@ bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
                        [&](auto class_pair) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                          return class_pair.first == hinstance->GetClass();
                        }));
-    art::ObjPtr<art::mirror::Object> new_instance(new_type->AllocObject(driver_->self_));
+    // Make sure when allocating the new instance we don't add it's finalizer since we will directly
+    // replace the old object in the finalizer reference. If we added it here to we would call
+    // finalize twice.
+    // NB If a type is changed from being non-finalizable to finalizable the finalizers on any
+    //    objects created before the redefine will never be called. This is (sort of) allowable by
+    //    the spec and greatly simplifies implementation.
+    // TODO Make it so we will always call all finalizers, even if the object when it was created
+    // wasn't finalizable. To do this we need to be careful of handling failure correctly and making
+    // sure that objects aren't finalized multiple times and that instances of failed redefinitions
+    // aren't finalized.
+    art::ObjPtr<art::mirror::Object> new_instance(
+        new_type->Alloc</*kIsInstrumented=*/true,
+                        art::mirror::Class::AddFinalizer::kNoAddFinalizer,
+                        /*kCheckAddFinalizer=*/false>(
+            driver_->self_, driver_->runtime_->GetHeap()->GetCurrentAllocator()));
     if (new_instance.IsNull()) {
       driver_->self_->AssertPendingOOMException();
       driver_->self_->ClearException();
@@ -2550,6 +2561,7 @@ void Redefiner::ClassRedefinition::UpdateMethods(art::ObjPtr<art::mirror::Class>
 }
 
 void Redefiner::ClassRedefinition::UpdateFields(art::ObjPtr<art::mirror::Class> mclass) {
+  std::unordered_map<uint32_t, uint32_t> dex_field_index_map;
   // TODO The IFields & SFields pointers should be combined like the methods_ arrays were.
   for (auto fields_iter : {mclass->GetIFields(), mclass->GetSFields()}) {
     for (art::ArtField& field : fields_iter) {
@@ -2562,10 +2574,33 @@ void Redefiner::ClassRedefinition::UpdateFields(art::ObjPtr<art::mirror::Class> 
       const art::dex::FieldId* new_field_id =
           dex_file_->FindFieldId(*new_declaring_id, *new_name_id, *new_type_id);
       CHECK(new_field_id != nullptr);
+      uint32_t new_field_index = dex_file_->GetIndexForFieldId(*new_field_id);
+      // We need to keep track of the changes to the index so we can update any
+      // java.lang.reflect.Field objects that happen to be on the heap.
+      dex_field_index_map[field.GetDexFieldIndex()] = new_field_index;
       // We only need to update the index since the other data in the ArtField cannot be updated.
-      field.SetDexFieldIndex(dex_file_->GetIndexForFieldId(*new_field_id));
+      field.SetDexFieldIndex(new_field_index);
     }
   }
+  // walk the heap to update any java/lang/reflect/Field objects that refer to any of these fields.
+  // TODO We could combine this and do one heap-walk for all redefined classes.
+  art::ObjPtr<art::mirror::Class> reflect_field(art::GetClassRoot<art::mirror::Field>());
+  auto vis = [&](art::ObjPtr<art::mirror::Object> obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+    // j.l.r.Field is a final class.
+    if (obj->GetClass() != reflect_field) {
+      return;
+    }
+    art::ObjPtr<art::mirror::Field> fld(art::down_cast<art::mirror::Field*>(obj.Ptr()));
+    // Only this class is getting new indexs.
+    if (fld->GetDeclaringClass() != mclass) {
+      return;
+    }
+    auto it = dex_field_index_map.find(fld->GetDexFieldIndex());
+    if (it != dex_field_index_map.end()) {
+      fld->SetDexFieldIndex</*kTransactionActive=*/false>(it->second);
+    }
+  };
+  driver_->runtime_->GetHeap()->VisitObjectsPaused(vis);
 }
 
 void Redefiner::ClassRedefinition::CollectNewFieldAndMethodMappings(

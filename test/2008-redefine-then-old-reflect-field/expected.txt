@@ -1,0 +1,2 @@
+PreTransform Field public java.lang.Object art.Test2008$Transform.myField = "bar"
+PostTransform Field public java.lang.Object art.Test2008$Transform.myField = "bar"

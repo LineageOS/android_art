@@ -1,0 +1,4 @@
+Tests that j.l.r.Field objects survive across redefinitions
+
+We had a bug where java.lang.reflect.Field objects would be invalid after the class of the Field
+they are referencing is redefined. This tests that the bug is fixed.

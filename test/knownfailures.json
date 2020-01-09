@@ -1033,6 +1033,7 @@
           "685-shifts",
           "686-get-this",
           "687-deopt",
+          "699-checker-string-append2",
           "706-checker-scheduler",
           "707-checker-invalid-profile",
           "714-invoke-custom-lambda-metafactory",
@@ -1105,7 +1106,7 @@
         ],
         "variant": "jvm",
         "bug": "b/73888836",
-        "description": ["Failing on RI. Needs further investigating."]
+        "description": ["Failing on RI. Needs further investigating. Some of these use smali."]
     },
     {
         "tests": ["530-checker-peel-unroll",
