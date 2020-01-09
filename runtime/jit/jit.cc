@@ -1652,6 +1652,9 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
         pthread_create,
         (&polling_thread, &attr, RunPollingThread, reinterpret_cast<void*>(this)),
         "Methods maps thread");
+  } else {
+    // We need to close the fd otherwise the webview zygote will have problems.
+    fd_methods_.reset();
   }
 
   if (is_zygote || runtime->IsSafeMode()) {
