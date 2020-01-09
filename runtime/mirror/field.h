@@ -42,6 +42,12 @@ class MANAGED Field : public AccessibleObject {
   ALWAYS_INLINE uint32_t GetDexFieldIndex() REQUIRES_SHARED(Locks::mutator_lock_) {
     return GetField32(OFFSET_OF_OBJECT_MEMBER(Field, dex_field_index_));
   }
+  // Public for use by class redefinition code.
+  template<bool kTransactionActive>
+  void SetDexFieldIndex(uint32_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
+    SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, dex_field_index_), idx);
+  }
+
 
   ObjPtr<mirror::Class> GetDeclaringClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -104,11 +110,6 @@ class MANAGED Field : public AccessibleObject {
   template<bool kTransactionActive>
   void SetAccessFlags(uint32_t flags) REQUIRES_SHARED(Locks::mutator_lock_) {
     SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, access_flags_), flags);
-  }
-
-  template<bool kTransactionActive>
-  void SetDexFieldIndex(uint32_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, dex_field_index_), idx);
   }
 
   template<bool kTransactionActive>
