@@ -1204,6 +1204,12 @@
         "description" : ["Test seems to timeout when run with gcstress due to slower unwinding by libbacktrace"]
     },
     {
+        "tests": ["708-jit-cache-churn"],
+        "variant": "jit-on-first-use & gcstress",
+        "bug": "b/147358440",
+        "description" : ["Times out with the combination of gcstress and jit-on-first-use."]
+    },
+    {
         "tests": ["712-varhandle-invocations"],
         "variant": "gcstress",
         "bug": "b/111630237",
