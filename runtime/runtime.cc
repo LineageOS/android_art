@@ -1046,12 +1046,7 @@ void Runtime::InitNonZygoteOrPostFork(
 
   StartSignalCatcher();
 
-  // Start the JDWP thread. If the command-line debugger flags specified "suspend=y",
-  // this will pause the runtime (in the internal debugger implementation), so we probably want
-  // this to come last.
   ScopedObjectAccess soa(Thread::Current());
-  GetRuntimeCallbacks()->StartDebugger();
-
   if (Dbg::IsJdwpAllowed() || IsProfileableFromShell() || IsJavaDebuggable()) {
     std::string err;
     ScopedThreadSuspension sts(Thread::Current(), ThreadState::kNative);
@@ -1066,6 +1061,10 @@ void Runtime::InitNonZygoteOrPostFork(
       SetJniIdType(JniIdType::kPointer);
     }
   }
+  // Start the JDWP thread. If the command-line debugger flags specified "suspend=y",
+  // this will pause the runtime (in the internal debugger implementation), so we probably want
+  // this to come last.
+  GetRuntimeCallbacks()->StartDebugger();
 }
 
 void Runtime::StartSignalCatcher() {
