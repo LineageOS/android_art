@@ -22,8 +22,6 @@ import java.util.concurrent.CountDownLatch;
 public class Test2005 {
   private static final int NUM_THREADS = 20;
   private static final String DEFAULT_VAL = "DEFAULT_VALUE";
-  // Don't perform more than this many repeats per thread to prevent OOMEs
-  private static final int TASK_COUNT_LIMIT = 1000;
 
   public static final class Transform {
     public String greetingEnglish;
@@ -110,14 +108,14 @@ public class Test2005 {
     public MyThread(CountDownLatch delay, int id) {
       super("Thread: " + id);
       this.thr_id = id;
-      this.results = new ArrayList<>(TASK_COUNT_LIMIT);
+      this.results = new HashSet<>();
       this.finish = false;
       this.delay = delay;
     }
 
     public void run() {
       delay.countDown();
-      while (!finish && results.size() < TASK_COUNT_LIMIT) {
+      while (!finish) {
         Transform t = new Transform();
         results.add(t.sayHi());
       }
@@ -140,7 +138,7 @@ public class Test2005 {
       }
     }
 
-    public ArrayList<String> results;
+    public HashSet<String> results;
     public volatile boolean finish;
     public int thr_id;
     public CountDownLatch delay;
