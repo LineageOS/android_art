@@ -747,7 +747,7 @@ java_genrule {
         "907-get-loaded-classes/expected.txt",
         "908-gc-start-finish/expected.txt",
         "910-methods/expected.txt",
-        "911-get-stack-trace/expected.txt",
+        "911-get-stack-trace/expected-cts-version.txt",
         "912-classes/expected.txt",
         "913-heaps/expected.txt",
         "914-hello-obsolescence/expected.txt",
