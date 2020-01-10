@@ -35,31 +35,27 @@ def run_one(cmd, tmpfile):
   with open(tmpfile, "x") as fd:
     return tmpfile, subprocess.run(cmd, stdout=fd).returncode
 
-@contextlib.contextmanager
-def nowait(ppe):
-  """Run a ProcessPoolExecutor and shutdown without waiting."""
-  try:
-    yield ppe
-  finally:
-    ppe.shutdown(False)
-
 def main():
   parser = argparse.ArgumentParser(
-      description="Run a command using multiple cores and save non-zero exit log"
+      description="""Run a command using multiple cores and save non-zero exit log
+
+      The cmd should print all output to stdout. Stderr is not captured."""
   )
   parser.add_argument("--jobs", "-j", type=int, help="max number of jobs. default 60", default=60)
   parser.add_argument("cmd", help="command to run")
   parser.add_argument("--out", type=str, help="where to put result", default="out_log")
   args = parser.parse_args()
   cnt = 0
+  found_fail = False
   ids = itertools.count(0)
   with tempfile.TemporaryDirectory() as td:
     print("Temporary files in {}".format(td))
-    with nowait(concurrent.futures.ProcessPoolExecutor(args.jobs)) as p:
+    with concurrent.futures.ProcessPoolExecutor(args.jobs) as p:
       fs = set()
-      while True:
-        for _, idx in zip(range(args.jobs - len(fs)), ids):
-          fs.add(p.submit(run_one, args.cmd, os.path.join(td, "run_log." + str(idx))))
+      while len(fs) != 0 or not found_fail:
+        if not found_fail:
+          for _, idx in zip(range(args.jobs - len(fs)), ids):
+            fs.add(p.submit(run_one, args.cmd, os.path.join(td, "run_log." + str(idx))))
         ws = concurrent.futures.wait(fs, return_when=concurrent.futures.FIRST_COMPLETED)
         fs = ws.not_done
         done = list(map(lambda a: a.result(), ws.done))
@@ -70,12 +66,14 @@ def main():
         for f in succ:
           os.remove(f)
         if len(failed) != 0:
-          if len(failed) != 1:
-            for f,i in zip(failed, range(len(failed))):
-              shutil.copyfile(f, args.out+"."+str(i))
-          else:
-            shutil.copyfile(failed[0], args.out)
-          break
+          if not found_fail:
+            found_fail = True
+            print("Failed at {} runs".format(cnt))
+            if len(failed) != 1:
+              for f,i in zip(failed, range(len(failed))):
+                shutil.copyfile(f, args.out+"."+str(i))
+            else:
+              shutil.copyfile(failed[0], args.out)
 
 if __name__ == '__main__':
   main()
