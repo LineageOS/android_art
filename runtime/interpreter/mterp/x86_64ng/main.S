@@ -233,7 +233,7 @@ DEFINE_FUNCTION \name
   call \helper
   RESTORE_SAVE_REFS_ONLY_FRAME
   RETURN_OR_DELIVER_PENDING_EXCEPTION
-END_FUNCTION nterp_get_static_field
+END_FUNCTION \name
 .endm
 
 .macro CLEAR_VOLATILE_MARKER reg
@@ -1446,7 +1446,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     // Setup the parameters
     movzwl CODE_ITEM_INS_SIZE_OFFSET(rPC), %r11d
     testl %r11d, %r11d
-    je .Lgpr_setup_finished
+    je .Lxmm_setup_finished
 
     sall $$2, %r11d
     subq %r11, %rbx // rbx is now the offset for inputs into the registers array.

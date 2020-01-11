@@ -79,7 +79,7 @@ inline void ObjectArray<T>::Set(int32_t i, ObjPtr<T> object) {
 template<class T>
 template<bool kTransactionActive, bool kCheckTransaction, VerifyObjectFlags kVerifyFlags>
 inline void ObjectArray<T>::SetWithoutChecks(int32_t i, ObjPtr<T> object) {
-  DCHECK(CheckIsValidIndex<kVerifyFlags>(i));
+  DCHECK(CheckIsValidIndex<kVerifyFlags>(i)) << i << " vs " << GetLength();
   DCHECK(CheckAssignable<static_cast<VerifyObjectFlags>(kVerifyFlags & ~kVerifyThis)>(object));
   SetFieldObject<kTransactionActive, kCheckTransaction, kVerifyFlags>(OffsetOfElement(i), object);
 }
@@ -87,7 +87,7 @@ inline void ObjectArray<T>::SetWithoutChecks(int32_t i, ObjPtr<T> object) {
 template<class T>
 template<bool kTransactionActive, bool kCheckTransaction, VerifyObjectFlags kVerifyFlags>
 inline void ObjectArray<T>::SetWithoutChecksAndWriteBarrier(int32_t i, ObjPtr<T> object) {
-  DCHECK(CheckIsValidIndex<kVerifyFlags>(i));
+  DCHECK(CheckIsValidIndex<kVerifyFlags>(i)) << i << " vs " << GetLength();
   // TODO:  enable this check. It fails when writing the image in ImageWriter::FixupObjectArray.
   // DCHECK(CheckAssignable(object));
   SetFieldObjectWithoutWriteBarrier<kTransactionActive, kCheckTransaction, kVerifyFlags>(
@@ -96,7 +96,7 @@ inline void ObjectArray<T>::SetWithoutChecksAndWriteBarrier(int32_t i, ObjPtr<T>
 
 template<class T> template<VerifyObjectFlags kVerifyFlags, ReadBarrierOption kReadBarrierOption>
 inline ObjPtr<T> ObjectArray<T>::GetWithoutChecks(int32_t i) {
-  DCHECK(CheckIsValidIndex(i));
+  DCHECK(CheckIsValidIndex(i)) << i << " vs " << GetLength();
   return GetFieldObject<T, kVerifyFlags, kReadBarrierOption>(OffsetOfElement(i));
 }
 

@@ -1710,6 +1710,7 @@ bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
       hs.NewHandle(cur_data->GetOldClasses()));
   art::Handle<art::mirror::ObjectArray<art::mirror::Class>> new_classes_arr(
       hs.NewHandle(cur_data->GetNewClasses()));
+  DCHECK_EQ(old_classes_arr->GetLength(), new_classes_arr->GetLength());
   art::Handle<art::mirror::Class> obj_array_class(
       hs.NewHandle(art::GetClassRoot<art::mirror::ObjectArray<art::mirror::Object>>(
           driver_->runtime_->GetClassLinker())));
