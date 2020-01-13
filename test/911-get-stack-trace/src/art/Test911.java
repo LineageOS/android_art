@@ -17,7 +17,13 @@
 package art;
 
 public class Test911 {
+  // CTS Entrypoint. We don't want to run 'AllTraces' since it breaks everytime somebody adds a new
+  // thread, which happens somewhat regularly.
   public static void run() throws Exception {
+    run(false);
+  }
+
+  public static void run(boolean known_thread_env) throws Exception {
     Thread t = new Thread("Test911") {
       @Override
       public void run() {
@@ -34,7 +40,9 @@ public class Test911 {
 
           System.out.println();
 
-          AllTraces.doTest();
+          if (known_thread_env) {
+            AllTraces.doTest();
+          }
 
           System.out.println();
 
