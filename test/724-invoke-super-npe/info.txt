@@ -1,0 +1,1 @@
+Regression test for implict null checks on invoke-super and invoke-super-range.
