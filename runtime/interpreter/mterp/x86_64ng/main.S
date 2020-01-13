@@ -266,6 +266,55 @@ END_FUNCTION \name
     jmp 2b
 .endm
 
+// Setup the stack to start executing the method. Expects:
+// - rdi to contain the ArtMethod
+// - rbx, r10, r11 to be available.
+//
+// Outputs
+// - rbx contains the dex registers size
+// - r11 contains the old stack pointer.
+.macro SETUP_STACK_FRAME code_item, refs, fp, cfi_refs
+    // Fetch dex register size.
+    movzwl CODE_ITEM_REGISTERS_SIZE_OFFSET(\code_item), %ebx
+    // Fetch outs size.
+    movzwq CODE_ITEM_OUTS_SIZE_OFFSET(\code_item), \refs
+
+    // Compute required frame size for dex registers: ((2 * ebx) + refs)
+    leaq (\refs, %rbx, 2), %r11
+    salq $$2, %r11
+
+    // Compute new stack pointer in r10: add 24 for saving the previous frame,
+    // pc, and method being executed.
+    leaq -24(%rsp), %r10
+    subq %r11, %r10
+    // Alignment
+    andq $$-16, %r10
+
+    // Set reference and dex registers.
+    leaq 24(%r10, \refs, 4), \refs
+    leaq (\refs, %rbx, 4), \fp
+
+    // Now setup the stack pointer.
+    movq %rsp, %r11
+    CFI_DEF_CFA_REGISTER(r11)
+    movq %r10, %rsp
+    movq %r11, -8(\refs)
+    CFI_DEFINE_CFA_DEREF(\cfi_refs, -8, (6 + 4 + 1) * 8)
+
+    // Put nulls in reference frame.
+    testl %ebx, %ebx
+    je 2f
+    movq \refs, %r10
+1:
+    movl $$0, (%r10)
+    addq $$4, %r10
+    cmpq %r10, \fp
+    jne 1b
+2:
+    // Save the ArtMethod.
+    movq %rdi, (%rsp)
+.endm
+
 // Puts the next floating point argument into the expected register,
 // fetching values based on a non-range invoke.
 // Uses rax as temporary.
@@ -740,54 +789,10 @@ END_FUNCTION \name
    // are called by compiled code or nterp.
    SPILL_ALL_CALLEE_SAVES
 
-   movq %rsp, %r11
-   CFI_DEF_CFA_REGISTER(r11)
-
-   // From this point:
-   // - rax contains code item
-   // - rdi contains method
-   // - r11 contains saved stack pointer.
-
-   // Create space for registers * 2. Set rFP and rRefs.
-   movzwl CODE_ITEM_REGISTERS_SIZE_OFFSET(%rax), %ecx
-   sall MACRO_LITERAL(2), %ecx
-   subq %rcx, %rsp
-   movq %rsp, rNEW_FP
-   subq %rcx, %rsp
-   movq %rsp, rNEW_REFS
-
-   // Put nulls in reference frame.
-   testl %ecx, %ecx
-   je 2f
-   movq rNEW_REFS, %rcx
-1:
-   movl MACRO_LITERAL(0), (%rcx)
-   addq MACRO_LITERAL(4), %rcx
-   cmpq %rcx, rNEW_FP
-   jne 1b
-2:
-   // Create space for the previous frame, saved dex pc, and method being called
-   subq MACRO_LITERAL(24), %rsp
-
-   // TODO: We could get rid of the two lines below if we preserve r11 until we copy
-   // rNEW_REFS to rREFS. (We currently do because we use it for copying parameters.
-   // We should move the alignment and rewrite the parameter copy so that we do not
-   // need r11 for that and still preserve r11.)
-   //
-   // Save the previous frame.
-   movq %r11, -8(rNEW_REFS)
-   CFI_DEFINE_CFA_DEREF(CFI_NEW_REFS, -8, (6 + 4 + 1) * 8)
-
-   // Take space for outs.
-   movzwl CODE_ITEM_OUTS_SIZE_OFFSET(%rax), %ecx
-   sall MACRO_LITERAL(2), %ecx
-   subq %rcx, %rsp
-
-   // Align stack pointer to 16.
-   andq MACRO_LITERAL(-16), %rsp
-
-   // Save the ArtMethod.
-   movq %rdi, (%rsp)
+   // Setup the frame.
+   SETUP_STACK_FRAME %rax, rNEW_REFS, rNEW_FP, CFI_NEW_REFS
+   // Make r11 point to the top of the dex register array.
+   leaq (rNEW_FP, %rbx, 4), %r11
 
    // Fetch instruction information before replacing rPC.
    movzbl 1(rPC), %edi
@@ -1384,7 +1389,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     call SYMBOL(NterpGetCodeItem)
     movq %rax, rPC
 
-    // Restore xmm registers _ alignment.
+    // Restore xmm registers + alignment.
     movq 0(%rsp), %xmm0
     movq 8(%rsp), %xmm1
     movq 16(%rsp), %xmm2
@@ -1404,55 +1409,20 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     POP rdi
     // TODO: Get shorty in a better way and remove above
 
-    movq %rsp, %r14  // Save stack pointer
-    CFI_DEF_CFA_REGISTER(r14)
-
-    // Create space for registers * 2. Set rFP and rRefs.
-    movzwl CODE_ITEM_REGISTERS_SIZE_OFFSET(rPC), %ebx
-    sall $$2, %ebx
-    subq %rbx, %rsp
-    movq %rsp, rFP
-    subq %rbx, %rsp
-    movq %rsp, rREFS
-    // Put nulls in reference frame.
-    testl %ebx, %ebx
-    je .Ldone_clearing_references
-    movq rREFS, %r11
-.Lclear_references:
-    movl $$0, (%r11)
-    addq $$4, %r11
-    cmpq %r11, rFP
-    jne .Lclear_references
-.Ldone_clearing_references:
-
-    // Create space for the previous frame, saved pc, and method being called
-    subq $$24, %rsp
-
-    // Save the previous frame.
-    movq %r14, -8(rREFS)
-    CFI_DEFINE_CFA_DEREF(CFI_REFS, -8, (6 + 4 + 1) * 8)
-
-    // Take space for outs.
-    movzwl CODE_ITEM_OUTS_SIZE_OFFSET(rPC), %r11d
-    sall $$2, %r11d
-    subq %r11, %rsp
-
-    // Align stack pointer to 16.
-    andq $$-16, %rsp
-
-    // Save the ArtMethod.
-    movq %rdi, (%rsp)
+    // Setup the stack for executing the method.
+    SETUP_STACK_FRAME rPC, rREFS, rFP, CFI_REFS
 
     // Setup the parameters
-    movzwl CODE_ITEM_INS_SIZE_OFFSET(rPC), %r11d
-    testl %r11d, %r11d
+    movzwl CODE_ITEM_INS_SIZE_OFFSET(rPC), %r14d
+    testl %r14d, %r14d
     je .Lxmm_setup_finished
 
-    sall $$2, %r11d
-    subq %r11, %rbx // rbx is now the offset for inputs into the registers array.
+    subq %r14, %rbx
+    salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
 
-    // Available r11, rbx, rdi, r10
     testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+
+    // Available: rdi, r10, r14
     // Note the leaq below don't change the flags.
     leaq 1(%rbp), %r10  // shorty + 1  ; ie skip return arg character
     leaq (rFP, %rbx, 1), %rdi
@@ -1462,30 +1432,30 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     movl %esi, (%rbx)
     addq $$4, %rdi
     addq $$4, %rbx
-    addq $$4, %r14
-    movq $$0, %r11
+    addq $$4, %r11
+    movq $$0, %r14
     jmp .Lcontinue_setup_gprs
 .Lhandle_static_method:
-    movq $$0, %r11
-    LOOP_OVER_SHORTY_STORING_GPRS rsi, esi, r10, r11, rdi, rbx, .Lgpr_setup_finished
+    movq $$0, %r14
+    LOOP_OVER_SHORTY_STORING_GPRS rsi, esi, r10, r14, rdi, rbx, .Lgpr_setup_finished
 .Lcontinue_setup_gprs:
-    LOOP_OVER_SHORTY_STORING_GPRS rdx, edx, r10, r11, rdi, rbx, .Lgpr_setup_finished
-    LOOP_OVER_SHORTY_STORING_GPRS rcx, ecx, r10, r11, rdi, rbx, .Lgpr_setup_finished
-    LOOP_OVER_SHORTY_STORING_GPRS r8, r8d, r10, r11, rdi, rbx, .Lgpr_setup_finished
-    LOOP_OVER_SHORTY_STORING_GPRS r9, r9d, r10, r11, rdi, rbx, .Lgpr_setup_finished
-    LOOP_OVER_INTs r10, r11, rdi, rbx, r14, .Lgpr_setup_finished
+    LOOP_OVER_SHORTY_STORING_GPRS rdx, edx, r10, r14, rdi, rbx, .Lgpr_setup_finished
+    LOOP_OVER_SHORTY_STORING_GPRS rcx, ecx, r10, r14, rdi, rbx, .Lgpr_setup_finished
+    LOOP_OVER_SHORTY_STORING_GPRS r8, r8d, r10, r14, rdi, rbx, .Lgpr_setup_finished
+    LOOP_OVER_SHORTY_STORING_GPRS r9, r9d, r10, r14, rdi, rbx, .Lgpr_setup_finished
+    LOOP_OVER_INTs r10, r14, rdi, rbx, r11, .Lgpr_setup_finished
 .Lgpr_setup_finished:
     leaq 1(%rbp), %r10  // shorty + 1  ; ie skip return arg character
-    movq $$0, %r11 // reset counter
-    LOOP_OVER_SHORTY_STORING_XMMS xmm0, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm1, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm2, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm3, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm4, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm5, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm6, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_SHORTY_STORING_XMMS xmm7, r10, r11, rdi, .Lxmm_setup_finished
-    LOOP_OVER_FPs r10, r11, rdi, r14, .Lxmm_setup_finished
+    movq $$0, %r14 // reset counter
+    LOOP_OVER_SHORTY_STORING_XMMS xmm0, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm1, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm2, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm3, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm4, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm5, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm6, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_SHORTY_STORING_XMMS xmm7, r10, r14, rdi, .Lxmm_setup_finished
+    LOOP_OVER_FPs r10, r14, rdi, r11, .Lxmm_setup_finished
 .Lxmm_setup_finished:
     // Set the dex pc pointer.
     addq $$CODE_ITEM_INSNS_OFFSET, rPC
