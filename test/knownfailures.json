@@ -1205,9 +1205,9 @@
     },
     {
         "tests": ["708-jit-cache-churn"],
-        "variant": "jit-on-first-use & gcstress",
+        "variant": "gcstress",
         "bug": "b/147358440",
-        "description" : ["Times out with the combination of gcstress and jit-on-first-use."]
+        "description" : ["Times out under gcstress since https://r.android.com/1200060."]
     },
     {
         "tests": ["712-varhandle-invocations"],
