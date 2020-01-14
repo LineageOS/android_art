@@ -2311,6 +2311,9 @@ DEFINE_FUNCTION art_quick_update_inline_cache
 #if (INLINE_CACHE_SIZE != 5)
 #error "INLINE_CACHE_SIZE not as expected."
 #endif
+    // Don't update the cache if we are marking.
+    cmpl LITERAL(0), %gs:THREAD_IS_GC_MARKING_OFFSET
+    jnz .Ldone
 .Lentry1:
     movl INLINE_CACHE_CLASSES_OFFSET(%r11), %eax
     cmpl %edi, %eax
