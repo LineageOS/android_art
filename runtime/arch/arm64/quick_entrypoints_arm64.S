@@ -2856,6 +2856,8 @@ ENTRY art_quick_update_inline_cache
 #if (INLINE_CACHE_SIZE != 5)
 #error "INLINE_CACHE_SIZE not as expected."
 #endif
+    // Don't update the cache if we are marking.
+    cbnz wMR, .Ldone
 .Lentry1:
     ldr w9, [x8, #INLINE_CACHE_CLASSES_OFFSET]
     cmp w9, w0
