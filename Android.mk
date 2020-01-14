@@ -581,8 +581,6 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libopenjdkjvmti.so \
   lib/libopenjdk.so \
   lib/libpac.so \
-  lib/libperfetto_hprofd.so \
-  lib/libperfetto_hprof.so \
   lib/libprocinfo.so \
   lib/libprofiled.so \
   lib/libprofile.so \
