@@ -50,7 +50,6 @@ namespace openjdkjvmti {
   ::openjdkjvmti::JvmtiLogMessage((env),                     \
                                   __FILE__,                  \
                                   __LINE__,                  \
-                                  ::android::base::DEFAULT,  \
                                   SEVERITY_LAMBDA(severity), \
                                   _LOG_TAG_INTERNAL,         \
                                   -1)
@@ -60,12 +59,11 @@ class JvmtiLogMessage {
   JvmtiLogMessage(jvmtiEnv* env,
                   const char* file,
                   unsigned int line,
-                  android::base::LogId id,
                   android::base::LogSeverity severity,
                   const char* tag,
                   int error)
       : env_(ArtJvmTiEnv::AsArtJvmTiEnv(env)),
-        real_log_(file, line, id, severity, tag, error),
+        real_log_(file, line, severity, tag, error),
         real_log_stream_(real_log_.stream()) {
     DCHECK(env_ != nullptr);
   }
