@@ -43,6 +43,8 @@ namespace art {
  *    | registers    |      On x86 and x64 this includes the return address,
  *    |              |      already spilled on entry.
  *    ----------------
+ *    |  alignment   |      Stack aligment of kStackAlignment.
+ *    ----------------
  *    |              |      Contains `registers_size` entries (of size 4) from
  *    |    dex       |      the code item information of the method.
  *    |  registers   |
@@ -57,8 +59,6 @@ namespace art {
  *    ----------------      registers array for easy access from nterp when returning.
  *    |  dex_pc_ptr  |      Pointer to the dex instruction being executed.
  *    ----------------      Stored whenever nterp goes into the runtime.
- *    |  alignment   |      Stack aligment of kStackAlignment. TODO: try to move
- *    ----------------      this below the callee-save registers.
  *    |              |      In case nterp calls compiled code, we reserve space
  *    |     out      |      for out registers. This space will be used for
  *    |   registers  |      arguments passed on stack.
@@ -118,25 +118,29 @@ QuickMethodFrameInfo NterpFrameInfo(ArtMethod** frame) {
 uintptr_t NterpGetRegistersArray(ArtMethod** frame) {
   CodeItemDataAccessor accessor((*frame)->DexInstructionData());
   const uint16_t num_regs = accessor.RegistersSize();
-  // The registers array is just below the frame entry.
-  return reinterpret_cast<uintptr_t>(frame) + NterpGetFrameSize(*frame) -
-      NterpGetFrameEntrySize() -
-      (num_regs * kVRegSize);
+  // The registers array is just above the reference array.
+  return NterpGetReferenceArray(frame) + (num_regs * kVRegSize);
 }
 
 uintptr_t NterpGetReferenceArray(ArtMethod** frame) {
   CodeItemDataAccessor accessor((*frame)->DexInstructionData());
-  const uint16_t num_regs = accessor.RegistersSize();
-  // The references array is just below the registers array.
-  return NterpGetRegistersArray(frame) - (num_regs * kVRegSize);
+  const uint16_t out_regs = accessor.OutsSize();
+  // The references array is just above the saved frame pointer.
+  return reinterpret_cast<uintptr_t>(frame) +
+      kPointerSize +  // method
+      (out_regs * kVRegSize) +  // out arguments
+      kPointerSize +  // saved dex pc
+      kPointerSize;  // previous frame.
 }
 
 uint32_t NterpGetDexPC(ArtMethod** frame) {
-  uintptr_t dex_pc_ptr = NterpGetReferenceArray(frame) -
-      kPointerSize -  // saved previous frame
-      kPointerSize;   // saved dex pc
-  CodeItemInstructionAccessor accessor((*frame)->DexInstructions());
-  return *reinterpret_cast<const uint16_t**>(dex_pc_ptr) - accessor.Insns();
+  CodeItemDataAccessor accessor((*frame)->DexInstructionData());
+  const uint16_t out_regs = accessor.OutsSize();
+  uintptr_t dex_pc_ptr = reinterpret_cast<uintptr_t>(frame) +
+      kPointerSize +  // method
+      (out_regs * kVRegSize);  // out arguments
+  CodeItemInstructionAccessor instructions((*frame)->DexInstructions());
+  return *reinterpret_cast<const uint16_t**>(dex_pc_ptr) - instructions.Insns();
 }
 
 uint32_t NterpGetVReg(ArtMethod** frame, uint16_t vreg) {

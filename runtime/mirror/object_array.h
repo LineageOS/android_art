@@ -180,7 +180,7 @@ class ArrayIter : public std::iterator<std::forward_iterator_tag, ObjPtr<T>> {
     CheckIdx();
     return *this;
   }
-  Iter operator++(int) const NO_THREAD_SAFETY_ANALYSIS {
+  Iter operator++(int) NO_THREAD_SAFETY_ANALYSIS {
     Iter res(this);
     idx_++;
     CheckIdx();

@@ -1711,6 +1711,7 @@ bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
   art::Handle<art::mirror::ObjectArray<art::mirror::Class>> new_classes_arr(
       hs.NewHandle(cur_data->GetNewClasses()));
   DCHECK_EQ(old_classes_arr->GetLength(), new_classes_arr->GetLength());
+  DCHECK_GT(old_classes_arr->GetLength(), 0);
   art::Handle<art::mirror::Class> obj_array_class(
       hs.NewHandle(art::GetClassRoot<art::mirror::ObjectArray<art::mirror::Object>>(
           driver_->runtime_->GetClassLinker())));
@@ -1742,12 +1743,15 @@ bool Redefiner::ClassRedefinition::CollectAndCreateNewInstances(
     int32_t i = pair.second;
     auto iterator = art::ZipLeft(old_classes_arr.Iterate<art::mirror::Class>(),
                                  new_classes_arr.Iterate<art::mirror::Class>());
-    auto [_, new_type] =
-        *(std::find_if(iterator.begin(),
-                       iterator.end(),
-                       [&](auto class_pair) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-                         return class_pair.first == hinstance->GetClass();
-                       }));
+    auto it = std::find_if(iterator.begin(),
+                           iterator.end(),
+                           [&](auto class_pair) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+                             return class_pair.first == hinstance->GetClass();
+                           });
+    DCHECK(it != iterator.end()) << "Unable to find class pair for "
+                                 << hinstance->GetClass()->PrettyClass() << " (instance " << i
+                                 << ")";
+    auto [_, new_type] = *it;
     // Make sure when allocating the new instance we don't add it's finalizer since we will directly
     // replace the old object in the finalizer reference. If we added it here to we would call
     // finalize twice.
@@ -1875,6 +1879,7 @@ bool Redefiner::ClassRedefinition::FinishNewClassAllocations(RedefinitionDataHol
         old_types.push_back(hs.NewHandle(obj->AsClass()));
       }
     });
+    DCHECK_GT(old_types.size(), 0u) << "Expected to find at least old_klass!";
     VLOG(plugin) << "Found " << old_types.size() << " types that are/are subtypes of "
                 << old_klass->PrettyClass();
   }
@@ -1903,9 +1908,11 @@ bool Redefiner::ClassRedefinition::FinishNewClassAllocations(RedefinitionDataHol
               });
   }
   for (uint32_t i = 0; i < old_types.size(); ++i) {
+    DCHECK(!old_types[i].IsNull()) << i;
     old_classes_arr->Set(i, old_types[i].Get());
   }
   cur_data->SetOldClasses(old_classes_arr.Get());
+  DCHECK_GT(old_classes_arr->GetLength(), 0);
 
   art::Handle<art::mirror::ObjectArray<art::mirror::Class>> new_classes_arr(
       hs.NewHandle(art::mirror::ObjectArray<art::mirror::Class>::Alloc(
