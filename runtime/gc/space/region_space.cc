@@ -868,7 +868,7 @@ void RegionSpace::RevokeThreadLocalBuffersLocked(Thread* thread) {
     r->is_a_tlab_ = false;
     r->thread_ = nullptr;
   }
-  thread->SetTlab(nullptr, nullptr, nullptr);
+  thread->ResetTlab();
 }
 
 size_t RegionSpace::RevokeAllThreadLocalBuffers() {
