@@ -2322,6 +2322,7 @@ Thread::Thread(bool daemon)
   tlsPtr_.thread_local_mark_stack = nullptr;
   tls32_.is_transitioning_to_runnable = false;
   tls32_.use_mterp = false;
+  ResetTlab();
 }
 
 void Thread::NotifyInTheadList() {
@@ -4169,8 +4170,12 @@ void Thread::SetTlab(uint8_t* start, uint8_t* end, uint8_t* limit) {
   tlsPtr_.thread_local_objects = 0;
 }
 
+void Thread::ResetTlab() {
+  SetTlab(nullptr, nullptr, nullptr);
+}
+
 bool Thread::HasTlab() const {
-  bool has_tlab = tlsPtr_.thread_local_pos != nullptr;
+  const bool has_tlab = tlsPtr_.thread_local_pos != nullptr;
   if (has_tlab) {
     DCHECK(tlsPtr_.thread_local_start != nullptr && tlsPtr_.thread_local_end != nullptr);
   } else {

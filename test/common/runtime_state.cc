@@ -272,8 +272,6 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
   while (true) {
     if (native && code_cache->ContainsMethod(method)) {
       break;
-    } else if (code_cache->WillExecuteJitCode(method)) {
-      break;
     } else {
       // Sleep to yield to the compiler thread.
       usleep(1000);
@@ -282,8 +280,14 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
         // Make sure there is a profiling info, required by the compiler.
         ProfilingInfo::Create(self, method, /* retry_allocation */ true);
       }
-      // Will either ensure it's compiled or do the compilation itself.
+      // Will either ensure it's compiled or do the compilation itself. We do
+      // this before checking if we will execute JIT code to make sure the
+      // method is compiled 'optimized' and not baseline (tests expect optimized
+      // compilation).
       jit->CompileMethod(method, self, /*baseline=*/ false, /*osr=*/ false, /*prejit=*/ false);
+      if (code_cache->WillExecuteJitCode(method)) {
+        break;
+      }
     }
   }
 }

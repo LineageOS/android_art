@@ -117,13 +117,12 @@ class VlogMessage {
   VlogMessage(bool enable,
               const char* file,
               unsigned int line,
-              ::android::base::LogId id,
               ::android::base::LogSeverity severity,
               const char* tag,
               int error)
       : msg_(std::in_place_type<std::ostringstream>) {
     if (enable) {
-      msg_.emplace<::android::base::LogMessage>(file, line, id, severity, tag, error);
+      msg_.emplace<::android::base::LogMessage>(file, line, severity, tag, error);
     }
   }
 
@@ -145,7 +144,6 @@ class VlogMessage {
   ::art::VlogMessage(VLOG_IS_ON(module),       \
                      __FILE__,                 \
                      __LINE__,                 \
-                     ::android::base::DEFAULT, \
                      ::android::base::INFO,    \
                      _LOG_TAG_INTERNAL,        \
                      -1)                       \

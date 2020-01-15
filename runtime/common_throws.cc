@@ -475,6 +475,8 @@ static bool IsValidImplicitCheck(uintptr_t addr, const Instruction& instr)
     case Instruction::INVOKE_INTERFACE_RANGE:
     case Instruction::INVOKE_POLYMORPHIC:
     case Instruction::INVOKE_POLYMORPHIC_RANGE:
+    case Instruction::INVOKE_SUPER:
+    case Instruction::INVOKE_SUPER_RANGE:
     case Instruction::INVOKE_VIRTUAL_QUICK:
     case Instruction::INVOKE_VIRTUAL_RANGE_QUICK: {
       // Without inlining, we could just check that the offset is the class offset.
@@ -595,6 +597,12 @@ void ThrowNullPointerExceptionFromDexPC(bool check_address, uintptr_t addr) {
       break;
     case Instruction::INVOKE_VIRTUAL_RANGE:
       ThrowNullPointerExceptionForMethodAccess(instr.VRegB_3rc(), kVirtual);
+      break;
+    case Instruction::INVOKE_SUPER:
+      ThrowNullPointerExceptionForMethodAccess(instr.VRegB_35c(), kSuper);
+      break;
+    case Instruction::INVOKE_SUPER_RANGE:
+      ThrowNullPointerExceptionForMethodAccess(instr.VRegB_3rc(), kSuper);
       break;
     case Instruction::INVOKE_INTERFACE:
       ThrowNullPointerExceptionForMethodAccess(instr.VRegB_35c(), kInterface);
