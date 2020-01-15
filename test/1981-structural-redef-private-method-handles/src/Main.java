@@ -16,6 +16,6 @@
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    art.Test1981.run();
+    art.Test1981.run(new art.Test1981_Varhandles());
   }
 }
