@@ -1,0 +1,8 @@
+Doing redefinition for instance field
+Result was VirtualString
+Doing redefinition for static field
+Result was StaticString
+Doing redefinition for instance method
+Result was meth
+Doing redefinition for static method
+Result was static-meth
