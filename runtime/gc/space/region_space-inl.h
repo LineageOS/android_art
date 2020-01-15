@@ -498,7 +498,7 @@ inline size_t RegionSpace::Region::BytesAllocated() const {
     DCHECK_LE(begin_, Top());
     size_t bytes;
     if (is_a_tlab_) {
-      bytes = thread_->GetThreadLocalBytesAllocated();
+      bytes = thread_->GetTlabEnd() - begin_;
     } else {
       bytes = static_cast<size_t>(Top() - begin_);
     }

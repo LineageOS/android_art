@@ -337,6 +337,10 @@ void RegionSpace::SetFromSpace(accounting::ReadBarrierTable* rb_table,
     rb_table->SetAll();
   }
   MutexLock mu(Thread::Current(), region_lock_);
+  // We cannot use the partially utilized TLABs across a GC. Therefore, revoke
+  // them during the thread-flip.
+  partial_tlabs_.clear();
+
   // Counter for the number of expected large tail regions following a large region.
   size_t num_expected_large_tails = 0U;
   // Flag to store whether the previously seen large region has been evacuated.
@@ -833,17 +837,40 @@ void RegionSpace::RecordAlloc(mirror::Object* ref) {
   r->objects_allocated_.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool RegionSpace::AllocNewTlab(Thread* self, size_t min_bytes) {
+bool RegionSpace::AllocNewTlab(Thread* self,
+                               const size_t tlab_size,
+                               size_t* bytes_tl_bulk_allocated) {
   MutexLock mu(self, region_lock_);
-  RevokeThreadLocalBuffersLocked(self);
-  // Retain sufficient free regions for full evacuation.
-
-  Region* r = AllocateRegion(/*for_evac=*/ false);
+  RevokeThreadLocalBuffersLocked(self, /*reuse=*/ gc::Heap::kUsePartialTlabs);
+  Region* r = nullptr;
+  uint8_t* pos = nullptr;
+  *bytes_tl_bulk_allocated = tlab_size;
+  // First attempt to get a partially used TLAB, if available.
+  if (tlab_size < kRegionSize) {
+    // Fetch the largest partial TLAB. The multimap is ordered in decreasing
+    // size.
+    auto largest_partial_tlab = partial_tlabs_.begin();
+    if (largest_partial_tlab != partial_tlabs_.end() && largest_partial_tlab->first >= tlab_size) {
+      r = largest_partial_tlab->second;
+      pos = r->End() - largest_partial_tlab->first;
+      partial_tlabs_.erase(largest_partial_tlab);
+      DCHECK_GT(r->End(), pos);
+      DCHECK_LE(r->Begin(), pos);
+      DCHECK_GE(r->Top(), pos);
+      *bytes_tl_bulk_allocated -= r->Top() - pos;
+    }
+  }
+  if (r == nullptr) {
+    // Fallback to allocating an entire region as TLAB.
+    r = AllocateRegion(/*for_evac=*/ false);
+  }
   if (r != nullptr) {
+    uint8_t* start = pos != nullptr ? pos : r->Begin();
+    DCHECK_ALIGNED(start, kObjectAlignment);
     r->is_a_tlab_ = true;
     r->thread_ = self;
     r->SetTop(r->End());
-    self->SetTlab(r->Begin(), r->Begin() + min_bytes, r->End());
+    self->SetTlab(start, start + tlab_size, r->End());
     return true;
   }
   return false;
@@ -851,22 +878,33 @@ bool RegionSpace::AllocNewTlab(Thread* self, size_t min_bytes) {
 
 size_t RegionSpace::RevokeThreadLocalBuffers(Thread* thread) {
   MutexLock mu(Thread::Current(), region_lock_);
-  RevokeThreadLocalBuffersLocked(thread);
+  RevokeThreadLocalBuffersLocked(thread, /*reuse=*/ gc::Heap::kUsePartialTlabs);
   return 0U;
 }
 
-void RegionSpace::RevokeThreadLocalBuffersLocked(Thread* thread) {
+size_t RegionSpace::RevokeThreadLocalBuffers(Thread* thread, const bool reuse) {
+  MutexLock mu(Thread::Current(), region_lock_);
+  RevokeThreadLocalBuffersLocked(thread, reuse);
+  return 0U;
+}
+
+void RegionSpace::RevokeThreadLocalBuffersLocked(Thread* thread, bool reuse) {
   uint8_t* tlab_start = thread->GetTlabStart();
   DCHECK_EQ(thread->HasTlab(), tlab_start != nullptr);
   if (tlab_start != nullptr) {
-    DCHECK_ALIGNED(tlab_start, kRegionSize);
     Region* r = RefToRegionLocked(reinterpret_cast<mirror::Object*>(tlab_start));
+    r->is_a_tlab_ = false;
+    r->thread_ = nullptr;
     DCHECK(r->IsAllocated());
     DCHECK_LE(thread->GetThreadLocalBytesAllocated(), kRegionSize);
     r->RecordThreadLocalAllocations(thread->GetThreadLocalObjectsAllocated(),
-                                    thread->GetThreadLocalBytesAllocated());
-    r->is_a_tlab_ = false;
-    r->thread_ = nullptr;
+                                    thread->GetTlabEnd() - r->Begin());
+    DCHECK_GE(r->End(), thread->GetTlabPos());
+    DCHECK_LE(r->Begin(), thread->GetTlabPos());
+    size_t remaining_bytes = r->End() - thread->GetTlabPos();
+    if (reuse && remaining_bytes >= gc::Heap::kPartialTlabSize) {
+      partial_tlabs_.insert(std::make_pair(remaining_bytes, r));
+    }
   }
   thread->ResetTlab();
 }
