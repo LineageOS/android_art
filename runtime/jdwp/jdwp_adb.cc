@@ -20,7 +20,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "android-base/cmsg.h"
 #include "android-base/stringprintf.h"
+#include "android-base/unique_fd.h"
 
 #include "base/logging.h"  // For VLOG.
 #include "base/socket_peer_is_trusted.h"
@@ -162,31 +164,8 @@ bool InitAdbTransport(JdwpState* state, const JdwpOptions*) {
  */
 int JdwpAdbState::ReceiveClientFd() {
   char dummy = '!';
-  union {
-    cmsghdr cm;
-    char buffer[CMSG_SPACE(sizeof(int))];
-  } cm_un;
-
-  iovec iov;
-  iov.iov_base       = &dummy;
-  iov.iov_len        = 1;
-
-  msghdr msg;
-  msg.msg_name       = nullptr;
-  msg.msg_namelen    = 0;
-  msg.msg_iov        = &iov;
-  msg.msg_iovlen     = 1;
-  msg.msg_flags      = 0;
-  msg.msg_control    = cm_un.buffer;
-  msg.msg_controllen = sizeof(cm_un.buffer);
-
-  cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-  cmsg->cmsg_len   = msg.msg_controllen;
-  cmsg->cmsg_level = SOL_SOCKET;
-  cmsg->cmsg_type  = SCM_RIGHTS;
-  (reinterpret_cast<int*>(CMSG_DATA(cmsg)))[0] = -1;
-
-  int rc = TEMP_FAILURE_RETRY(recvmsg(ControlSock(), &msg, 0));
+  android::base::unique_fd client_fd;
+  ssize_t rc = android::base::ReceiveFileDescriptors(ControlSock(), &dummy, 1, &client_fd);
 
   if (rc <= 0) {
     if (rc == -1) {
@@ -198,7 +177,7 @@ int JdwpAdbState::ReceiveClientFd() {
     return -1;
   }
 
-  return (reinterpret_cast<int*>(CMSG_DATA(cmsg)))[0];
+  return client_fd.release();
 }
 
 /*
