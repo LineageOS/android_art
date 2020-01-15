@@ -67,7 +67,8 @@ public class Test1983 {
       Class.forName("dalvik.system.EmulatedStackFrame"),
       Executable.class,
       Field.class,
-      FinalizerReference.class,
+      // @hide on CTS
+      Class.forName("java.lang.ref.FinalizerReference"),
       MethodHandle.class,
       MethodHandles.Lookup.class,
       MethodType.class,
@@ -79,8 +80,10 @@ public class Test1983 {
       String.class,
       Thread.class,
       Throwable.class,
-      VarHandle.class,
+      // @hide on CTS
+      Class.forName("java.lang.invoke.VarHandle"),
       // TODO all the var handle types.
+      // @hide on CTS
       Class.forName("java.lang.invoke.FieldVarHandle"),
     };
     System.out.println("Checking mirror'd classes");
