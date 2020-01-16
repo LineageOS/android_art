@@ -33,6 +33,9 @@ static dwarf::Reg DWARFReg(FloatRegister reg) {
 
 constexpr size_t kFramePointerSize = 8;
 
+static constexpr size_t kNativeStackAlignment = 16;
+static_assert(kNativeStackAlignment == kStackAlignment);
+
 #define __ asm_.
 
 void X86_64JNIMacroAssembler::BuildFrame(size_t frame_size,
@@ -41,8 +44,13 @@ void X86_64JNIMacroAssembler::BuildFrame(size_t frame_size,
                                          const ManagedRegisterEntrySpills& entry_spills) {
   DCHECK_EQ(CodeSize(), 0U);  // Nothing emitted yet.
   cfi().SetCurrentCFAOffset(8);  // Return address on stack.
-  CHECK_ALIGNED(frame_size, kStackAlignment);
-  int gpr_count = 0;
+  // Note: @CriticalNative tail call is not used (would have frame_size == kFramePointerSize).
+  if (method_reg.IsNoRegister()) {
+    CHECK_ALIGNED(frame_size, kNativeStackAlignment);
+  } else {
+    CHECK_ALIGNED(frame_size, kStackAlignment);
+  }
+  size_t gpr_count = 0u;
   for (int i = spill_regs.size() - 1; i >= 0; --i) {
     x86_64::X86_64ManagedRegister spill = spill_regs[i].AsX86_64();
     if (spill.IsCpuRegister()) {
@@ -56,8 +64,10 @@ void X86_64JNIMacroAssembler::BuildFrame(size_t frame_size,
   int64_t rest_of_frame = static_cast<int64_t>(frame_size)
                           - (gpr_count * kFramePointerSize)
                           - kFramePointerSize /*return address*/;
-  __ subq(CpuRegister(RSP), Immediate(rest_of_frame));
-  cfi().AdjustCFAOffset(rest_of_frame);
+  if (rest_of_frame != 0) {
+    __ subq(CpuRegister(RSP), Immediate(rest_of_frame));
+    cfi().AdjustCFAOffset(rest_of_frame);
+  }
 
   // spill xmms
   int64_t offset = rest_of_frame;
@@ -73,7 +83,9 @@ void X86_64JNIMacroAssembler::BuildFrame(size_t frame_size,
   static_assert(static_cast<size_t>(kX86_64PointerSize) == kFramePointerSize,
                 "Unexpected frame pointer size.");
 
-  __ movq(Address(CpuRegister(RSP), 0), method_reg.AsX86_64().AsCpuRegister());
+  if (method_reg.IsRegister()) {
+    __ movq(Address(CpuRegister(RSP), 0), method_reg.AsX86_64().AsCpuRegister());
+  }
 
   for (const ManagedRegisterSpill& spill : entry_spills) {
     if (spill.AsX86_64().IsCpuRegister()) {
@@ -101,26 +113,29 @@ void X86_64JNIMacroAssembler::BuildFrame(size_t frame_size,
 void X86_64JNIMacroAssembler::RemoveFrame(size_t frame_size,
                                           ArrayRef<const ManagedRegister> spill_regs,
                                           bool may_suspend ATTRIBUTE_UNUSED) {
-  CHECK_ALIGNED(frame_size, kStackAlignment);
+  CHECK_ALIGNED(frame_size, kNativeStackAlignment);
   cfi().RememberState();
   int gpr_count = 0;
   // unspill xmms
   int64_t offset = static_cast<int64_t>(frame_size)
       - (spill_regs.size() * kFramePointerSize)
-      - 2 * kFramePointerSize;
+      - kFramePointerSize;
   for (size_t i = 0; i < spill_regs.size(); ++i) {
     x86_64::X86_64ManagedRegister spill = spill_regs[i].AsX86_64();
     if (spill.IsXmmRegister()) {
-      offset += sizeof(double);
       __ movsd(spill.AsXmmRegister(), Address(CpuRegister(RSP), offset));
       cfi().Restore(DWARFReg(spill.AsXmmRegister().AsFloatRegister()));
+      offset += sizeof(double);
     } else {
       gpr_count++;
     }
   }
-  int adjust = static_cast<int>(frame_size) - (gpr_count * kFramePointerSize) - kFramePointerSize;
-  __ addq(CpuRegister(RSP), Immediate(adjust));
-  cfi().AdjustCFAOffset(-adjust);
+  DCHECK_EQ(static_cast<size_t>(offset),
+            frame_size - (gpr_count * kFramePointerSize) - kFramePointerSize);
+  if (offset != 0) {
+    __ addq(CpuRegister(RSP), Immediate(offset));
+    cfi().AdjustCFAOffset(-offset);
+  }
   for (size_t i = 0; i < spill_regs.size(); ++i) {
     x86_64::X86_64ManagedRegister spill = spill_regs[i].AsX86_64();
     if (spill.IsCpuRegister()) {
@@ -136,15 +151,19 @@ void X86_64JNIMacroAssembler::RemoveFrame(size_t frame_size,
 }
 
 void X86_64JNIMacroAssembler::IncreaseFrameSize(size_t adjust) {
-  CHECK_ALIGNED(adjust, kStackAlignment);
-  __ addq(CpuRegister(RSP), Immediate(-static_cast<int64_t>(adjust)));
-  cfi().AdjustCFAOffset(adjust);
+  if (adjust != 0u) {
+    CHECK_ALIGNED(adjust, kNativeStackAlignment);
+    __ addq(CpuRegister(RSP), Immediate(-static_cast<int64_t>(adjust)));
+    cfi().AdjustCFAOffset(adjust);
+  }
 }
 
 static void DecreaseFrameSizeImpl(size_t adjust, X86_64Assembler* assembler) {
-  CHECK_ALIGNED(adjust, kStackAlignment);
-  assembler->addq(CpuRegister(RSP), Immediate(adjust));
-  assembler->cfi().AdjustCFAOffset(-adjust);
+  if (adjust != 0u) {
+    CHECK_ALIGNED(adjust, kNativeStackAlignment);
+    assembler->addq(CpuRegister(RSP), Immediate(adjust));
+    assembler->cfi().AdjustCFAOffset(-adjust);
+  }
 }
 
 void X86_64JNIMacroAssembler::DecreaseFrameSize(size_t adjust) {
@@ -542,6 +561,12 @@ void X86_64JNIMacroAssembler::VerifyObject(ManagedRegister /*src*/, bool /*could
 
 void X86_64JNIMacroAssembler::VerifyObject(FrameOffset /*src*/, bool /*could_be_null*/) {
   // TODO: not validating references
+}
+
+void X86_64JNIMacroAssembler::Jump(ManagedRegister mbase, Offset offset, ManagedRegister) {
+  X86_64ManagedRegister base = mbase.AsX86_64();
+  CHECK(base.IsCpuRegister());
+  __ jmp(Address(base.AsCpuRegister(), offset.Int32Value()));
 }
 
 void X86_64JNIMacroAssembler::Call(ManagedRegister mbase, Offset offset, ManagedRegister) {

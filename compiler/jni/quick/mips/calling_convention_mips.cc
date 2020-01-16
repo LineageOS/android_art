@@ -75,11 +75,11 @@ static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask();
 static constexpr uint32_t kFpCalleeSpillMask = 0u;
 
 // Calling convention
-ManagedRegister MipsManagedRuntimeCallingConvention::InterproceduralScratchRegister() {
+ManagedRegister MipsManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
   return MipsManagedRegister::FromCoreRegister(T9);
 }
 
-ManagedRegister MipsJniCallingConvention::InterproceduralScratchRegister() {
+ManagedRegister MipsJniCallingConvention::InterproceduralScratchRegister() const {
   return MipsManagedRegister::FromCoreRegister(T9);
 }
 
@@ -334,7 +334,7 @@ ManagedRegister MipsJniCallingConvention::ReturnScratchRegister() const {
   return MipsManagedRegister::FromCoreRegister(AT);
 }
 
-size_t MipsJniCallingConvention::FrameSize() {
+size_t MipsJniCallingConvention::FrameSize() const {
   // ArtMethod*, RA and callee save area size, local reference segment state.
   const size_t method_ptr_size = static_cast<size_t>(kMipsPointerSize);
   const size_t ra_return_addr_size = kFramePointerSize;
@@ -362,7 +362,7 @@ size_t MipsJniCallingConvention::FrameSize() {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t MipsJniCallingConvention::OutArgSize() {
+size_t MipsJniCallingConvention::OutArgSize() const {
   // Argument Passing (3-17):
   //   "Despite the fact that some or all of the arguments to a function are passed in registers,
   // always allocate space on the stack for all arguments. This stack space should be a structure
@@ -371,8 +371,19 @@ size_t MipsJniCallingConvention::OutArgSize() {
   // for arguments are called the home locations."
   //
   // Allocate 16 bytes for home locations + space needed for stack arguments.
+
+  size_t static_args = HasSelfClass() ? 1 : 0;            // Count jclass.
+  // Regular argument parameters and this.
+  size_t param_args = NumArgs() + NumLongOrDoubleArgs();  // Twice count 8-byte args.
+  // Count JNIEnv* less arguments in registers.
+  size_t internal_args = (HasJniEnv() ? 1 : 0);
+  size_t total_args = static_args + param_args + internal_args;
+
+  size_t stack_args =
+      total_args - std::min(kMaxIntLikeRegisterArguments, static_cast<size_t>(total_args));
+
   return RoundUp(
-      (kMaxIntLikeRegisterArguments + NumberOfOutgoingStackArgs()) * kFramePointerSize + padding_,
+      (kMaxIntLikeRegisterArguments + stack_args) * kFramePointerSize + padding_,
       kStackAlignment);
 }
 
@@ -446,15 +457,14 @@ FrameOffset MipsJniCallingConvention::CurrentParamStackOffset() {
   return FrameOffset(offset);
 }
 
-size_t MipsJniCallingConvention::NumberOfOutgoingStackArgs() {
-  size_t static_args = HasSelfClass() ? 1 : 0;            // Count jclass.
-  // Regular argument parameters and this.
-  size_t param_args = NumArgs() + NumLongOrDoubleArgs();  // Twice count 8-byte args.
-  // Count JNIEnv* less arguments in registers.
-  size_t internal_args = (HasJniEnv() ? 1 : 0);
-  size_t total_args = static_args + param_args + internal_args;
+ManagedRegister MipsJniCallingConvention::HiddenArgumentRegister() const {
+  UNIMPLEMENTED(FATAL);
+  UNREACHABLE();
+}
 
-  return total_args - std::min(kMaxIntLikeRegisterArguments, static_cast<size_t>(total_args));
+bool MipsJniCallingConvention::UseTailCall() const {
+  UNIMPLEMENTED(FATAL);
+  UNREACHABLE();
 }
 
 }  // namespace mips
