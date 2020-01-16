@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,6 @@
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    art.Test1981.run(new art.Test1981_Varhandles());
+    art.Test2009.run();
   }
 }

@@ -22,9 +22,38 @@ import java.lang.reflect.*;
 import java.util.*;
 
 public class Test1981 {
+  // Allow us to hide the var-handle portions when running this on CTS.
+  public interface VarHandler {
+    public boolean doVarHandleTests();
+
+    public default Object findStaticVarHandle(MethodHandles.Lookup l, Class c, String n, Class t)
+        throws Throwable {
+      return null;
+    }
+
+    public default Object get(Object vh) throws Throwable {
+      throw new Error("Illegal call!");
+    }
+
+    public default void set(Object vh, Object v) throws Throwable {
+      throw new Error("Illegal call!");
+    }
+    public default boolean instanceofVarHandle(Object v) {
+      return false;
+    }
+    public default Object getVarTypeName(Object v) {
+      throw new Error("Illegal call!");
+    }
+  }
+
+  // CTS Entrypoint.
   public static void run() throws Exception {
+    run(() -> false);
+  }
+
+  public static void run(VarHandler varhandle_portion) throws Exception {
     Redefinition.setTestConfiguration(Redefinition.Config.COMMON_REDEFINE);
-    doTest();
+    doTest(varhandle_portion);
   }
 
   private static final boolean PRINT_NONDETERMINISTIC = false;
@@ -32,7 +61,7 @@ public class Test1981 {
   public static WeakHashMap<Object, Long> id_nums = new WeakHashMap<>();
   public static long next_id = 0;
 
-  public static String printGeneric(Object o) {
+  public static String printGeneric(VarHandler vh, Object o) {
     Long id = id_nums.get(o);
     if (id == null) {
       id = Long.valueOf(next_id++);
@@ -48,10 +77,9 @@ public class Test1981 {
           + ") "
           + Arrays.toString(Arrays.copyOf((byte[]) o, 10)).replace(']', ',')
           + " ...]";
-    } else if (o instanceof VarHandle) {
+    } else if (vh.instanceofVarHandle(o)) {
       // These don't have a good to-string. Give them one.
-      VarHandle v = (VarHandle)o;
-      return "(ID: " + id + ") " + o.getClass().getName() + "()->" + v.varType().getName();
+      return "(ID: " + id + ") " + o.getClass().getName() + "()->" + vh.getVarTypeName(o);
     } else {
       return "(ID: " + id + ") " + o.toString();
     }
@@ -140,21 +168,23 @@ public class Test1981 {
                   + "AAEgAAAFAAAAEAIAAAMgAAAFAAAA7gIAAAEQAAADAAAABAMAAAIgAAAkAAAAGgMAAAQgAAACAAAA"
                   + "WwUAAAAgAAABAAAAagUAAAMQAAACAAAAjAUAAAYgAAABAAAAnAUAAAAQAAABAAAArAUAAA==");
 
-  public static void doTest() throws Exception {
+  public static void doTest(VarHandler vh) throws Exception {
     try {
       System.out.println("Initial: " + Transform.staticToString());
       MethodHandles.Lookup lookup = Transform.getLookup();
-      String[] names = new String[] { "FOO", "BAR", };
+      String[] names =
+          new String[] {
+            "FOO", "BAR",
+          };
       MethodHandle[] handles =
           new MethodHandle[] {
             lookup.findStaticGetter(Transform.class, "FOO", Object.class),
             lookup.findStaticGetter(Transform.class, "BAR", Object.class),
           };
-      VarHandle foo_handle = lookup.findStaticVarHandle(Transform.class, "FOO", Object.class);
-      VarHandle[] var_handles =
-          new VarHandle[] {
-            foo_handle,
-            lookup.findStaticVarHandle(Transform.class, "BAR", Object.class),
+      Object foo_handle = vh.findStaticVarHandle(lookup, Transform.class, "FOO", Object.class);
+      Object[] var_handles =
+          new Object[] {
+            foo_handle, vh.findStaticVarHandle(lookup, Transform.class, "BAR", Object.class),
           };
 
       for (int i = 0; i < names.length; i++) {
@@ -162,16 +192,18 @@ public class Test1981 {
             "Reading field "
                 + names[i]
                 + " using "
-                + printGeneric(handles[i])
+                + printGeneric(vh, handles[i])
                 + " = "
-                + printGeneric(handles[i].invoke()));
-        System.out.println(
-            "Reading field "
-                + names[i]
-                + " using "
-                + printGeneric(var_handles[i])
-                + " = "
-                + printGeneric(var_handles[i].get()));
+                + printGeneric(vh, handles[i].invoke()));
+        if (vh.doVarHandleTests()) {
+          System.out.println(
+              "Reading field "
+                  + names[i]
+                  + " using "
+                  + printGeneric(vh, var_handles[i])
+                  + " = "
+                  + printGeneric(vh, vh.get(var_handles[i])));
+        }
       }
       MethodHandle old_field_write = lookup.findStaticSetter(Transform.class, "FOO", Object.class);
 
@@ -179,19 +211,22 @@ public class Test1981 {
       Redefinition.doCommonStructuralClassRedefinition(Transform.class, REDEFINED_DEX_BYTES);
       System.out.println("Post redefinition : " + Transform.staticToString());
 
-      String[] new_names = new String[] { "BAZ", "FOO", "BAR", };
+      String[] new_names =
+          new String[] {
+            "BAZ", "FOO", "BAR",
+          };
       MethodHandle[] new_handles =
           new MethodHandle[] {
             lookup.findStaticGetter(Transform.class, "BAZ", Object.class),
             lookup.findStaticGetter(Transform.class, "FOO", Object.class),
             lookup.findStaticGetter(Transform.class, "BAR", Object.class),
           };
-      VarHandle baz_handle = lookup.findStaticVarHandle(Transform.class, "BAZ", Object.class);
-      VarHandle[] new_var_handles =
-          new VarHandle[] {
+      Object baz_handle = vh.findStaticVarHandle(lookup, Transform.class, "BAZ", Object.class);
+      Object[] new_var_handles =
+          new Object[] {
             baz_handle,
-            lookup.findStaticVarHandle(Transform.class, "FOO", Object.class),
-            lookup.findStaticVarHandle(Transform.class, "BAR", Object.class),
+            vh.findStaticVarHandle(lookup, Transform.class, "FOO", Object.class),
+            vh.findStaticVarHandle(lookup, Transform.class, "BAR", Object.class),
           };
 
       for (int i = 0; i < names.length; i++) {
@@ -199,16 +234,18 @@ public class Test1981 {
             "Reading field "
                 + names[i]
                 + " using "
-                + printGeneric(handles[i])
+                + printGeneric(vh, handles[i])
                 + " = "
-                + printGeneric(handles[i].invoke()));
-        System.out.println(
-            "Reading field "
-                + names[i]
-                + " using "
-                + printGeneric(var_handles[i])
-                + " = "
-                + printGeneric(var_handles[i].get()));
+                + printGeneric(vh, handles[i].invoke()));
+        if (vh.doVarHandleTests()) {
+          System.out.println(
+              "Reading field "
+                  + names[i]
+                  + " using "
+                  + printGeneric(vh, var_handles[i])
+                  + " = "
+                  + printGeneric(vh, vh.get(var_handles[i])));
+        }
       }
 
       for (int i = 0; i < new_names.length; i++) {
@@ -216,39 +253,44 @@ public class Test1981 {
             "Reading new field "
                 + new_names[i]
                 + " using "
-                + printGeneric(new_handles[i])
+                + printGeneric(vh, new_handles[i])
                 + " = "
-                + printGeneric(new_handles[i].invoke()));
-        System.out.println(
-            "Reading new field "
-                + new_names[i]
-                + " using "
-                + printGeneric(new_var_handles[i])
-                + " = "
-                + printGeneric(new_var_handles[i].get()));
+                + printGeneric(vh, new_handles[i].invoke()));
+        if (vh.doVarHandleTests()) {
+          System.out.println(
+              "Reading new field "
+                  + new_names[i]
+                  + " using "
+                  + printGeneric(vh, new_var_handles[i])
+                  + " = "
+                  + printGeneric(vh, vh.get(new_var_handles[i])));
+        }
       }
 
       String val = "foo";
-      System.out.println("Setting BAZ to " + printGeneric(val) + " with new mh.");
+      System.out.println("Setting BAZ to " + printGeneric(vh, val) + " with new mh.");
       lookup.findStaticSetter(Transform.class, "BAZ", Object.class).invoke(val);
       System.out.println("Post set with new mh: " + Transform.staticToString());
 
-      System.out.println("Setting FOO to " + printGeneric(Transform.class) + " with old mh.");
+      System.out.println("Setting FOO to " + printGeneric(vh, Transform.class) + " with old mh.");
       old_field_write.invoke(Transform.class);
       System.out.println("Post set with old mh: " + Transform.staticToString());
 
-      Object new_val = new Object() {
-        public String toString() {
-          return "new_value object";
-        }
-      };
-      System.out.println("Setting FOO to '" + printGeneric(new_val) + "' with old varhandle.");
-      foo_handle.set(new_val);
-      System.out.println("Post set with new varhandle: " + Transform.staticToString());
+      Object new_val =
+          new Object() {
+            public String toString() {
+              return "new_value object";
+            }
+          };
+      if (vh.doVarHandleTests()) {
+        System.out.println("Setting FOO to '" + printGeneric(vh, new_val) + "' with old varhandle.");
+        vh.set(foo_handle, new_val);
+        System.out.println("Post set with new varhandle: " + Transform.staticToString());
 
-      System.out.println("Setting BAZ to 'bar' with new varhandle.");
-      baz_handle.set("bar");
-      System.out.println("Post set with old varhandle: " + Transform.staticToString());
+        System.out.println("Setting BAZ to 'bar' with new varhandle.");
+        vh.set(baz_handle, "bar");
+        System.out.println("Post set with old varhandle: " + Transform.staticToString());
+      }
 
       System.out.println("Using mh to call new private method.");
       MethodHandle reinit =
@@ -256,38 +298,41 @@ public class Test1981 {
       reinit.invoke();
       System.out.println("Post reinit with mh: " + Transform.staticToString());
 
-
       for (int i = 0; i < names.length; i++) {
         System.out.println(
             "Reading field "
                 + names[i]
                 + " using "
-                + printGeneric(handles[i])
+                + printGeneric(vh, handles[i])
                 + " = "
-                + printGeneric(handles[i].invoke()));
-        System.out.println(
-            "Reading field "
-                + names[i]
-                + " using "
-                + printGeneric(var_handles[i])
-                + " = "
-                + printGeneric(var_handles[i].get()));
+                + printGeneric(vh, handles[i].invoke()));
+        if (vh.doVarHandleTests()) {
+          System.out.println(
+              "Reading field "
+                  + names[i]
+                  + " using "
+                  + printGeneric(vh, var_handles[i])
+                  + " = "
+                  + printGeneric(vh, vh.get(var_handles[i])));
+        }
       }
       for (int i = 0; i < new_names.length; i++) {
         System.out.println(
             "Reading new field "
                 + new_names[i]
                 + " using "
-                + printGeneric(new_handles[i])
+                + printGeneric(vh, new_handles[i])
                 + " = "
-                + printGeneric(new_handles[i].invoke()));
-        System.out.println(
-            "Reading new field "
-                + new_names[i]
-                + " using "
-                + printGeneric(new_var_handles[i])
-                + " = "
-                + printGeneric(new_var_handles[i].get()));
+                + printGeneric(vh, new_handles[i].invoke()));
+        if (vh.doVarHandleTests()) {
+          System.out.println(
+              "Reading new field "
+                  + new_names[i]
+                  + " using "
+                  + printGeneric(vh, new_var_handles[i])
+                  + " = "
+                  + printGeneric(vh, vh.get(new_var_handles[i])));
+        }
       }
     } catch (Throwable t) {
       if (t instanceof Exception) {

@@ -23,6 +23,7 @@ public class Main {
   class Inner {}
 
   public static native void assertIsInterpreted();
+  public static native void ensureJitCompiled(Class<?> cls, String methodName);
 
   private static void assertEqual(String expected, String actual) {
     if (!expected.equals(actual)) {
@@ -36,6 +37,8 @@ public class Main {
     int[] array = new int[1];
 
     {
+      // If the JIT is enabled, ensure it has compiled the method to force the deopt.
+      ensureJitCompiled(c, "testNoAlias");
       Method m = c.getMethod("testNoAlias", int[].class, String.class);
       try {
         m.invoke(null, new Object[] { array , "foo" });
@@ -51,6 +54,8 @@ public class Main {
     }
 
     {
+      // If the JIT is enabled, ensure it has compiled the method to force the deopt.
+      ensureJitCompiled(c, "testAlias");
       Method m = c.getMethod("testAlias", int[].class, String.class);
       try {
         m.invoke(null, new Object[] { array, "bar" });

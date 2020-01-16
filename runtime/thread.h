@@ -1189,7 +1189,9 @@ class Thread {
   uint8_t* GetTlabPos() {
     return tlsPtr_.thread_local_pos;
   }
-
+  uint8_t* GetTlabEnd() {
+    return tlsPtr_.thread_local_end;
+  }
   // Remove the suspend trigger for this thread by making the suspend_trigger_ TLS value
   // equal to a valid pointer.
   // TODO: does this need to atomic?  I don't think so.

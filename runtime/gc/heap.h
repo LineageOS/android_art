@@ -129,6 +129,10 @@ static constexpr bool kUseThreadLocalAllocationStack = true;
 
 class Heap {
  public:
+  // How much we grow the TLAB if we can do it.
+  static constexpr size_t kPartialTlabSize = 16 * KB;
+  static constexpr bool kUsePartialTlabs = true;
+
   static constexpr size_t kDefaultStartingSize = kPageSize;
   static constexpr size_t kDefaultInitialSize = 2 * MB;
   static constexpr size_t kDefaultMaximumSize = 256 * MB;
