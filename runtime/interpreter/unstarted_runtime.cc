@@ -839,6 +839,11 @@ void UnstartedRuntime::UnstartedSystemArraycopy(
     return;
   }
 
+  if (Runtime::Current()->IsActiveTransaction() && !CheckWriteConstraint(self, dst_obj)) {
+    DCHECK(self->IsExceptionPending());
+    return;
+  }
+
   // Type checking.
   ObjPtr<mirror::Class> src_type = shadow_frame->GetVRegReference(arg_offset)->GetClass()->
       GetComponentType();
@@ -1461,6 +1466,10 @@ void UnstartedRuntime::UnstartedUnsafeCompareAndSwapLong(
   bool success;
   // Check whether we're in a transaction, call accordingly.
   if (Runtime::Current()->IsActiveTransaction()) {
+    if (!CheckWriteConstraint(self, obj)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
     success = obj->CasFieldStrongSequentiallyConsistent64<true>(MemberOffset(offset),
                                                                 expectedValue,
                                                                 newValue);
@@ -1482,7 +1491,7 @@ void UnstartedRuntime::UnstartedUnsafeCompareAndSwapObject(
   }
   int64_t offset = shadow_frame->GetVRegLong(arg_offset + 2);
   mirror::Object* expected_value = shadow_frame->GetVRegReference(arg_offset + 4);
-  mirror::Object* newValue = shadow_frame->GetVRegReference(arg_offset + 5);
+  mirror::Object* new_value = shadow_frame->GetVRegReference(arg_offset + 5);
 
   // Must use non transactional mode.
   if (kUseReadBarrier) {
@@ -1503,15 +1512,19 @@ void UnstartedRuntime::UnstartedUnsafeCompareAndSwapObject(
   bool success;
   // Check whether we're in a transaction, call accordingly.
   if (Runtime::Current()->IsActiveTransaction()) {
+    if (!CheckWriteConstraint(self, obj) || !CheckWriteValueConstraint(self, new_value)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
     success = obj->CasFieldObject<true>(MemberOffset(offset),
                                         expected_value,
-                                        newValue,
+                                        new_value,
                                         CASMode::kStrong,
                                         std::memory_order_seq_cst);
   } else {
     success = obj->CasFieldObject<false>(MemberOffset(offset),
                                          expected_value,
-                                         newValue,
+                                         new_value,
                                          CASMode::kStrong,
                                          std::memory_order_seq_cst);
   }
@@ -1544,6 +1557,10 @@ void UnstartedRuntime::UnstartedUnsafePutObjectVolatile(
   int64_t offset = shadow_frame->GetVRegLong(arg_offset + 2);
   mirror::Object* value = shadow_frame->GetVRegReference(arg_offset + 4);
   if (Runtime::Current()->IsActiveTransaction()) {
+    if (!CheckWriteConstraint(self, obj) || !CheckWriteValueConstraint(self, value)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
     obj->SetFieldObjectVolatile<true>(MemberOffset(offset), value);
   } else {
     obj->SetFieldObjectVolatile<false>(MemberOffset(offset), value);
@@ -1560,12 +1577,16 @@ void UnstartedRuntime::UnstartedUnsafePutOrderedObject(
     return;
   }
   int64_t offset = shadow_frame->GetVRegLong(arg_offset + 2);
-  mirror::Object* newValue = shadow_frame->GetVRegReference(arg_offset + 4);
+  mirror::Object* new_value = shadow_frame->GetVRegReference(arg_offset + 4);
   std::atomic_thread_fence(std::memory_order_release);
   if (Runtime::Current()->IsActiveTransaction()) {
-    obj->SetFieldObject<true>(MemberOffset(offset), newValue);
+    if (!CheckWriteConstraint(self, obj) || !CheckWriteValueConstraint(self, new_value)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
+    obj->SetFieldObject<true>(MemberOffset(offset), new_value);
   } else {
-    obj->SetFieldObject<false>(MemberOffset(offset), newValue);
+    obj->SetFieldObject<false>(MemberOffset(offset), new_value);
   }
 }
 
@@ -1893,6 +1914,10 @@ void UnstartedRuntime::UnstartedJNIUnsafeCompareAndSwapInt(
   jint newValue = args[4];
   bool success;
   if (Runtime::Current()->IsActiveTransaction()) {
+    if (!CheckWriteConstraint(self, obj)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
     success = obj->CasField32<true>(MemberOffset(offset),
                                     expectedValue,
                                     newValue,
@@ -1934,11 +1959,15 @@ void UnstartedRuntime::UnstartedJNIUnsafePutObject(Thread* self,
     return;
   }
   jlong offset = (static_cast<uint64_t>(args[2]) << 32) | args[1];
-  ObjPtr<mirror::Object> newValue = reinterpret_cast32<mirror::Object*>(args[3]);
+  ObjPtr<mirror::Object> new_value = reinterpret_cast32<mirror::Object*>(args[3]);
   if (Runtime::Current()->IsActiveTransaction()) {
-    obj->SetFieldObject<true>(MemberOffset(offset), newValue);
+    if (!CheckWriteConstraint(self, obj) || !CheckWriteValueConstraint(self, new_value)) {
+      DCHECK(self->IsExceptionPending());
+      return;
+    }
+    obj->SetFieldObject<true>(MemberOffset(offset), new_value);
   } else {
-    obj->SetFieldObject<false>(MemberOffset(offset), newValue);
+    obj->SetFieldObject<false>(MemberOffset(offset), new_value);
   }
 }
 

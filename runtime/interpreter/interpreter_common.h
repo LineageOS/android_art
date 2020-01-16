@@ -520,7 +520,7 @@ ALWAYS_INLINE bool DoFieldGet(Thread* self, ShadowFrame& shadow_frame, const Ins
   if (is_static) {
     obj = f->GetDeclaringClass();
     if (transaction_active) {
-      if (Runtime::Current()->GetTransaction()->ReadConstraint(self, obj, f)) {
+      if (Runtime::Current()->GetTransaction()->ReadConstraint(self, obj)) {
         Runtime::Current()->AbortTransactionAndThrowAbortError(self, "Can't read static fields of "
             + obj->PrettyTypeOf() + " since it does not belong to clinit's class.");
         return false;
@@ -635,6 +635,20 @@ ALWAYS_INLINE bool DoIGetQuick(ShadowFrame& shadow_frame, const Instruction* ins
   return true;
 }
 
+static inline bool CheckWriteConstraint(Thread* self, ObjPtr<mirror::Object> obj)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  Runtime* runtime = Runtime::Current();
+  if (runtime->GetTransaction()->WriteConstraint(self, obj)) {
+    DCHECK(runtime->GetHeap()->ObjectIsInBootImageSpace(obj) || obj->IsClass());
+    const char* base_msg = runtime->GetHeap()->ObjectIsInBootImageSpace(obj)
+        ? "Can't set fields of boot image "
+        : "Can't set fields of ";
+    runtime->AbortTransactionAndThrowAbortError(self, base_msg + obj->PrettyTypeOf());
+    return false;
+  }
+  return true;
+}
+
 static inline bool CheckWriteValueConstraint(Thread* self, ObjPtr<mirror::Object> value)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   Runtime* runtime = Runtime::Current();
@@ -676,21 +690,8 @@ ALWAYS_INLINE bool DoFieldPut(Thread* self, const ShadowFrame& shadow_frame,
       return false;
     }
   }
-  if (transaction_active) {
-    Runtime* runtime = Runtime::Current();
-    if (runtime->GetTransaction()->WriteConstraint(self, obj, f)) {
-      if (is_static) {
-        runtime->AbortTransactionAndThrowAbortError(
-            self, "Can't set fields of " + obj->PrettyTypeOf());
-      } else {
-        // This can happen only when compiling a boot image extension.
-        DCHECK(!runtime->GetTransaction()->IsStrict());
-        DCHECK(runtime->GetHeap()->ObjectIsInBootImageSpace(obj));
-        runtime->AbortTransactionAndThrowAbortError(
-            self, "Can't set fields of boot image objects");
-      }
-      return false;
-    }
+  if (transaction_active && !CheckWriteConstraint(self, obj)) {
+    return false;
   }
 
   uint32_t vregA = is_static ? inst->VRegA_21c(inst_data) : inst->VRegA_22c(inst_data);

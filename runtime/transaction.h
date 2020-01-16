@@ -67,7 +67,7 @@ class Transaction final {
   // one class's clinit will not be allowed to read or modify another class's static fields, unless
   // the transaction is aborted.
   bool IsStrict() {
-    return heap_ == nullptr;
+    return strict_;
   }
 
   // Record object field changes.
@@ -140,11 +140,11 @@ class Transaction final {
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool ReadConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field)
+  bool ReadConstraint(Thread* self, ObjPtr<mirror::Object> obj)
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool WriteConstraint(Thread* self, ObjPtr<mirror::Object> obj, ArtField* field)
+  bool WriteConstraint(Thread* self, ObjPtr<mirror::Object> obj)
       REQUIRES(!log_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -317,6 +317,7 @@ class Transaction final {
   bool aborted_ GUARDED_BY(log_lock_);
   bool rolling_back_;  // Single thread, no race.
   gc::Heap* const heap_;
+  const bool strict_;
   std::string abort_message_ GUARDED_BY(log_lock_);
   mirror::Class* root_ GUARDED_BY(log_lock_);
 
