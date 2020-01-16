@@ -4027,6 +4027,17 @@ void Mips64Assembler::VerifyObject(FrameOffset src ATTRIBUTE_UNUSED,
   // TODO: not validating references
 }
 
+void Mips64Assembler::Jump(ManagedRegister mbase, Offset offset, ManagedRegister mscratch) {
+  Mips64ManagedRegister base = mbase.AsMips64();
+  Mips64ManagedRegister scratch = mscratch.AsMips64();
+  CHECK(base.IsGpuRegister()) << base;
+  CHECK(scratch.IsGpuRegister()) << scratch;
+  LoadFromOffset(kLoadDoubleword, scratch.AsGpuRegister(),
+                 base.AsGpuRegister(), offset.Int32Value());
+  Jr(scratch.AsGpuRegister());
+  Nop();
+}
+
 void Mips64Assembler::Call(ManagedRegister mbase, Offset offset, ManagedRegister mscratch) {
   Mips64ManagedRegister base = mbase.AsMips64();
   Mips64ManagedRegister scratch = mscratch.AsMips64();

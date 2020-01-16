@@ -35,7 +35,7 @@ class Arm64ManagedRuntimeCallingConvention final : public ManagedRuntimeCallingC
   ~Arm64ManagedRuntimeCallingConvention() override {}
   // Calling convention
   ManagedRegister ReturnRegister() override;
-  ManagedRegister InterproceduralScratchRegister() override;
+  ManagedRegister InterproceduralScratchRegister() const override;
   // Managed runtime calling convention
   ManagedRegister MethodRegister() override;
   bool IsCurrentParamInRegister() override;
@@ -60,10 +60,10 @@ class Arm64JniCallingConvention final : public JniCallingConvention {
   // Calling convention
   ManagedRegister ReturnRegister() override;
   ManagedRegister IntReturnRegister() override;
-  ManagedRegister InterproceduralScratchRegister() override;
+  ManagedRegister InterproceduralScratchRegister() const override;
   // JNI calling convention
-  size_t FrameSize() override;
-  size_t OutArgSize() override;
+  size_t FrameSize() const override;
+  size_t OutArgSize() const override;
   ArrayRef<const ManagedRegister> CalleeSaveRegisters() const override;
   ManagedRegister ReturnScratchRegister() const override;
   uint32_t CoreSpillMask() const override;
@@ -75,11 +75,14 @@ class Arm64JniCallingConvention final : public JniCallingConvention {
 
   // aarch64 calling convention leaves upper bits undefined.
   bool RequiresSmallResultTypeExtension() const override {
-    return true;
+    return HasSmallReturnType();
   }
 
- protected:
-  size_t NumberOfOutgoingStackArgs() override;
+  // Hidden argument register, used to pass the method pointer for @CriticalNative call.
+  ManagedRegister HiddenArgumentRegister() const override;
+
+  // Whether to use tail call (used only for @CriticalNative).
+  bool UseTailCall() const override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(Arm64JniCallingConvention);
