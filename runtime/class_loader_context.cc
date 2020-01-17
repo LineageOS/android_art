@@ -600,13 +600,44 @@ std::string ClassLoaderContext::EncodeContext(const std::string& base_dir,
   return out.str();
 }
 
+void ClassLoaderContext::EncodeClassPath(const std::string& base_dir,
+                                         const std::vector<std::string>& dex_locations,
+                                         const std::vector<uint32_t>& checksums,
+                                         ClassLoaderType type,
+                                         std::ostringstream& out) const {
+  CHECK(checksums.empty() || dex_locations.size() == checksums.size());
+  out << GetClassLoaderTypeName(type);
+  out << kClassLoaderOpeningMark;
+  const size_t len = dex_locations.size();
+  for (size_t k = 0; k < len; k++) {
+    std::string location = dex_locations[k];
+    if (k > 0) {
+      out << kClasspathSeparator;
+    }
+    if (type == kInMemoryDexClassLoader) {
+      out << kInMemoryDexClassLoaderDexLocationMagic;
+    } else if (!base_dir.empty()
+               && location.substr(0, base_dir.length()) == base_dir) {
+      // Find paths that were relative and convert them back from absolute.
+      out << location.substr(base_dir.length() + 1).c_str();
+    } else {
+      out << location.c_str();
+    }
+    if (!checksums.empty()) {
+      out << kDexFileChecksumSeparator;
+      out << checksums[k];
+    }
+  }
+  out << kClassLoaderClosingMark;
+}
+
 void ClassLoaderContext::EncodeContextInternal(const ClassLoaderInfo& info,
                                                const std::string& base_dir,
                                                bool for_dex2oat,
                                                ClassLoaderInfo* stored_info,
                                                std::ostringstream& out) const {
-  out << GetClassLoaderTypeName(info.type);
-  out << kClassLoaderOpeningMark;
+  std::vector<std::string> locations;
+  std::vector<uint32_t> checksums;
   std::set<std::string> seen_locations;
   SafeMap<std::string, std::string> remap;
   if (stored_info != nullptr) {
@@ -615,6 +646,7 @@ void ClassLoaderContext::EncodeContextInternal(const ClassLoaderInfo& info,
       remap.Put(info.original_classpath[k], stored_info->classpath[k]);
     }
   }
+
   for (size_t k = 0; k < info.opened_dex_files.size(); k++) {
     const std::unique_ptr<const DexFile>& dex_file = info.opened_dex_files[k];
     if (for_dex2oat) {
@@ -626,6 +658,7 @@ void ClassLoaderContext::EncodeContextInternal(const ClassLoaderInfo& info,
         continue;
       }
     }
+
     std::string location = dex_file->GetLocation();
     // If there is a stored class loader remap, fix up the multidex strings.
     if (!remap.empty()) {
@@ -634,25 +667,22 @@ void ClassLoaderContext::EncodeContextInternal(const ClassLoaderInfo& info,
       CHECK(it != remap.end()) << base_dex_location;
       location = it->second + DexFileLoader::GetMultiDexSuffix(location);
     }
-    if (k > 0) {
-      out << kClasspathSeparator;
-    }
-    if (info.type == kInMemoryDexClassLoader) {
-      out << kInMemoryDexClassLoaderDexLocationMagic;
-    } else if (!base_dir.empty() && location.substr(0, base_dir.length()) == base_dir) {
-      // Find paths that were relative and convert them back from absolute.
-      out << location.substr(base_dir.length() + 1).c_str();
-    } else {
-      out << location.c_str();
-    }
+    locations.emplace_back(std::move(location));
+
     // dex2oat does not need the checksums.
     if (!for_dex2oat) {
-      out << kDexFileChecksumSeparator;
-      out << dex_file->GetLocationChecksum();
+      checksums.push_back(dex_file->GetLocationChecksum());
     }
   }
-  out << kClassLoaderClosingMark;
+  EncodeClassPath(base_dir, locations, checksums, info.type, out);
+  EncodeSharedLibAndParent(info, base_dir, for_dex2oat, stored_info, out);
+}
 
+void ClassLoaderContext::EncodeSharedLibAndParent(const ClassLoaderInfo& info,
+                                                  const std::string& base_dir,
+                                                  bool for_dex2oat,
+                                                  ClassLoaderInfo* stored_info,
+                                                  std::ostringstream& out) const {
   if (!info.shared_libraries.empty()) {
     out << kClassLoaderSharedLibraryOpeningMark;
     for (uint32_t i = 0; i < info.shared_libraries.size(); ++i) {
