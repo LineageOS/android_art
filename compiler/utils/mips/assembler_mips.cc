@@ -5191,6 +5191,17 @@ void MipsAssembler::VerifyObject(FrameOffset src ATTRIBUTE_UNUSED,
   // TODO: not validating references.
 }
 
+void MipsAssembler::Jump(ManagedRegister mbase, Offset offset, ManagedRegister mscratch) {
+  MipsManagedRegister base = mbase.AsMips();
+  MipsManagedRegister scratch = mscratch.AsMips();
+  CHECK(base.IsCoreRegister()) << base;
+  CHECK(scratch.IsCoreRegister()) << scratch;
+  LoadFromOffset(kLoadWord, scratch.AsCoreRegister(),
+                 base.AsCoreRegister(), offset.Int32Value());
+  Jr(scratch.AsCoreRegister());
+  NopIfNoReordering();
+}
+
 void MipsAssembler::Call(ManagedRegister mbase, Offset offset, ManagedRegister mscratch) {
   MipsManagedRegister base = mbase.AsMips();
   MipsManagedRegister scratch = mscratch.AsMips();
