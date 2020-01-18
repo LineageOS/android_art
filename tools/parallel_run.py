@@ -60,7 +60,7 @@ def main():
         fs = ws.not_done
         done = list(map(lambda a: a.result(), ws.done))
         cnt += len(done)
-        print("{} runs".format(cnt))
+        print("\r{} runs".format(cnt), end="")
         failed = [d for d,r in done if r != 0]
         succ = [d for d,r in done if r == 0]
         for f in succ:
@@ -68,7 +68,7 @@ def main():
         if len(failed) != 0:
           if not found_fail:
             found_fail = True
-            print("Failed at {} runs".format(cnt))
+            print("\rFailed at {} runs".format(cnt))
             if len(failed) != 1:
               for f,i in zip(failed, range(len(failed))):
                 shutil.copyfile(f, args.out+"."+str(i))
