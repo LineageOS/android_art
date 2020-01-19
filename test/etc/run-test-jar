@@ -1269,7 +1269,24 @@ else
       for var in ANDROID_PRINTF_LOG ANDROID_DATA ANDROID_ROOT ANDROID_I18N_ROOT ANDROID_TZDATA_ROOT ANDROID_ART_ROOT LD_LIBRARY_PATH DYLD_LIBRARY_PATH PATH LD_USE_LOAD_BIAS; do
         echo export $var="${!var}" >> ${DEX_LOCATION}/runit.sh
       done
-      echo $cmdline "2>&1" >> ${DEX_LOCATION}/runit.sh
+      if [ "$DEV_MODE" = "y" ]; then
+        echo $cmdline "2>&1" >> ${DEX_LOCATION}/runit.sh
+      else
+        echo 'STDERR=$(mktemp)' >> ${DEX_LOCATION}/runit.sh
+        echo 'STDOUT=$(mktemp)' >> ${DEX_LOCATION}/runit.sh
+        echo $cmdline '2>${STDERR} >${STDOUT}' >> ${DEX_LOCATION}/runit.sh
+        echo 'if diff ${STDOUT} $ANDROID_DATA/expected.txt; then' >> ${DEX_LOCATION}/runit.sh
+        echo '  rm -f ${STDOUT} ${STDERR}' >> ${DEX_LOCATION}/runit.sh
+        echo '  exit 0' >> ${DEX_LOCATION}/runit.sh
+        echo 'else' >> ${DEX_LOCATION}/runit.sh
+        echo '  echo  STDOUT:' >> ${DEX_LOCATION}/runit.sh
+        echo '  cat ${STDOUT}' >> ${DEX_LOCATION}/runit.sh
+        echo '  echo  STDERR:' >> ${DEX_LOCATION}/runit.sh
+        echo '  cat ${STDERR}' >> ${DEX_LOCATION}/runit.sh
+        echo '  rm -f ${STDOUT} ${STDERR}' >> ${DEX_LOCATION}/runit.sh
+        echo '  exit 1' >> ${DEX_LOCATION}/runit.sh
+        echo 'fi' >> ${DEX_LOCATION}/runit.sh
+      fi
       chmod u+x $DEX_LOCATION/runit.sh
       echo "Runnable test script written to ${DEX_LOCATION}/runit.sh"
     fi
