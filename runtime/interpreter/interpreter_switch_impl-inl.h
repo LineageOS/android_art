@@ -343,6 +343,9 @@ class InstructionHandler {
     if (UNLIKELY(!array->CheckIsValidIndex(index))) {
       return false;  // Pending exception.
     } else {
+      if (transaction_active && !CheckWriteConstraint(self, array)) {
+        return false;
+      }
       array->template SetWithoutChecks<transaction_active>(index, value);
     }
     return true;
@@ -974,7 +977,8 @@ class InstructionHandler {
     ObjPtr<mirror::Object> val = GetVRegReference(A());
     ObjPtr<mirror::ObjectArray<mirror::Object>> array = a->AsObjectArray<mirror::Object>();
     if (array->CheckIsValidIndex(index) && array->CheckAssignable(val)) {
-      if (transaction_active && !CheckWriteValueConstraint(self, val)) {
+      if (transaction_active &&
+          (!CheckWriteConstraint(self, array) || !CheckWriteValueConstraint(self, val))) {
         return false;
       }
       array->SetWithoutChecks<transaction_active>(index, val);

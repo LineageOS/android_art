@@ -2626,6 +2626,7 @@ class Dex2Oat final {
 
     if (compiler_options_->IsForceDeterminism()) {
       // To make identity hashcode deterministic, set a known seed.
+      // TODO: Select a different seed for boot image extensions; maybe hash dex file checksums.
       mirror::Object::SetHashCodeSeed(987654321U);
     }
 
