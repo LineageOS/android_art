@@ -1140,12 +1140,15 @@ void HInstructionBuilder::BuildConstructorFenceForAllocation(HInstruction* alloc
 
 static bool IsInBootImage(ObjPtr<mirror::Class> cls, const CompilerOptions& compiler_options)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (compiler_options.IsBootImage()) {
+  if (Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(cls)) {
+    return true;
+  }
+  if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
     std::string temp;
     const char* descriptor = cls->GetDescriptor(&temp);
     return compiler_options.IsImageClass(descriptor);
   } else {
-    return Runtime::Current()->GetHeap()->FindSpaceFromObject(cls, false)->IsImageSpace();
+    return false;
   }
 }
 
