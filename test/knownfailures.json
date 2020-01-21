@@ -96,6 +96,12 @@
                         "slowness of gcstress makes this bad."]
     },
     {
+        "tests": "137-cfi",
+        "variant": "target & 32",
+        "description": ["Flakes in unwinding on armv7."],
+        "bug": "b/147910661"
+    },
+    {
         "tests": "152-dead-large-object",
         "variant": "gcstress",
         "description": ["152-dead-large-object requires a heap larger than what gcstress uses."],
@@ -1286,13 +1292,6 @@
           "These tests directly set -Xjitthreshold:1000 to prevent the jit from compiling any",
           "extra methods. jit-at-first-use would disrupt this."
         ]
-    },
-    {
-        "tests": ["135-MirandaDispatch"],
-        "variant": "interp-ac & 32 & host",
-        "env_vars": {"SANITIZE_HOST": "address"},
-        "bug": "b/112993554",
-        "description": ["Timeout with ASan and interp-ac on 32-bit host (x86)."]
     },
     {
         "tests": ["454-get-vreg", "457-regs"],

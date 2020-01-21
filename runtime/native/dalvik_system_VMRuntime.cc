@@ -280,15 +280,13 @@ static void VMRuntime_setDisabledCompatChangesNative(JNIEnv* env, jobject,
   if (disabled_compat_changes == nullptr) {
     return;
   }
-  std::set<uint64_t> disabled_compat_changes_vec;
+  std::set<uint64_t> disabled_compat_changes_set;
   int length = env->GetArrayLength(disabled_compat_changes);
   jlong* elements = env->GetLongArrayElements(disabled_compat_changes, /*isCopy*/nullptr);
   for (int i = 0; i < length; i++) {
-    disabled_compat_changes_vec.insert(static_cast<uint64_t>(elements[i]));
+    disabled_compat_changes_set.insert(static_cast<uint64_t>(elements[i]));
   }
-  Runtime::Current()->SetDisabledCompatChanges(disabled_compat_changes_vec);
-
-  // TODO(145743810): pipe into libc as well.
+  Runtime::Current()->SetDisabledCompatChanges(disabled_compat_changes_set);
 }
 
 static inline size_t clamp_to_size_t(jlong n) {

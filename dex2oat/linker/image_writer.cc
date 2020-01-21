@@ -2152,6 +2152,7 @@ void ImageWriter::LayoutHelper::VerifyImageBinSlotsAssigned() {
     }
   }
 
+  std::vector<mirror::Object*> missed_objects;
   auto ensure_bin_slots_assigned = [&](mirror::Object* obj)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     if (!image_writer_->IsInBootImage(obj)) {
@@ -2188,12 +2189,24 @@ void ImageWriter::LayoutHelper::VerifyImageBinSlotsAssigned() {
             return;
           }
         }
-        LOG(FATAL) << "Image object without assigned bin slot: "
-            << mirror::Object::PrettyTypeOf(obj) << " " << obj;
+        missed_objects.push_back(obj);
       }
     }
   };
   Runtime::Current()->GetHeap()->VisitObjects(ensure_bin_slots_assigned);
+  if (!missed_objects.empty()) {
+    const gc::Verification* v = Runtime::Current()->GetHeap()->GetVerification();
+    size_t num_missed_objects = missed_objects.size();
+    size_t num_paths = std::min<size_t>(num_missed_objects, 5u);  // Do not flood the output.
+    ArrayRef<mirror::Object*> missed_objects_head =
+        ArrayRef<mirror::Object*>(missed_objects).SubArray(/*pos=*/ 0u, /*length=*/ num_paths);
+    for (mirror::Object* obj : missed_objects_head) {
+      LOG(ERROR) << "Image object without assigned bin slot: "
+          << mirror::Object::PrettyTypeOf(obj) << " " << obj
+          << " " << v->FirstPathFromRootSet(obj);
+    }
+    LOG(FATAL) << "Found " << num_missed_objects << " objects without assigned bin slots.";
+  }
 }
 
 void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {

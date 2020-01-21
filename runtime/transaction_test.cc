@@ -606,18 +606,22 @@ TEST_F(TransactionTest, FinalizableAbortClass) {
 
 TEST_F(TransactionTest, Constraints) {
   ScopedObjectAccess soa(Thread::Current());
-  StackHandleScope<5> hs(soa.Self());
+  StackHandleScope<11> hs(soa.Self());
   Handle<mirror::ClassLoader> class_loader(
       hs.NewHandle(soa.Decode<mirror::ClassLoader>(LoadDex("Transaction"))));
 
+  gc::Heap* heap = Runtime::Current()->GetHeap();
   Handle<mirror::Class> boolean_class = hs.NewHandle(
       class_linker_->FindClass(soa.Self(), "Ljava/lang/Boolean;", class_loader));
+  ASSERT_TRUE(boolean_class != nullptr);
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(boolean_class.Get()));
   ArtField* true_field =
       mirror::Class::FindField(soa.Self(), boolean_class.Get(), "TRUE", "Ljava/lang/Boolean;");
   ASSERT_TRUE(true_field != nullptr);
   ASSERT_TRUE(true_field->IsStatic());
   Handle<mirror::Object> true_value = hs.NewHandle(true_field->GetObject(boolean_class.Get()));
   ASSERT_TRUE(true_value != nullptr);
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(true_value.Get()));
   ArtField* value_field =
       mirror::Class::FindField(soa.Self(), boolean_class.Get(), "value", "Z");
   ASSERT_TRUE(value_field != nullptr);
@@ -625,50 +629,112 @@ TEST_F(TransactionTest, Constraints) {
 
   Handle<mirror::Class> static_field_class(hs.NewHandle(
       class_linker_->FindClass(soa.Self(), "LTransaction$StaticFieldClass;", class_loader)));
+  ASSERT_TRUE(static_field_class != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(static_field_class.Get()));
   ArtField* int_field =
       mirror::Class::FindField(soa.Self(), static_field_class.Get(), "intField", "I");
   ASSERT_TRUE(int_field != nullptr);
 
-  Handle<mirror::Class> long_array_dim2 = hs.NewHandle(
+  Handle<mirror::Class> static_fields_test_class(hs.NewHandle(
+      class_linker_->FindClass(soa.Self(), "LStaticFieldsTest;", class_loader)));
+  ASSERT_TRUE(static_fields_test_class != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(static_fields_test_class.Get()));
+  ArtField* static_fields_test_int_field =
+      mirror::Class::FindField(soa.Self(), static_fields_test_class.Get(), "intField", "I");
+  ASSERT_TRUE(static_fields_test_int_field != nullptr);
+
+  Handle<mirror::Class> instance_fields_test_class(hs.NewHandle(
+      class_linker_->FindClass(soa.Self(), "LInstanceFieldsTest;", class_loader)));
+  ASSERT_TRUE(instance_fields_test_class != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(instance_fields_test_class.Get()));
+  ArtField* instance_fields_test_int_field =
+      mirror::Class::FindField(soa.Self(), instance_fields_test_class.Get(), "intField", "I");
+  ASSERT_TRUE(instance_fields_test_int_field != nullptr);
+  Handle<mirror::Object> instance_fields_test_object = hs.NewHandle(
+      instance_fields_test_class->Alloc(soa.Self(), heap->GetCurrentAllocator()));
+  ASSERT_TRUE(instance_fields_test_object != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(instance_fields_test_object.Get()));
+
+  Handle<mirror::Class> long_array_dim2_class = hs.NewHandle(
       class_linker_->FindClass(soa.Self(), "[[J", class_loader));
+  ASSERT_TRUE(long_array_dim2_class != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(long_array_dim2_class.Get()));
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(long_array_dim2_class->GetComponentType()));
+  Handle<mirror::Array> long_array_dim2 = hs.NewHandle(mirror::Array::Alloc(
+      soa.Self(),
+      long_array_dim2_class.Get(),
+      /*component_count=*/ 1,
+      long_array_dim2_class->GetComponentSizeShift(),
+      heap->GetCurrentAllocator()));
   ASSERT_TRUE(long_array_dim2 != nullptr);
-  gc::Heap* heap = Runtime::Current()->GetHeap();
   ASSERT_FALSE(heap->ObjectIsInBootImageSpace(long_array_dim2.Get()));
-  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(long_array_dim2->GetComponentType()));
+  Handle<mirror::Array> long_array = hs.NewHandle(mirror::Array::Alloc(
+      soa.Self(),
+      long_array_dim2_class->GetComponentType(),
+      /*component_count=*/ 1,
+      long_array_dim2_class->GetComponentType()->GetComponentSizeShift(),
+      heap->GetCurrentAllocator()));
+  ASSERT_TRUE(long_array != nullptr);
+  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(long_array.Get()));
+
+  // Use the Array's IfTable as an array from the boot image.
+  Handle<mirror::ObjectArray<mirror::Object>> array_iftable =
+      hs.NewHandle(long_array_dim2_class->GetIfTable());
+  ASSERT_TRUE(array_iftable != nullptr);
+  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(array_iftable.Get()));
 
   // Test non-strict transaction.
   Transaction transaction(/*strict=*/ false, /*root=*/ nullptr);
   // Static field in boot image.
-  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(boolean_class.Get()));
-  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), boolean_class.Get(), true_field));
-  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), boolean_class.Get(), true_field));
-  // Instance field in boot image. Do not check ReadConstraint(), it expects only static fields.
-  ASSERT_TRUE(heap->ObjectIsInBootImageSpace(true_value.Get()));
-  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), true_value.Get(), value_field));
+  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), boolean_class.Get()));
+  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), boolean_class.Get()));
+  // Instance field or array element in boot image.
+  // Do not check ReadConstraint(), it expects only static fields (checks for class object).
+  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), true_value.Get()));
+  EXPECT_TRUE(transaction.WriteConstraint(soa.Self(), array_iftable.Get()));
   // Static field not in boot image.
-  ASSERT_FALSE(heap->ObjectIsInBootImageSpace(static_field_class.Get()));
-  EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
-  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+  EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), static_fields_test_class.Get()));
+  EXPECT_FALSE(transaction.ReadConstraint(soa.Self(), static_fields_test_class.Get()));
+  // Instance field or array element not in boot image.
+  // Do not check ReadConstraint(), it expects only static fields (checks for class object).
+  EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), instance_fields_test_object.Get()));
+  EXPECT_FALSE(transaction.WriteConstraint(soa.Self(), long_array_dim2.Get()));
   // Write value constraints.
-  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), static_field_class.Get()));
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), static_fields_test_class.Get()));
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), instance_fields_test_object.Get()));
+  EXPECT_TRUE(transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetClass()));
   EXPECT_TRUE(transaction.WriteValueConstraint(soa.Self(), long_array_dim2.Get()));
-  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetComponentType()));
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), long_array->GetClass()));
+  EXPECT_FALSE(transaction.WriteValueConstraint(soa.Self(), long_array.Get()));
 
   // Test strict transaction.
   Transaction strict_transaction(/*strict=*/ true, /*root=*/ static_field_class.Get());
-  // Static field in another class.
-  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), boolean_class.Get(), true_field));
-  EXPECT_TRUE(strict_transaction.ReadConstraint(soa.Self(), boolean_class.Get(), true_field));
-  // Instance field in another class. Do not check ReadConstraint(), it expects only static fields.
-  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), true_value.Get(), value_field));
+  // Static field in boot image.
+  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), boolean_class.Get()));
+  EXPECT_TRUE(strict_transaction.ReadConstraint(soa.Self(), boolean_class.Get()));
+  // Instance field or array element in boot image.
+  // Do not check ReadConstraint(), it expects only static fields (checks for class object).
+  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), true_value.Get()));
+  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), array_iftable.Get()));
+  // Static field in another class not in boot image.
+  EXPECT_TRUE(strict_transaction.WriteConstraint(soa.Self(), static_fields_test_class.Get()));
+  EXPECT_TRUE(strict_transaction.ReadConstraint(soa.Self(), static_fields_test_class.Get()));
+  // Instance field or array element not in boot image.
+  // Do not check ReadConstraint(), it expects only static fields (checks for class object).
+  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), instance_fields_test_object.Get()));
+  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), long_array_dim2.Get()));
   // Static field in the same class.
-  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), static_field_class.Get(), int_field));
-  EXPECT_FALSE(strict_transaction.ReadConstraint(soa.Self(), static_field_class.Get(), int_field));
+  EXPECT_FALSE(strict_transaction.WriteConstraint(soa.Self(), static_field_class.Get()));
+  EXPECT_FALSE(strict_transaction.ReadConstraint(soa.Self(), static_field_class.Get()));
   // Write value constraints.
-  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), static_field_class.Get()));
-  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2.Get()));
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), static_fields_test_class.Get()));
   EXPECT_FALSE(
-      strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetComponentType()));
+      strict_transaction.WriteValueConstraint(soa.Self(), instance_fields_test_object.Get()));
+  // TODO: The following may be revised, see a TODO in Transaction::WriteValueConstraint().
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2->GetClass()));
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array_dim2.Get()));
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array->GetClass()));
+  EXPECT_FALSE(strict_transaction.WriteValueConstraint(soa.Self(), long_array.Get()));
 }
 
 }  // namespace art
