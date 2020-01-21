@@ -32,7 +32,6 @@
 #include "base/locks.h"
 #include "base/macros.h"
 #include "dex/class_accessor.h"
-#include "dex/dex_cache_resolved_classes.h"
 #include "dex/dex_file_types.h"
 #include "gc_root.h"
 #include "handle.h"
@@ -696,9 +695,6 @@ class ClassLinker {
 
   static bool ShouldUseInterpreterEntrypoint(ArtMethod* method, const void* quick_code)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  std::set<DexCacheResolvedClasses> GetResolvedClasses(bool ignore_boot_classes)
-      REQUIRES(!Locks::dex_lock_);
 
   static bool IsBootClassLoader(ScopedObjectAccessAlreadyRunnable& soa,
                                 ObjPtr<mirror::ClassLoader> class_loader)
