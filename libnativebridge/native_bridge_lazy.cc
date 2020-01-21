@@ -60,6 +60,11 @@ bool PreInitializeNativeBridge(const char* app_data_dir, const char* instruction
   return f(app_data_dir, instruction_set);
 }
 
+void PreZygoteForkNativeBridge() {
+  static auto f = GET_FUNC_PTR(PreZygoteForkNativeBridge);
+  return f();
+}
+
 bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
   static auto f = GET_FUNC_PTR(InitializeNativeBridge);
   return f(env, instruction_set);

@@ -54,6 +54,22 @@ cc_library_shared {
     defaults: ["libnativebridge-dummy-defaults"],
 }
 
+cc_library_shared {
+    name: "libnativebridge6-dummy",
+    srcs: ["DummyNativeBridge6.cpp"],
+    defaults: ["libnativebridge-dummy-defaults"],
+    shared_libs: [
+        "libnativebridge6prezygotefork",
+    ],
+}
+
+// A helper library to produce dummy side effect of PreZygoteForkNativeBridge.
+cc_library_shared {
+    name: "libnativebridge6prezygotefork",
+    srcs: ["NativeBridge6PreZygoteFork_lib.cpp"],
+    defaults: ["libnativebridge-dummy-defaults"],
+}
+
 // Build the unit tests.
 cc_defaults {
     name: "libnativebridge-tests-defaults",
@@ -96,11 +112,13 @@ cc_defaults {
         "NativeBridge3InitAnonymousNamespace_test.cpp",
         "NativeBridge3CreateNamespace_test.cpp",
         "NativeBridge3LoadLibraryExt_test.cpp",
+        "NativeBridge6PreZygoteFork_test.cpp",
     ],
 
     shared_libs: [
         "liblog",
         "libnativebridge-dummy",
+        "libnativebridge6prezygotefork",
     ],
     header_libs: ["libbase_headers"],
 }

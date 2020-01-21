@@ -103,6 +103,8 @@ enum NativeBridgeImplementationVersion {
   VENDOR_NAMESPACE_VERSION = 4,
   // The version with runtime namespaces
   RUNTIME_NAMESPACE_VERSION = 5,
+  // The version with pre-zygote-fork hook to support app-zygotes.
+  PRE_ZYGOTE_FORK_VERSION = 6,
 };
 
 // Whether we had an error at some point.
@@ -326,6 +328,17 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
 #endif
 
   return true;
+}
+
+void PreZygoteForkNativeBridge() {
+  if (NativeBridgeInitialized()) {
+    if (isCompatibleWith(PRE_ZYGOTE_FORK_VERSION)) {
+      return callbacks->preZygoteFork();
+    } else {
+      ALOGE("not compatible with version %d, preZygoteFork() isn't invoked",
+            PRE_ZYGOTE_FORK_VERSION);
+    }
+  }
 }
 
 static void SetCpuAbi(JNIEnv* env, jclass build_class, const char* field, const char* value) {

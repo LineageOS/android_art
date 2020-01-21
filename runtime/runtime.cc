@@ -688,6 +688,7 @@ void Runtime::PreZygoteFork() {
     GetJit()->PreZygoteFork();
   }
   heap_->PreZygoteFork();
+  PreZygoteForkNativeBridge();
 }
 
 void Runtime::PostZygoteFork() {
