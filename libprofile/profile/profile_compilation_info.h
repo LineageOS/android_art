@@ -28,7 +28,6 @@
 #include "base/malloc_arena_pool.h"
 #include "base/mem_map.h"
 #include "base/safe_map.h"
-#include "dex/dex_cache_resolved_classes.h"
 #include "dex/dex_file.h"
 #include "dex/dex_file_types.h"
 #include "dex/method_reference.h"
