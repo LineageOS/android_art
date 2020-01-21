@@ -162,7 +162,6 @@ class ClassLinker {
   // properly handle read barriers and object marking.
   bool AddImageSpace(gc::space::ImageSpace* space,
                      Handle<mirror::ClassLoader> class_loader,
-                     jobjectArray dex_elements,
                      const char* dex_location,
                      std::vector<std::unique_ptr<const DexFile>>* out_dex_files,
                      std::string* error_msg)

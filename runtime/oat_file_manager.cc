@@ -571,7 +571,6 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
             ScopedTrace trace2(StringPrintf("Adding image space for location %s", dex_location));
             added_image_space = runtime->GetClassLinker()->AddImageSpace(image_space.get(),
                                                                          h_loader,
-                                                                         dex_elements,
                                                                          dex_location,
                                                                          /*out*/&dex_files,
                                                                          /*out*/&temp_error_msg);

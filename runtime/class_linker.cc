@@ -1278,7 +1278,6 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
     std::vector<std::unique_ptr<const DexFile>> dex_files;
     if (!AddImageSpace(spaces[i],
                        ScopedNullHandle<mirror::ClassLoader>(),
-                       /*dex_elements=*/ nullptr,
                        /*dex_location=*/ boot_class_path_locations[i].c_str(),
                        /*out*/&dex_files,
                        error_msg)) {
@@ -1320,31 +1319,6 @@ bool ClassLinker::IsBootClassLoader(ScopedObjectAccessAlreadyRunnable& soa,
   return class_loader == nullptr ||
        soa.Decode<mirror::Class>(WellKnownClasses::java_lang_BootClassLoader) ==
            class_loader->GetClass();
-}
-
-static bool GetDexPathListElementName(ObjPtr<mirror::Object> element,
-                                      ObjPtr<mirror::String>* out_name)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  ArtField* const dex_file_field =
-      jni::DecodeArtField(WellKnownClasses::dalvik_system_DexPathList__Element_dexFile);
-  ArtField* const dex_file_name_field =
-      jni::DecodeArtField(WellKnownClasses::dalvik_system_DexFile_fileName);
-  DCHECK(dex_file_field != nullptr);
-  DCHECK(dex_file_name_field != nullptr);
-  DCHECK(element != nullptr);
-  CHECK_EQ(dex_file_field->GetDeclaringClass(), element->GetClass()) << element->PrettyTypeOf();
-  ObjPtr<mirror::Object> dex_file = dex_file_field->GetObject(element);
-  if (dex_file == nullptr) {
-    // Null dex file means it was probably a jar with no dex files, return a null string.
-    *out_name = nullptr;
-    return true;
-  }
-  ObjPtr<mirror::Object> name_object = dex_file_name_field->GetObject(dex_file);
-  if (name_object != nullptr) {
-    *out_name = name_object->AsString();
-    return true;
-  }
-  return false;
 }
 
 class CHAOnDeleteUpdateClassVisitor {
@@ -2026,7 +2000,6 @@ static void VerifyAppImage(const ImageHeader& header,
 bool ClassLinker::AddImageSpace(
     gc::space::ImageSpace* space,
     Handle<mirror::ClassLoader> class_loader,
-    jobjectArray dex_elements,
     const char* dex_location,
     std::vector<std::unique_ptr<const DexFile>>* out_dex_files,
     std::string* error_msg) {
@@ -2125,32 +2098,9 @@ bool ClassLinker::AddImageSpace(
   if (app_image) {
     ScopedObjectAccessUnchecked soa(Thread::Current());
     ScopedAssertNoThreadSuspension sants("Checking app image", soa.Self());
-    // Check that the class loader resolves the same way as the ones in the image.
-    // Image class loader [A][B][C][image dex files]
-    // Class loader = [???][dex_elements][image dex files]
-    // Need to ensure that [???][dex_elements] == [A][B][C].
-    // For each class loader, PathClassLoader, the loader checks the parent first. Also the logic
-    // for PathClassLoader does this by looping through the array of dex files. To ensure they
-    // resolve the same way, simply flatten the hierarchy in the way the resolution order would be,
-    // and check that the dex file names are the same.
     if (IsBootClassLoader(soa, image_class_loader.Get())) {
       *error_msg = "Unexpected BootClassLoader in app image";
       return false;
-    }
-    // The dex files of `class_loader` are not setup yet, so we cannot do a full comparison
-    // of `class_loader` and `image_class_loader` in `CompareClassLoaders`. Therefore, we
-    // special case the comparison of dex files of the two class loaders, but then do full
-    // comparisons for their shared libraries and parent.
-    auto elements = soa.Decode<mirror::ObjectArray<mirror::Object>>(dex_elements);
-    std::list<ObjPtr<mirror::String>> loader_dex_file_names;
-    for (auto element : elements->Iterate()) {
-      if (element != nullptr) {
-        // If we are somewhere in the middle of the array, there may be nulls at the end.
-        ObjPtr<mirror::String> name;
-        if (GetDexPathListElementName(element, &name) && name != nullptr) {
-          loader_dex_file_names.push_back(name);
-        }
-      }
     }
   }
 
