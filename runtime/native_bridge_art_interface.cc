@@ -110,6 +110,10 @@ void PreInitializeNativeBridge(const std::string& dir) {
 #endif
 }
 
+void PreZygoteForkNativeBridge() {
+  android::PreZygoteForkNativeBridge();
+}
+
 void InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
   if (android::NativeBridgeInitialized()) {
     // This happens in apps forked from app-zygote, since native bridge
