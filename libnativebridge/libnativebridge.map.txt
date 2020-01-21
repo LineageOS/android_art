@@ -32,6 +32,7 @@ LIBNATIVEBRIDGE_1 {
     NativeBridgeGetTrampoline;
     LoadNativeBridge;
     PreInitializeNativeBridge;
+    PreZygoteForkNativeBridge;
     InitializeNativeBridge;
     NativeBridgeGetVersion;
     NativeBridgeGetSignalHandler;
