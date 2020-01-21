@@ -150,7 +150,6 @@ class ProfileSaver {
   uint64_t total_ms_of_sleep_;
   uint64_t total_ns_of_work_;
   // TODO(calin): replace with an actual size.
-  uint64_t max_number_of_profile_entries_cached_;
   uint64_t total_number_of_hot_spikes_;
   uint64_t total_number_of_wake_ups_;
 

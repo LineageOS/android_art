@@ -98,7 +98,6 @@ ProfileSaver::ProfileSaver(const ProfileSaverOptions& options,
       total_number_of_failed_writes_(0),
       total_ms_of_sleep_(0),
       total_ns_of_work_(0),
-      max_number_of_profile_entries_cached_(0),
       total_number_of_hot_spikes_(0),
       total_number_of_wake_ups_(0),
       options_(options) {
@@ -439,10 +438,8 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
                                   &hot_methods,
                                   &sampled_methods);
   MutexLock mu(self, *Locks::profiler_lock_);
-  uint64_t total_number_of_profile_entries_cached = 0;
 
   for (const auto& it : tracked_dex_base_locations_) {
-    std::set<DexCacheResolvedClasses> resolved_classes_for_location;
     const std::string& filename = it.first;
     auto info_it = profile_cache_.find(filename);
     if (info_it == profile_cache_.end()) {
@@ -507,11 +504,7 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
         VLOG(profiler) << "Location not found " << base_location;
       }
     }
-    total_number_of_profile_entries_cached += resolved_classes_for_location.size();
   }
-  max_number_of_profile_entries_cached_ = std::max(
-      max_number_of_profile_entries_cached_,
-      total_number_of_profile_entries_cached);
   VLOG(profiler) << "Profile saver recorded " << hot_methods.NumReferences() << " hot methods and "
                  << sampled_methods.NumReferences() << " sampled methods with threshold "
                  << hot_method_sample_threshold << " in "
@@ -913,8 +906,6 @@ void ProfileSaver::DumpInfo(std::ostream& os) {
      << "ProfileSaver total_number_of_failed_writes=" << total_number_of_failed_writes_ << '\n'
      << "ProfileSaver total_ms_of_sleep=" << total_ms_of_sleep_ << '\n'
      << "ProfileSaver total_ms_of_work=" << NsToMs(total_ns_of_work_) << '\n'
-     << "ProfileSaver max_number_profile_entries_cached="
-     << max_number_of_profile_entries_cached_ << '\n'
      << "ProfileSaver total_number_of_hot_spikes=" << total_number_of_hot_spikes_ << '\n'
      << "ProfileSaver total_number_of_wake_ups=" << total_number_of_wake_ups_ << '\n';
 }
