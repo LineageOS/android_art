@@ -2271,19 +2271,26 @@ class ClassDefinitionPauser : public art::ClassLoadCallback {
   }
   ~ClassDefinitionPauser() REQUIRES_SHARED(art::Locks::mutator_lock_) {
     art::Locks::mutator_lock_->AssertSharedHeld(self_);
+    CHECK(release_) << "Must call Release()";
+  }
+  void Release() REQUIRES(art::Locks::mutator_lock_) {
     if (is_running_) {
+      art::Locks::mutator_lock_->AssertExclusiveHeld(self_);
       uint32_t count;
       // Wake up everything.
       {
         art::MutexLock mu(self_, release_mu_);
         release_ = true;
+        // We have an exclusive mutator so all threads must be suspended and therefore they've
+        // either already incremented this count_ or they are stuck somewhere before it.
         count = count_;
         release_cond_.Broadcast(self_);
       }
       // Wait for all threads to leave this structs code.
-      art::ScopedThreadSuspension sts(self_, art::ThreadState::kWaiting);
       VLOG(plugin) << "Resuming " << count << " threads paused before class-allocation!";
-      release_barrier_.Increment(self_, count);
+      release_barrier_.Increment</*locks=*/art::Barrier::kAllowHoldingLocks>(self_, count);
+    } else {
+      release_ = true;
     }
   }
   void BeginDefineClass() override REQUIRES_SHARED(art::Locks::mutator_lock_) {
@@ -2298,22 +2305,22 @@ class ClassDefinitionPauser : public art::ClassLoadCallback {
                    << " allowed to proceed despite class-def pause initiated by " << *self_;
       return;
     }
+    // If we are suspended (no mutator-lock) then the pausing thread could do everything before the
+    // count_++ including destroying this object, causing UAF/deadlock.
+    art::Locks::mutator_lock_->AssertSharedHeld(this_thread);
+    ++count_;
     art::ScopedThreadSuspension sts(this_thread, art::ThreadState::kSuspended);
     {
       art::MutexLock mu(this_thread, release_mu_);
-      if (release_) {
-        // Count already retrieved, no need to pass.
-        return;
-      }
       VLOG(plugin) << "Suspending " << *this_thread << " due to class definition. class-def pause "
                    << "initiated by " << *self_;
-      count_++;
       while (!release_) {
         release_cond_.Wait(this_thread);
       }
     }
     release_barrier_.Pass(this_thread);
   }
+
   void EndDefineClass() override REQUIRES_SHARED(art::Locks::mutator_lock_) {
     art::Thread* this_thread = art::Thread::Current();
     if (this_thread == self_) {
@@ -2344,7 +2351,7 @@ class ClassDefinitionPauser : public art::ClassLoadCallback {
   art::Mutex release_mu_;
   art::Barrier release_barrier_;
   art::ConditionVariable release_cond_;
-  uint32_t count_ GUARDED_BY(release_mu_);
+  std::atomic<uint32_t> count_;
   bool release_;
 };
 
@@ -2352,44 +2359,45 @@ class ScopedSuspendClassLoading {
  public:
   ScopedSuspendClassLoading(art::Thread* self, art::Runtime* runtime, RedefinitionDataHolder& h)
       REQUIRES_SHARED(art::Locks::mutator_lock_)
-      : self_(self), runtime_(runtime), paused_(false), pauser_(self_) {
+      : self_(self), runtime_(runtime), pauser_() {
     if (std::any_of(h.begin(), h.end(), [](auto r) REQUIRES_SHARED(art::Locks::mutator_lock_) {
           return r.GetRedefinition().IsStructuralRedefinition();
         })) {
       VLOG(plugin) << "Pausing Class loading for structural redefinition.";
-      paused_ = true;
+      pauser_.emplace(self);
       {
         art::ScopedThreadSuspension sts(self_, art::ThreadState::kNative);
         uint32_t in_progress_defines = 0;
         {
           art::ScopedSuspendAll ssa(__FUNCTION__);
-          pauser_.SetRunning();
-          runtime_->GetRuntimeCallbacks()->AddClassLoadCallback(&pauser_);
+          pauser_->SetRunning();
+          runtime_->GetRuntimeCallbacks()->AddClassLoadCallback(&pauser_.value());
           art::MutexLock mu(self_, *art::Locks::thread_list_lock_);
           runtime_->GetThreadList()->ForEach([&](art::Thread* t) {
             if (t != self_ && t->GetDefineClassCount() != 0) {
               in_progress_defines++;
             }
           });
-          VLOG(plugin) << "Waiting for " << in_progress_defines << " in progress class-loads to finish";
+          VLOG(plugin) << "Waiting for " << in_progress_defines
+                       << " in progress class-loads to finish";
         }
-        pauser_.WaitFor(in_progress_defines);
+        pauser_->WaitFor(in_progress_defines);
       }
     }
   }
   ~ScopedSuspendClassLoading() {
-    if (paused_) {
+    if (pauser_.has_value()) {
       art::ScopedThreadSuspension sts(self_, art::ThreadState::kNative);
       art::ScopedSuspendAll ssa(__FUNCTION__);
-      runtime_->GetRuntimeCallbacks()->RemoveClassLoadCallback(&pauser_);
+      pauser_->Release();
+      runtime_->GetRuntimeCallbacks()->RemoveClassLoadCallback(&pauser_.value());
     }
   }
 
  private:
   art::Thread* self_;
   art::Runtime* runtime_;
-  bool paused_;
-  ClassDefinitionPauser pauser_;
+  std::optional<ClassDefinitionPauser> pauser_;
 };
 
 class ScopedSuspendAllocations {
