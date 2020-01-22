@@ -19,7 +19,12 @@
 
 #include "deoptimization_kind.h"
 
+#include "jni.h"
+
 namespace art {
+
+class ArtMethod;
+class Thread;
 
 #ifndef BUILDING_LIBART
 #error "File and symbols only for use within libart."
