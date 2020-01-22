@@ -16,11 +16,9 @@
 
 package com.android.class2greylist;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 
 import org.apache.commons.cli.CommandLine;
@@ -33,7 +31,7 @@ import org.apache.commons.cli.ParseException;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,21 +44,16 @@ import java.util.stream.Collectors;
  */
 public class Class2Greylist {
 
-    private static final Set<String> GREYLIST_ANNOTATIONS =
-            ImmutableSet.of(
-                    "android.annotation.UnsupportedAppUsage",
-                    "android.compat.annotation.UnsupportedAppUsage",
-                    "dalvik.annotation.compat.UnsupportedAppUsage");
-    private static final Set<String> WHITELIST_ANNOTATIONS = ImmutableSet.of();
+    private static final String UNSUPPORTED_APP_USAGE_ANNOTATION =
+            "android.compat.annotation.UnsupportedAppUsage";
 
-    public static final String FLAG_WHITELIST = "whitelist";
-    public static final String FLAG_GREYLIST = "greylist";
-    public static final String FLAG_BLACKLIST = "blacklist";
-    public static final String FLAG_GREYLIST_MAX_O = "greylist-max-o";
-    public static final String FLAG_GREYLIST_MAX_P = "greylist-max-p";
-    public static final String FLAG_GREYLIST_MAX_Q = "greylist-max-q";
+    private static final String FLAG_GREYLIST = "greylist";
+    private static final String FLAG_BLACKLIST = "blacklist";
+    private static final String FLAG_GREYLIST_MAX_O = "greylist-max-o";
+    private static final String FLAG_GREYLIST_MAX_P = "greylist-max-p";
+    private static final String FLAG_GREYLIST_MAX_Q = "greylist-max-q";
 
-    public static final String FLAG_PUBLIC_API = "public-api";
+    private static final String FLAG_PUBLIC_API = "public-api";
 
     private static final Map<Integer, String> TARGET_SDK_TO_LIST_MAP;
     static {
@@ -74,8 +67,6 @@ public class Class2Greylist {
     }
 
     private final Status mStatus;
-    private final String mCsvFlagsFile;
-    private final String mCsvMetadataFile;
     private final String[] mJarFiles;
     private final AnnotationConsumer mOutput;
     private final Set<String> mPublicApis;
@@ -164,23 +155,20 @@ public class Class2Greylist {
 
     }
 
-    @VisibleForTesting
-    Class2Greylist(Status status, String stubApiFlagsFile, String csvFlagsFile,
+    private Class2Greylist(Status status, String stubApiFlagsFile, String csvFlagsFile,
             String csvMetadataFile, String[] jarFiles)
             throws IOException {
         mStatus = status;
-        mCsvFlagsFile = csvFlagsFile;
-        mCsvMetadataFile = csvMetadataFile;
         mJarFiles = jarFiles;
-        if (mCsvMetadataFile != null) {
-            mOutput = new AnnotationPropertyWriter(mCsvMetadataFile);
+        if (csvMetadataFile != null) {
+            mOutput = new AnnotationPropertyWriter(csvMetadataFile);
         } else {
-            mOutput = new HiddenapiFlagsWriter(mCsvFlagsFile);
+            mOutput = new HiddenapiFlagsWriter(csvFlagsFile);
         }
 
         if (stubApiFlagsFile != null) {
             mPublicApis =
-                    Files.readLines(new File(stubApiFlagsFile), Charset.forName("UTF-8")).stream()
+                    Files.readLines(new File(stubApiFlagsFile), StandardCharsets.UTF_8).stream()
                         .map(s -> Splitter.on(",").splitToList(s))
                         .filter(s -> s.contains(FLAG_PUBLIC_API))
                         .map(s -> s.get(0))
@@ -195,12 +183,12 @@ public class Class2Greylist {
         UnsupportedAppUsageAnnotationHandler greylistAnnotationHandler =
                 new UnsupportedAppUsageAnnotationHandler(
                     mStatus, mOutput, mPublicApis, TARGET_SDK_TO_LIST_MAP);
-        GREYLIST_ANNOTATIONS
-            .forEach(a -> addRepeatedAnnotationHandlers(
+
+        addRepeatedAnnotationHandlers(
                 builder,
-                classNameToSignature(a),
-                classNameToSignature(a + "$Container"),
-                greylistAnnotationHandler));
+                classNameToSignature(UNSUPPORTED_APP_USAGE_ANNOTATION),
+                classNameToSignature(UNSUPPORTED_APP_USAGE_ANNOTATION + "$Container"),
+                greylistAnnotationHandler);
 
         CovariantReturnTypeHandler covariantReturnTypeHandler = new CovariantReturnTypeHandler(
             mOutput, mPublicApis, FLAG_PUBLIC_API);
@@ -232,7 +220,7 @@ public class Class2Greylist {
             .put(containerAnnotationName, new RepeatedAnnotationHandler(annotationName, handler));
     }
 
-    private void main() throws IOException {
+    private void main() {
         Map<String, AnnotationHandler> handlers = createAnnotationHandlers();
         for (String jarFile : mJarFiles) {
             mStatus.debug("Processing jar file %s", jarFile);
