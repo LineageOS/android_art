@@ -36,6 +36,10 @@ class BacktraceCollector {
   void Collect();
 
  private:
+  // Try to collect backtrace. Returns false on failure.
+  // It is used to retry backtrace on temporary failure.
+  bool CollectImpl();
+
   uintptr_t* const out_frames_ = nullptr;
   size_t num_frames_ = 0u;
   const size_t max_depth_ = 0u;
