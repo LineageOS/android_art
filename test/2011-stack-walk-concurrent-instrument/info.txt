@@ -1,0 +1,3 @@
+Tests concurrently instrumenting a thread while walking a stack doesn't crash/break.
+
+Bug: 72608560
