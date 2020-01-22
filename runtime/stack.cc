@@ -21,9 +21,11 @@
 
 #include "arch/context.h"
 #include "art_method-inl.h"
+#include "base/aborting.h"
 #include "base/callee_save_type.h"
 #include "base/enums.h"
 #include "base/hex_dump.h"
+#include "base/mutex.h"
 #include "dex/dex_file_types.h"
 #include "entrypoints/entrypoint_utils-inl.h"
 #include "entrypoints/quick/callee_save_frame.h"
@@ -71,6 +73,7 @@ StackVisitor::StackVisitor(Thread* thread,
       cur_oat_quick_method_header_(nullptr),
       num_frames_(num_frames),
       cur_depth_(0),
+      walk_started_(false),
       cur_inline_info_(nullptr, CodeInfo()),
       cur_stack_map_(0, StackMap()),
       context_(context),
@@ -845,186 +848,277 @@ void StackVisitor::WalkStack(bool include_transitions) {
     DCHECK(thread_ == Thread::Current() || thread_->IsSuspended());
   }
   CHECK_EQ(cur_depth_, 0U);
-  bool exit_stubs_installed = Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled();
-  uint32_t instrumentation_stack_depth = 0;
-  size_t inlined_frames_count = 0;
+  CHECK(!walk_started_);
+  walk_started_ = true;
+  bool retry = false;
+  size_t depth;
+  bool skip_to_depth = false;
+  uint64_t current_sequence_number;
+  Thread* self = Thread::Current();
+  // If the instrumentation stack changes due to DeoptimizeThreadStack or similar while we are
+  // running this stack-walk we need to restart and try again.
+  //
+  // This is because when we perform DeoptimizeThreadStack we replace the return-pc of the threads
+  // stack-frames with a trampoline, the actual return-address is placed in the threads
+  // InstrumentationStack. The instrumentation code will fill up this stack as it goes. Since there
+  // is no good way to map instrumentation stack frames to real ones (or vice versa) and we need to
+  // know which instrumentation stack frame we are on in order to find the real return-pc using that
+  // the next stack-frame's size we instead simply keep track of how many instrumentation frames we
+  // have used (as instrumentation_stack_depth). Each time we need a new instrumentation frame we
+  // simply increment this value. This works well enough but if InstrumentationInstallStack is
+  // called concurrently the InstrumentationStack might have frames inserted prior to the point this
+  // StackVisitor is currently at. This would cause the visitor to get the incorrect
+  // instrumentation_frame and start incorrectly walking the stack.
+  //
+  // To prevent this we keep track of when the last update that changes the indexs of
+  // instrumentation frames occurs and restart the stack walk if that changes. To simplify the
+  // process of building stack walkers we also keep track of how many times we have called
+  // VisitFrame and skip that many calls. This prevents any frames from being visited more than once
+  // per 'WalkStack' call.
+  do {
+    retry = false;
+    depth = 0;
+    // Keep track of how far in the stack-walk we are, making sure to also keep track of whether
+    // we've skipped enough to resume calling 'VisitFrame' after a retry.
+    auto increment_depth = [&]() {
+      DCHECK_LE(depth, cur_depth_);
+      ++depth;
+      if (skip_to_depth && depth == cur_depth_) {
+        skip_to_depth = false;
+      } else if (!skip_to_depth) {
+        ++cur_depth_;
+      }
+    };
+    // Wait for any current instrumentation installs to finish, Skip this if we are aborting.
+    if (LIKELY(gAborting == 0)) {
+      MutexLock mu(self, *GetThread()->GetInstrumentationInstallMutex());
+    }
+    // Get Current install state id.
+    {
+      MutexLock mu(self, *GetThread()->GetInstrumentationInstallSequenceNumberMutex());
+      current_sequence_number = GetThread()->GetInstrumentationInstallSequenceNumber();
+    }
+    bool exit_stubs_installed = Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled();
+    uint32_t instrumentation_stack_depth = 0;
+    size_t inlined_frames_count = 0;
 
-  for (const ManagedStack* current_fragment = thread_->GetManagedStack();
-       current_fragment != nullptr; current_fragment = current_fragment->GetLink()) {
-    cur_shadow_frame_ = current_fragment->GetTopShadowFrame();
-    cur_quick_frame_ = current_fragment->GetTopQuickFrame();
-    cur_quick_frame_pc_ = 0;
-    cur_oat_quick_method_header_ = nullptr;
-    if (cur_quick_frame_ != nullptr) {  // Handle quick stack frames.
-      // Can't be both a shadow and a quick fragment.
-      DCHECK(current_fragment->GetTopShadowFrame() == nullptr);
-      ArtMethod* method = *cur_quick_frame_;
-      DCHECK(method != nullptr);
-      bool header_retrieved = false;
-      if (method->IsNative()) {
-        // We do not have a PC for the first frame, so we cannot simply use
-        // ArtMethod::GetOatQuickMethodHeader() as we're unable to distinguish there
-        // between GenericJNI frame and JIT-compiled JNI stub; the entrypoint may have
-        // changed since the frame was entered. The top quick frame tag indicates
-        // GenericJNI here, otherwise it's either AOT-compiled or JNI-compiled JNI stub.
-        if (UNLIKELY(current_fragment->GetTopQuickFrameTag())) {
-          // The generic JNI does not have any method header.
-          cur_oat_quick_method_header_ = nullptr;
-        } else {
-          const void* existing_entry_point = method->GetEntryPointFromQuickCompiledCode();
-          CHECK(existing_entry_point != nullptr);
-          Runtime* runtime = Runtime::Current();
-          ClassLinker* class_linker = runtime->GetClassLinker();
-          // Check whether we can quickly get the header from the current entrypoint.
-          if (!class_linker->IsQuickGenericJniStub(existing_entry_point) &&
-              !class_linker->IsQuickResolutionStub(existing_entry_point) &&
-              existing_entry_point != GetQuickInstrumentationEntryPoint()) {
-            cur_oat_quick_method_header_ =
-                OatQuickMethodHeader::FromEntryPoint(existing_entry_point);
+    for (const ManagedStack* current_fragment = thread_->GetManagedStack();
+         current_fragment != nullptr;
+         current_fragment = current_fragment->GetLink()) {
+      cur_shadow_frame_ = current_fragment->GetTopShadowFrame();
+      cur_quick_frame_ = current_fragment->GetTopQuickFrame();
+      cur_quick_frame_pc_ = 0;
+      cur_oat_quick_method_header_ = nullptr;
+      if (cur_quick_frame_ != nullptr) {  // Handle quick stack frames.
+        // Can't be both a shadow and a quick fragment.
+        DCHECK(current_fragment->GetTopShadowFrame() == nullptr);
+        ArtMethod* method = *cur_quick_frame_;
+        DCHECK(method != nullptr);
+        bool header_retrieved = false;
+        if (method->IsNative()) {
+          // We do not have a PC for the first frame, so we cannot simply use
+          // ArtMethod::GetOatQuickMethodHeader() as we're unable to distinguish there
+          // between GenericJNI frame and JIT-compiled JNI stub; the entrypoint may have
+          // changed since the frame was entered. The top quick frame tag indicates
+          // GenericJNI here, otherwise it's either AOT-compiled or JNI-compiled JNI stub.
+          if (UNLIKELY(current_fragment->GetTopQuickFrameTag())) {
+            // The generic JNI does not have any method header.
+            cur_oat_quick_method_header_ = nullptr;
           } else {
-            const void* code = method->GetOatMethodQuickCode(class_linker->GetImagePointerSize());
-            if (code != nullptr) {
-              cur_oat_quick_method_header_ = OatQuickMethodHeader::FromEntryPoint(code);
+            const void* existing_entry_point = method->GetEntryPointFromQuickCompiledCode();
+            CHECK(existing_entry_point != nullptr);
+            Runtime* runtime = Runtime::Current();
+            ClassLinker* class_linker = runtime->GetClassLinker();
+            // Check whether we can quickly get the header from the current entrypoint.
+            if (!class_linker->IsQuickGenericJniStub(existing_entry_point) &&
+                !class_linker->IsQuickResolutionStub(existing_entry_point) &&
+                existing_entry_point != GetQuickInstrumentationEntryPoint()) {
+              cur_oat_quick_method_header_ =
+                  OatQuickMethodHeader::FromEntryPoint(existing_entry_point);
             } else {
-              // This must be a JITted JNI stub frame.
-              CHECK(runtime->GetJit() != nullptr);
-              code = runtime->GetJit()->GetCodeCache()->GetJniStubCode(method);
-              CHECK(code != nullptr) << method->PrettyMethod();
-              cur_oat_quick_method_header_ = OatQuickMethodHeader::FromCodePointer(code);
-            }
-          }
-        }
-        header_retrieved = true;
-      }
-      while (method != nullptr) {
-        if (!header_retrieved) {
-          cur_oat_quick_method_header_ = method->GetOatQuickMethodHeader(cur_quick_frame_pc_);
-        }
-        header_retrieved = false;  // Force header retrieval in next iteration.
-        SanityCheckFrame();
-
-        if ((walk_kind_ == StackWalkKind::kIncludeInlinedFrames)
-            && (cur_oat_quick_method_header_ != nullptr)
-            && cur_oat_quick_method_header_->IsOptimized()
-            && !method->IsNative()  // JNI methods cannot have any inlined frames.
-            && CodeInfo::HasInlineInfo(cur_oat_quick_method_header_->GetOptimizedCodeInfoPtr())) {
-          DCHECK_NE(cur_quick_frame_pc_, 0u);
-          CodeInfo* code_info = GetCurrentInlineInfo();
-          StackMap* stack_map = GetCurrentStackMap();
-          if (stack_map->IsValid() && stack_map->HasInlineInfo()) {
-            DCHECK_EQ(current_inline_frames_.size(), 0u);
-            for (current_inline_frames_ = code_info->GetInlineInfosOf(*stack_map);
-                 !current_inline_frames_.empty();
-                 current_inline_frames_.pop_back()) {
-              bool should_continue = VisitFrame();
-              if (UNLIKELY(!should_continue)) {
-                return;
+              const void* code = method->GetOatMethodQuickCode(class_linker->GetImagePointerSize());
+              if (code != nullptr) {
+                cur_oat_quick_method_header_ = OatQuickMethodHeader::FromEntryPoint(code);
+              } else {
+                // This must be a JITted JNI stub frame.
+                CHECK(runtime->GetJit() != nullptr);
+                code = runtime->GetJit()->GetCodeCache()->GetJniStubCode(method);
+                CHECK(code != nullptr) << method->PrettyMethod();
+                cur_oat_quick_method_header_ = OatQuickMethodHeader::FromCodePointer(code);
               }
-              cur_depth_++;
-              inlined_frames_count++;
             }
           }
+          header_retrieved = true;
         }
-
-        bool should_continue = VisitFrame();
-        if (UNLIKELY(!should_continue)) {
-          return;
-        }
-
-        QuickMethodFrameInfo frame_info = GetCurrentQuickFrameInfo();
-        if (context_ != nullptr) {
-          context_->FillCalleeSaves(reinterpret_cast<uint8_t*>(cur_quick_frame_), frame_info);
-        }
-        // Compute PC for next stack frame from return PC.
-        size_t frame_size = frame_info.FrameSizeInBytes();
-        size_t return_pc_offset = frame_size - sizeof(void*);
-        uint8_t* return_pc_addr = reinterpret_cast<uint8_t*>(cur_quick_frame_) + return_pc_offset;
-        uintptr_t return_pc = *reinterpret_cast<uintptr_t*>(return_pc_addr);
-
-        if (UNLIKELY(exit_stubs_installed ||
-                     reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc)) {
-          // While profiling, the return pc is restored from the side stack, except when walking
-          // the stack for an exception where the side stack will be unwound in VisitFrame.
-          if (reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc) {
-            CHECK_LT(instrumentation_stack_depth, thread_->GetInstrumentationStack()->size());
-            const instrumentation::InstrumentationStackFrame& instrumentation_frame =
-                (*thread_->GetInstrumentationStack())[instrumentation_stack_depth];
-            instrumentation_stack_depth++;
-            if (GetMethod() ==
-                Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveAllCalleeSaves)) {
-              // Skip runtime save all callee frames which are used to deliver exceptions.
-            } else if (instrumentation_frame.interpreter_entry_) {
-              ArtMethod* callee =
-                  Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveRefsAndArgs);
-              CHECK_EQ(GetMethod(), callee) << "Expected: " << ArtMethod::PrettyMethod(callee)
-                                            << " Found: " << ArtMethod::PrettyMethod(GetMethod());
-            } else {
-              // Instrumentation generally doesn't distinguish between a method's obsolete and
-              // non-obsolete version.
-              CHECK_EQ(instrumentation_frame.method_->GetNonObsoleteMethod(),
-                       GetMethod()->GetNonObsoleteMethod())
-                  << "Expected: "
-                  << ArtMethod::PrettyMethod(instrumentation_frame.method_->GetNonObsoleteMethod())
-                  << " Found: " << ArtMethod::PrettyMethod(GetMethod()->GetNonObsoleteMethod());
-            }
-            if (num_frames_ != 0) {
-              // Check agreement of frame Ids only if num_frames_ is computed to avoid infinite
-              // recursion.
-              size_t frame_id = instrumentation::Instrumentation::ComputeFrameId(
-                  thread_,
-                  cur_depth_,
-                  inlined_frames_count);
-              CHECK_EQ(instrumentation_frame.frame_id_, frame_id);
-            }
-            return_pc = instrumentation_frame.return_pc_;
+        while (method != nullptr) {
+          if (!header_retrieved) {
+            cur_oat_quick_method_header_ = method->GetOatQuickMethodHeader(cur_quick_frame_pc_);
           }
-        }
+          header_retrieved = false;  // Force header retrieval in next iteration.
+          SanityCheckFrame();
 
-        cur_quick_frame_pc_ = return_pc;
-        uint8_t* next_frame = reinterpret_cast<uint8_t*>(cur_quick_frame_) + frame_size;
-        cur_quick_frame_ = reinterpret_cast<ArtMethod**>(next_frame);
+          if ((walk_kind_ == StackWalkKind::kIncludeInlinedFrames) &&
+              (cur_oat_quick_method_header_ != nullptr) &&
+              cur_oat_quick_method_header_->IsOptimized() &&
+              !method->IsNative()  // JNI methods cannot have any inlined frames.
+              && CodeInfo::HasInlineInfo(cur_oat_quick_method_header_->GetOptimizedCodeInfoPtr())) {
+            DCHECK_NE(cur_quick_frame_pc_, 0u);
+            CodeInfo* code_info = GetCurrentInlineInfo();
+            StackMap* stack_map = GetCurrentStackMap();
+            if (stack_map->IsValid() && stack_map->HasInlineInfo()) {
+              DCHECK_EQ(current_inline_frames_.size(), 0u);
+              for (current_inline_frames_ = code_info->GetInlineInfosOf(*stack_map);
+                   !current_inline_frames_.empty();
+                   current_inline_frames_.pop_back()) {
+                if (!skip_to_depth) {
+                  bool should_continue = VisitFrame();
+                  if (UNLIKELY(!should_continue)) {
+                    return;
+                  }
+                }
+                increment_depth();
+                inlined_frames_count++;
+              }
+            }
+          }
 
-        if (kDebugStackWalk) {
-          LOG(INFO) << ArtMethod::PrettyMethod(method) << "@" << method << " size=" << frame_size
-              << std::boolalpha
-              << " optimized=" << (cur_oat_quick_method_header_ != nullptr &&
-                                   cur_oat_quick_method_header_->IsOptimized())
-              << " native=" << method->IsNative()
-              << std::noboolalpha
-              << " entrypoints=" << method->GetEntryPointFromQuickCompiledCode()
-              << "," << (method->IsNative() ? method->GetEntryPointFromJni() : nullptr)
-              << " next=" << *cur_quick_frame_;
-        }
+          if (!skip_to_depth) {
+            bool should_continue = VisitFrame();
+            if (UNLIKELY(!should_continue)) {
+              return;
+            }
+          }
+          if (kCount == CountTransitions::kYes || !method->IsRuntimeMethod()) {
+            increment_depth();
+          }
 
-        if (kCount == CountTransitions::kYes || !method->IsRuntimeMethod()) {
-          cur_depth_++;
+          // NB This uses cur_oat_quick_frame_info_ (and hence cur_quick_frame_pc_ & the previous
+          // return_pc_) to determine the frame information.
+          QuickMethodFrameInfo frame_info = GetCurrentQuickFrameInfo();
+          if (context_ != nullptr) {
+            context_->FillCalleeSaves(reinterpret_cast<uint8_t*>(cur_quick_frame_), frame_info);
+          }
+          // Compute PC for next stack frame from return PC.
+          size_t frame_size = frame_info.FrameSizeInBytes();
+          size_t return_pc_offset = frame_size - sizeof(void*);
+          uint8_t* return_pc_addr = reinterpret_cast<uint8_t*>(cur_quick_frame_) + return_pc_offset;
+          uintptr_t return_pc = *reinterpret_cast<uintptr_t*>(return_pc_addr);
+
+          if (UNLIKELY(exit_stubs_installed ||
+                       reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc)) {
+            // While profiling, the return pc is restored from the side stack, except when walking
+            // the stack for an exception where the side stack will be unwound in VisitFrame.
+            if (reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc) {
+              MutexLock mu(self, *GetThread()->GetInstrumentationInstallSequenceNumberMutex());
+              // Instrument-install walks will change the instrumentation-stack but only put things
+              // at the end, so we can continue regardless. We hold the InstrumentationInstallMutex
+              // so we know nothing can mess up the stack.
+              if (!IsStackInstrumentWalk() &&
+                  GetThread()->GetInstrumentationInstallSequenceNumber() !=
+                      current_sequence_number) {
+                if (kDebugStackWalk) {
+                  LOG(INFO) << "Retrying walk from begining due to instrumentation change. "
+                            << "Skipping to depth " << cur_depth_;
+                }
+                skip_to_depth = true;
+                retry = true;
+                // Annoyingly c++ doesn't have a labled continue. If they respected RAII this would
+                // be a good time to use goto but as is we'll just break twice.
+                break;  // From while (method != nullptr)
+              } else if (kIsDebugBuild && IsStackInstrumentWalk()) {
+                GetThread()->GetInstrumentationInstallMutex()->AssertExclusiveHeld(self);
+              }
+              CHECK_LT(instrumentation_stack_depth, thread_->GetInstrumentationStack()->size());
+              const instrumentation::InstrumentationStackFrame& instrumentation_frame =
+                  (*thread_->GetInstrumentationStack())[instrumentation_stack_depth];
+              instrumentation_stack_depth++;
+              if (GetMethod() ==
+                  Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveAllCalleeSaves)) {
+                // Skip runtime save all callee frames which are used to deliver exceptions.
+              } else if (instrumentation_frame.interpreter_entry_) {
+                ArtMethod* callee =
+                    Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveRefsAndArgs);
+                CHECK_EQ(GetMethod(), callee)
+                    << "Expected: " << ArtMethod::PrettyMethod(callee)
+                    << " Found: " << ArtMethod::PrettyMethod(GetMethod());
+              } else {
+                // Instrumentation generally doesn't distinguish between a method's obsolete and
+                // non-obsolete version.
+                CHECK_EQ(instrumentation_frame.method_->GetNonObsoleteMethod(),
+                          GetMethod()->GetNonObsoleteMethod())
+                    << "Expected: "
+                    << ArtMethod::PrettyMethod(
+                            instrumentation_frame.method_->GetNonObsoleteMethod())
+                    << " Found: " << ArtMethod::PrettyMethod(GetMethod()->GetNonObsoleteMethod());
+              }
+              return_pc = instrumentation_frame.return_pc_;
+              // TODO It would be nice to do this check but unfortunately it leads to a race since
+              // we need to perform a recursive stack-walk to calculate the frame-id.
+              // size_t expected_id = instrumentation_frame.frame_id_;
+              // if (num_frames_ != 0) {
+              //   // Check agreement of frame Ids only if num_frames_ is computed to avoid infinite
+              //   // recursion.
+              //   size_t frame_id = instrumentation::Instrumentation::ComputeFrameId(
+              //       thread_,
+              //       // We already incremented depth but we want to get the last visited frame.
+              //       depth - 1,
+              //       inlined_frames_count);
+              //   CHECK_EQ(expected_id, frame_id);
+              // }
+            }
+          }
+
+          cur_quick_frame_pc_ = return_pc;
+          uint8_t* next_frame = reinterpret_cast<uint8_t*>(cur_quick_frame_) + frame_size;
+          cur_quick_frame_ = reinterpret_cast<ArtMethod**>(next_frame);
+
+          if (kDebugStackWalk) {
+            LOG(INFO) << ArtMethod::PrettyMethod(method) << "@" << method << " size=" << frame_size
+                      << std::boolalpha << " optimized="
+                      << (cur_oat_quick_method_header_ != nullptr &&
+                          cur_oat_quick_method_header_->IsOptimized())
+                      << " native=" << method->IsNative() << std::noboolalpha
+                      << " entrypoints=" << method->GetEntryPointFromQuickCompiledCode() << ","
+                      << (method->IsNative() ? method->GetEntryPointFromJni() : nullptr)
+                      << " next=" << *cur_quick_frame_;
+          }
+
+          method = *cur_quick_frame_;
         }
-        method = *cur_quick_frame_;
+        // We want to start again. Break right now.
+        if (retry) {
+          break;  // From for (const ManagedStack* current_fragment = thread_->GetManagedStack();
+        }
+      } else if (cur_shadow_frame_ != nullptr) {
+        do {
+          SanityCheckFrame();
+          if (!skip_to_depth) {
+            bool should_continue = VisitFrame();
+            if (UNLIKELY(!should_continue)) {
+              return;
+            }
+          }
+          increment_depth();
+          cur_shadow_frame_ = cur_shadow_frame_->GetLink();
+        } while (cur_shadow_frame_ != nullptr);
       }
-    } else if (cur_shadow_frame_ != nullptr) {
-      do {
-        SanityCheckFrame();
+      if (!skip_to_depth && include_transitions) {
         bool should_continue = VisitFrame();
-        if (UNLIKELY(!should_continue)) {
+        if (!should_continue) {
           return;
         }
-        cur_depth_++;
-        cur_shadow_frame_ = cur_shadow_frame_->GetLink();
-      } while (cur_shadow_frame_ != nullptr);
-    }
-    if (include_transitions) {
-      bool should_continue = VisitFrame();
-      if (!should_continue) {
-        return;
+      }
+      if (kCount == CountTransitions::kYes) {
+        increment_depth();
       }
     }
-    if (kCount == CountTransitions::kYes) {
-      cur_depth_++;
+    if (retry) {
+      continue;  // Real retry.
     }
-  }
-  if (num_frames_ != 0) {
-    CHECK_EQ(cur_depth_, num_frames_);
-  }
+    if (num_frames_ != 0) {
+      CHECK_EQ(cur_depth_, num_frames_);
+    }
+  } while (retry);
 }
 
 template void StackVisitor::WalkStack<StackVisitor::CountTransitions::kYes>(bool);

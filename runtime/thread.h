@@ -607,6 +607,22 @@ class Thread {
   void NotifyLocked(Thread* self) REQUIRES(wait_mutex_);
 
  public:
+  Mutex* GetInstrumentationInstallMutex() const LOCK_RETURNED(instrumentation_install_mutex_) {
+    return instrumentation_install_mutex_;
+  }
+  Mutex* GetInstrumentationInstallSequenceNumberMutex() const
+      LOCK_RETURNED(instrumentation_install_sequence_number_mutex_) {
+    return instrumentation_install_sequence_number_mutex_;
+  }
+  uint64_t GetInstrumentationInstallSequenceNumber() const
+      REQUIRES(instrumentation_install_sequence_number_mutex_) {
+    return instrumentation_install_sequence_number_;
+  }
+  void IncrementInstrumentationInstallSequenceNumber()
+      REQUIRES(instrumentation_install_sequence_number_mutex_) {
+    ++instrumentation_install_sequence_number_;
+  }
+
   Mutex* GetWaitMutex() const LOCK_RETURNED(wait_mutex_) {
     return wait_mutex_;
   }
@@ -1872,6 +1888,15 @@ class Thread {
 
   // All fields below this line should not be accessed by native code. This means these fields can
   // be modified, rearranged, added or removed without having to modify asm_support.h
+
+  // Mutex that guards instrumentation installation.
+  Mutex* instrumentation_install_mutex_ DEFAULT_MUTEX_ACQUIRED_AFTER;
+
+  // Mutex and id to enable stack-walking to recognize that a concurrent instrumentation-install has
+  // occurred and stack-walking will need to retry.
+  Mutex* instrumentation_install_sequence_number_mutex_ BOTTOM_MUTEX_ACQUIRED_AFTER;
+  uint64_t instrumentation_install_sequence_number_
+      GUARDED_BY(instrumentation_install_sequence_number_mutex_);
 
   // Guards the 'wait_monitor_' members.
   Mutex* wait_mutex_ DEFAULT_MUTEX_ACQUIRED_AFTER;
