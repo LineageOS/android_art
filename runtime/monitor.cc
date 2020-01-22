@@ -99,8 +99,11 @@ Monitor::Monitor(Thread* self, Thread* owner, ObjPtr<mirror::Object> obj, int32_
       wait_set_(nullptr),
       wake_set_(nullptr),
       hash_code_(hash_code),
+      lock_owner_(nullptr),
       lock_owner_method_(nullptr),
       lock_owner_dex_pc_(0),
+      lock_owner_sum_(0),
+      lock_owner_request_(nullptr),
       monitor_id_(MonitorPool::ComputeMonitorId(this, self)) {
 #ifdef __LP64__
   DCHECK(false) << "Should not be reached in 64b";
@@ -126,6 +129,9 @@ Monitor::Monitor(Thread* self,
       wake_set_(nullptr),
       hash_code_(hash_code),
       lock_owner_(nullptr),
+      lock_owner_method_(nullptr),
+      lock_owner_dex_pc_(0),
+      lock_owner_sum_(0),
       lock_owner_request_(nullptr),
       monitor_id_(id) {
 #ifdef __LP64__
