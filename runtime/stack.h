@@ -129,10 +129,6 @@ class StackVisitor {
   bool GetRegisterIfAccessible(uint32_t reg, VRegKind kind, uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  virtual bool IsStackInstrumentWalk() const {
-    return false;
-  }
-
  public:
   virtual ~StackVisitor() {}
   StackVisitor(const StackVisitor&) = default;
@@ -364,8 +360,6 @@ class StackVisitor {
   size_t num_frames_;
   // Depth of the frame we're currently at.
   size_t cur_depth_;
-  // Whether we've received an initial WalkStack call.
-  bool walk_started_;
   // Current inlined frames of the method we are currently at.
   // We keep poping frames from the end as we visit the frames.
   BitTableRange<InlineInfo> current_inline_frames_;
