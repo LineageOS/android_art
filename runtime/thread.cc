@@ -2295,8 +2295,15 @@ void Thread::NotifyThreadGroup(ScopedObjectAccessAlreadyRunnable& soa, jobject t
 
 Thread::Thread(bool daemon)
     : tls32_(daemon),
+      instrumentation_install_sequence_number_(0),
       wait_monitor_(nullptr),
       is_runtime_thread_(false) {
+  instrumentation_install_mutex_ = new Mutex(
+      "a thread instrumentation install mutex",
+      LockLevel::kInstrumentationInstallLock,
+      /*recursive=*/true);
+  instrumentation_install_sequence_number_mutex_ = new Mutex(
+      "a thread instrumentation install sequence number mutex", LockLevel::kGenericBottomLock);
   wait_mutex_ = new Mutex("a thread wait mutex", LockLevel::kThreadWaitLock);
   wait_cond_ = new ConditionVariable("a thread wait condition variable", *wait_mutex_);
   tlsPtr_.instrumentation_stack = new std::deque<instrumentation::InstrumentationStackFrame>;
