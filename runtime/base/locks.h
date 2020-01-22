@@ -97,7 +97,6 @@ enum LockLevel : uint8_t {
   kTracingStreamingLock,
   kClassLoaderClassesLock,
   kDefaultMutexLevel,
-  kInstrumentationInstallLock,
   kDexLock,
   kMarkSweepLargeObjectLock,
   kJdwpObjectRegistryLock,
