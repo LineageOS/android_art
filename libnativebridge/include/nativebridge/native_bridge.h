@@ -50,6 +50,10 @@ bool NeedsNativeBridge(const char* instruction_set);
 // high privileges.
 bool PreInitializeNativeBridge(const char* app_data_dir, const char* instruction_set);
 
+// Prepare to fork from zygote. May be required to clean-up the enviroment, e.g.
+// close emulated file descriptors, after doPreload() in app-zygote.
+void PreZygoteForkNativeBridge();
+
 // Initialize the native bridge, if any. Should be called by Runtime::DidForkFromZygote. The JNIEnv*
 // will be used to modify the app environment for the bridge.
 bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set);
@@ -374,6 +378,10 @@ struct NativeBridgeCallbacks {
   // Returns:
   //   exported namespace or null if it was not set up for the device
   struct native_bridge_namespace_t* (*getExportedNamespace)(const char* name);
+
+  // If native bridge is used in app-zygote (in doPreload()) this callback is
+  // required to clean-up the environment before the fork (see b/146904103).
+  void (*preZygoteFork)();
 };
 
 // Runtime interfaces to native bridge.

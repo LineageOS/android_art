@@ -110,7 +110,16 @@ void PreInitializeNativeBridge(const std::string& dir) {
 #endif
 }
 
+void PreZygoteForkNativeBridge() {
+  android::PreZygoteForkNativeBridge();
+}
+
 void InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+  if (android::NativeBridgeInitialized()) {
+    // This happens in apps forked from app-zygote, since native bridge
+    // is initialized in the zygote.
+    return;
+  }
   if (android::InitializeNativeBridge(env, instruction_set)) {
     if (android::NativeBridgeGetVersion() >= 2U) {
 #ifdef _NSIG  // Undefined on Apple, but we don't support running on Mac, anyways.

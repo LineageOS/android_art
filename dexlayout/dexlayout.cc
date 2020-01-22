@@ -28,6 +28,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
 #include <vector>
 
 #include "android-base/stringprintf.h"

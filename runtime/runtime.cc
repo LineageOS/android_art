@@ -688,6 +688,7 @@ void Runtime::PreZygoteFork() {
     GetJit()->PreZygoteFork();
   }
   heap_->PreZygoteFork();
+  PreZygoteForkNativeBridge();
 }
 
 void Runtime::PostZygoteFork() {
@@ -935,6 +936,7 @@ bool Runtime::Start() {
         : NativeBridgeAction::kUnload;
     InitNonZygoteOrPostFork(self->GetJniEnv(),
                             /* is_system_server= */ false,
+                            /* is_child_zygote= */ false,
                             action,
                             GetInstructionSetString(kRuntimeISA));
   }
@@ -999,11 +1001,13 @@ void Runtime::EndThreadBirth() REQUIRES(Locks::runtime_shutdown_lock_) {
 void Runtime::InitNonZygoteOrPostFork(
     JNIEnv* env,
     bool is_system_server,
+    // This is true when we are initializing a child-zygote. It requires
+    // native bridge initialization to be able to run guest native code in
+    // doPreload().
+    bool is_child_zygote,
     NativeBridgeAction action,
     const char* isa,
     bool profile_system_server) {
-  DCHECK(!IsZygote());
-
   if (is_native_bridge_loaded_) {
     switch (action) {
       case NativeBridgeAction::kUnload:
@@ -1015,6 +1019,16 @@ void Runtime::InitNonZygoteOrPostFork(
         break;
     }
   }
+
+  if (is_child_zygote) {
+    // If creating a child-zygote we only initialize native bridge. The rest of
+    // runtime post-fork logic would spin up threads for Binder and JDWP.
+    // Instead, the Java side of the child process will call a static main in a
+    // class specified by the parent.
+    return;
+  }
+
+  DCHECK(!IsZygote());
 
   if (is_system_server && profile_system_server) {
     // Set the system server package name to "android".

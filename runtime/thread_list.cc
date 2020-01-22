@@ -1404,6 +1404,12 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
       // Finally wait for any threads woken before we set the "runtime deleted" flags to finish
       // touching memory.
       usleep(kDaemonSleepTime);
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(hwaddress_sanitizer)
+      // Sleep a bit longer with -fsanitize=address, since everything is slower.
+      usleep(2 * kDaemonSleepTime);
+#endif
+#endif
       return;
     }
     usleep(kSleepMicroseconds);

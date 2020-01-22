@@ -31,6 +31,8 @@ bool LoadNativeBridge(const std::string& native_bridge_library_filename);
 // This is mostly for testing purposes, as in a full system this is called by Zygote code.
 void PreInitializeNativeBridge(const std::string& dir);
 
+void PreZygoteForkNativeBridge();
+
 void InitializeNativeBridge(JNIEnv* env, const char* instruction_set);
 
 void UnloadNativeBridge();

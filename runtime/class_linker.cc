@@ -1278,7 +1278,6 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
     std::vector<std::unique_ptr<const DexFile>> dex_files;
     if (!AddImageSpace(spaces[i],
                        ScopedNullHandle<mirror::ClassLoader>(),
-                       /*dex_elements=*/ nullptr,
                        /*dex_location=*/ boot_class_path_locations[i].c_str(),
                        /*out*/&dex_files,
                        error_msg)) {
@@ -1320,31 +1319,6 @@ bool ClassLinker::IsBootClassLoader(ScopedObjectAccessAlreadyRunnable& soa,
   return class_loader == nullptr ||
        soa.Decode<mirror::Class>(WellKnownClasses::java_lang_BootClassLoader) ==
            class_loader->GetClass();
-}
-
-static bool GetDexPathListElementName(ObjPtr<mirror::Object> element,
-                                      ObjPtr<mirror::String>* out_name)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  ArtField* const dex_file_field =
-      jni::DecodeArtField(WellKnownClasses::dalvik_system_DexPathList__Element_dexFile);
-  ArtField* const dex_file_name_field =
-      jni::DecodeArtField(WellKnownClasses::dalvik_system_DexFile_fileName);
-  DCHECK(dex_file_field != nullptr);
-  DCHECK(dex_file_name_field != nullptr);
-  DCHECK(element != nullptr);
-  CHECK_EQ(dex_file_field->GetDeclaringClass(), element->GetClass()) << element->PrettyTypeOf();
-  ObjPtr<mirror::Object> dex_file = dex_file_field->GetObject(element);
-  if (dex_file == nullptr) {
-    // Null dex file means it was probably a jar with no dex files, return a null string.
-    *out_name = nullptr;
-    return true;
-  }
-  ObjPtr<mirror::Object> name_object = dex_file_name_field->GetObject(dex_file);
-  if (name_object != nullptr) {
-    *out_name = name_object->AsString();
-    return true;
-  }
-  return false;
 }
 
 class CHAOnDeleteUpdateClassVisitor {
@@ -2026,7 +2000,6 @@ static void VerifyAppImage(const ImageHeader& header,
 bool ClassLinker::AddImageSpace(
     gc::space::ImageSpace* space,
     Handle<mirror::ClassLoader> class_loader,
-    jobjectArray dex_elements,
     const char* dex_location,
     std::vector<std::unique_ptr<const DexFile>>* out_dex_files,
     std::string* error_msg) {
@@ -2125,32 +2098,9 @@ bool ClassLinker::AddImageSpace(
   if (app_image) {
     ScopedObjectAccessUnchecked soa(Thread::Current());
     ScopedAssertNoThreadSuspension sants("Checking app image", soa.Self());
-    // Check that the class loader resolves the same way as the ones in the image.
-    // Image class loader [A][B][C][image dex files]
-    // Class loader = [???][dex_elements][image dex files]
-    // Need to ensure that [???][dex_elements] == [A][B][C].
-    // For each class loader, PathClassLoader, the loader checks the parent first. Also the logic
-    // for PathClassLoader does this by looping through the array of dex files. To ensure they
-    // resolve the same way, simply flatten the hierarchy in the way the resolution order would be,
-    // and check that the dex file names are the same.
     if (IsBootClassLoader(soa, image_class_loader.Get())) {
       *error_msg = "Unexpected BootClassLoader in app image";
       return false;
-    }
-    // The dex files of `class_loader` are not setup yet, so we cannot do a full comparison
-    // of `class_loader` and `image_class_loader` in `CompareClassLoaders`. Therefore, we
-    // special case the comparison of dex files of the two class loaders, but then do full
-    // comparisons for their shared libraries and parent.
-    auto elements = soa.Decode<mirror::ObjectArray<mirror::Object>>(dex_elements);
-    std::list<ObjPtr<mirror::String>> loader_dex_file_names;
-    for (auto element : elements->Iterate()) {
-      if (element != nullptr) {
-        // If we are somewhere in the middle of the array, there may be nulls at the end.
-        ObjPtr<mirror::String> name;
-        if (GetDexPathListElementName(element, &name) && name != nullptr) {
-          loader_dex_file_names.push_back(name);
-        }
-      }
     }
   }
 
@@ -9780,99 +9730,6 @@ void ClassLinker::CleanupClassLoaders() {
     // CHA unloading analysis and SingleImplementaion cleanups are required.
     DeleteClassLoader(self, data, /*cleanup_cha=*/ true);
   }
-}
-
-class GetResolvedClassesVisitor : public ClassVisitor {
- public:
-  GetResolvedClassesVisitor(std::set<DexCacheResolvedClasses>* result, bool ignore_boot_classes)
-      : result_(result),
-        ignore_boot_classes_(ignore_boot_classes),
-        last_resolved_classes_(result->end()),
-        last_dex_file_(nullptr),
-        vlog_is_on_(VLOG_IS_ON(class_linker)),
-        extra_stats_(),
-        last_extra_stats_(extra_stats_.end()) { }
-
-  bool operator()(ObjPtr<mirror::Class> klass) override REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!klass->IsProxyClass() &&
-        !klass->IsArrayClass() &&
-        klass->IsResolved() &&
-        !klass->IsErroneousResolved() &&
-        (!ignore_boot_classes_ || klass->GetClassLoader() != nullptr)) {
-      const DexFile& dex_file = klass->GetDexFile();
-      if (&dex_file != last_dex_file_) {
-        last_dex_file_ = &dex_file;
-        DexCacheResolvedClasses resolved_classes(
-            dex_file.GetLocation(),
-            DexFileLoader::GetBaseLocation(dex_file.GetLocation()),
-            dex_file.GetLocationChecksum(),
-            dex_file.NumMethodIds());
-        last_resolved_classes_ = result_->find(resolved_classes);
-        if (last_resolved_classes_ == result_->end()) {
-          last_resolved_classes_ = result_->insert(resolved_classes).first;
-        }
-      }
-      bool added = last_resolved_classes_->AddClass(klass->GetDexTypeIndex());
-      if (UNLIKELY(vlog_is_on_) && added) {
-        const DexCacheResolvedClasses* resolved_classes = std::addressof(*last_resolved_classes_);
-        if (last_extra_stats_ == extra_stats_.end() ||
-            last_extra_stats_->first != resolved_classes) {
-          last_extra_stats_ = extra_stats_.find(resolved_classes);
-          if (last_extra_stats_ == extra_stats_.end()) {
-            last_extra_stats_ =
-                extra_stats_.emplace(resolved_classes, ExtraStats(dex_file.NumClassDefs())).first;
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-  void PrintStatistics() const {
-    if (vlog_is_on_) {
-      for (const DexCacheResolvedClasses& resolved_classes : *result_) {
-        auto it = extra_stats_.find(std::addressof(resolved_classes));
-        DCHECK(it != extra_stats_.end());
-        const ExtraStats& extra_stats = it->second;
-        LOG(INFO) << "Dex location " << resolved_classes.GetDexLocation()
-                  << " has " << resolved_classes.GetClasses().size() << " / "
-                  << extra_stats.number_of_class_defs_ << " resolved classes";
-      }
-    }
-  }
-
- private:
-  struct ExtraStats {
-    explicit ExtraStats(uint32_t number_of_class_defs)
-        : number_of_class_defs_(number_of_class_defs) {}
-    uint32_t number_of_class_defs_;
-  };
-
-  std::set<DexCacheResolvedClasses>* result_;
-  bool ignore_boot_classes_;
-  std::set<DexCacheResolvedClasses>::iterator last_resolved_classes_;
-  const DexFile* last_dex_file_;
-
-  // Statistics.
-  bool vlog_is_on_;
-  std::map<const DexCacheResolvedClasses*, ExtraStats> extra_stats_;
-  std::map<const DexCacheResolvedClasses*, ExtraStats>::iterator last_extra_stats_;
-};
-
-std::set<DexCacheResolvedClasses> ClassLinker::GetResolvedClasses(bool ignore_boot_classes) {
-  ScopedTrace trace(__PRETTY_FUNCTION__);
-  ScopedObjectAccess soa(Thread::Current());
-  ScopedAssertNoThreadSuspension ants(__FUNCTION__);
-  std::set<DexCacheResolvedClasses> ret;
-  VLOG(class_linker) << "Collecting resolved classes";
-  const uint64_t start_time = NanoTime();
-  GetResolvedClassesVisitor visitor(&ret, ignore_boot_classes);
-  VisitClasses(&visitor);
-  if (VLOG_IS_ON(class_linker)) {
-    visitor.PrintStatistics();
-    LOG(INFO) << "Collecting class profile took " << PrettyDuration(NanoTime() - start_time);
-  }
-  return ret;
 }
 
 class ClassLinker::FindVirtualMethodHolderVisitor : public ClassVisitor {
