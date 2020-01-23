@@ -17,6 +17,9 @@
 #ifndef ART_LIBARTBASE_BASE_BIT_STRUCT_H_
 #define ART_LIBARTBASE_BASE_BIT_STRUCT_H_
 
+#include <type_traits>
+
+#include "base/casts.h"
 #include "bit_struct_detail.h"
 #include "bit_utils.h"
 
@@ -119,7 +122,7 @@ struct BitStructField {
   template <typename _ = void,
             typename = std::enable_if_t<std::is_same<T, StorageType>::value, _>>
   explicit operator StorageType() const {
-    return GetStorage();
+    return BitFieldExtract(storage_, kBitOffset, kBitWidth);
   }
 
   BitStructField& operator=(T value) {
@@ -154,46 +157,27 @@ struct BitStructField {
   }
 
   T Get() const {
-    ValueStorage vs;
-    vs.pod_.val_ = GetStorage();
-    return vs.value_;
+    ExtractionType storage = static_cast<ExtractionType>(storage_);
+    ExtractionType extracted = BitFieldExtract(storage, kBitOffset, kBitWidth);
+    ConversionType to_convert = dchecked_integral_cast<ConversionType>(extracted);
+    return ValueConverter::FromUnderlyingStorage(to_convert);
   }
 
   void Set(T value) {
-    ValueStorage value_as_storage;
-    value_as_storage.value_ = value;
-
-    storage_.pod_.val_ = BitFieldInsert(storage_.pod_.val_,
-                                        value_as_storage.pod_.val_,
-                                        kBitOffset,
-                                        kBitWidth);
+    ConversionType converted = ValueConverter::ToUnderlyingStorage(value);
+    ExtractionType extracted = dchecked_integral_cast<ExtractionType>(converted);
+    storage_ = BitFieldInsert(storage_, extracted, kBitOffset, kBitWidth);
   }
 
  private:
-  StorageType GetStorage() const {
-    return BitFieldExtract(storage_.pod_.val_, kBitOffset, kBitWidth);
-  }
+  using ValueConverter = detail::ValueConverter<T>;
+  using ConversionType = typename ValueConverter::StorageType;
+  using ExtractionType =
+      typename std::conditional<std::is_signed_v<ConversionType>,
+                                std::make_signed_t<StorageType>,
+                                StorageType>::type;
 
-  // Underlying value must be wrapped in a separate standard-layout struct.
-  // See below for more details.
-  struct PodWrapper {
-    StorageType val_;
-  };
-
-  union ValueStorage {
-    // Safely alias pod_ and value_ together.
-    //
-    // See C++ 9.5.1 [class.union]:
-    // If a standard-layout union contains several standard-layout structs that share a common
-    // initial sequence ... it is permitted to inspect the common initial sequence of any of
-    // standard-layout struct members.
-    PodWrapper pod_;
-    T value_;
-  } storage_;
-
-  // Future work: In theory almost non-standard layout can be supported here,
-  // assuming they don't rely on the address of (this).
-  // We just have to use memcpy since the union-aliasing would not work.
+  StorageType storage_;
 };
 
 // Base class for number-like BitStruct fields.
