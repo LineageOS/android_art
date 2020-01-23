@@ -1441,27 +1441,13 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
       VLOG(jdwp) << "Disabling all JDWP support.";
       if (!jdwp_options_.empty()) {
         bool has_transport = jdwp_options_.find("transport") != std::string::npos;
-        const char* transport_internal = !has_transport ? "transport=dt_android_adb," : "";
         std::string adb_connection_args =
             std::string("  -XjdwpProvider:adbconnection -XjdwpOptions:") + jdwp_options_;
         LOG(WARNING) << "Jdwp options given when jdwp is disabled! You probably want to enable "
                      << "jdwp with one of:" << std::endl
-                     << "  -XjdwpProvider:internal "
-                     << "-XjdwpOptions:" << transport_internal << jdwp_options_ << std::endl
                      << "  -Xplugin:libopenjdkjvmti" << (kIsDebugBuild ? "d" : "") << ".so "
                      << "-agentpath:libjdwp.so=" << jdwp_options_ << std::endl
                      << (has_transport ? "" : adb_connection_args);
-      }
-      break;
-    }
-    case JdwpProvider::kInternal: {
-      if (runtime_options.Exists(Opt::JdwpOptions)) {
-        JDWP::JdwpOptions ops;
-        if (!JDWP::ParseJdwpOptions(runtime_options.GetOrDefault(Opt::JdwpOptions), &ops)) {
-          LOG(ERROR) << "failed to parse jdwp options!";
-          return false;
-        }
-        Dbg::ConfigureJdwp(ops);
       }
       break;
     }
@@ -2220,7 +2206,6 @@ void Runtime::VisitConcurrentRoots(RootVisitor* visitor, VisitRootFlags flags) {
     // Guaranteed to have no new roots in the constant roots.
     VisitConstantRoots(visitor);
   }
-  Dbg::VisitRoots(visitor);
 }
 
 void Runtime::VisitTransactionRoots(RootVisitor* visitor) {

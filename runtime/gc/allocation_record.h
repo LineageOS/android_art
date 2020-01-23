@@ -299,7 +299,6 @@ class AllocRecordObjectMap {
   size_t alloc_record_max_ GUARDED_BY(Locks::alloc_tracker_lock_) = kDefaultNumAllocRecords;
   size_t recent_record_max_ GUARDED_BY(Locks::alloc_tracker_lock_) = kDefaultNumRecentRecords;
   size_t max_stack_depth_ = kDefaultAllocStackDepth;
-  pid_t alloc_ddm_thread_id_  GUARDED_BY(Locks::alloc_tracker_lock_) = 0;
   bool allow_new_record_ GUARDED_BY(Locks::alloc_tracker_lock_) = true;
   ConditionVariable new_record_condition_ GUARDED_BY(Locks::alloc_tracker_lock_);
   // see the comment in typedef of EntryList

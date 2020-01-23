@@ -149,7 +149,6 @@ bool CanUseMterp()
   return
       runtime->IsStarted() &&
       !runtime->IsAotCompiler() &&
-      !Dbg::IsDebuggerActive() &&
       !runtime->GetInstrumentation()->IsActive() &&
       // mterp only knows how to deal with the normal exits. It cannot handle any of the
       // non-standard force-returns.

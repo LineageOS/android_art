@@ -29,7 +29,6 @@ enum class JdwpProvider {
   // should not be used and one should always call CanonicalizeJdwpProvider which will remove this
   // value before using a JdwpProvider value.
   kUnset,
-  kInternal,
   kAdbConnection,
 
   // The current default provider. Used if you run -XjdwpProvider:default
