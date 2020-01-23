@@ -790,7 +790,9 @@ void Thread::InstallImplicitProtection() {
 #else
           1u;
 #endif
-      volatile char space[kPageSize - (kAsanMultiplier * 256)];
+      // Keep space uninitialized as it can overflow the stack otherwise (should Clang actually
+      // auto-initialize this local variable).
+      volatile char space[kPageSize - (kAsanMultiplier * 256)] __attribute__((uninitialized));
       char sink ATTRIBUTE_UNUSED = space[zero];  // NOLINT
       // Remove tag from the pointer. Nop in non-hwasan builds.
       uintptr_t addr = reinterpret_cast<uintptr_t>(__hwasan_tag_pointer(space, 0));
