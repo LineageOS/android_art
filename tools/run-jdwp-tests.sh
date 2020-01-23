@@ -245,6 +245,11 @@ while true; do
   fi
 done
 
+if [ ! -t 1 ] ; then
+  # Suppress color codes if not attached to a terminal
+  args="$args --no-color"
+fi
+
 if [[ $mode == "target" ]]; then
   # Honor environment variable ART_TEST_CHROOT.
   if [[ -n "$ART_TEST_CHROOT" ]]; then
