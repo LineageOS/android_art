@@ -14,8 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Filter out expected error messages, which happen on device.
+export ANDROID_LOG_TAGS='*:f'
+
 flags="$@"
 
 # Reduce the file descriptor limit so the test will reach the limit sooner.
 ulimit -n 512
-${RUN} ${flags}
+${RUN} --external-log-tags ${flags}
