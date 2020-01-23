@@ -556,18 +556,18 @@ uintptr_t StackVisitor::GetFPR(uint32_t reg) const {
   return context_->GetFPR(reg);
 }
 
+uintptr_t StackVisitor::GetReturnPcAddr() const {
+  uintptr_t sp = reinterpret_cast<uintptr_t>(GetCurrentQuickFrame());
+  DCHECK_NE(sp, 0u);
+  return sp + GetCurrentQuickFrameInfo().GetReturnPcOffset();
+}
+
 uintptr_t StackVisitor::GetReturnPc() const {
-  uint8_t* sp = reinterpret_cast<uint8_t*>(GetCurrentQuickFrame());
-  DCHECK(sp != nullptr);
-  uint8_t* pc_addr = sp + GetCurrentQuickFrameInfo().GetReturnPcOffset();
-  return *reinterpret_cast<uintptr_t*>(pc_addr);
+  return *reinterpret_cast<uintptr_t*>(GetReturnPcAddr());
 }
 
 void StackVisitor::SetReturnPc(uintptr_t new_ret_pc) {
-  uint8_t* sp = reinterpret_cast<uint8_t*>(GetCurrentQuickFrame());
-  CHECK(sp != nullptr);
-  uint8_t* pc_addr = sp + GetCurrentQuickFrameInfo().GetReturnPcOffset();
-  *reinterpret_cast<uintptr_t*>(pc_addr) = new_ret_pc;
+  *reinterpret_cast<uintptr_t*>(GetReturnPcAddr()) = new_ret_pc;
 }
 
 size_t StackVisitor::ComputeNumFrames(Thread* thread, StackWalkKind walk_kind) {
@@ -851,8 +851,6 @@ void StackVisitor::WalkStack(bool include_transitions) {
     DCHECK(thread_ == Thread::Current() || thread_->IsSuspended());
   }
   CHECK_EQ(cur_depth_, 0U);
-  bool exit_stubs_installed = Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled();
-  uint32_t instrumentation_stack_depth = 0;
   size_t inlined_frames_count = 0;
 
   for (const ManagedStack* current_fragment = thread_->GetManagedStack();
@@ -943,47 +941,35 @@ void StackVisitor::WalkStack(bool include_transitions) {
         }
         // Compute PC for next stack frame from return PC.
         size_t frame_size = frame_info.FrameSizeInBytes();
-        size_t return_pc_offset = frame_size - sizeof(void*);
-        uint8_t* return_pc_addr = reinterpret_cast<uint8_t*>(cur_quick_frame_) + return_pc_offset;
+        uintptr_t return_pc_addr = GetReturnPcAddr();
         uintptr_t return_pc = *reinterpret_cast<uintptr_t*>(return_pc_addr);
 
-        if (UNLIKELY(exit_stubs_installed ||
-                     reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc)) {
+        if (UNLIKELY(reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc)) {
           // While profiling, the return pc is restored from the side stack, except when walking
           // the stack for an exception where the side stack will be unwound in VisitFrame.
-          if (reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) == return_pc) {
-            CHECK_LT(instrumentation_stack_depth, thread_->GetInstrumentationStack()->size());
-            const instrumentation::InstrumentationStackFrame& instrumentation_frame =
-                (*thread_->GetInstrumentationStack())[instrumentation_stack_depth];
-            instrumentation_stack_depth++;
-            if (GetMethod() ==
-                Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveAllCalleeSaves)) {
-              // Skip runtime save all callee frames which are used to deliver exceptions.
-            } else if (instrumentation_frame.interpreter_entry_) {
-              ArtMethod* callee =
-                  Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveRefsAndArgs);
-              CHECK_EQ(GetMethod(), callee) << "Expected: " << ArtMethod::PrettyMethod(callee)
-                                            << " Found: " << ArtMethod::PrettyMethod(GetMethod());
-            } else {
-              // Instrumentation generally doesn't distinguish between a method's obsolete and
-              // non-obsolete version.
-              CHECK_EQ(instrumentation_frame.method_->GetNonObsoleteMethod(),
-                       GetMethod()->GetNonObsoleteMethod())
-                  << "Expected: "
-                  << ArtMethod::PrettyMethod(instrumentation_frame.method_->GetNonObsoleteMethod())
-                  << " Found: " << ArtMethod::PrettyMethod(GetMethod()->GetNonObsoleteMethod());
-            }
-            if (num_frames_ != 0) {
-              // Check agreement of frame Ids only if num_frames_ is computed to avoid infinite
-              // recursion.
-              size_t frame_id = instrumentation::Instrumentation::ComputeFrameId(
-                  thread_,
-                  cur_depth_,
-                  inlined_frames_count);
-              CHECK_EQ(instrumentation_frame.frame_id_, frame_id);
-            }
-            return_pc = instrumentation_frame.return_pc_;
+          const std::map<uintptr_t, instrumentation::InstrumentationStackFrame>&
+              instrumentation_stack = *thread_->GetInstrumentationStack();
+          auto it = instrumentation_stack.find(return_pc_addr);
+          CHECK(it != instrumentation_stack.end());
+          const instrumentation::InstrumentationStackFrame& instrumentation_frame = it->second;
+          if (GetMethod() ==
+              Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveAllCalleeSaves)) {
+            // Skip runtime save all callee frames which are used to deliver exceptions.
+          } else if (instrumentation_frame.interpreter_entry_) {
+            ArtMethod* callee =
+                Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveRefsAndArgs);
+            CHECK_EQ(GetMethod(), callee) << "Expected: " << ArtMethod::PrettyMethod(callee)
+                                          << " Found: " << ArtMethod::PrettyMethod(GetMethod());
+          } else {
+            // Instrumentation generally doesn't distinguish between a method's obsolete and
+            // non-obsolete version.
+            CHECK_EQ(instrumentation_frame.method_->GetNonObsoleteMethod(),
+                     GetMethod()->GetNonObsoleteMethod())
+                << "Expected: "
+                << ArtMethod::PrettyMethod(instrumentation_frame.method_->GetNonObsoleteMethod())
+                << " Found: " << ArtMethod::PrettyMethod(GetMethod()->GetNonObsoleteMethod());
           }
+          return_pc = instrumentation_frame.return_pc_;
         }
 
         cur_quick_frame_pc_ = return_pc;
