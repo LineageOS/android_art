@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# The test logs error messages which is expected, discard them.
+export ANDROID_LOG_TAGS='*:f'
+
 # Squash the exit status and put it in expected
-./default-run "$@" --runtime-option -XX:FinalizerTimeoutMs=500
+./default-run --external-log-tags "$@" --runtime-option -XX:FinalizerTimeoutMs=500
 echo "exit status:" $?

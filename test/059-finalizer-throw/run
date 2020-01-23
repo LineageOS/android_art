@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2014 The Android Open Source Project
+# Copyright (C) 2020 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Strip uncaught exception logging. These are "E/System" messages.
-sed -e '/^E\/System/d' "$2" > "$2.tmp"
-
-diff --strip-trailing-cr -q "$1" "$2.tmp" >/dev/null
+# The test logs error messages which is expected, discard them.
+export ANDROID_LOG_TAGS='*:f'
+exec ${RUN} --external-log-tags "${@}"
