@@ -27,7 +27,6 @@ art_runtime_base_binaries_prefer32 = [
 // the ART APEX.
 art_runtime_base_native_shared_libs = [
     // External API (having APEX stubs).
-    "libadbconnection_server",
     "libdexfile_external",
     "libnativebridge",
     "libnativehelper",
