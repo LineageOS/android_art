@@ -24,6 +24,9 @@ namespace art {
 constexpr size_t BitString::kBitSizeAtPosition[BitString::kCapacity];
 constexpr size_t BitString::kCapacity;
 
+// Disable due to b/148125232
+#define DISABLED_TEST_F(a, b) TEST_F(a, DISABLED_##b)
+
 struct MockClass {
   explicit MockClass(MockClass* parent, size_t x = 0, size_t y = 0) {
     parent_ = parent;
@@ -338,7 +341,7 @@ struct SubtypeCheckTest : public ::testing::Test {
   std::vector<std::unique_ptr<MockClass>> all_classes_;
 };
 
-TEST_F(SubtypeCheckTest, LookupAllChildren) {
+DISABLED_TEST_F(SubtypeCheckTest, LookupAllChildren) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -352,7 +355,7 @@ TEST_F(SubtypeCheckTest, LookupAllChildren) {
   });
 }
 
-TEST_F(SubtypeCheckTest, LookupRoot) {
+DISABLED_TEST_F(SubtypeCheckTest, LookupRoot) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -362,7 +365,7 @@ TEST_F(SubtypeCheckTest, LookupRoot) {
   EXPECT_EQ(SubtypeCheckInfo::kSubtypeOf, root.IsSubtypeOf(root)) << root;
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitializedFirstLevel) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitializedFirstLevel) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -387,7 +390,7 @@ TEST_F(SubtypeCheckTest, EnsureInitializedFirstLevel) {
   }
 }
 
-TEST_F(SubtypeCheckTest, EnsureAssignedFirstLevel) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureAssignedFirstLevel) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -412,7 +415,7 @@ TEST_F(SubtypeCheckTest, EnsureAssignedFirstLevel) {
   }
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitializedSecondLevelWithPreassign) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitializedSecondLevelWithPreassign) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -462,7 +465,7 @@ TEST_F(SubtypeCheckTest, EnsureInitializedSecondLevelWithPreassign) {
   }
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitializedSecondLevelDontPreassign) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitializedSecondLevelDontPreassign) {
   MockScopedLockSubtypeCheck lock_a;
   MockScopedLockMutator lock_b;
   using SCTree = MockSubtypeCheck;
@@ -684,7 +687,7 @@ void EnsureStateChangedTest(
   EnsureStateChangedTestRecursive(root, /*cur_depth=*/0u, depth, transitions);
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitialized_NoOverflow) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitialized_NoOverflow) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kInitialized;
@@ -756,7 +759,7 @@ TEST_F(SubtypeCheckTest, EnsureInitialized_NoOverflow) {
                                          expected_uninitialize);
 }
 
-TEST_F(SubtypeCheckTest, EnsureAssigned_TooDeep) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureAssigned_TooDeep) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kAssigned;
@@ -780,7 +783,7 @@ TEST_F(SubtypeCheckTest, EnsureAssigned_TooDeep) {
   EnsureStateChangedTestRecursiveGeneric(root_, 0u, kMaxDepthForThisTest, transitions, expected);
 }
 
-TEST_F(SubtypeCheckTest, EnsureAssigned_TooDeep_OfTooDeep) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureAssigned_TooDeep_OfTooDeep) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kAssigned;
@@ -841,7 +844,7 @@ bool IsTooDeep(MockClass* kls) {
   return false;
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kAssigned;
@@ -885,7 +888,7 @@ TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide) {
                                          expected);
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide_TooWide) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide_TooWide) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kAssigned;
@@ -1005,7 +1008,7 @@ void EnsureSubtypeOfRecursive(MockClass* kls_root) {
   ASSERT_NO_FATAL_FAILURE(kls_root->Visit(visit_func));
 }
 
-TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide_TooDeep) {
+DISABLED_TEST_F(SubtypeCheckTest, EnsureInitialized_TooWide_TooDeep) {
   auto transitions = [](MockClass* kls) {
     UNUSED(kls);
     return MockSubtypeOfTransition::kAssigned;

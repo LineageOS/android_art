@@ -96,12 +96,6 @@
                         "slowness of gcstress makes this bad."]
     },
     {
-        "tests": "137-cfi",
-        "variant": "target & 32",
-        "description": ["Flakes in unwinding on armv7."],
-        "bug": "b/147910661"
-    },
-    {
         "tests": "152-dead-large-object",
         "variant": "gcstress",
         "description": ["152-dead-large-object requires a heap larger than what gcstress uses."],
