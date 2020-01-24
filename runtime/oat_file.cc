@@ -1303,16 +1303,6 @@ class ElfOatFile final : public OatFileBase {
  public:
   ElfOatFile(const std::string& filename, bool executable) : OatFileBase(filename, executable) {}
 
-  static ElfOatFile* OpenElfFile(int zip_fd,
-                                 File* file,
-                                 const std::string& location,
-                                 bool writable,
-                                 bool executable,
-                                 bool low_4gb,
-                                 ArrayRef<const std::string> dex_filenames,
-                                 /*inout*/MemMap* reservation,  // Where to load if not null.
-                                 /*out*/std::string* error_msg);
-
   bool InitializeFromElfFile(int zip_fd,
                              ElfFile* elf_file,
                              VdexFile* vdex_file,
@@ -1363,40 +1353,6 @@ class ElfOatFile final : public OatFileBase {
 
   DISALLOW_COPY_AND_ASSIGN(ElfOatFile);
 };
-
-ElfOatFile* ElfOatFile::OpenElfFile(int zip_fd,
-                                    File* file,
-                                    const std::string& location,
-                                    bool writable,
-                                    bool executable,
-                                    bool low_4gb,
-                                    ArrayRef<const std::string> dex_filenames,
-                                    /*inout*/MemMap* reservation,  // Where to load if not null.
-                                    /*out*/std::string* error_msg) {
-  ScopedTrace trace("Open elf file " + location);
-  std::unique_ptr<ElfOatFile> oat_file(new ElfOatFile(location, executable));
-  bool success = oat_file->ElfFileOpen(file,
-                                       writable,
-                                       low_4gb,
-                                       executable,
-                                       reservation,
-                                       error_msg);
-  if (!success) {
-    CHECK(!error_msg->empty());
-    return nullptr;
-  }
-
-  // Complete the setup.
-  if (!oat_file->ComputeFields(file->GetPath(), error_msg)) {
-    return nullptr;
-  }
-
-  if (!oat_file->Setup(zip_fd, dex_filenames, error_msg)) {
-    return nullptr;
-  }
-
-  return oat_file.release();
-}
 
 bool ElfOatFile::InitializeFromElfFile(int zip_fd,
                                        ElfFile* elf_file,
@@ -1585,18 +1541,6 @@ static void CheckLocation(const std::string& location) {
   CHECK(!location.empty());
 }
 
-OatFile* OatFile::OpenWithElfFile(int zip_fd,
-                                  ElfFile* elf_file,
-                                  VdexFile* vdex_file,
-                                  const std::string& location,
-                                  ArrayRef<const std::string> dex_filenames,
-                                  std::string* error_msg) {
-  std::unique_ptr<ElfOatFile> oat_file(new ElfOatFile(location, /*executable=*/ false));
-  return oat_file->InitializeFromElfFile(zip_fd, elf_file, vdex_file, dex_filenames, error_msg)
-      ? oat_file.release()
-      : nullptr;
-}
-
 OatFile* OatFile::Open(int zip_fd,
                        const std::string& oat_filename,
                        const std::string& oat_location,
@@ -1646,7 +1590,7 @@ OatFile* OatFile::Open(int zip_fd,
   // open a generated dex file by name, remove the file, then open
   // another generated dex file with the same name. http://b/10614658
   //
-  // On host, dlopen is expected to fail when cross compiling, so fall back to OpenElfFile.
+  // On host, dlopen is expected to fail when cross compiling, so fall back to ElfOatFile.
   //
   //
   // Another independent reason is the absolute placement of boot.oat. dlopen on the host usually
@@ -1689,40 +1633,6 @@ OatFile* OatFile::Open(int zip_fd,
                                                                 reservation,
                                                                 error_msg);
   return with_internal;
-}
-
-OatFile* OatFile::OpenWritable(int zip_fd,
-                               File* file,
-                               const std::string& location,
-                               ArrayRef<const std::string> dex_filenames,
-                               std::string* error_msg) {
-  CheckLocation(location);
-  return ElfOatFile::OpenElfFile(zip_fd,
-                                 file,
-                                 location,
-                                 /*writable=*/ true,
-                                 /*executable=*/ false,
-                                 /*low_4gb=*/false,
-                                 dex_filenames,
-                                 /*reservation=*/ nullptr,
-                                 error_msg);
-}
-
-OatFile* OatFile::OpenReadable(int zip_fd,
-                               File* file,
-                               const std::string& location,
-                               ArrayRef<const std::string> dex_filenames,
-                               std::string* error_msg) {
-  CheckLocation(location);
-  return ElfOatFile::OpenElfFile(zip_fd,
-                                 file,
-                                 location,
-                                 /*writable=*/ false,
-                                 /*executable=*/ false,
-                                 /*low_4gb=*/false,
-                                 dex_filenames,
-                                 /*reservation=*/ nullptr,
-                                 error_msg);
 }
 
 OatFile* OatFile::OpenFromVdex(const std::vector<const DexFile*>& dex_files,
