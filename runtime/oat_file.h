@@ -98,14 +98,6 @@ class OatFile {
   // Special classpath that skips shared library check.
   static constexpr const char* kSpecialSharedLibrary = "&";
 
-  // Opens an oat file contained within the given elf file. This is always opened as
-  // non-executable at the moment.
-  static OatFile* OpenWithElfFile(int zip_fd,
-                                  ElfFile* elf_file,
-                                  VdexFile* vdex_file,
-                                  const std::string& location,
-                                  ArrayRef<const std::string> dex_filenames,
-                                  std::string* error_msg);
   // Open an oat file. Returns null on failure.
   // The `dex_filenames` argument, if provided, overrides the dex locations
   // from oat file when opening the dex files if they are not embedded in the
@@ -165,23 +157,6 @@ class OatFile {
                        ArrayRef<const std::string> dex_filenames,
                        /*inout*/MemMap* reservation,  // Where to load if not null.
                        /*out*/std::string* error_msg);
-
-  // Open an oat file from an already opened File.
-  // Does not use dlopen underneath so cannot be used for runtime use
-  // where relocations may be required. Currently used from
-  // ImageWriter which wants to open a writable version from an existing
-  // file descriptor for patching.
-  static OatFile* OpenWritable(int zip_fd,
-                               File* file,
-                               const std::string& location,
-                               ArrayRef<const std::string> dex_filenames,
-                               std::string* error_msg);
-  // Open an oat file from an already opened File. Maps it PROT_READ, MAP_PRIVATE.
-  static OatFile* OpenReadable(int zip_fd,
-                               File* file,
-                               const std::string& location,
-                               ArrayRef<const std::string> dex_filenames,
-                               std::string* error_msg);
 
   // Initialize OatFile instance from an already loaded VdexFile. This assumes
   // the vdex does not have a dex section and accepts a vector of DexFiles separately.
