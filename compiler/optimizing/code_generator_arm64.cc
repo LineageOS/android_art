@@ -1081,7 +1081,7 @@ void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
     ScopedObjectAccess soa(Thread::Current());
     ProfilingInfo* info = GetGraph()->GetArtMethod()->GetProfilingInfo(kRuntimePointerSize);
     if (info != nullptr) {
-      uint32_t address = reinterpret_cast32<uint32_t>(info);
+      uint64_t address = reinterpret_cast64<uint64_t>(info);
       vixl::aarch64::Label done;
       UseScratchRegisterScope temps(masm);
       Register temp = temps.AcquireX();
