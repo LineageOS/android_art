@@ -1760,9 +1760,14 @@ void Jit::EnqueueCompilationFromNterp(ArtMethod* method, Thread* self) {
         self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileOsr));
     return;
   }
-  ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
-  thread_pool_->AddTask(
-      self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileBaseline));
+  if (GetCodeCache()->CanAllocateProfilingInfo()) {
+    ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
+    thread_pool_->AddTask(
+        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileBaseline));
+  } else {
+    thread_pool_->AddTask(
+        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+  }
 }
 
 }  // namespace jit
