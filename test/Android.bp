@@ -890,7 +890,8 @@ java_genrule {
         // "test/1981-structural-redef-private-method-handles/expected.txt",
         "1981-structural-redef-private-method-handles/expected_no_mh.txt",
         "1982-no-virtuals-structural-redefinition/expected.txt",
-        "1983-structural-redefinition-failures/expected.txt",
+        // JNI-id use can change the outcome of this test on device.
+        "1983-structural-redefinition-failures/expected-cts.txt",
         "1984-structural-redefine-field-trace/expected.txt",
         "1988-multi-structural-redefine/expected.txt",
         "1989-transform-bad-monitor/expected.txt",
