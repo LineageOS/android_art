@@ -241,6 +241,10 @@ static void EnsureSkipAccessChecksMethods(Handle<mirror::Class> klass, PointerSi
             interpreter::CanMethodUseNterp(&m)) {
           if (klass->IsVisiblyInitialized() || !NeedsClinitCheckBeforeCall(&m)) {
             runtime->GetInstrumentation()->UpdateMethodsCode(&m, interpreter::GetNterpEntryPoint());
+          } else {
+            // Put the resolution stub, which will initialize the class and then
+            // call the method with nterp.
+            runtime->GetInstrumentation()->UpdateMethodsCode(&m, GetQuickResolutionStub());
           }
         }
       }
@@ -2128,6 +2132,17 @@ bool ClassLinker::AddImageSpace(
           method.SetEntryPointFromQuickCompiledCodePtrSize(GetQuickToInterpreterBridge(),
                                                             image_pointer_size_);
         }
+      }
+    }, space->Begin(), image_pointer_size_);
+  }
+
+  if (interpreter::CanRuntimeUseNterp()) {
+    // Set image methods' entry point that point to the interpreter bridge to the nterp entry point.
+    header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
+      if (IsQuickToInterpreterBridge(method.GetEntryPointFromQuickCompiledCode()) &&
+          interpreter::CanMethodUseNterp(&method)) {
+        method.SetEntryPointFromQuickCompiledCodePtrSize(interpreter::GetNterpEntryPoint(),
+                                                         image_pointer_size_);
       }
     }, space->Begin(), image_pointer_size_);
   }
