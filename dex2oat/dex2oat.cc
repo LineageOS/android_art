@@ -828,13 +828,14 @@ class Dex2Oat final {
 
     DCHECK(compiler_options_->image_type_ == CompilerOptions::ImageType::kNone);
     if (!image_filenames_.empty() || image_fd_ != -1) {
-      if (!boot_image_filename_.empty()) {
-        compiler_options_->image_type_ = CompilerOptions::ImageType::kBootImageExtension;
-      } else if (android::base::EndsWith(image_filenames_[0], "apex.art")) {
-        compiler_options_->image_type_ = CompilerOptions::ImageType::kApexBootImage;
-      } else {
-        compiler_options_->image_type_ = CompilerOptions::ImageType::kBootImage;
-      }
+      // If no boot image is provided, then dex2oat is compiling the primary boot image,
+      // otherwise it is compiling the boot image extension. In the case of JIT-zygote
+      // extension the primary boot image has a special name "apex.art".
+      compiler_options_->image_type_ = boot_image_filename_.empty()
+          ? CompilerOptions::ImageType::kBootImage
+          : android::base::EndsWith(boot_image_filename_, "apex.art")
+              ? CompilerOptions::ImageType::kApexBootImageExtension
+              : CompilerOptions::ImageType::kBootImageExtension;
     }
     if (app_image_fd_ != -1 || !app_image_file_name_.empty()) {
       if (compiler_options_->IsBootImage() || compiler_options_->IsBootImageExtension()) {
