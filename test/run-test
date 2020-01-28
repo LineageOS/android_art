@@ -1076,7 +1076,12 @@ fi
         echo '#################### info'
         cat "${td_info}" | sed 's/^/# /g'
         echo '#################### diffs'
-        diff --strip-trailing-cr -u "$expected" "$output" | tail -n 3000
+        if [ "$run_checker" == "yes" ]; then
+          # Checker failures dump the whole CFG, so we output the whole diff.
+          diff --strip-trailing-cr -u "$expected" "$output"
+        else
+          diff --strip-trailing-cr -u "$expected" "$output" | tail -n 3000
+        fi
         echo '####################'
         if [ "$strace" = "yes" ]; then
             echo '#################### strace output'
