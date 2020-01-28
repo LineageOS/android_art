@@ -415,16 +415,22 @@ bool StackVisitor::GetVRegPair(ArtMethod* m, uint16_t vreg, VRegKind kind_lo,
   if (GetVRegPairFromDebuggerShadowFrame(vreg, kind_lo, kind_hi, val)) {
     return true;
   }
-  if (cur_quick_frame_ != nullptr) {
-    DCHECK(context_ != nullptr);  // You can't reliably read registers without a context.
-    DCHECK(m == GetMethod());
-    DCHECK(cur_oat_quick_method_header_->IsOptimized());
-    return GetVRegPairFromOptimizedCode(m, vreg, kind_lo, kind_hi, val);
-  } else {
+  if (cur_quick_frame_ == nullptr) {
     DCHECK(cur_shadow_frame_ != nullptr);
     *val = cur_shadow_frame_->GetVRegLong(vreg);
     return true;
   }
+  if (cur_oat_quick_method_header_->IsNterpMethodHeader()) {
+    uint64_t val_lo = NterpGetVReg(cur_quick_frame_, vreg);
+    uint64_t val_hi = NterpGetVReg(cur_quick_frame_, vreg + 1);
+    *val = (val_hi << 32) + val_lo;
+    return true;
+  }
+
+  DCHECK(context_ != nullptr);  // You can't reliably read registers without a context.
+  DCHECK(m == GetMethod());
+  DCHECK(cur_oat_quick_method_header_->IsOptimized());
+  return GetVRegPairFromOptimizedCode(m, vreg, kind_lo, kind_hi, val);
 }
 
 bool StackVisitor::GetVRegPairFromOptimizedCode(ArtMethod* m, uint16_t vreg,
