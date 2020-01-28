@@ -25,6 +25,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <thread>
 #include <time.h>
 
@@ -363,9 +364,30 @@ void DumpPerfetto(art::Thread* self) {
   art::ScopedSuspendAll ssa(__FUNCTION__, /* long_suspend=*/ true);
 
   pid_t pid = fork();
-  if (pid != 0) {
+  if (pid == -1) {
+    // Fork error.
+    PLOG(ERROR) << "fork";
     return;
   }
+  if (pid != 0) {
+    // Parent
+    int stat_loc;
+    for (;;) {
+      if (waitpid(pid, &stat_loc, 0) != -1 || errno != EINTR) {
+        break;
+      }
+    }
+    return;
+  }
+
+  // The following code is only executed by the child of the original process.
+  //
+  // Daemon creates a new process that is the grand-child of the original process, and exits.
+  if (daemon(0, 0) == -1) {
+    PLOG(FATAL) << "daemon";
+  }
+
+  // The following code is only executed by the grand-child of the original process.
 
   // Make sure that this is the first thing we do after forking, so if anything
   // below hangs, the fork will go away from the watchdog.
