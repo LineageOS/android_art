@@ -181,10 +181,6 @@ static void VMRuntime_clampGrowthLimit(JNIEnv*, jobject) {
   Runtime::Current()->GetHeap()->ClampGrowthLimit();
 }
 
-static jboolean VMRuntime_isDebuggerActive(JNIEnv*, jobject) {
-  return Dbg::IsDebuggerActive();
-}
-
 static jboolean VMRuntime_isNativeDebuggable(JNIEnv*, jobject) {
   return Runtime::Current()->IsNativeDebuggable();
 }
@@ -787,7 +783,6 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMRuntime, setHiddenApiExemptions, "([Ljava/lang/String;)V"),
   NATIVE_METHOD(VMRuntime, setHiddenApiAccessLogSamplingRate, "(I)V"),
   NATIVE_METHOD(VMRuntime, getTargetHeapUtilization, "()F"),
-  FAST_NATIVE_METHOD(VMRuntime, isDebuggerActive, "()Z"),
   FAST_NATIVE_METHOD(VMRuntime, isNativeDebuggable, "()Z"),
   NATIVE_METHOD(VMRuntime, isJavaDebuggable, "()Z"),
   NATIVE_METHOD(VMRuntime, nativeSetTargetHeapUtilization, "(F)V"),
