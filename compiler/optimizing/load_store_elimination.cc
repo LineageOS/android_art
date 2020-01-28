@@ -23,8 +23,6 @@
 #include "load_store_analysis.h"
 #include "side_effects_analysis.h"
 
-#include <iostream>
-
 /**
  * The general algorithm of load-store elimination (LSE).
  * Load-store analysis in the previous pass collects a list of heap locations
@@ -64,8 +62,9 @@
  *   all the heap values, depending on the instruction's side effects.
  * - Finalizable objects are considered as persisting at method
  *   return/deoptimization.
- * - Currently this LSE algorithm doesn't handle SIMD graph, e.g. with VecLoad
- *   and VecStore instructions.
+ * - SIMD graphs (with VecLoad and VecStore instructions) are also handled. Any
+ *   partial overlap access among ArrayGet/ArraySet/VecLoad/Store is seen as
+ *   alias and no load/store is eliminated in such case.
  * - Currently this LSE algorithm doesn't handle graph with try-catch, due to
  *   the special block merging structure.
  */
@@ -172,9 +171,7 @@ class LSEVisitor : public HGraphDelegateVisitor {
         DCHECK(substitute2->IsTypeConversion());
         continue;
       }
-      DCHECK(load2->IsInstanceFieldGet() ||
-             load2->IsStaticFieldGet() ||
-             load2->IsArrayGet());
+      DCHECK(IsLoad(load2));
       DCHECK(substitute2 != nullptr);
       if (substitute2 == substitute &&
           load2->GetType() == load->GetType() &&
@@ -204,9 +201,7 @@ class LSEVisitor : public HGraphDelegateVisitor {
         DCHECK(substitute_instructions_for_loads_[i]->IsTypeConversion());
         continue;
       }
-      DCHECK(load->IsInstanceFieldGet() ||
-             load->IsStaticFieldGet() ||
-             load->IsArrayGet());
+      DCHECK(IsLoad(load));
       HInstruction* substitute = substitute_instructions_for_loads_[i];
       DCHECK(substitute != nullptr);
       // We proactively retrieve the substitute for a removed load, so
@@ -224,7 +219,7 @@ class LSEVisitor : public HGraphDelegateVisitor {
       // We guarantee that type A stored as type B and then fetched out as
       // type C is the same as casting from type A to type C directly, since
       // type B and type C will have the same size which is guarenteed in
-      // HInstanceFieldGet/HStaticFieldGet/HArrayGet's SetType().
+      // HInstanceFieldGet/HStaticFieldGet/HArrayGet/HVecLoad's SetType().
       // So we only need one type conversion from type A to type C.
       HTypeConversion* type_conversion = AddTypeConversionIfNecessary(
           load, substitute, load->GetType());
@@ -240,7 +235,7 @@ class LSEVisitor : public HGraphDelegateVisitor {
 
     // At this point, stores in possibly_removed_stores_ can be safely removed.
     for (HInstruction* store : possibly_removed_stores_) {
-      DCHECK(store->IsInstanceFieldSet() || store->IsStaticFieldSet() || store->IsArraySet());
+      DCHECK(IsStore(store));
       store->GetBlock()->RemoveInstruction(store);
     }
 
@@ -261,24 +256,35 @@ class LSEVisitor : public HGraphDelegateVisitor {
   }
 
  private:
-  static bool IsLoad(HInstruction* instruction) {
+  static bool IsLoad(const HInstruction* instruction) {
     if (instruction == kUnknownHeapValue || instruction == kDefaultHeapValue) {
       return false;
     }
     // Unresolved load is not treated as a load.
     return instruction->IsInstanceFieldGet() ||
         instruction->IsStaticFieldGet() ||
+        instruction->IsVecLoad() ||
         instruction->IsArrayGet();
   }
 
-  static bool IsStore(HInstruction* instruction) {
+  static bool IsStore(const HInstruction* instruction) {
     if (instruction == kUnknownHeapValue || instruction == kDefaultHeapValue) {
       return false;
     }
     // Unresolved store is not treated as a store.
     return instruction->IsInstanceFieldSet() ||
         instruction->IsArraySet() ||
+        instruction->IsVecStore() ||
         instruction->IsStaticFieldSet();
+  }
+
+  // Check if it is allowed to use default values for the specified load.
+  static bool IsDefaultAllowedForLoad(const HInstruction* load) {
+    DCHECK(IsLoad(load));
+    // Using defaults for VecLoads requires to create additional vector operations.
+    // As there are some issues with scheduling vector operations it is better to avoid creating
+    // them.
+    return !load->IsVecOperation();
   }
 
   // Returns the real heap value by finding its substitute or by "peeling"
@@ -298,6 +304,8 @@ class LSEVisitor : public HGraphDelegateVisitor {
       heap_value = heap_value->AsInstanceFieldSet()->GetValue();
     } else if (heap_value->IsStaticFieldSet()) {
       heap_value = heap_value->AsStaticFieldSet()->GetValue();
+    } else if (heap_value->IsVecStore()) {
+      heap_value = heap_value->AsVecStore()->GetValue();
     } else {
       DCHECK(heap_value->IsArraySet());
       heap_value = heap_value->AsArraySet()->GetValue();
@@ -553,10 +561,15 @@ class LSEVisitor : public HGraphDelegateVisitor {
         heap_values_for_[instruction->GetBlock()->GetBlockId()];
     HInstruction* heap_value = heap_values[idx];
     if (heap_value == kDefaultHeapValue) {
-      HInstruction* constant = GetDefaultValue(instruction->GetType());
-      AddRemovedLoad(instruction, constant);
-      heap_values[idx] = constant;
-      return;
+      if (IsDefaultAllowedForLoad(instruction)) {
+        HInstruction* constant = GetDefaultValue(instruction->GetType());
+        AddRemovedLoad(instruction, constant);
+        heap_values[idx] = constant;
+        return;
+      } else {
+        heap_values[idx] = kUnknownHeapValue;
+        heap_value = kUnknownHeapValue;
+      }
     }
     heap_value = GetRealHeapValue(heap_value);
     if (heap_value == kUnknownHeapValue) {
@@ -588,6 +601,35 @@ class LSEVisitor : public HGraphDelegateVisitor {
       return Equal(real_heap_value, value);
     }
     return false;
+  }
+
+  bool CanValueBeKeptIfSameAsNew(HInstruction* value,
+                                 HInstruction* new_value,
+                                 HInstruction* new_value_set_instr) {
+    // For field/array set location operations, if the value is the same as the new_value
+    // it can be kept even if aliasing happens. All aliased operations will access the same memory
+    // range.
+    // For vector values, this is not true. For example:
+    //  packed_data = [0xA, 0xB, 0xC, 0xD];            <-- Different values in each lane.
+    //  VecStore array[i  ,i+1,i+2,i+3] = packed_data;
+    //  VecStore array[i+1,i+2,i+3,i+4] = packed_data; <-- We are here (partial overlap).
+    //  VecLoad  vx = array[i,i+1,i+2,i+3];            <-- Cannot be eliminated because the value
+    //                                                     here is not packed_data anymore.
+    //
+    // TODO: to allow such 'same value' optimization on vector data,
+    // LSA needs to report more fine-grain MAY alias information:
+    // (1) May alias due to two vector data partial overlap.
+    //     e.g. a[i..i+3] and a[i+1,..,i+4].
+    // (2) May alias due to two vector data may complete overlap each other.
+    //     e.g. a[i..i+3] and b[i..i+3].
+    // (3) May alias but the exact relationship between two locations is unknown.
+    //     e.g. a[i..i+3] and b[j..j+3], where values of a,b,i,j are all unknown.
+    // This 'same value' optimization can apply only on case (2).
+    if (new_value_set_instr->IsVecOperation()) {
+      return false;
+    }
+
+    return Equal(value, new_value);
   }
 
   void VisitSetLocation(HInstruction* instruction, size_t idx, HInstruction* value) {
@@ -636,23 +678,16 @@ class LSEVisitor : public HGraphDelegateVisitor {
 
     // This store may kill values in other heap locations due to aliasing.
     for (size_t i = 0; i < heap_values.size(); i++) {
-      if (i == idx) {
+      if (i == idx ||
+          heap_values[i] == kUnknownHeapValue ||
+          CanValueBeKeptIfSameAsNew(heap_values[i], value, instruction) ||
+          !heap_location_collector_.MayAlias(i, idx)) {
         continue;
       }
-      if (Equal(heap_values[i], value)) {
-        // Same value should be kept even if aliasing happens.
-        continue;
-      }
-      if (heap_values[i] == kUnknownHeapValue) {
-        // Value is already unknown, no need for aliasing check.
-        continue;
-      }
-      if (heap_location_collector_.MayAlias(i, idx)) {
-        // Kill heap locations that may alias and as a result if the heap value
-        // is a store, the store needs to be kept.
-        KeepIfIsStore(heap_values[i]);
-        heap_values[i] = kUnknownHeapValue;
-      }
+      // Kill heap locations that may alias and as a result if the heap value
+      // is a store, the store needs to be kept.
+      KeepIfIsStore(heap_values[i]);
+      heap_values[i] = kUnknownHeapValue;
     }
   }
 
@@ -689,7 +724,16 @@ class LSEVisitor : public HGraphDelegateVisitor {
 
   void VisitArraySet(HArraySet* instruction) override {
     size_t idx = heap_location_collector_.GetArrayHeapLocation(instruction);
-    VisitSetLocation(instruction, idx, instruction->InputAt(2));
+    VisitSetLocation(instruction, idx, instruction->GetValue());
+  }
+
+  void VisitVecLoad(HVecLoad* instruction) override {
+    VisitGetLocation(instruction, heap_location_collector_.GetArrayHeapLocation(instruction));
+  }
+
+  void VisitVecStore(HVecStore* instruction) override {
+    size_t idx = heap_location_collector_.GetArrayHeapLocation(instruction);
+    VisitSetLocation(instruction, idx, instruction->GetValue());
   }
 
   void VisitDeoptimize(HDeoptimize* instruction) override {
@@ -889,11 +933,6 @@ bool LoadStoreElimination::Run() {
   const HeapLocationCollector& heap_location_collector = lsa_.GetHeapLocationCollector();
   if (heap_location_collector.GetNumberOfHeapLocations() == 0) {
     // No HeapLocation information from LSA, skip this optimization.
-    return false;
-  }
-
-  // TODO: analyze VecLoad/VecStore better.
-  if (graph_->HasSIMD()) {
     return false;
   }
 
