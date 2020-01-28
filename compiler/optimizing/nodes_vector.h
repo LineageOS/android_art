@@ -1155,6 +1155,8 @@ class HVecStore final : public HVecMemoryOperation {
   // A store needs to stay in place.
   bool CanBeMoved() const override { return false; }
 
+  HInstruction* GetValue() const { return InputAt(2); }
+
   DECLARE_INSTRUCTION(VecStore);
 
  protected:
