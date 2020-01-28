@@ -22,6 +22,11 @@ import java.lang.invoke.*;
 import java.util.*;
 
 public class Test1983 {
+  public static void runNonCts() throws Exception {
+    Redefinition.setTestConfiguration(Redefinition.Config.COMMON_REDEFINE);
+    doTest();
+    doTestNonCts();
+  }
   public static void run() throws Exception {
     Redefinition.setTestConfiguration(Redefinition.Config.COMMON_REDEFINE);
     doTest();
@@ -91,18 +96,25 @@ public class Test1983 {
     // The results of some of these will change as we improve structural class redefinition. Any
     // that are true should always remain so though.
     Class[] non_mirrord_classes = new Class[] {
-      ArrayList.class,
-      Objects.class,
-      Arrays.class,
       new Object[0].getClass(),
-      Integer.class,
-      Number.class,
       NoVirtuals.class,
       WithVirtuals.class,
       SubWithVirtuals.class,
-      MethodHandles.class,
     };
     System.out.println("Checking non-mirror'd classes");
+    Check(non_mirrord_classes);
+  }
+
+  public static void doTestNonCts() throws Exception {
+    System.out.println("Checking non-mirror'd classes (non-cts)");
+    Class[] non_mirrord_classes = new Class[] {
+      ArrayList.class,
+      Objects.class,
+      Arrays.class,
+      Integer.class,
+      Number.class,
+      MethodHandles.class,
+    };
     Check(non_mirrord_classes);
   }
 }
