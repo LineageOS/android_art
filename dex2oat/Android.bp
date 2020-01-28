@@ -250,9 +250,6 @@ art_cc_binary {
         "dex2oat-defaults",
         "dex2oat-pgo-defaults",
     ],
-    // Modules that do dexpreopting, e.g. android_app, depend implicitly on
-    // either dex2oat or dex2oatd in ART source builds.
-    visibility: ["//visibility:public"],
     shared_libs: [
         "libprofile",
         "libart-compiler",
@@ -304,9 +301,6 @@ art_cc_binary {
         "art_debug_defaults",
         "dex2oat-defaults",
     ],
-    // Modules that do dexpreopting, e.g. android_app, depend implicitly on
-    // either dex2oat or dex2oatd in ART source builds.
-    visibility: ["//visibility:public"],
     shared_libs: [
         "libprofiled",
         "libartd-compiler",
