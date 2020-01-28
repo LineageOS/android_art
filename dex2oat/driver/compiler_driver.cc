@@ -936,7 +936,7 @@ bool CompilerDriver::ShouldCompileBasedOnProfile(const MethodReference& method_r
   // If compiling the apex image, filter out methods not in an apex file (the profile used
   // for boot classpath is the same between the apex image and the boot image, so it includes
   /// framewkro methods).
-  if (compiler_options_->IsApexBootImage() &&
+  if (compiler_options_->IsApexBootImageExtension() &&
       !android::base::StartsWith(method_ref.dex_file->GetLocation(), "/apex")) {
     return false;
   }
