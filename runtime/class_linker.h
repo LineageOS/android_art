@@ -103,6 +103,18 @@ class ClassVisitor {
   virtual bool operator()(ObjPtr<mirror::Class> klass) = 0;
 };
 
+template <typename Func>
+class ClassFuncVisitor final : public ClassVisitor {
+ public:
+  explicit ClassFuncVisitor(Func func) : func_(func) {}
+  bool operator()(ObjPtr<mirror::Class> klass) override REQUIRES_SHARED(Locks::mutator_lock_) {
+    return func_(klass);
+  }
+
+ private:
+  Func func_;
+};
+
 class ClassLoaderVisitor {
  public:
   virtual ~ClassLoaderVisitor() {}

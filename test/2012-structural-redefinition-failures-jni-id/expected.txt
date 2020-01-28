@@ -1,0 +1,8 @@
+Checking classes
+Is Structurally modifiable class Main$C1 true
+Is Structurally modifiable class Main$C2 true
+Is Structurally modifiable class Main$C3 true
+Setting C2 as having pointer-ids used and checking classes
+Is Structurally modifiable class Main$C1 false
+Is Structurally modifiable class Main$C2 false
+Is Structurally modifiable class Main$C3 true
