@@ -483,18 +483,15 @@ art_cc_defaults {
     name: "libtistress-defaults",
     defaults: ["libtistress-srcs"],
     shared_libs: [
+        "libbase",
         "slicer_no_rtti",
-        "libz", // for slicer (using adler32).
     ],
 }
 
 art_cc_test_library {
     name: "libtistress",
     defaults: ["libtistress-defaults"],
-    shared_libs: [
-        "libartbase",
-        "libz",
-    ],
+    shared_libs: ["libartbase"],
 }
 
 art_cc_test_library {
@@ -503,38 +500,31 @@ art_cc_test_library {
         "art_debug_defaults",
         "libtistress-defaults",
     ],
-    shared_libs: [
-        "libartbased",
-        "libz",
-    ],
+    shared_libs: ["libartbased"],
 }
 
 art_cc_defaults {
-    name: "libtistress-shared-defaults",
+    name: "libtistress-static-defaults",
     defaults: [
         "libtistress-srcs",
+        "libart_static_defaults",
     ],
     static_libs: ["slicer_no_rtti"],
 }
 
 art_cc_test_library {
     name: "libtistresss",
-    defaults: ["libtistress-shared-defaults"],
-    shared_libs: [
-        "libartbase",
-        "libz",
-    ],
+    defaults: ["libtistress-static-defaults"],
+    static_libs: ["libartbase"],
 }
 
 art_cc_test_library {
     name: "libtistressds",
     defaults: [
-        "libtistress-shared-defaults",
+        "art_debug_defaults",
+        "libtistress-static-defaults",
     ],
-    shared_libs: [
-        "libartbased",
-        "libz",
-    ],
+    static_libs: ["libartbased"],
 }
 
 cc_defaults {
