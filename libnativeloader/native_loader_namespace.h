@@ -60,7 +60,7 @@ struct NativeLoaderNamespace {
 
   static Result<NativeLoaderNamespace> GetExportedNamespace(const std::string& name,
                                                             bool is_bridged);
-  static Result<NativeLoaderNamespace> GetPlatformNamespace(bool is_bridged);
+  static Result<NativeLoaderNamespace> GetSystemNamespace(bool is_bridged);
 
  private:
   explicit NativeLoaderNamespace(const std::string& name, android_namespace_t* ns)
