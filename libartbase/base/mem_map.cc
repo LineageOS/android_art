@@ -641,6 +641,14 @@ void MemMap::Invalidate() {
 
 void MemMap::swap(MemMap& other) {
   if (IsValid() || other.IsValid()) {
+    DCHECK(mem_maps_lock_ != nullptr);
+#ifdef __i386__
+    if (kIsDebugBuild) {
+      // For debugging purposes, log everything we can about the mutex, relying
+      // on the fact that mutexes are a wrapper around pthread_mutexes.
+      LOG(DEBUG) << "MemMap::swap: *lock = " << *reinterpret_cast<uint32_t*>(mem_maps_lock_);
+    }
+#endif
     std::lock_guard<std::mutex> mu(*mem_maps_lock_);
     DCHECK(gMaps != nullptr);
     auto this_it = IsValid() ? GetGMapsEntry(*this) : gMaps->end();
@@ -1008,6 +1016,11 @@ void MemMap::Shutdown() {
     delete gMaps;
     gMaps = nullptr;
   }
+#ifdef __i386__
+  if (kIsDebugBuild) {
+    LOG(DEBUG) << "MemMap::shutdown: Removing mem_maps_lock_.";
+  }
+#endif
   delete mem_maps_lock_;
   mem_maps_lock_ = nullptr;
 }
