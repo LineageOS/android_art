@@ -28,6 +28,7 @@ cc_defaults {
 
     shared_libs: [
         "libbase",
+        "libadbconnection_client",
     ],
     target: {
         host: {
@@ -57,32 +58,6 @@ art_cc_library {
         "com.android.art.release",
         "com.android.art.debug",
     ],
-}
-
-// We export a library to do the server-side socket handling that gets loaded
-// by adbd from the art apex, so that we can update the socket handling
-// independently from the adbd apex.
-cc_library {
-    name: "libadbconnection_server",
-    srcs: ["adbconnection_server.cc"],
-
-    export_include_dirs: ["include"],
-
-    stl: "libc++_static",
-    shared_libs: ["liblog"],
-    whole_static_libs: ["libbase"],
-
-    defaults: ["art_defaults"],
-    visibility: [
-        "//system/core/adb",
-    ],
-    stubs: {
-        symbol_file: "libadbconnection_server.map.txt",
-        versions: ["1"],
-    },
-
-    host_supported: true,
-    recovery_available: true,
 }
 
 art_cc_library {
