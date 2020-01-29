@@ -257,6 +257,12 @@ class CheckJniAbortCatcher {
     return; \
   }
 
+#define TEST_DISABLED_FOR_X86_64() \
+  if (kRuntimeISA == InstructionSet::kX86_64) { \
+    printf("WARNING: TEST DISABLED FOR X86_64\n"); \
+    return; \
+  }
+
 #define TEST_DISABLED_FOR_STRING_COMPRESSION() \
   if (mirror::kUseStringCompression) { \
     printf("WARNING: TEST DISABLED FOR STRING COMPRESSION\n"); \
