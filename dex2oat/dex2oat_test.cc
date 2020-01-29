@@ -458,9 +458,10 @@ TEST_F(Dex2oatSwapUseTest, CheckSwapUsage) {
   TEST_DISABLED_FOR_MEMORY_TOOL();
 
   // The `native_alloc_2_ >= native_alloc_1_` assertion below may not
-  // hold true on some x86 systems; disable this test while we
+  // hold true on some x86 or x86_64 systems; disable this test while we
   // investigate (b/29259363).
   TEST_DISABLED_FOR_X86();
+  TEST_DISABLED_FOR_X86_64();
 
   RunTest(/*use_fd=*/ false,
           /*expect_use=*/ false);
