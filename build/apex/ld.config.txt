@@ -8,15 +8,16 @@
 dir.art = /apex/com.android.art/bin/
 
 [art]
-additional.namespaces = platform,conscrypt,art,neuralnetworks
+additional.namespaces = platform,conscrypt,art,neuralnetworks,adbd
 
 # The default namespace here only links to other namespaces, in particular "art"
 # where the real library loading takes place. Any outgoing links from "art" also
 # need to be present here.
 namespace.default.isolated = true
-namespace.default.links = art,platform
+namespace.default.links = art,platform,adbd
 namespace.default.link.art.allow_all_shared_libs = true
 namespace.default.link.platform.allow_all_shared_libs = true
+namespace.default.link.adbd.shared_libs = libadbconnection_client.so
 
 ###############################################################################
 # "art" APEX namespace
@@ -47,13 +48,14 @@ namespace.art.permitted.paths += /apex/com.android.art/javalib
 # the APEX namespaces, because searching of the libs are NOT done in
 # /system/lib, but in /apex/<module>/lib directory.
 namespace.art.permitted.paths += /system/${LIB}
-namespace.art.links = platform,neuralnetworks
+namespace.art.links = platform,neuralnetworks,adbd
 # Need allow_all_shared_libs because libart.so can dlopen oat files in
 # /system/framework and /data.
 # TODO(b/130340935): Use a dynamically created linker namespace similar to
 # classloader-namespace for oat files, and tighten this up.
 namespace.art.link.platform.allow_all_shared_libs = true
 namespace.art.link.neuralnetworks.shared_libs = libneuralnetworks.so
+namespace.art.link.adbd.shared_libs = libadbconnection_client.so
 
 ###############################################################################
 # "platform" namespace
@@ -155,3 +157,20 @@ namespace.neuralnetworks.link.platform.shared_libs += libnativewindow.so
 namespace.neuralnetworks.link.platform.shared_libs += libneuralnetworks_packageinfo.so
 namespace.neuralnetworks.link.platform.shared_libs += libsync.so
 namespace.neuralnetworks.link.platform.shared_libs += libvndksupport.so
+
+###############################################################################
+# "adbd" APEX namespace
+#
+# This namespace is for libraries within the adbd APEX.
+###############################################################################
+
+namespace.adbd.isolated = true
+namespace.adbd.visible = true
+
+namespace.adbd.search.paths = /apex/com.android.adbd/${LIB}
+namespace.adbd.asan.search.paths = /apex/com.android.adbd/${LIB}
+namespace.adbd.links = platform
+namespace.adbd.link.platform.shared_libs  = libc.so
+namespace.adbd.link.platform.shared_libs += libm.so
+namespace.adbd.link.platform.shared_libs += libdl.so
+namespace.adbd.link.platform.shared_libs += liblog.so
