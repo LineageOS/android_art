@@ -1,0 +1,3 @@
+Sanity check for isStructurallyModifiable.
+
+Ensures that types being not-modifiable makes their supertypes not-modifiable.

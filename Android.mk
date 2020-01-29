@@ -537,7 +537,6 @@ PRIVATE_ART_APEX_DEPENDENCY_FILES := \
 
 PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libadbconnectiond.so \
-  lib/libadbconnection_server.so \
   lib/libadbconnection.so \
   lib/libandroidicu.so \
   lib/libandroidio.so \
@@ -591,7 +590,6 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libziparchive.so \
   lib/libz.so \
   lib64/libadbconnectiond.so \
-  lib64/libadbconnection_server.so \
   lib64/libadbconnection.so \
   lib64/libandroidicu.so \
   lib64/libandroidio.so \

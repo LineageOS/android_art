@@ -1,0 +1,8 @@
+{
+  "presubmit": [
+    {
+      "name": "CtsSimpleperfTestCases",
+      "file_patterns": ["debugger_interface.cc"]
+    }
+  ]
+}

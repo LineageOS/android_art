@@ -18,10 +18,12 @@
 #define ART_ADBCONNECTION_ADBCONNECTION_H_
 
 #include <stdint.h>
+#include <memory>
 #include <vector>
 #include <limits>
 
 #include "android-base/unique_fd.h"
+#include "adbconnection/client.h"
 
 #include "base/mutex.h"
 #include "base/array_ref.h"
@@ -127,8 +129,8 @@ class AdbConnectionState {
   // Eventfd used to allow the StopDebuggerThreads function to wake up sleeping threads
   android::base::unique_fd sleep_event_fd_;
 
-  // Socket that we use to talk to adbd.
-  android::base::unique_fd control_sock_;
+  // Context which wraps the socket which we use to talk to adbd.
+  std::unique_ptr<AdbConnectionClientContext, void(*)(AdbConnectionClientContext*)> control_ctx_;
 
   // Socket that we use to talk to the agent (if it's loaded).
   android::base::unique_fd local_agent_control_sock_;

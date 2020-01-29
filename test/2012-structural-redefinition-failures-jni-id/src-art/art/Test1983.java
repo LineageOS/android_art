@@ -16,9 +16,9 @@
 
 package art;
 
+import java.lang.invoke.*;
 import java.lang.ref.*;
 import java.lang.reflect.*;
-import java.lang.invoke.*;
 import java.util.*;
 
 public class Test1983 {

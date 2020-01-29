@@ -492,7 +492,6 @@ class ReleaseChecker:
     self._checker.check_native_library('libnativebridge')
     self._checker.check_native_library('libnativehelper')
     self._checker.check_native_library('libnativeloader')
-    self._checker.check_native_library('libadbconnection_server')
 
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnection')
@@ -729,6 +728,7 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('linker_patch_test')
     self._checker.check_art_test_executable('live_interval_test')
     self._checker.check_art_test_executable('load_store_analysis_test')
+    self._checker.check_art_test_executable('load_store_elimination_test')
     self._checker.check_art_test_executable('loop_optimization_test')
     self._checker.check_art_test_executable('nodes_test')
     self._checker.check_art_test_executable('nodes_vector_test')
