@@ -30,10 +30,10 @@
 // Includes for the types that are being specialized
 #include <string>
 #include "base/time_utils.h"
+#include "base/logging.h"
 #include "experimental_flags.h"
 #include "gc/collector_type.h"
 #include "gc/space/large_object_space.h"
-#include "jdwp/jdwp.h"
 #include "jdwp_provider.h"
 #include "jit/profile_saver_options.h"
 #include "plugin.h"
@@ -74,13 +74,10 @@ struct CmdlineType<JdwpProvider> : CmdlineTypeParser<JdwpProvider> {
     if (option == "help") {
       return Result::Usage(
           "Example: -XjdwpProvider:none to disable JDWP\n"
-          "Example: -XjdwpProvider:internal for internal jdwp implementation\n"
           "Example: -XjdwpProvider:adbconnection for adb connection mediated jdwp implementation\n"
           "Example: -XjdwpProvider:default for the default jdwp implementation\n");
     } else if (option == "default") {
       return Result::Success(JdwpProvider::kDefaultJdwpProvider);
-    } else if (option == "internal") {
-      return Result::Success(JdwpProvider::kInternal);
     } else if (option == "adbconnection") {
       return Result::Success(JdwpProvider::kAdbConnection);
     } else if (option == "none") {

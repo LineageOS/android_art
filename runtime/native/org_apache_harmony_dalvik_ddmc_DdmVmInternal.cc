@@ -20,6 +20,7 @@
 
 #include "base/file_utils.h"
 #include "base/mutex.h"
+#include "base/endian_utils.h"
 #include "debugger.h"
 #include "gc/heap.h"
 #include "jni/jni_internal.h"
@@ -101,6 +102,57 @@ static void ThreadCountCallback(Thread*, void* context) {
 static const int kThstBytesPerEntry = 18;
 static const int kThstHeaderLen = 4;
 
+static constexpr uint8_t ToJdwpThreadStatus(ThreadState state) {
+  /*
+  * ThreadStatus constants.
+  */
+  enum JdwpThreadStatus : uint8_t {
+    TS_ZOMBIE   = 0,
+    TS_RUNNING  = 1,  // RUNNING
+    TS_SLEEPING = 2,  // (in Thread.sleep())
+    TS_MONITOR  = 3,  // WAITING (monitor wait)
+    TS_WAIT     = 4,  // (in Object.wait())
+  };
+  switch (state) {
+    case kBlocked:
+      return TS_MONITOR;
+    case kNative:
+    case kRunnable:
+    case kSuspended:
+      return TS_RUNNING;
+    case kSleeping:
+      return TS_SLEEPING;
+    case kStarting:
+    case kTerminated:
+      return TS_ZOMBIE;
+    case kTimedWaiting:
+    case kWaitingForTaskProcessor:
+    case kWaitingForLockInflation:
+    case kWaitingForCheckPointsToRun:
+    case kWaitingForDebuggerSend:
+    case kWaitingForDebuggerSuspension:
+    case kWaitingForDebuggerToAttach:
+    case kWaitingForDeoptimization:
+    case kWaitingForGcToComplete:
+    case kWaitingForGetObjectsAllocated:
+    case kWaitingForJniOnLoad:
+    case kWaitingForMethodTracingStart:
+    case kWaitingForSignalCatcherOutput:
+    case kWaitingForVisitObjects:
+    case kWaitingInMainDebuggerLoop:
+    case kWaitingInMainSignalCatcherLoop:
+    case kWaitingPerformingGc:
+    case kWaitingWeakGcRootRead:
+    case kWaitingForGcThreadFlip:
+    case kNativeForAbort:
+    case kWaiting:
+      return TS_WAIT;
+      // Don't add a 'default' here so the compiler can spot incompatible enum changes.
+  }
+  LOG(FATAL) << "Unknown thread state: " << state;
+  UNREACHABLE();
+}
+
 static void ThreadStatsGetterCallback(Thread* t, void* context) {
   /*
    * Generate the contents of a THST chunk.  The data encompasses all known
@@ -130,12 +182,12 @@ static void ThreadStatsGetterCallback(Thread* t, void* context) {
   GetTaskStats(t->GetTid(), &native_thread_state, &utime, &stime, &task_cpu);
 
   std::vector<uint8_t>& bytes = *reinterpret_cast<std::vector<uint8_t>*>(context);
-  JDWP::Append4BE(bytes, t->GetThreadId());
-  JDWP::Append1BE(bytes, Dbg::ToJdwpThreadStatus(t->GetState()));
-  JDWP::Append4BE(bytes, t->GetTid());
-  JDWP::Append4BE(bytes, utime);
-  JDWP::Append4BE(bytes, stime);
-  JDWP::Append1BE(bytes, t->IsDaemon());
+  Append4BE(bytes, t->GetThreadId());
+  Append1BE(bytes, ToJdwpThreadStatus(t->GetState()));
+  Append4BE(bytes, t->GetTid());
+  Append4BE(bytes, utime);
+  Append4BE(bytes, stime);
+  Append1BE(bytes, t->IsDaemon());
 }
 
 static jbyteArray DdmVmInternal_getThreadStats(JNIEnv* env, jclass) {
@@ -148,9 +200,9 @@ static jbyteArray DdmVmInternal_getThreadStats(JNIEnv* env, jclass) {
     uint16_t thread_count = 0;
     thread_list->ForEach(ThreadCountCallback, &thread_count);
 
-    JDWP::Append1BE(bytes, kThstHeaderLen);
-    JDWP::Append1BE(bytes, kThstBytesPerEntry);
-    JDWP::Append2BE(bytes, thread_count);
+    Append1BE(bytes, kThstHeaderLen);
+    Append1BE(bytes, kThstBytesPerEntry);
+    Append2BE(bytes, thread_count);
 
     thread_list->ForEach(ThreadStatsGetterCallback, &bytes);
   }

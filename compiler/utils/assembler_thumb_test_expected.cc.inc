@@ -153,7 +153,7 @@ const char* const VixlJniHelpersResults[] = {
   " 21c:	f8d9 8034 	ldr.w	r8, [r9, #52]	; 0x34\n",
   " 220:	4770      	bx	lr\n",
   " 222:	4660      	mov	r0, ip\n",
-  " 224:	f8d9 c2ec 	ldr.w	ip, [r9, #748]	; 0x2ec\n",
+  " 224:	f8d9 c2e4 	ldr.w	ip, [r9, #740]	; 0x2e4\n",
   " 228:	47e0      	blx	ip\n",
   nullptr
 };

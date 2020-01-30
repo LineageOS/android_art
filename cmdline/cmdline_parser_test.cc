@@ -391,11 +391,6 @@ TEST_F(CmdlineParserTest, TestJdwpProviderDefault) {
   EXPECT_SINGLE_PARSE_VALUE(JdwpProvider::kDefaultJdwpProvider, opt_args, M::JdwpProvider);
 }  // TEST_F
 
-TEST_F(CmdlineParserTest, TestJdwpProviderInternal) {
-  const char* opt_args = "-XjdwpProvider:internal";
-  EXPECT_SINGLE_PARSE_VALUE(JdwpProvider::kInternal, opt_args, M::JdwpProvider);
-}  // TEST_F
-
 TEST_F(CmdlineParserTest, TestJdwpProviderNone) {
   const char* opt_args = "-XjdwpProvider:none";
   EXPECT_SINGLE_PARSE_VALUE(JdwpProvider::kNone, opt_args, M::JdwpProvider);
