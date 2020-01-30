@@ -528,7 +528,6 @@ extern "C" bool ArtPlugin_Initialize() {
   }
 
   struct sigaction act = {};
-  act.sa_flags = SA_SIGINFO | SA_RESTART;
   act.sa_sigaction = [](int, siginfo_t*, void*) {
     if (write(g_signal_pipe_fds[1], kByte, sizeof(kByte)) == -1) {
       PLOG(ERROR) << "Failed to trigger heap dump";
@@ -547,17 +546,17 @@ extern "C" bool ArtPlugin_Initialize() {
   std::thread th([] {
     art::Runtime* runtime = art::Runtime::Current();
     if (!runtime) {
-      LOG(FATAL_WITHOUT_ABORT) << "no runtime in perfetto_hprof_listener";
+      LOG(FATAL_WITHOUT_ABORT) << "no runtime in hprof_listener";
       return;
     }
-    if (!runtime->AttachCurrentThread("perfetto_hprof_listener", /*as_daemon=*/ true,
+    if (!runtime->AttachCurrentThread("hprof_listener", /*as_daemon=*/ true,
                                       runtime->GetSystemThreadGroup(), /*create_peer=*/ false)) {
       LOG(ERROR) << "failed to attach thread.";
       return;
     }
     art::Thread* self = art::Thread::Current();
     if (!self) {
-      LOG(FATAL_WITHOUT_ABORT) << "no thread in perfetto_hprof_listener";
+      LOG(FATAL_WITHOUT_ABORT) << "no thread in hprof_listener";
       return;
     }
     {
