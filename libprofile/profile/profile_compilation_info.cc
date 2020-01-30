@@ -98,7 +98,7 @@ static constexpr uint32_t kSizeWarningThresholdBytes = 500000U;
 static constexpr uint32_t kSizeErrorThresholdBytes = 1500000U;
 
 static constexpr uint32_t kSizeWarningThresholdBootBytes = 25000000U;
-static constexpr uint32_t kSizeErrorThresholdBootBytes = 50000000U;
+static constexpr uint32_t kSizeErrorThresholdBootBytes = 100000000U;
 
 static bool ChecksumMatch(uint32_t dex_file_checksum, uint32_t checksum) {
   return kDebugIgnoreChecksum || dex_file_checksum == checksum;
