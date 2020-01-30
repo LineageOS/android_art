@@ -134,22 +134,6 @@ class ThreadList {
                !Locks::thread_list_lock_,
                !Locks::thread_suspend_count_lock_);
 
-  // Suspends all threads
-  void SuspendAllForDebugger()
-      REQUIRES(!Locks::mutator_lock_,
-               !Locks::thread_list_lock_,
-               !Locks::thread_suspend_count_lock_);
-
-  void SuspendSelfForDebugger()
-      REQUIRES(!Locks::thread_suspend_count_lock_);
-
-  // Resume all threads
-  void ResumeAllForDebugger()
-      REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_);
-
-  void UndoDebuggerSuspensions()
-      REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_);
-
   // Iterates over all the threads.
   void ForEach(void (*callback)(Thread*, void*), void* context)
       REQUIRES(Locks::thread_list_lock_);
@@ -229,7 +213,6 @@ class ThreadList {
 
   // Ongoing suspend all requests, used to ensure threads added to list_ respect SuspendAll.
   int suspend_all_count_ GUARDED_BY(Locks::thread_suspend_count_lock_);
-  int debug_suspend_all_count_ GUARDED_BY(Locks::thread_suspend_count_lock_);
 
   // Number of threads unregistering, ~ThreadList blocks until this hits 0.
   int unregistering_count_ GUARDED_BY(Locks::thread_list_lock_);

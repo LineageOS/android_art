@@ -172,7 +172,9 @@ static void VMDebug_stopEmulatorTracing(JNIEnv*, jclass) {
 }
 
 static jboolean VMDebug_isDebuggerConnected(JNIEnv*, jclass) {
-  return Dbg::IsDebuggerActive();
+  // This function will be replaced by the debugger when it's connected. See
+  // external/oj-libjdwp/src/share/vmDebug.c for implementation when debugger is connected.
+  return false;
 }
 
 static jboolean VMDebug_isDebuggingEnabled(JNIEnv* env, jclass) {
@@ -181,7 +183,9 @@ static jboolean VMDebug_isDebuggingEnabled(JNIEnv* env, jclass) {
 }
 
 static jlong VMDebug_lastDebuggerActivity(JNIEnv*, jclass) {
-  return Dbg::LastDebuggerActivity();
+  // This function will be replaced by the debugger when it's connected. See
+  // external/oj-libjdwp/src/share/vmDebug.c for implementation when debugger is connected.
+  return -1;
 }
 
 static void ThrowUnsupportedOperationException(JNIEnv* env) {

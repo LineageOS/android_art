@@ -26,8 +26,6 @@ enum class SuspendReason : char {
   // Suspending for internal reasons (e.g. GC, stack trace, etc.).
   // TODO Split this into more descriptive sections.
   kInternal,
-  // Suspending for debugger (code in Dbg::*, runtime/jdwp/, etc.).
-  kForDebugger,
   // Suspending due to non-runtime, user controlled, code. (For example Thread#Suspend()).
   kForUserCode,
 };

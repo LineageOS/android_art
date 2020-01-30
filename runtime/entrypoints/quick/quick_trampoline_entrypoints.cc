@@ -1466,22 +1466,11 @@ extern "C" const void* artQuickResolutionTrampoline(
     }
     bool force_interpreter = self->IsForceInterpreter() && !called->IsNative();
     if (called_class->IsInitialized() || called_class->IsInitializing()) {
-      if (UNLIKELY(force_interpreter ||
-                   Dbg::IsForcedInterpreterNeededForResolution(self, called))) {
+      if (UNLIKELY(force_interpreter)) {
         // If we are single-stepping or the called method is deoptimized (by a
         // breakpoint, for example), then we have to execute the called method
         // with the interpreter.
         code = GetQuickToInterpreterBridge();
-      } else if (UNLIKELY(Dbg::IsForcedInstrumentationNeededForResolution(self, caller))) {
-        // If the caller is deoptimized (by a breakpoint, for example), we have to
-        // continue its execution with interpreter when returning from the called
-        // method. Because we do not want to execute the called method with the
-        // interpreter, we wrap its execution into the instrumentation stubs.
-        // When the called method returns, it will execute the instrumentation
-        // exit hook that will determine the need of the interpreter with a call
-        // to Dbg::IsForcedInterpreterNeededForUpcall and deoptimize the stack if
-        // it is needed.
-        code = GetQuickInstrumentationEntryPoint();
       } else {
         code = called->GetEntryPointFromQuickCompiledCode();
         if (linker->IsQuickResolutionStub(code)) {

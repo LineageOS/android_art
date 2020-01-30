@@ -295,6 +295,7 @@ while true; do
         TIME_OUT="n"
         shift
     elif [ "x$1" = "x--debug" ]; then
+        USE_JVMTI="y"
         DEBUGGER="y"
         TIME_OUT="n"
         shift
@@ -533,7 +534,7 @@ msg "------------------------------"
 
 if [ "$DEBUGGER" = "y" ]; then
   # Use this instead for ddms and connect by running 'ddms':
-  # DEBUGGER_OPTS="-agentlib:jdwp=transport=dt_android_adb,server=y,suspend=y"
+  # DEBUGGER_OPTS="-XjdwpOptions=server=y,suspend=y -XjdwpProvider:adbconnection"
   # TODO: add a separate --ddms option?
 
   PORT=12345
@@ -543,9 +544,8 @@ if [ "$DEBUGGER" = "y" ]; then
   fi
   msg "    jdb -attach localhost:$PORT"
   if [ "$USE_JVM" = "n" ]; then
-    # TODO We should switch over to using the jvmti agent by default.
-    # Need to tell the runtime to enable the internal jdwp implementation.
-    DEBUGGER_OPTS="-XjdwpOptions:transport=dt_socket,address=$PORT,server=y,suspend=y -XjdwpProvider:internal"
+    # Use the default libjdwp agent. Use --debug-agent to use a custom one.
+    DEBUGGER_OPTS="-agentpath:libjdwp.so=transport=dt_socket,address=$PORT,server=y,suspend=y -XjdwpProvider:internal"
   else
     DEBUGGER_OPTS="-agentlib:jdwp=transport=dt_socket,address=$PORT,server=y,suspend=y"
   fi
