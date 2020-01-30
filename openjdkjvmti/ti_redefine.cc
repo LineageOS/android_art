@@ -83,10 +83,6 @@
 #include "handle_scope.h"
 #include "instrumentation.h"
 #include "intern_table.h"
-#include "jdwp/jdwp.h"
-#include "jdwp/jdwp_constants.h"
-#include "jdwp/jdwp_event.h"
-#include "jdwp/object_registry.h"
 #include "jit/jit.h"
 #include "jit/jit_code_cache.h"
 #include "jni/jni_env_ext-inl.h"
@@ -2155,19 +2151,8 @@ void Redefiner::ClassRedefinition::UnregisterJvmtiBreakpoints() {
   BreakpointUtil::RemoveBreakpointsInClass(driver_->env_, GetMirrorClass().Ptr());
 }
 
-void Redefiner::ClassRedefinition::UnregisterBreakpoints() {
-  if (LIKELY(!art::Dbg::IsDebuggerActive())) {
-    return;
-  }
-  art::JDWP::JdwpState* state = art::Dbg::GetJdwpState();
-  if (state != nullptr) {
-    state->UnregisterLocationEventsOnClass(GetMirrorClass());
-  }
-}
-
 void Redefiner::UnregisterAllBreakpoints() {
   for (Redefiner::ClassRedefinition& redef : redefinitions_) {
-    redef.UnregisterBreakpoints();
     redef.UnregisterJvmtiBreakpoints();
   }
 }

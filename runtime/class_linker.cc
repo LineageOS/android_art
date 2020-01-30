@@ -3499,8 +3499,7 @@ bool ClassLinker::ShouldUseInterpreterEntrypoint(ArtMethod* method, const void* 
     return true;
   }
 
-  if (Thread::Current()->IsForceInterpreter() ||
-      Dbg::IsForcedInterpreterNeededForCalling(Thread::Current(), method)) {
+  if (Thread::Current()->IsForceInterpreter()) {
     // Force the use of interpreter when it is required by the debugger.
     return true;
   }

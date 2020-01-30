@@ -904,7 +904,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('instrumentation_test')
     self._checker.check_art_test_executable('intern_table_test')
     self._checker.check_art_test_executable('java_vm_ext_test')
-    self._checker.check_art_test_executable('jdwp_options_test')
     self._checker.check_art_test_executable('jit_memory_region_test')
     self._checker.check_art_test_executable('jni_internal_test')
     self._checker.check_art_test_executable('large_object_space_test')

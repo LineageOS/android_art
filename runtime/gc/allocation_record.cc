@@ -153,11 +153,6 @@ void AllocRecordObjectMap::SetAllocTrackingEnabled(bool enable) {
       }
       CHECK(records != nullptr);
       records->SetMaxStackDepth(heap->GetAllocTrackerStackDepth());
-      std::string self_name;
-      self->GetThreadName(self_name);
-      if (self_name == "JDWP") {
-        records->alloc_ddm_thread_id_ = self->GetTid();
-      }
       size_t sz = sizeof(AllocRecordStackTraceElement) * records->max_stack_depth_ +
                   sizeof(AllocRecord) + sizeof(AllocRecordStackTrace);
       LOG(INFO) << "Enabling alloc tracker (" << records->alloc_record_max_ << " entries of "
@@ -222,10 +217,9 @@ void AllocRecordObjectMap::RecordAllocation(Thread* self,
     return;
   }
 
-  // Do not record for DDM thread.
-  if (alloc_ddm_thread_id_ == self->GetTid()) {
-    return;
-  }
+  // TODO Skip recording allocations associated with DDMS. This was a feature of the old debugger
+  // but when we switched to the JVMTI based debugger the feature was (unintentionally) broken.
+  // Since nobody seemed to really notice or care it might not be worth the trouble.
 
   // Wait for GC's sweeping to complete and allow new records.
   while (UNLIKELY((!kUseReadBarrier && !allow_new_record_) ||
