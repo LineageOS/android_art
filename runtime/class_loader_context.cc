@@ -1217,6 +1217,11 @@ ClassLoaderContext::EncodeClassPathContextsForClassLoader(jobject class_loader) 
   return results;
 }
 
+bool ClassLoaderContext::IsValidEncoding(const std::string& possible_encoded_class_loader_context) {
+  return ClassLoaderContext::Create(possible_encoded_class_loader_context.c_str()) != nullptr
+      || possible_encoded_class_loader_context == kUnsupportedClassLoaderContextEncoding;
+}
+
 ClassLoaderContext::VerificationResult ClassLoaderContext::VerifyClassLoaderContextMatch(
     const std::string& context_spec,
     bool verify_names,

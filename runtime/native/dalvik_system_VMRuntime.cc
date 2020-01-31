@@ -34,6 +34,7 @@ extern "C" void android_set_application_target_sdk_version(uint32_t version);
 #include "base/enums.h"
 #include "base/sdk_version.h"
 #include "class_linker-inl.h"
+#include "class_loader_context.h"
 #include "common_throws.h"
 #include "debugger.h"
 #include "dex/class_accessor-inl.h"
@@ -767,6 +768,18 @@ static void VMRuntime_resetJitCounters(JNIEnv* env, jclass klass ATTRIBUTE_UNUSE
   Runtime::Current()->GetClassLinker()->VisitClasses(&visitor);
 }
 
+static jboolean VMRuntime_isValidClassLoaderContext(JNIEnv* env,
+                                                    jclass klass ATTRIBUTE_UNUSED,
+                                                    jstring jencoded_class_loader_context) {
+  if (UNLIKELY(jencoded_class_loader_context == nullptr)) {
+    ScopedFastNativeObjectAccess soa(env);
+    ThrowNullPointerException("encoded_class_loader_context == null");
+    return false;
+  }
+  ScopedUtfChars encoded_class_loader_context(env, jencoded_class_loader_context);
+  return ClassLoaderContext::IsValidEncoding(encoded_class_loader_context.c_str());
+}
+
 static JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(VMRuntime, addressOf, "(Ljava/lang/Object;)J"),
   NATIVE_METHOD(VMRuntime, bootClassPath, "()Ljava/lang/String;"),
@@ -818,6 +831,7 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMRuntime, setProcessDataDirectory, "(Ljava/lang/String;)V"),
   NATIVE_METHOD(VMRuntime, bootCompleted, "()V"),
   NATIVE_METHOD(VMRuntime, resetJitCounters, "()V"),
+  NATIVE_METHOD(VMRuntime, isValidClassLoaderContext, "(Ljava/lang/String;)Z"),
 };
 
 void register_dalvik_system_VMRuntime(JNIEnv* env) {
