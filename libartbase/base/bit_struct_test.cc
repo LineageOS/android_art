@@ -61,33 +61,33 @@ size_t AsUint(const T& value) {
 
 struct CustomBitStruct {
   CustomBitStruct() = default;
-  explicit CustomBitStruct(int8_t data) : data(data) {}
+  explicit CustomBitStruct(uint8_t data) : data(data) {}
 
   static constexpr size_t BitStructSizeOf() {
     return 4;
   }
 
-  int8_t data;
+  uint8_t data;
 };
 
 TEST(BitStructs, Custom) {
-  CustomBitStruct expected(0b1111);
+  CustomBitStruct expected(0b1111u);
 
-  BitStructField<CustomBitStruct, /*lsb=*/4, /*width=*/4> f{};
+  BitStructField<CustomBitStruct, /*lsb=*/4, /*width=*/4, uint8_t> f{};
 
   EXPECT_EQ(1u, sizeof(f));
 
-  f = CustomBitStruct(0b1111);
+  f = CustomBitStruct(0b1111u);
 
   CustomBitStruct read_out = f;
-  EXPECT_EQ(read_out.data, 0b1111);
+  EXPECT_EQ(read_out.data, 0b1111u);
 
   EXPECT_EQ(AsUint(f), 0b11110000u);
 }
 
 BITSTRUCT_DEFINE_START(TestTwoCustom, /* size= */ 8)
-  BitStructField<CustomBitStruct, /*lsb=*/0, /*width=*/4> f4_a;
-  BitStructField<CustomBitStruct, /*lsb=*/4, /*width=*/4> f4_b;
+  BITSTRUCT_FIELD(CustomBitStruct, /*lsb=*/0, /*width=*/4) f4_a;
+  BITSTRUCT_FIELD(CustomBitStruct, /*lsb=*/4, /*width=*/4) f4_b;
 BITSTRUCT_DEFINE_END(TestTwoCustom);
 
 TEST(BitStructs, TwoCustom) {
@@ -122,7 +122,7 @@ TEST(BitStructs, TwoCustom) {
 }
 
 TEST(BitStructs, Number) {
-  BitStructNumber<uint16_t, /*lsb=*/4, /*width=*/4> bsn{};
+  BitStructNumber<uint16_t, /*lsb=*/4, /*width=*/4, uint16_t> bsn{};
   EXPECT_EQ(2u, sizeof(bsn));
 
   bsn = 0b1111;
@@ -135,25 +135,28 @@ TEST(BitStructs, Number) {
   EXPECT_EQ(AsUint(bsn), 0b11110000u);
 }
 
-BITSTRUCT_DEFINE_START(TestBitStruct, /* size= */ 8)
-  BitStructInt</*lsb=*/0, /*width=*/3> i3;
-  BitStructUint</*lsb=*/3, /*width=*/4> u4;
+TEST(BitStructs, NumberNarrowStorage) {
+  BitStructNumber<uint16_t, /*lsb=*/4, /*width=*/4, uint8_t> bsn{};
+  EXPECT_EQ(1u, sizeof(bsn));
 
-  BitStructUint</*lsb=*/0, /*width=*/7> alias_all;
+  bsn = 0b1111;
+
+  uint32_t read_out = static_cast<uint32_t>(bsn);
+  uint32_t read_out_impl = bsn;
+
+  EXPECT_EQ(read_out, read_out_impl);
+  EXPECT_EQ(read_out, 0b1111u);
+  EXPECT_EQ(AsUint(bsn), 0b11110000u);
+}
+
+BITSTRUCT_DEFINE_START(TestBitStruct, /* size= */ 8)
+  BITSTRUCT_INT(/*lsb=*/0, /*width=*/3) i3;
+  BITSTRUCT_UINT(/*lsb=*/3, /*width=*/4) u4;
+
+  BITSTRUCT_UINT(/*lsb=*/0, /*width=*/7) alias_all;
 BITSTRUCT_DEFINE_END(TestBitStruct);
 
 TEST(BitStructs, Test1) {
-  {
-    // Check minimal size selection is correct.
-    BitStructInt</*lsb=*/0, /*width=*/3> i3;
-    BitStructUint</*lsb=*/3, /*width=*/4> u4;
-
-    BitStructUint</*lsb=*/0, /*width=*/7> alias_all;
-
-    EXPECT_EQ(1u, sizeof(i3));
-    EXPECT_EQ(1u, sizeof(u4));
-    EXPECT_EQ(1u, sizeof(alias_all));
-  }
   TestBitStruct tst{};
 
   // Check minimal size selection is correct.
@@ -217,11 +220,11 @@ TEST(BitStructs, Test1) {
 }
 
 BITSTRUCT_DEFINE_START(MixedSizeBitStruct, /* size= */ 32)
-  BitStructUint</*lsb=*/0, /*width=*/3> u3;
-  BitStructUint</*lsb=*/3, /*width=*/10> u10;
-  BitStructUint</*lsb=*/13, /*width=*/19> u19;
+  BITSTRUCT_UINT(/*lsb=*/0, /*width=*/3) u3;
+  BITSTRUCT_UINT(/*lsb=*/3, /*width=*/10) u10;
+  BITSTRUCT_UINT(/*lsb=*/13, /*width=*/19) u19;
 
-  BitStructUint</*lsb=*/0, /*width=*/32> alias_all;
+  BITSTRUCT_UINT(/*lsb=*/0, /*width=*/32) alias_all;
 BITSTRUCT_DEFINE_END(MixedSizeBitStruct);
 
 // static_assert(sizeof(MixedSizeBitStruct) == sizeof(uint32_t), "TestBitStructs#MixedSize");
@@ -256,10 +259,10 @@ TEST(BitStructs, Mixed) {
 }
 
 BITSTRUCT_DEFINE_START(TestBitStruct_u8, /* size= */ 8)
-  BitStructInt</*lsb=*/0, /*width=*/3> i3;
-  BitStructUint</*lsb=*/3, /*width=*/4> u4;
+  BITSTRUCT_INT(/*lsb=*/0, /*width=*/3) i3;
+  BITSTRUCT_UINT(/*lsb=*/3, /*width=*/4) u4;
 
-  BitStructUint</*lsb=*/0, /*width=*/8> alias_all;
+  BITSTRUCT_UINT(/*lsb=*/0, /*width=*/8) alias_all;
 BITSTRUCT_DEFINE_END(TestBitStruct_u8);
 
 TEST(BitStructs, FieldAssignment) {
@@ -283,11 +286,15 @@ TEST(BitStructs, FieldAssignment) {
   }
 }
 
-BITSTRUCT_DEFINE_START(NestedStruct, /* size= */ 64)
-  BitStructField<MixedSizeBitStruct, /*lsb=*/0> mixed_lower;
-  BitStructField<MixedSizeBitStruct, /*lsb=*/32> mixed_upper;
+BITSTRUCT_DEFINE_START(NestedStruct, /* size= */ 2 * MixedSizeBitStruct::BitStructSizeOf())
+  BITSTRUCT_FIELD(MixedSizeBitStruct,
+                  /*lsb=*/0,
+                  /*width=*/MixedSizeBitStruct::BitStructSizeOf()) mixed_lower;
+  BITSTRUCT_FIELD(MixedSizeBitStruct,
+                  /*lsb=*/MixedSizeBitStruct::BitStructSizeOf(),
+                  /*width=*/MixedSizeBitStruct::BitStructSizeOf()) mixed_upper;
 
-  BitStructUint</*lsb=*/0, /*width=*/64> alias_all;
+  BITSTRUCT_UINT(/*lsb=*/0, /*width=*/ 2 * MixedSizeBitStruct::BitStructSizeOf()) alias_all;
 BITSTRUCT_DEFINE_END(NestedStruct);
 
 TEST(BitStructs, DISABLED_NestedFieldAssignment) {

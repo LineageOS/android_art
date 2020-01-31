@@ -32,9 +32,9 @@
 //
 //   // Definition for type 'Example'
 //   BITSTRUCT_DEFINE_START(Example, 10)
-//     BitStructUint<0, 2> u2;     // Every field must be a BitStruct[*].
-//     BitStructInt<2, 7>  i7;
-//     BitStructUint<9, 1> i1;
+//     BITSTRUCT_UINT(0, 2) u2;     // Every field must be a BitStruct[*] with the same StorageType,
+//     BITSTRUCT_INT(2, 7)  i7;     // preferably using BITSTRUCT_{FIELD,UINT,INT}
+//     BITSTRUCT_UINT(9, 1) i1;     // to fill in the StorageType parameter.
 //   BITSTRUCT_DEFINE_END(Example);
 //
 //  Would define a bit struct with this layout:
@@ -109,8 +109,8 @@ namespace art {
 // of T can be represented by kBitWidth.
 template <typename T,
           size_t kBitOffset,
-          size_t kBitWidth = BitStructSizeOf<T>(),
-          typename StorageType = typename detail::MinimumTypeUnsignedHelper<kBitOffset + kBitWidth>::type>
+          size_t kBitWidth,
+          typename StorageType>
 struct BitStructField {
   static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 
@@ -186,10 +186,8 @@ struct BitStructField {
 //
 // (Common usage should be BitStructInt, BitStructUint -- this
 // intermediate template allows a user-defined integer to be used.)
-template <typename T, size_t kBitOffset, size_t kBitWidth>
-struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*StorageType*/T> {
-  using StorageType = T;
-
+template <typename T, size_t kBitOffset, size_t kBitWidth, typename StorageType>
+struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, StorageType> {
   BitStructNumber& operator=(T value) {
     return BaseType::Assign(*this, value);
   }
@@ -221,7 +219,7 @@ struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*Stora
   }
 
  private:
-  using BaseType = BitStructField<T, kBitOffset, kBitWidth, /*StorageType*/T>;
+  using BaseType = BitStructField<T, kBitOffset, kBitWidth, StorageType>;
   using BaseType::Get;
 };
 
@@ -229,21 +227,23 @@ struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*Stora
 // in order to be large enough to fit (kBitOffset + kBitWidth).
 //
 // Values are sign-extended when they are read out.
-template <size_t kBitOffset, size_t kBitWidth>
+template <size_t kBitOffset, size_t kBitWidth, typename StorageType>
 using BitStructInt =
     BitStructNumber<typename detail::MinimumTypeHelper<int, kBitOffset + kBitWidth>::type,
                     kBitOffset,
-                    kBitWidth>;
+                    kBitWidth,
+                    StorageType>;
 
 // Create a BitStruct field which uses the smallest underlying uint storage type,
 // in order to be large enough to fit (kBitOffset + kBitWidth).
 //
 // Values are zero-extended when they are read out.
-template <size_t kBitOffset, size_t kBitWidth>
+template <size_t kBitOffset, size_t kBitWidth, typename StorageType>
 using BitStructUint =
     BitStructNumber<typename detail::MinimumTypeHelper<unsigned int, kBitOffset + kBitWidth>::type,
                     kBitOffset,
-                    kBitWidth>;
+                    kBitWidth,
+                    StorageType>;
 
 // Start a definition for a bitstruct.
 // A bitstruct is defined to be a union with a common initial subsequence
@@ -260,12 +260,22 @@ using BitStructUint =
 // standard-layout struct members.
 #define BITSTRUCT_DEFINE_START(name, bitwidth)                                        \
     union name {                                                         /* NOLINT */ \
+      using StorageType =                                                             \
+          typename detail::MinimumTypeUnsignedHelper<(bitwidth)>::type;               \
       art::detail::DefineBitStructSize<(bitwidth)> _;                                 \
       static constexpr size_t BitStructSizeOf() { return (bitwidth); }                \
       name& operator=(const name& other) { _ = other._; return *this; }  /* NOLINT */ \
       name(const name& other) : _(other._) {}                                         \
       name() = default;                                                               \
       ~name() = default;
+
+// Define a field. See top of file for usage example.
+#define BITSTRUCT_FIELD(type, bit_offset, bit_width)                           \
+    BitStructField<type, (bit_offset), (bit_width), StorageType>
+#define BITSTRUCT_INT(bit_offset, bit_width)                                   \
+    BitStructInt<(bit_offset), (bit_width), StorageType>
+#define BITSTRUCT_UINT(bit_offset, bit_width)                                  \
+    BitStructUint<(bit_offset), (bit_width), StorageType>
 
 // End the definition of a bitstruct, and insert a sanity check
 // to ensure that the bitstruct did not exceed the specified size.
