@@ -86,6 +86,7 @@ class ArtMethod;
 enum class CalleeSaveType: uint32_t;
 class ClassLinker;
 class CompilerCallbacks;
+class Dex2oatImageTest;
 class DexFile;
 enum class InstructionSet;
 class InternTable;
@@ -1342,6 +1343,7 @@ class Runtime {
 
   // Note: See comments on GetFaultMessage.
   friend std::string GetFaultMessageForAbortLogging();
+  friend class Dex2oatImageTest;
   friend class ScopedThreadPoolUsage;
   friend class OatFileAssistantTest;
   class NotifyStartupCompletedTask;
