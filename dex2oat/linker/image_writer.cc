@@ -460,9 +460,10 @@ bool ImageWriter::Write(int image_fd,
       return false;
     }
 
-    if (!compiler_options_.IsAppImage() && fchmod(image_file->Fd(), 0644) != 0) {
+    // Make file world readable if we have created it, i.e. when not passed as file descriptor.
+    if (image_fd == -1 && !compiler_options_.IsAppImage() && fchmod(image_file->Fd(), 0644) != 0) {
       PLOG(ERROR) << "Failed to make image file world readable: " << image_filename;
-      return EXIT_FAILURE;
+      return false;
     }
 
     // Image data size excludes the bitmap and the header.
