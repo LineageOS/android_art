@@ -358,12 +358,16 @@ class QuickArgumentVisitor {
     }
   }
 
-  // For the given quick ref and args quick frame, return the caller's PC.
-  static uintptr_t GetCallingPc(ArtMethod** sp) REQUIRES_SHARED(Locks::mutator_lock_) {
+  static uint8_t* GetCallingPcAddr(ArtMethod** sp) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK((*sp)->IsCalleeSaveMethod());
     uint8_t* return_adress_spill =
         reinterpret_cast<uint8_t*>(sp) + kQuickCalleeSaveFrame_RefAndArgs_ReturnPcOffset;
-    return *reinterpret_cast<uintptr_t*>(return_adress_spill);
+    return return_adress_spill;
+  }
+
+  // For the given quick ref and args quick frame, return the caller's PC.
+  static uintptr_t GetCallingPc(ArtMethod** sp) REQUIRES_SHARED(Locks::mutator_lock_) {
+    return *reinterpret_cast<uintptr_t*>(GetCallingPcAddr(sp));
   }
 
   QuickArgumentVisitor(ArtMethod** sp, bool is_static, const char* shorty,
@@ -1156,6 +1160,8 @@ extern "C" const void* artInstrumentationMethodEntryFromCode(ArtMethod* method,
   instrumentation->PushInstrumentationStackFrame(self,
                                                  is_static ? nullptr : this_object,
                                                  method,
+                                                 reinterpret_cast<uintptr_t>(
+                                                     QuickArgumentVisitor::GetCallingPcAddr(sp)),
                                                  QuickArgumentVisitor::GetCallingPc(sp),
                                                  interpreter_entry);
 
@@ -1181,9 +1187,9 @@ extern "C" TwoWordReturn artInstrumentationMethodExitFromCode(Thread* self,
   // Compute address of return PC and sanity check that it currently holds 0.
   constexpr size_t return_pc_offset =
       RuntimeCalleeSaveFrame::GetReturnPcOffset(CalleeSaveType::kSaveEverything);
-  uintptr_t* return_pc = reinterpret_cast<uintptr_t*>(reinterpret_cast<uint8_t*>(sp) +
-                                                      return_pc_offset);
-  CHECK_EQ(*return_pc, 0U);
+  uintptr_t* return_pc_addr = reinterpret_cast<uintptr_t*>(reinterpret_cast<uint8_t*>(sp) +
+                                                           return_pc_offset);
+  CHECK_EQ(*return_pc_addr, 0U);
 
   // Pop the frame filling in the return pc. The low half of the return value is 0 when
   // deoptimization shouldn't be performed with the high-half having the return address. When
@@ -1191,7 +1197,7 @@ extern "C" TwoWordReturn artInstrumentationMethodExitFromCode(Thread* self,
   // deoptimization entry point.
   instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
   TwoWordReturn return_or_deoptimize_pc = instrumentation->PopInstrumentationStackFrame(
-      self, return_pc, gpr_result, fpr_result);
+      self, return_pc_addr, gpr_result, fpr_result);
   if (self->IsExceptionPending() || self->ObserveAsyncException()) {
     return GetTwoWordFailureValue();
   }

@@ -156,37 +156,6 @@ class CatchBlockStackVisitor final : public StackVisitor {
   DISALLOW_COPY_AND_ASSIGN(CatchBlockStackVisitor);
 };
 
-static size_t GetInstrumentationFramesToPop(Thread* self, size_t frame_depth)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  CHECK_NE(frame_depth, kInvalidFrameDepth);
-  size_t instrumentation_frames_to_pop = 0;
-  StackVisitor::WalkStack(
-      [&](art::StackVisitor* stack_visitor) REQUIRES_SHARED(Locks::mutator_lock_) {
-        size_t current_frame_depth = stack_visitor->GetFrameDepth();
-        if (current_frame_depth < frame_depth) {
-          CHECK(stack_visitor->GetMethod() != nullptr);
-          if (UNLIKELY(reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()) ==
-                  stack_visitor->GetReturnPc())) {
-            if (!stack_visitor->IsInInlinedFrame()) {
-              // We do not count inlined frames, because we do not instrument them. The reason we
-              // include them in the stack walking is the check against `frame_depth_`, which is
-              // given to us by a visitor that visits inlined frames.
-              ++instrumentation_frames_to_pop;
-            }
-          }
-          return true;
-        }
-        // We reached the frame of the catch handler or the upcall.
-        return false;
-      },
-      self,
-      /* context= */ nullptr,
-      art::StackVisitor::StackWalkKind::kIncludeInlinedFrames,
-      /* check_suspended */ true,
-      /* include_transitions */ true);
-  return instrumentation_frames_to_pop;
-}
-
 // Finds the appropriate exception catch after calling all method exit instrumentation functions.
 // Note that this might change the exception being thrown.
 void QuickExceptionHandler::FindCatch(ObjPtr<mirror::Throwable> exception) {
@@ -219,11 +188,6 @@ void QuickExceptionHandler::FindCatch(ObjPtr<mirror::Throwable> exception) {
     DCHECK_GE(new_pop_count, already_popped);
     already_popped = new_pop_count;
 
-    // Figure out how many of those frames have instrumentation we need to remove (Should be the
-    // exact same as number of new_pop_count if there aren't inlined frames).
-    size_t instrumentation_frames_to_pop =
-        GetInstrumentationFramesToPop(self_, handler_frame_depth_);
-
     if (kDebugExceptionDelivery) {
       if (*handler_quick_frame_ == nullptr) {
         LOG(INFO) << "Handler is upcall";
@@ -234,8 +198,6 @@ void QuickExceptionHandler::FindCatch(ObjPtr<mirror::Throwable> exception) {
         LOG(INFO) << "Handler: " << handler_method_->PrettyMethod() << " (line: "
                   << line_number << ")";
       }
-      LOG(INFO) << "Will attempt to pop " << instrumentation_frames_to_pop
-                << " off of the instrumentation stack";
     }
     // Exception was cleared as part of delivery.
     DCHECK(!self_->IsExceptionPending());
@@ -245,7 +207,8 @@ void QuickExceptionHandler::FindCatch(ObjPtr<mirror::Throwable> exception) {
         handler_method_header_->IsOptimized()) {
       SetCatchEnvironmentForOptimizedHandler(&visitor);
     }
-    popped_to_top = popper.PopFramesTo(instrumentation_frames_to_pop, exception_ref);
+    popped_to_top =
+        popper.PopFramesTo(reinterpret_cast<uintptr_t>(handler_quick_frame_), exception_ref);
   } while (!popped_to_top);
   if (!clear_exception_) {
     // Put exception back in root set with clear throw location.
@@ -679,10 +642,9 @@ uintptr_t QuickExceptionHandler::UpdateInstrumentationStack() {
   DCHECK(is_deoptimization_) << "Non-deoptimization handlers should use FindCatch";
   uintptr_t return_pc = 0;
   if (method_tracing_active_) {
-    size_t instrumentation_frames_to_pop =
-        GetInstrumentationFramesToPop(self_, handler_frame_depth_);
     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
-    return_pc = instrumentation->PopFramesForDeoptimization(self_, instrumentation_frames_to_pop);
+    return_pc = instrumentation->PopFramesForDeoptimization(
+        self_, reinterpret_cast<uintptr_t>(handler_quick_frame_));
   }
   return return_pc;
 }
