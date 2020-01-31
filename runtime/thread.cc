@@ -2298,7 +2298,8 @@ Thread::Thread(bool daemon)
       is_runtime_thread_(false) {
   wait_mutex_ = new Mutex("a thread wait mutex", LockLevel::kThreadWaitLock);
   wait_cond_ = new ConditionVariable("a thread wait condition variable", *wait_mutex_);
-  tlsPtr_.instrumentation_stack = new std::deque<instrumentation::InstrumentationStackFrame>;
+  tlsPtr_.instrumentation_stack =
+      new std::map<uintptr_t, instrumentation::InstrumentationStackFrame>;
   tlsPtr_.name = new std::string(kThreadNameDuringStartup);
 
   static_assert((sizeof(Thread) % 4) == 0U,
@@ -3621,7 +3622,7 @@ void Thread::QuickDeliverException() {
           method_type);
       artDeoptimize(this);
       UNREACHABLE();
-    } else {
+    } else if (visitor.caller != nullptr) {
       LOG(WARNING) << "Got a deoptimization request on un-deoptimizable method "
                    << visitor.caller->PrettyMethod();
     }
@@ -4065,8 +4066,8 @@ void Thread::VisitRoots(RootVisitor* visitor) {
   RootCallbackVisitor visitor_to_callback(visitor, thread_id);
   ReferenceMapVisitor<RootCallbackVisitor, kPrecise> mapper(this, &context, visitor_to_callback);
   mapper.template WalkStack<StackVisitor::CountTransitions::kNo>(false);
-  for (instrumentation::InstrumentationStackFrame& frame : *GetInstrumentationStack()) {
-    visitor->VisitRootIfNonNull(&frame.this_object_, RootInfo(kRootVMInternal, thread_id));
+  for (auto& entry : *GetInstrumentationStack()) {
+    visitor->VisitRootIfNonNull(&entry.second.this_object_, RootInfo(kRootVMInternal, thread_id));
   }
 }
 

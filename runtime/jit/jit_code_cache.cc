@@ -1002,13 +1002,12 @@ class MarkCodeClosure final : public Closure {
       // The stack walking code queries the side instrumentation stack if it
       // sees an instrumentation exit pc, so the JIT code of methods in that stack
       // must have been seen. We sanity check this below.
-      for (const instrumentation::InstrumentationStackFrame& frame
-              : *thread->GetInstrumentationStack()) {
+      for (const auto& it : *thread->GetInstrumentationStack()) {
         // The 'method_' in InstrumentationStackFrame is the one that has return_pc_ in
         // its stack frame, it is not the method owning return_pc_. We just pass null to
         // LookupMethodHeader: the method is only checked against in debug builds.
         OatQuickMethodHeader* method_header =
-            code_cache_->LookupMethodHeader(frame.return_pc_, /* method= */ nullptr);
+            code_cache_->LookupMethodHeader(it.second.return_pc_, /* method= */ nullptr);
         if (method_header != nullptr) {
           const void* code = method_header->GetCode();
           CHECK(bitmap_->Test(FromCodeToAllocation(code)));
