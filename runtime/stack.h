@@ -258,6 +258,7 @@ class StackVisitor {
   uintptr_t* GetGPRAddress(uint32_t reg) const;
 
   uintptr_t GetReturnPc() const REQUIRES_SHARED(Locks::mutator_lock_);
+  uintptr_t GetReturnPcAddr() const REQUIRES_SHARED(Locks::mutator_lock_);
 
   void SetReturnPc(uintptr_t new_ret_pc) REQUIRES_SHARED(Locks::mutator_lock_);
 

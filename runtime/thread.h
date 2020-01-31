@@ -1064,7 +1064,19 @@ class Thread {
   void RemoveDebuggerShadowFrameMapping(size_t frame_id)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  std::deque<instrumentation::InstrumentationStackFrame>* GetInstrumentationStack() {
+  // While getting this map requires shared the mutator lock, manipulating it
+  // should actually follow these rules:
+  // (1) The owner of this map (the thread) can change it with its mutator lock.
+  // (2) Other threads can read this map when the owner is suspended and they
+  //     hold the mutator lock.
+  // (3) Other threads can change this map when owning the mutator lock exclusively.
+  //
+  // The reason why (3) needs the mutator lock exclusively (and not just having
+  // the owner suspended) is that we don't want other threads to concurrently read the map.
+  //
+  // TODO: Add a class abstraction to express these rules.
+  std::map<uintptr_t, instrumentation::InstrumentationStackFrame>* GetInstrumentationStack()
+      REQUIRES_SHARED(Locks::mutator_lock_) {
     return tlsPtr_.instrumentation_stack;
   }
 
@@ -1746,8 +1758,12 @@ class Thread {
     Context* long_jump_context;
 
     // Additional stack used by method instrumentation to store method and return pc values.
-    // Stored as a pointer since std::deque is not PACKED.
-    std::deque<instrumentation::InstrumentationStackFrame>* instrumentation_stack;
+    // Stored as a pointer since std::map is not PACKED.
+    // !DO NOT CHANGE! to std::unordered_map: the users of this map require an
+    // ordered iteration on the keys (which are stack addresses).
+    // Also see Thread::GetInstrumentationStack for the requirements on
+    // manipulating and reading this map.
+    std::map<uintptr_t, instrumentation::InstrumentationStackFrame>* instrumentation_stack;
 
     // For gc purpose, a shadow frame record stack that keeps track of:
     // 1) shadow frames under construction.

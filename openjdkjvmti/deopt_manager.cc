@@ -487,9 +487,11 @@ void DeoptManager::AddDeoptimizationRequester() {
 void DeoptManager::DeoptimizeThread(art::Thread* target) {
   // We might or might not be running on the target thread (self) so get Thread::Current
   // directly.
+  art::ScopedThreadSuspension sts(art::Thread::Current(), art::kSuspended);
   art::gc::ScopedGCCriticalSection sgccs(art::Thread::Current(),
                                          art::gc::GcCause::kGcCauseDebugger,
                                          art::gc::CollectorType::kCollectorTypeDebugger);
+  art::ScopedSuspendAll ssa("Instrument thread stack");
   art::Runtime::Current()->GetInstrumentation()->InstrumentThreadStack(target);
 }
 
