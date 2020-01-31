@@ -26,6 +26,8 @@
 #include "base/logging.h"
 #include "base/macros.h"
 #include "base/mutex.h"
+#include "base/socket_peer_is_trusted.h"
+#include "debugger.h"
 #include "jni/java_vm_ext.h"
 #include "jni/jni_env_ext.h"
 #include "mirror/throwable.h"
@@ -35,19 +37,23 @@
 #include "scoped_thread_state_change-inl.h"
 #include "well_known_classes.h"
 
-#include "jdwp/jdwp_priv.h"
-
 #include "fd_transport.h"
 
 #include "poll.h"
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/eventfd.h>
 #include <jni.h>
 
 namespace adbconnection {
+
+static constexpr size_t kJdwpHeaderLen = 11U;
+/* DDM support */
+static constexpr uint8_t kJdwpDdmCmdSet = 199U;  // 0xc7, or 'G'+128
+static constexpr uint8_t kJdwpDdmCmd = 1U;
 
 // Messages sent from the transport
 using dt_fd_forward::kListenStartMessage;
@@ -333,7 +339,7 @@ void AdbConnectionState::SendDdmPacket(uint32_t id,
   // the adb_write_event_fd_ will ensure that the adb_connection_socket_ will not go away until
   // after we have sent our data.
   static constexpr uint32_t kDdmPacketHeaderSize =
-      kJDWPHeaderLen       // jdwp command packet size
+      kJdwpHeaderLen       // jdwp command packet size
       + sizeof(uint32_t)   // Type
       + sizeof(uint32_t);  // length
   alignas(sizeof(uint32_t)) std::array<uint8_t, kDdmPacketHeaderSize> pkt;
@@ -352,9 +358,9 @@ void AdbConnectionState::SendDdmPacket(uint32_t id,
   switch (packet_type) {
     case DdmPacketType::kCmd: {
       // Now the cmd-set
-      *(pkt_data++) = kJDWPDdmCmdSet;
+      *(pkt_data++) = kJdwpDdmCmdSet;
       // Now the command
-      *(pkt_data++) = kJDWPDdmCmd;
+      *(pkt_data++) = kJdwpDdmCmd;
       break;
     }
     case DdmPacketType::kReply: {

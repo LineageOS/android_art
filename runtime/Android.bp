@@ -140,13 +140,6 @@ libart_cc_defaults {
         "interpreter/shadow_frame.cc",
         "interpreter/unstarted_runtime.cc",
         "java_frame_root_info.cc",
-        "jdwp/jdwp_event.cc",
-        "jdwp/jdwp_expand_buf.cc",
-        "jdwp/jdwp_handler.cc",
-        "jdwp/jdwp_main.cc",
-        "jdwp/jdwp_request.cc",
-        "jdwp/jdwp_socket.cc",
-        "jdwp/object_registry.cc",
         "jit/debugger_interface.cc",
         "jit/jit.cc",
         "jit/jit_code_cache.cc",
@@ -396,7 +389,6 @@ libart_cc_defaults {
     target: {
         android: {
             srcs: [
-                "jdwp/jdwp_adb.cc",
                 "monitor_android.cc",
                 "runtime_android.cc",
                 "thread_android.cc",
@@ -535,8 +527,6 @@ gensrcs {
         "instrumentation.h",
         "indirect_reference_table.h",
         "jdwp_provider.h",
-        "jdwp/jdwp.h",
-        "jdwp/jdwp_constants.h",
         "jni_id_type.h",
         "lock_word.h",
         "oat_file.h",
@@ -689,7 +679,6 @@ art_cc_test {
         "intern_table_test.cc",
         "interpreter/safe_math_test.cc",
         "interpreter/unstarted_runtime_test.cc",
-        "jdwp/jdwp_options_test.cc",
         "jit/jit_memory_region_test.cc",
         "jit/profile_saver_test.cc",
         "jit/profiling_info_test.cc",

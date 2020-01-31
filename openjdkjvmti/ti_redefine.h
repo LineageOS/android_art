@@ -256,7 +256,6 @@ class Redefiner {
 
     void ReleaseDexFile() REQUIRES_SHARED(art::Locks::mutator_lock_);
 
-    void UnregisterBreakpoints() REQUIRES_SHARED(art::Locks::mutator_lock_);
     // This should be done with all threads suspended.
     void UnregisterJvmtiBreakpoints() REQUIRES_SHARED(art::Locks::mutator_lock_);
 

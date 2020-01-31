@@ -73,7 +73,6 @@ static constexpr bool kDumpUnattachedThreadNativeStackForSigQuit = true;
 
 ThreadList::ThreadList(uint64_t thread_suspend_timeout_ns)
     : suspend_all_count_(0),
-      debug_suspend_all_count_(0),
       unregistering_count_(0),
       suspend_all_historam_("suspend all histogram", 16, 64),
       long_suspend_(false),
@@ -669,9 +668,6 @@ void ThreadList::SuspendAll(const char* cause, bool long_suspend) {
 }
 
 // Ensures all threads running Java suspend and that those not running Java don't start.
-// Debugger thread might be set to kRunnable for a short period of time after the
-// SuspendAllInternal. This is safe because it will be set back to suspended state before
-// the SuspendAll returns.
 void ThreadList::SuspendAllInternal(Thread* self,
                                     Thread* ignore1,
                                     Thread* ignore2,
@@ -705,9 +701,6 @@ void ThreadList::SuspendAllInternal(Thread* self,
     MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
     // Update global suspend all state for attaching threads.
     ++suspend_all_count_;
-    if (reason == SuspendReason::kForDebugger) {
-      ++debug_suspend_all_count_;
-    }
     pending_threads.store(list_.size() - num_ignored, std::memory_order_relaxed);
     // Increment everybody's suspend count (except those that should be ignored).
     for (const auto& thread : list_) {
@@ -1117,186 +1110,6 @@ Thread* ThreadList::FindThreadByThreadId(uint32_t thread_id) {
   return nullptr;
 }
 
-void ThreadList::SuspendAllForDebugger() {
-  Thread* self = Thread::Current();
-  Thread* debug_thread = Dbg::GetDebugThread();
-
-  VLOG(threads) << *self << " SuspendAllForDebugger starting...";
-
-  SuspendAllInternal(self, self, debug_thread, SuspendReason::kForDebugger);
-  // Block on the mutator lock until all Runnable threads release their share of access then
-  // immediately unlock again.
-#if HAVE_TIMED_RWLOCK
-  // Timeout if we wait more than 30 seconds.
-  if (!Locks::mutator_lock_->ExclusiveLockWithTimeout(self, 30 * 1000, 0)) {
-    UnsafeLogFatalForThreadSuspendAllTimeout();
-  } else {
-    Locks::mutator_lock_->ExclusiveUnlock(self);
-  }
-#else
-  Locks::mutator_lock_->ExclusiveLock(self);
-  Locks::mutator_lock_->ExclusiveUnlock(self);
-#endif
-  // Disabled for the following race condition:
-  // Thread 1 calls SuspendAllForDebugger, gets preempted after pulsing the mutator lock.
-  // Thread 2 calls SuspendAll and SetStateUnsafe (perhaps from Dbg::Disconnected).
-  // Thread 1 fails assertion that all threads are suspended due to thread 2 being in a runnable
-  // state (from SetStateUnsafe).
-  // AssertThreadsAreSuspended(self, self, debug_thread);
-
-  VLOG(threads) << *self << " SuspendAllForDebugger complete";
-}
-
-void ThreadList::SuspendSelfForDebugger() {
-  Thread* const self = Thread::Current();
-  self->SetReadyForDebugInvoke(true);
-
-  // The debugger thread must not suspend itself due to debugger activity!
-  Thread* debug_thread = Dbg::GetDebugThread();
-  CHECK(self != debug_thread);
-  CHECK_NE(self->GetState(), kRunnable);
-  Locks::mutator_lock_->AssertNotHeld(self);
-
-  // The debugger may have detached while we were executing an invoke request. In that case, we
-  // must not suspend ourself.
-  DebugInvokeReq* pReq = self->GetInvokeReq();
-  const bool skip_thread_suspension = (pReq != nullptr && !Dbg::IsDebuggerActive());
-  if (!skip_thread_suspension) {
-    // Collisions with other suspends aren't really interesting. We want
-    // to ensure that we're the only one fiddling with the suspend count
-    // though.
-    MutexLock mu(self, *Locks::thread_suspend_count_lock_);
-    bool updated = self->ModifySuspendCount(self, +1, nullptr, SuspendReason::kForDebugger);
-    DCHECK(updated);
-    CHECK_GT(self->GetSuspendCount(), 0);
-
-    VLOG(threads) << *self << " self-suspending (debugger)";
-  } else {
-    // We must no longer be subject to debugger suspension.
-    MutexLock mu(self, *Locks::thread_suspend_count_lock_);
-    CHECK_EQ(self->GetDebugSuspendCount(), 0) << "Debugger detached without resuming us";
-
-    VLOG(threads) << *self << " not self-suspending because debugger detached during invoke";
-  }
-
-  // If the debugger requested an invoke, we need to send the reply and clear the request.
-  if (pReq != nullptr) {
-    Dbg::FinishInvokeMethod(pReq);
-    self->ClearDebugInvokeReq();
-    pReq = nullptr;  // object has been deleted, clear it for safety.
-  }
-
-  // Tell JDWP that we've completed suspension. The JDWP thread can't
-  // tell us to resume before we're fully asleep because we hold the
-  // suspend count lock.
-  Dbg::ClearWaitForEventThread();
-
-  {
-    MutexLock mu(self, *Locks::thread_suspend_count_lock_);
-    while (self->GetSuspendCount() != 0) {
-      Thread::resume_cond_->Wait(self);
-      if (self->GetSuspendCount() != 0) {
-        // The condition was signaled but we're still suspended. This
-        // can happen when we suspend then resume all threads to
-        // update instrumentation or compute monitor info. This can
-        // also happen if the debugger lets go while a SIGQUIT thread
-        // dump event is pending (assuming SignalCatcher was resumed for
-        // just long enough to try to grab the thread-suspend lock).
-        VLOG(jdwp) << *self << " still suspended after undo "
-                   << "(suspend count=" << self->GetSuspendCount() << ", "
-                   << "debug suspend count=" << self->GetDebugSuspendCount() << ")";
-      }
-    }
-    CHECK_EQ(self->GetSuspendCount(), 0);
-  }
-
-  self->SetReadyForDebugInvoke(false);
-  VLOG(threads) << *self << " self-reviving (debugger)";
-}
-
-void ThreadList::ResumeAllForDebugger() {
-  Thread* self = Thread::Current();
-  Thread* debug_thread = Dbg::GetDebugThread();
-
-  VLOG(threads) << *self << " ResumeAllForDebugger starting...";
-
-  // Threads can't resume if we exclusively hold the mutator lock.
-  Locks::mutator_lock_->AssertNotExclusiveHeld(self);
-
-  {
-    MutexLock thread_list_mu(self, *Locks::thread_list_lock_);
-    {
-      MutexLock suspend_count_mu(self, *Locks::thread_suspend_count_lock_);
-      // Update global suspend all state for attaching threads.
-      DCHECK_GE(suspend_all_count_, debug_suspend_all_count_);
-      if (debug_suspend_all_count_ > 0) {
-        --suspend_all_count_;
-        --debug_suspend_all_count_;
-      } else {
-        // We've been asked to resume all threads without being asked to
-        // suspend them all before. That may happen if a debugger tries
-        // to resume some suspended threads (with suspend count == 1)
-        // at once with a VirtualMachine.Resume command. Let's print a
-        // warning.
-        LOG(WARNING) << "Debugger attempted to resume all threads without "
-                     << "having suspended them all before.";
-      }
-      // Decrement everybody's suspend count (except our own).
-      for (const auto& thread : list_) {
-        if (thread == self || thread == debug_thread) {
-          continue;
-        }
-        if (thread->GetDebugSuspendCount() == 0) {
-          // This thread may have been individually resumed with ThreadReference.Resume.
-          continue;
-        }
-        VLOG(threads) << "requesting thread resume: " << *thread;
-        bool updated = thread->ModifySuspendCount(self, -1, nullptr, SuspendReason::kForDebugger);
-        DCHECK(updated);
-      }
-    }
-  }
-
-  {
-    MutexLock mu(self, *Locks::thread_suspend_count_lock_);
-    Thread::resume_cond_->Broadcast(self);
-  }
-
-  VLOG(threads) << *self << " ResumeAllForDebugger complete";
-}
-
-void ThreadList::UndoDebuggerSuspensions() {
-  Thread* self = Thread::Current();
-
-  VLOG(threads) << *self << " UndoDebuggerSuspensions starting";
-
-  {
-    MutexLock mu(self, *Locks::thread_list_lock_);
-    MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
-    // Update global suspend all state for attaching threads.
-    suspend_all_count_ -= debug_suspend_all_count_;
-    debug_suspend_all_count_ = 0;
-    // Update running threads.
-    for (const auto& thread : list_) {
-      if (thread == self || thread->GetDebugSuspendCount() == 0) {
-        continue;
-      }
-      bool suspended = thread->ModifySuspendCount(self,
-                                                  -thread->GetDebugSuspendCount(),
-                                                  nullptr,
-                                                  SuspendReason::kForDebugger);
-      DCHECK(suspended);
-    }
-  }
-
-  {
-    MutexLock mu(self, *Locks::thread_suspend_count_lock_);
-    Thread::resume_cond_->Broadcast(self);
-  }
-
-  VLOG(threads) << "UndoDebuggerSuspensions(" << *self << ") complete";
-}
-
 void ThreadList::WaitForOtherNonDaemonThreadsToExit() {
   ScopedTrace trace(__PRETTY_FUNCTION__);
   Thread* self = Thread::Current();
@@ -1431,14 +1244,9 @@ void ThreadList::Register(Thread* self) {
   // SuspendAll requests.
   MutexLock mu(self, *Locks::thread_list_lock_);
   MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
-  CHECK_GE(suspend_all_count_, debug_suspend_all_count_);
   // Modify suspend count in increments of 1 to maintain invariants in ModifySuspendCount. While
   // this isn't particularly efficient the suspend counts are most commonly 0 or 1.
-  for (int delta = debug_suspend_all_count_; delta > 0; delta--) {
-    bool updated = self->ModifySuspendCount(self, +1, nullptr, SuspendReason::kForDebugger);
-    DCHECK(updated);
-  }
-  for (int delta = suspend_all_count_ - debug_suspend_all_count_; delta > 0; delta--) {
+  for (int delta = suspend_all_count_; delta > 0; delta--) {
     bool updated = self->ModifySuspendCount(self, +1, nullptr, SuspendReason::kInternal);
     DCHECK(updated);
   }
