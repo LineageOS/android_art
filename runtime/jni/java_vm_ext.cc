@@ -385,6 +385,13 @@ class JII {
       return JNI_ERR;
     }
     JavaVMExt* raw_vm = reinterpret_cast<JavaVMExt*>(vm);
+
+    // Wait for all non-dameon threads to terminate before we start destroying
+    // bits of the runtime. Thread list deletion will repeat this in case more
+    // threads are created by daemons in the meantime.
+    raw_vm->GetRuntime()->GetThreadList()
+          ->WaitForOtherNonDaemonThreadsToExit(/*check_no_birth=*/ false);
+
     delete raw_vm->GetRuntime();
     android::ResetNativeLoader();
     return JNI_OK;

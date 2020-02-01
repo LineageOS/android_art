@@ -1,0 +1,3 @@
+Check that a child of a main thread can run to completion even if the
+main thread terminates immediately, and the child allocates memory and
+forks additional threads.
