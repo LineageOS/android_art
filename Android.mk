@@ -97,40 +97,6 @@ TEST_ART_ADB_ROOT_AND_REMOUNT := \
        $(ADB) wait-for-device root && \
        $(ADB) wait-for-device remount)))
 
-# Sync test files to the target, depends upon all things that must be pushed to the target.
-.PHONY: test-art-target-sync
-# Check if we need to sync. In case ART_TEST_CHROOT or ART_TEST_ANDROID_ROOT
-# is not empty, the code below uses 'adb push' instead of 'adb sync',
-# which does not check if the files on the device have changed.
-# TODO: Remove support for ART_TEST_ANDROID_ROOT when it is no longer needed.
-ifneq ($(ART_TEST_NO_SYNC),true)
-# Sync system and data partitions.
-ifeq ($(ART_TEST_ANDROID_ROOT),)
-ifeq ($(ART_TEST_CHROOT),)
-test-art-target-sync: $(TEST_ART_TARGET_SYNC_DEPS)
-	$(TEST_ART_ADB_ROOT_AND_REMOUNT)
-	$(ADB) sync system && $(ADB) sync data
-else
-# TEST_ART_ADB_ROOT_AND_REMOUNT is not needed here, as we are only
-# pushing things to the chroot dir, which is expected to be under
-# /data on the device.
-test-art-target-sync: $(TEST_ART_TARGET_SYNC_DEPS)
-	$(ADB) wait-for-device
-	$(ADB) push $(PRODUCT_OUT)/system $(ART_TEST_CHROOT)/
-	$(ADB) push $(PRODUCT_OUT)/data $(ART_TEST_CHROOT)/
-endif
-else
-test-art-target-sync: $(TEST_ART_TARGET_SYNC_DEPS)
-	$(TEST_ART_ADB_ROOT_AND_REMOUNT)
-	$(ADB) wait-for-device
-	$(ADB) push $(PRODUCT_OUT)/system $(ART_TEST_CHROOT)$(ART_TEST_ANDROID_ROOT)
-# Push the contents of the `data` dir into `$(ART_TEST_CHROOT)/data` on the device (note
-# that $(ART_TEST_CHROOT) can be empty).  If `$(ART_TEST_CHROOT)/data` already exists on
-# the device, it is not overwritten, but its content is updated.
-	$(ADB) push $(PRODUCT_OUT)/data $(ART_TEST_CHROOT)/
-endif
-endif
-
 # "mm test-art" to build and run all tests on host and device
 .PHONY: test-art
 test-art: test-art-host test-art-target

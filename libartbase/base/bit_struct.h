@@ -17,6 +17,9 @@
 #ifndef ART_LIBARTBASE_BASE_BIT_STRUCT_H_
 #define ART_LIBARTBASE_BASE_BIT_STRUCT_H_
 
+#include <type_traits>
+
+#include "base/casts.h"
 #include "bit_struct_detail.h"
 #include "bit_utils.h"
 
@@ -29,9 +32,9 @@
 //
 //   // Definition for type 'Example'
 //   BITSTRUCT_DEFINE_START(Example, 10)
-//     BitStructUint<0, 2> u2;     // Every field must be a BitStruct[*].
-//     BitStructInt<2, 7>  i7;
-//     BitStructUint<9, 1> i1;
+//     BITSTRUCT_UINT(0, 2) u2;     // Every field must be a BitStruct[*] with the same StorageType,
+//     BITSTRUCT_INT(2, 7)  i7;     // preferably using BITSTRUCT_{FIELD,UINT,INT}
+//     BITSTRUCT_UINT(9, 1) i1;     // to fill in the StorageType parameter.
 //   BITSTRUCT_DEFINE_END(Example);
 //
 //  Would define a bit struct with this layout:
@@ -106,8 +109,8 @@ namespace art {
 // of T can be represented by kBitWidth.
 template <typename T,
           size_t kBitOffset,
-          size_t kBitWidth = BitStructSizeOf<T>(),
-          typename StorageType = typename detail::MinimumTypeUnsignedHelper<kBitOffset + kBitWidth>::type>
+          size_t kBitWidth,
+          typename StorageType>
 struct BitStructField {
   static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 
@@ -119,7 +122,7 @@ struct BitStructField {
   template <typename _ = void,
             typename = std::enable_if_t<std::is_same<T, StorageType>::value, _>>
   explicit operator StorageType() const {
-    return GetStorage();
+    return BitFieldExtract(storage_, kBitOffset, kBitWidth);
   }
 
   BitStructField& operator=(T value) {
@@ -154,46 +157,27 @@ struct BitStructField {
   }
 
   T Get() const {
-    ValueStorage vs;
-    vs.pod_.val_ = GetStorage();
-    return vs.value_;
+    ExtractionType storage = static_cast<ExtractionType>(storage_);
+    ExtractionType extracted = BitFieldExtract(storage, kBitOffset, kBitWidth);
+    ConversionType to_convert = dchecked_integral_cast<ConversionType>(extracted);
+    return ValueConverter::FromUnderlyingStorage(to_convert);
   }
 
   void Set(T value) {
-    ValueStorage value_as_storage;
-    value_as_storage.value_ = value;
-
-    storage_.pod_.val_ = BitFieldInsert(storage_.pod_.val_,
-                                        value_as_storage.pod_.val_,
-                                        kBitOffset,
-                                        kBitWidth);
+    ConversionType converted = ValueConverter::ToUnderlyingStorage(value);
+    ExtractionType extracted = dchecked_integral_cast<ExtractionType>(converted);
+    storage_ = BitFieldInsert(storage_, extracted, kBitOffset, kBitWidth);
   }
 
  private:
-  StorageType GetStorage() const {
-    return BitFieldExtract(storage_.pod_.val_, kBitOffset, kBitWidth);
-  }
+  using ValueConverter = detail::ValueConverter<T>;
+  using ConversionType = typename ValueConverter::StorageType;
+  using ExtractionType =
+      typename std::conditional<std::is_signed_v<ConversionType>,
+                                std::make_signed_t<StorageType>,
+                                StorageType>::type;
 
-  // Underlying value must be wrapped in a separate standard-layout struct.
-  // See below for more details.
-  struct PodWrapper {
-    StorageType val_;
-  };
-
-  union ValueStorage {
-    // Safely alias pod_ and value_ together.
-    //
-    // See C++ 9.5.1 [class.union]:
-    // If a standard-layout union contains several standard-layout structs that share a common
-    // initial sequence ... it is permitted to inspect the common initial sequence of any of
-    // standard-layout struct members.
-    PodWrapper pod_;
-    T value_;
-  } storage_;
-
-  // Future work: In theory almost non-standard layout can be supported here,
-  // assuming they don't rely on the address of (this).
-  // We just have to use memcpy since the union-aliasing would not work.
+  StorageType storage_;
 };
 
 // Base class for number-like BitStruct fields.
@@ -202,10 +186,8 @@ struct BitStructField {
 //
 // (Common usage should be BitStructInt, BitStructUint -- this
 // intermediate template allows a user-defined integer to be used.)
-template <typename T, size_t kBitOffset, size_t kBitWidth>
-struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*StorageType*/T> {
-  using StorageType = T;
-
+template <typename T, size_t kBitOffset, size_t kBitWidth, typename StorageType>
+struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, StorageType> {
   BitStructNumber& operator=(T value) {
     return BaseType::Assign(*this, value);
   }
@@ -237,7 +219,7 @@ struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*Stora
   }
 
  private:
-  using BaseType = BitStructField<T, kBitOffset, kBitWidth, /*StorageType*/T>;
+  using BaseType = BitStructField<T, kBitOffset, kBitWidth, StorageType>;
   using BaseType::Get;
 };
 
@@ -245,21 +227,23 @@ struct BitStructNumber : public BitStructField<T, kBitOffset, kBitWidth, /*Stora
 // in order to be large enough to fit (kBitOffset + kBitWidth).
 //
 // Values are sign-extended when they are read out.
-template <size_t kBitOffset, size_t kBitWidth>
+template <size_t kBitOffset, size_t kBitWidth, typename StorageType>
 using BitStructInt =
     BitStructNumber<typename detail::MinimumTypeHelper<int, kBitOffset + kBitWidth>::type,
                     kBitOffset,
-                    kBitWidth>;
+                    kBitWidth,
+                    StorageType>;
 
 // Create a BitStruct field which uses the smallest underlying uint storage type,
 // in order to be large enough to fit (kBitOffset + kBitWidth).
 //
 // Values are zero-extended when they are read out.
-template <size_t kBitOffset, size_t kBitWidth>
+template <size_t kBitOffset, size_t kBitWidth, typename StorageType>
 using BitStructUint =
     BitStructNumber<typename detail::MinimumTypeHelper<unsigned int, kBitOffset + kBitWidth>::type,
                     kBitOffset,
-                    kBitWidth>;
+                    kBitWidth,
+                    StorageType>;
 
 // Start a definition for a bitstruct.
 // A bitstruct is defined to be a union with a common initial subsequence
@@ -276,12 +260,22 @@ using BitStructUint =
 // standard-layout struct members.
 #define BITSTRUCT_DEFINE_START(name, bitwidth)                                        \
     union name {                                                         /* NOLINT */ \
+      using StorageType =                                                             \
+          typename detail::MinimumTypeUnsignedHelper<(bitwidth)>::type;               \
       art::detail::DefineBitStructSize<(bitwidth)> _;                                 \
       static constexpr size_t BitStructSizeOf() { return (bitwidth); }                \
       name& operator=(const name& other) { _ = other._; return *this; }  /* NOLINT */ \
       name(const name& other) : _(other._) {}                                         \
       name() = default;                                                               \
       ~name() = default;
+
+// Define a field. See top of file for usage example.
+#define BITSTRUCT_FIELD(type, bit_offset, bit_width)                           \
+    BitStructField<type, (bit_offset), (bit_width), StorageType>
+#define BITSTRUCT_INT(bit_offset, bit_width)                                   \
+    BitStructInt<(bit_offset), (bit_width), StorageType>
+#define BITSTRUCT_UINT(bit_offset, bit_width)                                  \
+    BitStructUint<(bit_offset), (bit_width), StorageType>
 
 // End the definition of a bitstruct, and insert a sanity check
 // to ensure that the bitstruct did not exceed the specified size.

@@ -56,6 +56,50 @@ struct MinimumTypeHelper {
                               /* else */ type_unsigned>::type;
 };
 
+// Helper for converting to and from T to an integral type.
+template <typename T>
+union ValueConverter {
+  using StorageType = typename MinimumTypeHelper<T, sizeof(T) * kBitsPerByte>::type;
+
+  static constexpr StorageType ToUnderlyingStorage(T value) {
+    ValueConverter converter;
+    converter.value_.val_ = value;
+    return converter.storage_.val_;
+  }
+
+  static constexpr T FromUnderlyingStorage(StorageType storage) {
+    ValueConverter converter;
+    converter.storage_.val_ = storage;
+    return converter.value_.val_;
+  }
+
+  // Underlying values must be wrapped in separate standard-layout structs.
+  // See below for more details.
+  struct StorageWrapper {
+    StorageType val_;
+  };
+  struct ValueWrapper {
+    T val_;
+  };
+
+  // Safely alias pod_ and value_ together.
+  //
+  // See C++ 9.5.1 [class.union]:
+  // If a standard-layout union contains several standard-layout structs that share a common
+  // initial sequence ... it is permitted to inspect the common initial sequence of any of
+  // standard-layout struct members.
+  StorageWrapper storage_;
+  ValueWrapper value_;
+#if __cplusplus >= 202000L
+#error "When upgrading to C++20, remove this error and check that this is OK for all use cases."
+  static_assert(std::is_layout_compatible_v<StorageWrapper, ValueWrapper>);
+#endif
+
+  // Future work: In theory almost non-standard layout can be supported here,
+  // assuming they don't rely on the address of (this).
+  // We just have to use memcpy since the union-aliasing would not work.
+};
+
 // Denotes the beginning of a bit struct.
 //
 // This marker is required by the C++ standard in order to

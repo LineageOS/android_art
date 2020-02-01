@@ -80,12 +80,13 @@ class Dex2oatImageTest : public CommonRuntimeTest {
                          size_t method_frequency = 1,
                          size_t class_frequency = 1) {
     std::vector<std::string> dexes = GetLibCoreDexFileNames();
-    VisitDexes(dexes, method_visitor, class_visitor, method_frequency, class_frequency);
+    ArrayRef<const std::string> dexes_array(dexes);
+    VisitDexes(dexes_array, method_visitor, class_visitor, method_frequency, class_frequency);
   }
 
   // Visitors take method and type references
   template <typename MethodVisitor, typename ClassVisitor>
-  void VisitDexes(const std::vector<std::string>& dexes,
+  void VisitDexes(ArrayRef<const std::string> dexes,
                   const MethodVisitor& method_visitor,
                   const ClassVisitor& class_visitor,
                   size_t method_frequency = 1,
@@ -123,7 +124,7 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     EXPECT_TRUE(file->WriteFully(&line[0], line.length()));
   }
 
-  void GenerateProfile(const std::vector<std::string>& dexes,
+  void GenerateProfile(ArrayRef<const std::string> dexes,
                        File* out_file,
                        size_t method_frequency,
                        size_t type_frequency) {
@@ -314,6 +315,21 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     }
     return file1->Compare(file2.get()) == 0;
   }
+
+  void AddAndroidRootToImageCompilerOptions() {
+    const char* android_root = getenv("ANDROID_ROOT");
+    CHECK(android_root != nullptr);
+    Runtime::Current()->image_compiler_options_.push_back(
+        "--android-root=" + std::string(android_root));
+  }
+
+  void EnableImageDex2Oat() {
+    Runtime::Current()->image_dex2oat_enabled_ = true;
+  }
+
+  void DisableImageDex2Oat() {
+    Runtime::Current()->image_dex2oat_enabled_ = false;
+  }
 };
 
 TEST_F(Dex2oatImageTest, TestModesAndFilters) {
@@ -341,9 +357,11 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   ImageSizes filter_sizes;
   std::cout << "Base compile sizes " << base_sizes << std::endl;
   // Compile all methods and classes
+  std::vector<std::string> libcore_dexes = GetLibCoreDexFileNames();
+  ArrayRef<const std::string> libcore_dexes_array(libcore_dexes);
   {
     ScratchFile profile_file;
-    GenerateProfile(GetLibCoreDexFileNames(),
+    GenerateProfile(libcore_dexes_array,
                     profile_file.GetFile(),
                     /*method_frequency=*/ 1u,
                     /*type_frequency=*/ 1u);
@@ -363,7 +381,7 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   // Test compiling fewer methods and classes.
   {
     ScratchFile profile_file;
-    GenerateProfile(GetLibCoreDexFileNames(),
+    GenerateProfile(libcore_dexes_array,
                     profile_file.GetFile(),
                     kMethodFrequency,
                     kTypeFrequency);
@@ -416,15 +434,6 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
   CopyDexFiles(jar_dir, &libcore_dex_files);
 
-  // Create a profile.
-  ScratchFile profile_file;
-  GenerateProfile(libcore_dex_files,
-                  profile_file.GetFile(),
-                  /*method_frequency=*/ 1u,
-                  /*type_frequency=*/ 1u);
-  std::vector<std::string> extra_args;
-  extra_args.push_back("--profile-file=" + profile_file.GetFilename());
-
   ArrayRef<const std::string> full_bcp(libcore_dex_files);
   size_t total_dex_files = full_bcp.size();
   ASSERT_GE(total_dex_files, 5u);  // 3 for "head", 1 for "tail", at least one for "mid", see below.
@@ -465,22 +474,46 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   ASSERT_NE(std::string::npos, tail_slash_pos);
   std::string tail_name = tail_location.substr(tail_slash_pos + 1u);
 
+  // Create profiles.
+  ScratchFile head_profile_file;
+  GenerateProfile(head_dex_files,
+                  head_profile_file.GetFile(),
+                  /*method_frequency=*/ 1u,
+                  /*type_frequency=*/ 1u);
+  const std::string& head_profile_filename = head_profile_file.GetFilename();
+  ScratchFile mid_profile_file;
+  GenerateProfile(mid_dex_files,
+                  mid_profile_file.GetFile(),
+                  /*method_frequency=*/ 5u,
+                  /*type_frequency=*/ 4u);
+  const std::string& mid_profile_filename = mid_profile_file.GetFilename();
+  ScratchFile tail_profile_file;
+  GenerateProfile(tail_dex_files,
+                  tail_profile_file.GetFile(),
+                  /*method_frequency=*/ 5u,
+                  /*type_frequency=*/ 4u);
+  const std::string& tail_profile_filename = tail_profile_file.GetFilename();
+
   // Compile the "head", i.e. the primary boot image.
+  std::vector<std::string> extra_args;
+  extra_args.push_back("--profile-file=" + head_profile_filename);
   extra_args.push_back(android::base::StringPrintf("--base=0x%08x", kBaseAddress));
   bool head_ok = CompileBootImage(extra_args, filename_prefix, head_dex_files, &error_msg);
   ASSERT_TRUE(head_ok) << error_msg;
-  extra_args.pop_back();
 
   // Compile the "mid", i.e. the first extension.
   std::string mid_bcp_string = android::base::Join(mid_bcp, ':');
+  extra_args.clear();
+  extra_args.push_back("--profile-file=" + mid_profile_filename);
   AddRuntimeArg(extra_args, "-Xbootclasspath:" + mid_bcp_string);
   AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + mid_bcp_string);
   extra_args.push_back("--boot-image=" + base_location);
   bool mid_ok = CompileBootImage(extra_args, filename_prefix, mid_dex_files, &error_msg);
   ASSERT_TRUE(mid_ok) << error_msg;
-  extra_args.resize(extra_args.size() - 3u);
 
   // Try to compile the "tail" without specifying the "mid" extension. This shall fail.
+  extra_args.clear();
+  extra_args.push_back("--profile-file=" + tail_profile_filename);
   std::string full_bcp_string = android::base::Join(full_bcp, ':');
   AddRuntimeArg(extra_args, "-Xbootclasspath:" + full_bcp_string);
   AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + full_bcp_string);
@@ -504,17 +537,16 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   ASSERT_EQ(0, mkdir_result);
   std::string single_filename_prefix = single_image_dir + "/core";
 
+  // The dex files for the single-image are everything not in the "head".
+  ArrayRef<const std::string> single_dex_files = full_bcp.SubArray(/*pos=*/ head_dex_files.size());
+
   // Create a smaller profile for the single-image test that squashes the "mid" and "tail".
   ScratchFile single_profile_file;
-  GenerateProfile(libcore_dex_files,
+  GenerateProfile(single_dex_files,
                   single_profile_file.GetFile(),
                   /*method_frequency=*/ 5u,
                   /*type_frequency=*/ 4u);
-  extra_args.clear();
-  extra_args.push_back("--profile-file=" + single_profile_file.GetFilename());
-
-  // The dex files for the single-image are everything not in the "head".
-  ArrayRef<const std::string> single_dex_files = full_bcp.SubArray(/*pos=*/ head_dex_files.size());
+  const std::string& single_profile_filename = single_profile_file.GetFilename();
 
   // Prepare the single image name and location.
   CHECK_GE(single_dex_files.size(), 2u);
@@ -531,6 +563,8 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   CHECK_EQ(single_name, mid_name);
 
   // Compile the single-image against the primary boot image.
+  extra_args.clear();
+  extra_args.push_back("--profile-file=" + single_profile_filename);
   AddRuntimeArg(extra_args, "-Xbootclasspath:" + full_bcp_string);
   AddRuntimeArg(extra_args, "-Xbootclasspath-locations:" + full_bcp_string);
   extra_args.push_back("--boot-image=" + base_location);
@@ -635,6 +669,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
     // Loading the primary image with just the name now succeeds.
     bool load_ok = load(base_name);
     ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
 
     // Loading the primary image with a search path still fails.
     load_ok = silent_load("*");
@@ -644,6 +679,11 @@ TEST_F(Dex2oatImageTest, TestExtension) {
 
     // Load the primary and first extension without paths.
     load_ok = load(base_name + ':' + mid_name);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
+
+    // Load the primary without path and first extension with path.
+    load_ok = load(base_name + ':' + mid_location);
     ASSERT_TRUE(load_ok) << error_msg;
     ASSERT_EQ(mid_bcp.size(), boot_image_spaces.size());
 
@@ -709,6 +749,81 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   EXPECT_TRUE(CompareFiles(single_ext_prefix + ".art", single_ext_prefix2 + ".art"));
   EXPECT_TRUE(CompareFiles(single_ext_prefix + ".vdex", single_ext_prefix2 + ".vdex"));
   EXPECT_TRUE(CompareFiles(single_ext_prefix + ".oat", single_ext_prefix2 + ".oat"));
+
+  // Test parsing profile specification and creating the boot image extension on-the-fly.
+  // We must set --android-root in the image compiler options.
+  AddAndroidRootToImageCompilerOptions();
+  for (bool r : { false, true }) {
+    relocate = r;
+
+    // Try and fail to load everything as compiled extension.
+    bool load_ok = silent_load(base_location + "!" + single_profile_filename);
+    ASSERT_FALSE(load_ok);
+
+    // Try and fail to load with invalid spec, two profile name separators.
+    load_ok = silent_load(base_location + ":" + single_location + "!!arbitrary-profile-name");
+    ASSERT_FALSE(load_ok);
+
+    // Try and fail to load with invalid spec, missing profile name.
+    load_ok = silent_load(base_location + ":" + single_location + "!");
+    ASSERT_FALSE(load_ok);
+
+    // Try and fail to load with invalid spec, missing component name.
+    load_ok = silent_load(base_location + ":!" + single_profile_filename);
+    ASSERT_FALSE(load_ok);
+
+    // Load primary boot image, specifying invalid extension component and profile name.
+    load_ok = load(base_location + ":/non-existent/" + single_name + "!non-existent-profile-name");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+
+    // Load primary boot image and the single extension, specifying invalid profile name.
+    // (Load extension from file.)
+    load_ok = load(base_location + ":" + single_location + "!non-existent-profile-name");
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size() + 1u, boot_image_spaces.size());
+    ASSERT_EQ(single_dex_files.size(),
+              boot_image_spaces.back()->GetImageHeader().GetComponentCount());
+
+    // Load primary boot image and fail to load the single extension, specifying
+    // invalid extension component name but a valid profile file.
+    // (Running dex2oat to compile extension is disabled.)
+    ASSERT_FALSE(Runtime::Current()->IsImageDex2OatEnabled());
+    load_ok = load(base_location + ":/non-existent/" + single_name + "!" + single_profile_filename);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+
+    EnableImageDex2Oat();
+
+    // Load primary boot image and the single extension, specifying invalid extension
+    // component name but a valid profile file. (Compile extension by running dex2oat.)
+    load_ok = load(base_location + ":/non-existent/" + single_name + "!" + single_profile_filename);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size() + 1u, boot_image_spaces.size());
+    ASSERT_EQ(single_dex_files.size(),
+              boot_image_spaces.back()->GetImageHeader().GetComponentCount());
+
+    // Load primary boot image and two extensions, specifying invalid extension component
+    // names but valid profile files. (Compile extensions by running dex2oat.)
+    load_ok = load(base_location + ":/non-existent/" + mid_name + "!" + mid_profile_filename
+                                 + ":/non-existent/" + tail_name + "!" + tail_profile_filename);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size() + 2u, boot_image_spaces.size());
+    ASSERT_EQ(mid_dex_files.size(),
+              boot_image_spaces[head_dex_files.size()]->GetImageHeader().GetComponentCount());
+    ASSERT_EQ(tail_dex_files.size(),
+              boot_image_spaces[head_dex_files.size() + 1u]->GetImageHeader().GetComponentCount());
+
+    // Load primary boot image and fail to load extensions, specifying invalid component
+    // names but valid profile file only for the second one. As we fail to load the first
+    // extension, the second extension has a missing dependency and cannot be compiled.
+    load_ok = load(base_location + ":/non-existent/" + mid_name
+                                 + ":/non-existent/" + tail_name + "!" + tail_profile_filename);
+    ASSERT_TRUE(load_ok) << error_msg;
+    ASSERT_EQ(head_dex_files.size(), boot_image_spaces.size());
+
+    DisableImageDex2Oat();
+  }
 
   ClearDirectory(scratch_dir.c_str());
   int rmdir_result = rmdir(scratch_dir.c_str());
