@@ -82,7 +82,7 @@ union ValueConverter {
     T val_;
   };
 
-  // Safely alias pod_ and value_ together.
+  // Safely alias storage_ and value_ together.
   //
   // See C++ 9.5.1 [class.union]:
   // If a standard-layout union contains several standard-layout structs that share a common
