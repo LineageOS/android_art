@@ -88,9 +88,17 @@ static constexpr bool kWarnJniAbort = false;
 template<typename T>
 ALWAYS_INLINE static bool ShouldDenyAccessToMember(T* member, Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (hiddenapi::ScopedCorePlatformApiCheck::IsCurrentCallerApproved(self)) {
+  const bool native_caller_trusted =
+      hiddenapi::ScopedCorePlatformApiCheck::IsCurrentCallerApproved(self);
+  if (native_caller_trusted) {
+    // A trusted caller is in the same domain as the ART module so is assumed to always have
+    // access to the APIs that the module provides.
     return false;
   }
+
+  // Construct AccessContext from the first calling class on stack.
+  // If the calling class cannot be determined, e.g. unattached threads,
+  // we conservatively assume the caller is trusted.
   return hiddenapi::ShouldDenyAccessToMember(
       member,
       [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
