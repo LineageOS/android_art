@@ -679,11 +679,7 @@ static jboolean VMRuntime_isBootClassPathOnDisk(JNIEnv* env, jclass, jstring jav
     env->ThrowNew(iae.get(), message.c_str());
     return JNI_FALSE;
   }
-  std::string error_msg;
-  Runtime* runtime = Runtime::Current();
-  std::unique_ptr<ImageHeader> image_header(gc::space::ImageSpace::ReadImageHeader(
-      runtime->GetImageLocation().c_str(), isa, runtime->GetImageSpaceLoadingOrder(), &error_msg));
-  return image_header.get() != nullptr;
+  return gc::space::ImageSpace::IsBootClassPathOnDisk(isa);
 }
 
 static jstring VMRuntime_getCurrentInstructionSet(JNIEnv* env, jclass) {

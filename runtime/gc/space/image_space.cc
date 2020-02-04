@@ -296,45 +296,6 @@ static std::unique_ptr<ImageHeader> ReadSpecificImageHeader(const char* filename
   return hdr;
 }
 
-std::unique_ptr<ImageHeader> ImageSpace::ReadImageHeader(const char* image_location,
-                                                         const InstructionSet image_isa,
-                                                         ImageSpaceLoadingOrder order,
-                                                         std::string* error_msg) {
-  std::string system_filename;
-  bool has_system = false;
-  std::string cache_filename;
-  bool has_cache = false;
-  bool dalvik_cache_exists = false;
-  bool is_global_cache = false;
-  if (FindImageFilename(image_location,
-                        image_isa,
-                        &system_filename,
-                        &has_system,
-                        &cache_filename,
-                        &dalvik_cache_exists,
-                        &has_cache,
-                        &is_global_cache)) {
-    if (order == ImageSpaceLoadingOrder::kSystemFirst) {
-      if (has_system) {
-        return ReadSpecificImageHeader(system_filename.c_str(), error_msg);
-      }
-      if (has_cache) {
-        return ReadSpecificImageHeader(cache_filename.c_str(), error_msg);
-      }
-    } else {
-      if (has_cache) {
-        return ReadSpecificImageHeader(cache_filename.c_str(), error_msg);
-      }
-      if (has_system) {
-        return ReadSpecificImageHeader(system_filename.c_str(), error_msg);
-      }
-    }
-  }
-
-  *error_msg = StringPrintf("Unable to find image file for %s", image_location);
-  return nullptr;
-}
-
 static bool CanWriteToDalvikCache(const InstructionSet isa) {
   const std::string dalvik_cache = GetDalvikCache(GetInstructionSetString(isa));
   if (access(dalvik_cache.c_str(), O_RDWR) == 0) {
@@ -3319,6 +3280,40 @@ bool ImageSpace::BootImageLoader::LoadFromDalvikCache(
     logger.Dump(LOG_STREAM(INFO));
   }
   return true;
+}
+
+bool ImageSpace::IsBootClassPathOnDisk(InstructionSet image_isa) {
+  Runtime* runtime = Runtime::Current();
+  BootImageLayout layout(runtime->GetImageLocation(),
+                         ArrayRef<const std::string>(runtime->GetBootClassPath()),
+                         ArrayRef<const std::string>(runtime->GetBootClassPathLocations()));
+  const std::string image_location = layout.GetPrimaryImageLocation();
+  ImageSpaceLoadingOrder order = runtime->GetImageSpaceLoadingOrder();
+  std::unique_ptr<ImageHeader> image_header;
+  std::string error_msg;
+
+  std::string system_filename;
+  bool has_system = false;
+  std::string cache_filename;
+  bool has_cache = false;
+  bool dalvik_cache_exists = false;
+  bool is_global_cache = false;
+  if (FindImageFilename(image_location.c_str(),
+                        image_isa,
+                        &system_filename,
+                        &has_system,
+                        &cache_filename,
+                        &dalvik_cache_exists,
+                        &has_cache,
+                        &is_global_cache)) {
+    DCHECK(has_system || has_cache);
+    const std::string& filename = (order == ImageSpaceLoadingOrder::kSystemFirst)
+        ? (has_system ? system_filename : cache_filename)
+        : (has_cache ? cache_filename : system_filename);
+    image_header = ReadSpecificImageHeader(filename.c_str(), &error_msg);
+  }
+
+  return image_header != nullptr;
 }
 
 static constexpr uint64_t kLowSpaceValue = 50 * MB;

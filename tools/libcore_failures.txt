@@ -267,5 +267,10 @@
   modes: [device_testdex],
   bug: 145348591,
   names: ["libcore.android.system.OsTest#test_if_nametoindex_if_indextoname"]
+},
+{
+  description: "Fails on non-Android and Android versions < R",
+  result: EXEC_FAILED,
+  names: ["libcore.android.system.OsTest#test_NetlinkSocket"]
 }
 ]

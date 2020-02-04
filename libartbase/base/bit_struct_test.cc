@@ -297,7 +297,7 @@ BITSTRUCT_DEFINE_START(NestedStruct, /* size= */ 2 * MixedSizeBitStruct::BitStru
   BITSTRUCT_UINT(/*lsb=*/0, /*width=*/ 2 * MixedSizeBitStruct::BitStructSizeOf()) alias_all;
 BITSTRUCT_DEFINE_END(NestedStruct);
 
-TEST(BitStructs, DISABLED_NestedFieldAssignment) {
+TEST(BitStructs, NestedFieldAssignment) {
   MixedSizeBitStruct mixed_all_1s{};
   mixed_all_1s.alias_all = 0xFFFFFFFFu;
 

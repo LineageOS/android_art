@@ -137,13 +137,8 @@ class ImageSpace : public MemMapSpace {
                                                         std::string* error_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Reads the image header from the specified image location for the
-  // instruction set image_isa. Returns null on failure, with
-  // reason in error_msg.
-  static std::unique_ptr<ImageHeader> ReadImageHeader(const char* image_location,
-                                                      InstructionSet image_isa,
-                                                      ImageSpaceLoadingOrder order,
-                                                      std::string* error_msg);
+  // Checks whether we have a primary boot image on the disk.
+  static bool IsBootClassPathOnDisk(InstructionSet image_isa);
 
   // Give access to the OatFile.
   const OatFile* GetOatFile() const;

@@ -522,7 +522,7 @@ extern "C" bool ArtPlugin_Initialize() {
     g_state = State::kWaitForListener;
   }
 
-  if (pipe(g_signal_pipe_fds) == -1) {
+  if (pipe2(g_signal_pipe_fds, O_CLOEXEC) == -1) {
     PLOG(ERROR) << "Failed to pipe";
     return false;
   }
