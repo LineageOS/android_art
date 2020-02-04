@@ -960,7 +960,9 @@ void StackVisitor::WalkStack(bool include_transitions) {
                 Runtime::Current()->GetCalleeSaveMethod(CalleeSaveType::kSaveRefsAndArgs);
             CHECK_EQ(GetMethod(), callee) << "Expected: " << ArtMethod::PrettyMethod(callee)
                                           << " Found: " << ArtMethod::PrettyMethod(GetMethod());
-          } else {
+          } else if (!instrumentation_frame.method_->IsRuntimeMethod()) {
+            // Trampolines get replaced with their actual method in the stack,
+            // so don't do the check below for runtime methods.
             // Instrumentation generally doesn't distinguish between a method's obsolete and
             // non-obsolete version.
             CHECK_EQ(instrumentation_frame.method_->GetNonObsoleteMethod(),
