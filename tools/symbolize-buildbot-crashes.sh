@@ -1,1 +1,0 @@
-buildbot-symbolize-crashes.sh

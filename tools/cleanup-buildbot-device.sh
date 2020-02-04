@@ -1,1 +1,0 @@
-buildbot-cleanup-device.sh

@@ -1,1 +1,0 @@
-buildbot-teardown-device.sh
