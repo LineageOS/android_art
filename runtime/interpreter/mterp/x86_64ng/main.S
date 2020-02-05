@@ -1464,8 +1464,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     // Set rIBASE
     leaq artNterpAsmInstructionStart(%rip), rIBASE
     /* start executing the instruction at rPC */
-    FETCH_INST
-    GOTO_NEXT
+    START_EXECUTING_INSTRUCTIONS
     /* NOTE: no fallthrough */
     // cfi info continues, and covers the whole nterp implementation.
     END ExecuteNterpImpl
