@@ -76,10 +76,10 @@ $(foreach dir,$(GTEST_DEX_DIRECTORIES), $(eval $(call build-art-test-dex,art-gte
 ART_TEST_HOST_GTEST_MainStripped_DEX := $(basename $(ART_TEST_HOST_GTEST_Main_DEX))Stripped$(suffix $(ART_TEST_HOST_GTEST_Main_DEX))
 ART_TEST_TARGET_GTEST_MainStripped_DEX := $(basename $(ART_TEST_TARGET_GTEST_Main_DEX))Stripped$(suffix $(ART_TEST_TARGET_GTEST_Main_DEX))
 
-# Create rules for MainUncompressed, a copy of Main with the classes.dex uncompressed
+# Create rules for MainUncompressedAligned, a copy of Main with the classes.dex uncompressed
 # for the dex2oat tests.
-ART_TEST_HOST_GTEST_MainUncompressed_DEX := $(basename $(ART_TEST_HOST_GTEST_Main_DEX))Uncompressed$(suffix $(ART_TEST_HOST_GTEST_Main_DEX))
-ART_TEST_TARGET_GTEST_MainUncompressed_DEX := $(basename $(ART_TEST_TARGET_GTEST_Main_DEX))Uncompressed$(suffix $(ART_TEST_TARGET_GTEST_Main_DEX))
+ART_TEST_HOST_GTEST_MainUncompressedAligned_DEX := $(basename $(ART_TEST_HOST_GTEST_Main_DEX))UncompressedAligned$(suffix $(ART_TEST_HOST_GTEST_Main_DEX))
+ART_TEST_TARGET_GTEST_MainUncompressedAligned_DEX := $(basename $(ART_TEST_TARGET_GTEST_Main_DEX))UncompressedAligned$(suffix $(ART_TEST_TARGET_GTEST_Main_DEX))
 
 # Create rules for UncompressedEmpty, a classes.dex that is empty and uncompressed
 # for the dex2oat tests.
@@ -91,10 +91,10 @@ ART_TEST_TARGET_GTEST_EmptyUncompressed_DEX := $(basename $(ART_TEST_TARGET_GTES
 ART_TEST_HOST_GTEST_EmptyUncompressedAligned_DEX := $(basename $(ART_TEST_HOST_GTEST_Main_DEX))EmptyUncompressedAligned$(suffix $(ART_TEST_HOST_GTEST_Main_DEX))
 ART_TEST_TARGET_GTEST_EmptyUncompressedAligned_DEX := $(basename $(ART_TEST_TARGET_GTEST_Main_DEX))EmptyUncompressedAligned$(suffix $(ART_TEST_TARGET_GTEST_Main_DEX))
 
-# Create rules for MultiDexUncompressed, a copy of MultiDex with the classes.dex uncompressed
+# Create rules for MultiDexUncompressedAligned, a copy of MultiDex with the classes.dex uncompressed
 # for the OatFile tests.
-ART_TEST_HOST_GTEST_MultiDexUncompressed_DEX := $(basename $(ART_TEST_HOST_GTEST_MultiDex_DEX))Uncompressed$(suffix $(ART_TEST_HOST_GTEST_MultiDex_DEX))
-ART_TEST_TARGET_GTEST_MultiDexUncompressed_DEX := $(basename $(ART_TEST_TARGET_GTEST_MultiDex_DEX))Uncompressed$(suffix $(ART_TEST_TARGET_GTEST_MultiDex_DEX))
+ART_TEST_HOST_GTEST_MultiDexUncompressedAligned_DEX := $(basename $(ART_TEST_HOST_GTEST_MultiDex_DEX))UncompressedAligned$(suffix $(ART_TEST_HOST_GTEST_MultiDex_DEX))
+ART_TEST_TARGET_GTEST_MultiDexUncompressedAligned_DEX := $(basename $(ART_TEST_TARGET_GTEST_MultiDex_DEX))UncompressedAligned$(suffix $(ART_TEST_TARGET_GTEST_MultiDex_DEX))
 
 ifdef ART_TEST_HOST_GTEST_Main_DEX
 $(ART_TEST_HOST_GTEST_MainStripped_DEX): $(ART_TEST_HOST_GTEST_Main_DEX)
@@ -109,14 +109,14 @@ $(ART_TEST_TARGET_GTEST_MainStripped_DEX): $(ART_TEST_TARGET_GTEST_Main_DEX)
 endif
 
 ifdef ART_TEST_HOST_GTEST_Main_DEX
-$(ART_TEST_HOST_GTEST_MainUncompressed_DEX): $(ART_TEST_HOST_GTEST_Main_DEX) $(ZIPALIGN)
+$(ART_TEST_HOST_GTEST_MainUncompressedAligned_DEX): $(ART_TEST_HOST_GTEST_Main_DEX) $(ZIPALIGN)
 	cp $< $@
 	$(call uncompress-dexs, $@)
 	$(call align-package, $@)
 endif
 
 ifdef ART_TEST_TARGET_GTEST_Main_DEX
-$(ART_TEST_TARGET_GTEST_MainUncompressed_DEX): $(ART_TEST_TARGET_GTEST_Main_DEX) $(ZIPALIGN)
+$(ART_TEST_TARGET_GTEST_MainUncompressedAligned_DEX): $(ART_TEST_TARGET_GTEST_Main_DEX) $(ZIPALIGN)
 	cp $< $@
 	$(call uncompress-dexs, $@)
 	$(call align-package, $@)
@@ -155,14 +155,14 @@ $(ART_TEST_TARGET_GTEST_EmptyUncompressedAligned_DEX): $(ZIPALIGN)
 endif
 
 ifdef ART_TEST_HOST_GTEST_MultiDex_DEX
-$(ART_TEST_HOST_GTEST_MultiDexUncompressed_DEX): $(ART_TEST_HOST_GTEST_MultiDex_DEX) $(ZIPALIGN)
+$(ART_TEST_HOST_GTEST_MultiDexUncompressedAligned_DEX): $(ART_TEST_HOST_GTEST_MultiDex_DEX) $(ZIPALIGN)
 	cp $< $@
 	$(call uncompress-dexs, $@)
 	$(call align-package, $@)
 endif
 
 ifdef ART_TEST_TARGET_GTEST_MultiDex_DEX
-$(ART_TEST_TARGET_GTEST_MultiDexUncompressed_DEX): $(ART_TEST_TARGET_GTEST_MultiDex_DEX) $(ZIPALIGN)
+$(ART_TEST_TARGET_GTEST_MultiDexUncompressedAligned_DEX): $(ART_TEST_TARGET_GTEST_MultiDex_DEX) $(ZIPALIGN)
 	cp $< $@
 	$(call uncompress-dexs, $@)
 	$(call align-package, $@)
@@ -209,7 +209,7 @@ ART_GTEST_compiler_driver_test_DEX_DEPS := AbstractMethod StaticLeafMethods Prof
 ART_GTEST_dex_cache_test_DEX_DEPS := Main Packages MethodTypes
 ART_GTEST_dexanalyze_test_DEX_DEPS := MultiDex
 ART_GTEST_dexlayout_test_DEX_DEPS := ManyMethods
-ART_GTEST_dex2oat_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS) ManyMethods Statics VerifierDeps MainUncompressed EmptyUncompressed EmptyUncompressedAligned StringLiterals
+ART_GTEST_dex2oat_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS) ManyMethods Statics VerifierDeps MainUncompressedAligned EmptyUncompressed EmptyUncompressedAligned StringLiterals
 ART_GTEST_dex2oat_image_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS) Statics VerifierDeps
 ART_GTEST_exception_test_DEX_DEPS := ExceptionHandle
 ART_GTEST_hiddenapi_test_DEX_DEPS := HiddenApi HiddenApiStubs
@@ -222,7 +222,7 @@ ART_GTEST_jni_internal_test_DEX_DEPS := AllFields StaticLeafMethods MyClassNativ
 ART_GTEST_oat_file_assistant_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
 ART_GTEST_dexoptanalyzer_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
 ART_GTEST_image_space_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
-ART_GTEST_oat_file_test_DEX_DEPS := Main MultiDex MainUncompressed MultiDexUncompressed MainStripped Nested MultiDexModifiedSecondary
+ART_GTEST_oat_file_test_DEX_DEPS := Main MultiDex MainUncompressedAligned MultiDexUncompressedAligned MainStripped Nested MultiDexModifiedSecondary
 ART_GTEST_oat_test_DEX_DEPS := Main
 ART_GTEST_oat_writer_test_DEX_DEPS := Main
 # two_runtimes_test build off dex2oat_environment_test, which does sanity checks on the following dex files.
@@ -722,8 +722,8 @@ $(foreach dir,$(GTEST_DEX_DIRECTORIES), $(eval ART_TEST_TARGET_GTEST_$(dir)_DEX 
 $(foreach dir,$(GTEST_DEX_DIRECTORIES), $(eval ART_TEST_HOST_GTEST_$(dir)_DEX :=))
 ART_TEST_HOST_GTEST_MainStripped_DEX :=
 ART_TEST_TARGET_GTEST_MainStripped_DEX :=
-ART_TEST_HOST_GTEST_MainUncompressed_DEX :=
-ART_TEST_TARGET_GTEST_MainUncompressed_DEX :=
+ART_TEST_HOST_GTEST_MainUncompressedAligned_DEX :=
+ART_TEST_TARGET_GTEST_MainUncompressedAligned_DEX :=
 ART_TEST_HOST_GTEST_EmptyUncompressed_DEX :=
 ART_TEST_TARGET_GTEST_EmptyUncompressed_DEX :=
 ART_TEST_GTEST_VerifierDeps_SRC :=
