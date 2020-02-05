@@ -780,7 +780,7 @@
     },
     {
         "tests": ["004-StackWalk"],
-        "variant": "interp-ac | interpreter | jit | no-prebuild | no-image | trace | redefine-stress | jvmti-stress | debuggable",
+        "variant": "speed-profile | interp-ac | interpreter | jit | no-prebuild | no-image | trace | redefine-stress | jvmti-stress | debuggable",
         "description": ["Test is designed to only check --optimizing"]
     },
     {

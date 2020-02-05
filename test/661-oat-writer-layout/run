@@ -16,5 +16,7 @@
 
 # Always use the 'profile'.
 # Note that this test only works with --compiler-filter=speed
-# -- we accomplish this by blacklisting other compiler variants.
-"${RUN}" "$@" --profile
+# -- we accomplish this by blacklisting other compiler variants
+# and we also have to pass the option explicitly as dex2oat
+# defaults to speed-profile if a profile is specified.
+"${RUN}" "$@" --profile -Xcompiler-option --compiler-filter=speed
