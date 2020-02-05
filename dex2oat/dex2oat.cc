@@ -341,7 +341,8 @@ NO_RETURN static void Usage(const char* fmt, ...) {
                 "|everything):");
   UsageError("      select compiler filter.");
   UsageError("      Example: --compiler-filter=everything");
-  UsageError("      Default: speed");
+  UsageError("      Default: speed-profile if --profile-file or --profile-file-fd is used,");
+  UsageError("               speed otherwise");
   UsageError("");
   UsageError("  --huge-method-max=<method-instruction-count>: threshold size for a huge");
   UsageError("      method for compiler filter tuning.");
@@ -1314,6 +1315,14 @@ class Dex2Oat final {
     } else if (args.Exists(M::StoredClassLoaderContext)) {
       Usage("Option --stored-class-loader-context should only be used if "
             "--class-loader-context is also specified");
+    }
+
+    // If we have a profile, change the default compiler filter to speed-profile
+    // before reading compiler options.
+    static_assert(CompilerFilter::kDefaultCompilerFilter == CompilerFilter::kSpeed);
+    DCHECK_EQ(compiler_options_->GetCompilerFilter(), CompilerFilter::kSpeed);
+    if (UseProfile()) {
+      compiler_options_->SetCompilerFilter(CompilerFilter::kSpeedProfile);
     }
 
     if (!ReadCompilerOptions(args, compiler_options_.get(), &error_msg)) {
