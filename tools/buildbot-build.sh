@@ -80,7 +80,12 @@ elif [[ $mode == "target" ]]; then
   make_command+=" libstdc++ "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   if [[ -n "$ART_TEST_CHROOT" ]]; then
-    # These targets are needed for the chroot environment.
+    # Targets required to generate a linker configuration on device within the
+    # chroot environment.
+    make_command+=" linkerconfig"
+    make_command+=" llndk.libraries.txt vndksp.libraries.txt vndkcore.libraries.txt"
+    make_command+=" vndkprivate.libraries.txt vndkcorevariant.libraries.txt sanitizer.libraries.txt"
+    # Additional targets needed for the chroot environment.
     make_command+=" crash_dump event-log-tags"
   fi
   # Build the Runtime (Bionic) APEX.
