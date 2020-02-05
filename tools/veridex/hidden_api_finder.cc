@@ -197,6 +197,8 @@ void HiddenApiFinder::Dump(std::ostream& os,
       stats->linking_count++;
       hiddenapi::ApiList api_list = hidden_api_.GetApiList(pair.first);
       stats->api_counts[api_list.GetIntValue()]++;
+      // Note: There is a test depending on this output format,
+      // so please be careful when you modify the format. b/123662832
       os << "#" << ++stats->count << ": Linking " << api_list << " " << pair.first << " use(s):";
       os << std::endl;
       HiddenApiFinder::DumpReferences(os, pair.second);
@@ -214,6 +216,8 @@ void HiddenApiFinder::Dump(std::ostream& os,
           hiddenapi::ApiList api_list = hidden_api_.GetApiList(full_name);
           stats->api_counts[api_list.GetIntValue()]++;
           stats->reflection_count++;
+          // Note: There is a test depending on this output format,
+          // so please be careful when you modify the format. b/123662832
           os << "#" << ++stats->count << ": Reflection " << api_list << " " << full_name
              << " potential use(s):";
           os << std::endl;
