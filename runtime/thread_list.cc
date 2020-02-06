@@ -1110,18 +1110,27 @@ Thread* ThreadList::FindThreadByThreadId(uint32_t thread_id) {
   return nullptr;
 }
 
-void ThreadList::WaitForOtherNonDaemonThreadsToExit() {
+void ThreadList::WaitForOtherNonDaemonThreadsToExit(bool check_no_birth) {
   ScopedTrace trace(__PRETTY_FUNCTION__);
   Thread* self = Thread::Current();
   Locks::mutator_lock_->AssertNotHeld(self);
   while (true) {
-    {
+    Locks::runtime_shutdown_lock_->Lock(self);
+    if (check_no_birth) {
       // No more threads can be born after we start to shutdown.
-      MutexLock mu(self, *Locks::runtime_shutdown_lock_);
       CHECK(Runtime::Current()->IsShuttingDownLocked());
       CHECK_EQ(Runtime::Current()->NumberOfThreadsBeingBorn(), 0U);
+    } else {
+      if (Runtime::Current()->NumberOfThreadsBeingBorn() != 0U) {
+        // Awkward. Shutdown_cond_ is private, but the only live thread may not be registered yet.
+        // Fortunately, this is used mostly for testing, and not performance-critical.
+        Locks::runtime_shutdown_lock_->Unlock(self);
+        usleep(1000);
+        continue;
+      }
     }
     MutexLock mu(self, *Locks::thread_list_lock_);
+    Locks::runtime_shutdown_lock_->Unlock(self);
     // Also wait for any threads that are unregistering to finish. This is required so that no
     // threads access the thread list after it is deleted. TODO: This may not work for user daemon
     // threads since they could unregister at the wrong time.

@@ -181,6 +181,10 @@ class ThreadList {
       REQUIRES(!Locks::thread_list_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  void WaitForOtherNonDaemonThreadsToExit(bool check_no_birth = true)
+      REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_,
+               !Locks::mutator_lock_);
+
  private:
   uint32_t AllocThreadId(Thread* self);
   void ReleaseThreadId(Thread* self, uint32_t id) REQUIRES(!Locks::allocated_thread_ids_lock_);
@@ -193,8 +197,6 @@ class ThreadList {
       REQUIRES(!Locks::thread_list_lock_);
 
   void SuspendAllDaemonThreadsForShutdown()
-      REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_);
-  void WaitForOtherNonDaemonThreadsToExit()
       REQUIRES(!Locks::thread_list_lock_, !Locks::thread_suspend_count_lock_);
 
   void SuspendAllInternal(Thread* self,
