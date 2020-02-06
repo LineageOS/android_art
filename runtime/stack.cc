@@ -858,7 +858,7 @@ void StackVisitor::WalkStack(bool include_transitions) {
     cur_shadow_frame_ = current_fragment->GetTopShadowFrame();
     cur_quick_frame_ = current_fragment->GetTopQuickFrame();
     cur_quick_frame_pc_ = 0;
-    cur_oat_quick_method_header_ = nullptr;
+    DCHECK(cur_oat_quick_method_header_ == nullptr);
     if (cur_quick_frame_ != nullptr) {  // Handle quick stack frames.
       // Can't be both a shadow and a quick fragment.
       DCHECK(current_fragment->GetTopShadowFrame() == nullptr);
@@ -995,6 +995,8 @@ void StackVisitor::WalkStack(bool include_transitions) {
         }
         method = *cur_quick_frame_;
       }
+      // We reached a transition frame, it doesn't have a method header.
+      cur_oat_quick_method_header_ = nullptr;
     } else if (cur_shadow_frame_ != nullptr) {
       do {
         SanityCheckFrame();
