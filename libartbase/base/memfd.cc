@@ -89,7 +89,7 @@ int memfd_create_compat(const char* name, unsigned int flags) {
       // We want the normal 'dup' semantics since memfd_create without any flags isn't CLOEXEC.
       // Unfortunately on some android targets we will compiler error if we use dup directly and so
       // need to use fcntl.
-      int nfd = fcntl(fileno(file), F_DUPFD);
+      int nfd = fcntl(fileno(file), F_DUPFD, /*lowest allowed fd*/ 0);
       fclose(file);
       return nfd;
     }
