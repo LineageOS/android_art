@@ -41,7 +41,6 @@ namespace android::nativeloader {
 using namespace internal;
 using namespace ::std::string_literals;
 using android::base::ErrnoError;
-using android::base::Errorf;
 using android::base::Result;
 
 namespace {
