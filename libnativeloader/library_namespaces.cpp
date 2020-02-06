@@ -27,7 +27,7 @@
 #include <android-base/macros.h>
 #include <android-base/properties.h>
 #include <android-base/strings.h>
-#include <nativehelper/ScopedUtfChars.h>
+#include <nativehelper/scoped_utf_chars.h>
 
 #include "nativeloader/dlext_namespaces.h"
 #include "public_libraries.h"
