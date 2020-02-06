@@ -29,7 +29,7 @@ public class Main {
       for (int i = 0; i < 100; ++i) {
         int [][] a = new int[10][];
         for (int j = 0; j < 10; ++j) {
-          a[j] = new int[100000 * j + 20];
+          a[j] = new int[50000 * j + 20];
           a[j][17] = 1;
         }
         Thread t = new Thread(new LazyGrandChildThread());
