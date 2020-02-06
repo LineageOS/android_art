@@ -94,7 +94,7 @@ jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobj
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   auto ns = g_namespaces->Create(env, target_sdk_version, class_loader, is_shared, dex_path,
                                  library_path, permitted_path);
-  if (!ns) {
+  if (!ns.ok()) {
     return env->NewStringUTF(ns.error().message().c_str());
   }
 #else
@@ -140,7 +140,7 @@ void* OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* pat
     Result<NativeLoaderNamespace*> isolated_ns =
         g_namespaces->Create(env, target_sdk_version, class_loader, false /* is_shared */, nullptr,
                              library_path, nullptr);
-    if (!isolated_ns) {
+    if (!isolated_ns.ok()) {
       *error_msg = strdup(isolated_ns.error().message().c_str());
       return nullptr;
     } else {
@@ -224,13 +224,13 @@ void NativeLoaderFreeErrorMessage(char* msg) {
 void* OpenNativeLibraryInNamespace(NativeLoaderNamespace* ns, const char* path,
                                    bool* needs_native_bridge, char** error_msg) {
   auto handle = ns->Load(path);
-  if (!handle && error_msg != nullptr) {
+  if (!handle.ok() && error_msg != nullptr) {
     *error_msg = strdup(handle.error().message().c_str());
   }
   if (needs_native_bridge != nullptr) {
     *needs_native_bridge = ns->IsBridged();
   }
-  return handle ? *handle : nullptr;
+  return handle.ok() ? *handle : nullptr;
 }
 
 // native_bridge_namespaces are not supported for callers of this function.
