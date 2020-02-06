@@ -1347,11 +1347,5 @@
         "tests": ["2029-contended-monitors"],
         "variant": "interpreter | interp-ac | gcstress | trace",
         "description": ["Slow test. Prone to timeouts."]
-    },
-    {
-        "tests": ["2030-long-running-child"],
-        "variant": "gcstress",
-        "bug": "b/147619421",
-        "description": ["Failure not yet understood."]
     }
 ]
