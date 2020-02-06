@@ -29,7 +29,6 @@
 #include "nativeloader/dlext_namespaces.h"
 
 using android::base::Error;
-using android::base::Errorf;
 
 namespace android {
 
