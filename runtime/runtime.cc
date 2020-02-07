@@ -196,9 +196,6 @@ static constexpr double kNormalMaxLoadFactor = 0.7;
 // barrier config.
 static constexpr double kExtraDefaultHeapGrowthMultiplier = kUseReadBarrier ? 1.0 : 0.0;
 
-static constexpr const char* kApexBootImageLocation =
-    "/apex/com.android.art/javalib/apex.art:/system/framework/apex-framework.art";
-
 Runtime* Runtime::instance_ = nullptr;
 
 struct TraceConfig {
@@ -1130,13 +1127,6 @@ static size_t OpenBootDexFiles(ArrayRef<const std::string> dex_filenames,
       continue;
     }
     bool verify = Runtime::Current()->IsVerificationEnabled();
-    // In the case we're using the apex boot image, we don't have support yet
-    // on reading vdex files of boot classpath. So just assume all boot classpath
-    // dex files have been verified (this should always be the case as the default boot
-    // image has been generated at build time).
-    if (Runtime::Current()->IsUsingApexBootImageLocation() && !kIsDebugBuild) {
-      verify = false;
-    }
     if (!dex_file_loader.Open(dex_filename,
                               dex_location,
                               verify,
@@ -1244,10 +1234,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
                 runtime_options.GetOrDefault(Opt::StackDumpLockProfThreshold));
 
   image_location_ = runtime_options.GetOrDefault(Opt::Image);
-  {
-    std::string error_msg;
-    is_using_apex_boot_image_location_ = (image_location_ == kApexBootImageLocation);
-  }
 
   SetInstructionSet(runtime_options.GetOrDefault(Opt::ImageInstructionSet));
   boot_class_path_ = runtime_options.ReleaseOrDefault(Opt::BootClassPath);

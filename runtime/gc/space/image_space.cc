@@ -78,6 +78,7 @@ Atomic<uint32_t> ImageSpace::bitmap_index_(0);
 
 ImageSpace::ImageSpace(const std::string& image_filename,
                        const char* image_location,
+                       const char* profile_file,
                        MemMap&& mem_map,
                        accounting::ContinuousSpaceBitmap&& live_bitmap,
                        uint8_t* end)
@@ -89,7 +90,8 @@ ImageSpace::ImageSpace(const std::string& image_filename,
                   kGcRetentionPolicyNeverCollect),
       live_bitmap_(std::move(live_bitmap)),
       oat_file_non_owned_(nullptr),
-      image_location_(image_location) {
+      image_location_(image_location),
+      profile_file_(profile_file) {
   DCHECK(live_bitmap_.IsValid());
 }
 
@@ -769,6 +771,7 @@ class ImageSpace::Loader {
     return Init(file.get(),
                 image_filename,
                 image_location,
+                /* profile_file=*/ "",
                 oat_file,
                 /*allow_direct_mapping=*/ true,
                 logger,
@@ -779,6 +782,7 @@ class ImageSpace::Loader {
   static std::unique_ptr<ImageSpace> Init(File* file,
                                           const char* image_filename,
                                           const char* image_location,
+                                          const char* profile_file,
                                           const OatFile* oat_file,
                                           bool allow_direct_mapping,
                                           TimingLogger* logger,
@@ -914,6 +918,7 @@ class ImageSpace::Loader {
     // We only want the mirror object, not the ArtFields and ArtMethods.
     std::unique_ptr<ImageSpace> space(new ImageSpace(image_filename,
                                                      image_location,
+                                                     profile_file,
                                                      std::move(map),
                                                      std::move(bitmap),
                                                      image_end));
@@ -1505,6 +1510,7 @@ class ImageSpace::BootImageLayout {
   struct ImageChunk {
     std::string base_location;
     std::string base_filename;
+    std::string profile_file;
     size_t start_index;
     uint32_t component_count;
     uint32_t image_space_count;
@@ -2144,6 +2150,7 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
   ImageChunk chunk;
   chunk.base_location = base_location;
   chunk.base_filename = base_filename;
+  chunk.profile_file = profile_filename;
   chunk.start_index = bcp_index;
   chunk.component_count = header.GetComponentCount();
   chunk.image_space_count = header.GetImageSpaceCount();
@@ -2877,6 +2884,7 @@ class ImageSpace::BootImageLoader {
 
   std::unique_ptr<ImageSpace> Load(const std::string& image_location,
                                    const std::string& image_filename,
+                                   const std::string& profile_file,
                                    android::base::unique_fd art_fd,
                                    TimingLogger* logger,
                                    /*inout*/MemMap* image_reservation,
@@ -2892,6 +2900,7 @@ class ImageSpace::BootImageLoader {
       std::unique_ptr<ImageSpace> result = Loader::Init(&image_file,
                                                         image_filename.c_str(),
                                                         image_location.c_str(),
+                                                        profile_file.c_str(),
                                                         /*oat_file=*/ nullptr,
                                                         /*allow_direct_mapping=*/ false,
                                                         logger,
@@ -3119,6 +3128,7 @@ class ImageSpace::BootImageLoader {
     for (size_t i = 0u, size = locations.size(); i != size; ++i) {
       spaces->push_back(Load(locations[i],
                              filenames[i],
+                             chunk.profile_file,
                              std::move(chunk.art_fd),
                              logger,
                              image_reservation,
