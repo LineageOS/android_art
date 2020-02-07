@@ -68,9 +68,9 @@ Result<NativeLoaderNamespace> NativeLoaderNamespace::GetExportedNamespace(const 
 // "default" always exists.
 Result<NativeLoaderNamespace> NativeLoaderNamespace::GetSystemNamespace(bool is_bridged) {
   auto ns = GetExportedNamespace(kSystemNamespaceName, is_bridged);
-  if (ns) return ns;
+  if (ns.ok()) return ns;
   ns = GetExportedNamespace(kDefaultNamespaceName, is_bridged);
-  if (ns) return ns;
+  if (ns.ok()) return ns;
 
   // If nothing is found, return NativeLoaderNamespace constructed from nullptr.
   // nullptr also means default namespace to the linker.
@@ -95,7 +95,7 @@ Result<NativeLoaderNamespace> NativeLoaderNamespace::Create(
 
   // Fall back to the system namespace if no parent is set.
   auto system_ns = GetSystemNamespace(is_bridged);
-  if (!system_ns) {
+  if (!system_ns.ok()) {
     return system_ns.error();
   }
   const NativeLoaderNamespace& effective_parent = parent != nullptr ? *parent : *system_ns;
