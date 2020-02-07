@@ -173,6 +173,7 @@ activate_apex com.android.art.testing com.android.art
 activate_apex com.android.i18n
 activate_apex com.android.runtime
 activate_apex com.android.tzdata
+activate_apex com.android.conscrypt
 
 # Adjust the linker configuration file (if needed).
 #

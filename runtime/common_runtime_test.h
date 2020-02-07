@@ -113,6 +113,24 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   bool StartDex2OatCommandLine(/*out*/std::vector<std::string>* argv,
                                /*out*/std::string* error_msg);
 
+  bool CompileBootImage(const std::vector<std::string>& extra_args,
+                        const std::string& image_file_name_prefix,
+                        ArrayRef<const std::string> dex_files,
+                        ArrayRef<const std::string> dex_locations,
+                        std::string* error_msg,
+                        const std::string& use_fd_prefix = "");
+
+  bool CompileBootImage(const std::vector<std::string>& extra_args,
+                        const std::string& image_file_name_prefix,
+                        ArrayRef<const std::string> dex_files,
+                        std::string* error_msg,
+                        const std::string& use_fd_prefix = "") {
+    return CompileBootImage(
+        extra_args, image_file_name_prefix, dex_files, dex_files, error_msg, use_fd_prefix);
+  }
+
+  bool RunDex2Oat(const std::vector<std::string>& args, std::string* error_msg);
+
  protected:
   // Allow subclases such as CommonCompilerTest to add extra options.
   virtual void SetUpRuntimeOptions(RuntimeOptions* options ATTRIBUTE_UNUSED) {}

@@ -42,6 +42,22 @@ using ScopedLogSeverity = android::base::ScopedLogSeverity;
 
 class DexFile;
 
+class ScratchDir {
+ public:
+  ScratchDir();
+
+  ~ScratchDir();
+
+  const std::string& GetPath() const {
+    return path_;
+  }
+
+ private:
+  std::string path_;
+
+  DISALLOW_COPY_AND_ASSIGN(ScratchDir);
+};
+
 class ScratchFile {
  public:
   ScratchFile();
