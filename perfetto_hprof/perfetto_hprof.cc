@@ -280,7 +280,7 @@ class ReferredObjectsFinder {
     }
     std::string field_name = "";
     if (field != nullptr) {
-      field_name = field->PrettyField(/*with_type=*/false);
+      field_name = field->PrettyField(/*with_type=*/true);
     }
     referred_objects_->emplace_back(std::move(field_name), ref);
   }
