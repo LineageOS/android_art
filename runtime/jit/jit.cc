@@ -873,29 +873,29 @@ class ZygoteTask final : public Task {
 
   void Run(Thread* self) override {
     Runtime* runtime = Runtime::Current();
-    std::string profile_file;
-    for (const std::string& option : runtime->GetImageCompilerOptions()) {
-      if (android::base::StartsWith(option, "--profile-file=")) {
-        profile_file = option.substr(strlen("--profile-file="));
-        break;
-      }
-    }
-
-    const std::vector<const DexFile*>& boot_class_path =
-        runtime->GetClassLinker()->GetBootClassPath();
-    ScopedNullHandle<mirror::ClassLoader> null_handle;
-    std::string boot_profile = GetBootProfileFile(profile_file);
-    // We add to the queue for zygote so that we can fork processes in-between
-    // compilations.
     uint32_t added_to_queue = 0;
-    if (Runtime::Current()->IsPrimaryZygote()) {
-      // We avoid doing compilation at boot for the secondary zygote, as apps
-      // forked from it are not critical for boot.
-      added_to_queue += runtime->GetJit()->CompileMethodsFromBootProfile(
-          self, boot_class_path, boot_profile, null_handle, /* add_to_queue= */ true);
+    for (gc::space::ImageSpace* space : Runtime::Current()->GetHeap()->GetBootImageSpaces()) {
+      const std::string& profile_file = space->GetProfileFile();
+      if (profile_file.empty()) {
+        continue;
+      }
+      LOG(INFO) << "JIT Zygote looking at profile " << profile_file;
+
+      const std::vector<const DexFile*>& boot_class_path =
+          runtime->GetClassLinker()->GetBootClassPath();
+      ScopedNullHandle<mirror::ClassLoader> null_handle;
+      // We add to the queue for zygote so that we can fork processes in-between
+      // compilations.
+      if (Runtime::Current()->IsPrimaryZygote()) {
+        std::string boot_profile = GetBootProfileFile(profile_file);
+        // We avoid doing compilation at boot for the secondary zygote, as apps
+        // forked from it are not critical for boot.
+        added_to_queue += runtime->GetJit()->CompileMethodsFromBootProfile(
+            self, boot_class_path, boot_profile, null_handle, /* add_to_queue= */ true);
+      }
+      added_to_queue += runtime->GetJit()->CompileMethodsFromProfile(
+          self, boot_class_path, profile_file, null_handle, /* add_to_queue= */ true);
     }
-    added_to_queue += runtime->GetJit()->CompileMethodsFromProfile(
-        self, boot_class_path, profile_file, null_handle, /* add_to_queue= */ true);
 
     JitCodeCache* code_cache = runtime->GetJit()->GetCodeCache();
     code_cache->GetZygoteMap()->Initialize(added_to_queue);
@@ -1128,7 +1128,7 @@ void Jit::CreateThreadPool() {
   Start();
 
   Runtime* runtime = Runtime::Current();
-  if (runtime->IsZygote() && runtime->IsUsingApexBootImageLocation() && UseJitCompilation()) {
+  if (runtime->IsZygote() && runtime->IsRunningJitZygote() && UseJitCompilation()) {
     // If we're not using the default boot image location, request a JIT task to
     // compile all methods in the boot image profile.
     thread_pool_->AddTask(Thread::Current(), new ZygoteTask());
@@ -1209,7 +1209,7 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
     return;
   }
   Runtime* runtime = Runtime::Current();
-  if (runtime->IsSystemServer() && runtime->IsUsingApexBootImageLocation() && UseJitCompilation()) {
+  if (runtime->IsSystemServer() && runtime->IsRunningJitZygote() && UseJitCompilation()) {
     thread_pool_->AddTask(Thread::Current(), new JitProfileTask(dex_files, class_loader));
   }
 }
@@ -1465,7 +1465,7 @@ bool Jit::MaybeCompileMethod(Thread* self,
   if (UseJitCompilation()) {
     if (old_count == 0 &&
         method->IsNative() &&
-        Runtime::Current()->IsUsingApexBootImageLocation()) {
+        Runtime::Current()->IsRunningJitZygote()) {
       // jitzygote: Compile JNI stub on first use to avoid the expensive generic stub.
       CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ false);
       return true;
@@ -1640,7 +1640,7 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
 
   Runtime* const runtime = Runtime::Current();
   // For child zygote, we instead query IsCompilationNotified() post zygote fork.
-  if (!is_zygote && runtime->IsUsingApexBootImageLocation() && fd_methods_ != -1) {
+  if (!is_zygote && runtime->IsRunningJitZygote() && fd_methods_ != -1) {
     // Create a thread that will poll the status of zygote compilation, and map
     // the private mapping of boot image methods.
     zygote_mapping_methods_.ResetInForkedProcess();
@@ -1668,7 +1668,7 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   code_cache_->SetGarbageCollectCode(!jit_compiler_->GenerateDebugInfo() &&
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
-  if (is_system_server && Runtime::Current()->IsUsingApexBootImageLocation()) {
+  if (is_system_server && Runtime::Current()->IsRunningJitZygote()) {
     // Disable garbage collection: we don't want it to delete methods we're compiling
     // through boot and system server profiles.
     // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.

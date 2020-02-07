@@ -46,6 +46,7 @@ class DummyImageSpace : public space::ImageSpace {
                   MemMap&& oat_map)
       : ImageSpace("DummyImageSpace",
                    /*image_location=*/"",
+                   /*profile_file=*/"",
                    std::move(map),
                    std::move(live_bitmap),
                    map.End()),
