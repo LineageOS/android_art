@@ -74,7 +74,6 @@ class CompilerOptions final {
     kBootImage,               // Creating boot image.
     kBootImageExtension,      // Creating boot image extension.
     kAppImage,                // Creating app image.
-    kApexBootImageExtension,  // Creating JIT-zygote boot image extension (b/119800099).
   };
 
   CompilerOptions();
@@ -197,14 +196,9 @@ class CompilerOptions final {
     return image_type_ == ImageType::kBootImage;
   }
 
-  bool IsApexBootImageExtension() const {
-    return image_type_ == ImageType::kApexBootImageExtension;
-  }
-
   // Are we compiling a boot image extension?
   bool IsBootImageExtension() const {
-    return image_type_ == ImageType::kBootImageExtension
-      || image_type_ == ImageType::kApexBootImageExtension;
+    return image_type_ == ImageType::kBootImageExtension;
   }
 
   bool IsBaseline() const {
