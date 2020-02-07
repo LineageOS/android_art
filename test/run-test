@@ -163,7 +163,6 @@ android_root="/system"
 bisection_search="no"
 timeout=""
 suspend_timeout="500000"
-image_suffix=""
 run_optimizing="false"
 
 # To cause tests to fail fast, limit the file sizes created by dx, dex2oat and
@@ -331,11 +330,9 @@ while true; do
         shift
     elif [ "x$1" = "x--interpreter" ]; then
         run_args+=(--interpreter)
-        image_suffix="-interpreter"
         shift
     elif [ "x$1" = "x--jit" ]; then
         run_args+=(--jit)
-        image_suffix="-interpreter"
         shift
     elif [ "x$1" = "x--baseline" ]; then
         run_args+=(--baseline)
@@ -348,7 +345,6 @@ while true; do
         shift
     elif [ "x$1" = "x--verify-soft-fail" ]; then
         run_args+=(--verify-soft-fail)
-        image_suffix="-interp-ac"
         shift
     elif [ "x$1" = "x--no-optimize" ]; then
         run_args+=(--no-optimize)
@@ -679,12 +675,12 @@ if [ "$runtime" = "dalvik" ]; then
 elif [ "$runtime" = "art" ]; then
     if [ "$target_mode" = "no" ]; then
         guess_host_arch_name
-        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core${image_suffix}.art:*")
+        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core.art:*")
         run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
         run_args+=(--runtime-option "-Djava.library.path=/data/nativetest${suffix64}/art/${target_arch_name}")
-        run_args+=(--boot "/data/art-test/core${image_suffix}.art:/data/art-test/*")
+        run_args+=(--boot "/data/art-test/core.art:/data/art-test/*")
     fi
     if [ "$relocate" = "yes" ]; then
       run_args+=(--relocate)
@@ -914,7 +910,7 @@ export TEST_NAME=`basename ${test_dir}`
 # Tests named '<number>-checker-*' will also have their CFGs verified with
 # Checker when compiled with Optimizing on host.
 if [[ "$TEST_NAME" =~ ^[0-9]+-checker- ]]; then
-  if [ "$runtime" = "art" -a "$image_suffix" = "" -a "$run_optimizing" = "true" ]; then
+  if [ "$runtime" = "art" -a "$run_optimizing" = "true" ]; then
     # In no-prebuild or no-image mode, the compiler only quickens so disable the checker.
     if [ "$prebuild_mode" = "yes" -a "$have_image" = "yes" ]; then
       run_checker="yes"
