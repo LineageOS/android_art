@@ -30,7 +30,7 @@
 #include <android-base/macros.h>
 #include <android-base/strings.h>
 #include <nativebridge/native_bridge.h>
-#include <nativehelper/ScopedUtfChars.h>
+#include <nativehelper/scoped_utf_chars.h>
 
 #ifdef __ANDROID__
 #include <log/log.h>

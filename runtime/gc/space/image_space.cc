@@ -1669,10 +1669,10 @@ class ImageSpace::BootImageLayout {
 
 std::string ImageSpace::BootImageLayout::GetPrimaryImageLocation() {
   size_t location_start = 0u;
-  size_t location_end = image_location_.find(':');
+  size_t location_end = image_location_.find(kComponentSeparator);
   while (location_end == location_start) {
     ++location_start;
-    location_end = image_location_.find(location_start, ':');
+    location_end = image_location_.find(location_start, kComponentSeparator);
   }
   std::string location = (location_end == std::string::npos)
       ? image_location_.substr(location_start)
@@ -1715,7 +1715,7 @@ bool ImageSpace::BootImageLayout::VerifyImageLocation(
   for (size_t i = 0; i != components_size; ++i) {
     const std::string& component = components[i];
     DCHECK(!component.empty());  // Guaranteed by Split().
-    const size_t profile_delimiter_pos = component.find('!');
+    const size_t profile_separator_pos = component.find(kProfileSeparator);
     size_t wildcard_pos = component.find('*');
     if (wildcard_pos == std::string::npos) {
       if (wildcards_start != components.size()) {
@@ -1724,12 +1724,12 @@ bool ImageSpace::BootImageLayout::VerifyImageLocation(
                          component.c_str());
         return false;
       }
-      if (profile_delimiter_pos != std::string::npos) {
-        if (component.find('!', profile_delimiter_pos + 1u) != std::string::npos) {
+      if (profile_separator_pos != std::string::npos) {
+        if (component.find(kProfileSeparator, profile_separator_pos + 1u) != std::string::npos) {
           *error_msg = StringPrintf("Multiple profile delimiters in %s", component.c_str());
           return false;
         }
-        if (profile_delimiter_pos == 0u || profile_delimiter_pos + 1u == component.size()) {
+        if (profile_separator_pos == 0u || profile_separator_pos + 1u == component.size()) {
           *error_msg = StringPrintf("Missing component and/or profile name in %s",
                                     component.c_str());
           return false;
@@ -1741,14 +1741,14 @@ bool ImageSpace::BootImageLayout::VerifyImageLocation(
         }
       }
       size_t component_name_length =
-          profile_delimiter_pos != std::string::npos ? profile_delimiter_pos : component.size();
+          profile_separator_pos != std::string::npos ? profile_separator_pos : component.size();
       if (component[component_name_length - 1u] == '/') {
         *error_msg = StringPrintf("Image component ends with path separator: %s",
                                   component.c_str());
         return false;
       }
     } else {
-      if (profile_delimiter_pos != std::string::npos) {
+      if (profile_separator_pos != std::string::npos) {
         *error_msg = StringPrintf("Unsupproted wildcard (*) and profile delimiter (!) in %s",
                                   component.c_str());
         return false;
@@ -1791,11 +1791,11 @@ bool ImageSpace::BootImageLayout::MatchNamedComponents(
   for (size_t i = 0, size = named_components.size(); i != size; ++i) {
     std::string component = named_components[i];
     std::string profile_filename;  // Empty.
-    const size_t profile_delimiter_pos = component.find('!');
-    if (profile_delimiter_pos != std::string::npos) {
-      profile_filename = component.substr(profile_delimiter_pos + 1u);
+    const size_t profile_separator_pos = component.find(kProfileSeparator);
+    if (profile_separator_pos != std::string::npos) {
+      profile_filename = component.substr(profile_separator_pos + 1u);
       DCHECK(!profile_filename.empty());  // Checked by VerifyImageLocation()
-      component.resize(profile_delimiter_pos);
+      component.resize(profile_separator_pos);
       DCHECK(!component.empty());  // Checked by VerifyImageLocation()
     }
     size_t slash_pos = component.rfind('/');
@@ -2085,7 +2085,7 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
   args.push_back("-Xbootclasspath:" + boot_class_path);
   args.push_back("--runtime-arg");
   args.push_back("-Xbootclasspath-locations:" + boot_class_path_locations);
-  args.push_back("--boot-image=" + Join(dependencies, ':'));
+  args.push_back("--boot-image=" + Join(dependencies, kComponentSeparator));
   for (size_t i = bcp_index; i != bcp_end; ++i) {
     args.push_back("--dex-file=" + boot_class_path_[i]);
     args.push_back("--dex-location=" + boot_class_path_locations_[i]);
@@ -2097,6 +2097,13 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
   args.push_back("--single-image");
   args.push_back("--image-format=uncompressed");
 
+  // We currently cannot guarantee that the boot class path has no verification failures.
+  // And we do not want to compile anything, compilation should be done by JIT in zygote.
+  args.push_back("--compiler-filter=verify");
+
+  // Pass the profile.
+  args.push_back("--profile-file=" + profile_filename);
+
   // Do not let the file descriptor numbers change the compilation output.
   args.push_back("--avoid-storing-invocation");
 
@@ -2106,6 +2113,7 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
     args.push_back("--host");
   }
 
+  // Image compiler options go last to allow overriding above args, such as --compiler-filter.
   for (const std::string& compiler_option : runtime->GetImageCompilerOptions()) {
     args.push_back(compiler_option);
   }
@@ -2198,7 +2206,7 @@ bool ImageSpace::BootImageLayout::LoadOrValidate(FilenameFn&& filename_fn,
   DCHECK(!validate || StartsWith(*oat_checksums, "i"));
 
   std::vector<std::string> components;
-  Split(image_location_, ':', &components);
+  Split(image_location_, kComponentSeparator, &components);
   size_t named_components_count = 0u;
   if (!VerifyImageLocation(components, &named_components_count, error_msg)) {
     return false;

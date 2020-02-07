@@ -27,7 +27,7 @@
 #include <android-base/macros.h>
 #include <android-base/properties.h>
 #include <android-base/strings.h>
-#include <nativehelper/ScopedUtfChars.h>
+#include <nativehelper/scoped_utf_chars.h>
 
 #include "nativeloader/dlext_namespaces.h"
 #include "public_libraries.h"
@@ -303,12 +303,12 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     }
   }
 
-  namespaces_.push_back(std::make_pair(env->NewWeakGlobalRef(class_loader), *app_ns));
+  auto& emplaced = namespaces_.emplace_back(
+      std::make_pair(env->NewWeakGlobalRef(class_loader), *app_ns));
   if (is_main_classloader) {
-    app_main_namespace_ = &(*app_ns);
+    app_main_namespace_ = &emplaced.second;
   }
-
-  return &(namespaces_.back().second);
+  return &emplaced.second;
 }
 
 NativeLoaderNamespace* LibraryNamespaces::FindNamespaceByClassLoader(JNIEnv* env,
