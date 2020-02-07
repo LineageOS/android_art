@@ -52,7 +52,7 @@ constexpr const char* kCronetNamespaceName = "cronet";
 // classloader, the classloader-namespace namespace associated with that
 // classloader is selected for dlopen. The namespace is configured so that its
 // search path is set to the app-local JNI directory and it is linked to the
-// platform namespace with the names of libs listed in the public.libraries.txt.
+// system namespace with the names of libs listed in the public.libraries.txt.
 // This way an app can only load its own JNI libraries along with the public libs.
 constexpr const char* kClassloaderNamespaceName = "classloader-namespace";
 // Same thing for vendor APKs.
@@ -61,7 +61,7 @@ constexpr const char* kVendorClassloaderNamespaceName = "vendor-classloader-name
 // "classloader-namespace-shared" or "vendor-classloader-namespace-shared",
 // respectively. A shared namespace (cf. ANDROID_NAMESPACE_TYPE_SHARED) has
 // inherited all the libraries of the parent classloader namespace, or the
-// platform namespace for the main app classloader. It is used to give full
+// system namespace for the main app classloader. It is used to give full
 // access to the platform libraries for apps bundled in the system image,
 // including their later updates installed in /data.
 constexpr const char* kSharedNamespaceSuffix = "-shared";
@@ -241,7 +241,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   // ... and link to other namespaces to allow access to some public libraries
   bool is_bridged = app_ns->IsBridged();
 
-  auto platform_ns = NativeLoaderNamespace::GetPlatformNamespace(is_bridged);
+  auto platform_ns = NativeLoaderNamespace::GetSystemNamespace(is_bridged);
   if (!platform_ns) {
     return platform_ns.error();
   }
@@ -293,7 +293,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
 
   if (!vendor_public_libraries().empty()) {
     auto vendor_ns = NativeLoaderNamespace::GetExportedNamespace(kVendorNamespaceName, is_bridged);
-    // when vendor_ns is not configured, link to the platform namespace
+    // when vendor_ns is not configured, link to the system namespace
     auto target_ns = vendor_ns ? vendor_ns : platform_ns;
     if (target_ns) {
       linked = app_ns->Link(*target_ns, vendor_public_libraries());
