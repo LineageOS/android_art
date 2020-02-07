@@ -340,7 +340,7 @@ const void* JitCodeCache::FindCompiledCodeForInstrumentation(ArtMethod* method) 
 }
 
 const void* JitCodeCache::GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method) {
-  if (Runtime::Current()->IsUsingApexBootImageLocation() && method->IsPreCompiled()) {
+  if (method->IsPreCompiled()) {
     const void* code_ptr = nullptr;
     if (method->GetDeclaringClass()->GetClassLoader() == nullptr) {
       code_ptr = zygote_map_.GetCodeFor(method);
@@ -723,7 +723,6 @@ bool JitCodeCache::Commit(Thread* self,
       } else if (NeedsClinitCheckBeforeCall(method) &&
                  !method->GetDeclaringClass()->IsVisiblyInitialized()) {
         // This situation currently only occurs in the jit-zygote mode.
-        DCHECK(Runtime::Current()->IsUsingApexBootImageLocation());
         DCHECK(!garbage_collect_code_);
         DCHECK(method->IsPreCompiled());
         // The shared region can easily be queried. For the private region, we
