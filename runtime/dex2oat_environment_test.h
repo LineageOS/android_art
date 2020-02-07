@@ -137,13 +137,6 @@ class Dex2oatEnvironmentTest : public CommonRuntimeTest {
     dst_stream << src_stream.rdbuf();
   }
 
-  // Returns the path to an image location whose contents differ from the
-  // image at GetImageLocation(). This is used for testing mismatched
-  // image checksums in the oat_file_assistant_tests.
-  std::string GetImageLocation2() const {
-    return GetImageDirectory() + "/core-interpreter.art";
-  }
-
   std::string GetDexSrc1() const {
     return GetTestDexFileName("Main");
   }
