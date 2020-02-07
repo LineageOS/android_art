@@ -8,15 +8,15 @@
 dir.art = /apex/com.android.art/bin/
 
 [art]
-additional.namespaces = platform,conscrypt,art,neuralnetworks,adbd
+additional.namespaces = system,conscrypt,art,neuralnetworks,adbd
 
 # The default namespace here only links to other namespaces, in particular "art"
 # where the real library loading takes place. Any outgoing links from "art" also
 # need to be present here.
 namespace.default.isolated = true
-namespace.default.links = art,platform,adbd
+namespace.default.links = art,system,adbd
 namespace.default.link.art.allow_all_shared_libs = true
-namespace.default.link.platform.allow_all_shared_libs = true
+namespace.default.link.system.allow_all_shared_libs = true
 namespace.default.link.adbd.shared_libs = libadbconnection_client.so
 
 ###############################################################################
@@ -24,7 +24,7 @@ namespace.default.link.adbd.shared_libs = libadbconnection_client.so
 #
 # This is the local namespace of this APEX, with the proper name "art" to make
 # links created e.g. through android_link_namespace work consistently with the
-# platform linker config.
+# system linker config.
 ###############################################################################
 namespace.art.isolated = true
 # Visible to allow links to be created at runtime, e.g. through
@@ -52,42 +52,42 @@ namespace.art.asan.permitted.paths += /apex/com.android.art/javalib
 # /system/lib, but in /apex/<module>/lib directory.
 namespace.art.permitted.paths += /system/${LIB}
 namespace.art.asan.permitted.paths += /system/${LIB}
-namespace.art.links = platform,neuralnetworks,adbd
+namespace.art.links = system,neuralnetworks,adbd
 # Need allow_all_shared_libs because libart.so can dlopen oat files in
 # /system/framework and /data.
 # TODO(b/130340935): Use a dynamically created linker namespace similar to
 # classloader-namespace for oat files, and tighten this up.
-namespace.art.link.platform.allow_all_shared_libs = true
+namespace.art.link.system.allow_all_shared_libs = true
 namespace.art.link.neuralnetworks.shared_libs = libneuralnetworks.so
 namespace.art.link.adbd.shared_libs = libadbconnection_client.so
 
 ###############################################################################
-# "platform" namespace
+# "system" namespace
 #
 # Corresponds to the default namespace in /system/etc/ld.config.txt. Please keep
 # in sync with linker config files in system/core/rootdir/etc.
 ###############################################################################
-namespace.platform.isolated = true
+namespace.system.isolated = true
 # Visible to allow links to be created at runtime, e.g. through
 # android_link_namespaces in libnativeloader.
-namespace.platform.visible = true
+namespace.system.visible = true
 
-namespace.platform.search.paths = /system/${LIB}
-namespace.platform.asan.search.paths = /data/asan/system/${LIB}
+namespace.system.search.paths = /system/${LIB}
+namespace.system.asan.search.paths = /data/asan/system/${LIB}
 
-namespace.platform.links = art
-namespace.platform.link.art.shared_libs  = libandroidicu.so
-namespace.platform.link.art.shared_libs += libdexfile_external.so
-namespace.platform.link.art.shared_libs += libdexfiled_external.so
+namespace.system.links = art
+namespace.system.link.art.shared_libs  = libandroidicu.so
+namespace.system.link.art.shared_libs += libdexfile_external.so
+namespace.system.link.art.shared_libs += libdexfiled_external.so
 # TODO(b/120786417 or b/134659294): libicuuc.so and libicui18n.so are kept for app compat.
-namespace.platform.link.art.shared_libs += libicui18n.so
-namespace.platform.link.art.shared_libs += libicuuc.so
-namespace.platform.link.art.shared_libs += libnativebridge.so
-namespace.platform.link.art.shared_libs += libnativehelper.so
-namespace.platform.link.art.shared_libs += libnativeloader.so
+namespace.system.link.art.shared_libs += libicui18n.so
+namespace.system.link.art.shared_libs += libicuuc.so
+namespace.system.link.art.shared_libs += libnativebridge.so
+namespace.system.link.art.shared_libs += libnativehelper.so
+namespace.system.link.art.shared_libs += libnativeloader.so
 
 # TODO(b/122876336): Remove libpac.so once it's migrated to Webview
-namespace.platform.link.art.shared_libs += libpac.so
+namespace.system.link.art.shared_libs += libpac.so
 
 # /system/lib/libc.so, etc are symlinks to
 # /apex/com.android.runtime/lib/bionic/libc.so, etc. Add the path to the
@@ -98,8 +98,8 @@ namespace.platform.link.art.shared_libs += libpac.so
 # then the latter is never tried because libc.so is always found in
 # /system/lib but fails to pass the accessibility test because of its realpath.
 # It's better to not depend on the ordering if possible.
-namespace.platform.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
-namespace.platform.asan.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
+namespace.system.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
+namespace.system.asan.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
 
 # Note that we don't need to link the art namespace with conscrypt:
 # the runtime Java code and binaries do not explicitly load native libraries
@@ -123,12 +123,12 @@ namespace.conscrypt.asan.search.paths = /apex/com.android.conscrypt/${LIB}
 # /system/lib, but in /apex/<module>/lib directory.
 namespace.conscrypt.permitted.paths = /system/${LIB}
 namespace.conscrypt.asan.permitted.paths = /system/${LIB}
-namespace.conscrypt.links = art,platform
+namespace.conscrypt.links = art,system
 namespace.conscrypt.link.art.shared_libs = libandroidio.so
-namespace.conscrypt.link.platform.shared_libs  = libc.so
-namespace.conscrypt.link.platform.shared_libs += libm.so
-namespace.conscrypt.link.platform.shared_libs += libdl.so
-namespace.conscrypt.link.platform.shared_libs += liblog.so
+namespace.conscrypt.link.system.shared_libs  = libc.so
+namespace.conscrypt.link.system.shared_libs += libm.so
+namespace.conscrypt.link.system.shared_libs += libdl.so
+namespace.conscrypt.link.system.shared_libs += liblog.so
 
 ###############################################################################
 # "neuralnetworks" APEX namespace
@@ -146,16 +146,16 @@ namespace.neuralnetworks.asan.search.paths = /apex/com.android.neuralnetworks/${
 # /system/lib, but in /apex/<module>/lib directory.
 namespace.neuralnetworks.permitted.paths = /system/${LIB}
 namespace.neuralnetworks.asan.permitted.paths = /system/${LIB}
-namespace.neuralnetworks.links = platform
-namespace.neuralnetworks.link.platform.shared_libs  = libc.so
-namespace.neuralnetworks.link.platform.shared_libs += libcgrouprc.so
-namespace.neuralnetworks.link.platform.shared_libs += libdl.so
-namespace.neuralnetworks.link.platform.shared_libs += liblog.so
-namespace.neuralnetworks.link.platform.shared_libs += libm.so
-namespace.neuralnetworks.link.platform.shared_libs += libnativewindow.so
-namespace.neuralnetworks.link.platform.shared_libs += libneuralnetworks_packageinfo.so
-namespace.neuralnetworks.link.platform.shared_libs += libsync.so
-namespace.neuralnetworks.link.platform.shared_libs += libvndksupport.so
+namespace.neuralnetworks.links = system
+namespace.neuralnetworks.link.system.shared_libs  = libc.so
+namespace.neuralnetworks.link.system.shared_libs += libcgrouprc.so
+namespace.neuralnetworks.link.system.shared_libs += libdl.so
+namespace.neuralnetworks.link.system.shared_libs += liblog.so
+namespace.neuralnetworks.link.system.shared_libs += libm.so
+namespace.neuralnetworks.link.system.shared_libs += libnativewindow.so
+namespace.neuralnetworks.link.system.shared_libs += libneuralnetworks_packageinfo.so
+namespace.neuralnetworks.link.system.shared_libs += libsync.so
+namespace.neuralnetworks.link.system.shared_libs += libvndksupport.so
 
 ###############################################################################
 # "adbd" APEX namespace
@@ -168,8 +168,8 @@ namespace.adbd.visible = true
 
 namespace.adbd.search.paths = /apex/com.android.adbd/${LIB}
 namespace.adbd.asan.search.paths = /apex/com.android.adbd/${LIB}
-namespace.adbd.links = platform
-namespace.adbd.link.platform.shared_libs  = libc.so
-namespace.adbd.link.platform.shared_libs += libm.so
-namespace.adbd.link.platform.shared_libs += libdl.so
-namespace.adbd.link.platform.shared_libs += liblog.so
+namespace.adbd.links = system
+namespace.adbd.link.system.shared_libs  = libc.so
+namespace.adbd.link.system.shared_libs += libm.so
+namespace.adbd.link.system.shared_libs += libdl.so
+namespace.adbd.link.system.shared_libs += liblog.so
