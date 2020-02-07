@@ -69,6 +69,28 @@ bool DexoptTest::Dex2Oat(const std::vector<std::string>& args, std::string* erro
   return Exec(argv, error_msg);
 }
 
+std::string DexoptTest::GenerateAlternateImage(const std::string& scratch_dir) {
+  std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
+  std::vector<std::string> libcore_dex_locations = GetLibCoreDexLocations();
+
+  std::string image_dir = scratch_dir + GetInstructionSetString(kRuntimeISA);
+  int mkdir_result = mkdir(image_dir.c_str(), 0700);
+  CHECK_EQ(0, mkdir_result) << image_dir.c_str();
+
+  std::vector<std::string> extra_args {
+    "--compiler-filter=verify",
+    android::base::StringPrintf("--base=0x%08x", ART_BASE_ADDRESS),
+  };
+  std::string filename_prefix = image_dir + "/boot-interpreter";
+  ArrayRef<const std::string> dex_files(libcore_dex_files);
+  ArrayRef<const std::string> dex_locations(libcore_dex_locations);
+  std::string error_msg;
+  bool ok = CompileBootImage(extra_args, filename_prefix, dex_files, dex_locations, &error_msg);
+  EXPECT_TRUE(ok) << error_msg;
+
+  return scratch_dir + "boot-interpreter.art";
+}
+
 void DexoptTest::GenerateOatForTest(const std::string& dex_location,
                                     const std::string& oat_location,
                                     CompilerFilter::Filter filter,
@@ -92,8 +114,11 @@ void DexoptTest::GenerateOatForTest(const std::string& dex_location,
   }
 
   std::string image_location = GetImageLocation();
+  std::optional<ScratchDir> scratch;
   if (with_alternate_image) {
-    args.push_back("--boot-image=" + GetImageLocation2());
+    scratch.emplace();  // Create the scratch directory for the generated boot image.
+    std::string alternate_image_location = GenerateAlternateImage(scratch->GetPath());
+    args.push_back("--boot-image=" + alternate_image_location);
   }
 
   if (compilation_reason != nullptr) {

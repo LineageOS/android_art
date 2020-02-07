@@ -164,21 +164,17 @@ class Dex2oatImageTest : public CommonRuntimeTest {
   ImageSizes CompileImageAndGetSizes(ArrayRef<const std::string> dex_files,
                                      const std::vector<std::string>& extra_args) {
     ImageSizes ret;
-    ScratchFile scratch;
-    std::string scratch_dir = scratch.GetFilename();
-    while (!scratch_dir.empty() && scratch_dir.back() != '/') {
-      scratch_dir.pop_back();
-    }
-    CHECK(!scratch_dir.empty()) << "No directory " << scratch.GetFilename();
+    ScratchDir scratch;
+    std::string filename_prefix = scratch.GetPath() + "boot";
     std::vector<std::string> local_extra_args = extra_args;
     local_extra_args.push_back(android::base::StringPrintf("--base=0x%08x", kBaseAddress));
     std::string error_msg;
-    if (!CompileBootImage(local_extra_args, scratch.GetFilename(), dex_files, &error_msg)) {
-      LOG(ERROR) << "Failed to compile image " << scratch.GetFilename() << error_msg;
+    if (!CompileBootImage(local_extra_args, filename_prefix, dex_files, &error_msg)) {
+      LOG(ERROR) << "Failed to compile image " << filename_prefix << error_msg;
     }
-    std::string art_file = scratch.GetFilename() + ".art";
-    std::string oat_file = scratch.GetFilename() + ".oat";
-    std::string vdex_file = scratch.GetFilename() + ".vdex";
+    std::string art_file = filename_prefix + ".art";
+    std::string oat_file = filename_prefix + ".oat";
+    std::string vdex_file = filename_prefix + ".vdex";
     int64_t art_size = OS::GetFileSizeBytes(art_file.c_str());
     int64_t oat_size = OS::GetFileSizeBytes(oat_file.c_str());
     int64_t vdex_size = OS::GetFileSizeBytes(vdex_file.c_str());
@@ -188,86 +184,7 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     ret.art_size = art_size;
     ret.oat_size = oat_size;
     ret.vdex_size = vdex_size;
-    scratch.Close();
-    // Clear image files since we compile the image multiple times and don't want to leave any
-    // artifacts behind.
-    ClearDirectory(scratch_dir.c_str(), /*recursive=*/ false);
     return ret;
-  }
-
-  bool CompileBootImage(const std::vector<std::string>& extra_args,
-                        const std::string& image_file_name_prefix,
-                        ArrayRef<const std::string> dex_files,
-                        std::string* error_msg,
-                        const std::string& use_fd_prefix = "") {
-    Runtime* const runtime = Runtime::Current();
-    std::vector<std::string> argv;
-    argv.push_back(runtime->GetCompilerExecutable());
-    AddRuntimeArg(argv, "-Xms64m");
-    AddRuntimeArg(argv, "-Xmx64m");
-    for (const std::string& dex_file : dex_files) {
-      argv.push_back("--dex-file=" + dex_file);
-      argv.push_back("--dex-location=" + dex_file);
-    }
-    if (runtime->IsJavaDebuggable()) {
-      argv.push_back("--debuggable");
-    }
-    runtime->AddCurrentRuntimeFeaturesAsDex2OatArguments(&argv);
-
-    AddRuntimeArg(argv, "-Xverify:softfail");
-
-    if (!kIsTargetBuild) {
-      argv.push_back("--host");
-    }
-
-    std::unique_ptr<File> art_file;
-    std::unique_ptr<File> vdex_file;
-    std::unique_ptr<File> oat_file;
-    if (!use_fd_prefix.empty()) {
-      art_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".art").c_str()));
-      vdex_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".vdex").c_str()));
-      oat_file.reset(OS::CreateEmptyFile((use_fd_prefix + ".oat").c_str()));
-      argv.push_back("--image-fd=" + std::to_string(art_file->Fd()));
-      argv.push_back("--output-vdex-fd=" + std::to_string(vdex_file->Fd()));
-      argv.push_back("--oat-fd=" + std::to_string(oat_file->Fd()));
-      argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
-    } else {
-      argv.push_back("--image=" + image_file_name_prefix + ".art");
-      argv.push_back("--oat-file=" + image_file_name_prefix + ".oat");
-      argv.push_back("--oat-location=" + image_file_name_prefix + ".oat");
-    }
-
-    std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
-    argv.insert(argv.end(), compiler_options.begin(), compiler_options.end());
-
-    // We must set --android-root.
-    const char* android_root = getenv("ANDROID_ROOT");
-    CHECK(android_root != nullptr);
-    argv.push_back("--android-root=" + std::string(android_root));
-    argv.insert(argv.end(), extra_args.begin(), extra_args.end());
-
-    bool result = RunDex2Oat(argv, error_msg);
-    if (art_file != nullptr) {
-      CHECK_EQ(0, art_file->FlushClose());
-    }
-    if (vdex_file != nullptr) {
-      CHECK_EQ(0, vdex_file->FlushClose());
-    }
-    if (oat_file != nullptr) {
-      CHECK_EQ(0, oat_file->FlushClose());
-    }
-    return result;
-  }
-
-  bool RunDex2Oat(const std::vector<std::string>& args, std::string* error_msg) {
-    // We only want fatal logging for the error message.
-    auto post_fork_fn = []() { return setenv("ANDROID_LOG_TAGS", "*:f", 1) == 0; };
-    ForkAndExecResult res = ForkAndExec(args, post_fork_fn, error_msg);
-    if (res.stage != ForkAndExecResult::kFinished) {
-      *error_msg = strerror(errno);
-      return false;
-    }
-    return res.StandardSuccess();
   }
 
   MemMap ReserveCoreImageAddressSpace(/*out*/std::string* error_msg) {
@@ -293,6 +210,7 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     CHECK(EndsWith(dir, "/"));
     for (std::string& dex_file : *dex_files) {
       size_t slash_pos = dex_file.rfind('/');
+      CHECK(OS::FileExists(dex_file.c_str())) << dex_file;
       CHECK_NE(std::string::npos, slash_pos);
       std::string new_location = dir + dex_file.substr(slash_pos + 1u);
       std::ifstream src_stream(dex_file, std::ios::binary);
@@ -415,13 +333,10 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   MemMap reservation = ReserveCoreImageAddressSpace(&error_msg);
   ASSERT_TRUE(reservation.IsValid()) << error_msg;
 
-  ScratchFile scratch;
-  std::string scratch_dir = scratch.GetFilename() + "-d";
-  int mkdir_result = mkdir(scratch_dir.c_str(), 0700);
-  ASSERT_EQ(0, mkdir_result);
-  scratch_dir += '/';
+  ScratchDir scratch;
+  const std::string& scratch_dir = scratch.GetPath();
   std::string image_dir = scratch_dir + GetInstructionSetString(kRuntimeISA);
-  mkdir_result = mkdir(image_dir.c_str(), 0700);
+  int mkdir_result = mkdir(image_dir.c_str(), 0700);
   ASSERT_EQ(0, mkdir_result);
   std::string filename_prefix = image_dir + "/core";
 
@@ -824,10 +739,6 @@ TEST_F(Dex2oatImageTest, TestExtension) {
 
     DisableImageDex2Oat();
   }
-
-  ClearDirectory(scratch_dir.c_str());
-  int rmdir_result = rmdir(scratch_dir.c_str());
-  ASSERT_EQ(0, rmdir_result);
 }
 
 }  // namespace art
