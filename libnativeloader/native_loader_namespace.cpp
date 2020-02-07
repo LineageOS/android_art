@@ -35,7 +35,7 @@ namespace android {
 namespace {
 
 constexpr const char* kDefaultNamespaceName = "default";
-constexpr const char* kPlatformNamespaceName = "platform";
+constexpr const char* kSystemNamespaceName = "system";
 
 std::string GetLinkerError(bool is_bridged) {
   const char* msg = is_bridged ? NativeBridgeGetError() : dlerror();
@@ -63,11 +63,11 @@ Result<NativeLoaderNamespace> NativeLoaderNamespace::GetExportedNamespace(const 
   return Errorf("namespace {} does not exist or exported", name);
 }
 
-// The platform namespace is called "default" for binaries in /system and
-// "platform" for those in the Runtime APEX. Try "platform" first since
+// The system namespace is called "default" for binaries in /system and
+// "system" for those in the Runtime APEX. Try "system" first since
 // "default" always exists.
-Result<NativeLoaderNamespace> NativeLoaderNamespace::GetPlatformNamespace(bool is_bridged) {
-  auto ns = GetExportedNamespace(kPlatformNamespaceName, is_bridged);
+Result<NativeLoaderNamespace> NativeLoaderNamespace::GetSystemNamespace(bool is_bridged) {
+  auto ns = GetExportedNamespace(kSystemNamespaceName, is_bridged);
   if (ns) return ns;
   ns = GetExportedNamespace(kDefaultNamespaceName, is_bridged);
   if (ns) return ns;
@@ -93,12 +93,12 @@ Result<NativeLoaderNamespace> NativeLoaderNamespace::Create(
     is_bridged = NativeBridgeIsPathSupported(search_paths.c_str());
   }
 
-  // Fall back to the platform namespace if no parent is set.
-  auto platform_ns = GetPlatformNamespace(is_bridged);
-  if (!platform_ns) {
-    return platform_ns.error();
+  // Fall back to the system namespace if no parent is set.
+  auto system_ns = GetSystemNamespace(is_bridged);
+  if (!system_ns) {
+    return system_ns.error();
   }
-  const NativeLoaderNamespace& effective_parent = parent != nullptr ? *parent : *platform_ns;
+  const NativeLoaderNamespace& effective_parent = parent != nullptr ? *parent : *system_ns;
 
   // All namespaces for apps are isolated
   uint64_t type = ANDROID_NAMESPACE_TYPE_ISOLATED;
