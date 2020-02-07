@@ -2147,6 +2147,14 @@ bool ClassLinker::AddImageSpace(
     }, space->Begin(), image_pointer_size_);
   }
 
+  if (runtime->IsVerificationSoftFail()) {
+    header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
+      if (!method.IsNative() && method.IsInvokable()) {
+        method.ClearSkipAccessChecks();
+      }
+    }, space->Begin(), image_pointer_size_);
+  }
+
   ClassTable* class_table = nullptr;
   {
     WriterMutexLock mu(self, *Locks::classlinker_classes_lock_);
