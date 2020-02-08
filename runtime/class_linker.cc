@@ -2147,6 +2147,14 @@ bool ClassLinker::AddImageSpace(
     }, space->Begin(), image_pointer_size_);
   }
 
+  if (runtime->IsVerificationSoftFail()) {
+    header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
+      if (!method.IsNative() && method.IsInvokable()) {
+        method.ClearSkipAccessChecks();
+      }
+    }, space->Begin(), image_pointer_size_);
+  }
+
   ClassTable* class_table = nullptr;
   {
     WriterMutexLock mu(self, *Locks::classlinker_classes_lock_);
@@ -4827,20 +4835,6 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
   const OatDexFile* oat_dex_file = dex_file.GetOatDexFile();
   // In case we run without an image there won't be a backing oat file.
   if (oat_dex_file == nullptr || oat_dex_file->GetOatFile() == nullptr) {
-    if (!kIsDebugBuild && klass->GetClassLoader() == nullptr) {
-      // For boot classpath classes in the case we're not using a default boot image:
-      // we don't have the infrastructure yet to query verification data on individual
-      // boot vdex files, so it's simpler for now to consider all boot classpath classes
-      // verified. This should be taken into account when measuring boot time and app
-      // startup compare to the (current) production system where both:
-      // 1) updatable boot classpath classes, and
-      // 2) classes in /system referencing updatable classes
-      // will be verified at runtime.
-      if (Runtime::Current()->IsUsingApexBootImageLocation()) {
-        oat_file_class_status = ClassStatus::kVerified;
-        return true;
-      }
-    }
     return false;
   }
 

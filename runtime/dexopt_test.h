@@ -32,6 +32,8 @@ class DexoptTest : public Dex2oatEnvironmentTest {
 
   void PostRuntimeCreate() override;
 
+  std::string GenerateAlternateImage(const std::string& scratch_dir);
+
   // Generate an oat file for the purposes of test.
   // The oat file will be generated for dex_location in the given oat_location
   // with the following configuration:

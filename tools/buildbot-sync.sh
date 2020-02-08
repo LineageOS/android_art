@@ -51,6 +51,20 @@ if [[ "$(build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)" != "true
   exit 1
 fi
 
+
+# `/system` "partition" synchronization.
+# --------------------------------------
+
+# Sync the system directory to the chroot.
+echo -e "${green}Syncing system directory...${nc}"
+adb shell mkdir -p "$ART_TEST_CHROOT/system"
+adb push "$ANDROID_PRODUCT_OUT/system" "$ART_TEST_CHROOT/"
+# Overwrite the default public.libraries.txt file with a smaller one that
+# contains only the public libraries pushed to the chroot directory.
+adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
+  "$ART_TEST_CHROOT/system/etc/public.libraries.txt"
+
+
 # Linker configuration.
 # ---------------------
 
@@ -133,18 +147,29 @@ get_ld_guest_system_config_file_path() {
   sed -e "s|^$ANDROID_PRODUCT_OUT||" <<< "$ld_config_file_paths"
 }
 
+# Adjust the linker configuration file (if needed).
+#
+# Check the linker configurations files on the "host system" and the "guest
+# system". If these file names are different, rename the "guest system" linker
+# configuration file within the chroot environment using the "host system"
+# linker configuration file name.
+ld_host_system_config_file_path=$(get_ld_host_system_config_file_path) || exit 1
+echo -e "${green}Determining host system linker configuration:" \
+  "\`$ld_host_system_config_file_path\`${nc}"
+ld_guest_system_config_file_path=$(get_ld_guest_system_config_file_path) || exit 1
+echo -e "${green}Determining guest system linker configuration:" \
+  "\`$ld_guest_system_config_file_path\`${nc}"
+if [[ "$ld_host_system_config_file_path" != "$ld_guest_system_config_file_path" ]]; then
+  echo -e "${green}Renaming linker configuration file in chroot environment:" \
+    "\`$ART_TEST_CHROOT$ld_guest_system_config_file_path\`" \
+    "-> \`$ART_TEST_CHROOT$ld_host_system_config_file_path\`${nc}"
+  adb shell mv -f "$ART_TEST_CHROOT$ld_guest_system_config_file_path" \
+      "$ART_TEST_CHROOT$ld_host_system_config_file_path"
+fi
 
-# Synchronization recipe.
-# -----------------------
 
-# Sync the system directory to the chroot.
-echo -e "${green}Syncing system directory...${nc}"
-adb shell mkdir -p "$ART_TEST_CHROOT/system"
-adb push "$ANDROID_PRODUCT_OUT/system" "$ART_TEST_CHROOT/"
-# Overwrite the default public.libraries.txt file with a smaller one that
-# contains only the public libraries pushed to the chroot directory.
-adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
-  "$ART_TEST_CHROOT/system/etc/public.libraries.txt"
+# APEX packages activation.
+# -------------------------
 
 # Manually "activate" the flattened APEX $1 by syncing it to /apex/$2 in the
 # chroot. $2 defaults to $1.
@@ -173,26 +198,11 @@ activate_apex com.android.art.testing com.android.art
 activate_apex com.android.i18n
 activate_apex com.android.runtime
 activate_apex com.android.tzdata
+activate_apex com.android.conscrypt
 
-# Adjust the linker configuration file (if needed).
-#
-# Check the linker configurations files on the "host system" and the "guest
-# system". If these file names are different, rename the "guest system" linker
-# configuration file within the chroot environment using the "host system"
-# linker configuration file name.
-ld_host_system_config_file_path=$(get_ld_host_system_config_file_path) || exit 1
-echo -e "${green}Determining host system linker configuration:" \
-  "\`$ld_host_system_config_file_path\`${nc}"
-ld_guest_system_config_file_path=$(get_ld_guest_system_config_file_path) || exit 1
-echo -e "${green}Determining guest system linker configuration:" \
-  "\`$ld_guest_system_config_file_path\`${nc}"
-if [[ "$ld_host_system_config_file_path" != "$ld_guest_system_config_file_path" ]]; then
-  echo -e "${green}Renaming linker configuration file in chroot environment:" \
-    "\`$ART_TEST_CHROOT$ld_guest_system_config_file_path\`" \
-    "-> \`$ART_TEST_CHROOT$ld_host_system_config_file_path\`${nc}"
-  adb shell mv -f "$ART_TEST_CHROOT$ld_guest_system_config_file_path" \
-      "$ART_TEST_CHROOT$ld_host_system_config_file_path"
-fi
+
+# `/data` "partition" synchronization.
+# ------------------------------------
 
 # Sync the data directory to the chroot.
 echo -e "${green}Syncing data directory...${nc}"

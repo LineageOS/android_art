@@ -92,7 +92,7 @@ class Platform {
 
 // These represents built-in namespaces created by the linker according to ld.config.txt
 static std::unordered_map<std::string, Platform::mock_namespace_handle> namespaces = {
-    {"platform", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("platform"))},
+    {"system", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("system"))},
     {"default", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("default"))},
     {"art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("art"))},
     {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
@@ -348,7 +348,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
       ANDROID_NAMESPACE_TYPE_ISOLATED | ANDROID_NAMESPACE_TYPE_ALSO_USED_AS_ANONYMOUS;
   std::string expected_library_path = library_path;
   std::string expected_permitted_path = std::string("/data:/mnt/expand:") + permitted_path;
-  std::string expected_parent_namespace = "platform";
+  std::string expected_parent_namespace = "system";
   bool expected_link_with_platform_ns = true;
   bool expected_link_with_art_ns = true;
   bool expected_link_with_sphal_ns = !vendor_public_libraries().empty();
@@ -378,7 +378,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
                            StrEq(expected_permitted_path), NsEq(expected_parent_namespace.c_str())))
         .WillOnce(Return(TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE(dex_path.c_str()))));
     if (expected_link_with_platform_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("platform"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("system"),
                                               StrEq(expected_shared_libs_to_platform_ns)))
           .WillOnce(Return(true));
     }
