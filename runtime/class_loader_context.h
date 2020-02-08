@@ -202,6 +202,10 @@ class ClassLoaderContext {
   static std::map<std::string, std::string> EncodeClassPathContextsForClassLoader(
       jobject class_loader);
 
+  // Returns whether `encoded_class_loader_context` is a valid encoded ClassLoaderContext or
+  // EncodedUnsupportedClassLoaderContext.
+  static bool IsValidEncoding(const std::string& possible_encoded_class_loader_context);
+
   struct ClassLoaderInfo {
     // The type of this class loader.
     ClassLoaderType type;
