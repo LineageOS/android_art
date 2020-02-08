@@ -15,6 +15,11 @@
 // The SDK for the art module apex.
 sdk {
     name: "art-module-sdk",
+    java_system_modules: [
+        "art-module-public-api-stubs-system-modules",
+        "art-module-intra-core-api-stubs-system-modules",
+        "art-module-platform-api-stubs-system-modules",
+    ],
     native_static_libs: [
         "libartimagevalues",
     ],
