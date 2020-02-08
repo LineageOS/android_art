@@ -99,11 +99,7 @@ class QuickExceptionHandler {
   }
 
   ArtMethod* GetHandlerMethod() const {
-    return handler_method_;
-  }
-
-  void SetHandlerMethod(ArtMethod* handler_quick_method) {
-    handler_method_ = handler_quick_method;
+    return *handler_quick_frame_;
   }
 
   uint32_t GetHandlerDexPc() const {
@@ -154,8 +150,6 @@ class QuickExceptionHandler {
   const OatQuickMethodHeader* handler_method_header_;
   // The value for argument 0.
   uintptr_t handler_quick_arg0_;
-  // The handler method to report to the debugger.
-  ArtMethod* handler_method_;
   // The handler's dex PC, zero implies an uncaught exception.
   uint32_t handler_dex_pc_;
   // Should the exception be cleared as the catch block has no move-exception?

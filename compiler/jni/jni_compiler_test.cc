@@ -147,21 +147,6 @@ struct count_refs_helper<Arg, Args ...> {
       (jni_type_traits<Arg>::is_ref ? 1 : 0) + count_refs_helper<Args ...>::value;
 };
 
-template <typename T, T fn>
-struct count_refs_fn_helper;
-
-template <typename R, typename ... Args, R fn(Args...)>
-struct count_refs_fn_helper<R(Args...), fn> : public count_refs_helper<Args...> {};
-
-// Given a function type 'T' figure out how many of the parameter types are a reference.
-// -- The implicit jclass and thisObject also count as 1 reference.
-//
-// Fields:
-// * value - the result counting # of refs
-// * value_type - the type of value (size_t)
-template <typename T, T fn>
-struct count_refs : public count_refs_fn_helper<T, fn> {};
-
 // Base case: No parameters = 0 refs.
 size_t count_nonnull_refs_helper() {
   return 0;
@@ -200,10 +185,10 @@ size_t count_nonnull_refs(Args ... args) {
   return count_nonnull_refs_helper(args...);
 }
 
-template <typename T, T fn>
+template <typename T, T* fn>
 struct remove_extra_parameters_helper;
 
-template <typename R, typename Arg1, typename Arg2, typename ... Args, R fn(Arg1, Arg2, Args...)>
+template <typename R, typename Arg1, typename Arg2, typename ... Args, R (*fn)(Arg1, Arg2, Args...)>
 struct remove_extra_parameters_helper<R(Arg1, Arg2, Args...), fn> {
   // Note: Do not use Args&& here to maintain C-style parameter types.
   static R apply(Args... args) {
@@ -216,7 +201,7 @@ struct remove_extra_parameters_helper<R(Arg1, Arg2, Args...), fn> {
 // Given a function 'fn' create a function 'apply' which will omit the JNIEnv/jklass parameters
 //
 // i.e. if fn(JNIEnv*,jklass,a,b,c,d,e...) then apply(a,b,c,d,e,...)
-template <typename T, T fn>
+template <typename T, T* fn>
 struct jni_remove_extra_parameters : public remove_extra_parameters_helper<T, fn> {};
 
 class JniCompilerTest : public CommonCompilerTest {
@@ -575,11 +560,11 @@ static void expectNumStackReferences(size_t val1, size_t val2) {
 
 #define EXPECT_NUM_STACK_REFERENCES(val1, val2) expectNumStackReferences(val1, val2)
 
-template <typename T, T fn>
+template <typename T, T* fn>
 struct make_jni_test_decorator;
 
 // Decorator for "static" JNI callbacks.
-template <typename R, typename ... Args, R fn(JNIEnv*, jclass, Args...)>
+template <typename R, typename ... Args, R (*fn)(JNIEnv*, jclass, Args...)>
 struct make_jni_test_decorator<R(JNIEnv*, jclass kls, Args...), fn> {
   static R apply(JNIEnv* env, jclass kls, Args ... args) {
     EXPECT_THREAD_STATE_FOR_CURRENT_JNI();
@@ -594,7 +579,7 @@ struct make_jni_test_decorator<R(JNIEnv*, jclass kls, Args...), fn> {
 };
 
 // Decorator for instance JNI callbacks.
-template <typename R, typename ... Args, R fn(JNIEnv*, jobject, Args...)>
+template <typename R, typename ... Args, R (*fn)(JNIEnv*, jobject, Args...)>
 struct make_jni_test_decorator<R(JNIEnv*, jobject, Args...), fn> {
   static R apply(JNIEnv* env, jobject thisObj, Args ... args) {
     EXPECT_THREAD_STATE_FOR_CURRENT_JNI();

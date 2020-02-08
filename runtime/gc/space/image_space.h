@@ -39,6 +39,11 @@ class ImageSpace : public MemMapSpace {
     return kSpaceTypeImageSpace;
   }
 
+  // The separator for boot image location components.
+  static constexpr char kComponentSeparator = ':';
+  // The separator for profile filename.
+  static constexpr char kProfileSeparator = '!';
+
   // Load boot image spaces for specified boot class path, image location, instruction set, etc.
   //
   // On successful return, the loaded spaces are added to boot_image_spaces (which must be

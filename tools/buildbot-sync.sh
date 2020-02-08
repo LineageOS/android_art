@@ -156,13 +156,15 @@ activate_apex() {
   local src_apex=${1}
   local dst_apex=${2:-${src_apex}}
   echo -e "${green}Activating APEX ${src_apex} as ${dst_apex}...${nc}"
-  # We copy the files from `/system/apex/${src_apex}` to `/apex/${dst_apex}` in
+  # We move the files from `/system/apex/${src_apex}` to `/apex/${dst_apex}` in
   # the chroot directory, instead of simply using a symlink, as Bionic's linker
   # relies on the real path name of a binary (e.g.
   # `/apex/com.android.art/bin/dex2oat`) to select the linker configuration.
   adb shell mkdir -p "$ART_TEST_CHROOT/apex"
   adb shell rm -rf "$ART_TEST_CHROOT/apex/${dst_apex}"
-  adb shell cp -a "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" \
+  # Use use mv instead of cp, as cp has a bug on fugu NRD90R where symbolic
+  # links get copied with odd names, eg: libcrypto.so -> /system/lib/libcrypto.soe.sort.so
+  adb shell mv "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" \
     || exit 1
 }
 
