@@ -272,16 +272,19 @@ jobject CommonRuntimeTestImpl::LoadDex(const char* dex_name) {
   return class_loader;
 }
 
-jobject CommonRuntimeTestImpl::LoadDexInWellKnownClassLoader(const std::string& dex_name,
-                                                             jclass loader_class,
-                                                             jobject parent_loader,
-                                                             jobject shared_libraries) {
-  std::vector<std::unique_ptr<const DexFile>> dex_files = OpenTestDexFiles(dex_name.c_str());
+jobject
+CommonRuntimeTestImpl::LoadDexInWellKnownClassLoader(const std::vector<std::string>& dex_names,
+                                                     jclass loader_class,
+                                                     jobject parent_loader,
+                                                     jobject shared_libraries) {
   std::vector<const DexFile*> class_path;
-  CHECK_NE(0U, dex_files.size());
-  for (auto& dex_file : dex_files) {
-    class_path.push_back(dex_file.get());
-    loaded_dex_files_.push_back(std::move(dex_file));
+  for (const std::string& dex_name : dex_names) {
+    std::vector<std::unique_ptr<const DexFile>> dex_files = OpenTestDexFiles(dex_name.c_str());
+    CHECK_NE(0U, dex_files.size());
+    for (auto& dex_file : dex_files) {
+      class_path.push_back(dex_file.get());
+      loaded_dex_files_.push_back(std::move(dex_file));
+    }
   }
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
@@ -320,7 +323,15 @@ jobject CommonRuntimeTestImpl::LoadDexInWellKnownClassLoader(const std::string& 
 jobject CommonRuntimeTestImpl::LoadDexInPathClassLoader(const std::string& dex_name,
                                                         jobject parent_loader,
                                                         jobject shared_libraries) {
-  return LoadDexInWellKnownClassLoader(dex_name,
+  return LoadDexInPathClassLoader(std::vector<std::string>{ dex_name },
+                                  parent_loader,
+                                  shared_libraries);
+}
+
+jobject CommonRuntimeTestImpl::LoadDexInPathClassLoader(const std::vector<std::string>& names,
+                                                        jobject parent_loader,
+                                                        jobject shared_libraries) {
+  return LoadDexInWellKnownClassLoader(names,
                                        WellKnownClasses::dalvik_system_PathClassLoader,
                                        parent_loader,
                                        shared_libraries);
@@ -328,14 +339,14 @@ jobject CommonRuntimeTestImpl::LoadDexInPathClassLoader(const std::string& dex_n
 
 jobject CommonRuntimeTestImpl::LoadDexInDelegateLastClassLoader(const std::string& dex_name,
                                                                 jobject parent_loader) {
-  return LoadDexInWellKnownClassLoader(dex_name,
+  return LoadDexInWellKnownClassLoader({ dex_name },
                                        WellKnownClasses::dalvik_system_DelegateLastClassLoader,
                                        parent_loader);
 }
 
 jobject CommonRuntimeTestImpl::LoadDexInInMemoryDexClassLoader(const std::string& dex_name,
                                                                jobject parent_loader) {
-  return LoadDexInWellKnownClassLoader(dex_name,
+  return LoadDexInWellKnownClassLoader({ dex_name },
                                        WellKnownClasses::dalvik_system_InMemoryDexClassLoader,
                                        parent_loader);
 }

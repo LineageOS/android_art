@@ -117,6 +117,7 @@
 #include "mirror/var_handle.h"
 #include "monitor.h"
 #include "native/dalvik_system_DexFile.h"
+#include "native/dalvik_system_BaseDexClassLoader.h"
 #include "native/dalvik_system_VMDebug.h"
 #include "native/dalvik_system_VMRuntime.h"
 #include "native/dalvik_system_VMStack.h"
@@ -1955,6 +1956,7 @@ jobject Runtime::GetSystemClassLoader() const {
 
 void Runtime::RegisterRuntimeNativeMethods(JNIEnv* env) {
   register_dalvik_system_DexFile(env);
+  register_dalvik_system_BaseDexClassLoader(env);
   register_dalvik_system_VMDebug(env);
   register_dalvik_system_VMRuntime(env);
   register_dalvik_system_VMStack(env);

@@ -49,6 +49,12 @@ class ClassLoaderContext {
     kInMemoryDexClassLoader = 3
   };
 
+  // Special encoding used to denote a foreign ClassLoader was found when trying to encode class
+  // loader contexts for each classpath element in a ClassLoader. See
+  // EncodeClassPathContextsForClassLoader. Keep in sync with PackageDexUsage in the framework.
+  static constexpr const char* kUnsupportedClassLoaderContextEncoding =
+      "=UnsupportedClassLoaderContext=";
+
   ~ClassLoaderContext();
 
   // Opens requested class path files and appends them to ClassLoaderInfo::opened_dex_files.
@@ -121,6 +127,25 @@ class ClassLoaderContext {
   // Should only be called if OpenDexFiles() returned true.
   std::string EncodeContextForDex2oat(const std::string& base_dir) const;
 
+  // Encodes the contexts for each of the classpath elements in the child-most
+  // classloader. Under the hood EncodeContextForDex2oat is used, so no checksums
+  // will be encoded.
+  // Should only be called if the dex files are opened (either via OpenDexFiles() or by creating the
+  // context from a live class loader).
+  // Notably, for each classpath element the encoded classloader context will contain only the
+  // elements that appear before it in the containing classloader. E.g. if `this` contains
+  // (from child to parent):
+  //
+  // PathClassLoader { multidex.apk!classes.dex, multidex.apk!classes2.dex, foo.dex, bar.dex } ->
+  //    PathClassLoader { baz.dex } -> BootClassLoader
+  //
+  // then the return value will look like:
+  //
+  // `{ "multidex.apk": "PCL[];PCL[baz.dex]",
+  //    "foo.dex"     : "PCL[multidex.apk];PCL[baz.dex]",
+  //    "bar.dex"     : "PCL[multidex.apk:foo.dex];PCL[baz.dex]" }`
+  std::map<std::string, std::string> EncodeClassPathContexts(const std::string& base_dir) const;
+
   // Flattens the opened dex files into the given vector.
   // Should only be called if OpenDexFiles() returned true.
   std::vector<const DexFile*> FlattenOpenedDexFiles() const;
@@ -167,6 +192,19 @@ class ClassLoaderContext {
   // Returns the default class loader context to be used when none is specified.
   // This will return a context with a single and empty PathClassLoader.
   static std::unique_ptr<ClassLoaderContext> Default();
+
+  // Encodes the contexts for each of the classpath elements in `class_loader`. See
+  // ClassLoaderContext::EncodeClassPathContexts for more information about the return value.
+  //
+  // If `class_loader` does not derive from BaseDexClassLoader then an empty map is returned.
+  // Otherwise if a foreign ClassLoader is found in the class loader chain then the results values
+  // will all be ClassLoaderContext::kUnsupportedClassLoaderContextEncoding.
+  static std::map<std::string, std::string> EncodeClassPathContextsForClassLoader(
+      jobject class_loader);
+
+  // Returns whether `encoded_class_loader_context` is a valid encoded ClassLoaderContext or
+  // EncodedUnsupportedClassLoaderContext.
+  static bool IsValidEncoding(const std::string& possible_encoded_class_loader_context);
 
   struct ClassLoaderInfo {
     // The type of this class loader.

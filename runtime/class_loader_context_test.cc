@@ -1136,6 +1136,200 @@ TEST_F(ClassLoaderContextTest, EncodeForDex2oatIMC) {
   ASSERT_EQ(expected_encoding, context->EncodeContextForDex2oat(""));
 }
 
+TEST_F(ClassLoaderContextTest, EncodeContextsSinglePath) {
+  jobject class_loader = LoadDexInPathClassLoader("Main", nullptr);
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(class_loader);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ("PCL[]", encodings.at(GetTestDexFileName("Main")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsMultiDex) {
+  jobject class_loader = LoadDexInPathClassLoader("MultiDex", nullptr);
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(class_loader);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ("PCL[]", encodings.at(GetTestDexFileName("MultiDex")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsRepeatedMultiDex) {
+  jobject top_class_loader = LoadDexInPathClassLoader("MultiDex", nullptr);
+  jobject middle_class_loader =
+      LoadDexInPathClassLoader("Main", top_class_loader);
+  jobject bottom_class_loader =
+      LoadDexInPathClassLoader("MultiDex", middle_class_loader);
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(bottom_class_loader);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(1u, encodings.size());
+
+  std::string main_dex_name = GetTestDexFileName("Main");
+  std::string multidex_dex_name = GetTestDexFileName("MultiDex");
+  ASSERT_EQ(
+      "PCL[];PCL[" + main_dex_name + "];PCL[" + multidex_dex_name + "]",
+      encodings.at(multidex_dex_name));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsSinglePathWithShared) {
+  jobject class_loader_a = LoadDexInPathClassLoader("MyClass", nullptr);
+
+  ScopedObjectAccess soa(Thread::Current());
+  StackHandleScope<1> hs(soa.Self());
+  Handle<mirror::ObjectArray<mirror::ClassLoader>> libraries = hs.NewHandle(
+    mirror::ObjectArray<mirror::ClassLoader>::Alloc(
+        soa.Self(),
+        GetClassRoot<mirror::ObjectArray<mirror::ClassLoader>>(),
+        1));
+  libraries->Set(0, soa.Decode<mirror::ClassLoader>(class_loader_a));
+
+  jobject class_loader_b = LoadDexInPathClassLoader(
+      "Main", nullptr, soa.AddLocalReference<jobject>(libraries.Get()));
+
+  std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader_b);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ(
+      "PCL[]{PCL[" + GetTestDexFileName("MyClass") + "]}",
+      encodings.at(GetTestDexFileName("Main")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsMultiplePaths) {
+  jobject class_loader = LoadDexInPathClassLoader(
+      std::vector<std::string>{ "Main", "MultiDex"}, nullptr);
+
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(class_loader);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(2u, encodings.size());
+  ASSERT_EQ("PCL[]", encodings.at(GetTestDexFileName("Main")));
+  ASSERT_EQ(
+      "PCL[" + GetTestDexFileName("Main") + "]", encodings.at(GetTestDexFileName("MultiDex")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsMultiplePathsWithShared) {
+  jobject class_loader_a = LoadDexInPathClassLoader("MyClass", nullptr);
+
+  ScopedObjectAccess soa(Thread::Current());
+  StackHandleScope<1> hs(soa.Self());
+  Handle<mirror::ObjectArray<mirror::ClassLoader>> libraries = hs.NewHandle(
+    mirror::ObjectArray<mirror::ClassLoader>::Alloc(
+        soa.Self(),
+        GetClassRoot<mirror::ObjectArray<mirror::ClassLoader>>(),
+        1));
+  libraries->Set(0, soa.Decode<mirror::ClassLoader>(class_loader_a));
+
+  jobject class_loader_b = LoadDexInPathClassLoader(
+      std::vector<std::string> { "Main", "MultiDex" },
+      nullptr, soa.AddLocalReference<jobject>(libraries.Get()));
+
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(class_loader_b);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(2u, encodings.size());
+  const std::string context_suffix =
+      "{PCL[" + GetTestDexFileName("MyClass") + "]}";
+  ASSERT_EQ("PCL[]" + context_suffix, encodings.at(GetTestDexFileName("Main")));
+  ASSERT_EQ(
+      "PCL[" + GetTestDexFileName("Main") + "]" + context_suffix,
+      encodings.at(GetTestDexFileName("MultiDex")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsIMC) {
+  jobject class_loader_a = LoadDexInPathClassLoader("Main", nullptr);
+  jobject class_loader_b =
+      LoadDexInInMemoryDexClassLoader("MyClass", class_loader_a);
+
+  std::unique_ptr<ClassLoaderContext> context =
+      CreateContextForClassLoader(class_loader_b);
+
+  std::map<std::string, std::string> encodings = context->EncodeClassPathContexts("");
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ(
+      "IMC[];PCL[" + GetTestDexFileName("Main") + "]",
+      encodings.at("<unknown>"));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsForSingleDex) {
+  jobject class_loader = LoadDexInPathClassLoader("Main", nullptr);
+  std::map<std::string, std::string> encodings =
+      ClassLoaderContext::EncodeClassPathContextsForClassLoader(class_loader);
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ("PCL[]", encodings.at(GetTestDexFileName("Main")));
+}
+
+static jobject CreateForeignClassLoader() {
+  ScopedObjectAccess soa(Thread::Current());
+  JNIEnv* env = soa.Env();
+
+  // We cannot instantiate a ClassLoader directly, so instead we allocate an Object to represent
+  // our foreign ClassLoader (this works because the runtime does proper instanceof checks before
+  // operating on this object.
+  jmethodID ctor = env->GetMethodID(WellKnownClasses::java_lang_Object, "<init>", "()V");
+  return env->NewObject(WellKnownClasses::java_lang_Object, ctor);
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsForUnsupportedBase) {
+  std::map<std::string, std::string> empty;
+  ASSERT_EQ(
+      empty, ClassLoaderContext::EncodeClassPathContextsForClassLoader(CreateForeignClassLoader()));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsForUnsupportedChain) {
+  jobject class_loader = LoadDexInPathClassLoader("Main", CreateForeignClassLoader());
+  std::map<std::string, std::string> encodings =
+      ClassLoaderContext::EncodeClassPathContextsForClassLoader(class_loader);
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ(
+      ClassLoaderContext::kUnsupportedClassLoaderContextEncoding,
+      encodings.at(GetTestDexFileName("Main")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsForUnsupportedChainMultiPath) {
+  jobject class_loader = LoadDexInPathClassLoader(std::vector<std::string> { "Main", "MyClass" },
+                                                  CreateForeignClassLoader());
+  std::map<std::string, std::string> encodings =
+      ClassLoaderContext::EncodeClassPathContextsForClassLoader(class_loader);
+  ASSERT_EQ(2u, encodings.size());
+  ASSERT_EQ(
+      ClassLoaderContext::kUnsupportedClassLoaderContextEncoding,
+      encodings.at(GetTestDexFileName("Main")));
+  ASSERT_EQ(
+      ClassLoaderContext::kUnsupportedClassLoaderContextEncoding,
+      encodings.at(GetTestDexFileName("MyClass")));
+}
+
+TEST_F(ClassLoaderContextTest, EncodeContextsForUnsupportedChainMultiDex) {
+  jobject class_loader = LoadDexInPathClassLoader("MultiDex", CreateForeignClassLoader());
+  std::map<std::string, std::string> encodings =
+      ClassLoaderContext::EncodeClassPathContextsForClassLoader(class_loader);
+  ASSERT_EQ(1u, encodings.size());
+  ASSERT_EQ(
+      ClassLoaderContext::kUnsupportedClassLoaderContextEncoding,
+      encodings.at(GetTestDexFileName("MultiDex")));
+}
+
+TEST_F(ClassLoaderContextTest, IsValidEncoding) {
+  ASSERT_TRUE(ClassLoaderContext::IsValidEncoding("PCL[]"));
+  ASSERT_TRUE(ClassLoaderContext::IsValidEncoding("PCL[foo.dex]"));
+  ASSERT_TRUE(ClassLoaderContext::IsValidEncoding("PCL[foo.dex];PCL[bar.dex]"));
+  ASSERT_TRUE(ClassLoaderContext::IsValidEncoding("DLC[];PCL[bar.dex]"));
+  ASSERT_TRUE(
+      ClassLoaderContext::IsValidEncoding(
+        ClassLoaderContext::kUnsupportedClassLoaderContextEncoding));
+  ASSERT_FALSE(ClassLoaderContext::IsValidEncoding("not_valid"));
+  ASSERT_FALSE(ClassLoaderContext::IsValidEncoding("[]"));
+  ASSERT_FALSE(ClassLoaderContext::IsValidEncoding("FCL[]"));
+  ASSERT_FALSE(ClassLoaderContext::IsValidEncoding("foo.dex:bar.dex"));
+}
+
 // TODO(calin) add a test which creates the context for a class loader together with dex_elements.
 TEST_F(ClassLoaderContextTest, CreateContextForClassLoader) {
   // The chain is

@@ -569,6 +569,46 @@ std::string ClassLoaderContext::EncodeContextForOatFile(const std::string& base_
   return EncodeContext(base_dir, /*for_dex2oat=*/ false, stored_context);
 }
 
+std::map<std::string, std::string>
+ClassLoaderContext::EncodeClassPathContexts(const std::string& base_dir) const {
+  CheckDexFilesOpened("EncodeClassPathContexts");
+  if (class_loader_chain_ == nullptr) {
+    return std::map<std::string, std::string>{};
+  }
+
+  std::map<std::string, std::string> results;
+  std::vector<std::string> dex_locations;
+  std::vector<uint32_t> checksums;
+  dex_locations.reserve(class_loader_chain_->original_classpath.size());
+
+  std::ostringstream encoded_libs_and_parent_stream;
+  EncodeSharedLibAndParent(*class_loader_chain_,
+                           base_dir,
+                           /*for_dex2oat=*/true,
+                           /*stored_info=*/nullptr,
+                           encoded_libs_and_parent_stream);
+  std::string encoded_libs_and_parent(encoded_libs_and_parent_stream.str());
+
+  std::set<std::string> seen_locations;
+  for (const std::string& path : class_loader_chain_->classpath) {
+    // The classpath will contain multiple entries for multidex files, so make sure this is the
+    // first time we're seeing this file.
+    const std::string base_location(DexFileLoader::GetBaseLocation(path));
+    if (!seen_locations.insert(base_location).second) {
+      continue;
+    }
+
+    std::ostringstream out;
+    EncodeClassPath(base_dir, dex_locations, checksums, class_loader_chain_->type, out);
+    out << encoded_libs_and_parent;
+    results.emplace(base_location, out.str());
+
+    dex_locations.push_back(base_location);
+  }
+
+  return results;
+}
+
 std::string ClassLoaderContext::EncodeContext(const std::string& base_dir,
                                               bool for_dex2oat,
                                               ClassLoaderContext* stored_context) const {
@@ -937,9 +977,7 @@ static bool CollectDexFilesFromSupportedClassLoader(ScopedObjectAccessAlreadyRun
                                                     Handle<mirror::ClassLoader> class_loader,
                                                     std::vector<const DexFile*>* out_dex_files)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-  CHECK(IsPathOrDexClassLoader(soa, class_loader) ||
-        IsDelegateLastClassLoader(soa, class_loader) ||
-        IsInMemoryDexClassLoader(soa, class_loader));
+  CHECK(IsInstanceOfBaseDexClassLoader(soa, class_loader));
 
   // All supported class loaders inherit from BaseDexClassLoader.
   // We need to get the DexPathList and loop through it.
@@ -1150,6 +1188,38 @@ std::unique_ptr<ClassLoaderContext> ClassLoaderContext::CreateContextForClassLoa
     return nullptr;
   }
   return result;
+}
+
+std::map<std::string, std::string>
+ClassLoaderContext::EncodeClassPathContextsForClassLoader(jobject class_loader) {
+  std::unique_ptr<ClassLoaderContext> clc =
+      ClassLoaderContext::CreateContextForClassLoader(class_loader, nullptr);
+  if (clc != nullptr) {
+    return clc->EncodeClassPathContexts("");
+  }
+
+  ScopedObjectAccess soa(Thread::Current());
+  StackHandleScope<1> hs(soa.Self());
+  Handle<mirror::ClassLoader> h_class_loader =
+      hs.NewHandle(soa.Decode<mirror::ClassLoader>(class_loader));
+  if (!IsInstanceOfBaseDexClassLoader(soa, h_class_loader)) {
+    return std::map<std::string, std::string>{};
+  }
+
+  std::vector<const DexFile*> dex_files_loaded;
+  CollectDexFilesFromSupportedClassLoader(soa, h_class_loader, &dex_files_loaded);
+
+  std::map<std::string, std::string> results;
+  for (const DexFile* dex_file : dex_files_loaded) {
+    results.emplace(DexFileLoader::GetBaseLocation(dex_file->GetLocation()),
+                    ClassLoaderContext::kUnsupportedClassLoaderContextEncoding);
+  }
+  return results;
+}
+
+bool ClassLoaderContext::IsValidEncoding(const std::string& possible_encoded_class_loader_context) {
+  return ClassLoaderContext::Create(possible_encoded_class_loader_context.c_str()) != nullptr
+      || possible_encoded_class_loader_context == kUnsupportedClassLoaderContextEncoding;
 }
 
 ClassLoaderContext::VerificationResult ClassLoaderContext::VerifyClassLoaderContextMatch(
