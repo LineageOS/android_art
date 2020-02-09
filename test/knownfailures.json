@@ -308,12 +308,6 @@
         "variant": "interp-ac"
     },
     {
-        "tests": "596-app-images",
-        "description": "Fails on debuggable",
-        "bug" : "b/149168708",
-        "variant": "debuggable"
-    },
-    {
         "tests": "597-app-images-same-classloader",
         "description": "not generated when using the access check configuration",
         "variant": "interp-ac"
