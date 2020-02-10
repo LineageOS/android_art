@@ -270,7 +270,7 @@ function make_dex() {
   if [[ "$USE_DESUGAR" = "true" ]]; then
     local boot_class_path_list=$($ANDROID_BUILD_TOP/art/tools/bootjars.sh --$BUILD_MODE --core --path)
     for boot_class_path_element in $boot_class_path_list; do
-      d8_local_flags="$d8_local_flags --classpath $boot_class_path_element"
+      d8_local_flags="$d8_local_flags --lib $boot_class_path_element"
     done
   else
     d8_local_flags="$d8_local_flags --no-desugaring"
