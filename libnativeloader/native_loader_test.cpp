@@ -477,7 +477,7 @@ TEST_P(NativeLoaderTest_Create, UnbundledVendorApp) {
   expected_library_path = expected_library_path + ":/vendor/" LIB_DIR;
   expected_permitted_path = expected_permitted_path + ":/vendor/" LIB_DIR;
   expected_shared_libs_to_platform_ns =
-      expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
+      expected_shared_libs_to_platform_ns + ":" + llndk_libraries_vendor();
   expected_link_with_vndk_ns = true;
   SetExpectations();
   RunTest();
@@ -503,7 +503,7 @@ TEST_P(NativeLoaderTest_Create, UnbundledProductApp) {
     expected_permitted_path =
         expected_permitted_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
     expected_shared_libs_to_platform_ns =
-        expected_shared_libs_to_platform_ns + ":" + llndk_libraries();
+        expected_shared_libs_to_platform_ns + ":" + llndk_libraries_product();
     expected_link_with_vndk_ns = true;
   }
   SetExpectations();
