@@ -173,10 +173,6 @@ ObjPtr<mirror::MethodType> ResolveMethodTypeFromCode(ArtMethod* referrer, dex::P
     REQUIRES_SHARED(Locks::mutator_lock_)
     REQUIRES(!Roles::uninterruptible_);
 
-// TODO: annotalysis disabled as monitor semantics are maintained in Java code.
-inline void UnlockJniSynchronizedMethod(jobject locked, Thread* self)
-    NO_THREAD_SAFETY_ANALYSIS REQUIRES(!Roles::uninterruptible_);
-
 void CheckReferenceResult(Handle<mirror::Object> o, Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_)
     REQUIRES(!Roles::uninterruptible_);
