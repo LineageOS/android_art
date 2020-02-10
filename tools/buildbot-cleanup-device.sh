@@ -32,6 +32,9 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
   fi
 
   if adb shell test -d "$ART_TEST_CHROOT"; then
+    echo -e "${green}Remove entire /linkerconfig directory from chroot directory${nc}"
+    adb shell rm -rf "$ART_TEST_CHROOT/linkerconfig"
+
     echo -e "${green}Remove entire /system directory from chroot directory${nc}"
     adb shell rm -rf "$ART_TEST_CHROOT/system"
 

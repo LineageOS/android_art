@@ -78,10 +78,68 @@ adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
 # the configuration file expected by the linker (governed by system properties
 # of the "host system").
 
-# Default linker configuration file name/stem.
+# Default linker configuration file name/stem (before Android R).
 ld_config_file_path="/system/etc/ld.config.txt";
 # VNDK-lite linker configuration file name.
 ld_config_vndk_lite_file_path="/system/etc/ld.config.vndk_lite.txt";
+
+# Statically linked `linkerconfig` binary.
+linkerconfig_binary="/system/bin/linkerconfig"
+# Generated linker configuration file path (since Android R).
+ld_generated_config_file_path="/linkerconfig/ld.config.txt"
+# Location of the generated linker configuration file.
+ld_generated_config_file_location=$(dirname "$ld_generated_config_file_path")
+
+# Return the file name passed as argument with the VNDK version of the "host
+# system" inserted before the file name's extension, if applicable. This mimics
+# the logic used in Bionic linker's `Config::get_vndk_version_string`.
+insert_vndk_version_string() {
+  local file_path="$1"
+  local vndk_version=$(adb shell getprop "ro.vndk.version")
+  if [[ -n "$vndk_version" ]] && [[ "$vndk_version" != current ]]; then
+    # Insert the VNDK version after the last period (and add another period).
+    file_path=$(echo "$file_path" \
+      | sed -e "s/^\\(.*\\)\\.\\([^.]\\)/\\1.${vndk_version}.\\2/")
+  fi
+  echo "$file_path"
+}
+
+# Adjust the names of the following files (sync'd to the device with the
+# previous `adb push` command) depending on the VNDK version of the "host
+# system":
+#
+#   /system/etc/llndk.libraries.R.txt
+#   /system/etc/vndkcore.libraries.R.txt
+#   /system/etc/vndkprivate.libraries.R.txt
+#   /system/etc/vndksp.libraries.R.txt
+#
+# Note that `/system/etc/vndkcorevariant.libraries.txt` does not have a version
+# number.
+#
+# See `build/soong/cc/vndk.go` and `packages/modules/vndk/Android.bp` for more
+# information.
+vndk_libraries_txt_file_names="llndk.libraries.txt \
+  vndkcore.libraries.txt \
+  vndkprivate.libraries.txt \
+  vndksp.libraries.txt"
+for file_name in $vndk_libraries_txt_file_names; do
+  pattern="$(basename $file_name .txt)\*.txt"
+  adb shell find "$ART_TEST_CHROOT/system/etc" -maxdepth 1 -name "$pattern" | \
+    while read src_file_name; do
+      dst_file_name="$ART_TEST_CHROOT/system/etc/$(insert_vndk_version_string "$file_name")"
+      if [[ "$src_file_name" != "$dst_file_name" ]]; then
+        echo -e "${green}Renaming VNDK libraries file in chroot environment:" \
+          "\`$src_file_name\` -> \`$dst_file_name\`${nc}"
+        adb shell mv -f "$src_file_name" "$dst_file_name"
+      fi
+  done
+done
+
+echo -e "${green}Generating the linker configuration file on device:" \
+  "\`$ld_generated_config_file_path\`${nc}"
+# Generate the linker configuration file on device.
+adb shell chroot "$ART_TEST_CHROOT" \
+  "$linkerconfig_binary" --target "$ld_generated_config_file_location" || exit 1
 
 # Find linker configuration path name on the "host system".
 #
@@ -89,6 +147,18 @@ ld_config_vndk_lite_file_path="/system/etc/ld.config.vndk_lite.txt";
 # configuration file search (see `get_ld_config_file_path` in
 # bionic/linker/linker.cpp).
 get_ld_host_system_config_file_path() {
+  # Use generated linker config if property `sys.linker.use_generated_config` is
+  # set on "host device".
+  local use_generated_linker_config=$(adb shell getprop "sys.linker.use_generated_config" true)
+  if [[ "$use_generated_linker_config" = true ]]; then
+    if adb shell test -f "$ld_generated_config_file_path"; then
+      echo "$ld_generated_config_file_path"
+      return
+    else
+      echo -e "${yellow}Failed to find generated linker configuration from" \
+        "\`$ld_generated_config_file_path\`${nc}" >&2
+    fi
+  fi
   # Check whether the "host device" uses a VNDK-lite linker configuration.
   local vndk_lite=$(adb shell getprop "ro.vndk.lite" false)
   if [[ "$vndk_lite" = true ]]; then
@@ -98,20 +168,10 @@ get_ld_host_system_config_file_path() {
     fi
   fi
   # Check the "host device"'s VNDK version, if any.
-  local vndk_version=$(adb shell getprop "ro.vndk.version")
-  if [[ -n "$vndk_version" ]] && [[ "$vndk_version" != current ]]; then
-    # Insert the VNDK version after the last period (and add another period).
-    local ld_config_file_vdnk_path=$(echo "$ld_config_file_path" \
-      | sed -e "s/^\\(.*\\)\\.\\([^.]\\)/\\1.${vndk_version}.\\2/")
-    if adb shell test -f "$ld_config_file_vdnk_path"; then
-      echo "$ld_config_file_vdnk_path"
-      return
-    fi
-  else
-    if adb shell test -f "$ld_config_file_path"; then
-      echo "$ld_config_file_path"
-      return
-    fi
+  local ld_config_file_vndk_path=$(insert_vndk_version_string "$ld_config_file_path")
+  if adb shell test -f "$ld_config_file_vndk_path"; then
+    echo "$ld_config_file_vndk_path"
+    return
   fi
   # If all else fails, return the default linker configuration name.
   echo -e "${yellow}Cannot find linker configuration; using default path name:" \
@@ -122,29 +182,17 @@ get_ld_host_system_config_file_path() {
 
 # Find linker configuration path name on the "guest system".
 #
-# The logic here tries to "guess" the name of the linker configuration file,
-# based on the contents of the build directory.
+# Since Android R, the linker configuration file used in newly built system is
+# generated at boot time on device, and has has a fixed name
+# ("/linkerconfig/ld.config.txt").
 get_ld_guest_system_config_file_path() {
-  if [[ -z "$ANDROID_PRODUCT_OUT" ]]; then
-    echo -e "${red}ANDROID_PRODUCT_OUT environment variable is empty;" \
-      "did you forget to run \`lunch\`${nc}?" >&2
-    exit 1
-  fi
-  local ld_config_file_location="$ANDROID_PRODUCT_OUT/system/etc"
-  local ld_config_file_paths=$(find "$ld_config_file_location" -name "ld.*.txt")
-  local ld_config_file_path_number=$(wc -l <<< "$ld_config_file_paths")
-  if [[ "$ld_config_file_path_number" -eq 0 ]]; then
-    echo -e "${red}No linker configuration file found in \`$ld_config_file_location\`${nc}" >&2
-    exit 1
-  fi
-  if [[ "$ld_config_file_path_number" -gt 1 ]]; then
+  if adb shell test ! -f "$ART_TEST_CHROOT$ld_generated_config_file_path"; then
     echo -e \
-      "${red}More than one linker configuration file found in \`$ld_config_file_location\`:" \
-      "\n${ld_config_file_paths}${nc}" >&2
+      "${red}No generated linker configuration file \`$ld_generated_config_file_path\`" \
+      "found in chroot environment${nc}" >&2
     exit 1
   fi
-  # Strip the build prefix to make the path name relative to the "guest root directory".
-  sed -e "s|^$ANDROID_PRODUCT_OUT||" <<< "$ld_config_file_paths"
+  echo "$ld_generated_config_file_path"
 }
 
 # Adjust the linker configuration file (if needed).
