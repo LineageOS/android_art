@@ -68,21 +68,6 @@ adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
 # Linker configuration.
 # ---------------------
 
-# Adjust the chroot environment to have it use the system linker configuration
-# of the built target ("guest system"), located in `/system/etc` under the
-# chroot directory, even if the linker configuration flavor of the "guest
-# system" (e.g. legacy configuration) does not match the one of the "host
-# system" (e.g. full-VNDK configuration). This is done by renaming the
-# configuration file provided by the "guest system" (created according to the
-# build target configuration) within the chroot environment, using the name of
-# the configuration file expected by the linker (governed by system properties
-# of the "host system").
-
-# Default linker configuration file name/stem (before Android R).
-ld_config_file_path="/system/etc/ld.config.txt";
-# VNDK-lite linker configuration file name.
-ld_config_vndk_lite_file_path="/system/etc/ld.config.vndk_lite.txt";
-
 # Statically linked `linkerconfig` binary.
 linkerconfig_binary="/system/bin/linkerconfig"
 # Generated linker configuration file path (since Android R).
@@ -140,80 +125,6 @@ echo -e "${green}Generating the linker configuration file on device:" \
 # Generate the linker configuration file on device.
 adb shell chroot "$ART_TEST_CHROOT" \
   "$linkerconfig_binary" --target "$ld_generated_config_file_location" || exit 1
-
-# Find linker configuration path name on the "host system".
-#
-# The logic here partly replicates (and simplifies) Bionic's linker logic around
-# configuration file search (see `get_ld_config_file_path` in
-# bionic/linker/linker.cpp).
-get_ld_host_system_config_file_path() {
-  # Use generated linker config if property `sys.linker.use_generated_config` is
-  # set on "host device".
-  local use_generated_linker_config=$(adb shell getprop "sys.linker.use_generated_config" true)
-  if [[ "$use_generated_linker_config" = true ]]; then
-    if adb shell test -f "$ld_generated_config_file_path"; then
-      echo "$ld_generated_config_file_path"
-      return
-    else
-      echo -e "${yellow}Failed to find generated linker configuration from" \
-        "\`$ld_generated_config_file_path\`${nc}" >&2
-    fi
-  fi
-  # Check whether the "host device" uses a VNDK-lite linker configuration.
-  local vndk_lite=$(adb shell getprop "ro.vndk.lite" false)
-  if [[ "$vndk_lite" = true ]]; then
-    if adb shell test -f "$ld_config_vndk_lite_file_path"; then
-      echo "$ld_config_vndk_lite_file_path"
-      return
-    fi
-  fi
-  # Check the "host device"'s VNDK version, if any.
-  local ld_config_file_vndk_path=$(insert_vndk_version_string "$ld_config_file_path")
-  if adb shell test -f "$ld_config_file_vndk_path"; then
-    echo "$ld_config_file_vndk_path"
-    return
-  fi
-  # If all else fails, return the default linker configuration name.
-  echo -e "${yellow}Cannot find linker configuration; using default path name:" \
-    "\`$ld_config_file_path\`${nc}" >&2
-  echo "$ld_config_file_path"
-  return
-}
-
-# Find linker configuration path name on the "guest system".
-#
-# Since Android R, the linker configuration file used in newly built system is
-# generated at boot time on device, and has has a fixed name
-# ("/linkerconfig/ld.config.txt").
-get_ld_guest_system_config_file_path() {
-  if adb shell test ! -f "$ART_TEST_CHROOT$ld_generated_config_file_path"; then
-    echo -e \
-      "${red}No generated linker configuration file \`$ld_generated_config_file_path\`" \
-      "found in chroot environment${nc}" >&2
-    exit 1
-  fi
-  echo "$ld_generated_config_file_path"
-}
-
-# Adjust the linker configuration file (if needed).
-#
-# Check the linker configurations files on the "host system" and the "guest
-# system". If these file names are different, rename the "guest system" linker
-# configuration file within the chroot environment using the "host system"
-# linker configuration file name.
-ld_host_system_config_file_path=$(get_ld_host_system_config_file_path) || exit 1
-echo -e "${green}Determining host system linker configuration:" \
-  "\`$ld_host_system_config_file_path\`${nc}"
-ld_guest_system_config_file_path=$(get_ld_guest_system_config_file_path) || exit 1
-echo -e "${green}Determining guest system linker configuration:" \
-  "\`$ld_guest_system_config_file_path\`${nc}"
-if [[ "$ld_host_system_config_file_path" != "$ld_guest_system_config_file_path" ]]; then
-  echo -e "${green}Renaming linker configuration file in chroot environment:" \
-    "\`$ART_TEST_CHROOT$ld_guest_system_config_file_path\`" \
-    "-> \`$ART_TEST_CHROOT$ld_host_system_config_file_path\`${nc}"
-  adb shell mv -f "$ART_TEST_CHROOT$ld_guest_system_config_file_path" \
-      "$ART_TEST_CHROOT$ld_host_system_config_file_path"
-fi
 
 
 # APEX packages activation.
