@@ -1707,41 +1707,44 @@ ENTRY art_quick_generic_jni_trampoline
     sub sp, sp, #5120
 
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //    r0      r1   <= C calling convention
-    //  rSELF     r10  <= where they are
+    // (Thread*, managed_sp, reserved_area)
+    //    r0         r1            r2   <= C calling convention
+    //  rSELF       r10            sp   <= where they are
 
     mov r0, rSELF   // Thread*
-    mov r1, r10
-    blx artQuickGenericJniTrampoline  // (Thread*, sp)
+    mov r1, r10     // SP for the managed frame.
+    mov r2, sp      // reserved area for arguments and other saved data (up to managed frame)
+    blx artQuickGenericJniTrampoline  // (Thread*, managed_sp, reserved_area)
 
     // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // r0: pointer to native code, 0 on error.
-    // r1: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     r0: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Check for error (locking can throw for synchronized native method).
+    // Check for error (class init check or locking for synchronized native method can throw).
     cbz r0, .Lexception_in_native
 
-    // Release part of the alloca.
-    mov sp, r1
-
     // Save the code pointer
-    mov r12, r0
+    mov lr, r0
 
-    // Load parameters from frame into registers.
-    pop {r0-r3}
+    // Load parameters from frame into registers r0-r3 (soft-float),
+    // hidden arg (r4) for @CriticalNative and SP for out args.
+    pop {r0-r3, r4, ip}
+
+    // Apply the new SP for out args, releasing unneeded reserved area.
+    mov sp, ip
 
     // Softfloat.
     // TODO: Change to hardfloat when supported.
 
-    blx r12           // native call.
+    blx lr            // native call.
 
     // result sign extension is handled in C code
     // prepare for artQuickGenericJniEndTrampoline call
     // (Thread*, result, result_f)
     //    r0      r2,r3    stack       <= C calling convention
-    //    r11     r0,r1    r0,r1          <= where they are
+    //    r11     r0,r1    r0,r1       <= where they are
     sub sp, sp, #8 // Stack alignment.
 
     push {r0-r1}

@@ -759,6 +759,14 @@ inline bool NeedsClinitCheckBeforeCall(ArtMethod* method) {
   return method->IsStatic() && !method->IsConstructor();
 }
 
+inline HandleScope* GetGenericJniHandleScope(ArtMethod** managed_sp,
+                                             size_t num_handle_scope_references) {
+  // The HandleScope is just below the cookie and padding to align as uintptr_t.
+  const size_t offset =
+      RoundUp(HandleScope::SizeOf(num_handle_scope_references) + kJniCookieSize, sizeof(uintptr_t));
+  return reinterpret_cast<HandleScope*>(reinterpret_cast<uint8_t*>(managed_sp) - offset);
+}
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_ENTRYPOINTS_ENTRYPOINT_UTILS_INL_H_
