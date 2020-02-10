@@ -1947,10 +1947,13 @@ ENTRY art_quick_generic_jni_trampoline
     mov x1, xFP
     bl artQuickGenericJniTrampoline  // (Thread*, sp)
 
-    // The C call will have registered the complete save-frame.
+    // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // x0: pointer to native code.
+    // x0: pointer to native code, 0 on error.
     // x1: pointer to the bottom of the used area of the alloca, can restore stack till there.
+
+    // Check for error (locking can throw for synchronized native method).
+    cbz x0, .Lexception_in_native
 
     // Release part of the alloca.
     mov sp, x1

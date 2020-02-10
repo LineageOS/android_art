@@ -1928,10 +1928,14 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     pushl %fs:THREAD_SELF_OFFSET  // Pass Thread::Current().
     call SYMBOL(artQuickGenericJniTrampoline)  // (Thread*, sp)
 
-    // The C call will have registered the complete save-frame.
+    // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // eax: pointer to native code.
+    // eax: pointer to native code, 0 on error.
     // edx: pointer to the bottom of the used area of the alloca, can restore stack till there.
+
+    // Check for error (locking can throw for synchronized native method).
+    test %eax, %eax
+    jz .Lexception_in_native
 
     // Release part of the alloca.
     movl %edx, %esp
