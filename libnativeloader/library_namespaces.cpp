@@ -182,25 +182,29 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     // together in the vendor / product partition.
     const char* origin_partition;
     const char* origin_lib_path;
+    const char* llndk_libraries;
 
     switch (apk_origin) {
       case APK_ORIGIN_VENDOR:
         origin_partition = "vendor";
         origin_lib_path = kVendorLibPath;
+        llndk_libraries = llndk_libraries_vendor().c_str();
         break;
       case APK_ORIGIN_PRODUCT:
         origin_partition = "product";
         origin_lib_path = kProductLibPath;
+        llndk_libraries = llndk_libraries_product().c_str();
         break;
       default:
         origin_partition = "unknown";
         origin_lib_path = "";
+        llndk_libraries = "";
     }
     library_path = library_path + ":" + origin_lib_path;
     permitted_path = permitted_path + ":" + origin_lib_path;
 
-    // Also give access to LLNDK libraries since they are available to vendors
-    system_exposed_libraries = system_exposed_libraries + ":" + llndk_libraries().c_str();
+    // Also give access to LLNDK libraries since they are available to vendor or product
+    system_exposed_libraries = system_exposed_libraries + ":" + llndk_libraries;
 
     // Different name is useful for debugging
     namespace_name = kVendorClassloaderNamespaceName;
