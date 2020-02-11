@@ -52,17 +52,15 @@ LibraryNamespaces* g_namespaces = new LibraryNamespaces;
 android_namespace_t* FindExportedNamespace(const char* caller_location) {
   std::string location = caller_location;
   // Lots of implicit assumptions here: we expect `caller_location` to be of the form:
-  // /apex/com.android...modulename/...
+  // /apex/modulename/...
   //
   // And we extract from it 'modulename', which is the name of the linker namespace.
   if (android::base::StartsWith(location, kApexPath)) {
-    size_t slash_index = location.find_first_of('/', strlen(kApexPath));
+    size_t start_index = strlen(kApexPath);
+    size_t slash_index = location.find_first_of('/', start_index);
     LOG_ALWAYS_FATAL_IF((slash_index == std::string::npos),
                         "Error finding namespace of apex: no slash in path %s", caller_location);
-    size_t dot_index = location.find_last_of('.', slash_index);
-    LOG_ALWAYS_FATAL_IF((dot_index == std::string::npos),
-                        "Error finding namespace of apex: no dot in apex name %s", caller_location);
-    std::string name = location.substr(dot_index + 1, slash_index - dot_index - 1);
+    std::string name = location.substr(start_index, slash_index - start_index);
     android_namespace_t* boot_namespace = android_get_exported_namespace(name.c_str());
     LOG_ALWAYS_FATAL_IF((boot_namespace == nullptr),
                         "Error finding namespace of apex: no namespace called %s", name.c_str());
