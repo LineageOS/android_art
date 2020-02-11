@@ -42,9 +42,9 @@ namespace {
 // vendor and system namespaces.
 constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
-constexpr const char* kArtNamespaceName = "art";
-constexpr const char* kNeuralNetworksNamespaceName = "neuralnetworks";
-constexpr const char* kCronetNamespaceName = "cronet";
+constexpr const char* kArtNamespaceName = "com.android.art";
+constexpr const char* kNeuralNetworksNamespaceName = "com.android.neuralnetworks";
+constexpr const char* kCronetNamespaceName = "com.android.cronet";
 
 // classloader-namespace is a linker namespace that is created for the loaded
 // app. To be specific, it is created for the app classloader. When
