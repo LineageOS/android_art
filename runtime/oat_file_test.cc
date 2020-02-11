@@ -54,9 +54,9 @@ TEST_F(OatFileTest, LoadOat) {
 }
 
 TEST_F(OatFileTest, ChangingMultiDexUncompressed) {
-  std::string dex_location = GetScratchDir() + "/MultiDexUncompressed.jar";
+  std::string dex_location = GetScratchDir() + "/MultiDexUncompressedAligned.jar";
 
-  Copy(GetTestDexFileName("MultiDexUncompressed"), dex_location);
+  Copy(GetTestDexFileName("MultiDexUncompressedAligned"), dex_location);
   GenerateOatForTest(dex_location.c_str(), CompilerFilter::kQuicken);
 
   std::string oat_location;
@@ -78,7 +78,7 @@ TEST_F(OatFileTest, ChangingMultiDexUncompressed) {
   }
 
   // Now replace the source.
-  Copy(GetTestDexFileName("MainUncompressed"), dex_location);
+  Copy(GetTestDexFileName("MainUncompressedAligned"), dex_location);
 
   // And try to load again.
   std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,

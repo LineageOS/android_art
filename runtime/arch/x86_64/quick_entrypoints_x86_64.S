@@ -1738,10 +1738,14 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     movq %rbp, %rsi
     call SYMBOL(artQuickGenericJniTrampoline)  // (Thread*, sp)
 
-    // The C call will have registered the complete save-frame.
+    // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // %rax: pointer to native code.
+    // %rax: pointer to native code, 0 on error.
     // %rdx: pointer to the bottom of the used area of the alloca, can restore stack till there.
+
+    // Check for error (locking can throw for synchronized native method).
+    test %rax, %rax
+    jz .Lexception_in_native
 
     // Release part of the alloca.
     movq %rdx, %rsp

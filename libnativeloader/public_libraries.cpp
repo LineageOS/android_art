@@ -74,8 +74,8 @@ bool debuggable() {
   return debuggable;
 }
 
-std::string vndk_version_str() {
-  static std::string version = android::base::GetProperty("ro.vndk.version", "");
+std::string vndk_version_str(bool use_product_vndk) {
+  static std::string version = get_vndk_version(use_product_vndk);
   if (version != "" && version != "current") {
     return "." + version;
   }
@@ -92,13 +92,13 @@ std::string additional_public_libraries() {
   return "";
 }
 
-void InsertVndkVersionStr(std::string* file_name) {
+void InsertVndkVersionStr(std::string* file_name, bool use_product_vndk) {
   CHECK(file_name != nullptr);
   size_t insert_pos = file_name->find_last_of(".");
   if (insert_pos == std::string::npos) {
     insert_pos = file_name->length();
   }
-  file_name->insert(insert_pos, vndk_version_str());
+  file_name->insert(insert_pos, vndk_version_str(use_product_vndk));
 }
 
 const std::function<Result<bool>(const struct ConfigEntry&)> always_true =
@@ -250,9 +250,20 @@ static std::string InitExtendedPublicLibraries() {
   return android::base::Join(sonames, ':');
 }
 
-static std::string InitLlndkLibraries() {
+static std::string InitLlndkLibrariesVendor() {
   std::string config_file = kLlndkLibrariesFile;
-  InsertVndkVersionStr(&config_file);
+  InsertVndkVersionStr(&config_file, false);
+  auto sonames = ReadConfig(config_file, always_true);
+  if (!sonames) {
+    LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
+    return "";
+  }
+  return android::base::Join(*sonames, ':');
+}
+
+static std::string InitLlndkLibrariesProduct() {
+  std::string config_file = kLlndkLibrariesFile;
+  InsertVndkVersionStr(&config_file, true);
   auto sonames = ReadConfig(config_file, always_true);
   if (!sonames.ok()) {
     LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
@@ -262,8 +273,10 @@ static std::string InitLlndkLibraries() {
 }
 
 static std::string InitVndkspLibraries() {
+  // VNDK-SP is used only for vendor hals which are not available for the
+  // product partition.
   std::string config_file = kVndkLibrariesFile;
-  InsertVndkVersionStr(&config_file);
+  InsertVndkVersionStr(&config_file, false);
   auto sonames = ReadConfig(config_file, always_true);
   if (!sonames.ok()) {
     LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
@@ -317,8 +330,13 @@ const std::string& cronet_public_libraries() {
   return list;
 }
 
-const std::string& llndk_libraries() {
-  static std::string list = InitLlndkLibraries();
+const std::string& llndk_libraries_product() {
+  static std::string list = InitLlndkLibrariesProduct();
+  return list;
+}
+
+const std::string& llndk_libraries_vendor() {
+  static std::string list = InitLlndkLibrariesVendor();
   return list;
 }
 
@@ -332,6 +350,20 @@ bool is_product_vndk_version_defined() {
   return android::sysprop::VndkProperties::product_vndk_version().has_value();
 #else
   return false;
+#endif
+}
+
+std::string get_vndk_version(bool is_product_vndk) {
+#if defined(__ANDROID__)
+  if (is_product_vndk) {
+    return android::sysprop::VndkProperties::product_vndk_version().value_or("");
+  }
+  return android::sysprop::VndkProperties::vendor_vndk_version().value_or("");
+#else
+  if (is_product_vndk) {
+    return android::base::GetProperty("ro.product.vndk.version", "");
+  }
+  return android::base::GetProperty("ro.vndk.version", "");
 #endif
 }
 
