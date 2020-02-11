@@ -94,11 +94,11 @@ class Platform {
 static std::unordered_map<std::string, Platform::mock_namespace_handle> namespaces = {
     {"system", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("system"))},
     {"default", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("default"))},
-    {"art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("art"))},
+    {"com.android.art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.art"))},
     {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
-    {"neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("neuralnetworks"))},
-    {"cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("cronet"))},
+    {"com.android.neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.neuralnetworks"))},
+    {"com.android.cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.cronet"))},
 };
 
 // The actual gmock object
@@ -383,7 +383,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
           .WillOnce(Return(true));
     }
     if (expected_link_with_art_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("art"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.art"),
                                               StrEq(expected_shared_libs_to_art_ns)))
           .WillOnce(Return(true));
     }
@@ -403,12 +403,12 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
           .WillOnce(Return(true));
     }
     if (expected_link_with_neuralnetworks_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("neuralnetworks"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
           .WillOnce(Return(true));
     }
     if (expected_link_with_cronet_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("cronet"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.cronet"),
                                               StrEq(expected_shared_libs_to_cronet_ns)))
           .WillOnce(Return(true));
     }
