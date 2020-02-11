@@ -89,7 +89,12 @@ inline ObjPtr<mirror::Field> Field::CreateFromArtField(Thread* self,
   ret->SetType<kTransactionActive>(type.Get());
   ret->SetDeclaringClass<kTransactionActive>(field->GetDeclaringClass());
   ret->SetAccessFlags<kTransactionActive>(field->GetAccessFlags());
-  ret->SetDexFieldIndex<kTransactionActive>(dex_field_index);
+  auto iter_range = field->IsStatic() ? field->GetDeclaringClass()->GetSFields()
+                                      : field->GetDeclaringClass()->GetIFields();
+  auto position = std::find_if(
+      iter_range.begin(), iter_range.end(), [&](const auto& f) { return &f == field; });
+  DCHECK(position != iter_range.end());
+  ret->SetArtFieldIndex<kTransactionActive>(std::distance(iter_range.begin(), position));
   ret->SetOffset<kTransactionActive>(field->GetOffset().Int32Value());
   return ret.Get();
 }
