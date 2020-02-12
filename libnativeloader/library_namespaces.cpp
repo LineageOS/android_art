@@ -245,12 +245,12 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   // ... and link to other namespaces to allow access to some public libraries
   bool is_bridged = app_ns->IsBridged();
 
-  auto platform_ns = NativeLoaderNamespace::GetSystemNamespace(is_bridged);
-  if (!platform_ns.ok()) {
-    return platform_ns.error();
+  auto system_ns = NativeLoaderNamespace::GetSystemNamespace(is_bridged);
+  if (!system_ns.ok()) {
+    return system_ns.error();
   }
 
-  auto linked = app_ns->Link(*platform_ns, system_exposed_libraries);
+  auto linked = app_ns->Link(*system_ns, system_exposed_libraries);
   if (!linked.ok()) {
     return linked.error();
   }
@@ -298,7 +298,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   if (!vendor_public_libraries().empty()) {
     auto vendor_ns = NativeLoaderNamespace::GetExportedNamespace(kVendorNamespaceName, is_bridged);
     // when vendor_ns is not configured, link to the system namespace
-    auto target_ns = vendor_ns.ok() ? vendor_ns : platform_ns;
+    auto target_ns = vendor_ns.ok() ? vendor_ns : system_ns;
     if (target_ns.ok()) {
       linked = app_ns->Link(*target_ns, vendor_public_libraries());
       if (!linked.ok()) {
