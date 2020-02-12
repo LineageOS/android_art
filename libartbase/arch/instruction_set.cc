@@ -29,8 +29,6 @@ void InstructionSetAbort(InstructionSet isa) {
     case InstructionSet::kArm64:
     case InstructionSet::kX86:
     case InstructionSet::kX86_64:
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
     case InstructionSet::kNone:
       LOG(FATAL) << "Unsupported instruction set " << isa;
       UNREACHABLE();
@@ -50,10 +48,6 @@ const char* GetInstructionSetString(InstructionSet isa) {
       return "x86";
     case InstructionSet::kX86_64:
       return "x86_64";
-    case InstructionSet::kMips:
-      return "mips";
-    case InstructionSet::kMips64:
-      return "mips64";
     case InstructionSet::kNone:
       return "none";
   }
@@ -72,10 +66,6 @@ InstructionSet GetInstructionSetFromString(const char* isa_str) {
     return InstructionSet::kX86;
   } else if (strcmp("x86_64", isa_str) == 0) {
     return InstructionSet::kX86_64;
-  } else if (strcmp("mips", isa_str) == 0) {
-    return InstructionSet::kMips;
-  } else if (strcmp("mips64", isa_str) == 0) {
-    return InstructionSet::kMips64;
   }
 
   return InstructionSet::kNone;
@@ -93,10 +83,6 @@ size_t GetInstructionSetAlignment(InstructionSet isa) {
       // Fall-through.
     case InstructionSet::kX86_64:
       return kX86Alignment;
-    case InstructionSet::kMips:
-      // Fall-through.
-    case InstructionSet::kMips64:
-      return kMipsAlignment;
     case InstructionSet::kNone:
       LOG(FATAL) << "ISA kNone does not have alignment.";
       UNREACHABLE();
@@ -109,9 +95,6 @@ namespace instruction_set_details {
 
 static_assert(IsAligned<kPageSize>(kArmStackOverflowReservedBytes), "ARM gap not page aligned");
 static_assert(IsAligned<kPageSize>(kArm64StackOverflowReservedBytes), "ARM64 gap not page aligned");
-static_assert(IsAligned<kPageSize>(kMipsStackOverflowReservedBytes), "Mips gap not page aligned");
-static_assert(IsAligned<kPageSize>(kMips64StackOverflowReservedBytes),
-              "Mips64 gap not page aligned");
 static_assert(IsAligned<kPageSize>(kX86StackOverflowReservedBytes), "X86 gap not page aligned");
 static_assert(IsAligned<kPageSize>(kX86_64StackOverflowReservedBytes),
               "X86_64 gap not page aligned");
@@ -123,10 +106,6 @@ static_assert(IsAligned<kPageSize>(kX86_64StackOverflowReservedBytes),
 // TODO: Should we require an extra page (RoundUp(SIZE) + kPageSize)?
 static_assert(ART_FRAME_SIZE_LIMIT < kArmStackOverflowReservedBytes, "Frame size limit too large");
 static_assert(ART_FRAME_SIZE_LIMIT < kArm64StackOverflowReservedBytes,
-              "Frame size limit too large");
-static_assert(ART_FRAME_SIZE_LIMIT < kMipsStackOverflowReservedBytes,
-              "Frame size limit too large");
-static_assert(ART_FRAME_SIZE_LIMIT < kMips64StackOverflowReservedBytes,
               "Frame size limit too large");
 static_assert(ART_FRAME_SIZE_LIMIT < kX86StackOverflowReservedBytes,
               "Frame size limit too large");
