@@ -601,7 +601,7 @@ libD.so
 )";
   const std::vector<std::string> expected_result = {"libA.so", "libC.so", "libD.so"};
   Result<std::vector<std::string>> result = ParseConfig(file_content, always_true);
-  ASSERT_TRUE(result) << result.error().message();
+  ASSERT_RESULT_OK(result);
   ASSERT_EQ(expected_result, *result);
 }
 
@@ -617,7 +617,7 @@ libC.so
   const std::vector<std::string> expected_result = {"libA.so", "libC.so"};
 #endif
   Result<std::vector<std::string>> result = ParseConfig(file_content, always_true);
-  ASSERT_TRUE(result) << result.error().message();
+  ASSERT_RESULT_OK(result);
   ASSERT_EQ(expected_result, *result);
 }
 
@@ -632,7 +632,7 @@ libC.so
   Result<std::vector<std::string>> result =
       ParseConfig(file_content,
                   [](const struct ConfigEntry& entry) -> Result<bool> { return !entry.nopreload; });
-  ASSERT_TRUE(result) << result.error().message();
+  ASSERT_RESULT_OK(result);
   ASSERT_EQ(expected_result, *result);
 }
 
@@ -653,17 +653,17 @@ libE.so nopreload
   Result<std::vector<std::string>> result =
       ParseConfig(file_content,
                   [](const struct ConfigEntry& entry) -> Result<bool> { return !entry.nopreload; });
-  ASSERT_TRUE(result) << result.error().message();
+  ASSERT_RESULT_OK(result);
   ASSERT_EQ(expected_result, *result);
 }
 
 TEST(NativeLoaderConfigParser, RejectMalformed) {
-  ASSERT_FALSE(ParseConfig("libA.so 32 64", always_true));
-  ASSERT_FALSE(ParseConfig("libA.so 32 32", always_true));
-  ASSERT_FALSE(ParseConfig("libA.so 32 nopreload 64", always_true));
-  ASSERT_FALSE(ParseConfig("32 libA.so nopreload", always_true));
-  ASSERT_FALSE(ParseConfig("nopreload libA.so 32", always_true));
-  ASSERT_FALSE(ParseConfig("libA.so nopreload # comment", always_true));
+  ASSERT_FALSE(ParseConfig("libA.so 32 64", always_true).ok());
+  ASSERT_FALSE(ParseConfig("libA.so 32 32", always_true).ok());
+  ASSERT_FALSE(ParseConfig("libA.so 32 nopreload 64", always_true).ok());
+  ASSERT_FALSE(ParseConfig("32 libA.so nopreload", always_true).ok());
+  ASSERT_FALSE(ParseConfig("nopreload libA.so 32", always_true).ok());
+  ASSERT_FALSE(ParseConfig("libA.so nopreload # comment", always_true).ok());
 }
 
 }  // namespace nativeloader
