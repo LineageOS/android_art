@@ -347,8 +347,6 @@ class Checker:
 
   def check_dexpreopt(self, basename):
     dirs = self.arch_dirs_for_path('javalib')
-    if not dirs:
-      self.fail('Could not find javalib directory for any arch.')
     for dir in dirs:
       for ext in ['art', 'oat', 'vdex']:
         self.check_file('%s/%s.%s' % (dir, basename, ext))
