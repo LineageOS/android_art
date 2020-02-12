@@ -1360,29 +1360,52 @@ TEST_F(OatFileAssistantTest, DexOptStatusValues) {
 
 TEST_F(OatFileAssistantTest, GetDexOptNeededWithOutOfDateContext) {
   std::string dex_location = GetScratchDir() + "/TestDex.jar";
+  std::string odex_location = GetOdexDir() + "/TestDex.odex";
+
   std::string context_location = GetScratchDir() + "/ContextDex.jar";
   Copy(GetDexSrc1(), dex_location);
   Copy(GetDexSrc2(), context_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
-
-  std::string error_msg;
   std::string context_str = "PCL[" + context_location + "]";
+
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(context != nullptr);
   ASSERT_TRUE(context->OpenDexFiles(kRuntimeISA, ""));
+
+  std::string error_msg;
+  std::vector<std::string> args;
+  args.push_back("--dex-file=" + dex_location);
+  args.push_back("--oat-file=" + odex_location);
+  args.push_back("--class-loader-context=" + context_str);
+  ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
 
   // Update the context by overriding the jar file.
   Copy(GetMultiDexSrc2(), context_location);
   std::unique_ptr<ClassLoaderContext> updated_context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(updated_context != nullptr);
-  // DexOptNeeded should advise compilation from scratch.
-  EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
-            oat_file_assistant.GetDexOptNeeded(
-                  CompilerFilter::kDefaultCompilerFilter,
-                  /* profile_changed= */ false,
-                  /* downgrade= */ false,
-                  updated_context.get()));
+
+  {
+    OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+    // DexOptNeeded should advise compilation from scratch when the context changes.
+    EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
+              oat_file_assistant.GetDexOptNeeded(
+                    CompilerFilter::kDefaultCompilerFilter,
+                    /* profile_changed= */ false,
+                    /* downgrade= */ false,
+                    updated_context.get()));
+  }
+  {
+    OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+    // Now check that DexOptNeeded does not advise compilation if we only extracted the file.
+    args.push_back("--compiler-filter=extract");
+    ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
+    EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
+              oat_file_assistant.GetDexOptNeeded(
+                    CompilerFilter::kExtract,
+                    /* profile_changed= */ false,
+                    /* downgrade= */ false,
+                    updated_context.get()));
+  }
 }
 
 // Test that GetLocation of a dex file is the same whether the dex
