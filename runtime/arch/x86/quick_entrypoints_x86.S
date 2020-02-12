@@ -1919,30 +1919,38 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     CFI_DEF_CFA_REGISTER(ebp)
     subl LITERAL(5120), %esp
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //  (esp)    4(esp)   <= C calling convention
-    //  fs:...    ebp     <= where they are
+    // (Thread*, managed_sp, reserved_area)
+    //   (esp)    4(esp)        8(esp)  <= C calling convention
+    //  fs:...      ebp           esp   <= where they are
 
-    subl LITERAL(8), %esp         // Padding for 16B alignment.
-    pushl %ebp                    // Pass SP (to ArtMethod).
+    movl %esp, %eax
+    subl LITERAL(4), %esp         // Padding for 16B alignment.
+    pushl %eax                    // Pass reserved area.
+    pushl %ebp                    // Pass managed frame SP.
     pushl %fs:THREAD_SELF_OFFSET  // Pass Thread::Current().
     call SYMBOL(artQuickGenericJniTrampoline)  // (Thread*, sp)
 
     // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // eax: pointer to native code, 0 on error.
-    // edx: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     eax: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Check for error (locking can throw for synchronized native method).
+    // Check for error (class init check or locking for synchronized native method can throw).
     test %eax, %eax
     jz .Lexception_in_native
 
-    // Release part of the alloca.
-    movl %edx, %esp
+    // On x86 there are no registers passed, so no native call args to pop here.
 
-    // On x86 there are no registers passed, so nothing to pop here.
+    // Save code pointer in EDX.
+    movl %eax, %edx
+    // Load hidden arg (EAX) for @CriticalNative.
+    movl 16(%esp), %eax
+    // Load SP for out args, releasing unneeded reserved area.
+    movl 20(%esp), %esp
+
     // Native call.
-    call *%eax
+    call *%edx
 
     // result sign extension is handled in C code
     // prepare for artQuickGenericJniEndTrampoline call

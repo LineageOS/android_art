@@ -149,8 +149,18 @@ ObjPtr<mirror::Object> StackVisitor::GetThisObject() const {
     return nullptr;
   } else if (m->IsNative()) {
     if (cur_quick_frame_ != nullptr) {
-      HandleScope* hs = reinterpret_cast<HandleScope*>(
-          reinterpret_cast<char*>(cur_quick_frame_) + sizeof(ArtMethod*));
+      HandleScope* hs;
+      if (cur_oat_quick_method_header_ != nullptr) {
+        hs = reinterpret_cast<HandleScope*>(
+            reinterpret_cast<char*>(cur_quick_frame_) + sizeof(ArtMethod*));
+      } else {
+        // GenericJNI frames have the HandleScope under the managed frame.
+        uint32_t shorty_len;
+        const char* shorty = m->GetShorty(&shorty_len);
+        const size_t num_handle_scope_references =
+            /* this */ 1u + std::count(shorty + 1, shorty + shorty_len, 'L');
+        hs = GetGenericJniHandleScope(cur_quick_frame_, num_handle_scope_references);
+      }
       return hs->GetReference(0);
     } else {
       return cur_shadow_frame_->GetVRegReference(0);
@@ -772,21 +782,6 @@ void StackVisitor::SanityCheckFrame() const {
   }
 }
 
-// Counts the number of references in the parameter list of the corresponding method.
-// Note: Thus does _not_ include "this" for non-static methods.
-static uint32_t GetNumberOfReferenceArgsWithoutReceiver(ArtMethod* method)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  uint32_t shorty_len;
-  const char* shorty = method->GetShorty(&shorty_len);
-  uint32_t refs = 0;
-  for (uint32_t i = 1; i < shorty_len ; ++i) {
-    if (shorty[i] == 'L') {
-      refs++;
-    }
-  }
-  return refs;
-}
-
 QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
   if (cur_oat_quick_method_header_ != nullptr) {
     if (cur_oat_quick_method_header_->IsOptimized()) {
@@ -831,18 +826,9 @@ QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
           (runtime->GetJit() != nullptr &&
            runtime->GetJit()->GetCodeCache()->ContainsPc(entry_point))) << method->PrettyMethod();
   }
-  // Generic JNI frame.
-  uint32_t handle_refs = GetNumberOfReferenceArgsWithoutReceiver(method) + 1;
-  size_t scope_size = HandleScope::SizeOf(handle_refs);
-  constexpr QuickMethodFrameInfo callee_info =
-      RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
-
-  // Callee saves + handle scope + method ref + alignment
-  // Note: -sizeof(void*) since callee-save frame stores a whole method pointer.
-  size_t frame_size = RoundUp(
-      callee_info.FrameSizeInBytes() - sizeof(void*) + sizeof(ArtMethod*) + scope_size,
-      kStackAlignment);
-  return QuickMethodFrameInfo(frame_size, callee_info.CoreSpillMask(), callee_info.FpSpillMask());
+  // Generic JNI frame is just like the SaveRefsAndArgs frame.
+  // Note that HandleScope, if any, is below the frame.
+  return RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
 }
 
 template <StackVisitor::CountTransitions kCount>
