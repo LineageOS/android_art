@@ -400,7 +400,6 @@ art_cc_defaults {
         "980-redefine-object/redef_object.cc",
         "983-source-transform-verify/source_transform_art.cc",
         "1940-ddms-ext/ddm_ext.cc",
-        "1944-sudden-exit/sudden_exit.cc",
         // "1952-pop-frame-jit/pop_frame.cc",
         "1959-redefine-object-instrument/fake_redef_object.cc",
         "1960-obsolete-jit-multithread-native/native_say_hi.cc",
