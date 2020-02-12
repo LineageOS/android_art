@@ -311,14 +311,15 @@ class ExecutionState(object):
 
     self.lastVariant = variant
 
-def MatchTestCase(testCase, c1Pass):
+def MatchTestCase(testCase, c1Pass, instructionSetFeatures):
   """ Runs a test case against a C1visualizer graph dump.
 
   Raises MatchFailedException when a statement cannot be satisfied.
   """
   assert testCase.name == c1Pass.name
 
-  state = ExecutionState(c1Pass)
+  initialVariables = {"ISA_FEATURES": instructionSetFeatures}
+  state = ExecutionState(c1Pass, initialVariables)
   testStatements = testCase.statements + [ None ]
   for statement in testStatements:
     state.handle(statement)
@@ -342,7 +343,7 @@ def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
 
     Logger.startTest(testCase.name)
     try:
-      MatchTestCase(testCase, c1Pass)
+      MatchTestCase(testCase, c1Pass, c1File.instructionSetFeatures)
       Logger.testPassed()
     except MatchFailedException as e:
       lineNo = c1Pass.startLineNo + e.lineNo
