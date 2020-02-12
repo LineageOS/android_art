@@ -42,16 +42,6 @@ art_cc_defaults {
                 "linker/arm64/relative_patcher_arm64.cc",
             ],
         },
-        mips: {
-            srcs: [
-                "linker/mips/relative_patcher_mips.cc",
-            ],
-        },
-        mips64: {
-            srcs: [
-                "linker/mips64/relative_patcher_mips64.cc",
-            ],
-        },
         x86: {
             srcs: [
                 "linker/x86/relative_patcher_x86.cc",
@@ -230,16 +220,6 @@ cc_defaults {
         android_x86: {
             pgo: {
                 profile_file: "art/dex2oat_x86_x86_64.profdata",
-            },
-        },
-        android_mips64: {
-            pgo: {
-                profile_file: "art/dex2oat_mips_mips64.profdata",
-            },
-        },
-        android_mips: {
-            pgo: {
-                profile_file: "art/dex2oat_mips_mips64.profdata",
             },
         },
     },
@@ -453,17 +433,6 @@ art_cc_test {
         arm64: {
             srcs: [
                 "linker/arm64/relative_patcher_arm64_test.cc",
-            ],
-        },
-        mips: {
-            srcs: [
-                "linker/mips/relative_patcher_mips_test.cc",
-                "linker/mips/relative_patcher_mips32r6_test.cc",
-            ],
-        },
-        mips64: {
-            srcs: [
-                "linker/mips64/relative_patcher_mips64_test.cc",
             ],
         },
         x86: {
