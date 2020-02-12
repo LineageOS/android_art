@@ -893,14 +893,20 @@ bool OatFileAssistant::OatFileInfo::CompilerFilterIsOkay(
 
 bool OatFileAssistant::OatFileInfo::ClassLoaderContextIsOkay(ClassLoaderContext* context,
                                                              const std::vector<int>& context_fds) {
-  if (context == nullptr) {
-    VLOG(oat) << "ClassLoaderContext check ignored: null context";
-    return true;
-  }
-
   const OatFile* file = GetFile();
   if (file == nullptr) {
     // No oat file means we have nothing to verify.
+    return true;
+  }
+
+  if (!CompilerFilter::IsVerificationEnabled(file->GetCompilerFilter())) {
+    // If verification is not enabled we don't need to verify the class loader context and we
+    // assume it's ok.
+    return true;
+  }
+
+  if (context == nullptr) {
+    VLOG(oat) << "ClassLoaderContext check ignored: null context";
     return true;
   }
 
