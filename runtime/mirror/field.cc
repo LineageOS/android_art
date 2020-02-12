@@ -27,47 +27,31 @@ namespace mirror {
 
 void Field::VisitTarget(ReflectiveValueVisitor* v) {
   HeapReflectiveSourceInfo hrsi(kSourceJavaLangReflectField, this);
-  ArtField* orig = GetArtField(/*use_dex_cache*/false);
+  ArtField* orig = GetArtField();
   ArtField* new_value = v->VisitField(orig, hrsi);
   if (orig != new_value) {
-    SetDexFieldIndex<false>(new_value->GetDexFieldIndex());
     SetOffset<false>(new_value->GetOffset().Int32Value());
     SetDeclaringClass<false>(new_value->GetDeclaringClass());
+    auto new_range =
+        IsStatic() ? GetDeclaringClass()->GetSFields() : GetDeclaringClass()->GetIFields();
+    auto position = std::find_if(
+        new_range.begin(), new_range.end(), [&](const auto& f) { return &f == new_value; });
+    DCHECK(position != new_range.end());
+    SetArtFieldIndex<false>(std::distance(new_range.begin(), position));
     WriteBarrier::ForEveryFieldWrite(this);
   }
-  DCHECK_EQ(new_value, GetArtField(/*use_dex_cache*/false));
+  DCHECK_EQ(new_value, GetArtField());
 }
 
-ArtField* Field::GetArtField(bool use_dex_cache) {
+ArtField* Field::GetArtField() {
   ObjPtr<mirror::Class> declaring_class = GetDeclaringClass();
-  if (UNLIKELY(declaring_class->IsProxyClass())) {
-    DCHECK(IsStatic());
-    DCHECK_EQ(declaring_class->NumStaticFields(), 2U);
-    // 0 == Class[] interfaces; 1 == Class[][] throws;
-    if (GetDexFieldIndex() == 0) {
-      return &declaring_class->GetSFieldsPtr()->At(0);
-    } else {
-      DCHECK_EQ(GetDexFieldIndex(), 1U);
-      return &declaring_class->GetSFieldsPtr()->At(1);
-    }
+  DCHECK_LT(GetArtFieldIndex(),
+            IsStatic() ? declaring_class->NumStaticFields() : declaring_class->NumInstanceFields());
+  if (IsStatic()) {
+    return declaring_class->GetStaticField(GetArtFieldIndex());
+  } else {
+    return declaring_class->GetInstanceField(GetArtFieldIndex());
   }
-  const ObjPtr<mirror::DexCache> dex_cache = declaring_class->GetDexCache();
-  ArtField* art_field = use_dex_cache
-                            ? dex_cache->GetResolvedField(GetDexFieldIndex(), kRuntimePointerSize)
-                            : nullptr;
-  if (UNLIKELY(art_field == nullptr)) {
-    if (IsStatic()) {
-      art_field = declaring_class->FindDeclaredStaticField(dex_cache, GetDexFieldIndex());
-    } else {
-      art_field = declaring_class->FindInstanceField(dex_cache, GetDexFieldIndex());
-    }
-    CHECK(art_field != nullptr);
-    if (use_dex_cache) {
-      dex_cache->SetResolvedField(GetDexFieldIndex(), art_field, kRuntimePointerSize);
-    }
-  }
-  CHECK_EQ(declaring_class, art_field->GetDeclaringClass());
-  return art_field;
 }
 
 }  // namespace mirror

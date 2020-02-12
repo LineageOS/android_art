@@ -719,8 +719,8 @@ struct AccessibleObjectOffsets : public CheckOffsets<mirror::AccessibleObject> {
 struct FieldOffsets : public CheckOffsets<mirror::Field> {
   FieldOffsets() : CheckOffsets<mirror::Field>(false, "Ljava/lang/reflect/Field;") {
     addOffset(OFFSETOF_MEMBER(mirror::Field, access_flags_), "accessFlags");
+    addOffset(OFFSETOF_MEMBER(mirror::Field, art_field_index_), "artFieldIndex");
     addOffset(OFFSETOF_MEMBER(mirror::Field, declaring_class_), "declaringClass");
-    addOffset(OFFSETOF_MEMBER(mirror::Field, dex_field_index_), "dexFieldIndex");
     addOffset(OFFSETOF_MEMBER(mirror::Field, offset_), "offset");
     addOffset(OFFSETOF_MEMBER(mirror::Field, type_), "type");
   }
