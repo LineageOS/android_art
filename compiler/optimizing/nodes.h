@@ -509,7 +509,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
     return reverse_post_order_;
   }
 
-  ArrayRef<HBasicBlock* const> GetReversePostOrderSkipEntryBlock() {
+  ArrayRef<HBasicBlock* const> GetReversePostOrderSkipEntryBlock() const {
     DCHECK(GetReversePostOrder()[0] == entry_block_);
     return ArrayRef<HBasicBlock* const>(GetReversePostOrder()).SubArray(1);
   }
