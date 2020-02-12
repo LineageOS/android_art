@@ -271,6 +271,7 @@ class VariableSizedHandleScope : public BaseHandleScope {
   using LocalScopeType = FixedSizeHandleScope<kNumReferencesPerScope>;
   static_assert(sizeof(LocalScopeType) <= kMaxLocalScopeSize, "Unexpected size of LocalScopeType");
   LocalScopeType* current_scope_;
+  LocalScopeType first_scope_;
 
   DISALLOW_COPY_AND_ASSIGN(VariableSizedHandleScope);
 };
