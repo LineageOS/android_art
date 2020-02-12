@@ -211,16 +211,18 @@ inline MutableHandle<MirrorType> VariableSizedHandleScope::NewHandle(ObjPtr<Mirr
 
 inline VariableSizedHandleScope::VariableSizedHandleScope(Thread* const self)
     : BaseHandleScope(self->GetTopHandleScope()),
-      self_(self) {
-  current_scope_ = new LocalScopeType(/*link=*/ nullptr);
+      self_(self),
+      current_scope_(&first_scope_),
+      first_scope_(/*link=*/ nullptr) {
   self_->PushHandleScope(this);
 }
 
 inline VariableSizedHandleScope::~VariableSizedHandleScope() {
   BaseHandleScope* top_handle_scope = self_->PopHandleScope();
   DCHECK_EQ(top_handle_scope, this);
-  while (current_scope_ != nullptr) {
-    LocalScopeType* next = reinterpret_cast<LocalScopeType*>(current_scope_->GetLink());
+  // Don't delete first_scope_ since it is not heap allocated.
+  while (current_scope_ != &first_scope_) {
+    LocalScopeType* next = down_cast<LocalScopeType*>(current_scope_->GetLink());
     delete current_scope_;
     current_scope_ = next;
   }
