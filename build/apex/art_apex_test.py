@@ -772,9 +772,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('verifier_deps_test')
     # These tests depend on a specific code generator and are conditionally included.
     self._checker.check_optional_art_test_executable('relative_patcher_arm64_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips32r6_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips64_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips_test')
     self._checker.check_optional_art_test_executable('relative_patcher_thumb2_test')
     self._checker.check_optional_art_test_executable('relative_patcher_x86_64_test')
     self._checker.check_optional_art_test_executable('relative_patcher_x86_test')

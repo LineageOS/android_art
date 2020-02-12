@@ -405,8 +405,6 @@ static bool InstructionSetHasGenericJniStub(InstructionSet isa) {
     case InstructionSet::kArm:
     case InstructionSet::kArm64:
     case InstructionSet::kThumb2:
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
     case InstructionSet::kX86:
     case InstructionSet::kX86_64: return true;
     default: return false;
