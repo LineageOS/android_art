@@ -35,6 +35,11 @@ static inline const void* GetJniDlsymLookupStub() {
   return reinterpret_cast<const void*>(art_jni_dlsym_lookup_stub);
 }
 
+extern "C" void* art_jni_dlsym_lookup_critical_stub(JNIEnv*, jobject);
+static inline const void* GetJniDlsymLookupCriticalStub() {
+  return reinterpret_cast<const void*>(art_jni_dlsym_lookup_critical_stub);
+}
+
 // Return the address of quick stub code for handling IMT conflicts.
 extern "C" void art_quick_imt_conflict_trampoline(ArtMethod*);
 static inline const void* GetQuickImtConflictStub() {

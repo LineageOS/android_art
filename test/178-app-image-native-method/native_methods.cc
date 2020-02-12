@@ -38,6 +38,10 @@ static inline bool VerifyManyParameters(
       (i8 == 81) && (l8 == 82) && (f8 == 83.0) && (d8 == 84.0);
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_Test_nativeMethodVoid(JNIEnv*, jclass) {
+  return 42;
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_Test_nativeMethod(JNIEnv*, jclass, jint i) {
   return i;
 }
@@ -64,6 +68,10 @@ extern "C" JNIEXPORT jint JNICALL Java_Test_nativeMethodWithManyParameters(
   return ok ? 42 : -1;
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_TestFast_nativeMethodVoid(JNIEnv*, jclass) {
+  return 42;
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_TestFast_nativeMethod(JNIEnv*, jclass, jint i) {
   return i;
 }
@@ -88,6 +96,10 @@ extern "C" JNIEXPORT jint JNICALL Java_TestFast_nativeMethodWithManyParameters(
       i7, l7, f7, d7,
       i8, l8, f8, d8);
   return ok ? 42 : -1;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_TestCritical_nativeMethodVoid() {
+  return 42;
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_TestCritical_nativeMethod(jint i) {

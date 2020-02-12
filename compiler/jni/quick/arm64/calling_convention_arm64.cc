@@ -18,6 +18,7 @@
 
 #include <android-base/logging.h>
 
+#include "arch/arm64/jni_frame_arm64.h"
 #include "arch/instruction_set.h"
 #include "handle_scope-inl.h"
 #include "utils/arm64/managed_register_arm64.h"
@@ -27,28 +28,25 @@ namespace arm64 {
 
 static_assert(kArm64PointerSize == PointerSize::k64, "Unexpected ARM64 pointer size");
 
-// Up to how many float-like (float, double) args can be enregistered.
-// The rest of the args must go on the stack.
-constexpr size_t kMaxFloatOrDoubleRegisterArguments = 8u;
-// Up to how many integer-like (pointers, objects, longs, int, short, bool, etc) args can be
-// enregistered. The rest of the args must go on the stack.
-constexpr size_t kMaxIntLikeRegisterArguments = 8u;
-
 static const XRegister kXArgumentRegisters[] = {
   X0, X1, X2, X3, X4, X5, X6, X7
 };
+static_assert(kMaxIntLikeRegisterArguments == arraysize(kXArgumentRegisters));
 
 static const WRegister kWArgumentRegisters[] = {
   W0, W1, W2, W3, W4, W5, W6, W7
 };
+static_assert(kMaxIntLikeRegisterArguments == arraysize(kWArgumentRegisters));
 
 static const DRegister kDArgumentRegisters[] = {
   D0, D1, D2, D3, D4, D5, D6, D7
 };
+static_assert(kMaxFloatOrDoubleRegisterArguments == arraysize(kDArgumentRegisters));
 
 static const SRegister kSArgumentRegisters[] = {
   S0, S1, S2, S3, S4, S5, S6, S7
 };
+static_assert(kMaxFloatOrDoubleRegisterArguments == arraysize(kSArgumentRegisters));
 
 static constexpr ManagedRegister kCalleeSaveRegisters[] = {
     // Core registers.
@@ -113,10 +111,6 @@ static constexpr uint32_t CalculateFpCalleeSpillMask(const ManagedRegister (&cal
 
 static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask(kCalleeSaveRegisters);
 static constexpr uint32_t kFpCalleeSpillMask = CalculateFpCalleeSpillMask(kCalleeSaveRegisters);
-
-// The AAPCS64 requires 16-byte alignement. This is the same as the Managed ABI stack alignment.
-static constexpr size_t kAapcs64StackAlignment = 16u;
-static_assert(kAapcs64StackAlignment == kStackAlignment);
 
 static constexpr ManagedRegister kAapcs64CalleeSaveRegisters[] = {
     // Core registers.
@@ -334,7 +328,11 @@ size_t Arm64JniCallingConvention::OutArgSize() const {
   if (is_critical_native_ && (size != 0u || RequiresSmallResultTypeExtension())) {
     size += kFramePointerSize;  // We need to spill LR with the args.
   }
-  return RoundUp(size, kStackAlignment);
+  size_t out_args_size = RoundUp(size, kAapcs64StackAlignment);
+  if (UNLIKELY(IsCriticalNative())) {
+    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+  }
+  return out_args_size;
 }
 
 ArrayRef<const ManagedRegister> Arm64JniCallingConvention::CalleeSaveRegisters() const {

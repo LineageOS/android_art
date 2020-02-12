@@ -16,6 +16,11 @@
 
 #include <android-base/logging.h>
 
+#include "arch/arm/jni_frame_arm.h"
+#include "arch/arm64/jni_frame_arm64.h"
+#include "arch/instruction_set.h"
+#include "arch/x86/jni_frame_x86.h"
+#include "arch/x86_64/jni_frame_x86_64.h"
 #include "art_method-inl.h"
 #include "entrypoints/entrypoint_utils.h"
 #include "jni/java_vm_ext.h"
@@ -50,6 +55,26 @@ extern "C" const void* artFindNativeMethod(Thread* self) {
   Locks::mutator_lock_->AssertNotHeld(self);  // We come here as Native.
   ScopedObjectAccess soa(self);
   return artFindNativeMethodRunnable(self);
+}
+
+extern "C" size_t artCriticalNativeOutArgsSize(ArtMethod* method)
+    REQUIRES_SHARED(Locks::mutator_lock_)  {
+  uint32_t shorty_len;
+  const char* shorty = method->GetShorty(&shorty_len);
+  switch (kRuntimeISA) {
+    case InstructionSet::kArm:
+    case InstructionSet::kThumb2:
+      return arm::GetCriticalNativeOutArgsSize(shorty, shorty_len);
+    case InstructionSet::kArm64:
+      return arm64::GetCriticalNativeOutArgsSize(shorty, shorty_len);
+    case InstructionSet::kX86:
+      return x86::GetCriticalNativeOutArgsSize(shorty, shorty_len);
+    case InstructionSet::kX86_64:
+      return x86_64::GetCriticalNativeOutArgsSize(shorty, shorty_len);
+    default:
+      UNIMPLEMENTED(FATAL) << kRuntimeISA;
+      UNREACHABLE();
+  }
 }
 
 }  // namespace art

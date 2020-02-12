@@ -31,17 +31,17 @@ public class Main {
     new TestMissingCritical();
     makeVisiblyInitialized();  // Make sure they are visibly initialized.
 
-    // FIXME: @FastNative and @CriticalNative fail a state check in artFindNativeMethod().
     test();
     testFast();
-    // testCritical();
+    testCritical();
     testMissing();
     testMissingFast();
-    // testMissingCritical();
+    testMissingCritical();
   }
 
   static void test() {
     System.out.println("test");
+    assertEquals(42, Test.nativeMethodVoid());
     assertEquals(42, Test.nativeMethod(42));
     assertEquals(42, Test.nativeMethodWithManyParameters(
         11, 12L, 13.0f, 14.0d,
@@ -56,6 +56,7 @@ public class Main {
 
   static void testFast() {
     System.out.println("testFast");
+    assertEquals(42, TestFast.nativeMethodVoid());
     assertEquals(42, TestFast.nativeMethod(42));
     assertEquals(42, TestFast.nativeMethodWithManyParameters(
         11, 12L, 13.0f, 14.0d,
@@ -70,6 +71,7 @@ public class Main {
 
   static void testCritical() {
     System.out.println("testCritical");
+    assertEquals(42, TestCritical.nativeMethodVoid());
     assertEquals(42, TestCritical.nativeMethod(42));
     assertEquals(42, TestCritical.nativeMethodWithManyParameters(
         11, 12L, 13.0f, 14.0d,
@@ -84,6 +86,11 @@ public class Main {
 
   static void testMissing() {
     System.out.println("testMissing");
+
+    try {
+      TestMissing.nativeMethodVoid();
+      throw new Error("UNREACHABLE");
+    } catch (LinkageError expected) {}
 
     try {
       TestMissing.nativeMethod(42);
@@ -108,6 +115,11 @@ public class Main {
     System.out.println("testMissingFast");
 
     try {
+      TestMissingFast.nativeMethodVoid();
+      throw new Error("UNREACHABLE");
+    } catch (LinkageError expected) {}
+
+    try {
       TestMissingFast.nativeMethod(42);
       throw new Error("UNREACHABLE");
     } catch (LinkageError expected) {}
@@ -128,6 +140,11 @@ public class Main {
 
   static void testMissingCritical() {
     System.out.println("testMissingCritical");
+
+    try {
+      TestMissingCritical.nativeMethodVoid();
+      throw new Error("UNREACHABLE");
+    } catch (LinkageError expected) {}
 
     try {
       TestMissingCritical.nativeMethod(42);
@@ -158,6 +175,8 @@ public class Main {
 }
 
 class Test {
+  public static native int nativeMethodVoid();
+
   public static native int nativeMethod(int i);
 
   public static native int nativeMethodWithManyParameters(
@@ -172,6 +191,9 @@ class Test {
 }
 
 class TestFast {
+  @FastNative
+  public static native int nativeMethodVoid();
+
   @FastNative
   public static native int nativeMethod(int i);
 
@@ -189,6 +211,9 @@ class TestFast {
 
 class TestCritical {
   @CriticalNative
+  public static native int nativeMethodVoid();
+
+  @CriticalNative
   public static native int nativeMethod(int i);
 
   @CriticalNative
@@ -204,6 +229,8 @@ class TestCritical {
 }
 
 class TestMissing {
+  public static native int nativeMethodVoid();
+
   public static native int nativeMethod(int i);
 
   public static native int nativeMethodWithManyParameters(
@@ -218,6 +245,9 @@ class TestMissing {
 }
 
 class TestMissingFast {
+  @FastNative
+  public static native int nativeMethodVoid();
+
   @FastNative
   public static native int nativeMethod(int i);
 
@@ -234,6 +264,9 @@ class TestMissingFast {
 }
 
 class TestMissingCritical {
+  @CriticalNative
+  public static native int nativeMethodVoid();
+
   @CriticalNative
   public static native int nativeMethod(int i);
 
