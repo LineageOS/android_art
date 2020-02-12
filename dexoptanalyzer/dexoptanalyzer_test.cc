@@ -36,7 +36,7 @@ class DexoptAnalyzerTest : public DexoptTest {
   int Analyze(const std::string& dex_file,
               CompilerFilter::Filter compiler_filter,
               bool assume_profile_changed,
-              const std::string& class_loader_context) {
+              const char* class_loader_context) {
     std::string dexoptanalyzer_cmd = GetDexoptAnalyzerCmd();
     std::vector<std::string> argv_str;
     argv_str.push_back(dexoptanalyzer_cmd);
@@ -52,8 +52,8 @@ class DexoptAnalyzerTest : public DexoptTest {
     argv_str.push_back(GetClassPathOption("-Xbootclasspath-locations:", GetLibCoreDexLocations()));
     argv_str.push_back("--image=" + GetImageLocation());
     argv_str.push_back("--android-data=" + android_data_);
-    if (!class_loader_context.empty()) {
-      argv_str.push_back("--class-loader-context=" + class_loader_context);
+    if (class_loader_context != nullptr) {
+      argv_str.push_back("--class-loader-context=" + std::string(class_loader_context));
     }
 
     std::string error;
@@ -78,13 +78,19 @@ class DexoptAnalyzerTest : public DexoptTest {
               CompilerFilter::Filter compiler_filter,
               bool assume_profile_changed = false,
               bool downgrade = false,
-              const std::string& class_loader_context = "") {
+              const char* class_loader_context = "PCL[]") {
     int dexoptanalyzerResult = Analyze(
         dex_file, compiler_filter, assume_profile_changed, class_loader_context);
     dexoptanalyzerResult = DexoptanalyzerToOatFileAssistant(dexoptanalyzerResult);
     OatFileAssistant oat_file_assistant(dex_file.c_str(), kRuntimeISA, /*load_executable=*/ false);
+    std::vector<int> context_fds;
+
+    std::unique_ptr<ClassLoaderContext> context = class_loader_context == nullptr
+        ? nullptr
+        : ClassLoaderContext::Create(class_loader_context);
+
     int assistantResult = oat_file_assistant.GetDexOptNeeded(
-        compiler_filter, assume_profile_changed, downgrade);
+        compiler_filter, context.get(), context_fds, assume_profile_changed, downgrade);
     EXPECT_EQ(assistantResult, dexoptanalyzerResult);
   }
 };
@@ -100,6 +106,7 @@ TEST_F(DexoptAnalyzerTest, DexNoOat) {
   Verify(dex_location, CompilerFilter::kExtract);
   Verify(dex_location, CompilerFilter::kQuicken);
   Verify(dex_location, CompilerFilter::kSpeedProfile);
+  Verify(dex_location, CompilerFilter::kSpeed, false, false, nullptr);
 }
 
 // Case: We have a DEX file and up-to-date OAT file for it.
@@ -112,6 +119,7 @@ TEST_F(DexoptAnalyzerTest, OatUpToDate) {
   Verify(dex_location, CompilerFilter::kQuicken);
   Verify(dex_location, CompilerFilter::kExtract);
   Verify(dex_location, CompilerFilter::kEverything);
+  Verify(dex_location, CompilerFilter::kSpeed, false, false, nullptr);
 }
 
 // Case: We have a DEX file and speed-profile OAT file for it.
@@ -325,7 +333,6 @@ TEST_F(DexoptAnalyzerTest, ClassLoaderContext) {
   // Generate the odex to get the class loader context also open the dex files.
   GenerateOdexForTest(dex_location1, odex_location1, CompilerFilter::kSpeed, /* compilation_reason= */ nullptr, /* extra_args= */ { class_loader_context_option });
 
-  Verify(dex_location1, CompilerFilter::kSpeed, false, false, class_loader_context);
+  Verify(dex_location1, CompilerFilter::kSpeed, false, false, class_loader_context.c_str());
 }
-
 }  // namespace art
