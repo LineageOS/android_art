@@ -1887,7 +1887,6 @@ END art_quick_resolution_trampoline
  * | X22               |    callee save
  * | X21               |    callee save
  * | X20               |    callee save
- * | X19               |    callee save
  * | X7                |    arg7
  * | X6                |    arg6
  * | X5                |    arg5
@@ -1903,27 +1902,30 @@ END art_quick_resolution_trampoline
  * | D2                |    float arg 3
  * | D1                |    float arg 2
  * | D0                |    float arg 1
- * | Method*           | <- X0
+ * | padding           | // 8B
+ * | Method*           | <- X0 (Managed frame similar to SaveRefsAndArgs.)
  * #-------------------#
  * | local ref cookie  | // 4B
- * | handle scope size | // 4B
+ * | padding           | // 0B or 4B to align handle scope on 8B address
+ * | handle scope      | // Size depends on number of references; multiple of 4B.
  * #-------------------#
- * | JNI Call Stack    |
- * #-------------------#    <--- SP on native call
+ * | JNI Stack Args    | // Empty if all args fit into registers x0-x7, d0-d7.
+ * #-------------------#    <--- SP on native call (1)
+ * | Free scratch      |
+ * #-------------------#
+ * | SP for JNI call   | // Pointer to (1).
+ * #-------------------#
+ * | Hidden arg        | // For @CriticalNative
+ * #-------------------#
  * |                   |
  * | Stack for Regs    |    The trampoline assembly will pop these values
  * |                   |    into registers for native call
- * #-------------------#
- * | Native code ptr   |
- * #-------------------#
- * | Free scratch      |
- * #-------------------#
- * | Ptr to (1)        |    <--- SP
  * #-------------------#
  */
     /*
      * Called to do a generic JNI down-call
      */
+    .extern artQuickGenericJniTrampoline
 ENTRY art_quick_generic_jni_trampoline
     SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_X0
 
@@ -1939,31 +1941,28 @@ ENTRY art_quick_generic_jni_trampoline
     sub sp, sp, xIP0
 
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //    x0      x1   <= C calling convention
-    //   xSELF    xFP  <= where they are
+    // (Thread*, managed_sp, reserved_area)
+    //    x0         x1            x2   <= C calling convention
+    //  xSELF       xFP            sp   <= where they are
 
     mov x0, xSELF   // Thread*
-    mov x1, xFP
+    mov x1, xFP     // SP for the managed frame.
+    mov x2, sp      // reserved area for arguments and other saved data (up to managed frame)
     bl artQuickGenericJniTrampoline  // (Thread*, sp)
 
     // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // x0: pointer to native code, 0 on error.
-    // x1: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     x0: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Check for error (locking can throw for synchronized native method).
+    // Check for error (class init check or locking for synchronized native method can throw).
     cbz x0, .Lexception_in_native
-
-    // Release part of the alloca.
-    mov sp, x1
 
     // Save the code pointer
     mov xIP0, x0
 
     // Load parameters from frame into registers.
-    // TODO Check with artQuickGenericJniTrampoline.
-    //      Also, check again APPCS64 - the stack arguments are interleaved.
     ldp x0, x1, [sp]
     ldp x2, x3, [sp, #16]
     ldp x4, x5, [sp, #32]
@@ -1974,7 +1973,11 @@ ENTRY art_quick_generic_jni_trampoline
     ldp d4, d5, [sp, #96]
     ldp d6, d7, [sp, #112]
 
-    add sp, sp, #128
+    // Load hidden arg (x15) for @CriticalNative and SP for out args.
+    ldp x15, xIP1, [sp, #128]
+
+    // Apply the new SP for out args, releasing unneeded reserved area.
+    mov sp, xIP1
 
     blr xIP0        // native call.
 
