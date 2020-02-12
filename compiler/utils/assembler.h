@@ -33,7 +33,6 @@
 #include "dwarf/debug_frame_opcode_writer.h"
 #include "label.h"
 #include "managed_register.h"
-#include "mips/constants_mips.h"
 #include "offsets.h"
 #include "x86/constants_x86.h"
 #include "x86_64/constants_x86_64.h"

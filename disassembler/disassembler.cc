@@ -29,10 +29,6 @@
 # include "disassembler_arm64.h"
 #endif
 
-#if defined(ART_ENABLE_CODEGEN_mips) || defined(ART_ENABLE_CODEGEN_mips64)
-# include "disassembler_mips.h"
-#endif
-
 #if defined(ART_ENABLE_CODEGEN_x86) || defined(ART_ENABLE_CODEGEN_x86_64)
 # include "disassembler_x86.h"
 #endif
@@ -56,14 +52,6 @@ Disassembler* Disassembler::Create(InstructionSet instruction_set, DisassemblerO
 #ifdef ART_ENABLE_CODEGEN_arm64
     case InstructionSet::kArm64:
       return new arm64::DisassemblerArm64(options);
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips:
-      return new mips::DisassemblerMips(options, /* is_o32_abi= */ true);
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64:
-      return new mips::DisassemblerMips(options, /* is_o32_abi= */ false);
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
     case InstructionSet::kX86:

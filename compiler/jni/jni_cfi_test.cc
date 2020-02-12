@@ -142,14 +142,6 @@ TEST_ISA(kX86)
 TEST_ISA(kX86_64)
 #endif
 
-#ifdef ART_ENABLE_CODEGEN_mips
-TEST_ISA(kMips)
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-TEST_ISA(kMips64)
-#endif
-
 #endif  // ART_TARGET_ANDROID
 
 }  // namespace art
