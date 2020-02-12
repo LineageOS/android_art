@@ -28,8 +28,6 @@
 // specialize the code.
 #include "arch/arm/callee_save_frame_arm.h"
 #include "arch/arm64/callee_save_frame_arm64.h"
-#include "arch/mips/callee_save_frame_mips.h"
-#include "arch/mips64/callee_save_frame_mips64.h"
 #include "arch/x86/callee_save_frame_x86.h"
 #include "arch/x86_64/callee_save_frame_x86_64.h"
 
@@ -78,10 +76,6 @@ template <>
 struct CSFSelector<InstructionSet::kArm> { using type = arm::ArmCalleeSaveFrame; };
 template <>
 struct CSFSelector<InstructionSet::kArm64> { using type = arm64::Arm64CalleeSaveFrame; };
-template <>
-struct CSFSelector<InstructionSet::kMips> { using type = mips::MipsCalleeSaveFrame; };
-template <>
-struct CSFSelector<InstructionSet::kMips64> { using type = mips64::Mips64CalleeSaveFrame; };
 template <>
 struct CSFSelector<InstructionSet::kX86> { using type = x86::X86CalleeSaveFrame; };
 template <>

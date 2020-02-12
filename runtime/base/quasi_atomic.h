@@ -46,9 +46,9 @@ class Mutex;
 // quasiatomic operations that are performed on partially-overlapping
 // memory.
 class QuasiAtomic {
-  static constexpr bool NeedSwapMutexes(InstructionSet isa) {
-    // TODO - mips64 still need this for Cas64 ???
-    return (isa == InstructionSet::kMips) || (isa == InstructionSet::kMips64);
+  static constexpr bool NeedSwapMutexes(InstructionSet isa ATTRIBUTE_UNUSED) {
+    // TODO: Remove this function now that mips support has been removed.
+    return false;
   }
 
  public:

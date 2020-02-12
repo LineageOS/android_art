@@ -83,9 +83,9 @@ void UpdateReadBarrierEntrypoints(QuickEntryPoints* qpoints, bool is_active) {
   // arguments, only define ReadBarrierMarkRegX entrypoints for the
   // first 30 registers.  This limitation is not a problem on other
   // supported architectures (ARM, x86 and x86-64) either, as they
-  // have less core registers (resp. 16, 8 and 16).  (We may have to
-  // revise that design choice if read barrier support is added for
-  // MIPS and/or MIPS64.)
+  // have less core registers (resp. 16, 8 and 16).
+  // TODO: ARM/ARM64 now use introspection entrypoints. Consider
+  // reducing the number of entrypoints to those needed by x86-64.
   qpoints->pReadBarrierMarkReg00 = is_active ? art_quick_read_barrier_mark_reg00 : nullptr;
   qpoints->pReadBarrierMarkReg01 = is_active ? art_quick_read_barrier_mark_reg01 : nullptr;
   qpoints->pReadBarrierMarkReg02 = is_active ? art_quick_read_barrier_mark_reg02 : nullptr;

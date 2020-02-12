@@ -93,12 +93,7 @@ std::string CommonRuntimeTestImpl::GetAndroidTargetToolsDir(InstructionSet isa) 
       return GetAndroidToolsDir("prebuilts/gcc/linux-x86/x86",
                                 "x86_64-linux-android",
                                 "x86_64-linux-android");
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
-      return GetAndroidToolsDir("prebuilts/gcc/linux-x86/mips",
-                                "mips64el-linux-android",
-                                "mips64el-linux-android");
-    case InstructionSet::kNone:
+    default:
       break;
   }
   ADD_FAILURE() << "Invalid isa " << isa;

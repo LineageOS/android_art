@@ -91,7 +91,7 @@ extern void ReadBarrierJni(mirror::CompressedReference<mirror::Object>* handle_o
 
 // Read barrier entrypoints.
 //
-// Compilers for ARM, ARM64, MIPS, MIPS64 can insert a call to these
+// Compilers for ARM, ARM64 can insert a call to these
 // functions directly.  For x86 and x86-64, compilers need a wrapper
 // assembly function, to handle mismatch in ABI.
 
