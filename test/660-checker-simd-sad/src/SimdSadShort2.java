@@ -84,7 +84,7 @@ public class SimdSadShort2 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort2.sadCastedChar2Int(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort2.sadCastedChar2Int(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -132,7 +132,7 @@ public class SimdSadShort2 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort2.sadCastedChar2IntAlt(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort2.sadCastedChar2IntAlt(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -182,7 +182,7 @@ public class SimdSadShort2 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort2.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort2.sadCastedChar2IntAlt2(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
@@ -239,7 +239,7 @@ public class SimdSadShort2 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadShort2.sadCastedChar2Long(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadShort2.sadCastedChar2Long(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -295,7 +295,7 @@ public class SimdSadShort2 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadShort2.sadCastedChar2LongAt1(char[], char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadShort2.sadCastedChar2LongAt1(char[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none

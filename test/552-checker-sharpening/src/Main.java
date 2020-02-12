@@ -41,7 +41,7 @@ public class Main {
     return x;
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: int Main.testSimple(int) builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: int Main.testSimple(int) builder (after)
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BssEntry
 
   /// CHECK-START-X86: int Main.testSimple(int) pc_relative_fixups_x86 (before)
@@ -56,7 +56,7 @@ public class Main {
     return $noinline$foo(x);
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: int Main.testDiamond(boolean, int) builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: int Main.testDiamond(boolean, int) builder (after)
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BssEntry
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BssEntry
 
@@ -132,7 +132,7 @@ public class Main {
     return x;
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.String Main.$noinline$getBootImageString() builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.String Main.$noinline$getBootImageString() builder (after)
   /// CHECK:                LoadString load_kind:BootImageRelRo
 
   public static String $noinline$getBootImageString() {
@@ -142,7 +142,7 @@ public class Main {
     return "";
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.String Main.$noinline$getNonBootImageString() builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.String Main.$noinline$getNonBootImageString() builder (after)
   /// CHECK:                LoadString load_kind:BssEntry
 
   /// CHECK-START-X86: java.lang.String Main.$noinline$getNonBootImageString() pc_relative_fixups_x86 (before)
@@ -159,7 +159,7 @@ public class Main {
     return "non-boot-image-string";
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.Class Main.$noinline$getStringClass() builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.Class Main.$noinline$getStringClass() builder (after)
   /// CHECK:                LoadClass load_kind:BootImageRelRo class_name:java.lang.String
 
   public static Class<?> $noinline$getStringClass() {
@@ -169,7 +169,7 @@ public class Main {
     return String.class;
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.Class Main.$noinline$getOtherClass() builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.Class Main.$noinline$getOtherClass() builder (after)
   /// CHECK:                LoadClass load_kind:BssEntry class_name:Other
 
   /// CHECK-START-X86: java.lang.Class Main.$noinline$getOtherClass() pc_relative_fixups_x86 (before)
@@ -186,13 +186,13 @@ public class Main {
     return Other.class;
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.String Main.$noinline$toHexString(int) builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.String Main.$noinline$toHexString(int) builder (after)
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BootImageRelRo
   public static String $noinline$toHexString(int value) {
     return Integer.toString(value, 16);
   }
 
-  /// CHECK-START-{ARM,ARM64,MIPS,MIPS64,X86,X86_64}: java.lang.String Main.$noinline$toHexStringIndirect(int) builder (after)
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: java.lang.String Main.$noinline$toHexStringIndirect(int) builder (after)
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BssEntry
 
   /// CHECK-START-X86: java.lang.String Main.$noinline$toHexStringIndirect(int) pc_relative_fixups_x86 (before)

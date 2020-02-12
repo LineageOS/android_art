@@ -689,10 +689,6 @@ TEST(StackMapTest, PackedNativePcTest) {
       StackMap::PackNativePc(kX86InstructionAlignment, InstructionSet::kX86);
   uint32_t packed_x86_64 =
       StackMap::PackNativePc(kX86_64InstructionAlignment, InstructionSet::kX86_64);
-  uint32_t packed_mips =
-      StackMap::PackNativePc(kMipsInstructionAlignment, InstructionSet::kMips);
-  uint32_t packed_mips64 =
-      StackMap::PackNativePc(kMips64InstructionAlignment, InstructionSet::kMips64);
   EXPECT_EQ(StackMap::UnpackNativePc(packed_thumb2, InstructionSet::kThumb2),
             kThumb2InstructionAlignment);
   EXPECT_EQ(StackMap::UnpackNativePc(packed_arm64, InstructionSet::kArm64),
@@ -701,10 +697,6 @@ TEST(StackMapTest, PackedNativePcTest) {
             kX86InstructionAlignment);
   EXPECT_EQ(StackMap::UnpackNativePc(packed_x86_64, InstructionSet::kX86_64),
             kX86_64InstructionAlignment);
-  EXPECT_EQ(StackMap::UnpackNativePc(packed_mips, InstructionSet::kMips),
-            kMipsInstructionAlignment);
-  EXPECT_EQ(StackMap::UnpackNativePc(packed_mips64, InstructionSet::kMips64),
-            kMips64InstructionAlignment);
 }
 
 TEST(StackMapTest, TestDeduplicateStackMask) {
