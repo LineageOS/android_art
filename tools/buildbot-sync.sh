@@ -153,11 +153,14 @@ for file_name in $vndk_libraries_txt_file_names; do
   done
 done
 
-echo -e "${green}Generating the linker configuration file on device:" \
-  "\`$ld_generated_config_file_path\`${nc}"
-# Generate the linker configuration file on device.
+# Generate linker configuration files on device.
+echo -e "${green}Generating linker configuration files on device in" \
+  "\`$ld_generated_config_file_path\`${nc}..."
 adb shell chroot "$ART_TEST_CHROOT" \
   "$linkerconfig_binary" --target "$ld_generated_config_file_location" || exit 1
+ld_generated_config_files=$(adb shell find $ART_TEST_CHROOT/linkerconfig ! -type d | sed 's/^/  /')
+echo -e "${green}Generated linker configuration files on device:${nc}"
+echo -e "${green}$ld_generated_config_files${nc}"
 
 
 # `/data` "partition" synchronization.
