@@ -42,7 +42,6 @@
 #include "android-base/strings.h"
 
 #include "arch/instruction_set_features.h"
-#include "arch/mips/instruction_set_features_mips.h"
 #include "art_method-inl.h"
 #include "base/callee_save_type.h"
 #include "base/dumpable.h"
@@ -310,7 +309,7 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("      Example: --android-root=out/host/linux-x86");
   UsageError("      Default: $ANDROID_ROOT");
   UsageError("");
-  UsageError("  --instruction-set=(arm|arm64|mips|mips64|x86|x86_64): compile for a particular");
+  UsageError("  --instruction-set=(arm|arm64|x86|x86_64): compile for a particular");
   UsageError("      instruction set.");
   UsageError("      Example: --instruction-set=x86");
   UsageError("      Default: arm");
@@ -1011,8 +1010,6 @@ class Dex2Oat final {
       case InstructionSet::kArm64:
       case InstructionSet::kX86:
       case InstructionSet::kX86_64:
-      case InstructionSet::kMips:
-      case InstructionSet::kMips64:
         compiler_options_->implicit_null_checks_ = true;
         compiler_options_->implicit_so_checks_ = true;
         break;
