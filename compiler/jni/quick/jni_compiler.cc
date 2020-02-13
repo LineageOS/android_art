@@ -43,8 +43,6 @@
 #include "utils/assembler.h"
 #include "utils/jni_macro_assembler.h"
 #include "utils/managed_register.h"
-#include "utils/mips/managed_register_mips.h"
-#include "utils/mips64/managed_register_mips64.h"
 #include "utils/x86/managed_register_x86.h"
 
 #define __ jni_asm->
@@ -324,8 +322,7 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
   // Skip this for @CriticalNative because we didn't build a HandleScope to begin with.
   // Note that we always have outgoing param space available for at least two params.
   if (kUseReadBarrier && is_static && !is_critical_native) {
-    const bool kReadBarrierFastPath =
-        (instruction_set != InstructionSet::kMips) && (instruction_set != InstructionSet::kMips64);
+    const bool kReadBarrierFastPath = true;  // Always true after Mips codegen was removed.
     std::unique_ptr<JNIMacroLabel> skip_cold_path_label;
     if (kReadBarrierFastPath) {
       skip_cold_path_label = __ CreateLabel();
@@ -548,16 +545,6 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
     if (LIKELY(!is_critical_native)) {
       // For normal JNI, store the return value on the stack because the call to
       // JniMethodEnd will clobber the return value. It will be restored in (13).
-      if ((instruction_set == InstructionSet::kMips ||
-           instruction_set == InstructionSet::kMips64) &&
-          main_jni_conv->GetReturnType() == Primitive::kPrimDouble &&
-          return_save_location.Uint32Value() % 8 != 0) {
-        // Ensure doubles are 8-byte aligned for MIPS
-        return_save_location = FrameOffset(return_save_location.Uint32Value()
-                                               + static_cast<size_t>(kMipsPointerSize));
-        // TODO: refactor this into the JniCallingConvention code
-        // as a return value alignment requirement.
-      }
       CHECK_LT(return_save_location.Uint32Value(), current_frame_size);
       __ Store(return_save_location,
                main_jni_conv->ReturnRegister(),
