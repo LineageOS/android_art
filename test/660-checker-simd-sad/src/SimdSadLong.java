@@ -32,7 +32,7 @@ public class SimdSadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2Long(long[], long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadLong.sadLong2Long(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -94,7 +94,7 @@ public class SimdSadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadLong.sadLong2LongAlt2(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -131,7 +131,7 @@ public class SimdSadLong {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadLong.sadLong2LongAt1(long[], long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadLong.sadLong2LongAt1(long[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none

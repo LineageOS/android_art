@@ -276,17 +276,6 @@ bool InstructionSimplifierVisitor::TryCombineVecMultiplyAccumulate(HVecMul* mul)
         return false;
       }
       break;
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
-      if (!(type == DataType::Type::kUint8 ||
-            type == DataType::Type::kInt8 ||
-            type == DataType::Type::kUint16 ||
-            type == DataType::Type::kInt16 ||
-            type == DataType::Type::kInt32 ||
-            type == DataType::Type::kInt64)) {
-        return false;
-      }
-      break;
     default:
       return false;
   }

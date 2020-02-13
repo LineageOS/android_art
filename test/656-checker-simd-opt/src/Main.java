@@ -102,7 +102,7 @@ public class Main {
   /// CHECK-DAG: <<Add2>>       Add [<<Phi2>>,<<Get>>]     loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add1>>       Add [<<Phi1>>,<<L1>>]      loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.longInductionReduction(long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long Main.longInductionReduction(long[]) loop_optimization (after)
   /// CHECK-DAG: <<L0:j\d+>>    LongConstant 0               loop:none
   /// CHECK-DAG: <<L1:j\d+>>    LongConstant 1               loop:none
   /// CHECK-DAG: <<L2:j\d+>>    LongConstant 2               loop:none
@@ -131,7 +131,7 @@ public class Main {
   /// CHECK-DAG:                ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add>>        Add [<<Phi>>,<<I1>>]                loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.intVectorLongInvariant(int[], long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.intVectorLongInvariant(int[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<I0:i\d+>>    IntConstant 0                       loop:none
   /// CHECK-DAG: <<I1:i\d+>>    IntConstant 1                       loop:none
   /// CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
@@ -159,7 +159,7 @@ public class Main {
   /// CHECK-DAG:                ArraySet [{{l\d+}},<<Phi>>,<<Cnv2>>] loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Add>>        Add [<<Phi>>,<<I1>>]                 loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.longCanBeDoneWithInt(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.longCanBeDoneWithInt(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<I0:i\d+>>    IntConstant 0                       loop:none
   /// CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
   /// CHECK-DAG: <<L1:j\d+>>    LongConstant 1                      loop:none
