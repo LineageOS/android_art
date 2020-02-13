@@ -1680,27 +1680,26 @@ END_FUNCTION art_quick_resolution_trampoline
  * #-------------------#
  * | caller method...  |
  * #-------------------#
- * | Return            |
- * | Callee-Save Data  |
- * #-------------------#
- * | handle scope      |
- * #-------------------#
+ * | Return PC         |
+ * | Callee-Saves      |
+ * | padding           | // 8B
  * | Method*           |    <--- (1)
  * #-------------------#
  * | local ref cookie  | // 4B
- * | handle scope size | // 4B   TODO: roll into call stack alignment?
+ * | padding           | // 0B or 4B to align handle scope on 8B address
+ * | handle scope      | // Size depends on number of references; multiple of 4B.
  * #-------------------#
- * | JNI Call Stack    |
- * #-------------------#    <--- SP on native call
+ * | JNI Stack Args    | // Empty if all args fit into registers.
+ * #-------------------#    <--- SP on native call (1)
+ * | Free scratch      |
+ * #-------------------#
+ * | SP for JNI call   | // Pointer to (1).
+ * #-------------------#
+ * | Hidden arg        | // For @CriticalNative
+ * #-------------------#
  * |                   |
  * | Stack for Regs    |    The trampoline assembly will pop these values
  * |                   |    into registers for native call
- * #-------------------#
- * | Native code ptr   |
- * #-------------------#
- * | Free scratch      |
- * #-------------------#
- * | Ptr to (1)        |    <--- RSP
  * #-------------------#
  */
     /*
@@ -1731,24 +1730,23 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     // 5k = 5120
     subq LITERAL(5120), %rsp
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //    rdi    rsi      <= C calling convention
-    //  gs:...   rbp      <= where they are
-    movq %gs:THREAD_SELF_OFFSET, %rdi
-    movq %rbp, %rsi
+    // (Thread*, managed_sp, reserved_area)
+    //    rdi       rsi           rdx   <= C calling convention
+    //  gs:...      rbp           rsp   <= where they are
+    movq %gs:THREAD_SELF_OFFSET, %rdi  // Pass Thread::Current().
+    movq %rbp, %rsi                    // Pass managed frame SP.
+    movq %rsp, %rdx                    // Pass reserved area.
     call SYMBOL(artQuickGenericJniTrampoline)  // (Thread*, sp)
 
     // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // %rax: pointer to native code, 0 on error.
-    // %rdx: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     %rax: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Check for error (locking can throw for synchronized native method).
+    // Check for error (class init check or locking for synchronized native method can throw).
     test %rax, %rax
     jz .Lexception_in_native
-
-    // Release part of the alloca.
-    movq %rdx, %rsp
 
     // pop from the register-passing alloca region
     // what's the right layout?
@@ -1767,7 +1765,11 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     movq 40(%rsp), %xmm5
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
-    addq LITERAL(64), %rsp          // floating-point done
+
+    // Load hidden arg (r11) for @CriticalNative.
+    movq 64(%rsp), %r11
+    // Load SP for out args, releasing unneeded reserved area.
+    movq 72(%rsp), %rsp
 
     // native call
     call *%rax

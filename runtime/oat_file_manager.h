@@ -144,6 +144,7 @@ class OatFileManager {
   enum class CheckCollisionResult {
     kSkippedUnsupportedClassLoader,
     kSkippedClassLoaderContextSharedLibrary,
+    kSkippedVerificationDisabled,
     kNoCollisions,
     kPerformedHasCollisions,
   };

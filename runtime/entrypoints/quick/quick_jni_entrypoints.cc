@@ -216,8 +216,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
                                     uint32_t saved_local_ref_cookie,
                                     jvalue result,
                                     uint64_t result_f,
-                                    ArtMethod* called,
-                                    HandleScope* handle_scope)
+                                    ArtMethod* called)
     // TODO: NO_THREAD_SAFETY_ANALYSIS as GoToRunnable() is NO_THREAD_SAFETY_ANALYSIS
     NO_THREAD_SAFETY_ANALYSIS {
   bool critical_native = called->IsCriticalNative();
@@ -232,6 +231,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
   // locked object.
   if (called->IsSynchronized()) {
     DCHECK(normal_native) << "@FastNative/@CriticalNative and synchronize is not supported";
+    HandleScope* handle_scope = down_cast<HandleScope*>(self->GetTopHandleScope());
     jobject lock = handle_scope->GetHandle(0).ToJObject();
     DCHECK(lock != nullptr);
     UnlockJniSynchronizedMethod(lock, self);
@@ -242,7 +242,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
         result.l, saved_local_ref_cookie, self));
   } else {
     if (LIKELY(!critical_native)) {
-      PopLocalReferences(saved_local_ref_cookie, self);  // Invalidates `handle_scope`.
+      PopLocalReferences(saved_local_ref_cookie, self);  // Invalidates top handle scope.
     }
     switch (return_shorty_char) {
       case 'F': {

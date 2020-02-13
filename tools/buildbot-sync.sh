@@ -65,6 +65,39 @@ adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
   "$ART_TEST_CHROOT/system/etc/public.libraries.txt"
 
 
+# APEX packages activation.
+# -------------------------
+
+# Manually "activate" the flattened APEX $1 by syncing it to /apex/$2 in the
+# chroot. $2 defaults to $1.
+#
+# TODO: Handle the case of build targets using non-flatted APEX packages.
+# As a workaround, one can run `export OVERRIDE_TARGET_FLATTEN_APEX=true` before building
+# a target to have its APEX packages flattened.
+activate_apex() {
+  local src_apex=${1}
+  local dst_apex=${2:-${src_apex}}
+  echo -e "${green}Activating APEX ${src_apex} as ${dst_apex}...${nc}"
+  # We move the files from `/system/apex/${src_apex}` to `/apex/${dst_apex}` in
+  # the chroot directory, instead of simply using a symlink, as Bionic's linker
+  # relies on the real path name of a binary (e.g.
+  # `/apex/com.android.art/bin/dex2oat`) to select the linker configuration.
+  adb shell mkdir -p "$ART_TEST_CHROOT/apex"
+  adb shell rm -rf "$ART_TEST_CHROOT/apex/${dst_apex}"
+  # Use use mv instead of cp, as cp has a bug on fugu NRD90R where symbolic
+  # links get copied with odd names, eg: libcrypto.so -> /system/lib/libcrypto.soe.sort.so
+  adb shell mv "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" \
+    || exit 1
+}
+
+# "Activate" the required APEX modules.
+activate_apex com.android.art.testing com.android.art
+activate_apex com.android.i18n
+activate_apex com.android.runtime
+activate_apex com.android.tzdata
+activate_apex com.android.conscrypt
+
+
 # Linker configuration.
 # ---------------------
 
@@ -120,44 +153,14 @@ for file_name in $vndk_libraries_txt_file_names; do
   done
 done
 
-echo -e "${green}Generating the linker configuration file on device:" \
-  "\`$ld_generated_config_file_path\`${nc}"
-# Generate the linker configuration file on device.
+# Generate linker configuration files on device.
+echo -e "${green}Generating linker configuration files on device in" \
+  "\`$ld_generated_config_file_path\`${nc}..."
 adb shell chroot "$ART_TEST_CHROOT" \
   "$linkerconfig_binary" --target "$ld_generated_config_file_location" || exit 1
-
-
-# APEX packages activation.
-# -------------------------
-
-# Manually "activate" the flattened APEX $1 by syncing it to /apex/$2 in the
-# chroot. $2 defaults to $1.
-#
-# TODO: Handle the case of build targets using non-flatted APEX packages.
-# As a workaround, one can run `export OVERRIDE_TARGET_FLATTEN_APEX=true` before building
-# a target to have its APEX packages flattened.
-activate_apex() {
-  local src_apex=${1}
-  local dst_apex=${2:-${src_apex}}
-  echo -e "${green}Activating APEX ${src_apex} as ${dst_apex}...${nc}"
-  # We move the files from `/system/apex/${src_apex}` to `/apex/${dst_apex}` in
-  # the chroot directory, instead of simply using a symlink, as Bionic's linker
-  # relies on the real path name of a binary (e.g.
-  # `/apex/com.android.art/bin/dex2oat`) to select the linker configuration.
-  adb shell mkdir -p "$ART_TEST_CHROOT/apex"
-  adb shell rm -rf "$ART_TEST_CHROOT/apex/${dst_apex}"
-  # Use use mv instead of cp, as cp has a bug on fugu NRD90R where symbolic
-  # links get copied with odd names, eg: libcrypto.so -> /system/lib/libcrypto.soe.sort.so
-  adb shell mv "$ART_TEST_CHROOT/system/apex/${src_apex}" "$ART_TEST_CHROOT/apex/${dst_apex}" \
-    || exit 1
-}
-
-# "Activate" the required APEX modules.
-activate_apex com.android.art.testing com.android.art
-activate_apex com.android.i18n
-activate_apex com.android.runtime
-activate_apex com.android.tzdata
-activate_apex com.android.conscrypt
+ld_generated_config_files=$(adb shell find $ART_TEST_CHROOT/linkerconfig ! -type d | sed 's/^/  /')
+echo -e "${green}Generated linker configuration files on device:${nc}"
+echo -e "${green}$ld_generated_config_files${nc}"
 
 
 # `/data` "partition" synchronization.

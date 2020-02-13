@@ -185,16 +185,16 @@ bool OatFileAssistant::IsInBootClassPath() {
 }
 
 int OatFileAssistant::GetDexOptNeeded(CompilerFilter::Filter target,
-                                      bool profile_changed,
-                                      bool downgrade,
                                       ClassLoaderContext* class_loader_context,
-                                      const std::vector<int>& context_fds) {
+                                      const std::vector<int>& context_fds,
+                                      bool profile_changed,
+                                      bool downgrade) {
   OatFileInfo& info = GetBestInfo();
   DexOptNeeded dexopt_needed = info.GetDexOptNeeded(target,
-                                                    profile_changed,
-                                                    downgrade,
                                                     class_loader_context,
-                                                    context_fds);
+                                                    context_fds,
+                                                    profile_changed,
+                                                    downgrade);
   if (info.IsOatLocation() || dexopt_needed == kDex2OatFromScratch) {
     return dexopt_needed;
   }
@@ -797,10 +797,10 @@ OatFileAssistant::OatStatus OatFileAssistant::OatFileInfo::Status() {
 
 OatFileAssistant::DexOptNeeded OatFileAssistant::OatFileInfo::GetDexOptNeeded(
     CompilerFilter::Filter target,
-    bool profile_changed,
-    bool downgrade,
     ClassLoaderContext* context,
-    const std::vector<int>& context_fds) {
+    const std::vector<int>& context_fds,
+    bool profile_changed,
+    bool downgrade) {
 
   bool filter_okay = CompilerFilterIsOkay(target, profile_changed, downgrade);
   bool class_loader_context_okay = ClassLoaderContextIsOkay(context, context_fds);
@@ -893,15 +893,24 @@ bool OatFileAssistant::OatFileInfo::CompilerFilterIsOkay(
 
 bool OatFileAssistant::OatFileInfo::ClassLoaderContextIsOkay(ClassLoaderContext* context,
                                                              const std::vector<int>& context_fds) {
-  if (context == nullptr) {
-    VLOG(oat) << "ClassLoaderContext check ignored: null context";
-    return true;
-  }
-
   const OatFile* file = GetFile();
   if (file == nullptr) {
     // No oat file means we have nothing to verify.
     return true;
+  }
+
+  if (!CompilerFilter::IsVerificationEnabled(file->GetCompilerFilter())) {
+    // If verification is not enabled we don't need to verify the class loader context and we
+    // assume it's ok.
+    return true;
+  }
+
+
+  if (context == nullptr) {
+    // TODO(calin): stop using null for the unkown contexts.
+    // b/148494302 introduces runtime encoding for unknown context which will make this possible.
+    VLOG(oat) << "ClassLoaderContext check failed: uknown(null) context";
+    return false;
   }
 
   size_t dir_index = oat_file_assistant_->dex_location_.rfind('/');
