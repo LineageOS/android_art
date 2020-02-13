@@ -113,7 +113,7 @@ done
 
 echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
-bash -c "$make_command"
+eval "$make_command"
 
 if [[ $mode == "target" ]]; then
   # Create canonical name -> file name symlink in the symbol directory for the
@@ -132,11 +132,11 @@ if [[ $mode == "target" ]]; then
   link_name="$target_out_unstripped/apex/com.android.art"
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
   echo "Executing $link_command"
-  bash -c "$link_command"
+  eval "$link_command"
   find $ANDROID_PRODUCT_OUT/symbols/apex/com.android.runtime/bin -type f | while read target; do
     cmd="ln -sf $target  $ANDROID_PRODUCT_OUT/symbols/system/bin/$(basename $target)"
     echo "Executing $cmd"
-    bash -c "$cmd"
+    eval "$cmd"
   done
 
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
@@ -156,7 +156,7 @@ if [[ $mode == "target" ]]; then
       if [ "${src}" -nt "${dst}" ]; then
         cmd="cp -p \"${src}\" \"${dst}\""
         echo "Executing $cmd"
-        bash -c "$cmd"
+        eval "$cmd"
       fi
     done
   done
