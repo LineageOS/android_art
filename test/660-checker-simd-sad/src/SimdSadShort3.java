@@ -33,7 +33,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntParamRight(short[], short) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntParamRight(short[], short) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Param:s\d+>>  ParameterValue                 loop:none
@@ -64,7 +64,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntParamLeft(short[], short) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntParamLeft(short[], short) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Param:s\d+>>  ParameterValue                 loop:none
@@ -95,7 +95,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntConstRight(short[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntConstRight(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 32767              loop:none
@@ -126,7 +126,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntConstLeft(short[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntConstLeft(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 32767              loop:none
@@ -157,7 +157,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntInvariantRight(short[], int) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntInvariantRight(short[], int) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Conv:s\d+>>   TypeConversion [{{i\d+}}]      loop:none
@@ -189,7 +189,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntInvariantLeft(short[], int) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntInvariantLeft(short[], int) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Conv:s\d+>>   TypeConversion [{{i\d+}}]      loop:none
@@ -223,7 +223,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntCastedExprRight(short[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntCastedExprRight(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 110                loop:none
@@ -258,7 +258,7 @@ public class SimdSadShort3 {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: int SimdSadShort3.sadShort2IntCastedExprLeft(short[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntCastedExprLeft(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 110                loop:none

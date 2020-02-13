@@ -19,8 +19,6 @@
 
 #include "arch/arm/registers_arm.h"
 #include "arch/instruction_set.h"
-#include "arch/mips/registers_mips.h"
-#include "arch/mips64/registers_mips64.h"
 #include "arch/x86/registers_x86.h"
 #include "code_simulator.h"
 #include "code_simulator_container.h"
@@ -43,14 +41,6 @@
 
 #ifdef ART_ENABLE_CODEGEN_x86_64
 #include "code_generator_x86_64.h"
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips
-#include "code_generator_mips.h"
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-#include "code_generator_mips64.h"
 #endif
 
 namespace art {
@@ -343,18 +333,6 @@ CodeGenerator* create_codegen_x86(HGraph* graph, const CompilerOptions& compiler
 #ifdef ART_ENABLE_CODEGEN_x86_64
 CodeGenerator* create_codegen_x86_64(HGraph* graph, const CompilerOptions& compiler_options) {
   return new (graph->GetAllocator()) x86_64::CodeGeneratorX86_64(graph, compiler_options);
-}
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips
-CodeGenerator* create_codegen_mips(HGraph* graph, const CompilerOptions& compiler_options) {
-  return new (graph->GetAllocator()) mips::CodeGeneratorMIPS(graph, compiler_options);
-}
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-CodeGenerator* create_codegen_mips64(HGraph* graph, const CompilerOptions& compiler_options) {
-  return new (graph->GetAllocator()) mips64::CodeGeneratorMIPS64(graph, compiler_options);
 }
 #endif
 

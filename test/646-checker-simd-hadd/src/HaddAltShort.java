@@ -39,7 +39,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.halving_add_signed(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.halving_add_signed(short[], short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Int16 rounded:false loop:<<Loop>> outer_loop:none
@@ -74,7 +74,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.halving_add_unsigned(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.halving_add_unsigned(short[], short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:false loop:<<Loop>> outer_loop:none
@@ -99,7 +99,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.rounding_halving_add_signed(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.rounding_halving_add_signed(short[], short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Int16 rounded:true loop:<<Loop>> outer_loop:none
@@ -136,7 +136,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.rounding_halving_add_unsigned(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.rounding_halving_add_unsigned(short[], short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<Get1:d\d+>> VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Get2:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<HAdd:d\d+>> VecHalvingAdd [<<Get1>>,<<Get2>>] packed_type:Uint16 rounded:true loop:<<Loop>> outer_loop:none
@@ -160,7 +160,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.halving_add_signed_constant(short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.halving_add_signed_constant(short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<SMAX:i\d+>> IntConstant 32767                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<SMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
@@ -194,7 +194,7 @@ public class HaddAltShort {
   /// CHECK-DAG: <<Cnv:s\d+>>  TypeConversion [<<UShr>>]           loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Cnv>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: void HaddAltShort.halving_add_unsigned_constant(short[], short[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: void HaddAltShort.halving_add_unsigned_constant(short[], short[]) loop_optimization (after)
   /// CHECK-DAG: <<UMAX:i\d+>> IntConstant 65535                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<UMAX>>]         loop:none
   /// CHECK-DAG: <<Get:d\d+>>  VecLoad                               loop:<<Loop:B\d+>> outer_loop:none
