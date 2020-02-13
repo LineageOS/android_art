@@ -30,12 +30,6 @@ class ArmManagedRegister;
 namespace arm64 {
 class Arm64ManagedRegister;
 }  // namespace arm64
-namespace mips {
-class MipsManagedRegister;
-}  // namespace mips
-namespace mips64 {
-class Mips64ManagedRegister;
-}  // namespace mips64
 
 namespace x86 {
 class X86ManagedRegister;
@@ -56,8 +50,6 @@ class ManagedRegister : public ValueObject {
 
   constexpr arm::ArmManagedRegister AsArm() const;
   constexpr arm64::Arm64ManagedRegister AsArm64() const;
-  constexpr mips::MipsManagedRegister AsMips() const;
-  constexpr mips64::Mips64ManagedRegister AsMips64() const;
   constexpr x86::X86ManagedRegister AsX86() const;
   constexpr x86_64::X86_64ManagedRegister AsX86_64() const;
 

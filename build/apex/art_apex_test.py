@@ -753,7 +753,6 @@ class TestingTargetChecker:
     self._checker.check_optional_art_test_executable('liveness_test')
     self._checker.check_optional_art_test_executable('managed_register_arm64_test')
     self._checker.check_optional_art_test_executable('managed_register_arm_test')
-    self._checker.check_optional_art_test_executable('managed_register_mips64_test')
     self._checker.check_optional_art_test_executable('managed_register_x86_64_test')
     self._checker.check_optional_art_test_executable('managed_register_x86_test')
     self._checker.check_optional_art_test_executable('register_allocator_test')

@@ -28,14 +28,6 @@
 #include "jni/quick/arm64/calling_convention_arm64.h"
 #endif
 
-#ifdef ART_ENABLE_CODEGEN_mips
-#include "jni/quick/mips/calling_convention_mips.h"
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-#include "jni/quick/mips64/calling_convention_mips64.h"
-#endif
-
 #ifdef ART_ENABLE_CODEGEN_x86
 #include "jni/quick/x86/calling_convention_x86.h"
 #endif
@@ -66,18 +58,6 @@ std::unique_ptr<ManagedRuntimeCallingConvention> ManagedRuntimeCallingConvention
     case InstructionSet::kArm64:
       return std::unique_ptr<ManagedRuntimeCallingConvention>(
           new (allocator) arm64::Arm64ManagedRuntimeCallingConvention(
-              is_static, is_synchronized, shorty));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips:
-      return std::unique_ptr<ManagedRuntimeCallingConvention>(
-          new (allocator) mips::MipsManagedRuntimeCallingConvention(
-              is_static, is_synchronized, shorty));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64:
-      return std::unique_ptr<ManagedRuntimeCallingConvention>(
-          new (allocator) mips64::Mips64ManagedRuntimeCallingConvention(
               is_static, is_synchronized, shorty));
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
@@ -168,18 +148,6 @@ std::unique_ptr<JniCallingConvention> JniCallingConvention::Create(ArenaAllocato
     case InstructionSet::kArm64:
       return std::unique_ptr<JniCallingConvention>(
           new (allocator) arm64::Arm64JniCallingConvention(
-              is_static, is_synchronized, is_critical_native, shorty));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips:
-      return std::unique_ptr<JniCallingConvention>(
-          new (allocator) mips::MipsJniCallingConvention(
-              is_static, is_synchronized, is_critical_native, shorty));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64:
-      return std::unique_ptr<JniCallingConvention>(
-          new (allocator) mips64::Mips64JniCallingConvention(
               is_static, is_synchronized, is_critical_native, shorty));
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86

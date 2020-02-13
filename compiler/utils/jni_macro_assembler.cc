@@ -25,12 +25,6 @@
 #ifdef ART_ENABLE_CODEGEN_arm64
 #include "arm64/jni_macro_assembler_arm64.h"
 #endif
-#ifdef ART_ENABLE_CODEGEN_mips
-#include "mips/assembler_mips.h"
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-#include "mips64/assembler_mips64.h"
-#endif
 #ifdef ART_ENABLE_CODEGEN_x86
 #include "x86/jni_macro_assembler_x86.h"
 #endif
@@ -50,23 +44,14 @@ MacroAsm32UniquePtr JNIMacroAssembler<PointerSize::k32>::Create(
     ArenaAllocator* allocator,
     InstructionSet instruction_set,
     const InstructionSetFeatures* instruction_set_features) {
-#ifndef ART_ENABLE_CODEGEN_mips
+  // TODO: Remove the parameter from API (not needed after Mips target was removed).
   UNUSED(instruction_set_features);
-#endif
 
   switch (instruction_set) {
 #ifdef ART_ENABLE_CODEGEN_arm
     case InstructionSet::kArm:
     case InstructionSet::kThumb2:
       return MacroAsm32UniquePtr(new (allocator) arm::ArmVIXLJNIMacroAssembler(allocator));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips:
-      return MacroAsm32UniquePtr(new (allocator) mips::MipsAssembler(
-          allocator,
-          instruction_set_features != nullptr
-              ? instruction_set_features->AsMipsInstructionSetFeatures()
-              : nullptr));
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
     case InstructionSet::kX86:
@@ -85,22 +70,13 @@ MacroAsm64UniquePtr JNIMacroAssembler<PointerSize::k64>::Create(
     ArenaAllocator* allocator,
     InstructionSet instruction_set,
     const InstructionSetFeatures* instruction_set_features) {
-#ifndef ART_ENABLE_CODEGEN_mips64
+  // TODO: Remove the parameter from API (not needed after Mips64 target was removed).
   UNUSED(instruction_set_features);
-#endif
 
   switch (instruction_set) {
 #ifdef ART_ENABLE_CODEGEN_arm64
     case InstructionSet::kArm64:
       return MacroAsm64UniquePtr(new (allocator) arm64::Arm64JNIMacroAssembler(allocator));
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64:
-      return MacroAsm64UniquePtr(new (allocator) mips64::Mips64Assembler(
-          allocator,
-          instruction_set_features != nullptr
-              ? instruction_set_features->AsMips64InstructionSetFeatures()
-              : nullptr));
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86_64
     case InstructionSet::kX86_64:
