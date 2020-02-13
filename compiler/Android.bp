@@ -124,11 +124,6 @@ art_cc_defaults {
         mips: {
             srcs: [
                 "jni/quick/mips/calling_convention_mips.cc",
-                "optimizing/code_generator_mips.cc",
-                "optimizing/code_generator_vector_mips.cc",
-                "optimizing/instruction_simplifier_mips.cc",
-                "optimizing/intrinsics_mips.cc",
-                "optimizing/pc_relative_fixups_mips.cc",
                 "utils/mips/assembler_mips.cc",
                 "utils/mips/managed_register_mips.cc",
             ],
@@ -136,9 +131,6 @@ art_cc_defaults {
         mips64: {
             srcs: [
                 "jni/quick/mips64/calling_convention_mips64.cc",
-                "optimizing/code_generator_mips64.cc",
-                "optimizing/code_generator_vector_mips64.cc",
-                "optimizing/intrinsics_mips64.cc",
                 "utils/mips64/assembler_mips64.cc",
                 "utils/mips64/managed_register_mips64.cc",
             ],
@@ -496,7 +488,6 @@ art_cc_test {
         },
         mips: {
             srcs: [
-                "optimizing/emit_swap_mips_test.cc",
                 "utils/mips/assembler_mips_test.cc",
                 "utils/mips/assembler_mips32r5_test.cc",
                 "utils/mips/assembler_mips32r6_test.cc",

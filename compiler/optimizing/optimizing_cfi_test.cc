@@ -27,8 +27,6 @@
 #include "read_barrier_config.h"
 #include "utils/arm/assembler_arm_vixl.h"
 #include "utils/assembler.h"
-#include "utils/mips/assembler_mips.h"
-#include "utils/mips64/assembler_mips64.h"
 
 #include "optimizing/optimizing_cfi_test_expected.inc"
 
@@ -182,14 +180,6 @@ TEST_ISA(kX86)
 TEST_ISA(kX86_64)
 #endif
 
-#ifdef ART_ENABLE_CODEGEN_mips
-TEST_ISA(kMips)
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-TEST_ISA(kMips64)
-#endif
-
 #ifdef ART_ENABLE_CODEGEN_arm
 TEST_F(OptimizingCFITest, kThumb2Adjust) {
   using vixl32::r0;
@@ -212,66 +202,6 @@ TEST_F(OptimizingCFITest, kThumb2Adjust) {
 #undef __
   Finish();
   Check(InstructionSet::kThumb2, "kThumb2_adjust", expected_asm, expected_cfi);
-}
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips
-TEST_F(OptimizingCFITest, kMipsAdjust) {
-  // One NOP in delay slot, 1 << 15 NOPS have size 1 << 17 which exceeds 18-bit signed maximum.
-  static constexpr size_t kNumNops = 1u + (1u << 15);
-  std::vector<uint8_t> expected_asm(
-      expected_asm_kMips_adjust_head,
-      expected_asm_kMips_adjust_head + arraysize(expected_asm_kMips_adjust_head));
-  expected_asm.resize(expected_asm.size() + kNumNops * 4u, 0u);
-  expected_asm.insert(
-      expected_asm.end(),
-      expected_asm_kMips_adjust_tail,
-      expected_asm_kMips_adjust_tail + arraysize(expected_asm_kMips_adjust_tail));
-  std::vector<uint8_t> expected_cfi(
-      expected_cfi_kMips_adjust,
-      expected_cfi_kMips_adjust + arraysize(expected_cfi_kMips_adjust));
-  SetUpFrame(InstructionSet::kMips);
-#define __ down_cast<mips::MipsAssembler*>(GetCodeGenerator()->GetAssembler())->
-  mips::MipsLabel target;
-  __ Beqz(mips::A0, &target);
-  // Push the target out of range of BEQZ.
-  for (size_t i = 0; i != kNumNops; ++i) {
-    __ Nop();
-  }
-  __ Bind(&target);
-#undef __
-  Finish();
-  Check(InstructionSet::kMips, "kMips_adjust", expected_asm, expected_cfi);
-}
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-TEST_F(OptimizingCFITest, kMips64Adjust) {
-  // One NOP in forbidden slot, 1 << 15 NOPS have size 1 << 17 which exceeds 18-bit signed maximum.
-  static constexpr size_t kNumNops = 1u + (1u << 15);
-  std::vector<uint8_t> expected_asm(
-      expected_asm_kMips64_adjust_head,
-      expected_asm_kMips64_adjust_head + arraysize(expected_asm_kMips64_adjust_head));
-  expected_asm.resize(expected_asm.size() + kNumNops * 4u, 0u);
-  expected_asm.insert(
-      expected_asm.end(),
-      expected_asm_kMips64_adjust_tail,
-      expected_asm_kMips64_adjust_tail + arraysize(expected_asm_kMips64_adjust_tail));
-  std::vector<uint8_t> expected_cfi(
-      expected_cfi_kMips64_adjust,
-      expected_cfi_kMips64_adjust + arraysize(expected_cfi_kMips64_adjust));
-  SetUpFrame(InstructionSet::kMips64);
-#define __ down_cast<mips64::Mips64Assembler*>(GetCodeGenerator()->GetAssembler())->
-  mips64::Mips64Label target;
-  __ Beqc(mips64::A1, mips64::A2, &target);
-  // Push the target out of range of BEQC.
-  for (size_t i = 0; i != kNumNops; ++i) {
-    __ Nop();
-  }
-  __ Bind(&target);
-#undef __
-  Finish();
-  Check(InstructionSet::kMips64, "kMips64_adjust", expected_asm, expected_cfi);
 }
 #endif
 

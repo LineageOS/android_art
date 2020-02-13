@@ -24,7 +24,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zeroz(boolean[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zeroz(boolean[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:i\d+>> IntConstant 0                        loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -40,7 +40,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zerob(byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zerob(byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:i\d+>> IntConstant 0                        loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -56,7 +56,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zeroc(char[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zeroc(char[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:i\d+>> IntConstant 0                        loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -72,7 +72,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zeros(short[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zeros(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:i\d+>> IntConstant 0                        loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -88,7 +88,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zeroi(int[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zeroi(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:i\d+>> IntConstant 0                        loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -104,7 +104,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zerol(long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zerol(long[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:j\d+>> LongConstant 0                       loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -120,7 +120,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zerof(float[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zerof(float[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:f\d+>> FloatConstant 0                      loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
@@ -136,7 +136,7 @@ public class Main {
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi>>,<<Zero>>] loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: void Main.zerod(double[]) loop_optimization (after)
+  /// CHECK-START-ARM64: void Main.zerod(double[]) loop_optimization (after)
   /// CHECK-DAG: <<Zero:d\d+>> DoubleConstant 0                     loop:none
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Zero>>]        loop:none
   /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
