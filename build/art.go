@@ -251,7 +251,9 @@ func prefer32Bit(ctx android.LoadHookContext) {
 		p.Target.Host.Compile_multilib = proptools.StringPtr("prefer32")
 	}
 
-	ctx.AppendProperties(p)
+	// Prepend to make it overridable in the blueprints. Note that it doesn't work
+	// to override the property in a cc_defaults module.
+	ctx.PrependProperties(p)
 }
 
 var testMapKey = android.NewOnceKey("artTests")
