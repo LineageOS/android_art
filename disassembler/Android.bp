@@ -28,12 +28,6 @@ art_cc_defaults {
         arm64: {
             srcs: ["disassembler_arm64.cc"],
         },
-        mips: {
-            srcs: ["disassembler_mips.cc"],
-        },
-        mips64: {
-            srcs: ["disassembler_mips.cc"],
-        },
         x86: {
             srcs: ["disassembler_x86.cc"],
         },

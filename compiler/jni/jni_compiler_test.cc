@@ -355,9 +355,6 @@ class JniCompilerTest : public CommonCompilerTest {
   void StackArgsIntsFirstImpl();
   void StackArgsFloatsFirstImpl();
   void StackArgsMixedImpl();
-#if defined(__mips__) && defined(__LP64__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-  void StackArgsSignExtendedMips64Impl();
-#endif
 
   void NormalNativeImpl();
   void FastNativeImpl();
@@ -2135,44 +2132,6 @@ void JniCompilerTest::StackArgsMixedImpl() {
 }
 
 JNI_TEST_CRITICAL(StackArgsMixed)
-
-#if defined(__mips__) && defined(__LP64__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-// Function will fetch the last argument passed from caller that is now on top of the stack and
-// return it as a 8B long. That way we can test if the caller has properly sign-extended the
-// value when placing it on the stack.
-__attribute__((naked))
-jlong Java_MyClassNatives_getStackArgSignExtendedMips64(
-    JNIEnv*, jclass,                      // Arguments passed from caller
-    jint, jint, jint, jint, jint, jint,   // through regs a0 to a7.
-    jint) {                               // The last argument will be passed on the stack.
-  __asm__(
-      ".set noreorder\n\t"                // Just return and store 8 bytes from the top of the stack
-      "jr  $ra\n\t"                       // in v0 (in branch delay slot). This should be the last
-      "ld  $v0, 0($sp)\n\t");             // argument. It is a 32-bit int, but it should be sign
-                                          // extended and it occupies 64-bit location.
-}
-
-void JniCompilerTest::StackArgsSignExtendedMips64Impl() {
-  uint64_t ret;
-  SetUpForTest(true,
-               "getStackArgSignExtendedMips64",
-               "(IIIIIII)J",
-               // Don't use wrapper because this is raw assembly function.
-               reinterpret_cast<void*>(&Java_MyClassNatives_getStackArgSignExtendedMips64));
-
-  // Mips64 ABI requires that arguments passed through stack be sign-extended 8B slots.
-  // First 8 arguments are passed through registers.
-  // Final argument's value is 7. When sign-extended, higher stack bits should be 0.
-  ret = env_->CallStaticLongMethod(jklass_, jmethod_, 1, 2, 3, 4, 5, 6, 7);
-  EXPECT_EQ(High32Bits(ret), static_cast<uint32_t>(0));
-
-  // Final argument's value is -8.  When sign-extended, higher stack bits should be 0xffffffff.
-  ret = env_->CallStaticLongMethod(jklass_, jmethod_, 1, 2, 3, 4, 5, 6, -8);
-  EXPECT_EQ(High32Bits(ret), static_cast<uint32_t>(0xffffffff));
-}
-
-JNI_TEST(StackArgsSignExtendedMips64)
-#endif
 
 void Java_MyClassNatives_normalNative(JNIEnv*, jclass) {
   // Intentionally left empty.

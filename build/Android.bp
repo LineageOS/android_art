@@ -198,12 +198,6 @@ art_global_defaults {
         arm64: {
             cflags: ["-DART_ENABLE_CODEGEN_arm64"],
         },
-        mips: {
-            cflags: ["-DART_ENABLE_CODEGEN_mips"],
-        },
-        mips64: {
-            cflags: ["-DART_ENABLE_CODEGEN_mips64"],
-        },
         x86: {
             cflags: ["-DART_ENABLE_CODEGEN_x86"],
         },
