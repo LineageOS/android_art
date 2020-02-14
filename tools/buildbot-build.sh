@@ -133,8 +133,10 @@ if [[ $mode == "target" ]]; then
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
   echo "Executing $link_command"
   eval "$link_command"
-  find $ANDROID_PRODUCT_OUT/symbols/apex/com.android.runtime/bin -type f | while read target; do
-    cmd="ln -sf $target  $ANDROID_PRODUCT_OUT/symbols/system/bin/$(basename $target)"
+  # Also provide access to symbols of binaries from the Runtime (Bionic) APEX,
+  # e.g. to support debugging in GDB.
+  find "$target_out_unstripped/apex/com.android.runtime/bin" -type f | while read target; do
+    cmd="ln -sf $target $target_out_unstripped/system/bin/$(basename $target)"
     echo "Executing $cmd"
     eval "$cmd"
   done
