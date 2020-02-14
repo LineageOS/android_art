@@ -2829,22 +2829,25 @@ static void GenIsInfinite(LocationSummary* locations,
                           bool is64bit,
                           MacroAssembler* masm) {
   Operand infinity;
+  Operand tst_mask;
   Register out;
 
   if (is64bit) {
     infinity = kPositiveInfinityDouble;
+    tst_mask = MaskLeastSignificant<uint64_t>(63);
     out = XRegisterFrom(locations->Out());
   } else {
     infinity = kPositiveInfinityFloat;
+    tst_mask = MaskLeastSignificant<uint32_t>(31);
     out = WRegisterFrom(locations->Out());
   }
 
-  const Register zero = vixl::aarch64::Assembler::AppropriateZeroRegFor(out);
-
   MoveFPToInt(locations, is64bit, masm);
+  // Checks whether exponent bits are all 1 and fraction bits are all 0.
   __ Eor(out, out, infinity);
-  // We don't care about the sign bit, so shift left.
-  __ Cmp(zero, Operand(out, LSL, 1));
+  // TST bitmask is used to mask out the sign bit: either 0x7fffffff or 0x7fffffffffffffff
+  // depending on is64bit.
+  __ Tst(out, tst_mask);
   __ Cset(out, eq);
 }
 
