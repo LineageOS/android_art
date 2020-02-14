@@ -28,8 +28,6 @@
 
 #include "arm/instruction_set_features_arm.h"
 #include "arm64/instruction_set_features_arm64.h"
-#include "mips/instruction_set_features_mips.h"
-#include "mips64/instruction_set_features_mips64.h"
 #include "x86/instruction_set_features_x86.h"
 #include "x86_64/instruction_set_features_x86_64.h"
 
@@ -43,16 +41,12 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromVarian
       return ArmInstructionSetFeatures::FromVariant(variant, error_msg);
     case InstructionSet::kArm64:
       return Arm64InstructionSetFeatures::FromVariant(variant, error_msg);
-    case InstructionSet::kMips:
-      return MipsInstructionSetFeatures::FromVariant(variant, error_msg);
-    case InstructionSet::kMips64:
-      return Mips64InstructionSetFeatures::FromVariant(variant, error_msg);
     case InstructionSet::kX86:
       return X86InstructionSetFeatures::FromVariant(variant, error_msg);
     case InstructionSet::kX86_64:
       return X86_64InstructionSetFeatures::FromVariant(variant, error_msg);
 
-    case InstructionSet::kNone:
+    default:
       break;
   }
   UNIMPLEMENTED(FATAL) << isa;
@@ -70,12 +64,6 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromBitmap
     case InstructionSet::kArm64:
       result = Arm64InstructionSetFeatures::FromBitmap(bitmap);
       break;
-    case InstructionSet::kMips:
-      result = MipsInstructionSetFeatures::FromBitmap(bitmap);
-      break;
-    case InstructionSet::kMips64:
-      result = Mips64InstructionSetFeatures::FromBitmap(bitmap);
-      break;
     case InstructionSet::kX86:
       result = X86InstructionSetFeatures::FromBitmap(bitmap);
       break;
@@ -83,7 +71,6 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromBitmap
       result = X86_64InstructionSetFeatures::FromBitmap(bitmap);
       break;
 
-    case InstructionSet::kNone:
     default:
       UNIMPLEMENTED(FATAL) << isa;
       UNREACHABLE();
@@ -99,16 +86,12 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromCppDef
       return ArmInstructionSetFeatures::FromCppDefines();
     case InstructionSet::kArm64:
       return Arm64InstructionSetFeatures::FromCppDefines();
-    case InstructionSet::kMips:
-      return MipsInstructionSetFeatures::FromCppDefines();
-    case InstructionSet::kMips64:
-      return Mips64InstructionSetFeatures::FromCppDefines();
     case InstructionSet::kX86:
       return X86InstructionSetFeatures::FromCppDefines();
     case InstructionSet::kX86_64:
       return X86_64InstructionSetFeatures::FromCppDefines();
 
-    case InstructionSet::kNone:
+    default:
       break;
   }
   UNIMPLEMENTED(FATAL) << kRuntimeISA;
@@ -133,16 +116,12 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromCpuInf
       return ArmInstructionSetFeatures::FromCpuInfo();
     case InstructionSet::kArm64:
       return Arm64InstructionSetFeatures::FromCpuInfo();
-    case InstructionSet::kMips:
-      return MipsInstructionSetFeatures::FromCpuInfo();
-    case InstructionSet::kMips64:
-      return Mips64InstructionSetFeatures::FromCpuInfo();
     case InstructionSet::kX86:
       return X86InstructionSetFeatures::FromCpuInfo();
     case InstructionSet::kX86_64:
       return X86_64InstructionSetFeatures::FromCpuInfo();
 
-    case InstructionSet::kNone:
+    default:
       break;
   }
   UNIMPLEMENTED(FATAL) << kRuntimeISA;
@@ -156,16 +135,12 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromHwcap(
       return ArmInstructionSetFeatures::FromHwcap();
     case InstructionSet::kArm64:
       return Arm64InstructionSetFeatures::FromHwcap();
-    case InstructionSet::kMips:
-      return MipsInstructionSetFeatures::FromHwcap();
-    case InstructionSet::kMips64:
-      return Mips64InstructionSetFeatures::FromHwcap();
     case InstructionSet::kX86:
       return X86InstructionSetFeatures::FromHwcap();
     case InstructionSet::kX86_64:
       return X86_64InstructionSetFeatures::FromHwcap();
 
-    case InstructionSet::kNone:
+    default:
       break;
   }
   UNIMPLEMENTED(FATAL) << kRuntimeISA;
@@ -179,16 +154,12 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromAssemb
       return ArmInstructionSetFeatures::FromAssembly();
     case InstructionSet::kArm64:
       return Arm64InstructionSetFeatures::FromAssembly();
-    case InstructionSet::kMips:
-      return MipsInstructionSetFeatures::FromAssembly();
-    case InstructionSet::kMips64:
-      return Mips64InstructionSetFeatures::FromAssembly();
     case InstructionSet::kX86:
       return X86InstructionSetFeatures::FromAssembly();
     case InstructionSet::kX86_64:
       return X86_64InstructionSetFeatures::FromAssembly();
 
-    case InstructionSet::kNone:
+    default:
       break;
   }
   UNIMPLEMENTED(FATAL) << kRuntimeISA;
@@ -257,16 +228,6 @@ const ArmInstructionSetFeatures* InstructionSetFeatures::AsArmInstructionSetFeat
 const Arm64InstructionSetFeatures* InstructionSetFeatures::AsArm64InstructionSetFeatures() const {
   DCHECK_EQ(InstructionSet::kArm64, GetInstructionSet());
   return down_cast<const Arm64InstructionSetFeatures*>(this);
-}
-
-const MipsInstructionSetFeatures* InstructionSetFeatures::AsMipsInstructionSetFeatures() const {
-  DCHECK_EQ(InstructionSet::kMips, GetInstructionSet());
-  return down_cast<const MipsInstructionSetFeatures*>(this);
-}
-
-const Mips64InstructionSetFeatures* InstructionSetFeatures::AsMips64InstructionSetFeatures() const {
-  DCHECK_EQ(InstructionSet::kMips64, GetInstructionSet());
-  return down_cast<const Mips64InstructionSetFeatures*>(this);
 }
 
 const X86InstructionSetFeatures* InstructionSetFeatures::AsX86InstructionSetFeatures() const {

@@ -45,8 +45,6 @@
 #include "arch/arm64/registers_arm64.h"
 #include "arch/context.h"
 #include "arch/instruction_set_features.h"
-#include "arch/mips/registers_mips.h"
-#include "arch/mips64/registers_mips64.h"
 #include "arch/x86/registers_x86.h"
 #include "arch/x86_64/registers_x86_64.h"
 #include "art_field-inl.h"
@@ -1487,8 +1485,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
     case InstructionSet::kX86:
     case InstructionSet::kArm64:
     case InstructionSet::kX86_64:
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
       implicit_null_checks_ = true;
       // Historical note: Installing stack protection was not playing well with Valgrind.
       implicit_so_checks_ = true;
@@ -2374,8 +2370,6 @@ void Runtime::SetInstructionSet(InstructionSet instruction_set) {
       break;
     case InstructionSet::kArm:
     case InstructionSet::kArm64:
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
     case InstructionSet::kX86:
     case InstructionSet::kX86_64:
       break;

@@ -28,12 +28,6 @@
 #elif defined(__aarch64__)
 #include "arm64/context_arm64.h"
 #define RUNTIME_CONTEXT_TYPE arm64::Arm64Context
-#elif defined(__mips__) && !defined(__LP64__)
-#include "mips/context_mips.h"
-#define RUNTIME_CONTEXT_TYPE mips::MipsContext
-#elif defined(__mips__) && defined(__LP64__)
-#include "mips64/context_mips64.h"
-#define RUNTIME_CONTEXT_TYPE mips64::Mips64Context
 #elif defined(__i386__)
 #include "x86/context_x86.h"
 #define RUNTIME_CONTEXT_TYPE x86::X86Context

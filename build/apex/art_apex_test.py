@@ -890,8 +890,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('indirect_reference_table_test')
     self._checker.check_art_test_executable('instruction_set_features_arm64_test')
     self._checker.check_art_test_executable('instruction_set_features_arm_test')
-    self._checker.check_art_test_executable('instruction_set_features_mips64_test')
-    self._checker.check_art_test_executable('instruction_set_features_mips_test')
     self._checker.check_art_test_executable('instruction_set_features_test')
     self._checker.check_art_test_executable('instruction_set_features_x86_64_test')
     self._checker.check_art_test_executable('instruction_set_features_x86_test')
