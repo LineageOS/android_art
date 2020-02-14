@@ -163,13 +163,11 @@ TEST_F(ParsedOptionsTest, ParsedOptionsInstructionSet) {
     EXPECT_EQ(kRuntimeISA, isa);
   }
 
-  const char* isa_strings[] = { "arm", "arm64", "x86", "x86_64", "mips", "mips64" };
+  const char* isa_strings[] = { "arm", "arm64", "x86", "x86_64" };
   InstructionSet ISAs[] = { InstructionSet::kArm,
                             InstructionSet::kArm64,
                             InstructionSet::kX86,
-                            InstructionSet::kX86_64,
-                            InstructionSet::kMips,
-                            InstructionSet::kMips64 };
+                            InstructionSet::kX86_64 };
   static_assert(arraysize(isa_strings) == arraysize(ISAs), "Need same amount.");
 
   for (size_t i = 0; i < arraysize(isa_strings); ++i) {

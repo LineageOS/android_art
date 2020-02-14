@@ -139,90 +139,6 @@ class QuickArgumentVisitor {
   static size_t GprIndexToGprOffset(uint32_t gpr_index) {
     return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
   }
-#elif defined(__mips__) && !defined(__LP64__)
-  // The callee save frame is pointed to by SP.
-  // | argN       |  |
-  // | ...        |  |
-  // | arg4       |  |
-  // | arg3 spill |  |  Caller's frame
-  // | arg2 spill |  |
-  // | arg1 spill |  |
-  // | Method*    | ---
-  // | RA         |
-  // | ...        |    callee saves
-  // | T1         |    arg5
-  // | T0         |    arg4
-  // | A3         |    arg3
-  // | A2         |    arg2
-  // | A1         |    arg1
-  // | F19        |
-  // | F18        |    f_arg5
-  // | F17        |
-  // | F16        |    f_arg4
-  // | F15        |
-  // | F14        |    f_arg3
-  // | F13        |
-  // | F12        |    f_arg2
-  // | F11        |
-  // | F10        |    f_arg1
-  // | F9         |
-  // | F8         |    f_arg0
-  // |            |    padding
-  // | A0/Method* |  <- sp
-  static constexpr bool kSplitPairAcrossRegisterAndStack = false;
-  static constexpr bool kAlignPairRegister = true;
-  static constexpr bool kQuickSoftFloatAbi = false;
-  static constexpr bool kQuickDoubleRegAlignedFloatBackFilled = false;
-  static constexpr bool kQuickSkipOddFpRegisters = true;
-  static constexpr size_t kNumQuickGprArgs = 5;   // 5 arguments passed in GPRs.
-  static constexpr size_t kNumQuickFprArgs = 12;  // 6 arguments passed in FPRs. Floats can be
-                                                  // passed only in even numbered registers and each
-                                                  // double occupies two registers.
-  static constexpr bool kGprFprLockstep = false;
-  static size_t GprIndexToGprOffset(uint32_t gpr_index) {
-    return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
-  }
-#elif defined(__mips__) && defined(__LP64__)
-  // The callee save frame is pointed to by SP.
-  // | argN       |  |
-  // | ...        |  |
-  // | arg4       |  |
-  // | arg3 spill |  |  Caller's frame
-  // | arg2 spill |  |
-  // | arg1 spill |  |
-  // | Method*    | ---
-  // | RA         |
-  // | ...        |    callee saves
-  // | A7         |    arg7
-  // | A6         |    arg6
-  // | A5         |    arg5
-  // | A4         |    arg4
-  // | A3         |    arg3
-  // | A2         |    arg2
-  // | A1         |    arg1
-  // | F19        |    f_arg7
-  // | F18        |    f_arg6
-  // | F17        |    f_arg5
-  // | F16        |    f_arg4
-  // | F15        |    f_arg3
-  // | F14        |    f_arg2
-  // | F13        |    f_arg1
-  // | F12        |    f_arg0
-  // |            |    padding
-  // | A0/Method* |  <- sp
-  // NOTE: for Mip64, when A0 is skipped, F12 is also skipped.
-  static constexpr bool kSplitPairAcrossRegisterAndStack = false;
-  static constexpr bool kAlignPairRegister = false;
-  static constexpr bool kQuickSoftFloatAbi = false;
-  static constexpr bool kQuickDoubleRegAlignedFloatBackFilled = false;
-  static constexpr bool kQuickSkipOddFpRegisters = false;
-  static constexpr size_t kNumQuickGprArgs = 7;  // 7 arguments passed in GPRs.
-  static constexpr size_t kNumQuickFprArgs = 7;  // 7 arguments passed in FPRs.
-  static constexpr bool kGprFprLockstep = true;
-
-  static size_t GprIndexToGprOffset(uint32_t gpr_index) {
-    return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
-  }
 #elif defined(__i386__)
   // The callee save frame is pointed to by SP.
   // | argN        |  |
@@ -520,15 +436,10 @@ class QuickArgumentVisitor {
         case Primitive::kPrimLong:
           if (kQuickSoftFloatAbi || (cur_type_ == Primitive::kPrimLong)) {
             if (cur_type_ == Primitive::kPrimLong &&
-#if defined(__mips__) && !defined(__LP64__)
-                (gpr_index_ == 0 || gpr_index_ == 2) &&
-#else
                 gpr_index_ == 0 &&
-#endif
                 kAlignPairRegister) {
-              // Currently, this is only for ARM and MIPS, where we align long parameters with
-              // even-numbered registers by skipping R1 (on ARM) or A1(A3) (on MIPS) and using
-              // R2 (on ARM) or A2(T0) (on MIPS) instead.
+              // Currently, this is only for ARM, where we align long parameters with
+              // even-numbered registers by skipping R1 and using R2 instead.
               IncGprIndex();
             }
             is_split_long_or_double_ = (GetBytesPerGprSpillLocation(kRuntimeISA) == 4) &&
@@ -1570,31 +1481,6 @@ template<class T> class BuildNativeCallFrameStateMachine {
   static constexpr bool kMultiGPRegistersWidened = false;
   static constexpr bool kAlignLongOnStack = false;
   static constexpr bool kAlignDoubleOnStack = false;
-#elif defined(__mips__) && !defined(__LP64__)
-  static constexpr bool kNativeSoftFloatAbi = true;  // This is a hard float ABI.
-  static constexpr size_t kNumNativeGprArgs = 4;  // 4 arguments passed in GPRs.
-  static constexpr size_t kNumNativeFprArgs = 0;  // 0 arguments passed in FPRs.
-
-  static constexpr size_t kRegistersNeededForLong = 2;
-  static constexpr size_t kRegistersNeededForDouble = 2;
-  static constexpr bool kMultiRegistersAligned = true;
-  static constexpr bool kMultiFPRegistersWidened = true;
-  static constexpr bool kMultiGPRegistersWidened = false;
-  static constexpr bool kAlignLongOnStack = true;
-  static constexpr bool kAlignDoubleOnStack = true;
-#elif defined(__mips__) && defined(__LP64__)
-  // Let the code prepare GPRs only and we will load the FPRs with same data.
-  static constexpr bool kNativeSoftFloatAbi = true;
-  static constexpr size_t kNumNativeGprArgs = 8;
-  static constexpr size_t kNumNativeFprArgs = 0;
-
-  static constexpr size_t kRegistersNeededForLong = 1;
-  static constexpr size_t kRegistersNeededForDouble = 1;
-  static constexpr bool kMultiRegistersAligned = false;
-  static constexpr bool kMultiFPRegistersWidened = false;
-  static constexpr bool kMultiGPRegistersWidened = true;
-  static constexpr bool kAlignLongOnStack = false;
-  static constexpr bool kAlignDoubleOnStack = false;
 #elif defined(__i386__)
   // TODO: Check these!
   static constexpr bool kNativeSoftFloatAbi = false;  // Not using int registers for fp
@@ -2353,41 +2239,6 @@ extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
   // FIXME: This is broken for @CriticalNative as the art_jni_dlsym_lookup_stub
   // does not handle that case. Calls from compiled stubs are also broken.
   void const* nativeCode = called->GetEntryPointFromJni();
-
-#if defined(__mips__) && !defined(__LP64__)
-  // On MIPS32 if the first two arguments are floating-point, we need to know their types
-  // so that art_quick_generic_jni_trampoline can correctly extract them from the stack
-  // and load into floating-point registers.
-  // Possible arrangements of first two floating-point arguments on the stack (32-bit FPU
-  // view):
-  // (1)
-  //  |     DOUBLE    |     DOUBLE    | other args, if any
-  //  |  F12  |  F13  |  F14  |  F15  |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (2)
-  //  |     DOUBLE    | FLOAT | (PAD) | other args, if any
-  //  |  F12  |  F13  |  F14  |       |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (3)
-  //  | FLOAT | (PAD) |     DOUBLE    | other args, if any
-  //  |  F12  |       |  F14  |  F15  |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (4)
-  //  | FLOAT | FLOAT | other args, if any
-  //  |  F12  |  F14  |
-  //  |  SP+0 |  SP+4 | SP+8
-  // As you can see, only the last case (4) is special. In all others we can just
-  // load F12/F13 and F14/F15 in the same manner.
-  // Set bit 0 of the native code address to 1 in this case (valid code addresses
-  // are always a multiple of 4 on MIPS32, so we have 2 spare bits available).
-  if (nativeCode != nullptr &&
-      shorty != nullptr &&
-      shorty_len >= 3 &&
-      shorty[1] == 'F' &&
-      shorty[2] == 'F') {
-    nativeCode = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(nativeCode) | 1);
-  }
-#endif
 
   VLOG(third_party_jni) << "GenericJNI: "
                         << called->PrettyMethod()
