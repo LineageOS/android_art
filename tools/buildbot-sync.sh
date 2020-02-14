@@ -25,6 +25,8 @@ if [ -t 1 ]; then
   nc='\033[0m'
 fi
 
+# Setup as root, as some actions performed here require it.
+adb root
 adb wait-for-device
 
 if [[ -z "$ANDROID_BUILD_TOP" ]]; then
