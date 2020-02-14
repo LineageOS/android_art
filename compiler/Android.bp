@@ -121,28 +121,6 @@ art_cc_defaults {
                 "utils/arm64/managed_register_arm64.cc",
             ],
         },
-        mips: {
-            srcs: [
-                "jni/quick/mips/calling_convention_mips.cc",
-                "optimizing/code_generator_mips.cc",
-                "optimizing/code_generator_vector_mips.cc",
-                "optimizing/instruction_simplifier_mips.cc",
-                "optimizing/intrinsics_mips.cc",
-                "optimizing/pc_relative_fixups_mips.cc",
-                "utils/mips/assembler_mips.cc",
-                "utils/mips/managed_register_mips.cc",
-            ],
-        },
-        mips64: {
-            srcs: [
-                "jni/quick/mips64/calling_convention_mips64.cc",
-                "optimizing/code_generator_mips64.cc",
-                "optimizing/code_generator_vector_mips64.cc",
-                "optimizing/intrinsics_mips64.cc",
-                "utils/mips64/assembler_mips64.cc",
-                "utils/mips64/managed_register_mips64.cc",
-            ],
-        },
         x86: {
             srcs: [
                 "jni/quick/x86/calling_convention_x86.cc",
@@ -202,8 +180,6 @@ gensrcs {
         "optimizing/optimizing_compiler_stats.h",
 
         "utils/arm/constants_arm.h",
-        "utils/mips/assembler_mips.h",
-        "utils/mips64/assembler_mips64.h",
     ],
     output_extension: "operator_out.cc",
 }
@@ -426,15 +402,6 @@ art_cc_test {
                 "utils/arm64/managed_register_arm64_test.cc",
             ],
         },
-        mips: {
-            srcs: [
-            ],
-        },
-        mips64: {
-            srcs: [
-                "utils/mips64/managed_register_mips64_test.cc",
-            ],
-        },
         x86: {
             srcs: [
                 "utils/x86/managed_register_x86_test.cc",
@@ -492,19 +459,6 @@ art_cc_test {
         arm: {
             srcs: [
                 "utils/assembler_thumb_test.cc",
-            ],
-        },
-        mips: {
-            srcs: [
-                "optimizing/emit_swap_mips_test.cc",
-                "utils/mips/assembler_mips_test.cc",
-                "utils/mips/assembler_mips32r5_test.cc",
-                "utils/mips/assembler_mips32r6_test.cc",
-            ],
-        },
-        mips64: {
-            srcs: [
-                "utils/mips64/assembler_mips64_test.cc",
             ],
         },
         x86: {

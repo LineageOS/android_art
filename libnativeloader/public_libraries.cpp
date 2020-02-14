@@ -254,7 +254,7 @@ static std::string InitLlndkLibrariesVendor() {
   std::string config_file = kLlndkLibrariesFile;
   InsertVndkVersionStr(&config_file, false);
   auto sonames = ReadConfig(config_file, always_true);
-  if (!sonames) {
+  if (!sonames.ok()) {
     LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
     return "";
   }

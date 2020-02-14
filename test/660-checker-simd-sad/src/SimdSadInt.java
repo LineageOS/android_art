@@ -31,7 +31,7 @@ public class SimdSadInt {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int SimdSadInt.sadInt2Int(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int SimdSadInt.sadInt2Int(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}                        loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]                   loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]                     loop:<<Loop:B\d+>> outer_loop:none
@@ -88,7 +88,7 @@ public class SimdSadInt {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int SimdSadInt.sadInt2IntAlt2(int[], int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int SimdSadInt.sadInt2IntAlt2(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}                        loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]                   loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]                     loop:<<Loop:B\d+>> outer_loop:none
@@ -124,7 +124,7 @@ public class SimdSadInt {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadInt.sadInt2Long(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadInt.sadInt2Long(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons4:i\d+>>  IntConstant 4                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
@@ -161,7 +161,7 @@ public class SimdSadInt {
   /// CHECK-DAG:                 Add [<<Phi2>>,<<Intrin>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]       loop:<<Loop>>      outer_loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long SimdSadInt.sadInt2LongAt1(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long SimdSadInt.sadInt2LongAt1(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
   /// CHECK-DAG: <<Cons4:i\d+>>  IntConstant 4                  loop:none
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none

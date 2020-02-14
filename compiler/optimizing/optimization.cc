@@ -22,10 +22,6 @@
 #ifdef ART_ENABLE_CODEGEN_arm64
 #include "instruction_simplifier_arm64.h"
 #endif
-#ifdef ART_ENABLE_CODEGEN_mips
-#include "instruction_simplifier_mips.h"
-#include "pc_relative_fixups_mips.h"
-#endif
 #ifdef ART_ENABLE_CODEGEN_x86
 #include "pc_relative_fixups_x86.h"
 #include "instruction_simplifier_x86.h"
@@ -108,12 +104,6 @@ const char* OptimizationPassName(OptimizationPass pass) {
     case OptimizationPass::kInstructionSimplifierArm64:
       return arm64::InstructionSimplifierArm64::kInstructionSimplifierArm64PassName;
 #endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case OptimizationPass::kPcRelativeFixupsMips:
-      return mips::PcRelativeFixups::kPcRelativeFixupsMipsPassName;
-    case OptimizationPass::kInstructionSimplifierMips:
-      return mips::InstructionSimplifierMips::kInstructionSimplifierMipsPassName;
-#endif
 #ifdef ART_ENABLE_CODEGEN_x86
     case OptimizationPass::kPcRelativeFixupsX86:
       return x86::PcRelativeFixups::kPcRelativeFixupsX86PassName;
@@ -159,10 +149,6 @@ OptimizationPass OptimizationPassByName(const std::string& pass_name) {
 #endif
 #ifdef ART_ENABLE_CODEGEN_arm64
   X(OptimizationPass::kInstructionSimplifierArm64);
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-  X(OptimizationPass::kPcRelativeFixupsMips);
-  X(OptimizationPass::kInstructionSimplifierMips);
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
   X(OptimizationPass::kPcRelativeFixupsX86);
@@ -298,16 +284,6 @@ ArenaVector<HOptimization*> ConstructOptimizations(
       case OptimizationPass::kInstructionSimplifierArm64:
         DCHECK(alt_name == nullptr) << "arch-specific pass does not support alternative name";
         opt = new (allocator) arm64::InstructionSimplifierArm64(graph, stats);
-        break;
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-      case OptimizationPass::kPcRelativeFixupsMips:
-        DCHECK(alt_name == nullptr) << "arch-specific pass does not support alternative name";
-        opt = new (allocator) mips::PcRelativeFixups(graph, codegen, stats);
-        break;
-      case OptimizationPass::kInstructionSimplifierMips:
-        DCHECK(alt_name == nullptr) << "arch-specific pass does not support alternative name";
-        opt = new (allocator) mips::InstructionSimplifierMips(graph, codegen, stats);
         break;
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
