@@ -281,7 +281,6 @@ void UContext::Dump(std::ostream& os) const {
   DumpArmStatusRegister(os, context.pstate);
   os << '\n';
 #else
-  // TODO: Add support for MIPS32 and MIPS64.
   os << "Unknown architecture/word size/OS in ucontext dump";
 #endif
 }
