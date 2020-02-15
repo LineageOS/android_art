@@ -231,6 +231,9 @@ art_cc_binary {
         "dex2oat-defaults",
         "dex2oat-pgo-defaults",
     ],
+    // Modules that do dexpreopting, e.g. android_app, depend implicitly on
+    // either dex2oat or dex2oatd in ART source builds.
+    visibility: ["//visibility:public"],
     shared_libs: [
         "libprofile",
         "libart-compiler",
@@ -268,6 +271,24 @@ art_cc_binary {
             shared_libs: [
                 "libz",
             ],
+            // Override the prefer32 added by art_cc_binary when
+            // HOST_PREFER_32_BIT is in use. Necessary because the logic in
+            // Soong for setting ctx.Config().BuildOSTarget (used in
+            // dexpreopt.RegisterToolDeps) doesn't take host prefer32 into
+            // account. Note that this override cannot be in cc_default because
+            // it'd get overridden by the load hook even when it uses
+            // PrependProperties.
+            compile_multilib: "both",
+            symlink_preferred_arch: true,
+        },
+        linux_glibc_x86: {
+            suffix: "32",
+        },
+        linux_glibc_x86_64: {
+            suffix: "64",
+        },
+        linux_bionic_x86_64: {
+            suffix: "64",
         },
     },
     apex_available: [
@@ -282,6 +303,9 @@ art_cc_binary {
         "art_debug_defaults",
         "dex2oat-defaults",
     ],
+    // Modules that do dexpreopting, e.g. android_app, depend implicitly on
+    // either dex2oat or dex2oatd in ART source builds.
+    visibility: ["//visibility:public"],
     shared_libs: [
         "libprofiled",
         "libartd-compiler",
@@ -308,6 +332,13 @@ art_cc_binary {
             shared_libs: [
                 "libz",
             ],
+            // Override the prefer32 added by art_cc_binary when
+            // HOST_PREFER_32_BIT is in use. Necessary because the logic in
+            // Soong for setting ctx.Config().BuildOSTarget (used in
+            // dexpreopt.RegisterToolDeps) doesn't take host prefer32 into
+            // account. Note that this override cannot be in cc_default because
+            // it'd get overridden by the load hook even when it uses
+            // PrependProperties.
             compile_multilib: "both",
             symlink_preferred_arch: true,
         },

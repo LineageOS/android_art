@@ -89,48 +89,6 @@ static constexpr size_t kFrameSizeSaveEverything = FRAME_SIZE_SAVE_EVERYTHING;
 #undef BAKER_MARK_INTROSPECTION_GC_ROOT_LDR_OFFSET
 }  // namespace arm64
 
-namespace mips {
-#include "arch/mips/asm_support_mips.h"
-static constexpr size_t kFrameSizeSaveAllCalleeSaves = FRAME_SIZE_SAVE_ALL_CALLEE_SAVES;
-#undef FRAME_SIZE_SAVE_ALL_CALLEE_SAVES
-static constexpr size_t kFrameSizeSaveRefsOnly = FRAME_SIZE_SAVE_REFS_ONLY;
-#undef FRAME_SIZE_SAVE_REFS_ONLY
-static constexpr size_t kFrameSizeSaveRefsAndArgs = FRAME_SIZE_SAVE_REFS_AND_ARGS;
-#undef FRAME_SIZE_SAVE_REFS_AND_ARGS
-static constexpr size_t kFrameSizeSaveEverythingForClinit = FRAME_SIZE_SAVE_EVERYTHING_FOR_CLINIT;
-#undef FRAME_SIZE_SAVE_EVERYTHING_FOR_CLINIT
-static constexpr size_t kFrameSizeSaveEverythingForSuspendCheck =
-    FRAME_SIZE_SAVE_EVERYTHING_FOR_SUSPEND_CHECK;
-#undef FRAME_SIZE_SAVE_EVERYTHING_FOR_SUSPEND_CHECK
-static constexpr size_t kFrameSizeSaveEverything = FRAME_SIZE_SAVE_EVERYTHING;
-#undef FRAME_SIZE_SAVE_EVERYTHING
-#undef BAKER_MARK_INTROSPECTION_REGISTER_COUNT
-#undef BAKER_MARK_INTROSPECTION_FIELD_ARRAY_ENTRY_SIZE
-#undef BAKER_MARK_INTROSPECTION_GC_ROOT_ENTRIES_OFFSET
-#undef BAKER_MARK_INTROSPECTION_GC_ROOT_ENTRY_SIZE
-}  // namespace mips
-
-namespace mips64 {
-#include "arch/mips64/asm_support_mips64.h"
-static constexpr size_t kFrameSizeSaveAllCalleeSaves = FRAME_SIZE_SAVE_ALL_CALLEE_SAVES;
-#undef FRAME_SIZE_SAVE_ALL_CALLEE_SAVES
-static constexpr size_t kFrameSizeSaveRefsOnly = FRAME_SIZE_SAVE_REFS_ONLY;
-#undef FRAME_SIZE_SAVE_REFS_ONLY
-static constexpr size_t kFrameSizeSaveRefsAndArgs = FRAME_SIZE_SAVE_REFS_AND_ARGS;
-#undef FRAME_SIZE_SAVE_REFS_AND_ARGS
-static constexpr size_t kFrameSizeSaveEverythingForClinit = FRAME_SIZE_SAVE_EVERYTHING_FOR_CLINIT;
-#undef FRAME_SIZE_SAVE_EVERYTHING_FOR_CLINIT
-static constexpr size_t kFrameSizeSaveEverythingForSuspendCheck =
-    FRAME_SIZE_SAVE_EVERYTHING_FOR_SUSPEND_CHECK;
-#undef FRAME_SIZE_SAVE_EVERYTHING_FOR_SUSPEND_CHECK
-static constexpr size_t kFrameSizeSaveEverything = FRAME_SIZE_SAVE_EVERYTHING;
-#undef FRAME_SIZE_SAVE_EVERYTHING
-#undef BAKER_MARK_INTROSPECTION_REGISTER_COUNT
-#undef BAKER_MARK_INTROSPECTION_FIELD_ARRAY_ENTRY_SIZE
-#undef BAKER_MARK_INTROSPECTION_GC_ROOT_ENTRIES_OFFSET
-#undef BAKER_MARK_INTROSPECTION_GC_ROOT_ENTRY_SIZE
-}  // namespace mips64
-
 namespace x86 {
 #include "arch/x86/asm_support_x86.h"
 static constexpr size_t kFrameSizeSaveAllCalleeSaves = FRAME_SIZE_SAVE_ALL_CALLEE_SAVES;
@@ -183,8 +141,6 @@ static constexpr size_t kFrameSizeSaveEverything = FRAME_SIZE_SAVE_EVERYTHING;
   }
 TEST_ARCH(Arm, arm)
 TEST_ARCH(Arm64, arm64)
-TEST_ARCH(Mips, mips)
-TEST_ARCH(Mips64, mips64)
 TEST_ARCH(X86, x86)
 TEST_ARCH(X86_64, x86_64)
 

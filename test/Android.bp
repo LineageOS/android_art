@@ -26,12 +26,6 @@ art_cc_defaults {
         android_arm64: {
             relative_install_path: "art/arm64",
         },
-        android_mips: {
-            relative_install_path: "art/mips",
-        },
-        android_mips64: {
-            relative_install_path: "art/mips64",
-        },
         android_x86: {
             relative_install_path: "art/x86",
         },

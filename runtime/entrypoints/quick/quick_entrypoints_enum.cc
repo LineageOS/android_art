@@ -61,6 +61,7 @@ bool EntrypointRequiresStackMap(QuickEntrypointEnum trampoline) {
     case kQuickUshrLong:
       return false;
 
+    // TODO: Remove these entrypoints now that MIPS support was removed.
     /* Used by mips for 64bit volatile load/stores. */
     case kQuickA64Load:
     case kQuickA64Store:
@@ -112,6 +113,7 @@ bool EntrypointCanTriggerGC(QuickEntrypointEnum entrypoint) {
     case kQuickUshrLong:
       return false;
 
+    // TODO: Remove these entrypoints now that MIPS support was removed.
     /* Used by mips for 64bit volatile load/stores. */
     case kQuickA64Load:
     case kQuickA64Store:

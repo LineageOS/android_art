@@ -706,9 +706,7 @@ TEST_F(ProfileCompilationInfoTest, AddMoreDexFileThanLimitRegular) {
   ASSERT_FALSE(AddMethod(&info, dex, /* method_idx= */ 0));
 }
 
-// This test exhausts a region in the scudo native memory allocator.
-// Temporarily disable the test until scudo is fixed. See b/149481706.
-TEST_F(ProfileCompilationInfoTest, DISABLED_AddMoreDexFileThanLimitBoot) {
+TEST_F(ProfileCompilationInfoTest, AddMoreDexFileThanLimitBoot) {
   FakeDexStorage local_storage;
   ProfileCompilationInfo info(/*for_boot_image=*/true);
   // Save a few methods.

@@ -1076,7 +1076,8 @@ bool ElfFileImpl<ElfTypes>::GetLoadedAddressRange(/*out*/uint8_t** vaddr_begin,
   return true;
 }
 
-static InstructionSet GetInstructionSetFromELF(uint16_t e_machine, uint32_t e_flags) {
+static InstructionSet GetInstructionSetFromELF(uint16_t e_machine,
+                                               uint32_t e_flags ATTRIBUTE_UNUSED) {
   switch (e_machine) {
     case EM_ARM:
       return InstructionSet::kArm;
@@ -1086,15 +1087,6 @@ static InstructionSet GetInstructionSetFromELF(uint16_t e_machine, uint32_t e_fl
       return InstructionSet::kX86;
     case EM_X86_64:
       return InstructionSet::kX86_64;
-    case EM_MIPS: {
-      if ((e_flags & EF_MIPS_ARCH) == EF_MIPS_ARCH_32R2 ||
-          (e_flags & EF_MIPS_ARCH) == EF_MIPS_ARCH_32R6) {
-        return InstructionSet::kMips;
-      } else if ((e_flags & EF_MIPS_ARCH) == EF_MIPS_ARCH_64R6) {
-        return InstructionSet::kMips64;
-      }
-      break;
-    }
   }
   return InstructionSet::kNone;
 }
