@@ -576,10 +576,12 @@ static jint GetDexOptNeeded(JNIEnv* env,
     return OatFileAssistant::kNoDexOptNeeded;
   }
 
+  std::vector<int> context_fds;
   return oat_file_assistant.GetDexOptNeeded(filter,
+                                            context.get(),
+                                            context_fds,
                                             profile_changed,
-                                            downgrade,
-                                            context.get());
+                                            downgrade);
 }
 
 static jstring DexFile_getDexFileStatus(JNIEnv* env,
