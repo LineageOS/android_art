@@ -1905,6 +1905,25 @@ NterpHandleHotnessOverflow:
     // Jump to the compiled code.
     jmp *%rbx
 
+NterpHandleInvokeInterfaceOnObjectMethodRange:
+   // First argument is the 'this' pointer.
+   movzwl 4(rPC), %r11d // arguments
+   movl (rFP, %r11, 4), %esi
+   // Note: if esi is null, this will be handled by our SIGSEGV handler.
+   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
+   movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
+   jmp NterpCommonInvokeInstanceRange
+
+NterpHandleInvokeInterfaceOnObjectMethod:
+   // First argument is the 'this' pointer.
+   movzwl 4(rPC), %r11d // arguments
+   andq MACRO_LITERAL(0xf), %r11
+   movl (rFP, %r11, 4), %esi
+   // Note: if esi is null, this will be handled by our SIGSEGV handler.
+   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
+   movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
+   jmp NterpCommonInvokeInstance
+
 // This is the logical end of ExecuteNterpImpl, where the frame info applies.
 // EndExecuteNterpImpl includes the methods below as we want the runtime to
 // see them as part of the Nterp PCs.
