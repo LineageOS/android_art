@@ -1017,14 +1017,40 @@ class ResolveCatchBlockExceptionsClassVisitor : public ClassVisitor {
   std::vector<ObjPtr<mirror::Class>> classes_;
 };
 
+static inline bool CanIncludeInCurrentImage(ObjPtr<mirror::Class> klass)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  DCHECK(klass != nullptr);
+  gc::Heap* heap = Runtime::Current()->GetHeap();
+  if (heap->GetBootImageSpaces().empty()) {
+    return true;  // We can include any class when compiling the primary boot image.
+  }
+  if (heap->ObjectIsInBootImageSpace(klass)) {
+    return false;  // Already included in the boot image we're compiling against.
+  }
+  return AotClassLinker::CanReferenceInBootImageExtension(klass, heap);
+}
+
 class RecordImageClassesVisitor : public ClassVisitor {
  public:
   explicit RecordImageClassesVisitor(HashSet<std::string>* image_classes)
       : image_classes_(image_classes) {}
 
   bool operator()(ObjPtr<mirror::Class> klass) override REQUIRES_SHARED(Locks::mutator_lock_) {
+    bool resolved = klass->IsResolved();
+    DCHECK(resolved || klass->IsErroneousUnresolved());
+    bool can_include_in_image = LIKELY(resolved) && CanIncludeInCurrentImage(klass);
     std::string temp;
-    image_classes_->insert(klass->GetDescriptor(&temp));
+    std::string_view descriptor(klass->GetDescriptor(&temp));
+    if (can_include_in_image) {
+      image_classes_->insert(std::string(descriptor));  // Does nothing if already present.
+    } else {
+      auto it = image_classes_->find(descriptor);
+      if (it != image_classes_->end()) {
+        VLOG(compiler) << "Removing " << (resolved ? "unsuitable" : "unresolved")
+            << " class from image classes: " << descriptor;
+        image_classes_->erase(it);
+      }
+    }
     return true;
   }
 
@@ -1106,7 +1132,9 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
   RecordImageClassesVisitor visitor(image_classes);
   class_linker->VisitClasses(&visitor);
 
-  CHECK(!image_classes->empty());
+  if (GetCompilerOptions().IsBootImage()) {
+    CHECK(!image_classes->empty());
+  }
 }
 
 static void MaybeAddToImageClasses(Thread* self,
@@ -1212,14 +1240,14 @@ class ClinitImageUpdate {
       DCHECK(resolved || klass->IsErroneousUnresolved());
       bool can_include_in_image = LIKELY(resolved) && CanIncludeInCurrentImage(klass);
       std::string temp;
-      std::string_view name(klass->GetDescriptor(&temp));
-      auto it = data_->image_class_descriptors_->find(name);
+      std::string_view descriptor(klass->GetDescriptor(&temp));
+      auto it = data_->image_class_descriptors_->find(descriptor);
       if (it != data_->image_class_descriptors_->end()) {
         if (can_include_in_image) {
           data_->image_classes_.push_back(data_->hs_.NewHandle(klass));
         } else {
           VLOG(compiler) << "Removing " << (resolved ? "unsuitable" : "unresolved")
-              << " class from image classes: " << name;
+              << " class from image classes: " << descriptor;
           data_->image_class_descriptors_->erase(it);
         }
       } else if (can_include_in_image) {
@@ -1262,19 +1290,6 @@ class ClinitImageUpdate {
     if (!object->IsDexCache()) {
       object->VisitReferences(*this, *this);
     }
-  }
-
-  static bool CanIncludeInCurrentImage(ObjPtr<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(klass != nullptr);
-    gc::Heap* heap = Runtime::Current()->GetHeap();
-    if (heap->GetBootImageSpaces().empty()) {
-      return true;  // We can include any class when compiling the primary boot image.
-    }
-    if (heap->ObjectIsInBootImageSpace(klass)) {
-      return false;  // Already included in the boot image we're compiling against.
-    }
-    return AotClassLinker::CanReferenceInBootImageExtension(klass, heap);
   }
 
   mutable VariableSizedHandleScope hs_;
