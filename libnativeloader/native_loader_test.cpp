@@ -99,6 +99,7 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
     {"com.android.neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.neuralnetworks"))},
     {"com.android.cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.cronet"))},
+    {"com.android.os.statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.os.statsd"))},
 };
 
 // The actual gmock object
@@ -356,6 +357,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
   bool expected_link_with_cronet_ns = true;
+  bool expected_link_with_statsd_ns = true;
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
   std::string expected_shared_libs_to_art_ns = art_public_libraries();
   std::string expected_shared_libs_to_sphal_ns = vendor_public_libraries();
@@ -363,6 +365,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
   std::string expected_shared_libs_to_neuralnetworks_ns = neuralnetworks_public_libraries();
   std::string expected_shared_libs_to_cronet_ns = cronet_public_libraries();
+  std::string expected_shared_libs_to_statsd_ns = statsd_public_libraries();
 
   void SetExpectations() {
     NativeLoaderTest::SetExpectations();
@@ -410,6 +413,11 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_cronet_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.cronet"),
                                               StrEq(expected_shared_libs_to_cronet_ns)))
+          .WillOnce(Return(true));
+    }
+    if (expected_link_with_statsd_ns) {
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.os.statsd"),
+                                              StrEq(expected_shared_libs_to_statsd_ns)))
           .WillOnce(Return(true));
     }
   }
