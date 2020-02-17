@@ -68,8 +68,6 @@ public class Options {
   public static boolean useArchArm64;
   public static boolean useArchX86;
   public static boolean useArchX86_64;
-  public static boolean useArchMips;
-  public static boolean useArchMips64;
   public static boolean skipHostVerify;
   public static boolean shortTimeouts;
   public static boolean dumpOutput;
@@ -112,8 +110,6 @@ public class Options {
     Log.always("    --allarm             : Short for --arm --arm64");
     Log.always("    --x86                : Include x86 backends in comparisons");
     Log.always("    --x86-64             : Include x86-64 backends in comparisons");
-    Log.always("    --mips               : Include MIPS backends in comparisons");
-    Log.always("    --mips64             : Include MIPS64 backends in comparisons");
     Log.always("");
     Log.always("    --dump-output        : Dump outputs of executed programs");
     Log.always("    --dump-verify        : Dump outputs of verification");
@@ -179,10 +175,6 @@ public class Options {
       useArchX86 = true;
     } else if (flag.equals("x86-64")) {
       useArchX86_64 = true;
-    } else if (flag.equals("mips")) {
-      useArchMips = true;
-    } else if (flag.equals("mips64")) {
-      useArchMips64 = true;
     } else if (flag.equals("mutate-limit")) {
       mutateLimit = true;
     } else if (flag.equals("report-unique")) {
@@ -411,9 +403,7 @@ public class Options {
         if (!(useArchArm
             || useArchArm64
             || useArchX86
-            || useArchX86_64
-            || useArchMips
-            || useArchMips64)) {
+            || useArchX86_64)) {
           Log.error("No architecture to execute on was specified!");
           return false;
         }
@@ -423,14 +413,6 @@ public class Options {
       }
       if ((useArchArm || useArchArm64) && (useArchX86 || useArchX86_64)) {
         Log.error("Did you mean to specify ARM and x86?");
-        return false;
-      }
-      if ((useArchArm || useArchArm64) && (useArchMips || useArchMips64)) {
-        Log.error("Did you mean to specify ARM and MIPS?");
-        return false;
-      }
-      if ((useArchX86 || useArchX86_64) && (useArchMips || useArchMips64)) {
-        Log.error("Did you mean to specify x86 and MIPS?");
         return false;
       }
       int backends = 0;
