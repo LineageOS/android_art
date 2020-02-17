@@ -1,0 +1,2 @@
+Test that invokeinterface through a j.l.Object method doesn't go
+through the IMT conflict trampoline.
