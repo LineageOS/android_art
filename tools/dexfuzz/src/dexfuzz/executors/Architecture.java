@@ -23,9 +23,7 @@ public enum Architecture {
   ARM("arm"),
   ARM64("arm64"),
   X86("x86"),
-  X86_64("x86_64"),
-  MIPS("mips"),
-  MIPS64("mips64");
+  X86_64("x86_64");
 
   private String archString = "";
 

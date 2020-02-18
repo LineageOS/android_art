@@ -319,10 +319,10 @@ class DexoptAnalyzer final {
     }
 
     int dexoptNeeded = oat_file_assistant->GetDexOptNeeded(compiler_filter_,
-                                                           assume_profile_changed_,
-                                                           downgrade_,
                                                            class_loader_context.get(),
-                                                           context_fds_);
+                                                           context_fds_,
+                                                           assume_profile_changed_,
+                                                           downgrade_);
 
     // Convert OatFileAssitant codes to dexoptanalyzer codes.
     switch (dexoptNeeded) {

@@ -26,10 +26,6 @@ import dexfuzz.executors.ArmInterpreterExecutor;
 import dexfuzz.executors.ArmOptimizingBackendExecutor;
 import dexfuzz.executors.Device;
 import dexfuzz.executors.Executor;
-import dexfuzz.executors.Mips64InterpreterExecutor;
-import dexfuzz.executors.Mips64OptimizingBackendExecutor;
-import dexfuzz.executors.MipsInterpreterExecutor;
-import dexfuzz.executors.MipsOptimizingBackendExecutor;
 import dexfuzz.executors.X86InterpreterExecutor;
 import dexfuzz.executors.X86OptimizingBackendExecutor;
 import dexfuzz.executors.X86_64InterpreterExecutor;
@@ -171,16 +167,6 @@ public abstract class Fuzzer {
     if (Options.useArchX86) {
       addExecutorsForArchitecture(device, X86OptimizingBackendExecutor.class,
           X86InterpreterExecutor.class);
-    }
-
-    if (Options.useArchMips64) {
-      addExecutorsForArchitecture(device, Mips64OptimizingBackendExecutor.class,
-          Mips64InterpreterExecutor.class);
-    }
-
-    if (Options.useArchMips) {
-      addExecutorsForArchitecture(device, MipsOptimizingBackendExecutor.class,
-          MipsInterpreterExecutor.class);
     }
 
     // Add the first backend as the golden executor for self-divergence tests.
