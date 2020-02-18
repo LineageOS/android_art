@@ -1343,5 +1343,11 @@
         "tests": ["2029-contended-monitors"],
         "variant": "interpreter | interp-ac | gcstress | trace",
         "description": ["Slow test. Prone to timeouts."]
+    },
+    {
+        "tests": ["096-array-copy-concurrent-gc"],
+        "variant": "gcstress & debuggable & debug & host",
+        "bug": "b/149708943",
+        "description": ["Timeouts."]
     }
 ]
