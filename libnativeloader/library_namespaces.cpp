@@ -42,6 +42,7 @@ namespace {
 // vendor and system namespaces.
 constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
+constexpr const char* kVndkProductNamespaceName = "vndk_product";
 constexpr const char* kArtNamespaceName = "com_android_art";
 constexpr const char* kNeuralNetworksNamespaceName = "com_android_neuralnetworks";
 constexpr const char* kCronetNamespaceName = "com_android_cronet";
@@ -172,12 +173,12 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
 
   std::string system_exposed_libraries = default_public_libraries();
   std::string namespace_name = kClassloaderNamespaceName;
-  bool unbundled_vendor_or_product_app = false;
+  ApkOrigin unbundled_app_origin = APK_ORIGIN_DEFAULT;
   if ((apk_origin == APK_ORIGIN_VENDOR ||
        (apk_origin == APK_ORIGIN_PRODUCT &&
         is_product_vndk_version_defined())) &&
       !is_shared) {
-    unbundled_vendor_or_product_app = true;
+    unbundled_app_origin = apk_origin;
     // For vendor / product apks, give access to the vendor / product lib even though
     // they are treated as unbundled; the libs and apks are still bundled
     // together in the vendor / product partition.
@@ -275,11 +276,22 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     }
   }
 
-  // Give access to VNDK-SP libraries from the 'vndk' namespace.
-  if (unbundled_vendor_or_product_app && !vndksp_libraries().empty()) {
+  // Give access to VNDK-SP libraries from the 'vndk' namespace for unbundled vendor apps.
+  if (unbundled_app_origin == APK_ORIGIN_VENDOR && !vndksp_libraries_vendor().empty()) {
     auto vndk_ns = NativeLoaderNamespace::GetExportedNamespace(kVndkNamespaceName, is_bridged);
     if (vndk_ns.ok()) {
-      linked = app_ns->Link(*vndk_ns, vndksp_libraries());
+      linked = app_ns->Link(*vndk_ns, vndksp_libraries_vendor());
+      if (!linked.ok()) {
+        return linked.error();
+      }
+    }
+  }
+
+  // Give access to VNDK-SP libraries from the 'vndk_product' namespace for unbundled product apps.
+  if (unbundled_app_origin == APK_ORIGIN_PRODUCT && !vndksp_libraries_product().empty()) {
+    auto vndk_ns = NativeLoaderNamespace::GetExportedNamespace(kVndkProductNamespaceName, is_bridged);
+    if (vndk_ns.ok()) {
+      linked = app_ns->Link(*vndk_ns, vndksp_libraries_product());
       if (!linked.ok()) {
         return linked.error();
       }

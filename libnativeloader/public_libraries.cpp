@@ -275,11 +275,20 @@ static std::string InitLlndkLibrariesProduct() {
   return android::base::Join(*sonames, ':');
 }
 
-static std::string InitVndkspLibraries() {
-  // VNDK-SP is used only for vendor hals which are not available for the
-  // product partition.
+static std::string InitVndkspLibrariesVendor() {
   std::string config_file = kVndkLibrariesFile;
   InsertVndkVersionStr(&config_file, false);
+  auto sonames = ReadConfig(config_file, always_true);
+  if (!sonames.ok()) {
+    LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
+    return "";
+  }
+  return android::base::Join(*sonames, ':');
+}
+
+static std::string InitVndkspLibrariesProduct() {
+  std::string config_file = kVndkLibrariesFile;
+  InsertVndkVersionStr(&config_file, true);
   auto sonames = ReadConfig(config_file, always_true);
   if (!sonames.ok()) {
     LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
@@ -352,8 +361,13 @@ const std::string& llndk_libraries_vendor() {
   return list;
 }
 
-const std::string& vndksp_libraries() {
-  static std::string list = InitVndkspLibraries();
+const std::string& vndksp_libraries_product() {
+  static std::string list = InitVndkspLibrariesProduct();
+  return list;
+}
+
+const std::string& vndksp_libraries_vendor() {
+  static std::string list = InitVndkspLibrariesVendor();
   return list;
 }
 
