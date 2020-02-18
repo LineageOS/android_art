@@ -1697,7 +1697,9 @@ void Jit::PostZygoteFork() {
   if (thread_pool_ == nullptr) {
     // If this is a child zygote, check if we need to remap the boot image
     // methods.
-    if (fd_methods_ != -1 && code_cache_->GetZygoteMap()->IsCompilationNotified()) {
+    if (Runtime::Current()->IsZygote() &&
+        fd_methods_ != -1 &&
+        code_cache_->GetZygoteMap()->IsCompilationNotified()) {
       ScopedSuspendAll ssa(__FUNCTION__);
       MapBootImageMethods();
     }
