@@ -21,6 +21,7 @@
 #include <dlfcn.h>
 #include <sys/types.h>
 
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -61,6 +62,7 @@ android_namespace_t* FindExportedNamespace(const char* caller_location) {
     LOG_ALWAYS_FATAL_IF((slash_index == std::string::npos),
                         "Error finding namespace of apex: no slash in path %s", caller_location);
     std::string name = location.substr(start_index, slash_index - start_index);
+    std::replace(name.begin(), name.end(), '.', '_');
     android_namespace_t* boot_namespace = android_get_exported_namespace(name.c_str());
     LOG_ALWAYS_FATAL_IF((boot_namespace == nullptr),
                         "Error finding namespace of apex: no namespace called %s", name.c_str());
