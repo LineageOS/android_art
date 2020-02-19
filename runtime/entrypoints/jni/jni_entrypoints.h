@@ -29,8 +29,10 @@ namespace art {
 
 // Pointers to functions that are called by JNI trampolines via thread-local storage.
 struct PACKED(4) JniEntryPoints {
-  // Called when the JNI method isn't registered.
+  // Called when the JNI method isn't registered for normal native and @FastNative methods.
   void* (*pDlsymLookup)(JNIEnv* env, jobject);
+  // Called when the JNI method isn't registered for @CriticalNative methods.
+  void* (*pDlsymLookupCritical)(JNIEnv* env, jobject);
 };
 
 }  // namespace art

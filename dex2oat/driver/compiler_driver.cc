@@ -298,6 +298,11 @@ std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateJniDlsymLookup
   CREATE_TRAMPOLINE(JNI, kJniAbi, pDlsymLookup)
 }
 
+std::unique_ptr<const std::vector<uint8_t>>
+CompilerDriver::CreateJniDlsymLookupCriticalTrampoline() const {
+  CREATE_TRAMPOLINE(JNI, kJniAbi, pDlsymLookupCritical)
+}
+
 std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateQuickGenericJniTrampoline()
     const {
   CREATE_TRAMPOLINE(QUICK, kQuickAbi, pQuickGenericJniTrampoline)

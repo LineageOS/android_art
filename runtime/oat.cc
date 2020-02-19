@@ -73,6 +73,7 @@ OatHeader::OatHeader(InstructionSet instruction_set,
       oat_dex_files_offset_(0),
       executable_offset_(0),
       jni_dlsym_lookup_trampoline_offset_(0),
+      jni_dlsym_lookup_critical_trampoline_offset_(0),
       quick_generic_jni_trampoline_offset_(0),
       quick_imt_conflict_trampoline_offset_(0),
       quick_resolution_trampoline_offset_(0),
@@ -215,6 +216,22 @@ void OatHeader::SetJniDlsymLookupTrampolineOffset(uint32_t offset) {
   DCHECK_EQ(jni_dlsym_lookup_trampoline_offset_, 0U) << offset;
 
   jni_dlsym_lookup_trampoline_offset_ = offset;
+}
+
+const void* OatHeader::GetJniDlsymLookupCriticalTrampoline() const {
+  return GetTrampoline(*this, GetJniDlsymLookupCriticalTrampolineOffset());
+}
+
+uint32_t OatHeader::GetJniDlsymLookupCriticalTrampolineOffset() const {
+  DCHECK(IsValid());
+  return jni_dlsym_lookup_critical_trampoline_offset_;
+}
+
+void OatHeader::SetJniDlsymLookupCriticalTrampolineOffset(uint32_t offset) {
+  DCHECK(IsValid());
+  DCHECK_EQ(jni_dlsym_lookup_critical_trampoline_offset_, 0U) << offset;
+
+  jni_dlsym_lookup_critical_trampoline_offset_ = offset;
 }
 
 const void* OatHeader::GetQuickGenericJniTrampoline() const {
