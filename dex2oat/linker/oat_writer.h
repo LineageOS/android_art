@@ -475,6 +475,7 @@ class OatWriter {
   dchecked_vector<OatClassHeader> oat_class_headers_;
   dchecked_vector<OatClass> oat_classes_;
   std::unique_ptr<const std::vector<uint8_t>> jni_dlsym_lookup_trampoline_;
+  std::unique_ptr<const std::vector<uint8_t>> jni_dlsym_lookup_critical_trampoline_;
   std::unique_ptr<const std::vector<uint8_t>> quick_generic_jni_trampoline_;
   std::unique_ptr<const std::vector<uint8_t>> quick_imt_conflict_trampoline_;
   std::unique_ptr<const std::vector<uint8_t>> quick_resolution_trampoline_;
@@ -495,6 +496,7 @@ class OatWriter {
   uint32_t size_interpreter_to_interpreter_bridge_;
   uint32_t size_interpreter_to_compiled_code_bridge_;
   uint32_t size_jni_dlsym_lookup_trampoline_;
+  uint32_t size_jni_dlsym_lookup_critical_trampoline_;
   uint32_t size_quick_generic_jni_trampoline_;
   uint32_t size_quick_imt_conflict_trampoline_;
   uint32_t size_quick_resolution_trampoline_;

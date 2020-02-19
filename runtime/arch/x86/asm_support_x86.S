@@ -94,7 +94,7 @@
     #define CFI_RESTORE(reg)
     #define CFI_REL_OFFSET(reg,size)
     #define CFI_REMEMBER_STATE
-    #define CFI_RESTORE_STATE_AND_DEF_CFA(off)
+    #define CFI_RESTORE_STATE_AND_DEF_CFA(reg,off)
     #define CFI_ESCAPE(...)
 #endif
 
@@ -156,6 +156,18 @@ MACRO1(POP, reg)
     CFI_RESTORE(REG_VAR(reg))
 END_MACRO
 
+// Arguments do not need .cfi_rel_offset as they are caller-saved and
+// therefore cannot hold caller's variables or unwinding data.
+MACRO1(PUSH_ARG, reg)
+    pushl REG_VAR(reg)
+    CFI_ADJUST_CFA_OFFSET(4)
+END_MACRO
+
+MACRO1(POP_ARG, reg)
+    popl REG_VAR(reg)
+    CFI_ADJUST_CFA_OFFSET(-4)
+END_MACRO
+
 MACRO1(CFI_RESTORE_REG, reg)
     CFI_RESTORE(REG_VAR(reg))
 END_MACRO
@@ -199,5 +211,64 @@ MACRO1(UNPOISON_HEAP_REF, rRef)
 #endif  // USE_HEAP_POISONING
 END_MACRO
 
+    /*
+     * Macro that sets up the callee save frame to conform with
+     * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs), except for pushing the method
+     */
+MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY)
+    PUSH edi      // Save callee saves
+    PUSH esi
+    PUSH ebp
+    PUSH_ARG ebx  // Save args.
+    PUSH_ARG edx
+    PUSH_ARG ecx
+    // Create space for FPR args.
+    subl MACRO_LITERAL(4 * 8), %esp
+    CFI_ADJUST_CFA_OFFSET(4 * 8)
+    // Save FPRs.
+    movsd %xmm0, 0(%esp)
+    movsd %xmm1, 8(%esp)
+    movsd %xmm2, 16(%esp)
+    movsd %xmm3, 24(%esp)
+
+    // Ugly compile-time check, but we only have the preprocessor.
+    // First +4: implicit return address pushed on stack when caller made call.
+    // Last +4: we're not pushing the method on the stack here.
+#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 4 + 6*4 + 4*8 + 4)
+#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(X86) size not as expected."
+#endif
+END_MACRO
+
+MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
+    // Restore FPRs. EAX is still on the stack.
+    movsd 4(%esp), %xmm0
+    movsd 12(%esp), %xmm1
+    movsd 20(%esp), %xmm2
+    movsd 28(%esp), %xmm3
+
+    addl MACRO_LITERAL(36), %esp  // Remove FPRs and method pointer.
+    CFI_ADJUST_CFA_OFFSET(-36)
+
+    POP_ARG ecx                   // Restore args
+    POP_ARG edx
+    POP_ARG ebx
+    POP ebp                       // Restore callee saves
+    POP esi
+    POP edi
+END_MACRO
+
+    /*
+     * Macro that calls through to artDeliverPendingExceptionFromCode, where the pending
+     * exception is Thread::Current()->exception_ when the runtime method frame is ready.
+     */
+MACRO0(DELIVER_PENDING_EXCEPTION_FRAME_READY)
+    // Outgoing argument set up
+    subl MACRO_LITERAL(12), %esp               // alignment padding
+    CFI_ADJUST_CFA_OFFSET(12)
+    pushl %fs:THREAD_SELF_OFFSET               // pass Thread::Current()
+    CFI_ADJUST_CFA_OFFSET(4)
+    call SYMBOL(artDeliverPendingExceptionFromCode)  // artDeliverPendingExceptionFromCode(Thread*)
+    UNREACHABLE
+END_MACRO
 
 #endif  // ART_RUNTIME_ARCH_X86_ASM_SUPPORT_X86_S_

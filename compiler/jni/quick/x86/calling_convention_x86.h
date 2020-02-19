@@ -23,8 +23,6 @@
 namespace art {
 namespace x86 {
 
-constexpr size_t kFramePointerSize = static_cast<size_t>(PointerSize::k32);
-
 class X86ManagedRuntimeCallingConvention final : public ManagedRuntimeCallingConvention {
  public:
   X86ManagedRuntimeCallingConvention(bool is_static, bool is_synchronized, const char* shorty)

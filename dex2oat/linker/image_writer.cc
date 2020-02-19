@@ -3373,6 +3373,8 @@ const uint8_t* ImageWriter::GetOatAddress(StubType type) const {
         return static_cast<const uint8_t*>(header.GetQuickGenericJniTrampoline());
       case StubType::kJNIDlsymLookupTrampoline:
         return static_cast<const uint8_t*>(header.GetJniDlsymLookupTrampoline());
+      case StubType::kJNIDlsymLookupCriticalTrampoline:
+        return static_cast<const uint8_t*>(header.GetJniDlsymLookupCriticalTrampoline());
       case StubType::kQuickIMTConflictTrampoline:
         return static_cast<const uint8_t*>(header.GetQuickImtConflictTrampoline());
       case StubType::kQuickResolutionTrampoline:
@@ -3486,8 +3488,9 @@ void ImageWriter::CopyAndFixupMethod(ArtMethod* orig,
       if (orig->IsNative()) {
         // The native method's pointer is set to a stub to lookup via dlsym.
         // Note this is not the code_ pointer, that is handled above.
-        copy->SetEntryPointFromJniPtrSize(
-            GetOatAddress(StubType::kJNIDlsymLookupTrampoline), target_ptr_size_);
+        StubType stub_type = orig->IsCriticalNative() ? StubType::kJNIDlsymLookupCriticalTrampoline
+                                                      : StubType::kJNIDlsymLookupTrampoline;
+        copy->SetEntryPointFromJniPtrSize(GetOatAddress(stub_type), target_ptr_size_);
       } else {
         CHECK(copy->GetDataPtrSize(target_ptr_size_) == nullptr);
       }
@@ -3624,6 +3627,8 @@ void ImageWriter::UpdateOatFileHeader(size_t oat_index, const OatHeader& oat_hea
     // Primary oat file, read the trampolines.
     cur_image_info.SetStubOffset(StubType::kJNIDlsymLookupTrampoline,
                                  oat_header.GetJniDlsymLookupTrampolineOffset());
+    cur_image_info.SetStubOffset(StubType::kJNIDlsymLookupCriticalTrampoline,
+                                 oat_header.GetJniDlsymLookupCriticalTrampolineOffset());
     cur_image_info.SetStubOffset(StubType::kQuickGenericJNITrampoline,
                                  oat_header.GetQuickGenericJniTrampolineOffset());
     cur_image_info.SetStubOffset(StubType::kQuickIMTConflictTrampoline,

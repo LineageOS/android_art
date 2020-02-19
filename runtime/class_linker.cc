@@ -627,6 +627,7 @@ ClassLinker::ClassLinker(InternTable* intern_table, bool fast_class_not_found_ex
       intern_table_(intern_table),
       fast_class_not_found_exceptions_(fast_class_not_found_exceptions),
       jni_dlsym_lookup_trampoline_(nullptr),
+      jni_dlsym_lookup_critical_trampoline_(nullptr),
       quick_resolution_trampoline_(nullptr),
       quick_imt_conflict_trampoline_(nullptr),
       quick_generic_jni_trampoline_(nullptr),
@@ -851,6 +852,7 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
   if (!runtime->IsAotCompiler()) {
     // We need to set up the generic trampolines since we don't have an image.
     jni_dlsym_lookup_trampoline_ = GetJniDlsymLookupStub();
+    jni_dlsym_lookup_critical_trampoline_ = GetJniDlsymLookupCriticalStub();
     quick_resolution_trampoline_ = GetQuickResolutionStub();
     quick_imt_conflict_trampoline_ = GetQuickImtConflictStub();
     quick_generic_jni_trampoline_ = GetQuickGenericJniStub();
@@ -1202,6 +1204,7 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
   DCHECK(!oat_files.empty());
   const OatHeader& default_oat_header = oat_files[0]->GetOatHeader();
   jni_dlsym_lookup_trampoline_ = default_oat_header.GetJniDlsymLookupTrampoline();
+  jni_dlsym_lookup_critical_trampoline_ = default_oat_header.GetJniDlsymLookupCriticalTrampoline();
   quick_resolution_trampoline_ = default_oat_header.GetQuickResolutionTrampoline();
   quick_imt_conflict_trampoline_ = default_oat_header.GetQuickImtConflictTrampoline();
   quick_generic_jni_trampoline_ = default_oat_header.GetQuickGenericJniTrampoline();
@@ -1212,6 +1215,8 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
       const OatHeader& ith_oat_header = oat_files[i]->GetOatHeader();
       const void* ith_jni_dlsym_lookup_trampoline_ =
           ith_oat_header.GetJniDlsymLookupTrampoline();
+      const void* ith_jni_dlsym_lookup_critical_trampoline_ =
+          ith_oat_header.GetJniDlsymLookupCriticalTrampoline();
       const void* ith_quick_resolution_trampoline =
           ith_oat_header.GetQuickResolutionTrampoline();
       const void* ith_quick_imt_conflict_trampoline =
@@ -1221,6 +1226,7 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
       const void* ith_quick_to_interpreter_bridge_trampoline =
           ith_oat_header.GetQuickToInterpreterBridge();
       if (ith_jni_dlsym_lookup_trampoline_ != jni_dlsym_lookup_trampoline_ ||
+          ith_jni_dlsym_lookup_critical_trampoline_ != jni_dlsym_lookup_critical_trampoline_ ||
           ith_quick_resolution_trampoline != quick_resolution_trampoline_ ||
           ith_quick_imt_conflict_trampoline != quick_imt_conflict_trampoline_ ||
           ith_quick_generic_jni_trampoline != quick_generic_jni_trampoline_ ||
@@ -9347,6 +9353,11 @@ bool ClassLinker::IsQuickGenericJniStub(const void* entry_point) const {
 bool ClassLinker::IsJniDlsymLookupStub(const void* entry_point) const {
   return entry_point == GetJniDlsymLookupStub() ||
       (jni_dlsym_lookup_trampoline_ == entry_point);
+}
+
+bool ClassLinker::IsJniDlsymLookupCriticalStub(const void* entry_point) const {
+  return entry_point == GetJniDlsymLookupCriticalStub() ||
+      (jni_dlsym_lookup_critical_trampoline_ == entry_point);
 }
 
 const void* ClassLinker::GetRuntimeQuickGenericJniStub() const {

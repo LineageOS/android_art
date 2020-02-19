@@ -49,42 +49,6 @@
     DECREASE_FRAME 96
 .endm
 
-
-.macro SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
-    INCREASE_FRAME 224
-
-    // Ugly compile-time check, but we only have the preprocessor.
-#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 224)
-#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(ARM64) size not as expected."
-#endif
-
-    // Stack alignment filler [sp, #8].
-    // FP args.
-    stp d0, d1, [sp, #16]
-    stp d2, d3, [sp, #32]
-    stp d4, d5, [sp, #48]
-    stp d6, d7, [sp, #64]
-
-    // Core args.
-    SAVE_TWO_REGS x1, x2, 80
-    SAVE_TWO_REGS x3, x4, 96
-    SAVE_TWO_REGS x5, x6, 112
-
-    // x7, Callee-saves.
-    // Note: We could avoid saving X20 in the case of Baker read
-    // barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    SAVE_TWO_REGS x7, x20, 128
-    SAVE_TWO_REGS x21, x22, 144
-    SAVE_TWO_REGS x23, x24, 160
-    SAVE_TWO_REGS x25, x26, 176
-    SAVE_TWO_REGS x27, x28, 192
-
-    // x29(callee-save) and LR.
-    SAVE_TWO_REGS x29, xLR, 208
-
-.endm
-
     /*
      * Macro that sets up the callee save frame to conform with
      * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs).
@@ -99,7 +63,8 @@
     // ArtMethod* xIP0 = Runtime::instance_->callee_save_methods_[kSaveRefAndArgs];
     ldr xIP0, [xIP0, RUNTIME_SAVE_REFS_AND_ARGS_METHOD_OFFSET]
 
-    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
+    INCREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL sp
 
     str xIP0, [sp]    // Store ArtMethod* Runtime::callee_save_methods_[kSaveRefsAndArgs].
     // Place sp in Thread::Current()->top_quick_frame.
@@ -108,40 +73,12 @@
 .endm
 
 .macro SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_X0
-    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
+    INCREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL sp
     str x0, [sp, #0]  // Store ArtMethod* to bottom of stack.
     // Place sp in Thread::Current()->top_quick_frame.
     mov xIP0, sp
     str xIP0, [xSELF, # THREAD_TOP_QUICK_FRAME_OFFSET]
-.endm
-
-// TODO: Probably no need to restore registers preserved by aapcs64.
-.macro RESTORE_SAVE_REFS_AND_ARGS_FRAME
-    // FP args.
-    ldp d0, d1, [sp, #16]
-    ldp d2, d3, [sp, #32]
-    ldp d4, d5, [sp, #48]
-    ldp d6, d7, [sp, #64]
-
-    // Core args.
-    RESTORE_TWO_REGS x1, x2, 80
-    RESTORE_TWO_REGS x3, x4, 96
-    RESTORE_TWO_REGS x5, x6, 112
-
-    // x7, Callee-saves.
-    // Note: Likewise, we could avoid restoring X20 in the case of Baker
-    // read barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    RESTORE_TWO_REGS x7, x20, 128
-    RESTORE_TWO_REGS x21, x22, 144
-    RESTORE_TWO_REGS x23, x24, 160
-    RESTORE_TWO_REGS x25, x26, 176
-    RESTORE_TWO_REGS x27, x28, 192
-
-    // x29(callee-save) and LR.
-    RESTORE_TWO_REGS x29, xLR, 208
-
-    DECREASE_FRAME 224
 .endm
 
     /*
