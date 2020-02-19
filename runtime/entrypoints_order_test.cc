@@ -147,8 +147,12 @@ class EntrypointsOrderTest : public CommonRuntimeTest {
   void CheckJniEntryPoints() {
     CHECKED(OFFSETOF_MEMBER(JniEntryPoints, pDlsymLookup) == 0,
             JniEntryPoints_start_with_dlsymlookup);
-    CHECKED(OFFSETOF_MEMBER(JniEntryPoints, pDlsymLookup)
-            + sizeof(void*) == sizeof(JniEntryPoints), JniEntryPoints_all);
+    CHECKED(OFFSETOF_MEMBER(JniEntryPoints, pDlsymLookup) + sizeof(void*) ==
+                OFFSETOF_MEMBER(JniEntryPoints, pDlsymLookupCritical),
+            JniEntryPoints_dlsymlookup_critical);
+    CHECKED(OFFSETOF_MEMBER(JniEntryPoints, pDlsymLookupCritical) + sizeof(void*) ==
+                sizeof(JniEntryPoints),
+            JniEntryPoints_all);
   }
 
   void CheckQuickEntryPoints() {

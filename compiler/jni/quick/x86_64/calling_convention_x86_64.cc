@@ -19,25 +19,13 @@
 #include <android-base/logging.h>
 
 #include "arch/instruction_set.h"
+#include "arch/x86_64/jni_frame_x86_64.h"
 #include "base/bit_utils.h"
 #include "handle_scope-inl.h"
 #include "utils/x86_64/managed_register_x86_64.h"
 
 namespace art {
 namespace x86_64 {
-
-constexpr size_t kFramePointerSize = static_cast<size_t>(PointerSize::k64);
-static_assert(kX86_64PointerSize == PointerSize::k64, "Unexpected x86_64 pointer size");
-
-constexpr size_t kMmxSpillSize = 8u;
-
-// XMM0..XMM7 can be used to pass the first 8 floating args. The rest must go on the stack.
-// -- Managed and JNI calling conventions.
-constexpr size_t kMaxFloatOrDoubleRegisterArguments = 8u;
-// Up to how many integer-like (pointers, objects, longs, int, short, bool, etc) args can be
-// enregistered. The rest of the args must go on the stack.
-// -- JNI calling convention only (Managed excludes RDI, so it's actually 5).
-constexpr size_t kMaxIntLikeRegisterArguments = 6u;
 
 static constexpr ManagedRegister kCalleeSaveRegisters[] = {
     // Core registers.
@@ -80,9 +68,6 @@ static constexpr uint32_t CalculateFpCalleeSpillMask(const ManagedRegister (&cal
 
 static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask(kCalleeSaveRegisters);
 static constexpr uint32_t kFpCalleeSpillMask = CalculateFpCalleeSpillMask(kCalleeSaveRegisters);
-
-static constexpr size_t kNativeStackAlignment = 16;
-static_assert(kNativeStackAlignment == kStackAlignment);
 
 static constexpr ManagedRegister kNativeCalleeSaveRegisters[] = {
     // Core registers.
@@ -268,13 +253,19 @@ size_t X86_64JniCallingConvention::OutArgSize() const {
     // but not native callee-saves.
     static_assert((kCoreCalleeSpillMask & ~kNativeCoreCalleeSpillMask) == 0u);
     static_assert((kFpCalleeSpillMask & ~kNativeFpCalleeSpillMask) != 0u);
-    size += POPCOUNT(kFpCalleeSpillMask & ~kNativeFpCalleeSpillMask) * kMmxSpillSize;
+    static_assert(
+        kAlwaysSpilledMmxRegisters == POPCOUNT(kFpCalleeSpillMask & ~kNativeFpCalleeSpillMask));
+    size += kAlwaysSpilledMmxRegisters * kMmxSpillSize;
     // Add return address size for @CriticalNative
     // For normal native the return PC is part of the managed stack frame instead of out args.
     size += kFramePointerSize;
   }
 
-  return RoundUp(size, kNativeStackAlignment);
+  size_t out_args_size = RoundUp(size, kNativeStackAlignment);
+  if (UNLIKELY(IsCriticalNative())) {
+    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+  }
+  return out_args_size;
 }
 
 ArrayRef<const ManagedRegister> X86_64JniCallingConvention::CalleeSaveRegisters() const {

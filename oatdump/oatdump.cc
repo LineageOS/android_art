@@ -196,6 +196,7 @@ class OatSymbolizer final {
         method_debug_infos_.push_back(std::move(info));                           \
       }
     DO_TRAMPOLINE(JniDlsymLookupTrampoline);
+    DO_TRAMPOLINE(JniDlsymLookupCriticalTrampoline);
     DO_TRAMPOLINE(QuickGenericJniTrampoline);
     DO_TRAMPOLINE(QuickImtConflictTrampoline);
     DO_TRAMPOLINE(QuickResolutionTrampoline);
@@ -447,6 +448,8 @@ class OatDumper {
     DUMP_OAT_HEADER_OFFSET("EXECUTABLE", GetExecutableOffset);
     DUMP_OAT_HEADER_OFFSET("JNI DLSYM LOOKUP TRAMPOLINE",
                            GetJniDlsymLookupTrampolineOffset);
+    DUMP_OAT_HEADER_OFFSET("JNI DLSYM LOOKUP CRITICAL TRAMPOLINE",
+                           GetJniDlsymLookupCriticalTrampolineOffset);
     DUMP_OAT_HEADER_OFFSET("QUICK GENERIC JNI TRAMPOLINE",
                            GetQuickGenericJniTrampolineOffset);
     DUMP_OAT_HEADER_OFFSET("QUICK IMT CONFLICT TRAMPOLINE",
@@ -2136,7 +2139,8 @@ class ImageDumper {
     if (class_linker->IsQuickResolutionStub(quick_code) ||
         class_linker->IsQuickToInterpreterBridge(quick_code) ||
         class_linker->IsQuickGenericJniStub(quick_code) ||
-        class_linker->IsJniDlsymLookupStub(quick_code)) {
+        class_linker->IsJniDlsymLookupStub(quick_code) ||
+        class_linker->IsJniDlsymLookupCriticalStub(quick_code)) {
       quick_code = oat_dumper_->GetQuickOatCode(m);
     }
     if (oat_dumper_->GetInstructionSet() == InstructionSet::kThumb2) {

@@ -122,6 +122,8 @@ class MyClassNatives {
     native void withoutImplementation();
     // Normal native
     native Object withoutImplementationRefReturn();
+    // Normal native
+    native static void staticWithoutImplementation();
 
     // Normal native
     native static void stackArgsIntsFirst(int i1, int i2, int i3, int i4, int i5, int i6, int i7,
@@ -256,6 +258,8 @@ class MyClassNatives {
     native void withoutImplementation_Fast();
     @FastNative
     native Object withoutImplementationRefReturn_Fast();
+    @FastNative
+    native static void staticWithoutImplementation_Fast();
 
     @FastNative
     native static void stackArgsIntsFirst_Fast(int i1, int i2, int i3, int i4, int i5, int i6, int i7,
@@ -299,6 +303,9 @@ class MyClassNatives {
     static native int fooSII_Critical(int x, int y);
     @CriticalNative
     static native double fooSDD_Critical(double x, double y);
+
+    @CriticalNative
+    native static void staticWithoutImplementation_Critical();
 
     @CriticalNative
     native static void stackArgsIntsFirst_Critical(int i1, int i2, int i3, int i4, int i5, int i6, int i7,

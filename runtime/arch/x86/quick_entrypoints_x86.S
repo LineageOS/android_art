@@ -120,20 +120,7 @@ END_MACRO
      * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs)
      */
 MACRO2(SETUP_SAVE_REFS_AND_ARGS_FRAME, got_reg, temp_reg)
-    PUSH edi  // Save callee saves
-    PUSH esi
-    PUSH ebp
-    PUSH ebx  // Save args
-    PUSH edx
-    PUSH ecx
-    // Create space for FPR args.
-    subl MACRO_LITERAL(4 * 8), %esp
-    CFI_ADJUST_CFA_OFFSET(4 * 8)
-    // Save FPRs.
-    movsd %xmm0, 0(%esp)
-    movsd %xmm1, 8(%esp)
-    movsd %xmm2, 16(%esp)
-    movsd %xmm3, 24(%esp)
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
 
     SETUP_GOT_NOSAVE RAW_VAR(got_reg)
     // Load Runtime::instance_ from GOT.
@@ -144,12 +131,6 @@ MACRO2(SETUP_SAVE_REFS_AND_ARGS_FRAME, got_reg, temp_reg)
     CFI_ADJUST_CFA_OFFSET(4)
     // Store esp as the stop quick frame.
     movl %esp, %fs:THREAD_TOP_QUICK_FRAME_OFFSET
-
-    // Ugly compile-time check, but we only have the preprocessor.
-    // Last +4: implicit return address pushed on stack when caller made call.
-#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 7*4 + 4*8 + 4)
-#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(X86) size not as expected."
-#endif
 END_MACRO
 
     /*
@@ -157,45 +138,12 @@ END_MACRO
      * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs) where the method is passed in EAX.
      */
 MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_EAX)
-    // Save callee and GPR args, mixed together to agree with core spills bitmap.
-    PUSH edi  // Save callee saves
-    PUSH esi
-    PUSH ebp
-    PUSH ebx  // Save args
-    PUSH edx
-    PUSH ecx
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
 
-    // Create space for FPR args.
-    subl MACRO_LITERAL(32), %esp
-    CFI_ADJUST_CFA_OFFSET(32)
-
-    // Save FPRs.
-    movsd %xmm0, 0(%esp)
-    movsd %xmm1, 8(%esp)
-    movsd %xmm2, 16(%esp)
-    movsd %xmm3, 24(%esp)
-
-    PUSH eax  // Store the ArtMethod reference at the bottom of the stack.
+    pushl %eax  // Store the ArtMethod reference at the bottom of the stack.
+    CFI_ADJUST_CFA_OFFSET(4)
     // Store esp as the stop quick frame.
     movl %esp, %fs:THREAD_TOP_QUICK_FRAME_OFFSET
-END_MACRO
-
-MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
-    // Restore FPRs. EAX is still on the stack.
-    movsd 4(%esp), %xmm0
-    movsd 12(%esp), %xmm1
-    movsd 20(%esp), %xmm2
-    movsd 28(%esp), %xmm3
-
-    addl MACRO_LITERAL(36), %esp  // Remove FPRs and EAX.
-    CFI_ADJUST_CFA_OFFSET(-36)
-
-    POP ecx                       // Restore args except eax
-    POP edx
-    POP ebx
-    POP ebp                       // Restore callee saves
-    POP esi
-    POP edi
 END_MACRO
 
 // Restore register and jump to routine
@@ -327,20 +275,6 @@ MACRO0(RESTORE_SAVE_EVERYTHING_FRAME_KEEP_EAX)
     CFI_ADJUST_CFA_OFFSET(-(16 + 8 * 8 + 4))
 
     RESTORE_SAVE_EVERYTHING_FRAME_GPRS_EXCEPT_EAX
-END_MACRO
-
-    /*
-     * Macro that calls through to artDeliverPendingExceptionFromCode, where the pending
-     * exception is Thread::Current()->exception_ when the runtime method frame is ready.
-     */
-MACRO0(DELIVER_PENDING_EXCEPTION_FRAME_READY)
-    // Outgoing argument set up
-    subl MACRO_LITERAL(12), %esp               // alignment padding
-    CFI_ADJUST_CFA_OFFSET(12)
-    pushl %fs:THREAD_SELF_OFFSET               // pass Thread::Current()
-    CFI_ADJUST_CFA_OFFSET(4)
-    call SYMBOL(artDeliverPendingExceptionFromCode)  // artDeliverPendingExceptionFromCode(Thread*)
-    UNREACHABLE
 END_MACRO
 
     /*

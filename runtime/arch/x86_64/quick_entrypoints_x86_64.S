@@ -38,115 +38,25 @@ MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME)
     int3
     int3
 #else
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
     // R10 := Runtime::Current()
     movq _ZN3art7Runtime9instance_E@GOTPCREL(%rip), %r10
     movq (%r10), %r10
-    // Save callee and GPR args, mixed together to agree with core spills bitmap.
-    PUSH r15  // Callee save.
-    PUSH r14  // Callee save.
-    PUSH r13  // Callee save.
-    PUSH r12  // Callee save.
-    PUSH r9   // Quick arg 5.
-    PUSH r8   // Quick arg 4.
-    PUSH rsi  // Quick arg 1.
-    PUSH rbp  // Callee save.
-    PUSH rbx  // Callee save.
-    PUSH rdx  // Quick arg 2.
-    PUSH rcx  // Quick arg 3.
-    // Create space for FPR args and create 2 slots for ArtMethod*.
-    subq MACRO_LITERAL(16 + 12 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(16 + 12 * 8)
     // R10 := ArtMethod* for ref and args callee save frame method.
     movq RUNTIME_SAVE_REFS_AND_ARGS_METHOD_OFFSET(%r10), %r10
-    // Save FPRs.
-    movq %xmm0, 16(%rsp)
-    movq %xmm1, 24(%rsp)
-    movq %xmm2, 32(%rsp)
-    movq %xmm3, 40(%rsp)
-    movq %xmm4, 48(%rsp)
-    movq %xmm5, 56(%rsp)
-    movq %xmm6, 64(%rsp)
-    movq %xmm7, 72(%rsp)
-    movq %xmm12, 80(%rsp)
-    movq %xmm13, 88(%rsp)
-    movq %xmm14, 96(%rsp)
-    movq %xmm15, 104(%rsp)
     // Store ArtMethod* to bottom of stack.
     movq %r10, 0(%rsp)
     // Store rsp as the top quick frame.
     movq %rsp, %gs:THREAD_TOP_QUICK_FRAME_OFFSET
-
-    // Ugly compile-time check, but we only have the preprocessor.
-    // Last +8: implicit return address pushed on stack when caller made call.
-#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 11 * 8 + 12 * 8 + 16 + 8)
-#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(X86_64) size not as expected."
-#endif
 #endif  // __APPLE__
 END_MACRO
 
 MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_RDI)
-    // Save callee and GPR args, mixed together to agree with core spills bitmap.
-    PUSH r15  // Callee save.
-    PUSH r14  // Callee save.
-    PUSH r13  // Callee save.
-    PUSH r12  // Callee save.
-    PUSH r9   // Quick arg 5.
-    PUSH r8   // Quick arg 4.
-    PUSH rsi  // Quick arg 1.
-    PUSH rbp  // Callee save.
-    PUSH rbx  // Callee save.
-    PUSH rdx  // Quick arg 2.
-    PUSH rcx  // Quick arg 3.
-    // Create space for FPR args and create 2 slots for ArtMethod*.
-    subq LITERAL(80 + 4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(80 + 4 * 8)
-    // Save FPRs.
-    movq %xmm0, 16(%rsp)
-    movq %xmm1, 24(%rsp)
-    movq %xmm2, 32(%rsp)
-    movq %xmm3, 40(%rsp)
-    movq %xmm4, 48(%rsp)
-    movq %xmm5, 56(%rsp)
-    movq %xmm6, 64(%rsp)
-    movq %xmm7, 72(%rsp)
-    movq %xmm12, 80(%rsp)
-    movq %xmm13, 88(%rsp)
-    movq %xmm14, 96(%rsp)
-    movq %xmm15, 104(%rsp)
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
     // Store ArtMethod to bottom of stack.
     movq %rdi, 0(%rsp)
     // Store rsp as the stop quick frame.
     movq %rsp, %gs:THREAD_TOP_QUICK_FRAME_OFFSET
-END_MACRO
-
-MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
-    // Restore FPRs.
-    movq 16(%rsp), %xmm0
-    movq 24(%rsp), %xmm1
-    movq 32(%rsp), %xmm2
-    movq 40(%rsp), %xmm3
-    movq 48(%rsp), %xmm4
-    movq 56(%rsp), %xmm5
-    movq 64(%rsp), %xmm6
-    movq 72(%rsp), %xmm7
-    movq 80(%rsp), %xmm12
-    movq 88(%rsp), %xmm13
-    movq 96(%rsp), %xmm14
-    movq 104(%rsp), %xmm15
-    addq MACRO_LITERAL(80 + 4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(-(80 + 4 * 8))
-    // Restore callee and GPR args, mixed together to agree with core spills bitmap.
-    POP rcx
-    POP rdx
-    POP rbx
-    POP rbp
-    POP rsi
-    POP r8
-    POP r9
-    POP r12
-    POP r13
-    POP r14
-    POP r15
 END_MACRO
 
     /*
