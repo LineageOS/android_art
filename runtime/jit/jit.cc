@@ -1024,6 +1024,10 @@ void Jit::MapBootImageMethods() {
     // such methods, we need their entrypoints to be stubs that do the
     // initialization check.
     header.VisitPackedArtMethods([&](ArtMethod& method) NO_THREAD_SAFETY_ANALYSIS {
+      // Methods in the boot image should never have their single
+      // implementation flag set (and therefore never have a `data_` pointing
+      // to an ArtMethod for single implementation).
+      CHECK(method.IsIntrinsic() || !method.HasSingleImplementationFlag());
       if (method.IsRuntimeMethod()) {
         return;
       }
