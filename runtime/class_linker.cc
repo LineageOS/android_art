@@ -1607,7 +1607,7 @@ void AppImageLoadingHelper::Update(
       const DexFile* const dex_file = dex_cache->GetDexFile();
       {
         WriterMutexLock mu2(self, *Locks::dex_lock_);
-        CHECK(!class_linker->FindDexCacheDataLocked(*dex_file).IsValid());
+        CHECK(class_linker->FindDexCacheDataLocked(*dex_file) == nullptr);
         class_linker->RegisterDexFileLocked(*dex_file, dex_cache, class_loader.Get());
       }
 
@@ -4033,25 +4033,19 @@ void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,
   dex_caches_.push_back(data);
 }
 
-ObjPtr<mirror::DexCache> ClassLinker::DecodeDexCache(Thread* self, const DexCacheData& data) {
-  return data.IsValid()
-      ? ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data.weak_root))
+ObjPtr<mirror::DexCache> ClassLinker::DecodeDexCacheLocked(Thread* self, const DexCacheData* data) {
+  return data != nullptr
+      ? ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data->weak_root))
       : nullptr;
 }
 
-ObjPtr<mirror::DexCache> ClassLinker::EnsureSameClassLoader(
-    Thread* self,
+bool ClassLinker::IsSameClassLoader(
     ObjPtr<mirror::DexCache> dex_cache,
-    const DexCacheData& data,
+    const DexCacheData* data,
     ObjPtr<mirror::ClassLoader> class_loader) {
-  DCHECK_EQ(dex_cache->GetDexFile(), data.dex_file);
-  if (data.class_table != ClassTableForClassLoader(class_loader)) {
-    self->ThrowNewExceptionF("Ljava/lang/InternalError;",
-                             "Attempt to register dex file %s with multiple class loaders",
-                             data.dex_file->GetLocation().c_str());
-    return nullptr;
-  }
-  return dex_cache;
+  CHECK(data != nullptr);
+  DCHECK_EQ(dex_cache->GetDexFile(), data->dex_file);
+  return data->class_table == ClassTableForClassLoader(class_loader);
 }
 
 void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
@@ -4064,12 +4058,9 @@ void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
   const DexFile* dex_file = dex_cache->GetDexFile();
   DCHECK(dex_file != nullptr) << "Attempt to register uninitialized dex_cache object!";
   if (kIsDebugBuild) {
-    DexCacheData old_data;
-    {
-      ReaderMutexLock mu(self, *Locks::dex_lock_);
-      old_data = FindDexCacheDataLocked(*dex_file);
-    }
-    ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCache(self, old_data);
+    ReaderMutexLock mu(self, *Locks::dex_lock_);
+    const DexCacheData* old_data = FindDexCacheDataLocked(*dex_file);
+    ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCacheLocked(self, old_data);
     DCHECK(old_dex_cache.IsNull()) << "Attempt to manually register a dex cache thats already "
                                    << "been registered on dex file " << dex_file->GetLocation();
   }
@@ -4092,17 +4083,35 @@ void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
   }
 }
 
+static void ThrowDexFileAlreadyRegisteredError(Thread* self, const DexFile& dex_file) REQUIRES_SHARED(Locks::mutator_lock_) {
+  self->ThrowNewExceptionF("Ljava/lang/InternalError;",
+                            "Attempt to register dex file %s with multiple class loaders",
+                            dex_file.GetLocation().c_str());
+}
+
 ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
                                                       ObjPtr<mirror::ClassLoader> class_loader) {
   Thread* self = Thread::Current();
-  DexCacheData old_data;
+  ObjPtr<mirror::DexCache> old_dex_cache;
+  bool registered_with_another_class_loader = false;
   {
     ReaderMutexLock mu(self, *Locks::dex_lock_);
-    old_data = FindDexCacheDataLocked(dex_file);
+    const DexCacheData* old_data = FindDexCacheDataLocked(dex_file);
+    old_dex_cache = DecodeDexCacheLocked(self, old_data);
+    if (old_dex_cache != nullptr) {
+      if (IsSameClassLoader(old_dex_cache, old_data, class_loader)) {
+        return old_dex_cache;
+      } else {
+        // TODO This is not very clean looking. Should maybe try to make a way to request exceptions
+        // be thrown when it's safe to do so to simplify this.
+        registered_with_another_class_loader = true;
+      }
+    }
   }
-  ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCache(self, old_data);
-  if (old_dex_cache != nullptr) {
-    return EnsureSameClassLoader(self, old_dex_cache, old_data, class_loader);
+  // We need to have released the dex_lock_ to allocate safely.
+  if (registered_with_another_class_loader) {
+    ThrowDexFileAlreadyRegisteredError(self, dex_file);
+    return nullptr;
   }
   SCOPED_TRACE << __FUNCTION__ << " " << dex_file.GetLocation();
   LinearAlloc* const linear_alloc = GetOrCreateAllocatorForClassLoader(class_loader);
@@ -4128,8 +4137,8 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
     // weak references access, and a thread blocking on the dex lock.
     gc::ScopedGCCriticalSection gcs(self, gc::kGcCauseClassLinker, gc::kCollectorTypeClassLinker);
     WriterMutexLock mu(self, *Locks::dex_lock_);
-    old_data = FindDexCacheDataLocked(dex_file);
-    old_dex_cache = DecodeDexCache(self, old_data);
+    const DexCacheData* old_data = FindDexCacheDataLocked(dex_file);
+    old_dex_cache = DecodeDexCacheLocked(self, old_data);
     if (old_dex_cache == nullptr && h_dex_cache != nullptr) {
       // Do InitializeDexCache while holding dex lock to make sure two threads don't call it at the
       // same time with the same dex cache. Since the .bss is shared this can cause failing DCHECK
@@ -4142,14 +4151,23 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
                                            image_pointer_size_);
       RegisterDexFileLocked(dex_file, h_dex_cache.Get(), h_class_loader.Get());
     }
+    if (old_dex_cache != nullptr) {
+      // Another thread managed to initialize the dex cache faster, so use that DexCache.
+      // If this thread encountered OOME, ignore it.
+      DCHECK_EQ(h_dex_cache == nullptr, self->IsExceptionPending());
+      self->ClearException();
+      // We cannot call EnsureSameClassLoader() or allocate an exception while holding the
+      // dex_lock_.
+      if (IsSameClassLoader(old_dex_cache, old_data, h_class_loader.Get())) {
+        return old_dex_cache;
+      } else {
+        registered_with_another_class_loader = true;
+      }
+    }
   }
-  if (old_dex_cache != nullptr) {
-    // Another thread managed to initialize the dex cache faster, so use that DexCache.
-    // If this thread encountered OOME, ignore it.
-    DCHECK_EQ(h_dex_cache == nullptr, self->IsExceptionPending());
-    self->ClearException();
-    // We cannot call EnsureSameClassLoader() while holding the dex_lock_.
-    return EnsureSameClassLoader(self, old_dex_cache, old_data, h_class_loader.Get());
+  if (registered_with_another_class_loader) {
+    ThrowDexFileAlreadyRegisteredError(self, dex_file);
+    return nullptr;
   }
   if (h_dex_cache == nullptr) {
     self->AssertPendingOOMException();
@@ -4166,24 +4184,24 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
 
 bool ClassLinker::IsDexFileRegistered(Thread* self, const DexFile& dex_file) {
   ReaderMutexLock mu(self, *Locks::dex_lock_);
-  return DecodeDexCache(self, FindDexCacheDataLocked(dex_file)) != nullptr;
+  return DecodeDexCacheLocked(self, FindDexCacheDataLocked(dex_file)) != nullptr;
 }
 
 ObjPtr<mirror::DexCache> ClassLinker::FindDexCache(Thread* self, const DexFile& dex_file) {
   ReaderMutexLock mu(self, *Locks::dex_lock_);
-  DexCacheData dex_cache_data = FindDexCacheDataLocked(dex_file);
-  ObjPtr<mirror::DexCache> dex_cache = DecodeDexCache(self, dex_cache_data);
+  const DexCacheData* dex_cache_data = FindDexCacheDataLocked(dex_file);
+  ObjPtr<mirror::DexCache> dex_cache = DecodeDexCacheLocked(self, dex_cache_data);
   if (dex_cache != nullptr) {
     return dex_cache;
   }
   // Failure, dump diagnostic and abort.
   for (const DexCacheData& data : dex_caches_) {
-    if (DecodeDexCache(self, data) != nullptr) {
+    if (DecodeDexCacheLocked(self, &data) != nullptr) {
       LOG(FATAL_WITHOUT_ABORT) << "Registered dex file " << data.dex_file->GetLocation();
     }
   }
   LOG(FATAL) << "Failed to find DexCache for DexFile " << dex_file.GetLocation()
-             << " " << &dex_file << " " << dex_cache_data.dex_file;
+             << " " << &dex_file << " " << dex_cache_data->dex_file;
   UNREACHABLE();
 }
 
@@ -4195,7 +4213,7 @@ ClassTable* ClassLinker::FindClassTable(Thread* self, ObjPtr<mirror::DexCache> d
   for (const DexCacheData& data : dex_caches_) {
     // Avoid decoding (and read barriers) other unrelated dex caches.
     if (data.dex_file == dex_file) {
-      ObjPtr<mirror::DexCache> registered_dex_cache = DecodeDexCache(self, data);
+      ObjPtr<mirror::DexCache> registered_dex_cache = DecodeDexCacheLocked(self, &data);
       if (registered_dex_cache != nullptr) {
         CHECK_EQ(registered_dex_cache, dex_cache) << dex_file->GetLocation();
         return data.class_table;
@@ -4205,15 +4223,15 @@ ClassTable* ClassLinker::FindClassTable(Thread* self, ObjPtr<mirror::DexCache> d
   return nullptr;
 }
 
-ClassLinker::DexCacheData ClassLinker::FindDexCacheDataLocked(const DexFile& dex_file) {
+const ClassLinker::DexCacheData* ClassLinker::FindDexCacheDataLocked(const DexFile& dex_file) {
   // Search assuming unique-ness of dex file.
   for (const DexCacheData& data : dex_caches_) {
     // Avoid decoding (and read barriers) other unrelated dex caches.
     if (data.dex_file == &dex_file) {
-      return data;
+      return &data;
     }
   }
-  return DexCacheData();
+  return nullptr;
 }
 
 void ClassLinker::CreatePrimitiveClass(Thread* self,
