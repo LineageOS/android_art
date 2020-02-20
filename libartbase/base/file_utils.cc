@@ -278,9 +278,8 @@ std::string GetDefaultBootImageLocation(const std::string& android_root) {
   // Boot image consists of two parts:
   //  - the primary boot image in the ART apex (contains the Core Libraries)
   //  - the boot image extension on the system partition (contains framework libraries)
-  return StringPrintf("%s/javalib/boot.art:%s/framework/boot-framework.art!%s/etc/boot-image.prof",
+  return StringPrintf("%s/javalib/boot.art:%s/framework/boot-framework.art",
                       kAndroidArtApexDefaultPath,
-                      android_root.c_str(),
                       android_root.c_str());
 }
 
