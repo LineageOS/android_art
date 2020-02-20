@@ -103,6 +103,10 @@ class CompilerOptions final {
     return CompilerFilter::IsVerificationEnabled(compiler_filter_);
   }
 
+  bool AssumeDexFilesAreVerified() const {
+    return compiler_filter_ == CompilerFilter::kAssumeVerified;
+  }
+
   bool AssumeClassesAreVerified() const {
     return compiler_filter_ == CompilerFilter::kAssumeVerified;
   }
