@@ -109,6 +109,11 @@ cc_defaults {
         darwin: {
             enabled: true,  // for libdexfile.
         },
+        host: {
+            cflags: [
+                "-DTARGET_HOST",
+            ],
+        },
     },
     generated_sources: ["art_libartbase_operator_srcs"],
     cflags: ["-DBUILDING_LIBART=1"],
