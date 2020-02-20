@@ -211,7 +211,7 @@ static jint trampoline_Java_Main_testSignal(JNIEnv*, jclass) {
   struct sigaction tmp;
   sigemptyset(&tmp.sa_mask);
   tmp.sa_sigaction = test_sigaction_handler;
-#if !defined(__APPLE__) && !defined(__mips__)
+#if !defined(__APPLE__)
   tmp.sa_restorer = nullptr;
 #endif
 
