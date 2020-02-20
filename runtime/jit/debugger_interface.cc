@@ -576,10 +576,12 @@ void RemoveNativeDebugInfoForJit(ArrayRef<const void*> removed) {
   RepackEntries(/*compress_entries=*/ true, removed);
 
   // Remove entries which are not allowed to be packed (containing single method each).
-  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr; it = it->next_) {
+  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr;) {
+    const JITCodeEntry* next = it->next_;
     if (!it->allow_packing_ && std::binary_search(removed.begin(), removed.end(), it->addr_)) {
       DeleteJITCodeEntryInternal<JitNativeInfo>(/*entry=*/ it);
     }
+    it = next;
   }
 }
 
