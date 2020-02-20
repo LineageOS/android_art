@@ -1608,7 +1608,8 @@ class Dex2Oat final {
         std::vector<std::unique_ptr<const DexFile>> opened_dex_files;
         // No need to verify the dex file when we have a vdex file, which means it was already
         // verified.
-        const bool verify = (input_vdex_file_ == nullptr);
+        const bool verify =
+            (input_vdex_file_ == nullptr) && !compiler_options_->AssumeDexFilesAreVerified();
         if (!oat_writers_[i]->WriteAndOpenDexFiles(
             vdex_files_[i].get(),
             verify,
