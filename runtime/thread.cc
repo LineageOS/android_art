@@ -3371,6 +3371,7 @@ void Thread::DumpThreadOffset(std::ostream& os, uint32_t offset) {
       return; \
     }
   JNI_ENTRY_POINT_INFO(pDlsymLookup)
+  JNI_ENTRY_POINT_INFO(pDlsymLookupCritical)
 #undef JNI_ENTRY_POINT_INFO
 
 #define QUICK_ENTRY_POINT_INFO(x) \

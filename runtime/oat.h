@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: invokeinterface on j.l.Object do a vtable call.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '7', '9', '\0' } };
+  // Last oat version changed reason: Allow late lookup for @CriticalNative.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '0', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";
@@ -72,6 +72,9 @@ class PACKED(4) OatHeader {
   const void* GetJniDlsymLookupTrampoline() const;
   uint32_t GetJniDlsymLookupTrampolineOffset() const;
   void SetJniDlsymLookupTrampolineOffset(uint32_t offset);
+  const void* GetJniDlsymLookupCriticalTrampoline() const;
+  uint32_t GetJniDlsymLookupCriticalTrampolineOffset() const;
+  void SetJniDlsymLookupCriticalTrampolineOffset(uint32_t offset);
 
   const void* GetQuickGenericJniTrampoline() const;
   uint32_t GetQuickGenericJniTrampolineOffset() const;
@@ -123,6 +126,7 @@ class PACKED(4) OatHeader {
   uint32_t oat_dex_files_offset_;
   uint32_t executable_offset_;
   uint32_t jni_dlsym_lookup_trampoline_offset_;
+  uint32_t jni_dlsym_lookup_critical_trampoline_offset_;
   uint32_t quick_generic_jni_trampoline_offset_;
   uint32_t quick_imt_conflict_trampoline_offset_;
   uint32_t quick_resolution_trampoline_offset_;

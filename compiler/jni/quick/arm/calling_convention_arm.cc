@@ -18,6 +18,7 @@
 
 #include <android-base/logging.h>
 
+#include "arch/arm/jni_frame_arm.h"
 #include "arch/instruction_set.h"
 #include "base/macros.h"
 #include "handle_scope-inl.h"
@@ -38,7 +39,7 @@ static const Register kJniArgumentRegisters[] = {
   R0, R1, R2, R3
 };
 
-static const size_t kJniArgumentRegisterCount = arraysize(kJniArgumentRegisters);
+static_assert(kJniArgumentRegisterCount == arraysize(kJniArgumentRegisters));
 
 //
 // Managed calling convention constants.
@@ -120,10 +121,6 @@ static constexpr uint32_t CalculateFpCalleeSpillMask(const ManagedRegister (&cal
 
 static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask(kCalleeSaveRegisters);
 static constexpr uint32_t kFpCalleeSpillMask = CalculateFpCalleeSpillMask(kCalleeSaveRegisters);
-
-// The AAPCS requires 8-byte alignement. This is not as strict as the Managed ABI stack alignment.
-static constexpr size_t kAapcsStackAlignment = 8u;
-static_assert(kAapcsStackAlignment < kStackAlignment);
 
 static constexpr ManagedRegister kAapcsCalleeSaveRegisters[] = {
     // Core registers.
@@ -448,7 +445,11 @@ size_t ArmJniCallingConvention::OutArgSize() const {
   if (is_critical_native_ && (size != 0u || GetShorty()[0] == 'F' || GetShorty()[0] == 'D')) {
     size += kFramePointerSize;  // We need to spill LR with the args.
   }
-  return RoundUp(size, kAapcsStackAlignment);
+  size_t out_args_size = RoundUp(size, kAapcsStackAlignment);
+  if (UNLIKELY(IsCriticalNative())) {
+    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+  }
+  return out_args_size;
 }
 
 ArrayRef<const ManagedRegister> ArmJniCallingConvention::CalleeSaveRegisters() const {

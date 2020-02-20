@@ -406,7 +406,8 @@ const void* ArtMethod::RegisterNative(const void* native_method) {
 void ArtMethod::UnregisterNative() {
   CHECK(IsNative()) << PrettyMethod();
   // restore stub to lookup native pointer via dlsym
-  SetEntryPointFromJni(GetJniDlsymLookupStub());
+  SetEntryPointFromJni(
+      IsCriticalNative() ? GetJniDlsymLookupCriticalStub() : GetJniDlsymLookupStub());
 }
 
 bool ArtMethod::IsOverridableByDefaultMethod() {

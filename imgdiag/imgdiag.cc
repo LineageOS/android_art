@@ -853,6 +853,10 @@ class RegionSpecializedBase<ArtMethod> : public RegionCommon<ArtMethod> {
       if (jdl != nullptr) {
         entry_point_names_[jdl] = "JniDlsymLookupTrampoline (from boot oat file)";
       }
+      const void* jdlc = oat_header.GetJniDlsymLookupCriticalTrampoline();
+      if (jdlc != nullptr) {
+        entry_point_names_[jdlc] = "JniDlsymLookupCriticalTrampoline (from boot oat file)";
+      }
       const void* qgjt = oat_header.GetQuickGenericJniTrampoline();
       if (qgjt != nullptr) {
         entry_point_names_[qgjt] = "QuickGenericJniTrampoline (from boot oat file)";
@@ -897,6 +901,8 @@ class RegionSpecializedBase<ArtMethod> : public RegionCommon<ArtMethod> {
           return "QuickResolutionStub";
         } else if (class_linker_->IsJniDlsymLookupStub(addr)) {
           return "JniDlsymLookupStub";
+        } else if (class_linker_->IsJniDlsymLookupCriticalStub(addr)) {
+          return "JniDlsymLookupCriticalStub";
         }
         // Match the address against those that we saved from the boot OAT files.
         if (entry_point_names_.find(addr) != entry_point_names_.end()) {

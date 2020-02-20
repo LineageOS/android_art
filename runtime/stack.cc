@@ -805,10 +805,12 @@ QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
     return RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
   }
 
-  // The only remaining case is if the method is native and uses the generic JNI stub,
-  // called either directly or through some (resolution, instrumentation) trampoline.
+  // The only remaining cases are for native methods that either
+  //   - use the Generic JNI stub, called either directly or through some
+  //     (resolution, instrumentation) trampoline; or
+  //   - fake a Generic JNI frame in art_jni_dlsym_lookup_critical_stub.
   DCHECK(method->IsNative());
-  if (kIsDebugBuild) {
+  if (kIsDebugBuild && !method->IsCriticalNative()) {
     ClassLinker* class_linker = runtime->GetClassLinker();
     const void* entry_point = runtime->GetInstrumentation()->GetQuickCodeFor(method,
                                                                              kRuntimePointerSize);

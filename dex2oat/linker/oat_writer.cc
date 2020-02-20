@@ -417,6 +417,7 @@ OatWriter::OatWriter(const CompilerOptions& compiler_options,
     size_interpreter_to_interpreter_bridge_(0),
     size_interpreter_to_compiled_code_bridge_(0),
     size_jni_dlsym_lookup_trampoline_(0),
+    size_jni_dlsym_lookup_critical_trampoline_(0),
     size_quick_generic_jni_trampoline_(0),
     size_quick_imt_conflict_trampoline_(0),
     size_quick_resolution_trampoline_(0),
@@ -2208,6 +2209,7 @@ size_t OatWriter::InitOatCode(size_t offset) {
       offset += (field)->size();
 
     DO_TRAMPOLINE(jni_dlsym_lookup_trampoline_, JniDlsymLookupTrampoline);
+    DO_TRAMPOLINE(jni_dlsym_lookup_critical_trampoline_, JniDlsymLookupCriticalTrampoline);
     DO_TRAMPOLINE(quick_generic_jni_trampoline_, QuickGenericJniTrampoline);
     DO_TRAMPOLINE(quick_imt_conflict_trampoline_, QuickImtConflictTrampoline);
     DO_TRAMPOLINE(quick_resolution_trampoline_, QuickResolutionTrampoline);
@@ -2216,6 +2218,7 @@ size_t OatWriter::InitOatCode(size_t offset) {
     #undef DO_TRAMPOLINE
   } else {
     oat_header_->SetJniDlsymLookupTrampolineOffset(0);
+    oat_header_->SetJniDlsymLookupCriticalTrampolineOffset(0);
     oat_header_->SetQuickGenericJniTrampolineOffset(0);
     oat_header_->SetQuickImtConflictTrampolineOffset(0);
     oat_header_->SetQuickResolutionTrampolineOffset(0);
@@ -2755,6 +2758,7 @@ bool OatWriter::CheckOatSize(OutputStream* out, size_t file_offset, size_t relat
     DO_STAT(size_interpreter_to_interpreter_bridge_);
     DO_STAT(size_interpreter_to_compiled_code_bridge_);
     DO_STAT(size_jni_dlsym_lookup_trampoline_);
+    DO_STAT(size_jni_dlsym_lookup_critical_trampoline_);
     DO_STAT(size_quick_generic_jni_trampoline_);
     DO_STAT(size_quick_imt_conflict_trampoline_);
     DO_STAT(size_quick_resolution_trampoline_);
@@ -3086,6 +3090,7 @@ size_t OatWriter::WriteCode(OutputStream* out, size_t file_offset, size_t relati
       } while (false)
 
     DO_TRAMPOLINE(jni_dlsym_lookup_trampoline_);
+    DO_TRAMPOLINE(jni_dlsym_lookup_critical_trampoline_);
     DO_TRAMPOLINE(quick_generic_jni_trampoline_);
     DO_TRAMPOLINE(quick_imt_conflict_trampoline_);
     DO_TRAMPOLINE(quick_resolution_trampoline_);

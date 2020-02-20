@@ -19,6 +19,7 @@
 #include <android-base/logging.h>
 
 #include "arch/instruction_set.h"
+#include "arch/x86/jni_frame_x86.h"
 #include "handle_scope-inl.h"
 #include "utils/x86/managed_register_x86.h"
 
@@ -50,9 +51,6 @@ static constexpr uint32_t CalculateCoreCalleeSpillMask(
 
 static constexpr uint32_t kCoreCalleeSpillMask = CalculateCoreCalleeSpillMask(kCalleeSaveRegisters);
 static constexpr uint32_t kFpCalleeSpillMask = 0u;
-
-static constexpr size_t kNativeStackAlignment = 16;  // IA-32 cdecl requires 16 byte alignment.
-static_assert(kNativeStackAlignment == kStackAlignment);
 
 static constexpr ManagedRegister kNativeCalleeSaveRegisters[] = {
     // Core registers.
@@ -268,8 +266,8 @@ size_t X86JniCallingConvention::OutArgSize() const {
   static_assert((kCoreCalleeSpillMask & ~kNativeCoreCalleeSpillMask) == 0u);
   static_assert((kFpCalleeSpillMask & ~kNativeFpCalleeSpillMask) == 0u);
 
-  if (is_critical_native_) {
-    // Add return address size for @CriticalNative
+  if (UNLIKELY(IsCriticalNative())) {
+    // Add return address size for @CriticalNative.
     // For normal native the return PC is part of the managed stack frame instead of out args.
     size += kFramePointerSize;
     // For @CriticalNative, we can make a tail call if there are no stack args
@@ -281,13 +279,17 @@ size_t X86JniCallingConvention::OutArgSize() const {
         GetShorty()[0] != 'F' && GetShorty()[0] != 'D' && !RequiresSmallResultTypeExtension());
     if (return_type_ok && size == kFramePointerSize) {
       // Note: This is not aligned to kNativeStackAlignment but that's OK for tail call.
-      DCHECK_EQ(size, kFramePointerSize);
       static_assert(kFramePointerSize < kNativeStackAlignment);
+      DCHECK_EQ(kFramePointerSize, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
       return kFramePointerSize;
     }
   }
 
-  return RoundUp(size, kNativeStackAlignment);
+  size_t out_args_size = RoundUp(size, kNativeStackAlignment);
+  if (UNLIKELY(IsCriticalNative())) {
+    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+  }
+  return out_args_size;
 }
 
 ArrayRef<const ManagedRegister> X86JniCallingConvention::CalleeSaveRegisters() const {
