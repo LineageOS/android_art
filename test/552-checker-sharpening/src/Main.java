@@ -73,7 +73,7 @@ public class Main {
 
   public static int testDiamond(boolean negate, int x) {
     // These calls should use PC-relative loads to retrieve the target method.
-    // PC-relative bases used by MIPS32R2 and X86 should be pulled before the If.
+    // PC-relative bases used by X86 should be pulled before the If.
     if (negate) {
       return $noinline$foo(-x);
     } else {
@@ -100,7 +100,7 @@ public class Main {
   /// CHECK:                InvokeStaticOrDirect method_load_kind:BssEntry
 
   public static int testLoop(int[] array, int x) {
-    // PC-relative bases used by MIPS32R2 and X86 should be pulled before the loop.
+    // PC-relative bases used by X86 should be pulled before the loop.
     for (int i : array) {
       x += $noinline$foo(i);
     }
@@ -118,8 +118,7 @@ public class Main {
   /// CHECK-NEXT:           Goto
 
   public static int testLoopWithDiamond(int[] array, boolean negate, int x) {
-    // PC-relative bases used by MIPS32R2 and X86 should be pulled before the loop
-    // but not outside the if.
+    // PC-relative bases used by X86 should be pulled before the loop but not outside the if.
     if (array != null) {
       for (int i : array) {
         if (negate) {

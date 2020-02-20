@@ -107,13 +107,13 @@ class LoadedByMyClassLoader {
                 /* Load and initialize FirstSeenByMyClassLoader */
   /// CHECK:      LoadClass class_name:FirstSeenByMyClassLoader gen_clinit_check:true
                 /* Load and initialize System */
-  // There may be MipsComputeBaseMethodAddress here.
+  // There may be HX86ComputeBaseMethodAddress here.
   /// CHECK:      LoadClass class_name:java.lang.System
   // The ClinitCheck may (PIC) or may not (non-PIC) be merged into the LoadClass.
   // (The merging checks for environment match but HLoadClass/kBootImageAddress
   // used for non-PIC mode does not have an environment at all.)
   /// CHECK:      StaticFieldGet
-  // There may be HX86ComputeBaseMethodAddress or MipsComputeBaseMethodAddress here.
+  // There may be HX86ComputeBaseMethodAddress here.
   /// CHECK:      LoadString
   /// CHECK-NEXT: NullCheck
   /// CHECK-NEXT: InvokeVirtual

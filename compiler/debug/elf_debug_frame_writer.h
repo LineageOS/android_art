@@ -88,30 +88,6 @@ static void WriteCIE(InstructionSet isa, /*inout*/ std::vector<uint8_t>* buffer)
       WriteCIE(is64bit, return_reg, opcodes, buffer);
       return;
     }
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64: {
-      dwarf::DebugFrameOpCodeWriter<> opcodes;
-      opcodes.DefCFA(Reg::MipsCore(29), 0);  // R29(SP).
-      // core registers.
-      for (int reg = 1; reg < 26; reg++) {
-        if (reg < 16 || reg == 24 || reg == 25) {  // AT, V*, A*, T*.
-          opcodes.Undefined(Reg::MipsCore(reg));
-        } else {
-          opcodes.SameValue(Reg::MipsCore(reg));
-        }
-      }
-      // fp registers.
-      for (int reg = 0; reg < 32; reg++) {
-        if (reg < 24) {
-          opcodes.Undefined(Reg::Mips64Fp(reg));
-        } else {
-          opcodes.SameValue(Reg::Mips64Fp(reg));
-        }
-      }
-      auto return_reg = Reg::MipsCore(31);  // R31(RA).
-      WriteCIE(is64bit, return_reg, opcodes, buffer);
-      return;
-    }
     case InstructionSet::kX86: {
       // FIXME: Add fp registers once libunwind adds support for them. Bug: 20491296
       constexpr bool generate_opcodes_for_x86_fp = false;
