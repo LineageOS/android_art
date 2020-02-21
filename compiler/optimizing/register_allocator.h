@@ -60,9 +60,6 @@ class RegisterAllocator : public DeletableArenaObject<kArenaAllocRegisterAllocat
   // intervals that intersect each other. Returns false if it failed.
   virtual bool Validate(bool log_fatal_on_failure) = 0;
 
-  static bool CanAllocateRegistersFor(const HGraph& graph,
-                                      InstructionSet instruction_set);
-
   // Verifies that live intervals do not conflict. Used by unit testing.
   static bool ValidateIntervals(ArrayRef<LiveInterval* const> intervals,
                                 size_t number_of_spill_slots,
