@@ -82,4 +82,4 @@ For convenience, several architectures can be specified as set after the
 thereby avoiding to repeat the check lines if some, but not all architectures
 match. An example line looks like:
 
-  /// CHECK-START-{MIPS,ARM,ARM64}: int MyClass.MyMethod() constant_folding (after)
+  /// CHECK-START-{X86_64,ARM,ARM64}: int MyClass.MyMethod() constant_folding (after)

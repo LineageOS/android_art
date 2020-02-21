@@ -59,7 +59,7 @@
 //               doesn't have SA_RESTART, and raise the signal to avoid restarting syscalls that are
 //               expected to be interrupted?
 
-#if defined(__BIONIC__) && !defined(__LP64__) && !defined(__mips__)
+#if defined(__BIONIC__) && !defined(__LP64__)
 static int sigismember(const sigset64_t* sigset, int signum) {
   return sigismember64(sigset, signum);
 }

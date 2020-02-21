@@ -26,7 +26,7 @@ import (
 	"android/soong/cc"
 )
 
-var supportedArches = []string{"arm", "arm64", "mips", "mips64", "x86", "x86_64"}
+var supportedArches = []string{"arm", "arm64", "x86", "x86_64"}
 
 func globalFlags(ctx android.LoadHookContext) ([]string, []string) {
 	var cflags []string
@@ -88,16 +88,12 @@ func globalFlags(ctx android.LoadHookContext) ([]string, []string) {
 		cflags = append(cflags,
 			"-DART_STACK_OVERFLOW_GAP_arm=8192",
 			"-DART_STACK_OVERFLOW_GAP_arm64=16384",
-			"-DART_STACK_OVERFLOW_GAP_mips=16384",
-			"-DART_STACK_OVERFLOW_GAP_mips64=16384",
 			"-DART_STACK_OVERFLOW_GAP_x86=16384",
 			"-DART_STACK_OVERFLOW_GAP_x86_64=20480")
 	} else {
 		cflags = append(cflags,
 			"-DART_STACK_OVERFLOW_GAP_arm=8192",
 			"-DART_STACK_OVERFLOW_GAP_arm64=8192",
-			"-DART_STACK_OVERFLOW_GAP_mips=16384",
-			"-DART_STACK_OVERFLOW_GAP_mips64=16384",
 			"-DART_STACK_OVERFLOW_GAP_x86=8192",
 			"-DART_STACK_OVERFLOW_GAP_x86_64=8192")
 	}
@@ -392,8 +388,7 @@ func libartStaticDefaultsFactory() android.Module {
 }
 
 func artLibrary() android.Module {
-	m, _ := cc.NewLibrary(android.HostAndDeviceSupported)
-	module := m.Init()
+	module := cc.LibraryFactory()
 
 	installCodegenCustomizer(module, staticAndSharedLibrary)
 
@@ -401,9 +396,7 @@ func artLibrary() android.Module {
 }
 
 func artStaticLibrary() android.Module {
-	m, library := cc.NewLibrary(android.HostAndDeviceSupported)
-	library.BuildOnlyStatic()
-	module := m.Init()
+	module := cc.LibraryStaticFactory()
 
 	installCodegenCustomizer(module, staticLibrary)
 
@@ -411,8 +404,7 @@ func artStaticLibrary() android.Module {
 }
 
 func artBinary() android.Module {
-	binary, _ := cc.NewBinary(android.HostAndDeviceSupported)
-	module := binary.Init()
+	module := cc.BinaryFactory()
 
 	android.AddLoadHook(module, customLinker)
 	android.AddLoadHook(module, prefer32Bit)
@@ -420,8 +412,7 @@ func artBinary() android.Module {
 }
 
 func artTest() android.Module {
-	test := cc.NewTest(android.HostAndDeviceSupported)
-	module := test.Init()
+	module := cc.TestFactory()
 
 	installCodegenCustomizer(module, binary)
 
@@ -432,8 +423,7 @@ func artTest() android.Module {
 }
 
 func artTestLibrary() android.Module {
-	test := cc.NewTestLibrary(android.HostAndDeviceSupported)
-	module := test.Init()
+	module := cc.TestLibraryFactory()
 
 	installCodegenCustomizer(module, staticAndSharedLibrary)
 

@@ -32,9 +32,7 @@ enum class InstructionSet {
   kThumb2,
   kX86,
   kX86_64,
-  kMips,
-  kMips64,
-  kLast = kMips64
+  kLast = kX86_64
 };
 std::ostream& operator<<(std::ostream& os, const InstructionSet& rhs);
 
@@ -42,10 +40,6 @@ std::ostream& operator<<(std::ostream& os, const InstructionSet& rhs);
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kArm;
 #elif defined(__aarch64__)
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kArm64;
-#elif defined(__mips__) && !defined(__LP64__)
-static constexpr InstructionSet kRuntimeISA = InstructionSet::kMips;
-#elif defined(__mips__) && defined(__LP64__)
-static constexpr InstructionSet kRuntimeISA = InstructionSet::kMips64;
 #elif defined(__i386__)
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kX86;
 #elif defined(__x86_64__)
@@ -57,8 +51,6 @@ static constexpr InstructionSet kRuntimeISA = InstructionSet::kNone;
 // Architecture-specific pointer sizes
 static constexpr PointerSize kArmPointerSize = PointerSize::k32;
 static constexpr PointerSize kArm64PointerSize = PointerSize::k64;
-static constexpr PointerSize kMipsPointerSize = PointerSize::k32;
-static constexpr PointerSize kMips64PointerSize = PointerSize::k64;
 static constexpr PointerSize kX86PointerSize = PointerSize::k32;
 static constexpr PointerSize kX86_64PointerSize = PointerSize::k64;
 
@@ -69,10 +61,6 @@ static constexpr size_t kArmAlignment = 8;
 // ARM64 instruction alignment. This is the recommended alignment for maximum performance.
 static constexpr size_t kArm64Alignment = 16;
 
-// MIPS instruction alignment.  MIPS processors require code to be 4-byte aligned,
-// but 64-bit literals must be 8-byte aligned.
-static constexpr size_t kMipsAlignment = 8;
-
 // X86 instruction alignment. This is the recommended alignment for maximum performance.
 static constexpr size_t kX86Alignment = 16;
 
@@ -81,8 +69,6 @@ static constexpr size_t kThumb2InstructionAlignment = 2;
 static constexpr size_t kArm64InstructionAlignment = 4;
 static constexpr size_t kX86InstructionAlignment = 1;
 static constexpr size_t kX86_64InstructionAlignment = 1;
-static constexpr size_t kMipsInstructionAlignment = 4;
-static constexpr size_t kMips64InstructionAlignment = 4;
 
 const char* GetInstructionSetString(InstructionSet isa);
 
@@ -104,10 +90,6 @@ constexpr PointerSize GetInstructionSetPointerSize(InstructionSet isa) {
       return kX86PointerSize;
     case InstructionSet::kX86_64:
       return kX86_64PointerSize;
-    case InstructionSet::kMips:
-      return kMipsPointerSize;
-    case InstructionSet::kMips64:
-      return kMips64PointerSize;
 
     case InstructionSet::kNone:
       break;
@@ -127,10 +109,6 @@ constexpr size_t GetInstructionSetInstructionAlignment(InstructionSet isa) {
       return kX86InstructionAlignment;
     case InstructionSet::kX86_64:
       return kX86_64InstructionAlignment;
-    case InstructionSet::kMips:
-      return kMipsInstructionAlignment;
-    case InstructionSet::kMips64:
-      return kMips64InstructionAlignment;
 
     case InstructionSet::kNone:
       break;
@@ -145,8 +123,6 @@ constexpr bool IsValidInstructionSet(InstructionSet isa) {
     case InstructionSet::kArm64:
     case InstructionSet::kX86:
     case InstructionSet::kX86_64:
-    case InstructionSet::kMips:
-    case InstructionSet::kMips64:
       return true;
 
     case InstructionSet::kNone:
@@ -162,12 +138,10 @@ constexpr bool Is64BitInstructionSet(InstructionSet isa) {
     case InstructionSet::kArm:
     case InstructionSet::kThumb2:
     case InstructionSet::kX86:
-    case InstructionSet::kMips:
       return false;
 
     case InstructionSet::kArm64:
     case InstructionSet::kX86_64:
-    case InstructionSet::kMips64:
       return true;
 
     case InstructionSet::kNone:
@@ -192,10 +166,6 @@ constexpr size_t GetBytesPerGprSpillLocation(InstructionSet isa) {
       return 4;
     case InstructionSet::kX86_64:
       return 8;
-    case InstructionSet::kMips:
-      return 4;
-    case InstructionSet::kMips64:
-      return 8;
 
     case InstructionSet::kNone:
       break;
@@ -215,10 +185,6 @@ constexpr size_t GetBytesPerFprSpillLocation(InstructionSet isa) {
       return 8;
     case InstructionSet::kX86_64:
       return 8;
-    case InstructionSet::kMips:
-      return 4;
-    case InstructionSet::kMips64:
-      return 8;
 
     case InstructionSet::kNone:
       break;
@@ -229,15 +195,12 @@ constexpr size_t GetBytesPerFprSpillLocation(InstructionSet isa) {
 namespace instruction_set_details {
 
 #if !defined(ART_STACK_OVERFLOW_GAP_arm) || !defined(ART_STACK_OVERFLOW_GAP_arm64) || \
-    !defined(ART_STACK_OVERFLOW_GAP_mips) || !defined(ART_STACK_OVERFLOW_GAP_mips64) || \
     !defined(ART_STACK_OVERFLOW_GAP_x86) || !defined(ART_STACK_OVERFLOW_GAP_x86_64)
 #error "Missing defines for stack overflow gap"
 #endif
 
 static constexpr size_t kArmStackOverflowReservedBytes    = ART_STACK_OVERFLOW_GAP_arm;
 static constexpr size_t kArm64StackOverflowReservedBytes  = ART_STACK_OVERFLOW_GAP_arm64;
-static constexpr size_t kMipsStackOverflowReservedBytes   = ART_STACK_OVERFLOW_GAP_mips;
-static constexpr size_t kMips64StackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_mips64;
 static constexpr size_t kX86StackOverflowReservedBytes    = ART_STACK_OVERFLOW_GAP_x86;
 static constexpr size_t kX86_64StackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_x86_64;
 
@@ -254,12 +217,6 @@ constexpr size_t GetStackOverflowReservedBytes(InstructionSet isa) {
 
     case InstructionSet::kArm64:
       return instruction_set_details::kArm64StackOverflowReservedBytes;
-
-    case InstructionSet::kMips:
-      return instruction_set_details::kMipsStackOverflowReservedBytes;
-
-    case InstructionSet::kMips64:
-      return instruction_set_details::kMips64StackOverflowReservedBytes;
 
     case InstructionSet::kX86:
       return instruction_set_details::kX86StackOverflowReservedBytes;
@@ -278,10 +235,10 @@ constexpr size_t GetStackOverflowReservedBytes(InstructionSet isa) {
 // in registers so that memory operations for the interface trampolines can be avoided. The entities
 // are the resolved method and the pointer to the code to be invoked.
 //
-// On x86, ARM32 and MIPS, this is given for a *scalar* 64bit value. The definition thus *must* be
+// On x86 and ARM32, this is given for a *scalar* 64bit value. The definition thus *must* be
 // uint64_t or long long int.
 //
-// On x86_64, ARM64 and MIPS64, structs are decomposed for allocation, so we can create a structs of
+// On x86_64 and ARM64, structs are decomposed for allocation, so we can create a structs of
 // two size_t-sized values.
 //
 // We need two operations:
@@ -297,7 +254,7 @@ constexpr size_t GetStackOverflowReservedBytes(InstructionSet isa) {
 //            when the garbage collector can move objects concurrently. Ensure that required locks
 //            are held when using!
 
-#if defined(__i386__) || defined(__arm__) || (defined(__mips__) && !defined(__LP64__))
+#if defined(__i386__) || defined(__arm__)
 typedef uint64_t TwoWordReturn;
 
 // Encodes method_ptr==nullptr and code_ptr==nullptr
@@ -313,7 +270,7 @@ static inline constexpr TwoWordReturn GetTwoWordSuccessValue(uintptr_t hi, uintp
   return ((hi64 << 32) | lo32);
 }
 
-#elif defined(__x86_64__) || defined(__aarch64__) || (defined(__mips__) && defined(__LP64__))
+#elif defined(__x86_64__) || defined(__aarch64__)
 
 // Note: TwoWordReturn can't be constexpr for 64-bit targets. We'd need a constexpr constructor,
 //       which would violate C-linkage in the entrypoint functions.
