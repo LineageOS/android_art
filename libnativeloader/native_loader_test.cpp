@@ -94,12 +94,12 @@ class Platform {
 static std::unordered_map<std::string, Platform::mock_namespace_handle> namespaces = {
     {"system", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("system"))},
     {"default", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("default"))},
-    {"com.android.art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.art"))},
+    {"com_android_art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_art"))},
     {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
-    {"com.android.neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.neuralnetworks"))},
-    {"com.android.cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.cronet"))},
-    {"com.android.os.statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com.android.os.statsd"))},
+    {"com_android_neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_neuralnetworks"))},
+    {"com_android_cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_cronet"))},
+    {"com_android_os_statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_os_statsd"))},
 };
 
 // The actual gmock object
@@ -386,7 +386,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
           .WillOnce(Return(true));
     }
     if (expected_link_with_art_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.art"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_art"),
                                               StrEq(expected_shared_libs_to_art_ns)))
           .WillOnce(Return(true));
     }
@@ -406,17 +406,17 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
           .WillOnce(Return(true));
     }
     if (expected_link_with_neuralnetworks_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.neuralnetworks"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
           .WillOnce(Return(true));
     }
     if (expected_link_with_cronet_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.cronet"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_cronet"),
                                               StrEq(expected_shared_libs_to_cronet_ns)))
           .WillOnce(Return(true));
     }
     if (expected_link_with_statsd_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com.android.os.statsd"),
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_os_statsd"),
                                               StrEq(expected_shared_libs_to_statsd_ns)))
           .WillOnce(Return(true));
     }
