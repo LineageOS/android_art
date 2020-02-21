@@ -15,15 +15,23 @@
 // The SDK for the art module apex.
 sdk {
     name: "art-module-sdk",
-    java_system_modules: [
-        "art-module-public-api-stubs-system-modules",
-        "art-module-intra-core-api-stubs-system-modules",
-        "art-module-platform-api-stubs-system-modules",
-        "core-platform-api-stubs-system-modules",
+    host_supported: true,
+    native_header_libs: [
+        "libnativehelper_header_only",
     ],
-    native_static_libs: [
-        "libartimagevalues",
-    ],
+    target: {
+        android: {
+            java_system_modules: [
+                "art-module-public-api-stubs-system-modules",
+                "art-module-intra-core-api-stubs-system-modules",
+                "art-module-platform-api-stubs-system-modules",
+                "core-platform-api-stubs-system-modules",
+            ],
+            native_static_libs: [
+                "libartimagevalues",
+            ],
+        },
+    },
 }
 
 // Exported host tools and libraries.
