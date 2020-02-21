@@ -124,14 +124,18 @@ function fail_check {
   exit_status=1
 }
 
-# Test all modules
+# Test all modules, if possible.
 
 apex_modules=(
   "com.android.art.release"
   "com.android.art.debug"
   "com.android.art.testing"
-  "com.android.art.host"
 )
+if [[ "$HOST_PREFER_32_BIT" = true ]]; then
+  say "Skipping com.android.art.host, as \`HOST_PREFER_32_BIT\` equals \`true\`"
+else
+  apex_modules+=("com.android.art.host")
+fi
 
 # Build the APEX packages (optional).
 build_apex ${apex_modules[@]}
