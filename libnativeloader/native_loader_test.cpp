@@ -97,6 +97,7 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
     {"com_android_art", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_art"))},
     {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
+    {"vndk_product", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk_product"))},
     {"com_android_neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_neuralnetworks"))},
     {"com_android_cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_cronet"))},
     {"com_android_os_statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_os_statsd"))},
@@ -354,6 +355,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_art_ns = true;
   bool expected_link_with_sphal_ns = !vendor_public_libraries().empty();
   bool expected_link_with_vndk_ns = false;
+  bool expected_link_with_vndk_product_ns = false;
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
   bool expected_link_with_cronet_ns = true;
@@ -361,7 +363,8 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
   std::string expected_shared_libs_to_art_ns = art_public_libraries();
   std::string expected_shared_libs_to_sphal_ns = vendor_public_libraries();
-  std::string expected_shared_libs_to_vndk_ns = vndksp_libraries();
+  std::string expected_shared_libs_to_vndk_ns = vndksp_libraries_vendor();
+  std::string expected_shared_libs_to_vndk_product_ns = vndksp_libraries_product();
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
   std::string expected_shared_libs_to_neuralnetworks_ns = neuralnetworks_public_libraries();
   std::string expected_shared_libs_to_cronet_ns = cronet_public_libraries();
@@ -398,6 +401,11 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_vndk_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("vndk"),
                                               StrEq(expected_shared_libs_to_vndk_ns)))
+          .WillOnce(Return(true));
+    }
+    if (expected_link_with_vndk_product_ns) {
+      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("vndk_product"),
+                                              StrEq(expected_shared_libs_to_vndk_product_ns)))
           .WillOnce(Return(true));
     }
     if (expected_link_with_default_ns) {
@@ -512,7 +520,7 @@ TEST_P(NativeLoaderTest_Create, UnbundledProductApp) {
         expected_permitted_path + ":/product/" LIB_DIR ":/system/product/" LIB_DIR;
     expected_shared_libs_to_platform_ns =
         expected_shared_libs_to_platform_ns + ":" + llndk_libraries_product();
-    expected_link_with_vndk_ns = true;
+    expected_link_with_vndk_product_ns = true;
   }
   SetExpectations();
   RunTest();
