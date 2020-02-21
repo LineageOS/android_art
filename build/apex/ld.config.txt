@@ -75,7 +75,7 @@ namespace.system.visible = true
 namespace.system.search.paths = /system/${LIB}
 namespace.system.asan.search.paths = /data/asan/system/${LIB}
 
-namespace.system.links = art
+namespace.system.links = art,adbd
 namespace.system.link.art.shared_libs  = libandroidicu.so
 namespace.system.link.art.shared_libs += libdexfile_external.so
 namespace.system.link.art.shared_libs += libdexfiled_external.so
@@ -88,6 +88,10 @@ namespace.system.link.art.shared_libs += libnativeloader.so
 
 # TODO(b/122876336): Remove libpac.so once it's migrated to Webview
 namespace.system.link.art.shared_libs += libpac.so
+
+namespace.system.link.adbd.shared_libs = libadb_pairing_auth.so
+namespace.system.link.adbd.shared_libs += libadb_pairing_connection.so
+namespace.system.link.adbd.shared_libs += libadb_pairing_server.so
 
 # /system/lib/libc.so, etc are symlinks to
 # /apex/com.android.runtime/lib/bionic/libc.so, etc. Add the path to the
