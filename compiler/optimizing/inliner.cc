@@ -465,6 +465,30 @@ static bool AlwaysThrows(const CompilerOptions& compiler_options, ArtMethod* met
   return throw_seen;
 }
 
+ArtMethod* HInliner::FindActualCallTarget(HInvoke* invoke_instruction, bool* cha_devirtualize) {
+  ArtMethod* resolved_method = invoke_instruction->GetResolvedMethod();
+  DCHECK(resolved_method != nullptr);
+
+  ArtMethod* actual_method = nullptr;
+  if (invoke_instruction->IsInvokeStaticOrDirect()) {
+    actual_method = resolved_method;
+  } else {
+    // Check if we can statically find the method.
+    actual_method = FindVirtualOrInterfaceTarget(invoke_instruction, resolved_method);
+  }
+
+  if (actual_method == nullptr) {
+    ArtMethod* method = TryCHADevirtualization(resolved_method);
+    if (method != nullptr) {
+      *cha_devirtualize = true;
+      actual_method = method;
+      LOG_NOTE() << "Try CHA-based inlining of " << actual_method->PrettyMethod();
+    }
+  }
+
+  return actual_method;
+}
+
 bool HInliner::TryInline(HInvoke* invoke_instruction) {
   if (invoke_instruction->IsInvokeUnresolved() ||
       invoke_instruction->IsInvokePolymorphic() ||
@@ -485,56 +509,42 @@ bool HInliner::TryInline(HInvoke* invoke_instruction) {
     LOG_FAIL_NO_STAT() << "Not inlining a String.<init> method";
     return false;
   }
-  ArtMethod* actual_method = nullptr;
-
-  if (invoke_instruction->IsInvokeStaticOrDirect()) {
-    actual_method = resolved_method;
-  } else {
-    // Check if we can statically find the method.
-    actual_method = FindVirtualOrInterfaceTarget(invoke_instruction, resolved_method);
-  }
 
   bool cha_devirtualize = false;
+  ArtMethod* actual_method = FindActualCallTarget(invoke_instruction, &cha_devirtualize);
+
+  // If we didn't find a method, see if we can inline from the inline caches.
   if (actual_method == nullptr) {
-    ArtMethod* method = TryCHADevirtualization(resolved_method);
-    if (method != nullptr) {
-      cha_devirtualize = true;
-      actual_method = method;
-      LOG_NOTE() << "Try CHA-based inlining of " << actual_method->PrettyMethod();
-    }
+    DCHECK(!invoke_instruction->IsInvokeStaticOrDirect());
+
+    return TryInlineFromInlineCache(caller_dex_file, invoke_instruction, resolved_method);
   }
 
-  if (actual_method != nullptr) {
-    // Single target.
-    bool result = TryInlineAndReplace(invoke_instruction,
-                                      actual_method,
-                                      ReferenceTypeInfo::CreateInvalid(),
-                                      /* do_rtp= */ true,
-                                      cha_devirtualize);
-    if (result) {
-      // Successfully inlined.
-      if (!invoke_instruction->IsInvokeStaticOrDirect()) {
-        if (cha_devirtualize) {
-          // Add dependency due to devirtualization. We've assumed resolved_method
-          // has single implementation.
-          outermost_graph_->AddCHASingleImplementationDependency(resolved_method);
-          MaybeRecordStat(stats_, MethodCompilationStat::kCHAInline);
-        } else {
-          MaybeRecordStat(stats_, MethodCompilationStat::kInlinedInvokeVirtualOrInterface);
-        }
+  // Single target.
+  bool result = TryInlineAndReplace(invoke_instruction,
+                                    actual_method,
+                                    ReferenceTypeInfo::CreateInvalid(),
+                                    /* do_rtp= */ true,
+                                    cha_devirtualize);
+  if (result) {
+    // Successfully inlined.
+    if (!invoke_instruction->IsInvokeStaticOrDirect()) {
+      if (cha_devirtualize) {
+        // Add dependency due to devirtualization. We've assumed resolved_method
+        // has single implementation.
+        outermost_graph_->AddCHASingleImplementationDependency(resolved_method);
+        MaybeRecordStat(stats_, MethodCompilationStat::kCHAInline);
+      } else {
+        MaybeRecordStat(stats_, MethodCompilationStat::kInlinedInvokeVirtualOrInterface);
       }
-    } else if (!cha_devirtualize && AlwaysThrows(codegen_->GetCompilerOptions(), actual_method)) {
-      // Set always throws property for non-inlined method call with single target
-      // (unless it was obtained through CHA, because that would imply we have
-      // to add the CHA dependency, which seems not worth it).
-      invoke_instruction->SetAlwaysThrows(true);
     }
-    return result;
+  } else if (!cha_devirtualize && AlwaysThrows(codegen_->GetCompilerOptions(), actual_method)) {
+    // Set always throws property for non-inlined method call with single target
+    // (unless it was obtained through CHA, because that would imply we have
+    // to add the CHA dependency, which seems not worth it).
+    invoke_instruction->SetAlwaysThrows(true);
   }
-  DCHECK(!invoke_instruction->IsInvokeStaticOrDirect());
-
-  // Try using inline caches.
-  return TryInlineFromInlineCache(caller_dex_file, invoke_instruction, resolved_method);
+  return result;
 }
 
 static Handle<mirror::ObjectArray<mirror::Class>> AllocateInlineCacheHolder(
@@ -1432,68 +1442,11 @@ static inline bool MayInline(const CompilerOptions& compiler_options,
   return true;
 }
 
-bool HInliner::TryBuildAndInline(HInvoke* invoke_instruction,
-                                 ArtMethod* method,
-                                 ReferenceTypeInfo receiver_type,
-                                 HInstruction** return_replacement) {
-  if (method->IsProxyMethod()) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedProxy)
-        << "Method " << method->PrettyMethod()
-        << " is not inlined because of unimplemented inline support for proxy methods.";
-    return false;
-  }
-
-  if (CountRecursiveCallsOf(method) > kMaximumNumberOfRecursiveCalls) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedRecursiveBudget)
-        << "Method "
-        << method->PrettyMethod()
-        << " is not inlined because it has reached its recursive call budget.";
-    return false;
-  }
-
-  // Check whether we're allowed to inline. The outermost compilation unit is the relevant
-  // dex file here (though the transitivity of an inline chain would allow checking the calller).
-  if (!MayInline(codegen_->GetCompilerOptions(),
-                 *method->GetDexFile(),
-                 *outer_compilation_unit_.GetDexFile())) {
-    if (TryPatternSubstitution(invoke_instruction, method, return_replacement)) {
-      LOG_SUCCESS() << "Successfully replaced pattern of invoke "
-                    << method->PrettyMethod();
-      MaybeRecordStat(stats_, MethodCompilationStat::kReplacedInvokeWithSimplePattern);
-      return true;
-    }
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedWont)
-        << "Won't inline " << method->PrettyMethod() << " in "
-        << outer_compilation_unit_.GetDexFile()->GetLocation() << " ("
-        << caller_compilation_unit_.GetDexFile()->GetLocation() << ") from "
-        << method->GetDexFile()->GetLocation();
-    return false;
-  }
-
-  bool same_dex_file = IsSameDexFile(*outer_compilation_unit_.GetDexFile(), *method->GetDexFile());
-
-  CodeItemDataAccessor accessor(method->DexInstructionData());
-
+// Returns whether inlining is allowed based on ART semantics.
+bool HInliner::IsInliningAllowed(ArtMethod* method, const CodeItemDataAccessor& accessor) const {
   if (!accessor.HasCodeItem()) {
     LOG_FAIL_NO_STAT()
         << "Method " << method->PrettyMethod() << " is not inlined because it is native";
-    return false;
-  }
-
-  size_t inline_max_code_units = codegen_->GetCompilerOptions().GetInlineMaxCodeUnits();
-  if (accessor.InsnsSizeInCodeUnits() > inline_max_code_units) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCodeItem)
-        << "Method " << method->PrettyMethod()
-        << " is not inlined because its code item is too big: "
-        << accessor.InsnsSizeInCodeUnits()
-        << " > "
-        << inline_max_code_units;
-    return false;
-  }
-
-  if (accessor.TriesSize() != 0) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedTryCatch)
-        << "Method " << method->PrettyMethod() << " is not inlined because of try block";
     return false;
   }
 
@@ -1511,6 +1464,30 @@ bool HInliner::TryBuildAndInline(HInvoke* invoke_instruction,
     return false;
   }
 
+  return true;
+}
+
+// Returns whether ART supports inlining this method.
+//
+// Some methods are not supported because they have features for which inlining
+// is not implemented. For example, we do not currently support inlining throw
+// instructions into a try block.
+bool HInliner::IsInliningSupported(const HInvoke* invoke_instruction,
+                                   ArtMethod* method,
+                                   const CodeItemDataAccessor& accessor) const {
+  if (method->IsProxyMethod()) {
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedProxy)
+        << "Method " << method->PrettyMethod()
+        << " is not inlined because of unimplemented inline support for proxy methods.";
+    return false;
+  }
+
+  if (accessor.TriesSize() != 0) {
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedTryCatch)
+        << "Method " << method->PrettyMethod() << " is not inlined because of try block";
+    return false;
+  }
+
   if (invoke_instruction->IsInvokeStaticOrDirect() &&
       invoke_instruction->AsInvokeStaticOrDirect()->IsStaticWithImplicitClinitCheck()) {
     // Case of a static method that cannot be inlined because it implicitly
@@ -1522,8 +1499,73 @@ bool HInliner::TryBuildAndInline(HInvoke* invoke_instruction,
     return false;
   }
 
+  return true;
+}
+
+// Returns whether our resource limits allow inlining this method.
+bool HInliner::IsInliningBudgetAvailable(ArtMethod* method,
+                                         const CodeItemDataAccessor& accessor) const {
+  if (CountRecursiveCallsOf(method) > kMaximumNumberOfRecursiveCalls) {
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedRecursiveBudget)
+        << "Method "
+        << method->PrettyMethod()
+        << " is not inlined because it has reached its recursive call budget.";
+    return false;
+  }
+
+  size_t inline_max_code_units = codegen_->GetCompilerOptions().GetInlineMaxCodeUnits();
+  if (accessor.InsnsSizeInCodeUnits() > inline_max_code_units) {
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCodeItem)
+        << "Method " << method->PrettyMethod()
+        << " is not inlined because its code item is too big: "
+        << accessor.InsnsSizeInCodeUnits()
+        << " > "
+        << inline_max_code_units;
+    return false;
+  }
+
+  return true;
+}
+
+bool HInliner::TryBuildAndInline(HInvoke* invoke_instruction,
+                                 ArtMethod* method,
+                                 ReferenceTypeInfo receiver_type,
+                                 HInstruction** return_replacement) {
+  // Check whether we're allowed to inline. The outermost compilation unit is the relevant
+  // dex file here (though the transitivity of an inline chain would allow checking the caller).
+  if (!MayInline(codegen_->GetCompilerOptions(),
+                 *method->GetDexFile(),
+                 *outer_compilation_unit_.GetDexFile())) {
+    if (TryPatternSubstitution(invoke_instruction, method, return_replacement)) {
+      LOG_SUCCESS() << "Successfully replaced pattern of invoke "
+                    << method->PrettyMethod();
+      MaybeRecordStat(stats_, MethodCompilationStat::kReplacedInvokeWithSimplePattern);
+      return true;
+    }
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedWont)
+        << "Won't inline " << method->PrettyMethod() << " in "
+        << outer_compilation_unit_.GetDexFile()->GetLocation() << " ("
+        << caller_compilation_unit_.GetDexFile()->GetLocation() << ") from "
+        << method->GetDexFile()->GetLocation();
+    return false;
+  }
+
+  CodeItemDataAccessor accessor(method->DexInstructionData());
+
+  if (!IsInliningAllowed(method, accessor)) {
+    return false;
+  }
+
+  if (!IsInliningSupported(invoke_instruction, method, accessor)) {
+    return false;
+  }
+
+  if (!IsInliningBudgetAvailable(method, accessor)) {
+    return false;
+  }
+
   if (!TryBuildAndInlineHelper(
-          invoke_instruction, method, receiver_type, same_dex_file, return_replacement)) {
+          invoke_instruction, method, receiver_type, return_replacement)) {
     return false;
   }
 
@@ -1753,107 +1795,12 @@ static bool CanEncodeInlinedMethodInStackMap(const DexFile& caller_dex_file, Art
   return false;
 }
 
-bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
-                                       ArtMethod* resolved_method,
-                                       ReferenceTypeInfo receiver_type,
-                                       bool same_dex_file,
-                                       HInstruction** return_replacement) {
-  DCHECK(!(resolved_method->IsStatic() && receiver_type.IsValid()));
-  ScopedObjectAccess soa(Thread::Current());
-  const dex::CodeItem* code_item = resolved_method->GetCodeItem();
-  const DexFile& callee_dex_file = *resolved_method->GetDexFile();
-  uint32_t method_index = resolved_method->GetDexMethodIndex();
-  CodeItemDebugInfoAccessor code_item_accessor(resolved_method->DexInstructionDebugInfo());
-  ClassLinker* class_linker = caller_compilation_unit_.GetClassLinker();
-  Handle<mirror::DexCache> dex_cache = NewHandleIfDifferent(resolved_method->GetDexCache(),
-                                                            caller_compilation_unit_.GetDexCache(),
-                                                            handles_);
-  Handle<mirror::ClassLoader> class_loader =
-      NewHandleIfDifferent(resolved_method->GetDeclaringClass()->GetClassLoader(),
-                           caller_compilation_unit_.GetClassLoader(),
-                           handles_);
-
-  Handle<mirror::Class> compiling_class = handles_->NewHandle(resolved_method->GetDeclaringClass());
-  DexCompilationUnit dex_compilation_unit(
-      class_loader,
-      class_linker,
-      callee_dex_file,
-      code_item,
-      resolved_method->GetDeclaringClass()->GetDexClassDefIndex(),
-      method_index,
-      resolved_method->GetAccessFlags(),
-      /* verified_method= */ nullptr,
-      dex_cache,
-      compiling_class);
-
-  InvokeType invoke_type = invoke_instruction->GetInvokeType();
-  if (invoke_type == kInterface) {
-    // We have statically resolved the dispatch. To please the class linker
-    // at runtime, we change this call as if it was a virtual call.
-    invoke_type = kVirtual;
-  }
-
-  bool caller_dead_reference_safe = graph_->IsDeadReferenceSafe();
-  const dex::ClassDef& callee_class = resolved_method->GetClassDef();
-  // MethodContainsRSensitiveAccess is currently slow, but HasDeadReferenceSafeAnnotation()
-  // is currently rarely true.
-  bool callee_dead_reference_safe =
-      annotations::HasDeadReferenceSafeAnnotation(callee_dex_file, callee_class)
-      && !annotations::MethodContainsRSensitiveAccess(callee_dex_file, callee_class, method_index);
-
-  const int32_t caller_instruction_counter = graph_->GetCurrentInstructionId();
-  HGraph* callee_graph = new (graph_->GetAllocator()) HGraph(
-      graph_->GetAllocator(),
-      graph_->GetArenaStack(),
-      callee_dex_file,
-      method_index,
-      codegen_->GetCompilerOptions().GetInstructionSet(),
-      invoke_type,
-      callee_dead_reference_safe,
-      graph_->IsDebuggable(),
-      /* osr= */ false,
-      /* is_shared_jit_code= */ graph_->IsCompilingForSharedJitCode(),
-      /* baseline= */ graph_->IsCompilingBaseline(),
-      /* start_instruction_id= */ caller_instruction_counter);
-  callee_graph->SetArtMethod(resolved_method);
-
-  // When they are needed, allocate `inline_stats_` on the Arena instead
-  // of on the stack, as Clang might produce a stack frame too large
-  // for this function, that would not fit the requirements of the
-  // `-Wframe-larger-than` option.
-  if (stats_ != nullptr) {
-    // Reuse one object for all inline attempts from this caller to keep Arena memory usage low.
-    if (inline_stats_ == nullptr) {
-      void* storage = graph_->GetAllocator()->Alloc<OptimizingCompilerStats>(kArenaAllocMisc);
-      inline_stats_ = new (storage) OptimizingCompilerStats;
-    } else {
-      inline_stats_->Reset();
-    }
-  }
-  HGraphBuilder builder(callee_graph,
-                        code_item_accessor,
-                        &dex_compilation_unit,
-                        &outer_compilation_unit_,
-                        codegen_,
-                        inline_stats_,
-                        resolved_method->GetQuickenedInfo(),
-                        handles_);
-
-  if (builder.BuildGraph() != kAnalysisSuccess) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCannotBuild)
-        << "Method " << callee_dex_file.PrettyMethod(method_index)
-        << " could not be built, so cannot be inlined";
-    return false;
-  }
-
-  if (!RegisterAllocator::CanAllocateRegistersFor(
-          *callee_graph, codegen_->GetCompilerOptions().GetInstructionSet())) {
-    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedRegisterAllocator)
-        << "Method " << callee_dex_file.PrettyMethod(method_index)
-        << " cannot be inlined because of the register allocator";
-    return false;
-  }
-
+  // Substitutes parameters in the callee graph with their values from the caller.
+void HInliner::SubstituteArguments(HGraph* callee_graph,
+                                   HInvoke* invoke_instruction,
+                                   ReferenceTypeInfo receiver_type,
+                                   const DexCompilationUnit& dex_compilation_unit) {
+  ArtMethod* const resolved_method = callee_graph->GetArtMethod();
   size_t parameter_index = 0;
   bool run_rtp = false;
   for (HInstructionIterator instructions(callee_graph->GetEntryBlock()->GetInstructions());
@@ -1896,8 +1843,23 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
                              handles_,
                              /* is_first_run= */ false).Run();
   }
+}
 
-  RunOptimizations(callee_graph, code_item, dex_compilation_unit);
+// Returns whether we can inline the callee_graph into the target_block.
+//
+// This performs a combination of semantics checks, compiler support checks, and
+// resource limit checks.
+//
+// If this function returns true, it will also set out_number_of_instructions to
+// the number of instructions in the inlined body.
+bool HInliner::CanInlineBody(const HGraph* callee_graph,
+                             const HBasicBlock* target_block,
+                             size_t* out_number_of_instructions) const {
+  const DexFile& callee_dex_file = callee_graph->GetDexFile();
+  ArtMethod* const resolved_method = callee_graph->GetArtMethod();
+  const uint32_t method_index = resolved_method->GetMethodIndex();
+  const bool same_dex_file =
+      IsSameDexFile(*outer_compilation_unit_.GetDexFile(), *resolved_method->GetDexFile());
 
   HBasicBlock* exit_block = callee_graph->GetExitBlock();
   if (exit_block == nullptr) {
@@ -1910,7 +1872,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
   bool has_one_return = false;
   for (HBasicBlock* predecessor : exit_block->GetPredecessors()) {
     if (predecessor->GetLastInstruction()->IsThrow()) {
-      if (invoke_instruction->GetBlock()->IsTryBlock()) {
+      if (target_block->IsTryBlock()) {
         // TODO(ngeoffray): Support adding HTryBoundary in Hgraph::InlineInto.
         LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedTryCatch)
             << "Method " << callee_dex_file.PrettyMethod(method_index)
@@ -2019,6 +1981,111 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
       }
     }
   }
+
+  *out_number_of_instructions = number_of_instructions;
+  return true;
+}
+
+bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
+                                       ArtMethod* resolved_method,
+                                       ReferenceTypeInfo receiver_type,
+                                       HInstruction** return_replacement) {
+  DCHECK(!(resolved_method->IsStatic() && receiver_type.IsValid()));
+  const dex::CodeItem* code_item = resolved_method->GetCodeItem();
+  const DexFile& callee_dex_file = *resolved_method->GetDexFile();
+  uint32_t method_index = resolved_method->GetDexMethodIndex();
+  CodeItemDebugInfoAccessor code_item_accessor(resolved_method->DexInstructionDebugInfo());
+  ClassLinker* class_linker = caller_compilation_unit_.GetClassLinker();
+  Handle<mirror::DexCache> dex_cache = NewHandleIfDifferent(resolved_method->GetDexCache(),
+                                                            caller_compilation_unit_.GetDexCache(),
+                                                            handles_);
+  Handle<mirror::ClassLoader> class_loader =
+      NewHandleIfDifferent(resolved_method->GetDeclaringClass()->GetClassLoader(),
+                           caller_compilation_unit_.GetClassLoader(),
+                           handles_);
+
+  Handle<mirror::Class> compiling_class = handles_->NewHandle(resolved_method->GetDeclaringClass());
+  DexCompilationUnit dex_compilation_unit(
+      class_loader,
+      class_linker,
+      callee_dex_file,
+      code_item,
+      resolved_method->GetDeclaringClass()->GetDexClassDefIndex(),
+      method_index,
+      resolved_method->GetAccessFlags(),
+      /* verified_method= */ nullptr,
+      dex_cache,
+      compiling_class);
+
+  InvokeType invoke_type = invoke_instruction->GetInvokeType();
+  if (invoke_type == kInterface) {
+    // We have statically resolved the dispatch. To please the class linker
+    // at runtime, we change this call as if it was a virtual call.
+    invoke_type = kVirtual;
+  }
+
+  bool caller_dead_reference_safe = graph_->IsDeadReferenceSafe();
+  const dex::ClassDef& callee_class = resolved_method->GetClassDef();
+  // MethodContainsRSensitiveAccess is currently slow, but HasDeadReferenceSafeAnnotation()
+  // is currently rarely true.
+  bool callee_dead_reference_safe =
+      annotations::HasDeadReferenceSafeAnnotation(callee_dex_file, callee_class)
+      && !annotations::MethodContainsRSensitiveAccess(callee_dex_file, callee_class, method_index);
+
+  const int32_t caller_instruction_counter = graph_->GetCurrentInstructionId();
+  HGraph* callee_graph = new (graph_->GetAllocator()) HGraph(
+      graph_->GetAllocator(),
+      graph_->GetArenaStack(),
+      callee_dex_file,
+      method_index,
+      codegen_->GetCompilerOptions().GetInstructionSet(),
+      invoke_type,
+      callee_dead_reference_safe,
+      graph_->IsDebuggable(),
+      /* osr= */ false,
+      /* is_shared_jit_code= */ graph_->IsCompilingForSharedJitCode(),
+      /* baseline= */ graph_->IsCompilingBaseline(),
+      /* start_instruction_id= */ caller_instruction_counter);
+  callee_graph->SetArtMethod(resolved_method);
+
+  // When they are needed, allocate `inline_stats_` on the Arena instead
+  // of on the stack, as Clang might produce a stack frame too large
+  // for this function, that would not fit the requirements of the
+  // `-Wframe-larger-than` option.
+  if (stats_ != nullptr) {
+    // Reuse one object for all inline attempts from this caller to keep Arena memory usage low.
+    if (inline_stats_ == nullptr) {
+      void* storage = graph_->GetAllocator()->Alloc<OptimizingCompilerStats>(kArenaAllocMisc);
+      inline_stats_ = new (storage) OptimizingCompilerStats;
+    } else {
+      inline_stats_->Reset();
+    }
+  }
+  HGraphBuilder builder(callee_graph,
+                        code_item_accessor,
+                        &dex_compilation_unit,
+                        &outer_compilation_unit_,
+                        codegen_,
+                        inline_stats_,
+                        resolved_method->GetQuickenedInfo(),
+                        handles_);
+
+  if (builder.BuildGraph() != kAnalysisSuccess) {
+    LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCannotBuild)
+        << "Method " << callee_dex_file.PrettyMethod(method_index)
+        << " could not be built, so cannot be inlined";
+    return false;
+  }
+
+  SubstituteArguments(callee_graph, invoke_instruction, receiver_type, dex_compilation_unit);
+
+  RunOptimizations(callee_graph, code_item, dex_compilation_unit);
+
+  size_t number_of_instructions = 0;
+  if (!CanInlineBody(callee_graph, invoke_instruction->GetBlock(), &number_of_instructions)) {
+    return false;
+  }
+
   DCHECK_EQ(caller_instruction_counter, graph_->GetCurrentInstructionId())
       << "No instructions can be added to the outer graph while inner graph is being built";
 

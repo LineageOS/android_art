@@ -73,6 +73,15 @@ class HInliner : public HOptimization {
 
   bool TryInline(HInvoke* invoke_instruction);
 
+  // Attempt to resolve the target of the invoke instruction to an acutal call
+  // target.
+  //
+  // Returns the target directly in the case of static or direct invokes.
+  // Otherwise, uses CHA devirtualization or other methods to try to find the
+  // call target.
+  ArtMethod* FindActualCallTarget(HInvoke* invoke_instruction, bool* cha_devirtualize)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
   // Try to inline `resolved_method` in place of `invoke_instruction`. `do_rtp` is whether
   // reference type propagation can run after the inlining. If the inlining is successful, this
   // method will replace and remove the `invoke_instruction`. If `cha_devirtualize` is true,
@@ -93,8 +102,15 @@ class HInliner : public HOptimization {
   bool TryBuildAndInlineHelper(HInvoke* invoke_instruction,
                                ArtMethod* resolved_method,
                                ReferenceTypeInfo receiver_type,
-                               bool same_dex_file,
-                               HInstruction** return_replacement);
+                               HInstruction** return_replacement)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Substitutes parameters in the callee graph with their values from the caller.
+  void SubstituteArguments(HGraph* callee_graph,
+                           HInvoke* invoke_instruction,
+                           ReferenceTypeInfo receiver_type,
+                           const DexCompilationUnit& dex_compilation_unit)
+    REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Run simple optimizations on `callee_graph`.
   void RunOptimizations(HGraph* callee_graph,
@@ -106,6 +122,38 @@ class HInliner : public HOptimization {
   bool TryPatternSubstitution(HInvoke* invoke_instruction,
                               ArtMethod* resolved_method,
                               HInstruction** return_replacement)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Returns whether inlining is allowed based on ART semantics.
+  bool IsInliningAllowed(art::ArtMethod* method, const CodeItemDataAccessor& accessor) const
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+
+  // Returns whether ART supports inlining this method.
+  //
+  // Some methods are not supported because they have features for which inlining
+  // is not implemented. For example, we do not currently support inlining throw
+  // instructions into a try block.
+  bool IsInliningSupported(const HInvoke* invoke_instruction,
+                           art::ArtMethod* method,
+                           const CodeItemDataAccessor& accessor) const
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Returns whether the inlining budget allows inlining method.
+  //
+  // For example, this checks whether the function has grown too large and
+  // inlining should be prevented.
+  bool IsInliningBudgetAvailable(art::ArtMethod* method, const CodeItemDataAccessor& accessor) const
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Inspects the body of a method (callee_graph) and returns whether it can be
+  // inlined.
+  //
+  // This checks for instructions and constructs that we do not support
+  // inlining, such as inlining a throw instruction into a try block.
+  bool CanInlineBody(const HGraph* callee_graph,
+                     const HBasicBlock* target_block,
+                     size_t* out_number_of_instructions) const
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Create a new HInstanceFieldGet.
