@@ -500,6 +500,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libart')
     self._checker.check_native_library('libart-compiler')
     self._checker.check_native_library('libart-dexlayout')
+    self._checker.check_native_library('libart-disassembler')
     self._checker.check_native_library('libartbase')
     self._checker.check_native_library('libartpalette')
     self._checker.check_native_library('libdexfile')
