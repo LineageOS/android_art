@@ -1055,19 +1055,15 @@ class ClassLinker {
                              ObjPtr<mirror::ClassLoader> class_loader)
       REQUIRES(Locks::dex_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  DexCacheData FindDexCacheDataLocked(const DexFile& dex_file)
+  const DexCacheData* FindDexCacheDataLocked(const DexFile& dex_file)
       REQUIRES(Locks::dex_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  static ObjPtr<mirror::DexCache> DecodeDexCache(Thread* self, const DexCacheData& data)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  // Called to ensure that the dex cache has been registered with the same class loader.
-  // If yes, returns the dex cache, otherwise throws InternalError and returns null.
-  ObjPtr<mirror::DexCache> EnsureSameClassLoader(Thread* self,
-                                                 ObjPtr<mirror::DexCache> dex_cache,
-                                                 const DexCacheData& data,
-                                                 ObjPtr<mirror::ClassLoader> class_loader)
-      REQUIRES(!Locks::dex_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+  static ObjPtr<mirror::DexCache> DecodeDexCacheLocked(Thread* self, const DexCacheData* data)
+      REQUIRES_SHARED(Locks::dex_lock_, Locks::mutator_lock_);
+  bool IsSameClassLoader(ObjPtr<mirror::DexCache> dex_cache,
+                         const DexCacheData* data,
+                         ObjPtr<mirror::ClassLoader> class_loader)
+      REQUIRES_SHARED(Locks::dex_lock_, Locks::mutator_lock_);
 
   bool InitializeDefaultInterfaceRecursive(Thread* self,
                                            Handle<mirror::Class> klass,
