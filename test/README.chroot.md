@@ -114,11 +114,11 @@ Note that using this chroot-based approach requires root access to the device
 10. Run JDWP tests:
     * On a 64-bit target:
         ```bash
-        art/tools/run-jdwp-tests.sh --mode=device --variant=X64
+        art/tools/run-libjdwp-tests.sh --mode=device --variant=X64
         ```
     * On a 32-bit target:
         ```bash
-        art/tools/run-jdwp-tests.sh --mode=device --variant=X32
+        art/tools/run-libjdwp-tests.sh --mode=device --variant=X32
         ```
 11. Tear down device setup:
     ```bash
