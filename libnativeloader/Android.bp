@@ -47,10 +47,6 @@ cc_library {
             ],
         },
     },
-    required: [
-        "llndk.libraries.txt",
-        "vndksp.libraries.txt",
-    ],
     stubs: {
         symbol_file: "libnativeloader.map.txt",
         versions: ["1"],
