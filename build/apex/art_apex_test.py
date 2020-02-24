@@ -614,6 +614,7 @@ class ReleaseHostChecker:
   def run(self):
     # Check binaries for ART.
     self._checker.check_executable('hprof-conv')
+    self._checker.check_symlinked_multilib_executable('dex2oat')
     self._checker.check_symlinked_multilib_executable('dex2oatd')
 
     # Check exported native libraries for Managed Core Library.
