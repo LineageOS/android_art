@@ -87,7 +87,62 @@ class HVecOperation : public HVariableInputSizeInstruction {
                                       kArenaAllocVectorNode),
         vector_length_(vector_length) {
     SetPackedField<PackedTypeField>(packed_type);
+    // By default vector operations are not predicated.
+    SetPackedField<PredicationKindField>(PredicationKind::kNotPredicated);
     DCHECK_LT(1u, vector_length);
+  }
+
+  // Predicated instructions execute a corresponding operation only on vector elements which are
+  // active (governing predicate is true for that element); the following modes determine what
+  // is happening with inactive elements.
+  //
+  // See HVecPredSetOperation.
+  enum class PredicationKind {
+    kNotPredicated,        // Instruction doesn't take any predicate as an input.
+    kZeroingForm,          // Inactive elements are reset to zero.
+    kMergingForm,          // Inactive elements keep their value.
+    kLast = kMergingForm,
+  };
+
+  PredicationKind GetPredicationKind() const { return GetPackedField<PredicationKindField>(); }
+
+  // Returns whether the vector operation must be predicated in predicated SIMD mode
+  // (see CodeGenerator::SupportsPredicatedSIMD). The method reflects semantics of
+  // the instruction class rather than the state of a particular instruction instance.
+  //
+  // This property is introduced for robustness purpose - to maintain and check the invariant:
+  // all instructions of the same vector operation class must be either all predicated or all
+  // not predicated (depending on the predicated SIMD support) in a correct graph.
+  virtual bool MustBePredicatedInPredicatedSIMDMode() {
+    return true;
+  }
+
+  bool IsPredicated() const {
+    return GetPredicationKind() != PredicationKind::kNotPredicated;
+  }
+
+  // See HVecPredSetOperation.
+  void SetGoverningPredicate(HInstruction* input, PredicationKind pred_kind) {
+    DCHECK(!IsPredicated());
+    DCHECK(input->IsVecPredSetOperation());
+    AddInput(input);
+    SetPackedField<PredicationKindField>(pred_kind);
+    DCHECK(IsPredicated());
+  }
+
+  void SetMergingGoverningPredicate(HInstruction* input) {
+    SetGoverningPredicate(input, PredicationKind::kMergingForm);
+  }
+  void SetZeroingGoverningPredicate(HInstruction* input) {
+    SetGoverningPredicate(input, PredicationKind::kZeroingForm);
+  }
+
+  // See HVecPredSetOperation.
+  HVecPredSetOperation* GetGoverningPredicate() const {
+    DCHECK(IsPredicated());
+    HInstruction* pred_input = InputAt(InputCount() - 1);
+    DCHECK(pred_input->IsVecPredSetOperation());
+    return pred_input->AsVecPredSetOperation();
   }
 
   // Returns the number of elements packed in a vector.
@@ -181,12 +236,16 @@ class HVecOperation : public HVariableInputSizeInstruction {
 
  protected:
   // Additional packed bits.
-  static constexpr size_t kFieldPackedType = HInstruction::kNumberOfGenericPackedBits;
+  static constexpr size_t kPredicationKind = HInstruction::kNumberOfGenericPackedBits;
+  static constexpr size_t kPredicationKindSize =
+      MinimumBitsToStore(static_cast<size_t>(PredicationKind::kLast));
+  static constexpr size_t kFieldPackedType = kPredicationKind + kPredicationKindSize;
   static constexpr size_t kFieldPackedTypeSize =
       MinimumBitsToStore(static_cast<size_t>(DataType::Type::kLast));
   static constexpr size_t kNumberOfVectorOpPackedBits = kFieldPackedType + kFieldPackedTypeSize;
   static_assert(kNumberOfVectorOpPackedBits <= kMaxNumberOfPackedBits, "Too many packed fields.");
   using PackedTypeField = BitField<DataType::Type, kFieldPackedType, kFieldPackedTypeSize>;
+  using PredicationKindField = BitField<PredicationKind, kPredicationKind, kPredicationKindSize>;
 
   DEFAULT_COPY_CONSTRUCTOR(VecOperation);
 
@@ -1161,6 +1220,237 @@ class HVecStore final : public HVecMemoryOperation {
 
  protected:
   DEFAULT_COPY_CONSTRUCTOR(VecStore)
+};
+
+//
+// 'Predicate-setting' instructions.
+//
+
+// An abstract class for instructions for which the output value is a vector predicate -
+// a special kind of vector value:
+//
+//    viz. [ p1, .. , pn ], where p_i is from { 0, 1 }.
+//
+// A VecOperation OP executes the same operation (e.g. ADD) on multiple elements of the vector.
+// It can be either unpredicated (operation is done on ALL of the elements) or predicated (only
+// on SOME elements, determined by a special extra input - vector predicate).
+// Implementations can vary depending on the ISA; the general idea is that for each element of the
+// regular vector a vector predicate has a corresponding element with either 0 or 1.
+// The value determines whether a vector element will be involved in OP calculations or not
+// (active or inactive). A vector predicate is referred as governing one if it is used to
+// control the execution of a predicated instruction.
+//
+// Note: vector predicate value type is introduced alongside existing vectors of booleans and
+// vectors of bytes to reflect their special semantics.
+//
+// TODO: we could introduce SIMD types in HIR.
+class HVecPredSetOperation : public HVecOperation {
+ public:
+  // A vector predicate-setting operation looks like a Int64 location.
+  // TODO: we could introduce vector types in HIR.
+  static constexpr DataType::Type kSIMDPredType = DataType::Type::kInt64;
+
+  HVecPredSetOperation(InstructionKind kind,
+                       ArenaAllocator* allocator,
+                       DataType::Type packed_type,
+                       SideEffects side_effects,
+                       size_t number_of_inputs,
+                       size_t vector_length,
+                       uint32_t dex_pc)
+      : HVecOperation(kind,
+                      allocator,
+                      packed_type,
+                      side_effects,
+                      number_of_inputs,
+                      vector_length,
+                      dex_pc) {
+    // Overrides the kSIMDType set by the VecOperation constructor.
+    SetPackedField<TypeField>(kSIMDPredType);
+  }
+
+  bool CanBeMoved() const override { return true; }
+
+  DECLARE_ABSTRACT_INSTRUCTION(VecPredSetOperation);
+
+ protected:
+  DEFAULT_COPY_CONSTRUCTOR(VecPredSetOperation);
+};
+
+// Sets all the vector predicate elements as active or inactive.
+//
+// viz. [ p1, .. , pn ]  = [ val, .. , val ] where val is from { 1, 0 }.
+class HVecPredSetAll final : public HVecPredSetOperation {
+ public:
+  HVecPredSetAll(ArenaAllocator* allocator,
+                 HInstruction* input,
+                 DataType::Type packed_type,
+                 size_t vector_length,
+                 uint32_t dex_pc) :
+      HVecPredSetOperation(kVecPredSetAll,
+                           allocator,
+                           packed_type,
+                           SideEffects::None(),
+                           /* number_of_inputs= */ 1,
+                           vector_length,
+                           dex_pc) {
+    DCHECK(input->IsIntConstant());
+    SetRawInputAt(0, input);
+    MarkEmittedAtUseSite();
+  }
+
+  // Having governing predicate doesn't make sense for set all TRUE/FALSE instruction.
+  bool MustBePredicatedInPredicatedSIMDMode() override { return false; }
+
+  bool IsSetTrue() const { return InputAt(0)->AsIntConstant()->IsTrue(); }
+
+  // Vector predicates are not kept alive across vector loop boundaries.
+  bool CanBeMoved() const override { return false; }
+
+  DECLARE_INSTRUCTION(VecPredSetAll);
+
+ protected:
+  DEFAULT_COPY_CONSTRUCTOR(VecPredSetAll);
+};
+
+//
+// Arm64 SVE-specific instructions.
+//
+// Classes of instructions which are specific to Arm64 SVE (though could be adopted
+// by other targets, possibly being lowered to a number of ISA instructions) and
+// implement SIMD loop predicated execution idiom.
+//
+
+// Takes two scalar values x and y, creates a vector S: s(n) = x + n, compares (OP) each s(n)
+// with y and set the corresponding element of the predicate register to the result of the
+// comparison.
+//
+// viz. [ p1, .. , pn ]  = [ x OP y , (x + 1) OP y, .. , (x + n) OP y ] where OP is CondKind
+// condition.
+class HVecPredWhile final : public HVecPredSetOperation {
+ public:
+  enum class CondKind {
+    kLE,   // signed less than or equal.
+    kLO,   // unsigned lower.
+    kLS,   // unsigned lower or same.
+    kLT,   // signed less.
+    kLast = kLT,
+  };
+
+  HVecPredWhile(ArenaAllocator* allocator,
+                HInstruction* left,
+                HInstruction* right,
+                CondKind cond,
+                DataType::Type packed_type,
+                size_t vector_length,
+                uint32_t dex_pc) :
+      HVecPredSetOperation(kVecPredWhile,
+                           allocator,
+                           packed_type,
+                           SideEffects::None(),
+                           /* number_of_inputs= */ 2,
+                           vector_length,
+                           dex_pc) {
+    DCHECK(!left->IsVecOperation());
+    DCHECK(!left->IsVecPredSetOperation());
+    DCHECK(!right->IsVecOperation());
+    DCHECK(!right->IsVecPredSetOperation());
+    DCHECK(DataType::IsIntegralType(left->GetType()));
+    DCHECK(DataType::IsIntegralType(right->GetType()));
+    SetRawInputAt(0, left);
+    SetRawInputAt(1, right);
+    SetPackedField<CondKindField>(cond);
+  }
+
+  // This is a special loop control instruction which must not be predicated.
+  bool MustBePredicatedInPredicatedSIMDMode() override { return false; }
+
+  CondKind GetCondKind() const {
+    return GetPackedField<CondKindField>();
+  }
+
+  DECLARE_INSTRUCTION(VecPredWhile);
+
+ protected:
+  // Additional packed bits.
+  static constexpr size_t kCondKind = HVecOperation::kNumberOfVectorOpPackedBits;
+  static constexpr size_t kCondKindSize =
+      MinimumBitsToStore(static_cast<size_t>(CondKind::kLast));
+  static constexpr size_t kNumberOfVecPredConditionPackedBits = kCondKind + kCondKindSize;
+  static_assert(kNumberOfVecPredConditionPackedBits <= kMaxNumberOfPackedBits,
+                "Too many packed fields.");
+  using CondKindField = BitField<CondKind, kCondKind, kCondKindSize>;
+
+  DEFAULT_COPY_CONSTRUCTOR(VecPredWhile);
+};
+
+// Evaluates the predicate condition (PCondKind) for a vector predicate; outputs
+// a scalar boolean value result.
+//
+// Note: as VecPredCondition can be also predicated, only active elements (determined by the
+// instruction's governing predicate) of the input vector predicate are used for condition
+// evaluation.
+//
+// Note: this instruction is currently used as a workaround for the fact that IR instructions
+// can't have more than one output.
+class HVecPredCondition final : public HVecOperation {
+ public:
+  // To get more info on the condition kinds please see "2.2 Process state, PSTATE" section of
+  // "ARM Architecture Reference Manual Supplement. The Scalable Vector Extension (SVE),
+  // for ARMv8-A".
+  enum class PCondKind {
+    kNone,    // No active elements were TRUE.
+    kAny,     // An active element was TRUE.
+    kNLast,   // The last active element was not TRUE.
+    kLast,    // The last active element was TRUE.
+    kFirst,   // The first active element was TRUE.
+    kNFirst,  // The first active element was not TRUE.
+    kPMore,   // An active element was TRUE but not the last active element.
+    kPLast,   // The last active element was TRUE or no active elements were TRUE.
+    kEnumLast = kPLast
+  };
+
+  HVecPredCondition(ArenaAllocator* allocator,
+                    HInstruction* input,
+                    PCondKind pred_cond,
+                    DataType::Type packed_type,
+                    size_t vector_length,
+                    uint32_t dex_pc)
+      : HVecOperation(kVecPredCondition,
+                      allocator,
+                      packed_type,
+                      SideEffects::None(),
+                      /* number_of_inputs */ 1,
+                      vector_length,
+                      dex_pc) {
+    DCHECK(input->IsVecPredSetOperation());
+    SetRawInputAt(0, input);
+    // Overrides the kSIMDType set by the VecOperation constructor.
+    SetPackedField<TypeField>(DataType::Type::kBool);
+    SetPackedField<CondKindField>(pred_cond);
+  }
+
+  // This instruction is currently used only as a special loop control instruction
+  // which must not be predicated.
+  // TODO: Remove the constraint.
+  bool MustBePredicatedInPredicatedSIMDMode() override { return false; }
+
+  PCondKind GetPCondKind() const {
+    return GetPackedField<CondKindField>();
+  }
+
+  DECLARE_INSTRUCTION(VecPredCondition);
+
+ protected:
+  // Additional packed bits.
+  static constexpr size_t kCondKind = HVecOperation::kNumberOfVectorOpPackedBits;
+  static constexpr size_t kCondKindSize =
+      MinimumBitsToStore(static_cast<size_t>(PCondKind::kEnumLast));
+  static constexpr size_t kNumberOfVecPredConditionPackedBits = kCondKind + kCondKindSize;
+  static_assert(kNumberOfVecPredConditionPackedBits <= kMaxNumberOfPackedBits,
+                "Too many packed fields.");
+  using CondKindField = BitField<PCondKind, kCondKind, kCondKindSize>;
+
+  DEFAULT_COPY_CONSTRUCTOR(VecPredCondition);
 };
 
 }  // namespace art
