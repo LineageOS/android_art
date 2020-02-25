@@ -38,6 +38,9 @@ module_exports {
             // implementation and cannot be overridden any other way.
             compile_multilib: "64",
         },
+        darwin: {
+            enabled: false,
+        },
     },
     java_libs: [
         "timezone-host",
