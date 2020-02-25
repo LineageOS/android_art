@@ -488,6 +488,27 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
     LOG(INFO) << "debuggable & jni-type indices are required to implement structural "
               << "class redefinition extensions.";
   }
+  // SetVerboseFlagExt
+  error = add_extension(
+      reinterpret_cast<jvmtiExtensionFunction>(LogUtil::SetVerboseFlagExt),
+      "com.android.art.misc.set_verbose_flag_ext",
+      "Sets the verbose flags selected by the 'option' c-string. Valid options are anything that"
+      " would be accepted by the -verbose:<option> runtime flag. The verbose selections are turned"
+      " on if 'enable' is set to true and disabled otherwise. You may select multiple options at"
+      " once using commas just like with the -verbose:<option> flag. For example \"class,deopt,gc\""
+      " is equivalent to turning on all of the VLOG(class_linker), VLOG(deopt) and VLOG(gc)"
+      " messages.",
+      {
+        { "option", JVMTI_KIND_IN_BUF, JVMTI_TYPE_CCHAR, false },
+        { "enable", JVMTI_KIND_IN, JVMTI_TYPE_JBOOLEAN, false },
+      },
+      {
+         ERR(NULL_POINTER),
+         ERR(ILLEGAL_ARGUMENT),
+      });
+  if (error != ERR(NONE)) {
+    return error;
+  }
 
   // Copy into output buffer.
 
