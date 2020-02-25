@@ -58,6 +58,7 @@ cc_defaults {
         "transform.cc",
     ],
     header_libs: [
+        "art_cmdlineparser_headers",
         "libnativehelper_header_only",
         "libopenjdkjvmti_headers",
     ],
