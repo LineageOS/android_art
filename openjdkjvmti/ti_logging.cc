@@ -33,8 +33,11 @@
 
 #include "art_jvmti.h"
 
+#include "base/logging.h"
 #include "base/mutex.h"
 #include "base/strlcpy.h"
+#include "cmdline_types.h"
+#include "jvmti.h"
 #include "thread-current-inl.h"
 
 namespace openjdkjvmti {
@@ -67,6 +70,93 @@ jvmtiError LogUtil::ClearLastError(jvmtiEnv* env) {
   art::MutexLock mu(art::Thread::Current(), tienv->last_error_mutex_);
   tienv->last_error_.clear();
   return OK;
+}
+
+jvmtiError LogUtil::SetVerboseFlagExt(jvmtiEnv* env, const char* data, jboolean enable) {
+  if (env == nullptr) {
+    return ERR(INVALID_ENVIRONMENT);
+  } else if (data == nullptr) {
+    return ERR(NULL_POINTER);
+  }
+  bool new_value = (enable == JNI_TRUE) ? true : false;
+  art::CmdlineType<art::LogVerbosity> cmdline_parser;
+  std::string parse_data(data);
+  art::CmdlineType<art::LogVerbosity>::Result result = cmdline_parser.Parse(parse_data);
+  if (result.IsError()) {
+    JVMTI_LOG(INFO, env) << "Invalid verbose argument: '" << parse_data << "'. Error was "
+                         << result.GetMessage();
+    return ERR(ILLEGAL_ARGUMENT);
+  }
+
+  const art::LogVerbosity& input_verbosity = result.GetValue();
+  const bool* verbosity_arr = reinterpret_cast<const bool*>(&input_verbosity);
+  bool* g_log_verbosity_arr = reinterpret_cast<bool*>(&art::gLogVerbosity);
+  // Copy/invert the verbosity byte-by-byte (sizeof(bool) == 1).
+  for (size_t i = 0; i < sizeof(art::LogVerbosity); i++) {
+    if (verbosity_arr[i]) {
+      g_log_verbosity_arr[i] = new_value;
+    }
+  }
+  return OK;
+}
+
+jvmtiError LogUtil::SetVerboseFlag(jvmtiEnv* env ATTRIBUTE_UNUSED,
+                                   jvmtiVerboseFlag flag,
+                                   jboolean value) {
+  if (flag == jvmtiVerboseFlag::JVMTI_VERBOSE_OTHER) {
+    // OTHER is special, as it's 0, so can't do a bit check.
+    bool val = (value == JNI_TRUE) ? true : false;
+
+    art::gLogVerbosity.collector = val;
+    art::gLogVerbosity.compiler = val;
+    art::gLogVerbosity.deopt = val;
+    art::gLogVerbosity.heap = val;
+    art::gLogVerbosity.interpreter = val;
+    art::gLogVerbosity.jdwp = val;
+    art::gLogVerbosity.jit = val;
+    art::gLogVerbosity.monitor = val;
+    art::gLogVerbosity.oat = val;
+    art::gLogVerbosity.profiler = val;
+    art::gLogVerbosity.signals = val;
+    art::gLogVerbosity.simulator = val;
+    art::gLogVerbosity.startup = val;
+    art::gLogVerbosity.third_party_jni = val;
+    art::gLogVerbosity.threads = val;
+    art::gLogVerbosity.verifier = val;
+    // Do not set verifier-debug.
+    art::gLogVerbosity.image = val;
+    art::gLogVerbosity.plugin = val;
+
+    // Note: can't switch systrace_lock_logging. That requires changing entrypoints.
+
+    art::gLogVerbosity.agents = val;
+  } else {
+    // Spec isn't clear whether "flag" is a mask or supposed to be single. We implement the mask
+    // semantics.
+    constexpr std::underlying_type<jvmtiVerboseFlag>::type kMask =
+        jvmtiVerboseFlag::JVMTI_VERBOSE_GC |
+        jvmtiVerboseFlag::JVMTI_VERBOSE_CLASS |
+        jvmtiVerboseFlag::JVMTI_VERBOSE_JNI;
+    if ((flag & ~kMask) != 0) {
+      return ERR(ILLEGAL_ARGUMENT);
+    }
+
+    bool val = (value == JNI_TRUE) ? true : false;
+
+    if ((flag & jvmtiVerboseFlag::JVMTI_VERBOSE_GC) != 0) {
+      art::gLogVerbosity.gc = val;
+    }
+
+    if ((flag & jvmtiVerboseFlag::JVMTI_VERBOSE_CLASS) != 0) {
+      art::gLogVerbosity.class_linker = val;
+    }
+
+    if ((flag & jvmtiVerboseFlag::JVMTI_VERBOSE_JNI) != 0) {
+      art::gLogVerbosity.jni = val;
+    }
+  }
+
+  return ERR(NONE);
 }
 
 }  // namespace openjdkjvmti
