@@ -896,8 +896,9 @@ void Heap::IncrementDisableThreadFlip(Thread* self) {
   MutexLock mu(self, *thread_flip_lock_);
   thread_flip_cond_->CheckSafeToWait(self);
   bool has_waited = false;
-  uint64_t wait_start = NanoTime();
+  uint64_t wait_start = 0;
   if (thread_flip_running_) {
+    wait_start = NanoTime();
     ScopedTrace trace("IncrementDisableThreadFlip");
     while (thread_flip_running_) {
       has_waited = true;
