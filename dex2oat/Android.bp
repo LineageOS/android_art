@@ -275,20 +275,10 @@ art_cc_binary {
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
             // dexpreopt.RegisterToolDeps) doesn't take host prefer32 into
-            // account. Note that this override cannot be in cc_default because
+            // account. Note that this override cannot be in cc_defaults because
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
-            compile_multilib: "both",
-            symlink_preferred_arch: true,
-        },
-        linux_glibc_x86: {
-            suffix: "32",
-        },
-        linux_glibc_x86_64: {
-            suffix: "64",
-        },
-        linux_bionic_x86_64: {
-            suffix: "64",
+            compile_multilib: "64",
         },
     },
     apex_available: [
@@ -336,20 +326,10 @@ art_cc_binary {
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
             // dexpreopt.RegisterToolDeps) doesn't take host prefer32 into
-            // account. Note that this override cannot be in cc_default because
+            // account. Note that this override cannot be in cc_defaults because
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
-            compile_multilib: "both",
-            symlink_preferred_arch: true,
-        },
-        linux_glibc_x86: {
-            suffix: "32",
-        },
-        linux_glibc_x86_64: {
-            suffix: "64",
-        },
-        linux_bionic_x86_64: {
-            suffix: "64",
+            compile_multilib: "64",
         },
     },
     apex_available: [
