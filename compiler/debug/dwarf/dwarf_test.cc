@@ -146,7 +146,7 @@ TEST_F(DwarfTest, DISABLED_DebugFrame64) {
 }
 
 // Test x86_64 register mapping. It is the only non-trivial architecture.
-// ARM, X86, and Mips have: dwarf_reg = art_reg + constant.
+// ARM and X86 have: dwarf_reg = art_reg + constant.
 TEST_F(DwarfTest, x86_64_RegisterMapping) {
   constexpr bool is64bit = true;
   DebugFrameOpCodeWriter<> opcodes;
