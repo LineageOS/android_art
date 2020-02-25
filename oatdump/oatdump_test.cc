@@ -74,7 +74,7 @@ TEST_F(OatDumpTest, TestListMethodsStatic) {
 }
 
 TEST_F(OatDumpTest, TestSymbolize) {
-  TEST_DISABLED_FOR_ARM_AND_ARM64();
+  TEST_DISABLED_FOR_TARGET();  // Can not write files inside the apex directory.
   std::string error_msg;
   ASSERT_TRUE(Exec(kDynamic, kModeSymbolize, {}, kListOnly));
 }
