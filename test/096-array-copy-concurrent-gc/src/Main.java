@@ -42,7 +42,7 @@ public class Main {
         }
     }
 
-    Object [] array = new Object[10000];
+    Object [] array = new Object[8000];
 
     void stressArray(boolean doLog) {
         // We want many references in the array
