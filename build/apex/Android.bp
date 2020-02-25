@@ -224,13 +224,6 @@ apex_key {
     private_key: "com.android.art.pem",
 }
 
-prebuilt_etc {
-    name: "com.android.art.ld.config.txt",
-    src: "ld.config.txt",
-    filename: "ld.config.txt",
-    installable: false,
-}
-
 // Default values shared by device ART APEXes.
 apex_defaults {
     name: "com.android.art-defaults",
@@ -253,7 +246,6 @@ apex_defaults {
                 art_tools_device_only_binaries,
         },
     },
-    prebuilts: ["com.android.art.ld.config.txt"],
     key: "com.android.art.key",
     required: [
         "art_apex_boot_integrity",
