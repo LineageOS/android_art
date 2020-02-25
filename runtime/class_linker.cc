@@ -4083,10 +4083,11 @@ void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
   }
 }
 
-static void ThrowDexFileAlreadyRegisteredError(Thread* self, const DexFile& dex_file) REQUIRES_SHARED(Locks::mutator_lock_) {
+static void ThrowDexFileAlreadyRegisteredError(Thread* self, const DexFile& dex_file)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
   self->ThrowNewExceptionF("Ljava/lang/InternalError;",
-                            "Attempt to register dex file %s with multiple class loaders",
-                            dex_file.GetLocation().c_str());
+                           "Attempt to register dex file %s with multiple class loaders",
+                           dex_file.GetLocation().c_str());
 }
 
 ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
