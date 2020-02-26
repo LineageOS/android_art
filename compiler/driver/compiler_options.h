@@ -195,10 +195,6 @@ class CompilerOptions final {
     return implicit_suspend_checks_;
   }
 
-  bool IsGeneratingImage() const {
-    return IsBootImage() || IsBootImageExtension() || IsAppImage();
-  }
-
   // Are we compiling a boot image?
   bool IsBootImage() const {
     return image_type_ == ImageType::kBootImage;
