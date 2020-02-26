@@ -35,4 +35,9 @@ sh_binary {
     host_supported: true,
     src: "art",
     filename_from_src: true,
+    required: [
+        "dalvikvm",
+        "dex2oat",
+        "dex2oatd",
+    ],
 }
