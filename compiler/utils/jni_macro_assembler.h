@@ -63,8 +63,7 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   // Emit code that will create an activation on the stack
   virtual void BuildFrame(size_t frame_size,
                           ManagedRegister method_reg,
-                          ArrayRef<const ManagedRegister> callee_save_regs,
-                          const ManagedRegisterEntrySpills& entry_spills) = 0;
+                          ArrayRef<const ManagedRegister> callee_save_regs) = 0;
 
   // Emit code that will remove an activation from the stack
   //
@@ -83,18 +82,16 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void StoreRef(FrameOffset dest, ManagedRegister src) = 0;
   virtual void StoreRawPtr(FrameOffset dest, ManagedRegister src) = 0;
 
-  virtual void StoreImmediateToFrame(FrameOffset dest, uint32_t imm, ManagedRegister scratch) = 0;
+  virtual void StoreImmediateToFrame(FrameOffset dest, uint32_t imm) = 0;
 
   virtual void StoreStackOffsetToThread(ThreadOffset<kPointerSize> thr_offs,
-                                        FrameOffset fr_offs,
-                                        ManagedRegister scratch) = 0;
+                                        FrameOffset fr_offs) = 0;
 
   virtual void StoreStackPointerToThread(ThreadOffset<kPointerSize> thr_offs) = 0;
 
   virtual void StoreSpanning(FrameOffset dest,
                              ManagedRegister src,
-                             FrameOffset in_off,
-                             ManagedRegister scratch) = 0;
+                             FrameOffset in_off) = 0;
 
   // Load routines
   virtual void Load(ManagedRegister dest, FrameOffset src, size_t size) = 0;
@@ -117,17 +114,19 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   // Copying routines
   virtual void Move(ManagedRegister dest, ManagedRegister src, size_t size) = 0;
 
-  virtual void CopyRawPtrFromThread(FrameOffset fr_offs,
-                                    ThreadOffset<kPointerSize> thr_offs,
-                                    ManagedRegister scratch) = 0;
+  virtual void CopyRawPtrFromThread(FrameOffset fr_offs, ThreadOffset<kPointerSize> thr_offs) = 0;
 
   virtual void CopyRawPtrToThread(ThreadOffset<kPointerSize> thr_offs,
                                   FrameOffset fr_offs,
                                   ManagedRegister scratch) = 0;
 
-  virtual void CopyRef(FrameOffset dest, FrameOffset src, ManagedRegister scratch) = 0;
+  virtual void CopyRef(FrameOffset dest, FrameOffset src) = 0;
+  virtual void CopyRef(FrameOffset dest,
+                       ManagedRegister base,
+                       MemberOffset offs,
+                       bool unpoison_reference) = 0;
 
-  virtual void Copy(FrameOffset dest, FrameOffset src, ManagedRegister scratch, size_t size) = 0;
+  virtual void Copy(FrameOffset dest, FrameOffset src, size_t size) = 0;
 
   virtual void Copy(FrameOffset dest,
                     ManagedRegister src_base,
@@ -170,8 +169,8 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void ZeroExtend(ManagedRegister mreg, size_t size) = 0;
 
   // Exploit fast access in managed code to Thread::Current()
-  virtual void GetCurrentThread(ManagedRegister tr) = 0;
-  virtual void GetCurrentThread(FrameOffset dest_offset, ManagedRegister scratch) = 0;
+  virtual void GetCurrentThread(ManagedRegister dest) = 0;
+  virtual void GetCurrentThread(FrameOffset dest_offset) = 0;
 
   // Set up out_reg to hold a Object** into the handle scope, or to be null if the
   // value is null and null_allowed. in_reg holds a possibly stale reference
@@ -186,7 +185,6 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   // value is null and null_allowed.
   virtual void CreateHandleScopeEntry(FrameOffset out_off,
                                       FrameOffset handlescope_offset,
-                                      ManagedRegister scratch,
                                       bool null_allowed) = 0;
 
   // src holds a handle scope entry (Object**) load this into dst
@@ -198,23 +196,23 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void VerifyObject(FrameOffset src, bool could_be_null) = 0;
 
   // Jump to address held at [base+offset] (used for tail calls).
-  virtual void Jump(ManagedRegister base, Offset offset, ManagedRegister scratch) = 0;
+  virtual void Jump(ManagedRegister base, Offset offset) = 0;
 
   // Call to address held at [base+offset]
-  virtual void Call(ManagedRegister base, Offset offset, ManagedRegister scratch) = 0;
-  virtual void Call(FrameOffset base, Offset offset, ManagedRegister scratch) = 0;
-  virtual void CallFromThread(ThreadOffset<kPointerSize> offset, ManagedRegister scratch) = 0;
+  virtual void Call(ManagedRegister base, Offset offset) = 0;
+  virtual void Call(FrameOffset base, Offset offset) = 0;
+  virtual void CallFromThread(ThreadOffset<kPointerSize> offset) = 0;
 
   // Generate code to check if Thread::Current()->exception_ is non-null
   // and branch to a ExceptionSlowPath if it is.
-  virtual void ExceptionPoll(ManagedRegister scratch, size_t stack_adjust) = 0;
+  virtual void ExceptionPoll(size_t stack_adjust) = 0;
 
   // Create a new label that can be used with Jump/Bind calls.
   virtual std::unique_ptr<JNIMacroLabel> CreateLabel() = 0;
   // Emit an unconditional jump to the label.
   virtual void Jump(JNIMacroLabel* label) = 0;
-  // Emit a conditional jump to the label by applying a unary condition test to the register.
-  virtual void Jump(JNIMacroLabel* label, JNIMacroUnaryCondition cond, ManagedRegister test) = 0;
+  // Emit a conditional jump to the label by applying a unary condition test to the GC marking flag.
+  virtual void TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryCondition cond) = 0;
   // Code at this offset will serve as the target for the Jump call.
   virtual void Bind(JNIMacroLabel* label) = 0;
 
