@@ -1,9 +1,6 @@
 {
   "presubmit": [
     {
-      "name": "ArtGtestsTarget"
-    },
-    {
       "name": "CtsJdwpTestCases"
     }
   ]
