@@ -69,9 +69,6 @@
 //       2) Read the symfile and re-read the next pointer.
 //       3) Re-read both the current and next seqlock.
 //       4) Go to step 1 with using new entry and seqlock.
-//   * New entries are appended at the end which makes it
-//     possible to repack entries even when the reader
-//     is concurrently iterating over the linked list.
 //
 // 3) Asynchronously, using the global seqlock.
 //   * The seqlock is a monotonically increasing counter which is incremented
@@ -314,9 +311,9 @@ static const JITCodeEntry* CreateJITCodeEntryInternal(
   uint64_t timestamp = GetNextTimestamp(descriptor);
 
   // We must insert entries at specific place.  See NativeDebugInfoPreFork().
-  const JITCodeEntry* next = nullptr;  // Append at the end of linked list.
-  if (!Runtime::Current()->IsZygote() && descriptor.zygote_head_entry_ != nullptr) {
-    next = &descriptor.application_tail_entry_;
+  const JITCodeEntry* next = descriptor.head_.load(kNonRacingRelaxed);  // Insert at the head.
+  if (descriptor.zygote_head_entry_ != nullptr && Runtime::Current()->IsZygote()) {
+    next = nullptr;  // Insert zygote entries at the tail.
   }
 
   // Pop entry from the free list.
@@ -423,9 +420,16 @@ void RemoveNativeDebugInfoForDex(Thread* self, const DexFile* dexfile) {
 // <------- owned by the application memory --------> <--- owned by zygote memory --->
 //         |----------------------|------------------|-------------|-----------------|
 // head -> | application_entries* | application_tail | zygote_head | zygote_entries* |
-//         |---------------------+|------------------|-------------|----------------+|
-//                               |                                                  |
-//     (new application entries)-/                             (new zygote entries)-/
+//         |+---------------------|------------------|-------------|----------------+|
+//          |                                                                       |
+//          \-(new application entries)                        (new zygote entries)-/
+//
+// Zygote entries are inserted at the end, which means that repacked zygote entries
+// will still be seen by single forward iteration of the linked list (avoiding race).
+//
+// Application entries are inserted at the start which introduces repacking race,
+// but that is ok, since it is easy to read new entries from head in further pass.
+// The benefit is that this makes it fast to read only the new entries.
 //
 void NativeDebugInfoPreFork() {
   CHECK(Runtime::Current()->IsZygote());
@@ -576,10 +580,12 @@ void RemoveNativeDebugInfoForJit(ArrayRef<const void*> removed) {
   RepackEntries(/*compress_entries=*/ true, removed);
 
   // Remove entries which are not allowed to be packed (containing single method each).
-  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr; it = it->next_) {
+  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr;) {
+    const JITCodeEntry* next = it->next_;
     if (!it->allow_packing_ && std::binary_search(removed.begin(), removed.end(), it->addr_)) {
       DeleteJITCodeEntryInternal<JitNativeInfo>(/*entry=*/ it);
     }
+    it = next;
   }
 }
 

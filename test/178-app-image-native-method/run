@@ -22,4 +22,4 @@ return_status1=$?
 ${RUN} ${@} --profile -Xcompiler-option --compiler-filter=verify
 return_status2=$?
 
-(exit ${return_status1}) # && (exit ${return_status2})
+(exit ${return_status1}) && (exit ${return_status2})

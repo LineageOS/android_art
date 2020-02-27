@@ -139,90 +139,6 @@ class QuickArgumentVisitor {
   static size_t GprIndexToGprOffset(uint32_t gpr_index) {
     return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
   }
-#elif defined(__mips__) && !defined(__LP64__)
-  // The callee save frame is pointed to by SP.
-  // | argN       |  |
-  // | ...        |  |
-  // | arg4       |  |
-  // | arg3 spill |  |  Caller's frame
-  // | arg2 spill |  |
-  // | arg1 spill |  |
-  // | Method*    | ---
-  // | RA         |
-  // | ...        |    callee saves
-  // | T1         |    arg5
-  // | T0         |    arg4
-  // | A3         |    arg3
-  // | A2         |    arg2
-  // | A1         |    arg1
-  // | F19        |
-  // | F18        |    f_arg5
-  // | F17        |
-  // | F16        |    f_arg4
-  // | F15        |
-  // | F14        |    f_arg3
-  // | F13        |
-  // | F12        |    f_arg2
-  // | F11        |
-  // | F10        |    f_arg1
-  // | F9         |
-  // | F8         |    f_arg0
-  // |            |    padding
-  // | A0/Method* |  <- sp
-  static constexpr bool kSplitPairAcrossRegisterAndStack = false;
-  static constexpr bool kAlignPairRegister = true;
-  static constexpr bool kQuickSoftFloatAbi = false;
-  static constexpr bool kQuickDoubleRegAlignedFloatBackFilled = false;
-  static constexpr bool kQuickSkipOddFpRegisters = true;
-  static constexpr size_t kNumQuickGprArgs = 5;   // 5 arguments passed in GPRs.
-  static constexpr size_t kNumQuickFprArgs = 12;  // 6 arguments passed in FPRs. Floats can be
-                                                  // passed only in even numbered registers and each
-                                                  // double occupies two registers.
-  static constexpr bool kGprFprLockstep = false;
-  static size_t GprIndexToGprOffset(uint32_t gpr_index) {
-    return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
-  }
-#elif defined(__mips__) && defined(__LP64__)
-  // The callee save frame is pointed to by SP.
-  // | argN       |  |
-  // | ...        |  |
-  // | arg4       |  |
-  // | arg3 spill |  |  Caller's frame
-  // | arg2 spill |  |
-  // | arg1 spill |  |
-  // | Method*    | ---
-  // | RA         |
-  // | ...        |    callee saves
-  // | A7         |    arg7
-  // | A6         |    arg6
-  // | A5         |    arg5
-  // | A4         |    arg4
-  // | A3         |    arg3
-  // | A2         |    arg2
-  // | A1         |    arg1
-  // | F19        |    f_arg7
-  // | F18        |    f_arg6
-  // | F17        |    f_arg5
-  // | F16        |    f_arg4
-  // | F15        |    f_arg3
-  // | F14        |    f_arg2
-  // | F13        |    f_arg1
-  // | F12        |    f_arg0
-  // |            |    padding
-  // | A0/Method* |  <- sp
-  // NOTE: for Mip64, when A0 is skipped, F12 is also skipped.
-  static constexpr bool kSplitPairAcrossRegisterAndStack = false;
-  static constexpr bool kAlignPairRegister = false;
-  static constexpr bool kQuickSoftFloatAbi = false;
-  static constexpr bool kQuickDoubleRegAlignedFloatBackFilled = false;
-  static constexpr bool kQuickSkipOddFpRegisters = false;
-  static constexpr size_t kNumQuickGprArgs = 7;  // 7 arguments passed in GPRs.
-  static constexpr size_t kNumQuickFprArgs = 7;  // 7 arguments passed in FPRs.
-  static constexpr bool kGprFprLockstep = true;
-
-  static size_t GprIndexToGprOffset(uint32_t gpr_index) {
-    return gpr_index * GetBytesPerGprSpillLocation(kRuntimeISA);
-  }
 #elif defined(__i386__)
   // The callee save frame is pointed to by SP.
   // | argN        |  |
@@ -520,15 +436,10 @@ class QuickArgumentVisitor {
         case Primitive::kPrimLong:
           if (kQuickSoftFloatAbi || (cur_type_ == Primitive::kPrimLong)) {
             if (cur_type_ == Primitive::kPrimLong &&
-#if defined(__mips__) && !defined(__LP64__)
-                (gpr_index_ == 0 || gpr_index_ == 2) &&
-#else
                 gpr_index_ == 0 &&
-#endif
                 kAlignPairRegister) {
-              // Currently, this is only for ARM and MIPS, where we align long parameters with
-              // even-numbered registers by skipping R1 (on ARM) or A1(A3) (on MIPS) and using
-              // R2 (on ARM) or A2(T0) (on MIPS) instead.
+              // Currently, this is only for ARM, where we align long parameters with
+              // even-numbered registers by skipping R1 and using R2 instead.
               IncGprIndex();
             }
             is_split_long_or_double_ = (GetBytesPerGprSpillLocation(kRuntimeISA) == 4) &&
@@ -1560,7 +1471,7 @@ template<class T> class BuildNativeCallFrameStateMachine {
   static constexpr bool kAlignDoubleOnStack = true;
 #elif defined(__aarch64__)
   static constexpr bool kNativeSoftFloatAbi = false;  // This is a hard float ABI.
-  static constexpr size_t kNumNativeGprArgs = 8;  // 6 arguments passed in GPRs.
+  static constexpr size_t kNumNativeGprArgs = 8;  // 8 arguments passed in GPRs.
   static constexpr size_t kNumNativeFprArgs = 8;  // 8 arguments passed in FPRs.
 
   static constexpr size_t kRegistersNeededForLong = 1;
@@ -1570,36 +1481,11 @@ template<class T> class BuildNativeCallFrameStateMachine {
   static constexpr bool kMultiGPRegistersWidened = false;
   static constexpr bool kAlignLongOnStack = false;
   static constexpr bool kAlignDoubleOnStack = false;
-#elif defined(__mips__) && !defined(__LP64__)
-  static constexpr bool kNativeSoftFloatAbi = true;  // This is a hard float ABI.
-  static constexpr size_t kNumNativeGprArgs = 4;  // 4 arguments passed in GPRs.
-  static constexpr size_t kNumNativeFprArgs = 0;  // 0 arguments passed in FPRs.
-
-  static constexpr size_t kRegistersNeededForLong = 2;
-  static constexpr size_t kRegistersNeededForDouble = 2;
-  static constexpr bool kMultiRegistersAligned = true;
-  static constexpr bool kMultiFPRegistersWidened = true;
-  static constexpr bool kMultiGPRegistersWidened = false;
-  static constexpr bool kAlignLongOnStack = true;
-  static constexpr bool kAlignDoubleOnStack = true;
-#elif defined(__mips__) && defined(__LP64__)
-  // Let the code prepare GPRs only and we will load the FPRs with same data.
-  static constexpr bool kNativeSoftFloatAbi = true;
-  static constexpr size_t kNumNativeGprArgs = 8;
-  static constexpr size_t kNumNativeFprArgs = 0;
-
-  static constexpr size_t kRegistersNeededForLong = 1;
-  static constexpr size_t kRegistersNeededForDouble = 1;
-  static constexpr bool kMultiRegistersAligned = false;
-  static constexpr bool kMultiFPRegistersWidened = false;
-  static constexpr bool kMultiGPRegistersWidened = true;
-  static constexpr bool kAlignLongOnStack = false;
-  static constexpr bool kAlignDoubleOnStack = false;
 #elif defined(__i386__)
   // TODO: Check these!
   static constexpr bool kNativeSoftFloatAbi = false;  // Not using int registers for fp
-  static constexpr size_t kNumNativeGprArgs = 0;  // 6 arguments passed in GPRs.
-  static constexpr size_t kNumNativeFprArgs = 0;  // 8 arguments passed in FPRs.
+  static constexpr size_t kNumNativeGprArgs = 0;  // 0 arguments passed in GPRs.
+  static constexpr size_t kNumNativeFprArgs = 0;  // 0 arguments passed in FPRs.
 
   static constexpr size_t kRegistersNeededForLong = 2;
   static constexpr size_t kRegistersNeededForDouble = 2;
@@ -1871,35 +1757,10 @@ class ComputeNativeCallFrameSize {
     return num_stack_entries_ * sizeof(uintptr_t);
   }
 
-  uint8_t* LayoutCallStack(uint8_t* sp8) const {
+  uint8_t* LayoutStackArgs(uint8_t* sp8) const {
     sp8 -= GetStackSize();
-    // Align by kStackAlignment.
+    // Align by kStackAlignment; it is at least as strict as native stack alignment.
     sp8 = reinterpret_cast<uint8_t*>(RoundDown(reinterpret_cast<uintptr_t>(sp8), kStackAlignment));
-    return sp8;
-  }
-
-  uint8_t* LayoutCallRegisterStacks(uint8_t* sp8, uintptr_t** start_gpr, uint32_t** start_fpr)
-      const {
-    // Assumption is OK right now, as we have soft-float arm
-    size_t fregs = BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>::kNumNativeFprArgs;
-    sp8 -= fregs * sizeof(uintptr_t);
-    *start_fpr = reinterpret_cast<uint32_t*>(sp8);
-    size_t iregs = BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>::kNumNativeGprArgs;
-    sp8 -= iregs * sizeof(uintptr_t);
-    *start_gpr = reinterpret_cast<uintptr_t*>(sp8);
-    return sp8;
-  }
-
-  uint8_t* LayoutNativeCall(uint8_t* sp8, uintptr_t** start_stack, uintptr_t** start_gpr,
-                            uint32_t** start_fpr) const {
-    // Native call stack.
-    sp8 = LayoutCallStack(sp8);
-    *start_stack = reinterpret_cast<uintptr_t*>(sp8);
-
-    // Put fprs and gprs below.
-    sp8 = LayoutCallRegisterStacks(sp8, start_gpr, start_fpr);
-
-    // Return the new bottom.
     return sp8;
   }
 
@@ -1976,80 +1837,53 @@ class ComputeGenericJniFrameSize final : public ComputeNativeCallFrameSize {
   explicit ComputeGenericJniFrameSize(bool critical_native)
     : num_handle_scope_references_(0), critical_native_(critical_native) {}
 
-  // Lays out the callee-save frame. Assumes that the incorrect frame corresponding to RefsAndArgs
-  // is at *m = sp. Will update to point to the bottom of the save frame.
-  //
-  // Note: assumes ComputeAll() has been run before.
-  void LayoutCalleeSaveFrame(Thread* self, ArtMethod*** m, void* sp, HandleScope** handle_scope)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    ArtMethod* method = **m;
-
+  uintptr_t* ComputeLayout(Thread* self,
+                           ArtMethod** managed_sp,
+                           const char* shorty,
+                           uint32_t shorty_len,
+                           HandleScope** handle_scope) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
 
-    uint8_t* sp8 = reinterpret_cast<uint8_t*>(sp);
-
-    // First, fix up the layout of the callee-save frame.
-    // We have to squeeze in the HandleScope, and relocate the method pointer.
-
-    // "Free" the slot for the method.
-    sp8 += sizeof(void*);  // In the callee-save frame we use a full pointer.
-
-    // Under the callee saves put handle scope and new method stack reference.
-    size_t handle_scope_size = HandleScope::SizeOf(num_handle_scope_references_);
-    size_t scope_and_method = handle_scope_size + sizeof(ArtMethod*);
-
-    sp8 -= scope_and_method;
-    // Align by kStackAlignment.
-    sp8 = reinterpret_cast<uint8_t*>(RoundDown(reinterpret_cast<uintptr_t>(sp8), kStackAlignment));
-
-    uint8_t* sp8_table = sp8 + sizeof(ArtMethod*);
-    *handle_scope = HandleScope::Create(sp8_table, self->GetTopHandleScope(),
-                                        num_handle_scope_references_);
-
-    // Add a slot for the method pointer, and fill it. Fix the pointer-pointer given to us.
-    uint8_t* method_pointer = sp8;
-    auto** new_method_ref = reinterpret_cast<ArtMethod**>(method_pointer);
-    *new_method_ref = method;
-    *m = new_method_ref;
-  }
-
-  // Adds space for the cookie. Note: may leave stack unaligned.
-  void LayoutCookie(uint8_t** sp) const {
-    // Reference cookie and padding
-    *sp -= 8;
-  }
-
-  // Re-layout the callee-save frame (insert a handle-scope). Then add space for the cookie.
-  // Returns the new bottom. Note: this may be unaligned.
-  uint8_t* LayoutJNISaveFrame(Thread* self, ArtMethod*** m, void* sp, HandleScope** handle_scope)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    // First, fix up the layout of the callee-save frame.
-    // We have to squeeze in the HandleScope, and relocate the method pointer.
-    LayoutCalleeSaveFrame(self, m, sp, handle_scope);
-
-    // The bottom of the callee-save frame is now where the method is, *m.
-    uint8_t* sp8 = reinterpret_cast<uint8_t*>(*m);
-
-    // Add space for cookie.
-    LayoutCookie(&sp8);
-
-    return sp8;
-  }
-
-  // WARNING: After this, *sp won't be pointing to the method anymore!
-  uint8_t* ComputeLayout(Thread* self, ArtMethod*** m, const char* shorty, uint32_t shorty_len,
-                         HandleScope** handle_scope, uintptr_t** start_stack, uintptr_t** start_gpr,
-                         uint32_t** start_fpr)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
     Walk(shorty, shorty_len);
 
-    // JNI part.
-    uint8_t* sp8 = LayoutJNISaveFrame(self, m, reinterpret_cast<void*>(*m), handle_scope);
+    // Add space for cookie and HandleScope.
+    void* storage = GetGenericJniHandleScope(managed_sp, num_handle_scope_references_);
+    DCHECK_ALIGNED(storage, sizeof(uintptr_t));
+    *handle_scope =
+        HandleScope::Create(storage, self->GetTopHandleScope(), num_handle_scope_references_);
+    DCHECK_EQ(*handle_scope, storage);
+    uint8_t* sp8 = reinterpret_cast<uint8_t*>(*handle_scope);
+    DCHECK_GE(static_cast<size_t>(reinterpret_cast<uint8_t*>(managed_sp) - sp8),
+              HandleScope::SizeOf(num_handle_scope_references_) + kJniCookieSize);
 
-    sp8 = LayoutNativeCall(sp8, start_stack, start_gpr, start_fpr);
+    // Layout stack arguments.
+    sp8 = LayoutStackArgs(sp8);
 
     // Return the new bottom.
-    return sp8;
+    DCHECK_ALIGNED(sp8, sizeof(uintptr_t));
+    return reinterpret_cast<uintptr_t*>(sp8);
+  }
+
+  static uintptr_t* GetStartGprRegs(uintptr_t* reserved_area) {
+    return reserved_area;
+  }
+
+  static uint32_t* GetStartFprRegs(uintptr_t* reserved_area) {
+    constexpr size_t num_gprs =
+        BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>::kNumNativeGprArgs;
+    return reinterpret_cast<uint32_t*>(GetStartGprRegs(reserved_area) + num_gprs);
+  }
+
+  static uintptr_t* GetHiddenArgSlot(uintptr_t* reserved_area) {
+    // Note: `num_fprs` is 0 on architectures where sizeof(uintptr_t) does not match the
+    // FP register size (it is actually 0 on all supported 32-bit architectures).
+    constexpr size_t num_fprs =
+        BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>::kNumNativeFprArgs;
+    return reinterpret_cast<uintptr_t*>(GetStartFprRegs(reserved_area)) + num_fprs;
+  }
+
+  static uintptr_t* GetOutArgsSpSlot(uintptr_t* reserved_area) {
+    return GetHiddenArgSlot(reserved_area) + 1;
   }
 
   uintptr_t PushHandle(mirror::Object* /* ptr */) override;
@@ -2138,20 +1972,33 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
                               bool critical_native,
                               const char* shorty,
                               uint32_t shorty_len,
-                              ArtMethod*** sp)
-     : QuickArgumentVisitor(*sp, is_static, shorty, shorty_len),
+                              ArtMethod** managed_sp,
+                              uintptr_t* reserved_area)
+     : QuickArgumentVisitor(managed_sp, is_static, shorty, shorty_len),
        jni_call_(nullptr, nullptr, nullptr, nullptr, critical_native),
        sm_(&jni_call_) {
-    ComputeGenericJniFrameSize fsc(critical_native);
-    uintptr_t* start_gpr_reg;
-    uint32_t* start_fpr_reg;
-    uintptr_t* start_stack_arg;
-    bottom_of_used_area_ = fsc.ComputeLayout(self, sp, shorty, shorty_len,
-                                             &handle_scope_,
-                                             &start_stack_arg,
-                                             &start_gpr_reg, &start_fpr_reg);
+    DCHECK_ALIGNED(managed_sp, kStackAlignment);
+    DCHECK_ALIGNED(reserved_area, sizeof(uintptr_t));
 
-    jni_call_.Reset(start_gpr_reg, start_fpr_reg, start_stack_arg, handle_scope_);
+    ComputeGenericJniFrameSize fsc(critical_native);
+    uintptr_t* out_args_sp =
+        fsc.ComputeLayout(self, managed_sp, shorty, shorty_len, &handle_scope_);
+
+    // Store hidden argument for @CriticalNative.
+    uintptr_t* hidden_arg_slot = fsc.GetHiddenArgSlot(reserved_area);
+    constexpr uintptr_t kGenericJniTag = 1u;
+    ArtMethod* method = *managed_sp;
+    *hidden_arg_slot = critical_native ? (reinterpret_cast<uintptr_t>(method) | kGenericJniTag)
+                                       : 0xebad6a89u;  // Bad value.
+
+    // Set out args SP.
+    uintptr_t* out_args_sp_slot = fsc.GetOutArgsSpSlot(reserved_area);
+    *out_args_sp_slot = reinterpret_cast<uintptr_t>(out_args_sp);
+
+    jni_call_.Reset(fsc.GetStartGprRegs(reserved_area),
+                    fsc.GetStartFprRegs(reserved_area),
+                    out_args_sp,
+                    handle_scope_);
 
     // First 2 parameters are always excluded for CriticalNative methods.
     if (LIKELY(!critical_native)) {
@@ -2159,7 +2006,7 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
       sm_.AdvancePointer(self->GetJniEnv());
 
       if (is_static) {
-        sm_.AdvanceHandleScope((**sp)->GetDeclaringClass().Ptr());
+        sm_.AdvanceHandleScope(method->GetDeclaringClass().Ptr());
       }  // else "this" reference is already handled by QuickArgumentVisitor.
     }
   }
@@ -2174,10 +2021,6 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
 
   jobject GetFirstHandleScopeJObject() const REQUIRES_SHARED(Locks::mutator_lock_) {
     return handle_scope_->GetHandle(0).ToJObject();
-  }
-
-  void* GetBottomOfUsedArea() const {
-    return bottom_of_used_area_;
   }
 
  private:
@@ -2224,7 +2067,6 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
 
   HandleScope* handle_scope_;
   FillJniCall jni_call_;
-  void* bottom_of_used_area_;
 
   BuildNativeCallFrameStateMachine<FillJniCall> sm_;
 
@@ -2296,21 +2138,27 @@ void BuildGenericJniFrameVisitor::FinalizeHandleScope(Thread* self) {
 }
 
 /*
- * Initializes an alloca region assumed to be directly below sp for a native call:
- * Create a HandleScope and call stack and fill a mini stack with values to be pushed to registers.
- * The final element on the stack is a pointer to the native code.
+ * Initializes the reserved area assumed to be directly below `managed_sp` for a native call:
  *
- * On entry, the stack has a standard callee-save frame above sp, and an alloca below it.
- * We need to fix this, as the handle scope needs to go into the callee-save frame.
+ * On entry, the stack has a standard callee-save frame above `managed_sp`,
+ * and the reserved area below it. Starting below `managed_sp`, we reserve space
+ * for local reference cookie (not present for @CriticalNative), HandleScope
+ * (not present for @CriticalNative) and stack args (if args do not fit into
+ * registers). At the bottom of the reserved area, there is space for register
+ * arguments, hidden arg (for @CriticalNative) and the SP for the native call
+ * (i.e. pointer to the stack args area), which the calling stub shall load
+ * to perform the native call. We fill all these fields, perform class init
+ * check (for static methods) and/or locking (for synchronized methods) if
+ * needed and return to the stub.
  *
- * The return of this function denotes:
- * 1) How many bytes of the alloca can be released, if the value is non-negative.
- * 2) An error, if the value is negative.
+ * The return value is the pointer to the native code, null on failure.
  */
-extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** sp)
+extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
+                                                    ArtMethod** managed_sp,
+                                                    uintptr_t* reserved_area)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   // Note: We cannot walk the stack properly until fixed up below.
-  ArtMethod* called = *sp;
+  ArtMethod* called = *managed_sp;
   DCHECK(called->IsNative()) << called->PrettyMethod(true);
   Runtime* runtime = Runtime::Current();
   uint32_t shorty_len = 0;
@@ -2325,7 +2173,8 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
                                       critical_native,
                                       shorty,
                                       shorty_len,
-                                      &sp);
+                                      managed_sp,
+                                      reserved_area);
   {
     ScopedAssertNoThreadSuspension sants(__FUNCTION__);
     visitor.VisitArguments();
@@ -2334,7 +2183,7 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
   }
 
   // Fix up managed-stack things in Thread. After this we can walk the stack.
-  self->SetTopOfStackTagged(sp);
+  self->SetTopOfStackTagged(managed_sp);
 
   self->VerifyStack();
 
@@ -2356,8 +2205,7 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
       if (!runtime->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
         DCHECK(Thread::Current()->IsExceptionPending()) << called->PrettyMethod();
         self->PopHandleScope();
-        // A negative value denotes an error.
-        return GetTwoWordFailureValue();
+        return nullptr;  // Report error.
       }
     }
   }
@@ -2372,8 +2220,7 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
       cookie = JniMethodStartSynchronized(visitor.GetFirstHandleScopeJObject(), self);
       if (self->IsExceptionPending()) {
         self->PopHandleScope();
-        // A negative value denotes an error.
-        return GetTwoWordFailureValue();
+        return nullptr;  // Report error.
       }
     } else {
       if (fast_native) {
@@ -2383,7 +2230,7 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
         cookie = JniMethodStart(self);
       }
     }
-    sp32 = reinterpret_cast<uint32_t*>(sp);
+    sp32 = reinterpret_cast<uint32_t*>(managed_sp);
     *(sp32 - 1) = cookie;
   }
 
@@ -2393,55 +2240,22 @@ extern "C" TwoWordReturn artQuickGenericJniTrampoline(Thread* self, ArtMethod** 
   // does not handle that case. Calls from compiled stubs are also broken.
   void const* nativeCode = called->GetEntryPointFromJni();
 
-#if defined(__mips__) && !defined(__LP64__)
-  // On MIPS32 if the first two arguments are floating-point, we need to know their types
-  // so that art_quick_generic_jni_trampoline can correctly extract them from the stack
-  // and load into floating-point registers.
-  // Possible arrangements of first two floating-point arguments on the stack (32-bit FPU
-  // view):
-  // (1)
-  //  |     DOUBLE    |     DOUBLE    | other args, if any
-  //  |  F12  |  F13  |  F14  |  F15  |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (2)
-  //  |     DOUBLE    | FLOAT | (PAD) | other args, if any
-  //  |  F12  |  F13  |  F14  |       |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (3)
-  //  | FLOAT | (PAD) |     DOUBLE    | other args, if any
-  //  |  F12  |       |  F14  |  F15  |
-  //  |  SP+0 |  SP+4 |  SP+8 | SP+12 | SP+16
-  // (4)
-  //  | FLOAT | FLOAT | other args, if any
-  //  |  F12  |  F14  |
-  //  |  SP+0 |  SP+4 | SP+8
-  // As you can see, only the last case (4) is special. In all others we can just
-  // load F12/F13 and F14/F15 in the same manner.
-  // Set bit 0 of the native code address to 1 in this case (valid code addresses
-  // are always a multiple of 4 on MIPS32, so we have 2 spare bits available).
-  if (nativeCode != nullptr &&
-      shorty != nullptr &&
-      shorty_len >= 3 &&
-      shorty[1] == 'F' &&
-      shorty[2] == 'F') {
-    nativeCode = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(nativeCode) | 1);
-  }
-#endif
-
   VLOG(third_party_jni) << "GenericJNI: "
                         << called->PrettyMethod()
                         << " -> "
                         << std::hex << reinterpret_cast<uintptr_t>(nativeCode);
 
-  // Return native code addr(lo) and bottom of alloca address(hi).
-  return GetTwoWordSuccessValue(reinterpret_cast<uintptr_t>(visitor.GetBottomOfUsedArea()),
-                                reinterpret_cast<uintptr_t>(nativeCode));
+  // Return native code.
+  return nativeCode;
 }
 
 // Defined in quick_jni_entrypoints.cc.
-extern uint64_t GenericJniMethodEnd(Thread* self, uint32_t saved_local_ref_cookie,
-                                    jvalue result, uint64_t result_f, ArtMethod* called,
-                                    HandleScope* handle_scope);
+extern uint64_t GenericJniMethodEnd(Thread* self,
+                                    uint32_t saved_local_ref_cookie,
+                                    jvalue result,
+                                    uint64_t result_f,
+                                    ArtMethod* called);
+
 /*
  * Is called after the native JNI code. Responsible for cleanup (handle scope, saved state) and
  * unlocking.
@@ -2458,8 +2272,15 @@ extern "C" uint64_t artQuickGenericJniEndTrampoline(Thread* self,
   uint32_t* sp32 = reinterpret_cast<uint32_t*>(sp);
   ArtMethod* called = *sp;
   uint32_t cookie = *(sp32 - 1);
-  HandleScope* table = reinterpret_cast<HandleScope*>(reinterpret_cast<uint8_t*>(sp) + sizeof(*sp));
-  return GenericJniMethodEnd(self, cookie, result, result_f, called, table);
+  if (kIsDebugBuild && !called->IsCriticalNative()) {
+    BaseHandleScope* handle_scope = self->GetTopHandleScope();
+    DCHECK(handle_scope != nullptr);
+    DCHECK(!handle_scope->IsVariableSized());
+    // Note: We do not hold mutator lock here for normal JNI, so we cannot use the method's shorty
+    // to determine the number of references. Instead rely on the value from the HandleScope.
+    DCHECK_EQ(handle_scope, GetGenericJniHandleScope(sp, handle_scope->NumberOfReferences()));
+  }
+  return GenericJniMethodEnd(self, cookie, result, result_f, called);
 }
 
 // We use TwoWordReturn to optimize scalar returns. We use the hi value for code, and the lo value
@@ -2631,6 +2452,11 @@ extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_metho
       return GetTwoWordFailureValue();  // Failure.
     }
   }
+
+  // The compiler and interpreter make sure the conflict trampoline is never
+  // called on a method that resolves to j.l.Object.
+  CHECK(!interface_method->GetDeclaringClass()->IsObjectClass());
+  CHECK(interface_method->GetDeclaringClass()->IsInterface());
 
   DCHECK(!interface_method->IsRuntimeMethod());
   // Look whether we have a match in the ImtConflictTable.

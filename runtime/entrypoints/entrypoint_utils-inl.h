@@ -735,27 +735,6 @@ inline ObjPtr<mirror::Class> ResolveVerifyAndClinit(dex::TypeIndex type_idx,
   return h_class.Get();
 }
 
-inline void UnlockJniSynchronizedMethod(jobject locked, Thread* self) {
-  // Save any pending exception over monitor exit call.
-  ObjPtr<mirror::Throwable> saved_exception = nullptr;
-  if (UNLIKELY(self->IsExceptionPending())) {
-    saved_exception = self->GetException();
-    self->ClearException();
-  }
-  // Decode locked object and unlock, before popping local references.
-  self->DecodeJObject(locked)->MonitorExit(self);
-  if (UNLIKELY(self->IsExceptionPending())) {
-    LOG(FATAL) << "Synchronized JNI code returning with an exception:\n"
-        << saved_exception->Dump()
-        << "\nEncountered second exception during implicit MonitorExit:\n"
-        << self->GetException()->Dump();
-  }
-  // Restore pending exception.
-  if (saved_exception != nullptr) {
-    self->SetException(saved_exception);
-  }
-}
-
 template <typename INT_TYPE, typename FLOAT_TYPE>
 inline INT_TYPE art_float_to_integral(FLOAT_TYPE f) {
   const INT_TYPE kMaxInt = static_cast<INT_TYPE>(std::numeric_limits<INT_TYPE>::max());
@@ -778,6 +757,14 @@ inline bool NeedsClinitCheckBeforeCall(ArtMethod* method) {
   // compiled code for static methods. See b/18161648 . The class initializer is
   // special as it is invoked during initialization and does not need the check.
   return method->IsStatic() && !method->IsConstructor();
+}
+
+inline HandleScope* GetGenericJniHandleScope(ArtMethod** managed_sp,
+                                             size_t num_handle_scope_references) {
+  // The HandleScope is just below the cookie and padding to align as uintptr_t.
+  const size_t offset =
+      RoundUp(HandleScope::SizeOf(num_handle_scope_references) + kJniCookieSize, sizeof(uintptr_t));
+  return reinterpret_cast<HandleScope*>(reinterpret_cast<uint8_t*>(managed_sp) - offset);
 }
 
 }  // namespace art

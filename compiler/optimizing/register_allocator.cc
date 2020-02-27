@@ -68,17 +68,6 @@ RegisterAllocator::~RegisterAllocator() {
   }
 }
 
-bool RegisterAllocator::CanAllocateRegistersFor(const HGraph& graph ATTRIBUTE_UNUSED,
-                                                InstructionSet instruction_set) {
-  return instruction_set == InstructionSet::kArm
-      || instruction_set == InstructionSet::kArm64
-      || instruction_set == InstructionSet::kMips
-      || instruction_set == InstructionSet::kMips64
-      || instruction_set == InstructionSet::kThumb2
-      || instruction_set == InstructionSet::kX86
-      || instruction_set == InstructionSet::kX86_64;
-}
-
 class AllRangesIterator : public ValueObject {
  public:
   explicit AllRangesIterator(LiveInterval* interval)

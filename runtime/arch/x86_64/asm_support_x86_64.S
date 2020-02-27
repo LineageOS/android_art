@@ -156,6 +156,28 @@ MACRO1(POP, reg)
     CFI_RESTORE(REG_VAR(reg))
 END_MACRO
 
+// Arguments do not need .cfi_rel_offset as they are caller-saved and
+// therefore cannot hold caller's variables or unwinding data.
+MACRO1(PUSH_ARG, reg)
+    pushq REG_VAR(reg)
+    CFI_ADJUST_CFA_OFFSET(8)
+END_MACRO
+
+MACRO1(POP_ARG, reg)
+    popq REG_VAR(reg)
+    CFI_ADJUST_CFA_OFFSET(-8)
+END_MACRO
+
+MACRO3(SAVE_REG_BASE, base, reg, offset)
+    movq REG_VAR(reg), RAW_VAR(offset)(REG_VAR(base))
+    CFI_REL_OFFSET(REG_VAR(reg), RAW_VAR(offset))
+END_MACRO
+
+MACRO3(RESTORE_REG_BASE, base, reg, offset)
+    movq RAW_VAR(offset)(REG_VAR(base)), REG_VAR(reg)
+    CFI_RESTORE(REG_VAR(reg))
+END_MACRO
+
 MACRO1(UNIMPLEMENTED,name)
     FUNCTION_TYPE(SYMBOL(\name))
     ASM_HIDDEN VAR(name)
@@ -243,6 +265,77 @@ MACRO0(RESTORE_SAVE_REFS_ONLY_FRAME)
     // TODO: optimize by not restoring callee-saves restored by the ABI
     POP rbx
     POP rbp
+    POP r12
+    POP r13
+    POP r14
+    POP r15
+END_MACRO
+
+    /*
+     * Macro that sets up the callee save frame to conform with
+     * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs), except for storing the method.
+     */
+MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY)
+    // Save callee and GPR args, mixed together to agree with core spills bitmap.
+    PUSH r15      // Callee save.
+    PUSH r14      // Callee save.
+    PUSH r13      // Callee save.
+    PUSH r12      // Callee save.
+    PUSH_ARG r9   // Quick arg 5.
+    PUSH_ARG r8   // Quick arg 4.
+    PUSH_ARG rsi  // Quick arg 1.
+    PUSH rbp      // Callee save.
+    PUSH rbx      // Callee save.
+    PUSH_ARG rdx  // Quick arg 2.
+    PUSH_ARG rcx  // Quick arg 3.
+    // Create space for FPR args and create 2 slots for ArtMethod*.
+    subq MACRO_LITERAL(16 + 12 * 8), %rsp
+    CFI_ADJUST_CFA_OFFSET(16 + 12 * 8)
+    // Save FPRs.
+    movq %xmm0, 16(%rsp)
+    movq %xmm1, 24(%rsp)
+    movq %xmm2, 32(%rsp)
+    movq %xmm3, 40(%rsp)
+    movq %xmm4, 48(%rsp)
+    movq %xmm5, 56(%rsp)
+    movq %xmm6, 64(%rsp)
+    movq %xmm7, 72(%rsp)
+    movq %xmm12, 80(%rsp)
+    movq %xmm13, 88(%rsp)
+    movq %xmm14, 96(%rsp)
+    movq %xmm15, 104(%rsp)
+
+    // Ugly compile-time check, but we only have the preprocessor.
+    // Last +8: implicit return address pushed on stack when caller made call.
+#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 11 * 8 + 12 * 8 + 16 + 8)
+#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(X86_64) size not as expected."
+#endif
+END_MACRO
+
+MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
+    // Restore FPRs.
+    movq 16(%rsp), %xmm0
+    movq 24(%rsp), %xmm1
+    movq 32(%rsp), %xmm2
+    movq 40(%rsp), %xmm3
+    movq 48(%rsp), %xmm4
+    movq 56(%rsp), %xmm5
+    movq 64(%rsp), %xmm6
+    movq 72(%rsp), %xmm7
+    movq 80(%rsp), %xmm12
+    movq 88(%rsp), %xmm13
+    movq 96(%rsp), %xmm14
+    movq 104(%rsp), %xmm15
+    addq MACRO_LITERAL(80 + 4 * 8), %rsp
+    CFI_ADJUST_CFA_OFFSET(-(80 + 4 * 8))
+    // Restore callee and GPR args, mixed together to agree with core spills bitmap.
+    POP_ARG rcx
+    POP_ARG rdx
+    POP rbx
+    POP rbp
+    POP_ARG rsi
+    POP_ARG r8
+    POP_ARG r9
     POP r12
     POP r13
     POP r14

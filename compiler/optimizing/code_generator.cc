@@ -32,14 +32,6 @@
 #include "code_generator_x86_64.h"
 #endif
 
-#ifdef ART_ENABLE_CODEGEN_mips
-#include "code_generator_mips.h"
-#endif
-
-#ifdef ART_ENABLE_CODEGEN_mips64
-#include "code_generator_mips64.h"
-#endif
-
 #include "base/bit_utils.h"
 #include "base/bit_utils_iterator.h"
 #include "base/casts.h"
@@ -948,18 +940,6 @@ std::unique_ptr<CodeGenerator> CodeGenerator::Create(HGraph* graph,
     case InstructionSet::kArm64: {
       return std::unique_ptr<CodeGenerator>(
           new (allocator) arm64::CodeGeneratorARM64(graph, compiler_options, stats));
-    }
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips: {
-      return std::unique_ptr<CodeGenerator>(
-          new (allocator) mips::CodeGeneratorMIPS(graph, compiler_options, stats));
-    }
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64: {
-      return std::unique_ptr<CodeGenerator>(
-          new (allocator) mips64::CodeGeneratorMIPS64(graph, compiler_options, stats));
     }
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86

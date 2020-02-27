@@ -170,7 +170,11 @@ class TargetFlattenedApexProvider:
         is_dir = os.path.isdir(filepath)
         is_exec = os.access(filepath, os.X_OK)
         is_symlink = os.path.islink(filepath)
-        size = os.path.getsize(filepath)
+        if is_symlink:
+          # Report the length of the symlink's target's path as file size, like `ls`.
+          size = len(os.readlink(filepath))
+        else:
+          size = os.path.getsize(filepath)
         apex_map[basename] = FSObject(basename, is_dir, is_exec, is_symlink, size)
     self._folder_cache[apex_dir] = apex_map
     return apex_map
@@ -347,8 +351,6 @@ class Checker:
 
   def check_dexpreopt(self, basename):
     dirs = self.arch_dirs_for_path('javalib')
-    if not dirs:
-      self.fail('Could not find javalib directory for any arch.')
     for dir in dirs:
       for ext in ['art', 'oat', 'vdex']:
         self.check_file('%s/%s.%s' % (dir, basename, ext))
@@ -498,6 +500,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libart')
     self._checker.check_native_library('libart-compiler')
     self._checker.check_native_library('libart-dexlayout')
+    self._checker.check_native_library('libart-disassembler')
     self._checker.check_native_library('libartbase')
     self._checker.check_native_library('libartpalette')
     self._checker.check_native_library('libdexfile')
@@ -611,7 +614,7 @@ class ReleaseHostChecker:
   def run(self):
     # Check binaries for ART.
     self._checker.check_executable('hprof-conv')
-    self._checker.check_symlinked_multilib_executable('dex2oatd')
+    self._checker.check_executable('dex2oatd')
 
     # Check exported native libraries for Managed Core Library.
     self._checker.check_native_library('libandroidicu-host')
@@ -755,7 +758,6 @@ class TestingTargetChecker:
     self._checker.check_optional_art_test_executable('liveness_test')
     self._checker.check_optional_art_test_executable('managed_register_arm64_test')
     self._checker.check_optional_art_test_executable('managed_register_arm_test')
-    self._checker.check_optional_art_test_executable('managed_register_mips64_test')
     self._checker.check_optional_art_test_executable('managed_register_x86_64_test')
     self._checker.check_optional_art_test_executable('managed_register_x86_test')
     self._checker.check_optional_art_test_executable('register_allocator_test')
@@ -774,9 +776,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('verifier_deps_test')
     # These tests depend on a specific code generator and are conditionally included.
     self._checker.check_optional_art_test_executable('relative_patcher_arm64_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips32r6_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips64_test')
-    self._checker.check_optional_art_test_executable('relative_patcher_mips_test')
     self._checker.check_optional_art_test_executable('relative_patcher_thumb2_test')
     self._checker.check_optional_art_test_executable('relative_patcher_x86_64_test')
     self._checker.check_optional_art_test_executable('relative_patcher_x86_test')
@@ -896,8 +895,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('indirect_reference_table_test')
     self._checker.check_art_test_executable('instruction_set_features_arm64_test')
     self._checker.check_art_test_executable('instruction_set_features_arm_test')
-    self._checker.check_art_test_executable('instruction_set_features_mips64_test')
-    self._checker.check_art_test_executable('instruction_set_features_mips_test')
     self._checker.check_art_test_executable('instruction_set_features_test')
     self._checker.check_art_test_executable('instruction_set_features_x86_64_test')
     self._checker.check_art_test_executable('instruction_set_features_x86_test')

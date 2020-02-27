@@ -24,9 +24,6 @@ cc_defaults {
     ],
 
     target: {
-        android: {
-            compile_multilib: "prefer32",
-        },
         darwin: {
             enabled: true,
         },
@@ -40,6 +37,15 @@ cc_defaults {
 art_cc_binary {
     name: "hiddenapi",
     defaults: ["hiddenapi-defaults"],
+    target: {
+        host: {
+            // Override the prefer32 added by art_cc_binary when
+            // HOST_PREFER_32_BIT is in use. Note that this override cannot be
+            // in cc_defaults because it'd get overridden by the load hook even
+            // when it uses PrependProperties.
+            compile_multilib: "64",
+        },
+    },
     shared_libs: [
         "libdexfile",
         "libartbase",

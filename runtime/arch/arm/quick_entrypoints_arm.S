@@ -25,45 +25,6 @@
     .extern artDeliverPendingException
 
     /*
-     * Macro to spill the GPRs.
-     */
-.macro SPILL_ALL_CALLEE_SAVE_GPRS
-    push {r4-r11, lr}                             @ 9 words (36 bytes) of callee saves.
-    .cfi_adjust_cfa_offset 36
-    .cfi_rel_offset r4, 0
-    .cfi_rel_offset r5, 4
-    .cfi_rel_offset r6, 8
-    .cfi_rel_offset r7, 12
-    .cfi_rel_offset r8, 16
-    .cfi_rel_offset r9, 20
-    .cfi_rel_offset r10, 24
-    .cfi_rel_offset r11, 28
-    .cfi_rel_offset lr, 32
-.endm
-
-    /*
-     * Macro that sets up the callee save frame to conform with
-     * Runtime::CreateCalleeSaveMethod(kSaveAllCalleeSaves)
-     */
-.macro SETUP_SAVE_ALL_CALLEE_SAVES_FRAME rTemp
-    SPILL_ALL_CALLEE_SAVE_GPRS                    @ 9 words (36 bytes) of callee saves.
-    vpush {s16-s31}                               @ 16 words (64 bytes) of floats.
-    .cfi_adjust_cfa_offset 64
-    sub sp, #12                                   @ 3 words of space, bottom word will hold Method*
-    .cfi_adjust_cfa_offset 12
-    RUNTIME_CURRENT1 \rTemp                       @ Load Runtime::Current into rTemp.
-    @ Load kSaveAllCalleeSaves Method* into rTemp.
-    ldr \rTemp, [\rTemp, #RUNTIME_SAVE_ALL_CALLEE_SAVES_METHOD_OFFSET]
-    str \rTemp, [sp, #0]                          @ Place Method* at bottom of stack.
-    str sp, [rSELF, #THREAD_TOP_QUICK_FRAME_OFFSET]  @ Place sp in Thread::Current()->top_quick_frame.
-
-     // Ugly compile-time check, but we only have the preprocessor.
-#if (FRAME_SIZE_SAVE_ALL_CALLEE_SAVES != 36 + 64 + 12)
-#error "FRAME_SIZE_SAVE_ALL_CALLEE_SAVES(ARM) size not as expected."
-#endif
-.endm
-
-    /*
      * Macro that sets up the callee save frame to conform with
      * Runtime::CreateCalleeSaveMethod(kSaveRefsOnly).
      */
@@ -111,36 +72,6 @@
     .cfi_adjust_cfa_offset -28
 .endm
 
-    /*
-     * Macro that sets up the callee save frame to conform with
-     * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs).
-     */
-.macro SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
-    // Note: We could avoid saving R8 in the case of Baker read
-    // barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    push {r1-r3, r5-r8, r10-r11, lr}   @ 10 words of callee saves and args.
-    .cfi_adjust_cfa_offset 40
-    .cfi_rel_offset r1, 0
-    .cfi_rel_offset r2, 4
-    .cfi_rel_offset r3, 8
-    .cfi_rel_offset r5, 12
-    .cfi_rel_offset r6, 16
-    .cfi_rel_offset r7, 20
-    .cfi_rel_offset r8, 24
-    .cfi_rel_offset r10, 28
-    .cfi_rel_offset r11, 32
-    .cfi_rel_offset lr, 36
-    vpush {s0-s15}                     @ 16 words of float args.
-    .cfi_adjust_cfa_offset 64
-    sub sp, #8                         @ 2 words of space, alignment padding and Method*
-    .cfi_adjust_cfa_offset 8
-    // Ugly compile-time check, but we only have the preprocessor.
-#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 40 + 64 + 8)
-#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(ARM) size not as expected."
-#endif
-.endm
-
 .macro SETUP_SAVE_REFS_AND_ARGS_FRAME rTemp
     SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
     RUNTIME_CURRENT3 \rTemp                       @ Load Runtime::Current into rTemp.
@@ -154,28 +85,6 @@
     SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
     str r0, [sp, #0]                              @ Store ArtMethod* to bottom of stack.
     str sp, [rSELF, #THREAD_TOP_QUICK_FRAME_OFFSET]  @ Place sp in Thread::Current()->top_quick_frame.
-.endm
-
-.macro RESTORE_SAVE_REFS_AND_ARGS_FRAME
-    add  sp, #8                      @ rewind sp
-    .cfi_adjust_cfa_offset -8
-    vpop {s0-s15}
-    .cfi_adjust_cfa_offset -64
-    // Note: Likewise, we could avoid restoring X20 in the case of Baker
-    // read barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    pop {r1-r3, r5-r8, r10-r11, lr}  @ 10 words of callee saves
-    .cfi_restore r1
-    .cfi_restore r2
-    .cfi_restore r3
-    .cfi_restore r5
-    .cfi_restore r6
-    .cfi_restore r7
-    .cfi_restore r8
-    .cfi_restore r10
-    .cfi_restore r11
-    .cfi_restore lr
-    .cfi_adjust_cfa_offset -40
 .endm
 
     /*
@@ -273,17 +182,6 @@
     .cfi_adjust_cfa_offset -52
 .endm
 
-// Macro to refresh the Marking Register (R8).
-//
-// This macro must be called at the end of functions implementing
-// entrypoints that possibly (directly or indirectly) perform a
-// suspend check (before they return).
-.macro REFRESH_MARKING_REGISTER
-#if defined(USE_READ_BARRIER) && defined(USE_BAKER_READ_BARRIER)
-    ldr rMR, [rSELF, #THREAD_IS_GC_MARKING_OFFSET]
-#endif
-.endm
-
 .macro RETURN_IF_RESULT_IS_ZERO
     cbnz   r0, 1f              @ result non-zero branch over
     bx     lr                  @ return
@@ -294,24 +192,6 @@
     cbz    r0, 1f              @ result zero branch over
     bx     lr                  @ return
 1:
-.endm
-
-    /*
-     * Macro that calls through to artDeliverPendingExceptionFromCode, where the pending
-     * exception is Thread::Current()->exception_ when the runtime method frame is ready.
-     */
-.macro DELIVER_PENDING_EXCEPTION_FRAME_READY
-    mov    r0, rSELF                           @ pass Thread::Current
-    bl     artDeliverPendingExceptionFromCode  @ artDeliverPendingExceptionFromCode(Thread*)
-.endm
-
-    /*
-     * Macro that calls through to artDeliverPendingExceptionFromCode, where the pending
-     * exception is Thread::Current()->exception_.
-     */
-.macro DELIVER_PENDING_EXCEPTION
-    SETUP_SAVE_ALL_CALLEE_SAVES_FRAME r0       @ save callee saves for throw
-    DELIVER_PENDING_EXCEPTION_FRAME_READY
 .endm
 
 .macro NO_ARG_RUNTIME_EXCEPTION c_name, cxx_name
@@ -1707,38 +1587,44 @@ ENTRY art_quick_generic_jni_trampoline
     sub sp, sp, #5120
 
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //    r0      r1   <= C calling convention
-    //  rSELF     r10  <= where they are
+    // (Thread*, managed_sp, reserved_area)
+    //    r0         r1            r2   <= C calling convention
+    //  rSELF       r10            sp   <= where they are
 
     mov r0, rSELF   // Thread*
-    mov r1, r10
-    blx artQuickGenericJniTrampoline  // (Thread*, sp)
+    mov r1, r10     // SP for the managed frame.
+    mov r2, sp      // reserved area for arguments and other saved data (up to managed frame)
+    blx artQuickGenericJniTrampoline  // (Thread*, managed_sp, reserved_area)
 
-    // The C call will have registered the complete save-frame.
+    // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // r0: pointer to native code.
-    // r1: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     r0: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Release part of the alloca.
-    mov sp, r1
+    // Check for error (class init check or locking for synchronized native method can throw).
+    cbz r0, .Lexception_in_native
 
     // Save the code pointer
-    mov r12, r0
+    mov lr, r0
 
-    // Load parameters from frame into registers.
-    pop {r0-r3}
+    // Load parameters from frame into registers r0-r3 (soft-float),
+    // hidden arg (r4) for @CriticalNative and SP for out args.
+    pop {r0-r3, r4, ip}
+
+    // Apply the new SP for out args, releasing unneeded reserved area.
+    mov sp, ip
 
     // Softfloat.
     // TODO: Change to hardfloat when supported.
 
-    blx r12           // native call.
+    blx lr            // native call.
 
     // result sign extension is handled in C code
     // prepare for artQuickGenericJniEndTrampoline call
     // (Thread*, result, result_f)
     //    r0      r2,r3    stack       <= C calling convention
-    //    r11     r0,r1    r0,r1          <= where they are
+    //    r11     r0,r1    r0,r1       <= where they are
     sub sp, sp, #8 // Stack alignment.
 
     push {r0-r1}

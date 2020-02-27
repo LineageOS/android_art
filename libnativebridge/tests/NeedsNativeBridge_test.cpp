@@ -20,7 +20,7 @@
 
 namespace android {
 
-static const char* kISAs[] = { "arm", "arm64", "mips", "mips64", "x86", "x86_64", "random", "64arm",
+static const char* kISAs[] = { "arm", "arm64", "x86", "x86_64", "random", "64arm",
                                "64_x86", "64_x86_64", "", "reallylongstringabcd", nullptr };
 
 TEST_F(NativeBridgeTest, NeedsNativeBridge) {

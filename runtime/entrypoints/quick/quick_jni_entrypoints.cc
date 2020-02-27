@@ -123,6 +123,29 @@ static void PopLocalReferences(uint32_t saved_local_ref_cookie, Thread* self)
   self->PopHandleScope();
 }
 
+// TODO: annotalysis disabled as monitor semantics are maintained in Java code.
+static inline void UnlockJniSynchronizedMethod(jobject locked, Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS REQUIRES(!Roles::uninterruptible_) {
+  // Save any pending exception over monitor exit call.
+  ObjPtr<mirror::Throwable> saved_exception = nullptr;
+  if (UNLIKELY(self->IsExceptionPending())) {
+    saved_exception = self->GetException();
+    self->ClearException();
+  }
+  // Decode locked object and unlock, before popping local references.
+  self->DecodeJObject(locked)->MonitorExit(self);
+  if (UNLIKELY(self->IsExceptionPending())) {
+    LOG(FATAL) << "Synchronized JNI code returning with an exception:\n"
+        << saved_exception->Dump()
+        << "\nEncountered second exception during implicit MonitorExit:\n"
+        << self->GetException()->Dump();
+  }
+  // Restore pending exception.
+  if (saved_exception != nullptr) {
+    self->SetException(saved_exception);
+  }
+}
+
 // TODO: These should probably be templatized or macro-ized.
 // Otherwise there's just too much repetitive boilerplate.
 
@@ -193,8 +216,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
                                     uint32_t saved_local_ref_cookie,
                                     jvalue result,
                                     uint64_t result_f,
-                                    ArtMethod* called,
-                                    HandleScope* handle_scope)
+                                    ArtMethod* called)
     // TODO: NO_THREAD_SAFETY_ANALYSIS as GoToRunnable() is NO_THREAD_SAFETY_ANALYSIS
     NO_THREAD_SAFETY_ANALYSIS {
   bool critical_native = called->IsCriticalNative();
@@ -207,22 +229,20 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
   }
   // We need the mutator lock (i.e., calling GoToRunnable()) before accessing the shorty or the
   // locked object.
-  jobject locked = called->IsSynchronized() ? handle_scope->GetHandle(0).ToJObject() : nullptr;
+  if (called->IsSynchronized()) {
+    DCHECK(normal_native) << "@FastNative/@CriticalNative and synchronize is not supported";
+    HandleScope* handle_scope = down_cast<HandleScope*>(self->GetTopHandleScope());
+    jobject lock = handle_scope->GetHandle(0).ToJObject();
+    DCHECK(lock != nullptr);
+    UnlockJniSynchronizedMethod(lock, self);
+  }
   char return_shorty_char = called->GetShorty()[0];
   if (return_shorty_char == 'L') {
-    if (locked != nullptr) {
-      DCHECK(normal_native) << " @FastNative and synchronize is not supported";
-      UnlockJniSynchronizedMethod(locked, self);
-    }
     return reinterpret_cast<uint64_t>(JniMethodEndWithReferenceHandleResult(
         result.l, saved_local_ref_cookie, self));
   } else {
-    if (locked != nullptr) {
-      DCHECK(normal_native) << " @FastNative and synchronize is not supported";
-      UnlockJniSynchronizedMethod(locked, self);  // Must decode before pop.
-    }
     if (LIKELY(!critical_native)) {
-      PopLocalReferences(saved_local_ref_cookie, self);
+      PopLocalReferences(saved_local_ref_cookie, self);  // Invalidates top handle scope.
     }
     switch (return_shorty_char) {
       case 'F': {

@@ -80,7 +80,12 @@ elif [[ $mode == "target" ]]; then
   make_command+=" libstdc++ "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   if [[ -n "$ART_TEST_CHROOT" ]]; then
-    # These targets are needed for the chroot environment.
+    # Targets required to generate a linker configuration on device within the
+    # chroot environment.
+    make_command+=" linkerconfig"
+    make_command+=" llndk.libraries.txt vndksp.libraries.txt vndkcore.libraries.txt"
+    make_command+=" vndkprivate.libraries.txt vndkcorevariant.libraries.txt sanitizer.libraries.txt"
+    # Additional targets needed for the chroot environment.
     make_command+=" crash_dump event-log-tags"
   fi
   # Build the Runtime (Bionic) APEX.
@@ -108,7 +113,7 @@ done
 
 echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
-bash -c "$make_command"
+eval "$make_command"
 
 if [[ $mode == "target" ]]; then
   # Create canonical name -> file name symlink in the symbol directory for the
@@ -127,11 +132,13 @@ if [[ $mode == "target" ]]; then
   link_name="$target_out_unstripped/apex/com.android.art"
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
   echo "Executing $link_command"
-  bash -c "$link_command"
-  find $ANDROID_PRODUCT_OUT/symbols/apex/com.android.runtime/bin -type f | while read target; do
-    cmd="ln -sf $target  $ANDROID_PRODUCT_OUT/symbols/system/bin/$(basename $target)"
+  eval "$link_command"
+  # Also provide access to symbols of binaries from the Runtime (Bionic) APEX,
+  # e.g. to support debugging in GDB.
+  find "$target_out_unstripped/apex/com.android.runtime/bin" -type f | while read target; do
+    cmd="ln -sf $target $target_out_unstripped/system/bin/$(basename $target)"
     echo "Executing $cmd"
-    bash -c "$cmd"
+    eval "$cmd"
   done
 
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
@@ -151,7 +158,7 @@ if [[ $mode == "target" ]]; then
       if [ "${src}" -nt "${dst}" ]; then
         cmd="cp -p \"${src}\" \"${dst}\""
         echo "Executing $cmd"
-        bash -c "$cmd"
+        eval "$cmd"
       fi
     done
   done

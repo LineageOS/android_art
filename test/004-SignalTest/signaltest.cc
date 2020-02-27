@@ -118,7 +118,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_initSignalTest(JNIEnv*, jclass) {
   sigfillset(&action.sa_mask);
   sigdelset(&action.sa_mask, UNBLOCKED_SIGNAL);
   action.sa_flags = SA_SIGINFO | SA_ONSTACK;
-#if !defined(__APPLE__) && !defined(__mips__)
+#if !defined(__APPLE__)
   action.sa_restorer = nullptr;
 #endif
 

@@ -110,9 +110,6 @@ else
   for i in $processes; do adb shell kill -9 $i; done
 fi
 
-echo -e "${green}Set sys.linker.use_generated_config to false if file is absent"
-adb shell "test -f /linkerconfig/ld.config.txt || setprop sys.linker.use_generated_config false"
-
 # Chroot environment.
 # ===================
 
@@ -173,4 +170,7 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
 
   # Create /apex directory in chroot.
   adb shell mkdir -p "$ART_TEST_CHROOT/apex"
+
+  # Create /linkerconfig directory in chroot.
+  adb shell mkdir -p "$ART_TEST_CHROOT/linkerconfig"
 fi

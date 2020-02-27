@@ -4,16 +4,18 @@
 // (Libcore).
 
 // Modules listed in LOCAL_REQUIRED_MODULES for module art-runtime in art/Android.mk.
-// - Base requirements (binaries for which both 32- and 64-bit versions are built, if relevant).
+// - Base requirements (binaries for which both 32- and 64-bit versions are built, if possible).
 art_runtime_base_binaries_both = [
     "dalvikvm",
 ]
-// - Base requirements (binaries for which a 32-bit version is preferred).
-art_runtime_base_binaries_prefer32 = [
+// - Base requirements (binaries for which a 32-bit version is preferred on device, but for which
+//   only the "first" (likely 64-bit) version is required on host).
+art_runtime_base_binaries_prefer32_on_device_first_on_host = [
     "dex2oat",
     "dexoptanalyzer",
     "profman",
 ]
+
 // - Base requirements (libraries).
 //
 // Note: ART on-device chroot-based testing and benchmarking is not yet using
@@ -61,17 +63,12 @@ bionic_binaries_both = [
     "linker",
 ]
 
-// - Debug variants (binaries for which a 32-bit version is preferred).
-art_runtime_debug_binaries_prefer32 = [
+// - Debug variants (binaries for which a 32-bit version is preferred on device, but for which
+//   only the "first" (likely 64-bit) version is required on host).
+art_runtime_debug_binaries_prefer32_on_device_first_on_host = [
+    "dex2oatd",
     "dexoptanalyzerd",
     "profmand",
-]
-art_runtime_debug_binaries_prefer32_device = [
-    "dex2oatd",
-]
-
-art_runtime_debug_binaries_both_host = [
-    "dex2oatd",
 ]
 
 // - Debug variants (libraries).
@@ -199,13 +196,6 @@ apex_key {
     private_key: "com.android.art.pem",
 }
 
-prebuilt_etc {
-    name: "com.android.art.ld.config.txt",
-    src: "ld.config.txt",
-    filename: "ld.config.txt",
-    installable: false,
-}
-
 // Default values shared by device ART APEXes.
 apex_defaults {
     name: "com.android.art-defaults",
@@ -221,14 +211,13 @@ apex_defaults {
             binaries: art_runtime_base_binaries_both,
         },
         prefer32: {
-            binaries: art_runtime_base_binaries_prefer32,
+            binaries: art_runtime_base_binaries_prefer32_on_device_first_on_host,
         },
         first: {
             binaries: art_tools_common_binaries +
                 art_tools_device_only_binaries,
         },
     },
-    prebuilts: ["com.android.art.ld.config.txt"],
     key: "com.android.art.key",
     required: [
         "art_apex_boot_integrity",
@@ -249,8 +238,7 @@ apex_defaults {
             binaries: art_tools_debug_binaries_both,
         },
         prefer32: {
-            binaries: art_runtime_debug_binaries_prefer32 +
-                art_runtime_debug_binaries_prefer32_device,
+            binaries: art_runtime_debug_binaries_prefer32_on_device_first_on_host,
         },
         first: {
             binaries: art_tools_debug_binaries +
@@ -336,15 +324,14 @@ art_apex_test_host {
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both +
-                art_runtime_debug_binaries_both_host +
                 art_tools_debug_binaries_both,
         },
         first: {
-            binaries: art_tools_common_binaries + // Host APEX is always debug.
-                art_tools_debug_binaries +
-                art_tools_host_only_binaries +
-                art_runtime_base_binaries_prefer32 +
-                art_runtime_debug_binaries_prefer32,
+            binaries: art_runtime_base_binaries_prefer32_on_device_first_on_host +
+                art_runtime_debug_binaries_prefer32_on_device_first_on_host +
+                art_tools_common_binaries +
+                art_tools_debug_binaries + // Host APEX is always debug.
+                art_tools_host_only_binaries,
         },
     },
     key: "com.android.art.key",

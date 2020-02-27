@@ -1636,7 +1636,7 @@ TEST_F(Dex2oatDedupeCode, DedupeTest) {
 }
 
 TEST_F(Dex2oatTest, UncompressedTest) {
-  std::unique_ptr<const DexFile> dex(OpenTestDexFile("MainUncompressed"));
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("MainUncompressedAligned"));
   std::string out_dir = GetScratchDir();
   const std::string base_oat_name = out_dir + "/base.oat";
   ASSERT_TRUE(GenerateOdexForTest(dex->GetLocation(),
@@ -2168,7 +2168,7 @@ TEST_F(Dex2oatTest, AppImageNoProfile) {
 }
 
 TEST_F(Dex2oatTest, ZipFd) {
-  std::string zip_location = GetTestDexFileName("MainUncompressed");
+  std::string zip_location = GetTestDexFileName("MainUncompressedAligned");
   std::unique_ptr<File> dex_file(OS::OpenFileForReading(zip_location.c_str()));
   std::vector<std::string> extra_args{
       StringPrintf("--zip-fd=%d", dex_file->Fd()),

@@ -19,8 +19,6 @@
 #include "arch/arm/instruction_set_features_arm.h"
 #include "arch/arm64/instruction_set_features_arm64.h"
 #include "arch/instruction_set.h"
-#include "arch/mips/instruction_set_features_mips.h"
-#include "arch/mips64/instruction_set_features_mips64.h"
 #include "arch/x86/instruction_set_features_x86.h"
 #include "arch/x86_64/instruction_set_features_x86_64.h"
 #include "driver/compiler_options.h"
@@ -1642,64 +1640,6 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
             return TrySetVectorLength(4);
           case DataType::Type::kInt64:
             *restrictions |= kNoMul | kNoDiv | kNoShr | kNoAbs | kNoSAD;
-            return TrySetVectorLength(2);
-          case DataType::Type::kFloat32:
-            *restrictions |= kNoReduction;
-            return TrySetVectorLength(4);
-          case DataType::Type::kFloat64:
-            *restrictions |= kNoReduction;
-            return TrySetVectorLength(2);
-          default:
-            break;
-        }  // switch type
-      }
-      return false;
-    case InstructionSet::kMips:
-      if (features->AsMipsInstructionSetFeatures()->HasMsa()) {
-        switch (type) {
-          case DataType::Type::kBool:
-          case DataType::Type::kUint8:
-          case DataType::Type::kInt8:
-            *restrictions |= kNoDiv | kNoDotProd;
-            return TrySetVectorLength(16);
-          case DataType::Type::kUint16:
-          case DataType::Type::kInt16:
-            *restrictions |= kNoDiv | kNoStringCharAt | kNoDotProd;
-            return TrySetVectorLength(8);
-          case DataType::Type::kInt32:
-            *restrictions |= kNoDiv;
-            return TrySetVectorLength(4);
-          case DataType::Type::kInt64:
-            *restrictions |= kNoDiv;
-            return TrySetVectorLength(2);
-          case DataType::Type::kFloat32:
-            *restrictions |= kNoReduction;
-            return TrySetVectorLength(4);
-          case DataType::Type::kFloat64:
-            *restrictions |= kNoReduction;
-            return TrySetVectorLength(2);
-          default:
-            break;
-        }  // switch type
-      }
-      return false;
-    case InstructionSet::kMips64:
-      if (features->AsMips64InstructionSetFeatures()->HasMsa()) {
-        switch (type) {
-          case DataType::Type::kBool:
-          case DataType::Type::kUint8:
-          case DataType::Type::kInt8:
-            *restrictions |= kNoDiv | kNoDotProd;
-            return TrySetVectorLength(16);
-          case DataType::Type::kUint16:
-          case DataType::Type::kInt16:
-            *restrictions |= kNoDiv | kNoStringCharAt | kNoDotProd;
-            return TrySetVectorLength(8);
-          case DataType::Type::kInt32:
-            *restrictions |= kNoDiv;
-            return TrySetVectorLength(4);
-          case DataType::Type::kInt64:
-            *restrictions |= kNoDiv;
             return TrySetVectorLength(2);
           case DataType::Type::kFloat32:
             *restrictions |= kNoReduction;

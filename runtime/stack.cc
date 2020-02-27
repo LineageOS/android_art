@@ -149,8 +149,18 @@ ObjPtr<mirror::Object> StackVisitor::GetThisObject() const {
     return nullptr;
   } else if (m->IsNative()) {
     if (cur_quick_frame_ != nullptr) {
-      HandleScope* hs = reinterpret_cast<HandleScope*>(
-          reinterpret_cast<char*>(cur_quick_frame_) + sizeof(ArtMethod*));
+      HandleScope* hs;
+      if (cur_oat_quick_method_header_ != nullptr) {
+        hs = reinterpret_cast<HandleScope*>(
+            reinterpret_cast<char*>(cur_quick_frame_) + sizeof(ArtMethod*));
+      } else {
+        // GenericJNI frames have the HandleScope under the managed frame.
+        uint32_t shorty_len;
+        const char* shorty = m->GetShorty(&shorty_len);
+        const size_t num_handle_scope_references =
+            /* this */ 1u + std::count(shorty + 1, shorty + shorty_len, 'L');
+        hs = GetGenericJniHandleScope(cur_quick_frame_, num_handle_scope_references);
+      }
       return hs->GetReference(0);
     } else {
       return cur_shadow_frame_->GetVRegReference(0);
@@ -358,14 +368,6 @@ bool StackVisitor::GetRegisterIfAccessible(uint32_t reg, VRegKind kind, uint32_t
     // X86 float registers are 64-bit and each XMM register is provided as two separate
     // 32-bit registers by the context.
     reg = (kind == kDoubleHiVReg) ? (2 * reg + 1) : (2 * reg);
-  }
-
-  // MIPS32 float registers are used as 64-bit (for MIPS32r2 it is pair
-  // F(2n)-F(2n+1), and for MIPS32r6 it is 64-bit register F(2n)). When
-  // accessing upper 32-bits from double, reg + 1 should be used.
-  if ((kRuntimeISA == InstructionSet::kMips) && (kind == kDoubleHiVReg)) {
-    DCHECK_ALIGNED(reg, 2);
-    reg++;
   }
 
   if (!IsAccessibleRegister(reg, is_float)) {
@@ -772,21 +774,6 @@ void StackVisitor::SanityCheckFrame() const {
   }
 }
 
-// Counts the number of references in the parameter list of the corresponding method.
-// Note: Thus does _not_ include "this" for non-static methods.
-static uint32_t GetNumberOfReferenceArgsWithoutReceiver(ArtMethod* method)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  uint32_t shorty_len;
-  const char* shorty = method->GetShorty(&shorty_len);
-  uint32_t refs = 0;
-  for (uint32_t i = 1; i < shorty_len ; ++i) {
-    if (shorty[i] == 'L') {
-      refs++;
-    }
-  }
-  return refs;
-}
-
 QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
   if (cur_oat_quick_method_header_ != nullptr) {
     if (cur_oat_quick_method_header_->IsOptimized()) {
@@ -818,10 +805,12 @@ QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
     return RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
   }
 
-  // The only remaining case is if the method is native and uses the generic JNI stub,
-  // called either directly or through some (resolution, instrumentation) trampoline.
+  // The only remaining cases are for native methods that either
+  //   - use the Generic JNI stub, called either directly or through some
+  //     (resolution, instrumentation) trampoline; or
+  //   - fake a Generic JNI frame in art_jni_dlsym_lookup_critical_stub.
   DCHECK(method->IsNative());
-  if (kIsDebugBuild) {
+  if (kIsDebugBuild && !method->IsCriticalNative()) {
     ClassLinker* class_linker = runtime->GetClassLinker();
     const void* entry_point = runtime->GetInstrumentation()->GetQuickCodeFor(method,
                                                                              kRuntimePointerSize);
@@ -831,18 +820,9 @@ QuickMethodFrameInfo StackVisitor::GetCurrentQuickFrameInfo() const {
           (runtime->GetJit() != nullptr &&
            runtime->GetJit()->GetCodeCache()->ContainsPc(entry_point))) << method->PrettyMethod();
   }
-  // Generic JNI frame.
-  uint32_t handle_refs = GetNumberOfReferenceArgsWithoutReceiver(method) + 1;
-  size_t scope_size = HandleScope::SizeOf(handle_refs);
-  constexpr QuickMethodFrameInfo callee_info =
-      RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
-
-  // Callee saves + handle scope + method ref + alignment
-  // Note: -sizeof(void*) since callee-save frame stores a whole method pointer.
-  size_t frame_size = RoundUp(
-      callee_info.FrameSizeInBytes() - sizeof(void*) + sizeof(ArtMethod*) + scope_size,
-      kStackAlignment);
-  return QuickMethodFrameInfo(frame_size, callee_info.CoreSpillMask(), callee_info.FpSpillMask());
+  // Generic JNI frame is just like the SaveRefsAndArgs frame.
+  // Note that HandleScope, if any, is below the frame.
+  return RuntimeCalleeSaveFrame::GetMethodFrameInfo(CalleeSaveType::kSaveRefsAndArgs);
 }
 
 template <StackVisitor::CountTransitions kCount>

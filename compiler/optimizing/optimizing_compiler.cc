@@ -450,8 +450,6 @@ static bool IsInstructionSetSupported(InstructionSet instruction_set) {
   return instruction_set == InstructionSet::kArm
       || instruction_set == InstructionSet::kArm64
       || instruction_set == InstructionSet::kThumb2
-      || instruction_set == InstructionSet::kMips
-      || instruction_set == InstructionSet::kMips64
       || instruction_set == InstructionSet::kX86
       || instruction_set == InstructionSet::kX86_64;
 }
@@ -462,19 +460,6 @@ bool OptimizingCompiler::RunBaselineOptimizations(HGraph* graph,
                                                   PassObserver* pass_observer,
                                                   VariableSizedHandleScope* handles) const {
   switch (codegen->GetCompilerOptions().GetInstructionSet()) {
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips: {
-      OptimizationDef mips_optimizations[] = {
-        OptDef(OptimizationPass::kPcRelativeFixupsMips)
-      };
-      return RunOptimizations(graph,
-                              codegen,
-                              dex_compilation_unit,
-                              pass_observer,
-                              handles,
-                              mips_optimizations);
-    }
-#endif
 #ifdef ART_ENABLE_CODEGEN_x86
     case InstructionSet::kX86: {
       OptimizationDef x86_optimizations[] = {
@@ -535,36 +520,6 @@ bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                               pass_observer,
                               handles,
                               arm64_optimizations);
-    }
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips
-    case InstructionSet::kMips: {
-      OptimizationDef mips_optimizations[] = {
-        OptDef(OptimizationPass::kInstructionSimplifierMips),
-        OptDef(OptimizationPass::kSideEffectsAnalysis),
-        OptDef(OptimizationPass::kGlobalValueNumbering, "GVN$after_arch"),
-        OptDef(OptimizationPass::kPcRelativeFixupsMips)
-      };
-      return RunOptimizations(graph,
-                              codegen,
-                              dex_compilation_unit,
-                              pass_observer,
-                              handles,
-                              mips_optimizations);
-    }
-#endif
-#ifdef ART_ENABLE_CODEGEN_mips64
-    case InstructionSet::kMips64: {
-      OptimizationDef mips64_optimizations[] = {
-        OptDef(OptimizationPass::kSideEffectsAnalysis),
-        OptDef(OptimizationPass::kGlobalValueNumbering, "GVN$after_arch")
-      };
-      return RunOptimizations(graph,
-                              codegen,
-                              dex_compilation_unit,
-                              pass_observer,
-                              handles,
-                              mips64_optimizations);
     }
 #endif
 #ifdef ART_ENABLE_CODEGEN_x86
@@ -1340,6 +1295,8 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                             /* has_should_deoptimize_flag= */ false,
                             cha_single_implementation_list)) {
       code_cache->Free(self, region, reserved_code.data(), reserved_data.data());
+      MutexLock mu(self, *Locks::jit_lock_);
+      RemoveNativeDebugInfoForJit(ArrayRef<const void*>(reinterpret_cast<const void**>(&code), 1));
       return false;
     }
 
@@ -1448,6 +1405,8 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                           codegen->GetGraph()->HasShouldDeoptimizeFlag(),
                           codegen->GetGraph()->GetCHASingleImplementationList())) {
     code_cache->Free(self, region, reserved_code.data(), reserved_data.data());
+    MutexLock mu(self, *Locks::jit_lock_);
+    RemoveNativeDebugInfoForJit(ArrayRef<const void*>(reinterpret_cast<const void**>(&code), 1));
     return false;
   }
 

@@ -49,42 +49,6 @@
     DECREASE_FRAME 96
 .endm
 
-
-.macro SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
-    INCREASE_FRAME 224
-
-    // Ugly compile-time check, but we only have the preprocessor.
-#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 224)
-#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(ARM64) size not as expected."
-#endif
-
-    // Stack alignment filler [sp, #8].
-    // FP args.
-    stp d0, d1, [sp, #16]
-    stp d2, d3, [sp, #32]
-    stp d4, d5, [sp, #48]
-    stp d6, d7, [sp, #64]
-
-    // Core args.
-    SAVE_TWO_REGS x1, x2, 80
-    SAVE_TWO_REGS x3, x4, 96
-    SAVE_TWO_REGS x5, x6, 112
-
-    // x7, Callee-saves.
-    // Note: We could avoid saving X20 in the case of Baker read
-    // barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    SAVE_TWO_REGS x7, x20, 128
-    SAVE_TWO_REGS x21, x22, 144
-    SAVE_TWO_REGS x23, x24, 160
-    SAVE_TWO_REGS x25, x26, 176
-    SAVE_TWO_REGS x27, x28, 192
-
-    // x29(callee-save) and LR.
-    SAVE_TWO_REGS x29, xLR, 208
-
-.endm
-
     /*
      * Macro that sets up the callee save frame to conform with
      * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs).
@@ -99,7 +63,8 @@
     // ArtMethod* xIP0 = Runtime::instance_->callee_save_methods_[kSaveRefAndArgs];
     ldr xIP0, [xIP0, RUNTIME_SAVE_REFS_AND_ARGS_METHOD_OFFSET]
 
-    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
+    INCREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL sp
 
     str xIP0, [sp]    // Store ArtMethod* Runtime::callee_save_methods_[kSaveRefsAndArgs].
     // Place sp in Thread::Current()->top_quick_frame.
@@ -108,40 +73,12 @@
 .endm
 
 .macro SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_X0
-    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL
+    INCREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
+    SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL sp
     str x0, [sp, #0]  // Store ArtMethod* to bottom of stack.
     // Place sp in Thread::Current()->top_quick_frame.
     mov xIP0, sp
     str xIP0, [xSELF, # THREAD_TOP_QUICK_FRAME_OFFSET]
-.endm
-
-// TODO: Probably no need to restore registers preserved by aapcs64.
-.macro RESTORE_SAVE_REFS_AND_ARGS_FRAME
-    // FP args.
-    ldp d0, d1, [sp, #16]
-    ldp d2, d3, [sp, #32]
-    ldp d4, d5, [sp, #48]
-    ldp d6, d7, [sp, #64]
-
-    // Core args.
-    RESTORE_TWO_REGS x1, x2, 80
-    RESTORE_TWO_REGS x3, x4, 96
-    RESTORE_TWO_REGS x5, x6, 112
-
-    // x7, Callee-saves.
-    // Note: Likewise, we could avoid restoring X20 in the case of Baker
-    // read barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    RESTORE_TWO_REGS x7, x20, 128
-    RESTORE_TWO_REGS x21, x22, 144
-    RESTORE_TWO_REGS x23, x24, 160
-    RESTORE_TWO_REGS x25, x26, 176
-    RESTORE_TWO_REGS x27, x28, 192
-
-    // x29(callee-save) and LR.
-    RESTORE_TWO_REGS x29, xLR, 208
-
-    DECREASE_FRAME 224
 .endm
 
     /*
@@ -1887,7 +1824,6 @@ END art_quick_resolution_trampoline
  * | X22               |    callee save
  * | X21               |    callee save
  * | X20               |    callee save
- * | X19               |    callee save
  * | X7                |    arg7
  * | X6                |    arg6
  * | X5                |    arg5
@@ -1903,27 +1839,30 @@ END art_quick_resolution_trampoline
  * | D2                |    float arg 3
  * | D1                |    float arg 2
  * | D0                |    float arg 1
- * | Method*           | <- X0
+ * | padding           | // 8B
+ * | Method*           | <- X0 (Managed frame similar to SaveRefsAndArgs.)
  * #-------------------#
  * | local ref cookie  | // 4B
- * | handle scope size | // 4B
+ * | padding           | // 0B or 4B to align handle scope on 8B address
+ * | handle scope      | // Size depends on number of references; multiple of 4B.
  * #-------------------#
- * | JNI Call Stack    |
- * #-------------------#    <--- SP on native call
+ * | JNI Stack Args    | // Empty if all args fit into registers x0-x7, d0-d7.
+ * #-------------------#    <--- SP on native call (1)
+ * | Free scratch      |
+ * #-------------------#
+ * | SP for JNI call   | // Pointer to (1).
+ * #-------------------#
+ * | Hidden arg        | // For @CriticalNative
+ * #-------------------#
  * |                   |
  * | Stack for Regs    |    The trampoline assembly will pop these values
  * |                   |    into registers for native call
- * #-------------------#
- * | Native code ptr   |
- * #-------------------#
- * | Free scratch      |
- * #-------------------#
- * | Ptr to (1)        |    <--- SP
  * #-------------------#
  */
     /*
      * Called to do a generic JNI down-call
      */
+    .extern artQuickGenericJniTrampoline
 ENTRY art_quick_generic_jni_trampoline
     SETUP_SAVE_REFS_AND_ARGS_FRAME_WITH_METHOD_IN_X0
 
@@ -1939,28 +1878,28 @@ ENTRY art_quick_generic_jni_trampoline
     sub sp, sp, xIP0
 
     // prepare for artQuickGenericJniTrampoline call
-    // (Thread*,  SP)
-    //    x0      x1   <= C calling convention
-    //   xSELF    xFP  <= where they are
+    // (Thread*, managed_sp, reserved_area)
+    //    x0         x1            x2   <= C calling convention
+    //  xSELF       xFP            sp   <= where they are
 
     mov x0, xSELF   // Thread*
-    mov x1, xFP
+    mov x1, xFP     // SP for the managed frame.
+    mov x2, sp      // reserved area for arguments and other saved data (up to managed frame)
     bl artQuickGenericJniTrampoline  // (Thread*, sp)
 
-    // The C call will have registered the complete save-frame.
+    // The C call will have registered the complete save-frame on success.
     // The result of the call is:
-    // x0: pointer to native code.
-    // x1: pointer to the bottom of the used area of the alloca, can restore stack till there.
+    //     x0: pointer to native code, 0 on error.
+    //     The bottom of the reserved area contains values for arg registers,
+    //     hidden arg register and SP for out args for the call.
 
-    // Release part of the alloca.
-    mov sp, x1
+    // Check for error (class init check or locking for synchronized native method can throw).
+    cbz x0, .Lexception_in_native
 
     // Save the code pointer
     mov xIP0, x0
 
     // Load parameters from frame into registers.
-    // TODO Check with artQuickGenericJniTrampoline.
-    //      Also, check again APPCS64 - the stack arguments are interleaved.
     ldp x0, x1, [sp]
     ldp x2, x3, [sp, #16]
     ldp x4, x5, [sp, #32]
@@ -1971,7 +1910,11 @@ ENTRY art_quick_generic_jni_trampoline
     ldp d4, d5, [sp, #96]
     ldp d6, d7, [sp, #112]
 
-    add sp, sp, #128
+    // Load hidden arg (x15) for @CriticalNative and SP for out args.
+    ldp x15, xIP1, [sp, #128]
+
+    // Apply the new SP for out args, releasing unneeded reserved area.
+    mov sp, xIP1
 
     blr xIP0        // native call.
 

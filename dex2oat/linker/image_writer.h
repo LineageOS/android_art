@@ -234,6 +234,7 @@ class ImageWriter final {
 
   enum class StubType {
     kJNIDlsymLookupTrampoline,
+    kJNIDlsymLookupCriticalTrampoline,
     kQuickGenericJNITrampoline,
     kQuickIMTConflictTrampoline,
     kQuickResolutionTrampoline,

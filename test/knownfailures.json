@@ -490,8 +490,7 @@
             "607-daemon-stress",
             "674-hiddenapi",
             "687-deopt",
-            "904-object-allocation",
-            "2030-core-platform-api-jni"
+            "904-object-allocation"
         ],
         "description": ["Tests that sometimes fail when run with jvmti-stress for unknown reasons."],
         "bug": "b/120995005",
@@ -545,8 +544,7 @@
             "690-hiddenapi-same-name-methods",
             "804-class-extends-itself",
             "921-hello-failure",
-            "999-redefine-hiddenapi",
-            "2030-core-platform-api-jni"
+            "999-redefine-hiddenapi"
         ],
         "description": [
             "Tests that use illegal dex files or otherwise break dexter assumptions"
@@ -568,8 +566,7 @@
             "692-vdex-inmem-loader",
             "693-vdex-inmem-loader-evict",
             "944-transform-classloaders",
-            "999-redefine-hiddenapi",
-            "2030-core-platform-api-jni"
+            "999-redefine-hiddenapi"
         ],
         "description": [
             "Tests that use custom class loaders or other features not supported ",
@@ -1207,8 +1204,7 @@
                   "2004-double-virtual-structural-abstract",
                   "2005-pause-all-redefine-multithreaded",
                   "2006-virtual-structural-finalizing",
-                  "2007-virtual-structural-finalizable",
-                  "2030-core-platform-api-jni"
+                  "2007-virtual-structural-finalizable"
                 ],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
@@ -1347,5 +1343,11 @@
         "tests": ["2029-contended-monitors"],
         "variant": "interpreter | interp-ac | gcstress | trace",
         "description": ["Slow test. Prone to timeouts."]
+    },
+    {
+        "tests": ["096-array-copy-concurrent-gc"],
+        "variant": "gcstress & debuggable & debug & host",
+        "bug": "b/149708943",
+        "description": ["Timeouts."]
     }
 ]

@@ -33,7 +33,6 @@
 #include "dwarf/debug_frame_opcode_writer.h"
 #include "label.h"
 #include "managed_register.h"
-#include "mips/constants_mips.h"
 #include "offsets.h"
 #include "x86/constants_x86.h"
 #include "x86_64/constants_x86_64.h"
@@ -372,6 +371,7 @@ class Assembler : public DeletableArenaObject<kArenaAllocAssembler> {
   // the instructions that can trigger signals into branch delay slots. Handling
   // signals from instructions in delay slots is a bit problematic and should be
   // avoided.
+  // TODO: Re-evaluate whether we still need this now that MIPS support has been removed.
   virtual size_t CodePosition() { return CodeSize(); }
 
   // Copy instructions out of assembly buffer into the given region of memory

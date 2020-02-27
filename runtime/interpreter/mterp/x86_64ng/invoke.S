@@ -87,7 +87,15 @@
    movq 0(%rsp), %rsi
    movq rPC, %rdx
    call nterp_get_method
-   jmp 1b
+   testl %eax, %eax
+   jns 1b
+   // For j.l.Object interface calls, the high bit is set. Also the method index is 16bits.
+   andl LITERAL(0xffff), %eax
+   .if $range
+   jmp NterpHandleInvokeInterfaceOnObjectMethodRange
+   .else
+   jmp NterpHandleInvokeInterfaceOnObjectMethod
+   .endif
 
 %def op_invoke_interface():
 %  invoke_interface(helper="NterpCommonInvokeInterface", range="0")

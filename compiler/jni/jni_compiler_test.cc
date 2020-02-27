@@ -45,7 +45,22 @@ extern "C" JNIEXPORT jint JNICALL Java_MyClassNatives_bar(JNIEnv*, jobject, jint
   return count + 1;
 }
 
+// Note: JNI name mangling "_" -> "_1".
+extern "C" JNIEXPORT jint JNICALL Java_MyClassNatives_bar_1Fast(JNIEnv*, jobject, jint count) {
+  return count + 1;
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_MyClassNatives_sbar(JNIEnv*, jclass, jint count) {
+  return count + 1;
+}
+
+// Note: JNI name mangling "_" -> "_1".
+extern "C" JNIEXPORT jint JNICALL Java_MyClassNatives_sbar_1Fast(JNIEnv*, jclass, jint count) {
+  return count + 1;
+}
+
+// Note: JNI name mangling "_" -> "_1".
+extern "C" JNIEXPORT jint JNICALL Java_MyClassNatives_sbar_1Critical(jint count) {
   return count + 1;
 }
 
@@ -69,6 +84,11 @@ uint32_t gCurrentJni = static_cast<uint32_t>(JniKind::kNormal);
 // Is the current native method under test @CriticalNative?
 static bool IsCurrentJniCritical() {
   return gCurrentJni == static_cast<uint32_t>(JniKind::kCritical);
+}
+
+// Is the current native method under test @FastNative?
+static bool IsCurrentJniFast() {
+  return gCurrentJni == static_cast<uint32_t>(JniKind::kFast);
 }
 
 // Is the current native method a plain-old non-annotated native?
@@ -352,12 +372,10 @@ class JniCompilerTest : public CommonCompilerTest {
   void MaxParamNumberImpl();
   void WithoutImplementationImpl();
   void WithoutImplementationRefReturnImpl();
+  void StaticWithoutImplementationImpl();
   void StackArgsIntsFirstImpl();
   void StackArgsFloatsFirstImpl();
   void StackArgsMixedImpl();
-#if defined(__mips__) && defined(__LP64__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-  void StackArgsSignExtendedMips64Impl();
-#endif
 
   void NormalNativeImpl();
   void FastNativeImpl();
@@ -376,9 +394,7 @@ jobject JniCompilerTest::class_loader_;
 
 // Test the normal compiler and normal generic JNI only.
 // The following features are unsupported in @FastNative:
-// 1) JNI stubs (lookup via dlsym) when methods aren't explicitly registered
-// 2) synchronized keyword
-// -- TODO: We can support (1) if we remove the mutator lock assert during stub lookup.
+// 1) synchronized keyword
 # define JNI_TEST_NORMAL_ONLY(TestName)          \
   TEST_F(JniCompilerTest, TestName ## NormalCompiler) { \
     ScopedCheckHandleScope top_handle_scope_check;  \
@@ -615,8 +631,8 @@ struct make_jni_test_decorator<R(JNIEnv*, jobject, Args...), fn> {
 #define NORMAL_JNI_ONLY_NOWRAP(func) \
     ({ ASSERT_TRUE(IsCurrentJniNormal()); reinterpret_cast<void*>(&(func)); })
 // Same as above, but with nullptr. When we want to test the stub functionality.
-#define NORMAL_JNI_ONLY_NULLPTR \
-    ({ ASSERT_TRUE(IsCurrentJniNormal()); nullptr; })
+#define NORMAL_OR_FAST_JNI_ONLY_NULLPTR \
+    ({ ASSERT_TRUE(IsCurrentJniNormal() || IsCurrentJniFast()); nullptr; })
 
 
 int gJava_MyClassNatives_foo_calls[kJniKindCount] = {};
@@ -639,8 +655,8 @@ void JniCompilerTest::CompileAndRunNoArgMethodImpl() {
 JNI_TEST(CompileAndRunNoArgMethod)
 
 void JniCompilerTest::CompileAndRunIntMethodThroughStubImpl() {
-  SetUpForTest(false, "bar", "(I)I", NORMAL_JNI_ONLY_NULLPTR);
-  // calling through stub will link with &Java_MyClassNatives_bar
+  SetUpForTest(false, "bar", "(I)I", NORMAL_OR_FAST_JNI_ONLY_NULLPTR);
+  // calling through stub will link with &Java_MyClassNatives_bar{,_1Fast}
 
   std::string reason;
   ASSERT_TRUE(Runtime::Current()->GetJavaVM()->
@@ -651,12 +667,12 @@ void JniCompilerTest::CompileAndRunIntMethodThroughStubImpl() {
   EXPECT_EQ(25, result);
 }
 
-// TODO: Support @FastNative and @CriticalNative through stubs.
-JNI_TEST_NORMAL_ONLY(CompileAndRunIntMethodThroughStub)
+// Note: @CriticalNative is only for static methods.
+JNI_TEST(CompileAndRunIntMethodThroughStub)
 
 void JniCompilerTest::CompileAndRunStaticIntMethodThroughStubImpl() {
-  SetUpForTest(true, "sbar", "(I)I", NORMAL_JNI_ONLY_NULLPTR);
-  // calling through stub will link with &Java_MyClassNatives_sbar
+  SetUpForTest(true, "sbar", "(I)I", nullptr);
+  // calling through stub will link with &Java_MyClassNatives_sbar{,_1Fast,_1Critical}
 
   std::string reason;
   ASSERT_TRUE(Runtime::Current()->GetJavaVM()->
@@ -667,8 +683,7 @@ void JniCompilerTest::CompileAndRunStaticIntMethodThroughStubImpl() {
   EXPECT_EQ(43, result);
 }
 
-// TODO: Support @FastNative and @CriticalNative through stubs.
-JNI_TEST_NORMAL_ONLY(CompileAndRunStaticIntMethodThroughStub)
+JNI_TEST_CRITICAL(CompileAndRunStaticIntMethodThroughStub)
 
 int gJava_MyClassNatives_fooI_calls[kJniKindCount] = {};
 jint Java_MyClassNatives_fooI(JNIEnv*, jobject, jint x) {
@@ -1897,7 +1912,7 @@ void JniCompilerTest::WithoutImplementationImpl() {
   // This will lead to error messages in the log.
   ScopedLogSeverity sls(LogSeverity::FATAL);
 
-  SetUpForTest(false, "withoutImplementation", "()V", NORMAL_JNI_ONLY_NULLPTR);
+  SetUpForTest(false, "withoutImplementation", "()V", NORMAL_OR_FAST_JNI_ONLY_NULLPTR);
 
   env_->CallVoidMethod(jobj_, jmethod_);
 
@@ -1905,9 +1920,7 @@ void JniCompilerTest::WithoutImplementationImpl() {
   EXPECT_TRUE(env_->ExceptionCheck() == JNI_TRUE);
 }
 
-// TODO: Don't test @FastNative here since it goes through a stub lookup (unsupported) which would
-// normally fail with an exception, but fails with an assert.
-JNI_TEST_NORMAL_ONLY(WithoutImplementation)
+JNI_TEST(WithoutImplementation)
 
 void JniCompilerTest::WithoutImplementationRefReturnImpl() {
   // This will lead to error messages in the log.
@@ -1916,7 +1929,7 @@ void JniCompilerTest::WithoutImplementationRefReturnImpl() {
   SetUpForTest(false,
                "withoutImplementationRefReturn",
                "()Ljava/lang/Object;",
-               NORMAL_JNI_ONLY_NULLPTR);
+               NORMAL_OR_FAST_JNI_ONLY_NULLPTR);
 
   env_->CallObjectMethod(jobj_, jmethod_);
 
@@ -1924,8 +1937,21 @@ void JniCompilerTest::WithoutImplementationRefReturnImpl() {
   EXPECT_TRUE(env_->ExceptionCheck() == JNI_TRUE);
 }
 
-// TODO: Should work for @FastNative too.
-JNI_TEST_NORMAL_ONLY(WithoutImplementationRefReturn)
+JNI_TEST(WithoutImplementationRefReturn)
+
+void JniCompilerTest::StaticWithoutImplementationImpl() {
+  // This will lead to error messages in the log.
+  ScopedLogSeverity sls(LogSeverity::FATAL);
+
+  SetUpForTest(true, "staticWithoutImplementation", "()V", nullptr);
+
+  env_->CallStaticVoidMethod(jklass_, jmethod_);
+
+  EXPECT_TRUE(Thread::Current()->IsExceptionPending());
+  EXPECT_TRUE(env_->ExceptionCheck() == JNI_TRUE);
+}
+
+JNI_TEST_CRITICAL(StaticWithoutImplementation)
 
 void Java_MyClassNatives_stackArgsIntsFirst(JNIEnv*, jclass, jint i1, jint i2, jint i3,
                                             jint i4, jint i5, jint i6, jint i7, jint i8, jint i9,
@@ -2135,44 +2161,6 @@ void JniCompilerTest::StackArgsMixedImpl() {
 }
 
 JNI_TEST_CRITICAL(StackArgsMixed)
-
-#if defined(__mips__) && defined(__LP64__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-// Function will fetch the last argument passed from caller that is now on top of the stack and
-// return it as a 8B long. That way we can test if the caller has properly sign-extended the
-// value when placing it on the stack.
-__attribute__((naked))
-jlong Java_MyClassNatives_getStackArgSignExtendedMips64(
-    JNIEnv*, jclass,                      // Arguments passed from caller
-    jint, jint, jint, jint, jint, jint,   // through regs a0 to a7.
-    jint) {                               // The last argument will be passed on the stack.
-  __asm__(
-      ".set noreorder\n\t"                // Just return and store 8 bytes from the top of the stack
-      "jr  $ra\n\t"                       // in v0 (in branch delay slot). This should be the last
-      "ld  $v0, 0($sp)\n\t");             // argument. It is a 32-bit int, but it should be sign
-                                          // extended and it occupies 64-bit location.
-}
-
-void JniCompilerTest::StackArgsSignExtendedMips64Impl() {
-  uint64_t ret;
-  SetUpForTest(true,
-               "getStackArgSignExtendedMips64",
-               "(IIIIIII)J",
-               // Don't use wrapper because this is raw assembly function.
-               reinterpret_cast<void*>(&Java_MyClassNatives_getStackArgSignExtendedMips64));
-
-  // Mips64 ABI requires that arguments passed through stack be sign-extended 8B slots.
-  // First 8 arguments are passed through registers.
-  // Final argument's value is 7. When sign-extended, higher stack bits should be 0.
-  ret = env_->CallStaticLongMethod(jklass_, jmethod_, 1, 2, 3, 4, 5, 6, 7);
-  EXPECT_EQ(High32Bits(ret), static_cast<uint32_t>(0));
-
-  // Final argument's value is -8.  When sign-extended, higher stack bits should be 0xffffffff.
-  ret = env_->CallStaticLongMethod(jklass_, jmethod_, 1, 2, 3, 4, 5, 6, -8);
-  EXPECT_EQ(High32Bits(ret), static_cast<uint32_t>(0xffffffff));
-}
-
-JNI_TEST(StackArgsSignExtendedMips64)
-#endif
 
 void Java_MyClassNatives_normalNative(JNIEnv*, jclass) {
   // Intentionally left empty.

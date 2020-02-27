@@ -627,6 +627,7 @@ ClassLinker::ClassLinker(InternTable* intern_table, bool fast_class_not_found_ex
       intern_table_(intern_table),
       fast_class_not_found_exceptions_(fast_class_not_found_exceptions),
       jni_dlsym_lookup_trampoline_(nullptr),
+      jni_dlsym_lookup_critical_trampoline_(nullptr),
       quick_resolution_trampoline_(nullptr),
       quick_imt_conflict_trampoline_(nullptr),
       quick_generic_jni_trampoline_(nullptr),
@@ -851,6 +852,7 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
   if (!runtime->IsAotCompiler()) {
     // We need to set up the generic trampolines since we don't have an image.
     jni_dlsym_lookup_trampoline_ = GetJniDlsymLookupStub();
+    jni_dlsym_lookup_critical_trampoline_ = GetJniDlsymLookupCriticalStub();
     quick_resolution_trampoline_ = GetQuickResolutionStub();
     quick_imt_conflict_trampoline_ = GetQuickImtConflictStub();
     quick_generic_jni_trampoline_ = GetQuickGenericJniStub();
@@ -1202,6 +1204,7 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
   DCHECK(!oat_files.empty());
   const OatHeader& default_oat_header = oat_files[0]->GetOatHeader();
   jni_dlsym_lookup_trampoline_ = default_oat_header.GetJniDlsymLookupTrampoline();
+  jni_dlsym_lookup_critical_trampoline_ = default_oat_header.GetJniDlsymLookupCriticalTrampoline();
   quick_resolution_trampoline_ = default_oat_header.GetQuickResolutionTrampoline();
   quick_imt_conflict_trampoline_ = default_oat_header.GetQuickImtConflictTrampoline();
   quick_generic_jni_trampoline_ = default_oat_header.GetQuickGenericJniTrampoline();
@@ -1212,6 +1215,8 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
       const OatHeader& ith_oat_header = oat_files[i]->GetOatHeader();
       const void* ith_jni_dlsym_lookup_trampoline_ =
           ith_oat_header.GetJniDlsymLookupTrampoline();
+      const void* ith_jni_dlsym_lookup_critical_trampoline_ =
+          ith_oat_header.GetJniDlsymLookupCriticalTrampoline();
       const void* ith_quick_resolution_trampoline =
           ith_oat_header.GetQuickResolutionTrampoline();
       const void* ith_quick_imt_conflict_trampoline =
@@ -1221,6 +1226,7 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
       const void* ith_quick_to_interpreter_bridge_trampoline =
           ith_oat_header.GetQuickToInterpreterBridge();
       if (ith_jni_dlsym_lookup_trampoline_ != jni_dlsym_lookup_trampoline_ ||
+          ith_jni_dlsym_lookup_critical_trampoline_ != jni_dlsym_lookup_critical_trampoline_ ||
           ith_quick_resolution_trampoline != quick_resolution_trampoline_ ||
           ith_quick_imt_conflict_trampoline != quick_imt_conflict_trampoline_ ||
           ith_quick_generic_jni_trampoline != quick_generic_jni_trampoline_ ||
@@ -1275,25 +1281,14 @@ bool ClassLinker::InitFromBootImage(std::string* error_msg) {
   runtime->SetSentinel(boot_image_live_objects->Get(ImageHeader::kClearedJniWeakSentinel));
   DCHECK(runtime->GetSentinel().Read()->GetClass() == GetClassRoot<mirror::Object>(this));
 
-  const std::vector<std::string>& boot_class_path_locations = runtime->GetBootClassPathLocations();
-  CHECK_LE(spaces.size(), boot_class_path_locations.size());
   for (size_t i = 0u, size = spaces.size(); i != size; ++i) {
     // Boot class loader, use a null handle.
     std::vector<std::unique_ptr<const DexFile>> dex_files;
     if (!AddImageSpace(spaces[i],
                        ScopedNullHandle<mirror::ClassLoader>(),
-                       /*dex_location=*/ boot_class_path_locations[i].c_str(),
                        /*out*/&dex_files,
                        error_msg)) {
       return false;
-    }
-    // Assert that if absolute boot classpath locations were provided, they were
-    // assigned to the loaded dex files.
-    if (kIsDebugBuild && IsAbsoluteLocation(boot_class_path_locations[i])) {
-      for (const auto& dex_file : dex_files) {
-        DCHECK_EQ(DexFileLoader::GetBaseLocation(dex_file->GetLocation()),
-                  boot_class_path_locations[i]);
-      }
     }
     // Append opened dex files at the end.
     boot_dex_files_.insert(boot_dex_files_.end(),
@@ -1612,7 +1607,7 @@ void AppImageLoadingHelper::Update(
       const DexFile* const dex_file = dex_cache->GetDexFile();
       {
         WriterMutexLock mu2(self, *Locks::dex_lock_);
-        CHECK(!class_linker->FindDexCacheDataLocked(*dex_file).IsValid());
+        CHECK(class_linker->FindDexCacheDataLocked(*dex_file) == nullptr);
         class_linker->RegisterDexFileLocked(*dex_file, dex_cache, class_loader.Get());
       }
 
@@ -2004,7 +1999,6 @@ static void VerifyAppImage(const ImageHeader& header,
 bool ClassLinker::AddImageSpace(
     gc::space::ImageSpace* space,
     Handle<mirror::ClassLoader> class_loader,
-    const char* dex_location,
     std::vector<std::unique_ptr<const DexFile>>* out_dex_files,
     std::string* error_msg) {
   DCHECK(out_dex_files != nullptr);
@@ -2064,10 +2058,6 @@ bool ClassLinker::AddImageSpace(
 
   for (auto dex_cache : dex_caches.Iterate<mirror::DexCache>()) {
     std::string dex_file_location = dex_cache->GetLocation()->ToModifiedUtf8();
-    if (class_loader == nullptr) {
-      // For app images, we'll see the relative location. b/130666977.
-      DCHECK_EQ(dex_location, DexFileLoader::GetBaseLocation(dex_file_location));
-    }
     std::unique_ptr<const DexFile> dex_file = OpenOatDexFile(oat_file,
                                                              dex_file_location.c_str(),
                                                              error_msg);
@@ -2143,6 +2133,14 @@ bool ClassLinker::AddImageSpace(
           interpreter::CanMethodUseNterp(&method)) {
         method.SetEntryPointFromQuickCompiledCodePtrSize(interpreter::GetNterpEntryPoint(),
                                                          image_pointer_size_);
+      }
+    }, space->Begin(), image_pointer_size_);
+  }
+
+  if (runtime->IsVerificationSoftFail()) {
+    header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
+      if (!method.IsNative() && method.IsInvokable()) {
+        method.ClearSkipAccessChecks();
       }
     }, space->Begin(), image_pointer_size_);
   }
@@ -4035,25 +4033,19 @@ void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,
   dex_caches_.push_back(data);
 }
 
-ObjPtr<mirror::DexCache> ClassLinker::DecodeDexCache(Thread* self, const DexCacheData& data) {
-  return data.IsValid()
-      ? ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data.weak_root))
+ObjPtr<mirror::DexCache> ClassLinker::DecodeDexCacheLocked(Thread* self, const DexCacheData* data) {
+  return data != nullptr
+      ? ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data->weak_root))
       : nullptr;
 }
 
-ObjPtr<mirror::DexCache> ClassLinker::EnsureSameClassLoader(
-    Thread* self,
+bool ClassLinker::IsSameClassLoader(
     ObjPtr<mirror::DexCache> dex_cache,
-    const DexCacheData& data,
+    const DexCacheData* data,
     ObjPtr<mirror::ClassLoader> class_loader) {
-  DCHECK_EQ(dex_cache->GetDexFile(), data.dex_file);
-  if (data.class_table != ClassTableForClassLoader(class_loader)) {
-    self->ThrowNewExceptionF("Ljava/lang/InternalError;",
-                             "Attempt to register dex file %s with multiple class loaders",
-                             data.dex_file->GetLocation().c_str());
-    return nullptr;
-  }
-  return dex_cache;
+  CHECK(data != nullptr);
+  DCHECK_EQ(dex_cache->GetDexFile(), data->dex_file);
+  return data->class_table == ClassTableForClassLoader(class_loader);
 }
 
 void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
@@ -4066,12 +4058,9 @@ void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
   const DexFile* dex_file = dex_cache->GetDexFile();
   DCHECK(dex_file != nullptr) << "Attempt to register uninitialized dex_cache object!";
   if (kIsDebugBuild) {
-    DexCacheData old_data;
-    {
-      ReaderMutexLock mu(self, *Locks::dex_lock_);
-      old_data = FindDexCacheDataLocked(*dex_file);
-    }
-    ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCache(self, old_data);
+    ReaderMutexLock mu(self, *Locks::dex_lock_);
+    const DexCacheData* old_data = FindDexCacheDataLocked(*dex_file);
+    ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCacheLocked(self, old_data);
     DCHECK(old_dex_cache.IsNull()) << "Attempt to manually register a dex cache thats already "
                                    << "been registered on dex file " << dex_file->GetLocation();
   }
@@ -4094,17 +4083,36 @@ void ClassLinker::RegisterExistingDexCache(ObjPtr<mirror::DexCache> dex_cache,
   }
 }
 
+static void ThrowDexFileAlreadyRegisteredError(Thread* self, const DexFile& dex_file)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  self->ThrowNewExceptionF("Ljava/lang/InternalError;",
+                           "Attempt to register dex file %s with multiple class loaders",
+                           dex_file.GetLocation().c_str());
+}
+
 ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
                                                       ObjPtr<mirror::ClassLoader> class_loader) {
   Thread* self = Thread::Current();
-  DexCacheData old_data;
+  ObjPtr<mirror::DexCache> old_dex_cache;
+  bool registered_with_another_class_loader = false;
   {
     ReaderMutexLock mu(self, *Locks::dex_lock_);
-    old_data = FindDexCacheDataLocked(dex_file);
+    const DexCacheData* old_data = FindDexCacheDataLocked(dex_file);
+    old_dex_cache = DecodeDexCacheLocked(self, old_data);
+    if (old_dex_cache != nullptr) {
+      if (IsSameClassLoader(old_dex_cache, old_data, class_loader)) {
+        return old_dex_cache;
+      } else {
+        // TODO This is not very clean looking. Should maybe try to make a way to request exceptions
+        // be thrown when it's safe to do so to simplify this.
+        registered_with_another_class_loader = true;
+      }
+    }
   }
-  ObjPtr<mirror::DexCache> old_dex_cache = DecodeDexCache(self, old_data);
-  if (old_dex_cache != nullptr) {
-    return EnsureSameClassLoader(self, old_dex_cache, old_data, class_loader);
+  // We need to have released the dex_lock_ to allocate safely.
+  if (registered_with_another_class_loader) {
+    ThrowDexFileAlreadyRegisteredError(self, dex_file);
+    return nullptr;
   }
   SCOPED_TRACE << __FUNCTION__ << " " << dex_file.GetLocation();
   LinearAlloc* const linear_alloc = GetOrCreateAllocatorForClassLoader(class_loader);
@@ -4130,8 +4138,8 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
     // weak references access, and a thread blocking on the dex lock.
     gc::ScopedGCCriticalSection gcs(self, gc::kGcCauseClassLinker, gc::kCollectorTypeClassLinker);
     WriterMutexLock mu(self, *Locks::dex_lock_);
-    old_data = FindDexCacheDataLocked(dex_file);
-    old_dex_cache = DecodeDexCache(self, old_data);
+    const DexCacheData* old_data = FindDexCacheDataLocked(dex_file);
+    old_dex_cache = DecodeDexCacheLocked(self, old_data);
     if (old_dex_cache == nullptr && h_dex_cache != nullptr) {
       // Do InitializeDexCache while holding dex lock to make sure two threads don't call it at the
       // same time with the same dex cache. Since the .bss is shared this can cause failing DCHECK
@@ -4144,14 +4152,23 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
                                            image_pointer_size_);
       RegisterDexFileLocked(dex_file, h_dex_cache.Get(), h_class_loader.Get());
     }
+    if (old_dex_cache != nullptr) {
+      // Another thread managed to initialize the dex cache faster, so use that DexCache.
+      // If this thread encountered OOME, ignore it.
+      DCHECK_EQ(h_dex_cache == nullptr, self->IsExceptionPending());
+      self->ClearException();
+      // We cannot call EnsureSameClassLoader() or allocate an exception while holding the
+      // dex_lock_.
+      if (IsSameClassLoader(old_dex_cache, old_data, h_class_loader.Get())) {
+        return old_dex_cache;
+      } else {
+        registered_with_another_class_loader = true;
+      }
+    }
   }
-  if (old_dex_cache != nullptr) {
-    // Another thread managed to initialize the dex cache faster, so use that DexCache.
-    // If this thread encountered OOME, ignore it.
-    DCHECK_EQ(h_dex_cache == nullptr, self->IsExceptionPending());
-    self->ClearException();
-    // We cannot call EnsureSameClassLoader() while holding the dex_lock_.
-    return EnsureSameClassLoader(self, old_dex_cache, old_data, h_class_loader.Get());
+  if (registered_with_another_class_loader) {
+    ThrowDexFileAlreadyRegisteredError(self, dex_file);
+    return nullptr;
   }
   if (h_dex_cache == nullptr) {
     self->AssertPendingOOMException();
@@ -4168,24 +4185,24 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
 
 bool ClassLinker::IsDexFileRegistered(Thread* self, const DexFile& dex_file) {
   ReaderMutexLock mu(self, *Locks::dex_lock_);
-  return DecodeDexCache(self, FindDexCacheDataLocked(dex_file)) != nullptr;
+  return DecodeDexCacheLocked(self, FindDexCacheDataLocked(dex_file)) != nullptr;
 }
 
 ObjPtr<mirror::DexCache> ClassLinker::FindDexCache(Thread* self, const DexFile& dex_file) {
   ReaderMutexLock mu(self, *Locks::dex_lock_);
-  DexCacheData dex_cache_data = FindDexCacheDataLocked(dex_file);
-  ObjPtr<mirror::DexCache> dex_cache = DecodeDexCache(self, dex_cache_data);
+  const DexCacheData* dex_cache_data = FindDexCacheDataLocked(dex_file);
+  ObjPtr<mirror::DexCache> dex_cache = DecodeDexCacheLocked(self, dex_cache_data);
   if (dex_cache != nullptr) {
     return dex_cache;
   }
   // Failure, dump diagnostic and abort.
   for (const DexCacheData& data : dex_caches_) {
-    if (DecodeDexCache(self, data) != nullptr) {
+    if (DecodeDexCacheLocked(self, &data) != nullptr) {
       LOG(FATAL_WITHOUT_ABORT) << "Registered dex file " << data.dex_file->GetLocation();
     }
   }
   LOG(FATAL) << "Failed to find DexCache for DexFile " << dex_file.GetLocation()
-             << " " << &dex_file << " " << dex_cache_data.dex_file;
+             << " " << &dex_file << " " << dex_cache_data->dex_file;
   UNREACHABLE();
 }
 
@@ -4197,7 +4214,7 @@ ClassTable* ClassLinker::FindClassTable(Thread* self, ObjPtr<mirror::DexCache> d
   for (const DexCacheData& data : dex_caches_) {
     // Avoid decoding (and read barriers) other unrelated dex caches.
     if (data.dex_file == dex_file) {
-      ObjPtr<mirror::DexCache> registered_dex_cache = DecodeDexCache(self, data);
+      ObjPtr<mirror::DexCache> registered_dex_cache = DecodeDexCacheLocked(self, &data);
       if (registered_dex_cache != nullptr) {
         CHECK_EQ(registered_dex_cache, dex_cache) << dex_file->GetLocation();
         return data.class_table;
@@ -4207,15 +4224,15 @@ ClassTable* ClassLinker::FindClassTable(Thread* self, ObjPtr<mirror::DexCache> d
   return nullptr;
 }
 
-ClassLinker::DexCacheData ClassLinker::FindDexCacheDataLocked(const DexFile& dex_file) {
+const ClassLinker::DexCacheData* ClassLinker::FindDexCacheDataLocked(const DexFile& dex_file) {
   // Search assuming unique-ness of dex file.
   for (const DexCacheData& data : dex_caches_) {
     // Avoid decoding (and read barriers) other unrelated dex caches.
     if (data.dex_file == &dex_file) {
-      return data;
+      return &data;
     }
   }
-  return DexCacheData();
+  return nullptr;
 }
 
 void ClassLinker::CreatePrimitiveClass(Thread* self,
@@ -4827,20 +4844,6 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
   const OatDexFile* oat_dex_file = dex_file.GetOatDexFile();
   // In case we run without an image there won't be a backing oat file.
   if (oat_dex_file == nullptr || oat_dex_file->GetOatFile() == nullptr) {
-    if (!kIsDebugBuild && klass->GetClassLoader() == nullptr) {
-      // For boot classpath classes in the case we're not using a default boot image:
-      // we don't have the infrastructure yet to query verification data on individual
-      // boot vdex files, so it's simpler for now to consider all boot classpath classes
-      // verified. This should be taken into account when measuring boot time and app
-      // startup compare to the (current) production system where both:
-      // 1) updatable boot classpath classes, and
-      // 2) classes in /system referencing updatable classes
-      // will be verified at runtime.
-      if (Runtime::Current()->IsUsingApexBootImageLocation()) {
-        oat_file_class_status = ClassStatus::kVerified;
-        return true;
-      }
-    }
     return false;
   }
 
@@ -9369,6 +9372,11 @@ bool ClassLinker::IsQuickGenericJniStub(const void* entry_point) const {
 bool ClassLinker::IsJniDlsymLookupStub(const void* entry_point) const {
   return entry_point == GetJniDlsymLookupStub() ||
       (jni_dlsym_lookup_trampoline_ == entry_point);
+}
+
+bool ClassLinker::IsJniDlsymLookupCriticalStub(const void* entry_point) const {
+  return entry_point == GetJniDlsymLookupCriticalStub() ||
+      (jni_dlsym_lookup_critical_trampoline_ == entry_point);
 }
 
 const void* ClassLinker::GetRuntimeQuickGenericJniStub() const {

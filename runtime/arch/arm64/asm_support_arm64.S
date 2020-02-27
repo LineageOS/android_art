@@ -103,16 +103,24 @@
     .cfi_restore \reg
 .endm
 
-.macro SAVE_TWO_REGS reg1, reg2, offset
-    stp \reg1, \reg2, [sp, #(\offset)]
+.macro SAVE_TWO_REGS_BASE base, reg1, reg2, offset
+    stp \reg1, \reg2, [\base, #(\offset)]
     .cfi_rel_offset \reg1, (\offset)
     .cfi_rel_offset \reg2, (\offset) + 8
 .endm
 
-.macro RESTORE_TWO_REGS reg1, reg2, offset
-    ldp \reg1, \reg2, [sp, #(\offset)]
+.macro SAVE_TWO_REGS reg1, reg2, offset
+    SAVE_TWO_REGS_BASE sp, \reg1, \reg2, \offset
+.endm
+
+.macro RESTORE_TWO_REGS_BASE base, reg1, reg2, offset
+    ldp \reg1, \reg2, [\base, #(\offset)]
     .cfi_restore \reg1
     .cfi_restore \reg2
+.endm
+
+.macro RESTORE_TWO_REGS reg1, reg2, offset
+    RESTORE_TWO_REGS_BASE sp, \reg1, \reg2, \offset
 .endm
 
 .macro LOAD_RUNTIME_INSTANCE reg
@@ -188,6 +196,71 @@
     RESTORE_TWO_REGS x29, xLR, 80
 
     DECREASE_FRAME 96
+.endm
+
+.macro SETUP_SAVE_REFS_AND_ARGS_FRAME_INTERNAL base
+    // Ugly compile-time check, but we only have the preprocessor.
+#if (FRAME_SIZE_SAVE_REFS_AND_ARGS != 224)
+#error "FRAME_SIZE_SAVE_REFS_AND_ARGS(ARM64) size not as expected."
+#endif
+
+    // Stack alignment filler [\base, #8].
+    // FP args.
+    stp d0, d1, [\base, #16]
+    stp d2, d3, [\base, #32]
+    stp d4, d5, [\base, #48]
+    stp d6, d7, [\base, #64]
+
+    // Core args.
+    SAVE_TWO_REGS_BASE \base, x1, x2, 80
+    SAVE_TWO_REGS_BASE \base, x3, x4, 96
+    SAVE_TWO_REGS_BASE \base, x5, x6, 112
+
+    // x7, Callee-saves.
+    // Note: We could avoid saving X20 in the case of Baker read
+    // barriers, as it is overwritten by REFRESH_MARKING_REGISTER
+    // later; but it's not worth handling this special case.
+    SAVE_TWO_REGS_BASE \base, x7, x20, 128
+    SAVE_TWO_REGS_BASE \base, x21, x22, 144
+    SAVE_TWO_REGS_BASE \base, x23, x24, 160
+    SAVE_TWO_REGS_BASE \base, x25, x26, 176
+    SAVE_TWO_REGS_BASE \base, x27, x28, 192
+
+    // x29(callee-save) and LR.
+    SAVE_TWO_REGS_BASE \base, x29, xLR, 208
+.endm
+
+// TODO: Probably no need to restore registers preserved by aapcs64. (That would require
+// auditing all users to make sure they restore aapcs64 callee-save registers they clobber.)
+.macro RESTORE_SAVE_REFS_AND_ARGS_FRAME_INTERNAL base
+    // FP args.
+    ldp d0, d1, [\base, #16]
+    ldp d2, d3, [\base, #32]
+    ldp d4, d5, [\base, #48]
+    ldp d6, d7, [\base, #64]
+
+    // Core args.
+    RESTORE_TWO_REGS_BASE \base, x1, x2, 80
+    RESTORE_TWO_REGS_BASE \base, x3, x4, 96
+    RESTORE_TWO_REGS_BASE \base, x5, x6, 112
+
+    // x7, Callee-saves.
+    // Note: Likewise, we could avoid restoring X20 in the case of Baker
+    // read barriers, as it is overwritten by REFRESH_MARKING_REGISTER
+    // later; but it's not worth handling this special case.
+    RESTORE_TWO_REGS_BASE \base, x7, x20, 128
+    RESTORE_TWO_REGS_BASE \base, x21, x22, 144
+    RESTORE_TWO_REGS_BASE \base, x23, x24, 160
+    RESTORE_TWO_REGS_BASE \base, x25, x26, 176
+    RESTORE_TWO_REGS_BASE \base, x27, x28, 192
+
+    // x29(callee-save) and LR.
+    RESTORE_TWO_REGS_BASE \base, x29, xLR, 208
+.endm
+
+.macro RESTORE_SAVE_REFS_AND_ARGS_FRAME
+    RESTORE_SAVE_REFS_AND_ARGS_FRAME_INTERNAL sp
+    DECREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
 .endm
 
     /*

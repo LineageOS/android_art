@@ -21,6 +21,7 @@
 #include <dlfcn.h>
 #include <sys/types.h>
 
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -52,17 +53,16 @@ LibraryNamespaces* g_namespaces = new LibraryNamespaces;
 android_namespace_t* FindExportedNamespace(const char* caller_location) {
   std::string location = caller_location;
   // Lots of implicit assumptions here: we expect `caller_location` to be of the form:
-  // /apex/com.android...modulename/...
+  // /apex/modulename/...
   //
   // And we extract from it 'modulename', which is the name of the linker namespace.
   if (android::base::StartsWith(location, kApexPath)) {
-    size_t slash_index = location.find_first_of('/', strlen(kApexPath));
+    size_t start_index = strlen(kApexPath);
+    size_t slash_index = location.find_first_of('/', start_index);
     LOG_ALWAYS_FATAL_IF((slash_index == std::string::npos),
                         "Error finding namespace of apex: no slash in path %s", caller_location);
-    size_t dot_index = location.find_last_of('.', slash_index);
-    LOG_ALWAYS_FATAL_IF((dot_index == std::string::npos),
-                        "Error finding namespace of apex: no dot in apex name %s", caller_location);
-    std::string name = location.substr(dot_index + 1, slash_index - dot_index - 1);
+    std::string name = location.substr(start_index, slash_index - start_index);
+    std::replace(name.begin(), name.end(), '.', '_');
     android_namespace_t* boot_namespace = android_get_exported_namespace(name.c_str());
     LOG_ALWAYS_FATAL_IF((boot_namespace == nullptr),
                         "Error finding namespace of apex: no namespace called %s", name.c_str());
@@ -94,7 +94,7 @@ jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobj
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   auto ns = g_namespaces->Create(env, target_sdk_version, class_loader, is_shared, dex_path,
                                  library_path, permitted_path);
-  if (!ns) {
+  if (!ns.ok()) {
     return env->NewStringUTF(ns.error().message().c_str());
   }
 #else
@@ -140,7 +140,7 @@ void* OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* pat
     Result<NativeLoaderNamespace*> isolated_ns =
         g_namespaces->Create(env, target_sdk_version, class_loader, false /* is_shared */, nullptr,
                              library_path, nullptr);
-    if (!isolated_ns) {
+    if (!isolated_ns.ok()) {
       *error_msg = strdup(isolated_ns.error().message().c_str());
       return nullptr;
     } else {
@@ -224,13 +224,13 @@ void NativeLoaderFreeErrorMessage(char* msg) {
 void* OpenNativeLibraryInNamespace(NativeLoaderNamespace* ns, const char* path,
                                    bool* needs_native_bridge, char** error_msg) {
   auto handle = ns->Load(path);
-  if (!handle && error_msg != nullptr) {
+  if (!handle.ok() && error_msg != nullptr) {
     *error_msg = strdup(handle.error().message().c_str());
   }
   if (needs_native_bridge != nullptr) {
     *needs_native_bridge = ns->IsBridged();
   }
-  return handle ? *handle : nullptr;
+  return handle.ok() ? *handle : nullptr;
 }
 
 // native_bridge_namespaces are not supported for callers of this function.

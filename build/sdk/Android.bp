@@ -15,6 +15,12 @@
 // The SDK for the art module apex.
 sdk {
     name: "art-module-sdk",
+    java_system_modules: [
+        "art-module-public-api-stubs-system-modules",
+        "art-module-intra-core-api-stubs-system-modules",
+        "art-module-platform-api-stubs-system-modules",
+        "core-platform-api-stubs-system-modules",
+    ],
     native_static_libs: [
         "libartimagevalues",
     ],
@@ -25,8 +31,24 @@ module_exports {
     name: "art-module-host-exports",
     host_supported: true,
     device_supported: false,
+    target: {
+        host: {
+            // Set in target.host because the top level compile_multilib
+            // property is fixed to "both" in the sdk/module_exports
+            // implementation and cannot be overridden any other way.
+            compile_multilib: "64",
+        },
+        darwin: {
+            enabled: false,
+        },
+    },
     java_libs: [
         "timezone-host",
+    ],
+    native_binaries: [
+        "hiddenapi",
+        "dex2oat",
+        "dex2oatd",
     ],
 }
 

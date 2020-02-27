@@ -62,7 +62,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.reductionInt(int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int Main.reductionInt(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}           loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
@@ -102,7 +102,7 @@ public class Main {
   //
   /// CHECK-EVAL: "<<Loop1>>" != "<<Loop2>>"
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.reductionIntChain() loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int Main.reductionIntChain() loop_optimization (after)
   /// CHECK-DAG: <<Set1:d\d+>>   VecSetScalars [{{i\d+}}]       loop:none
   /// CHECK-DAG: <<Phi1:d\d+>>   Phi [<<Set1>>,{{d\d+}}]        loop:<<Loop1:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Load1:d\d+>>  VecLoad [{{l\d+}},<<I1:i\d+>>] loop:<<Loop1>>      outer_loop:none
@@ -146,7 +146,7 @@ public class Main {
   //
   /// CHECK-EVAL: "<<Loop1>>" != "<<Loop2>>"
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.reductionIntToLoop(int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int Main.reductionIntToLoop(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}           loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop1:B\d+>> outer_loop:none
@@ -177,7 +177,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.reductionLong(long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long Main.reductionLong(long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{j\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
@@ -229,7 +229,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.reductionIntM1(int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int Main.reductionIntM1(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}           loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
@@ -257,7 +257,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.reductionLongM1(long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long Main.reductionLongM1(long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{j\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
@@ -308,7 +308,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM,ARM64,MIPS64}: int Main.reductionMinusInt(int[]) loop_optimization (after)
+  /// CHECK-START-{ARM,ARM64}: int Main.reductionMinusInt(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:i\d+>>   IntConstant {{2|4}}           loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{i\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
@@ -336,7 +336,7 @@ public class Main {
   /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons1>>]      loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                 Return [<<Phi2>>]             loop:none
   //
-  /// CHECK-START-{ARM64,MIPS64}: long Main.reductionMinusLong(long[]) loop_optimization (after)
+  /// CHECK-START-ARM64: long Main.reductionMinusLong(long[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons2:i\d+>>  IntConstant 2                 loop:none
   /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [{{j\d+}}]      loop:none
   /// CHECK-DAG: <<Phi:d\d+>>    Phi [<<Set>>,{{d\d+}}]        loop:<<Loop:B\d+>> outer_loop:none

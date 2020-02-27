@@ -42,6 +42,7 @@ class String;
 
 class ArtField;
 class ArtMethod;
+class HandleScope;
 enum InvokeType : uint32_t;
 class OatQuickMethodHeader;
 class ScopedObjectAccessAlreadyRunnable;
@@ -173,10 +174,6 @@ ObjPtr<mirror::MethodType> ResolveMethodTypeFromCode(ArtMethod* referrer, dex::P
     REQUIRES_SHARED(Locks::mutator_lock_)
     REQUIRES(!Roles::uninterruptible_);
 
-// TODO: annotalysis disabled as monitor semantics are maintained in Java code.
-inline void UnlockJniSynchronizedMethod(jobject locked, Thread* self)
-    NO_THREAD_SAFETY_ANALYSIS REQUIRES(!Roles::uninterruptible_);
-
 void CheckReferenceResult(Handle<mirror::Object> o, Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_)
     REQUIRES(!Roles::uninterruptible_);
@@ -215,6 +212,11 @@ ArtMethod* GetCalleeSaveOuterMethod(Thread* self, CalleeSaveType type)
 // Returns whether we need to do class initialization check before invoking the method.
 // The caller is responsible for performing that check.
 bool NeedsClinitCheckBeforeCall(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
+
+constexpr size_t kJniCookieSize = sizeof(uint32_t);
+
+inline HandleScope* GetGenericJniHandleScope(ArtMethod** managed_sp,
+                                             size_t num_handle_scope_references);
 
 }  // namespace art
 

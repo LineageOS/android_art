@@ -23,8 +23,6 @@
 namespace art {
 namespace arm {
 
-constexpr size_t kFramePointerSize = static_cast<size_t>(PointerSize::k32);
-
 class ArmManagedRuntimeCallingConvention final : public ManagedRuntimeCallingConvention {
  public:
   ArmManagedRuntimeCallingConvention(bool is_static, bool is_synchronized, const char* shorty)
