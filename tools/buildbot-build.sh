@@ -83,8 +83,6 @@ elif [[ $mode == "target" ]]; then
     # Targets required to generate a linker configuration on device within the
     # chroot environment.
     make_command+=" linkerconfig"
-    make_command+=" llndk.libraries.txt vndksp.libraries.txt vndkcore.libraries.txt"
-    make_command+=" vndkprivate.libraries.txt vndkcorevariant.libraries.txt sanitizer.libraries.txt"
     # Additional targets needed for the chroot environment.
     make_command+=" crash_dump event-log-tags"
   fi
