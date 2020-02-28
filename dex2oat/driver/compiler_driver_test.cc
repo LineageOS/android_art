@@ -308,7 +308,7 @@ class CompilerDriverVerifyTest : public CompilerDriverTest {
     bool found = compiler_driver_->GetCompiledClass(
         ClassReference(&klass->GetDexFile(), klass->GetDexTypeIndex().index_), &status);
     ASSERT_TRUE(found);
-    EXPECT_EQ(status, ClassStatus::kVerified);
+    EXPECT_GE(status, ClassStatus::kVerified);
   }
 };
 
