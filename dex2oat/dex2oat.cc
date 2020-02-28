@@ -1654,8 +1654,10 @@ class Dex2Oat final {
       }
     }
 
-    if (CompilerFilter::IsAnyCompilationEnabled(compiler_options_->GetCompilerFilter())) {
-      // Only modes with compilation require verification results, do this here instead of when we
+    if (CompilerFilter::IsAnyCompilationEnabled(compiler_options_->GetCompilerFilter()) ||
+        IsImage()) {
+      // Only modes with compilation or image generation require verification results.
+      // Do this here instead of when we
       // create the compilation callbacks since the compilation mode may have been changed by the
       // very large app logic.
       // Avoiding setting the verification results saves RAM by not adding the dex files later in
