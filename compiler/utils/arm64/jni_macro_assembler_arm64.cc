@@ -165,7 +165,7 @@ void Arm64JNIMacroAssembler::StoreRawPtr(FrameOffset offs, ManagedRegister m_src
 void Arm64JNIMacroAssembler::StoreImmediateToFrame(FrameOffset offs, uint32_t imm) {
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   Register scratch = temps.AcquireW();
-  ___ Mov(scratch.X(), imm);  // TODO: Use W register.
+  ___ Mov(scratch, imm);
   ___ Str(scratch, MEM_OP(reg_x(SP), offs.Int32Value()));
 }
 
@@ -408,13 +408,7 @@ void Arm64JNIMacroAssembler::Copy(FrameOffset dest, FrameOffset src, size_t size
   DCHECK(size == 4 || size == 8) << size;
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   Register scratch = (size == 8) ? temps.AcquireX() : temps.AcquireW();
-  if (size < 8u || IsAligned<8u>(src.Int32Value()) || src.Int32Value() < 0x100) {
-    ___ Ldr(scratch, MEM_OP(reg_x(SP), src.Int32Value()));
-  } else {
-    // TODO: Let the macro assembler deal with this case as well (uses another scratch register).
-    ___ Mov(scratch.X(), src.Int32Value());
-    ___ Ldr(scratch, MEM_OP(reg_x(SP), scratch.X()));
-  }
+  ___ Ldr(scratch, MEM_OP(reg_x(SP), src.Int32Value()));
   ___ Str(scratch, MEM_OP(reg_x(SP), dest.Int32Value()));
 }
 
@@ -559,19 +553,15 @@ void Arm64JNIMacroAssembler::Jump(ManagedRegister m_base, Offset offs) {
 void Arm64JNIMacroAssembler::Call(ManagedRegister m_base, Offset offs) {
   Arm64ManagedRegister base = m_base.AsArm64();
   CHECK(base.IsXRegister()) << base;
-  UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
-  Register scratch = temps.AcquireX();
-  ___ Ldr(scratch, MEM_OP(reg_x(base.AsXRegister()), offs.Int32Value()));
-  ___ Blr(scratch);
+  ___ Ldr(lr, MEM_OP(reg_x(base.AsXRegister()), offs.Int32Value()));
+  ___ Blr(lr);
 }
 
 void Arm64JNIMacroAssembler::Call(FrameOffset base, Offset offs) {
-  UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
-  Register scratch = temps.AcquireX();
   // Call *(*(SP + base) + offset)
-  ___ Ldr(scratch, MEM_OP(reg_x(SP), base.Int32Value()));
-  ___ Ldr(scratch, MEM_OP(scratch, offs.Int32Value()));
-  ___ Blr(scratch);
+  ___ Ldr(lr, MEM_OP(reg_x(SP), base.Int32Value()));
+  ___ Ldr(lr, MEM_OP(lr, offs.Int32Value()));
+  ___ Blr(lr);
 }
 
 void Arm64JNIMacroAssembler::CallFromThread(ThreadOffset64 offset ATTRIBUTE_UNUSED) {
@@ -612,15 +602,14 @@ void Arm64JNIMacroAssembler::CreateHandleScopeEntry(FrameOffset out_off,
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   Register scratch = temps.AcquireX();
   if (null_allowed) {
-    // TODO: Clean this up; load to temp2 (W register), use xzr for CSEL, reorder ADD earlier.
     Register scratch2 = temps.AcquireW();
-    ___ Ldr(scratch.W(), MEM_OP(reg_x(SP), handle_scope_offset.Int32Value()));
+    ___ Ldr(scratch2, MEM_OP(reg_x(SP), handle_scope_offset.Int32Value()));
+    ___ Add(scratch, reg_x(SP), handle_scope_offset.Int32Value());
     // Null values get a handle scope entry value of 0.  Otherwise, the handle scope entry is
     // the address in the handle scope holding the reference.
     // e.g. scratch = (scratch == 0) ? 0 : (SP+handle_scope_offset)
-    ___ Cmp(scratch.W(), 0);
-    ___ Add(scratch2.X(), reg_x(SP), handle_scope_offset.Int32Value());
-    ___ Csel(scratch, scratch2.X(), scratch, ne);
+    ___ Cmp(scratch2, 0);
+    ___ Csel(scratch, scratch, xzr, ne);
   } else {
     ___ Add(scratch, reg_x(SP), handle_scope_offset.Int32Value());
   }
@@ -669,12 +658,11 @@ void Arm64JNIMacroAssembler::TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryCo
   Register scratch = temps.AcquireW();
   ___ Ldr(scratch, MEM_OP(reg_x(TR), Thread::IsGcMarkingOffset<kArm64PointerSize>().Int32Value()));
   switch (cond) {
-    // TODO: Use `scratch` instead of `scratch.X()`.
     case JNIMacroUnaryCondition::kZero:
-      ___ Cbz(scratch.X(), Arm64JNIMacroLabel::Cast(label)->AsArm64());
+      ___ Cbz(scratch, Arm64JNIMacroLabel::Cast(label)->AsArm64());
       break;
     case JNIMacroUnaryCondition::kNotZero:
-      ___ Cbnz(scratch.X(), Arm64JNIMacroLabel::Cast(label)->AsArm64());
+      ___ Cbnz(scratch, Arm64JNIMacroLabel::Cast(label)->AsArm64());
       break;
     default:
       LOG(FATAL) << "Not implemented unary condition: " << static_cast<int>(cond);
@@ -690,7 +678,6 @@ void Arm64JNIMacroAssembler::Bind(JNIMacroLabel* label) {
 void Arm64JNIMacroAssembler::EmitExceptionPoll(Arm64Exception* exception) {
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   temps.Exclude(exception->scratch_);
-  Register scratch = temps.AcquireX();
 
   // Bind exception poll entry.
   ___ Bind(exception->Entry());
@@ -700,11 +687,11 @@ void Arm64JNIMacroAssembler::EmitExceptionPoll(Arm64Exception* exception) {
   // Pass exception object as argument.
   // Don't care about preserving X0 as this won't return.
   ___ Mov(reg_x(X0), exception->scratch_);
-  ___ Ldr(scratch,
+  ___ Ldr(lr,
           MEM_OP(reg_x(TR),
                  QUICK_ENTRYPOINT_OFFSET(kArm64PointerSize, pDeliverException).Int32Value()));
 
-  ___ Blr(scratch);
+  ___ Blr(lr);
   // Call should never return.
   ___ Brk();
 }

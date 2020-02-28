@@ -576,20 +576,16 @@ void ArmVIXLJNIMacroAssembler::Jump(ManagedRegister mbase, Offset offset) {
 
 void ArmVIXLJNIMacroAssembler::Call(ManagedRegister mbase, Offset offset) {
   vixl::aarch32::Register base = AsVIXLRegister(mbase.AsArm());
-  UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
-  vixl32::Register scratch = temps.Acquire();
-  asm_.LoadFromOffset(kLoadWord, scratch, base, offset.Int32Value());
-  ___ Blx(scratch);
+  asm_.LoadFromOffset(kLoadWord, lr, base, offset.Int32Value());
+  ___ Blx(lr);
   // TODO: place reference map on call.
 }
 
 void ArmVIXLJNIMacroAssembler::Call(FrameOffset base, Offset offset) {
-  UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
-  vixl32::Register scratch = temps.Acquire();
   // Call *(*(SP + base) + offset)
-  asm_.LoadFromOffset(kLoadWord, scratch, sp, base.Int32Value());
-  asm_.LoadFromOffset(kLoadWord, scratch, scratch, offset.Int32Value());
-  ___ Blx(scratch);
+  asm_.LoadFromOffset(kLoadWord, lr, sp, base.Int32Value());
+  asm_.LoadFromOffset(kLoadWord, lr, lr, offset.Int32Value());
+  ___ Blx(lr);
   // TODO: place reference map on call
 }
 
@@ -671,13 +667,10 @@ void ArmVIXLJNIMacroAssembler::EmitExceptionPoll(
   // Pass exception object as argument.
   // Don't care about preserving r0 as this won't return.
   ___ Mov(r0, scratch);
-  temps.Include(scratch);
-  // TODO: check that exception->scratch_ is dead by this point.
-  vixl32::Register temp = temps.Acquire();
-  ___ Ldr(temp,
+  ___ Ldr(lr,
           MemOperand(tr,
               QUICK_ENTRYPOINT_OFFSET(kArmPointerSize, pDeliverException).Int32Value()));
-  ___ Blx(temp);
+  ___ Blx(lr);
 }
 
 void ArmVIXLJNIMacroAssembler::MemoryBarrier(ManagedRegister scratch ATTRIBUTE_UNUSED) {
