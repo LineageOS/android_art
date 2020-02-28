@@ -44,7 +44,7 @@ public class Main {
     }
   }
 
-  // Increment counter by n, holding log for time roughly propertional to n.
+  // Increment counter by n, holding lock for time roughly propertional to n.
   // N must be even.
   private void holdFor(Object lock, int n) {
     synchronized(lock) {
@@ -53,6 +53,20 @@ public class Main {
         counter += y;
         y = nextInt(y);
       }
+    }
+  }
+
+  // Increment local by an even number n in a way that takes time roughly proportional
+  // to n.
+  private void spinFor(int n) {
+    int y = -1;
+    int local_counter = 0;
+    for (int i = 0; i < n; ++i) {
+      local_counter += y;
+      y = nextInt(y);
+    }
+    if (local_counter != n) {
+      throw new Error();
     }
   }
 
@@ -66,6 +80,24 @@ public class Main {
       Object myLock = sharedLock ? lock : new Object();
       int nIters = TOTAL_ITERS / currentThreadCount / holdTime;
       for (int i = 0; i < nIters; ++i) {
+        holdFor(myLock, holdTime);
+      }
+    }
+    private boolean sharedLock;
+    private int holdTime;
+  }
+
+  private class RepeatedIntermittentLockHolder implements Runnable {
+    RepeatedIntermittentLockHolder(boolean shared, int n /* even */) {
+      sharedLock = shared;
+      holdTime = n;
+    }
+    @Override
+    public void run() {
+      Object myLock = sharedLock ? lock : new Object();
+      int nIters = TOTAL_ITERS / 10 / currentThreadCount / holdTime;
+      for (int i = 0; i < nIters; ++i) {
+        spinFor(9 * holdTime);
         holdFor(myLock, holdTime);
       }
     }
@@ -154,11 +186,15 @@ public class Main {
   }
 
   private class CheckCounter implements Runnable {
+    private final int expected;
+    public CheckCounter(int e) {
+      expected = e;
+    }
     @Override
     public void run() {
-      if (counter != TOTAL_ITERS) {
+      if (counter != expected) {
         throw new AssertionError("Failed counter postcondition check for "
-            + currentThreadCount + " threads");
+            + currentThreadCount + " threads, expected " + expected + " got " + counter);
       }
     }
   }
@@ -172,7 +208,14 @@ public class Main {
     for (int i = 2; i <= MAX_HOLD_TIME; i *= 10) {
       // i * 8 (max thread count) divides TOTAL_ITERS
       System.out.println("Hold time " + i + ", shared lock");
-      runAll(new RepeatedLockHolder(true, i), () -> { counter = 0; }, new CheckCounter());
+      runAll(new RepeatedLockHolder(true, i), () -> { counter = 0; },
+          new CheckCounter(TOTAL_ITERS));
+    }
+    for (int i = 2; i <= MAX_HOLD_TIME / 10; i *= 10) {
+      // i * 8 (max thread count) divides TOTAL_ITERS
+      System.out.println("Hold time " + i + ", pause time " + (9 * i) + ", shared lock");
+      runAll(new RepeatedIntermittentLockHolder(true, i), () -> { counter = 0; },
+          new CheckCounter(TOTAL_ITERS / 10));
     }
     if (PRINT_TIMES) {
       for (int i = 2; i <= MAX_HOLD_TIME; i *= 1000) {
@@ -183,7 +226,7 @@ public class Main {
       }
     }
     System.out.println("Hold for 2 msecs while sleeping, shared lock");
-    runAll(new SleepyLockHolder(true), () -> { counter = 0; }, new CheckCounter());
+    runAll(new SleepyLockHolder(true), () -> { counter = 0; }, new CheckCounter(TOTAL_ITERS));
     System.out.println("Hold for 2 msecs while sleeping, private lock");
     runAll(new SleepyLockHolder(false), () -> { counter = 0; }, () -> {});
   }
