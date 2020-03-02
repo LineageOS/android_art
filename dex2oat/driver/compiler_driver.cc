@@ -883,55 +883,56 @@ void CompilerDriver::PreCompile(jobject class_loader,
   if (compiler_options_->AssumeClassesAreVerified()) {
     VLOG(compiler) << "Verify none mode specified, skipping verification.";
     SetVerified(class_loader, dex_files, timings);
-  }
+  } else if (compiler_options_->IsVerificationEnabled()) {
+    Verify(class_loader, dex_files, timings, verification_results);
+    VLOG(compiler) << "Verify: " << GetMemoryUsageString(false);
 
-  if (!compiler_options_->IsVerificationEnabled()) {
-    return;
-  }
-
-  Verify(class_loader, dex_files, timings, verification_results);
-  VLOG(compiler) << "Verify: " << GetMemoryUsageString(false);
-
-  if (GetCompilerOptions().IsForceDeterminism() &&
-      (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension())) {
-    // Resolve strings from const-string. Do this now to have a deterministic image.
-    ResolveConstStrings(dex_files, /*only_startup_strings=*/ false, timings);
-    VLOG(compiler) << "Resolve const-strings: " << GetMemoryUsageString(false);
-  } else if (GetCompilerOptions().ResolveStartupConstStrings()) {
-    ResolveConstStrings(dex_files, /*only_startup_strings=*/ true, timings);
-  }
-
-  if (had_hard_verifier_failure_ && GetCompilerOptions().AbortOnHardVerifierFailure()) {
-    // Avoid dumping threads. Even if we shut down the thread pools, there will still be three
-    // instances of this thread's stack.
-    LOG(FATAL_WITHOUT_ABORT) << "Had a hard failure verifying all classes, and was asked to abort "
-                             << "in such situations. Please check the log.";
-    _exit(1);
-  } else if (number_of_soft_verifier_failures_ > 0 &&
-             GetCompilerOptions().AbortOnSoftVerifierFailure()) {
-    LOG(FATAL_WITHOUT_ABORT) << "Had " << number_of_soft_verifier_failures_ << " soft failure(s) "
-                             << "verifying all classes, and was asked to abort in such situations. "
-                             << "Please check the log.";
-    _exit(1);
-  }
-
-  if (compiler_options_->IsAnyCompilationEnabled()) {
-    if (kIsDebugBuild) {
-      EnsureVerifiedOrVerifyAtRuntime(class_loader, dex_files);
+    if (GetCompilerOptions().IsForceDeterminism() &&
+        (GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension())) {
+      // Resolve strings from const-string. Do this now to have a deterministic image.
+      ResolveConstStrings(dex_files, /*only_startup_strings=*/ false, timings);
+      VLOG(compiler) << "Resolve const-strings: " << GetMemoryUsageString(false);
+    } else if (GetCompilerOptions().ResolveStartupConstStrings()) {
+      ResolveConstStrings(dex_files, /*only_startup_strings=*/ true, timings);
     }
-    InitializeClasses(class_loader, dex_files, timings);
-    VLOG(compiler) << "InitializeClasses: " << GetMemoryUsageString(false);
+
+    if (had_hard_verifier_failure_ && GetCompilerOptions().AbortOnHardVerifierFailure()) {
+      // Avoid dumping threads. Even if we shut down the thread pools, there will still be three
+      // instances of this thread's stack.
+      LOG(FATAL_WITHOUT_ABORT) << "Had a hard failure verifying all classes, and was asked to abort "
+                               << "in such situations. Please check the log.";
+      _exit(1);
+    } else if (number_of_soft_verifier_failures_ > 0 &&
+               GetCompilerOptions().AbortOnSoftVerifierFailure()) {
+      LOG(FATAL_WITHOUT_ABORT) << "Had " << number_of_soft_verifier_failures_ << " soft failure(s) "
+                               << "verifying all classes, and was asked to abort in such situations. "
+                               << "Please check the log.";
+      _exit(1);
+    }
   }
 
-  UpdateImageClasses(timings, image_classes);
-  VLOG(compiler) << "UpdateImageClasses: " << GetMemoryUsageString(false);
+  if (GetCompilerOptions().IsGeneratingImage()) {
+    // We can only initialize classes when their verification bit is set.
+    if (compiler_options_->AssumeClassesAreVerified() ||
+        compiler_options_->IsVerificationEnabled()) {
+      if (kIsDebugBuild) {
+        EnsureVerifiedOrVerifyAtRuntime(class_loader, dex_files);
+      }
+      InitializeClasses(class_loader, dex_files, timings);
+      VLOG(compiler) << "InitializeClasses: " << GetMemoryUsageString(false);
+    }
 
-  if (kBitstringSubtypeCheckEnabled &&
-      GetCompilerOptions().IsForceDeterminism() && GetCompilerOptions().IsBootImage()) {
-    // Initialize type check bit string used by check-cast and instanceof.
-    // Do this now to have a deterministic image.
-    // Note: This is done after UpdateImageClasses() at it relies on the image classes to be final.
-    InitializeTypeCheckBitstrings(this, dex_files, timings);
+    UpdateImageClasses(timings, image_classes);
+    VLOG(compiler) << "UpdateImageClasses: " << GetMemoryUsageString(false);
+
+    if (kBitstringSubtypeCheckEnabled &&
+        GetCompilerOptions().IsForceDeterminism() && GetCompilerOptions().IsBootImage()) {
+      // Initialize type check bit string used by check-cast and instanceof.
+      // Do this now to have a deterministic image.
+      // Note: This is done after UpdateImageClasses() at it relies on the image
+      // classes to be final.
+      InitializeTypeCheckBitstrings(this, dex_files, timings);
+    }
   }
 }
 
@@ -1781,7 +1782,9 @@ bool CompilerDriver::FastVerify(jobject jclass_loader,
     return false;
   }
 
-  bool compiler_only_verifies = !GetCompilerOptions().IsAnyCompilationEnabled();
+  bool compiler_only_verifies =
+      !GetCompilerOptions().IsAnyCompilationEnabled() &&
+      !GetCompilerOptions().IsGeneratingImage();
 
   // We successfully validated the dependencies, now update class status
   // of verified classes. Note that the dependencies also record which classes
