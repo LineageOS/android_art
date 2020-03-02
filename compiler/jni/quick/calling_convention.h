@@ -48,15 +48,13 @@ class CallingConvention : public DeletableArenaObject<kArenaAllocCallingConventi
 
   // Register that holds result of this method invocation.
   virtual ManagedRegister ReturnRegister() = 0;
-  // Register reserved for scratch usage during procedure calls.
-  virtual ManagedRegister InterproceduralScratchRegister() const = 0;
 
   // Iterator interface
 
   // Place iterator at start of arguments. The displacement is applied to
   // frame offset methods to account for frames which may be on the stack
   // below the one being iterated over.
-  void ResetIterator(FrameOffset displacement) {
+  virtual void ResetIterator(FrameOffset displacement) {
     displacement_ = displacement;
     itr_slots_ = 0;
     itr_args_ = 0;
@@ -252,11 +250,14 @@ class ManagedRuntimeCallingConvention : public CallingConvention {
 
   // Iterator interface
   bool HasNext();
-  void Next();
+  virtual void Next();
   bool IsCurrentParamAReference();
   bool IsCurrentParamAFloatOrDouble();
   bool IsCurrentParamADouble();
   bool IsCurrentParamALong();
+  bool IsCurrentParamALongOrDouble() {
+    return IsCurrentParamALong() || IsCurrentParamADouble();
+  }
   bool IsCurrentArgExplicit();  // ie a non-implict argument such as this
   bool IsCurrentArgPossiblyNull();
   size_t CurrentParamSize();
@@ -266,9 +267,6 @@ class ManagedRuntimeCallingConvention : public CallingConvention {
   virtual FrameOffset CurrentParamStackOffset() = 0;
 
   virtual ~ManagedRuntimeCallingConvention() {}
-
-  // Registers to spill to caller's out registers on entry.
-  virtual const ManagedRegisterEntrySpills& EntrySpills() = 0;
 
  protected:
   ManagedRuntimeCallingConvention(bool is_static,

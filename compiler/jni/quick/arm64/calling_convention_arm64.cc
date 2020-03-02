@@ -26,8 +26,6 @@
 namespace art {
 namespace arm64 {
 
-static_assert(kArm64PointerSize == PointerSize::k64, "Unexpected ARM64 pointer size");
-
 static const XRegister kXArgumentRegisters[] = {
   X0, X1, X2, X3, X4, X5, X6, X7
 };
@@ -143,14 +141,6 @@ static constexpr uint32_t kAapcs64FpCalleeSpillMask =
     CalculateFpCalleeSpillMask(kAapcs64CalleeSaveRegisters);
 
 // Calling convention
-ManagedRegister Arm64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
-  return Arm64ManagedRegister::FromXRegister(IP0);  // X16
-}
-
-ManagedRegister Arm64JniCallingConvention::InterproceduralScratchRegister() const {
-  return Arm64ManagedRegister::FromXRegister(IP0);  // X16
-}
-
 static ManagedRegister ReturnRegisterForShorty(const char* shorty) {
   if (shorty[0] == 'F') {
     return Arm64ManagedRegister::FromSRegister(S0);
@@ -184,71 +174,42 @@ ManagedRegister Arm64ManagedRuntimeCallingConvention::MethodRegister() {
 }
 
 bool Arm64ManagedRuntimeCallingConvention::IsCurrentParamInRegister() {
-  return false;  // Everything moved to stack on entry.
+  if (IsCurrentParamAFloatOrDouble()) {
+    return itr_float_and_doubles_ < kMaxFloatOrDoubleRegisterArguments;
+  } else {
+    size_t non_fp_arg_number = itr_args_ - itr_float_and_doubles_;
+    return /* method */ 1u + non_fp_arg_number < kMaxIntLikeRegisterArguments;
+  }
 }
 
 bool Arm64ManagedRuntimeCallingConvention::IsCurrentParamOnStack() {
-  return true;
+  return !IsCurrentParamInRegister();
 }
 
 ManagedRegister Arm64ManagedRuntimeCallingConvention::CurrentParamRegister() {
-  LOG(FATAL) << "Should not reach here";
-  UNREACHABLE();
+  DCHECK(IsCurrentParamInRegister());
+  if (IsCurrentParamAFloatOrDouble()) {
+    if (IsCurrentParamADouble()) {
+      return Arm64ManagedRegister::FromDRegister(kDArgumentRegisters[itr_float_and_doubles_]);
+    } else {
+      return Arm64ManagedRegister::FromSRegister(kSArgumentRegisters[itr_float_and_doubles_]);
+    }
+  } else {
+    size_t non_fp_arg_number = itr_args_ - itr_float_and_doubles_;
+    if (IsCurrentParamALong()) {
+      XRegister x_reg = kXArgumentRegisters[/* method */ 1u + non_fp_arg_number];
+      return Arm64ManagedRegister::FromXRegister(x_reg);
+    } else {
+      WRegister w_reg = kWArgumentRegisters[/* method */ 1u + non_fp_arg_number];
+      return Arm64ManagedRegister::FromWRegister(w_reg);
+    }
+  }
 }
 
 FrameOffset Arm64ManagedRuntimeCallingConvention::CurrentParamStackOffset() {
-  CHECK(IsCurrentParamOnStack());
   return FrameOffset(displacement_.Int32Value() +  // displacement
                      kFramePointerSize +  // Method ref
                      (itr_slots_ * sizeof(uint32_t)));  // offset into in args
-}
-
-const ManagedRegisterEntrySpills& Arm64ManagedRuntimeCallingConvention::EntrySpills() {
-  // We spill the argument registers on ARM64 to free them up for scratch use, we then assume
-  // all arguments are on the stack.
-  if ((entry_spills_.size() == 0) && (NumArgs() > 0)) {
-    int gp_reg_index = 1;   // we start from X1/W1, X0 holds ArtMethod*.
-    int fp_reg_index = 0;   // D0/S0.
-
-    // We need to choose the correct register (D/S or X/W) since the managed
-    // stack uses 32bit stack slots.
-    ResetIterator(FrameOffset(0));
-    while (HasNext()) {
-      if (IsCurrentParamAFloatOrDouble()) {  // FP regs.
-          if (fp_reg_index < 8) {
-            if (!IsCurrentParamADouble()) {
-              entry_spills_.push_back(Arm64ManagedRegister::FromSRegister(kSArgumentRegisters[fp_reg_index]));
-            } else {
-              entry_spills_.push_back(Arm64ManagedRegister::FromDRegister(kDArgumentRegisters[fp_reg_index]));
-            }
-            fp_reg_index++;
-          } else {  // just increase the stack offset.
-            if (!IsCurrentParamADouble()) {
-              entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-            } else {
-              entry_spills_.push_back(ManagedRegister::NoRegister(), 8);
-            }
-          }
-      } else {  // GP regs.
-        if (gp_reg_index < 8) {
-          if (IsCurrentParamALong() && (!IsCurrentParamAReference())) {
-            entry_spills_.push_back(Arm64ManagedRegister::FromXRegister(kXArgumentRegisters[gp_reg_index]));
-          } else {
-            entry_spills_.push_back(Arm64ManagedRegister::FromWRegister(kWArgumentRegisters[gp_reg_index]));
-          }
-          gp_reg_index++;
-        } else {  // just increase the stack offset.
-          if (IsCurrentParamALong() && (!IsCurrentParamAReference())) {
-              entry_spills_.push_back(ManagedRegister::NoRegister(), 8);
-          } else {
-              entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-          }
-        }
-      }
-      Next();
-    }
-  }
-  return entry_spills_;
 }
 
 // JNI calling convention
@@ -411,7 +372,6 @@ ManagedRegister Arm64JniCallingConvention::HiddenArgumentRegister() const {
   DCHECK(std::none_of(kXArgumentRegisters,
                       kXArgumentRegisters + std::size(kXArgumentRegisters),
                       [](XRegister reg) { return reg == X15; }));
-  DCHECK(!InterproceduralScratchRegister().Equals(Arm64ManagedRegister::FromXRegister(X15)));
   return Arm64ManagedRegister::FromXRegister(X15);
 }
 
