@@ -82,8 +82,15 @@ class JNICFITest : public CFITest {
     std::unique_ptr<JNIMacroAssembler<kPointerSize>> jni_asm(
         JNIMacroAssembler<kPointerSize>::Create(&allocator, isa));
     jni_asm->cfi().SetEnabled(true);
-    jni_asm->BuildFrame(frame_size, mr_conv->MethodRegister(),
-                        callee_save_regs, mr_conv->EntrySpills());
+    jni_asm->BuildFrame(frame_size, mr_conv->MethodRegister(), callee_save_regs);
+    // Spill arguments.
+    mr_conv->ResetIterator(FrameOffset(frame_size));
+    for (; mr_conv->HasNext(); mr_conv->Next()) {
+      if (mr_conv->IsCurrentParamInRegister()) {
+        size_t size = mr_conv->IsCurrentParamALongOrDouble() ? 8u : 4u;
+        jni_asm->Store(mr_conv->CurrentParamStackOffset(), mr_conv->CurrentParamRegister(), size);
+      }
+    }
     jni_asm->IncreaseFrameSize(32);
     jni_asm->DecreaseFrameSize(32);
     jni_asm->RemoveFrame(frame_size, callee_save_regs, /* may_suspend= */ true);
