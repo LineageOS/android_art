@@ -224,9 +224,19 @@ TEST_F(ArmVIXLAssemblerTest, VixlJniHelpers) {
   ArrayRef<const ManagedRegister> callee_save_regs = jni_conv->CalleeSaveRegisters();
 
   const ManagedRegister method_register = ArmManagedRegister::FromCoreRegister(R0);
+  const ManagedRegister hidden_arg_register = ArmManagedRegister::FromCoreRegister(R4);
   const ManagedRegister scratch_register = ArmManagedRegister::FromCoreRegister(R12);
 
-  __ BuildFrame(frame_size, mr_conv->MethodRegister(), callee_save_regs, mr_conv->EntrySpills());
+  __ BuildFrame(frame_size, mr_conv->MethodRegister(), callee_save_regs);
+
+  // Spill arguments.
+  mr_conv->ResetIterator(FrameOffset(frame_size));
+  for (; mr_conv->HasNext(); mr_conv->Next()) {
+    if (mr_conv->IsCurrentParamInRegister()) {
+      size_t size = mr_conv->IsCurrentParamALongOrDouble() ? 8u : 4u;
+      __ Store(mr_conv->CurrentParamStackOffset(), mr_conv->CurrentParamRegister(), size);
+    }
+  }
   __ IncreaseFrameSize(32);
 
   // Loads
@@ -249,33 +259,33 @@ TEST_F(ArmVIXLAssemblerTest, VixlJniHelpers) {
   __ Store(FrameOffset(1024), method_register, 4);
   __ Store(FrameOffset(4092), scratch_register, 4);
   __ Store(FrameOffset(4096), scratch_register, 4);
-  __ StoreImmediateToFrame(FrameOffset(48), 0xFF, scratch_register);
-  __ StoreImmediateToFrame(FrameOffset(48), 0xFFFFFF, scratch_register);
+  __ StoreImmediateToFrame(FrameOffset(48), 0xFF);
+  __ StoreImmediateToFrame(FrameOffset(48), 0xFFFFFF);
   __ StoreRawPtr(FrameOffset(48), scratch_register);
   __ StoreRef(FrameOffset(48), scratch_register);
-  __ StoreSpanning(FrameOffset(48), method_register, FrameOffset(48), scratch_register);
-  __ StoreStackOffsetToThread(ThreadOffset32(512), FrameOffset(4096), scratch_register);
+  __ StoreSpanning(FrameOffset(48), method_register, FrameOffset(48));
+  __ StoreStackOffsetToThread(ThreadOffset32(512), FrameOffset(4096));
   __ StoreStackPointerToThread(ThreadOffset32(512));
 
   // Other
-  __ Call(method_register, FrameOffset(48), scratch_register);
-  __ Copy(FrameOffset(48), FrameOffset(44), scratch_register, 4);
-  __ CopyRawPtrFromThread(FrameOffset(44), ThreadOffset32(512), scratch_register);
-  __ CopyRef(FrameOffset(48), FrameOffset(44), scratch_register);
+  __ Call(method_register, FrameOffset(48));
+  __ Copy(FrameOffset(48), FrameOffset(44), 4);
+  __ CopyRawPtrFromThread(FrameOffset(44), ThreadOffset32(512));
+  __ CopyRef(FrameOffset(48), FrameOffset(44));
   __ GetCurrentThread(method_register);
-  __ GetCurrentThread(FrameOffset(48), scratch_register);
-  __ Move(scratch_register, method_register, 4);
+  __ GetCurrentThread(FrameOffset(48));
+  __ Move(hidden_arg_register, method_register, 4);
   __ VerifyObject(scratch_register, false);
 
   __ CreateHandleScopeEntry(scratch_register, FrameOffset(48), scratch_register, true);
   __ CreateHandleScopeEntry(scratch_register, FrameOffset(48), scratch_register, false);
   __ CreateHandleScopeEntry(method_register, FrameOffset(48), scratch_register, true);
-  __ CreateHandleScopeEntry(FrameOffset(48), FrameOffset(64), scratch_register, true);
+  __ CreateHandleScopeEntry(FrameOffset(48), FrameOffset(64), true);
   __ CreateHandleScopeEntry(method_register, FrameOffset(0), scratch_register, true);
   __ CreateHandleScopeEntry(method_register, FrameOffset(1025), scratch_register, true);
   __ CreateHandleScopeEntry(scratch_register, FrameOffset(1025), scratch_register, true);
 
-  __ ExceptionPoll(scratch_register, 0);
+  __ ExceptionPoll(0);
 
   // Push the target out of range of branch emitted by ExceptionPoll.
   for (int i = 0; i < 64; i++) {
