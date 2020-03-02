@@ -364,14 +364,13 @@ class AssemblerTestInfrastructure {
     std::ifstream f1_in(f1);
     std::ifstream f2_in(f2);
 
-    bool result = std::equal(std::istreambuf_iterator<char>(f1_in),
-                             std::istreambuf_iterator<char>(),
-                             std::istreambuf_iterator<char>(f2_in));
-
-    f1_in.close();
-    f2_in.close();
-
-    return result;
+    bool read1_ok, read2_ok;
+    char c1, c2;
+    do {
+      read1_ok = static_cast<bool>(f1_in >> c1);
+      read2_ok = static_cast<bool>(f2_in >> c2);
+    } while (read1_ok && read2_ok && c1 == c2);
+    return !read1_ok && !read2_ok;  // Did we reach the end of both streams?
   }
 
   // Compile the given assembly code and extract the binary, if possible. Put result into res.

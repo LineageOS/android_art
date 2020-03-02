@@ -84,52 +84,6 @@ class ManagedRegister : public ValueObject {
 static_assert(std::is_trivially_copyable<ManagedRegister>::value,
               "ManagedRegister should be trivially copyable");
 
-class ManagedRegisterSpill : public ManagedRegister {
- public:
-  // ManagedRegisterSpill contains information about data type size and location in caller frame
-  // These additional attributes could be defined by calling convention (EntrySpills)
-  ManagedRegisterSpill(const ManagedRegister& other, uint32_t size, uint32_t spill_offset)
-      : ManagedRegister(other), size_(size), spill_offset_(spill_offset)  { }
-
-  explicit ManagedRegisterSpill(const ManagedRegister& other)
-      : ManagedRegister(other), size_(-1), spill_offset_(-1) { }
-
-  ManagedRegisterSpill(const ManagedRegister& other, int32_t size)
-      : ManagedRegister(other), size_(size), spill_offset_(-1) { }
-
-  int32_t getSpillOffset() const {
-    return spill_offset_;
-  }
-
-  int32_t getSize() const {
-    return size_;
-  }
-
- private:
-  int32_t size_;
-  int32_t spill_offset_;
-};
-
-class ManagedRegisterEntrySpills : public std::vector<ManagedRegisterSpill> {
- public:
-  // The ManagedRegister does not have information about size and offset.
-  // In this case it's size and offset determined by BuildFrame (assembler)
-  void push_back(ManagedRegister x) {
-    ManagedRegisterSpill spill(x);
-    std::vector<ManagedRegisterSpill>::push_back(spill);
-  }
-
-  void push_back(ManagedRegister x, int32_t size) {
-    ManagedRegisterSpill spill(x, size);
-    std::vector<ManagedRegisterSpill>::push_back(spill);
-  }
-
-  void push_back(ManagedRegisterSpill x) {
-    std::vector<ManagedRegisterSpill>::push_back(x);
-  }
- private:
-};
-
 }  // namespace art
 
 #endif  // ART_COMPILER_UTILS_MANAGED_REGISTER_H_
