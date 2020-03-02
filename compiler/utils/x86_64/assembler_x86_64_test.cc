@@ -2334,19 +2334,15 @@ std::string buildframe_test_fn(JNIMacroAssemblerX86_64Test::Base* assembler_test
   };
   ArrayRef<const ManagedRegister> spill_regs(raw_spill_regs);
 
-  // Three random entry spills.
-  ManagedRegisterEntrySpills entry_spills;
-  ManagedRegisterSpill spill(ManagedFromCpu(x86_64::RAX), 8, 0);
-  entry_spills.push_back(spill);
-  ManagedRegisterSpill spill2(ManagedFromCpu(x86_64::RBX), 8, 8);
-  entry_spills.push_back(spill2);
-  ManagedRegisterSpill spill3(ManagedFromFpu(x86_64::XMM1), 8, 16);
-  entry_spills.push_back(spill3);
-
   x86_64::X86_64ManagedRegister method_reg = ManagedFromCpu(x86_64::RDI);
 
   size_t frame_size = 10 * kStackAlignment;
-  assembler->BuildFrame(frame_size, method_reg, spill_regs, entry_spills);
+  assembler->BuildFrame(frame_size, method_reg, spill_regs);
+
+  // Three random entry spills.
+  assembler->Store(FrameOffset(frame_size + 0u), ManagedFromCpu(x86_64::RAX), /* size= */ 8u);
+  assembler->Store(FrameOffset(frame_size + 8u), ManagedFromCpu(x86_64::RBX), /* size= */ 8u);
+  assembler->Store(FrameOffset(frame_size + 16u), ManagedFromFpu(x86_64::XMM1), /* size= */ 8u);
 
   // Construct assembly text counterpart.
   std::ostringstream str;
