@@ -6,5 +6,10 @@ Hold time 200, shared lock
 Hold time 2000, shared lock
 Hold time 20000, shared lock
 Hold time 200000, shared lock
+Hold time 2, pause time 18, shared lock
+Hold time 20, pause time 180, shared lock
+Hold time 200, pause time 1800, shared lock
+Hold time 2000, pause time 18000, shared lock
+Hold time 20000, pause time 180000, shared lock
 Hold for 2 msecs while sleeping, shared lock
 Hold for 2 msecs while sleeping, private lock
