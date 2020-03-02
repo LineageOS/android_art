@@ -38,6 +38,7 @@ using ::testing::StrEq;
 using ::testing::_;
 using internal::ConfigEntry;
 using internal::ParseConfig;
+using internal::ParseJniConfig;
 
 #if defined(__LP64__)
 #define LIB_DIR "lib64"
@@ -680,6 +681,29 @@ TEST(NativeLoaderConfigParser, RejectMalformed) {
   ASSERT_FALSE(ParseConfig("32 libA.so nopreload", always_true).ok());
   ASSERT_FALSE(ParseConfig("nopreload libA.so 32", always_true).ok());
   ASSERT_FALSE(ParseConfig("libA.so nopreload # comment", always_true).ok());
+}
+
+TEST(NativeLoaderJniConfigParser, BasicLoading) {
+  const char file_content[] = R"(
+# comment
+com_android_foo libfoo.so
+# Empty line is ignored
+
+com_android_bar libbar.so:libbar2.so
+)";
+
+  std::map<std::string, std::string> expected_result{
+    {"com_android_foo", "libfoo.so"},
+    {"com_android_bar", "libbar.so:libbar2.so"},
+  };
+
+  Result<std::map<std::string, std::string>> result = ParseJniConfig(file_content);
+  ASSERT_RESULT_OK(result);
+  ASSERT_EQ(expected_result, *result);
+}
+
+TEST(NativeLoaderJniConfigParser, RejectMalformed) {
+  ASSERT_FALSE(ParseJniConfig("com_android_foo").ok());
 }
 
 }  // namespace nativeloader
