@@ -1833,8 +1833,11 @@ void Thread::DumpState(std::ostream& os, const Thread* thread, pid_t tid) {
           group_name_field->GetObject(thread_group)->AsString();
       group_name = (group_name_string != nullptr) ? group_name_string->ToModifiedUtf8() : "<null>";
     }
+  } else if (thread != nullptr) {
+    priority = thread->GetNativePriority();
   } else {
-    priority = GetNativePriority();
+    PaletteStatus status = PaletteSchedGetPriority(tid, &priority);
+    CHECK(status == PaletteStatus::kOkay || status == PaletteStatus::kCheckErrno);
   }
 
   std::string scheduler_group_name(GetSchedulerGroupName(tid));
@@ -4266,15 +4269,13 @@ void Thread::ReleaseLongJumpContextInternal() {
 }
 
 void Thread::SetNativePriority(int new_priority) {
-  // ART tests on JVM can reach this code path, use tid = 0 as shorthand for current thread.
-  PaletteStatus status = PaletteSchedSetPriority(0, new_priority);
+  PaletteStatus status = PaletteSchedSetPriority(GetTid(), new_priority);
   CHECK(status == PaletteStatus::kOkay || status == PaletteStatus::kCheckErrno);
 }
 
-int Thread::GetNativePriority() {
+int Thread::GetNativePriority() const {
   int priority = 0;
-  // ART tests on JVM can reach this code path, use tid = 0 as shorthand for current thread.
-  PaletteStatus status = PaletteSchedGetPriority(0, &priority);
+  PaletteStatus status = PaletteSchedGetPriority(GetTid(), &priority);
   CHECK(status == PaletteStatus::kOkay || status == PaletteStatus::kCheckErrno);
   return priority;
 }

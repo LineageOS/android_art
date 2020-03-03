@@ -1,0 +1,6 @@
+Regression test for b/140507091: Check that an explicit null check is
+emitted for a volatile field load on ARM64 at the beginning of the
+Baker read barrier thunk, so that a null holder object is properly
+caught (and throws a NullPointerException as expected), instead of
+trigerring a SIGSEGV, when the Concurrent Copying GC is in the marking
+phase.
