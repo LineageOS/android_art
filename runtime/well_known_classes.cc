@@ -28,7 +28,6 @@
 #include "entrypoints/quick/quick_entrypoints_enum.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
 #include "hidden_api.h"
-#include "hidden_api_jni.h"
 #include "jni/jni_internal.h"
 #include "jni_id_type.h"
 #include "mirror/class.h"
@@ -178,7 +177,6 @@ static jfieldID CacheField(JNIEnv* env, jclass c, bool is_static,
   jfieldID fid;
   {
     ScopedObjectAccess soa(env);
-    hiddenapi::ScopedCorePlatformApiCheck scpac;
     if (Runtime::Current()->GetJniIdType() != JniIdType::kSwapablePointer) {
       fid = jni::EncodeArtField</*kEnableIndexIds*/ true>(
           FindFieldJNI(soa, c, name, signature, is_static));
@@ -205,7 +203,6 @@ static jmethodID CacheMethod(JNIEnv* env, jclass c, bool is_static,
   jmethodID mid;
   {
     ScopedObjectAccess soa(env);
-    hiddenapi::ScopedCorePlatformApiCheck scpac;
     if (Runtime::Current()->GetJniIdType() != JniIdType::kSwapablePointer) {
       mid = jni::EncodeArtMethod</*kEnableIndexIds*/ true>(
           FindMethodJNI(soa, c, name, signature, is_static));

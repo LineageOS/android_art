@@ -121,7 +121,6 @@ libart_cc_defaults {
         "gc/task_processor.cc",
         "gc/verification.cc",
         "hidden_api.cc",
-        "hidden_api_jni.cc",
         "hprof/hprof.cc",
         "image.cc",
         "index_bss_mapping.cc",
