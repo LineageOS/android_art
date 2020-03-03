@@ -1,0 +1,5 @@
+Regression test for b/144947842
+
+Check that we correctly identify jit-zygote compiled frames as non-debuggable.
+
+We would hit DCHECKS before (part of) the fix to this bug.
