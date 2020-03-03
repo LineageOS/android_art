@@ -27,8 +27,6 @@
 namespace art {
 namespace arm {
 
-static_assert(kArmPointerSize == PointerSize::k32, "Unexpected ARM pointer size");
-
 //
 // JNI calling convention constants.
 //
@@ -49,18 +47,21 @@ static_assert(kJniArgumentRegisterCount == arraysize(kJniArgumentRegisters));
 static const Register kHFCoreArgumentRegisters[] = {
   R0, R1, R2, R3
 };
+static constexpr size_t kHFCoreArgumentRegistersCount = arraysize(kHFCoreArgumentRegisters);
 
 // (VFP single-precision registers.)
 static const SRegister kHFSArgumentRegisters[] = {
   S0, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15
 };
+static constexpr size_t kHFSArgumentRegistersCount = arraysize(kHFSArgumentRegisters);
 
 // (VFP double-precision registers.)
 static const DRegister kHFDArgumentRegisters[] = {
   D0, D1, D2, D3, D4, D5, D6, D7
 };
+static constexpr size_t kHFDArgumentRegistersCount = arraysize(kHFDArgumentRegisters);
 
-static_assert(arraysize(kHFDArgumentRegisters) * 2 == arraysize(kHFSArgumentRegisters),
+static_assert(kHFDArgumentRegistersCount * 2 == kHFSArgumentRegistersCount,
     "ks d argument registers mismatch");
 
 //
@@ -159,14 +160,6 @@ static constexpr uint32_t kAapcsFpCalleeSpillMask =
 
 // Calling convention
 
-ManagedRegister ArmManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
-  return ArmManagedRegister::FromCoreRegister(IP);  // R12
-}
-
-ManagedRegister ArmJniCallingConvention::InterproceduralScratchRegister() const {
-  return ArmManagedRegister::FromCoreRegister(IP);  // R12
-}
-
 ManagedRegister ArmManagedRuntimeCallingConvention::ReturnRegister() {
   switch (GetShorty()[0]) {
     case 'V':
@@ -204,91 +197,91 @@ ManagedRegister ArmManagedRuntimeCallingConvention::MethodRegister() {
   return ArmManagedRegister::FromCoreRegister(R0);
 }
 
+void ArmManagedRuntimeCallingConvention::ResetIterator(FrameOffset displacement) {
+  ManagedRuntimeCallingConvention::ResetIterator(displacement);
+  gpr_index_ = 1u;  // Skip r0 for ArtMethod*
+  float_index_ = 0u;
+  double_index_ = 0u;
+}
+
+void ArmManagedRuntimeCallingConvention::Next() {
+  if (IsCurrentParamAFloatOrDouble()) {
+    if (float_index_ % 2 == 0) {
+      // The register for the current float is the same as the first register for double.
+      DCHECK_EQ(float_index_, double_index_ * 2u);
+    } else {
+      // There is a space for an extra float before space for a double.
+      DCHECK_LT(float_index_, double_index_ * 2u);
+    }
+    if (IsCurrentParamADouble()) {
+      double_index_ += 1u;
+      if (float_index_ % 2 == 0) {
+        float_index_ = double_index_ * 2u;
+      }
+    } else {
+      if (float_index_ % 2 == 0) {
+        float_index_ += 1u;
+        double_index_ += 1u;  // Leaves space for one more float before the next double.
+      } else {
+        float_index_ = double_index_ * 2u;
+      }
+    }
+  } else {  // Not a float/double.
+    if (IsCurrentParamALong()) {
+      // Note that the alignment to even register is done lazily.
+      gpr_index_ = RoundUp(gpr_index_, 2u) + 2u;
+    } else {
+      gpr_index_ += 1u;
+    }
+  }
+  ManagedRuntimeCallingConvention::Next();
+}
+
 bool ArmManagedRuntimeCallingConvention::IsCurrentParamInRegister() {
-  return false;  // Everything moved to stack on entry.
+  if (IsCurrentParamAFloatOrDouble()) {
+    if (IsCurrentParamADouble()) {
+      return double_index_ < kHFDArgumentRegistersCount;
+    } else {
+      return float_index_ < kHFSArgumentRegistersCount;
+    }
+  } else {
+    if (IsCurrentParamALong()) {
+      // Round up to even register and do not split a long between the last register and the stack.
+      return RoundUp(gpr_index_, 2u) + 1u < kHFCoreArgumentRegistersCount;
+    } else {
+      return gpr_index_ < kHFCoreArgumentRegistersCount;
+    }
+  }
 }
 
 bool ArmManagedRuntimeCallingConvention::IsCurrentParamOnStack() {
-  return true;
+  return !IsCurrentParamInRegister();
 }
 
 ManagedRegister ArmManagedRuntimeCallingConvention::CurrentParamRegister() {
-  LOG(FATAL) << "Should not reach here";
-  UNREACHABLE();
+  DCHECK(IsCurrentParamInRegister());
+  if (IsCurrentParamAFloatOrDouble()) {
+    if (IsCurrentParamADouble()) {
+      return ArmManagedRegister::FromDRegister(kHFDArgumentRegisters[double_index_]);
+    } else {
+      return ArmManagedRegister::FromSRegister(kHFSArgumentRegisters[float_index_]);
+    }
+  } else {
+    if (IsCurrentParamALong()) {
+      // Currently the only register pair for a long parameter is r2-r3.
+      // Note that the alignment to even register is done lazily.
+      CHECK_EQ(RoundUp(gpr_index_, 2u), 2u);
+      return ArmManagedRegister::FromRegisterPair(R2_R3);
+    } else {
+      return ArmManagedRegister::FromCoreRegister(kHFCoreArgumentRegisters[gpr_index_]);
+    }
+  }
 }
 
 FrameOffset ArmManagedRuntimeCallingConvention::CurrentParamStackOffset() {
-  CHECK(IsCurrentParamOnStack());
   return FrameOffset(displacement_.Int32Value() +        // displacement
                      kFramePointerSize +                 // Method*
                      (itr_slots_ * kFramePointerSize));  // offset into in args
-}
-
-const ManagedRegisterEntrySpills& ArmManagedRuntimeCallingConvention::EntrySpills() {
-  // We spill the argument registers on ARM to free them up for scratch use, we then assume
-  // all arguments are on the stack.
-  if ((entry_spills_.size() == 0) && (NumArgs() > 0)) {
-    uint32_t gpr_index = 1;  // R0 ~ R3. Reserve r0 for ArtMethod*.
-    uint32_t fpr_index = 0;  // S0 ~ S15.
-    uint32_t fpr_double_index = 0;  // D0 ~ D7.
-
-    ResetIterator(FrameOffset(0));
-    while (HasNext()) {
-      if (IsCurrentParamAFloatOrDouble()) {
-        if (IsCurrentParamADouble()) {  // Double.
-          // Double should not overlap with float.
-          fpr_double_index = (std::max(fpr_double_index * 2, RoundUp(fpr_index, 2))) / 2;
-          if (fpr_double_index < arraysize(kHFDArgumentRegisters)) {
-            entry_spills_.push_back(
-                ArmManagedRegister::FromDRegister(kHFDArgumentRegisters[fpr_double_index++]));
-          } else {
-            entry_spills_.push_back(ManagedRegister::NoRegister(), 8);
-          }
-        } else {  // Float.
-          // Float should not overlap with double.
-          if (fpr_index % 2 == 0) {
-            fpr_index = std::max(fpr_double_index * 2, fpr_index);
-          }
-          if (fpr_index < arraysize(kHFSArgumentRegisters)) {
-            entry_spills_.push_back(
-                ArmManagedRegister::FromSRegister(kHFSArgumentRegisters[fpr_index++]));
-          } else {
-            entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-          }
-        }
-      } else {
-        // FIXME: Pointer this returns as both reference and long.
-        if (IsCurrentParamALong() && !IsCurrentParamAReference()) {  // Long.
-          if (gpr_index < arraysize(kHFCoreArgumentRegisters) - 1) {
-            // Skip R1, and use R2_R3 if the long is the first parameter.
-            if (gpr_index == 1) {
-              gpr_index++;
-            }
-          }
-
-          // If it spans register and memory, we must use the value in memory.
-          if (gpr_index < arraysize(kHFCoreArgumentRegisters) - 1) {
-            entry_spills_.push_back(
-                ArmManagedRegister::FromCoreRegister(kHFCoreArgumentRegisters[gpr_index++]));
-          } else if (gpr_index == arraysize(kHFCoreArgumentRegisters) - 1) {
-            gpr_index++;
-            entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-          } else {
-            entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-          }
-        }
-        // High part of long or 32-bit argument.
-        if (gpr_index < arraysize(kHFCoreArgumentRegisters)) {
-          entry_spills_.push_back(
-              ArmManagedRegister::FromCoreRegister(kHFCoreArgumentRegisters[gpr_index++]));
-        } else {
-          entry_spills_.push_back(ManagedRegister::NoRegister(), 4);
-        }
-      }
-      Next();
-    }
-  }
-  return entry_spills_;
 }
 
 // JNI calling convention
@@ -538,7 +531,6 @@ ManagedRegister ArmJniCallingConvention::HiddenArgumentRegister() const {
   DCHECK(std::none_of(kJniArgumentRegisters,
                       kJniArgumentRegisters + std::size(kJniArgumentRegisters),
                       [](Register reg) { return reg == R4; }));
-  DCHECK(!InterproceduralScratchRegister().Equals(ArmManagedRegister::FromCoreRegister(R4)));
   return ArmManagedRegister::FromCoreRegister(R4);
 }
 

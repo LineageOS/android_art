@@ -27,6 +27,11 @@
 namespace art {
 namespace x86_64 {
 
+static constexpr Register kCoreArgumentRegisters[] = {
+    RDI, RSI, RDX, RCX, R8, R9
+};
+static_assert(kMaxIntLikeRegisterArguments == arraysize(kCoreArgumentRegisters));
+
 static constexpr ManagedRegister kCalleeSaveRegisters[] = {
     // Core registers.
     X86_64ManagedRegister::FromCpuRegister(RBX),
@@ -87,14 +92,6 @@ static constexpr uint32_t kNativeFpCalleeSpillMask =
 
 // Calling convention
 
-ManagedRegister X86_64ManagedRuntimeCallingConvention::InterproceduralScratchRegister() const {
-  return X86_64ManagedRegister::FromCpuRegister(RAX);
-}
-
-ManagedRegister X86_64JniCallingConvention::InterproceduralScratchRegister() const {
-  return X86_64ManagedRegister::FromCpuRegister(RAX);
-}
-
 ManagedRegister X86_64JniCallingConvention::ReturnScratchRegister() const {
   return ManagedRegister::NoRegister();  // No free regs, so assembler uses push/pop
 }
@@ -130,56 +127,35 @@ ManagedRegister X86_64ManagedRuntimeCallingConvention::MethodRegister() {
 }
 
 bool X86_64ManagedRuntimeCallingConvention::IsCurrentParamInRegister() {
-  return !IsCurrentParamOnStack();
+  if (IsCurrentParamAFloatOrDouble()) {
+    return itr_float_and_doubles_ < kMaxFloatOrDoubleRegisterArguments;
+  } else {
+    size_t non_fp_arg_number = itr_args_ - itr_float_and_doubles_;
+    return /* method */ 1u + non_fp_arg_number < kMaxIntLikeRegisterArguments;
+  }
 }
 
 bool X86_64ManagedRuntimeCallingConvention::IsCurrentParamOnStack() {
-  // We assume all parameters are on stack, args coming via registers are spilled as entry_spills
-  return true;
+  return !IsCurrentParamInRegister();
 }
 
 ManagedRegister X86_64ManagedRuntimeCallingConvention::CurrentParamRegister() {
-  ManagedRegister res = ManagedRegister::NoRegister();
-  if (!IsCurrentParamAFloatOrDouble()) {
-    switch (itr_args_ - itr_float_and_doubles_) {
-    case 0: res = X86_64ManagedRegister::FromCpuRegister(RSI); break;
-    case 1: res = X86_64ManagedRegister::FromCpuRegister(RDX); break;
-    case 2: res = X86_64ManagedRegister::FromCpuRegister(RCX); break;
-    case 3: res = X86_64ManagedRegister::FromCpuRegister(R8); break;
-    case 4: res = X86_64ManagedRegister::FromCpuRegister(R9); break;
-    }
-  } else if (itr_float_and_doubles_ < kMaxFloatOrDoubleRegisterArguments) {
+  DCHECK(IsCurrentParamInRegister());
+  if (IsCurrentParamAFloatOrDouble()) {
     // First eight float parameters are passed via XMM0..XMM7
-    res = X86_64ManagedRegister::FromXmmRegister(
-                                 static_cast<FloatRegister>(XMM0 + itr_float_and_doubles_));
+    FloatRegister fp_reg = static_cast<FloatRegister>(XMM0 + itr_float_and_doubles_);
+    return X86_64ManagedRegister::FromXmmRegister(fp_reg);
+  } else {
+    size_t non_fp_arg_number = itr_args_ - itr_float_and_doubles_;
+    Register core_reg = kCoreArgumentRegisters[/* method */ 1u + non_fp_arg_number];
+    return X86_64ManagedRegister::FromCpuRegister(core_reg);
   }
-  return res;
 }
 
 FrameOffset X86_64ManagedRuntimeCallingConvention::CurrentParamStackOffset() {
-  CHECK(IsCurrentParamOnStack());
   return FrameOffset(displacement_.Int32Value() +  // displacement
                      static_cast<size_t>(kX86_64PointerSize) +  // Method ref
                      itr_slots_ * sizeof(uint32_t));  // offset into in args
-}
-
-const ManagedRegisterEntrySpills& X86_64ManagedRuntimeCallingConvention::EntrySpills() {
-  // We spill the argument registers on X86 to free them up for scratch use, we then assume
-  // all arguments are on the stack.
-  if (entry_spills_.size() == 0) {
-    ResetIterator(FrameOffset(0));
-    while (HasNext()) {
-      ManagedRegister in_reg = CurrentParamRegister();
-      if (!in_reg.IsNoRegister()) {
-        int32_t size = IsParamALongOrDouble(itr_args_) ? 8 : 4;
-        int32_t spill_offset = CurrentParamStackOffset().Uint32Value();
-        ManagedRegisterSpill spill(in_reg, size, spill_offset);
-        entry_spills_.push_back(spill);
-      }
-      Next();
-    }
-  }
-  return entry_spills_;
 }
 
 // JNI calling convention
@@ -334,7 +310,6 @@ ManagedRegister X86_64JniCallingConvention::HiddenArgumentRegister() const {
                       [](ManagedRegister callee_save) constexpr {
                         return callee_save.Equals(X86_64ManagedRegister::FromCpuRegister(R11));
                       }));
-  DCHECK(!InterproceduralScratchRegister().Equals(X86_64ManagedRegister::FromCpuRegister(R11)));
   return X86_64ManagedRegister::FromCpuRegister(R11);
 }
 
