@@ -118,6 +118,26 @@ void InitializeDexFileDomain(const DexFile& dex_file, ObjPtr<mirror::ClassLoader
   }
 }
 
+void InitializeCorePlatformApiPrivateFields() {
+  // The following fields in WellKnownClasses correspond to private fields in the Core Platform
+  // API that cannot be otherwise expressed and propagated through tooling (b/144502743).
+  jfieldID private_core_platform_api_fields[] = {
+    WellKnownClasses::java_nio_Buffer_address,
+    WellKnownClasses::java_nio_Buffer_elementSizeShift,
+    WellKnownClasses::java_nio_Buffer_limit,
+    WellKnownClasses::java_nio_Buffer_position,
+  };
+
+  ScopedObjectAccess soa(Thread::Current());
+  for (const auto private_core_platform_api_field : private_core_platform_api_fields) {
+    ArtField* field = jni::DecodeArtField(private_core_platform_api_field);
+    const uint32_t access_flags = field->GetAccessFlags();
+    uint32_t new_access_flags = access_flags | kAccCorePlatformApi;
+    DCHECK(new_access_flags != access_flags);
+    field->SetAccessFlags(new_access_flags);
+  }
+}
+
 namespace detail {
 
 // Do not change the values of items in this enum, as they are written to the
