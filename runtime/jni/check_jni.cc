@@ -35,7 +35,6 @@
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
 #include "gc/space/space.h"
-#include "hidden_api_jni.h"
 #include "java_vm_ext.h"
 #include "jni_internal.h"
 #include "mirror/class-inl.h"
@@ -2222,22 +2221,18 @@ class CheckJNI {
   }
 
   static jmethodID GetMethodID(JNIEnv* env, jclass c, const char* name, const char* sig) {
-    hiddenapi::ScopedCorePlatformApiCheck sc;
     return GetMethodIDInternal(__FUNCTION__, env, c, name, sig, false);
   }
 
   static jmethodID GetStaticMethodID(JNIEnv* env, jclass c, const char* name, const char* sig) {
-    hiddenapi::ScopedCorePlatformApiCheck sc;
     return GetMethodIDInternal(__FUNCTION__, env, c, name, sig, true);
   }
 
   static jfieldID GetFieldID(JNIEnv* env, jclass c, const char* name, const char* sig) {
-    hiddenapi::ScopedCorePlatformApiCheck sc;
     return GetFieldIDInternal(__FUNCTION__, env, c, name, sig, false);
   }
 
   static jfieldID GetStaticFieldID(JNIEnv* env, jclass c, const char* name, const char* sig) {
-    hiddenapi::ScopedCorePlatformApiCheck sc;
     return GetFieldIDInternal(__FUNCTION__, env, c, name, sig, true);
   }
 
