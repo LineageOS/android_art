@@ -979,11 +979,6 @@ class Runtime {
   // Return true if we should load oat files as executable or not.
   bool GetOatFilesExecutable() const;
 
-  bool IsRunningJitZygote() const {
-    // TODO: This should be better specified.
-    return EndsWith(image_location_, "boot-image.prof");
-  }
-
  private:
   static void InitPlatformSignalHandlers();
 
