@@ -150,6 +150,10 @@ jfieldID WellKnownClasses::java_lang_Throwable_detailMessage;
 jfieldID WellKnownClasses::java_lang_Throwable_stackTrace;
 jfieldID WellKnownClasses::java_lang_Throwable_stackState;
 jfieldID WellKnownClasses::java_lang_Throwable_suppressedExceptions;
+jfieldID WellKnownClasses::java_nio_Buffer_address;
+jfieldID WellKnownClasses::java_nio_Buffer_elementSizeShift;
+jfieldID WellKnownClasses::java_nio_Buffer_limit;
+jfieldID WellKnownClasses::java_nio_Buffer_position;
 jfieldID WellKnownClasses::java_nio_ByteBuffer_address;
 jfieldID WellKnownClasses::java_nio_ByteBuffer_hb;
 jfieldID WellKnownClasses::java_nio_ByteBuffer_isReadOnly;
@@ -378,6 +382,7 @@ void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
   dalvik_system_BaseDexClassLoader_getLdLibraryPath = CacheMethod(env, dalvik_system_BaseDexClassLoader, false, "getLdLibraryPath", "()Ljava/lang/String;");
   dalvik_system_VMRuntime_runFinalization = CacheMethod(env, dalvik_system_VMRuntime, true, "runFinalization", "(J)V");
   dalvik_system_VMRuntime_hiddenApiUsed = CacheMethod(env, dalvik_system_VMRuntime, true, "hiddenApiUsed", "(ILjava/lang/String;Ljava/lang/String;IZ)V");
+
   java_lang_ClassNotFoundException_init = CacheMethod(env, java_lang_ClassNotFoundException, false, "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V");
   java_lang_ClassLoader_loadClass = CacheMethod(env, java_lang_ClassLoader, false, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
 
@@ -412,6 +417,7 @@ void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
   dalvik_system_DexPathList_dexElements = CacheField(env, dalvik_system_DexPathList, false, "dexElements", "[Ldalvik/system/DexPathList$Element;");
   dalvik_system_DexPathList__Element_dexFile = CacheField(env, dalvik_system_DexPathList__Element, false, "dexFile", "Ldalvik/system/DexFile;");
   dalvik_system_VMRuntime_nonSdkApiUsageConsumer = CacheField(env, dalvik_system_VMRuntime, true, "nonSdkApiUsageConsumer", "Ljava/util/function/Consumer;");
+
   java_lang_Thread_parkBlocker = CacheField(env, java_lang_Thread, false, "parkBlocker", "Ljava/lang/Object;");
   java_lang_Thread_daemon = CacheField(env, java_lang_Thread, false, "daemon", "Z");
   java_lang_Thread_group = CacheField(env, java_lang_Thread, false, "group", "Ljava/lang/ThreadGroup;");
@@ -432,6 +438,13 @@ void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
   java_lang_Throwable_stackTrace = CacheField(env, java_lang_Throwable, false, "stackTrace", "[Ljava/lang/StackTraceElement;");
   java_lang_Throwable_stackState = CacheField(env, java_lang_Throwable, false, "backtrace", "Ljava/lang/Object;");
   java_lang_Throwable_suppressedExceptions = CacheField(env, java_lang_Throwable, false, "suppressedExceptions", "Ljava/util/List;");
+
+  ScopedLocalRef<jclass> java_nio_Buffer(env, env->FindClass("java/nio/Buffer"));
+  java_nio_Buffer_address = CacheField(env, java_nio_Buffer.get(), false, "address", "J");
+  java_nio_Buffer_elementSizeShift = CacheField(env, java_nio_Buffer.get(), false, "_elementSizeShift", "I");
+  java_nio_Buffer_limit = CacheField(env, java_nio_Buffer.get(), false, "limit", "I");
+  java_nio_Buffer_position = CacheField(env, java_nio_Buffer.get(), false, "position", "I");
+
   java_nio_ByteBuffer_address = CacheField(env, java_nio_ByteBuffer, false, "address", "J");
   java_nio_ByteBuffer_hb = CacheField(env, java_nio_ByteBuffer, false, "hb", "[B");
   java_nio_ByteBuffer_isReadOnly = CacheField(env, java_nio_ByteBuffer, false, "isReadOnly", "Z");
@@ -457,10 +470,10 @@ void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
 }
 
 void WellKnownClasses::LateInit(JNIEnv* env) {
-  ScopedLocalRef<jclass> java_lang_Runtime(env, env->FindClass("java/lang/Runtime"));
   // CacheField and CacheMethod will initialize their classes. Classes below
   // have clinit sections that call JNI methods. Late init is required
   // to make sure these JNI methods are available.
+  ScopedLocalRef<jclass> java_lang_Runtime(env, env->FindClass("java/lang/Runtime"));
   java_lang_Runtime_nativeLoad =
       CacheMethod(env, java_lang_Runtime.get(), true, "nativeLoad",
                   "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)"
@@ -587,6 +600,10 @@ void WellKnownClasses::Clear() {
   java_lang_Throwable_stackTrace = nullptr;
   java_lang_Throwable_stackState = nullptr;
   java_lang_Throwable_suppressedExceptions = nullptr;
+  java_nio_Buffer_address = nullptr;
+  java_nio_Buffer_elementSizeShift = nullptr;
+  java_nio_Buffer_limit = nullptr;
+  java_nio_Buffer_position = nullptr;
   java_nio_ByteBuffer_address = nullptr;
   java_nio_ByteBuffer_hb = nullptr;
   java_nio_ByteBuffer_isReadOnly = nullptr;
