@@ -97,6 +97,7 @@ else
   bcp_arg="$(join_by ":" "${javac_bootclasspath[@]}")"
   javac_args=(-bootclasspath "$bcp_arg")
 fi
+javac_args+=(-encoding utf8)
 
 if [[ $showcommands == y ]]; then
   echo ${JAVAC} "${javac_args[@]}" "$@"
