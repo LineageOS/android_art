@@ -824,7 +824,6 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('membarrier_test')
     self._checker.check_art_test_executable('memfd_test')
     self._checker.check_art_test_executable('memory_region_test')
-    self._checker.check_art_test_executable('memory_type_table_test')
     self._checker.check_art_test_executable('safe_copy_test')
     self._checker.check_art_test_executable('scoped_flock_test')
     self._checker.check_art_test_executable('time_utils_test')
