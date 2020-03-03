@@ -23,9 +23,11 @@
 #include "base/hiddenapi_flags.h"
 #include "base/locks.h"
 #include "intrinsics_enum.h"
+#include "jni/jni_internal.h"
 #include "mirror/class-inl.h"
 #include "reflection.h"
 #include "runtime.h"
+#include "well_known_classes.h"
 
 namespace art {
 namespace hiddenapi {
@@ -155,6 +157,8 @@ class ScopedHiddenApiEnforcementPolicySetting {
   const EnforcementPolicy initial_policy_;
   DISALLOW_COPY_AND_ASSIGN(ScopedHiddenApiEnforcementPolicySetting);
 };
+
+void InitializeCorePlatformApiPrivateFields() REQUIRES(!Locks::mutator_lock_);
 
 // Implementation details. DO NOT ACCESS DIRECTLY.
 namespace detail {
