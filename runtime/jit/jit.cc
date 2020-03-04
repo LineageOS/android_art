@@ -767,7 +767,10 @@ class JitCompileTask final : public Task {
     ScopedObjectAccess soa(Thread::Current());
     // For a non-bootclasspath class, add a global ref to the class to prevent class unloading
     // until compilation is done.
-    if (method->GetDeclaringClass()->GetClassLoader() != nullptr) {
+    // When we precompile, this is either with boot classpath methods, or main
+    // class loader methods, so we don't need to keep a global reference.
+    if (method->GetDeclaringClass()->GetClassLoader() != nullptr &&
+        kind_ != TaskKind::kPreCompile) {
       klass_ = soa.Vm()->AddGlobalRef(soa.Self(), method_->GetDeclaringClass());
       CHECK(klass_ != nullptr);
     }
@@ -1116,6 +1119,17 @@ void Jit::MapBootImageMethods() {
   LOG(INFO) << "Successfully mapped boot image methods";
 }
 
+// Return whether a boot image has a profile. This means we'll need to pre-JIT
+// methods in that profile for performance.
+static bool HasImageWithProfile() {
+  for (gc::space::ImageSpace* space : Runtime::Current()->GetHeap()->GetBootImageSpaces()) {
+    if (!space->GetProfileFile().empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Jit::CreateThreadPool() {
   // There is a DCHECK in the 'AddSamples' method to ensure the tread pool
   // is not null when we instrument.
@@ -1128,9 +1142,9 @@ void Jit::CreateThreadPool() {
   Start();
 
   Runtime* runtime = Runtime::Current();
-  if (runtime->IsZygote() && runtime->IsRunningJitZygote() && UseJitCompilation()) {
-    // If we're not using the default boot image location, request a JIT task to
-    // compile all methods in the boot image profile.
+  if (runtime->IsZygote() && HasImageWithProfile() && UseJitCompilation()) {
+    // If we have an image with a profile, request a JIT task to
+    // compile all methods in that profile.
     thread_pool_->AddTask(Thread::Current(), new ZygoteTask());
 
     // And create mappings to share boot image methods memory from the zygote to
@@ -1209,7 +1223,7 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
     return;
   }
   Runtime* runtime = Runtime::Current();
-  if (runtime->IsSystemServer() && runtime->IsRunningJitZygote() && UseJitCompilation()) {
+  if (runtime->IsSystemServer() && UseJitCompilation() && HasImageWithProfile()) {
     thread_pool_->AddTask(Thread::Current(), new JitProfileTask(dex_files, class_loader));
   }
 }
@@ -1237,7 +1251,9 @@ bool Jit::CompileMethodFromProfile(Thread* self,
   const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
   if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
       class_linker->IsQuickGenericJniStub(entry_point) ||
-      class_linker->IsQuickResolutionStub(entry_point)) {
+      // We explicitly check for the stub. The trampoline is for methods backed by
+      // a .oat file that has a compiled version of the method.
+      (entry_point == GetQuickResolutionStub())) {
     method->SetPreCompiled();
     if (!add_to_queue) {
       CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
@@ -1463,13 +1479,6 @@ bool Jit::MaybeCompileMethod(Thread* self,
     }
   }
   if (UseJitCompilation()) {
-    if (old_count == 0 &&
-        method->IsNative() &&
-        Runtime::Current()->IsRunningJitZygote()) {
-      // jitzygote: Compile JNI stub on first use to avoid the expensive generic stub.
-      CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ false);
-      return true;
-    }
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
       if (!code_cache_->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
         DCHECK(thread_pool_ != nullptr);
@@ -1639,10 +1648,11 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   }
 
   Runtime* const runtime = Runtime::Current();
-  // For child zygote, we instead query IsCompilationNotified() post zygote fork.
-  if (!is_zygote && runtime->IsRunningJitZygote() && fd_methods_ != -1) {
+  // Check if we'll need to remap the boot image methods.
+  if (!is_zygote && fd_methods_ != -1) {
     // Create a thread that will poll the status of zygote compilation, and map
     // the private mapping of boot image methods.
+    // For child zygote, we instead query IsCompilationNotified() post zygote fork.
     zygote_mapping_methods_.ResetInForkedProcess();
     pthread_t polling_thread;
     pthread_attr_t attr;
@@ -1668,7 +1678,7 @@ void Jit::PostForkChildAction(bool is_system_server, bool is_zygote) {
   code_cache_->SetGarbageCollectCode(!jit_compiler_->GenerateDebugInfo() &&
       !Runtime::Current()->GetInstrumentation()->AreExitStubsInstalled());
 
-  if (is_system_server && Runtime::Current()->IsRunningJitZygote()) {
+  if (is_system_server && HasImageWithProfile()) {
     // Disable garbage collection: we don't want it to delete methods we're compiling
     // through boot and system server profiles.
     // TODO(ngeoffray): Fix this so we still collect deoptimized and unused code.
