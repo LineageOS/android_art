@@ -49,7 +49,6 @@ constexpr const char* kVndkNamespaceName = "vndk";
 constexpr const char* kVndkProductNamespaceName = "vndk_product";
 constexpr const char* kArtNamespaceName = "com_android_art";
 constexpr const char* kNeuralNetworksNamespaceName = "com_android_neuralnetworks";
-constexpr const char* kCronetNamespaceName = "com_android_cronet";
 constexpr const char* kStatsdNamespaceName = "com_android_os_statsd";
 
 // classloader-namespace is a linker namespace that is created for the loaded
@@ -313,16 +312,6 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
           return linked.error();
         }
       }
-    }
-  }
-
-  // TODO(b/143733063): Remove it after library path of apex module is supported.
-  auto cronet_ns =
-      NativeLoaderNamespace::GetExportedNamespace(kCronetNamespaceName, is_bridged);
-  if (cronet_ns.ok()) {
-    linked = app_ns->Link(*cronet_ns, cronet_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
     }
   }
 
