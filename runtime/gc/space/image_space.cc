@@ -975,6 +975,7 @@ class ImageSpace::Loader {
     uint32_t checksum = 0u;
     size_t chunk_count = 0u;
     size_t space_pos = 0u;
+    uint64_t boot_image_size = 0u;
     for (size_t component_count = 0u; component_count != boot_image_component_count; ) {
       const ImageHeader& current_header = image_spaces[space_pos]->GetImageHeader();
       if (current_header.GetComponentCount() > boot_image_component_count - component_count) {
@@ -990,11 +991,19 @@ class ImageSpace::Loader {
       checksum ^= current_header.GetImageChecksum();
       chunk_count += 1u;
       space_pos += current_header.GetImageSpaceCount();
+      boot_image_size += current_header.GetImageReservationSize();
     }
     if (image_header.GetBootImageChecksum() != checksum) {
-      *error_msg = StringPrintf("Boot image checksum mismatch (0x%x != 0x%x) in image %s",
+      *error_msg = StringPrintf("Boot image checksum mismatch (0x%08x != 0x%08x) in image %s",
                                 image_header.GetBootImageChecksum(),
                                 checksum,
+                                image_filename);
+      return false;
+    }
+    if (image_header.GetBootImageSize() != boot_image_size) {
+      *error_msg = StringPrintf("Boot image size (0x%08x != 0x%08" PRIx64 ") in image %s",
+                                image_header.GetBootImageSize(),
+                                boot_image_size,
                                 image_filename);
       return false;
     }
@@ -1263,19 +1272,7 @@ class ImageSpace::Loader {
     // Set up sections.
     gc::Heap* const heap = Runtime::Current()->GetHeap();
     uint32_t boot_image_begin = heap->GetBootImagesStartAddress();
-    uint32_t boot_image_size = heap->GetBootImagesSize();
-    if (boot_image_size == 0u) {
-      *error_msg = "Can not relocate app image without boot image space";
-      return false;
-    }
-    const uint32_t image_header_boot_image_size = image_header.GetBootImageSize();
-    if (boot_image_size != image_header_boot_image_size) {
-      *error_msg = StringPrintf("Boot image size %" PRIu64 " does not match expected size %"
-                                    PRIu64,
-                                static_cast<uint64_t>(boot_image_size),
-                                static_cast<uint64_t>(image_header_boot_image_size));
-      return false;
-    }
+    const uint32_t boot_image_size = image_header.GetBootImageSize();
     const ImageSection& objects_section = image_header.GetObjectsSection();
     // Where the app image objects are mapped to.
     uint8_t* objects_location = target_base + objects_section.Offset();
@@ -1517,8 +1514,8 @@ class ImageSpace::BootImageLayout {
     uint32_t reservation_size;
     uint32_t checksum;
     uint32_t boot_image_component_count;
-    uint32_t boot_image_space_count;
     uint32_t boot_image_checksum;
+    uint32_t boot_image_size;
 
     // The following file descriptors hold the memfd files for extensions compiled
     // in memory and described by the above fields. We want to use them to mmap()
@@ -1625,13 +1622,11 @@ class ImageSpace::BootImageLayout {
 
   bool ValidateBootImageChecksum(const char* file_description,
                                  const ImageHeader& header,
-                                 /*out*/uint32_t* boot_image_space_count,
                                  /*out*/std::string* error_msg);
 
   bool ValidateHeader(const ImageHeader& header,
                       size_t bcp_index,
                       const char* file_description,
-                      /*out*/uint32_t* boot_image_space_count,
                       /*out*/std::string* error_msg);
 
   bool ReadHeader(const std::string& base_location,
@@ -1856,7 +1851,6 @@ bool ImageSpace::BootImageLayout::MatchNamedComponents(
 
 bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const char* file_description,
                                                             const ImageHeader& header,
-                                                            /*out*/uint32_t* boot_image_space_count,
                                                             /*out*/std::string* error_msg) {
   uint32_t boot_image_component_count = header.GetBootImageComponentCount();
   if (chunks_.empty() != (boot_image_component_count == 0u)) {
@@ -1868,7 +1862,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const char* file_des
   }
   uint32_t component_count = 0u;
   uint32_t composite_checksum = 0u;
-  *boot_image_space_count = 0u;
+  uint64_t boot_image_size = 0u;
   for (const ImageChunk& chunk : chunks_) {
     if (component_count == boot_image_component_count) {
       break;  // Hit the component count.
@@ -1887,7 +1881,7 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const char* file_des
     }
     component_count += chunk.component_count;
     composite_checksum ^= chunk.checksum;
-    *boot_image_space_count += chunk.image_space_count;
+    boot_image_size += chunk.reservation_size;
   }
   DCHECK_LE(component_count, boot_image_component_count);
   if (component_count != boot_image_component_count) {
@@ -1904,13 +1898,19 @@ bool ImageSpace::BootImageLayout::ValidateBootImageChecksum(const char* file_des
                               composite_checksum);
     return false;
   }
+  if (boot_image_size != header.GetBootImageSize()) {
+    *error_msg = StringPrintf("Boot image size mismatch in %s: 0x%08x != 0x%08" PRIx64,
+                              file_description,
+                              header.GetBootImageSize(),
+                              boot_image_size);
+    return false;
+  }
   return true;
 }
 
 bool ImageSpace::BootImageLayout::ValidateHeader(const ImageHeader& header,
                                                  size_t bcp_index,
                                                  const char* file_description,
-                                                 /*out*/uint32_t* boot_image_space_count,
                                                  /*out*/std::string* error_msg) {
   size_t bcp_component_count = boot_class_path_.size();
   DCHECK_LT(bcp_index, bcp_component_count);
@@ -1934,7 +1934,7 @@ bool ImageSpace::BootImageLayout::ValidateHeader(const ImageHeader& header,
                               allowed_reservation_size);
     return false;
   }
-  if (!ValidateBootImageChecksum(file_description, header, boot_image_space_count, error_msg)) {
+  if (!ValidateBootImageChecksum(file_description, header, error_msg)) {
     return false;
   }
 
@@ -1954,8 +1954,7 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
     return false;
   }
   const char* file_description = actual_filename.c_str();
-  uint32_t boot_image_space_count;
-  if (!ValidateHeader(header, bcp_index, file_description, &boot_image_space_count, error_msg)) {
+  if (!ValidateHeader(header, bcp_index, file_description, error_msg)) {
     return false;
   }
 
@@ -1971,8 +1970,8 @@ bool ImageSpace::BootImageLayout::ReadHeader(const std::string& base_location,
   chunk.reservation_size = header.GetImageReservationSize();
   chunk.checksum = header.GetImageChecksum();
   chunk.boot_image_component_count = header.GetBootImageComponentCount();
-  chunk.boot_image_space_count = boot_image_space_count;
   chunk.boot_image_checksum = header.GetBootImageChecksum();
+  chunk.boot_image_size = header.GetBootImageSize();
   chunks_.push_back(std::move(chunk));
   next_bcp_index_ = bcp_index + header.GetComponentCount();
   total_component_count_ += header.GetComponentCount();
@@ -2140,9 +2139,8 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
     }
     art_fd.reset(image_file.Release());
   }
-  uint32_t boot_image_space_count;
   const char* file_description = "compiled image file";
-  if (!ValidateHeader(header, bcp_index, file_description, &boot_image_space_count, error_msg)) {
+  if (!ValidateHeader(header, bcp_index, file_description, error_msg)) {
     return false;
   }
 
@@ -2157,8 +2155,8 @@ bool ImageSpace::BootImageLayout::CompileExtension(const std::string& base_locat
   chunk.reservation_size = header.GetImageReservationSize();
   chunk.checksum = header.GetImageChecksum();
   chunk.boot_image_component_count = header.GetBootImageComponentCount();
-  chunk.boot_image_space_count = boot_image_space_count;
   chunk.boot_image_checksum = header.GetBootImageChecksum();
+  chunk.boot_image_size = header.GetBootImageSize();
   chunk.art_fd.reset(art_fd.release());
   chunk.vdex_fd.reset(vdex_fd.release());
   chunk.oat_fd.reset(oat_fd.release());
@@ -3147,12 +3145,14 @@ class ImageSpace::BootImageLoader {
       if (i == 0 && (chunk.checksum != header.GetImageChecksum() ||
                      chunk.image_space_count != header.GetImageSpaceCount() ||
                      chunk.boot_image_component_count != header.GetBootImageComponentCount() ||
-                     chunk.boot_image_checksum != header.GetBootImageChecksum())) {
+                     chunk.boot_image_checksum != header.GetBootImageChecksum() ||
+                     chunk.boot_image_size != header.GetBootImageSize())) {
         *error_msg = StringPrintf("Image header modified since previously read from %s; "
                                       "checksum: 0x%08x -> 0x%08x,"
                                       "image_space_count: %u -> %u"
                                       "boot_image_component_count: %u -> %u, "
-                                      "boot_image_checksum: 0x%08x -> 0x%08x",
+                                      "boot_image_checksum: 0x%08x -> 0x%08x"
+                                      "boot_image_size: 0x%08x -> 0x%08x",
                                   space->GetImageFilename().c_str(),
                                   chunk.checksum,
                                   chunk.image_space_count,
@@ -3161,7 +3161,9 @@ class ImageSpace::BootImageLoader {
                                   chunk.boot_image_component_count,
                                   header.GetBootImageComponentCount(),
                                   chunk.boot_image_checksum,
-                                  header.GetBootImageChecksum());
+                                  header.GetBootImageChecksum(),
+                                  chunk.boot_image_size,
+                                  header.GetBootImageSize());
         return false;
       }
     }
