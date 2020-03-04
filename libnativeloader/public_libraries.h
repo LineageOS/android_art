@@ -18,6 +18,7 @@
 #define ART_LIBNATIVELOADER_PUBLIC_LIBRARIES_H_
 
 #include <algorithm>
+#include <map>
 #include <string>
 
 #include <android-base/result.h>
@@ -40,6 +41,7 @@ const std::string& llndk_libraries_product();
 const std::string& llndk_libraries_vendor();
 const std::string& vndksp_libraries_product();
 const std::string& vndksp_libraries_vendor();
+const std::string& apex_jni_libraries(const std::string& apex_name);
 
 // Returns true if libnativeloader is running on devices and the device has
 // ro.product.vndk.version property. It returns false for host.
@@ -61,6 +63,9 @@ struct ConfigEntry {
 Result<std::vector<std::string>> ParseConfig(
     const std::string& file_content,
     const std::function<Result<bool>(const ConfigEntry& /* entry */)>& filter_fn);
+
+Result<std::map<std::string, std::string>> ParseJniConfig(
+    const std::string& file_content);
 
 }  // namespace internal
 

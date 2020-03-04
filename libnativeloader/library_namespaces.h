@@ -67,6 +67,8 @@ class LibraryNamespaces {
   std::list<std::pair<jweak, NativeLoaderNamespace>> namespaces_;
 };
 
+Result<std::string> FindApexNamespaceName(const std::string& location);
+
 }  // namespace android::nativeloader
 
 #endif  // ART_LIBNATIVELOADER_LIBRARY_NAMESPACES_H_

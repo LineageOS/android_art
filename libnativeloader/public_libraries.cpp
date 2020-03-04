@@ -21,6 +21,7 @@
 #include <dirent.h>
 
 #include <algorithm>
+#include <map>
 #include <memory>
 
 #include <android-base/file.h>
@@ -42,6 +43,7 @@ using android::base::ErrnoError;
 using android::base::Result;
 using internal::ConfigEntry;
 using internal::ParseConfig;
+using internal::ParseJniConfig;
 using std::literals::string_literals::operator""s;
 
 namespace {
@@ -49,6 +51,7 @@ namespace {
 constexpr const char* kDefaultPublicLibrariesFile = "/etc/public.libraries.txt";
 constexpr const char* kExtendedPublicLibrariesFilePrefix = "public.libraries-";
 constexpr const char* kExtendedPublicLibrariesFileSuffix = ".txt";
+constexpr const char* kJniConfigFile = "/linkerconfig/jni.config.txt";
 constexpr const char* kVendorPublicLibrariesFile = "/vendor/etc/public.libraries.txt";
 constexpr const char* kLlndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/llndk.libraries.{}.txt";
 constexpr const char* kVndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/vndksp.libraries.{}.txt";
@@ -307,6 +310,21 @@ static std::string InitStatsdPublicLibraries() {
   return kStatsdApexPublicLibrary;
 }
 
+static std::map<std::string, std::string> InitApexJniLibraries() {
+  std::string file_content;
+  if (!base::ReadFileToString(kJniConfigFile, &file_content)) {
+    // jni config is optional
+    return {};
+  }
+  auto config = ParseJniConfig(file_content);
+  if (!config.ok()) {
+    LOG_ALWAYS_FATAL("%s: %s", kJniConfigFile, config.error().message().c_str());
+    // not reach here
+    return {};
+  }
+  return *config;
+}
+
 }  // namespace
 
 const std::string& preloadable_public_libraries() {
@@ -362,6 +380,11 @@ const std::string& vndksp_libraries_product() {
 const std::string& vndksp_libraries_vendor() {
   static std::string list = InitVndkspLibrariesVendor();
   return list;
+}
+
+const std::string& apex_jni_libraries(const std::string& apex_ns_name) {
+  static std::map<std::string, std::string> jni_libraries = InitApexJniLibraries();
+  return jni_libraries[apex_ns_name];
 }
 
 bool is_product_vndk_version_defined() {
@@ -439,6 +462,24 @@ Result<std::vector<std::string>> ParseConfig(
     }
   }
   return sonames;
+}
+
+Result<std::map<std::string, std::string>> ParseJniConfig(const std::string& file_content) {
+  std::map<std::string, std::string> entries;
+  std::vector<std::string> lines = base::Split(file_content, "\n");
+  for (auto& line : lines) {
+    auto trimmed_line = base::Trim(line);
+    if (trimmed_line[0] == '#' || trimmed_line.empty()) {
+      continue;
+    }
+
+    std::vector<std::string> tokens = base::Split(trimmed_line, " ");
+    if (tokens.size() < 2) {
+      return Errorf( "Malformed line \"{}\"", line);
+    }
+    entries[tokens[0]] = tokens[1];
+  }
+  return entries;
 }
 
 }  // namespace internal
