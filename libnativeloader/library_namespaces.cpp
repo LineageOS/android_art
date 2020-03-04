@@ -26,6 +26,7 @@
 #include <android-base/logging.h>
 #include <android-base/macros.h>
 #include <android-base/properties.h>
+#include <android-base/result.h>
 #include <android-base/strings.h>
 #include <nativehelper/scoped_utf_chars.h>
 
@@ -36,6 +37,9 @@
 namespace android::nativeloader {
 
 namespace {
+
+constexpr const char* kApexPath = "/apex/";
+
 // The device may be configured to have the vendor libraries loaded to a separate namespace.
 // For historical reasons this namespace was named sphal but effectively it is intended
 // to use to load vendor libraries to separate namespace with controlled interface between
@@ -93,23 +97,17 @@ jobject GetParentClassLoader(JNIEnv* env, jobject class_loader) {
   return env->CallObjectMethod(class_loader, get_parent);
 }
 
-ApkOrigin GetApkOriginFromDexPath(JNIEnv* env, jstring dex_path) {
+ApkOrigin GetApkOriginFromDexPath(const std::string& dex_path) {
   ApkOrigin apk_origin = APK_ORIGIN_DEFAULT;
+  if (std::regex_search(dex_path, kVendorDexPathRegex)) {
+    apk_origin = APK_ORIGIN_VENDOR;
+  }
+  if (std::regex_search(dex_path, kProductDexPathRegex)) {
+    LOG_ALWAYS_FATAL_IF(apk_origin == APK_ORIGIN_VENDOR,
+                        "Dex path contains both vendor and product partition : %s",
+                        dex_path.c_str());
 
-  if (dex_path != nullptr) {
-    ScopedUtfChars dex_path_utf_chars(env, dex_path);
-
-    if (std::regex_search(dex_path_utf_chars.c_str(), kVendorDexPathRegex)) {
-      apk_origin = APK_ORIGIN_VENDOR;
-    }
-
-    if (std::regex_search(dex_path_utf_chars.c_str(), kProductDexPathRegex)) {
-      LOG_ALWAYS_FATAL_IF(apk_origin == APK_ORIGIN_VENDOR,
-                          "Dex path contains both vendor and product partition : %s",
-                          dex_path_utf_chars.c_str());
-
-      apk_origin = APK_ORIGIN_PRODUCT;
-    }
+    apk_origin = APK_ORIGIN_PRODUCT;
   }
   return apk_origin;
 }
@@ -140,17 +138,23 @@ void LibraryNamespaces::Initialize() {
 
 Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t target_sdk_version,
                                                          jobject class_loader, bool is_shared,
-                                                         jstring dex_path,
+                                                         jstring dex_path_j,
                                                          jstring java_library_path,
                                                          jstring java_permitted_path) {
   std::string library_path;  // empty string by default.
+  std::string dex_path;
 
   if (java_library_path != nullptr) {
     ScopedUtfChars library_path_utf_chars(env, java_library_path);
     library_path = library_path_utf_chars.c_str();
   }
 
-  ApkOrigin apk_origin = GetApkOriginFromDexPath(env, dex_path);
+  if (dex_path_j != nullptr) {
+    ScopedUtfChars dex_path_chars(env, dex_path_j);
+    dex_path = dex_path_chars.c_str();
+  }
+
+  ApkOrigin apk_origin = GetApkOriginFromDexPath(dex_path);
 
   // (http://b/27588281) This is a workaround for apps using custom
   // classloaders and calling System.load() with an absolute path which
@@ -297,6 +301,20 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     }
   }
 
+  auto apex_ns_name = FindApexNamespaceName(dex_path);
+  if (apex_ns_name.ok()) {
+    const auto& jni_libs = apex_jni_libraries(*apex_ns_name);
+    if (jni_libs != "") {
+      auto apex_ns = NativeLoaderNamespace::GetExportedNamespace(*apex_ns_name, is_bridged);
+      if (apex_ns.ok()) {
+        auto link = app_ns->Link(*apex_ns, jni_libs);
+        if (!link.ok()) {
+          return linked.error();
+        }
+      }
+    }
+  }
+
   // Give access to StatsdAPI libraries
   auto statsd_ns =
       NativeLoaderNamespace::GetExportedNamespace(kStatsdNamespaceName, is_bridged);
@@ -354,6 +372,23 @@ NativeLoaderNamespace* LibraryNamespaces::FindParentNamespaceByClassLoader(JNIEn
   }
 
   return nullptr;
+}
+
+base::Result<std::string> FindApexNamespaceName(const std::string& location) {
+  // Lots of implicit assumptions here: we expect `location` to be of the form:
+  // /apex/modulename/...
+  //
+  // And we extract from it 'modulename', and then apply mangling rule to get namespace name for it.
+  if (android::base::StartsWith(location, kApexPath)) {
+    size_t start_index = strlen(kApexPath);
+    size_t slash_index = location.find_first_of('/', start_index);
+    LOG_ALWAYS_FATAL_IF((slash_index == std::string::npos),
+                        "Error finding namespace of apex: no slash in path %s", location.c_str());
+    std::string name = location.substr(start_index, slash_index - start_index);
+    std::replace(name.begin(), name.end(), '.', '_');
+    return name;
+  }
+  return base::Error();
 }
 
 }  // namespace android::nativeloader
