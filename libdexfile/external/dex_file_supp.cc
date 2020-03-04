@@ -77,7 +77,7 @@ bool TryLoadLibdexfileExternal([[maybe_unused]] std::string* err_msg) {
 
 #define RESOLVE_DLFUNC_PTR(CLASS, DLFUNC) \
     decltype(DLFUNC)* DLFUNC##_ptr = reinterpret_cast<decltype(DLFUNC)*>(dlsym(handle, #DLFUNC)); \
-    if (DLFUNC == nullptr) { \
+    if ((DLFUNC) == nullptr) { \
       *err_msg = dlerror(); \
       return false; \
     }
