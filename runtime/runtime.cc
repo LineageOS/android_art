@@ -889,6 +889,10 @@ bool Runtime::Start() {
   // needs the SignaturePolymorphic annotation class which is initialized in WellKnownClasses::Init.
   InitializeIntrinsics();
 
+  // InitializeCorePlatformApiPrivateFields() needs to be called after well known class
+  // initializtion in InitNativeMethods().
+  art::hiddenapi::InitializeCorePlatformApiPrivateFields();
+
   // Initialize well known thread group values that may be accessed threads while attaching.
   InitThreadGroups(self);
 
