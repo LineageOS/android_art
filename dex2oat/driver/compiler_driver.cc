@@ -1076,6 +1076,12 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
     return;
   }
 
+  // Make sure the File[] class is in the primary boot image. b/150319075
+  // TODO: Implement support for array classes in profiles and remove this workaround. b/148067697
+  if (GetCompilerOptions().IsBootImage()) {
+    image_classes->insert("[Ljava/io/File;");
+  }
+
   TimingLogger::ScopedTiming t("LoadImageClasses", timings);
   // Make a first pass to load all classes explicitly listed in the file
   Thread* self = Thread::Current();
