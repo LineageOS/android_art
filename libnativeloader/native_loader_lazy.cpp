@@ -40,7 +40,7 @@ FuncPtr GetFuncPtr(const char* function_name) {
   return f;
 }
 
-#define GET_FUNC_PTR(name) GetFuncPtr<decltype(&name)>(#name)
+#define GET_FUNC_PTR(name) GetFuncPtr<decltype(&(name))>(#name)
 
 }  // namespace
 
