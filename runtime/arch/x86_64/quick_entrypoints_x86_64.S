@@ -1676,13 +1676,16 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
 
-    // Load hidden arg (r11) for @CriticalNative.
-    movq 64(%rsp), %r11
+    // Save call target in scratch register.
+    movq %rax, %r11
+
+    // Load hidden arg (rax) for @CriticalNative.
+    movq 64(%rsp), %rax
     // Load SP for out args, releasing unneeded reserved area.
     movq 72(%rsp), %rsp
 
     // native call
-    call *%rax
+    call *%r11
 
     // result sign extension is handled in C code
     // prepare for artQuickGenericJniEndTrampoline call

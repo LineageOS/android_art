@@ -563,14 +563,10 @@ void X86JNIMacroAssembler::TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryCond
       UNREACHABLE();
   }
 
-  // TODO: Compare the memory location with immediate 0.
-  Register scratch = GetScratchRegister();
-  DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
-  __ fs()->movl(scratch, Address::Absolute(Thread::IsGcMarkingOffset<kX86PointerSize>()));
-
-  // TEST reg, reg
+  // CMP self->tls32_.is_gc_marking, 0
   // Jcc <Offset>
-  __ testl(scratch, scratch);
+  DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
+  __ fs()->cmpl(Address::Absolute(Thread::IsGcMarkingOffset<kX86PointerSize>()), Immediate(0));
   __ j(x86_cond, X86JNIMacroLabel::Cast(label)->AsX86());
 }
 
