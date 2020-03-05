@@ -79,9 +79,9 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
 END_FUNCTION art_jni_dlsym_lookup_stub
 
 DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
-    // The hidden arg holding the tagged method (bit 0 set means GenericJNI) is r11.
+    // The hidden arg holding the tagged method (bit 0 set means GenericJNI) is RAX.
     // For Generic JNI we already have a managed frame, so we reuse the art_jni_dlsym_lookup_stub.
-    testq LITERAL(1), %r11
+    testq LITERAL(1), %rax
     jnz art_jni_dlsym_lookup_stub
 
     // We need to create a GenericJNI managed frame above the stack args.
@@ -121,10 +121,10 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     subq MACRO_LITERAL(__SIZEOF_POINTER__), %rsp
     CFI_ADJUST_CFA_OFFSET(__SIZEOF_POINTER__)
     // Save hidden arg.
-    PUSH_ARG r11
+    PUSH_ARG rax
 
     // Call artCriticalNativeOutArgsSize(method).
-    movq %r11, %rdi  // Pass the method from hidden arg.
+    movq %rax, %rdi  // Pass the method from hidden arg.
     call SYMBOL(artCriticalNativeOutArgsSize)
 
     // Calculate the address of the end of the move destination and redefine CFI to take
@@ -148,7 +148,7 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     movq %rax, (%rdi)
 
     // Pop the hidden arg and alignment padding.
-    popq %r11    // No `.cfi_adjust_cfa_offset`, CFA register is currently R10, not RSP.
+    popq %rax    // No `.cfi_adjust_cfa_offset`, CFA register is currently R10, not RSP.
     addq MACRO_LITERAL(__SIZEOF_POINTER__), %rsp  // ditto
 
     // Fill the SaveRefsAndArgs frame above the args, without actual args. Note that
@@ -175,7 +175,7 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     movq %xmm14, 96(%r10)
     movq %xmm15, 104(%r10)
     // Save the hidden arg as method pointer at the bottom of the stack.
-    movq %r11, (%r10)
+    movq %rax, (%r10)
 
     // Move the frame register to a callee-save register.
     movq %r10, %rbp
@@ -255,7 +255,7 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     CFI_RESTORE_STATE_AND_DEF_CFA(%rbp, FRAME_SIZE_SAVE_REFS_AND_ARGS)
 
 2:
-    // Drop the args from the stack (the r11 and padding was already removed).
+    // Drop the args from the stack (the RAX and padding was already removed).
     addq LITERAL(14 * __SIZEOF_POINTER__), %rsp
 
     DELIVER_PENDING_EXCEPTION_FRAME_READY
