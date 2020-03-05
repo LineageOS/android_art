@@ -37,8 +37,7 @@ static constexpr size_t kNativeStackAlignment = 16;
 static_assert(kNativeStackAlignment == kStackAlignment);
 
 static inline CpuRegister GetScratchRegister() {
-  // TODO: Use R11 in line with Optimizing.
-  return CpuRegister(RAX);
+  return CpuRegister(R11);
 }
 
 #define __ asm_.
@@ -403,11 +402,8 @@ void X86_64JNIMacroAssembler::Copy(FrameOffset dest, FrameOffset src, size_t siz
   DCHECK(size == 4 || size == 8) << size;
   CpuRegister scratch = GetScratchRegister();
   if (size == 8) {
-    // TODO: Use MOVQ.
-    __ movl(scratch, Address(CpuRegister(RSP), src));
-    __ movl(Address(CpuRegister(RSP), dest), scratch);
-    __ movl(scratch, Address(CpuRegister(RSP), FrameOffset(src.Int32Value() + 4)));
-    __ movl(Address(CpuRegister(RSP), FrameOffset(dest.Int32Value() + 4)), scratch);
+    __ movq(scratch, Address(CpuRegister(RSP), src));
+    __ movq(Address(CpuRegister(RSP), dest), scratch);
   } else {
     __ movl(scratch, Address(CpuRegister(RSP), src));
     __ movl(Address(CpuRegister(RSP), dest), scratch);
@@ -622,14 +618,11 @@ void X86_64JNIMacroAssembler::TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryC
       UNREACHABLE();
   }
 
-  // TODO: Compare the memory location with immediate 0.
-  CpuRegister scratch = GetScratchRegister();
-  DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
-  __ gs()->movl(scratch, Address::Absolute(Thread::IsGcMarkingOffset<kX86_64PointerSize>(), true));
-
-  // TEST reg, reg
+  // CMP self->tls32_.is_gc_marking, 0
   // Jcc <Offset>
-  __ testq(scratch, scratch);
+  DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
+  __ gs()->cmpl(Address::Absolute(Thread::IsGcMarkingOffset<kX86_64PointerSize>(), true),
+                Immediate(0));
   __ j(x86_64_cond, X86_64JNIMacroLabel::Cast(label)->AsX86_64());
 }
 
