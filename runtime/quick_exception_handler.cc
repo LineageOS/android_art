@@ -15,10 +15,12 @@
  */
 
 #include "quick_exception_handler.h"
+#include <ios>
 
 #include "arch/context.h"
 #include "art_method-inl.h"
 #include "base/enums.h"
+#include "base/globals.h"
 #include "base/logging.h"  // For VLOG_IS_ON.
 #include "base/systrace.h"
 #include "dex/dex_file_types.h"
@@ -465,7 +467,12 @@ class DeoptimizeStackVisitor final : public StackVisitor {
         ? code_info.GetInlineDexRegisterMapOf(stack_map, GetCurrentInlinedFrame())
         : code_info.GetDexRegisterMapOf(stack_map);
 
-    DCHECK_EQ(vreg_map.size(), number_of_vregs);
+    if (kIsDebugBuild || UNLIKELY(Runtime::Current()->IsJavaDebuggable())) {
+      CHECK_EQ(vreg_map.size(), number_of_vregs) << *Thread::Current()
+                                                 << "Deopting: " << m->PrettyMethod()
+                                                 << " inlined? "
+                                                 << std::boolalpha << IsInInlinedFrame();
+    }
     if (vreg_map.empty()) {
       return;
     }
