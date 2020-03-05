@@ -541,6 +541,11 @@ def handle_zipapex(ziploc):
   else:
     yield ""
 
+def _popen(**kwargs):
+  if sys.version_info.major == 3 and sys.version_info.minor >= 6:
+    return subprocess.Popen(encoding=sys.stdout.encoding, **kwargs)
+  return subprocess.Popen(**kwargs)
+
 def run_test(command, test, test_variant, test_name):
   """Runs the test.
 
@@ -569,11 +574,20 @@ def run_test(command, test, test_variant, test_name):
       if verbose:
         print_text("Starting %s at %s\n" % (test_name, test_start_time))
       if gdb:
-        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT,
-                                universal_newlines=True, start_new_session=True)
+        proc = _popen(
+          args=command.split(),
+          stderr=subprocess.STDOUT,
+          universal_newlines=True,
+          start_new_session=True
+        )
       else:
-        proc = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, stdout = subprocess.PIPE,
-                                universal_newlines=True, start_new_session=True)
+        proc = _popen(
+          args=command.split(),
+          stderr=subprocess.STDOUT,
+          stdout = subprocess.PIPE,
+          universal_newlines=True,
+          start_new_session=True,
+        )
       script_output = proc.communicate(timeout=timeout)[0]
       test_passed = not proc.wait()
       test_time_seconds = time.monotonic() - test_start_time
