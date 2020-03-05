@@ -415,9 +415,11 @@ std::unique_ptr<const DexFile> DexFileLoader::OpenOneDexFileFromZip(
     return nullptr;
   }
   VerifyResult verify_result;
+  auto map_data = map.data();
+  auto map_size = map.size();
   std::unique_ptr<const DexFile> dex_file = OpenCommon(
-      map.data(),
-      map.size(),
+      map_data,
+      map_size,
       /*data_base=*/ nullptr,
       /*data_size=*/ 0u,
       location,
