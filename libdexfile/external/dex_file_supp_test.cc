@@ -62,7 +62,7 @@ TEST(DexStringTest, alloc_empty_string) {
 TEST(DexStringTest, move_construct) {
   auto s1 = DexString("foo");
   auto s2 = DexString(std::move(s1));
-  EXPECT_TRUE(std::string_view(s1).empty());
+  EXPECT_TRUE(std::string_view(s1).empty()); // NOLINT bugprone-use-after-move
   EXPECT_EQ(std::string_view(s2), "foo");
 }
 
@@ -71,7 +71,7 @@ TEST(DexStringTest, move_assign) {
   DexString s2;
   EXPECT_TRUE(std::string_view(s2).empty());
   s2 = std::move(s1);
-  EXPECT_TRUE(std::string_view(s1).empty());
+  EXPECT_TRUE(std::string_view(s1).empty()); // NOLINT bugprone-use-after-move
   EXPECT_EQ(std::string_view(s2), "foo");
 }
 
