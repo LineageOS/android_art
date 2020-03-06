@@ -304,13 +304,13 @@ FrameOffset X86_64JniCallingConvention::CurrentParamStackOffset() {
 
 ManagedRegister X86_64JniCallingConvention::HiddenArgumentRegister() const {
   CHECK(IsCriticalNative());
-  // R11 is neither managed callee-save, nor argument register, nor scratch register.
+  // RAX is neither managed callee-save, nor argument register, nor scratch register.
   DCHECK(std::none_of(kCalleeSaveRegisters,
                       kCalleeSaveRegisters + std::size(kCalleeSaveRegisters),
                       [](ManagedRegister callee_save) constexpr {
-                        return callee_save.Equals(X86_64ManagedRegister::FromCpuRegister(R11));
+                        return callee_save.Equals(X86_64ManagedRegister::FromCpuRegister(RAX));
                       }));
-  return X86_64ManagedRegister::FromCpuRegister(R11);
+  return X86_64ManagedRegister::FromCpuRegister(RAX);
 }
 
 // Whether to use tail call (used only for @CriticalNative).
