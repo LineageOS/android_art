@@ -304,8 +304,23 @@
     },
     {
         "tests": "596-app-images",
-        "description": "Code being tested has been disabled",
-        "bug": "b/70734839"
+        "description": "app images do not initialize classes when debuggable",
+        "variant": "debuggable"
+    },
+    {
+        "tests": "596-app-images",
+        "description": "not generated when using the access check configuration",
+        "variant": "interp-ac"
+    },
+    {
+        "tests": "597-app-images-same-classloader",
+        "description": "not generated when using the access check configuration",
+        "variant": "interp-ac"
+    },
+    {
+        "tests": ["596-app-images", "597-app-images-same-classloader"],
+        "description": "jvmti does not interact well with images",
+        "variant": "field-stress | jvmti-stress | redefine-stress | step-stress | trace-stress"
     },
     {
         "tests": "055-enum-performance",
