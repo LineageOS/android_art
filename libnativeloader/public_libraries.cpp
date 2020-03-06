@@ -50,8 +50,8 @@ constexpr const char* kDefaultPublicLibrariesFile = "/etc/public.libraries.txt";
 constexpr const char* kExtendedPublicLibrariesFilePrefix = "public.libraries-";
 constexpr const char* kExtendedPublicLibrariesFileSuffix = ".txt";
 constexpr const char* kVendorPublicLibrariesFile = "/vendor/etc/public.libraries.txt";
-constexpr const char* kLlndkLibrariesFile = "/system/etc/llndk.libraries.txt";
-constexpr const char* kVndkLibrariesFile = "/system/etc/vndksp.libraries.txt";
+constexpr const char* kLlndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/llndk.libraries.{}.txt";
+constexpr const char* kVndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/vndksp.libraries.{}.txt";
 
 const std::vector<const std::string> kArtApexPublicLibraries = {
     "libicuuc.so",
@@ -76,11 +76,13 @@ bool debuggable() {
 }
 
 std::string vndk_version_str(bool use_product_vndk) {
-  static std::string version = get_vndk_version(use_product_vndk);
-  if (version != "" && version != "current") {
-    return "." + version;
+  if (use_product_vndk) {
+    static std::string product_vndk_version = get_vndk_version(true);
+    return product_vndk_version;
+  } else {
+    static std::string vendor_vndk_version = get_vndk_version(false);
+    return vendor_vndk_version;
   }
-  return "";
 }
 
 // For debuggable platform builds use ANDROID_ADDITIONAL_PUBLIC_LIBRARIES environment
@@ -93,13 +95,15 @@ std::string additional_public_libraries() {
   return "";
 }
 
+// insert vndk version in every {} placeholder
 void InsertVndkVersionStr(std::string* file_name, bool use_product_vndk) {
   CHECK(file_name != nullptr);
-  size_t insert_pos = file_name->find_last_of(".");
-  if (insert_pos == std::string::npos) {
-    insert_pos = file_name->length();
+  auto version = vndk_version_str(use_product_vndk);
+  size_t pos = file_name->find("{}");
+  while (pos != std::string::npos) {
+    file_name->replace(pos, 2, version);
+    pos = file_name->find("{}", pos + version.size());
   }
-  file_name->insert(insert_pos, vndk_version_str(use_product_vndk));
 }
 
 const std::function<Result<bool>(const struct ConfigEntry&)> always_true =
@@ -256,7 +260,7 @@ static std::string InitLlndkLibrariesVendor() {
   InsertVndkVersionStr(&config_file, false);
   auto sonames = ReadConfig(config_file, always_true);
   if (!sonames.ok()) {
-    LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
+    LOG_ALWAYS_FATAL("%s: %s", config_file.c_str(), sonames.error().message().c_str());
     return "";
   }
   return android::base::Join(*sonames, ':');
@@ -267,7 +271,7 @@ static std::string InitLlndkLibrariesProduct() {
   InsertVndkVersionStr(&config_file, true);
   auto sonames = ReadConfig(config_file, always_true);
   if (!sonames.ok()) {
-    LOG_ALWAYS_FATAL("%s", sonames.error().message().c_str());
+    LOG_ALWAYS_FATAL("%s: %s", config_file.c_str(), sonames.error().message().c_str());
     return "";
   }
   return android::base::Join(*sonames, ':');
