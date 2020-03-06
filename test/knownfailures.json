@@ -304,18 +304,8 @@
     },
     {
         "tests": "596-app-images",
-        "description": "app images do not initialize classes when debuggable",
-        "variant": "debuggable"
-    },
-    {
-        "tests": "596-app-images",
-        "description": "not generated when using the access check configuration",
-        "variant": "interp-ac"
-    },
-    {
-        "tests": "597-app-images-same-classloader",
-        "description": "not generated when using the access check configuration",
-        "variant": "interp-ac"
+        "description": "Code being tested has been disabled",
+        "bug": "b/70734839"
     },
     {
         "tests": "055-enum-performance",
