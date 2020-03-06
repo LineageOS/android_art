@@ -84,9 +84,6 @@ TEST_VDEX="n"
 TEST_DM="n"
 TEST_IS_NDEBUG="n"
 APP_IMAGE="y"
-SECONDARY_APP_IMAGE="y"
-SECONDARY_CLASS_LOADER_CONTEXT=""
-SECONDARY_COMPILATION="y"
 JVMTI_STRESS="n"
 JVMTI_STEP_STRESS="n"
 JVMTI_FIELD_STRESS="n"
@@ -133,8 +130,6 @@ while true; do
     elif [ "x$1" = "x--jvmti" ]; then
         USE_JVMTI="y"
         IS_JVMTI_TEST="y"
-        # Secondary images block some tested behavior.
-        SECONDARY_APP_IMAGE="n"
         shift
     elif [ "x$1" = "x-O" ]; then
         TEST_IS_NDEBUG="y"
@@ -217,7 +212,6 @@ while true; do
         # APP_IMAGE doesn't really work with jvmti redefine stress
         USE_JVMTI="y"
         APP_IMAGE="n"
-        SECONDARY_APP_IMAGE="n"
         JVMTI_STRESS="y"
         JVMTI_REDEFINE_STRESS="y"
         shift
@@ -238,16 +232,6 @@ while true; do
         shift
     elif [ "x$1" = "x--no-app-image" ]; then
         APP_IMAGE="n"
-        shift
-    elif [ "x$1" = "x--no-secondary-app-image" ]; then
-        SECONDARY_APP_IMAGE="n"
-        shift
-    elif [ "x$1" = "x--secondary-class-loader-context" ]; then
-        shift
-        SECONDARY_CLASS_LOADER_CONTEXT="$1"
-        shift
-    elif [ "x$1" = "x--no-secondary-compilation" ]; then
-        SECONDARY_COMPILATION="n"
         shift
     elif [ "x$1" = "x--strip-dex" ]; then
         STRIP_DEX="y"
@@ -918,27 +902,16 @@ if [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
   fi
 fi
 
-function write_dex2oat_cmdlines {
-  local name="$1"
+# Enable mini-debug-info for JIT (if JIT is used).
+FLAGS="$FLAGS -Xcompiler-option --generate-mini-debug-info"
 
-  local class_loader_context=""
-  local enable_app_image=false
+if [ "$PREBUILD" = "y" ]; then
+  mkdir_locations="${mkdir_locations} ${DEX_LOCATION}/oat/$ISA"
   if [ "$APP_IMAGE" = "y" ]; then
-    enable_app_image=true
+    # Pick a base that will force the app image to get relocated.
+    app_image="--app-image-file=$DEX_LOCATION/oat/$ISA/$TEST_NAME.art --resolve-startup-const-strings=true"
   fi
 
-  # If the name ends in -ex then this is a secondary dex file
-  if [ "${name:${#name}-3}" = "-ex" ]; then
-    # Lazily realize the default value in case DEX_LOCATION/TEST_NAME change
-    [ -z "$SECONDARY_CLASS_LOADER_CONTEXT" ] && SECONDARY_CLASS_LOADER_CONTEXT="PCL[];PCL[$DEX_LOCATION/$TEST_NAME.jar]"
-    class_loader_context="'--class-loader-context=$SECONDARY_CLASS_LOADER_CONTEXT'"
-    $enable_app_image && [ "$SECONDARY_APP_IMAGE" = "y" ] || enable_app_image=false
-  fi
-
-  local app_image=""
-  $enable_app_image && app_image="--app-image-file=$DEX_LOCATION/oat/$ISA/$name.art --resolve-startup-const-strings=true"
-
-  local dex2oat_binary
   dex2oat_binary=${DEX2OAT_DEBUG_BINARY}
   if  [[ "$TEST_IS_NDEBUG" = "y" ]]; then
     dex2oat_binary=${DEX2OAT_NDEBUG_BINARY}
@@ -946,12 +919,11 @@ function write_dex2oat_cmdlines {
   dex2oat_cmdline="$INVOKE_WITH $ANDROID_ART_BIN_DIR/$dex2oat_binary \
                       $COMPILE_FLAGS \
                       --boot-image=${BOOT_IMAGE} \
-                      --dex-file=$DEX_LOCATION/$name.jar \
-                      --oat-file=$DEX_LOCATION/oat/$ISA/$name.odex \
-                      "$app_image" \
+                      --dex-file=$DEX_LOCATION/$TEST_NAME.jar \
+                      --oat-file=$DEX_LOCATION/oat/$ISA/$TEST_NAME.odex \
+                      ${app_image} \
                       --generate-mini-debug-info \
-                      --instruction-set=$ISA \
-                      $class_loader_context"
+                      --instruction-set=$ISA"
   if [ "x$INSTRUCTION_SET_FEATURES" != "x" ] ; then
     dex2oat_cmdline="${dex2oat_cmdline} --instruction-set-features=${INSTRUCTION_SET_FEATURES}"
   fi
@@ -968,48 +940,15 @@ function write_dex2oat_cmdlines {
     dex2oat_cmdline="timeout -k ${DEX2OAT_TIMEOUT}s -s SIGRTMIN+2 ${DEX2OAT_RT_TIMEOUT}s ${dex2oat_cmdline} --watchdog-timeout=${DEX2OAT_TIMEOUT}000"
   fi
   if [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
-    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex --output-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex"
+    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$TEST_NAME.vdex --output-vdex=$DEX_LOCATION/oat/$ISA/$TEST_NAME.vdex"
   elif [ "$TEST_VDEX" = "y" ]; then
-    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex"
+    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$TEST_NAME.vdex"
   elif [ "$TEST_DM" = "y" ]; then
     dex2oat_cmdline="${dex2oat_cmdline} --output-vdex=$DEX_LOCATION/oat/$ISA/primary.vdex"
-    dm_cmdline="zip -qj $DEX_LOCATION/oat/$ISA/$name.dm $DEX_LOCATION/oat/$ISA/primary.vdex"
-    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --dump-timings --dm-file=$DEX_LOCATION/oat/$ISA/$name.dm"
-  fi
-}
-
-# Enable mini-debug-info for JIT (if JIT is used).
-FLAGS="$FLAGS -Xcompiler-option --generate-mini-debug-info"
-
-if [ "$PREBUILD" = "y" ]; then
-  mkdir_locations="${mkdir_locations} ${DEX_LOCATION}/oat/$ISA"
-
-  # "Primary".
-  write_dex2oat_cmdlines "$TEST_NAME"
-  dex2oat_cmdline=$(echo $dex2oat_cmdline)
-  dm_cmdline=$(echo $dm_cmdline)
-  vdex_cmdline=$(echo $vdex_cmdline)
-
-  # Enable mini-debug-info for JIT (if JIT is used).
-  FLAGS="$FLAGS -Xcompiler-option --generate-mini-debug-info"
-
-  if [ -f "$TEST_NAME-ex.jar" ] && [ "$SECONDARY_COMPILATION" = "y" ] ; then
-    # "Secondary" for test coverage.
-
-    # Store primary values.
-    base_dex2oat_cmdline="$dex2oat_cmdline"
-    base_dm_cmdline="$dm_cmdline"
-    base_vdex_cmdline="$vdex_cmdline"
-
-    write_dex2oat_cmdlines "$TEST_NAME-ex"
-    dex2oat_cmdline=$(echo $dex2oat_cmdline)
-    dm_cmdline=$(echo $dm_cmdline)
-    vdex_cmdline=$(echo $vdex_cmdline)
-
-    # Concatenate.
-    dex2oat_cmdline="$base_dex2oat_cmdline && $dex2oat_cmdline"
-    dm_cmdline="$base_dm_cmdline" # Only use primary dm.
-    vdex_cmdline="$base_vdex_cmdline && $vdex_cmdline"
+    dm_cmdline="zip -qj $DEX_LOCATION/oat/$ISA/$TEST_NAME.dm $DEX_LOCATION/oat/$ISA/primary.vdex"
+    vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --dump-timings --dm-file=$DEX_LOCATION/oat/$ISA/$TEST_NAME.dm"
+  elif [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
+    vdex_cmdline="${dex2oat_cmdline} --input-vdex=$DEX_LOCATION/oat/$ISA/$TEST_NAME.vdex --output-vdex=$DEX_LOCATION/oat/$ISA/$TEST_NAME.vdex"
   fi
 fi
 
@@ -1058,22 +997,11 @@ dalvikvm_cmdline="$INVOKE_WITH $GDB $ANDROID_ART_BIN_DIR/$DALVIKVM \
                   -XX:DumpNativeStackOnSigQuit:false \
                   -cp $DEX_LOCATION/$TEST_NAME.jar$SECONDARY_DEX $MAIN $ARGS"
 
-sanitize_dex2oat_cmdline() {
-  local args=()
-  for arg in "$@"; do
-    if [ "$arg" = "--class-loader-context=&" ]; then
-      arg="--class-loader-context=\&"
-    fi
-    args+=("$arg")
-  done
-  echo -n "${args[@]}"
-}
-
 # Remove whitespace.
-dex2oat_cmdline=$(sanitize_dex2oat_cmdline $(echo $dex2oat_cmdline))
+dex2oat_cmdline=$(echo $dex2oat_cmdline)
 dalvikvm_cmdline=$(echo $dalvikvm_cmdline)
 dm_cmdline=$(echo $dm_cmdline)
-vdex_cmdline=$(sanitize_dex2oat_cmdline $(echo $vdex_cmdline))
+vdex_cmdline=$(echo $vdex_cmdline)
 profman_cmdline=$(echo $profman_cmdline)
 
 # Use an empty ASAN_OPTIONS to enable defaults.
@@ -1334,9 +1262,9 @@ else
     $linkroot_cmdline || { echo "create symlink android-root failed." >&2 ; exit 2; }
     $linkroot_overlay_cmdline || { echo "overlay android-root failed." >&2 ; exit 2; }
     $profman_cmdline || { echo "Profman failed." >&2 ; exit 2; }
-    eval "$dex2oat_cmdline" || { echo "Dex2oat failed." >&2 ; exit 2; }
-    eval "$dm_cmdline" || { echo "Dex2oat failed." >&2 ; exit 2; }
-    eval "$vdex_cmdline" || { echo "Dex2oat failed." >&2 ; exit 2; }
+    $dex2oat_cmdline || { echo "Dex2oat failed." >&2 ; exit 2; }
+    $dm_cmdline || { echo "Dex2oat failed." >&2 ; exit 2; }
+    $vdex_cmdline || { echo "Dex2oat failed." >&2 ; exit 2; }
     $strip_cmdline || { echo "Strip failed." >&2 ; exit 3; }
     $sync_cmdline || { echo "Sync failed." >&2 ; exit 4; }
 
