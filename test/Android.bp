@@ -496,6 +496,7 @@ cc_defaults {
         "674-hiddenapi/hiddenapi.cc",
         "692-vdex-inmem-loader/vdex_inmem_loader.cc",
         "708-jit-cache-churn/jit.cc",
+        "720-thread-priority/thread_priority.cc",
         "800-smali/jni.cc",
         "909-attach-agent/disallow_debugging.cc",
         "1001-app-image-regions/app_image_regions.cc",
