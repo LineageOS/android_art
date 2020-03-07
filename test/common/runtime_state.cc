@@ -66,6 +66,24 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasOatFile(JNIEnv* env, jclass c
   return (oat_dex_file != nullptr) ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jobject JNICALL Java_Main_getCompilerFilter(JNIEnv* env,
+                                                                 jclass caller ATTRIBUTE_UNUSED,
+                                                                 jclass cls) {
+  ScopedObjectAccess soa(env);
+
+  ObjPtr<mirror::Class> klass = soa.Decode<mirror::Class>(cls);
+  const DexFile& dex_file = klass->GetDexFile();
+  const OatDexFile* oat_dex_file = dex_file.GetOatDexFile();
+  if (oat_dex_file == nullptr) {
+    return nullptr;
+  }
+
+  std::string filter =
+      CompilerFilter::NameOfFilter(oat_dex_file->GetOatFile()->GetCompilerFilter());
+  return soa.AddLocalReference<jobject>(
+      mirror::String::AllocFromModifiedUtf8(soa.Self(), filter.c_str()));
+}
+
 // public static native boolean runtimeIsSoftFail();
 
 extern "C" JNIEXPORT jboolean JNICALL Java_Main_runtimeIsSoftFail(JNIEnv* env ATTRIBUTE_UNUSED,
