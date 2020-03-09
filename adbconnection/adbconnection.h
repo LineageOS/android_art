@@ -171,12 +171,6 @@ class AdbConnectionState {
 
   bool started_debugger_threads_;
 
-  socklen_t control_addr_len_;
-  union {
-    sockaddr_un controlAddrUn;
-    sockaddr controlAddrPlain;
-  } control_addr_;
-
   friend struct AdbConnectionDebuggerController;
 };
 
