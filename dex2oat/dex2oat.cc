@@ -86,7 +86,7 @@
 #include "linker/image_writer.h"
 #include "linker/multi_oat_relative_patcher.h"
 #include "linker/oat_writer.h"
-#include "mirror/class-inl.h"
+#include "mirror/class-alloc-inl.h"
 #include "mirror/class_loader.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
@@ -697,6 +697,70 @@ class WatchDog {
 
 pthread_mutex_t WatchDog::runtime_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 Runtime* WatchDog::runtime_ = nullptr;
+
+// Helper class for overriding `java.lang.ThreadLocal.nextHashCode`.
+//
+// The class ThreadLocal has a static field nextHashCode used for assigning hash codes to
+// new ThreadLocal objects. Since the class and the object referenced by the field are
+// in the boot image, they cannot be modified under normal rules for AOT compilation.
+// However, since this is a private detail that's used only for assigning hash codes and
+// everything should work fine with different hash codes, we override the field for the
+// compilation, providing another object that the AOT class initialization can modify.
+class ThreadLocalHashOverride {
+ public:
+  ThreadLocalHashOverride(bool apply, int32_t initial_value) {
+    Thread* self = Thread::Current();
+    ScopedObjectAccess soa(self);
+    hs_.emplace(self);  // While holding the mutator lock.
+    Runtime* runtime = Runtime::Current();
+    klass_ = hs_->NewHandle(apply
+        ? runtime->GetClassLinker()->LookupClass(self,
+                                                 "Ljava/lang/ThreadLocal;",
+                                                 /*class_loader=*/ nullptr)
+        : nullptr);
+    field_ = (klass_ != nullptr)
+        ? klass_->FindDeclaredStaticField("nextHashCode",
+                                          "Ljava/util/concurrent/atomic/AtomicInteger;")
+        : nullptr;
+    old_field_value_ =
+        hs_->NewHandle(field_ != nullptr ? field_->GetObject(klass_.Get()) : nullptr);
+    if (old_field_value_ != nullptr) {
+      gc::AllocatorType allocator_type = runtime->GetHeap()->GetCurrentAllocator();
+      StackHandleScope<1u> hs2(self);
+      Handle<mirror::Object> new_field_value = hs2.NewHandle(
+          old_field_value_->GetClass()->Alloc(self, allocator_type));
+      PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
+      ArtMethod* constructor = old_field_value_->GetClass()->FindConstructor("(I)V", pointer_size);
+      CHECK(constructor != nullptr);
+      uint32_t args[] = {
+          reinterpret_cast32<uint32_t>(new_field_value.Get()),
+          static_cast<uint32_t>(initial_value)
+      };
+      JValue result;
+      constructor->Invoke(self, args, sizeof(args), &result, /*shorty=*/ "VI");
+      CHECK(!self->IsExceptionPending());
+      field_->SetObject</*kTransactionActive=*/ false>(klass_.Get(), new_field_value.Get());
+    }
+    if (apply && old_field_value_ == nullptr) {
+      LOG(ERROR) << "Failed to override ThreadLocal.nextHashCode";
+    }
+  }
+
+  ~ThreadLocalHashOverride() {
+    ScopedObjectAccess soa(hs_->Self());
+    if (old_field_value_ != nullptr) {
+      // Allow the overriding object to be collected.
+      field_->SetObject</*kTransactionActive=*/ false>(klass_.Get(), old_field_value_.Get());
+    }
+    hs_.reset();  // While holding the mutator lock.
+  }
+
+ private:
+  std::optional<StackHandleScope<2u>> hs_;
+  Handle<mirror::Class> klass_;
+  ArtField* field_;
+  Handle<mirror::Object> old_field_value_;
+};
 
 class Dex2Oat final {
  public:
@@ -2012,6 +2076,21 @@ class Dex2Oat final {
       // the results for all the dex files, not just the results for the current dex file.
       callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
     }
+
+    // To make identity hashcode deterministic, set a seed based on the dex file checksums.
+    // That makes the seed also most likely different for different inputs, for example
+    // for primary boot image and different extensions that could be loaded together.
+    uint32_t combined_checksums = 0u;
+    for (const DexFile* dex_file : compiler_options_->GetDexFilesForOatFile()) {
+      combined_checksums ^= dex_file->GetLocationChecksum();
+    }
+    mirror::Object::SetHashCodeSeed(987654321u ^ combined_checksums);
+
+    // To allow initialization of classes that construct ThreadLocal objects in class initializer,
+    // re-initialize the ThreadLocal.nextHashCode to a new object that's not in the boot image.
+    ThreadLocalHashOverride thread_local_hash_override(
+        /*apply=*/ !IsBootImage(), /*initial_value=*/ 123456789u ^ combined_checksums);
+
     // Invoke the compilation.
     if (compile_individually) {
       CompileDexFilesIndividually();
@@ -2028,7 +2107,7 @@ class Dex2Oat final {
     jobject class_loader = nullptr;
     if (!IsBootImage() && !IsBootImageExtension()) {
       class_loader =
-          class_loader_context_->CreateClassLoader(compiler_options_->dex_files_for_oat_file_);
+          class_loader_context_->CreateClassLoader(compiler_options_->GetDexFilesForOatFile());
     }
     if (!IsBootImage()) {
       callbacks_->SetDexFiles(&dex_files);
@@ -2650,12 +2729,6 @@ class Dex2Oat final {
     // Only need disable Hspace for OOM becasue background collector is equal to
     // foreground collector by default for dex2oat.
     raw_options.push_back(std::make_pair("-XX:DisableHSpaceCompactForOOM", nullptr));
-
-    if (compiler_options_->IsForceDeterminism()) {
-      // To make identity hashcode deterministic, set a known seed.
-      // TODO: Select a different seed for boot image extensions; maybe hash dex file checksums.
-      mirror::Object::SetHashCodeSeed(987654321U);
-    }
 
     if (!Runtime::ParseOptions(raw_options, false, runtime_options)) {
       LOG(ERROR) << "Failed to parse runtime options";
