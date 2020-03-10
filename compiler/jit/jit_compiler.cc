@@ -164,7 +164,9 @@ JitCompiler::~JitCompiler() {
 
 bool JitCompiler::CompileMethod(
     Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr) {
-  SCOPED_TRACE << "JIT compiling " << method->PrettyMethod();
+  SCOPED_TRACE << "JIT compiling "
+               << method->PrettyMethod()
+               << " (baseline=" << baseline << ", osr=" << osr << ")";
 
   DCHECK(!method->IsProxyMethod());
   DCHECK(method->GetDeclaringClass()->IsResolved());
