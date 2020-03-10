@@ -668,6 +668,9 @@ static void VMRuntime_registerAppInfo(JNIEnv* env,
   Runtime::Current()->RegisterAppInfo(code_paths_vec, profile_file_str);
 }
 
+static void VMRuntime_doNotInitializeInAot() {
+}
+
 static jboolean VMRuntime_isBootClassPathOnDisk(JNIEnv* env, jclass, jstring java_instruction_set) {
   ScopedUtfChars instruction_set(env, java_instruction_set);
   if (instruction_set.c_str() == nullptr) {
@@ -822,6 +825,7 @@ static JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(VMRuntime, isCheckJniEnabled, "()Z"),
   NATIVE_METHOD(VMRuntime, preloadDexCaches, "()V"),
   NATIVE_METHOD(VMRuntime, registerAppInfo, "(Ljava/lang/String;[Ljava/lang/String;)V"),
+  CRITICAL_NATIVE_METHOD(VMRuntime, doNotInitializeInAot, "()V"),
   NATIVE_METHOD(VMRuntime, isBootClassPathOnDisk, "(Ljava/lang/String;)Z"),
   NATIVE_METHOD(VMRuntime, getCurrentInstructionSet, "()Ljava/lang/String;"),
   NATIVE_METHOD(VMRuntime, didPruneDalvikCache, "()Z"),
