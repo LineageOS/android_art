@@ -1349,5 +1349,11 @@
         "variant": "gcstress & debuggable & debug & host",
         "bug": "b/149708943",
         "description": ["Timeouts."]
+    },
+    {
+        "tests": ["137-cfi"],
+        "variant": "target & jit",
+        "bug": "b/151137723",
+        "description": ["Fails on arm32"]
     }
 ]
