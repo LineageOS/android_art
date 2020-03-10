@@ -1109,7 +1109,13 @@ class Dex2Oat final {
       }
     }
 
-    // Trim the boot image location to the components that do not have any profile specified.
+    // Trim the boot image location to not include any specified profile. Note
+    // that the logic below will include the first boot image extension, but not
+    // the ones that could be listed after the profile of that extension. This
+    // works for our current top use case:
+    // boot.art:/system/framework/boot-framework.art
+    // But this would need to be adjusted if we had to support different use
+    // cases.
     size_t profile_separator_pos = boot_image_filename_.find(ImageSpace::kProfileSeparator);
     if (profile_separator_pos != std::string::npos) {
       DCHECK(!IsBootImage());  // For primary boot image the boot_image_filename_ is empty.
@@ -1117,15 +1123,11 @@ class Dex2Oat final {
         Usage("Unsupported profile specification in boot image location (%s) for extension.",
               boot_image_filename_.c_str());
       }
-      size_t component_separator_pos =
-          boot_image_filename_.rfind(ImageSpace::kComponentSeparator, profile_separator_pos);
-      if (component_separator_pos != std::string::npos && component_separator_pos != 0u) {
-        VLOG(compiler)
-            << "Truncating boot image location " << boot_image_filename_
-            << " because it contains profile specification. Truncated: "
-            << boot_image_filename_.substr(/*pos*/ 0u, /*length*/ component_separator_pos);
-        boot_image_filename_.resize(component_separator_pos);
-      }  // else let the full validation in ImageSpace reject the invalid location.
+      VLOG(compiler)
+          << "Truncating boot image location " << boot_image_filename_
+          << " because it contains profile specification. Truncated: "
+          << boot_image_filename_.substr(/*pos*/ 0u, /*length*/ profile_separator_pos);
+      boot_image_filename_.resize(profile_separator_pos);
     }
 
     compiler_options_->passes_to_run_ = passes_to_run_.get();
