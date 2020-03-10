@@ -400,6 +400,7 @@ art_cc_defaults {
         "1964-add-to-dex-classloader-file/add_to_loader.cc",
         "1963-add-to-dex-classloader-in-memory/check_memfd_create.cc",
         "2012-structural-redefinition-failures-jni-id/set-jni-id-used.cc",
+        "2031-zygote-compiled-frame-deopt/native-wait.cc",
     ],
     static_libs: [
         "libz",
@@ -594,6 +595,7 @@ cc_defaults {
         "1972-jni-id-swap-indices/jni_id.cc",
         "1985-structural-redefine-stack-scope/stack_scope.cc",
         "2011-stack-walk-concurrent-instrument/stack_walk_concurrent.cc",
+        "2031-zygote-compiled-frame-deopt/native-wait.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],
