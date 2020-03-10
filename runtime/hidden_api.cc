@@ -122,8 +122,6 @@ void InitializeCorePlatformApiPrivateFields() {
   // The following fields in WellKnownClasses correspond to private fields in the Core Platform
   // API that cannot be otherwise expressed and propagated through tooling (b/144502743).
   jfieldID private_core_platform_api_fields[] = {
-    WellKnownClasses::java_io_FileDescriptor_descriptor,
-    WellKnownClasses::java_io_FileDescriptor_ownerId,
     WellKnownClasses::java_nio_Buffer_address,
     WellKnownClasses::java_nio_Buffer_elementSizeShift,
     WellKnownClasses::java_nio_Buffer_limit,
