@@ -225,6 +225,9 @@ class JitCodeCache {
   // Return true if the code cache contains this pc.
   bool ContainsPc(const void* pc) const;
 
+  // Return true if the code cache contains this pc in the private region (i.e. not from zygote).
+  bool PrivateRegionContainsPc(const void* pc) const;
+
   // Returns true if either the method's entrypoint is JIT compiled code or it is the
   // instrumentation entrypoint and we can jump to jit code for this method. For testing use only.
   bool WillExecuteJitCode(ArtMethod* method) REQUIRES(!Locks::jit_lock_);
