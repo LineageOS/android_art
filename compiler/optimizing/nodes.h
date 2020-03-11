@@ -6948,6 +6948,8 @@ class HStringBuilderAppend final : public HVariableInputSizeInstruction {
 
   bool CanThrow() const override { return true; }
 
+  bool CanBeNull() const override { return false; }
+
   DECLARE_INSTRUCTION(StringBuilderAppend);
 
  protected:
