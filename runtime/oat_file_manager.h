@@ -120,7 +120,7 @@ class OatFileManager {
 
   void DumpForSigQuit(std::ostream& os);
 
-  void SetOnlyUseSystemOatFiles(bool enforce, bool assert_no_files_loaded);
+  void SetOnlyUseSystemOatFiles(bool assert_no_files_loaded);
 
   // Spawn a background thread which verifies all classes in the given dex files.
   void RunBackgroundVerification(const std::vector<const DexFile*>& dex_files,

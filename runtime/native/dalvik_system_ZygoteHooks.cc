@@ -278,11 +278,6 @@ static void ZygoteHooks_nativePostForkSystemServer(JNIEnv* env ATTRIBUTE_UNUSED,
     Runtime::Current()->GetJit()->GetCodeCache()->PostForkChildAction(
         /* is_system_server= */ true, /* is_zygote= */ false);
   }
-  // Allow picking up verity-protected files from the dalvik cache for pre-caching. This window will
-  // be closed in the common nativePostForkChild below.
-  Runtime::Current()->GetOatFileManager().SetOnlyUseSystemOatFiles(
-      /*enforce=*/false, /*assert_no_files_loaded=*/false);
-
   // Enable profiling if required based on the flags. This is done here instead of in
   // nativePostForkChild since nativePostForkChild is called after loading the system server oat
   // files.
@@ -315,13 +310,10 @@ static void ZygoteHooks_nativePostForkChild(JNIEnv* env,
     runtime_flags &= ~DISABLE_VERIFIER;
   }
 
-  bool only_use_system_oat_files = false;
   if ((runtime_flags & ONLY_USE_SYSTEM_OAT_FILES) != 0 || is_system_server) {
-    only_use_system_oat_files = true;
+    runtime->GetOatFileManager().SetOnlyUseSystemOatFiles(!is_system_server);
     runtime_flags &= ~ONLY_USE_SYSTEM_OAT_FILES;
   }
-  runtime->GetOatFileManager().SetOnlyUseSystemOatFiles(only_use_system_oat_files,
-                                                        !is_system_server);
 
   api_enforcement_policy = hiddenapi::EnforcementPolicyFromInt(
       (runtime_flags & HIDDEN_API_ENFORCEMENT_POLICY_MASK) >> API_ENFORCEMENT_POLICY_SHIFT);
