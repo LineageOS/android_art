@@ -41,12 +41,7 @@ art_cc_library {
         // and binds the methods in the libartpalette-system library.
         android: {
             srcs: ["apex/palette.cc"],
-            shared: {
-                shared_libs: ["liblog"],
-            },
-            static: {
-                static_libs: ["liblog"],
-            },
+            shared_libs: ["liblog"],
             version_script: "libartpalette.map.txt",
         },
         linux_bionic: {
