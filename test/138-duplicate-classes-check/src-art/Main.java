@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import dalvik.system.DexClassLoader;
+import dalvik.system.PathClassLoader;
 import java.io.File;
 import java.lang.reflect.Method;
 
@@ -32,9 +32,8 @@ public class Main {
         // Now run the class from the -ex file.
 
         String dexPath = System.getenv("DEX_LOCATION") + "/138-duplicate-classes-check-ex.jar";
-        String optimizedDirectory = System.getenv("DEX_LOCATION");
         String librarySearchPath = null;
-        DexClassLoader loader = new DexClassLoader(dexPath, optimizedDirectory, librarySearchPath,
+        PathClassLoader loader = new PathClassLoader(dexPath, librarySearchPath,
                 getClass().getClassLoader());
 
         try {
