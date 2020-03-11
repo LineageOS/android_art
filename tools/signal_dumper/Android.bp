@@ -61,7 +61,6 @@ art_cc_binary {
 
     srcs: ["signal_dumper.cc"],
 
-    static_executable: true,
     static_libs: [
         "libbacktrace",
         "libbase",
