@@ -23,5 +23,4 @@ exec ${RUN} \
   --dm \
   --vdex-arg \
   --class-loader-context=PCL[$DEX_LOCATION/719-dm-verify-redefinition-ex.jar] \
-  --no-secondary-compilation \
   "${@}"
