@@ -91,7 +91,10 @@ static bool IsDebuggingPossible() {
 
 // Begin running the debugger.
 void AdbConnectionDebuggerController::StartDebugger() {
-  if (IsDebuggingPossible()) {
+  // The debugger thread is started for a debuggable or profileable-from-shell process.
+  // The pid will be send to adbd for adb's "track-jdwp" and "track-app" services.
+  // The thread will also set up the jdwp tunnel if the process is debuggable.
+  if (IsDebuggingPossible() || art::Runtime::Current()->IsProfileableFromShell()) {
     connection_->StartDebuggerThreads();
   } else {
     LOG(ERROR) << "Not starting debugger since process cannot load the jdwp agent.";
@@ -145,11 +148,6 @@ AdbConnectionState::AdbConnectionState(const std::string& agent_name)
     notified_ddm_active_(false),
     next_ddm_id_(1),
     started_debugger_threads_(false) {
-  // Setup the addr.
-  control_addr_.controlAddrUn.sun_family = AF_UNIX;
-  control_addr_len_ = sizeof(control_addr_.controlAddrUn.sun_family) + sizeof(kJdwpControlName) - 1;
-  memcpy(control_addr_.controlAddrUn.sun_path, kJdwpControlName, sizeof(kJdwpControlName) - 1);
-
   // Add the startup callback.
   art::ScopedObjectAccess soa(art::Thread::Current());
   art::Runtime::Current()->GetRuntimeCallbacks()->AddDebuggerControlCallback(&controller_);
@@ -464,11 +462,20 @@ bool AdbConnectionState::SetupAdbConnection() {
   int sleep_ms = 500;
   const int sleep_max_ms = 2 * 1000;
 
+  const char* isa = GetInstructionSetString(art::Runtime::Current()->GetInstructionSet());
   const AdbConnectionClientInfo infos[] = {
-    {.type = AdbConnectionClientInfoType::pid, .data.pid = static_cast<uint64_t>(getpid())},
-    {.type = AdbConnectionClientInfoType::debuggable, .data.debuggable = true},
+      {.type = AdbConnectionClientInfoType::pid,
+       .data.pid = static_cast<uint64_t>(getpid())},
+      {.type = AdbConnectionClientInfoType::debuggable,
+       .data.debuggable = IsDebuggingPossible()},
+      {.type = AdbConnectionClientInfoType::profileable,
+       .data.profileable = art::Runtime::Current()->IsProfileableFromShell()},
+      {.type = AdbConnectionClientInfoType::architecture,
+       // GetInstructionSetString() returns a null-terminating C-style string.
+       .data.architecture.name = isa,
+       .data.architecture.size = strlen(isa)},
   };
-  const AdbConnectionClientInfo* info_ptrs[] = {&infos[0], &infos[1]};
+  const AdbConnectionClientInfo *info_ptrs[] = {&infos[0], &infos[1], &infos[2], &infos[3]};
 
   while (!shutting_down_) {
     // If adbd isn't running, because USB debugging was disabled or
@@ -500,6 +507,7 @@ bool AdbConnectionState::SetupAdbConnection() {
 }
 
 void AdbConnectionState::RunPollLoop(art::Thread* self) {
+  DCHECK(IsDebuggingPossible() || art::Runtime::Current()->IsProfileableFromShell());
   CHECK_NE(agent_name_, "");
   CHECK_EQ(self->GetState(), art::kNative);
   art::Locks::mutator_lock_->AssertNotHeld(self);
@@ -537,6 +545,7 @@ void AdbConnectionState::RunPollLoop(art::Thread* self) {
       const struct pollfd& control_sock_poll       = pollfds[2];
       const struct pollfd& adb_socket_poll         = pollfds[3];
       if (FlagsSet(agent_control_sock_poll.revents, POLLIN)) {
+        CHECK(IsDebuggingPossible());  // This path is unexpected for a profileable process.
         DCHECK(agent_loaded_);
         char buf[257];
         res = TEMP_FAILURE_RETRY(recv(local_agent_control_sock_, buf, sizeof(buf) - 1, 0));
@@ -566,6 +575,11 @@ void AdbConnectionState::RunPollLoop(art::Thread* self) {
           LOG(ERROR) << "Unknown message received from debugger! '" << std::string(buf) << "'";
         }
       } else if (FlagsSet(control_sock_poll.revents, POLLIN)) {
+        if (!IsDebuggingPossible()) {
+            // For a profielable process, this path can execute when the adbd restarts.
+            control_ctx_.reset();
+            break;
+        }
         bool maybe_send_fds = false;
         {
           // Hold onto this lock so that concurrent ddm publishes don't try to use an illegal fd.
@@ -596,11 +610,13 @@ void AdbConnectionState::RunPollLoop(art::Thread* self) {
       } else if (FlagsSet(control_sock_poll.revents, POLLRDHUP)) {
         // The other end of the adb connection just dropped it.
         // Reset the connection since we don't have an active socket through the adb server.
+        // Note this path is expected for either debuggable or profileable processes.
         DCHECK(!agent_has_socket_) << "We shouldn't be doing anything if there is already a "
                                    << "connection active";
         control_ctx_.reset();
         break;
       } else if (FlagsSet(adb_socket_poll.revents, POLLIN)) {
+        CHECK(IsDebuggingPossible());  // This path is unexpected for a profileable process.
         DCHECK(!agent_has_socket_);
         if (!agent_loaded_) {
           HandleDataWithoutAgent(self);
@@ -610,6 +626,7 @@ void AdbConnectionState::RunPollLoop(art::Thread* self) {
           SendAgentFds(/*require_handshake=*/ true);
         }
       } else if (FlagsSet(adb_socket_poll.revents, POLLRDHUP)) {
+        CHECK(IsDebuggingPossible());  // This path is unexpected for a profileable process.
         DCHECK(!agent_has_socket_);
         CloseFds();
       } else {

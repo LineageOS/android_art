@@ -22,6 +22,7 @@ public class Main {
         testMiscelaneous();
         testNoArgs();
         testInline();
+        testEquals();
         System.out.println("passed");
     }
 
@@ -263,6 +264,31 @@ public class Main {
 
     public static void testNoArgs() {
         assertEquals("", $noinline$appendNothing());
+    }
+
+    /// CHECK-START: boolean Main.$noinline$testAppendEquals(java.lang.String, int) instruction_simplifier (before)
+    /// CHECK-NOT:              StringBuilderAppend
+
+    /// CHECK-START: boolean Main.$noinline$testAppendEquals(java.lang.String, int) instruction_simplifier (after)
+    /// CHECK:                  StringBuilderAppend
+    public static boolean $noinline$testAppendEquals(String s, int i) {
+      // Regression test for b/151107293 .
+      // When a string is used as both receiver and argument of String.equals(), we DCHECK()
+      // that it cannot be null. However, when replacing the call to StringBuilder.toString()
+      // with the HStringBuilderAppend(), the former reported CanBeNull() as false and
+      // therefore no explicit null checks were needed, but the replacement reported
+      // CanBeNull() as true, so when the result was used in String.equals() for both
+      // receiver and argument, the DCHECK() failed. This was fixed by overriding
+      // CanBeNull() in HStringBuilderAppend to correctly return false; the string that
+      // previously didn't require null check still does not require it.
+      String str = new StringBuilder().append(s).append(i).toString();
+      return str.equals(str);
+    }
+
+    public static void testEquals() {
+      if (!$noinline$testAppendEquals("Test", 42)) {
+        throw new Error("str.equals(str) is false");
+      }
     }
 
     public static void assertEquals(String expected, String actual) {
