@@ -1076,7 +1076,7 @@ fi
           # Checker failures dump the whole CFG, so we output the whole diff.
           diff --strip-trailing-cr -u "$expected" "$output"
         else
-          diff --strip-trailing-cr -u "$expected" "$output" | tail -n 3000
+          diff --strip-trailing-cr -u "$expected" "$output" | tail -n 10000
         fi
         echo '####################'
         if [ "$strace" = "yes" ]; then
