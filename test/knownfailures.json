@@ -1333,6 +1333,13 @@
         "description": ["Occasional timeouts."]
     },
     {
+        "tests": ["2031-zygote-compiled-frame-deopt"],
+        "zipapex": true,
+        "bug": "b/144947842",
+        "description": ["This test requires strong knowledge about where the libdir is",
+                        "which the zipapex runner breaks."]
+    },
+    {
         "tests": ["909-attach-agent", "126-miranda-multidex"],
         "zipapex": true,
         "bug": "b/135507613",

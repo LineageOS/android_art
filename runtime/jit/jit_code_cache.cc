@@ -273,8 +273,12 @@ JitCodeCache::JitCodeCache()
 
 JitCodeCache::~JitCodeCache() {}
 
+bool JitCodeCache::PrivateRegionContainsPc(const void* ptr) const {
+  return private_region_.IsInExecSpace(ptr);
+}
+
 bool JitCodeCache::ContainsPc(const void* ptr) const {
-  return private_region_.IsInExecSpace(ptr) || shared_region_.IsInExecSpace(ptr);
+  return PrivateRegionContainsPc(ptr) || shared_region_.IsInExecSpace(ptr);
 }
 
 bool JitCodeCache::WillExecuteJitCode(ArtMethod* method) {
@@ -879,13 +883,26 @@ void JitCodeCache::MoveObsoleteMethod(ArtMethod* old_method, ArtMethod* new_meth
   }
 }
 
-void JitCodeCache::ClearEntryPointsInZygoteExecSpace() {
-  MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  for (const auto& it : method_code_map_) {
-    ArtMethod* method = it.second;
-    if (IsInZygoteExecSpace(method->GetEntryPointFromQuickCompiledCode())) {
+void JitCodeCache::TransitionToDebuggable() {
+  {
+    MutexLock mu(Thread::Current(), *Locks::jit_lock_);
+    for (const auto& it : method_code_map_) {
+      ArtMethod* method = it.second;
+      if (IsInZygoteExecSpace(method->GetEntryPointFromQuickCompiledCode())) {
+        method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
+      }
+      // We don't want any pre-compiled data being selected.
+      method->ClearPreCompiled();
+    }
+  }
+  for (const auto& entry : zygote_map_) {
+    ArtMethod* method = entry.method;
+    if (ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
+      DCHECK(IsInZygoteExecSpace(method->GetEntryPointFromQuickCompiledCode()));
+      DCHECK(method->IsPreCompiled());
       method->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
     }
+    method->ClearPreCompiled();
   }
 }
 

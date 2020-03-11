@@ -52,6 +52,7 @@ INTERPRETER="n"
 JIT="n"
 INVOKE_WITH=""
 IS_JVMTI_TEST="n"
+ADD_LIBDIR_ARGUMENTS="n"
 ISA=x86
 LIBRARY_DIRECTORY="lib"
 TEST_DIRECTORY="nativetest"
@@ -130,6 +131,9 @@ while true; do
     elif [ "x$1" = "x--jvmti" ]; then
         USE_JVMTI="y"
         IS_JVMTI_TEST="y"
+        shift
+    elif [ "x$1" = "x--add-libdir-argument" ]; then
+        ADD_LIBDIR_ARGUMENTS="y"
         shift
     elif [ "x$1" = "x-O" ]; then
         TEST_IS_NDEBUG="y"
@@ -592,6 +596,14 @@ if [ "$USE_JVMTI" = "y" ]; then
   fi
 fi
 
+# Add the libdir to the argv passed to the main function.
+if [ "$ADD_LIBDIR_ARGUMENTS" = "y" ]; then
+  if [[ "$HOST" = "y" ]]; then
+    ARGS="${ARGS} ${ANDROID_HOST_OUT}/${TEST_DIRECTORY}/"
+  else
+    ARGS="${ARGS} /data/${TEST_DIRECTORY}/art/${ISA}/"
+  fi
+fi
 if [ "$IS_JVMTI_TEST" = "y" ]; then
   agent=libtiagentd.so
   lib=tiagentd

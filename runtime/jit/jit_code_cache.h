@@ -104,6 +104,14 @@ enum class ZygoteCompilationState : uint8_t {
 // This map is writable only by the zygote, and readable by all children.
 class ZygoteMap {
  public:
+  struct Entry {
+    ArtMethod* method;
+    // Note we currently only allocate code in the low 4g, so we could just reserve 4 bytes
+    // for the code pointer. For simplicity and in the case we move to 64bit
+    // addresses for code, just keep it void* for now.
+    const void* code_ptr;
+  };
+
   explicit ZygoteMap(JitMemoryRegion* region)
       : map_(), region_(region), compilation_state_(nullptr) {}
 
@@ -140,15 +148,20 @@ class ZygoteMap {
            *compilation_state_ == ZygoteCompilationState::kNotifiedOk;
   }
 
- private:
-  struct Entry {
-    ArtMethod* method;
-    // Note we currently only allocate code in the low 4g, so we could just reserve 4 bytes
-    // for the code pointer. For simplicity and in the case we move to 64bit
-    // addresses for code, just keep it void* for now.
-    const void* code_ptr;
-  };
+  ArrayRef<const Entry>::const_iterator cbegin() const {
+    return map_.cbegin();
+  }
+  ArrayRef<const Entry>::iterator begin() {
+    return map_.begin();
+  }
+  ArrayRef<const Entry>::const_iterator cend() const {
+    return map_.cend();
+  }
+  ArrayRef<const Entry>::iterator end() {
+    return map_.end();
+  }
 
+ private:
   // The map allocated with `region_`.
   ArrayRef<const Entry> map_;
 
@@ -211,6 +224,9 @@ class JitCodeCache {
 
   // Return true if the code cache contains this pc.
   bool ContainsPc(const void* pc) const;
+
+  // Return true if the code cache contains this pc in the private region (i.e. not from zygote).
+  bool PrivateRegionContainsPc(const void* pc) const;
 
   // Returns true if either the method's entrypoint is JIT compiled code or it is the
   // instrumentation entrypoint and we can jump to jit code for this method. For testing use only.
@@ -370,8 +386,9 @@ class JitCodeCache {
 
   // Clear the entrypoints of JIT compiled methods that belong in the zygote space.
   // This is used for removing non-debuggable JIT code at the point we realize the runtime
-  // is debuggable.
-  void ClearEntryPointsInZygoteExecSpace() REQUIRES(!Locks::jit_lock_) REQUIRES(Locks::mutator_lock_);
+  // is debuggable. Also clear the Precompiled flag from all methods so the non-debuggable code
+  // doesn't come back.
+  void TransitionToDebuggable() REQUIRES(!Locks::jit_lock_) REQUIRES(Locks::mutator_lock_);
 
   JitMemoryRegion* GetCurrentRegion();
   bool IsSharedRegion(const JitMemoryRegion& region) const { return &region == &shared_region_; }
