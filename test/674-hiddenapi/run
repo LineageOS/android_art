@@ -16,4 +16,7 @@
 
 # Make verification soft fail so that we can re-verify boot classpath
 # methods at runtime.
-exec ${RUN} $@ --verify-soft-fail
+#
+# N.B. Compilation of secondary dexes can prevent hidden API checks, e.g. if
+# a blacklisted field get is inlined.
+exec ${RUN} $@ --verify-soft-fail --no-secondary-compilation
