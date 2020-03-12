@@ -377,6 +377,11 @@ static uintptr_t FromCodeToAllocation(const void* code) {
   return reinterpret_cast<uintptr_t>(code) - RoundUp(sizeof(OatQuickMethodHeader), alignment);
 }
 
+static const void* FromAllocationToCode(const uint8_t* alloc) {
+  size_t alignment = GetInstructionSetAlignment(kRuntimeISA);
+  return reinterpret_cast<const void*>(alloc + RoundUp(sizeof(OatQuickMethodHeader), alignment));
+}
+
 static uint32_t GetNumberOfRoots(const uint8_t* stack_map) {
   // The length of the table is stored just before the stack map (and therefore at the end of
   // the table itself), in order to be able to fetch it from a `stack_map` pointer.
@@ -459,22 +464,18 @@ void JitCodeCache::SweepRootTables(IsMarkedVisitor* visitor) {
   }
 }
 
-void JitCodeCache::FreeCodeAndData(const void* code_ptr, bool free_debug_info) {
+void JitCodeCache::FreeCodeAndData(const void* code_ptr) {
   if (IsInZygoteExecSpace(code_ptr)) {
     // No need to free, this is shared memory.
     return;
   }
   uintptr_t allocation = FromCodeToAllocation(code_ptr);
-  if (free_debug_info) {
-    // Remove compressed mini-debug info for the method.
-    // TODO: This is expensive, so we should always do it in the caller in bulk.
-    RemoveNativeDebugInfoForJit(ArrayRef<const void*>(&code_ptr, 1));
-  }
+  const uint8_t* data = nullptr;
   if (OatQuickMethodHeader::FromCodePointer(code_ptr)->IsOptimized()) {
-    private_region_.FreeData(GetRootTable(code_ptr));
+    data = GetRootTable(code_ptr);
   }  // else this is a JNI stub without any data.
 
-  private_region_.FreeCode(reinterpret_cast<uint8_t*>(allocation));
+  FreeLocked(&private_region_, reinterpret_cast<uint8_t*>(allocation), data);
 }
 
 void JitCodeCache::FreeAllMethodHeaders(
@@ -490,19 +491,13 @@ void JitCodeCache::FreeAllMethodHeaders(
         ->RemoveDependentsWithMethodHeaders(method_headers);
   }
 
-  // Remove compressed mini-debug info for the methods.
-  std::vector<const void*> removed_symbols;
-  removed_symbols.reserve(method_headers.size());
-  for (const OatQuickMethodHeader* method_header : method_headers) {
-    removed_symbols.push_back(method_header->GetCode());
-  }
-  std::sort(removed_symbols.begin(), removed_symbols.end());
-  RemoveNativeDebugInfoForJit(ArrayRef<const void*>(removed_symbols));
-
   ScopedCodeCacheWrite scc(private_region_);
   for (const OatQuickMethodHeader* method_header : method_headers) {
-    FreeCodeAndData(method_header->GetCode(), /*free_debug_info=*/ false);
+    FreeCodeAndData(method_header->GetCode());
   }
+
+  // We have potentially removed a lot of debug info. Do maintenance pass to save space.
+  RepackNativeDebugInfoForJit();
 }
 
 void JitCodeCache::RemoveMethodsIn(Thread* self, const LinearAlloc& alloc) {
@@ -993,7 +988,12 @@ void JitCodeCache::Free(Thread* self,
                         const uint8_t* data) {
   MutexLock mu(self, *Locks::jit_lock_);
   ScopedCodeCacheWrite ccw(*region);
+  FreeLocked(region, code, data);
+}
+
+void JitCodeCache::FreeLocked(JitMemoryRegion* region, const uint8_t* code, const uint8_t* data) {
   if (code != nullptr) {
+    RemoveNativeDebugInfoForJit(reinterpret_cast<const void*>(FromAllocationToCode(code)));
     region->FreeCode(code);
   }
   if (data != nullptr) {
