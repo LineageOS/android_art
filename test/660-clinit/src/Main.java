@@ -21,7 +21,7 @@ public class Main {
   public static void main(String[] args) throws Exception {
     System.loadLibrary(args[0]);
 
-    if (!checkAppImageLoaded()) {
+    if (!checkAppImageLoaded("660-clinit")) {
       System.out.println("AppImage not loaded.");
     }
     if (!checkAppImageContains(ClInit.class)) {
@@ -90,7 +90,7 @@ public class Main {
     }
   }
 
-  public static native boolean checkAppImageLoaded();
+  public static native boolean checkAppImageLoaded(String name);
   public static native boolean checkAppImageContains(Class<?> klass);
   public static native boolean checkInitialized(Class<?> klass);
 }
