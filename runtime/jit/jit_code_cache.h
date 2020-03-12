@@ -276,6 +276,9 @@ class JitCodeCache {
   void Free(Thread* self, JitMemoryRegion* region, const uint8_t* code, const uint8_t* data)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
+  void FreeLocked(JitMemoryRegion* region, const uint8_t* code, const uint8_t* data)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(Locks::jit_lock_);
 
   // Perform a collection on the code cache.
   void GarbageCollectCache(Thread* self)
@@ -422,6 +425,7 @@ class JitCodeCache {
 
   // Remove CHA dependents and underlying allocations for entries in `method_headers`.
   void FreeAllMethodHeaders(const std::unordered_set<OatQuickMethodHeader*>& method_headers)
+      REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES(!Locks::cha_lock_);
 
@@ -432,8 +436,9 @@ class JitCodeCache {
       REQUIRES(Locks::mutator_lock_);
 
   // Free code and data allocations for `code_ptr`.
-  void FreeCodeAndData(const void* code_ptr, bool free_debug_info = true)
-      REQUIRES(Locks::jit_lock_);
+  void FreeCodeAndData(const void* code_ptr)
+      REQUIRES(Locks::jit_lock_)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Number of bytes allocated in the code cache.
   size_t CodeCacheSize() REQUIRES(!Locks::jit_lock_);
