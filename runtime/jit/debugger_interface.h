@@ -57,7 +57,11 @@ void AddNativeDebugInfoForJit(const void* code_ptr,
     REQUIRES_SHARED(Locks::jit_lock_);  // Might need JIT code cache to allocate memory.
 
 // Notify native tools (e.g. libunwind) that JIT code has been garbage collected.
-void RemoveNativeDebugInfoForJit(ArrayRef<const void*> removed_code_ptrs)
+// The actual removal might be lazy. Removal of address that was not added is no-op.
+void RemoveNativeDebugInfoForJit(const void* code_ptr);
+
+// Merge and compress entries to save space.
+void RepackNativeDebugInfoForJit()
     REQUIRES_SHARED(Locks::jit_lock_);  // Might need JIT code cache to allocate memory.
 
 // Returns approximate memory used by debug info for JIT code.
