@@ -3,5 +3,10 @@
     {
       "name": "CtsJdwpTestCases"
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "ArtGtestsTarget"
+    }
   ]
 }
