@@ -2619,6 +2619,8 @@ static bool TryReplaceStringBuilderAppend(HInvoke* invoke) {
     append->SetArgumentAt(i, args[num_args - 1u - i]);
   }
   block->InsertInstructionBefore(append, invoke);
+  DCHECK(!invoke->CanBeNull());
+  DCHECK(!append->CanBeNull());
   invoke->ReplaceWith(append);
   // Copy environment, except for the StringBuilder uses.
   for (HEnvironment* env = invoke->GetEnvironment(); env != nullptr; env = env->GetParent()) {
