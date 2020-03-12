@@ -917,6 +917,18 @@ java_genrule {
         "$(location soong_zip) -o $(out) -C $(genDir)/res -D $(genDir)/res",
 }
 
+art_cc_test {
+    name: "ArtGtestsTarget",
+    data: [
+        // We need the ART testing apex, which contains all gtest binaries.
+        // Note that due to linker constraints the gtests must be in the apex.
+        ":com.android.art.testing",
+        ":art-gtest-jars",
+    ],
+    test_suites: ["device-tests"],
+    test_config: "gtests-target.xml",
+}
+
 filegroup {
     name: "art-gtest-jars",
     srcs: [
