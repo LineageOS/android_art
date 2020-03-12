@@ -16,6 +16,7 @@
 
 #include <array>
 
+#include "common_runtime_test.h"
 #include "instruction_set_features.h"
 
 #include <gtest/gtest.h>
@@ -39,6 +40,12 @@ TEST(InstructionSetFeaturesTest, DISABLED_FeaturesFromSystemPropertyVariant) {
 #else
 TEST(InstructionSetFeaturesTest, FeaturesFromSystemPropertyVariant) {
 #endif
+  if (kIsTargetBuild) {
+    // atest differs in build-time and run-time features.
+    TEST_DISABLED_FOR_X86();
+    TEST_DISABLED_FOR_X86_64();
+  }
+
   // Take the default set of instruction features from the build.
   std::unique_ptr<const InstructionSetFeatures> instruction_set_features(
       InstructionSetFeatures::FromCppDefines());
@@ -66,6 +73,12 @@ TEST(InstructionSetFeaturesTest, DISABLED_FeaturesFromSystemPropertyString) {
 #else
 TEST(InstructionSetFeaturesTest, FeaturesFromSystemPropertyString) {
 #endif
+  if (kIsTargetBuild) {
+    // atest differs in build-time and run-time features.
+    TEST_DISABLED_FOR_X86();
+    TEST_DISABLED_FOR_X86_64();
+  }
+
   // Take the default set of instruction features from the build.
   std::unique_ptr<const InstructionSetFeatures> instruction_set_features(
       InstructionSetFeatures::FromCppDefines());
