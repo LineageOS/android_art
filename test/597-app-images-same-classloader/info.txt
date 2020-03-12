@@ -1,0 +1,2 @@
+Tests that loading an app image into an already existent classloader works if
+the classloader context is correct.
