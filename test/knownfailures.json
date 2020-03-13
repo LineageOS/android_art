@@ -305,7 +305,7 @@
     {
         "tests": ["596-app-images", "597-app-images-same-classloader"],
         "description": "no image generated in configuration",
-        "variant": "no-image"
+        "variant": "no-image | no-prebuild"
     },
     {
         "tests": ["596-app-images", "597-app-images-same-classloader"],
