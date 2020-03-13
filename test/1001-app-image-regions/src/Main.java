@@ -21,7 +21,7 @@ import java.lang.reflect.Method;
 class Main {
   public static void main(String[] args) {
     System.loadLibrary(args[0]);
-    System.out.println("App image loaded " + checkAppImageLoaded());
+    System.out.println("App image loaded " + checkAppImageLoaded("1001-app-image-regions"));
     int regionSize = getRegionSize();
     int objectsSectionSize = checkAppImageSectionSize(Main.class);
     System.out.println("Region size " + regionSize);
@@ -31,7 +31,7 @@ class Main {
     }
   }
 
-  public static native boolean checkAppImageLoaded();
+  public static native boolean checkAppImageLoaded(String name);
   public static native int getRegionSize();
   public static native int checkAppImageSectionSize(Class c);
 }
