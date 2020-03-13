@@ -1295,8 +1295,6 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                             /* has_should_deoptimize_flag= */ false,
                             cha_single_implementation_list)) {
       code_cache->Free(self, region, reserved_code.data(), reserved_data.data());
-      MutexLock mu(self, *Locks::jit_lock_);
-      RemoveNativeDebugInfoForJit(ArrayRef<const void*>(reinterpret_cast<const void**>(&code), 1));
       return false;
     }
 
@@ -1405,8 +1403,6 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                           codegen->GetGraph()->HasShouldDeoptimizeFlag(),
                           codegen->GetGraph()->GetCHASingleImplementationList())) {
     code_cache->Free(self, region, reserved_code.data(), reserved_data.data());
-    MutexLock mu(self, *Locks::jit_lock_);
-    RemoveNativeDebugInfoForJit(ArrayRef<const void*>(reinterpret_cast<const void**>(&code), 1));
     return false;
   }
 
