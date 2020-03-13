@@ -2493,6 +2493,10 @@ extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_metho
   // We arrive here if we have found an implementation, and it is not in the ImtConflictTable.
   // We create a new table with the new pair { interface_method, method }.
   DCHECK(conflict_method->IsRuntimeMethod());
+
+  // Classes in the boot image should never need to update conflict methods in
+  // their IMT.
+  CHECK(!Runtime::Current()->GetHeap()->ObjectIsInBootImageSpace(cls.Get())) << cls->PrettyClass();
   ArtMethod* new_conflict_method = Runtime::Current()->GetClassLinker()->AddMethodToConflictTable(
       cls.Get(),
       conflict_method,
