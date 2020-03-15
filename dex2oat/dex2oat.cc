@@ -1981,6 +1981,14 @@ class Dex2Oat final {
         !CompilerFilter::IsAotCompilationEnabled(compiler_options_->GetCompilerFilter());
   }
 
+  uint32_t GetCombinedChecksums() const {
+    uint32_t combined_checksums = 0u;
+    for (const DexFile* dex_file : compiler_options_->GetDexFilesForOatFile()) {
+      combined_checksums ^= dex_file->GetLocationChecksum();
+    }
+    return combined_checksums;
+  }
+
   // Set up and create the compiler driver and then invoke it to compile all the dex files.
   jobject Compile() {
     ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
@@ -2079,19 +2087,10 @@ class Dex2Oat final {
       callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
     }
 
-    // To make identity hashcode deterministic, set a seed based on the dex file checksums.
-    // That makes the seed also most likely different for different inputs, for example
-    // for primary boot image and different extensions that could be loaded together.
-    uint32_t combined_checksums = 0u;
-    for (const DexFile* dex_file : compiler_options_->GetDexFilesForOatFile()) {
-      combined_checksums ^= dex_file->GetLocationChecksum();
-    }
-    mirror::Object::SetHashCodeSeed(987654321u ^ combined_checksums);
-
     // To allow initialization of classes that construct ThreadLocal objects in class initializer,
     // re-initialize the ThreadLocal.nextHashCode to a new object that's not in the boot image.
     ThreadLocalHashOverride thread_local_hash_override(
-        /*apply=*/ !IsBootImage(), /*initial_value=*/ 123456789u ^ combined_checksums);
+        /*apply=*/ !IsBootImage(), /*initial_value=*/ 123456789u ^ GetCombinedChecksums());
 
     // Invoke the compilation.
     if (compile_individually) {
@@ -2741,6 +2740,11 @@ class Dex2Oat final {
 
   // Create a runtime necessary for compilation.
   bool CreateRuntime(RuntimeArgumentMap&& runtime_options) {
+    // To make identity hashcode deterministic, set a seed based on the dex file checksums.
+    // That makes the seed also most likely different for different inputs, for example
+    // for primary boot image and different extensions that could be loaded together.
+    mirror::Object::SetHashCodeSeed(987654321u ^ GetCombinedChecksums());
+
     TimingLogger::ScopedTiming t_runtime("Create runtime", timings_);
     if (!Runtime::Create(std::move(runtime_options))) {
       LOG(ERROR) << "Failed to create runtime";

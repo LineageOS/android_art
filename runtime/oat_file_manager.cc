@@ -1037,21 +1037,20 @@ void OatFileManager::WaitForBackgroundVerificationTasks() {
   }
 }
 
-void OatFileManager::SetOnlyUseSystemOatFiles(bool enforce, bool assert_no_files_loaded) {
+void OatFileManager::SetOnlyUseSystemOatFiles() {
   ReaderMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
-  if (!only_use_system_oat_files_ && enforce && assert_no_files_loaded) {
-    // Make sure all files that were loaded up to this point are on /system. Skip the image
-    // files.
-    std::vector<const OatFile*> boot_vector = GetBootOatFiles();
-    std::unordered_set<const OatFile*> boot_set(boot_vector.begin(), boot_vector.end());
+  // Make sure all files that were loaded up to this point are on /system.
+  // Skip the image files as they can encode locations that don't exist (eg not
+  // containing the arch in the path, or for JIT zygote /nonx/existent).
+  std::vector<const OatFile*> boot_vector = GetBootOatFiles();
+  std::unordered_set<const OatFile*> boot_set(boot_vector.begin(), boot_vector.end());
 
-    for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
-      if (boot_set.find(oat_file.get()) == boot_set.end()) {
-        CHECK(LocationIsOnSystem(oat_file->GetLocation().c_str())) << oat_file->GetLocation();
-      }
+  for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
+    if (boot_set.find(oat_file.get()) == boot_set.end()) {
+      CHECK(LocationIsOnSystem(oat_file->GetLocation().c_str())) << oat_file->GetLocation();
     }
   }
-  only_use_system_oat_files_ = enforce;
+  only_use_system_oat_files_ = true;
 }
 
 void OatFileManager::DumpForSigQuit(std::ostream& os) {
