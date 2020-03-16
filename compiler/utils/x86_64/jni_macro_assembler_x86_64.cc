@@ -338,6 +338,76 @@ void X86_64JNIMacroAssembler::ZeroExtend(ManagedRegister mreg, size_t size) {
   }
 }
 
+void X86_64JNIMacroAssembler::MoveArguments(ArrayRef<ArgumentLocation> dests,
+                                            ArrayRef<ArgumentLocation> srcs) {
+  DCHECK_EQ(dests.size(), srcs.size());
+  auto get_mask = [](ManagedRegister reg) -> uint32_t {
+    X86_64ManagedRegister x86_64_reg = reg.AsX86_64();
+    if (x86_64_reg.IsCpuRegister()) {
+      size_t cpu_reg_number = static_cast<size_t>(x86_64_reg.AsCpuRegister().AsRegister());
+      DCHECK_LT(cpu_reg_number, 16u);
+      return 1u << cpu_reg_number;
+    } else {
+      DCHECK(x86_64_reg.IsXmmRegister());
+      size_t xmm_reg_number = static_cast<size_t>(x86_64_reg.AsXmmRegister().AsFloatRegister());
+      DCHECK_LT(xmm_reg_number, 16u);
+      return (1u << 16u) << xmm_reg_number;
+    }
+  };
+  // Collect registers to move while storing/copying args to stack slots.
+  uint32_t src_regs = 0u;
+  uint32_t dest_regs = 0u;
+  for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+    const ArgumentLocation& src = srcs[i];
+    const ArgumentLocation& dest = dests[i];
+    DCHECK_EQ(src.GetSize(), dest.GetSize());
+    if (dest.IsRegister()) {
+      if (src.IsRegister() && src.GetRegister().Equals(dest.GetRegister())) {
+        // Nothing to do.
+      } else {
+        if (src.IsRegister()) {
+          src_regs |= get_mask(src.GetRegister());
+        }
+        dest_regs |= get_mask(dest.GetRegister());
+      }
+    } else {
+      if (src.IsRegister()) {
+        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
+      } else {
+        Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
+      }
+    }
+  }
+  // Fill destination registers.
+  // There should be no cycles, so this simple algorithm should make progress.
+  while (dest_regs != 0u) {
+    uint32_t old_dest_regs = dest_regs;
+    for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+      const ArgumentLocation& src = srcs[i];
+      const ArgumentLocation& dest = dests[i];
+      if (!dest.IsRegister()) {
+        continue;  // Stored in first loop above.
+      }
+      uint32_t dest_reg_mask = get_mask(dest.GetRegister());
+      if ((dest_reg_mask & dest_regs) == 0u) {
+        continue;  // Equals source, or already filled in one of previous iterations.
+      }
+      if ((dest_reg_mask & src_regs) != 0u) {
+        continue;  // Cannot clobber this register yet.
+      }
+      if (src.IsRegister()) {
+        Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
+        src_regs &= ~get_mask(src.GetRegister());  // Allow clobbering source register.
+      } else {
+        Load(dest.GetRegister(), src.GetFrameOffset(), dest.GetSize());
+      }
+      dest_regs &= ~get_mask(dest.GetRegister());  // Destination register was filled.
+    }
+    CHECK_NE(old_dest_regs, dest_regs);
+    DCHECK_EQ(0u, dest_regs & ~old_dest_regs);
+  }
+}
+
 void X86_64JNIMacroAssembler::Move(ManagedRegister mdest, ManagedRegister msrc, size_t size) {
   DCHECK(!mdest.Equals(X86_64ManagedRegister::FromCpuRegister(GetScratchRegister().AsRegister())));
   X86_64ManagedRegister dest = mdest.AsX86_64();
