@@ -93,6 +93,8 @@ class ArmVIXLJNIMacroAssembler final
   void LoadRawPtrFromThread(ManagedRegister dest, ThreadOffset32 offs) override;
 
   // Copying routines.
+  void MoveArguments(ArrayRef<ArgumentLocation> dests, ArrayRef<ArgumentLocation> srcs) override;
+
   void Move(ManagedRegister dest, ManagedRegister src, size_t size) override;
 
   void CopyRawPtrFromThread(FrameOffset fr_offs, ThreadOffset32 thr_offs) override;
