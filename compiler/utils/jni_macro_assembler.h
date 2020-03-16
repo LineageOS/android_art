@@ -43,6 +43,40 @@ enum class JNIMacroUnaryCondition {
   kNotZero
 };
 
+class ArgumentLocation {
+ public:
+  ArgumentLocation(ManagedRegister reg, size_t size)
+      : reg_(reg), frame_offset_(0u), size_(size) {
+    DCHECK(reg.IsRegister());
+  }
+
+  ArgumentLocation(FrameOffset frame_offset, size_t size)
+      : reg_(ManagedRegister::NoRegister()), frame_offset_(frame_offset), size_(size) {}
+
+  bool IsRegister() const {
+    return reg_.IsRegister();
+  }
+
+  ManagedRegister GetRegister() const {
+    DCHECK(IsRegister());
+    return reg_;
+  }
+
+  FrameOffset GetFrameOffset() const {
+    DCHECK(!IsRegister());
+    return frame_offset_;
+  }
+
+  size_t GetSize() const {
+    return size_;
+  }
+
+ private:
+  ManagedRegister reg_;
+  FrameOffset frame_offset_;
+  size_t size_;
+};
+
 template <PointerSize kPointerSize>
 class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
  public:
@@ -112,6 +146,8 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void LoadRawPtrFromThread(ManagedRegister dest, ThreadOffset<kPointerSize> offs) = 0;
 
   // Copying routines
+  virtual void MoveArguments(ArrayRef<ArgumentLocation> dests, ArrayRef<ArgumentLocation> srcs) = 0;
+
   virtual void Move(ManagedRegister dest, ManagedRegister src, size_t size) = 0;
 
   virtual void CopyRawPtrFromThread(FrameOffset fr_offs, ThreadOffset<kPointerSize> thr_offs) = 0;

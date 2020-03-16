@@ -326,6 +326,88 @@ void Arm64JNIMacroAssembler::LoadRawPtrFromThread(ManagedRegister m_dst, ThreadO
 }
 
 // Copying routines.
+void Arm64JNIMacroAssembler::MoveArguments(ArrayRef<ArgumentLocation> dests,
+                                           ArrayRef<ArgumentLocation> srcs) {
+  DCHECK_EQ(dests.size(), srcs.size());
+  auto get_mask = [](ManagedRegister reg) -> uint64_t {
+    Arm64ManagedRegister arm64_reg = reg.AsArm64();
+    if (arm64_reg.IsXRegister()) {
+      size_t core_reg_number = static_cast<size_t>(arm64_reg.AsXRegister());
+      DCHECK_LT(core_reg_number, 31u);  // xSP, xZR not allowed.
+      return UINT64_C(1) << core_reg_number;
+    } else if (arm64_reg.IsWRegister()) {
+      size_t core_reg_number = static_cast<size_t>(arm64_reg.AsWRegister());
+      DCHECK_LT(core_reg_number, 31u);  // wSP, wZR not allowed.
+      return UINT64_C(1) << core_reg_number;
+    } else if (arm64_reg.IsDRegister()) {
+      size_t fp_reg_number = static_cast<size_t>(arm64_reg.AsDRegister());
+      DCHECK_LT(fp_reg_number, 32u);
+      return (UINT64_C(1) << 32u) << fp_reg_number;
+    } else {
+      DCHECK(arm64_reg.IsSRegister());
+      size_t fp_reg_number = static_cast<size_t>(arm64_reg.AsSRegister());
+      DCHECK_LT(fp_reg_number, 32u);
+      return (UINT64_C(1) << 32u) << fp_reg_number;
+    }
+  };
+  // Collect registers to move while storing/copying args to stack slots.
+  // More than 8 core or FP reg args are very rare, so we do not optimize
+  // for that case by using LDP/STP.
+  // TODO: LDP/STP will be useful for normal and @FastNative where we need
+  // to spill even the leading arguments.
+  uint64_t src_regs = 0u;
+  uint64_t dest_regs = 0u;
+  for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+    const ArgumentLocation& src = srcs[i];
+    const ArgumentLocation& dest = dests[i];
+    DCHECK_EQ(src.GetSize(), dest.GetSize());
+    if (dest.IsRegister()) {
+      if (src.IsRegister() && src.GetRegister().Equals(dest.GetRegister())) {
+        // Nothing to do.
+      } else {
+        if (src.IsRegister()) {
+          src_regs |= get_mask(src.GetRegister());
+        }
+        dest_regs |= get_mask(dest.GetRegister());
+      }
+    } else {
+      if (src.IsRegister()) {
+        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
+      } else {
+        Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
+      }
+    }
+  }
+  // Fill destination registers.
+  // There should be no cycles, so this simple algorithm should make progress.
+  while (dest_regs != 0u) {
+    uint64_t old_dest_regs = dest_regs;
+    for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+      const ArgumentLocation& src = srcs[i];
+      const ArgumentLocation& dest = dests[i];
+      if (!dest.IsRegister()) {
+        continue;  // Stored in first loop above.
+      }
+      uint64_t dest_reg_mask = get_mask(dest.GetRegister());
+      if ((dest_reg_mask & dest_regs) == 0u) {
+        continue;  // Equals source, or already filled in one of previous iterations.
+      }
+      if ((dest_reg_mask & src_regs) != 0u) {
+        continue;  // Cannot clobber this register yet.
+      }
+      if (src.IsRegister()) {
+        Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
+        src_regs &= ~get_mask(src.GetRegister());  // Allow clobbering source register.
+      } else {
+        Load(dest.GetRegister(), src.GetFrameOffset(), dest.GetSize());
+      }
+      dest_regs &= ~get_mask(dest.GetRegister());  // Destination register was filled.
+    }
+    CHECK_NE(old_dest_regs, dest_regs);
+    DCHECK_EQ(0u, dest_regs & ~old_dest_regs);
+  }
+}
+
 void Arm64JNIMacroAssembler::Move(ManagedRegister m_dst, ManagedRegister m_src, size_t size) {
   Arm64ManagedRegister dst = m_dst.AsArm64();
   if (kIsDebugBuild) {
