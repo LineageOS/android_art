@@ -129,7 +129,7 @@ enum class FieldAccessType {
 //
 // Note: This should eventually be removed.
 constexpr bool IsCompatThrow(Instruction::Code opcode) {
-  return opcode == Instruction::Code::RETURN_OBJECT;
+  return opcode == Instruction::Code::RETURN_OBJECT || opcode == Instruction::Code::MOVE_EXCEPTION;
 }
 
 template <bool kVerifierDebug>
