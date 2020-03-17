@@ -101,7 +101,7 @@ class ImageWriter final {
    * image have been initialized and all native methods have been generated.  In
    * addition, no other thread should be modifying the heap.
    */
-  bool PrepareImageAddressSpace(TimingLogger* timings);
+  bool PrepareImageAddressSpace(bool preload_dex_caches, TimingLogger* timings);
 
   bool IsImageAddressSpaceReady() const {
     DCHECK(!image_infos_.empty());
@@ -450,10 +450,9 @@ class ImageWriter final {
   // Remove unwanted classes from various roots.
   void PruneNonImageClasses() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Remove unwanted classes from the DexCache roots.
-  void PruneDexCache(ObjPtr<mirror::DexCache> dex_cache, ObjPtr<mirror::ClassLoader> class_loader)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::classlinker_classes_lock_);
+  // Remove everything from the DexCache.
+  void ClearDexCache(ObjPtr<mirror::DexCache> dex_cache)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Preload deterministic DexCache contents.
   void PreloadDexCache(ObjPtr<mirror::DexCache> dex_cache, ObjPtr<mirror::ClassLoader> class_loader)
