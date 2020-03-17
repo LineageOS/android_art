@@ -362,7 +362,8 @@ void Class::SetClassSize(uint32_t new_class_size) {
     LOG(FATAL_WITHOUT_ABORT) << new_class_size << " vs " << GetClassSize();
     LOG(FATAL) << "class=" << PrettyTypeOf();
   }
-  SetField32Transaction(OFFSET_OF_OBJECT_MEMBER(Class, class_size_), new_class_size);
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      OFFSET_OF_OBJECT_MEMBER(Class, class_size_), new_class_size);
 }
 
 ObjPtr<Class> Class::GetObsoleteClass() {
