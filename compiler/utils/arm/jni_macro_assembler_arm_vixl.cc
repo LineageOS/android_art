@@ -41,6 +41,9 @@ namespace arm {
 static constexpr size_t kAapcsStackAlignment = 8u;
 static_assert(kAapcsStackAlignment < kStackAlignment);
 
+// STRD immediate can encode any 4-byte aligned offset smaller than this cutoff.
+static constexpr size_t kStrdOffsetCutoff = 1024u;
+
 vixl::aarch32::Register AsVIXLRegister(ArmManagedRegister reg) {
   CHECK(reg.IsCoreRegister());
   return vixl::aarch32::Register(reg.RegId());
@@ -223,8 +226,9 @@ void ArmVIXLJNIMacroAssembler::Store(FrameOffset dest, ManagedRegister m_src, si
     asm_.StoreToOffset(kStoreWord, AsVIXLRegister(src), sp, dest.Int32Value());
   } else if (src.IsRegisterPair()) {
     CHECK_EQ(8u, size);
-    asm_.StoreToOffset(kStoreWord, AsVIXLRegisterPairLow(src),  sp, dest.Int32Value());
-    asm_.StoreToOffset(kStoreWord, AsVIXLRegisterPairHigh(src), sp, dest.Int32Value() + 4);
+    ___ Strd(AsVIXLRegisterPairLow(src),
+             AsVIXLRegisterPairHigh(src),
+             MemOperand(sp, dest.Int32Value()));
   } else if (src.IsSRegister()) {
     CHECK_EQ(4u, size);
     asm_.StoreSToOffset(AsVIXLSRegister(src), sp, dest.Int32Value());
@@ -365,6 +369,310 @@ void ArmVIXLJNIMacroAssembler::ZeroExtend(ManagedRegister mreg ATTRIBUTE_UNUSED,
   UNIMPLEMENTED(FATAL) << "no zero extension necessary for arm";
 }
 
+static inline bool IsCoreRegisterOrPair(ArmManagedRegister reg) {
+  return reg.IsCoreRegister() || reg.IsRegisterPair();
+}
+
+static inline bool NoSpillGap(const ArgumentLocation& loc1, const ArgumentLocation& loc2) {
+  DCHECK(!loc1.IsRegister());
+  DCHECK(!loc2.IsRegister());
+  uint32_t loc1_offset = loc1.GetFrameOffset().Uint32Value();
+  uint32_t loc2_offset = loc2.GetFrameOffset().Uint32Value();
+  DCHECK_LT(loc1_offset, loc2_offset);
+  return loc1_offset + loc1.GetSize() == loc2_offset;
+}
+
+static inline uint32_t GetSRegisterNumber(ArmManagedRegister reg) {
+  if (reg.IsSRegister()) {
+    return static_cast<uint32_t>(reg.AsSRegister());
+  } else {
+    DCHECK(reg.IsDRegister());
+    return 2u * static_cast<uint32_t>(reg.AsDRegister());
+  }
+}
+
+// Get the number of locations to spill together.
+static inline size_t GetSpillChunkSize(ArrayRef<ArgumentLocation> dests,
+                                       ArrayRef<ArgumentLocation> srcs,
+                                       size_t start,
+                                       bool have_extra_temp) {
+  DCHECK_LT(start, dests.size());
+  DCHECK_ALIGNED(dests[start].GetFrameOffset().Uint32Value(), 4u);
+  const ArgumentLocation& first_src = srcs[start];
+  if (!first_src.IsRegister()) {
+    DCHECK_ALIGNED(first_src.GetFrameOffset().Uint32Value(), 4u);
+    // If we have an extra temporary, look for opportunities to move 2 words
+    // at a time with LDRD/STRD when the source types are word-sized.
+    if (have_extra_temp &&
+        start + 1u != dests.size() &&
+        !srcs[start + 1u].IsRegister() &&
+        first_src.GetSize() == 4u &&
+        srcs[start + 1u].GetSize() == 4u &&
+        NoSpillGap(first_src, srcs[start + 1u]) &&
+        NoSpillGap(dests[start], dests[start + 1u]) &&
+        dests[start].GetFrameOffset().Uint32Value() < kStrdOffsetCutoff) {
+      // Note: The source and destination may not be 8B aligned (but they are 4B aligned).
+      return 2u;
+    }
+    return 1u;
+  }
+  ArmManagedRegister first_src_reg = first_src.GetRegister().AsArm();
+  size_t end = start + 1u;
+  if (IsCoreRegisterOrPair(first_src_reg)) {
+    while (end != dests.size() &&
+           NoSpillGap(dests[end - 1u], dests[end]) &&
+           srcs[end].IsRegister() &&
+           IsCoreRegisterOrPair(srcs[end].GetRegister().AsArm())) {
+      ++end;
+    }
+  } else {
+    DCHECK(first_src_reg.IsSRegister() || first_src_reg.IsDRegister());
+    uint32_t next_sreg = GetSRegisterNumber(first_src_reg) + first_src.GetSize() / kSRegSizeInBytes;
+    while (end != dests.size() &&
+           NoSpillGap(dests[end - 1u], dests[end]) &&
+           srcs[end].IsRegister() &&
+           !IsCoreRegisterOrPair(srcs[end].GetRegister().AsArm()) &&
+           GetSRegisterNumber(srcs[end].GetRegister().AsArm()) == next_sreg) {
+      next_sreg += srcs[end].GetSize() / kSRegSizeInBytes;
+      ++end;
+    }
+  }
+  return end - start;
+}
+
+static inline uint32_t GetCoreRegisterMask(ArmManagedRegister reg) {
+  if (reg.IsCoreRegister()) {
+    return 1u << static_cast<size_t>(reg.AsCoreRegister());
+  } else {
+    DCHECK(reg.IsRegisterPair());
+    DCHECK_LT(reg.AsRegisterPairLow(), reg.AsRegisterPairHigh());
+    return (1u << static_cast<size_t>(reg.AsRegisterPairLow())) |
+           (1u << static_cast<size_t>(reg.AsRegisterPairHigh()));
+  }
+}
+
+static inline uint32_t GetCoreRegisterMask(ArrayRef<ArgumentLocation> srcs) {
+  uint32_t mask = 0u;
+  for (const ArgumentLocation& loc : srcs) {
+    DCHECK(loc.IsRegister());
+    mask |= GetCoreRegisterMask(loc.GetRegister().AsArm());
+  }
+  return mask;
+}
+
+static inline bool UseStrdForChunk(ArrayRef<ArgumentLocation> srcs, size_t start, size_t length) {
+  DCHECK_GE(length, 2u);
+  DCHECK(srcs[start].IsRegister());
+  DCHECK(srcs[start + 1u].IsRegister());
+  // The destination may not be 8B aligned (but it is 4B aligned).
+  // Allow arbitrary destination offset, macro assembler will use a temp if needed.
+  // Note: T32 allows unrelated registers in STRD. (A32 does not.)
+  return length == 2u &&
+         srcs[start].GetRegister().AsArm().IsCoreRegister() &&
+         srcs[start + 1u].GetRegister().AsArm().IsCoreRegister();
+}
+
+static inline bool UseVstrForChunk(ArrayRef<ArgumentLocation> srcs, size_t start, size_t length) {
+  DCHECK_GE(length, 2u);
+  DCHECK(srcs[start].IsRegister());
+  DCHECK(srcs[start + 1u].IsRegister());
+  // The destination may not be 8B aligned (but it is 4B aligned).
+  // Allow arbitrary destination offset, macro assembler will use a temp if needed.
+  return length == 2u &&
+         srcs[start].GetRegister().AsArm().IsSRegister() &&
+         srcs[start + 1u].GetRegister().AsArm().IsSRegister() &&
+         IsAligned<2u>(static_cast<size_t>(srcs[start].GetRegister().AsArm().AsSRegister()));
+}
+
+void ArmVIXLJNIMacroAssembler::MoveArguments(ArrayRef<ArgumentLocation> dests,
+                                             ArrayRef<ArgumentLocation> srcs) {
+  DCHECK_EQ(dests.size(), srcs.size());
+
+  // Native ABI is soft-float, so all destinations should be core registers or stack offsets.
+  // And register locations should be first, followed by stack locations with increasing offset.
+  auto is_register = [](const ArgumentLocation& loc) { return loc.IsRegister(); };
+  DCHECK(std::is_partitioned(dests.begin(), dests.end(), is_register));
+  size_t num_reg_dests =
+      std::distance(dests.begin(), std::partition_point(dests.begin(), dests.end(), is_register));
+  DCHECK(std::is_sorted(
+      dests.begin() + num_reg_dests,
+      dests.end(),
+      [](const ArgumentLocation& lhs, const ArgumentLocation& rhs) {
+        return lhs.GetFrameOffset().Uint32Value() < rhs.GetFrameOffset().Uint32Value();
+      }));
+
+  // Collect registers to move. No need to record FP regs as destinations are only core regs.
+  uint32_t src_regs = 0u;
+  uint32_t dest_regs = 0u;
+  for (size_t i = 0; i != num_reg_dests; ++i) {
+    const ArgumentLocation& src = srcs[i];
+    const ArgumentLocation& dest = dests[i];
+    DCHECK(dest.IsRegister() && IsCoreRegisterOrPair(dest.GetRegister().AsArm()));
+    if (src.IsRegister() && IsCoreRegisterOrPair(src.GetRegister().AsArm())) {
+      if (src.GetRegister().Equals(dest.GetRegister())) {
+        continue;
+      }
+      src_regs |= GetCoreRegisterMask(src.GetRegister().AsArm());
+    }
+    dest_regs |= GetCoreRegisterMask(dest.GetRegister().AsArm());
+  }
+
+  // Spill args first. Look for opportunities to spill multiple arguments at once.
+  {
+    UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
+    vixl32::Register xtemp;  // Extra temp register;
+    if ((dest_regs & ~src_regs) != 0u) {
+      xtemp = vixl32::Register(CTZ(dest_regs & ~src_regs));
+      DCHECK(!temps.IsAvailable(xtemp));
+    }
+    auto move_two_words = [&](FrameOffset dest_offset, FrameOffset src_offset) {
+      DCHECK(xtemp.IsValid());
+      DCHECK_LT(dest_offset.Uint32Value(), kStrdOffsetCutoff);
+      // VIXL macro assembler can use destination registers for loads from large offsets.
+      UseScratchRegisterScope temps2(asm_.GetVIXLAssembler());
+      vixl32::Register temp2 = temps2.Acquire();
+      ___ Ldrd(xtemp, temp2, MemOperand(sp, src_offset.Uint32Value()));
+      ___ Strd(xtemp, temp2, MemOperand(sp, dest_offset.Uint32Value()));
+    };
+    for (size_t i = num_reg_dests, arg_count = dests.size(); i != arg_count; ) {
+      const ArgumentLocation& src = srcs[i];
+      const ArgumentLocation& dest = dests[i];
+      DCHECK_EQ(src.GetSize(), dest.GetSize());
+      DCHECK(!dest.IsRegister());
+      uint32_t frame_offset = dest.GetFrameOffset().Uint32Value();
+      size_t chunk_size = GetSpillChunkSize(dests, srcs, i, xtemp.IsValid());
+      DCHECK_NE(chunk_size, 0u);
+      if (chunk_size == 1u) {
+        if (src.IsRegister()) {
+          Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
+        } else if (dest.GetSize() == 8u && xtemp.IsValid() && frame_offset < kStrdOffsetCutoff) {
+          move_two_words(dest.GetFrameOffset(), src.GetFrameOffset());
+        } else {
+          Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
+        }
+      } else if (!src.IsRegister()) {
+        DCHECK_EQ(chunk_size, 2u);
+        DCHECK_EQ(dest.GetSize(), 4u);
+        DCHECK_EQ(dests[i + 1u].GetSize(), 4u);
+        move_two_words(dest.GetFrameOffset(), src.GetFrameOffset());
+      } else if (UseStrdForChunk(srcs, i, chunk_size)) {
+        ___ Strd(AsVIXLRegister(srcs[i].GetRegister().AsArm()),
+                 AsVIXLRegister(srcs[i + 1u].GetRegister().AsArm()),
+                 MemOperand(sp, frame_offset));
+      } else if (UseVstrForChunk(srcs, i, chunk_size)) {
+        size_t sreg = GetSRegisterNumber(src.GetRegister().AsArm());
+        DCHECK_ALIGNED(sreg, 2u);
+        ___ Vstr(vixl32::DRegister(sreg / 2u), MemOperand(sp, frame_offset));
+      } else {
+        UseScratchRegisterScope temps2(asm_.GetVIXLAssembler());
+        vixl32::Register base_reg;
+        if (frame_offset == 0u) {
+          base_reg = sp;
+        } else {
+          base_reg = temps2.Acquire();
+          ___ Add(base_reg, sp, frame_offset);
+        }
+
+        ArmManagedRegister src_reg = src.GetRegister().AsArm();
+        if (IsCoreRegisterOrPair(src_reg)) {
+          uint32_t core_reg_mask = GetCoreRegisterMask(srcs.SubArray(i, chunk_size));
+          ___ Stm(base_reg, NO_WRITE_BACK, RegisterList(core_reg_mask));
+        } else {
+          uint32_t start_sreg = GetSRegisterNumber(src_reg);
+          const ArgumentLocation& last_dest = dests[i + chunk_size - 1u];
+          uint32_t total_size =
+              last_dest.GetFrameOffset().Uint32Value() + last_dest.GetSize() - frame_offset;
+          if (IsAligned<2u>(start_sreg) &&
+              IsAligned<kDRegSizeInBytes>(frame_offset) &&
+              IsAligned<kDRegSizeInBytes>(total_size)) {
+            uint32_t dreg_count = total_size / kDRegSizeInBytes;
+            DRegisterList dreg_list(vixl32::DRegister(start_sreg / 2u), dreg_count);
+            ___ Vstm(F64, base_reg, NO_WRITE_BACK, dreg_list);
+          } else {
+            uint32_t sreg_count = total_size / kSRegSizeInBytes;
+            SRegisterList sreg_list(vixl32::SRegister(start_sreg), sreg_count);
+            ___ Vstm(F32, base_reg, NO_WRITE_BACK, sreg_list);
+          }
+        }
+      }
+      i += chunk_size;
+    }
+  }
+
+  // Fill destination registers from source core registers.
+  // There should be no cycles, so this algorithm should make progress.
+  while (src_regs != 0u) {
+    uint32_t old_src_regs = src_regs;
+    for (size_t i = 0; i != num_reg_dests; ++i) {
+      DCHECK(dests[i].IsRegister() && IsCoreRegisterOrPair(dests[i].GetRegister().AsArm()));
+      if (!srcs[i].IsRegister() || !IsCoreRegisterOrPair(srcs[i].GetRegister().AsArm())) {
+        continue;
+      }
+      uint32_t dest_reg_mask = GetCoreRegisterMask(dests[i].GetRegister().AsArm());
+      if ((dest_reg_mask & dest_regs) == 0u) {
+        continue;  // Equals source, or already filled in one of previous iterations.
+      }
+      // There are no partial overlaps of 8-byte arguments, otherwise we would have to
+      // tweak this check; Move() can deal with partial overlap for historical reasons.
+      if ((dest_reg_mask & src_regs) != 0u) {
+        continue;  // Cannot clobber this register yet.
+      }
+      Move(dests[i].GetRegister(), srcs[i].GetRegister(), dests[i].GetSize());
+      uint32_t src_reg_mask = GetCoreRegisterMask(srcs[i].GetRegister().AsArm());
+      DCHECK_EQ(src_regs & src_reg_mask, src_reg_mask);
+      src_regs &= ~src_reg_mask;  // Allow clobbering the source register or pair.
+      dest_regs &= ~dest_reg_mask;  // Destination register or pair was filled.
+    }
+    CHECK_NE(old_src_regs, src_regs);
+    DCHECK_EQ(0u, src_regs & ~old_src_regs);
+  }
+
+  // Now fill destination registers from FP registers or stack slots, looking for
+  // opportunities to use LDRD/VMOV to fill 2 registers with one instruction.
+  for (size_t i = 0, j; i != num_reg_dests; i = j) {
+    j = i + 1u;
+    DCHECK(dests[i].IsRegister() && IsCoreRegisterOrPair(dests[i].GetRegister().AsArm()));
+    if (srcs[i].IsRegister() && IsCoreRegisterOrPair(srcs[i].GetRegister().AsArm())) {
+      DCHECK_EQ(GetCoreRegisterMask(dests[i].GetRegister().AsArm()) & dest_regs, 0u);
+      continue;  // Equals destination or moved above.
+    }
+    DCHECK_NE(GetCoreRegisterMask(dests[i].GetRegister().AsArm()) & dest_regs, 0u);
+    if (dests[i].GetSize() == 4u) {
+      // Find next register to load.
+      while (j != num_reg_dests &&
+             (srcs[j].IsRegister() && IsCoreRegisterOrPair(srcs[j].GetRegister().AsArm()))) {
+        DCHECK_EQ(GetCoreRegisterMask(dests[j].GetRegister().AsArm()) & dest_regs, 0u);
+        ++j;  // Equals destination or moved above.
+      }
+      if (j != num_reg_dests && dests[j].GetSize() == 4u) {
+        if (!srcs[i].IsRegister() && !srcs[j].IsRegister() && NoSpillGap(srcs[i], srcs[j])) {
+          ___ Ldrd(AsVIXLRegister(dests[i].GetRegister().AsArm()),
+                   AsVIXLRegister(dests[j].GetRegister().AsArm()),
+                   MemOperand(sp, srcs[i].GetFrameOffset().Uint32Value()));
+          ++j;
+          continue;
+        }
+        if (srcs[i].IsRegister() && srcs[j].IsRegister()) {
+          uint32_t first_sreg = GetSRegisterNumber(srcs[i].GetRegister().AsArm());
+          if (IsAligned<2u>(first_sreg) &&
+              first_sreg + 1u == GetSRegisterNumber(srcs[j].GetRegister().AsArm())) {
+            ___ Vmov(AsVIXLRegister(dests[i].GetRegister().AsArm()),
+                     AsVIXLRegister(dests[j].GetRegister().AsArm()),
+                     vixl32::DRegister(first_sreg / 2u));
+            ++j;
+            continue;
+          }
+        }
+      }
+    }
+    if (srcs[i].IsRegister()) {
+      Move(dests[i].GetRegister(), srcs[i].GetRegister(), dests[i].GetSize());
+    } else {
+      Load(dests[i].GetRegister(), srcs[i].GetFrameOffset(), dests[i].GetSize());
+    }
+  }
+}
+
 void ArmVIXLJNIMacroAssembler::Move(ManagedRegister mdst,
                                     ManagedRegister msrc,
                                     size_t size  ATTRIBUTE_UNUSED) {
@@ -387,8 +695,12 @@ void ArmVIXLJNIMacroAssembler::Move(ManagedRegister mdst,
   ArmManagedRegister src = msrc.AsArm();
   if (!dst.Equals(src)) {
     if (dst.IsCoreRegister()) {
-      CHECK(src.IsCoreRegister()) << src;
-      ___ Mov(AsVIXLRegister(dst), AsVIXLRegister(src));
+      if (src.IsCoreRegister()) {
+        ___ Mov(AsVIXLRegister(dst), AsVIXLRegister(src));
+      } else {
+        CHECK(src.IsSRegister()) << src;
+        ___ Vmov(AsVIXLRegister(dst), AsVIXLSRegister(src));
+      }
     } else if (dst.IsDRegister()) {
       if (src.IsDRegister()) {
         ___ Vmov(F64, AsVIXLDRegister(dst), AsVIXLDRegister(src));
@@ -407,14 +719,18 @@ void ArmVIXLJNIMacroAssembler::Move(ManagedRegister mdst,
       }
     } else {
       CHECK(dst.IsRegisterPair()) << dst;
-      CHECK(src.IsRegisterPair()) << src;
-      // Ensure that the first move doesn't clobber the input of the second.
-      if (src.AsRegisterPairHigh() != dst.AsRegisterPairLow()) {
-        ___ Mov(AsVIXLRegisterPairLow(dst),  AsVIXLRegisterPairLow(src));
-        ___ Mov(AsVIXLRegisterPairHigh(dst), AsVIXLRegisterPairHigh(src));
+      if (src.IsRegisterPair()) {
+        // Ensure that the first move doesn't clobber the input of the second.
+        if (src.AsRegisterPairHigh() != dst.AsRegisterPairLow()) {
+          ___ Mov(AsVIXLRegisterPairLow(dst),  AsVIXLRegisterPairLow(src));
+          ___ Mov(AsVIXLRegisterPairHigh(dst), AsVIXLRegisterPairHigh(src));
+        } else {
+          ___ Mov(AsVIXLRegisterPairHigh(dst), AsVIXLRegisterPairHigh(src));
+          ___ Mov(AsVIXLRegisterPairLow(dst),  AsVIXLRegisterPairLow(src));
+        }
       } else {
-        ___ Mov(AsVIXLRegisterPairHigh(dst), AsVIXLRegisterPairHigh(src));
-        ___ Mov(AsVIXLRegisterPairLow(dst),  AsVIXLRegisterPairLow(src));
+        CHECK(src.IsDRegister()) << src;
+        ___ Vmov(AsVIXLRegisterPairLow(dst), AsVIXLRegisterPairHigh(dst), AsVIXLDRegister(src));
       }
     }
   }
