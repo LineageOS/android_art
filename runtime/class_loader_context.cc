@@ -455,10 +455,12 @@ bool ClassLoaderContext::OpenDexFiles(InstructionSet isa,
       std::string error_msg;
       // When opening the dex files from the context we expect their checksum to match their
       // contents. So pass true to verify_checksum.
+      // We don't need to do structural dex file verification, we only need to
+      // check the checksum, so pass false to verify.
       if (fd < 0) {
         if (!dex_file_loader.Open(location.c_str(),
                                   location.c_str(),
-                                  Runtime::Current()->IsVerificationEnabled(),
+                                  /*verify=*/ false,
                                   /*verify_checksum=*/ true,
                                   &error_msg,
                                   &info->opened_dex_files)) {
@@ -484,7 +486,7 @@ bool ClassLoaderContext::OpenDexFiles(InstructionSet isa,
         }
       } else if (!dex_file_loader.Open(fd,
                                        location.c_str(),
-                                       Runtime::Current()->IsVerificationEnabled(),
+                                       /*verify=*/ false,
                                        /*verify_checksum=*/ true,
                                        &error_msg,
                                        &info->opened_dex_files)) {
