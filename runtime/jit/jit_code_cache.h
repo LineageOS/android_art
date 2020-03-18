@@ -400,6 +400,11 @@ class JitCodeCache {
     return region->IsValid() && !IsSharedRegion(*region);
   }
 
+  // Return whether the given `ptr` is in the zygote executable memory space.
+  bool IsInZygoteExecSpace(const void* ptr) const {
+    return shared_region_.IsInExecSpace(ptr);
+  }
+
  private:
   JitCodeCache();
 
@@ -473,10 +478,6 @@ class JitCodeCache {
 
   bool IsInZygoteDataSpace(const void* ptr) const {
     return shared_region_.IsInDataSpace(ptr);
-  }
-
-  bool IsInZygoteExecSpace(const void* ptr) const {
-    return shared_region_.IsInExecSpace(ptr);
   }
 
   bool IsWeakAccessEnabled(Thread* self) const;
