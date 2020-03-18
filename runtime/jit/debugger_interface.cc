@@ -25,6 +25,7 @@
 #include "base/time_utils.h"
 #include "base/utils.h"
 #include "dex/dex_file.h"
+#include "elf/elf_debug_reader.h"
 #include "jit/jit.h"
 #include "jit/jit_code_cache.h"
 #include "jit/jit_memory_region.h"
@@ -606,6 +607,8 @@ void RemoveNativeDebugInfoForJit(const void* code_ptr) {
   // Method removal is very expensive since we need to decompress and read ELF files.
   // Collet methods to be removed and do the removal in bulk later.
   g_removed_jit_functions.push_back(code_ptr);
+
+  VLOG(jit) << "JIT mini-debug-info removed for " << code_ptr;
 }
 
 void RepackNativeDebugInfoForJitLocked() {
@@ -643,6 +646,20 @@ size_t GetJitMiniDebugInfoMemUsage() {
 
 Mutex* GetNativeDebugInfoLock() {
   return &g_jit_debug_lock;
+}
+
+void ForEachNativeDebugSymbol(std::function<void(const void*, size_t, const char*)> cb) {
+  MutexLock mu(Thread::Current(), g_jit_debug_lock);
+  using ElfRuntimeTypes = std::conditional<sizeof(void*) == 4, ElfTypes32, ElfTypes64>::type;
+  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr; it = it->next_) {
+    ArrayRef<const uint8_t> buffer(it->symfile_addr_, it->symfile_size_);
+    if (!buffer.empty()) {
+      ElfDebugReader<ElfRuntimeTypes> reader(buffer);
+      reader.VisitFunctionSymbols([&](ElfRuntimeTypes::Sym sym, const char* name) {
+        cb(reinterpret_cast<const void*>(sym.st_value), sym.st_size, name);
+      });
+    }
+  }
 }
 
 }  // namespace art
