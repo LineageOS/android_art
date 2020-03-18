@@ -237,8 +237,12 @@ std::vector<uint8_t> PackElfFileForJIT(
   using Elf_Sym = typename ElfTypes::Sym;
   const InstructionSet isa = kRuntimeISA;
   CHECK_EQ(sizeof(Elf_Addr), static_cast<size_t>(GetInstructionSetPointerSize(isa)));
+  const uint32_t kPcAlign = GetInstructionSetInstructionAlignment(isa);
+  auto is_pc_aligned = [](const void* pc) { return IsAligned<kPcAlign>(pc); };
+  DCHECK(std::all_of(removed_symbols.begin(), removed_symbols.end(), is_pc_aligned));
   auto is_removed_symbol = [&removed_symbols](Elf_Addr addr) {
-    const void* code_ptr = reinterpret_cast<const void*>(addr);
+    // Remove thumb-bit, if any (using the fact that address is instruction aligned).
+    const void* code_ptr = AlignDown(reinterpret_cast<const void*>(addr), kPcAlign);
     return std::binary_search(removed_symbols.begin(), removed_symbols.end(), code_ptr);
   };
   uint64_t min_address = std::numeric_limits<uint64_t>::max();
