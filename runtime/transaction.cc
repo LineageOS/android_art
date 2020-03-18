@@ -45,7 +45,8 @@ Transaction::Transaction(bool strict, mirror::Class* root)
       rolling_back_(false),
       heap_(Runtime::Current()->GetHeap()),
       strict_(strict),
-      root_(root) {
+      root_(root),
+      assert_no_new_records_reason_(nullptr) {
   DCHECK(Runtime::Current()->IsAotCompiler());
 }
 
@@ -170,6 +171,7 @@ void Transaction::RecordWriteFieldBoolean(mirror::Object* obj,
                                           bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.LogBooleanValue(field_offset, value, is_volatile);
 }
@@ -180,6 +182,7 @@ void Transaction::RecordWriteFieldByte(mirror::Object* obj,
                                        bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.LogByteValue(field_offset, value, is_volatile);
 }
@@ -190,6 +193,7 @@ void Transaction::RecordWriteFieldChar(mirror::Object* obj,
                                        bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.LogCharValue(field_offset, value, is_volatile);
 }
@@ -201,6 +205,7 @@ void Transaction::RecordWriteFieldShort(mirror::Object* obj,
                                         bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.LogShortValue(field_offset, value, is_volatile);
 }
@@ -212,6 +217,7 @@ void Transaction::RecordWriteField32(mirror::Object* obj,
                                      bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.Log32BitsValue(field_offset, value, is_volatile);
 }
@@ -222,6 +228,7 @@ void Transaction::RecordWriteField64(mirror::Object* obj,
                                      bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.Log64BitsValue(field_offset, value, is_volatile);
 }
@@ -232,6 +239,7 @@ void Transaction::RecordWriteFieldReference(mirror::Object* obj,
                                             bool is_volatile) {
   DCHECK(obj != nullptr);
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   ObjectLog& object_log = object_logs_[obj];
   object_log.LogReferenceValue(field_offset, value, is_volatile);
 }
@@ -241,6 +249,7 @@ void Transaction::RecordWriteArray(mirror::Array* array, size_t index, uint64_t 
   DCHECK(array->IsArrayInstance());
   DCHECK(!array->IsObjectArray());
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   auto it = array_logs_.find(array);
   if (it == array_logs_.end()) {
     ArrayLog log;
@@ -254,6 +263,7 @@ void Transaction::RecordResolveString(ObjPtr<mirror::DexCache> dex_cache,
   DCHECK(dex_cache != nullptr);
   DCHECK_LT(string_idx.index_, dex_cache->GetDexFile()->NumStringIds());
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   resolve_string_logs_.emplace_back(dex_cache, string_idx);
 }
 
@@ -280,6 +290,7 @@ void Transaction::RecordWeakStringRemoval(ObjPtr<mirror::String> s) {
 void Transaction::LogInternedString(InternStringLog&& log) {
   Locks::intern_table_lock_->AssertExclusiveHeld(Thread::Current());
   MutexLock mu(Thread::Current(), log_lock_);
+  DCHECK(assert_no_new_records_reason_ == nullptr) << assert_no_new_records_reason_;
   intern_string_logs_.push_front(std::move(log));
 }
 
@@ -695,6 +706,29 @@ void Transaction::ArrayLog::UndoArrayWrite(mirror::Array* array,
     default:
       LOG(FATAL) << "Unsupported type " << array_type;
       UNREACHABLE();
+  }
+}
+
+Transaction* ScopedAssertNoNewTransactionRecords::InstallAssertion(const char* reason) {
+  Transaction* transaction = nullptr;
+  if (kIsDebugBuild && Runtime::Current()->IsActiveTransaction()) {
+    transaction = Runtime::Current()->GetTransaction().get();
+    if (transaction != nullptr) {
+      MutexLock mu(Thread::Current(), transaction->log_lock_);
+      CHECK(transaction->assert_no_new_records_reason_ == nullptr)
+          << "old: " << transaction->assert_no_new_records_reason_ << " new: " << reason;
+      transaction->assert_no_new_records_reason_ = reason;
+    }
+  }
+  return transaction;
+}
+
+void ScopedAssertNoNewTransactionRecords::RemoveAssertion(Transaction* transaction) {
+  if (kIsDebugBuild) {
+    CHECK(Runtime::Current()->GetTransaction().get() == transaction);
+    MutexLock mu(Thread::Current(), transaction->log_lock_);
+    CHECK(transaction->assert_no_new_records_reason_ != nullptr);
+    transaction->assert_no_new_records_reason_ = nullptr;
   }
 }
 
