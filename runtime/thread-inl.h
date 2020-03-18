@@ -114,7 +114,8 @@ inline ThreadState Thread::SetState(ThreadState new_state) {
   }
   union StateAndFlags old_state_and_flags;
   old_state_and_flags.as_int = tls32_.state_and_flags.as_int;
-  CHECK_NE(old_state_and_flags.as_struct.state, kRunnable);
+  CHECK_NE(old_state_and_flags.as_struct.state, kRunnable) << new_state << " " << *this << " "
+      << *Thread::Current();
   tls32_.state_and_flags.as_struct.state = new_state;
   return static_cast<ThreadState>(old_state_and_flags.as_struct.state);
 }
