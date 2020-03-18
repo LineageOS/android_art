@@ -278,6 +278,7 @@ bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
   }
 
   {
+    TimingLogger::ScopedTiming t("PreloadDexCaches", timings);
     // Preload deterministic contents to the dex cache arrays we're going to write.
     ScopedObjectAccess soa(self);
     ObjPtr<mirror::ClassLoader> class_loader = GetAppClassLoader();
