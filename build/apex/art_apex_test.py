@@ -292,15 +292,6 @@ class Checker:
     self._expected_file_globs.add(path)
     return ok
 
-  def check_symlink(self, path):
-    fs_object = self._provider.get(path)
-    if fs_object is None:
-      self.fail('Could not find %s', path)
-      return
-    if not fs_object.is_symlink:
-      self.fail('%s is not a symlink', path)
-    self._expected_file_globs.add(path)
-
   def check_executable(self, filename):
     path = 'bin/%s' % filename
     if not self.check_file(path):
@@ -361,10 +352,8 @@ class Checker:
   def check_dexpreopt(self, basename):
     dirs = self.arch_dirs_for_path('javalib')
     for dir in dirs:
-      for ext in ['art', 'oat']:
+      for ext in ['art', 'oat', 'vdex']:
         self.check_file('%s/%s.%s' % (dir, basename, ext))
-      self.check_symlink('%s/%s.vdex' % (dir, basename))
-    self.check_file('javalib/%s.%s' % (basename, 'vdex'))
 
   def check_java_library(self, basename):
     return self.check_file('javalib/%s.jar' % basename)
