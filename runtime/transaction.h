@@ -320,8 +320,29 @@ class Transaction final {
   const bool strict_;
   std::string abort_message_ GUARDED_BY(log_lock_);
   mirror::Class* root_ GUARDED_BY(log_lock_);
+  const char* assert_no_new_records_reason_ GUARDED_BY(log_lock_);
+
+  friend class ScopedAssertNoNewTransactionRecords;
 
   DISALLOW_COPY_AND_ASSIGN(Transaction);
+};
+
+class ScopedAssertNoNewTransactionRecords {
+ public:
+  explicit ScopedAssertNoNewTransactionRecords(const char* reason)
+    : transaction_(kIsDebugBuild ? InstallAssertion(reason) : nullptr) {}
+
+  ~ScopedAssertNoNewTransactionRecords() {
+    if (kIsDebugBuild && transaction_ != nullptr) {
+      RemoveAssertion(transaction_);
+    }
+  }
+
+ private:
+  static Transaction* InstallAssertion(const char* reason);
+  static void RemoveAssertion(Transaction* transaction);
+
+  Transaction* transaction_;
 };
 
 }  // namespace art
