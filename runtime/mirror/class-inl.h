@@ -78,7 +78,8 @@ inline void Class::SetSuperClass(ObjPtr<Class> new_super_class) {
     DCHECK(old_super_class == nullptr || old_super_class == new_super_class);
   }
   DCHECK(new_super_class != nullptr);
-  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(Class, super_class_), new_super_class);
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      OFFSET_OF_OBJECT_MEMBER(Class, super_class_), new_super_class);
 }
 
 inline bool Class::HasSuperClass() {
@@ -299,7 +300,8 @@ inline ObjPtr<PointerArray> Class::GetVTableDuringLinking() {
 }
 
 inline void Class::SetVTable(ObjPtr<PointerArray> new_vtable) {
-  SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(Class, vtable_), new_vtable);
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      OFFSET_OF_OBJECT_MEMBER(Class, vtable_), new_vtable);
 }
 
 template<VerifyObjectFlags kVerifyFlags>
@@ -345,7 +347,8 @@ inline int32_t Class::GetEmbeddedVTableLength() {
 }
 
 inline void Class::SetEmbeddedVTableLength(int32_t len) {
-  SetField32<false>(MemberOffset(EmbeddedVTableLengthOffset()), len);
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      MemberOffset(EmbeddedVTableLengthOffset()), len);
 }
 
 inline ImTable* Class::GetImt(PointerSize pointer_size) {
@@ -353,7 +356,8 @@ inline ImTable* Class::GetImt(PointerSize pointer_size) {
 }
 
 inline void Class::SetImt(ImTable* imt, PointerSize pointer_size) {
-  return SetFieldPtrWithSize<false>(ImtPtrOffset(pointer_size), imt, pointer_size);
+  return SetFieldPtrWithSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      ImtPtrOffset(pointer_size), imt, pointer_size);
 }
 
 inline MemberOffset Class::EmbeddedVTableEntryOffset(uint32_t i, PointerSize pointer_size) {
@@ -367,7 +371,8 @@ inline ArtMethod* Class::GetEmbeddedVTableEntry(uint32_t i, PointerSize pointer_
 
 inline void Class::SetEmbeddedVTableEntryUnchecked(
     uint32_t i, ArtMethod* method, PointerSize pointer_size) {
-  SetFieldPtrWithSize<false>(EmbeddedVTableEntryOffset(i, pointer_size), method, pointer_size);
+  SetFieldPtrWithSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      EmbeddedVTableEntryOffset(i, pointer_size), method, pointer_size);
 }
 
 inline void Class::SetEmbeddedVTableEntry(uint32_t i, ArtMethod* method, PointerSize pointer_size) {
@@ -671,7 +676,8 @@ inline int32_t Class::GetIfTableCount() {
 
 inline void Class::SetIfTable(ObjPtr<IfTable> new_iftable) {
   DCHECK(new_iftable != nullptr) << PrettyClass(this);
-  SetFieldObject<false>(IfTableOffset(), new_iftable);
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      IfTableOffset(), new_iftable);
 }
 
 inline LengthPrefixedArray<ArtField>* Class::GetIFieldsPtr() {
@@ -919,8 +925,15 @@ inline void Class::InitializeClassVisitor::operator()(ObjPtr<Object> obj,
   klass->SetDexClassDefIndex(DexFile::kDexNoIndex16);  // Default to no valid class def index.
   klass->SetDexTypeIndex(dex::TypeIndex(DexFile::kDexNoIndex16));  // Default to no valid type
                                                                    // index.
-  // Default to force slow path until initialized.
-  klass->SetObjectSizeAllocFastPath(std::numeric_limits<uint32_t>::max());
+  // Default to force slow path until visibly initialized.
+  // There is no need for release store (volatile) in pre-fence visitor.
+  klass->SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      ObjectSizeAllocFastPathOffset(), std::numeric_limits<uint32_t>::max());
+}
+
+inline void Class::SetAccessFlagsDuringLinking(uint32_t new_access_flags) {
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      AccessFlagsOffset(), new_access_flags);
 }
 
 inline void Class::SetAccessFlags(uint32_t new_access_flags) {
@@ -936,11 +949,8 @@ inline void Class::SetAccessFlags(uint32_t new_access_flags) {
 }
 
 inline void Class::SetClassFlags(uint32_t new_flags) {
-  if (Runtime::Current()->IsActiveTransaction()) {
-    SetField32<true>(OFFSET_OF_OBJECT_MEMBER(Class, class_flags_), new_flags);
-  } else {
-    SetField32<false>(OFFSET_OF_OBJECT_MEMBER(Class, class_flags_), new_flags);
-  }
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      OFFSET_OF_OBJECT_MEMBER(Class, class_flags_), new_flags);
 }
 
 inline uint32_t Class::NumDirectInterfaces() {
@@ -1020,7 +1030,8 @@ inline void Class::SetComponentType(ObjPtr<Class> new_component_type) {
   DCHECK(GetComponentType() == nullptr);
   DCHECK(new_component_type != nullptr);
   // Component type is invariant: use non-transactional mode without check.
-  SetFieldObject<false, false>(ComponentTypeOffset(), new_component_type);
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      ComponentTypeOffset(), new_component_type);
 }
 
 inline size_t Class::GetComponentSize() {
@@ -1188,14 +1199,9 @@ inline bool Class::CannotBeAssignedFromOtherTypes() {
   return component->IsPrimitive() || component->CannotBeAssignedFromOtherTypes();
 }
 
-template <bool kCheckTransaction>
 inline void Class::SetClassLoader(ObjPtr<ClassLoader> new_class_loader) {
-  if (kCheckTransaction && Runtime::Current()->IsActiveTransaction()) {
-    SetFieldObject<true>(OFFSET_OF_OBJECT_MEMBER(Class, class_loader_), new_class_loader);
-  } else {
-    DCHECK(!Runtime::Current()->IsActiveTransaction());
-    SetFieldObject<false>(OFFSET_OF_OBJECT_MEMBER(Class, class_loader_), new_class_loader);
-  }
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      OFFSET_OF_OBJECT_MEMBER(Class, class_loader_), new_class_loader);
 }
 
 inline void Class::SetRecursivelyInitialized() {
@@ -1207,7 +1213,7 @@ inline void Class::SetRecursivelyInitialized() {
 inline void Class::SetHasDefaultMethods() {
   DCHECK_EQ(GetLockOwnerThreadId(), Thread::Current()->GetThreadId());
   uint32_t flags = GetField32(OFFSET_OF_OBJECT_MEMBER(Class, access_flags_));
-  SetAccessFlags(flags | kAccHasDefaultMethod);
+  SetAccessFlagsDuringLinking(flags | kAccHasDefaultMethod);
 }
 
 }  // namespace mirror
