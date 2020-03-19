@@ -47,6 +47,7 @@ cc_defaults {
     shared_libs: [
         "libbase",
         "liblog",
+        "libdexfile",
     ],
     static_libs: [
         "libperfetto_client_experimental",
