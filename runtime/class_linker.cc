@@ -4026,6 +4026,8 @@ void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,
   // Make sure to hold the dex cache live in the class table. This case happens for the boot class
   // path dex caches without an image.
   data.class_table->InsertStrongRoot(dex_cache);
+  // Make sure that the dex cache holds the classloader live.
+  dex_cache->SetClassLoader(class_loader);
   if (class_loader != nullptr) {
     // Since we added a strong root to the class table, do the write barrier as required for
     // remembered sets and generational GCs.
