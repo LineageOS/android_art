@@ -237,7 +237,7 @@ static void ClearDexFileCookies() REQUIRES_SHARED(Locks::mutator_lock_) {
   Runtime::Current()->GetHeap()->VisitObjects(visitor);
 }
 
-bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
+bool ImageWriter::PrepareImageAddressSpace(bool preload_dex_caches, TimingLogger* timings) {
   target_ptr_size_ = InstructionSetPointerSize(compiler_options_.GetInstructionSet());
 
   Thread* const self = Thread::Current();
@@ -277,7 +277,8 @@ bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
     Runtime::Current()->GetInternTable()->PromoteWeakToStrong();
   }
 
-  {
+  if (preload_dex_caches) {
+    TimingLogger::ScopedTiming t("PreloadDexCaches", timings);
     // Preload deterministic contents to the dex cache arrays we're going to write.
     ScopedObjectAccess soa(self);
     ObjPtr<mirror::ClassLoader> class_loader = GetAppClassLoader();
@@ -1234,75 +1235,40 @@ void ImageWriter::VisitClassLoaders(ClassLoaderVisitor* visitor) {
   Runtime::Current()->GetClassLinker()->VisitClassLoaders(visitor);
 }
 
-void ImageWriter::PruneDexCache(ObjPtr<mirror::DexCache> dex_cache,
-                                ObjPtr<mirror::ClassLoader> class_loader) {
-  Runtime* runtime = Runtime::Current();
-  ClassLinker* class_linker = runtime->GetClassLinker();
-  const DexFile& dex_file = *dex_cache->GetDexFile();
-  // Prune methods.
-  dex::TypeIndex last_class_idx;  // Initialized to invalid index.
-  ObjPtr<mirror::Class> last_class = nullptr;
+void ImageWriter::ClearDexCache(ObjPtr<mirror::DexCache> dex_cache) {
+  // Clear methods.
   mirror::MethodDexCacheType* resolved_methods = dex_cache->GetResolvedMethods();
   for (size_t slot_idx = 0, num = dex_cache->NumResolvedMethods(); slot_idx != num; ++slot_idx) {
     auto pair =
         mirror::DexCache::GetNativePairPtrSize(resolved_methods, slot_idx, target_ptr_size_);
-    uint32_t stored_index = pair.index;
-    ArtMethod* method = pair.object;
-    if (method == nullptr) {
-      continue;  // Empty entry.
-    }
-    // Check if the referenced class is in the image. Note that we want to check the referenced
-    // class rather than the declaring class to preserve the semantics, i.e. using a MethodId
-    // results in resolving the referenced class and that can for example throw OOME.
-    const dex::MethodId& method_id = dex_file.GetMethodId(stored_index);
-    if (method_id.class_idx_ != last_class_idx) {
-      last_class_idx = method_id.class_idx_;
-      last_class = class_linker->LookupResolvedType(last_class_idx, dex_cache, class_loader);
-      if (last_class != nullptr && !KeepClass(last_class)) {
-        last_class = nullptr;
-      }
-    }
-    if (last_class == nullptr) {
-      dex_cache->ClearResolvedMethod(stored_index, target_ptr_size_);
+    if (pair.object != nullptr) {
+      dex_cache->ClearResolvedMethod(pair.index, target_ptr_size_);
     }
   }
-  // Prune fields.
+  // Clear fields.
   mirror::FieldDexCacheType* resolved_fields = dex_cache->GetResolvedFields();
-  last_class_idx = dex::TypeIndex();  // Initialized to invalid index.
-  last_class = nullptr;
   for (size_t slot_idx = 0, num = dex_cache->NumResolvedFields(); slot_idx != num; ++slot_idx) {
     auto pair = mirror::DexCache::GetNativePairPtrSize(resolved_fields, slot_idx, target_ptr_size_);
-    uint32_t stored_index = pair.index;
-    ArtField* field = pair.object;
-    if (field == nullptr) {
-      continue;  // Empty entry.
-    }
-    // Check if the referenced class is in the image. Note that we want to check the referenced
-    // class rather than the declaring class to preserve the semantics, i.e. using a FieldId
-    // results in resolving the referenced class and that can for example throw OOME.
-    const dex::FieldId& field_id = dex_file.GetFieldId(stored_index);
-    if (field_id.class_idx_ != last_class_idx) {
-      last_class_idx = field_id.class_idx_;
-      last_class = class_linker->LookupResolvedType(last_class_idx, dex_cache, class_loader);
-      if (last_class != nullptr && !KeepClass(last_class)) {
-        last_class = nullptr;
-      }
-    }
-    if (last_class == nullptr) {
-      dex_cache->ClearResolvedField(stored_index, target_ptr_size_);
+    if (pair.object != nullptr) {
+      dex_cache->ClearResolvedField(pair.index, target_ptr_size_);
     }
   }
-  // Prune types.
+  // Clear types.
   for (size_t slot_idx = 0, num = dex_cache->NumResolvedTypes(); slot_idx != num; ++slot_idx) {
     mirror::TypeDexCachePair pair =
         dex_cache->GetResolvedTypes()[slot_idx].load(std::memory_order_relaxed);
-    uint32_t stored_index = pair.index;
-    ObjPtr<mirror::Class> klass = pair.object.Read();
-    if (klass != nullptr && !KeepClass(klass)) {
-      dex_cache->ClearResolvedType(dex::TypeIndex(stored_index));
+    if (!pair.object.IsNull()) {
+      dex_cache->ClearResolvedType(dex::TypeIndex(pair.index));
     }
   }
-  // Strings do not need pruning.
+  // Clear strings.
+  for (size_t slot_idx = 0, num = dex_cache->NumStrings(); slot_idx != num; ++slot_idx) {
+    mirror::StringDexCachePair pair =
+        dex_cache->GetStrings()[slot_idx].load(std::memory_order_relaxed);
+    if (!pair.object.IsNull()) {
+      dex_cache->ClearString(dex::StringIndex(pair.index));
+    }
+  }
 }
 
 void ImageWriter::PreloadDexCache(ObjPtr<mirror::DexCache> dex_cache,
@@ -1442,13 +1408,10 @@ void ImageWriter::PruneNonImageClasses() {
     VLOG(compiler) << "Pruned " << class_loader_visitor.GetRemovedClassCount() << " classes";
   }
 
-  // Clear references to removed classes from the DexCaches.
+  // Completely clear DexCaches. They shall be re-filled in PreloadDexCaches if requested.
   std::vector<ObjPtr<mirror::DexCache>> dex_caches = FindDexCaches(self);
   for (ObjPtr<mirror::DexCache> dex_cache : dex_caches) {
-    // Pass the class loader associated with the DexCache. This can either be
-    // the app's `class_loader` or `nullptr` if boot class loader.
-    bool is_app_image_dex_cache = compiler_options_.IsAppImage() && IsImageDexCache(dex_cache);
-    PruneDexCache(dex_cache, is_app_image_dex_cache ? GetAppClassLoader() : nullptr);
+    ClearDexCache(dex_cache);
   }
 
   // Drop the array class cache in the ClassLinker, as these are roots holding those classes live.
