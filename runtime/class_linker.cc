@@ -139,6 +139,7 @@
 #include "thread-inl.h"
 #include "thread_list.h"
 #include "trace.h"
+#include "transaction.h"
 #include "utils/dex_cache_arrays_layout-inl.h"
 #include "verifier/class_verifier.h"
 #include "well_known_classes.h"
@@ -2179,7 +2180,7 @@ bool ClassLinker::AddImageSpace(
         // class loader is only the initiating loader but not the defining loader.
         // Avoid read barrier since we are comparing against null.
         if (klass->GetClassLoader<kDefaultVerifyFlags, kWithoutReadBarrier>() != nullptr) {
-          klass->SetClassLoader</*kCheckTransaction=*/ false>(loader);
+          klass->SetClassLoader(loader);
         }
       }
     }
@@ -2636,7 +2637,7 @@ void ClassLinker::FinishArrayClassSetup(ObjPtr<mirror::Class> array_class) {
   // Arrays are access-checks-clean and preverified.
   access_flags |= kAccVerificationAttempted;
 
-  array_class->SetAccessFlags(access_flags);
+  array_class->SetAccessFlagsDuringLinking(access_flags);
 
   // Array classes are fully initialized either during single threaded startup,
   // or from a pre-fence visitor, so visibly initialized.
@@ -3694,7 +3695,7 @@ void ClassLinker::SetupClass(const DexFile& dex_file,
   klass->SetClass(GetClassRoot<mirror::Class>(this));
   uint32_t access_flags = dex_class_def.GetJavaAccessFlags();
   CHECK_EQ(access_flags & ~kAccJavaFlagsMask, 0U);
-  klass->SetAccessFlags(access_flags);
+  klass->SetAccessFlagsDuringLinking(access_flags);
   klass->SetClassLoader(class_loader);
   DCHECK_EQ(klass->GetPrimitiveType(), Primitive::kPrimNot);
   mirror::Class::SetStatus(klass, ClassStatus::kIdx, nullptr);
@@ -4242,7 +4243,7 @@ void ClassLinker::CreatePrimitiveClass(Thread* self,
   CHECK(primitive_class != nullptr) << "OOM for primitive class " << type;
   // Do not hold lock on the primitive class object, the initialization of
   // primitive classes is done while the process is still single threaded.
-  primitive_class->SetAccessFlags(
+  primitive_class->SetAccessFlagsDuringLinking(
       kAccPublic | kAccFinal | kAccAbstract | kAccVerificationAttempted);
   primitive_class->SetPrimitiveType(type);
   primitive_class->SetIfTable(GetClassRoot<mirror::Object>(this)->GetIfTable());
@@ -4359,6 +4360,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateArrayClass(Thread* self,
   auto visitor = [this, array_class_size, component_type](ObjPtr<mirror::Object> obj,
                                                           size_t usable_size)
       REQUIRES_SHARED(Locks::mutator_lock_) {
+    ScopedAssertNoNewTransactionRecords sanntr("CreateArrayClass");
     mirror::Class::InitializeClassVisitor init_class(array_class_size);
     init_class(obj, usable_size);
     ObjPtr<mirror::Class> klass = ObjPtr<mirror::Class>::DownCast(obj);
@@ -4959,7 +4961,8 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
   temp_klass->SetObjectSize(sizeof(mirror::Proxy));
   // Set the class access flags incl. VerificationAttempted, so we do not try to set the flag on
   // the methods.
-  temp_klass->SetAccessFlags(kAccClassIsProxy | kAccPublic | kAccFinal | kAccVerificationAttempted);
+  temp_klass->SetAccessFlagsDuringLinking(
+      kAccClassIsProxy | kAccPublic | kAccFinal | kAccVerificationAttempted);
   temp_klass->SetClassLoader(soa.Decode<mirror::ClassLoader>(loader));
   DCHECK_EQ(temp_klass->GetPrimitiveType(), Primitive::kPrimNot);
   temp_klass->SetName(soa.Decode<mirror::String>(name));
