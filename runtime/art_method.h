@@ -214,6 +214,10 @@ class ArtMethod final {
   }
 
   bool IsPreCompiled() const {
+    if (IsIntrinsic()) {
+      // kAccCompileDontBother overlaps with kAccIntrinsicBits.
+      return false;
+    }
     uint32_t expected = (kAccPreCompiled | kAccCompileDontBother);
     return (GetAccessFlags() & expected) == expected;
   }
