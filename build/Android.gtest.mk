@@ -602,7 +602,8 @@ ifeq ($(ART_BUILD_TARGET),true)
     libicu_jni.com.android.art.debug \
     libjavacore.com.android.art.debug \
     libopenjdkd.com.android.art.debug \
-    $(foreach jar,$(TARGET_TEST_CORE_JARS),$(TARGET_OUT_JAVA_LIBRARIES)/$(jar).jar)
+    com.android.art.testing \
+    com.android.conscrypt
 endif
 ifeq ($(ART_BUILD_HOST),true)
   $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),)))

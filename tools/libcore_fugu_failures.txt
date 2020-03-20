@@ -10,7 +10,7 @@
   description: "Test using memfd_create() syscall, only available from Linux 3.17.",
   result: EXEC_FAILED,
   bug: 146113753,
-  modes: [device_testdex],
+  modes: [device],
   names: [
     "libcore.android.system.OsTest#testMemfdCreate",
     "libcore.android.system.OsTest#testMemfdCreateErrno",
@@ -21,7 +21,7 @@
   description: "Test using the getrandom() syscall, only available from Linux 3.17.",
   result: EXEC_FAILED,
   bug: 141230711,
-  modes: [device_testdex],
+  modes: [device],
   names: [
     "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
     "libcore.java.math.BigIntegerTest#test_probablePrime",

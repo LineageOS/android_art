@@ -540,11 +540,6 @@ if [[ "$DEX2OAT_BOOT_IMAGE" = *core*.art && "$DEX2OAT_BCP" = "" ]]; then
     if [[ ${core_locations_dir:0:${#prefix}} = $prefix ]]; then
       core_locations_dir="${core_locations_dir##$prefix}"
     fi
-  elif [[ -e $ANDROID_ROOT/framework/core-oj-testdex.jar ]]; then
-    core_jars_suffix=-testdex
-    core_locations_dir=/system/framework
-  fi
-  if [[ $core_jars_suffix != "" ]]; then
     boot_separator=""
     for boot_module in ${core_jars_list}; do
       DEX_FILENAME="$boot_module$core_jars_suffix.jar"

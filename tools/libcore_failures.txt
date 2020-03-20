@@ -25,13 +25,13 @@
 {
   description: "Differences between vogar and cts in user directory",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   name: "libcore.java.lang.SystemTest#testSystemProperties_mutable"
 },
 {
   description: "Differences between vogar and cts. Passes with --mode activity",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.java.lang.OldSystemTest#test_getProperties"]
 },
 {
@@ -40,7 +40,7 @@
                 (--invoke-with \"su root\"). Does not pass after setting chmod
                 777 all directories on path to socket (on device without su).",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.libcore.io.OsTest#testUnixDomainSockets_in_file_system"]
 },
 {
@@ -55,7 +55,7 @@
 {
   description: "Issue with incorrect device time (1970)",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.java.util.TimeZoneTest#testDisplayNames",
           "libcore.java.util.TimeZoneTest#test_useDaylightTime_Taiwan",
           "org.apache.harmony.tests.java.util.TimeZoneTest#test_hasSameRules_Ljava_util_TimeZone"],
@@ -65,13 +65,13 @@
   description: "Issue with incorrect device time (1970). Test assumes that DateTime.now()
                 is greater then a date in 1998.",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["org.apache.harmony.tests.java.util.DateTest#test_Constructor"]
 },
 {
   description: "Failing due to a locale problem on hammerhead.",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.icu.DateIntervalFormatTest#test10089890",
           "libcore.icu.DateIntervalFormatTest#test10209343_when_not_this_year",
           "libcore.icu.DateIntervalFormatTest#test10560853_for_single_day_events",
@@ -88,7 +88,7 @@
 {
   description: "Failing due to missing localhost on hammerhead and volantis.",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.javax.crypto.CipherTest#testCipherInitWithCertificate",
           "libcore.net.NetworkSecurityPolicyTest#testCleartextTrafficPolicyWithFtpURLConnection",
           "libcore.net.NetworkSecurityPolicyTest#testCleartextTrafficPolicyWithJarFtpURLConnection",
@@ -103,13 +103,13 @@
 {
   description: "Test timeouts",
   result: EXEC_TIMEOUT,
-  modes: [device_testdex],
+  modes: [device],
   names: ["org.apache.harmony.tests.java.util.ScannerTest#testPerformance"]
 },
 {
   description: "Needs the newest cat version on the device",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["org.apache.harmony.tests.java.lang.ProcessTest#test_getErrorStream"]
 },
 {
@@ -119,7 +119,7 @@
 },
 {
   description: "Linker issues in chrooted environment",
-  modes: [device_testdex],
+  modes: [device],
   result: EXEC_FAILED,
   names: ["org.apache.harmony.tests.java.lang.ProcessManagerTest#testEnvironment"]
 },
@@ -132,14 +132,14 @@
 {
   description: "test_xattr fails on arm64 on the buildbots only: needs investigation",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.libcore.io.OsTest#test_xattr"],
   bug: 22258911
 },
 {
   description: "fails on L builds: needs investigation",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: ["org.apache.harmony.tests.java.lang.ClassTest#test_forNameLjava_lang_String"]
 },
 {
@@ -165,7 +165,7 @@
   description: "Flaky test",
   result: EXEC_FAILED,
   bug: 30107038,
-  modes: [device_testdex],
+  modes: [device],
   names: ["org.apache.harmony.tests.java.lang.ProcessTest#test_destroyForcibly"]
 },
 {
@@ -173,7 +173,7 @@
                 Unclear if this relates to the tests running sh as a child process.",
   result: EXEC_FAILED,
   bug: 30657148,
-  modes: [device_testdex],
+  modes: [device],
   names: ["libcore.java.lang.ProcessBuilderTest#testRedirectInherit",
           "libcore.java.lang.ProcessBuilderTest#testRedirect_nullStreams"]
 },
@@ -197,7 +197,7 @@
 {
   description: "Timeout on heap-poisoning target builds",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   bug: 116446372,
   names: ["libcore.libcore.io.FdsanTest#testSocket"]
 },
@@ -229,7 +229,7 @@
 {
   description: "Apex related",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   bug: 122642227,
   names: [
     "libcore.libcore.icu.TimeZoneIntegrationTest#testTimeZoneDataVersion",
@@ -240,7 +240,7 @@
 {
   description: "Timeout on walleye bots, currenlty on OPM1.171019.019. But test passes on Q, so just mark it fail here.",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   names: [
     "libcore.libcore.io.OsTest#testCrossFamilyBindConnectSendto"
   ]
@@ -264,7 +264,7 @@
 {
   description: "Fails on device",
   result: EXEC_FAILED,
-  modes: [device_testdex],
+  modes: [device],
   bug: 145348591,
   names: ["libcore.android.system.OsTest#test_if_nametoindex_if_indextoname"]
 },
