@@ -19,7 +19,8 @@ ART_ANDROID_COMMON_MK = true
 
 ART_TARGET_SUPPORTED_ARCH := arm arm64 x86 x86_64
 ART_HOST_SUPPORTED_ARCH := x86 x86_64
-ART_DEXPREOPT_BOOT_JAR_DIR := system/framework
+ART_DEXPREOPT_BOOT_JAR_DIR := apex/com.android.art/javalib
+CONSCRYPT_DEXPREOPT_BOOT_JAR_DIR := apex/com.android.conscrypt/javalib
 
 ifneq ($(HOST_OS),darwin)
   ART_HOST_SUPPORTED_ARCH := x86 x86_64
