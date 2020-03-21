@@ -1,0 +1,1 @@
+Test that redefining a class in the boot classpath produces a warning.
