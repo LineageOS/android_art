@@ -1,0 +1,2 @@
+LINKAGE VIOLATION: java.lang.Class<java.lang.Object,null> was redefined
+LINKAGE VIOLATION: java.lang.Class<MyClassLoader,dalvik.system.PathClassLoader> is a subclass of java.lang.ClassLoader
