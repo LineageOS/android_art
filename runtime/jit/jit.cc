@@ -980,6 +980,10 @@ static void CopyIfDifferent(void* s1, const void* s2, size_t n) {
 }
 
 void Jit::MapBootImageMethods() {
+  if (Runtime::Current()->IsJavaDebuggable()) {
+    LOG(INFO) << "Not mapping boot image methods due to process being debuggable";
+    return;
+  }
   CHECK_NE(fd_methods_.get(), -1);
   if (!code_cache_->GetZygoteMap()->CanMapBootImageMethods()) {
     LOG(WARNING) << "Not mapping boot image methods due to error from zygote";
@@ -1223,7 +1227,10 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
     return;
   }
   Runtime* runtime = Runtime::Current();
-  if (runtime->IsSystemServer() && UseJitCompilation() && HasImageWithProfile()) {
+  // If the runtime is debuggable, no need to precompile methods.
+  if (runtime->IsSystemServer() &&
+      UseJitCompilation() && HasImageWithProfile() &&
+      !runtime->IsJavaDebuggable()) {
     thread_pool_->AddTask(Thread::Current(), new JitProfileTask(dex_files, class_loader));
   }
 }
