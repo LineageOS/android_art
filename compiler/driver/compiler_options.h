@@ -311,6 +311,14 @@ class CompilerOptions final {
     return force_determinism_;
   }
 
+  bool IsCheckLinkageConditions() const {
+    return check_linkage_conditions_;
+  }
+
+  bool IsCrashOnLinkageViolation() const {
+    return crash_on_linkage_violation_;
+  }
+
   bool DeduplicateCode() const {
     return deduplicate_code_;
   }
@@ -430,6 +438,13 @@ class CompilerOptions final {
   // Whether the compiler should trade performance for determinism to guarantee exactly reproducible
   // outcomes.
   bool force_determinism_;
+
+  // Whether the compiler should check for violation of the conditions required to perform AOT
+  // "linkage".
+  bool check_linkage_conditions_;
+  // Whether the compiler should crash when encountering a violation of one of
+  // the conditions required to perform AOT "linkage".
+  bool crash_on_linkage_violation_;
 
   // Whether code should be deduplicated.
   bool deduplicate_code_;
