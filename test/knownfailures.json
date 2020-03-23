@@ -802,15 +802,6 @@
     },
     {
         "tests": [
-          "1964-linkage"
-        ],
-        "variant": "speed-profile | interpreter | interp-ac",
-        "description": [
-          "Linkage warnings are only emitted from dex2oat."
-        ]
-    },
-    {
-        "tests": [
           "1965-get-set-local-primitive-no-tables",
           "1966-get-set-local-objects-no-table"
         ],
