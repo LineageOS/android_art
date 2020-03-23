@@ -129,6 +129,12 @@ class DexFile {
     ext_dex_file_ = dex_file.ext_dex_file_;
     dex_file.ext_dex_file_ = nullptr;
   }
+
+  explicit DexFile(std::unique_ptr<DexFile>& dex_file) noexcept {
+    ext_dex_file_ = dex_file->ext_dex_file_;
+    dex_file->ext_dex_file_ = nullptr;
+    dex_file.reset(nullptr);
+  }
   virtual ~DexFile();
 
   // Interprets a chunk of memory as a dex file. As long as *size is too small,
