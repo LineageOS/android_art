@@ -176,11 +176,6 @@ art_cc_library {
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
-        // due to the transitive dependency from linker:
-        // linker -> libdebuggerd_handler_fallback -> libdexfile_support_static -> libdexfile
-        // libartbase
-        // TODO(b/142944931): remove this
-        "com.android.runtime",
         // TODO(b/142944931) Clean this up. This is due to the dependency to libdexfile_support_static
         // from /system/core, etc.
         "//apex_available:platform",
