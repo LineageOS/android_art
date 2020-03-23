@@ -718,7 +718,7 @@ class ThreadLocalHashOverride {
                                                  "Ljava/lang/ThreadLocal;",
                                                  /*class_loader=*/ nullptr)
         : nullptr);
-    field_ = (klass_ != nullptr)
+    field_ = ((klass_ != nullptr) && klass_->IsVisiblyInitialized())
         ? klass_->FindDeclaredStaticField("nextHashCode",
                                           "Ljava/util/concurrent/atomic/AtomicInteger;")
         : nullptr;
@@ -742,7 +742,13 @@ class ThreadLocalHashOverride {
       field_->SetObject</*kTransactionActive=*/ false>(klass_.Get(), new_field_value.Get());
     }
     if (apply && old_field_value_ == nullptr) {
-      LOG(ERROR) << "Failed to override ThreadLocal.nextHashCode";
+      if ((klass_ != nullptr) && klass_->IsVisiblyInitialized()) {
+        // This would mean that the implementation of ThreadLocal has changed
+        // and the code above is no longer applicable.
+        LOG(ERROR) << "Failed to override ThreadLocal.nextHashCode";
+      } else {
+        VLOG(compiler) << "ThreadLocal is not initialized in the primary boot image.";
+      }
     }
   }
 
