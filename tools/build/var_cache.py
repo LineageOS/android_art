@@ -35,8 +35,7 @@
 #
 # For example, this would be a valid var-cache:
 #
-# export ART_TOOLS_BUILD_VAR_CACHE="TARGET_CORE_JARS='core-oj core-libart'
-#   HOST_CORE_JARS='core-oj-hostdex core-libart-hostdex'"
+# export ART_TOOLS_BUILD_VAR_CACHE="ART_APEX_JARS='core-oj core-libart'"
 #
 # Calling into soong repeatedly is very slow; whenever it needs to be done
 # more than once, the var_cache.py or var_cache.sh script should be used instead.
@@ -119,8 +118,7 @@ def _build_dict():
   _var_cache_dict = {}
 
   # Parse $ART_TOOLS_BUILD_VAR_CACHE, e.g.
-  #   TARGET_CORE_JARS='core-oj core-libart conscrypt okhttp bouncycastle apache-xml'
-  #   HOST_CORE_JARS='core-oj-hostdex core-libart-hostdex ...'
+  #   ART_APEX_JARS='core-oj core-libart conscrypt okhttp bouncycastle apache-xml'
 
   for line in os.environ['ART_TOOLS_BUILD_VAR_CACHE'].splitlines():
     _debug(line)
