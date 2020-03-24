@@ -40,7 +40,11 @@ function boot_classpath_arg {
   local separator=""
   for var
   do
-    printf -- "${separator}${dir}/${var}${suffix}.jar";
+    if [ "$var" = "conscrypt" ] && [ "$mode" = "target" ]; then
+      printf -- "${separator}/apex/com.android.conscrypt/javalib/conscrypt.jar";
+    else
+      printf -- "${separator}${dir}/${var}${suffix}.jar";
+    fi
     separator=":"
   done
 }
@@ -52,6 +56,7 @@ BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-x
 
 vm_args=""
 art="$android_root/bin/art"
+mode="target"
 art_debugee="sh $android_root/bin/art"
 args=$@
 chroot_option=
@@ -66,7 +71,7 @@ debug="no"
 explicit_debug="no"
 verbose="no"
 image="-Ximage:/data/art-test/core.art"
-boot_classpath="$(boot_classpath_arg /system/framework -testdex $BOOT_CLASSPATH_JARS)"
+boot_classpath="$(boot_classpath_arg /apex/com.android.art/javalib "" $BOOT_CLASSPATH_JARS)"
 boot_classpath_locations=""
 with_jdwp_path=""
 agent_wrapper=""
@@ -74,7 +79,6 @@ vm_args=""
 # By default, we run the whole JDWP test suite.
 has_specific_test="no"
 test="org.apache.harmony.jpda.tests.share.AllTests"
-mode="target"
 # Use JIT compiling by default.
 use_jit=true
 instant_jit=false
@@ -121,11 +125,6 @@ while true; do
     device_dir=""
     # Vogar knows which VM to use on host.
     vm_command=""
-    shift
-  elif [[ "$1" == "--mode=device" ]]; then
-    # Remove the --mode=device from the arguments and replace it with --mode=device_testdex
-    args=${args/$1}
-    args="$args --mode=device_testdex"
     shift
   elif [[ "$1" == "--mode=jvm" ]]; then
     mode="ri"
