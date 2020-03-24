@@ -285,5 +285,16 @@ TEST(DexFileTest, move_construct) {
   EXPECT_EQ(info.offset, int32_t{0x100});
 }
 
+TEST(DexFileTest, pointer_construct) {
+  std::unique_ptr<DexFile> dex_file = GetTestDexData();
+  ASSERT_NE(dex_file, nullptr);
+
+  auto new_dex = DexFile(dex_file);
+  ASSERT_TRUE(dex_file.get() == nullptr);
+
+  MethodInfo info = new_dex.GetMethodInfoForOffset(0x100, false);
+  EXPECT_EQ(info.offset, int32_t{0x100});
+}
+
 }  // namespace dex
 }  // namespace art_api
