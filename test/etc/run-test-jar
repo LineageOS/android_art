@@ -701,6 +701,9 @@ fi
 # because that's what we use for compiling the core.art image.
 # It may contain additional modules from TEST_CORE_JARS.
 bpath_modules="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
+bpath=""
+bpath_locations=""
+bpath_separator=""
 if [ "${HOST}" = "y" ]; then
     framework="${ANDROID_HOST_OUT}/framework"
     if [ "${ANDROID_HOST_OUT:0:${#ANDROID_BUILD_TOP}+1}" = "${ANDROID_BUILD_TOP}/" ]; then
@@ -712,19 +715,22 @@ if [ "${HOST}" = "y" ]; then
       exit
     fi
     bpath_suffix="-hostdex"
+    for bpath_module in ${bpath_modules}; do
+      bpath+="${bpath_separator}${framework}/${bpath_module}${bpath_suffix}.jar"
+      bpath_locations+="${bpath_separator}${framework_location}/${bpath_module}${bpath_suffix}.jar"
+      bpath_separator=":"
+    done
 else
-    framework="${ANDROID_ROOT}/framework"
-    framework_location="${ANDROID_ROOT}/framework"
-    bpath_suffix="-testdex"
+    for bpath_module in ${bpath_modules}; do
+      apex_module="com.android.art"
+      if [ "${bpath_module}" = "conscrypt" ]; then
+        apex_module="com.android.conscrypt"
+      fi
+      bpath+="${bpath_separator}/apex/${apex_module}/javalib/${bpath_module}.jar"
+      bpath_locations+="${bpath_separator}/apex/${apex_module}/javalib/${bpath_module}.jar"
+      bpath_separator=":"
+    done
 fi
-bpath=""
-bpath_locations=""
-bpath_separator=""
-for bpath_module in ${bpath_modules}; do
-  bpath+="${bpath_separator}${framework}/${bpath_module}${bpath_suffix}.jar"
-  bpath_locations+="${bpath_separator}${framework_location}/${bpath_module}${bpath_suffix}.jar"
-  bpath_separator=":"
-done
 # Pass down the bootclasspath
 FLAGS="${FLAGS} -Xbootclasspath:${bpath}"
 FLAGS="${FLAGS} -Xbootclasspath-locations:${bpath_locations}"

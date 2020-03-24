@@ -125,7 +125,6 @@ define build-art-test-dex
     LOCAL_DEX_PREOPT := false
     LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_test.mk $(4)
     LOCAL_MODULE_TAGS := tests
-    LOCAL_JAVA_LIBRARIES := $(TARGET_TEST_CORE_JARS)
     LOCAL_MODULE_PATH := $(3)
     ifneq ($(wildcard $(LOCAL_PATH)/$(2)/main.list),)
       LOCAL_MIN_SDK_VERSION := 19
