@@ -267,6 +267,9 @@ static std::string InitLlndkLibrariesVendor() {
 }
 
 static std::string InitLlndkLibrariesProduct() {
+  if (!is_product_vndk_version_defined()) {
+    return "";
+  }
   std::string config_file = kLlndkLibrariesFile;
   InsertVndkVersionStr(&config_file, true);
   auto sonames = ReadConfig(config_file, always_true);
@@ -289,6 +292,9 @@ static std::string InitVndkspLibrariesVendor() {
 }
 
 static std::string InitVndkspLibrariesProduct() {
+  if (!is_product_vndk_version_defined()) {
+    return "";
+  }
   std::string config_file = kVndkLibrariesFile;
   InsertVndkVersionStr(&config_file, true);
   auto sonames = ReadConfig(config_file, always_true);
