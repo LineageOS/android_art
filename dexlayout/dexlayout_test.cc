@@ -438,19 +438,13 @@ class DexLayoutTest : public CommonArtTest {
 
     // -v makes sure that the layout did not corrupt the dex file.
     std::vector<std::string> dexlayout_args =
-        { "-i", "-v", "-w", tmp_dir, "-o", tmp_name, "-p", profile_file, dex_file };
+        { "-v", "-w", tmp_dir, "-o", tmp_name, "-p", profile_file, dex_file };
     if (!DexLayoutExec(dexlayout_args, error_msg, /*pass_default_cdex_option=*/ false)) {
       return false;
     }
 
     // Recreate the profile with the new dex location. This is required so that the profile dex
     // location matches.
-    // For convenience we just copy the previous dex file to the new location so we can re-use it
-    // for profile generation.
-
-    // Don't check the output. The exec cmd wrongfully coplains that the cp cmd fails.
-    std::vector<std::string> cp_args = {"/usr/bin/cp", dex_file, output_dex};
-    art::Exec(cp_args, error_msg);
     CreateProfile(output_dex, profile_file);
     // -v makes sure that the layout did not corrupt the dex file.
     // -i since the checksum won't match from the first layout.
