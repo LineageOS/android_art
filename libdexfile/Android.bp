@@ -338,6 +338,7 @@ art_cc_test {
     name: "art_libdexfile_external_tests",
     host_supported: true,
     test_per_src: true, // For consistency with other ART gtests.
+    test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_ext_c_test.c",
     ],
@@ -373,6 +374,7 @@ art_cc_test {
         "art_test_defaults",
     ],
     host_supported: true,
+    test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_supp_test.cc",
     ],
@@ -438,6 +440,7 @@ cc_library_static {
 art_cc_test {
     name: "art_libdexfile_support_static_tests",
     host_supported: true,
+    test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_supp_test.cc",
     ],
