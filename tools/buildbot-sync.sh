@@ -127,3 +127,6 @@ echo -e "${green}$ld_generated_config_files${nc}"
 echo -e "${green}Syncing data directory...${nc}"
 adb shell mkdir -p "$ART_TEST_CHROOT/data"
 adb push "$ANDROID_PRODUCT_OUT/data" "$ART_TEST_CHROOT/"
+
+# Create the framework directory if it doesn't exist. Some gtests need it.
+adb shell mkdir -p "$ART_TEST_CHROOT/system/framework"
