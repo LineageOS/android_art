@@ -117,6 +117,9 @@ class Handle : public ValueObject {
     return IsNull();
   }
 
+  mirror::Object* ObjectFromGdb() REQUIRES_SHARED(Locks::mutator_lock_);
+  T* GetFromGdb() REQUIRES_SHARED(Locks::mutator_lock_);
+
  protected:
   template<typename S>
   explicit Handle(StackReference<S>* reference)
