@@ -173,17 +173,21 @@ class JitCodeCache::JniStubData {
     return methods_;
   }
 
-  void RemoveMethodsIn(const LinearAlloc& alloc) {
-    auto kept_end = std::remove_if(
+  void RemoveMethodsIn(const LinearAlloc& alloc) REQUIRES_SHARED(Locks::mutator_lock_) {
+    auto kept_end = std::partition(
         methods_.begin(),
         methods_.end(),
-        [&alloc](ArtMethod* method) { return alloc.ContainsUnsafe(method); });
+        [&alloc](ArtMethod* method) { return !alloc.ContainsUnsafe(method); });
+    for (auto it = kept_end; it != methods_.end(); it++) {
+      VLOG(jit) << "JIT removed (JNI) " << (*it)->PrettyMethod() << ": " << code_;
+    }
     methods_.erase(kept_end, methods_.end());
   }
 
-  bool RemoveMethod(ArtMethod* method) {
+  bool RemoveMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
     auto it = std::find(methods_.begin(), methods_.end(), method);
     if (it != methods_.end()) {
+      VLOG(jit) << "JIT removed (JNI) " << (*it)->PrettyMethod() << ": " << code_;
       methods_.erase(it);
       return true;
     } else {
@@ -497,6 +501,26 @@ void JitCodeCache::FreeAllMethodHeaders(
 
   // We have potentially removed a lot of debug info. Do maintenance pass to save space.
   RepackNativeDebugInfoForJit();
+
+  // Check that the set of compiled methods exactly matches native debug information.
+  if (kIsDebugBuild) {
+    std::map<const void*, ArtMethod*> compiled_methods;
+    VisitAllMethods([&](const void* addr, ArtMethod* method) {
+      CHECK(addr != nullptr && method != nullptr);
+      compiled_methods.emplace(addr, method);
+    });
+    std::set<const void*> debug_info;
+    ForEachNativeDebugSymbol([&](const void* addr, size_t, const char* name) {
+      addr = AlignDown(addr, GetInstructionSetInstructionAlignment(kRuntimeISA));  // Thumb-bit.
+      CHECK(debug_info.emplace(addr).second) << "Duplicate debug info: " << addr << " " << name;
+      CHECK_EQ(compiled_methods.count(addr), 1u) << "Extra debug info: " << addr << " " << name;
+    });
+    if (!debug_info.empty()) {  // If debug-info generation is enabled.
+      for (auto it : compiled_methods) {
+        CHECK_EQ(debug_info.count(it.first), 1u) << "No debug info: " << it.second->PrettyMethod();
+      }
+    }
+  }
 }
 
 void JitCodeCache::RemoveMethodsIn(Thread* self, const LinearAlloc& alloc) {
@@ -525,6 +549,7 @@ void JitCodeCache::RemoveMethodsIn(Thread* self, const LinearAlloc& alloc) {
       for (auto it = method_code_map_.begin(); it != method_code_map_.end();) {
         if (alloc.ContainsUnsafe(it->second)) {
           method_headers.insert(OatQuickMethodHeader::FromCodePointer(it->first));
+          VLOG(jit) << "JIT removed " << it->second->PrettyMethod() << ": " << it->first;
           it = method_code_map_.erase(it);
         } else {
           ++it;
@@ -636,6 +661,8 @@ bool JitCodeCache::Commit(Thread* self,
                           ArrayRef<const uint8_t> reserved_data,
                           const std::vector<Handle<mirror::Object>>& roots,
                           ArrayRef<const uint8_t> stack_map,
+                          const std::vector<uint8_t>& debug_info,
+                          bool is_full_debug_info,
                           bool osr,
                           bool has_should_deoptimize_flag,
                           const ArenaSet<ArtMethod*>& cha_single_implementation_list) {
@@ -668,6 +695,13 @@ bool JitCodeCache::Commit(Thread* self,
   }
 
   number_of_compilations_++;
+
+  // We need to update the debug info before the entry point gets set.
+  // At the same time we want to do under JIT lock so that debug info and JIT maps are in sync.
+  if (!debug_info.empty()) {
+    // NB: Don't allow packing of full info since it would remove non-backtrace data.
+    AddNativeDebugInfoForJit(code_ptr, debug_info, /*allow_packing=*/ !is_full_debug_info);
+  }
 
   // We need to update the entry point in the runnable state for the instrumentation.
   {
@@ -811,6 +845,7 @@ bool JitCodeCache::RemoveMethodLocked(ArtMethod* method, bool release_memory) {
         if (release_memory) {
           FreeCodeAndData(it->first);
         }
+        VLOG(jit) << "JIT removed " << it->second->PrettyMethod() << ": " << it->first;
         it = method_code_map_.erase(it);
       } else {
         ++it;
@@ -1198,6 +1233,9 @@ void JitCodeCache::RemoveUnmarkedCode(Thread* self) {
         ++it;
       } else {
         method_headers.insert(OatQuickMethodHeader::FromCodePointer(data->GetCode()));
+        for (ArtMethod* method : data->GetMethods()) {
+          VLOG(jit) << "JIT removed (JNI) " << method->PrettyMethod() << ": " << data->GetCode();
+        }
         it = jni_stubs_map_.erase(it);
       }
     }
@@ -1209,6 +1247,7 @@ void JitCodeCache::RemoveUnmarkedCode(Thread* self) {
       } else {
         OatQuickMethodHeader* header = OatQuickMethodHeader::FromCodePointer(code_ptr);
         method_headers.insert(header);
+        VLOG(jit) << "JIT removed " << it->second->PrettyMethod() << ": " << it->first;
         it = method_code_map_.erase(it);
       }
     }
@@ -1871,6 +1910,28 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
 
 JitMemoryRegion* JitCodeCache::GetCurrentRegion() {
   return Runtime::Current()->IsZygote() ? &shared_region_ : &private_region_;
+}
+
+void JitCodeCache::VisitAllMethods(const std::function<void(const void*, ArtMethod*)>& cb) {
+  for (const auto& it : jni_stubs_map_) {
+    const JniStubData& data = it.second;
+    if (data.IsCompiled()) {
+      for (ArtMethod* method : data.GetMethods()) {
+        cb(data.GetCode(), method);
+      }
+    }
+  }
+  for (auto it : method_code_map_) {  // Includes OSR methods.
+    cb(it.first, it.second);
+  }
+  for (auto it : saved_compiled_methods_map_) {
+    cb(it.second, it.first);
+  }
+  for (auto it : zygote_map_) {
+    if (it.code_ptr != nullptr && it.method != nullptr) {
+      cb(it.code_ptr, it.method);
+    }
+  }
 }
 
 void ZygoteMap::Initialize(uint32_t number_of_methods) {
