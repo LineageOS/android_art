@@ -266,6 +266,8 @@ class JitCodeCache {
               ArrayRef<const uint8_t> reserved_data,  // Uninitialized destination.
               const std::vector<Handle<mirror::Object>>& roots,
               ArrayRef<const uint8_t> stack_map,      // Compiler output (source).
+              const std::vector<uint8_t>& debug_info,
+              bool is_full_debug_info,
               bool osr,
               bool has_should_deoptimize_flag,
               const ArenaSet<ArtMethod*>& cha_single_implementation_list)
@@ -439,6 +441,10 @@ class JitCodeCache {
   bool RemoveMethodLocked(ArtMethod* method, bool release_memory)
       REQUIRES(Locks::jit_lock_)
       REQUIRES(Locks::mutator_lock_);
+
+  // Call given callback for every compiled method in the code cache.
+  void VisitAllMethods(const std::function<void(const void*, ArtMethod*)>& cb)
+      REQUIRES(Locks::jit_lock_);
 
   // Free code and data allocations for `code_ptr`.
   void FreeCodeAndData(const void* code_ptr)
