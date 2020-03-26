@@ -71,9 +71,7 @@ static constexpr const char* kAndroidRootDefaultPath = "/system";
 static constexpr const char* kAndroidDataEnvVar = "ANDROID_DATA";
 static constexpr const char* kAndroidDataDefaultPath = "/data";
 static constexpr const char* kAndroidArtRootEnvVar = "ANDROID_ART_ROOT";
-static constexpr const char* kAndroidArtApexDefaultPath = "/apex/com.android.art";
 static constexpr const char* kAndroidConscryptRootEnvVar = "ANDROID_CONSCRYPT_ROOT";
-static constexpr const char* kAndroidConscryptApexDefaultPath = "/apex/com.android.conscrypt";
 
 // Get the "root" directory containing the "lib" directory where this instance
 // of the libartbase library (which contains `GetRootContainingLibartbase`) is
