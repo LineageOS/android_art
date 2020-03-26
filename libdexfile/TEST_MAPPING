@@ -1,0 +1,16 @@
+{
+  "presubmit": [
+    {
+      "name": "art_libdexfile_external_tests_dex_file_ext_c_test",
+      "host": true
+    },
+    {
+      "name": "art_libdexfile_support_tests",
+      "host": true
+    },
+    {
+      "name": "art_libdexfile_support_static_tests",
+      "host": true
+    }
+  ]
+}
