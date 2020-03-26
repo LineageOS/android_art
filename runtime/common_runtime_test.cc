@@ -523,22 +523,22 @@ bool CommonRuntimeTestImpl::RunDex2Oat(const std::vector<std::string>& args,
 }
 
 std::string CommonRuntimeTestImpl::GetImageDirectory() {
+  std::string prefix;
   if (IsHost()) {
     const char* host_dir = getenv("ANDROID_HOST_OUT");
     CHECK(host_dir != nullptr);
-    return std::string(host_dir) + "/framework";
-  } else {
-    return std::string("/apex/com.android.art/javalib");
+    prefix = host_dir;
   }
+  return prefix + kAndroidArtApexDefaultPath + "/javalib";
 }
 
 std::string CommonRuntimeTestImpl::GetImageLocation() {
-  return GetImageDirectory() + (IsHost() ? "/core.art" : "/boot.art");
+  return GetImageDirectory() + "/boot.art";
 }
 
 std::string CommonRuntimeTestImpl::GetSystemImageFile() {
   std::string isa = GetInstructionSetString(kRuntimeISA);
-  return GetImageDirectory() + "/" + isa + (IsHost() ? "/core.art" : "/boot.art");
+  return GetImageDirectory() + "/" + isa + "/boot.art";
 }
 
 void CommonRuntimeTestImpl::EnterTransactionMode() {

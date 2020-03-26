@@ -224,6 +224,7 @@ class OatDumpTest : public CommonRuntimeTest {
         exec_argv.push_back("--app-image=" + GetAppImageName());
       } else if (mode == kModeCoreOat) {
         exec_argv.push_back("--oat-file=" + core_oat_location_);
+        exec_argv.push_back("--dex-file=" + GetLibCoreDexFileNames()[0]);
       } else {
         CHECK_EQ(static_cast<size_t>(mode), static_cast<size_t>(kModeOat));
         exec_argv.push_back("--oat-file=" + GetAppOdexName());
