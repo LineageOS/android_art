@@ -1651,7 +1651,11 @@ ArtField* HInstructionBuilder::ResolveField(uint16_t field_idx, bool is_static, 
                                                         dex_compilation_unit_->GetDexCache(),
                                                         class_loader,
                                                         is_static);
-  DCHECK_EQ(resolved_field == nullptr, soa.Self()->IsExceptionPending());
+  DCHECK_EQ(resolved_field == nullptr, soa.Self()->IsExceptionPending())
+      << "field="
+      << ((resolved_field == nullptr) ? "null" : resolved_field->PrettyField())
+      << ", exception="
+      << (soa.Self()->IsExceptionPending() ? soa.Self()->GetException()->Dump() : "null");
   if (UNLIKELY(resolved_field == nullptr)) {
     // Clean up any exception left by field resolution.
     soa.Self()->ClearException();
