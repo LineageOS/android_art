@@ -177,8 +177,6 @@ art_cc_library {
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
-        // TODO(b/142944931): remove this
-        "com.android.runtime", // due to the transitive dependency from linker
         // TODO(b/142944931) Clean this up. This is due to the dependency to libdexfile_support_static
         // from /system/core, etc.
         "//apex_available:platform",
@@ -313,8 +311,6 @@ cc_library {
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
-        // TODO(b/142944931): remove this
-        "com.android.runtime", // due to the transitive dependency from linker
         // TODO(b/142944931) Clean this up. This is due to the dependency to libdexfile_support_static
         // from /system/core, etc.
         "//apex_available:platform",
@@ -422,9 +418,8 @@ cc_library_static {
     name: "libdexfile_support_static",
     visibility: [
         "//art:__subpackages__",
-        // TODO(b/133140750): Clean this up.
-        "//system/core/debuggerd",
-        "//system/core/init", // Dependency from Android.mk file, so not enforced.
+        // Required for the simpleperf binary in the NDK. No other modules than
+        // //system/extras/simpleperf:simpleperf_ndk are allowed to use it.
         "//system/extras/simpleperf",
     ],
     defaults: [
