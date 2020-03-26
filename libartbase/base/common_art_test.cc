@@ -338,14 +338,19 @@ std::unique_ptr<const DexFile> CommonArtTestImpl::LoadExpectSingleDexFile(const 
   MemMap::Init();
   static constexpr bool kVerifyChecksum = true;
   const ArtDexFileLoader dex_file_loader;
-  if (!dex_file_loader.Open(
-        location, location, /* verify= */ true, kVerifyChecksum, &error_msg, &dex_files)) {
-    LOG(FATAL) << "Could not open .dex file '" << location << "': " << error_msg << "\n";
+  std::string prefix = IsHost() ? GetAndroidRoot() : "";
+  std::string filename = prefix + location;
+  if (!dex_file_loader.Open(filename.c_str(),
+                            std::string(location),
+                            /* verify= */ true,
+                            kVerifyChecksum,
+                            &error_msg,
+                            &dex_files)) {
+    LOG(FATAL) << "Could not open .dex file '" << filename << "': " << error_msg << "\n";
     UNREACHABLE();
-  } else {
-    CHECK_EQ(1U, dex_files.size()) << "Expected only one dex file in " << location;
-    return std::move(dex_files[0]);
   }
+  CHECK_EQ(1U, dex_files.size()) << "Expected only one dex file in " << filename;
+  return std::move(dex_files[0]);
 }
 
 void CommonArtTestImpl::ClearDirectory(const char* dirpath, bool recursive) {
@@ -388,13 +393,11 @@ void CommonArtTestImpl::TearDown() {
 }
 
 static std::string GetDexFileName(const std::string& jar_prefix, bool host) {
-  if (host) {
-    std::string path = GetAndroidRoot();
-    return StringPrintf("%s/framework/%s-hostdex.jar", path.c_str(), jar_prefix.c_str());
-  } else {
-    const char* apex = (jar_prefix == "conscrypt") ? "com.android.conscrypt" : "com.android.art";
-    return StringPrintf("/apex/%s/javalib/%s.jar", apex, jar_prefix.c_str());
-  }
+  std::string prefix(host ? GetAndroidRoot() : "");
+  const char* apexPath = (jar_prefix == "conscrypt")
+    ? kAndroidConscryptApexDefaultPath
+    : kAndroidArtApexDefaultPath;
+  return StringPrintf("%s%s/javalib/%s.jar", prefix.c_str(), apexPath, jar_prefix.c_str());
 }
 
 std::vector<std::string> CommonArtTestImpl::GetLibCoreModuleNames() const {
@@ -433,14 +436,8 @@ std::vector<std::string> CommonArtTestImpl::GetLibCoreDexLocations(
     const std::vector<std::string>& modules) const {
   std::vector<std::string> result = GetLibCoreDexFileNames(modules);
   if (IsHost()) {
-    // Strip the ANDROID_BUILD_TOP directory including the directory separator '/'.
-    const char* host_dir = getenv("ANDROID_BUILD_TOP");
-    CHECK(host_dir != nullptr);
-    std::string prefix = host_dir;
-    CHECK(!prefix.empty());
-    if (prefix.back() != '/') {
-      prefix += '/';
-    }
+    // Strip the build directory prefix (e.g. .../host/linux-x86)
+    std::string prefix = GetAndroidRoot();
     for (std::string& location : result) {
       CHECK_GT(location.size(), prefix.size());
       CHECK_EQ(location.compare(0u, prefix.size(), prefix), 0);
@@ -522,16 +519,8 @@ std::unique_ptr<const DexFile> CommonArtTestImpl::OpenTestDexFile(const char* na
 
 std::string CommonArtTestImpl::GetCoreFileLocation(const char* suffix) {
   CHECK(suffix != nullptr);
-
-  std::string location;
-  if (IsHost()) {
-    std::string host_dir = GetAndroidRoot();
-    location = StringPrintf("%s/framework/core.%s", host_dir.c_str(), suffix);
-  } else {
-    location = StringPrintf("/apex/com.android.art/javalib/boot.%s", suffix);
-  }
-
-  return location;
+  std::string prefix(IsHost() ? GetAndroidRoot() : "");
+  return StringPrintf("%s%s/javalib/boot.%s", prefix.c_str(), kAndroidArtApexDefaultPath, suffix);
 }
 
 std::string CommonArtTestImpl::CreateClassPath(
