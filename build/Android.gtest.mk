@@ -197,15 +197,9 @@ $(ART_TEST_HOST_GTEST_VerifySoftFailDuringClinit_DEX): $(ART_TEST_GTEST_VerifySo
 $(ART_TEST_TARGET_GTEST_VerifySoftFailDuringClinit_DEX): $(ART_TEST_GTEST_VerifySoftFailDuringClinit_SRC) $(HOST_OUT_EXECUTABLES)/smali
 	 $(HOST_OUT_EXECUTABLES)/smali assemble --output $@ $(filter %.smali,$^)
 
-# Linkage test artifacts.
-ART_TEST_GTEST_LinkageTest_SRC := $(abspath $(wildcard $(LOCAL_PATH)/LinkageTest/*.smali))
-ART_TEST_HOST_GTEST_LinkageTest_DEX := $(dir $(ART_TEST_HOST_GTEST_Main_DEX))$(subst Main,LinkageTest,$(basename $(notdir $(ART_TEST_HOST_GTEST_Main_DEX))))$(suffix $(ART_TEST_HOST_GTEST_Main_DEX))
-$(ART_TEST_HOST_GTEST_LinkageTest_DEX): $(ART_TEST_GTEST_LinkageTest_SRC) $(HOST_OUT_EXECUTABLES)/smali
-	 $(HOST_OUT_EXECUTABLES)/smali assemble --output $@ $(filter %.smali,$^)
-
 # Dex file dependencies for each gtest.
 ART_GTEST_art_dex_file_loader_test_DEX_DEPS := GetMethodSignature Main Nested MultiDex
-ART_GTEST_dex2oat_environment_tests_DEX_DEPS := Main MainStripped MultiDex MultiDexModifiedSecondary MyClassNatives Nested VerifierDeps VerifierDepsMulti LinkageTest
+ART_GTEST_dex2oat_environment_tests_DEX_DEPS := Main MainStripped MultiDex MultiDexModifiedSecondary MyClassNatives Nested VerifierDeps VerifierDepsMulti
 
 ART_GTEST_atomic_dex_ref_map_test_DEX_DEPS := Interfaces
 ART_GTEST_class_linker_test_DEX_DEPS := AllFields ErroneousA ErroneousB ErroneousInit ForClassLoaderA ForClassLoaderB ForClassLoaderC ForClassLoaderD Interfaces MethodTypes MultiDex MyClass Nested Statics StaticsFromCode
