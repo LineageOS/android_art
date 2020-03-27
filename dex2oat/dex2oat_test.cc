@@ -2422,4 +2422,29 @@ TEST_F(Dex2oatISAFeaturesRuntimeDetectionTest, TestCurrentRuntimeFeaturesAsDex2O
   RunTest();
 }
 
+class LinkageTest : public Dex2oatTest {};
+
+TEST_F(LinkageTest, LinkageEnabled) {
+  TEST_DISABLED_FOR_TARGET();
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("LinkageTest"));
+  std::string out_dir = GetScratchDir();
+  const std::string base_oat_name = out_dir + "/base.oat";
+  std::string error_msg;
+  const int res_fail = GenerateOdexForTestWithStatus(
+        {dex->GetLocation()},
+        base_oat_name,
+        CompilerFilter::Filter::kQuicken,
+        &error_msg,
+        {"--check-linkage-conditions", "--crash-on-linkage-violation"});
+  EXPECT_NE(0, res_fail);
+
+  const int res_no_fail = GenerateOdexForTestWithStatus(
+        {dex->GetLocation()},
+        base_oat_name,
+        CompilerFilter::Filter::kQuicken,
+        &error_msg,
+        {"--check-linkage-conditions"});
+  EXPECT_EQ(0, res_no_fail);
+}
+
 }  // namespace art
