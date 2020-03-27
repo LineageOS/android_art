@@ -806,9 +806,7 @@ class Dex2Oat final {
       app_image_fd_(kInvalidFd),
       profile_file_fd_(kInvalidFd),
       timings_(timings),
-      force_determinism_(false),
-      check_linkage_conditions_(false),
-      crash_on_linkage_violation_(false)
+      force_determinism_(false)
       {}
 
   ~Dex2Oat() {
@@ -1108,9 +1106,6 @@ class Dex2Oat final {
     }
     compiler_options_->force_determinism_ = force_determinism_;
 
-    compiler_options_->check_linkage_conditions_ = check_linkage_conditions_;
-    compiler_options_->crash_on_linkage_violation_ = crash_on_linkage_violation_;
-
     if (passes_to_run_filename_ != nullptr) {
       passes_to_run_ = ReadCommentedInputFromFile<std::vector<std::string>>(
           passes_to_run_filename_,
@@ -1329,8 +1324,6 @@ class Dex2Oat final {
     AssignIfExists(args, M::DirtyImageObjects, &dirty_image_objects_filename_);
     AssignIfExists(args, M::ImageFormat, &image_storage_mode_);
     AssignIfExists(args, M::CompilationReason, &compilation_reason_);
-    AssignTrueIfExists(args, M::CheckLinkageConditions, &check_linkage_conditions_);
-    AssignTrueIfExists(args, M::CrashOnLinkageViolation, &crash_on_linkage_violation_);
 
     AssignIfExists(args, M::Backend, &compiler_kind_);
     parser_options->requested_specific_compiler = args.Exists(M::Backend);
@@ -3023,10 +3016,6 @@ class Dex2Oat final {
 
   // See CompilerOptions.force_determinism_.
   bool force_determinism_;
-  // See CompilerOptions.crash_on_linkage_violation_.
-  bool check_linkage_conditions_;
-  // See CompilerOptions.crash_on_linkage_violation_.
-  bool crash_on_linkage_violation_;
 
   // Directory of relative classpaths.
   std::string classpath_dir_;
