@@ -1,0 +1,7 @@
+Regression test for b/152199517
+
+We would incorrectly search all declared methods of a class for interface
+implementations instead of restricting ourselves to virtual methods when
+looking for overrides to a superclasses interfaces. This could cause
+exceptions and incorrect behavior as we might try to use a private or a
+static method as an interface implementation.
