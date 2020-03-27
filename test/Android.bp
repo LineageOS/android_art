@@ -776,10 +776,7 @@ filegroup {
 // source tree each expected test result is in the NN-xxxx/expected.txt.
 // Copy+rename them them to a temporary directory and them zip them.
 java_genrule {
-    name: "expected_cts_outputs",
-    visibility: [
-        "//cts/hostsidetests/jvmti:__subpackages__",
-    ],
+    name: "expected_cts_outputs_gen",
     srcs: [
         "901-hello-ti-agent/expected.txt",
         "902-hello-transformation/expected.txt",
@@ -915,6 +912,20 @@ java_genrule {
         "for f in $(in); do x=$${f#art/test/}; " +
         "cp $$f $(genDir)/res/results.$${x%%-*}.expected.txt; done && " +
         "$(location soong_zip) -o $(out) -C $(genDir)/res -D $(genDir)/res",
+}
+
+// Wrap the expected_cts_outputs_gen inside a java library to make it easy
+// to export as a member of a module_exports.
+java_library {
+    name: "expected_cts_outputs",
+    visibility: [
+        "//art/build/sdk",
+        "//cts/hostsidetests/jvmti:__subpackages__",
+    ],
+    static_libs: [
+        "expected_cts_outputs_gen",
+    ],
+    sdk_version: "core_current",
 }
 
 art_cc_test {
