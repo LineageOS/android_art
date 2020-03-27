@@ -494,7 +494,6 @@ define define-art-gtest-rule-host
   gtest_exe := $(2)
   # Dependencies for all host gtests.
   gtest_deps := $$(HOST_CORE_DEX_LOCATIONS) \
-    $$($(3)HOST_BOOT_IMAGE) \
     $$(HOST_BOOT_IMAGE_JARS) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libicu_jni$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
@@ -503,6 +502,28 @@ define define-art-gtest-rule-host
     $$(ART_GTEST_$(1)_HOST_DEPS) \
     $(foreach file,$(ART_GTEST_$(1)_DEX_DEPS),$(ART_TEST_HOST_GTEST_$(file)_DEX)) \
     $(HOST_OUT_EXECUTABLES)/signal_dumper
+
+  # Note: The "host arch" Make variables defined in build/make/core/envsetup.mk
+  # and art/build/Android.common.mk have different meanings:
+  #
+  #   * In build/make/core/envsetup.mk:
+  #     * HOST_ARCH := x86_64
+  #     * HOST_2ND_ARCH := x86
+  #
+  #   * In art/build/Android.common.mk:
+  #     * When `HOST_PREFER_32_BIT` is `true`:
+  #       * ART_HOST_ARCH := x86
+  #       * 2ND_ART_HOST_ARCH :=
+  #       * 2ND_HOST_ARCH :=
+  #     * Otherwise:
+  #       * ART_HOST_ARCH := x86_64
+  #       * 2ND_ART_HOST_ARCH := x86
+  #       * 2ND_HOST_ARCH := x86
+  ifeq ($(HOST_PREFER_32_BIT),true)
+    gtest_deps += $$(2ND_HOST_BOOT_IMAGE) # Depend on the 32-bit boot image.
+  else
+    gtest_deps += $$($(3)HOST_BOOT_IMAGE)
+  endif
 
   ART_TEST_HOST_GTEST_DEPENDENCIES += $$(gtest_deps)
 
