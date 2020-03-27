@@ -51,7 +51,7 @@ class DexAnalyze {
     LOG(ERROR)
         << "Usage " << argv[0] << " [options] <dex files>\n"
         << "    [options] is a combination of the following\n"
-        << "    -count_indices (Count dex indices accessed from code items)\n"
+        << "    -count-indices (Count dex indices accessed from code items)\n"
         << "    -analyze-strings (Analyze string data)\n"
         << "    -analyze-debug-info (Analyze debug info)\n"
         << "    -new-bytecode (Bytecode optimizations)\n"

@@ -99,6 +99,15 @@ endif
 HOST_CORE_DEX_FILES   := $(foreach jar,$(HOST_TEST_CORE_JARS),  $(call intermediates-dir-for,JAVA_LIBRARIES,$(jar),t,COMMON)/javalib.jar)
 TARGET_CORE_DEX_FILES := $(foreach jar,$(TARGET_CORE_IMG_JARS), $(call intermediates-dir-for,JAVA_LIBRARIES,$(jar).com.android.art.testing, ,COMMON)/javalib.jar)
 TARGET_CORE_DEX_FILES += $(call intermediates-dir-for,JAVA_LIBRARIES,conscrypt.com.android.conscrypt, ,COMMON)/javalib.jar
+
+# Also copy the jar files next to host boot.art image.
+HOST_BOOT_IMAGE_JARS := $(foreach jar,$(CORE_IMG_JARS),$(HOST_OUT)/apex/com.android.art/javalib/$(jar).jar)
+$(HOST_BOOT_IMAGE_JARS): $(HOST_OUT)/apex/com.android.art/javalib/%.jar : $(HOST_OUT_JAVA_LIBRARIES)/%-hostdex.jar
+	$(copy-file-to-target)
+HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar
+$(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar : $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar
+	$(copy-file-to-target)
+
 ART_HOST_DEX_DEPENDENCIES := $(foreach jar,$(HOST_TEST_CORE_JARS),$(HOST_OUT_JAVA_LIBRARIES)/$(jar).jar)
 ART_TARGET_DEX_DEPENDENCIES := com.android.art.testing com.android.conscrypt
 
