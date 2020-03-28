@@ -2425,6 +2425,7 @@ TEST_F(Dex2oatISAFeaturesRuntimeDetectionTest, TestCurrentRuntimeFeaturesAsDex2O
 class LinkageTest : public Dex2oatTest {};
 
 TEST_F(LinkageTest, LinkageEnabled) {
+  TEST_DISABLED_FOR_TARGET();
   std::unique_ptr<const DexFile> dex(OpenTestDexFile("LinkageTest"));
   std::string out_dir = GetScratchDir();
   const std::string base_oat_name = out_dir + "/base.oat";
