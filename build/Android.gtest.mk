@@ -493,7 +493,7 @@ define define-art-gtest-rule-host
   $$(call dist-for-goals,$$(gtest_rule),$$(gtest_output):gtest/$$(gtest_suffix))
   gtest_exe := $(2)
   # Dependencies for all host gtests.
-  gtest_deps := $$(HOST_CORE_DEX_LOCATIONS) \
+  gtest_deps := $$(ART_HOST_DEX_DEPENDENCIES) \
     $$(HOST_BOOT_IMAGE_JARS) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libicu_jni$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
