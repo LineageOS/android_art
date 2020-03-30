@@ -5047,7 +5047,12 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     }
   }
   const size_t num_virtual_methods = proxied_methods.size();
-  // We also need to filter out the 'throws'
+  // We also need to filter out the 'throws'. The 'throws' are a Class[][] that
+  // contains an array of all the classes each function is declared to throw.
+  // This is used to wrap unexpected exceptions in a
+  // UndeclaredThrowableException exception. This array is in the same order as
+  // the methods array and like the methods array must be filtered to remove any
+  // non-proxied methods.
   const bool has_filtered_methods =
       static_cast<int32_t>(num_virtual_methods) != h_methods->GetLength();
   MutableHandle<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>> original_proxied_throws(
@@ -5058,6 +5063,10 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
               ? mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>::Alloc(
                     self, original_proxied_throws->GetClass(), num_virtual_methods)
               : original_proxied_throws.Get()));
+  if (proxied_throws.IsNull() && !original_proxied_throws.IsNull()) {
+    self->AssertPendingOOMException();
+    return nullptr;
+  }
   if (has_filtered_methods) {
     for (auto [orig_idx, new_idx] : ZipCount(MakeIterationRange(proxied_throws_idx))) {
       DCHECK_LE(new_idx, orig_idx);
