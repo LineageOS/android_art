@@ -116,6 +116,7 @@
 #include "mirror/object.h"
 #include "mirror/object_array-alloc-inl.h"
 #include "mirror/object_array-inl.h"
+#include "mirror/object_array.h"
 #include "mirror/object_reference.h"
 #include "mirror/object_reference-inl.h"
 #include "mirror/proxy.h"
@@ -137,6 +138,7 @@
 #include "runtime_callbacks.h"
 #include "scoped_thread_state_change-inl.h"
 #include "thread-inl.h"
+#include "thread.h"
 #include "thread_list.h"
 #include "trace.h"
 #include "transaction.h"
@@ -4969,7 +4971,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     return nullptr;
   }
 
-  StackHandleScope<10> hs(self);
+  StackHandleScope<12> hs(self);
   MutableHandle<mirror::Class> temp_klass(hs.NewHandle(
       AllocClass(self, GetClassRoot<mirror::Class>(this), sizeof(mirror::Class))));
   if (temp_klass == nullptr) {
@@ -5024,11 +5026,44 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
   // Proxies have 1 direct method, the constructor
   const size_t num_direct_methods = 1;
 
-  // They have as many virtual methods as the array
-  auto h_methods = hs.NewHandle(soa.Decode<mirror::ObjectArray<mirror::Method>>(methods));
+  // The array we get passed contains all methods, including private and static
+  // ones that aren't proxied. We need to filter those out since only interface
+  // methods (non-private & virtual) are actually proxied.
+  Handle<mirror::ObjectArray<mirror::Method>> h_methods =
+      hs.NewHandle(soa.Decode<mirror::ObjectArray<mirror::Method>>(methods));
   DCHECK_EQ(h_methods->GetClass(), GetClassRoot<mirror::ObjectArray<mirror::Method>>())
       << mirror::Class::PrettyClass(h_methods->GetClass());
-  const size_t num_virtual_methods = h_methods->GetLength();
+  // List of the actual virtual methods this class will have.
+  std::vector<ArtMethod*> proxied_methods;
+  std::vector<size_t> proxied_throws_idx;
+  proxied_methods.reserve(h_methods->GetLength());
+  proxied_throws_idx.reserve(h_methods->GetLength());
+  // Filter out to only the non-private virtual methods.
+  for (auto [mirror, idx] : ZipCount(h_methods.Iterate<mirror::Method>())) {
+    ArtMethod* m = mirror->GetArtMethod();
+    if (!m->IsPrivate() && !m->IsStatic()) {
+      proxied_methods.push_back(m);
+      proxied_throws_idx.push_back(idx);
+    }
+  }
+  const size_t num_virtual_methods = proxied_methods.size();
+  // We also need to filter out the 'throws'
+  const bool has_filtered_methods =
+      static_cast<int32_t>(num_virtual_methods) != h_methods->GetLength();
+  MutableHandle<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>> original_proxied_throws(
+      hs.NewHandle(soa.Decode<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>>(throws)));
+  MutableHandle<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>> proxied_throws(
+      hs.NewHandle<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>>(
+          (has_filtered_methods)
+              ? mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>::Alloc(
+                    self, original_proxied_throws->GetClass(), num_virtual_methods)
+              : original_proxied_throws.Get()));
+  if (has_filtered_methods) {
+    for (auto [orig_idx, new_idx] : ZipCount(MakeIterationRange(proxied_throws_idx))) {
+      DCHECK_LE(new_idx, orig_idx);
+      proxied_throws->Set(new_idx, original_proxied_throws->Get(orig_idx));
+    }
+  }
 
   // Create the methods array.
   LengthPrefixedArray<ArtMethod>* proxy_class_methods = AllocArtMethodArray(
@@ -5048,7 +5083,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
   // TODO These should really use the iterators.
   for (size_t i = 0; i < num_virtual_methods; ++i) {
     auto* virtual_method = temp_klass->GetVirtualMethodUnchecked(i, image_pointer_size_);
-    auto* prototype = h_methods->Get(i)->GetArtMethod();
+    auto* prototype = proxied_methods[i];
     CreateProxyMethod(temp_klass, prototype, virtual_method);
     DCHECK(virtual_method->GetDeclaringClass() != nullptr);
     DCHECK(prototype->GetDeclaringClass() != nullptr);
@@ -5087,7 +5122,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
   CHECK_EQ(throws_sfield.GetDeclaringClass(), klass.Get());
   throws_sfield.SetObject<false>(
       klass.Get(),
-      soa.Decode<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>>(throws));
+      proxied_throws.Get());
 
   Runtime::Current()->GetRuntimeCallbacks()->ClassPrepare(temp_klass, klass);
 
@@ -5118,8 +5153,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
 
     for (size_t i = 0; i < num_virtual_methods; ++i) {
       auto* virtual_method = klass->GetVirtualMethodUnchecked(i, image_pointer_size_);
-      auto* prototype = h_methods->Get(i++)->GetArtMethod();
-      CheckProxyMethod(virtual_method, prototype);
+      CheckProxyMethod(virtual_method, proxied_methods[i]);
     }
 
     StackHandleScope<1> hs2(self);
@@ -5135,7 +5169,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     CHECK_EQ(klass.Get()->GetProxyInterfaces(),
              soa.Decode<mirror::ObjectArray<mirror::Class>>(interfaces));
     CHECK_EQ(klass.Get()->GetProxyThrows(),
-             soa.Decode<mirror::ObjectArray<mirror::ObjectArray<mirror::Class>>>(throws));
+             proxied_throws.Get());
   }
   return klass.Get();
 }
