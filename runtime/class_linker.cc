@@ -8148,7 +8148,7 @@ bool ClassLinker::LinkInterfaceMethods(
         // If we are overwriting a super class interface, try to only virtual methods instead of the
         // whole vtable.
         using_virtuals = true;
-        input_virtual_methods = klass->GetDeclaredMethodsSlice(image_pointer_size_);
+        input_virtual_methods = klass->GetDeclaredVirtualMethodsSlice(image_pointer_size_);
         input_array_length = input_virtual_methods.size();
       } else {
         // For a new interface, however, we need the whole vtable in case a new
@@ -8184,6 +8184,7 @@ bool ClassLinker::LinkInterfaceMethods(
               input_vtable_array->GetElementPtrSize<ArtMethod*>(k, image_pointer_size_);
           ArtMethod* vtable_method_for_name_comparison =
               vtable_method->GetInterfaceMethodIfProxy(image_pointer_size_);
+          DCHECK(!vtable_method->IsStatic()) << vtable_method->PrettyMethod();
           if (interface_name_comparator.HasSameNameAndSignature(
               vtable_method_for_name_comparison)) {
             if (!vtable_method->IsAbstract() && !vtable_method->IsPublic()) {
