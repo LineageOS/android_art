@@ -93,6 +93,8 @@ class CompilerDriver {
 
   ~CompilerDriver();
 
+  void PrepareDexFilesForOatFile(TimingLogger* timings);
+
   // Set dex files classpath.
   void SetClasspathDexFiles(const std::vector<const DexFile*>& dex_files);
 
