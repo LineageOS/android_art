@@ -1236,6 +1236,9 @@ static void dumpMethod(const ClassAccessor::Method& method, int i) {
     fprintf(gOutFile, "      name          : '%s'\n", name);
     fprintf(gOutFile, "      type          : '%s'\n", typeDescriptor);
     fprintf(gOutFile, "      access        : 0x%04x (%s)\n", flags, accessStr);
+    if (gOptions.showSectionHeaders) {
+      fprintf(gOutFile, "      method_idx    : %d\n", method.GetIndex());
+    }
     if (hiddenapiFlags != 0u) {
       fprintf(gOutFile,
               "      hiddenapi     : 0x%04x (%s)\n",
