@@ -17,9 +17,6 @@
 #ifndef ART_RUNTIME_INTERN_TABLE_H_
 #define ART_RUNTIME_INTERN_TABLE_H_
 
-#include <unordered_set>
-
-#include "base/atomic.h"
 #include "base/allocator.h"
 #include "base/hash_set.h"
 #include "base/mutex.h"

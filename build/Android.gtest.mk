@@ -30,6 +30,8 @@ GTEST_DEX_DIRECTORIES := \
   ErroneousA \
   ErroneousB \
   ErroneousInit \
+  Extension1 \
+  Extension2 \
   ForClassLoaderA \
   ForClassLoaderB \
   ForClassLoaderC \
@@ -227,7 +229,7 @@ ART_GTEST_jni_compiler_test_DEX_DEPS := MyClassNatives
 ART_GTEST_jni_internal_test_DEX_DEPS := AllFields StaticLeafMethods MyClassNatives
 ART_GTEST_oat_file_assistant_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
 ART_GTEST_dexoptanalyzer_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
-ART_GTEST_image_space_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS)
+ART_GTEST_image_space_test_DEX_DEPS := $(ART_GTEST_dex2oat_environment_tests_DEX_DEPS) Extension1 Extension2
 ART_GTEST_oat_file_test_DEX_DEPS := Main MultiDex MainUncompressedAligned MultiDexUncompressedAligned MainStripped Nested MultiDexModifiedSecondary
 ART_GTEST_oat_test_DEX_DEPS := Main
 ART_GTEST_oat_writer_test_DEX_DEPS := Main

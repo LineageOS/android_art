@@ -27,6 +27,7 @@
 #include <stack>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "art_method.h"
 #include "base/bit_utils.h"
