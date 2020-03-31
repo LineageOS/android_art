@@ -1178,6 +1178,9 @@ void DexLayout::DumpMethod(uint32_t idx,
     fprintf(out_file_, "      name          : '%s'\n", name);
     fprintf(out_file_, "      type          : '%s'\n", type_descriptor);
     fprintf(out_file_, "      access        : 0x%04x (%s)\n", flags, access_str);
+    if (options_.show_section_headers_) {
+      fprintf(out_file_, "      method_idx    : %d\n", method_id->GetIndex());
+    }
     if (hiddenapi_flags != 0u) {
       fprintf(out_file_,
               "      hiddenapi     : 0x%04x (%s)\n",
