@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 #include <jni.h>
 
+#include <functional>
 #include <string>
 
 #include <android-base/logging.h>
@@ -37,6 +38,9 @@
 #include "scoped_thread_state_change-inl.h"
 
 namespace art {
+
+class MethodReference;
+class TypeReference;
 
 using LogSeverity = android::base::LogSeverity;
 using ScopedLogSeverity = android::base::ScopedLogSeverity;
@@ -111,7 +115,8 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool StartDex2OatCommandLine(/*out*/std::vector<std::string>* argv,
-                               /*out*/std::string* error_msg);
+                               /*out*/std::string* error_msg,
+                               bool use_runtime_bcp_and_image = true);
 
   bool CompileBootImage(const std::vector<std::string>& extra_args,
                         const std::string& image_file_name_prefix,
@@ -161,6 +166,17 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
                                         jclass loader_class,
                                         jobject parent_loader,
                                         jobject shared_libraries = nullptr);
+
+  void VisitDexes(ArrayRef<const std::string> dexes,
+                  const std::function<void(MethodReference)>& method_visitor,
+                  const std::function<void(TypeReference)>& class_visitor,
+                  size_t method_frequency = 1u,
+                  size_t class_frequency = 1u);
+
+  void GenerateProfile(ArrayRef<const std::string> dexes,
+                       File* out_file,
+                       size_t method_frequency = 1u,
+                       size_t type_frequency = 1u);
 
   std::unique_ptr<Runtime> runtime_;
 
