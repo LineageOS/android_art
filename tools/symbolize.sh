@@ -26,7 +26,7 @@ if [ "x$1" = "x--interactive" ] ; then
 fi
 
 # Pull the file from the device and symbolize it.
-function one() {
+one() {
   echo $1 $2
   if [ "x$INTERACTIVE" = "xyes" ] ; then
     echo -n "What to do? [Y/n/q] "
@@ -39,17 +39,20 @@ function one() {
     fi
   fi
   adb pull $1/$2 /tmp || exit 1
+  # pull vdex file for oatdump
+  vdex=${2%.*}.vdex
+  adb pull $1/$vdex /tmp/ 2>/dev/null
   mkdir -p $OUT/symbols/$1
   oatdump --symbolize=/tmp/$2 --output=$OUT/symbols/$1/$2
 }
 
 # adb shell find seems to output in DOS format (CRLF), which messes up scripting
-function adbshellstrip() {
+adbshellstrip() {
   adb shell $@ | sed 's/\r$//'
 }
 
 # Search in all of /data on device.
-function all() {
+all() {
   FILES=$(adbshellstrip find /data -name "'*.oat'" -o -name "'*.dex'" -o -name "'*.odex'")
   for FILE in $FILES ; do
     DIR=$(dirname $FILE)
