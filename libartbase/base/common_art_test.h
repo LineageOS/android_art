@@ -28,6 +28,7 @@
 
 #include "base/file_utils.h"
 #include "base/globals.h"
+#include "base/memory_tool.h"
 #include "base/mutex.h"
 #include "base/os.h"
 #include "base/unix_file/fd_file.h"

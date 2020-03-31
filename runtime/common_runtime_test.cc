@@ -41,7 +41,9 @@
 #include "dex/art_dex_file_loader.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_loader.h"
+#include "dex/method_reference.h"
 #include "dex/primitive.h"
+#include "dex/type_reference.h"
 #include "gc/heap.h"
 #include "gc/space/image_space.h"
 #include "gc_root-inl.h"
@@ -56,6 +58,7 @@
 #include "mirror/object_array-alloc-inl.h"
 #include "native/dalvik_system_DexFile.h"
 #include "noop_compiler_callbacks.h"
+#include "profile/profile_compilation_info.h"
 #include "runtime-inl.h"
 #include "scoped_thread_state_change-inl.h"
 #include "thread.h"
@@ -408,18 +411,16 @@ void CommonRuntimeTestImpl::MakeInterpreted(ObjPtr<mirror::Class> klass) {
 }
 
 bool CommonRuntimeTestImpl::StartDex2OatCommandLine(/*out*/std::vector<std::string>* argv,
-                                                    /*out*/std::string* error_msg) {
+                                                    /*out*/std::string* error_msg,
+                                                    bool use_runtime_bcp_and_image) {
   DCHECK(argv != nullptr);
   DCHECK(argv->empty());
 
   Runtime* runtime = Runtime::Current();
-  const std::vector<gc::space::ImageSpace*>& image_spaces =
-      runtime->GetHeap()->GetBootImageSpaces();
-  if (image_spaces.empty()) {
+  if (use_runtime_bcp_and_image && runtime->GetHeap()->GetBootImageSpaces().empty()) {
     *error_msg = "No image location found for Dex2Oat.";
     return false;
   }
-  std::string image_location = image_spaces[0]->GetImageLocation();
 
   argv->push_back(runtime->GetCompilerExecutable());
   if (runtime->IsJavaDebuggable()) {
@@ -427,12 +428,17 @@ bool CommonRuntimeTestImpl::StartDex2OatCommandLine(/*out*/std::vector<std::stri
   }
   runtime->AddCurrentRuntimeFeaturesAsDex2OatArguments(argv);
 
-  argv->push_back("--runtime-arg");
-  argv->push_back(GetClassPathOption("-Xbootclasspath:", GetLibCoreDexFileNames()));
-  argv->push_back("--runtime-arg");
-  argv->push_back(GetClassPathOption("-Xbootclasspath-locations:", GetLibCoreDexLocations()));
+  if (use_runtime_bcp_and_image) {
+    argv->push_back("--runtime-arg");
+    argv->push_back(GetClassPathOption("-Xbootclasspath:", GetLibCoreDexFileNames()));
+    argv->push_back("--runtime-arg");
+    argv->push_back(GetClassPathOption("-Xbootclasspath-locations:", GetLibCoreDexLocations()));
 
-  argv->push_back("--boot-image=" + image_location);
+    const std::vector<gc::space::ImageSpace*>& image_spaces =
+        runtime->GetHeap()->GetBootImageSpaces();
+    DCHECK(!image_spaces.empty());
+    argv->push_back("--boot-image=" + image_spaces[0]->GetImageLocation());
+  }
 
   std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
   argv->insert(argv->end(), compiler_options.begin(), compiler_options.end());
@@ -558,6 +564,64 @@ void CommonRuntimeTestImpl::RollbackAndExitTransactionMode() {
 
 bool CommonRuntimeTestImpl::IsTransactionAborted() {
   return Runtime::Current()->IsTransactionAborted();
+}
+
+void CommonRuntimeTestImpl::VisitDexes(ArrayRef<const std::string> dexes,
+                                       const std::function<void(MethodReference)>& method_visitor,
+                                       const std::function<void(TypeReference)>& class_visitor,
+                                       size_t method_frequency,
+                                       size_t class_frequency) {
+  size_t method_counter = 0;
+  size_t class_counter = 0;
+  for (const std::string& dex : dexes) {
+    std::vector<std::unique_ptr<const DexFile>> dex_files;
+    std::string error_msg;
+    const ArtDexFileLoader dex_file_loader;
+    CHECK(dex_file_loader.Open(dex.c_str(),
+                               dex,
+                               /*verify*/ true,
+                               /*verify_checksum*/ false,
+                               &error_msg,
+                               &dex_files))
+        << error_msg;
+    for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
+      for (size_t i = 0; i < dex_file->NumMethodIds(); ++i) {
+        if (++method_counter % method_frequency == 0) {
+          method_visitor(MethodReference(dex_file.get(), i));
+        }
+      }
+      for (size_t i = 0; i < dex_file->NumTypeIds(); ++i) {
+        if (++class_counter % class_frequency == 0) {
+          class_visitor(TypeReference(dex_file.get(), dex::TypeIndex(i)));
+        }
+      }
+    }
+  }
+}
+
+void CommonRuntimeTestImpl::GenerateProfile(ArrayRef<const std::string> dexes,
+                                            File* out_file,
+                                            size_t method_frequency,
+                                            size_t type_frequency) {
+  ProfileCompilationInfo profile;
+  VisitDexes(
+      dexes,
+      [&profile](MethodReference ref) {
+        uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
+            ProfileCompilationInfo::MethodHotness::kFlagStartup;
+        EXPECT_TRUE(profile.AddMethod(
+            ProfileMethodInfo(ref),
+            static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags)));
+      },
+      [&profile](TypeReference ref) {
+        std::set<dex::TypeIndex> classes;
+        classes.insert(ref.TypeIndex());
+        EXPECT_TRUE(profile.AddClassesForDex(ref.dex_file, classes.begin(), classes.end()));
+      },
+      method_frequency,
+      type_frequency);
+  profile.Save(out_file->Fd());
+  EXPECT_EQ(out_file->Flush(), 0);
 }
 
 CheckJniAbortCatcher::CheckJniAbortCatcher() : vm_(Runtime::Current()->GetJavaVM()) {
