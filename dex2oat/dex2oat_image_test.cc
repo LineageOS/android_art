@@ -41,8 +41,8 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_loader.h"
 #include "dex/method_reference.h"
+#include "dex/type_reference.h"
 #include "gc/space/image_space.h"
-#include "profile/profile_compilation_info.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
 #include "thread-current-inl.h"
@@ -73,87 +73,9 @@ class Dex2oatImageTest : public CommonRuntimeTest {
     options->emplace_back("-Xnoimage-dex2oat", nullptr);
   }
 
-  // Visitors take method and type references
-  template <typename MethodVisitor, typename ClassVisitor>
-  void VisitLibcoreDexes(const MethodVisitor& method_visitor,
-                         const ClassVisitor& class_visitor,
-                         size_t method_frequency = 1,
-                         size_t class_frequency = 1) {
-    std::vector<std::string> dexes = GetLibCoreDexFileNames();
-    ArrayRef<const std::string> dexes_array(dexes);
-    VisitDexes(dexes_array, method_visitor, class_visitor, method_frequency, class_frequency);
-  }
-
-  // Visitors take method and type references
-  template <typename MethodVisitor, typename ClassVisitor>
-  void VisitDexes(ArrayRef<const std::string> dexes,
-                  const MethodVisitor& method_visitor,
-                  const ClassVisitor& class_visitor,
-                  size_t method_frequency = 1,
-                  size_t class_frequency = 1) {
-    size_t method_counter = 0;
-    size_t class_counter = 0;
-    for (const std::string& dex : dexes) {
-      std::vector<std::unique_ptr<const DexFile>> dex_files;
-      std::string error_msg;
-      const ArtDexFileLoader dex_file_loader;
-      CHECK(dex_file_loader.Open(dex.c_str(),
-                                 dex,
-                                 /*verify*/ true,
-                                 /*verify_checksum*/ false,
-                                 &error_msg,
-                                 &dex_files))
-          << error_msg;
-      for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
-        for (size_t i = 0; i < dex_file->NumMethodIds(); ++i) {
-          if (++method_counter % method_frequency == 0) {
-            method_visitor(MethodReference(dex_file.get(), i));
-          }
-        }
-        for (size_t i = 0; i < dex_file->NumTypeIds(); ++i) {
-          if (++class_counter % class_frequency == 0) {
-            class_visitor(TypeReference(dex_file.get(), dex::TypeIndex(i)));
-          }
-        }
-      }
-    }
-  }
-
   static void WriteLine(File* file, std::string line) {
     line += '\n';
     EXPECT_TRUE(file->WriteFully(&line[0], line.length()));
-  }
-
-  void GenerateProfile(ArrayRef<const std::string> dexes,
-                       File* out_file,
-                       size_t method_frequency,
-                       size_t type_frequency) {
-    ProfileCompilationInfo profile;
-    VisitDexes(
-        dexes,
-        [&profile](MethodReference ref) {
-          uint32_t flags = ProfileCompilationInfo::MethodHotness::kFlagHot |
-              ProfileCompilationInfo::MethodHotness::kFlagStartup;
-          EXPECT_TRUE(profile.AddMethod(
-              ProfileMethodInfo(ref),
-              static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags)));
-        },
-        [&profile](TypeReference ref) {
-          std::set<dex::TypeIndex> classes;
-          classes.insert(ref.TypeIndex());
-          EXPECT_TRUE(profile.AddClassesForDex(ref.dex_file, classes.begin(), classes.end()));
-        },
-        method_frequency,
-        type_frequency);
-    profile.Save(out_file->Fd());
-    EXPECT_EQ(out_file->Flush(), 0);
-  }
-
-  void GenerateMethods(File* out_file, size_t frequency = 1) {
-    VisitLibcoreDexes([out_file](MethodReference ref) {
-      WriteLine(out_file, ref.PrettyMethod());
-    }, VoidFunctor(), frequency, frequency);
-    EXPECT_EQ(out_file->Flush(), 0);
   }
 
   void AddRuntimeArg(std::vector<std::string>& args, const std::string& arg) {
@@ -316,8 +238,9 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   // Test dirty image objects.
   {
     ScratchFile classes;
-    VisitLibcoreDexes(VoidFunctor(),
-                      [&](TypeReference ref) {
+    VisitDexes(libcore_dexes_array,
+               VoidFunctor(),
+               [&](TypeReference ref) {
       WriteLine(classes.GetFile(), ref.dex_file->PrettyType(ref.TypeIndex()));
     }, /*method_frequency=*/ 1u, /*class_frequency=*/ 1u);
     ImageSizes image_classes_sizes = CompileImageAndGetSizes(
