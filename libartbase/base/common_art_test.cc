@@ -276,11 +276,7 @@ void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
   }
 }
 
-// Helper - find directory with the following format:
-// ${ANDROID_BUILD_TOP}/${subdir1}/${subdir2}-${version}/${subdir3}/bin/
-std::string CommonArtTestImpl::GetAndroidToolsDir(const std::string& subdir1,
-                                                  const std::string& subdir2,
-                                                  const std::string& subdir3) {
+std::string CommonArtTestImpl::GetAndroidBuildTop() {
   std::string root;
   const char* android_build_top = getenv("ANDROID_BUILD_TOP");
   if (android_build_top != nullptr) {
@@ -292,8 +288,19 @@ std::string CommonArtTestImpl::GetAndroidToolsDir(const std::string& subdir1,
     root = cwd;
     free(cwd);
   }
+  CHECK(!root.empty());
+  if (root.back() != '/') {
+    root += '/';
+  }
+  return root;
+}
 
-  std::string toolsdir = root + "/" + subdir1;
+// Helper - find directory with the following format:
+// ${ANDROID_BUILD_TOP}/${subdir1}/${subdir2}-${version}/${subdir3}/bin/
+std::string CommonArtTestImpl::GetAndroidToolsDir(const std::string& subdir1,
+                                                  const std::string& subdir2,
+                                                  const std::string& subdir3) {
+  std::string toolsdir = GetAndroidBuildTop() + subdir1;
   std::string founddir;
   DIR* dir;
   if ((dir = opendir(toolsdir.c_str())) != nullptr) {
@@ -338,8 +345,7 @@ std::unique_ptr<const DexFile> CommonArtTestImpl::LoadExpectSingleDexFile(const 
   MemMap::Init();
   static constexpr bool kVerifyChecksum = true;
   const ArtDexFileLoader dex_file_loader;
-  std::string prefix = IsHost() ? GetAndroidRoot() : "";
-  std::string filename = prefix + location;
+  std::string filename(location);
   if (!dex_file_loader.Open(filename.c_str(),
                             std::string(location),
                             /* verify= */ true,
@@ -436,8 +442,8 @@ std::vector<std::string> CommonArtTestImpl::GetLibCoreDexLocations(
     const std::vector<std::string>& modules) const {
   std::vector<std::string> result = GetLibCoreDexFileNames(modules);
   if (IsHost()) {
-    // Strip the build directory prefix (e.g. .../host/linux-x86)
-    std::string prefix = GetAndroidRoot();
+    // Strip the ANDROID_BUILD_TOP directory including the directory separator '/'.
+    std::string prefix = GetAndroidBuildTop();
     for (std::string& location : result) {
       CHECK_GT(location.size(), prefix.size());
       CHECK_EQ(location.compare(0u, prefix.size(), prefix), 0);
