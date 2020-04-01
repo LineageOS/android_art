@@ -254,6 +254,12 @@ ART_GTEST_oatdump_app_test_DEX_DEPS := ProfileTestMultiDex
 ART_GTEST_oatdump_test_DEX_DEPS := ProfileTestMultiDex
 ART_GTEST_reg_type_test_DEX_DEPS := Interfaces
 
+# Deprecated core.art dependencies.
+HOST_CORE_IMAGE_DEFAULT_32 :=
+HOST_CORE_IMAGE_DEFAULT_64 :=
+TARGET_CORE_IMAGE_DEFAULT_32 :=
+TARGET_CORE_IMAGE_DEFAULT_64 :=
+
 # The elf writer test has dependencies on core.oat.
 ART_GTEST_elf_writer_test_HOST_DEPS := $(HOST_CORE_IMAGE_DEFAULT_64) $(HOST_CORE_IMAGE_DEFAULT_32)
 ART_GTEST_elf_writer_test_TARGET_DEPS := $(TARGET_CORE_IMAGE_DEFAULT_64) $(TARGET_CORE_IMAGE_DEFAULT_32)
