@@ -248,3 +248,23 @@ art_debug_defaults {
         },
     },
 }
+
+// A version of conscrypt only for enabling the "-hostdex" version to test ART on host.
+java_library {
+    // We need our own name to not class with the conscrypt library.
+    name: "conscrypt-host",
+    installable: true,
+    hostdex: true,
+    static_libs: ["conscrypt"],
+
+    // Tests and build files rely on this file to be installed as "conscrypt-hostdex",
+    // therefore set a stem. Without it, the file would be installed as
+    // "conscrypt-host-hostdex".
+    stem: "conscrypt",
+    sdk_version: "core_platform",
+    target: {
+        hostdex: {
+            required: ["libjavacrypto"],
+        },
+    },
+}
