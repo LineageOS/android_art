@@ -253,6 +253,9 @@ class CommonArtTestImpl {
     return !kIsTargetBuild;
   }
 
+  // Returns ${ANDROID_BUILD_TOP}. Ensure it has tailing /.
+  static std::string GetAndroidBuildTop();
+
   // Helper - find directory with the following format:
   // ${ANDROID_BUILD_TOP}/${subdir1}/${subdir2}-${version}/${subdir3}/bin/
   static std::string GetAndroidToolsDir(const std::string& subdir1,
