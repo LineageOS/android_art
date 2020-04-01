@@ -15,6 +15,7 @@
  */
 
 #include <array>
+#include <cstddef>
 #include <iterator>
 
 #include "adbconnection.h"
@@ -84,6 +85,7 @@ static constexpr uint8_t kDdmCommandSet = 199;
 static constexpr uint8_t kDdmChunkCommand = 1;
 
 static std::optional<AdbConnectionState> gState;
+static std::optional<pthread_t> gPthread;
 
 static bool IsDebuggingPossible() {
   return art::Dbg::IsJdwpAllowed();
@@ -98,9 +100,23 @@ void AdbConnectionDebuggerController::StartDebugger() {
   }
 }
 
-// The debugger should begin shutting down since the runtime is ending. We don't actually do
-// anything here. The real shutdown has already happened as far as the agent is concerned.
-void AdbConnectionDebuggerController::StopDebugger() { }
+// The debugger should have already shut down since the runtime is ending. As far
+// as the agent is concerned shutdown already happened when we went to kDeath
+// state. We need to clean up our threads still though and this is a good time
+// to do it since the runtime is still able to handle all the normal state
+// transitions.
+void AdbConnectionDebuggerController::StopDebugger() {
+  // Stop our threads.
+  gState->StopDebuggerThreads();
+  // Wait for our threads to actually return and cleanup the pthread.
+  if (gPthread.has_value()) {
+    void* ret_unused;
+    if (TEMP_FAILURE_RETRY(pthread_join(gPthread.value(), &ret_unused)) != 0) {
+      PLOG(ERROR) << "Failed to join debugger threads!";
+    }
+    gPthread.reset();
+  }
+}
 
 bool AdbConnectionDebuggerController::IsDebuggerConfigured() {
   return IsDebuggingPossible() && !art::Runtime::Current()->GetJdwpOptions().empty();
@@ -261,14 +277,15 @@ void AdbConnectionState::StartDebuggerThreads() {
   ScopedLocalRef<jobject> thr(soa.Env(), CreateAdbConnectionThread(soa.Self()));
   // Note: Using pthreads instead of std::thread to not abort when the thread cannot be
   //       created (exception support required).
-  pthread_t pthread;
   std::unique_ptr<CallbackData> data(new CallbackData { this, soa.Env()->NewGlobalRef(thr.get()) });
   started_debugger_threads_ = true;
-  int pthread_create_result = pthread_create(&pthread,
+  gPthread.emplace();
+  int pthread_create_result = pthread_create(&gPthread.value(),
                                              nullptr,
                                              &CallbackFunction,
                                              data.get());
   if (pthread_create_result != 0) {
+    gPthread.reset();
     started_debugger_threads_ = false;
     // If the create succeeded the other thread will call EndThreadBirth.
     art::Runtime* runtime = art::Runtime::Current();
@@ -839,7 +856,9 @@ extern "C" bool ArtPlugin_Initialize() {
 }
 
 extern "C" bool ArtPlugin_Deinitialize() {
-  gState->StopDebuggerThreads();
+  // We don't actually have to do anything here. The debugger (if one was
+  // attached) was shutdown by the move to the kDeath runtime phase and the
+  // adbconnection threads were shutdown by StopDebugger.
   return true;
 }
 
