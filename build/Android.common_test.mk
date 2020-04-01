@@ -140,7 +140,7 @@ define build-art-test-dex
     LOCAL_NO_STANDARD_LIBRARIES := true
     LOCAL_DEX_PREOPT := false
     LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_test.mk $(4)
-    LOCAL_JAVA_LIBRARIES := $(HOST_TEST_CORE_JARS)
+    LOCAL_JAVA_LIBRARIES := $(addsuffix -hostdex,$(CORE_IMG_JARS))
     ifneq ($(wildcard $(LOCAL_PATH)/$(2)/main.list),)
       LOCAL_MIN_SDK_VERSION := 19
       LOCAL_DX_FLAGS := --multi-dex --main-dex-list=$(LOCAL_PATH)/$(2)/main.list --minimal-main-dex
