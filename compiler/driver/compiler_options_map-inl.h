@@ -43,6 +43,7 @@ inline bool ReadCompilerOptions(Base& map, CompilerOptions* options, std::string
     }
     options->SetCompilerFilter(compiler_filter);
   }
+  map.AssignIfExists(Base::CompileArtTest, &options->compile_art_test_);
   map.AssignIfExists(Base::HugeMethodMaxThreshold, &options->huge_method_threshold_);
   map.AssignIfExists(Base::LargeMethodMaxThreshold, &options->large_method_threshold_);
   map.AssignIfExists(Base::NumDexMethodsThreshold, &options->num_dex_methods_threshold_);
@@ -110,6 +111,9 @@ inline void AddCompilerOptionsArgumentParserOptions(Builder& b) {
           .template WithType<std::string>()
           .IntoKey(Map::CompilerFilter)
 
+      .Define({"--compile-art-test", "--no-compile-art-test"})
+          .WithValues({true, false})
+          .IntoKey(Map::CompileArtTest)
       .Define("--huge-method-max=_")
           .template WithType<unsigned int>()
           .IntoKey(Map::HugeMethodMaxThreshold)

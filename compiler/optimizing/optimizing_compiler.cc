@@ -1106,7 +1106,7 @@ CompiledMethod* OptimizingCompiler::Compile(const dex::CodeItem* code_item,
   }
 
   if (kIsDebugBuild &&
-      compiler_options.CompilingWithCoreImage() &&
+      compiler_options.CompileArtTest() &&
       IsInstructionSetSupported(compiler_options.GetInstructionSet())) {
     // For testing purposes, we put a special marker on method names
     // that should be compiled with this compiler (when the
