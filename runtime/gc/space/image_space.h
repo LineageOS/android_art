@@ -136,11 +136,18 @@ class ImageSpace : public MemMapSpace {
       /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
       /*out*/MemMap* extra_reservation) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Try to open an existing app image space.
+  // Try to open an existing app image space for an oat file,
+  // using the boot image spaces from the current Runtime.
   static std::unique_ptr<ImageSpace> CreateFromAppImage(const char* image,
                                                         const OatFile* oat_file,
                                                         std::string* error_msg)
       REQUIRES_SHARED(Locks::mutator_lock_);
+  // Try to open an existing app image space for an the oat file and given boot image spaces.
+  static std::unique_ptr<ImageSpace> CreateFromAppImage(
+      const char* image,
+      const OatFile* oat_file,
+      ArrayRef<ImageSpace* const> boot_image_spaces,
+      std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Checks whether we have a primary boot image on the disk.
   static bool IsBootClassPathOnDisk(InstructionSet image_isa);
@@ -317,6 +324,7 @@ class ImageSpace : public MemMapSpace {
   class BootImageLoader;
   template <typename ReferenceVisitor>
   class ClassTableVisitor;
+  class RemapInternedStringsVisitor;
   class Loader;
   template <typename PatchObjectVisitor>
   class PatchArtFieldVisitor;
