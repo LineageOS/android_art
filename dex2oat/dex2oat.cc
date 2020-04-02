@@ -1142,9 +1142,6 @@ class Dex2Oat final {
     }
 
     compiler_options_->passes_to_run_ = passes_to_run_.get();
-    compiler_options_->compiling_with_core_image_ =
-        !boot_image_filename_.empty() &&
-        CompilerOptions::IsCoreImageFilename(boot_image_filename_);
   }
 
   void ExpandOatAndImageFilenames() {
