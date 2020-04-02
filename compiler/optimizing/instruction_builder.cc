@@ -385,6 +385,9 @@ bool HInstructionBuilder::Build() {
       if (!ProcessDexInstruction(pair.Inst(), dex_pc, quicken_index)) {
         return false;
       }
+      DCHECK(!Thread::Current()->IsExceptionPending())
+          << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
+          << pair.Inst().Name() << "@" << dex_pc;
 
       if (QuickenInfoTable::NeedsIndexForInstruction(&pair.Inst())) {
         ++quicken_index;
