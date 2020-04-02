@@ -2185,6 +2185,71 @@ TEST_F(Dex2oatTest, ZipFd) {
                                   /*use_zip_fd=*/ true));
 }
 
+TEST_F(Dex2oatTest, AppImageEmptyDex) {
+  // Create a profile with the startup method marked.
+  ScratchFile profile_file;
+  ScratchFile temp_dex;
+  const std::string& dex_location = temp_dex.GetFilename();
+  std::vector<uint16_t> methods;
+  std::vector<dex::TypeIndex> classes;
+  {
+    MutateDexFile(temp_dex.GetFile(), GetTestDexFileName("StringLiterals"), [&] (DexFile* dex) {
+      // Modify the header to make the dex file valid but empty.
+      DexFile::Header* header = const_cast<DexFile::Header*>(&dex->GetHeader());
+      header->string_ids_size_ = 0;
+      header->string_ids_off_ = 0;
+      header->type_ids_size_ = 0;
+      header->type_ids_off_ = 0;
+      header->proto_ids_size_ = 0;
+      header->proto_ids_off_ = 0;
+      header->field_ids_size_ = 0;
+      header->field_ids_off_ = 0;
+      header->method_ids_size_ = 0;
+      header->method_ids_off_ = 0;
+      header->class_defs_size_ = 0;
+      header->class_defs_off_ = 0;
+      ASSERT_GT(header->file_size_,
+                sizeof(*header) + sizeof(dex::MapList) + sizeof(dex::MapItem) * 2);
+      // Move map list to be right after the header.
+      header->map_off_ = sizeof(DexFile::Header);
+      dex::MapList* map_list = const_cast<dex::MapList*>(dex->GetMapList());
+      map_list->list_[0].type_ = DexFile::kDexTypeHeaderItem;
+      map_list->list_[0].size_ = 1u;
+      map_list->list_[0].offset_ = 0u;
+      map_list->list_[1].type_ = DexFile::kDexTypeMapList;
+      map_list->list_[1].size_ = 1u;
+      map_list->list_[1].offset_ = header->map_off_;
+      map_list->size_ = 2;
+      header->data_off_ = header->map_off_;
+      header->data_size_ = map_list->Size();
+    });
+  }
+  std::unique_ptr<const DexFile> dex_file(OpenDexFile(temp_dex.GetFilename().c_str()));
+  const std::string out_dir = GetScratchDir();
+  const std::string odex_location = out_dir + "/base.odex";
+  const std::string app_image_location = out_dir + "/base.art";
+  ASSERT_TRUE(GenerateOdexForTest(dex_location,
+                                  odex_location,
+                                  CompilerFilter::Filter::kSpeedProfile,
+                                  { "--app-image-file=" + app_image_location,
+                                    "--resolve-startup-const-strings=true",
+                                    "--profile-file=" + profile_file.GetFilename()},
+                                  /*expect_success=*/ true,
+                                  /*use_fd=*/ false,
+                                  /*use_zip_fd=*/ false,
+                                  [](const OatFile&) {}));
+  // Open our generated oat file.
+  std::string error_msg;
+  std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                   odex_location.c_str(),
+                                                   odex_location.c_str(),
+                                                   /*executable=*/ false,
+                                                   /*low_4gb=*/ false,
+                                                   &error_msg));
+  ASSERT_TRUE(odex_file != nullptr);
+}
+
+
 TEST_F(Dex2oatTest, AppImageResolveStrings) {
   using Hotness = ProfileCompilationInfo::MethodHotness;
   // Create a profile with the startup method marked.
