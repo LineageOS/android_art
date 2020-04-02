@@ -682,7 +682,11 @@ void ImageWriter::PrepareDexCacheArraySlots() {
         << "Dex cache should have been pruned " << dex_file->GetLocation()
         << "; possibly in class path";
     DexCacheArraysLayout layout(target_ptr_size_, dex_file);
-    DCHECK(layout.Valid());
+    // Empty dex files will not have a "valid" DexCacheArraysLayout.
+    if (dex_file->NumTypeIds() + dex_file->NumStringIds() + dex_file->NumMethodIds() +
+        dex_file->NumFieldIds() + dex_file->NumProtoIds() + dex_file->NumCallSiteIds() != 0) {
+      DCHECK(layout.Valid());
+    }
     size_t oat_index = GetOatIndexForDexFile(dex_file);
     ImageInfo& image_info = GetImageInfo(oat_index);
     uint32_t start = image_info.dex_cache_array_starts_.Get(dex_file);
