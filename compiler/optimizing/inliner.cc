@@ -148,15 +148,14 @@ bool HInliner::Run() {
   DCHECK_NE(total_number_of_instructions_, 0u);
   DCHECK_NE(inlining_budget_, 0u);
 
-  // If we're compiling with a core image (which is only used for
-  // test purposes), honor inlining directives in method names:
+  // If we're compiling tests, honor inlining directives in method names:
   // - if a method's name contains the substring "$noinline$", do not
   //   inline that method;
   // - if a method's name contains the substring "$inline$", ensure
   //   that this method is actually inlined.
   // We limit the latter to AOT compilation, as the JIT may or may not inline
   // depending on the state of classes at runtime.
-  const bool honor_noinline_directives = codegen_->GetCompilerOptions().CompilingWithCoreImage();
+  const bool honor_noinline_directives = codegen_->GetCompilerOptions().CompileArtTest();
   const bool honor_inline_directives =
       honor_noinline_directives && Runtime::Current()->IsAotCompiler();
 

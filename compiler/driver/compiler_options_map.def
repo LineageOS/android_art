@@ -37,6 +37,7 @@
 
 // TODO: Add type parser.
 COMPILER_OPTIONS_KEY (std::string,                 CompilerFilter)
+COMPILER_OPTIONS_KEY (bool,                        CompileArtTest)
 COMPILER_OPTIONS_KEY (Unit,                        PIC)
 COMPILER_OPTIONS_KEY (unsigned int,                HugeMethodMaxThreshold)
 COMPILER_OPTIONS_KEY (unsigned int,                LargeMethodMaxThreshold)
