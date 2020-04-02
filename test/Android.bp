@@ -950,6 +950,8 @@ filegroup {
         ":art-gtest-jars-ErroneousA",
         ":art-gtest-jars-ErroneousB",
         ":art-gtest-jars-ErroneousInit",
+        ":art-gtest-jars-Extension1",
+        ":art-gtest-jars-Extension2",
         ":art-gtest-jars-ForClassLoaderA",
         ":art-gtest-jars-ForClassLoaderB",
         ":art-gtest-jars-ForClassLoaderC",
@@ -1046,6 +1048,18 @@ java_library {
 java_library {
     name: "art-gtest-jars-ErroneousInit",
     srcs: ["ErroneousInit/**/*.java"],
+    defaults: ["art-gtest-jars-defaults"],
+}
+
+java_library {
+    name: "art-gtest-jars-Extension1",
+    srcs: ["Extension1/**/*.java"],
+    defaults: ["art-gtest-jars-defaults"],
+}
+
+java_library {
+    name: "art-gtest-jars-Extension2",
+    srcs: ["Extension2/**/*.java"],
     defaults: ["art-gtest-jars-defaults"],
 }
 

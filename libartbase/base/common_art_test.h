@@ -28,6 +28,7 @@
 
 #include "base/file_utils.h"
 #include "base/globals.h"
+#include "base/memory_tool.h"
 #include "base/mutex.h"
 #include "base/os.h"
 #include "base/unix_file/fd_file.h"
@@ -251,6 +252,9 @@ class CommonArtTestImpl {
   static bool IsHost() {
     return !kIsTargetBuild;
   }
+
+  // Returns ${ANDROID_BUILD_TOP}. Ensure it has tailing /.
+  static std::string GetAndroidBuildTop();
 
   // Helper - find directory with the following format:
   // ${ANDROID_BUILD_TOP}/${subdir1}/${subdir2}-${version}/${subdir3}/bin/
