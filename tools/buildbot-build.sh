@@ -78,6 +78,8 @@ elif [[ $mode == "target" ]]; then
   make_command+=" libnetd_client-target toybox toolbox sh"
   make_command+=" debuggerd su gdbserver"
   make_command+=" libstdc++ "
+  # vogar requires the class files for conscrypt.
+  make_command+=" conscrypt "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   if [[ -n "$ART_TEST_CHROOT" ]]; then
     # Targets required to generate a linker configuration on device within the
@@ -86,10 +88,12 @@ elif [[ $mode == "target" ]]; then
     # Additional targets needed for the chroot environment.
     make_command+=" crash_dump event-log-tags"
   fi
-  # Build the Runtime (Bionic) APEX.
-  make_command+=" com.android.runtime"
+  # Needed to extract prebuilts apexes.
+  make_command+=" deapexer "
   # Build the Testing ART APEX (which is a superset of the Release and Debug ART APEXes).
   make_command+=" com.android.art.testing"
+  # Build the Runtime (Bionic) APEX.
+  make_command+=" com.android.runtime"
   # Build the bootstrap Bionic artifacts links (linker, libc, libdl, libm).
   # These targets create these symlinks:
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
@@ -139,19 +143,27 @@ if [[ $mode == "target" ]]; then
     eval "$cmd"
   done
 
+
+  conscrypt_dir="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
+  conscrypt_apex="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt.apex"
+  if [ -f "${conscrypt_apex}" ]; then
+    # If there is a conscrypt apex prebuilt, extract it.
+    rm -rf $conscrypt_dir
+    mkdir $conscrypt_dir
+    deapexer extract $conscrypt_apex $conscrypt_dir
+  fi
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
-  conscrypt_apex="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
   conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
-  if [ ! -d "${conscrypt_apex}" ]; then
-    echo -e "Missing conscrypt APEX in build output: ${conscrypt_apex}"
+  if [ ! -d "${conscrypt_dir}" ]; then
+    echo -e "Missing conscrypt APEX in build output: ${conscrypt_dir}"
     exit 1
   fi
   for l in lib lib64; do
-    if [ ! -d "${conscrypt_apex}/$l" ]; then
+    if [ ! -d "$ANDROID_PRODUCT_OUT/system/$l" ]; then
       continue
     fi
     for so in $conscrypt_libs; do
-      src="${conscrypt_apex}/${l}/${so}"
+      src="${conscrypt_dir}/${l}/${so}"
       dst="$ANDROID_PRODUCT_OUT/system/${l}/${so}"
       if [ "${src}" -nt "${dst}" ]; then
         cmd="cp -p \"${src}\" \"${dst}\""
