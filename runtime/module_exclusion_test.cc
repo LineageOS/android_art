@@ -16,6 +16,8 @@
 
 #include "common_compiler_test.h"
 
+#include "aot_class_linker.h"
+#include "base/casts.h"
 #include "class_linker-inl.h"
 #include "handle.h"
 #include "handle_scope-inl.h"
@@ -71,7 +73,15 @@ class ModuleExclusionTest : public CommonCompilerTest {
     }
   }
 
- private:
+ protected:
+  void SetUpRuntimeOptions(RuntimeOptions* options) override {
+    CommonCompilerTest::SetUpRuntimeOptions(options);
+
+    // Set up the image location to be used by StartDex2OatCommandLine().
+    // Using a prebuilt image also makes the test run faster.
+    options->push_back(std::make_pair("-Ximage:" + GetImageLocation(), nullptr));
+  }
+
   std::string GetModuleFileName() const {
     std::vector<std::string> filename = GetLibCoreDexFileNames({ module_ });
     CHECK_EQ(filename.size(), 1u);
@@ -124,7 +134,60 @@ class ConscryptExclusionTest : public ModuleExclusionTest {
 };
 
 TEST_F(ConscryptExclusionTest, Test) {
+  Runtime* runtime = Runtime::Current();
+  ASSERT_TRUE(runtime->IsAotCompiler());
+  AotClassLinker* aot_class_linker = down_cast<AotClassLinker*>(runtime->GetClassLinker());
+  const std::vector<std::string> package_list = {
+      // Reserved conscrypt packages (includes sub-packages under these paths).
+      "android.net.ssl",
+      "com.android.org.conscrypt",
+  };
+  bool list_applied = aot_class_linker->SetUpdatableBootClassPackages(package_list);
+  ASSERT_TRUE(list_applied);
   DoTest();
+
+  // Also test passing the list to dex2oat.
+  ScratchFile package_list_file;
+  for (const std::string& package : package_list) {
+    std::string data = package + '\n';
+    ASSERT_TRUE(package_list_file.GetFile()->WriteFully(data.data(), data.size()));
+  }
+  ASSERT_EQ(0, package_list_file.GetFile()->Flush());
+  ScratchDir scratch_dir;
+  std::string jar_name = GetModuleFileName();
+  std::string odex_name = scratch_dir.GetPath() + module_ + ".odex";
+  std::vector<std::string> argv;
+  std::string error_msg;
+  bool success = StartDex2OatCommandLine(&argv, &error_msg);
+  ASSERT_TRUE(success) << error_msg;
+  argv.insert(argv.end(), {
+      "--dex-file=" + jar_name,
+      "--dex-location=" + jar_name,
+      "--oat-file=" + odex_name,
+      "--compiler-filter=speed",
+      "--updatable-bcp-packages-file=" + package_list_file.GetFilename()
+  });
+  success = RunDex2Oat(argv, &error_msg);
+  ASSERT_TRUE(success) << error_msg;
+  // Load the odex file.
+  std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                   odex_name.c_str(),
+                                                   odex_name.c_str(),
+                                                   /*executable=*/ false,
+                                                   /*low_4gb=*/ false,
+                                                   jar_name,
+                                                   &error_msg));
+  ASSERT_TRUE(odex_file != nullptr) << error_msg;
+  // Check that no classes have been resolved.
+  for (const OatDexFile* oat_dex_file : odex_file->GetOatDexFiles()) {
+    std::unique_ptr<const DexFile> dex_file = oat_dex_file->OpenDexFile(&error_msg);
+    ASSERT_TRUE(dex_file != nullptr);
+    for (size_t i = 0, num_class_defs = dex_file->NumClassDefs(); i != num_class_defs; ++i) {
+      ClassStatus status = oat_dex_file->GetOatClass(i).GetStatus();
+      ASSERT_FALSE(mirror::Class::IsErroneous(status));
+      ASSERT_LT(status, ClassStatus::kResolved);
+    }
+  }
 }
 
 }  // namespace art
