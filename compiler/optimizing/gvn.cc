@@ -126,7 +126,7 @@ class ValueSet : public ArenaObject<kArenaAllocGvn> {
   // Removes all instructions in the set affected by the given side effects.
   void Kill(SideEffects side_effects) {
     DeleteAllImpureWhich([side_effects](Node* node) {
-      return node->GetInstruction()->GetSideEffects().MayDependOn(side_effects);
+      return node->GetSideEffects().MayDependOn(side_effects);
     });
   }
 
@@ -195,6 +195,21 @@ class ValueSet : public ArenaObject<kArenaAllocGvn> {
 
     Node* Dup(ScopedArenaAllocator* allocator, Node* new_next = nullptr) {
       return new (allocator) Node(instruction_, hash_code_, new_next);
+    }
+
+    SideEffects GetSideEffects() const {
+      // Deoptimize is a weird instruction since it's predicated and
+      // never-return. Its side-effects are to prevent the splitting of dex
+      // instructions across it (which could cause inconsistencies once we begin
+      // interpreting again). In the context of GVN the 'perform-deopt' branch is not
+      // relevant and we only need to care about the no-op case, in which case there are
+      // no side-effects. By doing this we are able to eliminate redundant (i.e.
+      // dominated deopts with GVNd conditions) deoptimizations.
+      if (instruction_->IsDeoptimize()) {
+        return SideEffects::None();
+      } else {
+        return instruction_->GetSideEffects();
+      }
     }
 
    private:
@@ -479,7 +494,10 @@ void GlobalValueNumberer::VisitBasicBlock(HBasicBlock* block) {
     //
     // BoundType is a special case example of an instruction which shouldn't be moved but can be
     // GVN'ed.
-    if (current->CanBeMoved() || current->IsBoundType()) {
+    //
+    // Deoptimize is a special case since even though we don't want to move it we can still remove
+    // it for GVN.
+    if (current->CanBeMoved() || current->IsBoundType() || current->IsDeoptimize()) {
       if (current->IsBinaryOperation() && current->AsBinaryOperation()->IsCommutative()) {
         // For commutative ops, (x op y) will be treated the same as (y op x)
         // after fixed ordering.
