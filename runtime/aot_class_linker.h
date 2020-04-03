@@ -35,6 +35,8 @@ class AotClassLinker : public ClassLinker {
   static bool CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klass, gc::Heap* heap)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  bool SetUpdatableBootClassPackages(const std::vector<std::string>& packages);
+
  protected:
   // Overridden version of PerformClassVerification allows skipping verification if the class was
   // previously verified but unloaded.
@@ -59,7 +61,13 @@ class AotClassLinker : public ClassLinker {
       override
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::dex_lock_);
+
+  bool IsUpdatableBootClassPathDescriptor(const char* descriptor) override;
+
+ private:
+  std::vector<std::string> updatable_boot_class_path_descriptor_prefixes_;
 };
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_AOT_CLASS_LINKER_H_
