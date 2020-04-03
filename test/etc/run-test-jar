@@ -111,6 +111,10 @@ ANDROID_FLAGS="${ANDROID_FLAGS} -XX:SlowDebug=true"
 ANDROID_FLAGS="${ANDROID_FLAGS} -Xcompiler-option --runtime-arg -Xcompiler-option -XX:SlowDebug=true"
 COMPILER_FLAGS="${COMPILER_FLAGS} --runtime-arg -XX:SlowDebug=true"
 
+# Let the compiler and runtime know that we are running tests.
+COMPILE_FLAGS="${COMPILE_FLAGS} --compile-art-test"
+FLAGS="${FLAGS} -Xcompiler-option --compile-art-test"
+
 while true; do
     if [ "x$1" = "x--quiet" ]; then
         QUIET="y"
