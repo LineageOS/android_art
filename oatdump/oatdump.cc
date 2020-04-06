@@ -564,7 +564,11 @@ class OatDumper {
           }
           dex_files.push_back(dex_file);
         }
-        verifier::VerifierDeps deps(dex_files, oat_file_.GetVdexFile()->GetVerifierDepsData());
+        verifier::VerifierDeps deps(dex_files, /*output_only=*/ false);
+        if (!deps.ParseStoredData(dex_files, oat_file_.GetVdexFile()->GetVerifierDepsData())) {
+          os << "Error parsing verifier dependencies." << std::endl;
+          return false;
+        }
         deps.Dump(&vios);
       } else {
         os << "UNRECOGNIZED vdex file, magic "
