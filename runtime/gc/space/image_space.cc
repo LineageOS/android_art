@@ -677,9 +677,10 @@ class ImageSpace::ClassTableVisitor final {
 
 class ImageSpace::RemapInternedStringsVisitor {
  public:
-  explicit RemapInternedStringsVisitor(SafeMap<mirror::String*, mirror::String*> intern_remap)
+  explicit RemapInternedStringsVisitor(
+      const SafeMap<mirror::String*, mirror::String*>& intern_remap)
       REQUIRES_SHARED(Locks::mutator_lock_)
-      : intern_remap_(std::move(intern_remap)),
+      : intern_remap_(intern_remap),
         string_class_(GetStringClass()) {}
 
   // Visitor for VisitReferences().
@@ -717,7 +718,7 @@ class ImageSpace::RemapInternedStringsVisitor {
     return intern_remap_.begin()->first->GetClass<kVerifyNone, kWithoutReadBarrier>();
   }
 
-  const SafeMap<mirror::String*, mirror::String*> intern_remap_;
+  const SafeMap<mirror::String*, mirror::String*>& intern_remap_;
   mirror::Class* const string_class_;
 };
 
@@ -802,7 +803,7 @@ class ImageSpace::Loader {
         SafeMap<mirror::String*, mirror::String*> intern_remap;
         RemoveInternTableDuplicates(old_spaces, space.get(), &intern_remap);
         if (!intern_remap.empty()) {
-          RemapInternedStringDuplicates(std::move(intern_remap), space.get());
+          RemapInternedStringDuplicates(intern_remap, space.get());
         }
       }
 
@@ -1026,9 +1027,9 @@ class ImageSpace::Loader {
   }
 
   static void RemapInternedStringDuplicates(
-      SafeMap<mirror::String*, mirror::String*>&& intern_remap,
+      const SafeMap<mirror::String*, mirror::String*>& intern_remap,
       ImageSpace* new_space) REQUIRES_SHARED(Locks::mutator_lock_) {
-    RemapInternedStringsVisitor visitor(std::move(intern_remap));
+    RemapInternedStringsVisitor visitor(intern_remap);
     static_assert(IsAligned<kObjectAlignment>(sizeof(ImageHeader)), "Header alignment check");
     uint32_t objects_end = new_space->GetImageHeader().GetObjectsSection().Size();
     DCHECK_ALIGNED(objects_end, kObjectAlignment);
@@ -3042,7 +3043,7 @@ class ImageSpace::BootImageLoader {
         if (!intern_remap.empty()) {
           for (size_t i = 0; i != image_space_count; ++i) {
             ImageSpace* new_space = spaces[space_pos + i].get();
-            Loader::RemapInternedStringDuplicates(std::move(intern_remap), new_space);
+            Loader::RemapInternedStringDuplicates(intern_remap, new_space);
           }
         }
       }
