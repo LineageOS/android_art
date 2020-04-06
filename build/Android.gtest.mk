@@ -309,6 +309,11 @@ ART_GTEST_dex2oat_image_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
   $(TESTING_ART_APEX)  # For dex2oatd.
 
+ART_GTEST_module_exclusion_test_HOST_DEPS := \
+  $(ART_GTEST_dex2oat_image_test_HOST_DEPS)
+ART_GTEST_module_exclusion_test_TARGET_DEPS := \
+  $(ART_GTEST_dex2oat_image_test_TARGET_DEPS)
+
 # TODO: document why this is needed.
 ART_GTEST_proxy_test_HOST_DEPS := $(HOST_CORE_IMAGE_DEFAULT_64) $(HOST_CORE_IMAGE_DEFAULT_32)
 
@@ -712,6 +717,8 @@ ART_GTEST_dex2oat_test_TARGET_DEPS :=
 ART_GTEST_dex2oat_image_test_DEX_DEPS :=
 ART_GTEST_dex2oat_image_test_HOST_DEPS :=
 ART_GTEST_dex2oat_image_test_TARGET_DEPS :=
+ART_GTEST_module_exclusion_test_HOST_DEPS :=
+ART_GTEST_module_exclusion_test_TARGET_DEPS :=
 ART_GTEST_object_test_DEX_DEPS :=
 ART_GTEST_proxy_test_DEX_DEPS :=
 ART_GTEST_reflection_test_DEX_DEPS :=
