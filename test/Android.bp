@@ -65,8 +65,6 @@ art_cc_defaults {
         "libartbased",
 
         "libbase",
-        "libicuuc",
-        "libicui18n",
         "libnativehelper",
         "libz",
     ],
