@@ -60,11 +60,15 @@ TEST_F(ImageSpaceTest, StringDeduplication) {
   int mkdir_result = mkdir(image_dir.c_str(), 0700);
   ASSERT_EQ(0, mkdir_result);
 
-  // Prepare boot class path variables, exclude conscrypt which is not in the primary boot image.
+  // Prepare boot class path variables, exclude core-icu4j and conscrypt
+  // which are not in the primary boot image.
   std::vector<std::string> bcp = GetLibCoreDexFileNames();
   std::vector<std::string> bcp_locations = GetLibCoreDexLocations();
   CHECK_EQ(bcp.size(), bcp_locations.size());
   ASSERT_NE(std::string::npos, bcp.back().find("conscrypt"));
+  bcp.pop_back();
+  bcp_locations.pop_back();
+  ASSERT_NE(std::string::npos, bcp.back().find("core-icu4j"));
   bcp.pop_back();
   bcp_locations.pop_back();
   std::string base_bcp_string = android::base::Join(bcp, ':');
