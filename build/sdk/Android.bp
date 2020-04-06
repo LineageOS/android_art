@@ -44,6 +44,9 @@ module_exports {
         "core-tests-support",
         "okhttp-tests-nojarjar",
     ],
+    java_tests: [
+        "libcore-crypto-tests",
+    ],
     native_shared_libs: [
         "libjavacoretests",
     ],
