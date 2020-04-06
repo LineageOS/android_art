@@ -829,6 +829,8 @@ class ClassLinker {
     return true;
   }
 
+  virtual bool IsUpdatableBootClassPathDescriptor(const char* descriptor);
+
  private:
   class LinkInterfaceMethodsHelper;
   class VisiblyInitializedCallback;

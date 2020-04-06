@@ -3147,33 +3147,6 @@ ObjPtr<mirror::Class> ClassLinker::FindClass(Thread* self,
   return result_ptr;
 }
 
-static bool IsReservedBootClassPathDescriptor(const char* descriptor) {
-  std::string_view descriptor_sv(descriptor);
-  return
-      // Reserved conscrypt packages (includes sub-packages under these paths).
-      // StartsWith(descriptor_sv, "Landroid/net/ssl/") ||  // Covered by android.net below.
-      StartsWith(descriptor_sv, "Lcom/android/org/conscrypt/") ||
-      // Reserved updatable-media package (includes sub-packages under this path).
-      StartsWith(descriptor_sv, "Landroid/media/") ||
-      // Reserved framework-mediaprovider package (includes sub-packages under this path).
-      StartsWith(descriptor_sv, "Landroid/provider/") ||
-      // Reserved framework-statsd packages (includes sub-packages under these paths).
-      StartsWith(descriptor_sv, "Landroid/app/") ||
-      StartsWith(descriptor_sv, "Landroid/os/") ||
-      StartsWith(descriptor_sv, "Landroid/util/") ||
-      // Reserved framework-permission packages (includes sub-packages under this path).
-      StartsWith(descriptor_sv, "Landroid/permission/") ||
-      // StartsWith(descriptor_sv, "Landroid/app/role/") ||  // Covered by android.app above.
-      // Reserved framework-sdkextensions package (includes sub-packages under this path).
-      // StartsWith(descriptor_sv, "Landroid/os/ext/") ||  // Covered by android.os above.
-      // Reserved framework-wifi packages (includes sub-packages under these paths).
-      StartsWith(descriptor_sv, "Landroid/hardware/wifi/") ||
-      // StartsWith(descriptor_sv, "Landroid/net/wifi/") ||  // Covered by android.net below.
-      StartsWith(descriptor_sv, "Landroid/x/net/wifi/") ||
-      // Reserved framework-tethering package (includes sub-packages under this path).
-      StartsWith(descriptor_sv, "Landroid/net/");
-}
-
 // Helper for maintaining DefineClass counting. We need to notify callbacks when we start/end a
 // define-class and how many recursive DefineClasses we are at in order to allow for doing  things
 // like pausing class definition.
@@ -3251,7 +3224,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
   // with these modules as these classes could be resolved differently during execution.
   if (class_loader != nullptr &&
       Runtime::Current()->IsAotCompiler() &&
-      IsReservedBootClassPathDescriptor(descriptor)) {
+      IsUpdatableBootClassPathDescriptor(descriptor)) {
     ObjPtr<mirror::Throwable> pre_allocated =
         Runtime::Current()->GetPreAllocatedNoClassDefFoundError();
     self->SetException(pre_allocated);
@@ -9851,6 +9824,12 @@ ObjPtr<mirror::IfTable> ClassLinker::AllocIfTable(Thread* self, size_t ifcount) 
       mirror::IfTable::Alloc(self,
                              GetClassRoot<mirror::ObjectArray<mirror::Object>>(this),
                              ifcount * mirror::IfTable::kMax)));
+}
+
+bool ClassLinker::IsUpdatableBootClassPathDescriptor(const char* descriptor ATTRIBUTE_UNUSED) {
+  // Should not be called on ClassLinker, only on AotClassLinker that overrides this.
+  LOG(FATAL) << "UNREACHABLE";
+  UNREACHABLE();
 }
 
 // Instantiate ClassLinker::ResolveMethod.

@@ -41,6 +41,7 @@
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
 
+#include "aot_class_linker.h"
 #include "arch/instruction_set_features.h"
 #include "art_method-inl.h"
 #include "base/callee_save_type.h"
@@ -491,8 +492,13 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("      for dex files in --class-loader-context. Their order must be the same as");
   UsageError("      dex files in flattened class loader context.");
   UsageError("");
-  UsageError("  --dirty-image-objects=<directory-path>: list of known dirty objects in the image.");
+  UsageError("  --dirty-image-objects=<file-path>: list of known dirty objects in the image.");
   UsageError("      The image writer will group them together.");
+  UsageError("");
+  UsageError("  --updatable-bcp-packages-file=<file-path>: file with a list of updatable");
+  UsageError("      boot class path packages. Classes in these packages and sub-packages");
+  UsageError("      shall not be resolved during app compilation to avoid AOT assumptions");
+  UsageError("      being invalidated after applying updates to these components.");
   UsageError("");
   UsageError("  --compact-dex-level=none|fast: None avoids generating compact dex, fast");
   UsageError("      generates compact dex with low compile time. If speed-profile is specified as");
@@ -793,6 +799,7 @@ class Dex2Oat final {
       image_storage_mode_(ImageHeader::kStorageModeUncompressed),
       passes_to_run_filename_(nullptr),
       dirty_image_objects_filename_(nullptr),
+      updatable_bcp_packages_filename_(nullptr),
       is_host_(false),
       elf_writers_(),
       oat_writers_(),
@@ -1064,6 +1071,10 @@ class Dex2Oat final {
       }
     }
 
+    if ((IsBootImage() || IsBootImageExtension()) && updatable_bcp_packages_filename_ != nullptr) {
+      Usage("Do not specify --updatable-bcp-packages-file for boot image compilation.");
+    }
+
     if (!cpu_set_.empty()) {
       SetCpuAffinity(cpu_set_);
     }
@@ -1322,6 +1333,7 @@ class Dex2Oat final {
     AssignIfExists(args, M::NoInlineFrom, &no_inline_from_string_);
     AssignIfExists(args, M::ClasspathDir, &classpath_dir_);
     AssignIfExists(args, M::DirtyImageObjects, &dirty_image_objects_filename_);
+    AssignIfExists(args, M::UpdatableBcpPackagesFile, &updatable_bcp_packages_filename_);
     AssignIfExists(args, M::ImageFormat, &image_storage_mode_);
     AssignIfExists(args, M::CompilationReason, &compilation_reason_);
 
@@ -1875,6 +1887,11 @@ class Dex2Oat final {
           class_loader_context_->EncodeContextForOatFile(classpath_dir_,
                                                          stored_class_loader_context_.get());
       key_value_store_->Put(OatHeader::kClassPathKey, class_path_key);
+
+      // Prepare exclusion list for updatable boot class path packages.
+      if (!PrepareUpdatableBcpPackages()) {
+        return dex2oat::ReturnCode::kOther;
+      }
     }
 
     // Now that we have finalized key_value_store_, start writing the .rodata section.
@@ -2609,6 +2626,48 @@ class Dex2Oat final {
     return true;
   }
 
+  bool PrepareUpdatableBcpPackages() {
+    DCHECK(!IsBootImage() && !IsBootImageExtension());
+    AotClassLinker* aot_class_linker = down_cast<AotClassLinker*>(runtime_->GetClassLinker());
+    if (updatable_bcp_packages_filename_ != nullptr) {
+      std::unique_ptr<std::vector<std::string>> updatable_bcp_packages =
+          ReadCommentedInputFromFile<std::vector<std::string>>(updatable_bcp_packages_filename_,
+                                                               nullptr);  // No post-processing.
+      if (updatable_bcp_packages == nullptr) {
+        LOG(ERROR) << "Failed to load updatable boot class path packages from '"
+            << updatable_bcp_packages_filename_ << "'";
+        return false;
+      }
+      return aot_class_linker->SetUpdatableBootClassPackages(*updatable_bcp_packages);
+    } else {
+      // Use the default list based on updatable packages for Android 11.
+      return aot_class_linker->SetUpdatableBootClassPackages({
+          // Reserved conscrypt packages (includes sub-packages under these paths).
+          // "android.net.ssl",  // Covered by android.net below.
+          "com.android.org.conscrypt",
+          // Reserved updatable-media package (includes sub-packages under this path).
+          "android.media",
+          // Reserved framework-mediaprovider package (includes sub-packages under this path).
+          "android.provider",
+          // Reserved framework-statsd packages (includes sub-packages under these paths).
+          "android.app",
+          "android.os",
+          "android.util",
+          // Reserved framework-permission packages (includes sub-packages under this path).
+          "android.permission",
+          // "android.app.role",  // Covered by android.app above.
+          // Reserved framework-sdkextensions package (includes sub-packages under this path).
+          // "android.os.ext",  // Covered by android.os above.
+          // Reserved framework-wifi packages (includes sub-packages under these paths).
+          "android.hardware.wifi",
+          // "android.net.wifi",  // Covered by android.net below.
+          "android.x.net.wifi",
+          // Reserved framework-tethering package (includes sub-packages under this path).
+          "android.net",
+      });
+    }
+  }
+
   void PruneNonExistentDexFiles() {
     DCHECK_EQ(dex_filenames_.size(), dex_locations_.size());
     size_t kept = 0u;
@@ -2981,6 +3040,7 @@ class Dex2Oat final {
   ImageHeader::StorageMode image_storage_mode_;
   const char* passes_to_run_filename_;
   const char* dirty_image_objects_filename_;
+  const char* updatable_bcp_packages_filename_;
   std::unique_ptr<HashSet<std::string>> dirty_image_objects_;
   std::unique_ptr<std::vector<std::string>> passes_to_run_;
   bool is_host_;
