@@ -196,4 +196,48 @@ bool AotClassLinker::CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klas
   return true;
 }
 
+bool AotClassLinker::SetUpdatableBootClassPackages(const std::vector<std::string>& packages) {
+  DCHECK(updatable_boot_class_path_descriptor_prefixes_.empty());
+  // Transform package names to descriptor prefixes.
+  std::vector<std::string> prefixes;
+  prefixes.reserve(packages.size());
+  for (const std::string& package : packages) {
+    if (package.empty() || package.find('/') != std::string::npos) {
+      LOG(ERROR) << "Invalid package name: " << package;
+      return false;
+    }
+    std::string prefix = 'L' + package + '/';
+    std::replace(prefix.begin(), prefix.end(), '.', '/');
+    prefixes.push_back(std::move(prefix));
+  }
+  // Sort and remove unnecessary prefixes.
+  std::sort(prefixes.begin(), prefixes.end());
+  std::string last_prefix;
+  auto end_it = std::remove_if(
+      prefixes.begin(),
+      prefixes.end(),
+      [&last_prefix](const std::string& s) {
+        if (!last_prefix.empty() && StartsWith(s, last_prefix)) {
+          return true;
+        } else {
+          last_prefix = s;
+          return false;
+        }
+      });
+  prefixes.resize(std::distance(prefixes.begin(), end_it));
+  prefixes.shrink_to_fit();
+  updatable_boot_class_path_descriptor_prefixes_.swap(prefixes);
+  return true;
+}
+
+bool AotClassLinker::IsUpdatableBootClassPathDescriptor(const char* descriptor) {
+  std::string_view descriptor_sv(descriptor);
+  for (const std::string& prefix : updatable_boot_class_path_descriptor_prefixes_) {
+    if (StartsWith(descriptor_sv, prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace art
