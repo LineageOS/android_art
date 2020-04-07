@@ -4,8 +4,14 @@ cc_defaults {
     cppflags: [
         "-fvisibility=protected",
     ],
-    header_libs: ["libnativebridge-headers"],
-    export_header_lib_headers: ["libnativebridge-headers"],
+    header_libs: [
+        "jni_headers",
+        "libnativebridge-headers",
+    ],
+    export_header_lib_headers: [
+        "jni_headers",
+        "libnativebridge-headers",
+    ],
 }
 
 cc_library_headers {
