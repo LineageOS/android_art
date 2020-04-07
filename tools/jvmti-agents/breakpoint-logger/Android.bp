@@ -36,6 +36,7 @@ cc_defaults {
         },
     },
     header_libs: [
+        "jni_headers",
         "libopenjdkjvmti_headers",
     ],
 }

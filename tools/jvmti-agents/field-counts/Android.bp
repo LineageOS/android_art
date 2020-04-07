@@ -24,9 +24,9 @@ cc_defaults {
     // to be same ISA as what it is attached to.
     compile_multilib: "both",
     header_libs: [
+        "jni_headers",
         "libopenjdkjvmti_headers",
         "libnativehelper_header_only",
-        "jni_headers",
     ],
 }
 
