@@ -29,6 +29,7 @@ cc_defaults {
         "libbase",
     ],
     header_libs: [
+        "jni_headers",
         "libopenjdkjvmti_headers",
     ],
 }
