@@ -26,7 +26,9 @@ cc_library {
     srcs: [
         "native_loader.cpp",
     ],
-    header_libs: ["libnativehelper_header_only"],
+    header_libs: [
+        "libnativehelper_header_only",
+    ],
     shared_libs: [
         "liblog",
         "libnativebridge",
@@ -78,6 +80,8 @@ cc_library_headers {
     ],
     host_supported: true,
     export_include_dirs: ["include"],
+    header_libs: ["jni_headers"],
+    export_header_lib_headers: ["jni_headers"],
 }
 
 cc_test {
