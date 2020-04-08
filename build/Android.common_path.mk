@@ -94,6 +94,8 @@ HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt
 $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar : $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar
 	$(copy-file-to-target)
 
+HOST_CORE_IMG_OUTS += $(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
+
 HOST_TEST_CORE_JARS   := $(addsuffix -hostdex,$(CORE_IMG_JARS) conscrypt)
 ART_HOST_DEX_DEPENDENCIES := $(foreach jar,$(HOST_TEST_CORE_JARS),$(HOST_OUT_JAVA_LIBRARIES)/$(jar).jar)
 ART_TARGET_DEX_DEPENDENCIES := com.android.art.testing com.android.conscrypt
