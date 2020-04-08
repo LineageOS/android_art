@@ -39,6 +39,7 @@ cc_defaults {
         },
     },
     header_libs: [
+        "jni_headers",
         "libopenjdkjvmti_headers",
         "libdexfile_all_headers", // for dex_instruction_list.h only
     ],

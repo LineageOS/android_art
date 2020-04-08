@@ -32,7 +32,10 @@ cc_defaults {
             ],
         },
     },
-    header_libs: ["libnativebridge-headers"],
+    header_libs: [
+        "jni_headers",
+        "libnativebridge-headers",
+    ],
     cppflags: ["-fvisibility=protected"],
 }
 
@@ -159,5 +162,8 @@ cc_test {
     srcs: [
         "NativeBridgeApi.c",
     ],
-    header_libs: ["libnativebridge-headers"],
+    header_libs: [
+        "jni_headers",
+        "libnativebridge-headers",
+    ],
 }
