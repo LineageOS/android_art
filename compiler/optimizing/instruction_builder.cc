@@ -382,12 +382,15 @@ bool HInstructionBuilder::Build() {
         AppendInstruction(new (allocator_) HNativeDebugInfo(dex_pc));
       }
 
+      DCHECK(!Thread::Current()->IsExceptionPending())
+          << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
+          << " " << pair.Inst().Name() << "@" << dex_pc;
       if (!ProcessDexInstruction(pair.Inst(), dex_pc, quicken_index)) {
         return false;
       }
       DCHECK(!Thread::Current()->IsExceptionPending())
           << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
-          << pair.Inst().Name() << "@" << dex_pc;
+          << " " << pair.Inst().Name() << "@" << dex_pc;
 
       if (QuickenInfoTable::NeedsIndexForInstruction(&pair.Inst())) {
         ++quicken_index;
@@ -835,6 +838,7 @@ ArtMethod* HInstructionBuilder::ResolveMethod(uint16_t method_idx, InvokeType in
     soa.Self()->ClearException();
     return nullptr;
   }
+  DCHECK(!soa.Self()->IsExceptionPending());
 
   // The referrer may be unresolved for AOT if we're compiling a class that cannot be
   // resolved because, for example, we don't find a superclass in the classpath.
@@ -922,6 +926,7 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
   ArtMethod* resolved_method = ResolveMethod(method_idx, invoke_type);
 
   if (UNLIKELY(resolved_method == nullptr)) {
+    DCHECK(!Thread::Current()->IsExceptionPending());
     MaybeRecordStat(compilation_stats_,
                     MethodCompilationStat::kUnresolvedMethod);
     HInvoke* invoke = new (allocator_) HInvokeUnresolved(allocator_,
