@@ -392,7 +392,7 @@ Signal Catcher
 Test911
  getAllStackTraces (I)[[Ljava/lang/Object; -1 -2
  printAll (I)V 0 75
- doTest ()V 120 59
+ doTest ()V 118 59
  run ()V 28 44
 
 ---------
@@ -647,7 +647,7 @@ Signal Catcher
 Test911
  getAllStackTraces (I)[[Ljava/lang/Object; -1 -2
  printAll (I)V 0 75
- doTest ()V 125 61
+ doTest ()V 123 61
  run ()V 28 44
 
 ---------
