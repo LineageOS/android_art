@@ -166,6 +166,11 @@ class ClassLoaderContext {
                                                    bool verify_names = true,
                                                    bool verify_checksums = true) const;
 
+  // Checks if any of the given dex files is already loaded in the current class loader context.
+  // Returns the list of duplicate dex files (empty if there are no duplicates).
+  std::vector<const DexFile*> CheckForDuplicateDexFiles(
+      const std::vector<const DexFile*>& dex_files);
+
   // Creates the class loader context from the given string.
   // The format: ClassLoaderType1[ClasspathElem1:ClasspathElem2...];ClassLoaderType2[...]...
   // ClassLoaderType is either "PCL" (PathClassLoader) or "DLC" (DelegateLastClassLoader).
