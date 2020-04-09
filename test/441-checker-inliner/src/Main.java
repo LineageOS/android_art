@@ -136,7 +136,7 @@ public class Main {
   }
 
   /// CHECK-START: int Main.returnAbs(int) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>>      InvokeStaticOrDirect intrinsic:MathAbsInt
+  /// CHECK-DAG:     <<Result:i\d+>>      Abs
   /// CHECK-DAG:                          Return [<<Result>>]
 
   private static int returnAbs(int i) {

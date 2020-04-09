@@ -21,20 +21,11 @@
 ## CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
 ## CHECK-DAG:     <<One:i\d+>>     IntConstant 1
 ## CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
-## CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<Val>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-## CHECK-DAG:                      Return [<<Result>>]
-
-## CHECK-START: int Main2.rotateLeftBoolean(boolean, int) instruction_simplifier (after)
-## CHECK:         <<ArgVal:z\d+>>  ParameterValue
-## CHECK:         <<ArgDist:i\d+>> ParameterValue
-## CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
-## CHECK-DAG:     <<One:i\d+>>     IntConstant 1
-## CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
 ## CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
 ## CHECK-DAG:     <<Result:i\d+>>  Ror [<<Val>>,<<NegDist>>]
 ## CHECK-DAG:                      Return [<<Result>>]
 
-## CHECK-START: int Main2.rotateLeftBoolean(boolean, int) instruction_simplifier (after)
+## CHECK-START: int Main2.rotateLeftBoolean(boolean, int) builder (after)
 ## CHECK-NOT:                      InvokeStaticOrDirect
 
 ## CHECK-START: int Main2.rotateLeftBoolean(boolean, int) select_generator (after)
@@ -96,19 +87,10 @@
 ## CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
 ## CHECK-DAG:     <<One:i\d+>>     IntConstant 1
 ## CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
-## CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<Val>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-## CHECK-DAG:                      Return [<<Result>>]
-
-## CHECK-START: int Main2.rotateRightBoolean(boolean, int) instruction_simplifier (after)
-## CHECK:         <<ArgVal:z\d+>>  ParameterValue
-## CHECK:         <<ArgDist:i\d+>> ParameterValue
-## CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
-## CHECK-DAG:     <<One:i\d+>>     IntConstant 1
-## CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
 ## CHECK-DAG:     <<Result:i\d+>>  Ror [<<Val>>,<<ArgDist>>]
 ## CHECK-DAG:                      Return [<<Result>>]
 
-## CHECK-START: int Main2.rotateRightBoolean(boolean, int) instruction_simplifier (after)
+## CHECK-START: int Main2.rotateRightBoolean(boolean, int) builder (after)
 ## CHECK-NOT:                      InvokeStaticOrDirect
 
 ## CHECK-START: int Main2.rotateRightBoolean(boolean, int) select_generator (after)
