@@ -163,12 +163,13 @@ class Heap {
 
   // Client should call NotifyNativeAllocation every kNotifyNativeInterval allocations.
   // Should be chosen so that time_to_call_mallinfo / kNotifyNativeInterval is on the same order
-  // as object allocation time. time_to_call_mallinfo seems to be on the order of 1 usec.
+  // as object allocation time. time_to_call_mallinfo seems to be on the order of 1 usec
+  // on Android.
 #ifdef __ANDROID__
   static constexpr uint32_t kNotifyNativeInterval = 32;
 #else
   // Some host mallinfo() implementations are slow. And memory is less scarce.
-  static constexpr uint32_t kNotifyNativeInterval = 512;
+  static constexpr uint32_t kNotifyNativeInterval = 384;
 #endif
 
   // RegisterNativeAllocation checks immediately whether GC is needed if size exceeds the
