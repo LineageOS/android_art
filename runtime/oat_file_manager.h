@@ -147,6 +147,7 @@ class OatFileManager {
     kSkippedVerificationDisabled,
     kNoCollisions,
     kPerformedHasCollisions,
+    kClassLoaderContextMatches
   };
 
   std::vector<std::unique_ptr<const DexFile>> OpenDexFilesFromOat_Impl(

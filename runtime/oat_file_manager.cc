@@ -412,7 +412,7 @@ OatFileManager::CheckCollisionResult OatFileManager::CheckCollision(
       // Mismatched context, do the actual collision check.
       break;
     case ClassLoaderContext::VerificationResult::kVerifies:
-      return CheckCollisionResult::kNoCollisions;
+      return CheckCollisionResult::kClassLoaderContextMatches;
   }
 
   // The class loader context does not match. Perform a full duplicate classes check.
@@ -434,7 +434,8 @@ bool OatFileManager::ShouldLoadAppImage(CheckCollisionResult check_collision_res
   if (kEnableAppImage && (!runtime->IsJavaDebuggable() || source_oat_file->IsDebuggable())) {
     // If we verified the class loader context (skipping due to the special marker doesn't
     // count), then also avoid the collision check.
-    bool load_image = check_collision_result == CheckCollisionResult::kNoCollisions;
+    bool load_image = check_collision_result == CheckCollisionResult::kNoCollisions
+        || check_collision_result == CheckCollisionResult::kClassLoaderContextMatches;
     // If we skipped the collision check, we need to reverify to be sure its OK to load the
     // image.
     if (!load_image &&
@@ -655,6 +656,41 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
     Runtime::Current()->GetJit()->RegisterDexFiles(dex_files, class_loader);
   }
 
+  // Verify if any of the dex files being loaded is already in the class path.
+  // If so, report an error with the current stack trace.
+  // Most likely the developer didn't intend to do this because it will waste
+  // performance and memory.
+  // We perform the check only if the class loader context match failed or did
+  // not run (e.g. not that we do not run the check if we don't have an oat file).
+  if (context != nullptr
+          && check_collision_result != CheckCollisionResult::kClassLoaderContextMatches) {
+    std::vector<const DexFile*> already_exists_in_classpath =
+        context->CheckForDuplicateDexFiles(MakeNonOwningPointerVector(dex_files));
+    if (!already_exists_in_classpath.empty()) {
+      std::string duplicates = already_exists_in_classpath[0]->GetLocation();
+      for (size_t i = 1; i < already_exists_in_classpath.size(); i++) {
+        duplicates += "," + already_exists_in_classpath[i]->GetLocation();
+      }
+
+      std::ostringstream out;
+      out << "Trying to load dex files which is already loaded in the same ClassLoader hierarchy.\n"
+        << "This is a strong indication of bad ClassLoader construct which leads to poor "
+        << "performance and wastes memory.\n"
+        << "The list of duplicate dex files is: " << duplicates << "\n"
+        << "The current class loader context is: " << context->EncodeContextForOatFile("") << "\n"
+        << "Java stack trace:\n";
+
+      {
+        ScopedObjectAccess soa(self);
+        self->DumpJavaStack(out);
+      }
+
+      // We log this as an ERROR to stress the fact that this is most likely unintended.
+      // Note that ART cannot do anything about it. It is up to the app to fix their logic.
+      // Here we are trying to give a heads up on why the app might have performance issues.
+      LOG(ERROR) << out.str();
+    }
+  }
   return dex_files;
 }
 
