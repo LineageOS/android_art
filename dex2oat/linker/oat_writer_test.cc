@@ -147,18 +147,19 @@ class OatTest : public CommonCompilerDriverTest {
 
   bool WriteElf(File* vdex_file,
                 File* oat_file,
-                File&& zip_fd,
+                File&& dex_file_fd,
                 const char* location,
                 SafeMap<std::string, std::string>& key_value_store,
                 bool verify,
-                CopyOption copy) {
+                CopyOption copy,
+                ProfileCompilationInfo* profile_compilation_info = nullptr) {
     TimingLogger timings("WriteElf", false, false);
     ClearBootImageOption();
     OatWriter oat_writer(*compiler_options_,
                          &timings,
-                         /*profile_compilation_info*/nullptr,
+                         profile_compilation_info,
                          CompactDexLevel::kCompactDexLevelNone);
-    if (!oat_writer.AddZippedDexFilesSource(std::move(zip_fd), location)) {
+    if (!oat_writer.AddDexFileSource(std::move(dex_file_fd), location)) {
       return false;
     }
     return DoWriteElf(vdex_file, oat_file, oat_writer, key_value_store, verify, copy);
@@ -260,6 +261,56 @@ class OatTest : public CommonCompilerDriverTest {
       opened_dex_files_.emplace_back(dex_file.release());
     }
     return true;
+  }
+
+  void CheckOatWriteResult(ScratchFile& oat_file,
+                           ScratchFile& vdex_file,
+                           std::vector<std::unique_ptr<const DexFile>>& input_dexfiles,
+                           const unsigned int expected_oat_dexfile_count,
+                           bool low_4gb) {
+    ASSERT_EQ(expected_oat_dexfile_count, input_dexfiles.size());
+
+    std::string error_msg;
+    std::unique_ptr<OatFile> opened_oat_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                           oat_file.GetFilename(),
+                                                           oat_file.GetFilename(),
+                                                           /*executable=*/ false,
+                                                           low_4gb,
+                                                           &error_msg));
+    ASSERT_TRUE(opened_oat_file != nullptr) << error_msg;
+    ASSERT_EQ(expected_oat_dexfile_count, opened_oat_file->GetOatDexFiles().size());
+
+    if (low_4gb) {
+      uintptr_t begin = reinterpret_cast<uintptr_t>(opened_oat_file->Begin());
+      EXPECT_EQ(begin, static_cast<uint32_t>(begin));
+    }
+
+    for (uint32_t i = 0; i <  input_dexfiles.size(); i++) {
+      const std::unique_ptr<const DexFile>& dex_file_data = input_dexfiles[i];
+      std::unique_ptr<const DexFile> opened_dex_file =
+          opened_oat_file->GetOatDexFiles()[i]->OpenDexFile(&error_msg);
+
+      ASSERT_EQ(opened_oat_file->GetOatDexFiles()[i]->GetDexFileLocationChecksum(),
+                dex_file_data->GetHeader().checksum_);
+
+      ASSERT_EQ(dex_file_data->GetHeader().file_size_, opened_dex_file->GetHeader().file_size_);
+      ASSERT_EQ(0, memcmp(&dex_file_data->GetHeader(),
+                          &opened_dex_file->GetHeader(),
+                          dex_file_data->GetHeader().file_size_));
+      ASSERT_EQ(dex_file_data->GetLocation(), opened_dex_file->GetLocation());
+    }
+    const VdexFile::DexSectionHeader &vdex_header =
+        opened_oat_file->GetVdexFile()->GetDexSectionHeader();
+    if (!compiler_driver_->GetCompilerOptions().IsQuickeningCompilationEnabled()) {
+      // If quickening is enabled we will always write the table since there is no special logic
+      // that checks for all methods not being quickened (not worth the complexity).
+      ASSERT_EQ(vdex_header.GetQuickeningInfoSize(), 0u);
+    }
+
+    int64_t actual_vdex_size = vdex_file.GetFile()->GetLength();
+    ASSERT_GE(actual_vdex_size, 0);
+    ASSERT_EQ(dchecked_integral_cast<uint64_t>(actual_vdex_size),
+              opened_oat_file->GetVdexFile()->GetComputedFileSize());
   }
 
   void TestDexFileInput(bool verify, bool low_4gb, bool use_profile);
@@ -549,6 +600,8 @@ void OatTest::TestDexFileInput(bool verify, bool low_4gb, bool use_profile) {
   TimingLogger timings("OatTest::DexFileInput", false, false);
 
   std::vector<const char*> input_filenames;
+  std::vector<std::unique_ptr<const DexFile>> input_dexfiles;
+  std::vector<const ScratchFile*> scratch_files;
 
   ScratchFile dex_file1;
   TestDexFileBuilder builder1;
@@ -564,6 +617,8 @@ void OatTest::TestDexFileInput(bool verify, bool low_4gb, bool use_profile) {
   success = dex_file1.GetFile()->Flush() == 0;
   ASSERT_TRUE(success);
   input_filenames.push_back(dex_file1.GetFilename().c_str());
+  input_dexfiles.push_back(std::move(dex_file1_data));
+  scratch_files.push_back(&dex_file1);
 
   ScratchFile dex_file2;
   TestDexFileBuilder builder2;
@@ -579,73 +634,75 @@ void OatTest::TestDexFileInput(bool verify, bool low_4gb, bool use_profile) {
   success = dex_file2.GetFile()->Flush() == 0;
   ASSERT_TRUE(success);
   input_filenames.push_back(dex_file2.GetFilename().c_str());
+  input_dexfiles.push_back(std::move(dex_file2_data));
+  scratch_files.push_back(&dex_file2);
 
-  ScratchFile tmp_base, tmp_oat(tmp_base, ".oat"), tmp_vdex(tmp_base, ".vdex");
   SafeMap<std::string, std::string> key_value_store;
-  std::unique_ptr<ProfileCompilationInfo>
-      profile_compilation_info(use_profile ? new ProfileCompilationInfo() : nullptr);
-  success = WriteElf(tmp_vdex.GetFile(),
-                     tmp_oat.GetFile(),
-                     input_filenames,
-                     key_value_store,
-                     verify,
-                     CopyOption::kOnlyIfCompressed,
-                     profile_compilation_info.get());
+  {
+    // Test using the AddDexFileSource() interface with the dex files.
+    ScratchFile tmp_base, tmp_oat(tmp_base, ".oat"), tmp_vdex(tmp_base, ".vdex");
+    std::unique_ptr<ProfileCompilationInfo>
+        profile_compilation_info(use_profile ? new ProfileCompilationInfo() : nullptr);
+    success = WriteElf(tmp_vdex.GetFile(),
+                       tmp_oat.GetFile(),
+                       input_filenames,
+                       key_value_store,
+                       verify,
+                       CopyOption::kOnlyIfCompressed,
+                       profile_compilation_info.get());
 
-  // In verify mode, we expect failure.
-  if (verify) {
-    ASSERT_FALSE(success);
-    return;
+    // In verify mode, we expect failure.
+    if (verify) {
+      ASSERT_FALSE(success);
+      return;
+    }
+
+    ASSERT_TRUE(success);
+
+    CheckOatWriteResult(tmp_oat,
+                        tmp_vdex,
+                        input_dexfiles,
+                        /* oat_dexfile_count */ 2,
+                        low_4gb);
   }
 
-  ASSERT_TRUE(success);
+  {
+    // Test using the AddDexFileSource() interface with the dexfile1's fd.
+    // Only need one input dexfile.
+    std::vector<std::unique_ptr<const DexFile>> input_dexfiles2;
+    input_dexfiles2.push_back(std::move(input_dexfiles[0]));
+    const ScratchFile* dex_file = scratch_files[0];
+    File dex_file_fd(DupCloexec(dex_file->GetFd()), /*check_usage=*/ false);
 
-  std::string error_msg;
-  std::unique_ptr<OatFile> opened_oat_file(OatFile::Open(/*zip_fd=*/ -1,
-                                                         tmp_oat.GetFilename(),
-                                                         tmp_oat.GetFilename(),
-                                                         /*executable=*/ false,
-                                                         low_4gb,
-                                                         &error_msg));
-  ASSERT_TRUE(opened_oat_file != nullptr) << error_msg;
-  if (low_4gb) {
-    uintptr_t begin = reinterpret_cast<uintptr_t>(opened_oat_file->Begin());
-    EXPECT_EQ(begin, static_cast<uint32_t>(begin));
+    ASSERT_NE(-1, dex_file_fd.Fd());
+    ASSERT_EQ(0, lseek(dex_file_fd.Fd(), 0, SEEK_SET));
+
+    ScratchFile tmp_base, tmp_oat(tmp_base, ".oat"), tmp_vdex(tmp_base, ".vdex");
+    std::unique_ptr<ProfileCompilationInfo>
+        profile_compilation_info(use_profile ? new ProfileCompilationInfo() : nullptr);
+    success = WriteElf(tmp_vdex.GetFile(),
+                       tmp_oat.GetFile(),
+                       std::move(dex_file_fd),
+                       dex_file->GetFilename().c_str(),
+                       key_value_store,
+                       verify,
+                       CopyOption::kOnlyIfCompressed,
+                       profile_compilation_info.get());
+
+    // In verify mode, we expect failure.
+    if (verify) {
+      ASSERT_FALSE(success);
+      return;
+    }
+
+    ASSERT_TRUE(success);
+
+    CheckOatWriteResult(tmp_oat,
+                        tmp_vdex,
+                        input_dexfiles2,
+                        /* oat_dexfile_count */ 1,
+                        low_4gb);
   }
-  ASSERT_EQ(2u, opened_oat_file->GetOatDexFiles().size());
-  std::unique_ptr<const DexFile> opened_dex_file1 =
-      opened_oat_file->GetOatDexFiles()[0]->OpenDexFile(&error_msg);
-  std::unique_ptr<const DexFile> opened_dex_file2 =
-      opened_oat_file->GetOatDexFiles()[1]->OpenDexFile(&error_msg);
-
-  ASSERT_EQ(opened_oat_file->GetOatDexFiles()[0]->GetDexFileLocationChecksum(),
-            dex_file1_data->GetHeader().checksum_);
-  ASSERT_EQ(opened_oat_file->GetOatDexFiles()[1]->GetDexFileLocationChecksum(),
-            dex_file2_data->GetHeader().checksum_);
-
-  ASSERT_EQ(dex_file1_data->GetHeader().file_size_, opened_dex_file1->GetHeader().file_size_);
-  ASSERT_EQ(0, memcmp(&dex_file1_data->GetHeader(),
-                      &opened_dex_file1->GetHeader(),
-                      dex_file1_data->GetHeader().file_size_));
-  ASSERT_EQ(dex_file1_data->GetLocation(), opened_dex_file1->GetLocation());
-
-  ASSERT_EQ(dex_file2_data->GetHeader().file_size_, opened_dex_file2->GetHeader().file_size_);
-  ASSERT_EQ(0, memcmp(&dex_file2_data->GetHeader(),
-                      &opened_dex_file2->GetHeader(),
-                      dex_file2_data->GetHeader().file_size_));
-  ASSERT_EQ(dex_file2_data->GetLocation(), opened_dex_file2->GetLocation());
-
-  const VdexFile::DexSectionHeader &vdex_header =
-      opened_oat_file->GetVdexFile()->GetDexSectionHeader();
-  if (!compiler_driver_->GetCompilerOptions().IsQuickeningCompilationEnabled()) {
-    // If quickening is enabled we will always write the table since there is no special logic that
-    // checks for all methods not being quickened (not worth the complexity).
-    ASSERT_EQ(vdex_header.GetQuickeningInfoSize(), 0u);
-  }
-
-  int64_t actual_vdex_size = tmp_vdex.GetFile()->GetLength();
-  ASSERT_GE(actual_vdex_size, 0);
-  ASSERT_EQ((uint64_t) actual_vdex_size, opened_oat_file->GetVdexFile()->GetComputedFileSize());
 }
 
 TEST_F(OatTest, DexFileInputCheckOutput) {
@@ -759,9 +816,10 @@ void OatTest::TestZipFileInput(bool verify, CopyOption copy) {
   }
 
   {
-    // Test using the AddZipDexFileSource() interface with the zip file handle.
+    // Test using the AddDexFileSource() interface with the zip file handle.
     File zip_fd(DupCloexec(zip_file.GetFd()), /*check_usage=*/ false);
     ASSERT_NE(-1, zip_fd.Fd());
+    ASSERT_EQ(0, lseek(zip_fd.Fd(), 0, SEEK_SET));
 
     ScratchFile tmp_base, tmp_oat(tmp_base, ".oat"), tmp_vdex(tmp_base, ".vdex");
     success = WriteElf(tmp_vdex.GetFile(),
