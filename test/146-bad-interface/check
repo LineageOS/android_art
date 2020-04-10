@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2015 The Android Open Source Project
+# Copyright (C) 2020 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Finalizers of DexFile will complain not being able to close
-# the main dex file, as it's still open. That's OK to ignore.
-# Oat file manager will also complain about duplicate dex files. Ignore.
-sed -e '/^E\/System/d' "$2" | sed -e '/.*oat_file_manager.*/d' > "$2.tmp"
+# Oat file manager will complain about duplicate dex files. Ignore.
+sed -e '/.*oat_file_manager.*/d' "$2" > "$2.tmp"
 
 diff --strip-trailing-cr -q "$1" "$2.tmp" >/dev/null

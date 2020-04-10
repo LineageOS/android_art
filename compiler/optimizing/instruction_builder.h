@@ -230,7 +230,7 @@ class HInstructionBuilder : public ValueObject {
   Handle<mirror::Class> ResolveClass(ScopedObjectAccess& soa, dex::TypeIndex type_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool LoadClassNeedsAccessCheck(Handle<mirror::Class> klass)
+  bool LoadClassNeedsAccessCheck(ObjPtr<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Builds a `HLoadMethodHandle` loading the given `method_handle_index`.
@@ -263,8 +263,7 @@ class HInstructionBuilder : public ValueObject {
   HClinitCheck* ProcessClinitCheckForInvoke(
       uint32_t dex_pc,
       ArtMethod* method,
-      HInvokeStaticOrDirect::ClinitCheckRequirement* clinit_check_requirement)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+      HInvokeStaticOrDirect::ClinitCheckRequirement* clinit_check_requirement);
 
   // Build a HNewInstance instruction.
   HNewInstance* BuildNewInstance(dex::TypeIndex type_index, uint32_t dex_pc);
@@ -274,12 +273,8 @@ class HInstructionBuilder : public ValueObject {
   void BuildConstructorFenceForAllocation(HInstruction* allocation);
 
   // Return whether the compiler can assume `cls` is initialized.
-  bool IsInitialized(Handle<mirror::Class> cls) const
+  bool IsInitialized(ObjPtr<mirror::Class> cls) const
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Try to resolve a method using the class linker. Return null if a method could
-  // not be resolved.
-  ArtMethod* ResolveMethod(uint16_t method_idx, InvokeType invoke_type);
 
   // Try to resolve a field using the class linker. Return null if it could not
   // be found.
