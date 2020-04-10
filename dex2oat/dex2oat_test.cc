@@ -34,6 +34,7 @@
 #include "base/mutex-inl.h"
 #include "base/string_view_cpp20.h"
 #include "base/utils.h"
+#include "base/zip_archive.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/base64_test_util.h"
 #include "dex/bytecode_utils.h"
@@ -2249,6 +2250,40 @@ TEST_F(Dex2oatTest, AppImageEmptyDex) {
   ASSERT_TRUE(odex_file != nullptr);
 }
 
+TEST_F(Dex2oatTest, DexFileFd) {
+  std::string error_msg;
+  std::string zip_location = GetTestDexFileName("Main");
+  std::unique_ptr<File> zip_file(OS::OpenFileForReading(zip_location.c_str()));
+  ASSERT_NE(-1, zip_file->Fd());
+
+  std::unique_ptr<ZipArchive> zip_archive(
+      ZipArchive::OpenFromFd(zip_file->Release(), zip_location.c_str(), &error_msg));
+  ASSERT_TRUE(zip_archive != nullptr);
+
+  std::string entry_name = DexFileLoader::GetMultiDexClassesDexName(0);
+  std::unique_ptr<ZipEntry> entry(zip_archive->Find(entry_name.c_str(), &error_msg));
+  ASSERT_TRUE(entry != nullptr);
+
+  ScratchFile dex_file;
+  const std::string& dex_location = dex_file.GetFilename();
+  const std::string base_oat_name = GetScratchDir() + "/base.oat";
+
+  bool success = entry->ExtractToFile(*(dex_file.GetFile()), &error_msg);
+  ASSERT_TRUE(success);
+  ASSERT_EQ(0, lseek(dex_file.GetFd(), 0, SEEK_SET));
+
+  std::vector<std::string> extra_args{
+      StringPrintf("--zip-fd=%d", dex_file.GetFd()),
+      "--zip-location=" + dex_location,
+  };
+  ASSERT_TRUE(GenerateOdexForTest(dex_location,
+                                  base_oat_name,
+                                  CompilerFilter::Filter::kQuicken,
+                                  extra_args,
+                                  /*expect_success=*/ true,
+                                  /*use_fd=*/ false,
+                                  /*use_zip_fd=*/ true));
+}
 
 TEST_F(Dex2oatTest, AppImageResolveStrings) {
   using Hotness = ProfileCompilationInfo::MethodHotness;

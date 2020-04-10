@@ -504,21 +504,38 @@ bool OatWriter::AddDexFileSource(const char* filename,
                                  const char* location,
                                  CreateTypeLookupTable create_type_lookup_table) {
   DCHECK(write_state_ == WriteState::kAddingDexFileSources);
-  uint32_t magic;
-  std::string error_msg;
-  File fd = OpenAndReadMagic(filename, &magic, &error_msg);
+  File fd(filename, O_RDONLY, /* check_usage= */ false);
   if (fd.Fd() == -1) {
-    PLOG(ERROR) << "Failed to read magic number from dex file: '" << filename << "'";
+    PLOG(ERROR) << "Failed to open dex file: '" << filename << "'";
     return false;
-  } else if (DexFileLoader::IsMagicValid(magic)) {
+  }
+
+  return AddDexFileSource(std::move(fd), location, create_type_lookup_table);
+}
+
+// Add dex file source(s) from a file specified by a file handle.
+// Note: The `dex_file_fd` specifies a plain dex file or a zip file.
+bool OatWriter::AddDexFileSource(File&& dex_file_fd,
+                                 const char* location,
+                                 CreateTypeLookupTable create_type_lookup_table) {
+  DCHECK(write_state_ == WriteState::kAddingDexFileSources);
+  std::string error_msg;
+  uint32_t magic;
+  if (!ReadMagicAndReset(dex_file_fd.Fd(), &magic, &error_msg)) {
+    LOG(ERROR) << "Failed to read magic number from dex file '" << location << "': " << error_msg;
+    return false;
+  }
+  if (DexFileLoader::IsMagicValid(magic)) {
     uint8_t raw_header[sizeof(DexFile::Header)];
-    const UnalignedDexFileHeader* header = GetDexFileHeader(&fd, raw_header, location);
+    const UnalignedDexFileHeader* header = GetDexFileHeader(&dex_file_fd, raw_header, location);
     if (header == nullptr) {
+      LOG(ERROR) << "Failed to get DexFileHeader from file descriptor for '"
+          << location << "': " << error_msg;
       return false;
     }
     // The file is open for reading, not writing, so it's OK to let the File destructor
     // close it without checking for explicit Close(), so pass checkUsage = false.
-    raw_dex_files_.emplace_back(new File(fd.Release(), location, /* checkUsage */ false));
+    raw_dex_files_.emplace_back(new File(dex_file_fd.Release(), location, /* checkUsage */ false));
     oat_dex_files_.emplace_back(/* OatDexFile */
         location,
         DexFileSource(raw_dex_files_.back().get()),
@@ -526,48 +543,36 @@ bool OatWriter::AddDexFileSource(const char* filename,
         header->checksum_,
         header->file_size_);
   } else if (IsZipMagic(magic)) {
-    if (!AddZippedDexFilesSource(std::move(fd), location, create_type_lookup_table)) {
+    zip_archives_.emplace_back(ZipArchive::OpenFromFd(dex_file_fd.Release(), location, &error_msg));
+    ZipArchive* zip_archive = zip_archives_.back().get();
+    if (zip_archive == nullptr) {
+      LOG(ERROR) << "Failed to open zip from file descriptor for '" << location << "': "
+          << error_msg;
+      return false;
+    }
+    for (size_t i = 0; ; ++i) {
+      std::string entry_name = DexFileLoader::GetMultiDexClassesDexName(i);
+      std::unique_ptr<ZipEntry> entry(zip_archive->Find(entry_name.c_str(), &error_msg));
+      if (entry == nullptr) {
+        break;
+      }
+      zipped_dex_files_.push_back(std::move(entry));
+      zipped_dex_file_locations_.push_back(DexFileLoader::GetMultiDexLocation(i, location));
+      const char* full_location = zipped_dex_file_locations_.back().c_str();
+      // We override the checksum from header with the CRC from ZIP entry.
+      oat_dex_files_.emplace_back(/* OatDexFile */
+          full_location,
+          DexFileSource(zipped_dex_files_.back().get()),
+          create_type_lookup_table,
+          zipped_dex_files_.back()->GetCrc32(),
+          zipped_dex_files_.back()->GetUncompressedLength());
+    }
+    if (zipped_dex_file_locations_.empty()) {
+      LOG(ERROR) << "No dex files in zip file '" << location << "': " << error_msg;
       return false;
     }
   } else {
-    LOG(ERROR) << "Expected valid zip or dex file: '" << filename << "'";
-    return false;
-  }
-  return true;
-}
-
-// Add dex file source(s) from a zip file specified by a file handle.
-bool OatWriter::AddZippedDexFilesSource(File&& zip_fd,
-                                        const char* location,
-                                        CreateTypeLookupTable create_type_lookup_table) {
-  DCHECK(write_state_ == WriteState::kAddingDexFileSources);
-  std::string error_msg;
-  zip_archives_.emplace_back(ZipArchive::OpenFromFd(zip_fd.Release(), location, &error_msg));
-  ZipArchive* zip_archive = zip_archives_.back().get();
-  if (zip_archive == nullptr) {
-    LOG(ERROR) << "Failed to open zip from file descriptor for '" << location << "': "
-        << error_msg;
-    return false;
-  }
-  for (size_t i = 0; ; ++i) {
-    std::string entry_name = DexFileLoader::GetMultiDexClassesDexName(i);
-    std::unique_ptr<ZipEntry> entry(zip_archive->Find(entry_name.c_str(), &error_msg));
-    if (entry == nullptr) {
-      break;
-    }
-    zipped_dex_files_.push_back(std::move(entry));
-    zipped_dex_file_locations_.push_back(DexFileLoader::GetMultiDexLocation(i, location));
-    const char* full_location = zipped_dex_file_locations_.back().c_str();
-    // We override the checksum from header with the CRC from ZIP entry.
-    oat_dex_files_.emplace_back(/* OatDexFile */
-        full_location,
-        DexFileSource(zipped_dex_files_.back().get()),
-        create_type_lookup_table,
-        zipped_dex_files_.back()->GetCrc32(),
-        zipped_dex_files_.back()->GetUncompressedLength());
-  }
-  if (zipped_dex_file_locations_.empty()) {
-    LOG(ERROR) << "No dex files in zip file '" << location << "': " << error_msg;
+    LOG(ERROR) << "Expected valid zip or dex file: '" << location << "'";
     return false;
   }
   return true;
