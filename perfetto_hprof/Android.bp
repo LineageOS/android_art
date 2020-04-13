@@ -52,9 +52,6 @@ cc_defaults {
     static_libs: [
         "libperfetto_client_experimental",
         "perfetto_trace_protos",
-        // TODO(132880619): Remove this as soon as the Perfetto client API no
-        // longer depends on this.
-        "libprotobuf-cpp-lite",
     ],
     generated_sources: [
         "perfetto_protos_perfetto_config_profiling_zero_gen",
