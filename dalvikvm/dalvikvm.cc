@@ -214,5 +214,7 @@ extern "C" const char *__asan_default_options() {
 }
 
 int main(int argc, char** argv) {
-  return art::dalvikvm(argc, argv);
+  // Do not allow static destructors to be called, since it's conceivable that
+  // daemons may still awaken (literally).
+  _exit(art::dalvikvm(argc, argv));
 }
