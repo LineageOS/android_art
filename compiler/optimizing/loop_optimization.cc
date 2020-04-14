@@ -305,7 +305,8 @@ static bool IsAddConst2(HGraph* graph,
                         /*out*/ HInstruction** a,
                         /*out*/ HInstruction** b,
                         /*out*/ int64_t* c) {
-  if (IsAddConst(instruction, a, b, c) && *a != nullptr) {
+  // We want an actual add/sub and not the trivial case where {b: 0, c: 0}.
+  if (IsAddOrSub(instruction) && IsAddConst(instruction, a, b, c) && *a != nullptr) {
     if (*b == nullptr) {
       // Constant is usually already present, unless accumulated.
       *b = graph->GetConstant(instruction->GetType(), (*c));

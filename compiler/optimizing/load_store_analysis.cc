@@ -30,10 +30,6 @@ static bool CanIntegerRangesOverlap(int64_t l1, int64_t h1, int64_t l2, int64_t 
   return std::max(l1, l2) <= std::min(h1, h2);
 }
 
-static bool IsAddOrSub(const HInstruction* instruction) {
-  return instruction->IsAdd() || instruction->IsSub();
-}
-
 static bool CanBinaryOpAndIndexAlias(const HBinaryOperation* idx1,
                                      const size_t vector_length1,
                                      const HInstruction* idx2,
