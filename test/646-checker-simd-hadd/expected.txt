@@ -4,3 +4,4 @@ HaddAltChar passed
 HaddByte passed
 HaddShort passed
 HaddChar passed
+HaddOther passed
