@@ -80,9 +80,9 @@ OatHeader::OatHeader(InstructionSet instruction_set,
       quick_to_interpreter_bridge_offset_(0) {
   // Don't want asserts in header as they would be checked in each file that includes it. But the
   // fields are private, so we check inside a method.
-  static_assert(sizeof(magic_) == sizeof(kOatMagic),
+  static_assert(decltype(magic_)().size() == kOatMagic.size(),
                 "Oat magic and magic_ have different lengths.");
-  static_assert(sizeof(version_) == sizeof(kOatVersion),
+  static_assert(decltype(version_)().size() == kOatVersion.size(),
                 "Oat version and version_ have different lengths.");
 
   magic_ = kOatMagic;
@@ -112,13 +112,13 @@ bool OatHeader::IsValid() const {
 
 std::string OatHeader::GetValidationErrorMessage() const {
   if (magic_ != kOatMagic) {
-    static_assert(sizeof(kOatMagic) == 4, "kOatMagic has unexpected length");
+    static_assert(kOatMagic.size() == 4, "kOatMagic has unexpected length");
     return StringPrintf("Invalid oat magic, expected 0x%02x%02x%02x%02x, got 0x%02x%02x%02x%02x.",
                         kOatMagic[0], kOatMagic[1], kOatMagic[2], kOatMagic[3],
                         magic_[0], magic_[1], magic_[2], magic_[3]);
   }
   if (version_ != kOatVersion) {
-    static_assert(sizeof(kOatVersion) == 4, "kOatVersion has unexpected length");
+    static_assert(kOatVersion.size() == 4, "kOatVersion has unexpected length");
     return StringPrintf("Invalid oat version, expected 0x%02x%02x%02x%02x, got 0x%02x%02x%02x%02x.",
                         kOatVersion[0], kOatVersion[1], kOatVersion[2], kOatVersion[3],
                         version_[0], version_[1], version_[2], version_[3]);
