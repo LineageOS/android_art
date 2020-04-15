@@ -226,7 +226,7 @@ static std::string InitDefaultPublicLibraries(bool for_preload) {
 }
 
 static std::string InitArtPublicLibraries() {
-  CHECK_GT((int)sizeof(kArtApexPublicLibraries), 0);
+  CHECK_GT((int)kArtApexPublicLibraries.size(), 0);
   std::string list = android::base::Join(kArtApexPublicLibraries, ":");
 
   std::string additional_libs = additional_public_libraries();
