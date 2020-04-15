@@ -870,6 +870,54 @@ class JitDoneCompilingProfileTask final : public SelfDeletingTask {
   DISALLOW_COPY_AND_ASSIGN(JitDoneCompilingProfileTask);
 };
 
+/**
+ * A JIT task to run Java verification of boot classpath classes that were not
+ * verified at compile-time.
+ */
+class ZygoteVerificationTask final : public Task {
+ public:
+  ZygoteVerificationTask() {}
+
+  void Run(Thread* self) override {
+    Runtime* runtime = Runtime::Current();
+    ClassLinker* linker = runtime->GetClassLinker();
+    const std::vector<const DexFile*>& boot_class_path =
+        runtime->GetClassLinker()->GetBootClassPath();
+    ScopedObjectAccess soa(self);
+    StackHandleScope<1> hs(self);
+    MutableHandle<mirror::Class> klass = hs.NewHandle<mirror::Class>(nullptr);
+    uint64_t start_ns = ThreadCpuNanoTime();
+    uint64_t number_of_classes = 0;
+    for (const DexFile* dex_file : boot_class_path) {
+      if (dex_file->GetOatDexFile() != nullptr &&
+          dex_file->GetOatDexFile()->GetOatFile() != nullptr) {
+        // If backed by an .oat file, we have already run verification at
+        // compile-time. Note that some classes may still have failed
+        // verification there if they reference updatable mainline module
+        // classes.
+        continue;
+      }
+      for (uint32_t i = 0; i < dex_file->NumClassDefs(); ++i) {
+        const dex::ClassDef& class_def = dex_file->GetClassDef(i);
+        const char* descriptor = dex_file->GetClassDescriptor(class_def);
+        ScopedNullHandle<mirror::ClassLoader> null_loader;
+        klass.Assign(linker->FindClass(self, descriptor, null_loader));
+        if (klass == nullptr) {
+          self->ClearException();
+          LOG(WARNING) << "Could not find " << descriptor;
+          continue;
+        }
+        ++number_of_classes;
+        linker->VerifyClass(self, klass);
+      }
+    }
+    LOG(INFO) << "Verified "
+              << number_of_classes
+              << " classes from mainline modules in "
+              << PrettyDuration(ThreadCpuNanoTime() - start_ns);
+  }
+};
+
 class ZygoteTask final : public Task {
  public:
   ZygoteTask() {}
@@ -1146,6 +1194,23 @@ void Jit::CreateThreadPool() {
   Start();
 
   Runtime* runtime = Runtime::Current();
+  if (runtime->IsZygote()) {
+    // To speed up class lookups, generate a type lookup table for
+    // dex files not backed by oat file.
+    for (const DexFile* dex_file : runtime->GetClassLinker()->GetBootClassPath()) {
+      if (dex_file->GetOatDexFile() == nullptr) {
+        TypeLookupTable type_lookup_table = TypeLookupTable::Create(*dex_file);
+        type_lookup_tables_.push_back(
+            std::make_unique<art::OatDexFile>(std::move(type_lookup_table)));
+        dex_file->SetOatDexFile(type_lookup_tables_.back().get());
+      }
+    }
+
+    // Add a task that will verify boot classpath jars that were not
+    // pre-compiled.
+    thread_pool_->AddTask(Thread::Current(), new ZygoteVerificationTask());
+  }
+
   if (runtime->IsZygote() && HasImageWithProfile() && UseJitCompilation()) {
     // If we have an image with a profile, request a JIT task to
     // compile all methods in that profile.
@@ -1358,14 +1423,6 @@ uint32_t Jit::CompileMethodsFromProfile(
     if (LocationIsOnArtModule(dex_file->GetLocation().c_str())) {
       // The ART module jars are already preopted.
       continue;
-    }
-    // To speed up class lookups, generate a type lookup table for
-    // the dex file.
-    if (dex_file->GetOatDexFile() == nullptr) {
-      TypeLookupTable type_lookup_table = TypeLookupTable::Create(*dex_file);
-      type_lookup_tables_.push_back(
-            std::make_unique<art::OatDexFile>(std::move(type_lookup_table)));
-      dex_file->SetOatDexFile(type_lookup_tables_.back().get());
     }
 
     std::set<dex::TypeIndex> class_types;
