@@ -193,6 +193,13 @@ public class Test2005 {
   }
 
   public static void doTest() throws Exception {
+    // Force the Transform class to be initialized. We are suspending the remote
+    // threads so if one of them is in the class initialization (and therefore
+    // has a monitor lock on the class object) the redefinition will deadlock
+    // waiting for the clinit to finish and the monitor to be released.
+    if (null == Class.forName("art.Test2005$Transform")) {
+      throw new Error("No class!");
+    }
     MyThread[] threads = startThreads(NUM_THREADS);
 
     doRedefinition();
