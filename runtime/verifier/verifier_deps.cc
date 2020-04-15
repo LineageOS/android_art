@@ -45,9 +45,6 @@ VerifierDeps::VerifierDeps(const std::vector<const DexFile*>& dex_files, bool ou
   }
 }
 
-VerifierDeps::VerifierDeps(const std::vector<const DexFile*>& dex_files)
-    : VerifierDeps(dex_files, /*output_only=*/ true) {}
-
 // Perform logical OR on two bit vectors and assign back to LHS, i.e. `to_update |= other`.
 // Size of the two vectors must be equal.
 // Size of `other` must be equal to size of `to_update`.
@@ -581,11 +578,6 @@ void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
 
 namespace {
 
-static inline uint32_t DecodeUint32WithOverflowCheck(const uint8_t** in, const uint8_t* end) {
-  CHECK_LT(*in, end);
-  return DecodeUnsignedLeb128(in);
-}
-
 template<typename T> inline uint32_t Encode(T in);
 
 template<> inline uint32_t Encode<uint16_t>(uint16_t in) {
@@ -623,10 +615,14 @@ static inline void EncodeTuple(std::vector<uint8_t>* out, const std::tuple<T1, T
 }
 
 template<typename T1, typename T2>
-static inline void DecodeTuple(const uint8_t** in, const uint8_t* end, std::tuple<T1, T2>* t) {
-  T1 v1 = Decode<T1>(DecodeUint32WithOverflowCheck(in, end));
-  T2 v2 = Decode<T2>(DecodeUint32WithOverflowCheck(in, end));
-  *t = std::make_tuple(v1, v2);
+static inline bool DecodeTuple(const uint8_t** in, const uint8_t* end, std::tuple<T1, T2>* t) {
+  uint32_t v1, v2;
+  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &v1)) ||
+      UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &v2))) {
+    return false;
+  }
+  *t = std::make_tuple(Decode<T1>(v1), Decode<T2>(v2));
+  return true;
 }
 
 template<typename T1, typename T2, typename T3>
@@ -637,11 +633,15 @@ static inline void EncodeTuple(std::vector<uint8_t>* out, const std::tuple<T1, T
 }
 
 template<typename T1, typename T2, typename T3>
-static inline void DecodeTuple(const uint8_t** in, const uint8_t* end, std::tuple<T1, T2, T3>* t) {
-  T1 v1 = Decode<T1>(DecodeUint32WithOverflowCheck(in, end));
-  T2 v2 = Decode<T2>(DecodeUint32WithOverflowCheck(in, end));
-  T3 v3 = Decode<T3>(DecodeUint32WithOverflowCheck(in, end));
-  *t = std::make_tuple(v1, v2, v3);
+static inline bool DecodeTuple(const uint8_t** in, const uint8_t* end, std::tuple<T1, T2, T3>* t) {
+  uint32_t v1, v2, v3;
+  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &v1)) ||
+      UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &v2)) ||
+      UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &v3))) {
+    return false;
+  }
+  *t = std::make_tuple(Decode<T1>(v1), Decode<T2>(v2), Decode<T3>(v3));
+  return true;
 }
 
 template<typename T>
@@ -652,15 +652,23 @@ static inline void EncodeSet(std::vector<uint8_t>* out, const std::set<T>& set) 
   }
 }
 
-template<typename T>
-static inline void DecodeSet(const uint8_t** in, const uint8_t* end, std::set<T>* set) {
+template<bool kFillSet, typename T>
+static inline bool DecodeSet(const uint8_t** in, const uint8_t* end, std::set<T>* set) {
   DCHECK(set->empty());
-  size_t num_entries = DecodeUint32WithOverflowCheck(in, end);
-  for (size_t i = 0; i < num_entries; ++i) {
-    T tuple;
-    DecodeTuple(in, end, &tuple);
-    set->emplace(tuple);
+  uint32_t num_entries;
+  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_entries))) {
+    return false;
   }
+  for (uint32_t i = 0; i < num_entries; ++i) {
+    T tuple;
+    if (UNLIKELY(!DecodeTuple(in, end, &tuple))) {
+      return false;
+    }
+    if (kFillSet) {
+      set->emplace(tuple);
+    }
+  }
+  return true;
 }
 
 static inline void EncodeUint16SparseBitVector(std::vector<uint8_t>* out,
@@ -675,18 +683,31 @@ static inline void EncodeUint16SparseBitVector(std::vector<uint8_t>* out,
   }
 }
 
-static inline void DecodeUint16SparseBitVector(const uint8_t** in,
+template<bool kFillVector>
+static inline bool DecodeUint16SparseBitVector(const uint8_t** in,
                                                const uint8_t* end,
-                                               std::vector<bool>* vector,
-                                               bool sparse_value) {
-  DCHECK(IsUint<16>(vector->size()));
-  std::fill(vector->begin(), vector->end(), !sparse_value);
-  size_t num_entries = DecodeUint32WithOverflowCheck(in, end);
-  for (size_t i = 0; i < num_entries; ++i) {
-    uint16_t idx = Decode<uint16_t>(DecodeUint32WithOverflowCheck(in, end));
-    DCHECK_LT(idx, vector->size());
-    (*vector)[idx] = sparse_value;
+                                               size_t num_class_defs,
+                                               bool sparse_value,
+                                               /*out*/std::vector<bool>* vector) {
+  if (kFillVector) {
+    DCHECK_EQ(vector->size(), num_class_defs);
+    DCHECK(IsUint<16>(vector->size()));
+    std::fill(vector->begin(), vector->end(), !sparse_value);
   }
+  uint32_t num_entries;
+  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_entries))) {
+    return false;
+  }
+  for (uint32_t i = 0; i < num_entries; ++i) {
+    uint32_t idx;
+    if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &idx)) || idx >= vector->size()) {
+      return false;
+    }
+    if (kFillVector) {
+      (*vector)[idx] = sparse_value;
+    }
+  }
+  return true;
 }
 
 static inline void EncodeStringVector(std::vector<uint8_t>* out,
@@ -700,18 +721,31 @@ static inline void EncodeStringVector(std::vector<uint8_t>* out,
   }
 }
 
-static inline void DecodeStringVector(const uint8_t** in,
+template<bool kFillVector>
+static inline bool DecodeStringVector(const uint8_t** in,
                                       const uint8_t* end,
                                       std::vector<std::string>* strings) {
   DCHECK(strings->empty());
-  size_t num_strings = DecodeUint32WithOverflowCheck(in, end);
-  strings->reserve(num_strings);
-  for (size_t i = 0; i < num_strings; ++i) {
-    CHECK_LT(*in, end);
-    const char* string_start = reinterpret_cast<const char*>(*in);
-    strings->emplace_back(std::string(string_start));
-    *in += strings->back().length() + 1;
+  uint32_t num_strings;
+  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_strings))) {
+    return false;
   }
+  if (kFillVector) {
+    strings->reserve(num_strings);
+  }
+  for (uint32_t i = 0; i < num_strings; ++i) {
+    const char* string_start = reinterpret_cast<const char*>(*in);
+    const char* string_end = reinterpret_cast<const char*>(memchr(string_start, 0, end - *in));
+    if (UNLIKELY(string_end == nullptr)) {
+      return false;
+    }
+    size_t string_length = string_end - string_start;
+    if (kFillVector) {
+      strings->emplace_back(string_start, string_length);
+    }
+    *in += string_length + 1;
+  }
+  return true;
 }
 
 static inline std::string ToHex(uint32_t value) {
@@ -737,60 +771,79 @@ void VerifierDeps::Encode(const std::vector<const DexFile*>& dex_files,
   }
 }
 
-void VerifierDeps::DecodeDexFileDeps(DexFileDeps& deps,
+template <bool kOnlyVerifiedClasses>
+bool VerifierDeps::DecodeDexFileDeps(DexFileDeps& deps,
                                      const uint8_t** data_start,
-                                     const uint8_t* data_end) {
-  DecodeStringVector(data_start, data_end, &deps.strings_);
-  DecodeSet(data_start, data_end, &deps.assignable_types_);
-  DecodeSet(data_start, data_end, &deps.unassignable_types_);
-  DecodeSet(data_start, data_end, &deps.classes_);
-  DecodeSet(data_start, data_end, &deps.fields_);
-  DecodeSet(data_start, data_end, &deps.methods_);
-  DecodeUint16SparseBitVector(data_start,
-                              data_end,
-                              &deps.verified_classes_,
-                              /* sparse_value= */ false);
-  DecodeUint16SparseBitVector(data_start,
-                              data_end,
-                              &deps.redefined_classes_,
-                              /* sparse_value= */ true);
+                                     const uint8_t* data_end,
+                                     size_t num_class_defs) {
+  return
+      DecodeStringVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
+          data_start, data_end, &deps.strings_) &&
+      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(
+          data_start, data_end, &deps.assignable_types_) &&
+      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(
+          data_start, data_end, &deps.unassignable_types_) &&
+      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(data_start, data_end, &deps.classes_) &&
+      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(data_start, data_end, &deps.fields_) &&
+      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(data_start, data_end, &deps.methods_) &&
+      DecodeUint16SparseBitVector</*kFillVector=*/ true>(
+          data_start, data_end, num_class_defs, /*sparse_value=*/ false, &deps.verified_classes_) &&
+      DecodeUint16SparseBitVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
+          data_start, data_end, num_class_defs, /*sparse_value=*/ true, &deps.redefined_classes_);
 }
 
-VerifierDeps::VerifierDeps(const std::vector<const DexFile*>& dex_files,
-                           ArrayRef<const uint8_t> data)
-    : VerifierDeps(dex_files, /*output_only=*/ false) {
+bool VerifierDeps::ParseStoredData(const std::vector<const DexFile*>& dex_files,
+                                   ArrayRef<const uint8_t> data) {
   if (data.empty()) {
     // Return eagerly, as the first thing we expect from VerifierDeps data is
     // the number of created strings, even if there is no dependency.
     // Currently, only the boot image does not have any VerifierDeps data.
-    return;
+    return true;
   }
   const uint8_t* data_start = data.data();
   const uint8_t* data_end = data_start + data.size();
   for (const DexFile* dex_file : dex_files) {
     DexFileDeps* deps = GetDexFileDeps(*dex_file);
-    DecodeDexFileDeps(*deps, &data_start, data_end);
+    size_t num_class_defs = dex_file->NumClassDefs();
+    if (UNLIKELY(!DecodeDexFileDeps</*kOnlyVerifiedClasses=*/ false>(*deps,
+                                                                     &data_start,
+                                                                     data_end,
+                                                                     num_class_defs))) {
+      LOG(ERROR) << "Failed to parse dex file dependencies for " << dex_file->GetLocation();
+      return false;
+    }
   }
-  CHECK_LE(data_start, data_end);
+  // TODO: We should check that `data_start == data_end`. Why are we passing excessive data?
+  return true;
 }
 
-std::vector<std::vector<bool>> VerifierDeps::ParseVerifiedClasses(
+bool VerifierDeps::ParseVerifiedClasses(
     const std::vector<const DexFile*>& dex_files,
-    ArrayRef<const uint8_t> data) {
+    ArrayRef<const uint8_t> data,
+    /*out*/std::vector<std::vector<bool>>* verified_classes_per_dex) {
   DCHECK(!data.empty());
   DCHECK(!dex_files.empty());
+  DCHECK(verified_classes_per_dex->empty());
 
-  std::vector<std::vector<bool>> verified_classes_per_dex;
-  verified_classes_per_dex.reserve(dex_files.size());
+  verified_classes_per_dex->reserve(dex_files.size());
 
   const uint8_t* data_start = data.data();
   const uint8_t* data_end = data_start + data.size();
   for (const DexFile* dex_file : dex_files) {
-    DexFileDeps deps(dex_file->NumClassDefs());
-    DecodeDexFileDeps(deps, &data_start, data_end);
-    verified_classes_per_dex.push_back(std::move(deps.verified_classes_));
+    DexFileDeps deps(/*num_class_defs=*/ 0u);  // Do not initialize sparse bool vectors.
+    size_t num_class_defs = dex_file->NumClassDefs();
+    deps.verified_classes_.resize(num_class_defs);
+    if (UNLIKELY(!DecodeDexFileDeps</*kOnlyVerifiedClasses=*/ true>(deps,
+                                                                    &data_start,
+                                                                    data_end,
+                                                                    num_class_defs))) {
+      LOG(ERROR) << "Failed to parse dex file dependencies for " << dex_file->GetLocation();
+      return false;
+    }
+    verified_classes_per_dex->push_back(std::move(deps.verified_classes_));
   }
-  return verified_classes_per_dex;
+  // TODO: We should check that `data_start == data_end`. Why are we passing excessive data?
+  return true;
 }
 
 bool VerifierDeps::Equals(const VerifierDeps& rhs) const {
