@@ -597,19 +597,21 @@ MemMap::~MemMap() {
 
 void MemMap::DoReset() {
   DCHECK(IsValid());
-
+  size_t real_base_size = base_size_;
   // Unlike Valgrind, AddressSanitizer requires that all manually poisoned memory is unpoisoned
   // before it is returned to the system.
   if (redzone_size_ != 0) {
+    // Add redzone_size_ back to base_size or it will cause a mmap leakage.
+    real_base_size += redzone_size_;
     MEMORY_TOOL_MAKE_UNDEFINED(
-        reinterpret_cast<char*>(base_begin_) + base_size_ - redzone_size_,
+        reinterpret_cast<char*>(base_begin_) + real_base_size - redzone_size_,
         redzone_size_);
   }
 
   if (!reuse_) {
     MEMORY_TOOL_MAKE_UNDEFINED(base_begin_, base_size_);
     if (!already_unmapped_) {
-      int result = TargetMUnmap(base_begin_, base_size_);
+      int result = TargetMUnmap(base_begin_, real_base_size);
       if (result == -1) {
         PLOG(FATAL) << "munmap failed";
       }
