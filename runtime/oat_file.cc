@@ -165,6 +165,7 @@ class OatFileBase : public OatFile {
 
   virtual void PreSetup(const std::string& elf_filename) = 0;
 
+  // Setup functions return true on success, false on failure.
   bool Setup(int zip_fd, ArrayRef<const std::string> dex_filenames, std::string* error_msg);
   bool Setup(const std::vector<const DexFile*>& dex_files);
 
@@ -1450,12 +1451,13 @@ class OatFileBackedByVdex final : public OatFileBase {
                                    std::unique_ptr<VdexFile>&& vdex_file,
                                    const std::string& location) {
     std::unique_ptr<OatFileBackedByVdex> oat_file(new OatFileBackedByVdex(location));
-    oat_file->Initialize(dex_files, std::move(vdex_file));
+    if (!oat_file->Setup(dex_files, std::move(vdex_file))) {
+      return nullptr;
+    }
     return oat_file.release();
   }
 
-  void Initialize(const std::vector<const DexFile*>& dex_files,
-                  std::unique_ptr<VdexFile>&& vdex_file) {
+  bool Setup(const std::vector<const DexFile*>& dex_files, std::unique_ptr<VdexFile>&& vdex_file) {
     DCHECK(!IsExecutable());
 
     // SetVdex will take ownership of the VdexFile.
@@ -1478,10 +1480,18 @@ class OatFileBackedByVdex final : public OatFileBase {
 
     // Load VerifierDeps from VDEX and copy bit vectors of verified classes.
     ArrayRef<const uint8_t> deps_data = GetVdexFile()->GetVerifierDepsData();
-    verified_classes_per_dex_ = verifier::VerifierDeps::ParseVerifiedClasses(dex_files, deps_data);
+    if (!verifier::VerifierDeps::ParseVerifiedClasses(dex_files,
+                                                      deps_data,
+                                                      &verified_classes_per_dex_)) {
+      return false;
+    }
 
     // Initialize OatDexFiles.
-    Setup(dex_files);
+    if (!OatFileBase::Setup(dex_files)) {
+      return false;
+    }
+
+    return true;
   }
 
   bool IsClassVerifiedInVdex(const OatDexFile& oat_dex_file, uint16_t class_def_index) const {
