@@ -1962,6 +1962,20 @@ class Dex2Oat final {
       }
     }
 
+    // Setup VerifierDeps for compilation and report if we fail to parse the data.
+    if (!DoEagerUnquickeningOfVdex() && input_vdex_file_ != nullptr) {
+      std::unique_ptr<verifier::VerifierDeps> verifier_deps(
+          new verifier::VerifierDeps(dex_files, /*output_only=*/ false));
+      if (!verifier_deps->ParseStoredData(dex_files, input_vdex_file_->GetVerifierDepsData())) {
+        return dex2oat::ReturnCode::kOther;
+      }
+      callbacks_->SetVerifierDeps(verifier_deps.release());
+    } else {
+      // Create the main VerifierDeps, here instead of in the compiler since we want to aggregate
+      // the results for all the dex files, not just the results for the current dex file.
+      callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
+    }
+
     return dex2oat::ReturnCode::kNoFailure;
   }
 
@@ -2099,9 +2113,6 @@ class Dex2Oat final {
     // Setup vdex for compilation.
     const std::vector<const DexFile*>& dex_files = compiler_options_->dex_files_for_oat_file_;
     if (!DoEagerUnquickeningOfVdex() && input_vdex_file_ != nullptr) {
-      callbacks_->SetVerifierDeps(
-          new verifier::VerifierDeps(dex_files, input_vdex_file_->GetVerifierDepsData()));
-
       // TODO: we unquicken unconditionally, as we don't know
       // if the boot image has changed. How exactly we'll know is under
       // experimentation.
@@ -2111,10 +2122,6 @@ class Dex2Oat final {
       // optimization does not depend on the boot image (the optimization relies on not
       // having final fields in a class, which does not change for an app).
       input_vdex_file_->Unquicken(dex_files, /* decompile_return_instruction */ false);
-    } else {
-      // Create the main VerifierDeps, here instead of in the compiler since we want to aggregate
-      // the results for all the dex files, not just the results for the current dex file.
-      callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
     }
 
     // To allow initialization of classes that construct ThreadLocal objects in class initializer,
