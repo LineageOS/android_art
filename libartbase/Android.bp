@@ -176,9 +176,6 @@ art_cc_library {
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
-        // TODO(b/142944931) Clean this up. This is due to the dependency to libdexfile_support_static
-        // from /system/core, etc.
-        "//apex_available:platform",
     ],
 
     shared_libs: [
