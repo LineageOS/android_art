@@ -19,6 +19,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include "arch/instruction_set.h"
 #include "base/dchecked_vector.h"
@@ -167,8 +168,9 @@ class ClassLoaderContext {
                                                    bool verify_checksums = true) const;
 
   // Checks if any of the given dex files is already loaded in the current class loader context.
+  // It only checks the first class loader.
   // Returns the list of duplicate dex files (empty if there are no duplicates).
-  std::vector<const DexFile*> CheckForDuplicateDexFiles(
+  std::set<const DexFile*> CheckForDuplicateDexFiles(
       const std::vector<const DexFile*>& dex_files);
 
   // Creates the class loader context from the given string.
