@@ -1637,23 +1637,44 @@ TEST_F(ClassLoaderContextTest, CreateContextForClassLoaderWithSharedLibraries) {
             ClassLoaderContext::VerificationResult::kVerifies);
 }
 
-TEST_F(ClassLoaderContextTest, CheckForDuplicateDexFiles) {
-  jobject class_loader_a = LoadDexInPathClassLoader("Main", nullptr);
-  jobject class_loader_b =
-      LoadDexInInMemoryDexClassLoader("MyClass", class_loader_a);
+TEST_F(ClassLoaderContextTest, CheckForDuplicateDexFilesNotFoundSingleCL) {
+  jobject class_loader = LoadDexInPathClassLoader("Main", nullptr);
 
-  std::unique_ptr<ClassLoaderContext> context =
-      CreateContextForClassLoader(class_loader_b);
+  std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader);
 
-  std::vector<const DexFile*> result = context->CheckForDuplicateDexFiles(
+  std::set<const DexFile*> result = context->CheckForDuplicateDexFiles(
       std::vector<const DexFile*>());
   ASSERT_EQ(0u, result.size());
 
-  std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("Main");
+  std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("ForClassLoaderA");
   std::vector<const DexFile*> dex1_raw = MakeNonOwningPointerVector(dex1);
   result = context->CheckForDuplicateDexFiles(dex1_raw);
-  ASSERT_EQ(1u, result.size());
-  ASSERT_EQ(dex1_raw[0], result[0]);
+  ASSERT_EQ(0u, result.size());
+}
+
+TEST_F(ClassLoaderContextTest, CheckForDuplicateDexFilesFound) {
+  jobject class_loader = LoadDexInPathClassLoader(std::vector<std::string> { "Main", "Main" }, nullptr);
+
+  std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader);
+
+  std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("Main");
+  std::vector<const DexFile*> dex1_raw = MakeNonOwningPointerVector(dex1);
+  std::set<const DexFile*> result = context->CheckForDuplicateDexFiles(dex1_raw);
+  ASSERT_EQ(1u, result.size()) << context->EncodeContextForOatFile("");
+  ASSERT_EQ(dex1_raw[0], *(result.begin()));
+}
+
+
+TEST_F(ClassLoaderContextTest, CheckForDuplicateCrossCLNotFound) {
+  jobject class_loader_a = LoadDexInPathClassLoader("ForClassLoaderA", nullptr);
+  jobject class_loader_b = LoadDexInInMemoryDexClassLoader("ForClassLoaderB", class_loader_a);
+
+  std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader_b);
+
+  std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("ForClassLoaderA");
+  std::vector<const DexFile*> dex1_raw = MakeNonOwningPointerVector(dex1);
+  std::set<const DexFile*> result = context->CheckForDuplicateDexFiles(dex1_raw);
+  ASSERT_EQ(0u, result.size());
 }
 
 }  // namespace art
