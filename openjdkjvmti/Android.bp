@@ -16,7 +16,9 @@
 cc_library_headers {
     name: "libopenjdkjvmti_headers",
     visibility: ["//visibility:public"],
+    header_libs: ["jni_headers"],
     host_supported: true,
+    export_header_lib_headers: ["jni_headers"],
     export_include_dirs: ["include"],
     sdk_version: "current",
 }
