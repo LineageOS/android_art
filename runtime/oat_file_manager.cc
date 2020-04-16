@@ -674,12 +674,13 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
   // not run (e.g. not that we do not run the check if we don't have an oat file).
   if (context != nullptr
           && check_collision_result != CheckCollisionResult::kClassLoaderContextMatches) {
-    std::vector<const DexFile*> already_exists_in_classpath =
+    std::set<const DexFile*> already_exists_in_classpath =
         context->CheckForDuplicateDexFiles(MakeNonOwningPointerVector(dex_files));
     if (!already_exists_in_classpath.empty()) {
-      std::string duplicates = already_exists_in_classpath[0]->GetLocation();
-      for (size_t i = 1; i < already_exists_in_classpath.size(); i++) {
-        duplicates += "," + already_exists_in_classpath[i]->GetLocation();
+      auto duplicate_it = already_exists_in_classpath.begin();
+      std::string duplicates = (*duplicate_it)->GetLocation();
+      for (duplicate_it++ ; duplicate_it != already_exists_in_classpath.end(); duplicate_it++) {
+        duplicates += "," + (*duplicate_it)->GetLocation();
       }
 
       std::ostringstream out;
