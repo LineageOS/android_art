@@ -478,7 +478,9 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     jobject second_loader = LoadDex("VerifierDeps");
     const auto& second_dex_files = GetDexFiles(second_loader);
 
-    VerifierDeps decoded_deps(second_dex_files, ArrayRef<const uint8_t>(buffer));
+    VerifierDeps decoded_deps(second_dex_files, /*output_only=*/ false);
+    bool parsed = decoded_deps.ParseStoredData(second_dex_files, ArrayRef<const uint8_t>(buffer));
+    CHECK(parsed);
     VerifierDeps::DexFileDeps* decoded_dex_deps =
         decoded_deps.GetDexFileDeps(*second_dex_files.front());
 
@@ -1144,7 +1146,9 @@ TEST_F(VerifierDepsTest, EncodeDecode) {
   verifier_deps_->Encode(dex_files_, &buffer);
   ASSERT_FALSE(buffer.empty());
 
-  VerifierDeps decoded_deps(dex_files_, ArrayRef<const uint8_t>(buffer));
+  VerifierDeps decoded_deps(dex_files_, /*output_only=*/ false);
+  bool parsed = decoded_deps.ParseStoredData(dex_files_, ArrayRef<const uint8_t>(buffer));
+  ASSERT_TRUE(parsed);
   ASSERT_TRUE(verifier_deps_->Equals(decoded_deps));
 }
 
@@ -1170,7 +1174,9 @@ TEST_F(VerifierDepsTest, EncodeDecodeMulti) {
   }
 
   // Dump the new verifier deps to ensure it can properly read the data.
-  VerifierDeps decoded_deps(dex_files, ArrayRef<const uint8_t>(buffer));
+  VerifierDeps decoded_deps(dex_files, /*output_only=*/ false);
+  bool parsed = decoded_deps.ParseStoredData(dex_files, ArrayRef<const uint8_t>(buffer));
+  ASSERT_TRUE(parsed);
   std::ostringstream stream;
   VariableIndentationOutputStream os(&stream);
   decoded_deps.Dump(&os);
@@ -1430,7 +1436,9 @@ TEST_F(VerifierDepsTest, CompilerDriver) {
         ScopedObjectAccess soa(Thread::Current());
         LoadDexFile(soa, "VerifierDeps", multi);
       }
-      verifier::VerifierDeps decoded_deps(dex_files_, ArrayRef<const uint8_t>(buffer));
+      VerifierDeps decoded_deps(dex_files_, /*output_only=*/ false);
+      bool parsed = decoded_deps.ParseStoredData(dex_files_, ArrayRef<const uint8_t>(buffer));
+      ASSERT_TRUE(parsed);
       if (verify_failure) {
         // Just taint the decoded VerifierDeps with one invalid entry.
         VerifierDeps::DexFileDeps* deps = decoded_deps.GetDexFileDeps(*primary_dex_file_);

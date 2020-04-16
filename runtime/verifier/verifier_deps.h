@@ -58,9 +58,10 @@ namespace verifier {
 // changes in the classpath.
 class VerifierDeps {
  public:
-  explicit VerifierDeps(const std::vector<const DexFile*>& dex_files);
+  explicit VerifierDeps(const std::vector<const DexFile*>& dex_files, bool output_only = true);
 
-  VerifierDeps(const std::vector<const DexFile*>& dex_files, ArrayRef<const uint8_t> data);
+  // Fill dependencies from stored data. Returns true on success, false on failure.
+  bool ParseStoredData(const std::vector<const DexFile*>& dex_files, ArrayRef<const uint8_t> data);
 
   // Merge `other` into this `VerifierDeps`'. `other` and `this` must be for the
   // same set of dex files.
@@ -147,9 +148,10 @@ class VerifierDeps {
   // Parses raw VerifierDeps data to extract bitvectors of which class def indices
   // were verified or not. The given `dex_files` must match the order and count of
   // dex files used to create the VerifierDeps.
-  static std::vector<std::vector<bool>> ParseVerifiedClasses(
+  static bool ParseVerifiedClasses(
       const std::vector<const DexFile*>& dex_files,
-      ArrayRef<const uint8_t> data);
+      ArrayRef<const uint8_t> data,
+      /*out*/std::vector<std::vector<bool>>* verified_classes_per_dex);
 
  private:
   static constexpr uint16_t kUnresolvedMarker = static_cast<uint16_t>(-1);
@@ -239,12 +241,13 @@ class VerifierDeps {
     bool Equals(const DexFileDeps& rhs) const;
   };
 
-  VerifierDeps(const std::vector<const DexFile*>& dex_files, bool output_only);
-
   // Helper function to share DexFileDeps decoding code.
-  static void DecodeDexFileDeps(DexFileDeps& deps,
+  // Returns true on success, false on failure.
+  template <bool kOnlyVerifiedClasses>
+  static bool DecodeDexFileDeps(DexFileDeps& deps,
                                 const uint8_t** data_start,
-                                const uint8_t* data_end);
+                                const uint8_t* data_end,
+                                size_t num_class_defs);
 
   // Finds the DexFileDep instance associated with `dex_file`, or nullptr if
   // `dex_file` is not reported as being compiled.

@@ -100,7 +100,6 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
     {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
     {"vndk_product", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk_product"))},
     {"com_android_neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_neuralnetworks"))},
-    {"com_android_cronet", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_cronet"))},
     {"com_android_os_statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_os_statsd"))},
 };
 
@@ -359,7 +358,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_vndk_product_ns = false;
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
-  bool expected_link_with_cronet_ns = true;
   bool expected_link_with_statsd_ns = true;
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
   std::string expected_shared_libs_to_art_ns = art_public_libraries();
@@ -368,7 +366,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   std::string expected_shared_libs_to_vndk_product_ns = vndksp_libraries_product();
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
   std::string expected_shared_libs_to_neuralnetworks_ns = neuralnetworks_public_libraries();
-  std::string expected_shared_libs_to_cronet_ns = cronet_public_libraries();
   std::string expected_shared_libs_to_statsd_ns = statsd_public_libraries();
 
   void SetExpectations() {
@@ -417,11 +414,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_neuralnetworks_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
-          .WillOnce(Return(true));
-    }
-    if (expected_link_with_cronet_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_cronet"),
-                                              StrEq(expected_shared_libs_to_cronet_ns)))
           .WillOnce(Return(true));
     }
     if (expected_link_with_statsd_ns) {

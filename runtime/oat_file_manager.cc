@@ -836,9 +836,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
   std::unique_ptr<OatFile> oat_file(OatFile::OpenFromVdex(MakeNonOwningPointerVector(dex_files),
                                                           std::move(vdex_file),
                                                           dex_location));
-  DCHECK(oat_file != nullptr);
-  VLOG(class_linker) << "Registering " << oat_file->GetLocation();
-  *out_oat_file = RegisterOatFile(std::move(oat_file));
+  if (oat_file != nullptr) {
+    VLOG(class_linker) << "Registering " << oat_file->GetLocation();
+    *out_oat_file = RegisterOatFile(std::move(oat_file));
+  }
   return dex_files;
 }
 
