@@ -91,36 +91,27 @@ public class Main {
   //
 
   /// CHECK-START: void Main.load() builder (after)
-  /// CHECK-DAG: InvokeVirtual intrinsic:UnsafeLoadFence
+  /// CHECK-NOT: InvokeVirtual
   //
-  /// CHECK-START: void Main.load() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeVirtual intrinsic:UnsafeLoadFence
-  //
-  /// CHECK-START: void Main.load() instruction_simplifier (after)
+  /// CHECK-START: void Main.load() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:LoadAny
   private static void load() {
     unsafe.loadFence();
   }
 
   /// CHECK-START: void Main.store() builder (after)
-  /// CHECK-DAG: InvokeVirtual intrinsic:UnsafeStoreFence
+  /// CHECK-NOT: InvokeVirtual
   //
-  /// CHECK-START: void Main.store() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeVirtual intrinsic:UnsafeStoreFence
-  //
-  /// CHECK-START: void Main.store() instruction_simplifier (after)
+  /// CHECK-START: void Main.store() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyStore
   private static void store() {
     unsafe.storeFence();
   }
 
   /// CHECK-START: void Main.full() builder (after)
-  /// CHECK-DAG: InvokeVirtual intrinsic:UnsafeFullFence
+  /// CHECK-NOT: InvokeVirtual
   //
-  /// CHECK-START: void Main.full() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeVirtual intrinsic:UnsafeFullFence
-  //
-  /// CHECK-START: void Main.full() instruction_simplifier (after)
+  /// CHECK-START: void Main.full() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyAny
   private static void full() {
     unsafe.fullFence();

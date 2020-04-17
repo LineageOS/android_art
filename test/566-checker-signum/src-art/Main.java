@@ -19,14 +19,10 @@ import java.lang.reflect.Method;
 public class Main {
 
   /// CHECK-START: int Main.signByte(byte) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect intrinsic:IntegerSignum
-  /// CHECK-DAG:                     Return [<<Result>>]
-
-  /// CHECK-START: int Main.signByte(byte) instruction_simplifier (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.signByte(byte) instruction_simplifier (after)
+  /// CHECK-START: int Main.signByte(byte) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int signByte(byte x) {
@@ -34,14 +30,10 @@ public class Main {
   }
 
   /// CHECK-START: int Main.signShort(short) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect intrinsic:IntegerSignum
-  /// CHECK-DAG:                     Return [<<Result>>]
-
-  /// CHECK-START: int Main.signShort(short) instruction_simplifier (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.signShort(short) instruction_simplifier (after)
+  /// CHECK-START: int Main.signShort(short) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int signShort(short x) {
@@ -49,14 +41,10 @@ public class Main {
   }
 
   /// CHECK-START: int Main.signChar(char) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect intrinsic:IntegerSignum
-  /// CHECK-DAG:                     Return [<<Result>>]
-
-  /// CHECK-START: int Main.signChar(char) instruction_simplifier (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.signChar(char) instruction_simplifier (after)
+  /// CHECK-START: int Main.signChar(char) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int signChar(char x) {
@@ -64,14 +52,10 @@ public class Main {
   }
 
   /// CHECK-START: int Main.signInt(int) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect intrinsic:IntegerSignum
-  /// CHECK-DAG:                     Return [<<Result>>]
-
-  /// CHECK-START: int Main.signInt(int) instruction_simplifier (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.signInt(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.signInt(int) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int signInt(int x) {
@@ -79,14 +63,10 @@ public class Main {
   }
 
   /// CHECK-START: int Main.signLong(long) builder (after)
-  /// CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect intrinsic:LongSignum
-  /// CHECK-DAG:                     Return [<<Result>>]
-
-  /// CHECK-START: int Main.signLong(long) instruction_simplifier (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.signLong(long) instruction_simplifier (after)
+  /// CHECK-START: int Main.signLong(long) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int signLong(long x) {

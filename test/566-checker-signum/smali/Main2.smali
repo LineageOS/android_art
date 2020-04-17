@@ -19,17 +19,10 @@
 ## CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
 ## CHECK-DAG:     <<One:i\d+>>    IntConstant 1
 ## CHECK-DAG:     <<Phi:i\d+>>    Phi [<<One>>,<<Zero>>]
-## CHECK-DAG:     <<Result:i\d+>> InvokeStaticOrDirect [<<Phi>>{{(,[ij]\d+)?}}] intrinsic:IntegerSignum
-## CHECK-DAG:                     Return [<<Result>>]
-
-## CHECK-START: int Main2.signBoolean(boolean) instruction_simplifier (after)
-## CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
-## CHECK-DAG:     <<One:i\d+>>    IntConstant 1
-## CHECK-DAG:     <<Phi:i\d+>>    Phi [<<One>>,<<Zero>>]
 ## CHECK-DAG:     <<Result:i\d+>> Compare [<<Phi>>,<<Zero>>]
 ## CHECK-DAG:                     Return [<<Result>>]
 
-## CHECK-START: int Main2.signBoolean(boolean) instruction_simplifier (after)
+## CHECK-START: int Main2.signBoolean(boolean) builder (after)
 ## CHECK-NOT:                     InvokeStaticOrDirect
 
 ## CHECK-START: int Main2.signBoolean(boolean) select_generator (after)
