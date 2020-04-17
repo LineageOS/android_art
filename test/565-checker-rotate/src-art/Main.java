@@ -23,17 +23,11 @@ public class Main {
   /// CHECK-START: int Main.rotateLeftByte(byte, int) builder (after)
   /// CHECK:         <<ArgVal:b\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateLeftByte(byte, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:b\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateLeftByte(byte, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateLeftByte(byte, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateLeftByte(byte value, int distance) {
@@ -43,17 +37,11 @@ public class Main {
   /// CHECK-START: int Main.rotateLeftShort(short, int) builder (after)
   /// CHECK:         <<ArgVal:s\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateLeftShort(short, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:s\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateLeftShort(short, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateLeftShort(short, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateLeftShort(short value, int distance) {
@@ -63,17 +51,11 @@ public class Main {
   /// CHECK-START: int Main.rotateLeftChar(char, int) builder (after)
   /// CHECK:         <<ArgVal:c\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateLeftChar(char, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:c\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateLeftChar(char, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateLeftChar(char, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateLeftChar(char value, int distance) {
@@ -83,17 +65,11 @@ public class Main {
   /// CHECK-START: int Main.rotateLeftInt(int, int) builder (after)
   /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateLeftInt(int, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateLeftInt(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateLeftInt(int, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateLeftInt(int value, int distance) {
@@ -103,17 +79,11 @@ public class Main {
   /// CHECK-START: long Main.rotateLeftLong(long, int) builder (after)
   /// CHECK:         <<ArgVal:j\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:j\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:LongRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: long Main.rotateLeftLong(long, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:j\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:j\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: long Main.rotateLeftLong(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateLeftLong(long, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static long rotateLeftLong(long value, int distance) {
@@ -123,16 +93,10 @@ public class Main {
   /// CHECK-START: int Main.rotateRightByte(byte, int) builder (after)
   /// CHECK:         <<ArgVal:b\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateRightByte(byte, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:b\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateRightByte(byte, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateRightByte(byte, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateRightByte(byte value, int distance) {
@@ -142,16 +106,10 @@ public class Main {
   /// CHECK-START: int Main.rotateRightShort(short, int) builder (after)
   /// CHECK:         <<ArgVal:s\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateRightShort(short, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:s\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateRightShort(short, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateRightShort(short, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateRightShort(short value, int distance) {
@@ -161,16 +119,10 @@ public class Main {
   /// CHECK-START: int Main.rotateRightChar(char, int) builder (after)
   /// CHECK:         <<ArgVal:c\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateRightChar(char, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:c\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateRightChar(char, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateRightChar(char, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateRightChar(char value, int distance) {
@@ -180,16 +132,10 @@ public class Main {
   /// CHECK-START: int Main.rotateRightInt(int, int) builder (after)
   /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateRightInt(int, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateRightInt(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateRightInt(int, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateRightInt(int value, int distance) {
@@ -199,16 +145,10 @@ public class Main {
   /// CHECK-START: long Main.rotateRightLong(long, int) builder (after)
   /// CHECK:         <<ArgVal:j\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:i\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:j\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:LongRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: long Main.rotateRightLong(long, int) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:j\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:j\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: long Main.rotateRightLong(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateRightLong(long, int) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static long rotateRightLong(long value, int distance) {
@@ -219,17 +159,11 @@ public class Main {
   /// CHECK-START: int Main.rotateLeftIntWithByteDistance(int, byte) builder (after)
   /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:b\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateLeft
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateLeftIntWithByteDistance(int, byte) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:b\d+>> ParameterValue
   /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateLeftIntWithByteDistance(int, byte) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateLeftIntWithByteDistance(int, byte) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateLeftIntWithByteDistance(int value, byte distance) {
@@ -239,16 +173,10 @@ public class Main {
   /// CHECK-START: int Main.rotateRightIntWithByteDistance(int, byte) builder (after)
   /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
   /// CHECK:         <<ArgDist:b\d+>> ParameterValue
-  /// CHECK-DAG:     <<Result:i\d+>>  InvokeStaticOrDirect [<<ArgVal>>,<<ArgDist>>{{(,[ij]\d+)?}}] intrinsic:IntegerRotateRight
-  /// CHECK-DAG:                      Return [<<Result>>]
-
-  /// CHECK-START: int Main.rotateRightIntWithByteDistance(int, byte) instruction_simplifier (after)
-  /// CHECK:         <<ArgVal:i\d+>>  ParameterValue
-  /// CHECK:         <<ArgDist:b\d+>> ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
   /// CHECK-DAG:                      Return [<<Result>>]
 
-  /// CHECK-START: int Main.rotateRightIntWithByteDistance(int, byte) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateRightIntWithByteDistance(int, byte) builder (after)
   /// CHECK-NOT:                      InvokeStaticOrDirect
 
   private static int rotateRightIntWithByteDistance(int value, byte distance) {
