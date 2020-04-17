@@ -340,12 +340,16 @@ class CodeGeneratorX86_64 : public CodeGenerator {
 
   size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
-        ? 2 * kX86_64WordSize   // 16 bytes == 2 x86_64 words for each spill
+        ? GetSIMDRegisterWidth()
         : 1 * kX86_64WordSize;  //  8 bytes == 1 x86_64 words for each spill
   }
 
   size_t GetCalleePreservedFPWidth() const override {
     return 1 * kX86_64WordSize;
+  }
+
+  size_t GetSIMDRegisterWidth() const override {
+    return 2 * kX86_64WordSize;
   }
 
   HGraphVisitor* GetLocationBuilder() override {
