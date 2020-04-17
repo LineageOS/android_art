@@ -214,7 +214,7 @@ ArenaVector<HOptimization*> ConstructOptimizations(
       case OptimizationPass::kLoopOptimization:
         CHECK(most_recent_induction != nullptr);
         opt = new (allocator) HLoopOptimization(
-            graph, &codegen->GetCompilerOptions(), most_recent_induction, stats, pass_name);
+            graph, *codegen, most_recent_induction, stats, pass_name);
         break;
       case OptimizationPass::kBoundsCheckElimination:
         CHECK(most_recent_side_effects != nullptr && most_recent_induction != nullptr);

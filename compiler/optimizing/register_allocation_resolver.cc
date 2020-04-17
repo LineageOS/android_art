@@ -303,12 +303,12 @@ void RegisterAllocationResolver::ConnectSiblings(LiveInterval* interval) {
       && !interval->GetDefinedBy()->IsCurrentMethod()) {
     // We spill eagerly, so move must be at definition.
     Location loc;
-    switch (interval->NumberOfSpillSlotsNeeded()) {
-      case 1: loc = Location::StackSlot(interval->GetParent()->GetSpillSlot()); break;
-      case 2: loc = Location::DoubleStackSlot(interval->GetParent()->GetSpillSlot()); break;
-      case 4: loc = Location::SIMDStackSlot(interval->GetParent()->GetSpillSlot()); break;
-      default: LOG(FATAL) << "Unexpected number of spill slots"; UNREACHABLE();
-    }
+    size_t num_of_slots = interval->NumberOfSpillSlotsNeeded();
+    loc = Location::StackSlotByNumOfSlots(num_of_slots, interval->GetParent()->GetSpillSlot());
+
+    CHECK(!loc.IsSIMDStackSlot() ||
+          (codegen_->GetSIMDRegisterWidth() / kVRegSize == num_of_slots)) <<
+          "Unexpected number of spill slots";
     InsertMoveAfter(interval->GetDefinedBy(), interval->ToLocation(), loc);
   }
   UsePositionList::const_iterator use_it = current->GetUses().begin();
@@ -466,12 +466,11 @@ void RegisterAllocationResolver::ConnectSplitSiblings(LiveInterval* interval,
       location_source = defined_by->GetLocations()->Out();
     } else {
       DCHECK(defined_by->IsCurrentMethod());
-      switch (parent->NumberOfSpillSlotsNeeded()) {
-        case 1: location_source = Location::StackSlot(parent->GetSpillSlot()); break;
-        case 2: location_source = Location::DoubleStackSlot(parent->GetSpillSlot()); break;
-        case 4: location_source = Location::SIMDStackSlot(parent->GetSpillSlot()); break;
-        default: LOG(FATAL) << "Unexpected number of spill slots"; UNREACHABLE();
-      }
+      size_t num_of_slots = parent->NumberOfSpillSlotsNeeded();
+      location_source = Location::StackSlotByNumOfSlots(num_of_slots, parent->GetSpillSlot());
+      CHECK(!location_source.IsSIMDStackSlot() ||
+            (codegen_->GetSIMDRegisterWidth() == num_of_slots * kVRegSize)) <<
+            "Unexpected number of spill slots";
     }
   } else {
     DCHECK(source != nullptr);
