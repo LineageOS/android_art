@@ -16,29 +16,21 @@
 
 public class Main {
 
-  /// CHECK-START: boolean Main.isNaN32(float) instruction_simplifier (before)
-  /// CHECK-DAG: <<Result:z\d+>> InvokeStaticOrDirect
-  /// CHECK-DAG: Return [<<Result>>]
-  //
-  /// CHECK-START: boolean Main.isNaN32(float) instruction_simplifier (after)
+  /// CHECK-START: boolean Main.isNaN32(float) builder (after)
   /// CHECK-DAG: <<Result:z\d+>> NotEqual
   /// CHECK-DAG: Return [<<Result>>]
   //
-  /// CHECK-START: boolean Main.isNaN32(float) instruction_simplifier (after)
+  /// CHECK-START: boolean Main.isNaN32(float) builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   private static boolean isNaN32(float x) {
     return Float.isNaN(x);
   }
 
-  /// CHECK-START: boolean Main.isNaN64(double) instruction_simplifier (before)
-  /// CHECK-DAG: <<Result:z\d+>> InvokeStaticOrDirect
-  /// CHECK-DAG: Return [<<Result>>]
-  //
-  /// CHECK-START: boolean Main.isNaN64(double) instruction_simplifier (after)
+  /// CHECK-START: boolean Main.isNaN64(double) builder (after)
   /// CHECK-DAG: <<Result:z\d+>> NotEqual
   /// CHECK-DAG: Return [<<Result>>]
   //
-  /// CHECK-START: boolean Main.isNaN64(double) instruction_simplifier (after)
+  /// CHECK-START: boolean Main.isNaN64(double) builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   private static boolean isNaN64(double x) {
     return Double.isNaN(x);
