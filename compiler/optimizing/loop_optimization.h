@@ -38,7 +38,7 @@ class ArchNoOptsLoopHelper;
 class HLoopOptimization : public HOptimization {
  public:
   HLoopOptimization(HGraph* graph,
-                    const CompilerOptions* compiler_options,
+                    const CodeGenerator& codegen,    // Needs info about the target.
                     HInductionVarAnalysis* induction_analysis,
                     OptimizingCompilerStats* stats,
                     const char* name = kLoopOptimizationPassName);
@@ -186,7 +186,15 @@ class HLoopOptimization : public HOptimization {
                     uint64_t restrictions);
   uint32_t GetVectorSizeInBytes();
   bool TrySetVectorType(DataType::Type type, /*out*/ uint64_t* restrictions);
-  bool TrySetVectorLength(uint32_t length);
+  bool TrySetVectorLengthImpl(uint32_t length);
+
+  bool TrySetVectorLength(DataType::Type type, uint32_t length) {
+    bool res = TrySetVectorLengthImpl(length);
+    // Currently the vectorizer supports only the mode when full SIMD registers are used.
+    DCHECK(!res || (DataType::Size(type) * length == GetVectorSizeInBytes()));
+    return res;
+  }
+
   void GenerateVecInv(HInstruction* org, DataType::Type type);
   void GenerateVecSub(HInstruction* org, HInstruction* offset);
   void GenerateVecMem(HInstruction* org,
@@ -264,6 +272,9 @@ class HLoopOptimization : public HOptimization {
 
   // Compiler options (to query ISA features).
   const CompilerOptions* compiler_options_;
+
+  // Cached target SIMD vector register size in bytes.
+  const size_t simd_register_size_;
 
   // Range information based on prior induction variable analysis.
   InductionVarRange induction_range_;
