@@ -153,9 +153,6 @@ public class Main {
     return result;
   }
 
-  /// CHECK-START: int Main.invariantBoundIntrinsic(int) instruction_simplifier (before)
-  /// CHECK-DAG: InvokeStaticOrDirect loop:{{B\d+}}
-  //
   /// CHECK-START: int Main.invariantBoundIntrinsic(int) licm (before)
   /// CHECK-DAG: Abs loop:{{B\d+}}
 
@@ -174,9 +171,6 @@ public class Main {
     }
     return result;
   }
-
-  /// CHECK-START: int Main.invariantBodyIntrinsic(int, int) instruction_simplifier (before)
-  /// CHECK-DAG: InvokeStaticOrDirect loop:{{B\d+}}
 
   /// CHECK-START: int Main.invariantBodyIntrinsic(int, int) licm (before)
   /// CHECK-DAG: Max loop:{{B\d+}}
