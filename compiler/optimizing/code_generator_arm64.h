@@ -437,12 +437,16 @@ class CodeGeneratorARM64 : public CodeGenerator {
 
   size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
-        ? vixl::aarch64::kQRegSizeInBytes
+        ? GetSIMDRegisterWidth()
         : vixl::aarch64::kDRegSizeInBytes;
   }
 
   size_t GetCalleePreservedFPWidth() const override {
     return vixl::aarch64::kDRegSizeInBytes;
+  }
+
+  size_t GetSIMDRegisterWidth() const override {
+    return vixl::aarch64::kQRegSizeInBytes;
   }
 
   uintptr_t GetAddressOf(HBasicBlock* block) override {

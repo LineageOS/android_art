@@ -742,14 +742,15 @@ void SuperblockCloner::VerifyGraph() {
       DCHECK(it.second->GetBlock() != nullptr);
     }
   }
-
-  GraphChecker checker(graph_);
-  checker.Run();
-  if (!checker.IsValid()) {
-    for (const std::string& error : checker.GetErrors()) {
-      std::cout << error << std::endl;
+  if (kSuperblockClonerVerify) {
+    GraphChecker checker(graph_);
+    checker.Run();
+    if (!checker.IsValid()) {
+      for (const std::string& error : checker.GetErrors()) {
+        std::cout << error << std::endl;
+      }
+      LOG(FATAL) << "GraphChecker failed: superblock cloner\n";
     }
-    LOG(FATAL) << "GraphChecker failed: superblock cloner\n";
   }
 }
 
