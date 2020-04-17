@@ -523,12 +523,8 @@ Location LiveInterval::ToLocation() const {
     if (defined_by->IsConstant()) {
       return defined_by->GetLocations()->Out();
     } else if (GetParent()->HasSpillSlot()) {
-      switch (NumberOfSpillSlotsNeeded()) {
-        case 1: return Location::StackSlot(GetParent()->GetSpillSlot());
-        case 2: return Location::DoubleStackSlot(GetParent()->GetSpillSlot());
-        case 4: return Location::SIMDStackSlot(GetParent()->GetSpillSlot());
-        default: LOG(FATAL) << "Unexpected number of spill slots"; UNREACHABLE();
-      }
+      return Location::StackSlotByNumOfSlots(NumberOfSpillSlotsNeeded(),
+                                             GetParent()->GetSpillSlot());
     } else {
       return Location();
     }

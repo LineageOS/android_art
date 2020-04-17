@@ -176,8 +176,8 @@ static void SaveRestoreLiveRegistersHelper(CodeGenerator* codegen,
                                          codegen->GetNumberOfFloatingPointRegisters()));
 
   CPURegList core_list = CPURegList(CPURegister::kRegister, kXRegSize, core_spills);
-  unsigned v_reg_size = codegen->GetGraph()->HasSIMD() ? kQRegSize : kDRegSize;
-  CPURegList fp_list = CPURegList(CPURegister::kVRegister, v_reg_size, fp_spills);
+  const unsigned v_reg_size_in_bits = codegen->GetSlowPathFPWidth() * 8;
+  CPURegList fp_list = CPURegList(CPURegister::kVRegister, v_reg_size_in_bits, fp_spills);
 
   MacroAssembler* masm = down_cast<CodeGeneratorARM64*>(codegen)->GetVIXLAssembler();
   UseScratchRegisterScope temps(masm);
@@ -224,7 +224,7 @@ void SlowPathCodeARM64::SaveLiveRegisters(CodeGenerator* codegen, LocationSummar
     stack_offset += kXRegSizeInBytes;
   }
 
-  const size_t fp_reg_size = codegen->GetGraph()->HasSIMD() ? kQRegSizeInBytes : kDRegSizeInBytes;
+  const size_t fp_reg_size = codegen->GetSlowPathFPWidth();
   const uint32_t fp_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ false);
   for (uint32_t i : LowToHighBits(fp_spills)) {
     DCHECK_LT(stack_offset, codegen->GetFrameSize() - codegen->FrameEntrySpillSize());
