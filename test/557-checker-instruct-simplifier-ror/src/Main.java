@@ -28,82 +28,62 @@ public class Main {
     }
   }
 
-  /// CHECK-START: int Main.rotateIntegerRight(int, int) instruction_simplifier (before)
-  /// CHECK:          <<ArgValue:i\d+>>     ParameterValue
-  /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
-  /// CHECK:          <<Invoke:i\d+>>       InvokeStaticOrDirect intrinsic:IntegerRotateRight
-
-  /// CHECK-START: int Main.rotateIntegerRight(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateIntegerRight(int, int) builder (after)
   /// CHECK:          <<ArgValue:i\d+>>     ParameterValue
   /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
   /// CHECK:          <<Ror:i\d+>>          Ror [<<ArgValue>>,<<ArgDistance>>]
   /// CHECK:                                Return [<<Ror>>]
 
-  /// CHECK-START: int Main.rotateIntegerRight(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateIntegerRight(int, int) builder (after)
   /// CHECK-NOT:      LoadClass
   /// CHECK-NOT:      ClinitCheck
   /// CHECK-NOT:      InvokeStaticOrDirect
   public static int rotateIntegerRight(int value, int distance) {
-    return java.lang.Integer.rotateRight(value, distance);
+    return Integer.rotateRight(value, distance);
   }
 
-  /// CHECK-START: int Main.rotateIntegerLeft(int, int) instruction_simplifier (before)
-  /// CHECK:          <<ArgValue:i\d+>>     ParameterValue
-  /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
-  /// CHECK:          <<Invoke:i\d+>>       InvokeStaticOrDirect intrinsic:IntegerRotateLeft
-
-  /// CHECK-START: int Main.rotateIntegerLeft(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateIntegerLeft(int, int) builder (after)
   /// CHECK:          <<ArgValue:i\d+>>     ParameterValue
   /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
   /// CHECK:          <<Neg:i\d+>>          Neg [<<ArgDistance>>]
   /// CHECK:          <<Ror:i\d+>>          Ror [<<ArgValue>>,<<Neg>>]
   /// CHECK:                                Return [<<Ror>>]
 
-  /// CHECK-START: int Main.rotateIntegerLeft(int, int) instruction_simplifier (after)
+  /// CHECK-START: int Main.rotateIntegerLeft(int, int) builder (after)
   /// CHECK-NOT:      LoadClass
   /// CHECK-NOT:      ClinitCheck
   /// CHECK-NOT:      InvokeStaticOrDirect
   public static int rotateIntegerLeft(int value, int distance) {
-    return java.lang.Integer.rotateLeft(value, distance);
+    return Integer.rotateLeft(value, distance);
   }
 
-  /// CHECK-START: long Main.rotateLongRight(long, int) instruction_simplifier (before)
-  /// CHECK:          <<ArgValue:j\d+>>     ParameterValue
-  /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
-  /// CHECK:          <<Invoke:j\d+>>       InvokeStaticOrDirect intrinsic:LongRotateRight
-
-  /// CHECK-START: long Main.rotateLongRight(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateLongRight(long, int) builder (after)
   /// CHECK:          <<ArgValue:j\d+>>     ParameterValue
   /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
   /// CHECK:          <<Ror:j\d+>>          Ror [<<ArgValue>>,<<ArgDistance>>]
   /// CHECK:                                Return [<<Ror>>]
 
-  /// CHECK-START: long Main.rotateLongRight(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateLongRight(long, int) builder (after)
   /// CHECK-NOT:      LoadClass
   /// CHECK-NOT:      ClinitCheck
   /// CHECK-NOT:      InvokeStaticOrDirect
   public static long rotateLongRight(long value, int distance) {
-    return java.lang.Long.rotateRight(value, distance);
+    return Long.rotateRight(value, distance);
   }
 
-  /// CHECK-START: long Main.rotateLongLeft(long, int) instruction_simplifier (before)
-  /// CHECK:          <<ArgValue:j\d+>>     ParameterValue
-  /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
-  /// CHECK:          <<Invoke:j\d+>>       InvokeStaticOrDirect intrinsic:LongRotateLeft
-
-  /// CHECK-START: long Main.rotateLongLeft(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateLongLeft(long, int) builder (after)
   /// CHECK:          <<ArgValue:j\d+>>     ParameterValue
   /// CHECK:          <<ArgDistance:i\d+>>  ParameterValue
   /// CHECK:          <<Neg:i\d+>>          Neg [<<ArgDistance>>]
   /// CHECK:          <<Ror:j\d+>>          Ror [<<ArgValue>>,<<Neg>>]
   /// CHECK:                                Return [<<Ror>>]
 
-  /// CHECK-START: long Main.rotateLongLeft(long, int) instruction_simplifier (after)
+  /// CHECK-START: long Main.rotateLongLeft(long, int) builder (after)
   /// CHECK-NOT:      LoadClass
   /// CHECK-NOT:      ClinitCheck
   /// CHECK-NOT:      InvokeStaticOrDirect
   public static long rotateLongLeft(long value, int distance) {
-    return java.lang.Long.rotateLeft(value, distance);
+    return Long.rotateLeft(value, distance);
   }
 
   //  (i >>> #distance) | (i << #(reg_bits - distance))

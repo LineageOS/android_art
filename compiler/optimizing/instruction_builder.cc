@@ -431,38 +431,43 @@ void HInstructionBuilder::BuildIntrinsic(ArtMethod* method) {
   InitializeBlockLocals();
   DCHECK(!IsBlockPopulated(current_block_));
 
-  // Add the invoke and return instruction. Use HInvokeStaticOrDirect even
-  // for methods that would normally use an HInvokeVirtual (sharpen the call).
+  // Add the intermediate representation, if available, or invoke instruction.
   size_t in_vregs = graph_->GetNumberOfInVRegs();
   size_t number_of_arguments =
       in_vregs - std::count(current_locals_->end() - in_vregs, current_locals_->end(), nullptr);
   uint32_t method_idx = dex_compilation_unit_->GetDexMethodIndex();
-  MethodReference target_method(dex_file_, method_idx);
-  HInvokeStaticOrDirect::DispatchInfo dispatch_info = {
-      HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall,
-      HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod,
-      /* method_load_data= */ 0u
-  };
-  InvokeType invoke_type = dex_compilation_unit_->IsStatic() ? kStatic : kDirect;
-  HInvokeStaticOrDirect* invoke = new (allocator_) HInvokeStaticOrDirect(
-      allocator_,
-      number_of_arguments,
-      return_type_,
-      kNoDexPc,
-      method_idx,
-      method,
-      dispatch_info,
-      invoke_type,
-      target_method,
-      HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  const char* shorty = dex_file_->GetMethodShorty(method_idx);
   RangeInstructionOperands operands(graph_->GetNumberOfVRegs() - in_vregs, in_vregs);
-  HandleInvoke(invoke, operands, dex_file_->GetMethodShorty(method_idx), /* is_unresolved= */ false);
+  if (!BuildSimpleIntrinsic(method, kNoDexPc, operands, shorty)) {
+    // Some intrinsics without intermediate representation still yield a leaf method,
+    // so build the invoke. Use HInvokeStaticOrDirect even for methods that would
+    // normally use an HInvokeVirtual (sharpen the call).
+    MethodReference target_method(dex_file_, method_idx);
+    HInvokeStaticOrDirect::DispatchInfo dispatch_info = {
+        HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall,
+        HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod,
+        /* method_load_data= */ 0u
+    };
+    InvokeType invoke_type = dex_compilation_unit_->IsStatic() ? kStatic : kDirect;
+    HInvokeStaticOrDirect* invoke = new (allocator_) HInvokeStaticOrDirect(
+        allocator_,
+        number_of_arguments,
+        return_type_,
+        kNoDexPc,
+        method_idx,
+        method,
+        dispatch_info,
+        invoke_type,
+        target_method,
+        HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+    HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
+  }
 
   // Add the return instruction.
   if (return_type_ == DataType::Type::kVoid) {
     AppendInstruction(new (allocator_) HReturnVoid());
   } else {
-    AppendInstruction(new (allocator_) HReturn(invoke));
+    AppendInstruction(new (allocator_) HReturn(latest_result_));
   }
 
   // Fill the exit block.
@@ -1007,6 +1012,17 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
     clinit_check = ProcessClinitCheckForInvoke(dex_pc, resolved_method, &clinit_check_requirement);
   }
 
+  // Try to build an HIR replacement for the intrinsic.
+  if (UNLIKELY(resolved_method->IsIntrinsic())) {
+    // All intrinsics are in the primary boot image, so their class can always be referenced
+    // and we do not need to rely on the implicit class initialization check. The class should
+    // be initialized but we do not require that here.
+    DCHECK_NE(clinit_check_requirement, HInvokeStaticOrDirect::ClinitCheckRequirement::kImplicit);
+    if (BuildSimpleIntrinsic(resolved_method, dex_pc, operands, shorty)) {
+      return true;
+    }
+  }
+
   HInvoke* invoke = nullptr;
   if (invoke_type == kDirect || invoke_type == kStatic || invoke_type == kSuper) {
     if (invoke_type == kSuper) {
@@ -1029,6 +1045,13 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                                     invoke_type,
                                                     target_method,
                                                     clinit_check_requirement);
+    if (clinit_check != nullptr) {
+      // Add the class initialization check as last input of `invoke`.
+      DCHECK_EQ(clinit_check_requirement, HInvokeStaticOrDirect::ClinitCheckRequirement::kExplicit);
+      size_t clinit_check_index = invoke->InputCount() - 1u;
+      DCHECK(invoke->InputAt(clinit_check_index) == nullptr);
+      invoke->SetArgumentAt(clinit_check_index, clinit_check);
+    }
   } else if (invoke_type == kVirtual) {
     DCHECK(target_method.dex_file == nullptr);
     invoke = new (allocator_) HInvokeVirtual(allocator_,
@@ -1048,7 +1071,7 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                                resolved_method,
                                                /*imt_index=*/ target_method.index);
   }
-  return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false, clinit_check);
+  return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
 }
 
 bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
@@ -1431,54 +1454,86 @@ HClinitCheck* HInstructionBuilder::ProcessClinitCheckForInvoke(
   return clinit_check;
 }
 
-bool HInstructionBuilder::SetupInvokeArguments(HInvoke* invoke,
+bool HInstructionBuilder::SetupInvokeArguments(HInstruction* invoke,
                                                const InstructionOperands& operands,
                                                const char* shorty,
-                                               size_t start_index,
-                                               size_t* argument_index) {
+                                               ReceiverArg receiver_arg) {
+  // Note: The `invoke` can be an intrinsic replacement, so not necessaritly HInvoke.
+  // In that case, do not log errors, they shall be reported when we try to build the HInvoke.
   uint32_t shorty_index = 1;  // Skip the return type.
   const size_t number_of_operands = operands.GetNumberOfOperands();
-  for (size_t i = start_index;
-       // Make sure we don't go over the expected arguments or over the number of
-       // dex registers given. If the instruction was seen as dead by the verifier,
-       // it hasn't been properly checked.
-       (i < number_of_operands) && (*argument_index < invoke->GetNumberOfArguments());
-       i++, (*argument_index)++) {
+  bool argument_length_error = false;
+
+  size_t start_index = 0u;
+  size_t argument_index = 0u;
+  if (receiver_arg != ReceiverArg::kNone) {
+    if (number_of_operands == 0u) {
+      argument_length_error = true;
+    } else {
+      start_index = 1u;
+      if (receiver_arg != ReceiverArg::kIgnored) {
+        uint32_t obj_reg = operands.GetOperand(0u);
+        HInstruction* arg = (receiver_arg == ReceiverArg::kPlainArg)
+            ? LoadLocal(obj_reg, DataType::Type::kReference)
+            : LoadNullCheckedLocal(obj_reg, invoke->GetDexPc());
+        if (receiver_arg != ReceiverArg::kNullCheckedOnly) {
+          invoke->SetRawInputAt(0u, arg);
+          argument_index = 1u;
+        }
+      }
+    }
+  }
+
+  for (size_t i = start_index; i < number_of_operands; ++i, ++argument_index) {
+    // Make sure we don't go over the expected arguments or over the number of
+    // dex registers given. If the instruction was seen as dead by the verifier,
+    // it hasn't been properly checked.
+    if (UNLIKELY(shorty[shorty_index] == 0)) {
+      argument_length_error = true;
+      break;
+    }
     DataType::Type type = DataType::FromShorty(shorty[shorty_index++]);
     bool is_wide = (type == DataType::Type::kInt64) || (type == DataType::Type::kFloat64);
     if (is_wide && ((i + 1 == number_of_operands) ||
                     (operands.GetOperand(i) + 1 != operands.GetOperand(i + 1)))) {
-      // Longs and doubles should be in pairs, that is, sequential registers. The verifier should
-      // reject any class where this is violated. However, the verifier only does these checks
-      // on non trivially dead instructions, so we just bailout the compilation.
-      VLOG(compiler) << "Did not compile "
-                     << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
-                     << " because of non-sequential dex register pair in wide argument";
-      MaybeRecordStat(compilation_stats_,
-                      MethodCompilationStat::kNotCompiledMalformedOpcode);
+      if (invoke->IsInvoke()) {
+        // Longs and doubles should be in pairs, that is, sequential registers. The verifier should
+        // reject any class where this is violated. However, the verifier only does these checks
+        // on non trivially dead instructions, so we just bailout the compilation.
+        VLOG(compiler) << "Did not compile "
+                       << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
+                       << " because of non-sequential dex register pair in wide argument";
+        MaybeRecordStat(compilation_stats_,
+                        MethodCompilationStat::kNotCompiledMalformedOpcode);
+      }
       return false;
     }
     HInstruction* arg = LoadLocal(operands.GetOperand(i), type);
-    invoke->SetArgumentAt(*argument_index, arg);
+    DCHECK(invoke->InputAt(argument_index) == nullptr);
+    invoke->SetRawInputAt(argument_index, arg);
     if (is_wide) {
-      i++;
+      ++i;
     }
   }
 
-  if (*argument_index != invoke->GetNumberOfArguments()) {
-    VLOG(compiler) << "Did not compile "
-                   << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
-                   << " because of wrong number of arguments in invoke instruction";
-    MaybeRecordStat(compilation_stats_,
-                    MethodCompilationStat::kNotCompiledMalformedOpcode);
+  argument_length_error = argument_length_error || shorty[shorty_index] != 0;
+  if (argument_length_error) {
+    if (invoke->IsInvoke()) {
+      VLOG(compiler) << "Did not compile "
+                     << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
+                     << " because of wrong number of arguments in invoke instruction";
+      MaybeRecordStat(compilation_stats_,
+                      MethodCompilationStat::kNotCompiledMalformedOpcode);
+    }
     return false;
   }
 
   if (invoke->IsInvokeStaticOrDirect() &&
       HInvokeStaticOrDirect::NeedsCurrentMethodInput(
           invoke->AsInvokeStaticOrDirect()->GetMethodLoadKind())) {
-    invoke->SetArgumentAt(*argument_index, graph_->GetCurrentMethod());
-    (*argument_index)++;
+    DCHECK_EQ(argument_index, invoke->AsInvokeStaticOrDirect()->GetSpecialInputIndex());
+    DCHECK(invoke->InputAt(argument_index) == nullptr);
+    invoke->SetRawInputAt(argument_index, graph_->GetCurrentMethod());
   }
 
   return true;
@@ -1487,37 +1542,201 @@ bool HInstructionBuilder::SetupInvokeArguments(HInvoke* invoke,
 bool HInstructionBuilder::HandleInvoke(HInvoke* invoke,
                                        const InstructionOperands& operands,
                                        const char* shorty,
-                                       bool is_unresolved,
-                                       HClinitCheck* clinit_check) {
+                                       bool is_unresolved) {
   DCHECK(!invoke->IsInvokeStaticOrDirect() || !invoke->AsInvokeStaticOrDirect()->IsStringInit());
 
-  size_t start_index = 0;
-  size_t argument_index = 0;
-  if (invoke->GetInvokeType() != InvokeType::kStatic) {  // Instance call.
-    uint32_t obj_reg = operands.GetOperand(0);
-    HInstruction* arg = is_unresolved
-        ? LoadLocal(obj_reg, DataType::Type::kReference)
-        : LoadNullCheckedLocal(obj_reg, invoke->GetDexPc());
-    invoke->SetArgumentAt(0, arg);
-    start_index = 1;
-    argument_index = 1;
-  }
-
-  if (!SetupInvokeArguments(invoke, operands, shorty, start_index, &argument_index)) {
+  ReceiverArg receiver_arg = (invoke->GetInvokeType() == InvokeType::kStatic)
+      ? ReceiverArg::kNone
+      : (is_unresolved ? ReceiverArg::kPlainArg : ReceiverArg::kNullCheckedArg);
+  if (!SetupInvokeArguments(invoke, operands, shorty, receiver_arg)) {
     return false;
-  }
-
-  if (clinit_check != nullptr) {
-    // Add the class initialization check as last input of `invoke`.
-    DCHECK(invoke->IsInvokeStaticOrDirect());
-    DCHECK(invoke->AsInvokeStaticOrDirect()->GetClinitCheckRequirement()
-        == HInvokeStaticOrDirect::ClinitCheckRequirement::kExplicit);
-    invoke->SetArgumentAt(argument_index, clinit_check);
-    argument_index++;
   }
 
   AppendInstruction(invoke);
   latest_result_ = invoke;
+
+  return true;
+}
+
+bool HInstructionBuilder::BuildSimpleIntrinsic(ArtMethod* method,
+                                               uint32_t dex_pc,
+                                               const InstructionOperands& operands,
+                                               const char* shorty) {
+  Intrinsics intrinsic = static_cast<Intrinsics>(method->GetIntrinsic());
+  DCHECK_NE(intrinsic, Intrinsics::kNone);
+  constexpr DataType::Type kInt32 = DataType::Type::kInt32;
+  constexpr DataType::Type kInt64 = DataType::Type::kInt64;
+  constexpr DataType::Type kFloat32 = DataType::Type::kFloat32;
+  constexpr DataType::Type kFloat64 = DataType::Type::kFloat64;
+  ReceiverArg receiver_arg = method->IsStatic() ? ReceiverArg::kNone : ReceiverArg::kNullCheckedArg;
+  HInstruction* instruction = nullptr;
+  switch (intrinsic) {
+    case Intrinsics::kIntegerRotateRight:
+    case Intrinsics::kIntegerRotateLeft:
+      // For rotate left, we negate the distance below.
+      instruction = new (allocator_) HRor(kInt32, /*value=*/ nullptr, /*distance=*/ nullptr);
+      break;
+    case Intrinsics::kLongRotateRight:
+    case Intrinsics::kLongRotateLeft:
+      // For rotate left, we negate the distance below.
+      instruction = new (allocator_) HRor(kInt64, /*value=*/ nullptr, /*distance=*/ nullptr);
+      break;
+    case Intrinsics::kIntegerCompare:
+      instruction = new (allocator_) HCompare(
+          kInt32, /*first=*/ nullptr, /*second=*/ nullptr, ComparisonBias::kNoBias, dex_pc);
+      break;
+    case Intrinsics::kLongCompare:
+      instruction = new (allocator_) HCompare(
+          kInt64, /*first=*/ nullptr, /*second=*/ nullptr, ComparisonBias::kNoBias, dex_pc);
+      break;
+    case Intrinsics::kIntegerSignum:
+      instruction = new (allocator_) HCompare(
+          kInt32, /*first=*/ nullptr, graph_->GetIntConstant(0), ComparisonBias::kNoBias, dex_pc);
+      break;
+    case Intrinsics::kLongSignum:
+      instruction = new (allocator_) HCompare(
+          kInt64, /*first=*/ nullptr, graph_->GetLongConstant(0), ComparisonBias::kNoBias, dex_pc);
+      break;
+    case Intrinsics::kFloatIsNaN:
+    case Intrinsics::kDoubleIsNaN: {
+      // IsNaN(x) is the same as x != x.
+      instruction = new (allocator_) HNotEqual(/*first=*/ nullptr, /*second=*/ nullptr, dex_pc);
+      instruction->AsCondition()->SetBias(ComparisonBias::kLtBias);
+      break;
+    }
+    case Intrinsics::kStringCharAt:
+      // We treat String as an array to allow DCE and BCE to seamlessly work on strings.
+      instruction = new (allocator_) HArrayGet(/*array=*/ nullptr,
+                                               /*index=*/ nullptr,
+                                               DataType::Type::kUint16,
+                                               SideEffects::None(),  // Strings are immutable.
+                                               dex_pc,
+                                               /*is_string_char_at=*/ true);
+      break;
+    case Intrinsics::kStringIsEmpty:
+    case Intrinsics::kStringLength:
+      // We treat String as an array to allow DCE and BCE to seamlessly work on strings.
+      // For String.isEmpty(), we add a comparison with 0 below.
+      instruction =
+          new (allocator_) HArrayLength(/*array=*/ nullptr, dex_pc, /* is_string_length= */ true);
+      break;
+    case Intrinsics::kUnsafeLoadFence:
+      receiver_arg = ReceiverArg::kNullCheckedOnly;
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kLoadAny, dex_pc);
+      break;
+    case Intrinsics::kUnsafeStoreFence:
+      receiver_arg = ReceiverArg::kNullCheckedOnly;
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kAnyStore, dex_pc);
+      break;
+    case Intrinsics::kUnsafeFullFence:
+      receiver_arg = ReceiverArg::kNullCheckedOnly;
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kAnyAny, dex_pc);
+      break;
+    case Intrinsics::kVarHandleFullFence:
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kAnyAny, dex_pc);
+      break;
+    case Intrinsics::kVarHandleAcquireFence:
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kLoadAny, dex_pc);
+      break;
+    case Intrinsics::kVarHandleReleaseFence:
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kAnyStore, dex_pc);
+      break;
+    case Intrinsics::kVarHandleLoadLoadFence:
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kLoadAny, dex_pc);
+      break;
+    case Intrinsics::kVarHandleStoreStoreFence:
+      instruction = new (allocator_) HMemoryBarrier(MemBarrierKind::kStoreStore, dex_pc);
+      break;
+    case Intrinsics::kMathMinIntInt:
+      instruction = new (allocator_) HMin(kInt32, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMinLongLong:
+      instruction = new (allocator_) HMin(kInt64, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMinFloatFloat:
+      instruction = new (allocator_) HMin(kFloat32, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMinDoubleDouble:
+      instruction = new (allocator_) HMin(kFloat64, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMaxIntInt:
+      instruction = new (allocator_) HMax(kInt32, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMaxLongLong:
+      instruction = new (allocator_) HMax(kInt64, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMaxFloatFloat:
+      instruction = new (allocator_) HMax(kFloat32, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathMaxDoubleDouble:
+      instruction = new (allocator_) HMax(kFloat64, /*left=*/ nullptr, /*right=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathAbsInt:
+      instruction = new (allocator_) HAbs(kInt32, /*input=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathAbsLong:
+      instruction = new (allocator_) HAbs(kInt64, /*input=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathAbsFloat:
+      instruction = new (allocator_) HAbs(kFloat32, /*input=*/ nullptr, dex_pc);
+      break;
+    case Intrinsics::kMathAbsDouble:
+      instruction = new (allocator_) HAbs(kFloat64, /*input=*/ nullptr, dex_pc);
+      break;
+    default:
+      // We do not have intermediate representation for other intrinsics.
+      return false;
+  }
+  DCHECK(instruction != nullptr);
+  if (!SetupInvokeArguments(instruction, operands, shorty, receiver_arg)) {
+    return false;
+  }
+
+  switch (intrinsic) {
+    case Intrinsics::kIntegerRotateLeft:
+    case Intrinsics::kLongRotateLeft: {
+      // Negate the distance value for rotate left.
+      DCHECK(instruction->IsRor());
+      HNeg* neg = new (allocator_) HNeg(kInt32, instruction->InputAt(1u));
+      AppendInstruction(neg);
+      instruction->SetRawInputAt(1u, neg);
+      break;
+    }
+    case Intrinsics::kFloatIsNaN:
+    case Intrinsics::kDoubleIsNaN:
+      // Set the second input to be the same as first.
+      DCHECK(instruction->IsNotEqual());
+      DCHECK(instruction->InputAt(1u) == nullptr);
+      instruction->SetRawInputAt(1u, instruction->InputAt(0u));
+      break;
+    case Intrinsics::kStringCharAt: {
+      // Add bounds check.
+      HInstruction* array = instruction->InputAt(0u);
+      HInstruction* index = instruction->InputAt(1u);
+      HInstruction* length =
+          new (allocator_) HArrayLength(array, dex_pc, /*is_string_length=*/ true);
+      AppendInstruction(length);
+      HBoundsCheck* bounds_check =
+          new (allocator_) HBoundsCheck(index, length, dex_pc, /*is_string_char_at=*/ true);
+      AppendInstruction(bounds_check);
+      graph_->SetHasBoundsChecks(true);
+      instruction->SetRawInputAt(1u, bounds_check);
+      break;
+    }
+    case Intrinsics::kStringIsEmpty: {
+      // Compare the length with 0.
+      DCHECK(instruction->IsArrayLength());
+      AppendInstruction(instruction);
+      HEqual* equal = new (allocator_) HEqual(instruction, graph_->GetIntConstant(0), dex_pc);
+      instruction = equal;
+      break;
+    }
+    default:
+      break;
+  }
+
+  AppendInstruction(instruction);
+  latest_result_ = instruction;
 
   return true;
 }
@@ -1528,9 +1747,7 @@ bool HInstructionBuilder::HandleStringInit(HInvoke* invoke,
   DCHECK(invoke->IsInvokeStaticOrDirect());
   DCHECK(invoke->AsInvokeStaticOrDirect()->IsStringInit());
 
-  size_t start_index = 1;
-  size_t argument_index = 0;
-  if (!SetupInvokeArguments(invoke, operands, shorty, start_index, &argument_index)) {
+  if (!SetupInvokeArguments(invoke, operands, shorty, ReceiverArg::kIgnored)) {
     return false;
   }
 

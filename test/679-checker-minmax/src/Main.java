@@ -23,19 +23,13 @@ public class Main {
   // Direct intrinsics.
   //
 
-  /// CHECK-START: int Main.minI(int) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:i\d+>> ParameterValue
-  /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
-  /// CHECK-DAG: <<Min:i\d+>> InvokeStaticOrDirect [<<Par>>,<<Con>>] intrinsic:MathMinIntInt
-  /// CHECK-DAG:              Return [<<Min>>]
-  //
-  /// CHECK-START: int Main.minI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.minI(int) builder (after)
   /// CHECK-DAG: <<Par:i\d+>> ParameterValue
   /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
   /// CHECK-DAG: <<Min:i\d+>> Min [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.minI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.minI(int) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
   /// CHECK-START-ARM64: int Main.minI(int) disassembly (after)
@@ -48,19 +42,13 @@ public class Main {
     return Math.min(a, 20);
   }
 
-  /// CHECK-START: long Main.minL(long) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:j\d+>> ParameterValue
-  /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
-  /// CHECK-DAG: <<Min:j\d+>> InvokeStaticOrDirect [<<Par>>,<<Con>>] intrinsic:MathMinLongLong
-  /// CHECK-DAG:              Return [<<Min>>]
-  //
-  /// CHECK-START: long Main.minL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.minL(long) builder (after)
   /// CHECK-DAG: <<Par:j\d+>> ParameterValue
   /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
   /// CHECK-DAG: <<Min:j\d+>> Min [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: long Main.minL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.minL(long) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
   /// CHECK-START-ARM64: long Main.minL(long) disassembly (after)
@@ -73,19 +61,13 @@ public class Main {
     return Math.min(a, 20L);
   }
 
-  /// CHECK-START: int Main.maxI(int) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:i\d+>> ParameterValue
-  /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
-  /// CHECK-DAG: <<Max:i\d+>> InvokeStaticOrDirect [<<Par>>,<<Con>>] intrinsic:MathMaxIntInt
-  /// CHECK-DAG:              Return [<<Max>>]
-  //
-  /// CHECK-START: int Main.maxI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.maxI(int) builder (after)
   /// CHECK-DAG: <<Par:i\d+>> ParameterValue
   /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
   /// CHECK-DAG: <<Max:i\d+>> Max [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.maxI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.maxI(int) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
   /// CHECK-START-ARM64: int Main.maxI(int) disassembly (after)
@@ -98,19 +80,13 @@ public class Main {
     return Math.max(a, 20);
   }
 
-  /// CHECK-START: long Main.maxL(long) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:j\d+>> ParameterValue
-  /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
-  /// CHECK-DAG: <<Max:j\d+>> InvokeStaticOrDirect [<<Par>>,<<Con>>] intrinsic:MathMaxLongLong
-  /// CHECK-DAG:              Return [<<Max>>]
-  //
-  /// CHECK-START: long Main.maxL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.maxL(long) builder (after)
   /// CHECK-DAG: <<Par:j\d+>> ParameterValue
   /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
   /// CHECK-DAG: <<Max:j\d+>> Max [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: long Main.maxL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.maxL(long) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
   /// CHECK-START-ARM64: long Main.maxL(long) disassembly (after)
