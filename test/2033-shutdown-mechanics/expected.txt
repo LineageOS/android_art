@@ -1,0 +1,6 @@
+JNI_OnLoad called
+Main Started
+Child started
+Main Finished
+Saw RuntimeShutdownFunctions
+Saw RuntimeDeleted
