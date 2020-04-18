@@ -1,0 +1,3 @@
+Check that when the main thread completes with a Daemon thread running
+in native code, the JNI environment is suitably adjusted so that we
+can avoid accessing deleted data structures.
