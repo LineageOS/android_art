@@ -594,6 +594,7 @@ cc_defaults {
         "1985-structural-redefine-stack-scope/stack_scope.cc",
         "2011-stack-walk-concurrent-instrument/stack_walk_concurrent.cc",
         "2031-zygote-compiled-frame-deopt/native-wait.cc",
+        "2033-shutdown-mechanics/native_shutdown.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],
