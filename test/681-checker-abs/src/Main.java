@@ -23,33 +23,23 @@ public class Main {
   // Intrinsics.
   //
 
-  /// CHECK-START: int Main.absI(int) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:i\d+>> ParameterValue
-  /// CHECK-DAG: <<Abs:i\d+>> InvokeStaticOrDirect [<<Par>>] intrinsic:MathAbsInt
-  /// CHECK-DAG:              Return [<<Abs>>]
-  //
-  /// CHECK-START: int Main.absI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.absI(int) builder (after)
   /// CHECK-DAG: <<Par:i\d+>> ParameterValue
   /// CHECK-DAG: <<Abs:i\d+>> Abs [<<Par>>]
   /// CHECK-DAG:              Return [<<Abs>>]
   //
-  /// CHECK-START: int Main.absI(int) instruction_simplifier (after)
+  /// CHECK-START: int Main.absI(int) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   public static int absI(int a) {
     return Math.abs(a);
   }
 
-  /// CHECK-START: long Main.absL(long) instruction_simplifier (before)
-  /// CHECK-DAG: <<Par:j\d+>> ParameterValue
-  /// CHECK-DAG: <<Abs:j\d+>> InvokeStaticOrDirect [<<Par>>] intrinsic:MathAbsLong
-  /// CHECK-DAG:              Return [<<Abs>>]
-  //
-  /// CHECK-START: long Main.absL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.absL(long) builder (after)
   /// CHECK-DAG: <<Par:j\d+>> ParameterValue
   /// CHECK-DAG: <<Abs:j\d+>> Abs [<<Par>>]
   /// CHECK-DAG:              Return [<<Abs>>]
   //
-  /// CHECK-START: long Main.absL(long) instruction_simplifier (after)
+  /// CHECK-START: long Main.absL(long) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   public static long absL(long a) {
     return Math.abs(a);
@@ -223,7 +213,7 @@ public class Main {
   /// CHECK-DAG: <<Par:b\d+>> ParameterValue
   /// CHECK-DAG: <<Msk:i\d+>> IntConstant 255
   /// CHECK-DAG: <<And:i\d+>> [<<Par>>,<<Msk>>]
-  /// CHECK-DAG: <<Abs:i\d+>> InvokeStaticOrDirect [<<And>>] intrinsic:MathAbsInt
+  /// CHECK-DAG: <<Abs:i\d+>> Abs
   /// CHECK-DAG:              Return [<<Abs>>]
   //
   /// CHECK-START: int Main.zabs1(byte) instruction_simplifier (after)
@@ -232,7 +222,6 @@ public class Main {
   /// CHECK-DAG:              Return [<<Cnv>>]
   //
   /// CHECK-START: int Main.zabs1(byte) instruction_simplifier (after)
-  /// CHECK-NOT:              InvokeStaticOrDirect
   /// CHECK-NOT:              Abs
   public static int zabs1(byte a) {
     return Math.abs(a & 0xff);
@@ -242,7 +231,7 @@ public class Main {
   /// CHECK-DAG: <<Par:s\d+>> ParameterValue
   /// CHECK-DAG: <<Msk:i\d+>> IntConstant 65535
   /// CHECK-DAG: <<And:i\d+>> [<<Msk>>,<<Par>>]
-  /// CHECK-DAG: <<Abs:i\d+>> InvokeStaticOrDirect [<<And>>] intrinsic:MathAbsInt
+  /// CHECK-DAG: <<Abs:i\d+>> Abs
   /// CHECK-DAG:              Return [<<Abs>>]
   //
   /// CHECK-START: int Main.zabs2(short) instruction_simplifier (after)
@@ -251,7 +240,6 @@ public class Main {
   /// CHECK-DAG:              Return [<<Cnv>>]
   //
   /// CHECK-START: int Main.zabs2(short) instruction_simplifier (after)
-  /// CHECK-NOT:              InvokeStaticOrDirect
   /// CHECK-NOT:              Abs
   public static int zabs2(short a) {
     return Math.abs(a & 0xffff);
@@ -259,20 +247,14 @@ public class Main {
 
   /// CHECK-START: int Main.zabs3(char) instruction_simplifier (before)
   /// CHECK-DAG: <<Par:c\d+>> ParameterValue
-  /// CHECK-DAG: <<Abs:i\d+>> InvokeStaticOrDirect [<<Par>>] intrinsic:MathAbsInt
+  /// CHECK-DAG: <<Abs:i\d+>> Abs
   /// CHECK-DAG:              Return [<<Abs>>]
   //
   /// CHECK-START: int Main.zabs3(char) instruction_simplifier (after)
   /// CHECK-DAG: <<Par:c\d+>> ParameterValue
-  /// CHECK-DAG: <<Abs:i\d+>> Abs [<<Par>>]
-  /// CHECK-DAG:              Return [<<Abs>>]
-  //
-  /// CHECK-START: int Main.zabs3(char) instruction_simplifier$after_gvn (after)
-  /// CHECK-DAG: <<Par:c\d+>> ParameterValue
   /// CHECK-DAG:              Return [<<Par>>]
   //
-  /// CHECK-START: int Main.zabs3(char) instruction_simplifier$after_gvn (after)
-  /// CHECK-NOT:              InvokeStaticOrDirect
+  /// CHECK-START: int Main.zabs3(char) instruction_simplifier (after)
   /// CHECK-NOT:              Abs
   public static int zabs3(char a) {
     return Math.abs(a);

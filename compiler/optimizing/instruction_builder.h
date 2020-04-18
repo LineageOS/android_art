@@ -243,17 +243,22 @@ class HInstructionBuilder : public ValueObject {
                                      uint32_t dex_pc,
                                      HInvoke* invoke);
 
-  bool SetupInvokeArguments(HInvoke* invoke,
+  enum class ReceiverArg {
+    kNone,             // No receiver, static method.
+    kNullCheckedArg,   // Normal instance invoke, null check and pass the argument.
+    kNullCheckedOnly,  // Null check but do not use the arg, used for intrinsic replacements.
+    kPlainArg,         // Do not null check but pass the argument, used for unresolved methods.
+    kIgnored,          // No receiver despite allocated vreg, used for String.<init>.
+  };
+  bool SetupInvokeArguments(HInstruction* invoke,
                             const InstructionOperands& operands,
                             const char* shorty,
-                            size_t start_index,
-                            size_t* argument_index);
+                            ReceiverArg receiver_arg);
 
   bool HandleInvoke(HInvoke* invoke,
                     const InstructionOperands& operands,
                     const char* shorty,
-                    bool is_unresolved,
-                    HClinitCheck* clinit_check = nullptr);
+                    bool is_unresolved);
 
   bool HandleStringInit(HInvoke* invoke,
                         const InstructionOperands& operands,
@@ -264,6 +269,14 @@ class HInstructionBuilder : public ValueObject {
       uint32_t dex_pc,
       ArtMethod* method,
       HInvokeStaticOrDirect::ClinitCheckRequirement* clinit_check_requirement);
+
+  // Try to build a replacement for an intrinsic invoke. Returns true on success,
+  // false on failure. Failure can be either lack of replacement HIR classes, or
+  // input register mismatch.
+  bool BuildSimpleIntrinsic(ArtMethod* method,
+                            uint32_t dex_pc,
+                            const InstructionOperands& operands,
+                            const char* shorty);
 
   // Build a HNewInstance instruction.
   HNewInstance* BuildNewInstance(dex::TypeIndex type_index, uint32_t dex_pc);
