@@ -15,11 +15,7 @@
 .class public LSmaliTests;
 .super Ljava/lang/Object;
 
-## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) instruction_simplifier (before)
-## CHECK-DAG:  <<Char:c\d+>>     InvokeVirtual intrinsic:StringCharAt
-## CHECK-DAG:                    Return [<<Char>>]
-
-## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) instruction_simplifier (after)
+## CHECK-START: char SmaliTests.$noinline$stringCharAtCatch(java.lang.String, int) builder (after)
 ## CHECK-DAG:  <<String:l\d+>>   ParameterValue
 ## CHECK-DAG:  <<Pos:i\d+>>      ParameterValue
 ## CHECK-DAG:  <<NullCk:l\d+>>   NullCheck [<<String>>]
@@ -54,13 +50,7 @@
     return v1
 .end method
 
-##  CHECK-START: char SmaliTests.stringCharAtCatchPhiReturn(java.lang.String, int) instruction_simplifier (before)
-##  CHECK-DAG:  <<Int:i\d+>>      IntConstant 0
-##  CHECK-DAG:  <<Char:c\d+>>     InvokeVirtual intrinsic:StringCharAt
-##  CHECK-DAG:  <<Phi:i\d+>>      Phi [<<Char>>,<<Int>>]
-##  CHECK-DAG:                    Return [<<Phi>>]
-
-##  CHECK-START: char SmaliTests.stringCharAtCatchPhiReturn(java.lang.String, int) instruction_simplifier (after)
+##  CHECK-START: char SmaliTests.stringCharAtCatchPhiReturn(java.lang.String, int) builder (after)
 ##  CHECK-DAG:  <<String:l\d+>>   ParameterValue
 ##  CHECK-DAG:  <<Pos:i\d+>>      ParameterValue
 ##  CHECK-DAG:  <<Int:i\d+>>      IntConstant 0

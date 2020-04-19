@@ -281,6 +281,19 @@ class Location : public ValueObject {
     return GetKind() == kSIMDStackSlot;
   }
 
+  static Location StackSlotByNumOfSlots(size_t num_of_slots, int spill_slot) {
+    DCHECK_NE(num_of_slots, 0u);
+    switch (num_of_slots) {
+      case 1u:
+        return Location::StackSlot(spill_slot);
+      case 2u:
+        return Location::DoubleStackSlot(spill_slot);
+      default:
+        // Assume all other stack slot sizes correspond to SIMD slot size.
+        return Location::SIMDStackSlot(spill_slot);
+    }
+  }
+
   intptr_t GetStackIndex() const {
     DCHECK(IsStackSlot() || IsDoubleStackSlot() || IsSIMDStackSlot());
     // Decode stack index manually to preserve sign.

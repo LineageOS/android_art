@@ -21,6 +21,7 @@
 #include "arch/instruction_set.h"
 #include "arch/x86/instruction_set_features_x86.h"
 #include "arch/x86_64/instruction_set_features_x86_64.h"
+#include "code_generator.h"
 #include "driver/compiler_options.h"
 #include "linear_order.h"
 #include "mirror/array-inl.h"
@@ -457,12 +458,13 @@ static DataType::Type GetNarrowerType(HInstruction* a, HInstruction* b) {
 //
 
 HLoopOptimization::HLoopOptimization(HGraph* graph,
-                                     const CompilerOptions* compiler_options,
+                                     const CodeGenerator& codegen,
                                      HInductionVarAnalysis* induction_analysis,
                                      OptimizingCompilerStats* stats,
                                      const char* name)
     : HOptimization(graph, name, stats),
-      compiler_options_(compiler_options),
+      compiler_options_(&codegen.GetCompilerOptions()),
+      simd_register_size_(codegen.GetSIMDRegisterWidth()),
       induction_range_(induction_analysis),
       loop_allocator_(nullptr),
       global_allocator_(graph_->GetAllocator()),
@@ -886,12 +888,6 @@ bool HLoopOptimization::TryFullUnrolling(LoopAnalysisInfo* analysis_info, bool g
 }
 
 bool HLoopOptimization::TryPeelingAndUnrolling(LoopNode* node) {
-  // Don't run peeling/unrolling if compiler_options_ is nullptr (i.e., running under tests)
-  // as InstructionSet is needed.
-  if (compiler_options_ == nullptr) {
-    return false;
-  }
-
   HLoopInformation* loop_info = node->loop_info;
   int64_t trip_count = LoopAnalysis::GetLoopTripCount(loop_info, &induction_range_);
   LoopAnalysisInfo analysis_info(loop_info);
@@ -1543,13 +1539,15 @@ bool HLoopOptimization::VectorizeUse(LoopNode* node,
 }
 
 uint32_t HLoopOptimization::GetVectorSizeInBytes() {
-  switch (compiler_options_->GetInstructionSet()) {
-    case InstructionSet::kArm:
-    case InstructionSet::kThumb2:
-      return 8;  // 64-bit SIMD
-    default:
-      return 16;  // 128-bit SIMD
+  if (kIsDebugBuild) {
+    InstructionSet isa = compiler_options_->GetInstructionSet();
+    // TODO: Remove this check when there are no implicit assumptions on the SIMD reg size.
+    DCHECK_EQ(simd_register_size_, (isa == InstructionSet::kArm || isa == InstructionSet::kThumb2)
+                                   ? 8u
+                                   : 16u);
   }
+
+  return simd_register_size_;
 }
 
 bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrictions) {
@@ -1564,14 +1562,14 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
         case DataType::Type::kUint8:
         case DataType::Type::kInt8:
           *restrictions |= kNoDiv | kNoReduction | kNoDotProd;
-          return TrySetVectorLength(8);
+          return TrySetVectorLength(type, 8);
         case DataType::Type::kUint16:
         case DataType::Type::kInt16:
           *restrictions |= kNoDiv | kNoStringCharAt | kNoReduction | kNoDotProd;
-          return TrySetVectorLength(4);
+          return TrySetVectorLength(type, 4);
         case DataType::Type::kInt32:
           *restrictions |= kNoDiv | kNoWideSAD;
-          return TrySetVectorLength(2);
+          return TrySetVectorLength(type, 2);
         default:
           break;
       }
@@ -1584,23 +1582,23 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
         case DataType::Type::kUint8:
         case DataType::Type::kInt8:
           *restrictions |= kNoDiv;
-          return TrySetVectorLength(16);
+          return TrySetVectorLength(type, 16);
         case DataType::Type::kUint16:
         case DataType::Type::kInt16:
           *restrictions |= kNoDiv;
-          return TrySetVectorLength(8);
+          return TrySetVectorLength(type, 8);
         case DataType::Type::kInt32:
           *restrictions |= kNoDiv;
-          return TrySetVectorLength(4);
+          return TrySetVectorLength(type, 4);
         case DataType::Type::kInt64:
           *restrictions |= kNoDiv | kNoMul;
-          return TrySetVectorLength(2);
+          return TrySetVectorLength(type, 2);
         case DataType::Type::kFloat32:
           *restrictions |= kNoReduction;
-          return TrySetVectorLength(4);
+          return TrySetVectorLength(type, 4);
         case DataType::Type::kFloat64:
           *restrictions |= kNoReduction;
-          return TrySetVectorLength(2);
+          return TrySetVectorLength(type, 2);
         default:
           return false;
       }
@@ -1620,7 +1618,7 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
                              kNoUnroundedHAdd |
                              kNoSAD |
                              kNoDotProd;
-            return TrySetVectorLength(16);
+            return TrySetVectorLength(type, 16);
           case DataType::Type::kUint16:
             *restrictions |= kNoDiv |
                              kNoAbs |
@@ -1628,26 +1626,26 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
                              kNoUnroundedHAdd |
                              kNoSAD |
                              kNoDotProd;
-            return TrySetVectorLength(8);
+            return TrySetVectorLength(type, 8);
           case DataType::Type::kInt16:
             *restrictions |= kNoDiv |
                              kNoAbs |
                              kNoSignedHAdd |
                              kNoUnroundedHAdd |
                              kNoSAD;
-            return TrySetVectorLength(8);
+            return TrySetVectorLength(type, 8);
           case DataType::Type::kInt32:
             *restrictions |= kNoDiv | kNoSAD;
-            return TrySetVectorLength(4);
+            return TrySetVectorLength(type, 4);
           case DataType::Type::kInt64:
             *restrictions |= kNoMul | kNoDiv | kNoShr | kNoAbs | kNoSAD;
-            return TrySetVectorLength(2);
+            return TrySetVectorLength(type, 2);
           case DataType::Type::kFloat32:
             *restrictions |= kNoReduction;
-            return TrySetVectorLength(4);
+            return TrySetVectorLength(type, 4);
           case DataType::Type::kFloat64:
             *restrictions |= kNoReduction;
-            return TrySetVectorLength(2);
+            return TrySetVectorLength(type, 2);
           default:
             break;
         }  // switch type
@@ -1658,7 +1656,7 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
   }  // switch instruction set
 }
 
-bool HLoopOptimization::TrySetVectorLength(uint32_t length) {
+bool HLoopOptimization::TrySetVectorLengthImpl(uint32_t length) {
   DCHECK(IsPowerOfTwo(length) && length >= 2u);
   // First time set?
   if (vector_length_ == 0) {

@@ -29,60 +29,45 @@ public class Main {
   //
 
   /// CHECK-START: void Main.fullFence() builder (after)
-  /// CHECK-DAG: InvokeStaticOrDirect intrinsic:VarHandleFullFence
+  /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.fullFence() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeStaticOrDirect intrinsic:VarHandleFullFence
-  //
-  /// CHECK-START: void Main.fullFence() instruction_simplifier (after)
+  /// CHECK-START: void Main.fullFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyAny
   private static void fullFence() {
       VarHandle.fullFence();
   }
 
   /// CHECK-START: void Main.acquireFence() builder (after)
-  /// CHECK-DAG: InvokeStaticOrDirect intrinsic:VarHandleAcquireFence
+  /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.acquireFence() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeStaticOrDirect intrinsic:VarHandleAcquireFence
-  //
-  /// CHECK-START: void Main.acquireFence() instruction_simplifier (after)
+  /// CHECK-START: void Main.acquireFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:LoadAny
   private static void acquireFence() {
       VarHandle.acquireFence();
   }
 
   /// CHECK-START: void Main.releaseFence() builder (after)
-  /// CHECK-DAG: InvokeStaticOrDirect intrinsic:VarHandleReleaseFence
+  /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.releaseFence() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeStaticOrDirect intrinsic:VarHandleReleaseFence
-  //
-  /// CHECK-START: void Main.releaseFence() instruction_simplifier (after)
+  /// CHECK-START: void Main.releaseFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyStore
   private static void releaseFence() {
       VarHandle.releaseFence();
   }
 
   /// CHECK-START: void Main.loadLoadFence() builder (after)
-  /// CHECK-DAG: InvokeStaticOrDirect intrinsic:VarHandleLoadLoadFence
+  /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.loadLoadFence() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeStaticOrDirect intrinsic:VarHandleLoadLoadFence
-  //
-  /// CHECK-START: void Main.loadLoadFence() instruction_simplifier (after)
+  /// CHECK-START: void Main.loadLoadFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:LoadAny
   private static void loadLoadFence() {
       VarHandle.loadLoadFence();
   }
 
   /// CHECK-START: void Main.storeStoreFence() builder (after)
-  /// CHECK-DAG: InvokeStaticOrDirect intrinsic:VarHandleStoreStoreFence
+  /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.storeStoreFence() instruction_simplifier (after)
-  /// CHECK-NOT: InvokeStaticOrDirect intrinsic:VarHandleStoreStoreFence
-  //
-  /// CHECK-START: void Main.storeStoreFence() instruction_simplifier (after)
+  /// CHECK-START: void Main.storeStoreFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:StoreStore
   private static void storeStoreFence() {
       VarHandle.storeStoreFence();
