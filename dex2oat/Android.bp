@@ -181,8 +181,7 @@ cc_defaults {
 
     target: {
         android: {
-            // Use the 32-bit version of dex2oat on devices.
-            compile_multilib: "prefer32",
+            compile_multilib: "both",
         },
     },
     header_libs: [
@@ -250,6 +249,15 @@ art_cc_binary {
         "libart-dex2oat",
     ],
 
+    multilib: {
+        lib32: {
+            suffix: "32",
+        },
+        lib64: {
+            suffix: "64",
+        },
+    },
+
     pgo: {
         // Additional cflags just for dex2oat during PGO instrumentation
         cflags: [
@@ -279,6 +287,7 @@ art_cc_binary {
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
             compile_multilib: "64",
+            symlink_preferred_arch: true,
         },
     },
     apex_available: [
@@ -316,7 +325,6 @@ art_cc_binary {
             static_libs: [
                 "libz",
             ],
-            compile_multilib: "prefer32",
         },
         host: {
             shared_libs: [
@@ -330,11 +338,21 @@ art_cc_binary {
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
             compile_multilib: "64",
+            symlink_preferred_arch: true,
         },
     },
     apex_available: [
         "com.android.art.debug",
     ],
+
+    multilib: {
+        lib32: {
+            suffix: "32",
+        },
+        lib64: {
+            suffix: "64",
+        },
+    },
 }
 
 cc_defaults {
