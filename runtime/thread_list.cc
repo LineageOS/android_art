@@ -1191,8 +1191,9 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
   bool have_complained = false;
   static constexpr size_t kTimeoutMicroseconds = 2000 * 1000;
   static constexpr size_t kSleepMicroseconds = 1000;
-  for (size_t i = 0; i < kTimeoutMicroseconds / kSleepMicroseconds; ++i) {
-    bool all_suspended = true;
+  bool all_suspended = false;
+  for (size_t i = 0; !all_suspended && i < kTimeoutMicroseconds / kSleepMicroseconds; ++i) {
+    bool found_running = false;
     {
       MutexLock mu(self, *Locks::thread_list_lock_);
       for (const auto& thread : list_) {
@@ -1201,42 +1202,53 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
             LOG(WARNING) << "daemon thread not yet suspended: " << *thread;
             have_complained = true;
           }
-          all_suspended = false;
+          found_running = true;
         }
       }
     }
-    if (all_suspended) {
-      // Wait again for all the now "suspended" threads to actually quiesce. (b)
-      static constexpr size_t kDaemonSleepTime = 200 * 1000;
-      usleep(kDaemonSleepTime);
-      std::list<Thread*> list_copy;
-      {
-        MutexLock mu(self, *Locks::thread_list_lock_);
-        // Half-way through the wait, set the "runtime deleted" flag, causing any newly awoken
-        // threads to immediately go back to sleep without touching memory. This prevents us from
-        // touching deallocated memory, but it also prevents mutexes from getting released. Thus we
-        // only do this once we're reasonably sure that no system mutexes are still held.
-        for (const auto& thread : list_) {
-          DCHECK(thread == self || thread->GetState() != kRunnable);
-          thread->GetJniEnv()->SetRuntimeDeleted();
-          // Possibly contended Mutex acquisitions are unsafe after this.
-          // Releasing thread_list_lock_ is OK, since it can't block.
-        }
-      }
-      // Finally wait for any threads woken before we set the "runtime deleted" flags to finish
-      // touching memory.
-      usleep(kDaemonSleepTime);
+    if (found_running) {
+      // Sleep briefly before checking again. Max total sleep time is kTimeoutMicroseconds.
+      usleep(kSleepMicroseconds);
+    } else {
+      all_suspended = true;
+    }
+  }
+  if (!all_suspended) {
+    // We can get here if a daemon thread executed a fastnative native call, so that it
+    // remained in runnable state, and then made a JNI call after we called
+    // SetFunctionsToRuntimeShutdownFunctions(), causing it to permanently stay in a harmless
+    // but runnable state. See b/147804269 .
+    LOG(WARNING) << "timed out suspending all daemon threads";
+  }
+  // Assume all threads are either suspended or somehow wedged.
+  // Wait again for all the now "suspended" threads to actually quiesce. (b)
+  static constexpr size_t kDaemonSleepTime = 200 * 1000;
+  usleep(kDaemonSleepTime);
+  std::list<Thread*> list_copy;
+  {
+    MutexLock mu(self, *Locks::thread_list_lock_);
+    // Half-way through the wait, set the "runtime deleted" flag, causing any newly awoken
+    // threads to immediately go back to sleep without touching memory. This prevents us from
+    // touching deallocated memory, but it also prevents mutexes from getting released. Thus we
+    // only do this once we're reasonably sure that no system mutexes are still held.
+    for (const auto& thread : list_) {
+      DCHECK(thread == self || !all_suspended || thread->GetState() != kRunnable);
+      // In the !all_suspended case, the target is probably sleeping.
+      thread->GetJniEnv()->SetRuntimeDeleted();
+      // Possibly contended Mutex acquisitions are unsafe after this.
+      // Releasing thread_list_lock_ is OK, since it can't block.
+    }
+  }
+  // Finally wait for any threads woken before we set the "runtime deleted" flags to finish
+  // touching memory.
+  usleep(kDaemonSleepTime);
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer) || __has_feature(hwaddress_sanitizer)
-      // Sleep a bit longer with -fsanitize=address, since everything is slower.
-      usleep(2 * kDaemonSleepTime);
+  // Sleep a bit longer with -fsanitize=address, since everything is slower.
+  usleep(2 * kDaemonSleepTime);
 #endif
 #endif
-      return;
-    }
-    usleep(kSleepMicroseconds);
-  }
-  LOG(WARNING) << "timed out suspending all daemon threads";
+  // At this point no threads should be touching our data structures anymore.
 }
 
 void ThreadList::Register(Thread* self) {
