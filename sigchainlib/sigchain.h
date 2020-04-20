@@ -17,6 +17,10 @@
 #ifndef ART_SIGCHAINLIB_SIGCHAIN_H_
 #define ART_SIGCHAINLIB_SIGCHAIN_H_
 
+// TODO(b/142944043): Symbol changes here currently need to be reflected in
+// version scripts in frameworks/base/cmds/app_process. The plan is to convert
+// libsigchain to a shared lib to get rid of them.
+
 #include <signal.h>
 #include <stdint.h>
 
