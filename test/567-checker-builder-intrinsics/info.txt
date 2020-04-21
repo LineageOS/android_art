@@ -1,0 +1,2 @@
+Tests for creating intermediate representation in InstructionBuilder for simple
+intrinsics. It also tests some simplifications for these instructions.
