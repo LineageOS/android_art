@@ -448,15 +448,11 @@ bool DexFileVerifier::VerifyTypeDescriptor(dex::TypeIndex idx,
   // All sources of the `idx` have already been checked in CheckIntraSection().
   DCHECK_LT(idx.index_, header_->type_ids_size_);
 
-  auto err_fn = [&](const char* descriptor) {
-    ErrorStringPrintf("%s: '%s'", error_msg, descriptor);
-  };
-
   char cached_char = verified_type_descriptors_[idx.index_];
   if (cached_char != 0) {
     if (!extra_check(cached_char)) {
       const char* descriptor = dex_file_->StringByTypeIdx(idx);
-      err_fn(descriptor);
+      ErrorStringPrintf("%s: '%s'", error_msg, descriptor);
       return false;
     }
     return true;
@@ -464,13 +460,13 @@ bool DexFileVerifier::VerifyTypeDescriptor(dex::TypeIndex idx,
 
   const char* descriptor = dex_file_->StringByTypeIdx(idx);
   if (UNLIKELY(!IsValidDescriptor(descriptor))) {
-    err_fn(descriptor);
+    ErrorStringPrintf("%s: '%s'", error_msg, descriptor);
     return false;
   }
   verified_type_descriptors_[idx.index_] = descriptor[0];
 
   if (!extra_check(descriptor[0])) {
-    err_fn(descriptor);
+    ErrorStringPrintf("%s: '%s'", error_msg, descriptor);
     return false;
   }
   return true;
