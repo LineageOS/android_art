@@ -52,6 +52,11 @@ public class Main {
             System.out.println("Test succeeded!");
         } else {
             System.out.println("Test failed.");
+            test.printTimes();
+            System.out.println("Value of success = " + test.success);
+            Thread.sleep(3000);
+            System.out.println("Value of success after sleeping = " + test.success);
+            test.printTimes();  // In case they weren't ready the first time.
         }
     }
 
@@ -81,6 +86,7 @@ public class Main {
     /**
      * Scribbles on the stack to help ensure we don't have a fake
      * pointer that would keep would-be garbage alive.
+     * TODO(hboehm): Remove this long useless cruft once we understand current failure.
      */
     private static void clearStack(int depth) {
         int a = 0;
@@ -102,6 +108,9 @@ public class Main {
     private static class ParkTester extends Thread {
         public volatile boolean parkNow = false;
         public volatile boolean success = false;
+        public volatile long startTime = 0;
+        public volatile long elapsedTime = 0;
+        public volatile long finishTime = 0;
 
         public void run() {
             while (!parkNow) {
@@ -122,7 +131,15 @@ public class Main {
             } else {
                 System.out.println("park() returned quickly");
                 success = true;
+                finishTime = System.currentTimeMillis();
+                startTime = start;
+                elapsedTime = elapsed;
             }
+        }
+
+        public void printTimes() {
+          System.out.println("Started at " + startTime + "ms, took " + elapsedTime
+              + "ms, signalled at " + finishTime + "ms");
         }
     }
 }
