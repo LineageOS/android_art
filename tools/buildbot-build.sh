@@ -156,8 +156,9 @@ if [[ $mode == "target" ]]; then
     fi
     echo -e "Listing contents of the conscrypt apex"
     ls -l $conscrypt_apex
-    $ANDROID_HOST_OUT/bin/deapexer list $conscrypt_apex
-    $ANDROID_HOST_OUT/bin/deapexer extract $conscrypt_apex $conscrypt_dir
+    debugfs=$ANDROID_HOST_OUT/bin/debugfs_static
+    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs list $conscrypt_apex
+    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs extract $conscrypt_apex $conscrypt_dir
   fi
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
   conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
