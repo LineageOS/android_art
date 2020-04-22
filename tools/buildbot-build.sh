@@ -154,6 +154,9 @@ if [[ $mode == "target" ]]; then
       echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
       ANDROID_HOST_OUT=$out_dir/host/linux-x86
     fi
+    echo -e "Listing contents of the conscrypt apex"
+    ls -l $conscrypt_apex
+    $ANDROID_HOST_OUT/bin/deapexer list $conscrypt_apex
     $ANDROID_HOST_OUT/bin/deapexer extract $conscrypt_apex $conscrypt_dir
   fi
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
