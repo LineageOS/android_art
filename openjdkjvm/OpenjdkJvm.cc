@@ -313,7 +313,9 @@ JNIEXPORT void JVM_GC(void) {
 JNIEXPORT __attribute__((noreturn)) void JVM_Exit(jint status) {
   LOG(INFO) << "System.exit called, status: " << status;
   art::Runtime::Current()->CallExitHook(status);
-  exit(status);
+  // Unsafe to call exit() while threads may still be running. They would race
+  // with static destructors.
+  _exit(status);
 }
 
 JNIEXPORT jstring JVM_NativeLoad(JNIEnv* env,
@@ -471,7 +473,7 @@ JNIEXPORT __attribute__((noreturn)) jboolean JVM_RaiseSignal(jint signum ATTRIBU
 }
 
 JNIEXPORT __attribute__((noreturn))  void JVM_Halt(jint code) {
-  exit(code);
+  _exit(code);
 }
 
 JNIEXPORT jboolean JVM_IsNaN(jdouble d) {
