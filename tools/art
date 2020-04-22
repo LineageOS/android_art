@@ -302,6 +302,7 @@ function run_art() {
 ######################################
 ART_BINARY=dalvikvm
 DEX2OAT_BINARY=dex2oat
+DEX2OAT_SUFFIX=""
 DELETE_ANDROID_DATA="no"
 LAUNCH_WRAPPER=
 LIBART=libart.so
@@ -324,15 +325,17 @@ while [[ "$1" = "-"* ]]; do
     ;;
   --32)
     ART_BINARY=dalvikvm32
+    DEX2OAT_SUFFIX=32
     ;;
   --64)
     ART_BINARY=dalvikvm64
+    DEX2OAT_SUFFIX=64
     ;;
   -d)
     ;& # Fallthrough
   --debug)
     LIBART="libartd.so"
-    DEX2OAT_BINARY=dex2oatd
+    DEX2OAT_BINARY="dex2oatd"
     # Expect that debug mode wants all checks.
     EXTRA_OPTIONS+=(-XX:SlowDebug=true)
     ;;
@@ -478,7 +481,7 @@ EOF
   exit 1
 fi
 
-DEX2OAT_BINARY_PATH=$ANDROID_ROOT/bin/$DEX2OAT_BINARY
+DEX2OAT_BINARY_PATH=$ANDROID_ROOT/bin/$DEX2OAT_BINARY$DEX2OAT_SUFFIX
 
 if [ ! -x "$DEX2OAT_BINARY_PATH" ]; then
   echo "Warning: Android Compiler not found: $DEX2OAT_BINARY_PATH"

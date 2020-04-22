@@ -71,7 +71,7 @@ class OatDumpTest : public CommonRuntimeTest {
   };
 
   // Returns path to the oatdump/dex2oat/dexdump binary.
-  std::string GetExecutableFilePath(const char* name, bool is_debug, bool is_static) {
+  std::string GetExecutableFilePath(const char* name, bool is_debug, bool is_static, bool bitness) {
     std::string path = GetArtBinDir() + '/' + name;
     if (is_debug) {
       path += 'd';
@@ -79,11 +79,14 @@ class OatDumpTest : public CommonRuntimeTest {
     if (is_static) {
       path += 's';
     }
+    if (bitness) {
+      path += Is64BitInstructionSet(kRuntimeISA) ? "64" : "32";
+    }
     return path;
   }
 
-  std::string GetExecutableFilePath(Flavor flavor, const char* name) {
-    return GetExecutableFilePath(name, kIsDebugBuild, flavor == kStatic);
+  std::string GetExecutableFilePath(Flavor flavor, const char* name, bool bitness) {
+    return GetExecutableFilePath(name, kIsDebugBuild, flavor == kStatic, bitness);
   }
 
   enum Mode {
@@ -124,7 +127,8 @@ class OatDumpTest : public CommonRuntimeTest {
 
   ::testing::AssertionResult GenerateAppOdexFile(Flavor flavor,
                                                  const std::vector<std::string>& args) {
-    std::string dex2oat_path = GetExecutableFilePath(flavor, "dex2oat");
+    std::string dex2oat_path =
+        GetExecutableFilePath(flavor, "dex2oat", /* bitness= */ kIsTargetBuild);
     std::vector<std::string> exec_argv = {
         dex2oat_path,
         "--runtime-arg",
@@ -167,7 +171,7 @@ class OatDumpTest : public CommonRuntimeTest {
                                   const std::vector<std::string>& args,
                                   Display display,
                                   bool expect_failure = false) {
-    std::string file_path = GetExecutableFilePath(flavor, "oatdump");
+    std::string file_path = GetExecutableFilePath(flavor, "oatdump", /* bitness= */ false);
 
     if (!OS::FileExists(file_path.c_str())) {
       return ::testing::AssertionFailure() << file_path << " should be a valid file path";
