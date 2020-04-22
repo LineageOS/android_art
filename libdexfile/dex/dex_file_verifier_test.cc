@@ -158,7 +158,7 @@ TEST_F(DexFileVerifierTest, MethodId) {
         dex::MethodId* method_id = const_cast<dex::MethodId*>(&dex_file->GetMethodId(0));
         method_id->class_idx_ = dex::TypeIndex(0xFF);
       },
-      "could not find declaring class for direct method index 0");
+      "Bad index for method_id.class");
 
   // Proto idx error.
   VerifyModification(
@@ -168,7 +168,7 @@ TEST_F(DexFileVerifierTest, MethodId) {
         dex::MethodId* method_id = const_cast<dex::MethodId*>(&dex_file->GetMethodId(0));
         method_id->proto_idx_ = dex::ProtoIndex(0xFF);
       },
-      "inter_method_id_item proto_idx");
+      "Bad index for method_id.proto");
 
   // Name idx error.
   VerifyModification(
@@ -178,7 +178,7 @@ TEST_F(DexFileVerifierTest, MethodId) {
         dex::MethodId* method_id = const_cast<dex::MethodId*>(&dex_file->GetMethodId(0));
         method_id->name_idx_ = dex::StringIndex(0xFF);
       },
-      "Bad index for method flags verification");
+      "Bad index for method_id.name");
 }
 
 TEST_F(DexFileVerifierTest, InitCachingWithUnicode) {
