@@ -151,7 +151,7 @@ if [[ $mode == "target" ]]; then
     rm -rf $conscrypt_dir
     mkdir $conscrypt_dir
     if [[ -z "${ANDROID_HOST_OUT}" ]]; then
-      echo 'ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86'
+      echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
       ANDROID_HOST_OUT=$out_dir/host/linux-x86
     fi
     $ANDROID_HOST_OUT/bin/deapexer extract $conscrypt_apex $conscrypt_dir
