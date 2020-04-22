@@ -162,6 +162,10 @@ if [[ $mode == "target" ]]; then
     echo -e "Missing conscrypt APEX in build output: ${conscrypt_dir}"
     exit 1
   fi
+  if [ ! -f "${conscrypt_dir}/javalib/conscrypt.jar" ]; then
+    echo -e "Missing conscrypt jar in build output: ${conscrypt_dir}"
+    exit 1
+  fi
   for l in lib lib64; do
     if [ ! -d "$ANDROID_PRODUCT_OUT/system/$l" ]; then
       continue
