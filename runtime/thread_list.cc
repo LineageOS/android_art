@@ -1222,7 +1222,7 @@ void ThreadList::SuspendAllDaemonThreadsForShutdown() {
   }
   // Assume all threads are either suspended or somehow wedged.
   // Wait again for all the now "suspended" threads to actually quiesce. (b)
-  static constexpr size_t kDaemonSleepTime = 200 * 1000;
+  static constexpr size_t kDaemonSleepTime = 400'000;
   usleep(kDaemonSleepTime);
   std::list<Thread*> list_copy;
   {
