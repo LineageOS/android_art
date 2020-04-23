@@ -510,8 +510,9 @@ def run_tests(tests):
         for address_size in _user_input_variants['address_sizes_target'][target]:
           test_futures.append(start_combination(executor, config_tuple, options_all, address_size))
 
-        for config_tuple in uncombinated_config:
-          test_futures.append(start_combination(executor, config_tuple, options_all, ""))  # no address size
+      for config_tuple in uncombinated_config:
+        test_futures.append(
+            start_combination(executor, config_tuple, options_all, ""))  # no address size
 
       tests_done = 0
       for test_future in concurrent.futures.as_completed(test_futures):
