@@ -151,7 +151,7 @@ if [[ $mode == "target" ]]; then
     rm -rf $conscrypt_dir
     mkdir $conscrypt_dir
     if [[ -z "${ANDROID_HOST_OUT}" ]]; then
-      echo 'ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86'
+      echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
       ANDROID_HOST_OUT=$out_dir/host/linux-x86
     fi
     $ANDROID_HOST_OUT/bin/deapexer extract $conscrypt_apex $conscrypt_dir
@@ -160,6 +160,10 @@ if [[ $mode == "target" ]]; then
   conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
   if [ ! -d "${conscrypt_dir}" ]; then
     echo -e "Missing conscrypt APEX in build output: ${conscrypt_dir}"
+    exit 1
+  fi
+  if [ ! -f "${conscrypt_dir}/javalib/conscrypt.jar" ]; then
+    echo -e "Missing conscrypt jar in build output: ${conscrypt_dir}"
     exit 1
   fi
   for l in lib lib64; do

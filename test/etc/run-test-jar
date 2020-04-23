@@ -113,7 +113,7 @@ COMPILER_FLAGS="${COMPILER_FLAGS} --runtime-arg -XX:SlowDebug=true"
 
 # Let the compiler and runtime know that we are running tests.
 COMPILE_FLAGS="${COMPILE_FLAGS} --compile-art-test"
-FLAGS="${FLAGS} -Xcompiler-option --compile-art-test"
+ANDROID_FLAGS="${ANDROID_FLAGS} -Xcompiler-option --compile-art-test"
 
 while true; do
     if [ "x$1" = "x--quiet" ]; then
@@ -508,7 +508,7 @@ fi
 CHROOT_DEX_LOCATION="$CHROOT$DEX_LOCATION"
 
 # If running on device, determine the ISA of the device.
-if [ "$HOST" = "n" ]; then
+if [ "$HOST" = "n" -a "$USE_JVM" = "n" ]; then
   ISA=$("$ANDROID_BUILD_TOP/art/test/utils/get-device-isa" "$GET_DEVICE_ISA_BITNESS_FLAG")
 fi
 
