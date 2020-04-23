@@ -151,15 +151,23 @@ if [[ $mode == "target" ]]; then
     rm -rf $conscrypt_dir
     mkdir $conscrypt_dir
     if [[ -z "${ANDROID_HOST_OUT}" ]]; then
-      echo 'ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86'
+      echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
       ANDROID_HOST_OUT=$out_dir/host/linux-x86
     fi
-    $ANDROID_HOST_OUT/bin/deapexer extract $conscrypt_apex $conscrypt_dir
+    echo -e "Listing contents of the conscrypt apex"
+    ls -l $conscrypt_apex
+    debugfs=$ANDROID_HOST_OUT/bin/debugfs_static
+    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs list $conscrypt_apex
+    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs extract $conscrypt_apex $conscrypt_dir
   fi
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
   conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
   if [ ! -d "${conscrypt_dir}" ]; then
     echo -e "Missing conscrypt APEX in build output: ${conscrypt_dir}"
+    exit 1
+  fi
+  if [ ! -f "${conscrypt_dir}/javalib/conscrypt.jar" ]; then
+    echo -e "Missing conscrypt jar in build output: ${conscrypt_dir}"
     exit 1
   fi
   for l in lib lib64; do

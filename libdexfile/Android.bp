@@ -364,7 +364,7 @@ cc_library {
     srcs: [
         "external/dex_file_supp.cc",
     ],
-    required: ["libdexfile_external"],
+    runtime_libs: ["libdexfile_external"],
     shared_libs: ["liblog"],
     header_libs: ["libdexfile_external_headers"],
     export_header_lib_headers: ["libdexfile_external_headers"],
