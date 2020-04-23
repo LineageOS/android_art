@@ -34,7 +34,7 @@ public class Main {
     t.setDaemon(true);
     t.start();
     try {
-      Thread.sleep(200);
+      Thread.sleep(400);
     } catch (InterruptedException e) {
       System.out.println("Unexpected interrupt");
     }
