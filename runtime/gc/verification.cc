@@ -86,10 +86,7 @@ void Verification::LogHeapCorruption(ObjPtr<mirror::Object> holder,
                                      MemberOffset offset,
                                      mirror::Object* ref,
                                      bool fatal) const {
-  // Lowest priority logging first:
-  PrintFileToLog("/proc/self/maps", android::base::LogSeverity::FATAL_WITHOUT_ABORT);
-  MemMap::DumpMaps(LOG_STREAM(FATAL_WITHOUT_ABORT), /* terse= */ true);
-  Runtime::Current()->GetHeap()->DumpSpaces(LOG_STREAM(FATAL_WITHOUT_ABORT));
+  // Highest priority logging first.
   // Buffer the output in the string stream since it is more important than the stack traces
   // and we want it to have log priority. The stack traces are printed from Runtime::Abort
   // which is called from LOG(FATAL) but before the abort message.
@@ -110,6 +107,8 @@ void Verification::LogHeapCorruption(ObjPtr<mirror::Object> holder,
     oss << " reference addr"
         << DumpRAMAroundAddress(reinterpret_cast<uintptr_t>(addr), 4 * kObjectAlignment);
   }
+  Runtime::Current()->GetHeap()->DumpSpaces(oss);
+  MemMap::DumpMaps(oss, /* terse= */ true);
 
   if (fatal) {
     LOG(FATAL) << oss.str();
