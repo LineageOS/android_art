@@ -1166,13 +1166,15 @@
         "bug": "b/147207934"
     },
     {
-        "tests": ["530-checker-peel-unroll",
+        "tests": ["178-app-image-native-method",
+                  "530-checker-peel-unroll",
                   "616-cha-unloading",
                   "674-hiddenapi",
                   "677-fsi2",
                   "678-quickening",
                   "679-locks",
                   "688-shared-library",
+                  "689-zygote-jit-deopt",
                   "690-hiddenapi-same-name-methods",
                   "691-hiddenapi-proxy",
                   "692-vdex-inmem-loader",
@@ -1219,8 +1221,8 @@
                   "2004-double-virtual-structural-abstract",
                   "2005-pause-all-redefine-multithreaded",
                   "2006-virtual-structural-finalizing",
-                  "2007-virtual-structural-finalizable"
-                ],
+                  "2007-virtual-structural-finalizable",
+                  "2033-shutdown-mechanics"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
@@ -1371,5 +1373,29 @@
         "variant": "gcstress & debuggable & debug & host",
         "bug": "b/149708943",
         "description": ["Timeouts."]
+    },
+    {
+        "tests": ["003-omnibus-opcodes",
+                  "051-thread",
+                  "427-bounds",
+                  "570-checker-osr-locals",
+                  "597-app-images-same-classloader",
+                  "724-invoke-super-npe",
+                  "725-imt-conflict-object",
+                  "952-invoke-custom",
+                  "960-default-smali",
+                  "966-default-conflict",
+                  "990-field-trace",
+                  "1953-pop-frame",
+                  "1954-pop-frame-jit",
+                  "1955-pop-frame-jit-called",
+                  "1956-pop-frame-jit-calling",
+                  "2009-structural-local-ref",
+                  "2011-stack-walk-concurrent-instrument",
+                  "2012-structural-redefinition-failures-jni-id",
+                  "2029-spaces-in-SimpleName"],
+        "variant": "jvm",
+        "bug": "b/154802847",
+        "description": ["Failing on RI. Needs further investigating."]
     }
 ]

@@ -19,9 +19,6 @@ droiddoc_host {
     ],
     custom_template: "droiddoc-templates-sdk",
     args: "-stubpackages com.android.ahat:com.android.ahat.*",
-    api_tag_name: "AHAT",
-    api_filename: "ahat_api.txt",
-    removed_api_filename: "ahat_removed_api.txt",
     check_api: {
         current: {
             api_file: "etc/ahat_api.txt",
