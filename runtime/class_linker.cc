@@ -8779,6 +8779,8 @@ ArtMethod* ClassLinker::ResolveMethod(uint32_t method_idx,
       // We normaly should not end up here. However the verifier currently doesn't guarantee
       // the invariant of having the klass in the class table. b/73760543
       klass = ResolveType(method_id.class_idx_, dex_cache, class_loader);
+      DCHECK(!Thread::Current()->IsExceptionPending())
+          << Thread::Current()->GetException()->Dump();
     }
   } else {
     // The method was not in the DexCache, resolve the declaring class.
