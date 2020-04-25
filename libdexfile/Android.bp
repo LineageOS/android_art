@@ -252,8 +252,6 @@ cc_library_headers {
     name: "libdexfile_external_headers",
     visibility: ["//visibility:public"],
     host_supported: true,
-    vendor_available: true,
-    recovery_available: true,
     header_libs: ["libbase_headers"],
     export_header_lib_headers: ["libbase_headers"],
     export_include_dirs: ["external/include"],
@@ -351,23 +349,13 @@ cc_library {
     name: "libdexfile_support",
     visibility: ["//visibility:public"],
     host_supported: true,
-    vendor_available: true,
-    recovery_available: true,
     srcs: [
         "external/dex_file_supp.cc",
     ],
-    required: ["libdexfile_external"],
+    runtime_libs: ["libdexfile_external"],
     shared_libs: ["liblog"],
     header_libs: ["libdexfile_external_headers"],
     export_header_lib_headers: ["libdexfile_external_headers"],
-    target: {
-        recovery: {
-            cflags: ["-DNO_DEXFILE_SUPPORT"],
-        },
-        vendor: {
-            cflags: ["-DNO_DEXFILE_SUPPORT"],
-        },
-    },
 }
 
 // The same source file is used in two tests here, so unlike other ART gtests it
