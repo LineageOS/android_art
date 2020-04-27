@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <sstream>
 
 #include "aborting.h"
@@ -79,7 +80,31 @@ void InitLogging(char* argv[], AbortFunction& abort_function) {
   }
 
 #ifdef ART_TARGET_ANDROID
-#define INIT_LOGGING_DEFAULT_LOGGER android::base::LogdLogger()
+  // android::base::LogdLogger breaks messages up into line delimited 4K chunks, since that is the
+  // most that logd can handle per message.  To prevent other threads from interleaving their
+  // messages, LogdLoggerLocked uses a mutex to ensure that only one ART thread is logging at a
+  // time.
+  // Note that this lock makes logging after fork() unsafe in multi-threaded programs, which is part
+  // of the motivation that this lock is not a part of libbase logging.  Zygote guarantees that no
+  // threads are running before calling fork() via ZygoteHooks.waitUntilAllThreadsStopped().
+  class LogdLoggerLocked {
+   public:
+    LogdLoggerLocked() {}
+    void operator()(android::base::LogId id,
+                    android::base::LogSeverity severity,
+                    const char* tag,
+                    const char* file,
+                    unsigned int line,
+                    const char* message) {
+      static std::mutex* logging_lock_ = new std::mutex();
+      std::lock_guard<std::mutex> guard(*logging_lock_);
+      logd_logger_(id, severity, tag, file, line, message);
+    }
+
+   private:
+    android::base::LogdLogger logd_logger_;
+  };
+#define INIT_LOGGING_DEFAULT_LOGGER LogdLoggerLocked()
 #else
 #define INIT_LOGGING_DEFAULT_LOGGER android::base::StderrLogger
 #endif
