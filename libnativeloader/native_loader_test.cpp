@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if defined(ART_TARGET_ANDROID)
+
 #include <dlfcn.h>
 #include <memory>
 #include <unordered_map>
@@ -700,3 +702,5 @@ TEST(NativeLoaderJniConfigParser, RejectMalformed) {
 
 }  // namespace nativeloader
 }  // namespace android
+
+#endif  // defined(ART_TARGET_ANDROID)

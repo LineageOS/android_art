@@ -31,7 +31,7 @@
 #include <android-base/strings.h>
 #include <log/log.h>
 
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
 #include <android/sysprop/VndkProperties.sysprop.h>
 #endif
 
@@ -394,7 +394,7 @@ const std::string& apex_jni_libraries(const std::string& apex_ns_name) {
 }
 
 bool is_product_vndk_version_defined() {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   return android::sysprop::VndkProperties::product_vndk_version().has_value();
 #else
   return false;
@@ -402,7 +402,7 @@ bool is_product_vndk_version_defined() {
 }
 
 std::string get_vndk_version(bool is_product_vndk) {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   if (is_product_vndk) {
     return android::sysprop::VndkProperties::product_vndk_version().value_or("");
   }

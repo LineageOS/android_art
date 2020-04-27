@@ -17,8 +17,8 @@
 #ifndef ART_LIBNATIVELOADER_LIBRARY_NAMESPACES_H_
 #define ART_LIBNATIVELOADER_LIBRARY_NAMESPACES_H_
 
-#if !defined(__ANDROID__)
-#error "Not available for host"
+#if !defined(ART_TARGET_ANDROID)
+#error "Not available for host or linux target"
 #endif
 
 #define LOG_TAG "nativeloader"
