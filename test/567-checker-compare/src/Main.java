@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import java.lang.reflect.Method;
-
 public class Main {
 
   /// CHECK-START: void Main.$opt$noinline$testReplaceInputWithItself(int) builder (after)
@@ -55,10 +53,55 @@ public class Main {
     return Integer.compare((x ? 1 : 0), (y ? 1 : 0));
   }
 
-  private static int compareBooleansSmali(boolean x, boolean y) throws Exception {
-    Class<?> c = Class.forName("Smali");
-    Method m = c.getMethod("compareBooleans", boolean.class, boolean.class);
-    return (Integer) m.invoke(null, x, y);
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) builder (after)
+  ///  CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
+  ///  CHECK-DAG:     <<One:i\d+>>    IntConstant 1
+  ///  CHECK-DAG:     <<PhiX:i\d+>>   Phi [<<One>>,<<Zero>>]
+  ///  CHECK-DAG:     <<PhiY:i\d+>>   Phi [<<One>>,<<Zero>>]
+  ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<PhiX>>,<<PhiY>>]
+  ///  CHECK-DAG:                     Return [<<Result>>]
+
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) builder (after)
+  ///  CHECK-NOT:                     InvokeStaticOrDirect
+
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) select_generator (after)
+  ///  CHECK:         <<ArgX:z\d+>>   ParameterValue
+  ///  CHECK:         <<ArgY:z\d+>>   ParameterValue
+  ///  CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
+  ///  CHECK-DAG:     <<One:i\d+>>    IntConstant 1
+  ///  CHECK-DAG:     <<SelX:i\d+>>   Select [<<Zero>>,<<One>>,<<ArgX>>]
+  ///  CHECK-DAG:     <<SelY:i\d+>>   Select [<<Zero>>,<<One>>,<<ArgY>>]
+  ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<SelX>>,<<SelY>>]
+  ///  CHECK-DAG:                     Return [<<Result>>]
+
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) select_generator (after)
+  ///  CHECK-NOT:                     Phi
+
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
+  ///  CHECK:         <<ArgX:z\d+>>   ParameterValue
+  ///  CHECK:         <<ArgY:z\d+>>   ParameterValue
+  ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<ArgX>>,<<ArgY>>]
+  ///  CHECK-DAG:                     Return [<<Result>>]
+
+  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
+  ///  CHECK-NOT:                     Select
+
+  private static int compareBooleans2(boolean x, boolean y) {
+    // Note: D8 would replace the ternary expression `x ? 1 : 0` with `x`
+    // but explicit `if` is preserved.
+    int src_x;
+    if (x) {
+      src_x = 1;
+    } else {
+      src_x = 0;
+    }
+    int src_y;
+    if (y) {
+      src_y = 1;
+    } else {
+      src_y = 0;
+    }
+    return Integer.compare(src_x, src_y);
   }
 
   /// CHECK-START: int Main.compareBytes(byte, byte) builder (after)
@@ -255,15 +298,15 @@ public class Main {
 
   public static void testCompareBooleans() throws Exception {
     expectEquals(-1, compareBooleans(false, true));
-    expectEquals(-1, compareBooleansSmali(false, true));
+    expectEquals(-1, compareBooleans2(false, true));
 
     expectEquals(0, compareBooleans(false, false));
     expectEquals(0, compareBooleans(true, true));
-    expectEquals(0, compareBooleansSmali(false, false));
-    expectEquals(0, compareBooleansSmali(true, true));
+    expectEquals(0, compareBooleans2(false, false));
+    expectEquals(0, compareBooleans2(true, true));
 
     expectEquals(1, compareBooleans(true, false));
-    expectEquals(1, compareBooleansSmali(true, false));
+    expectEquals(1, compareBooleans2(true, false));
   }
 
   public static void testCompareBytes() {
