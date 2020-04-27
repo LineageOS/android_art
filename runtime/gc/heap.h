@@ -783,6 +783,7 @@ class Heap {
   bool HasBootImageSpace() const {
     return !boot_image_spaces_.empty();
   }
+  bool HasAppImageSpace() const REQUIRES_SHARED(Locks::mutator_lock_);
 
   ReferenceProcessor* GetReferenceProcessor() {
     return reference_processor_.get();
