@@ -14,11 +14,7 @@
  * limitations under the License.
  */
 
-import java.lang.reflect.Method;
-
 public class Main {
-
-  private static Class main2;
 
   /// CHECK-START: int Main.rotateLeftByte(byte, int) builder (after)
   /// CHECK:         <<ArgVal:b\d+>>  ParameterValue
@@ -183,13 +179,59 @@ public class Main {
     return Integer.rotateRight(value, distance);
   }
 
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) builder (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>     IntConstant 1
+  /// CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
+  /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<Val>>,<<NegDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) builder (after)
+  /// CHECK-NOT:                      InvokeStaticOrDirect
+
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) select_generator (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>     IntConstant 1
+  /// CHECK-DAG:     <<SelVal:i\d+>>  Select [<<Zero>>,<<One>>,<<ArgVal>>]
+  /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<SelVal>>,<<NegDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) select_generator (after)
+  /// CHECK-NOT:                      Phi
+
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) instruction_simplifier$after_bce (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<NegDist:i\d+>> Neg [<<ArgDist>>]
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<NegDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateLeftBoolean(boolean, int) instruction_simplifier$after_bce (after)
+  /// CHECK-NOT:                      Select
+
+  private static int rotateLeftBoolean(boolean value, int distance) {
+    // Note: D8 would replace the ternary expression `value ? 1 : 0` with `value`
+    // but explicit `if` is preserved.
+    int src;
+    if (value) {
+      src = 1;
+    } else {
+      src = 0;
+    }
+    return Integer.rotateLeft(src, distance);
+  }
 
   public static void testRotateLeftBoolean() throws Exception {
-    Method rotateLeftBoolean = main2.getMethod("rotateLeftBoolean", boolean.class, int.class);
     for (int i = 0; i < 40; i++) {  // overshoot a bit
       int j = i & 31;
-      expectEqualsInt(0, (int)rotateLeftBoolean.invoke(null, false, i));
-      expectEqualsInt(1 << i, (int)rotateLeftBoolean.invoke(null, true, i));
+      expectEqualsInt(0, rotateLeftBoolean(false, i));
+      expectEqualsInt(1 << j, rotateLeftBoolean(true, i));
     }
   }
 
@@ -284,12 +326,56 @@ public class Main {
     }
   }
 
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) builder (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>     IntConstant 1
+  /// CHECK-DAG:     <<Val:i\d+>>     Phi [<<One>>,<<Zero>>]
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<Val>>,<<ArgDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) builder (after)
+  /// CHECK-NOT:                      InvokeStaticOrDirect
+
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) select_generator (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>    IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>     IntConstant 1
+  /// CHECK-DAG:     <<SelVal:i\d+>>  Select [<<Zero>>,<<One>>,<<ArgVal>>]
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<SelVal>>,<<ArgDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) select_generator (after)
+  /// CHECK-NOT:                     Phi
+
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) instruction_simplifier$after_bce (after)
+  /// CHECK:         <<ArgVal:z\d+>>  ParameterValue
+  /// CHECK:         <<ArgDist:i\d+>> ParameterValue
+  /// CHECK-DAG:     <<Result:i\d+>>  Ror [<<ArgVal>>,<<ArgDist>>]
+  /// CHECK-DAG:                      Return [<<Result>>]
+
+  /// CHECK-START: int Main.rotateRightBoolean(boolean, int) instruction_simplifier$after_bce (after)
+  /// CHECK-NOT:                     Select
+
+  private static int rotateRightBoolean(boolean value, int distance) {
+    // Note: D8 would replace the ternary expression `value ? 1 : 0` with `value`
+    // but explicit `if` is preserved.
+    int src;
+    if (value) {
+      src = 1;
+    } else {
+      src = 0;
+    }
+    return Integer.rotateRight(src, distance);
+  }
+
   public static void testRotateRightBoolean() throws Exception {
-    Method rotateRightBoolean = main2.getMethod("rotateRightBoolean", boolean.class, int.class);
     for (int i = 0; i < 40; i++) {  // overshoot a bit
-      int j = i & 31;
-      expectEqualsInt(0, (int)rotateRightBoolean.invoke(null, false, i));
-      expectEqualsInt(1 << (32 - i), (int)rotateRightBoolean.invoke(null, true, i));
+      int j = (-i) & 31;
+      expectEqualsInt(0, rotateRightBoolean(false, i));
+      expectEqualsInt(1 << j, rotateRightBoolean(true, i));
     }
   }
 
@@ -424,8 +510,6 @@ public class Main {
 
 
   public static void main(String args[]) throws Exception {
-    main2 = Class.forName("Main2");
-
     testRotateLeftBoolean();
     testRotateLeftByte();
     testRotateLeftShort();
