@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#if defined(ART_TARGET_ANDROID)
+
 #include "library_namespaces.h"
 
 #include <dirent.h>
@@ -392,3 +395,5 @@ base::Result<std::string> FindApexNamespaceName(const std::string& location) {
 }
 
 }  // namespace android::nativeloader
+
+#endif  // defined(ART_TARGET_ANDROID)
