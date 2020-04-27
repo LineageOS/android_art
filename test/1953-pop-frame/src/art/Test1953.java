@@ -37,6 +37,7 @@ import static art.SuspendEvents.EVENT_TYPE_CLASS_PREPARE;
 import static art.SuspendEvents.setupSuspendClassEvent;
 
 public class Test1953 {
+  private static boolean IS_ART = System.getProperty("java.vm.name").equals("Dalvik");
   public final boolean canRunClassLoadTests;
   public static void doNothing() {}
 
@@ -801,29 +802,34 @@ public class Test1953 {
         (thr) -> setupSuspendMethodEvent(exceptionOnceCalledMethod, /*enter*/ false, thr),
         SuspendEvents::clearSuspendMethodEvent);
 
-    System.out.println("Test stopped during notifyFramePop without exception on pop of calledFunction");
-    runTestOn(new StandardTestObject(false),
-        (thr) -> setupSuspendPopFrameEvent(1, doNothingMethod, thr),
-        SuspendEvents::clearSuspendPopFrameEvent);
-
-    System.out.println("Test stopped during notifyFramePop without exception on pop of doNothing");
-    runTestOn(new StandardTestObject(false),
-        (thr) -> setupSuspendPopFrameEvent(0, doNothingMethod, thr),
-        SuspendEvents::clearSuspendPopFrameEvent);
-
     final Method exceptionThrowCalledMethod =
         ExceptionThrowTestObject.class.getDeclaredMethod("calledFunction");
-    System.out.println("Test stopped during notifyFramePop with exception on pop of calledFunction");
-    runTestOn(new ExceptionThrowTestObject(false),
-        (thr) -> setupSuspendPopFrameEvent(0, exceptionThrowCalledMethod, thr),
-        SuspendEvents::clearSuspendPopFrameEvent);
-
     final Method exceptionCatchThrowMethod =
         ExceptionCatchTestObject.class.getDeclaredMethod("doThrow");
-    System.out.println("Test stopped during notifyFramePop with exception on pop of doThrow");
-    runTestOn(new ExceptionCatchTestObject(),
-        (thr) -> setupSuspendPopFrameEvent(0, exceptionCatchThrowMethod, thr),
-        SuspendEvents::clearSuspendPopFrameEvent);
+    // Disable more often then we technically need to in order to avoid the need
+    // for a huge number of possible results and allow the test to be easily
+    // used in CTS.
+    if (IS_ART && canRunClassLoadTests && CanRunClassLoadingTests()) {
+      System.out.println("Test stopped during notifyFramePop without exception on pop of calledFunction");
+      runTestOn(new StandardTestObject(false),
+          (thr) -> setupSuspendPopFrameEvent(1, doNothingMethod, thr),
+          SuspendEvents::clearSuspendPopFrameEvent);
+
+      System.out.println("Test stopped during notifyFramePop without exception on pop of doNothing");
+      runTestOn(new StandardTestObject(false),
+          (thr) -> setupSuspendPopFrameEvent(0, doNothingMethod, thr),
+          SuspendEvents::clearSuspendPopFrameEvent);
+
+      System.out.println("Test stopped during notifyFramePop with exception on pop of calledFunction");
+      runTestOn(new ExceptionThrowTestObject(false),
+          (thr) -> setupSuspendPopFrameEvent(0, exceptionThrowCalledMethod, thr),
+          SuspendEvents::clearSuspendPopFrameEvent);
+
+      System.out.println("Test stopped during notifyFramePop with exception on pop of doThrow");
+      runTestOn(new ExceptionCatchTestObject(),
+          (thr) -> setupSuspendPopFrameEvent(0, exceptionCatchThrowMethod, thr),
+          SuspendEvents::clearSuspendPopFrameEvent);
+    }
 
     System.out.println("Test stopped during ExceptionCatch event of calledFunction " +
         "(catch in called function, throw in called function)");
