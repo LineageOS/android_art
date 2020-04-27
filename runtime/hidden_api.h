@@ -196,7 +196,7 @@ class MemberSignature {
   // building the entire thing in memory and performing a simple prefix match)
   bool DoesPrefixMatch(const std::string& prefix) const;
 
-  bool IsExempted(const std::vector<std::string>& exemptions);
+  bool DoesPrefixMatchAny(const std::vector<std::string>& exemptions);
 
   void WarnAboutAccess(AccessMethod access_method, ApiList list, bool access_denied);
 
