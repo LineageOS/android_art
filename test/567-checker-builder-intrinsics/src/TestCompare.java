@@ -14,46 +14,46 @@
  * limitations under the License.
  */
 
-public class Main {
+public class TestCompare {
 
-  /// CHECK-START: void Main.$opt$noinline$testReplaceInputWithItself(int) builder (after)
+  /// CHECK-START: void TestCompare.$opt$noinline$testReplaceInputWithItself(int) builder (after)
   /// CHECK-DAG:     <<ArgX:i\d+>>   ParameterValue
   /// CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
   /// CHECK-DAG:     <<Cmp:i\d+>>    Compare [<<ArgX>>,<<Zero>>]
   /// CHECK-DAG:                     GreaterThanOrEqual [<<Cmp>>,<<Zero>>]
 
-  /// CHECK-START: void Main.$opt$noinline$testReplaceInputWithItself(int) instruction_simplifier (after)
+  /// CHECK-START: void TestCompare.$opt$noinline$testReplaceInputWithItself(int) instruction_simplifier (after)
   /// CHECK-DAG:     <<ArgX:i\d+>>   ParameterValue
   /// CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
   /// CHECK-DAG:                     GreaterThanOrEqual [<<ArgX>>,<<Zero>>]
 
   public static void $opt$noinline$testReplaceInputWithItself(int x) {
-    // The instruction simplifier first replaces Integer.compare(x, 0) with Compare HIR
-    // and then merges the Compare into the GreaterThanOrEqual. This is a regression
-    // test that to check that it is allowed to replace the second input of the
-    // GreaterThanOrEqual, i.e. <<Zero>>, with the very same instruction.
+    // The instruction builder first replaces Integer.compare(x, 0) with Compare HIR
+    // and then the instruction simplifier merges the Compare into the GreaterThanOrEqual.
+    // This is a regression test to check that it is allowed to replace the second
+    // input of the GreaterThanOrEqual, i.e. <<Zero>>, with the very same instruction.
     if (Integer.compare(x, 0) < 0) {
       System.out.println("OOOPS");
     }
   }
 
-  /// CHECK-START: int Main.compareBooleans(boolean, boolean) select_generator (after)
+  /// CHECK-START: int TestCompare.compareBooleans(boolean, boolean) select_generator (after)
   /// CHECK-NOT:                     Phi
 
-  /// CHECK-START: int Main.compareBooleans(boolean, boolean) instruction_simplifier$after_bce (after)
+  /// CHECK-START: int TestCompare.compareBooleans(boolean, boolean) instruction_simplifier$after_bce (after)
   /// CHECK:         <<ArgX:z\d+>>   ParameterValue
   /// CHECK:         <<ArgY:z\d+>>   ParameterValue
   /// CHECK-DAG:     <<Result:i\d+>> Compare [<<ArgX>>,<<ArgY>>]
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareBooleans(boolean, boolean) instruction_simplifier$after_bce (after)
+  /// CHECK-START: int TestCompare.compareBooleans(boolean, boolean) instruction_simplifier$after_bce (after)
   /// CHECK-NOT:                     Select
 
   private static int compareBooleans(boolean x, boolean y) {
     return Integer.compare((x ? 1 : 0), (y ? 1 : 0));
   }
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) builder (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) builder (after)
   ///  CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
   ///  CHECK-DAG:     <<One:i\d+>>    IntConstant 1
   ///  CHECK-DAG:     <<PhiX:i\d+>>   Phi [<<One>>,<<Zero>>]
@@ -61,10 +61,10 @@ public class Main {
   ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<PhiX>>,<<PhiY>>]
   ///  CHECK-DAG:                     Return [<<Result>>]
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) builder (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) builder (after)
   ///  CHECK-NOT:                     InvokeStaticOrDirect
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) select_generator (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) select_generator (after)
   ///  CHECK:         <<ArgX:z\d+>>   ParameterValue
   ///  CHECK:         <<ArgY:z\d+>>   ParameterValue
   ///  CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
@@ -74,16 +74,16 @@ public class Main {
   ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<SelX>>,<<SelY>>]
   ///  CHECK-DAG:                     Return [<<Result>>]
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) select_generator (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) select_generator (after)
   ///  CHECK-NOT:                     Phi
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
   ///  CHECK:         <<ArgX:z\d+>>   ParameterValue
   ///  CHECK:         <<ArgY:z\d+>>   ParameterValue
   ///  CHECK-DAG:     <<Result:i\d+>> Compare [<<ArgX>>,<<ArgY>>]
   ///  CHECK-DAG:                     Return [<<Result>>]
 
-  ///  CHECK-START: int Main.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
+  ///  CHECK-START: int TestCompare.compareBooleans2(boolean, boolean) instruction_simplifier$after_bce (after)
   ///  CHECK-NOT:                     Select
 
   private static int compareBooleans2(boolean x, boolean y) {
@@ -104,55 +104,55 @@ public class Main {
     return Integer.compare(src_x, src_y);
   }
 
-  /// CHECK-START: int Main.compareBytes(byte, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareBytes(byte, byte) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareBytes(byte, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareBytes(byte, byte) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int compareBytes(byte x, byte y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareShorts(short, short) builder (after)
+  /// CHECK-START: int TestCompare.compareShorts(short, short) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareShorts(short, short) builder (after)
+  /// CHECK-START: int TestCompare.compareShorts(short, short) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int compareShorts(short x, short y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareChars(char, char) builder (after)
+  /// CHECK-START: int TestCompare.compareChars(char, char) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareChars(char, char) builder (after)
+  /// CHECK-START: int TestCompare.compareChars(char, char) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int compareChars(char x, char y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareInts(int, int) builder (after)
+  /// CHECK-START: int TestCompare.compareInts(int, int) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareInts(int, int) builder (after)
+  /// CHECK-START: int TestCompare.compareInts(int, int) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int compareInts(int x, int y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareLongs(long, long) builder (after)
+  /// CHECK-START: int TestCompare.compareLongs(long, long) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareLongs(long, long) builder (after)
+  /// CHECK-START: int TestCompare.compareLongs(long, long) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   private static int compareLongs(long x, long y) {
@@ -160,33 +160,33 @@ public class Main {
   }
 
 
-  /// CHECK-START: int Main.compareByteShort(byte, short) builder (after)
+  /// CHECK-START: int TestCompare.compareByteShort(byte, short) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareByteShort(byte, short) builder (after)
+  /// CHECK-START: int TestCompare.compareByteShort(byte, short) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareByteShort(byte x, short y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareByteChar(byte, char) builder (after)
+  /// CHECK-START: int TestCompare.compareByteChar(byte, char) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareByteChar(byte, char) builder (after)
+  /// CHECK-START: int TestCompare.compareByteChar(byte, char) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareByteChar(byte x, char y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareByteInt(byte, int) builder (after)
+  /// CHECK-START: int TestCompare.compareByteInt(byte, int) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareByteInt(byte, int) builder (after)
+  /// CHECK-START: int TestCompare.compareByteInt(byte, int) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareByteInt(byte x, int y) {
@@ -194,33 +194,33 @@ public class Main {
   }
 
 
-  /// CHECK-START: int Main.compareShortByte(short, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareShortByte(short, byte) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareShortByte(short, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareShortByte(short, byte) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareShortByte(short x, byte y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareShortChar(short, char) builder (after)
+  /// CHECK-START: int TestCompare.compareShortChar(short, char) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareShortChar(short, char) builder (after)
+  /// CHECK-START: int TestCompare.compareShortChar(short, char) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareShortChar(short x, char y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareShortInt(short, int) builder (after)
+  /// CHECK-START: int TestCompare.compareShortInt(short, int) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareShortInt(short, int) builder (after)
+  /// CHECK-START: int TestCompare.compareShortInt(short, int) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareShortInt(short x, int y) {
@@ -228,33 +228,33 @@ public class Main {
   }
 
 
-  /// CHECK-START: int Main.compareCharByte(char, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareCharByte(char, byte) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareCharByte(char, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareCharByte(char, byte) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareCharByte(char x, byte y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareCharShort(char, short) builder (after)
+  /// CHECK-START: int TestCompare.compareCharShort(char, short) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareCharShort(char, short) builder (after)
+  /// CHECK-START: int TestCompare.compareCharShort(char, short) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareCharShort(char x, short y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareCharInt(char, int) builder (after)
+  /// CHECK-START: int TestCompare.compareCharInt(char, int) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareCharInt(char, int) builder (after)
+  /// CHECK-START: int TestCompare.compareCharInt(char, int) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareCharInt(char x, int y) {
@@ -262,33 +262,33 @@ public class Main {
   }
 
 
-  /// CHECK-START: int Main.compareIntByte(int, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareIntByte(int, byte) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareIntByte(int, byte) builder (after)
+  /// CHECK-START: int TestCompare.compareIntByte(int, byte) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareIntByte(int x, byte y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareIntShort(int, short) builder (after)
+  /// CHECK-START: int TestCompare.compareIntShort(int, short) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareIntShort(int, short) builder (after)
+  /// CHECK-START: int TestCompare.compareIntShort(int, short) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareIntShort(int x, short y) {
     return Integer.compare(x, y);
   }
 
-  /// CHECK-START: int Main.compareIntChar(int, char) builder (after)
+  /// CHECK-START: int TestCompare.compareIntChar(int, char) builder (after)
   /// CHECK-DAG:     <<Result:i\d+>> Compare
   /// CHECK-DAG:                     Return [<<Result>>]
 
-  /// CHECK-START: int Main.compareIntChar(int, char) builder (after)
+  /// CHECK-START: int TestCompare.compareIntChar(int, char) builder (after)
   /// CHECK-NOT:                     InvokeStaticOrDirect
 
   public static int compareIntChar(int x, char y) {
@@ -296,7 +296,7 @@ public class Main {
   }
 
 
-  public static void testCompareBooleans() throws Exception {
+  public static void testCompareBooleans() {
     expectEquals(-1, compareBooleans(false, true));
     expectEquals(-1, compareBooleans2(false, true));
 
@@ -867,7 +867,7 @@ public class Main {
   }
 
 
-  public static void main(String args[]) throws Exception {
+  public static void main() {
     $opt$noinline$testReplaceInputWithItself(42);
 
     testCompareBooleans();
@@ -893,7 +893,7 @@ public class Main {
     testCompareIntShort();
     testCompareIntChar();
 
-    System.out.println("passed");
+    System.out.println("TestCompare passed");
   }
 
   private static void expectEquals(int expected, int result) {
