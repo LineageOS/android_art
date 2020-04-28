@@ -1,0 +1,8 @@
+TestRotate passed
+TestCompare passed
+TestSignum passed
+TestIsNan passed
+TestVarHandles passed
+TestMinMax passed
+TestAbs passed
+TestFpAbs passed
