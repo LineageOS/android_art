@@ -15,7 +15,7 @@
  */
 
 #include "jni.h"
-#include "nativehelper/ScopedPrimitiveArray.h"
+#include "nativehelper/scoped_primitive_array.h"
 
 extern "C" JNIEXPORT jlong JNICALL Java_ScopedPrimitiveArrayBenchmark_measureByteArray(
     JNIEnv* env, jclass, int reps, jbyteArray arr) {
