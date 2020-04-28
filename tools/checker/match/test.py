@@ -16,8 +16,8 @@ from common.immutables               import ImmutableDict
 from common.testing                  import ToUnicode
 from file_format.c1visualizer.parser import ParseC1visualizerStream
 from file_format.c1visualizer.struct import C1visualizerFile, C1visualizerPass
-from file_format.checker.parser      import ParseCheckerStream, ParseCheckerAssertion
-from file_format.checker.struct      import CheckerFile, TestCase, TestAssertion
+from file_format.checker.parser      import ParseCheckerStream, ParseCheckerStatement
+from file_format.checker.struct      import CheckerFile, TestCase, TestStatement
 from match.file                      import MatchTestCase, MatchFailedException
 from match.line                      import MatchLines
 
@@ -28,13 +28,13 @@ CheckerException = SystemExit
 
 class MatchLines_Test(unittest.TestCase):
 
-  def createTestAssertion(self, checkerString):
+  def createTestStatement(self, checkerString):
     checkerFile = CheckerFile("<checker-file>")
     testCase = TestCase(checkerFile, "TestMethod TestPass", 0)
-    return ParseCheckerAssertion(testCase, checkerString, TestAssertion.Variant.InOrder, 0)
+    return ParseCheckerStatement(testCase, checkerString, TestStatement.Variant.InOrder, 0)
 
   def tryMatch(self, checkerString, c1String, varState={}):
-    return MatchLines(self.createTestAssertion(checkerString),
+    return MatchLines(self.createTestStatement(checkerString),
                       ToUnicode(c1String),
                       ImmutableDict(varState))
 
@@ -175,7 +175,7 @@ class MatchFiles_Test(unittest.TestCase):
     self.assertDoesNotMatch("/// CHECK: b{{.}}r", "abc barX def")
     self.assertDoesNotMatch("/// CHECK: b{{.}}r", "abc b r def")
 
-  def test_InOrderAssertions(self):
+  def test_InOrderStatements(self):
     self.assertMatches(
     """
       /// CHECK: foo
@@ -195,7 +195,7 @@ class MatchFiles_Test(unittest.TestCase):
       foo
     """)
 
-  def test_NextLineAssertions(self):
+  def test_NextLineStatements(self):
     self.assertMatches(
     """
       /// CHECK:      foo
@@ -243,7 +243,7 @@ class MatchFiles_Test(unittest.TestCase):
       abc
     """)
 
-  def test_DagAssertions(self):
+  def test_DagStatements(self):
     self.assertMatches(
     """
       /// CHECK-DAG: foo
@@ -263,7 +263,7 @@ class MatchFiles_Test(unittest.TestCase):
       foo
     """)
 
-  def test_DagAssertionsScope(self):
+  def test_DagStatementsScope(self):
     self.assertMatches(
     """
       /// CHECK:     foo
@@ -304,7 +304,7 @@ class MatchFiles_Test(unittest.TestCase):
       abc
     """)
 
-  def test_NotAssertions(self):
+  def test_NotStatements(self):
     self.assertMatches(
     """
       /// CHECK-NOT: foo
@@ -331,7 +331,7 @@ class MatchFiles_Test(unittest.TestCase):
       def bar
     """)
 
-  def test_NotAssertionsScope(self):
+  def test_NotStatementsScope(self):
     self.assertMatches(
     """
       /// CHECK:     abc
@@ -387,7 +387,7 @@ class MatchFiles_Test(unittest.TestCase):
       bar
     """)
 
-  def test_EvalAssertions(self):
+  def test_EvalStatements(self):
     self.assertMatches("/// CHECK-EVAL: True", "foo")
     self.assertDoesNotMatch("/// CHECK-EVAL: False", "foo")
 
