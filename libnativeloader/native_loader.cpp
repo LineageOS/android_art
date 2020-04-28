@@ -33,7 +33,7 @@
 #include <nativebridge/native_bridge.h>
 #include <nativehelper/scoped_utf_chars.h>
 
-#ifdef __ANDROID__
+#ifdef ART_TARGET_ANDROID
 #include <log/log.h>
 #include "library_namespaces.h"
 #include "nativeloader/dlext_namespaces.h"
@@ -42,7 +42,7 @@
 namespace android {
 
 namespace {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
 using android::nativeloader::LibraryNamespaces;
 
 std::mutex g_namespaces_mutex;
@@ -58,18 +58,18 @@ android_namespace_t* FindExportedNamespace(const char* caller_location) {
   }
   return nullptr;
 }
-#endif  // #if defined(__ANDROID__)
+#endif  // #if defined(ART_TARGET_ANDROID)
 }  // namespace
 
 void InitializeNativeLoader() {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   g_namespaces->Initialize();
 #endif
 }
 
 void ResetNativeLoader() {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   g_namespaces->Reset();
 #endif
@@ -78,7 +78,7 @@ void ResetNativeLoader() {
 jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobject class_loader,
                                    bool is_shared, jstring dex_path, jstring library_path,
                                    jstring permitted_path) {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   auto ns = g_namespaces->Create(env, target_sdk_version, class_loader, is_shared, dex_path,
                                  library_path, permitted_path);
@@ -94,7 +94,7 @@ jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobj
 void* OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* path,
                         jobject class_loader, const char* caller_location, jstring library_path,
                         bool* needs_native_bridge, char** error_msg) {
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
   UNUSED(target_sdk_version);
   if (class_loader == nullptr) {
     *needs_native_bridge = false;
@@ -208,7 +208,7 @@ void NativeLoaderFreeErrorMessage(char* msg) {
   free(msg);
 }
 
-#if defined(__ANDROID__)
+#if defined(ART_TARGET_ANDROID)
 void* OpenNativeLibraryInNamespace(NativeLoaderNamespace* ns, const char* path,
                                    bool* needs_native_bridge, char** error_msg) {
   auto handle = ns->Load(path);

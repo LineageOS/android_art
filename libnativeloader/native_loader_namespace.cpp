@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if defined(ART_TARGET_ANDROID)
+
 #define LOG_TAG "nativeloader"
 
 #include "native_loader_namespace.h"
@@ -175,3 +177,5 @@ Result<void*> NativeLoaderNamespace::Load(const char* lib_name) const {
 }
 
 }  // namespace android
+
+#endif  // defined(ART_TARGET_ANDROID)
