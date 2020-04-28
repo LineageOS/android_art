@@ -261,6 +261,12 @@ cc_library_headers {
             enabled: true,
         },
     },
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 // Make dex_instruction_list.h available for tools/jvmti-agents/titrace
@@ -269,6 +275,11 @@ cc_library_headers {
     visibility: ["//art:__subpackages__"],
     host_supported: true,
     export_include_dirs: ["."],
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 cc_defaults {
@@ -356,6 +367,12 @@ cc_library {
     shared_libs: ["liblog"],
     header_libs: ["libdexfile_external_headers"],
     export_header_lib_headers: ["libdexfile_external_headers"],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 // The same source file is used in two tests here, so unlike other ART gtests it
