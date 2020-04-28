@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from common.logger              import Logger
-from file_format.checker.struct import TestExpression, TestAssertion
+from file_format.checker.struct import TestExpression, TestStatement
 
 import re
 
@@ -77,7 +77,7 @@ def MatchLines(checkerLine, stringLine, variables):
   """ Attempts to match a CHECK line against a string. Returns variable state
       after the match if successful and None otherwise.
   """
-  assert checkerLine.variant != TestAssertion.Variant.Eval
+  assert checkerLine.variant != TestStatement.Variant.Eval
 
   checkerWords = splitAtSeparators(checkerLine.expressions)
   stringWords = stringLine.split()
@@ -109,7 +109,7 @@ def getEvalText(expression, variables, pos):
     return getVariable(expression.name, variables, pos)
 
 def EvaluateLine(checkerLine, variables):
-  assert checkerLine.variant == TestAssertion.Variant.Eval
+  assert checkerLine.variant == TestStatement.Variant.Eval
   eval_string = "".join(map(lambda expr: getEvalText(expr, variables, checkerLine),
                             checkerLine.expressions))
   return eval(eval_string)
