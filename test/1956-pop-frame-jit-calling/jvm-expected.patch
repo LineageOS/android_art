@@ -1,4 +1,19 @@
-75,94d74
+37,50d36
+< Test stopped during notifyFramePop without exception on pop of calledFunction
+< Single call with PopFrame on StandardTestObject { cnt: 0 } base-call-count: 0
+< result is StandardTestObject { cnt: 2 } base-call count: 1
+< Test stopped during notifyFramePop without exception on pop of doNothing
+< Single call with PopFrame on StandardTestObject { cnt: 0 } base-call-count: 0
+< result is StandardTestObject { cnt: 1 } base-call count: 1
+< Test stopped during notifyFramePop with exception on pop of calledFunction
+< Single call with PopFrame on ExceptionThrowTestObject { cnt: 0 } base-call-count: 0
+< art.Test1953$ExceptionThrowTestObject$TestError thrown and caught!
+< result is ExceptionThrowTestObject { cnt: 2 } base-call count: 1
+< Test stopped during notifyFramePop with exception on pop of doThrow
+< Single call with PopFrame on ExceptionCatchTestObject { cnt: 0 } base-call-count: 0
+< art.Test1953$ExceptionCatchTestObject$TestError caught in called function.
+< result is ExceptionCatchTestObject { cnt: 1 } base-call count: 1
+75,94d60
 < Test stopped during a ClassLoad event.
 < Single call with PopFrame on ClassLoadObject { cnt: 0, curClass: 0} base-call-count: 0
 < Failed to pop frame due to java.lang.RuntimeException: JVMTI_ERROR_OPAQUE_FRAME
