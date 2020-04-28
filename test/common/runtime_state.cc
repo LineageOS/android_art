@@ -102,6 +102,14 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasImage(JNIEnv* env ATTRIBUTE_U
   return Runtime::Current()->GetHeap()->HasBootImageSpace();
 }
 
+// public static native boolean hasAppImage();
+
+extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasAppImage(JNIEnv* env,
+                                                            jclass cls ATTRIBUTE_UNUSED) {
+  ScopedObjectAccess soa(env);
+  return Runtime::Current()->GetHeap()->HasAppImageSpace();
+}
+
 // public static native boolean isImageDex2OatEnabled();
 
 extern "C" JNIEXPORT jboolean JNICALL Java_Main_isImageDex2OatEnabled(JNIEnv* env ATTRIBUTE_UNUSED,
