@@ -22,52 +22,52 @@ import java.lang.invoke.VarHandle;
  * Instead, this test ensures the methods are recognized as intrinsic and behave
  * as expected.
  */
-public class Main {
+public class TestVarHandles {
 
   //
   // Fences (native).
   //
 
-  /// CHECK-START: void Main.fullFence() builder (after)
+  /// CHECK-START: void TestVarHandles.fullFence() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.fullFence() builder (after)
+  /// CHECK-START: void TestVarHandles.fullFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyAny
   private static void fullFence() {
       VarHandle.fullFence();
   }
 
-  /// CHECK-START: void Main.acquireFence() builder (after)
+  /// CHECK-START: void TestVarHandles.acquireFence() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.acquireFence() builder (after)
+  /// CHECK-START: void TestVarHandles.acquireFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:LoadAny
   private static void acquireFence() {
       VarHandle.acquireFence();
   }
 
-  /// CHECK-START: void Main.releaseFence() builder (after)
+  /// CHECK-START: void TestVarHandles.releaseFence() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.releaseFence() builder (after)
+  /// CHECK-START: void TestVarHandles.releaseFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:AnyStore
   private static void releaseFence() {
       VarHandle.releaseFence();
   }
 
-  /// CHECK-START: void Main.loadLoadFence() builder (after)
+  /// CHECK-START: void TestVarHandles.loadLoadFence() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.loadLoadFence() builder (after)
+  /// CHECK-START: void TestVarHandles.loadLoadFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:LoadAny
   private static void loadLoadFence() {
       VarHandle.loadLoadFence();
   }
 
-  /// CHECK-START: void Main.storeStoreFence() builder (after)
+  /// CHECK-START: void TestVarHandles.storeStoreFence() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   //
-  /// CHECK-START: void Main.storeStoreFence() builder (after)
+  /// CHECK-START: void TestVarHandles.storeStoreFence() builder (after)
   /// CHECK-DAG: MemoryBarrier kind:StoreStore
   private static void storeStoreFence() {
       VarHandle.storeStoreFence();
@@ -77,13 +77,12 @@ public class Main {
   // Driver.
   //
 
-  public static void main(String[] args) {
-    System.out.println("starting");
+  public static void main() {
     acquireFence();
     releaseFence();
     loadLoadFence();
     storeStoreFence();
     fullFence();
-    System.out.println("passed");
+    System.out.println("TestVarHandles passed");
   }
 }
