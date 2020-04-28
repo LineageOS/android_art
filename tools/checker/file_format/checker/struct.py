@@ -41,7 +41,7 @@ class TestCase(PrintableMixin):
 
     self.parent = parent
     self.name = name
-    self.assertions = []
+    self.statements = []
     self.startLineNo = startLineNo
     self.testArch = testArch
     self.forDebuggable = forDebuggable
@@ -55,26 +55,26 @@ class TestCase(PrintableMixin):
   def fileName(self):
     return self.parent.fileName
 
-  def addAssertion(self, new_assertion):
-    if new_assertion.variant == TestAssertion.Variant.NextLine:
-      if not self.assertions or \
-         (self.assertions[-1].variant != TestAssertion.Variant.InOrder and \
-          self.assertions[-1].variant != TestAssertion.Variant.NextLine):
-        Logger.fail("A next-line assertion can only be placed after an "
-                    "in-order assertion or another next-line assertion.",
-                    new_assertion.fileName, new_assertion.lineNo)
-    self.assertions.append(new_assertion)
+  def addStatement(self, new_statement):
+    if new_statement.variant == TestStatement.Variant.NextLine:
+      if not self.statements or \
+         (self.statements[-1].variant != TestStatement.Variant.InOrder and \
+          self.statements[-1].variant != TestStatement.Variant.NextLine):
+        Logger.fail("A next-line statement can only be placed after an "
+                    "in-order statement or another next-line statement.",
+                    new_statement.fileName, new_statement.lineNo)
+    self.statements.append(new_statement)
 
   def __eq__(self, other):
     return isinstance(other, self.__class__) \
        and self.name == other.name \
-       and self.assertions == other.assertions
+       and self.statements == other.statements
 
 
-class TestAssertion(PrintableMixin):
+class TestStatement(PrintableMixin):
 
   class Variant(object):
-    """Supported types of assertions."""
+    """Supported types of statements."""
     InOrder, NextLine, DAG, Not, Eval = range(5)
 
   def __init__(self, parent, variant, originalText, lineNo):
@@ -86,7 +86,7 @@ class TestAssertion(PrintableMixin):
     self.lineNo = lineNo
     self.originalText = originalText
 
-    self.parent.addAssertion(self)
+    self.parent.addStatement(self)
 
   @property
   def fileName(self):
@@ -94,13 +94,13 @@ class TestAssertion(PrintableMixin):
 
   def addExpression(self, new_expression):
     assert isinstance(new_expression, TestExpression)
-    if self.variant == TestAssertion.Variant.Not:
+    if self.variant == TestStatement.Variant.Not:
       if new_expression.variant == TestExpression.Variant.VarDef:
         Logger.fail("CHECK-NOT lines cannot define variables", self.fileName, self.lineNo)
     self.expressions.append(new_expression)
 
   def toRegex(self):
-    """ Returns a regex pattern for this entire assertion. Only used in tests. """
+    """ Returns a regex pattern for this entire statement. Only used in tests. """
     regex = ""
     for expression in self.expressions:
       if expression.variant == TestExpression.Variant.Separator:

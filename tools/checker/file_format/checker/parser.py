@@ -15,7 +15,7 @@
 from common.archs               import archs_list
 from common.logger              import Logger
 from file_format.common         import SplitStream
-from file_format.checker.struct import CheckerFile, TestCase, TestAssertion, TestExpression
+from file_format.checker.struct import CheckerFile, TestCase, TestStatement, TestExpression
 
 import re
 
@@ -93,29 +93,29 @@ def __processLine(line, lineNo, prefix, fileName, targetArch):
   # Lines starting only with 'CHECK' are matched in order.
   plainLine = __extractLine(prefix, line)
   if plainLine is not None:
-    return (plainLine, TestAssertion.Variant.InOrder, lineNo), None, None
+    return (plainLine, TestStatement.Variant.InOrder, lineNo), None, None
 
   # 'CHECK-NEXT' lines are in-order but must match the very next line.
   nextLine = __extractLine(prefix + "-NEXT", line)
   if nextLine is not None:
-    return (nextLine, TestAssertion.Variant.NextLine, lineNo), None, None
+    return (nextLine, TestStatement.Variant.NextLine, lineNo), None, None
 
-  # 'CHECK-DAG' lines are no-order assertions.
+  # 'CHECK-DAG' lines are no-order statements.
   dagLine = __extractLine(prefix + "-DAG", line)
   if dagLine is not None:
-    return (dagLine, TestAssertion.Variant.DAG, lineNo), None, None
+    return (dagLine, TestStatement.Variant.DAG, lineNo), None, None
 
-  # 'CHECK-NOT' lines are no-order negative assertions.
+  # 'CHECK-NOT' lines are no-order negative statements.
   notLine = __extractLine(prefix + "-NOT", line)
   if notLine is not None:
-    return (notLine, TestAssertion.Variant.Not, lineNo), None, None
+    return (notLine, TestStatement.Variant.Not, lineNo), None, None
 
   # 'CHECK-EVAL' lines evaluate a Python expression.
   evalLine = __extractLine(prefix + "-EVAL", line)
   if evalLine is not None:
-    return (evalLine, TestAssertion.Variant.Eval, lineNo), None, None
+    return (evalLine, TestStatement.Variant.Eval, lineNo), None, None
 
-  Logger.fail("Checker assertion could not be parsed: '" + line + "'", fileName, lineNo)
+  Logger.fail("Checker statement could not be parsed: '" + line + "'", fileName, lineNo)
 
 def __isMatchAtStart(match):
   """ Tests if the given Match occurred at the beginning of the line. """
@@ -129,12 +129,12 @@ def __firstMatch(matches, string):
   starts = map(lambda m: len(string) if m is None else m.start(), matches)
   return min(starts)
 
-def ParseCheckerAssertion(parent, line, variant, lineNo):
+def ParseCheckerStatement(parent, line, variant, lineNo):
   """ This method parses the content of a check line stripped of the initial
       comment symbol and the CHECK-* keyword.
   """
-  assertion = TestAssertion(parent, variant, line, lineNo)
-  isEvalLine = (variant == TestAssertion.Variant.Eval)
+  statement = TestStatement(parent, variant, line, lineNo)
+  isEvalLine = (variant == TestStatement.Variant.Eval)
 
   # Loop as long as there is something to parse.
   while line:
@@ -156,24 +156,24 @@ def ParseCheckerAssertion(parent, line, variant, lineNo):
       # A whitespace in the check line creates a new separator of line parts.
       # This allows for ignored output between the previous and next parts.
       line = line[matchWhitespace.end():]
-      assertion.addExpression(TestExpression.createSeparator())
+      statement.addExpression(TestExpression.createSeparator())
     elif __isMatchAtStart(matchPattern):
       pattern = line[0:matchPattern.end()]
       pattern = pattern[2:-2]
       line = line[matchPattern.end():]
-      assertion.addExpression(TestExpression.createPattern(pattern))
+      statement.addExpression(TestExpression.createPattern(pattern))
     elif __isMatchAtStart(matchVariableReference):
       var = line[0:matchVariableReference.end()]
       line = line[matchVariableReference.end():]
       name = var[2:-2]
-      assertion.addExpression(TestExpression.createVariableReference(name))
+      statement.addExpression(TestExpression.createVariableReference(name))
     elif __isMatchAtStart(matchVariableDefinition):
       var = line[0:matchVariableDefinition.end()]
       line = line[matchVariableDefinition.end():]
       colonPos = var.find(":")
       name = var[2:colonPos]
       body = var[colonPos+1:-2]
-      assertion.addExpression(TestExpression.createVariableDefinition(name, body))
+      statement.addExpression(TestExpression.createVariableDefinition(name, body))
     else:
       # If we're not currently looking at a special marker, this is a plain
       # text match all the way until the first special marker (or the end
@@ -186,10 +186,10 @@ def ParseCheckerAssertion(parent, line, variant, lineNo):
       text = line[0:firstMatch]
       line = line[firstMatch:]
       if isEvalLine:
-        assertion.addExpression(TestExpression.createPlainText(text))
+        statement.addExpression(TestExpression.createPlainText(text))
       else:
-        assertion.addExpression(TestExpression.createPatternFromPlainText(text))
-  return assertion
+        statement.addExpression(TestExpression.createPatternFromPlainText(text))
+  return statement
 
 def ParseCheckerStream(fileName, prefix, stream, targetArch = None):
   checkerFile = CheckerFile(fileName)
@@ -202,5 +202,5 @@ def ParseCheckerStream(fileName, prefix, stream, targetArch = None):
     forDebuggable = testData[1]
     testCase = TestCase(checkerFile, caseName, startLineNo, testArch, forDebuggable)
     for caseLine in caseLines:
-      ParseCheckerAssertion(testCase, caseLine[0], caseLine[1], caseLine[2])
+      ParseCheckerStatement(testCase, caseLine[0], caseLine[1], caseLine[2])
   return checkerFile
