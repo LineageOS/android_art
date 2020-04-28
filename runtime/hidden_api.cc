@@ -48,6 +48,14 @@ static constexpr uint64_t kHideMaxtargetsdkQHiddenApis = 149994052;
 // list.
 static constexpr bool kLogAllAccesses = false;
 
+// Exemptions for logcat warning. Following signatures do not produce a warning as app developers
+// should not be alerted on the usage of these greylised APIs. See b/154851649.
+static const std::vector<std::string> kWarningExemptions = {
+    "Ljava/nio/Buffer;",
+    "Llibcore/io/Memory;",
+    "Lsun/misc/Unsafe;",
+};
+
 static inline std::ostream& operator<<(std::ostream& os, AccessMethod value) {
   switch (value) {
     case AccessMethod::kNone:
@@ -209,7 +217,7 @@ bool MemberSignature::DoesPrefixMatch(const std::string& prefix) const {
   return pos == prefix.length();
 }
 
-bool MemberSignature::IsExempted(const std::vector<std::string>& exemptions) {
+bool MemberSignature::DoesPrefixMatchAny(const std::vector<std::string>& exemptions) {
   for (const std::string& exemption : exemptions) {
     if (DoesPrefixMatch(exemption)) {
       return true;
@@ -470,7 +478,7 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
   MemberSignature member_signature(member);
 
   // Check for an exemption first. Exempted APIs are treated as white list.
-  if (member_signature.IsExempted(runtime->GetHiddenApiExemptions())) {
+  if (member_signature.DoesPrefixMatchAny(runtime->GetHiddenApiExemptions())) {
     // Avoid re-examining the exemption list next time.
     // Note this results in no warning for the member, which seems like what one would expect.
     // Exemptions effectively adds new members to the whitelist.
@@ -500,14 +508,17 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
   }
 
   if (access_method != AccessMethod::kNone) {
-    // Print a log message with information about this class member access.
-    // We do this if we're about to deny access, or the app is debuggable.
-    if (kLogAllAccesses || deny_access || runtime->IsJavaDebuggable()) {
-      member_signature.WarnAboutAccess(access_method, api_list, deny_access);
-    }
+    // Warn if non-greylisted signature is being accessed or it is not exempted.
+    if (deny_access || !member_signature.DoesPrefixMatchAny(kWarningExemptions)) {
+      // Print a log message with information about this class member access.
+      // We do this if we're about to deny access, or the app is debuggable.
+      if (kLogAllAccesses || deny_access || runtime->IsJavaDebuggable()) {
+        member_signature.WarnAboutAccess(access_method, api_list, deny_access);
+      }
 
-    // If there is a StrictMode listener, notify it about this violation.
-    member_signature.NotifyHiddenApiListener(access_method);
+      // If there is a StrictMode listener, notify it about this violation.
+      member_signature.NotifyHiddenApiListener(access_method);
+    }
 
     // If event log sampling is enabled, report this violation.
     if (kIsTargetBuild && !kIsTargetLinux) {
