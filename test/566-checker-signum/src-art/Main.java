@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import java.lang.reflect.Method;
-
 public class Main {
 
   /// CHECK-START: int Main.signByte(byte) builder (after)
@@ -73,11 +71,51 @@ public class Main {
     return Long.signum(x);
   }
 
+  /// CHECK-START: int Main.signBoolean(boolean) builder (after)
+  /// CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>    IntConstant 1
+  /// CHECK-DAG:     <<Phi:i\d+>>    Phi [<<One>>,<<Zero>>]
+  /// CHECK-DAG:     <<Result:i\d+>> Compare [<<Phi>>,<<Zero>>]
+  /// CHECK-DAG:                     Return [<<Result>>]
+
+  /// CHECK-START: int Main.signBoolean(boolean) builder (after)
+  /// CHECK-NOT:                     InvokeStaticOrDirect
+
+  /// CHECK-START: int Main.signBoolean(boolean) select_generator (after)
+  /// CHECK-DAG:     <<Arg:z\d+>>    ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
+  /// CHECK-DAG:     <<One:i\d+>>    IntConstant 1
+  /// CHECK-DAG:     <<Sel:i\d+>>    Select [<<Zero>>,<<One>>,<<Arg>>]
+  /// CHECK-DAG:     <<Result:i\d+>> Compare [<<Sel>>,<<Zero>>]
+  /// CHECK-DAG:                     Return [<<Result>>]
+
+  /// CHECK-START: int Main.signBoolean(boolean) select_generator (after)
+  /// CHECK-NOT:                     Phi
+
+  /// CHECK-START: int Main.signBoolean(boolean) instruction_simplifier$after_bce (after)
+  /// CHECK-DAG:     <<Arg:z\d+>>    ParameterValue
+  /// CHECK-DAG:     <<Zero:i\d+>>   IntConstant 0
+  /// CHECK-DAG:     <<Result:i\d+>> Compare [<<Arg>>,<<Zero>>]
+  /// CHECK-DAG:                     Return [<<Result>>]
+
+  /// CHECK-START: int Main.signBoolean(boolean) instruction_simplifier$after_bce (after)
+  /// CHECK-NOT:                     Select
+
+  private static int signBoolean(boolean x) {
+    // Note: D8 would replace the ternary expression `x ? 1 : 0` with `x`
+    // but explicit `if` is preserved.
+    int src_x;
+    if (x) {
+      src_x = 1;
+    } else {
+      src_x = 0;
+    }
+    return Integer.signum(src_x);
+  }
 
   public static void testSignBoolean() throws Exception {
-    Method signBoolean = Class.forName("Main2").getMethod("signBoolean", boolean.class);
-    expectEquals(0, (int)signBoolean.invoke(null, false));
-    expectEquals(1, (int)signBoolean.invoke(null, true));
+    expectEquals(0, signBoolean(false));
+    expectEquals(1, signBoolean(true));
   }
 
   public static void testSignByte() {
