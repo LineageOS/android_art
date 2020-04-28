@@ -94,6 +94,6 @@ class Logger(object):
     Logger.log("PASS", color=Logger.Color.Blue)
 
   @staticmethod
-  def testFailed(msg, assertion, variables):
+  def testFailed(msg, statement, variables):
     Logger.log("FAIL", color=Logger.Color.Red)
-    Logger.fail(msg, assertion.fileName, assertion.lineNo, assertion.originalText, variables)
+    Logger.fail(msg, statement.fileName, statement.lineNo, statement.originalText, variables)
