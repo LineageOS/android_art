@@ -497,31 +497,23 @@ PRIVATE_ART_APEX_DEPENDENCY_FILES := \
   bin/dalvikvm32 \
   bin/dalvikvm64 \
   bin/dalvikvm \
-  bin/dex2oat \
-  bin/dex2oatd \
+  bin/dex2oat32 \
+  bin/dex2oat64 \
   bin/dexdump \
 
 PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
-  lib/libadbconnectiond.so \
   lib/libadbconnection.so \
   lib/libandroidicu.so \
   lib/libandroidio.so \
-  lib/libartbased.so \
   lib/libartbase.so \
   lib/libart-compiler.so \
-  lib/libartd-compiler.so \
-  lib/libartd-dexlayout.so \
-  lib/libartd-disassembler.so \
   lib/libart-dexlayout.so \
   lib/libart-disassembler.so \
-  lib/libartd.so \
   lib/libartpalette.so \
   lib/libart.so \
   lib/libbacktrace.so \
   lib/libbase.so \
   lib/libcrypto.so \
-  lib/libdexfiled_external.so \
-  lib/libdexfiled.so \
   lib/libdexfile_external.so \
   lib/libdexfile.so \
   lib/libdexfile_support.so \
@@ -539,42 +531,29 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libnativehelper.so \
   lib/libnativeloader.so \
   lib/libnpt.so \
-  lib/libopenjdkd.so \
-  lib/libopenjdkjvmd.so \
   lib/libopenjdkjvm.so \
-  lib/libopenjdkjvmtid.so \
   lib/libopenjdkjvmti.so \
   lib/libopenjdk.so \
   lib/libpac.so \
   lib/libprocinfo.so \
-  lib/libprofiled.so \
   lib/libprofile.so \
   lib/libsigchain.so \
   lib/libunwindstack.so \
-  lib/libvixld.so \
   lib/libvixl.so \
   lib/libziparchive.so \
   lib/libz.so \
-  lib64/libadbconnectiond.so \
   lib64/libadbconnection.so \
   lib64/libandroidicu.so \
   lib64/libandroidio.so \
-  lib64/libartbased.so \
   lib64/libartbase.so \
   lib64/libart-compiler.so \
-  lib64/libartd-compiler.so \
-  lib64/libartd-dexlayout.so \
-  lib64/libartd-disassembler.so \
   lib64/libart-dexlayout.so \
   lib64/libart-disassembler.so \
-  lib64/libartd.so \
   lib64/libartpalette.so \
   lib64/libart.so \
   lib64/libbacktrace.so \
   lib64/libbase.so \
   lib64/libcrypto.so \
-  lib64/libdexfiled_external.so \
-  lib64/libdexfiled.so \
   lib64/libdexfile_external.so \
   lib64/libdexfile.so \
   lib64/libdexfile_support.so \
@@ -592,19 +571,14 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libnativehelper.so \
   lib64/libnativeloader.so \
   lib64/libnpt.so \
-  lib64/libopenjdkd.so \
-  lib64/libopenjdkjvmd.so \
   lib64/libopenjdkjvm.so \
-  lib64/libopenjdkjvmtid.so \
   lib64/libopenjdkjvmti.so \
   lib64/libopenjdk.so \
   lib64/libpac.so \
   lib64/libprocinfo.so \
-  lib64/libprofiled.so \
   lib64/libprofile.so \
   lib64/libsigchain.so \
   lib64/libunwindstack.so \
-  lib64/libvixld.so \
   lib64/libvixl.so \
   lib64/libziparchive.so \
   lib64/libz.so \
@@ -652,7 +626,7 @@ standalone-apex-files: libc.bootstrap \
                        libdl_android.bootstrap \
                        libm.bootstrap \
                        linker \
-                       $(DEBUG_ART_APEX) \
+                       $(RELEASE_ART_APEX) \
                        $(CONSCRYPT_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
@@ -663,7 +637,7 @@ standalone-apex-files: libc.bootstrap \
 	else \
           apex_orig_dir=""; \
 	fi; \
-	art_apex_orig_dir=$$apex_orig_dir/$(DEBUG_ART_APEX); \
+	art_apex_orig_dir=$$apex_orig_dir/$(RELEASE_ART_APEX); \
 	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES); do \
 	  tf="$$art_apex_orig_dir/$$f"; \
 	  df="$(TARGET_OUT)/$$f"; \
@@ -718,11 +692,9 @@ standalone-apex-files: libc.bootstrap \
 # ART APEX (and TZ Data APEX).
 
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
-build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
+build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \
                         $(TARGET_OUT_EXECUTABLES)/art \
                         $(TARGET_OUT)/etc/public.libraries.txt \
-                        $(ART_TARGET_DEX_DEPENDENCIES) \
-                        $(ART_DEBUG_TARGET_SHARED_LIBRARY_DEPENDENCIES) \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(TARGET_CORE_IMG_OUT_BASE).art \
                         $(TARGET_CORE_IMG_OUT_BASE)-interpreter.art \
@@ -738,6 +710,8 @@ build-art-target-golem: dex2oat dalvikvm linker libstdc++ \
 	sed -i '/libdexfiled.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	sed -i '/libprofiled.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	sed -i '/libartbased.so/d' $(TARGET_OUT)/etc/public.libraries.txt
+	# The 'art' script will look for a 'com.android.art' directory.
+	ln -sf $(TARGET_OUT)/apex/com.android.art $(TARGET_OUT)/apex/com.android.art.release
 
 ########################################################################
 # Phony target for building what go/lem requires on host.
