@@ -21,6 +21,8 @@
 
 #include "jni.h"
 
+#include <stdio.h>
+
 namespace art {
 
 static void MaybePrintTime() {
@@ -41,16 +43,19 @@ extern "C" [[noreturn]] JNIEXPORT void JNICALL Java_Main_monitorShutdown(
       found_shutdown = true;
       MaybePrintTime();
       printf("Saw RuntimeShutdownFunctions\n");
+      fflush(stdout);
     }
     if (!found_runtime_deleted && extEnv->IsRuntimeDeleted()) {
       found_runtime_deleted = true;
       MaybePrintTime();
       printf("Saw RuntimeDeleted\n");
+      fflush(stdout);
     }
     if (found_shutdown && found_runtime_deleted) {
       // All JNI calls should now get rerouted to SleepForever();
       (void) env->NewByteArray(17);
       printf("Unexpectedly returned from JNI call\n");
+      fflush(stdout);
       SleepForever();
     }
   }
