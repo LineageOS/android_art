@@ -79,6 +79,7 @@ $$(core_image_name): PRIVATE_CORE_COMPILE_OPTIONS := $$(core_compile_options)
 $$(core_image_name): PRIVATE_CORE_IMAGE_LOCATION := $$(core_image_location)
 $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
 $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
+$$(core_image_name): .KATI_IMPLICIT_OUTPUTS := $$(core_oat_name)
 $$(core_image_name): $$(HOST_CORE_IMG_DEX_LOCATIONS) $$(core_dex2oat_dependency)
 	@echo "host dex2oat: $$@"
 	@mkdir -p $$(dir $$@)
@@ -98,8 +99,6 @@ $$(core_image_name): $$(HOST_CORE_IMG_DEX_LOCATIONS) $$(core_dex2oat_dependency)
 	  --runtime-arg -XX:SlowDebug=true \
 	  --no-inline-from=core-oj-hostdex.jar \
 	  $$(PRIVATE_CORE_COMPILE_OPTIONS)
-
-$$(core_oat_name): $$(core_image_name)
 
   # Clean up locally used variables.
   core_dex2oat_dependency :=
@@ -171,6 +170,7 @@ $$(core_image_name): PRIVATE_CORE_COMPILE_OPTIONS := $$(core_compile_options)
 $$(core_image_name): PRIVATE_CORE_IMAGE_LOCATION := $$(core_image_location)
 $$(core_image_name): PRIVATE_CORE_IMG_NAME := $$(core_image_name)
 $$(core_image_name): PRIVATE_CORE_OAT_NAME := $$(core_oat_name)
+$$(core_image_name): .KATI_IMPLICIT_OUTPUTS := $$(core_oat_name)
 $$(core_image_name): $$(TARGET_CORE_IMG_DEX_FILES) $$(core_dex2oat_dependency)
 	@echo "target dex2oat: $$@"
 	@mkdir -p $$(dir $$@)
@@ -190,8 +190,6 @@ $$(core_image_name): $$(TARGET_CORE_IMG_DEX_FILES) $$(core_dex2oat_dependency)
 	  --generate-debug-info --generate-build-id \
 	  --runtime-arg -XX:SlowDebug=true \
 	  $$(PRIVATE_CORE_COMPILE_OPTIONS)
-
-$$(core_oat_name): $$(core_image_name)
 
   # Clean up locally used variables.
   core_dex2oat_dependency :=
