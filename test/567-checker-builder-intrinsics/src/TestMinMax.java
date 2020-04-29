@@ -17,22 +17,22 @@
 /**
  * Functional tests for detecting min/max.
  */
-public class Main {
+public class TestMinMax {
 
   //
   // Direct intrinsics.
   //
 
-  /// CHECK-START: int Main.minI(int) builder (after)
+  /// CHECK-START: int TestMinMax.minI(int) builder (after)
   /// CHECK-DAG: <<Par:i\d+>> ParameterValue
   /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
   /// CHECK-DAG: <<Min:i\d+>> Min [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.minI(int) builder (after)
+  /// CHECK-START: int TestMinMax.minI(int) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
-  /// CHECK-START-ARM64: int Main.minI(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.minI(int) disassembly (after)
   /// CHECK-NOT:              mov {{w\d+}}, #0x14
   /// CHECK:                  cmp {{w\d+}}, #0x14
   //  Check that the constant generation was handled by VIXL.
@@ -42,16 +42,16 @@ public class Main {
     return Math.min(a, 20);
   }
 
-  /// CHECK-START: long Main.minL(long) builder (after)
+  /// CHECK-START: long TestMinMax.minL(long) builder (after)
   /// CHECK-DAG: <<Par:j\d+>> ParameterValue
   /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
   /// CHECK-DAG: <<Min:j\d+>> Min [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: long Main.minL(long) builder (after)
+  /// CHECK-START: long TestMinMax.minL(long) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
-  /// CHECK-START-ARM64: long Main.minL(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.minL(long) disassembly (after)
   /// CHECK-NOT:              mov {{x\d+}}, #0x14
   /// CHECK:                  cmp {{x\d+}}, #0x14
   //  Check that the constant generation was handled by VIXL.
@@ -61,16 +61,16 @@ public class Main {
     return Math.min(a, 20L);
   }
 
-  /// CHECK-START: int Main.maxI(int) builder (after)
+  /// CHECK-START: int TestMinMax.maxI(int) builder (after)
   /// CHECK-DAG: <<Par:i\d+>> ParameterValue
   /// CHECK-DAG: <<Con:i\d+>> IntConstant 20
   /// CHECK-DAG: <<Max:i\d+>> Max [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.maxI(int) builder (after)
+  /// CHECK-START: int TestMinMax.maxI(int) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
-  /// CHECK-START-ARM64: int Main.maxI(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.maxI(int) disassembly (after)
   /// CHECK-NOT:              mov {{w\d+}}, #0x14
   /// CHECK:                  cmp {{w\d+}}, #0x14
   //  Check that the constant generation was handled by VIXL.
@@ -80,16 +80,16 @@ public class Main {
     return Math.max(a, 20);
   }
 
-  /// CHECK-START: long Main.maxL(long) builder (after)
+  /// CHECK-START: long TestMinMax.maxL(long) builder (after)
   /// CHECK-DAG: <<Par:j\d+>> ParameterValue
   /// CHECK-DAG: <<Con:j\d+>> LongConstant 20
   /// CHECK-DAG: <<Max:j\d+>> Max [<<Par>>,<<Con>>]
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: long Main.maxL(long) builder (after)
+  /// CHECK-START: long TestMinMax.maxL(long) builder (after)
   /// CHECK-NOT:              InvokeStaticOrDirect
   //
-  /// CHECK-START-ARM64: long Main.maxL(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.maxL(long) disassembly (after)
   /// CHECK-NOT:              mov {{x\d+}}, #0x14
   /// CHECK:                  cmp {{x\d+}}, #0x14
   //  Check that the constant generation was handled by VIXL.
@@ -103,7 +103,7 @@ public class Main {
   // Special Cases
   //
 
-  /// CHECK-START-ARM64: int Main.minIntConstantZero(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.minIntConstantZero(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0x0
   /// CHECK:            cmp {{w\d+}}, #0x0 (0)
@@ -113,7 +113,7 @@ public class Main {
     return Math.min(a, 0);
   }
 
-  /// CHECK-START-ARM64: int Main.minIntConstantOne(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.minIntConstantOne(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0x1
   /// CHECK:            cmp {{w\d+}}, #0x1 (1)
@@ -123,7 +123,7 @@ public class Main {
     return Math.min(a, 1);
   }
 
-  /// CHECK-START-ARM64: int Main.minIntConstantMinusOne(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.minIntConstantMinusOne(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0xffffffff
   /// CHECK:            cmn {{w\d+}}, #0x1 (1)
@@ -133,7 +133,7 @@ public class Main {
     return Math.min(a, -1);
   }
 
-  /// CHECK-START-ARM64: long Main.minLongConstantZero(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.minLongConstantZero(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0x0
   /// CHECK:            cmp {{x\d+}}, #0x0 (0)
@@ -143,7 +143,7 @@ public class Main {
     return Math.min(a, 0L);
   }
 
-  /// CHECK-START-ARM64: long Main.minLongConstantOne(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.minLongConstantOne(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0x1
   /// CHECK:            cmp {{x\d+}}, #0x1 (1)
@@ -153,7 +153,7 @@ public class Main {
     return Math.min(a, 1L);
   }
 
-  /// CHECK-START-ARM64: long Main.minLongConstantMinusOne(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.minLongConstantMinusOne(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0xffffffffffffffff
   /// CHECK:            cmn {{x\d+}}, #0x1 (1)
@@ -163,7 +163,7 @@ public class Main {
     return Math.min(a, -1L);
   }
 
-  /// CHECK-START-ARM64: int Main.maxIntConstantZero(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.maxIntConstantZero(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0x0
   /// CHECK:            cmp {{w\d+}}, #0x0 (0)
@@ -173,7 +173,7 @@ public class Main {
     return Math.max(a, 0);
   }
 
-  /// CHECK-START-ARM64: int Main.maxIntConstantOne(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.maxIntConstantOne(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0x1
   /// CHECK:            cmp {{w\d+}}, #0x1 (1)
@@ -183,7 +183,7 @@ public class Main {
     return Math.max(a, 1);
   }
 
-  /// CHECK-START-ARM64: int Main.maxIntConstantMinusOne(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.maxIntConstantMinusOne(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{w\d+}}, #0xffffffff
   /// CHECK:            cmn {{w\d+}}, #0x1 (1)
@@ -193,7 +193,7 @@ public class Main {
     return Math.max(a, -1);
   }
 
-  /// CHECK-START-ARM64: int Main.maxIntLargeConstant(int) disassembly (after)
+  /// CHECK-START-ARM64: int TestMinMax.maxIntLargeConstant(int) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK:            mov {{w\d+}}, #0x2001
   /// CHECK:            cmp {{w\d+}}, {{w\d+}}
@@ -205,7 +205,7 @@ public class Main {
     return Math.max(a, 8193);
   }
 
-  /// CHECK-START-ARM64: long Main.maxLongConstantZero(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.maxLongConstantZero(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0x0
   /// CHECK:            cmp {{x\d+}}, #0x0 (0)
@@ -215,7 +215,7 @@ public class Main {
     return Math.max(a, 0L);
   }
 
-  /// CHECK-START-ARM64: long Main.maxLongConstantOne(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.maxLongConstantOne(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0x1
   /// CHECK:            cmp {{x\d+}}, #0x1 (1)
@@ -225,7 +225,7 @@ public class Main {
     return Math.max(a, 1L);
   }
 
-  /// CHECK-START-ARM64: long Main.maxLongConstantMinusOne(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.maxLongConstantMinusOne(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK-NOT:        mov {{x\d+}}, #0xffffffffffffffff
   /// CHECK:            cmn {{x\d+}}, #0x1 (1)
@@ -235,7 +235,7 @@ public class Main {
     return Math.max(a, -1L);
   }
 
-  /// CHECK-START-ARM64: long Main.maxLongLargeConstant(long) disassembly (after)
+  /// CHECK-START-ARM64: long TestMinMax.maxLongLargeConstant(long) disassembly (after)
   /// CHECK-NOT:        InvokeStaticOrDirect
   /// CHECK:            mov {{x\d+}}, #0x2001
   /// CHECK:            cmp {{x\d+}}, {{x\d+}}
@@ -251,211 +251,211 @@ public class Main {
   // Different types.
   //
 
-  /// CHECK-START: int Main.min1(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min1(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> GreaterThanOrEqual [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min1(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min1(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min1(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min1(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min1(int a, int b) {
     return a < b ? a : b;
   }
 
-  /// CHECK-START: int Main.min2(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min2(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> GreaterThan [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min2(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min2(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min2(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min2(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min2(int a, int b) {
     return a <= b ? a : b;
   }
 
-  /// CHECK-START: int Main.min3(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min3(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThanOrEqual [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min3(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min3(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min3(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min3(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min3(int a, int b) {
     return a > b ? b : a;
   }
 
-  /// CHECK-START: int Main.min4(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min4(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min4(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min4(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min4(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min4(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min4(int a, int b) {
     return a >= b ? b : a;
   }
 
-  /// CHECK-START: int Main.min5(short, short) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min5(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:s\d+>>,<<Op2:s\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min5(short, short) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min5(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min5(short, short) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min5(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min5(short a, short b) {
     return a >= b ? b : a;
   }
 
-  /// CHECK-START: int Main.min6(byte, byte) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min6(byte, byte) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:b\d+>>,<<Op2:b\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min6(byte, byte) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min6(byte, byte) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min6(byte, byte) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min6(byte, byte) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min6(byte a, byte b) {
     return a >= b ? b : a;
   }
 
-  /// CHECK-START: long Main.min7(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long TestMinMax.min7(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:j\d+>>,<<Op2:j\d+>>]
   /// CHECK-DAG: <<Sel:j\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: long Main.min7(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long TestMinMax.min7(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:j\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: long Main.min7(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long TestMinMax.min7(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static long min7(long a, long b) {
     return a >= b ? b : a;
   }
 
-  /// CHECK-START: int Main.max1(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max1(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> GreaterThanOrEqual [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max1(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max1(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max1(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max1(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max1(int a, int b) {
     return a < b ? b : a;
   }
 
-  /// CHECK-START: int Main.max2(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max2(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> GreaterThan [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op2>>,<<Op1>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max2(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max2(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max2(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max2(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max2(int a, int b) {
     return a <= b ? b : a;
   }
 
-  /// CHECK-START: int Main.max3(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max3(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThanOrEqual [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max3(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max3(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max3(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max3(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max3(int a, int b) {
     return a > b ? a : b;
   }
 
-  /// CHECK-START: int Main.max4(int, int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max4(int, int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:i\d+>>,<<Op2:i\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max4(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max4(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max4(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max4(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max4(int a, int b) {
     return a >= b ? a : b;
   }
 
-  /// CHECK-START: int Main.max5(short, short) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max5(short, short) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:s\d+>>,<<Op2:s\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max5(short, short) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max5(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max5(short, short) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max5(short, short) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max5(short a, short b) {
     return a >= b ? a : b;
   }
 
-  /// CHECK-START: int Main.max6(byte, byte) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max6(byte, byte) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:b\d+>>,<<Op2:b\d+>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max6(byte, byte) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max6(byte, byte) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max6(byte, byte) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max6(byte, byte) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max6(byte a, byte b) {
     return a >= b ? a : b;
   }
 
-  /// CHECK-START: long Main.max7(long, long) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: long TestMinMax.max7(long, long) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Op1:j\d+>>,<<Op2:j\d+>>]
   /// CHECK-DAG: <<Sel:j\d+>> Select [<<Op1>>,<<Op2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: long Main.max7(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long TestMinMax.max7(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:j\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: long Main.max7(long, long) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: long TestMinMax.max7(long, long) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static long max7(long a, long b) {
     return a >= b ? a : b;
@@ -465,18 +465,18 @@ public class Main {
   // Complications.
   //
 
-  /// CHECK-START: int Main.min0(int[], int[]) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.min0(int[], int[]) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Ar1:i\d+>> ArrayGet [{{l\d+}},{{i\d+}}]
   /// CHECK-DAG: <<Ar2:i\d+>> ArrayGet [{{l\d+}},{{i\d+}}]
   /// CHECK-DAG: <<Cnd:z\d+>> GreaterThan [<<Ar1>>,<<Ar2>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Ar1>>,<<Ar2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.min0(int[], int[]) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min0(int[], int[]) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Min:i\d+>> Min
   /// CHECK-DAG:              Return [<<Min>>]
   //
-  /// CHECK-START: int Main.min0(int[], int[]) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.min0(int[], int[]) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int min0(int[] a, int[] b) {
     // Repeat of array references needs finding the common subexpressions
@@ -484,18 +484,18 @@ public class Main {
     return a[0] <= b[0] ? a[0] : b[0];
   }
 
-  /// CHECK-START: int Main.max0(int[], int[]) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.max0(int[], int[]) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Ar1:i\d+>> ArrayGet [{{l\d+}},{{i\d+}}]
   /// CHECK-DAG: <<Ar2:i\d+>> ArrayGet [{{l\d+}},{{i\d+}}]
   /// CHECK-DAG: <<Cnd:z\d+>> LessThan [<<Ar1>>,<<Ar2>>]
   /// CHECK-DAG: <<Sel:i\d+>> Select [<<Ar1>>,<<Ar2>>,<<Cnd>>]
   /// CHECK-DAG:              Return [<<Sel>>]
   //
-  /// CHECK-START: int Main.max0(int[], int[]) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max0(int[], int[]) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Max:i\d+>> Max
   /// CHECK-DAG:              Return [<<Max>>]
   //
-  /// CHECK-START: int Main.max0(int[], int[]) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.max0(int[], int[]) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:              Select
   public static int max0(int[] a, int[] b) {
     // Repeat of array references needs finding the common subexpressions
@@ -503,7 +503,7 @@ public class Main {
     return a[0] >= b[0] ? a[0] : b[0];
   }
 
-  /// CHECK-START: int Main.minmax1(int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.minmax1(int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -513,7 +513,7 @@ public class Main {
   /// CHECK-DAG: <<Sel2:i\d+>> Select [<<M100>>,<<Sel1>>,<<Cnd2>>]
   /// CHECK-DAG:               Return [<<Sel2>>]
   //
-  /// CHECK-START: int Main.minmax1(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax1(int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -521,7 +521,7 @@ public class Main {
   /// CHECK-DAG: <<Max:i\d+>>  Max [<<Min>>,<<M100>>]
   /// CHECK-DAG:               Return [<<Max>>]
   //
-  /// CHECK-START: int Main.minmax1(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax1(int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:               Select
   public static int minmax1(int x) {
     // Simple if-if gives clean select sequence.
@@ -534,7 +534,7 @@ public class Main {
     return x;
   }
 
-  /// CHECK-START: int Main.minmax2(int) instruction_simplifier$after_gvn (before)
+  /// CHECK-START: int TestMinMax.minmax2(int) instruction_simplifier$after_gvn (before)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -544,7 +544,7 @@ public class Main {
   /// CHECK-DAG: <<Sel2:i\d+>> Select [<<P100>>,<<Sel1>>,<<Cnd1>>]
   /// CHECK-DAG:               Return [<<Sel2>>]
   //
-  /// CHECK-START: int Main.minmax2(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax2(int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -552,7 +552,7 @@ public class Main {
   /// CHECK-DAG: <<Min:i\d+>>  Min [<<Max>>,<<P100>>]
   /// CHECK-DAG:               Return [<<Min>>]
   //
-  /// CHECK-START: int Main.minmax2(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax2(int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:               Select
   public static int minmax2(int x) {
     // Simple if-else requires inspecting bounds of resulting selects.
@@ -564,7 +564,7 @@ public class Main {
     return x;
   }
 
-  /// CHECK-START: int Main.minmax3(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax3(int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -572,13 +572,13 @@ public class Main {
   /// CHECK-DAG: <<Min:i\d+>>  Min [<<Max>>,<<P100>>]
   /// CHECK-DAG:               Return [<<Min>>]
   //
-  /// CHECK-START: int Main.minmax3(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax3(int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:               Select
   public static int minmax3(int x) {
     return (x > 100) ? 100 : ((x < -100) ? -100 : x);
   }
 
-  /// CHECK-START: int Main.minmax4(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax4(int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par:i\d+>>  ParameterValue
   /// CHECK-DAG: <<P100:i\d+>> IntConstant 100
   /// CHECK-DAG: <<M100:i\d+>> IntConstant -100
@@ -586,13 +586,13 @@ public class Main {
   /// CHECK-DAG: <<Max:i\d+>>  Max [<<Min>>,<<M100>>]
   /// CHECK-DAG:               Return [<<Max>>]
   //
-  /// CHECK-START: int Main.minmax4(int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmax4(int) instruction_simplifier$after_gvn (after)
   /// CHECK-NOT:               Select
   public static int minmax4(int x) {
     return (x < -100) ? -100 : ((x > 100) ? 100 : x);
   }
 
-  /// CHECK-START: int Main.minmaxCSEScalar(int, int) select_generator (after)
+  /// CHECK-START: int TestMinMax.minmaxCSEScalar(int, int) select_generator (after)
   /// CHECK-DAG: <<Par1:i\d+>> ParameterValue
   /// CHECK-DAG: <<Par2:i\d+>> ParameterValue
   /// CHECK-DAG: <<Cnd1:z\d+>> LessThanOrEqual    [<<Par1>>,<<Par2>>]
@@ -606,7 +606,7 @@ public class Main {
   /// CHECK-DAG: <<Add5:i\d+>> Add                [<<Sel2>>,<<Add4>>]
   /// CHECK-DAG:               Return             [<<Add5>>]
   //
-  /// CHECK-START: int Main.minmaxCSEScalar(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmaxCSEScalar(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par1:i\d+>> ParameterValue
   /// CHECK-DAG: <<Par2:i\d+>> ParameterValue
   /// CHECK-DAG: <<Max:i\d+>>  Max    [<<Par1>>,<<Par2>>]
@@ -628,7 +628,7 @@ public class Main {
     return t1 + t2 + t3 + t4 + t5 + t6;
   }
 
-  /// CHECK-START: int Main.minmaxCSEArray(int[], int[]) select_generator (after)
+  /// CHECK-START: int TestMinMax.minmaxCSEArray(int[], int[]) select_generator (after)
   /// CHECK-DAG: <<Arr1:i\d+>> ArrayGet
   /// CHECK-DAG: <<Arr2:i\d+>> ArrayGet
   /// CHECK-DAG: <<Cnd1:z\d+>> LessThanOrEqual    [<<Arr1>>,<<Arr2>>]
@@ -642,7 +642,7 @@ public class Main {
   /// CHECK-DAG: <<Add5:i\d+>> Add                [<<Sel2>>,<<Add4>>]
   /// CHECK-DAG:               Return             [<<Add5>>]
   //
-  /// CHECK-START: int Main.minmaxCSEArray(int[], int[]) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmaxCSEArray(int[], int[]) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Arr1:i\d+>> ArrayGet
   /// CHECK-DAG: <<Arr2:i\d+>> ArrayGet
   /// CHECK-DAG: <<Max:i\d+>>  Max    [<<Arr1>>,<<Arr2>>]
@@ -664,7 +664,7 @@ public class Main {
     return t1 + t2 + t3 + t4 + t5 + t6;
   }
 
-  /// CHECK-START: int Main.minmaxCSEScalarAndCond(int, int) instruction_simplifier$after_gvn (after)
+  /// CHECK-START: int TestMinMax.minmaxCSEScalarAndCond(int, int) instruction_simplifier$after_gvn (after)
   /// CHECK-DAG: <<Par1:i\d+>> ParameterValue
   /// CHECK-DAG: <<Par2:i\d+>> ParameterValue
   /// CHECK-DAG: <<Max:i\d+>>  Max    [<<Par1>>,<<Par2>>]
@@ -686,7 +686,7 @@ public class Main {
     return t1 + t2 + t3 + t4;
   }
 
-  public static void main(String[] args) {
+  public static void main() {
     // Intrinsics.
     expectEquals(10, minI(10));
     expectEquals(20, minI(25));
@@ -760,7 +760,7 @@ public class Main {
     expectEquals(90, minmaxCSEArray(a, b));
     expectEquals(20, minmaxCSEScalarAndCond(10, 10));
     expectEquals(60, minmaxCSEScalarAndCond(10, 20));
-    System.out.println("passed");
+    System.out.println("TestMinMax passed");
   }
 
   private static void expectEquals(int expected, int result) {
