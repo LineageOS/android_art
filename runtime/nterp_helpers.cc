@@ -59,6 +59,8 @@ namespace art {
  *    ----------------      registers array for easy access from nterp when returning.
  *    |  dex_pc_ptr  |      Pointer to the dex instruction being executed.
  *    ----------------      Stored whenever nterp goes into the runtime.
+ *    |  alignment   |      Pointer aligment for dex_pc_ptr and caller_fp.
+ *    ----------------
  *    |              |      In case nterp calls compiled code, we reserve space
  *    |     out      |      for out registers. This space will be used for
  *    |   registers  |      arguments passed on stack.
@@ -97,6 +99,11 @@ size_t NterpGetFrameSize(ArtMethod* method) {
   const uint16_t num_regs = accessor.RegistersSize();
   const uint16_t out_regs = accessor.OutsSize();
 
+  // Note: There may be two pieces of alignment but there is no need to align
+  // out args to `kPointerSize` separately before aligning to kStackAlignment.
+  static_assert(IsAligned<kPointerSize>(kStackAlignment));
+  static_assert(IsAligned<kPointerSize>(NterpGetFrameEntrySize()));
+  static_assert(IsAligned<kPointerSize>(kVRegSize * 2));
   size_t frame_size =
       NterpGetFrameEntrySize() +
       (num_regs * kVRegSize) * 2 +  // dex registers and reference registers
@@ -128,7 +135,7 @@ uintptr_t NterpGetReferenceArray(ArtMethod** frame) {
   // The references array is just above the saved frame pointer.
   return reinterpret_cast<uintptr_t>(frame) +
       kPointerSize +  // method
-      (out_regs * kVRegSize) +  // out arguments
+      RoundUp(out_regs * kVRegSize, kPointerSize) +  // out arguments and pointer alignment
       kPointerSize +  // saved dex pc
       kPointerSize;  // previous frame.
 }
@@ -138,7 +145,7 @@ uint32_t NterpGetDexPC(ArtMethod** frame) {
   const uint16_t out_regs = accessor.OutsSize();
   uintptr_t dex_pc_ptr = reinterpret_cast<uintptr_t>(frame) +
       kPointerSize +  // method
-      (out_regs * kVRegSize);  // out arguments
+      RoundUp(out_regs * kVRegSize, kPointerSize);  // out arguments and pointer alignment
   CodeItemInstructionAccessor instructions((*frame)->DexInstructions());
   return *reinterpret_cast<const uint16_t**>(dex_pc_ptr) - instructions.Insns();
 }
