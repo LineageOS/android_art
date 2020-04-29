@@ -20,6 +20,13 @@ public class Main {
     Object[] data = new Object[100000];
     try {
         System.out.println("Filling heap");
+
+        // Make sure that there is no reclaimable memory in the heap. Otherwise we may throw
+        // OOME to prevent GC thrashing, even if later allocations may succeed.
+        Runtime.getRuntime().gc();
+        System.runFinalization();
+        Runtime.getRuntime().gc();
+
         int size = 256 * 1024 * 1024;
         int index = 0;
         while (true) {
