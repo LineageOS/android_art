@@ -870,18 +870,6 @@ bool Heap::IsCompilingBoot() const {
   return true;
 }
 
-bool Heap::HasAppImageSpace() const {
-  for (const auto& space : GetContinuousSpaces()) {
-    if (space->IsImageSpace()) {
-      const gc::space::ImageSpace* image_space = space->AsImageSpace();
-      if (image_space->GetImageHeader().IsAppImage()) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 void Heap::IncrementDisableMovingGC(Thread* self) {
   // Need to do this holding the lock to prevent races where the GC is about to run / running when
   // we attempt to disable it.
