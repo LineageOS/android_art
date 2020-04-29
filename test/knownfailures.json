@@ -1387,8 +1387,7 @@
                   "960-default-smali",
                   "966-default-conflict",
                   "990-field-trace",
-                  "2034-spaces-in-SimpleName",
-                  "2231-oat-require-app-image"],
+                  "2034-spaces-in-SimpleName"],
         "variant": "jvm",
         "bug": "b/154802847",
         "description": ["Failing on RI. Needs further investigating."]
