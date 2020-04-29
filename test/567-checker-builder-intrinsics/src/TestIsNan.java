@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-public class Main {
+public class TestIsNan {
 
-  /// CHECK-START: boolean Main.isNaN32(float) builder (after)
+  /// CHECK-START: boolean TestIsNan.isNaN32(float) builder (after)
   /// CHECK-DAG: <<Result:z\d+>> NotEqual
   /// CHECK-DAG: Return [<<Result>>]
   //
-  /// CHECK-START: boolean Main.isNaN32(float) builder (after)
+  /// CHECK-START: boolean TestIsNan.isNaN32(float) builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   private static boolean isNaN32(float x) {
     return Float.isNaN(x);
   }
 
-  /// CHECK-START: boolean Main.isNaN64(double) builder (after)
+  /// CHECK-START: boolean TestIsNan.isNaN64(double) builder (after)
   /// CHECK-DAG: <<Result:z\d+>> NotEqual
   /// CHECK-DAG: Return [<<Result>>]
   //
-  /// CHECK-START: boolean Main.isNaN64(double) builder (after)
+  /// CHECK-START: boolean TestIsNan.isNaN64(double) builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect
   private static boolean isNaN64(double x) {
     return Double.isNaN(x);
   }
 
-  public static void main(String args[]) {
+  public static void main() {
     // A few distinct numbers.
     expectFalse(isNaN32(Float.NEGATIVE_INFINITY));
     expectFalse(isNaN32(-1.0f));
@@ -101,7 +101,7 @@ public class Main {
       expectTrue(isNaN64(dvals[i]));
     }
 
-    System.out.println("passed");
+    System.out.println("TestIsNan passed");
   }
 
   private static void expectTrue(boolean value) {

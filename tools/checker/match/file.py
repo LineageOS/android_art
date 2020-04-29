@@ -16,94 +16,94 @@ from collections                      import namedtuple
 from common.immutables                import ImmutableDict
 from common.logger                    import Logger
 from file_format.c1visualizer.struct  import C1visualizerFile, C1visualizerPass
-from file_format.checker.struct       import CheckerFile, TestCase, TestAssertion
+from file_format.checker.struct       import CheckerFile, TestCase, TestStatement
 from match.line                       import MatchLines, EvaluateLine
 
 MatchScope = namedtuple("MatchScope", ["start", "end"])
 MatchInfo = namedtuple("MatchInfo", ["scope", "variables"])
 
 class MatchFailedException(Exception):
-  def __init__(self, assertion, lineNo, variables):
-    self.assertion = assertion
+  def __init__(self, statement, lineNo, variables):
+    self.statement = statement
     self.lineNo = lineNo
     self.variables = variables
 
-def splitIntoGroups(assertions):
-  """ Breaks up a list of assertions, grouping instructions which should be
+def splitIntoGroups(statements):
+  """ Breaks up a list of statements, grouping instructions which should be
       tested in the same scope (consecutive DAG and NOT instructions).
    """
-  splitAssertions = []
+  splitStatements = []
   lastVariant = None
-  for assertion in assertions:
-    if (assertion.variant == lastVariant and
-        assertion.variant in [TestAssertion.Variant.DAG, TestAssertion.Variant.Not]):
-      splitAssertions[-1].append(assertion)
+  for statement in statements:
+    if (statement.variant == lastVariant and
+        statement.variant in [TestStatement.Variant.DAG, TestStatement.Variant.Not]):
+      splitStatements[-1].append(statement)
     else:
-      splitAssertions.append([assertion])
-      lastVariant = assertion.variant
-  return splitAssertions
+      splitStatements.append([statement])
+      lastVariant = statement.variant
+  return splitStatements
 
-def findMatchingLine(assertion, c1Pass, scope, variables, excludeLines=[]):
-  """ Finds the first line in `c1Pass` which matches `assertion`.
+def findMatchingLine(statement, c1Pass, scope, variables, excludeLines=[]):
+  """ Finds the first line in `c1Pass` which matches `statement`.
 
   Scan only lines numbered between `scope.start` and `scope.end` and not on the
   `excludeLines` list.
 
-  Returns the index of the `c1Pass` line matching the assertion and variables
+  Returns the index of the `c1Pass` line matching the statement and variables
   values after the match.
 
   Raises MatchFailedException if no such `c1Pass` line can be found.
   """
   for i in range(scope.start, scope.end):
     if i in excludeLines: continue
-    newVariables = MatchLines(assertion, c1Pass.body[i], variables)
+    newVariables = MatchLines(statement, c1Pass.body[i], variables)
     if newVariables is not None:
       return MatchInfo(MatchScope(i, i), newVariables)
-  raise MatchFailedException(assertion, scope.start, variables)
+  raise MatchFailedException(statement, scope.start, variables)
 
-def matchDagGroup(assertions, c1Pass, scope, variables):
-  """ Attempts to find matching `c1Pass` lines for a group of DAG assertions.
+def matchDagGroup(statements, c1Pass, scope, variables):
+  """ Attempts to find matching `c1Pass` lines for a group of DAG statements.
 
-  Assertions are matched in the list order and variable values propagated. Only
-  lines in `scope` are scanned and each line can only match one assertion.
+  Statements are matched in the list order and variable values propagated. Only
+  lines in `scope` are scanned and each line can only match one statement.
 
   Returns the range of `c1Pass` lines covered by this group (min/max of matching
-  line numbers) and the variable values after the match of the last assertion.
+  line numbers) and the variable values after the match of the last statement.
 
-  Raises MatchFailedException when an assertion cannot be satisfied.
+  Raises MatchFailedException when an statement cannot be satisfied.
   """
   matchedLines = []
-  for assertion in assertions:
-    assert assertion.variant == TestAssertion.Variant.DAG
-    match = findMatchingLine(assertion, c1Pass, scope, variables, matchedLines)
+  for statement in statements:
+    assert statement.variant == TestStatement.Variant.DAG
+    match = findMatchingLine(statement, c1Pass, scope, variables, matchedLines)
     variables = match.variables
     assert match.scope.start == match.scope.end
     assert match.scope.start not in matchedLines
     matchedLines.append(match.scope.start)
   return MatchInfo(MatchScope(min(matchedLines), max(matchedLines)), variables)
 
-def testNotGroup(assertions, c1Pass, scope, variables):
-  """ Verifies that none of the given NOT assertions matches a line inside
+def testNotGroup(statements, c1Pass, scope, variables):
+  """ Verifies that none of the given NOT statements matches a line inside
       the given `scope` of `c1Pass` lines.
 
-  Raises MatchFailedException if an assertion matches a line in the scope.
+  Raises MatchFailedException if an statement matches a line in the scope.
   """
   for i in range(scope.start, scope.end):
     line = c1Pass.body[i]
-    for assertion in assertions:
-      assert assertion.variant == TestAssertion.Variant.Not
-      if MatchLines(assertion, line, variables) is not None:
-        raise MatchFailedException(assertion, i, variables)
+    for statement in statements:
+      assert statement.variant == TestStatement.Variant.Not
+      if MatchLines(statement, line, variables) is not None:
+        raise MatchFailedException(statement, i, variables)
 
-def testEvalGroup(assertions, scope, variables):
-  for assertion in assertions:
-    if not EvaluateLine(assertion, variables):
-      raise MatchFailedException(assertion, scope.start, variables)
+def testEvalGroup(statements, scope, variables):
+  for statement in statements:
+    if not EvaluateLine(statement, variables):
+      raise MatchFailedException(statement, scope.start, variables)
 
 def MatchTestCase(testCase, c1Pass):
   """ Runs a test case against a C1visualizer graph dump.
 
-  Raises MatchFailedException when an assertion cannot be satisfied.
+  Raises MatchFailedException when an statement cannot be satisfied.
   """
   assert testCase.name == c1Pass.name
 
@@ -111,49 +111,49 @@ def MatchTestCase(testCase, c1Pass):
   variables = ImmutableDict()
   c1Length = len(c1Pass.body)
 
-  # NOT assertions are verified retrospectively, once the scope is known.
-  pendingNotAssertions = None
+  # NOT statements are verified retrospectively, once the scope is known.
+  pendingNotStatements = None
 
-  # Prepare assertions by grouping those that are verified in the same scope.
-  # We also add None as an EOF assertion that will set scope for NOTs.
-  assertionGroups = splitIntoGroups(testCase.assertions)
-  assertionGroups.append(None)
+  # Prepare statements by grouping those that are verified in the same scope.
+  # We also add None as an EOF statement that will set scope for NOTs.
+  statementGroups = splitIntoGroups(testCase.statements)
+  statementGroups.append(None)
 
-  for assertionGroup in assertionGroups:
-    if assertionGroup is None:
+  for statementGroup in statementGroups:
+    if statementGroup is None:
       # EOF marker always matches the last+1 line of c1Pass.
       match = MatchInfo(MatchScope(c1Length, c1Length), None)
-    elif assertionGroup[0].variant == TestAssertion.Variant.Not:
-      # NOT assertions will be tested together with the next group.
-      assert not pendingNotAssertions
-      pendingNotAssertions = assertionGroup
+    elif statementGroup[0].variant == TestStatement.Variant.Not:
+      # NOT statements will be tested together with the next group.
+      assert not pendingNotStatements
+      pendingNotStatements = statementGroup
       continue
-    elif assertionGroup[0].variant == TestAssertion.Variant.InOrder:
-      # Single in-order assertion. Find the first line that matches.
-      assert len(assertionGroup) == 1
+    elif statementGroup[0].variant == TestStatement.Variant.InOrder:
+      # Single in-order statement. Find the first line that matches.
+      assert len(statementGroup) == 1
       scope = MatchScope(matchFrom, c1Length)
-      match = findMatchingLine(assertionGroup[0], c1Pass, scope, variables)
-    elif assertionGroup[0].variant == TestAssertion.Variant.NextLine:
-      # Single next-line assertion. Test if the current line matches.
-      assert len(assertionGroup) == 1
+      match = findMatchingLine(statementGroup[0], c1Pass, scope, variables)
+    elif statementGroup[0].variant == TestStatement.Variant.NextLine:
+      # Single next-line statement. Test if the current line matches.
+      assert len(statementGroup) == 1
       scope = MatchScope(matchFrom, matchFrom + 1)
-      match = findMatchingLine(assertionGroup[0], c1Pass, scope, variables)
-    elif assertionGroup[0].variant == TestAssertion.Variant.DAG:
-      # A group of DAG assertions. Match them all starting from the same point.
+      match = findMatchingLine(statementGroup[0], c1Pass, scope, variables)
+    elif statementGroup[0].variant == TestStatement.Variant.DAG:
+      # A group of DAG statements. Match them all starting from the same point.
       scope = MatchScope(matchFrom, c1Length)
-      match = matchDagGroup(assertionGroup, c1Pass, scope, variables)
+      match = matchDagGroup(statementGroup, c1Pass, scope, variables)
     else:
-      assert assertionGroup[0].variant == TestAssertion.Variant.Eval
+      assert statementGroup[0].variant == TestStatement.Variant.Eval
       scope = MatchScope(matchFrom, c1Length)
-      testEvalGroup(assertionGroup, scope, variables)
+      testEvalGroup(statementGroup, scope, variables)
       continue
 
-    if pendingNotAssertions:
-      # Previous group were NOT assertions. Make sure they don't match any lines
+    if pendingNotStatements:
+      # Previous group were NOT statements. Make sure they don't match any lines
       # in the [matchFrom, match.start) scope.
       scope = MatchScope(matchFrom, match.scope.start)
-      testNotGroup(pendingNotAssertions, c1Pass, scope, variables)
-      pendingNotAssertions = None
+      testNotGroup(pendingNotStatements, c1Pass, scope, variables)
+      pendingNotStatements = None
 
     # Update state.
     assert matchFrom <= match.scope.end
@@ -183,11 +183,11 @@ def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
       Logger.testPassed()
     except MatchFailedException as e:
       lineNo = c1Pass.startLineNo + e.lineNo
-      if e.assertion.variant == TestAssertion.Variant.Not:
-        msg = "NOT assertion matched line {}"
+      if e.statement.variant == TestStatement.Variant.Not:
+        msg = "NOT statement matched line {}"
       else:
-        msg = "Assertion could not be matched starting from line {}"
+        msg = "Statement could not be matched starting from line {}"
       msg = msg.format(lineNo)
       with file(c1File.fileName) as cfgFile:
         Logger.log(''.join(cfgFile), Logger.Level.Error)
-      Logger.testFailed(msg, e.assertion, e.variables)
+      Logger.testFailed(msg, e.statement, e.variables)

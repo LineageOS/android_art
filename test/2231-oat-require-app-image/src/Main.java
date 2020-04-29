@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 
-// This file is just for running on the RI as the test is ART specific.
 public class Main {
-  public static void main(String args[]) {
-    System.out.println("passed");
+  public static void main(String[] args) {
+    System.loadLibrary(args[0]);
+
+    if ("speed-profile".equals(getCompilerFilter(Main.class)) && !hasAppImage() && hasOatFile()) {
+      System.out.println("Error: Loaded OAT file with no app image in speed-profile mode");
+    }
+
+    System.out.println("Test passed.");
   }
+
+  private native static boolean hasAppImage();
+  private native static boolean hasOatFile();
+  private native static Object getCompilerFilter(Class c);
 }

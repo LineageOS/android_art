@@ -21,7 +21,7 @@
  * we require that Math.abs() clears the sign bit (but changes nothing else)
  * for all numbers, including NaN (signaling NaN may become quiet though).
  */
-public class Main {
+public class TestFpAbs {
 
   private final static boolean isDalvik =
       System.getProperty("java.vm.name").equals("Dalvik");
@@ -31,21 +31,21 @@ public class Main {
 
   public static boolean doThrow = false;
 
-  /// CHECK-START: float Main.$opt$noinline$absSP(float) builder (after)
+  /// CHECK-START: float TestFpAbs.$opt$noinline$absSP(float) builder (after)
   /// CHECK-DAG: <<Result:f\d+>> Abs
   /// CHECK-DAG:                 Return [<<Result>>]
   private static float $opt$noinline$absSP(float f) {
     return Math.abs(f);
   }
 
-  /// CHECK-START: double Main.$opt$noinline$absDP(double) builder (after)
+  /// CHECK-START: double TestFpAbs.$opt$noinline$absDP(double) builder (after)
   /// CHECK-DAG: <<Result:d\d+>> Abs
   /// CHECK-DAG:                 Return [<<Result>>]
   private static double $opt$noinline$absDP(double d) {
     return Math.abs(d);
   }
 
-  public static void main(String args[]) {
+  public static void main() {
     // A few obvious numbers.
     for (float f = -100.0f; f < 0.0f; f += 0.5f) {
       expectEqualsSP(-f, $opt$noinline$absSP(f));
@@ -129,7 +129,7 @@ public class Main {
           Double.doubleToRawLongBits($opt$noinline$absDP(d)));
     }
 
-    System.out.println("passed");
+    System.out.println("TestFpAbs passed");
   }
 
   private static void expectEquals32(int expected, int result) {

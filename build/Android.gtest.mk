@@ -282,7 +282,7 @@ ART_GTEST_oat_file_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dex2oatd
 ART_GTEST_oat_file_test_TARGET_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_TARGET_DEPS) \
-  dex2oatd.com.android.art.debug
+  dex2oatd.com.android.art.testing
 
 ART_GTEST_oat_file_assistant_test_HOST_DEPS := \
   $(ART_GTEST_dex2oat_environment_tests_HOST_DEPS)
@@ -336,7 +336,7 @@ ART_GTEST_dexdump_test_HOST_DEPS := \
 ART_GTEST_dexdump_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  dexdump.com.android.art.debug
+  dexdump.com.android.art.testing
 
 # The dexanalyze test requires an image and the dexanalyze utility.
 ART_GTEST_dexanalyze_test_HOST_DEPS := \
@@ -346,7 +346,7 @@ ART_GTEST_dexanalyze_test_HOST_DEPS := \
 ART_GTEST_dexanalyze_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  dexanalyze.com.android.art.debug
+  dexanalyze.com.android.art.testing
 
 # The dexlayout test requires an image and the dexlayout utility.
 # TODO: rename into dexdump when migration completes
@@ -358,8 +358,8 @@ ART_GTEST_dexlayout_test_HOST_DEPS := \
 ART_GTEST_dexlayout_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  dexlayoutd.com.android.art.debug \
-  dexdump.com.android.art.debug
+  dexlayoutd.com.android.art.testing \
+  dexdump.com.android.art.testing
 
 # The dexlist test requires an image and the dexlist utility.
 ART_GTEST_dexlist_test_HOST_DEPS := \
@@ -381,13 +381,13 @@ ART_GTEST_imgdiag_test_HOST_DEPS := \
 ART_GTEST_imgdiag_test_TARGET_DEPS := \
   $(TARGET_CORE_IMAGE_DEFAULT_64) \
   $(TARGET_CORE_IMAGE_DEFAULT_32) \
-  imgdiagd.com.android.art.debug
+  imgdiagd.com.android.art.testing
 
 # Dex analyze test requires dexanalyze.
 ART_GTEST_dexanalyze_test_HOST_DEPS := \
   $(HOST_OUT_EXECUTABLES)/dexanalyze
 ART_GTEST_dexanalyze_test_TARGET_DEPS := \
-  dexanalyze.com.android.art.debug
+  dexanalyze.com.android.art.testing
 
 # Oatdump test requires an image and oatfile to dump.
 ART_GTEST_oatdump_test_HOST_DEPS := \
@@ -628,9 +628,9 @@ endef  # define-art-gtest-host-both
 ifeq ($(ART_BUILD_TARGET),true)
   $(foreach name,$(ART_TARGET_GTEST_NAMES), $(eval $(call add-art-gtest-dependencies,$(name),)))
   ART_TEST_TARGET_GTEST_DEPENDENCIES += \
-    libicu_jni.com.android.art.debug \
-    libjavacore.com.android.art.debug \
-    libopenjdkd.com.android.art.debug \
+    libicu_jni.com.android.art.testing \
+    libjavacore.com.android.art.testing \
+    libopenjdkd.com.android.art.testing \
     com.android.art.testing \
     com.android.conscrypt
 endif
