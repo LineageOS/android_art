@@ -711,7 +711,7 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
 	sed -i '/libprofiled.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	sed -i '/libartbased.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	# The 'art' script will look for a 'com.android.art' directory.
-	ln -sf $(TARGET_OUT)/apex/com.android.art $(TARGET_OUT)/apex/com.android.art.release
+	ln -sf com.android.art.release $(TARGET_OUT)/apex/com.android.art
 
 ########################################################################
 # Phony target for building what go/lem requires on host.
