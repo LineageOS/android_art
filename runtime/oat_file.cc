@@ -2124,6 +2124,8 @@ OatFile::OatClass OatFile::FindOatClass(const DexFile& dex_file,
   return oat_dex_file->GetOatClass(class_def_idx);
 }
 
+bool OatFile::RequiresImage() const { return GetOatHeader().RequiresImage(); }
+
 static void DCheckIndexToBssMapping(const OatFile* oat_file,
                                     uint32_t number_of_indexes,
                                     size_t slot_size,
