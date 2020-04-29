@@ -288,10 +288,13 @@ END_FUNCTION \name
     leaq -24(%rsp), %r10
     subq %r11, %r10
     // Alignment
+    // Note: There may be two pieces of alignment but there is no need to align
+    // out args to `kPointerSize` separately before aligning to kStackAlignment.
     andq $$-16, %r10
 
-    // Set reference and dex registers.
-    leaq 24(%r10, \refs, 4), \refs
+    // Set reference and dex registers, align to pointer size for previous frame and dex pc.
+    leaq 24 + 4(%r10, \refs, 4), \refs
+    andq LITERAL(-__SIZEOF_POINTER__), \refs
     leaq (\refs, %rbx, 4), \fp
 
     // Now setup the stack pointer.
