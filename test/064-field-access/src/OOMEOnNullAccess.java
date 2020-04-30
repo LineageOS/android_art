@@ -42,6 +42,12 @@ public class OOMEOnNullAccess {
         Main.stopJit();
         Main.waitForCompilation();
 
+        // Make sure that there is no reclaimable memory in the heap. Otherwise we may throw
+        // OOME to prevent GC thrashing, even if later allocations may succeed.
+        Runtime.getRuntime().gc();
+        System.runFinalization();
+        Runtime.getRuntime().gc();
+
         int l = 1024 * 1024;
         while (l > 8) {
           try {
