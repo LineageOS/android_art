@@ -19,21 +19,10 @@ set -e -x
 
 export ASM_JAR="${ANDROID_BUILD_TOP}/prebuilts/misc/common/asm/asm-6.0.jar"
 
-cd src
-
 # generate Java bytecode with ASM
-${JAVAC:-java} -cp "$ASM_JAR:." SpacesInSimpleName.java
-${JAVA:-java} -cp "$ASM_JAR:." SpacesInSimpleName
-
-# compile Java bytecode to DEX bytecode
-# TODO: replace DX with D8 when it adds support for spaces in SimpleName
-# ${D8} --min-api 10000 Main.class
-$ANDROID_HOST_OUT/bin/dx --dex --output=classes.dex Main.class
-
-# move the resulting DEX file and cleanup
-mv classes.dex ../classes.dex
-rm *.class
-
+cd src_gen
+${JAVA:-java} -cp "$ASM_JAR:." SpacesInSimpleName.java
+mkdir ../classes && mv Main.class ../classes/Main.class
 cd ..
 
 # Use API level 10000 for spaces in SimpleName
