@@ -1143,7 +1143,7 @@ class Thread {
     return tls32_.use_mterp.load();
   }
 
-  void ResetQuickAllocEntryPointsForThread(bool is_marking);
+  void ResetQuickAllocEntryPointsForThread();
 
   // Returns the remaining space in the TLAB.
   size_t TlabSize() const {
