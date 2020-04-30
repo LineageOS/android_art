@@ -211,7 +211,7 @@ void SetQuickAllocEntryPointsInstrumented(bool instrumented) {
   entry_points_instrumented = instrumented;
 }
 
-void ResetQuickAllocEntryPoints(QuickEntryPoints* qpoints, bool is_marking) {
+void ResetQuickAllocEntryPoints(QuickEntryPoints* qpoints) {
 #if !defined(__APPLE__) || !defined(__LP64__)
   switch (entry_points_allocator) {
     case gc::kAllocatorTypeDlMalloc: {
@@ -239,12 +239,7 @@ void ResetQuickAllocEntryPoints(QuickEntryPoints* qpoints, bool is_marking) {
     }
     case gc::kAllocatorTypeRegionTLAB: {
       CHECK(kMovingCollector);
-      if (is_marking) {
-        SetQuickAllocEntryPoints_region_tlab(qpoints, entry_points_instrumented);
-      } else {
-        // Not marking means we need no read barriers and can just use the normal TLAB case.
-        SetQuickAllocEntryPoints_tlab(qpoints, entry_points_instrumented);
-      }
+      SetQuickAllocEntryPoints_region_tlab(qpoints, entry_points_instrumented);
       return;
     }
     default:
@@ -252,7 +247,6 @@ void ResetQuickAllocEntryPoints(QuickEntryPoints* qpoints, bool is_marking) {
   }
 #else
   UNUSED(qpoints);
-  UNUSED(is_marking);
 #endif
   UNIMPLEMENTED(FATAL);
   UNREACHABLE();
