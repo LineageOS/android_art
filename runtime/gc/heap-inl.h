@@ -393,9 +393,8 @@ inline mirror::Object* Heap::TryToAllocate(Thread* self,
       static_assert(kObjectAlignment == space::BumpPointerSpace::kAlignment,
                     "mismatched alignments");
       if (UNLIKELY(self->TlabSize() < alloc_size)) {
-        // kAllocatorTypeTLAB may be the allocator for region space TLAB if the GC is not marking,
-        // that is why the allocator is not passed down.
         return AllocWithNewTLAB(self,
+                                allocator_type,
                                 alloc_size,
                                 kGrow,
                                 bytes_allocated,
