@@ -557,6 +557,16 @@ if [[ "$DEX2OAT_BOOT_IMAGE" = *core*.art && "$DEX2OAT_BCP" = "" ]]; then
       DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
       boot_separator=":"
     done
+    # Add conscrypt.
+    if [[ -e $ANDROID_ROOT/framework/conscrypt-hostdex.jar ]]; then
+      DEX_FILENAME="conscrypt-hostdex.jar"
+      DEX2OAT_BCP+="$boot_separator$core_filenames_dir/${DEX_FILENAME}"
+      DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
+    else
+      DEX_PATH="/apex/com.android.conscrypt/javalib/conscrypt.jar"
+      DEX2OAT_BCP+="$boot_separator$ANDROID_ROOT/$DEX_PATH"
+      DEX2OAT_BCP_LOCS+="$boot_separator$DEX_PATH"
+    fi
     if [ "$VERBOSE" = "yes" ]; then
       echo "Using predefined -Xbootclasspath for image $DEX2OAT_BOOT_IMAGE:"
       echo DEX2OAT_BOOT_IMAGE=$DEX2OAT_BOOT_IMAGE
