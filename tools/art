@@ -195,6 +195,12 @@ function run_dex2oat() {
     verbose_run mkdir -p $(dirname "$dex_file")/oat/$ISA
     local oat_file=$(basename "$dex_file")
     local oat_file=$(dirname "$dex_file")/oat/$ISA/${oat_file%.*}.odex
+    if [ "$GENERATE_APP_IMAGE" = "yes" ]; then
+      local art_file=$(basename "$dex_file")
+      local art_file=$(dirname "$dex_file")/oat/$ISA/${art_file%.*}.art
+      DEX2OAT_FLAGS+=("--app-image-file=$art_file")
+    fi
+
     # When running dex2oat use the exact same context as when running dalvikvm.
     # (see run_art function)
     verbose_run ANDROID_DATA=$ANDROID_DATA                    \
@@ -232,6 +238,17 @@ function extract_dex2oat_flags() {
     case $1 in
       -Xcompiler-option)
         DEX2OAT_FLAGS+=("$2")
+
+        # Enable app images for profile filters
+        case $2 in
+          --compiler-filter=speed-profile)
+            GENERATE_APP_IMAGE="yes"
+            ;;
+          --compiler-filter=everything-profile)
+            GENERATE_APP_IMAGE="yes"
+            ;;
+        esac
+
         shift
         ;;
       -Ximage:*)
@@ -314,6 +331,7 @@ RUN_DEX2OAT="yes"
 EXTRA_OPTIONS=()
 DEX2OAT_FLAGS=()
 DEX2OAT_CLASSPATH=()
+GENERATE_APP_IMAGE="no"
 
 # Parse arguments
 while [[ "$1" = "-"* ]]; do
