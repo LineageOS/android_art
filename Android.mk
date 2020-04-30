@@ -621,7 +621,8 @@ PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
 .PHONY: standalone-apex-files
-standalone-apex-files: libc.bootstrap \
+standalone-apex-files: deapexer \
+                       libc.bootstrap \
                        libdl.bootstrap \
                        libdl_android.bootstrap \
                        libm.bootstrap \
@@ -646,6 +647,14 @@ standalone-apex-files: libc.bootstrap \
             cp -fd $$tf $$df; \
           fi; \
 	done; \
+	conscrypt_dir="$$apex_orig_dir/$(CONSCRYPT_APEX)"; \
+	conscrypt_apex="$$apex_orig_dir/$(CONSCRYPT_APEX).apex"; \
+	if [ -f $$conscrypt_apex ]; then \
+		rm -rf $$conscrypt_dir; \
+		mkdir $$conscrypt_dir; \
+		debugfs=$(HOST_OUT)/bin/debugfs_static; \
+		$(HOST_OUT)/bin/deapexer --debugfs_path $$debugfs extract $$conscrypt_apex $$conscrypt_dir; \
+	fi; \
 	conscrypt_apex_orig_dir=$$apex_orig_dir/$(CONSCRYPT_APEX); \
 	for f in $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS); do \
 	  tf="$$conscrypt_apex_orig_dir/$$f"; \
