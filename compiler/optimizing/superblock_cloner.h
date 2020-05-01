@@ -89,7 +89,8 @@ inline bool IsEdgeValid(HEdge edge, HGraph* graph) {
 // fine grain manipulation with IR; data flow and graph properties are resolved/adjusted
 // automatically. The clone transformation is defined by specifying a set of basic blocks to copy
 // and a set of rules how to treat edges, remap their successors. By using this approach such
-// optimizations as Branch Target Expansion, Loop Peeling, Loop Unrolling can be implemented.
+// optimizations as Branch Target Expansion, Loop Peeling, Loop Unrolling, Loop Versioning can be
+// implemented.
 //
 // The idea of the transformation is based on "Superblock cloning" technique described in the book
 // "Engineering a Compiler. Second Edition", Keith D. Cooper, Linda Torczon, Rice University
@@ -161,7 +162,7 @@ class SuperblockCloner : public ValueObject {
   //
   // TODO: formally describe the criteria.
   //
-  // Loop peeling and unrolling satisfy the criteria.
+  // Loop peeling, unrolling and versioning satisfy the criteria.
   bool IsFastCase() const;
 
   // Runs the copy algorithm according to the description.
@@ -297,6 +298,18 @@ class SuperblockCloner : public ValueObject {
   // Remaps copy internal edge to its origin, adjusts the phi inputs in orig_succ.
   void RemapCopyInternalEdge(HBasicBlock* orig_block, HBasicBlock* orig_succ);
 
+  // Checks whether the edges remapping info corresponds to the subgraph versioning case:
+  //  - none of the incoming edges are to be remapped (they are being duplicated).
+  //  - none of the internal edges are to be remapped.
+  bool IsRemapInfoForVersioning() const;
+
+  // Processes incoming edges for subgraph versioning case: for each incoming edge (X, Y) adds
+  // an edge (X, Y_1) where Y_1 = Copy(Y) and add corresponding phi input to copy phi.
+  //
+  // Note: such node X will now have two successors, its unconditional branch instruction
+  // will be invalid and should be adjusted to some conditional branch by the client code.
+  void CopyIncomingEdgesForVersioning();
+
   //
   // Local versions of control flow calculation/adjustment routines.
   //
@@ -362,19 +375,19 @@ class SuperblockCloner : public ValueObject {
   DISALLOW_COPY_AND_ASSIGN(SuperblockCloner);
 };
 
-// Helper class to perform loop peeling/unrolling.
+// Helper class to perform loop peeling/unrolling/versioning.
 //
 // This helper should be used when correspondence map between original and copied
 // basic blocks/instructions are demanded.
-class PeelUnrollHelper : public ValueObject {
+class LoopClonerHelper : public ValueObject {
  public:
-  PeelUnrollHelper(HLoopInformation* info,
+  LoopClonerHelper(HLoopInformation* info,
                    SuperblockCloner::HBasicBlockMap* bb_map,
                    SuperblockCloner::HInstructionMap* hir_map,
                    InductionVarRange* induction_range) :
       loop_info_(info),
       cloner_(info->GetHeader()->GetGraph(), &info->GetBlocks(), bb_map, hir_map, induction_range) {
-    // For now do peeling/unrolling only for natural loops.
+    // For now do transformations only for natural loops.
     DCHECK(!info->IsIrreducible());
   }
 
@@ -384,33 +397,121 @@ class PeelUnrollHelper : public ValueObject {
   // Returns whether the loop can be peeled/unrolled.
   bool IsLoopClonable() const { return cloner_.IsSubgraphClonable(); }
 
-  HBasicBlock* DoPeeling() { return DoPeelUnrollImpl(/* to_unroll= */ false); }
-  HBasicBlock* DoUnrolling() { return DoPeelUnrollImpl(/* to_unroll= */ true); }
+  // Perform loop peeling.
+  //
+  // Control flow of an example (ignoring critical edges splitting).
+  //
+  //       Before                    After
+  //
+  //         |B|                      |B|
+  //          |                        |
+  //          v                        v
+  //         |1|                      |1|
+  //          |                        |
+  //          v                        v
+  //         |2|<-\                  |2A|
+  //         / \  /                   / \
+  //        v   v/                   /   v
+  //       |4|  |3|                 /   |3A|
+  //        |                      /     /
+  //        v                     |     v
+  //       |E|                     \   |2|<-\
+  //                                \ / \   /
+  //                                 v   v /
+  //                                |4|  |3|
+  //                                 |
+  //                                 v
+  //                                |E|
+  HBasicBlock* DoPeeling() {
+    return DoLoopTransformationImpl(TransformationKind::kPeeling);
+  }
+
+  // Perform loop unrolling.
+  //
+  // Control flow of an example (ignoring critical edges splitting).
+  //
+  //       Before                    After
+  //
+  //         |B|                      |B|
+  //          |                        |
+  //          v                        v
+  //         |1|                      |1|
+  //          |                        |
+  //          v                        v
+  //         |2|<-\                   |2A|<-\
+  //         / \  /                   / \    \
+  //        v   v/                   /   v    \
+  //       |4|  |3|                 /   |3A|   |
+  //        |                      /     /    /
+  //        v                     |     v    /
+  //       |E|                     \   |2|  /
+  //                                \ / \  /
+  //                                 v   v/
+  //                                |4| |3|
+  //                                 |
+  //                                 v
+  //                                |E|
+  HBasicBlock* DoUnrolling() {
+    return DoLoopTransformationImpl(TransformationKind::kUnrolling);
+  }
+
+  // Perform loop versioning.
+  //
+  // Control flow of an example (ignoring critical edges splitting).
+  //
+  //       Before                    After
+  //
+  //         |B|                      |B|
+  //          |                        |
+  //          v                        v
+  //         |1|                      |1|_________
+  //          |                        |          |
+  //          v                        v          v
+  //         |2|<-\                   |2|<-\     |2A|<-\
+  //         / \  /                   / \  /     /  \  /
+  //        v   v/                   |   v/      |   v/
+  //        |   |3|                  |  |3|      | |3A|
+  //        |                        | __________|
+  //        |                        ||
+  //        v                        vv
+  //       |4|                       |4|
+  //        |                         |
+  //        v                         v
+  //       |E|                       |E|
+  HBasicBlock* DoVersioning() {
+    return DoLoopTransformationImpl(TransformationKind::kVersioning);
+  }
+
   HLoopInformation* GetRegionToBeAdjusted() const { return cloner_.GetRegionToBeAdjusted(); }
 
  protected:
-  // Applies loop peeling/unrolling for the loop specified by 'loop_info'.
-  //
-  // Depending on 'do_unroll' either unrolls loop by 2 or peels one iteration from it.
-  HBasicBlock* DoPeelUnrollImpl(bool to_unroll);
+  enum class TransformationKind {
+    kPeeling,
+    kUnrolling,
+    kVersioning,
+  };
+
+  // Applies a specific loop transformation to the loop.
+  HBasicBlock* DoLoopTransformationImpl(TransformationKind transformation);
 
  private:
   HLoopInformation* loop_info_;
   SuperblockCloner cloner_;
 
-  DISALLOW_COPY_AND_ASSIGN(PeelUnrollHelper);
+  DISALLOW_COPY_AND_ASSIGN(LoopClonerHelper);
 };
 
-// Helper class to perform loop peeling/unrolling.
+// Helper class to perform loop peeling/unrolling/versioning.
 //
 // This helper should be used when there is no need to get correspondence information between
 // original and copied basic blocks/instructions.
-class PeelUnrollSimpleHelper : public ValueObject {
+class LoopClonerSimpleHelper : public ValueObject {
  public:
-  PeelUnrollSimpleHelper(HLoopInformation* info, InductionVarRange* induction_range);
+  LoopClonerSimpleHelper(HLoopInformation* info, InductionVarRange* induction_range);
   bool IsLoopClonable() const { return helper_.IsLoopClonable(); }
   HBasicBlock* DoPeeling() { return helper_.DoPeeling(); }
   HBasicBlock* DoUnrolling() { return helper_.DoUnrolling(); }
+  HBasicBlock* DoVersioning() { return helper_.DoVersioning(); }
   HLoopInformation* GetRegionToBeAdjusted() const { return helper_.GetRegionToBeAdjusted(); }
 
   const SuperblockCloner::HBasicBlockMap* GetBasicBlockMap() const { return &bb_map_; }
@@ -419,9 +520,9 @@ class PeelUnrollSimpleHelper : public ValueObject {
  private:
   SuperblockCloner::HBasicBlockMap bb_map_;
   SuperblockCloner::HInstructionMap hir_map_;
-  PeelUnrollHelper helper_;
+  LoopClonerHelper helper_;
 
-  DISALLOW_COPY_AND_ASSIGN(PeelUnrollSimpleHelper);
+  DISALLOW_COPY_AND_ASSIGN(LoopClonerSimpleHelper);
 };
 
 // Collects edge remapping info for loop peeling/unrolling for the loop specified by loop info.
