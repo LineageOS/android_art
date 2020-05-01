@@ -21,7 +21,6 @@
 
 #if !defined(_WIN32)
 #include <sys/syscall.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 #include "macros.h"
@@ -29,6 +28,7 @@
 #if defined(__BIONIC__)
 
 #include <atomic>
+#include <base/utils.h>
 #include <linux/membarrier.h>
 
 #define CHECK_MEMBARRIER_CMD(art_value, membarrier_value) \
@@ -49,14 +49,7 @@ namespace art {
 
 int membarrier(MembarrierCommand command) {
   // Check kernel version supports membarrier(2).
-  static constexpr int kRequiredMajor = 4;
-  static constexpr int kRequiredMinor = 16;
-  struct utsname uts;
-  int major, minor;
-  if (uname(&uts) != 0 ||
-      strcmp(uts.sysname, "Linux") != 0 ||
-      sscanf(uts.release, "%d.%d", &major, &minor) != 2 ||
-      (major < kRequiredMajor || (major == kRequiredMajor && minor < kRequiredMinor))) {
+  if (KernelVersionLower(4, 16)) {
     errno = ENOSYS;
     return -1;
   }
