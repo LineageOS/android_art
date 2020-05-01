@@ -42,6 +42,9 @@ static inline uint32_t PointerToLowMemUInt32(const void* p) {
 // Returns a human-readable size string such as "1MB".
 std::string PrettySize(int64_t size_in_bytes);
 
+// Returns true if the kernel's version (based on uname) is lower than required.
+bool KernelVersionLower(int required_major, int required_minor);
+
 // Splits a string using the given separator character into a vector of
 // strings. Empty strings will be omitted.
 void Split(const std::string& s, char separator, std::vector<std::string>* result);
