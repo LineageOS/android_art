@@ -482,7 +482,7 @@ extern "C" void NterpUnimplemented() {
 static mirror::Object* DoFilledNewArray(Thread* self,
                                         ArtMethod* caller,
                                         uint16_t* dex_pc_ptr,
-                                        int32_t* regs,
+                                        uint32_t* regs,
                                         bool is_range)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Instruction* inst = Instruction::At(dex_pc_ptr);
@@ -555,7 +555,7 @@ static mirror::Object* DoFilledNewArray(Thread* self,
 
 extern "C" mirror::Object* NterpFilledNewArray(Thread* self,
                                                ArtMethod* caller,
-                                               int32_t* registers,
+                                               uint32_t* registers,
                                                uint16_t* dex_pc_ptr)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   return DoFilledNewArray(self, caller, dex_pc_ptr, registers, /* is_range= */ false);
@@ -563,7 +563,7 @@ extern "C" mirror::Object* NterpFilledNewArray(Thread* self,
 
 extern "C" mirror::Object* NterpFilledNewArrayRange(Thread* self,
                                                     ArtMethod* caller,
-                                                    int32_t* registers,
+                                                    uint32_t* registers,
                                                     uint16_t* dex_pc_ptr)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   return DoFilledNewArray(self, caller, dex_pc_ptr, registers, /* is_range= */ true);
@@ -573,7 +573,7 @@ extern "C" jit::OsrData* NterpHotMethod(ArtMethod* method, uint16_t* dex_pc_ptr,
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ScopedAssertNoThreadSuspension sants("In nterp");
   jit::Jit* jit = Runtime::Current()->GetJit();
-  if (jit != nullptr) {
+  if (jit != nullptr && jit->UseJitCompilation()) {
     // Nterp passes null on entry where we don't want to OSR.
     if (dex_pc_ptr != nullptr) {
       // This could be a loop back edge, check if we can OSR.
@@ -593,12 +593,14 @@ extern "C" jit::OsrData* NterpHotMethod(ArtMethod* method, uint16_t* dex_pc_ptr,
 extern "C" ssize_t MterpDoPackedSwitch(const uint16_t* switchData, int32_t testVal);
 extern "C" ssize_t NterpDoPackedSwitch(const uint16_t* switchData, int32_t testVal)
     REQUIRES_SHARED(Locks::mutator_lock_) {
+  ScopedAssertNoThreadSuspension sants("In nterp");
   return MterpDoPackedSwitch(switchData, testVal);
 }
 
 extern "C" ssize_t MterpDoSparseSwitch(const uint16_t* switchData, int32_t testVal);
 extern "C" ssize_t NterpDoSparseSwitch(const uint16_t* switchData, int32_t testVal)
     REQUIRES_SHARED(Locks::mutator_lock_) {
+  ScopedAssertNoThreadSuspension sants("In nterp");
   return MterpDoSparseSwitch(switchData, testVal);
 }
 
