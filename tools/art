@@ -195,6 +195,12 @@ function run_dex2oat() {
     verbose_run mkdir -p $(dirname "$dex_file")/oat/$ISA
     local oat_file=$(basename "$dex_file")
     local oat_file=$(dirname "$dex_file")/oat/$ISA/${oat_file%.*}.odex
+    if [ "$GENERATE_APP_IMAGE" = "yes" ]; then
+      local art_file=$(basename "$dex_file")
+      local art_file=$(dirname "$dex_file")/oat/$ISA/${art_file%.*}.art
+      DEX2OAT_FLAGS+=("--app-image-file=$art_file")
+    fi
+
     # When running dex2oat use the exact same context as when running dalvikvm.
     # (see run_art function)
     verbose_run ANDROID_DATA=$ANDROID_DATA                    \
@@ -232,6 +238,17 @@ function extract_dex2oat_flags() {
     case $1 in
       -Xcompiler-option)
         DEX2OAT_FLAGS+=("$2")
+
+        # Enable app images for profile filters
+        case $2 in
+          --compiler-filter=speed-profile)
+            GENERATE_APP_IMAGE="yes"
+            ;;
+          --compiler-filter=everything-profile)
+            GENERATE_APP_IMAGE="yes"
+            ;;
+        esac
+
         shift
         ;;
       -Ximage:*)
@@ -314,6 +331,7 @@ RUN_DEX2OAT="yes"
 EXTRA_OPTIONS=()
 DEX2OAT_FLAGS=()
 DEX2OAT_CLASSPATH=()
+GENERATE_APP_IMAGE="no"
 
 # Parse arguments
 while [[ "$1" = "-"* ]]; do
@@ -533,7 +551,7 @@ if [[ "$DEX2OAT_BOOT_IMAGE" = *core*.art && "$DEX2OAT_BCP" = "" ]]; then
   # It may contain additional modules from TEST_CORE_JARS.
   core_jars_list="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml"
   core_jars_suffix=
-  if [[ -e $ANDROID_ROOT/framework/core-oj-hostdex.jar ]]; then
+  if [[ -f $ANDROID_ROOT/framework/core-oj-hostdex.jar ]]; then
     core_jars_suffix=-hostdex
     core_filenames_dir=$ANDROID_ROOT/framework
     core_locations_dir=$ANDROID_ROOT/framework
@@ -541,7 +559,7 @@ if [[ "$DEX2OAT_BOOT_IMAGE" = *core*.art && "$DEX2OAT_BCP" = "" ]]; then
     if [[ ${core_locations_dir:0:${#prefix}} = $prefix ]]; then
       core_locations_dir="${core_locations_dir##$prefix}"
     fi
-  elif [[ -e $ANDROID_ROOT/apex/com.android.art/javalib/core-oj.jar ]]; then
+  elif [[ -f $ANDROID_ROOT/apex/com.android.art/javalib/core-oj.jar ]]; then
     core_jars_suffix=
     core_filenames_dir=$ANDROID_ROOT/apex/com.android.art/javalib
     core_locations_dir=/apex/com.android.art/javalib
@@ -557,6 +575,16 @@ if [[ "$DEX2OAT_BOOT_IMAGE" = *core*.art && "$DEX2OAT_BCP" = "" ]]; then
       DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
       boot_separator=":"
     done
+    # Add conscrypt.
+    if [[ -f $ANDROID_ROOT/framework/conscrypt-hostdex.jar ]]; then
+      DEX_FILENAME="conscrypt-hostdex.jar"
+      DEX2OAT_BCP+="$boot_separator$core_filenames_dir/${DEX_FILENAME}"
+      DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
+    else
+      DEX_PATH="/apex/com.android.conscrypt/javalib/conscrypt.jar"
+      DEX2OAT_BCP+="$boot_separator$ANDROID_ROOT/$DEX_PATH"
+      DEX2OAT_BCP_LOCS+="$boot_separator$DEX_PATH"
+    fi
     if [ "$VERBOSE" = "yes" ]; then
       echo "Using predefined -Xbootclasspath for image $DEX2OAT_BOOT_IMAGE:"
       echo DEX2OAT_BOOT_IMAGE=$DEX2OAT_BOOT_IMAGE
