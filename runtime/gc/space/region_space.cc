@@ -24,6 +24,10 @@
 #include "mirror/object-inl.h"
 #include "thread_list.h"
 
+#if defined(__linux__)
+#include <sys/utsname.h>
+#endif
+
 namespace art {
 namespace gc {
 namespace space {
@@ -46,6 +50,12 @@ static constexpr uint32_t kPoisonDeadObject = 0xBADDB01D;  // "BADDROID"
 
 // Whether we check a region's live bytes count against the region bitmap.
 static constexpr bool kCheckLiveBytesAgainstRegionBitmap = kIsDebugBuild;
+
+#ifndef MADV_FREE
+const int RegionSpace::gPurgeAdvice = MADV_DONTNEED;
+#else
+const int RegionSpace::gPurgeAdvice = KernelVersionLower(4, 12) ? MADV_DONTNEED : MADV_FREE;
+#endif
 
 MemMap RegionSpace::CreateMemMap(const std::string& name,
                                  size_t capacity,
@@ -141,7 +151,7 @@ RegionSpace::RegionSpace(const std::string& name, MemMap&& mem_map, bool use_gen
   DCHECK(!full_region_.IsFree());
   DCHECK(full_region_.IsAllocated());
   size_t ignored;
-  DCHECK(full_region_.Alloc(kAlignment, &ignored, nullptr, &ignored) == nullptr);
+  DCHECK(full_region_.Alloc</*kForEvac*/true>(kAlignment, &ignored, nullptr, &ignored) == nullptr);
   // Protect the whole region space from the start.
   Protect();
 }
@@ -497,10 +507,9 @@ void RegionSpace::ClearFromSpace(/* out */ uint64_t* cleared_bytes,
       madvise_list.push_back(std::pair(clear_block_begin, clear_block_end));
     }
   }
-
   // Madvise the memory ranges.
   for (const auto &iter : madvise_list) {
-    ZeroAndProtectRegion(iter.first, iter.second);
+    PurgePages(iter.first, iter.second - iter.first);
     if (clear_bitmap) {
       GetLiveBitmap()->ClearRange(
           reinterpret_cast<mirror::Object*>(iter.first),
@@ -628,6 +637,19 @@ void RegionSpace::ClearFromSpace(/* out */ uint64_t* cleared_bytes,
   evac_region_ = nullptr;
   num_non_free_regions_ += num_evac_regions_;
   num_evac_regions_ = 0;
+}
+
+void RegionSpace::PurgePages(void* address, size_t length) {
+  DCHECK(IsAligned<kPageSize>(address));
+  if (length == 0) {
+    return;
+  }
+#ifdef _WIN32
+  // PurgePages does not madvise on Windows.
+#else
+  CHECK_EQ(madvise(address, length, gPurgeAdvice), 0)
+      << "madvise failed: " << strerror(errno);
+#endif
 }
 
 void RegionSpace::CheckLiveBytesAgainstRegionBitmap(Region* r) {
@@ -867,6 +889,9 @@ bool RegionSpace::AllocNewTlab(Thread* self,
   if (r != nullptr) {
     uint8_t* start = pos != nullptr ? pos : r->Begin();
     DCHECK_ALIGNED(start, kObjectAlignment);
+    // If we are allocating a partially utilized TLAB, then the tlab is already
+    // clean from [pos, r->Top()).
+    ZeroAllocRange(pos != nullptr ? r->Top() : r->Begin(), *bytes_tl_bulk_allocated);
     r->is_a_tlab_ = true;
     r->thread_ = self;
     r->SetTop(r->End());
