@@ -3112,11 +3112,7 @@ class Dex2Oat final {
 
 static void b13564922() {
 #if defined(__linux__) && defined(__arm__)
-  int major, minor;
-  struct utsname uts;
-  if (uname(&uts) != -1 &&
-      sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
-      ((major < 3) || ((major == 3) && (minor < 4)))) {
+  if (KernelVersionLower(3, 4)) {
     // Kernels before 3.4 don't handle the ASLR well and we can run out of address
     // space (http://b/13564922). Work around the issue by inhibiting further mmap() randomization.
     int old_personality = personality(0xffffffff);
