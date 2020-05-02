@@ -63,7 +63,7 @@ while true; do
 done
 
 # Allow to build successfully in master-art.
-extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true TEMPORARY_DISABLE_PATH_RESTRICTIONS=true"
+extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
 
 if [[ $mode == "host" ]]; then
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-host-tests $common_targets"
