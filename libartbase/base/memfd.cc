@@ -21,7 +21,6 @@
 #if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/syscall.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 #if defined(__BIONIC__)
@@ -30,6 +29,7 @@
 
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
+#include <base/utils.h>
 
 #include "macros.h"
 
@@ -51,14 +51,7 @@ namespace art {
 int memfd_create(const char* name, unsigned int flags) {
   // Check kernel version supports memfd_create(). Some older kernels segfault executing
   // memfd_create() rather than returning ENOSYS (b/116769556).
-  static constexpr int kRequiredMajor = 3;
-  static constexpr int kRequiredMinor = 17;
-  struct utsname uts;
-  int major, minor;
-  if (uname(&uts) != 0 ||
-      strcmp(uts.sysname, "Linux") != 0 ||
-      sscanf(uts.release, "%d.%d", &major, &minor) != 2 ||
-      (major < kRequiredMajor || (major == kRequiredMajor && minor < kRequiredMinor))) {
+  if (KernelVersionLower(3, 17)) {
     errno = ENOSYS;
     return -1;
   }
