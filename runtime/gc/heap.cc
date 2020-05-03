@@ -4187,6 +4187,11 @@ mirror::Object* Heap::AllocWithNewTLAB(Thread* self,
       return nullptr;
     }
     *bytes_tl_bulk_allocated = expand_bytes;
+    // Zero the TLAB pages as we MADV_FREE the regions in CC, which doesn't
+    // guarantee clean pages.
+    if (allocator_type == kAllocatorTypeRegionTLAB) {
+      region_space_->ZeroAllocRange(self->GetTlabEnd(), expand_bytes);
+    }
     self->ExpandTlab(expand_bytes);
     DCHECK_LE(alloc_size, self->TlabSize());
   } else if (allocator_type == kAllocatorTypeTLAB) {
