@@ -1387,7 +1387,7 @@ class HLoopInformationOutwardIterator : public ValueObject {
   DISALLOW_COPY_AND_ASSIGN(HLoopInformationOutwardIterator);
 };
 
-#define FOR_EACH_CONCRETE_INSTRUCTION_COMMON(M)                         \
+#define FOR_EACH_CONCRETE_INSTRUCTION_SCALAR_COMMON(M)                  \
   M(Above, Condition)                                                   \
   M(AboveOrEqual, Condition)                                            \
   M(Abs, UnaryOperation)                                                \
@@ -1477,7 +1477,9 @@ class HLoopInformationOutwardIterator : public ValueObject {
   M(TryBoundary, Instruction)                                           \
   M(TypeConversion, Instruction)                                        \
   M(UShr, BinaryOperation)                                              \
-  M(Xor, BinaryOperation)                                               \
+  M(Xor, BinaryOperation)
+
+#define FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(M)                  \
   M(VecReplicateScalar, VecUnaryOperation)                              \
   M(VecExtractScalar, VecUnaryOperation)                                \
   M(VecReduce, VecUnaryOperation)                                       \
@@ -1507,6 +1509,10 @@ class HLoopInformationOutwardIterator : public ValueObject {
   M(VecDotProd, VecOperation)                                           \
   M(VecLoad, VecMemoryOperation)                                        \
   M(VecStore, VecMemoryOperation)                                       \
+
+#define FOR_EACH_CONCRETE_INSTRUCTION_COMMON(M)                         \
+  FOR_EACH_CONCRETE_INSTRUCTION_SCALAR_COMMON(M)                        \
+  FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(M)
 
 /*
  * Instructions, shared across several (not all) architectures.
