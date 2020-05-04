@@ -112,7 +112,8 @@ art_cc_defaults {
             srcs: [
                 "jni/quick/arm64/calling_convention_arm64.cc",
                 "optimizing/code_generator_arm64.cc",
-                "optimizing/code_generator_vector_arm64.cc",
+                "optimizing/code_generator_vector_arm64_neon.cc",
+                "optimizing/code_generator_vector_arm64_sve.cc",
                 "optimizing/scheduler_arm64.cc",
                 "optimizing/instruction_simplifier_arm64.cc",
                 "optimizing/intrinsics_arm64.cc",
