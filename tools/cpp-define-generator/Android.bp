@@ -51,12 +51,22 @@ cc_genrule {
             enabled: false,
         },
     },
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 cc_library_headers {
     name: "cpp-define-generator-definitions",
     host_supported: true,
     export_include_dirs: ["."],
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 python_binary_host {
