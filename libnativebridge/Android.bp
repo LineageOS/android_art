@@ -19,6 +19,12 @@ cc_library_headers {
 
     host_supported: true,
     export_include_dirs: ["include"],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 cc_library {
