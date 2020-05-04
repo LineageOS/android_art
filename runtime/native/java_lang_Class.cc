@@ -540,10 +540,10 @@ static jobject Class_getDeclaredConstructorInternal(
     return nullptr;
   }
   Handle<mirror::Constructor> result = hs.NewHandle(
-      mirror::Class::GetDeclaredConstructorInternal<kRuntimePointerSize, false>(
-      soa.Self(),
-      klass,
-      soa.Decode<mirror::ObjectArray<mirror::Class>>(args)));
+      mirror::Class::GetDeclaredConstructorInternal<kRuntimePointerSize>(
+          soa.Self(),
+          klass,
+          soa.Decode<mirror::ObjectArray<mirror::Class>>(args)));
   if (result == nullptr || ShouldDenyAccessToMember(result->GetArtMethod(), soa.Self())) {
     return nullptr;
   }
@@ -588,7 +588,7 @@ static jobjectArray Class_getDeclaredConstructorsInternal(
       DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
       DCHECK(!Runtime::Current()->IsActiveTransaction());
       ObjPtr<mirror::Constructor> constructor =
-          mirror::Constructor::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), &m);
+          mirror::Constructor::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), &m);
       if (UNLIKELY(constructor == nullptr)) {
         soa.Self()->AssertPendingOOMException();
         return nullptr;
@@ -611,7 +611,7 @@ static jobject Class_getDeclaredMethodInternal(JNIEnv* env, jobject javaThis,
     return nullptr;
   }
   Handle<mirror::Method> result = hs.NewHandle(
-      mirror::Class::GetDeclaredMethodInternal<kRuntimePointerSize, false>(
+      mirror::Class::GetDeclaredMethodInternal<kRuntimePointerSize>(
           soa.Self(),
           klass,
           soa.Decode<mirror::String>(name),
@@ -659,7 +659,7 @@ static jobjectArray Class_getDeclaredMethodsUnchecked(JNIEnv* env, jobject javaT
       DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
       DCHECK(!Runtime::Current()->IsActiveTransaction());
       ObjPtr<mirror::Method> method =
-          mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), &m);
+          mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), &m);
       if (method == nullptr) {
         soa.Self()->AssertPendingException();
         return nullptr;

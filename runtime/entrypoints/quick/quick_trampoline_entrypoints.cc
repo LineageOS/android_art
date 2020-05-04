@@ -845,7 +845,7 @@ extern "C" uint64_t artQuickProxyInvokeHandler(
   DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
   DCHECK(!Runtime::Current()->IsActiveTransaction());
   ObjPtr<mirror::Method> interface_reflect_method =
-      mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), interface_method);
+      mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), interface_method);
   if (interface_reflect_method == nullptr) {
     soa.Self()->AssertPendingOOMException();
     return 0;

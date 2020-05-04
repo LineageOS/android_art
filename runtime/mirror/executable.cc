@@ -22,22 +22,24 @@
 namespace art {
 namespace mirror {
 
-template <PointerSize kPointerSize, bool kTransactionActive>
-bool Executable::CreateFromArtMethod(ArtMethod* method) {
+template <PointerSize kPointerSize>
+void Executable::InitializeFromArtMethod(ArtMethod* method) {
+  // We're initializing a newly allocated object, so we do not need to record that under
+  // a transaction. If the transaction is aborted, the whole object shall be unreachable.
   auto* interface_method = method->GetInterfaceMethodIfProxy(kPointerSize);
-  SetArtMethod<kTransactionActive>(method);
-  SetFieldObject<kTransactionActive>(DeclaringClassOffset(), method->GetDeclaringClass());
-  SetFieldObject<kTransactionActive>(
+  SetArtMethod</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(method);
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      DeclaringClassOffset(), method->GetDeclaringClass());
+  SetFieldObject</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
       DeclaringClassOfOverriddenMethodOffset(), interface_method->GetDeclaringClass());
-  SetField32<kTransactionActive>(AccessFlagsOffset(), method->GetAccessFlags());
-  SetField32<kTransactionActive>(DexMethodIndexOffset(), method->GetDexMethodIndex());
-  return true;
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      AccessFlagsOffset(), method->GetAccessFlags());
+  SetField32</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      DexMethodIndexOffset(), method->GetDexMethodIndex());
 }
 
-template bool Executable::CreateFromArtMethod<PointerSize::k32, false>(ArtMethod* method);
-template bool Executable::CreateFromArtMethod<PointerSize::k32, true>(ArtMethod* method);
-template bool Executable::CreateFromArtMethod<PointerSize::k64, false>(ArtMethod* method);
-template bool Executable::CreateFromArtMethod<PointerSize::k64, true>(ArtMethod* method);
+template void Executable::InitializeFromArtMethod<PointerSize::k32>(ArtMethod* method);
+template void Executable::InitializeFromArtMethod<PointerSize::k64>(ArtMethod* method);
 
 }  // namespace mirror
 }  // namespace art
