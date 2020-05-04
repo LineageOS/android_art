@@ -21,6 +21,12 @@ cc_library_headers {
     export_header_lib_headers: ["jni_headers"],
     export_include_dirs: ["include"],
     sdk_version: "current",
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 cc_defaults {
