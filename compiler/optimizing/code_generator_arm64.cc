@@ -75,7 +75,6 @@ using helpers::OperandFromMemOperand;
 using helpers::OutputCPURegister;
 using helpers::OutputFPRegister;
 using helpers::OutputRegister;
-using helpers::QRegisterFrom;
 using helpers::RegisterFrom;
 using helpers::StackOperandFrom;
 using helpers::VIXLRegCodeFromART;
@@ -177,6 +176,7 @@ static void SaveRestoreLiveRegistersHelper(CodeGenerator* codegen,
 
   CPURegList core_list = CPURegList(CPURegister::kRegister, kXRegSize, core_spills);
   const unsigned v_reg_size_in_bits = codegen->GetSlowPathFPWidth() * 8;
+  DCHECK_LE(codegen->GetSIMDRegisterWidth(), kQRegSizeInBytes);
   CPURegList fp_list = CPURegList(CPURegister::kVRegister, v_reg_size_in_bits, fp_spills);
 
   MacroAssembler* masm = down_cast<CodeGeneratorARM64*>(codegen)->GetVIXLAssembler();
@@ -426,10 +426,10 @@ class SuspendCheckSlowPathARM64 : public SlowPathCodeARM64 {
     LocationSummary* locations = instruction_->GetLocations();
     CodeGeneratorARM64* arm64_codegen = down_cast<CodeGeneratorARM64*>(codegen);
     __ Bind(GetEntryLabel());
-    SaveLiveRegisters(codegen, locations);  // Only saves live 128-bit regs for SIMD.
+    SaveLiveRegisters(codegen, locations);  // Only saves live vector regs for SIMD.
     arm64_codegen->InvokeRuntime(kQuickTestSuspend, instruction_, instruction_->GetDexPc(), this);
     CheckEntrypointTypes<kQuickTestSuspend, void, void>();
-    RestoreLiveRegisters(codegen, locations);  // Only restores live 128-bit regs for SIMD.
+    RestoreLiveRegisters(codegen, locations);  // Only restores live vector regs for SIMD.
     if (successor_ == nullptr) {
       __ B(GetReturnLabel());
     } else {
@@ -883,8 +883,10 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
                     stats),
       block_labels_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       jump_tables_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
-      location_builder_(graph, this),
-      instruction_visitor_(graph, this),
+      location_builder_neon_(graph, this),
+      instruction_visitor_neon_(graph, this),
+      location_builder_sve_(graph, this),
+      instruction_visitor_sve_(graph, this),
       move_resolver_(graph->GetAllocator(), this),
       assembler_(graph->GetAllocator(),
                  compiler_options.GetInstructionSetFeatures()->AsArm64InstructionSetFeatures()),
@@ -909,6 +911,19 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
                                          graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)) {
   // Save the link register (containing the return address) to mimic Quick.
   AddAllocatedRegister(LocationFrom(lr));
+
+  bool use_sve = ShouldUseSVE();
+  if (use_sve) {
+    location_builder_ = &location_builder_sve_;
+    instruction_visitor_ = &instruction_visitor_sve_;
+  } else {
+    location_builder_ = &location_builder_neon_;
+    instruction_visitor_ = &instruction_visitor_neon_;
+  }
+}
+
+bool CodeGeneratorARM64::ShouldUseSVE() const {
+  return kArm64AllowSVE && GetInstructionSetFeatures().HasSVE();
 }
 
 #define __ GetVIXLAssembler()->
@@ -1038,9 +1053,9 @@ Location ParallelMoveResolverARM64::AllocateScratchLocationFor(Location::Kind ki
     scratch = LocationFrom(vixl_temps_.AcquireX());
   } else {
     DCHECK_EQ(kind, Location::kFpuRegister);
-    scratch = LocationFrom(codegen_->GetGraph()->HasSIMD()
-        ? vixl_temps_.AcquireVRegisterOfSize(kQRegSize)
-        : vixl_temps_.AcquireD());
+    scratch = codegen_->GetGraph()->HasSIMD()
+        ? codegen_->GetInstructionCodeGeneratorArm64()->AllocateSIMDScratchLocation(&vixl_temps_)
+        : LocationFrom(vixl_temps_.AcquireD());
   }
   AddScratchLocation(scratch);
   return scratch;
@@ -1051,7 +1066,11 @@ void ParallelMoveResolverARM64::FreeScratchLocation(Location loc) {
     vixl_temps_.Release(XRegisterFrom(loc));
   } else {
     DCHECK(loc.IsFpuRegister());
-    vixl_temps_.Release(codegen_->GetGraph()->HasSIMD() ? QRegisterFrom(loc) : DRegisterFrom(loc));
+    if (codegen_->GetGraph()->HasSIMD()) {
+      codegen_->GetInstructionCodeGeneratorArm64()->FreeSIMDScratchLocation(loc, &vixl_temps_);
+    } else {
+      vixl_temps_.Release(DRegisterFrom(loc));
+    }
   }
   RemoveScratchLocation(loc);
 }
@@ -1434,7 +1453,7 @@ void CodeGeneratorARM64::MoveLocation(Location destination,
       DCHECK(dst.Is64Bits() == source.IsDoubleStackSlot());
       __ Ldr(dst, StackOperandFrom(source));
     } else if (source.IsSIMDStackSlot()) {
-      __ Ldr(QRegisterFrom(destination), StackOperandFrom(source));
+      GetInstructionCodeGeneratorArm64()->LoadSIMDRegFromStack(destination, source);
     } else if (source.IsConstant()) {
       DCHECK(CoherentConstantAndType(source, dst_type));
       MoveConstant(dst, source.GetConstant());
@@ -1458,30 +1477,14 @@ void CodeGeneratorARM64::MoveLocation(Location destination,
       } else {
         DCHECK(destination.IsFpuRegister());
         if (GetGraph()->HasSIMD()) {
-          __ Mov(QRegisterFrom(destination), QRegisterFrom(source));
+          GetInstructionCodeGeneratorArm64()->MoveSIMDRegToSIMDReg(destination, source);
         } else {
           __ Fmov(VRegister(dst), FPRegisterFrom(source, dst_type));
         }
       }
     }
   } else if (destination.IsSIMDStackSlot()) {
-    if (source.IsFpuRegister()) {
-      __ Str(QRegisterFrom(source), StackOperandFrom(destination));
-    } else {
-      DCHECK(source.IsSIMDStackSlot());
-      UseScratchRegisterScope temps(GetVIXLAssembler());
-      if (GetVIXLAssembler()->GetScratchVRegisterList()->IsEmpty()) {
-        Register temp = temps.AcquireX();
-        __ Ldr(temp, MemOperand(sp, source.GetStackIndex()));
-        __ Str(temp, MemOperand(sp, destination.GetStackIndex()));
-        __ Ldr(temp, MemOperand(sp, source.GetStackIndex() + kArm64WordSize));
-        __ Str(temp, MemOperand(sp, destination.GetStackIndex() + kArm64WordSize));
-      } else {
-        VRegister temp = temps.AcquireVRegisterOfSize(kQRegSize);
-        __ Ldr(temp, StackOperandFrom(source));
-        __ Str(temp, StackOperandFrom(destination));
-      }
-    }
+    GetInstructionCodeGeneratorArm64()->MoveToSIMDStackSlot(destination, source);
   } else {  // The destination is not a register. It must be a stack slot.
     DCHECK(destination.IsStackSlot() || destination.IsDoubleStackSlot());
     if (source.IsRegister() || source.IsFpuRegister()) {
@@ -6369,6 +6372,39 @@ void CodeGeneratorARM64::EmitJitRootPatches(uint8_t* code, const uint8_t* roots_
     vixl::aarch64::Literal<uint32_t>* table_entry_literal = entry.second;
     uint64_t index_in_table = GetJitClassRootIndex(type_reference);
     PatchJitRootUse(code, roots_data, table_entry_literal, index_in_table);
+  }
+}
+
+MemOperand InstructionCodeGeneratorARM64::VecNeonAddress(
+    HVecMemoryOperation* instruction,
+    UseScratchRegisterScope* temps_scope,
+    size_t size,
+    bool is_string_char_at,
+    /*out*/ Register* scratch) {
+  LocationSummary* locations = instruction->GetLocations();
+  Register base = InputRegisterAt(instruction, 0);
+
+  if (instruction->InputAt(1)->IsIntermediateAddressIndex()) {
+    DCHECK(!is_string_char_at);
+    return MemOperand(base.X(), InputRegisterAt(instruction, 1).X());
+  }
+
+  Location index = locations->InAt(1);
+  uint32_t offset = is_string_char_at
+      ? mirror::String::ValueOffset().Uint32Value()
+      : mirror::Array::DataOffset(size).Uint32Value();
+  size_t shift = ComponentSizeShiftWidth(size);
+
+  // HIntermediateAddress optimization is only applied for scalar ArrayGet and ArraySet.
+  DCHECK(!instruction->InputAt(0)->IsIntermediateAddress());
+
+  if (index.IsConstant()) {
+    offset += Int64FromLocation(index) << shift;
+    return HeapOperand(base, offset);
+  } else {
+    *scratch = temps_scope->AcquireSameSizeAs(base);
+    __ Add(*scratch, base, Operand(WRegisterFrom(index), LSL, shift));
+    return HeapOperand(*scratch, offset);
   }
 }
 

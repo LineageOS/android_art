@@ -53,6 +53,9 @@ static constexpr size_t kArm64WordSize = static_cast<size_t>(kArm64PointerSize);
 static constexpr int kMaxMacroInstructionSizeInBytes = 15 * vixl::aarch64::kInstructionSize;
 static constexpr int kInvokeCodeMarginSizeInBytes = 6 * kMaxMacroInstructionSizeInBytes;
 
+// SVE is currently not enabled.
+static constexpr bool kArm64AllowSVE = false;
+
 static const vixl::aarch64::Register kParameterCoreRegisters[] = {
   vixl::aarch64::x1,
   vixl::aarch64::x2,
@@ -262,7 +265,7 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
 #define DECLARE_VISIT_INSTRUCTION(name, super) \
   void Visit##name(H##name* instr) override;
 
-  FOR_EACH_CONCRETE_INSTRUCTION_COMMON(DECLARE_VISIT_INSTRUCTION)
+  FOR_EACH_CONCRETE_INSTRUCTION_SCALAR_COMMON(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_ARM64(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_SHARED(DECLARE_VISIT_INSTRUCTION)
 
@@ -276,7 +279,15 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
   Arm64Assembler* GetAssembler() const { return assembler_; }
   vixl::aarch64::MacroAssembler* GetVIXLAssembler() { return GetAssembler()->GetVIXLAssembler(); }
 
- private:
+  // SIMD helpers.
+  virtual Location AllocateSIMDScratchLocation(vixl::aarch64::UseScratchRegisterScope* scope) = 0;
+  virtual void FreeSIMDScratchLocation(Location loc,
+                                       vixl::aarch64::UseScratchRegisterScope* scope)  = 0;
+  virtual void LoadSIMDRegFromStack(Location destination, Location source) = 0;
+  virtual void MoveSIMDRegToSIMDReg(Location destination, Location source) = 0;
+  virtual void MoveToSIMDStackSlot(Location destination, Location source) = 0;
+
+ protected:
   void GenerateClassInitializationCheck(SlowPathCodeARM64* slow_path,
                                         vixl::aarch64::Register class_reg);
   void GenerateBitstringTypeCheckCompare(HTypeCheckInstruction* check,
@@ -340,7 +351,11 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
   void GenerateIntRemForPower2Denom(HRem *instruction);
   void HandleGoto(HInstruction* got, HBasicBlock* successor);
 
-  vixl::aarch64::MemOperand VecAddress(
+  // Helper to set up locations for vector memory operations. Returns the memory operand and,
+  // if used, sets the output parameter scratch to a temporary register used in this operand,
+  // so that the client can release it right after the memory operand use.
+  // Neon version.
+  vixl::aarch64::MemOperand VecNeonAddress(
       HVecMemoryOperation* instruction,
       // This function may acquire a scratch register.
       vixl::aarch64::UseScratchRegisterScope* temps_scope,
@@ -362,7 +377,7 @@ class LocationsBuilderARM64 : public HGraphVisitor {
 #define DECLARE_VISIT_INSTRUCTION(name, super) \
   void Visit##name(H##name* instr) override;
 
-  FOR_EACH_CONCRETE_INSTRUCTION_COMMON(DECLARE_VISIT_INSTRUCTION)
+  FOR_EACH_CONCRETE_INSTRUCTION_SCALAR_COMMON(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_ARM64(DECLARE_VISIT_INSTRUCTION)
   FOR_EACH_CONCRETE_INSTRUCTION_SHARED(DECLARE_VISIT_INSTRUCTION)
 
@@ -373,7 +388,7 @@ class LocationsBuilderARM64 : public HGraphVisitor {
                << " (id " << instruction->GetId() << ")";
   }
 
- private:
+ protected:
   void HandleBinaryOp(HBinaryOperation* instr);
   void HandleFieldSet(HInstruction* instruction);
   void HandleFieldGet(HInstruction* instruction, const FieldInfo& field_info);
@@ -385,6 +400,72 @@ class LocationsBuilderARM64 : public HGraphVisitor {
   InvokeDexCallingConventionVisitorARM64 parameter_visitor_;
 
   DISALLOW_COPY_AND_ASSIGN(LocationsBuilderARM64);
+};
+
+class InstructionCodeGeneratorARM64Neon : public InstructionCodeGeneratorARM64 {
+ public:
+  InstructionCodeGeneratorARM64Neon(HGraph* graph, CodeGeneratorARM64* codegen) :
+      InstructionCodeGeneratorARM64(graph, codegen) {}
+
+#define DECLARE_VISIT_INSTRUCTION(name, super) \
+  void Visit##name(H##name* instr) override;
+
+  FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(DECLARE_VISIT_INSTRUCTION)
+
+#undef DECLARE_VISIT_INSTRUCTION
+
+  Location AllocateSIMDScratchLocation(vixl::aarch64::UseScratchRegisterScope* scope) override;
+  void FreeSIMDScratchLocation(Location loc,
+                               vixl::aarch64::UseScratchRegisterScope* scope) override;
+  void LoadSIMDRegFromStack(Location destination, Location source) override;
+  void MoveSIMDRegToSIMDReg(Location destination, Location source) override;
+  void MoveToSIMDStackSlot(Location destination, Location source) override;
+};
+
+class LocationsBuilderARM64Neon : public LocationsBuilderARM64 {
+ public:
+  LocationsBuilderARM64Neon(HGraph* graph, CodeGeneratorARM64* codegen) :
+      LocationsBuilderARM64(graph, codegen) {}
+
+#define DECLARE_VISIT_INSTRUCTION(name, super) \
+  void Visit##name(H##name* instr) override;
+
+  FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(DECLARE_VISIT_INSTRUCTION)
+
+#undef DECLARE_VISIT_INSTRUCTION
+};
+
+class InstructionCodeGeneratorARM64Sve : public InstructionCodeGeneratorARM64 {
+ public:
+  InstructionCodeGeneratorARM64Sve(HGraph* graph, CodeGeneratorARM64* codegen) :
+      InstructionCodeGeneratorARM64(graph, codegen) {}
+
+#define DECLARE_VISIT_INSTRUCTION(name, super) \
+  void Visit##name(H##name* instr) override;
+
+  FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(DECLARE_VISIT_INSTRUCTION)
+
+#undef DECLARE_VISIT_INSTRUCTION
+
+  Location AllocateSIMDScratchLocation(vixl::aarch64::UseScratchRegisterScope* scope) override;
+  void FreeSIMDScratchLocation(Location loc,
+                               vixl::aarch64::UseScratchRegisterScope* scope) override;
+  void LoadSIMDRegFromStack(Location destination, Location source) override;
+  void MoveSIMDRegToSIMDReg(Location destination, Location source) override;
+  void MoveToSIMDStackSlot(Location destination, Location source) override;
+};
+
+class LocationsBuilderARM64Sve : public LocationsBuilderARM64 {
+ public:
+  LocationsBuilderARM64Sve(HGraph* graph, CodeGeneratorARM64* codegen) :
+      LocationsBuilderARM64(graph, codegen) {}
+
+#define DECLARE_VISIT_INSTRUCTION(name, super) \
+  void Visit##name(H##name* instr) override;
+
+  FOR_EACH_CONCRETE_INSTRUCTION_VECTOR_COMMON(DECLARE_VISIT_INSTRUCTION)
+
+#undef DECLARE_VISIT_INSTRUCTION
 };
 
 class ParallelMoveResolverARM64 : public ParallelMoveResolverNoSwap {
@@ -435,6 +516,8 @@ class CodeGeneratorARM64 : public CodeGenerator {
     return kArm64WordSize;
   }
 
+  bool SupportsPredicatedSIMD() const override { return ShouldUseSVE(); }
+
   size_t GetSlowPathFPWidth() const override {
     return GetGraph()->HasSIMD()
         ? GetSIMDRegisterWidth()
@@ -455,8 +538,11 @@ class CodeGeneratorARM64 : public CodeGenerator {
     return block_entry_label->GetLocation();
   }
 
-  HGraphVisitor* GetLocationBuilder() override { return &location_builder_; }
-  HGraphVisitor* GetInstructionVisitor() override { return &instruction_visitor_; }
+  HGraphVisitor* GetLocationBuilder() override { return location_builder_; }
+  InstructionCodeGeneratorARM64* GetInstructionCodeGeneratorArm64() {
+    return instruction_visitor_;
+  }
+  HGraphVisitor* GetInstructionVisitor() override { return GetInstructionCodeGeneratorArm64(); }
   Arm64Assembler* GetAssembler() override { return &assembler_; }
   const Arm64Assembler& GetAssembler() const override { return assembler_; }
   vixl::aarch64::MacroAssembler* GetVIXLAssembler() { return GetAssembler()->GetVIXLAssembler(); }
@@ -899,14 +985,22 @@ class CodeGeneratorARM64 : public CodeGenerator {
   static void EmitPcRelativeLinkerPatches(const ArenaDeque<PcRelativePatchInfo>& infos,
                                           ArenaVector<linker::LinkerPatch>* linker_patches);
 
+  // Returns whether SVE features are supported and should be used.
+  bool ShouldUseSVE() const;
+
   // Labels for each block that will be compiled.
   // We use a deque so that the `vixl::aarch64::Label` objects do not move in memory.
   ArenaDeque<vixl::aarch64::Label> block_labels_;  // Indexed by block id.
   vixl::aarch64::Label frame_entry_label_;
   ArenaVector<std::unique_ptr<JumpTableARM64>> jump_tables_;
 
-  LocationsBuilderARM64 location_builder_;
-  InstructionCodeGeneratorARM64 instruction_visitor_;
+  LocationsBuilderARM64Neon location_builder_neon_;
+  InstructionCodeGeneratorARM64Neon instruction_visitor_neon_;
+  LocationsBuilderARM64Sve location_builder_sve_;
+  InstructionCodeGeneratorARM64Sve instruction_visitor_sve_;
+
+  LocationsBuilderARM64* location_builder_;
+  InstructionCodeGeneratorARM64* instruction_visitor_;
   ParallelMoveResolverARM64 move_resolver_;
   Arm64Assembler assembler_;
 
