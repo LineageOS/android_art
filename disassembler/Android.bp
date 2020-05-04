@@ -68,6 +68,11 @@ art_cc_library {
         // For disassembler_arm*.
         "libvixld",
     ],
+
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 cc_library_headers {
@@ -75,5 +80,10 @@ cc_library_headers {
     host_supported: true,
     export_include_dirs: [
         ".",
+    ],
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
     ],
 }

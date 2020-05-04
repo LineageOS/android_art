@@ -288,4 +288,9 @@ cc_library_headers {
     export_include_dirs: ["."],
     shared_libs: ["libbase"],
     export_shared_lib_headers: ["libbase"],
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
