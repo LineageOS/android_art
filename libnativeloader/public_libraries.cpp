@@ -59,6 +59,7 @@ constexpr const char* kVndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/vndks
 const std::vector<const std::string> kArtApexPublicLibraries = {
     "libicuuc.so",
     "libicui18n.so",
+    "libnativehelper.so",
 };
 
 constexpr const char* kArtApexLibPath = "/apex/com.android.art/" LIB;
