@@ -42,12 +42,6 @@ class MANAGED Field : public AccessibleObject {
   ALWAYS_INLINE uint32_t GetArtFieldIndex() REQUIRES_SHARED(Locks::mutator_lock_) {
     return GetField32(OFFSET_OF_OBJECT_MEMBER(Field, art_field_index_));
   }
-  // Public for use by class redefinition code.
-  template<bool kTransactionActive>
-  void SetArtFieldIndex(uint32_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, art_field_index_), idx);
-  }
-
 
   ObjPtr<mirror::Class> GetDeclaringClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -77,7 +71,7 @@ class MANAGED Field : public AccessibleObject {
 
   ArtField* GetArtField() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  template <PointerSize kPointerSize, bool kTransactionActive = false>
+  template <PointerSize kPointerSize>
   static ObjPtr<mirror::Field> CreateFromArtField(Thread* self,
                                                   ArtField* field,
                                                   bool force_resolve)
@@ -98,20 +92,45 @@ class MANAGED Field : public AccessibleObject {
   int32_t art_field_index_;
   int32_t offset_;
 
-  template<bool kTransactionActive>
-  void SetDeclaringClass(ObjPtr<mirror::Class> c) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<bool kTransactionActive>
-  void SetType(ObjPtr<mirror::Class> type) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  template<bool kTransactionActive>
-  void SetAccessFlags(uint32_t flags) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, access_flags_), flags);
+  static constexpr MemberOffset DeclaringClassOffset() {
+    return OFFSET_OF_OBJECT_MEMBER(Field, declaring_class_);
   }
 
-  template<bool kTransactionActive>
+  static constexpr MemberOffset TypeOffset() {
+    return OFFSET_OF_OBJECT_MEMBER(Field, type_);
+  }
+
+  static constexpr MemberOffset AccessFlagsOffset() {
+    return OFFSET_OF_OBJECT_MEMBER(Field, access_flags_);
+  }
+
+  static constexpr MemberOffset ArtFieldIndexOffset() {
+    return OFFSET_OF_OBJECT_MEMBER(Field, art_field_index_);
+  }
+
+  static constexpr MemberOffset OffsetOffset() {
+    return OFFSET_OF_OBJECT_MEMBER(Field, offset_);
+  }
+
+  template<bool kTransactionActive, bool kCheckTransaction = true>
+  void SetDeclaringClass(ObjPtr<Class> c) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template<bool kTransactionActive, bool kCheckTransaction = true>
+  void SetType(ObjPtr<Class> type) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template<bool kTransactionActive, bool kCheckTransaction = true>
+  void SetAccessFlags(uint32_t access_flags) REQUIRES_SHARED(Locks::mutator_lock_) {
+    SetField32<kTransactionActive, kCheckTransaction>(AccessFlagsOffset(), access_flags);
+  }
+
+  template<bool kTransactionActive, bool kCheckTransaction = true>
+  void SetArtFieldIndex(uint32_t idx) REQUIRES_SHARED(Locks::mutator_lock_) {
+    SetField32<kTransactionActive, kCheckTransaction>(ArtFieldIndexOffset(), idx);
+  }
+
+  template<bool kTransactionActive, bool kCheckTransaction = true>
   void SetOffset(uint32_t offset) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetField32<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, offset_), offset);
+    SetField32<kTransactionActive, kCheckTransaction>(OffsetOffset(), offset);
   }
 
   friend struct art::FieldOffsets;  // for verifying offset information
