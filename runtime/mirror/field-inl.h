@@ -41,7 +41,7 @@ inline ObjPtr<mirror::Class> Field::GetType() {
   return GetFieldObject<mirror::Class>(OFFSET_OF_OBJECT_MEMBER(Field, type_));
 }
 
-template <PointerSize kPointerSize, bool kTransactionActive>
+template <PointerSize kPointerSize>
 inline ObjPtr<mirror::Field> Field::CreateFromArtField(Thread* self,
                                                        ArtField* field,
                                                        bool force_resolve) {
@@ -86,27 +86,33 @@ inline ObjPtr<mirror::Field> Field::CreateFromArtField(Thread* self,
       field->GetDexCache()->SetResolvedField(dex_field_index, field, kPointerSize);
     }
   }
-  ret->SetType<kTransactionActive>(type.Get());
-  ret->SetDeclaringClass<kTransactionActive>(field->GetDeclaringClass());
-  ret->SetAccessFlags<kTransactionActive>(field->GetAccessFlags());
+  // We're initializing a newly allocated object, so we do not need to record that under
+  // a transaction. If the transaction is aborted, the whole object shall be unreachable.
+  ret->SetType</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(type.Get());
+  ret->SetDeclaringClass</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetDeclaringClass());
+  ret->SetAccessFlags</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetAccessFlags());
   auto iter_range = field->IsStatic() ? field->GetDeclaringClass()->GetSFields()
                                       : field->GetDeclaringClass()->GetIFields();
   auto position = std::find_if(
       iter_range.begin(), iter_range.end(), [&](const auto& f) { return &f == field; });
   DCHECK(position != iter_range.end());
-  ret->SetArtFieldIndex<kTransactionActive>(std::distance(iter_range.begin(), position));
-  ret->SetOffset<kTransactionActive>(field->GetOffset().Int32Value());
+  ret->SetArtFieldIndex</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      std::distance(iter_range.begin(), position));
+  ret->SetOffset</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetOffset().Int32Value());
   return ret.Get();
 }
 
-template<bool kTransactionActive>
-inline void Field::SetDeclaringClass(ObjPtr<mirror::Class> c) {
-  SetFieldObject<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, declaring_class_), c);
+template<bool kTransactionActive, bool kCheckTransaction>
+inline void Field::SetDeclaringClass(ObjPtr<Class> c) {
+  SetFieldObject<kTransactionActive, kCheckTransaction>(DeclaringClassOffset(), c);
 }
 
-template<bool kTransactionActive>
-inline void Field::SetType(ObjPtr<mirror::Class> type) {
-  SetFieldObject<kTransactionActive>(OFFSET_OF_OBJECT_MEMBER(Field, type_), type);
+template<bool kTransactionActive, bool kCheckTransaction>
+inline void Field::SetType(ObjPtr<Class> type) {
+  SetFieldObject<kTransactionActive, kCheckTransaction>(TypeOffset(), type);
 }
 
 }  // namespace mirror
