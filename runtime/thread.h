@@ -638,7 +638,6 @@ class Thread {
 
   // Create the internal representation of a stack trace, that is more time
   // and space efficient to compute than the StackTraceElement[].
-  template<bool kTransactionActive>
   jobject CreateInternalStackTrace(const ScopedObjectAccessAlreadyRunnable& soa) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
