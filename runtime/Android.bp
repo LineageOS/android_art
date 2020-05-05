@@ -701,6 +701,11 @@ cc_library_headers {
     host_supported: true,
     export_include_dirs: ["."],
     sdk_version: "current",
+
+    apex_available: [
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
 }
 
 genrule {
