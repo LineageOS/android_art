@@ -2921,8 +2921,50 @@ void InstructionCodeGeneratorARM64::GenerateIntDivForPower2Denom(HDiv* instructi
   }
 }
 
-void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperation* instruction) {
+// Return true if the magic number was modified by subtracting 2^32. So dividend needs to be added.
+static inline bool NeedToAddDividend(int64_t magic_number, int64_t divisor) {
+  return divisor > 0 && magic_number < 0;
+}
+
+// Return true if the magic number was modified by adding 2^32. So dividend needs to be subtracted.
+static inline bool NeedToSubDividend(int64_t magic_number, int64_t divisor) {
+  return divisor < 0 && magic_number > 0;
+}
+
+void InstructionCodeGeneratorARM64::GenerateResultDivRemWithAnyConstant(
+    bool is_rem,
+    int final_right_shift,
+    int64_t magic_number,
+    int64_t divisor,
+    Register dividend,
+    Register temp_result,
+    Register out,
+    UseScratchRegisterScope* temps_scope) {
+  // As magic_number can be modified to fit into 32 bits, check whether the correction is needed.
+  if (NeedToAddDividend(magic_number, divisor)) {
+    __ Add(temp_result, temp_result, dividend);
+  } else if (NeedToSubDividend(magic_number, divisor)) {
+    __ Sub(temp_result, temp_result, dividend);
+  }
+
+  if (final_right_shift != 0) {
+    __ Asr(temp_result, temp_result, final_right_shift);
+  }
+
+  Register& result = (is_rem) ? temp_result : out;
+  __ Add(result, temp_result, Operand(temp_result, LSR, temp_result.GetSizeInBits() - 1));
+  if (is_rem) {
+    // TODO: Strength reduction for msub.
+    Register temp_imm = temps_scope->AcquireSameSizeAs(out);
+    __ Mov(temp_imm, divisor);
+    __ Msub(out, temp_result, temp_imm, dividend);
+  }
+}
+
+void InstructionCodeGeneratorARM64::GenerateInt64DivRemWithAnyConstant(
+    HBinaryOperation* instruction) {
   DCHECK(instruction->IsDiv() || instruction->IsRem());
+  DCHECK(instruction->GetResultType() == DataType::Type::kInt64);
 
   LocationSummary* locations = instruction->GetLocations();
   Location second = locations->InAt(1);
@@ -2932,44 +2974,67 @@ void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperati
   Register dividend = InputRegisterAt(instruction, 0);
   int64_t imm = Int64FromConstant(second.GetConstant());
 
-  DataType::Type type = instruction->GetResultType();
-  DCHECK(type == DataType::Type::kInt32 || type == DataType::Type::kInt64);
-
   int64_t magic;
   int shift;
-  CalculateMagicAndShiftForDivRem(
-      imm, /* is_long= */ type == DataType::Type::kInt64, &magic, &shift);
+  CalculateMagicAndShiftForDivRem(imm, /* is_long= */ true, &magic, &shift);
 
   UseScratchRegisterScope temps(GetVIXLAssembler());
   Register temp = temps.AcquireSameSizeAs(out);
 
   // temp = get_high(dividend * magic)
   __ Mov(temp, magic);
-  if (type == DataType::Type::kInt64) {
-    __ Smulh(temp, dividend, temp);
+  __ Smulh(temp, dividend, temp);
+
+  GenerateResultDivRemWithAnyConstant(/* is_rem= */ instruction->IsRem(),
+                                      /* final_right_shift= */ shift,
+                                      magic,
+                                      imm,
+                                      dividend,
+                                      temp,
+                                      out,
+                                      &temps);
+}
+
+void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
+    HBinaryOperation* instruction) {
+  DCHECK(instruction->IsDiv() || instruction->IsRem());
+  DCHECK(instruction->GetResultType() == DataType::Type::kInt32);
+
+  LocationSummary* locations = instruction->GetLocations();
+  Location second = locations->InAt(1);
+  DCHECK(second.IsConstant());
+
+  Register out = OutputRegister(instruction);
+  Register dividend = InputRegisterAt(instruction, 0);
+  int64_t imm = Int64FromConstant(second.GetConstant());
+
+  int64_t magic;
+  int shift;
+  CalculateMagicAndShiftForDivRem(imm, /* is_long= */ false, &magic, &shift);
+  UseScratchRegisterScope temps(GetVIXLAssembler());
+  Register temp = temps.AcquireSameSizeAs(out);
+
+  // temp = get_high(dividend * magic)
+  __ Mov(temp, magic);
+  __ Smull(temp.X(), dividend, temp);
+  __ Lsr(temp.X(), temp.X(), 32);
+
+  GenerateResultDivRemWithAnyConstant(/* is_rem= */ instruction->IsRem(),
+                                      /* final_right_shift= */ shift,
+                                      magic,
+                                      imm,
+                                      dividend,
+                                      temp,
+                                      out,
+                                      &temps);
+}
+
+void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperation* instruction) {
+  DCHECK(instruction->IsDiv() || instruction->IsRem());
+  if (instruction->GetResultType() == DataType::Type::kInt64) {
+    GenerateInt64DivRemWithAnyConstant(instruction);
   } else {
-    __ Smull(temp.X(), dividend, temp);
-    __ Lsr(temp.X(), temp.X(), 32);
-  }
-
-  if (imm > 0 && magic < 0) {
-    __ Add(temp, temp, dividend);
-  } else if (imm < 0 && magic > 0) {
-    __ Sub(temp, temp, dividend);
-  }
-
-  if (shift != 0) {
-    __ Asr(temp, temp, shift);
-  }
-
-  if (instruction->IsDiv()) {
-    __ Sub(out, temp, Operand(temp, ASR, type == DataType::Type::kInt64 ? 63 : 31));
-  } else {
-    __ Sub(temp, temp, Operand(temp, ASR, type == DataType::Type::kInt64 ? 63 : 31));
-    // TODO: Strength reduction for msub.
-    Register temp_imm = temps.AcquireSameSizeAs(out);
-    __ Mov(temp_imm, imm);
-    __ Msub(out, temp, temp_imm, dividend);
+    GenerateInt32DivRemWithAnyConstant(instruction);
   }
 }
 

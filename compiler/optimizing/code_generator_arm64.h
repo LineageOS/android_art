@@ -331,6 +331,24 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
                              vixl::aarch64::Label* false_target);
   void DivRemOneOrMinusOne(HBinaryOperation* instruction);
   void DivRemByPowerOfTwo(HBinaryOperation* instruction);
+
+  // Helper to generate code producing the final result of HDiv/HRem with a constant divisor.
+  // 'temp_result' holds the result of multiplication of the dividend by a sort of reciprocal
+  // of the divisor (magic_number). Based on magic_number and divisor, temp_result might need
+  // to be corrected before applying final_right_shift.
+  // If the code is generated for HRem the final temp_result is used for producing the
+  // remainder.
+  void GenerateResultDivRemWithAnyConstant(bool is_rem,
+                                           int final_right_shift,
+                                           int64_t magic_number,
+                                           int64_t divisor,
+                                           vixl::aarch64::Register dividend,
+                                           vixl::aarch64::Register temp_result,
+                                           vixl::aarch64::Register out,
+                                           // This function may acquire a scratch register.
+                                           vixl::aarch64::UseScratchRegisterScope* temps_scope);
+  void GenerateInt64DivRemWithAnyConstant(HBinaryOperation* instruction);
+  void GenerateInt32DivRemWithAnyConstant(HBinaryOperation* instruction);
   void GenerateDivRemWithAnyConstant(HBinaryOperation* instruction);
   void GenerateIntDiv(HDiv* instruction);
   void GenerateIntDivForConstDenom(HDiv *instruction);
