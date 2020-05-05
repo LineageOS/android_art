@@ -107,6 +107,10 @@ static Domain DetermineDomainFromLocation(const std::string& dex_location,
     return Domain::kPlatform;
   }
 
+  if (LocationIsOnSystemExtFramework(dex_location.c_str())) {
+    return Domain::kPlatform;
+  }
+
   if (class_loader.IsNull()) {
     LOG(WARNING) << "DexFile " << dex_location
         << " is in boot class path but is not in a known location";

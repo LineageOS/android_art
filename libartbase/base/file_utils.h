@@ -109,6 +109,9 @@ bool LocationIsOnSystem(const char* location);
 // Return whether the location is on system/framework (i.e. android_root/framework).
 bool LocationIsOnSystemFramework(const char* location);
 
+// Return whether the location is on system_ext/framework
+bool LocationIsOnSystemExtFramework(const char* location);
+
 // Return whether the location is on /apex/.
 bool LocationIsOnApex(const char* location);
 
