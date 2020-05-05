@@ -27,7 +27,7 @@ namespace art {
 
 static jobject Throwable_nativeFillInStackTrace(JNIEnv* env, jclass) {
   ScopedFastNativeObjectAccess soa(env);
-  return soa.Self()->CreateInternalStackTrace<false>(soa);
+  return soa.Self()->CreateInternalStackTrace(soa);
 }
 
 static jobjectArray Throwable_nativeGetStackTrace(JNIEnv* env, jclass, jobject javaStackState) {

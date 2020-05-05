@@ -241,10 +241,13 @@ class PointerArray : public Array {
                                     static_cast<size_t>(ptr_size) * index);
   }
 
-  template<bool kTransactionActive = false, bool kUnchecked = false>
+  template<bool kTransactionActive = false, bool kCheckTransaction = true, bool kUnchecked = false>
   void SetElementPtrSize(uint32_t idx, uint64_t element, PointerSize ptr_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  template<bool kTransactionActive = false, bool kUnchecked = false, typename T>
+  template<bool kTransactionActive = false,
+           bool kCheckTransaction = true,
+           bool kUnchecked = false,
+           typename T>
   void SetElementPtrSize(uint32_t idx, T* element, PointerSize ptr_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
