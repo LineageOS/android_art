@@ -76,14 +76,14 @@ ObjPtr<mirror::Class> GenerateProxyClass(ScopedObjectAccess& soa,
   DCHECK(!Runtime::Current()->IsActiveTransaction());
   soa.Env()->SetObjectArrayElement(
       proxyClassMethods, array_index++, soa.AddLocalReference<jobject>(
-          mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), method)));
+          mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), method)));
   method = javaLangObject->FindClassMethod("hashCode", "()I", kRuntimePointerSize);
   CHECK(method != nullptr);
   CHECK(!method->IsDirect());
   CHECK(method->GetDeclaringClass() == javaLangObject.Get());
   soa.Env()->SetObjectArrayElement(
       proxyClassMethods, array_index++, soa.AddLocalReference<jobject>(
-          mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), method)));
+          mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), method)));
   method = javaLangObject->FindClassMethod(
       "toString", "()Ljava/lang/String;", kRuntimePointerSize);
   CHECK(method != nullptr);
@@ -91,13 +91,13 @@ ObjPtr<mirror::Class> GenerateProxyClass(ScopedObjectAccess& soa,
   CHECK(method->GetDeclaringClass() == javaLangObject.Get());
   soa.Env()->SetObjectArrayElement(
       proxyClassMethods, array_index++, soa.AddLocalReference<jobject>(
-          mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), method)));
+          mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), method)));
   // Now adds all interfaces virtual methods.
   for (Handle<mirror::Class> interface : interfaces) {
     for (auto& m : interface->GetDeclaredVirtualMethods(kRuntimePointerSize)) {
       soa.Env()->SetObjectArrayElement(
           proxyClassMethods, array_index++, soa.AddLocalReference<jobject>(
-              mirror::Method::CreateFromArtMethod<kRuntimePointerSize, false>(soa.Self(), &m)));
+              mirror::Method::CreateFromArtMethod<kRuntimePointerSize>(soa.Self(), &m)));
     }
   }
   CHECK_EQ(array_index, methods_count);
