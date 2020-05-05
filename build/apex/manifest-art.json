@@ -1,11 +1,11 @@
 {
   "name": "com.android.art",
   "version": 1,
-  "requireNativeLibs": [
-    "libandroidicu.so",
-    "libicuuc.so",
+  "provideNativeLibs": [
     "libicui18n.so",
-    "libicu_jni.so",
+    "libicuuc.so"
+  ],
+  "requireNativeLibs": [
     "libneuralnetworks.so"
   ]
 }
