@@ -586,6 +586,29 @@ TEST_F(HiddenApiTest, DexDomain_SystemDir) {
   ASSERT_EQ(0, remove(system_location_path.c_str()));
 }
 
+TEST_F(HiddenApiTest, DexDomain_SystemExtDir) {
+  // Load file from a system_ext, non-framework directory and check that it is not flagged as framework.
+  std::string system_ext_location_path = android_system_ext_ + "/foo.jar";
+  ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_location_path.c_str()));
+
+  ScopedObjectAccess soa(Thread::Current());
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  std::string error_msg;
+  ObjPtr<mirror::ClassLoader> class_loader;
+
+  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_ext_location_path, &error_msg)) << error_msg;
+  ASSERT_TRUE(LoadDexFiles(system_ext_location_path, soa, &dex_files, &class_loader, &error_msg))
+      << error_msg;
+  ASSERT_GE(dex_files.size(), 1u);
+  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
+                                       dex_files,
+                                       hiddenapi::Domain::kApplication,
+                                       &error_msg)) << error_msg;
+
+  dex_files.clear();
+  ASSERT_EQ(0, remove(system_ext_location_path.c_str()));
+}
+
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
   // Load file from a system/framework directory and check that it is flagged as a framework dex.
   std::string system_framework_location_path = GetAndroidRoot() + "/framework/foo.jar";
@@ -611,6 +634,33 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
 
   dex_files.clear();
   ASSERT_EQ(0, remove(system_framework_location_path.c_str()));
+}
+
+TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir) {
+  // Load file from a system_ext/framework directory and check that it is flagged as a framework dex.
+  std::string system_ext_framework_location_path = android_system_ext_ + "/framework/foo.jar";
+  ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_location_path.c_str()));
+
+  ScopedObjectAccess soa(Thread::Current());
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  std::string error_msg;
+  ObjPtr<mirror::ClassLoader> class_loader;
+
+  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_ext_framework_location_path, &error_msg))
+      << error_msg;
+  ASSERT_TRUE(LoadDexFiles(system_ext_framework_location_path,
+                           soa,
+                           &dex_files,
+                           &class_loader,
+                           &error_msg)) << error_msg;
+  ASSERT_GE(dex_files.size(), 1u);
+  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
+                                       dex_files,
+                                       hiddenapi::Domain::kPlatform,
+                                       &error_msg)) << error_msg;
+
+  dex_files.clear();
+  ASSERT_EQ(0, remove(system_ext_framework_location_path.c_str()));
 }
 
 TEST_F(HiddenApiTest, DexDomain_DataDir_MultiDex) {
@@ -662,6 +712,31 @@ TEST_F(HiddenApiTest, DexDomain_SystemDir_MultiDex) {
   ASSERT_EQ(0, remove(system_multi_location_path.c_str()));
 }
 
+TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
+  // Load multidex file from a system_ext, non-framework directory and check that it is not flagged
+  // as framework.
+  std::string system_ext_multi_location_path = android_system_ext_ + "/multifoo.jar";
+  ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_multi_location_path.c_str()));
+
+  ScopedObjectAccess soa(Thread::Current());
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  std::string error_msg;
+  ObjPtr<mirror::ClassLoader> class_loader;
+
+  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"), system_ext_multi_location_path, &error_msg))
+      << error_msg;
+  ASSERT_TRUE(LoadDexFiles(system_ext_multi_location_path, soa, &dex_files, &class_loader, &error_msg))
+      << error_msg;
+  ASSERT_GT(dex_files.size(), 1u);
+  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
+                                       dex_files,
+                                       hiddenapi::Domain::kApplication,
+                                       &error_msg)) << error_msg;
+
+  dex_files.clear();
+  ASSERT_EQ(0, remove(system_ext_multi_location_path.c_str()));
+}
+
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
   // Load multidex file from a system/framework directory and check that it is flagged as a
   // framework dex.
@@ -689,6 +764,35 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
 
   dex_files.clear();
   ASSERT_EQ(0, remove(system_framework_multi_location_path.c_str()));
+}
+
+TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir_MultiDex) {
+  // Load multidex file from a system_ext/framework directory and check that it is flagged as a
+  // framework dex.
+  std::string system_ext_framework_multi_location_path = android_system_ext_ + "/framework/multifoo.jar";
+  ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_multi_location_path.c_str()));
+
+  ScopedObjectAccess soa(Thread::Current());
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  std::string error_msg;
+  ObjPtr<mirror::ClassLoader> class_loader;
+
+  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"),
+                   system_ext_framework_multi_location_path,
+                   &error_msg)) << error_msg;
+  ASSERT_TRUE(LoadDexFiles(system_ext_framework_multi_location_path,
+                           soa,
+                           &dex_files,
+                           &class_loader,
+                           &error_msg)) << error_msg;
+  ASSERT_GT(dex_files.size(), 1u);
+  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
+                                       dex_files,
+                                       hiddenapi::Domain::kPlatform,
+                                       &error_msg)) << error_msg;
+
+  dex_files.clear();
+  ASSERT_EQ(0, remove(system_ext_framework_multi_location_path.c_str()));
 }
 
 }  // namespace art
