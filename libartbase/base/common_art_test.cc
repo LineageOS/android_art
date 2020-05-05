@@ -16,14 +16,15 @@
 
 #include "common_art_test.h"
 
+#include <cstdio>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <filesystem>
 #include <ftw.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <cstdio>
-#include <filesystem>
 #include "android-base/file.h"
 #include "android-base/logging.h"
 #include "nativehelper/scoped_local_ref.h"
@@ -493,16 +494,14 @@ std::string CommonArtTestImpl::GetClassPathOption(const char* option,
 
 std::string CommonArtTestImpl::GetTestDexFileName(const char* name) const {
   CHECK(name != nullptr);
-  std::string filename;
-  if (IsHost()) {
-    filename += GetAndroidRoot() + "/framework/";
-  } else {
-    filename += ART_TARGET_NATIVETEST_DIR_STRING;
-  }
-  filename += "art-gtest-";
-  filename += name;
-  filename += ".jar";
-  return filename;
+  // The needed jar files for gtest are located next to the gtest binary itself.
+  std::string cmdline;
+  bool result = android::base::ReadFileToString("/proc/self/cmdline", &cmdline);
+  CHECK(result);
+  UniqueCPtr<char[]> executable_path(realpath(cmdline.c_str(), nullptr));
+  CHECK(executable_path != nullptr);
+  std::string executable_dir = dirname(executable_path.get());
+  return executable_dir + "/art-gtest-jars-" + name + ".jar";
 }
 
 std::vector<std::unique_ptr<const DexFile>> CommonArtTestImpl::OpenDexFiles(const char* filename) {

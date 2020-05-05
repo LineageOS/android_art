@@ -70,6 +70,17 @@ art_cc_test {
     shared_libs: [
         "libbacktrace",
     ],
+    data: [
+        ":art-gtest-jars-LinkageTest",
+        ":art-gtest-jars-Main",
+        ":art-gtest-jars-MainStripped",
+        ":art-gtest-jars-MultiDex",
+        ":art-gtest-jars-MultiDexModifiedSecondary",
+        ":art-gtest-jars-MyClassNatives",
+        ":art-gtest-jars-Nested",
+        ":art-gtest-jars-VerifierDeps",
+        ":art-gtest-jars-VerifierDepsMulti",
+    ],
     srcs: ["dexoptanalyzer_test.cc"],
     required: [
         "dex2oatd",
