@@ -733,7 +733,8 @@ build-art-host-golem: build-art-host \
 ########################################################################
 # Phony target for building what go/lem requires for syncing /system to target.
 .PHONY: build-art-unbundled-golem
-build-art-unbundled-golem: art-runtime linker oatdump $(ART_APEX_JARS) conscrypt crash_dump
+art_apex_jars := $(foreach pair,$(ART_APEX_JARS), $(call word-colon,2,$(pair)))
+build-art-unbundled-golem: art-runtime linker oatdump $(art_apex_jars) conscrypt crash_dump
 
 ########################################################################
 # Rules for building all dependencies for tests.
