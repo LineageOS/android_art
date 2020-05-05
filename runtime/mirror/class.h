@@ -740,7 +740,7 @@ class MANAGED Class final : public Object {
         PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  template <PointerSize kPointerSize, bool kTransactionActive>
+  template <PointerSize kPointerSize>
   static ObjPtr<Method> GetDeclaredMethodInternal(
       Thread* self,
       ObjPtr<Class> klass,
@@ -749,7 +749,7 @@ class MANAGED Class final : public Object {
       const std::function<hiddenapi::AccessContext()>& fn_get_access_context)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  template <PointerSize kPointerSize, bool kTransactionActive>
+  template <PointerSize kPointerSize>
   static ObjPtr<Constructor> GetDeclaredConstructorInternal(Thread* self,
                                                             ObjPtr<Class> klass,
                                                             ObjPtr<ObjectArray<Class>> args)
