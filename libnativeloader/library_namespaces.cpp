@@ -51,6 +51,7 @@ constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
 constexpr const char* kVndkProductNamespaceName = "vndk_product";
 constexpr const char* kArtNamespaceName = "com_android_art";
+constexpr const char* kI18nNamespaceName = "com_android_i18n";
 constexpr const char* kNeuralNetworksNamespaceName = "com_android_neuralnetworks";
 constexpr const char* kStatsdNamespaceName = "com_android_os_statsd";
 
@@ -267,6 +268,15 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   // ART APEX does not exist on host, and under certain build conditions.
   if (art_ns.ok()) {
     linked = app_ns->Link(*art_ns, art_public_libraries());
+    if (!linked.ok()) {
+      return linked.error();
+    }
+  }
+
+  auto i18n_ns = NativeLoaderNamespace::GetExportedNamespace(kI18nNamespaceName, is_bridged);
+  // i18n APEX does not exist on host, and under certain build conditions.
+  if (i18n_ns.ok()) {
+    linked = app_ns->Link(*i18n_ns, i18n_public_libraries());
     if (!linked.ok()) {
       return linked.error();
     }

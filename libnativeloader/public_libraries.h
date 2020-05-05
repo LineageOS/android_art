@@ -36,6 +36,7 @@ const std::string& art_public_libraries();
 const std::string& statsd_public_libraries();
 const std::string& vendor_public_libraries();
 const std::string& extended_public_libraries();
+const std::string& i18n_public_libraries();
 const std::string& neuralnetworks_public_libraries();
 const std::string& llndk_libraries_product();
 const std::string& llndk_libraries_vendor();
