@@ -400,9 +400,9 @@ void CommonArtTestImpl::TearDown() {
 
 static std::string GetDexFileName(const std::string& jar_prefix, bool host) {
   std::string prefix(host ? GetAndroidRoot() : "");
-  const char* apexPath = (jar_prefix == "conscrypt")
-    ? kAndroidConscryptApexDefaultPath
-    : kAndroidArtApexDefaultPath;
+  const char* apexPath = (jar_prefix == "conscrypt") ? kAndroidConscryptApexDefaultPath
+    : (jar_prefix == "core-icu4j" ? kAndroidI18nApexDefaultPath
+    : kAndroidArtApexDefaultPath);
   return StringPrintf("%s%s/javalib/%s.jar", prefix.c_str(), apexPath, jar_prefix.c_str());
 }
 
@@ -414,11 +414,11 @@ std::vector<std::string> CommonArtTestImpl::GetLibCoreModuleNames() const {
       // CORE_IMG_JARS modules.
       "core-oj",
       "core-libart",
-      "core-icu4j",
       "okhttp",
       "bouncycastle",
       "apache-xml",
       // Additional modules.
+      "core-icu4j",
       "conscrypt",
   };
 }

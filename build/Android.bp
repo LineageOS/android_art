@@ -251,7 +251,7 @@ art_debug_defaults {
 
 // A version of conscrypt only for enabling the "-hostdex" version to test ART on host.
 java_library {
-    // We need our own name to not class with the conscrypt library.
+    // We need our own name to not clash with the conscrypt library.
     name: "conscrypt-host",
     installable: true,
     hostdex: true,
@@ -265,6 +265,26 @@ java_library {
     target: {
         hostdex: {
             required: ["libjavacrypto"],
+        },
+    },
+}
+
+// A version of core-icu4j only for enabling the "-hostdex" version to test ART on host.
+java_library {
+    // We need our own name to not clash with the core-icu4j library.
+    name: "core-icu4j-host",
+    installable: true,
+    hostdex: true,
+    static_libs: ["core-icu4j"],
+
+    // Tests and build files rely on this file to be installed as "core-icu4j-hostdex",
+    // therefore set a stem. Without it, the file would be installed as
+    // "core-icu4j-host-hostdex".
+    stem: "core-icu4j",
+    sdk_version: "core_platform",
+    target: {
+        hostdex: {
+            required: ["libicu_jni"],
         },
     },
 }
