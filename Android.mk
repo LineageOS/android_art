@@ -503,6 +503,7 @@ PRIVATE_ART_APEX_DEPENDENCY_FILES := \
 
 PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libadbconnection.so \
+  lib/libandroidicu.so \
   lib/libandroidio.so \
   lib/libartbase.so \
   lib/libart-compiler.so \
@@ -519,6 +520,9 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libdt_fd_forward.so \
   lib/libdt_socket.so \
   lib/libexpat.so \
+  lib/libicui18n.so \
+  lib/libicu_jni.so \
+  lib/libicuuc.so \
   lib/libjavacore.so \
   lib/libjdwp.so \
   lib/liblzma.so \
@@ -539,6 +543,7 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libziparchive.so \
   lib/libz.so \
   lib64/libadbconnection.so \
+  lib64/libandroidicu.so \
   lib64/libandroidio.so \
   lib64/libartbase.so \
   lib64/libart-compiler.so \
@@ -555,6 +560,9 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libdt_fd_forward.so \
   lib64/libdt_socket.so \
   lib64/libexpat.so \
+  lib64/libicui18n.so \
+  lib64/libicu_jni.so \
+  lib64/libicuuc.so \
   lib64/libjavacore.so \
   lib64/libjdwp.so \
   lib64/liblzma.so \
@@ -583,16 +591,6 @@ PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
   lib64/libjavacrypto.so \
   lib64/libssl.so \
 
-PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
-  lib/libandroidicu.so \
-  lib/libicui18n.so \
-  lib/libicu_jni.so \
-  lib/libicuuc.so \
-  lib64/libandroidicu.so \
-  lib64/libicui18n.so \
-  lib64/libicu_jni.so \
-  lib64/libicuuc.so \
-
 # Generate copies of Bionic bootstrap artifacts and ART APEX
 # libraries in the `system` (TARGET_OUT) directory. This is dangerous
 # as these files could inadvertently stay in this directory and be
@@ -612,7 +610,7 @@ PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
 #   `$(TARGET_OUT)/../apex/com.android.art.debug` (the local
 #   directory under the build tree containing the (Debug) ART APEX
 #   artifacts, which is not sync'd to the target).
-# - Libraries from the Conscrypt and I18n APEX may be loaded during golem runs.
+# - Libraries from the Conscrypt APEX may be loaded during golem runs.
 #
 # This target is only used by Golem now.
 #
@@ -630,8 +628,7 @@ standalone-apex-files: deapexer \
                        libm.bootstrap \
                        linker \
                        $(RELEASE_ART_APEX) \
-                       $(CONSCRYPT_APEX) \
-                       $(I18N_APEX)
+                       $(CONSCRYPT_APEX)
 	for f in $(PRIVATE_BIONIC_FILES); do \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
@@ -661,11 +658,6 @@ standalone-apex-files: deapexer \
 	conscrypt_apex_orig_dir=$$apex_orig_dir/$(CONSCRYPT_APEX); \
 	for f in $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS); do \
 	  tf="$$conscrypt_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
-	done; \
-	i18n_apex_orig_dir=$$apex_orig_dir/$(I18N_APEX); \
-	for f in $(PRIVATE_I18N_APEX_DEPENDENCY_LIBS); do \
-	  tf="$$i18n_apex_orig_dir/$$f"; \
 	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
 	done; \
 
