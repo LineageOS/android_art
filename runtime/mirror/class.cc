@@ -1453,7 +1453,7 @@ static bool IsMethodPreferredOver(ArtMethod* orig_method,
   return false;
 }
 
-template <PointerSize kPointerSize, bool kTransactionActive>
+template <PointerSize kPointerSize>
 ObjPtr<Method> Class::GetDeclaredMethodInternal(
     Thread* self,
     ObjPtr<Class> klass,
@@ -1494,7 +1494,7 @@ ObjPtr<Method> Class::GetDeclaredMethodInternal(
     bool m_hidden = hiddenapi::ShouldDenyAccessToMember(&m, fn_get_access_context, access_method);
     if (!m_hidden && !m.IsSynthetic()) {
       // Non-hidden, virtual, non-synthetic. Best possible result, exit early.
-      return Method::CreateFromArtMethod<kPointerSize, kTransactionActive>(self, &m);
+      return Method::CreateFromArtMethod<kPointerSize>(self, &m);
     } else if (IsMethodPreferredOver(result, result_hidden, &m, m_hidden)) {
       // Remember as potential result.
       result = &m;
@@ -1533,7 +1533,7 @@ ObjPtr<Method> Class::GetDeclaredMethodInternal(
         // Non-hidden, direct, non-synthetic. Any virtual result could only have been
         // hidden, therefore this is the best possible match. Exit now.
         DCHECK((result == nullptr) || result_hidden);
-        return Method::CreateFromArtMethod<kPointerSize, kTransactionActive>(self, &m);
+        return Method::CreateFromArtMethod<kPointerSize>(self, &m);
       } else if (IsMethodPreferredOver(result, result_hidden, &m, m_hidden)) {
         // Remember as potential result.
         result = &m;
@@ -1543,40 +1543,26 @@ ObjPtr<Method> Class::GetDeclaredMethodInternal(
   }
 
   return result != nullptr
-      ? Method::CreateFromArtMethod<kPointerSize, kTransactionActive>(self, result)
+      ? Method::CreateFromArtMethod<kPointerSize>(self, result)
       : nullptr;
 }
 
 template
-ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k32, false>(
+ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k32>(
     Thread* self,
     ObjPtr<Class> klass,
     ObjPtr<String> name,
     ObjPtr<ObjectArray<Class>> args,
     const std::function<hiddenapi::AccessContext()>& fn_get_access_context);
 template
-ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k32, true>(
-    Thread* self,
-    ObjPtr<Class> klass,
-    ObjPtr<String> name,
-    ObjPtr<ObjectArray<Class>> args,
-    const std::function<hiddenapi::AccessContext()>& fn_get_access_context);
-template
-ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k64, false>(
-    Thread* self,
-    ObjPtr<Class> klass,
-    ObjPtr<String> name,
-    ObjPtr<ObjectArray<Class>> args,
-    const std::function<hiddenapi::AccessContext()>& fn_get_access_context);
-template
-ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k64, true>(
+ObjPtr<Method> Class::GetDeclaredMethodInternal<PointerSize::k64>(
     Thread* self,
     ObjPtr<Class> klass,
     ObjPtr<String> name,
     ObjPtr<ObjectArray<Class>> args,
     const std::function<hiddenapi::AccessContext()>& fn_get_access_context);
 
-template <PointerSize kPointerSize, bool kTransactionActive>
+template <PointerSize kPointerSize>
 ObjPtr<Constructor> Class::GetDeclaredConstructorInternal(
     Thread* self,
     ObjPtr<Class> klass,
@@ -1584,29 +1570,19 @@ ObjPtr<Constructor> Class::GetDeclaredConstructorInternal(
   StackHandleScope<1> hs(self);
   ArtMethod* result = klass->GetDeclaredConstructor(self, hs.NewHandle(args), kPointerSize);
   return result != nullptr
-      ? Constructor::CreateFromArtMethod<kPointerSize, kTransactionActive>(self, result)
+      ? Constructor::CreateFromArtMethod<kPointerSize>(self, result)
       : nullptr;
 }
 
 // Constructor::CreateFromArtMethod<kTransactionActive>(self, result)
 
 template
-ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k32, false>(
+ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k32>(
     Thread* self,
     ObjPtr<Class> klass,
     ObjPtr<ObjectArray<Class>> args);
 template
-ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k32, true>(
-    Thread* self,
-    ObjPtr<Class> klass,
-    ObjPtr<ObjectArray<Class>> args);
-template
-ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k64, false>(
-    Thread* self,
-    ObjPtr<Class> klass,
-    ObjPtr<ObjectArray<Class>> args);
-template
-ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k64, true>(
+ObjPtr<Constructor> Class::GetDeclaredConstructorInternal<PointerSize::k64>(
     Thread* self,
     ObjPtr<Class> klass,
     ObjPtr<ObjectArray<Class>> args);
