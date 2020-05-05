@@ -184,13 +184,11 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
   }
   // Compile only a subset of the libcore dex files to make this test shorter.
   std::vector<std::string> libcore_dex_files = GetLibCoreDexFileNames();
-  // The primary image must contain at least core-oj and core-libart to initialize the runtime
-  // and we also need the core-icu4j if we want to compile these with full profile.
+  // The primary image must contain at least core-oj and core-libart to initialize the runtime.
   ASSERT_NE(std::string::npos, libcore_dex_files[0].find("core-oj"));
   ASSERT_NE(std::string::npos, libcore_dex_files[1].find("core-libart"));
-  ASSERT_NE(std::string::npos, libcore_dex_files[2].find("core-icu4j"));
   ArrayRef<const std::string> dex_files =
-      ArrayRef<const std::string>(libcore_dex_files).SubArray(/*pos=*/ 0u, /*length=*/ 3u);
+      ArrayRef<const std::string>(libcore_dex_files).SubArray(/*pos=*/ 0u, /*length=*/ 2u);
 
   ImageSizes base_sizes = CompileImageAndGetSizes(dex_files, {});
   ImageSizes everything_sizes;
@@ -274,19 +272,17 @@ TEST_F(Dex2oatImageTest, TestExtension) {
 
   ArrayRef<const std::string> full_bcp(libcore_dex_files);
   size_t total_dex_files = full_bcp.size();
-  ASSERT_GE(total_dex_files, 5u);  // 3 for "head", 1 for "tail", at least one for "mid", see below.
+  ASSERT_GE(total_dex_files, 4u);  // 2 for "head", 1 for "tail", at least one for "mid", see below.
 
-  // The primary image must contain at least core-oj and core-libart to initialize the runtime
-  // and we also need the core-icu4j if we want to compile these with full profile.
+  // The primary image must contain at least core-oj and core-libart to initialize the runtime.
   ASSERT_NE(std::string::npos, full_bcp[0].find("core-oj"));
   ASSERT_NE(std::string::npos, full_bcp[1].find("core-libart"));
-  ASSERT_NE(std::string::npos, full_bcp[2].find("core-icu4j"));
-  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 3u);
+  ArrayRef<const std::string> head_dex_files = full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ 2u);
   // Middle part is everything else except for conscrypt.
   ASSERT_NE(std::string::npos, full_bcp[full_bcp.size() - 1u].find("conscrypt"));
   ArrayRef<const std::string> mid_bcp =
       full_bcp.SubArray(/*pos=*/ 0u, /*length=*/ total_dex_files - 1u);
-  ArrayRef<const std::string> mid_dex_files = mid_bcp.SubArray(/*pos=*/ 3u);
+  ArrayRef<const std::string> mid_dex_files = mid_bcp.SubArray(/*pos=*/ 2u);
   // Tail is just the conscrypt.
   ArrayRef<const std::string> tail_dex_files =
       full_bcp.SubArray(/*pos=*/ total_dex_files - 1u, /*length=*/ 1u);
