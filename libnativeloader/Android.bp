@@ -71,6 +71,11 @@ cc_library {
 
 cc_library_headers {
     name: "libnativeloader-headers",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.art.debug",
+        "com.android.art.release",
+    ],
     visibility: [
         "//art:__subpackages__",
         // TODO(b/133140750): Clean this up.
