@@ -68,6 +68,8 @@ static constexpr const char* kClassesDex = "classes.dex";
 static constexpr const char* kApexDefaultPath = "/apex/";
 static constexpr const char* kAndroidRootEnvVar = "ANDROID_ROOT";
 static constexpr const char* kAndroidRootDefaultPath = "/system";
+static constexpr const char* kAndroidSystemExtRootEnvVar = "ANDROID_SYSTEM_EXT";
+static constexpr const char* kAndroidSystemExtRootDefaultPath = "/system_ext";
 static constexpr const char* kAndroidDataEnvVar = "ANDROID_DATA";
 static constexpr const char* kAndroidDataDefaultPath = "/data";
 static constexpr const char* kAndroidArtRootEnvVar = "ANDROID_ART_ROOT";
@@ -445,6 +447,13 @@ bool LocationIsOnSystemFramework(const char* full_path) {
   return IsLocationOnModule(full_path,
                             kAndroidRootEnvVar,
                             kAndroidRootDefaultPath,
+                            /* subdir= */ "framework/");
+}
+
+bool LocationIsOnSystemExtFramework(const char* full_path) {
+  return IsLocationOnModule(full_path,
+                            kAndroidSystemExtRootEnvVar,
+                            kAndroidSystemExtRootDefaultPath,
                             /* subdir= */ "framework/");
 }
 

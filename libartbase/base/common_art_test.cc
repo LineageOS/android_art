@@ -256,9 +256,21 @@ void CommonArtTestImpl::SetUpAndroidDataDir(std::string& android_data) {
 void CommonArtTestImpl::SetUp() {
   SetUpAndroidRootEnvVars();
   SetUpAndroidDataDir(android_data_);
+
+  // Re-use the data temporary directory for /system_ext tests
+  android_system_ext_.append(android_data_.c_str());
+  android_system_ext_.append("/system_ext");
+  int mkdir_result = mkdir(android_system_ext_.c_str(), 0700);
+  ASSERT_EQ(mkdir_result, 0);
+  setenv("ANDROID_SYSTEM_EXT", android_system_ext_.c_str(), 1);
+
+  std::string system_ext_framework = android_system_ext_ + "/framework";
+  mkdir_result = mkdir(system_ext_framework.c_str(), 0700);
+  ASSERT_EQ(mkdir_result, 0);
+
   dalvik_cache_.append(android_data_.c_str());
   dalvik_cache_.append("/dalvik-cache");
-  int mkdir_result = mkdir(dalvik_cache_.c_str(), 0700);
+  mkdir_result = mkdir(dalvik_cache_.c_str(), 0700);
   ASSERT_EQ(mkdir_result, 0);
 
   static bool gSlowDebugTestFlag = false;
@@ -394,8 +406,12 @@ void CommonArtTestImpl::TearDown() {
   ClearDirectory(dalvik_cache_.c_str());
   int rmdir_cache_result = rmdir(dalvik_cache_.c_str());
   ASSERT_EQ(0, rmdir_cache_result);
+  ClearDirectory(android_system_ext_.c_str(), true);
+  rmdir_cache_result = rmdir(android_system_ext_.c_str());
+  ASSERT_EQ(0, rmdir_cache_result);
   TearDownAndroidDataDir(android_data_, true);
   dalvik_cache_.clear();
+  android_system_ext_.clear();
 }
 
 static std::string GetDexFileName(const std::string& jar_prefix, bool host) {
