@@ -831,7 +831,7 @@ void ThrowStackOverflowError(Thread* self) {
     ScopedLocalRef<jobject> stack_state_val(env, nullptr);
     {
       ScopedObjectAccessUnchecked soa(env);  // TODO: Is this necessary?
-      stack_state_val.reset(soa.Self()->CreateInternalStackTrace<false>(soa));
+      stack_state_val.reset(soa.Self()->CreateInternalStackTrace(soa));
     }
     if (stack_state_val != nullptr) {
       env->SetObjectField(exc.get(),

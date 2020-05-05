@@ -1837,11 +1837,7 @@ void UnstartedRuntime::UnstartedJNIThrowableNativeFillInStackTrace(
     Thread* self, ArtMethod* method ATTRIBUTE_UNUSED, mirror::Object* receiver ATTRIBUTE_UNUSED,
     uint32_t* args ATTRIBUTE_UNUSED, JValue* result) {
   ScopedObjectAccessUnchecked soa(self);
-  if (Runtime::Current()->IsActiveTransaction()) {
-    result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace<true>(soa)));
-  } else {
-    result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace<false>(soa)));
-  }
+  result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace(soa)));
 }
 
 void UnstartedRuntime::UnstartedJNIByteOrderIsLittleEndian(
