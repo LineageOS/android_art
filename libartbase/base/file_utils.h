@@ -104,6 +104,9 @@ bool LocationIsOnArtModule(const char* location);
 // Return whether the location is on /apex/com.android.conscrypt
 bool LocationIsOnConscryptModule(const char* location);
 
+// Return whether the location is on /apex/com.android.i18n
+bool LocationIsOnI18nModule(const char* location);
+
 // Return whether the location is on system (i.e. android root).
 bool LocationIsOnSystem(const char* location);
 
