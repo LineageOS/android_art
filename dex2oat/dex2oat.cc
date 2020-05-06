@@ -2296,23 +2296,8 @@ class Dex2Oat final {
       verifier::VerifierDeps* verifier_deps = callbacks_->GetVerifierDeps();
       for (size_t i = 0, size = oat_files_.size(); i != size; ++i) {
         File* vdex_file = vdex_files_[i].get();
-        std::unique_ptr<BufferedOutputStream> vdex_out =
-            std::make_unique<BufferedOutputStream>(
-                std::make_unique<FileOutputStream>(vdex_file));
-
-        if (!oat_writers_[i]->WriteVerifierDeps(vdex_out.get(), verifier_deps)) {
-          LOG(ERROR) << "Failed to write verifier dependencies into VDEX " << vdex_file->GetPath();
-          return false;
-        }
-
-        if (!oat_writers_[i]->WriteQuickeningInfo(vdex_out.get())) {
-          LOG(ERROR) << "Failed to write quickening info into VDEX " << vdex_file->GetPath();
-          return false;
-        }
-
-        // VDEX finalized, seek back to the beginning and write checksums and the header.
-        if (!oat_writers_[i]->WriteChecksumsAndVdexHeader(vdex_out.get())) {
-          LOG(ERROR) << "Failed to write vdex header into VDEX " << vdex_file->GetPath();
+        if (!oat_writers_[i]->FinishVdexFile(vdex_file, verifier_deps)) {
+          LOG(ERROR) << "Failed to finish VDEX file " << vdex_file->GetPath();
           return false;
         }
       }
