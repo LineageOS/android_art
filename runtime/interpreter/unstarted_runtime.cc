@@ -360,26 +360,10 @@ void UnstartedRuntime::UnstartedClassGetDeclaredField(
                            klass->PrettyDescriptor().c_str());
     return;
   }
-  Runtime* runtime = Runtime::Current();
-  PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
-  ObjPtr<mirror::Field> field;
-  if (runtime->IsActiveTransaction()) {
-    if (pointer_size == PointerSize::k64) {
-      field = mirror::Field::CreateFromArtField<PointerSize::k64, true>(
-          self, found, true);
-    } else {
-      field = mirror::Field::CreateFromArtField<PointerSize::k32, true>(
-          self, found, true);
-    }
-  } else {
-    if (pointer_size == PointerSize::k64) {
-      field = mirror::Field::CreateFromArtField<PointerSize::k64, false>(
-          self, found, true);
-    } else {
-      field = mirror::Field::CreateFromArtField<PointerSize::k32, false>(
-          self, found, true);
-    }
-  }
+  PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+  ObjPtr<mirror::Field> field = (pointer_size == PointerSize::k64)
+      ? mirror::Field::CreateFromArtField<PointerSize::k64>(self, found, true)
+      : mirror::Field::CreateFromArtField<PointerSize::k32>(self, found, true);
   result->SetL(field);
 }
 
@@ -395,28 +379,13 @@ void UnstartedRuntime::UnstartedClassGetDeclaredMethod(
   ObjPtr<mirror::String> name = shadow_frame->GetVRegReference(arg_offset + 1)->AsString();
   ObjPtr<mirror::ObjectArray<mirror::Class>> args =
       shadow_frame->GetVRegReference(arg_offset + 2)->AsObjectArray<mirror::Class>();
-  Runtime* runtime = Runtime::Current();
-  bool transaction = runtime->IsActiveTransaction();
-  PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
+  PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
   auto fn_hiddenapi_access_context = GetHiddenapiAccessContextFunction(shadow_frame);
-  ObjPtr<mirror::Method> method;
-  if (transaction) {
-    if (pointer_size == PointerSize::k64) {
-      method = mirror::Class::GetDeclaredMethodInternal<PointerSize::k64, true>(
-          self, klass, name, args, fn_hiddenapi_access_context);
-    } else {
-      method = mirror::Class::GetDeclaredMethodInternal<PointerSize::k32, true>(
-          self, klass, name, args, fn_hiddenapi_access_context);
-    }
-  } else {
-    if (pointer_size == PointerSize::k64) {
-      method = mirror::Class::GetDeclaredMethodInternal<PointerSize::k64, false>(
-          self, klass, name, args, fn_hiddenapi_access_context);
-    } else {
-      method = mirror::Class::GetDeclaredMethodInternal<PointerSize::k32, false>(
-          self, klass, name, args, fn_hiddenapi_access_context);
-    }
-  }
+  ObjPtr<mirror::Method> method = (pointer_size == PointerSize::k64)
+      ? mirror::Class::GetDeclaredMethodInternal<PointerSize::k64>(
+            self, klass, name, args, fn_hiddenapi_access_context)
+      : mirror::Class::GetDeclaredMethodInternal<PointerSize::k32>(
+            self, klass, name, args, fn_hiddenapi_access_context);
   if (method != nullptr && ShouldDenyAccessToMember(method->GetArtMethod(), shadow_frame)) {
     method = nullptr;
   }
@@ -433,27 +402,10 @@ void UnstartedRuntime::UnstartedClassGetDeclaredConstructor(
   }
   ObjPtr<mirror::ObjectArray<mirror::Class>> args =
       shadow_frame->GetVRegReference(arg_offset + 1)->AsObjectArray<mirror::Class>();
-  Runtime* runtime = Runtime::Current();
-  bool transaction = runtime->IsActiveTransaction();
-  PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
-  ObjPtr<mirror::Constructor> constructor;
-  if (transaction) {
-    if (pointer_size == PointerSize::k64) {
-      constructor = mirror::Class::GetDeclaredConstructorInternal<PointerSize::k64,
-                                                                  true>(self, klass, args);
-    } else {
-      constructor = mirror::Class::GetDeclaredConstructorInternal<PointerSize::k32,
-                                                                  true>(self, klass, args);
-    }
-  } else {
-    if (pointer_size == PointerSize::k64) {
-      constructor = mirror::Class::GetDeclaredConstructorInternal<PointerSize::k64,
-                                                                  false>(self, klass, args);
-    } else {
-      constructor = mirror::Class::GetDeclaredConstructorInternal<PointerSize::k32,
-                                                                  false>(self, klass, args);
-    }
-  }
+  PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+  ObjPtr<mirror::Constructor> constructor = (pointer_size == PointerSize::k64)
+      ? mirror::Class::GetDeclaredConstructorInternal<PointerSize::k64>(self, klass, args)
+      : mirror::Class::GetDeclaredConstructorInternal<PointerSize::k32>(self, klass, args);
   if (constructor != nullptr &&
       ShouldDenyAccessToMember(constructor->GetArtMethod(), shadow_frame)) {
     constructor = nullptr;
@@ -1885,11 +1837,7 @@ void UnstartedRuntime::UnstartedJNIThrowableNativeFillInStackTrace(
     Thread* self, ArtMethod* method ATTRIBUTE_UNUSED, mirror::Object* receiver ATTRIBUTE_UNUSED,
     uint32_t* args ATTRIBUTE_UNUSED, JValue* result) {
   ScopedObjectAccessUnchecked soa(self);
-  if (Runtime::Current()->IsActiveTransaction()) {
-    result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace<true>(soa)));
-  } else {
-    result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace<false>(soa)));
-  }
+  result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace(soa)));
 }
 
 void UnstartedRuntime::UnstartedJNIByteOrderIsLittleEndian(

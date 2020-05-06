@@ -32,11 +32,6 @@ namespace mirror {
 // C++ mirror of java.lang.reflect.Executable.
 class MANAGED Executable : public AccessibleObject {
  public:
-  // Called from Constructor::CreateFromArtMethod, Method::CreateFromArtMethod.
-  template <PointerSize kPointerSize, bool kTransactionActive>
-  bool CreateFromArtMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Roles::uninterruptible_);
-
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   ArtMethod* GetArtMethod() REQUIRES_SHARED(Locks::mutator_lock_) {
     return reinterpret_cast64<ArtMethod*>(GetField64<kVerifyFlags>(ArtMethodOffset()));
@@ -55,6 +50,13 @@ class MANAGED Executable : public AccessibleObject {
   static MemberOffset ArtMethodOffset() {
     return MemberOffset(OFFSETOF_MEMBER(Executable, art_method_));
   }
+
+ protected:
+  // Called from Constructor::CreateFromArtMethod, Method::CreateFromArtMethod.
+  template <PointerSize kPointerSize>
+  void InitializeFromArtMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!Roles::uninterruptible_);
+
 
  private:
   uint16_t has_real_parameter_data_;

@@ -2711,7 +2711,6 @@ class FetchStackTraceVisitor : public StackVisitor {
   DISALLOW_COPY_AND_ASSIGN(FetchStackTraceVisitor);
 };
 
-template<bool kTransactionActive>
 class BuildInternalStackTraceVisitor : public StackVisitor {
  public:
   BuildInternalStackTraceVisitor(Thread* self, Thread* thread, int skip_depth)
@@ -2747,7 +2746,7 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
       self_->AssertPendingOOMException();
       return false;
     }
-    trace->Set(0, methods_and_pcs);
+    trace->Set</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(0, methods_and_pcs);
     trace_ = trace.Get();
     // If We are called from native, use non-transactional mode.
     CHECK(last_no_suspend_cause == nullptr) << last_no_suspend_cause;
@@ -2775,15 +2774,15 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
   }
 
   void AddFrame(ArtMethod* method, uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_) {
-    ObjPtr<mirror::PointerArray> trace_methods_and_pcs = GetTraceMethodsAndPCs();
-    trace_methods_and_pcs->SetElementPtrSize<kTransactionActive>(count_, method, pointer_size_);
-    trace_methods_and_pcs->SetElementPtrSize<kTransactionActive>(
-        trace_methods_and_pcs->GetLength() / 2 + count_,
-        dex_pc,
-        pointer_size_);
+    ObjPtr<mirror::PointerArray> methods_and_pcs = GetTraceMethodsAndPCs();
+    methods_and_pcs->SetElementPtrSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+        count_, method, pointer_size_);
+    methods_and_pcs->SetElementPtrSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+        methods_and_pcs->GetLength() / 2 + count_, dex_pc, pointer_size_);
     // Save the declaring class of the method to ensure that the declaring classes of the methods
     // do not get unloaded while the stack trace is live.
-    trace_->Set(count_ + 1, method->GetDeclaringClass());
+    trace_->Set</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+        count_ + 1, method->GetDeclaringClass());
     ++count_;
   }
 
@@ -2802,9 +2801,10 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
   // Current position down stack trace.
   uint32_t count_ = 0;
   // An object array where the first element is a pointer array that contains the ArtMethod
-  // pointers on the stack and dex PCs. The rest of the elements are the declaring
-  // class of the ArtMethod pointers. trace_[i+1] contains the declaring class of the ArtMethod of
-  // the i'th frame.
+  // pointers on the stack and dex PCs. The rest of the elements are the declaring class of
+  // the ArtMethod pointers. trace_[i+1] contains the declaring class of the ArtMethod of the
+  // i'th frame. We're initializing a newly allocated trace, so we do not need to record that
+  // under a transaction. If the transaction is aborted, the whole trace shall be unreachable.
   mirror::ObjectArray<mirror::Object>* trace_ = nullptr;
   // For cross compilation.
   const PointerSize pointer_size_;
@@ -2812,7 +2812,6 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
   DISALLOW_COPY_AND_ASSIGN(BuildInternalStackTraceVisitor);
 };
 
-template<bool kTransactionActive>
 jobject Thread::CreateInternalStackTrace(const ScopedObjectAccessAlreadyRunnable& soa) const {
   // Compute depth of stack, save frames if possible to avoid needing to recompute many.
   constexpr size_t kMaxSavedFrames = 256;
@@ -2825,9 +2824,8 @@ jobject Thread::CreateInternalStackTrace(const ScopedObjectAccessAlreadyRunnable
   const uint32_t skip_depth = count_visitor.GetSkipDepth();
 
   // Build internal stack trace.
-  BuildInternalStackTraceVisitor<kTransactionActive> build_trace_visitor(soa.Self(),
-                                                                         const_cast<Thread*>(this),
-                                                                         skip_depth);
+  BuildInternalStackTraceVisitor build_trace_visitor(
+      soa.Self(), const_cast<Thread*>(this), skip_depth);
   if (!build_trace_visitor.Init(depth)) {
     return nullptr;  // Allocation failed.
   }
@@ -2853,10 +2851,6 @@ jobject Thread::CreateInternalStackTrace(const ScopedObjectAccessAlreadyRunnable
   }
   return soa.AddLocalReference<jobject>(trace);
 }
-template jobject Thread::CreateInternalStackTrace<false>(
-    const ScopedObjectAccessAlreadyRunnable& soa) const;
-template jobject Thread::CreateInternalStackTrace<true>(
-    const ScopedObjectAccessAlreadyRunnable& soa) const;
 
 bool Thread::IsExceptionThrownByCurrentMethod(ObjPtr<mirror::Throwable> exception) const {
   // Only count the depth since we do not pass a stack frame array as an argument.
@@ -3273,10 +3267,7 @@ void Thread::ThrowNewWrappedException(const char* exception_class_descriptor,
     if (cause.get() != nullptr) {
       exception->SetCause(DecodeJObject(cause.get())->AsThrowable());
     }
-    ScopedLocalRef<jobject> trace(GetJniEnv(),
-                                  Runtime::Current()->IsActiveTransaction()
-                                      ? CreateInternalStackTrace<true>(soa)
-                                      : CreateInternalStackTrace<false>(soa));
+    ScopedLocalRef<jobject> trace(GetJniEnv(), CreateInternalStackTrace(soa));
     if (trace.get() != nullptr) {
       exception->SetStackState(DecodeJObject(trace.get()).Ptr());
     }

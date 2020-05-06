@@ -285,6 +285,7 @@ class CommonArtTestImpl {
 
 
   std::string android_data_;
+  std::string android_system_ext_;
   std::string dalvik_cache_;
 
   virtual void SetUp();

@@ -213,7 +213,7 @@ TEST_F(ExceptionTest, StackTraceElement) {
   // Set up thread to appear as if we called out of method_g_ at given pc dex.
   thread->SetTopOfStack(reinterpret_cast<ArtMethod**>(&fake_stack[0]));
 
-  jobject internal = thread->CreateInternalStackTrace<false>(soa);
+  jobject internal = thread->CreateInternalStackTrace(soa);
   ASSERT_TRUE(internal != nullptr);
   jobjectArray ste_array = Thread::InternalStackTraceToStackTraceElementArray(soa, internal);
   ASSERT_TRUE(ste_array != nullptr);
