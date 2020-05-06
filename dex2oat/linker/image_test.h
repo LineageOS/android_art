@@ -294,12 +294,7 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
         ASSERT_TRUE(start_rodata_ok);
         oat_writer->Initialize(driver, writer.get(), cur_dex_files);
 
-        std::unique_ptr<BufferedOutputStream> vdex_out =
-            std::make_unique<BufferedOutputStream>(
-                std::make_unique<FileOutputStream>(out_helper.vdex_files[i].GetFile()));
-        oat_writer->WriteVerifierDeps(vdex_out.get(), nullptr);
-        oat_writer->WriteQuickeningInfo(vdex_out.get());
-        oat_writer->WriteChecksumsAndVdexHeader(vdex_out.get());
+        oat_writer->FinishVdexFile(out_helper.vdex_files[i].GetFile(), /*verifier_deps=*/ nullptr);
 
         oat_writer->PrepareLayout(&patcher);
         elf_writer->PrepareDynamicSection(oat_writer->GetOatHeader().GetExecutableOffset(),

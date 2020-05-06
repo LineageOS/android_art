@@ -41,12 +41,17 @@ class MemMap;
 
 class ZipEntry {
  public:
-  bool ExtractToFile(File& file, std::string* error_msg);
+  // Extracts this entry to file.
+  // Returns true on success, false on failure.
+  bool ExtractToFile(File& file, /*out*/std::string* error_msg);
   // Extract this entry to anonymous memory (R/W).
   // Returns null on failure and sets error_msg.
   MemMap ExtractToMemMap(const char* zip_filename,
                          const char* entry_filename,
-                         std::string* error_msg);
+                         /*out*/std::string* error_msg);
+  // Extracts this entry to memory. Stores `GetUncompressedSize()` bytes on success.
+  // Returns true on success, false on failure.
+  bool ExtractToMemory(/*out*/uint8_t* buffer, /*out*/std::string* error_msg);
   // Create a file-backed private (clean, R/W) memory mapping to this entry.
   // 'zip_filename' is used for diagnostics only,
   //   the original file that the ZipArchive was open with is used
