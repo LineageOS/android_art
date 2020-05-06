@@ -212,15 +212,7 @@ class OatTest : public CommonCompilerDriverTest {
                                       oat_writer.GetBssRootsOffset(),
                                       oat_writer.GetVdexSize());
 
-    std::unique_ptr<BufferedOutputStream> vdex_out =
-        std::make_unique<BufferedOutputStream>(std::make_unique<FileOutputStream>(vdex_file));
-    if (!oat_writer.WriteVerifierDeps(vdex_out.get(), nullptr)) {
-      return false;
-    }
-    if (!oat_writer.WriteQuickeningInfo(vdex_out.get())) {
-      return false;
-    }
-    if (!oat_writer.WriteChecksumsAndVdexHeader(vdex_out.get())) {
+    if (!oat_writer.FinishVdexFile(vdex_file, /*verifier_deps=*/ nullptr)) {
       return false;
     }
 

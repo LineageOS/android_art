@@ -132,9 +132,7 @@ class OatWriter {
   // Then the user must call in order
   //   - WriteAndOpenDexFiles()
   //   - StartRoData()
-  //   - WriteVerifierDeps()
-  //   - WriteQuickeningInfo()
-  //   - WriteChecksumsAndVdexHeader()
+  //   - FinishVdexFile()
   //   - PrepareLayout(),
   //   - WriteRodata(),
   //   - WriteCode(),
@@ -185,9 +183,7 @@ class OatWriter {
   void Initialize(const CompilerDriver* compiler_driver,
                   ImageWriter* image_writer,
                   const std::vector<const DexFile*>& dex_files);
-  bool WriteQuickeningInfo(OutputStream* vdex_out);
-  bool WriteVerifierDeps(OutputStream* vdex_out, verifier::VerifierDeps* verifier_deps);
-  bool WriteChecksumsAndVdexHeader(OutputStream* vdex_out);
+  bool FinishVdexFile(File* vdex_file, verifier::VerifierDeps* verifier_deps);
 
   // Prepare layout of remaining data.
   void PrepareLayout(MultiOatRelativePatcher* relative_patcher);
@@ -291,32 +287,30 @@ class OatWriter {
 
   // If `update_input_vdex` is true, then this method won't actually write the dex files,
   // and the compiler will just re-use the existing vdex file.
-  bool WriteDexFiles(OutputStream* out,
-                     File* file,
+  bool WriteDexFiles(File* file,
                      bool update_input_vdex,
-                     CopyOption copy_dex_files);
-  bool WriteDexFile(OutputStream* out,
-                    File* file,
+                     CopyOption copy_dex_files,
+                     /*out*/ std::vector<MemMap>* opened_dex_files_map);
+  bool WriteDexFile(File* file,
                     OatDexFile* oat_dex_file,
                     bool update_input_vdex);
-  bool SeekToDexFile(OutputStream* out, File* file, OatDexFile* oat_dex_file);
-  bool LayoutAndWriteDexFile(OutputStream* out, OatDexFile* oat_dex_file);
-  bool WriteDexFile(OutputStream* out,
-                    File* file,
+  bool LayoutDexFile(OatDexFile* oat_dex_file);
+  bool WriteDexFile(File* file,
                     OatDexFile* oat_dex_file,
                     ZipEntry* dex_file);
-  bool WriteDexFile(OutputStream* out,
-                    File* file,
+  bool WriteDexFile(File* file,
                     OatDexFile* oat_dex_file,
                     File* dex_file);
-  bool WriteDexFile(OutputStream* out,
-                    OatDexFile* oat_dex_file,
+  bool WriteDexFile(OatDexFile* oat_dex_file,
                     const uint8_t* dex_file,
                     bool update_input_vdex);
   bool OpenDexFiles(File* file,
                     bool verify,
-                    /*out*/ std::vector<MemMap>* opened_dex_files_map,
+                    /*inout*/ std::vector<MemMap>* opened_dex_files_map,
                     /*out*/ std::vector<std::unique_ptr<const DexFile>>* opened_dex_files);
+  void WriteQuickeningInfo(/*out*/std::vector<uint8_t>* buffer);
+  void WriteVerifierDeps(verifier::VerifierDeps* verifier_deps,
+                         /*out*/std::vector<uint8_t>* buffer);
 
   size_t InitOatHeader(uint32_t num_dex_files, SafeMap<std::string, std::string>* key_value_store);
   size_t InitClassOffsets(size_t offset);
@@ -386,6 +380,8 @@ class OatWriter {
   ImageWriter* image_writer_;
   // Whether the dex files being compiled are going to be extracted to the vdex.
   bool extract_dex_files_into_vdex_;
+  // The start of the vdex file section mmapped for writing dex files.
+  uint8_t* vdex_begin_;
 
   // note OatFile does not take ownership of the DexFiles
   const std::vector<const DexFile*>* dex_files_;
@@ -485,6 +481,7 @@ class OatWriter {
   uint32_t size_vdex_header_;
   uint32_t size_vdex_checksums_;
   uint32_t size_dex_file_alignment_;
+  uint32_t size_quickening_table_offset_;
   uint32_t size_executable_offset_alignment_;
   uint32_t size_oat_header_;
   uint32_t size_oat_header_key_value_store_;
