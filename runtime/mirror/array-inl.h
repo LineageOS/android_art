@@ -22,6 +22,7 @@
 #include <android-base/logging.h>
 
 #include "base/bit_utils.h"
+#include "base/casts.h"
 #include "class.h"
 #include "obj_ptr-inl.h"
 #include "runtime.h"
@@ -251,23 +252,22 @@ inline T PointerArray::GetElementPtrSize(uint32_t idx, PointerSize ptr_size) {
   return GetElementPtrSize<T, PointerSize::k32, kVerifyFlags>(idx);
 }
 
-template<bool kTransactionActive, bool kUnchecked>
+template<bool kTransactionActive, bool kCheckTransaction, bool kUnchecked>
 inline void PointerArray::SetElementPtrSize(uint32_t idx, uint64_t element, PointerSize ptr_size) {
   if (ptr_size == PointerSize::k64) {
     (kUnchecked ? ObjPtr<LongArray>::DownCast(ObjPtr<Object>(this)) : AsLongArray())->
-        SetWithoutChecks<kTransactionActive>(idx, element);
+        SetWithoutChecks<kTransactionActive, kCheckTransaction>(idx, element);
   } else {
-    DCHECK_LE(element, static_cast<uint64_t>(0xFFFFFFFFu));
+    uint32_t element32 = dchecked_integral_cast<uint32_t>(element);
     (kUnchecked ? ObjPtr<IntArray>::DownCast(ObjPtr<Object>(this)) : AsIntArray())
-        ->SetWithoutChecks<kTransactionActive>(idx, static_cast<uint32_t>(element));
+        ->SetWithoutChecks<kTransactionActive, kCheckTransaction>(idx, element32);
   }
 }
 
-template<bool kTransactionActive, bool kUnchecked, typename T>
+template<bool kTransactionActive, bool kCheckTransaction, bool kUnchecked, typename T>
 inline void PointerArray::SetElementPtrSize(uint32_t idx, T* element, PointerSize ptr_size) {
-  SetElementPtrSize<kTransactionActive, kUnchecked>(idx,
-                                                    reinterpret_cast<uintptr_t>(element),
-                                                    ptr_size);
+  SetElementPtrSize<kTransactionActive, kCheckTransaction, kUnchecked>(
+      idx, reinterpret_cast<uintptr_t>(element), ptr_size);
 }
 
 template <VerifyObjectFlags kVerifyFlags, typename Visitor>
@@ -278,7 +278,9 @@ inline void PointerArray::Fixup(ObjPtr<mirror::PointerArray> dest,
     void* ptr = GetElementPtrSize<void*, kVerifyFlags>(i, pointer_size);
     void* new_ptr = visitor(ptr);
     if (ptr != new_ptr) {
-      dest->SetElementPtrSize<false, true>(i, new_ptr, pointer_size);
+      dest->SetElementPtrSize</*kActiveTransaction=*/ false,
+                              /*kCheckTransaction=*/ true,
+                              /*kUnchecked=*/ true>(i, new_ptr, pointer_size);
     }
   }
 }
