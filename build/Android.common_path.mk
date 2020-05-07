@@ -74,7 +74,7 @@ HOST_CORE_IMG_LOCATION := $(HOST_OUT_JAVA_LIBRARIES)/core.art
 TARGET_CORE_IMG_LOCATION := $(ART_TARGET_TEST_OUT)/core.art
 
 # Modules to compile for core.art.
-CORE_IMG_JARS := core-oj core-libart core-icu4j okhttp bouncycastle apache-xml
+CORE_IMG_JARS := core-oj core-libart okhttp bouncycastle apache-xml
 HOST_CORE_IMG_JARS   := $(addsuffix -hostdex,$(CORE_IMG_JARS))
 TARGET_CORE_IMG_JARS := $(CORE_IMG_JARS)
 HOST_CORE_IMG_DEX_LOCATIONS   := $(foreach jar,$(HOST_CORE_IMG_JARS),  $(HOST_OUT_JAVA_LIBRARIES)/$(jar).jar)
@@ -93,19 +93,23 @@ $(HOST_BOOT_IMAGE_JARS): $(HOST_OUT)/apex/com.android.art/javalib/%.jar : $(HOST
 HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar
 $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar : $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar
 	$(copy-file-to-target)
+HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.i18n/javalib/core-icu4j.jar
+$(HOST_OUT)/apex/com.android.i18n/javalib/core-icu4j.jar : $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar
+	$(copy-file-to-target)
 
 HOST_CORE_IMG_OUTS += $(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
 
-HOST_TEST_CORE_JARS   := $(addsuffix -hostdex,$(CORE_IMG_JARS) conscrypt)
+HOST_TEST_CORE_JARS   := $(addsuffix -hostdex,$(CORE_IMG_JARS) core-icu4j conscrypt)
 ART_HOST_DEX_DEPENDENCIES := $(foreach jar,$(HOST_TEST_CORE_JARS),$(HOST_OUT_JAVA_LIBRARIES)/$(jar).jar)
-ART_TARGET_DEX_DEPENDENCIES := com.android.art.testing com.android.conscrypt
+ART_TARGET_DEX_DEPENDENCIES := com.android.art.testing com.android.conscrypt com.android.i18n
 
-ART_CORE_SHARED_LIBRARIES := libicu_jni libjavacore libopenjdk libopenjdkjvm libopenjdkjvmti
+ART_CORE_SHARED_LIBRARIES := libjavacore libopenjdk libopenjdkjvm libopenjdkjvmti
 ART_CORE_SHARED_DEBUG_LIBRARIES := libopenjdkd libopenjdkjvmd libopenjdkjvmtid
-ART_HOST_SHARED_LIBRARY_DEPENDENCIES := $(foreach lib,$(ART_CORE_SHARED_LIBRARIES), $(ART_HOST_OUT_SHARED_LIBRARIES)/$(lib)$(ART_HOST_SHLIB_EXTENSION))
+ART_HOST_CORE_SHARED_LIBRARIES := $(ART_CORE_SHARED_LIBRARIES) libandroidicu-host libicuuc-host libicui18n-host libicu_jni
+ART_HOST_SHARED_LIBRARY_DEPENDENCIES := $(foreach lib,$(ART_HOST_CORE_SHARED_LIBRARIES), $(ART_HOST_OUT_SHARED_LIBRARIES)/$(lib)$(ART_HOST_SHLIB_EXTENSION))
 ART_HOST_SHARED_LIBRARY_DEBUG_DEPENDENCIES := $(foreach lib,$(ART_CORE_SHARED_DEBUG_LIBRARIES), $(ART_HOST_OUT_SHARED_LIBRARIES)/$(lib)$(ART_HOST_SHLIB_EXTENSION))
 ifdef HOST_2ND_ARCH
-ART_HOST_SHARED_LIBRARY_DEPENDENCIES += $(foreach lib,$(ART_CORE_SHARED_LIBRARIES), $(2ND_HOST_OUT_SHARED_LIBRARIES)/$(lib).so)
+ART_HOST_SHARED_LIBRARY_DEPENDENCIES += $(foreach lib,$(ART_HOST_CORE_SHARED_LIBRARIES), $(2ND_HOST_OUT_SHARED_LIBRARIES)/$(lib).so)
 ART_HOST_SHARED_LIBRARY_DEBUG_DEPENDENCIES += $(foreach lib,$(ART_CORE_SHARED_DEBUG_LIBRARIES), $(2ND_HOST_OUT_SHARED_LIBRARIES)/$(lib).so)
 endif
 
@@ -156,5 +160,7 @@ TESTING_ART_APEX := com.android.art.testing
 
 # Conscrypt APEX
 CONSCRYPT_APEX := com.android.conscrypt
+# i18n APEX
+I18N_APEX := com.android.i18n
 
 endif # ART_ANDROID_COMMON_PATH_MK

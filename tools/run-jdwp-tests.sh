@@ -42,6 +42,8 @@ function boot_classpath_arg {
   do
     if [ "$var" = "conscrypt" ] && [ "$mode" = "target" ]; then
       printf -- "${separator}/apex/com.android.conscrypt/javalib/conscrypt.jar";
+    elif [ "$var" = "core-icu4j" ] && [ "$mode" = "target" ]; then
+      printf -- "${separator}/apex/com.android.i18n/javalib/core-icu4j.jar";
     else
       printf -- "${separator}${dir}/${var}${suffix}.jar";
     fi
@@ -52,7 +54,7 @@ function boot_classpath_arg {
 # Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
 # because that's what we use for compiling the core.art image.
 # It may contain additional modules from TEST_CORE_JARS.
-BOOT_CLASSPATH_JARS="core-oj core-libart core-icu4j okhttp bouncycastle apache-xml conscrypt"
+BOOT_CLASSPATH_JARS="core-oj core-libart okhttp bouncycastle apache-xml core-icu4j conscrypt"
 
 vm_args=""
 art="$android_root/bin/art"
