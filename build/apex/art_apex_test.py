@@ -542,7 +542,6 @@ class ReleaseChecker:
     # Check java libraries for Managed Core Library.
     self._checker.check_java_library('apache-xml')
     self._checker.check_java_library('bouncycastle')
-    self._checker.check_java_library('core-icu4j')
     self._checker.check_java_library('core-libart')
     self._checker.check_java_library('core-oj')
     self._checker.check_java_library('okhttp')
@@ -586,7 +585,6 @@ class ReleaseChecker:
     self._checker.check_dexpreopt('boot')
     self._checker.check_dexpreopt('boot-apache-xml')
     self._checker.check_dexpreopt('boot-bouncycastle')
-    self._checker.check_dexpreopt('boot-core-icu4j')
     self._checker.check_dexpreopt('boot-core-libart')
     self._checker.check_dexpreopt('boot-okhttp')
     if isEnvTrue('EMMA_INSTRUMENT_FRAMEWORK'):
@@ -615,16 +613,11 @@ class ReleaseTargetChecker:
     self._checker.check_native_library('libperfetto_hprof')
 
     # Check exported native libraries for Managed Core Library.
-    self._checker.check_native_library('libandroidicu')
     self._checker.check_native_library('libandroidio')
 
     # Check internal native library dependencies.
     self._checker.check_native_library('libcrypto')
     self._checker.check_native_library('libexpat')
-    self._checker.check_native_library('libicui18n')
-    self._checker.check_native_library('libicuuc')
-    self._checker.check_native_library('libicu_jni')
-    self._checker.check_native_library('libpac')
     self._checker.check_native_library('libz')
 
     # TODO(b/139046641): Fix proper 2nd arch checks. For now, just ignore these
@@ -653,9 +646,6 @@ class ReleaseHostChecker:
 
     # Check internal libraries for Managed Core Library.
     self._checker.check_native_library('libexpat-host')
-    self._checker.check_native_library('libicui18n-host')
-    self._checker.check_native_library('libicuuc-host')
-    self._checker.check_native_library('libicu_jni')
     self._checker.check_native_library('libz-host')
 
 

@@ -29,6 +29,7 @@ namespace art {
 
 static constexpr const char* kAndroidArtApexDefaultPath = "/apex/com.android.art";
 static constexpr const char* kAndroidConscryptApexDefaultPath = "/apex/com.android.conscrypt";
+static constexpr const char* kAndroidI18nApexDefaultPath = "/apex/com.android.i18n";
 
 // These methods return the Android Root, which is the historical location of
 // the Android "system" directory, containing the built Android artifacts. On
@@ -102,6 +103,9 @@ bool LocationIsOnArtModule(const char* location);
 
 // Return whether the location is on /apex/com.android.conscrypt
 bool LocationIsOnConscryptModule(const char* location);
+
+// Return whether the location is on /apex/com.android.i18n
+bool LocationIsOnI18nModule(const char* location);
 
 // Return whether the location is on system (i.e. android root).
 bool LocationIsOnSystem(const char* location);
