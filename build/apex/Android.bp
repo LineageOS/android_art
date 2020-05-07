@@ -141,7 +141,6 @@ art_tools_host_only_binaries = [
 libcore_java_libs = [
     "core-oj",
     "core-libart",
-    "core-icu4j",
     "okhttp",
     "bouncycastle",
     "apache-xml",
@@ -160,25 +159,15 @@ libcore_java_libs = [
 // the ART APEX.
 libcore_native_shared_libs = [
     // External API (having APEX stubs).
-    "libandroidicu",
     "libandroidio",
     // TODO(b/124476339): Clean up the following libraries once "required"
     // dependencies work with APEX libraries.
     "libexpat",
-    "libicui18n",
-    "libicuuc",
-    "libicu_jni",
     "libjavacore",
     "libopenjdk",
 ]
 libcore_debug_native_shared_libs = [
     "libopenjdkd",
-]
-
-libcore_native_device_only_shared_libs = [
-    // TODO(b/122876336): Remove libpac.so once it's migrated to Webview.
-    // libpac is used by frameworks, not by ART host.
-    "libpac",
 ]
 
 // Temporary library includes for b/123591866 as all libraries are moved into the main art-apex.
@@ -208,7 +197,6 @@ apex_defaults {
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
-        libcore_native_device_only_shared_libs +
         libcore_native_shared_libs,
     multilib: {
         both: {
