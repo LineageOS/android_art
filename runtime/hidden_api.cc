@@ -94,7 +94,8 @@ static Domain DetermineDomainFromLocation(const std::string& dex_location,
   // is set to "/system".
   if (ArtModuleRootDistinctFromAndroidRoot()) {
     if (LocationIsOnArtModule(dex_location.c_str()) ||
-        LocationIsOnConscryptModule(dex_location.c_str())) {
+        LocationIsOnConscryptModule(dex_location.c_str()) ||
+        LocationIsOnI18nModule(dex_location.c_str())) {
       return Domain::kCorePlatform;
     }
 
