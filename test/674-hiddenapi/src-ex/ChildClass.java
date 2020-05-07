@@ -103,7 +103,6 @@ public class ChildClass {
     ChildClass.everythingWhitelisted = everythingWhitelisted;
 
     boolean isSameBoot = (isParentInBoot == isChildInBoot);
-    boolean isDebuggable = VMRuntime.getRuntime().isJavaDebuggable();
 
     // For compat reasons, meta-reflection should still be usable by apps if hidden api check
     // hardening is disabled (i.e. target SDK is Q or earlier). The only configuration where this
