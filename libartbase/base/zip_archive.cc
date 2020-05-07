@@ -60,7 +60,7 @@ ZipEntry::~ZipEntry() {
 
 bool ZipEntry::ExtractToFile(File& file, std::string* error_msg) {
   const int32_t error = ExtractEntryToFile(handle_, zip_entry_, file.Fd());
-  if (error) {
+  if (error != 0) {
     *error_msg = std::string(ErrorCodeString(error));
     return false;
   }
@@ -84,13 +84,21 @@ MemMap ZipEntry::ExtractToMemMap(const char* zip_filename,
     return MemMap::Invalid();
   }
 
-  const int32_t error = ExtractToMemory(handle_, zip_entry_, map.Begin(), map.Size());
-  if (error) {
-    *error_msg = std::string(ErrorCodeString(error));
+  DCHECK_EQ(map.Size(), GetUncompressedLength());
+  if (!ExtractToMemory(map.Begin(), error_msg)) {
     return MemMap::Invalid();
   }
 
   return map;
+}
+
+bool ZipEntry::ExtractToMemory(/*out*/uint8_t* buffer, /*out*/std::string* error_msg) {
+  const int32_t error = ::ExtractToMemory(handle_, zip_entry_, buffer, GetUncompressedLength());
+  if (error != 0) {
+    *error_msg = std::string(ErrorCodeString(error));
+    return false;
+  }
+  return true;
 }
 
 MemMap ZipEntry::MapDirectlyFromFile(const char* zip_filename, std::string* error_msg) {
@@ -227,7 +235,7 @@ ZipArchive* ZipArchive::Open(const char* filename, std::string* error_msg) {
 
   ZipArchiveHandle handle;
   const int32_t error = OpenArchive(filename, &handle);
-  if (error) {
+  if (error != 0) {
     *error_msg = std::string(ErrorCodeString(error));
     CloseArchive(handle);
     return nullptr;
@@ -243,7 +251,7 @@ ZipArchive* ZipArchive::OpenFromFd(int fd, const char* filename, std::string* er
 
   ZipArchiveHandle handle;
   const int32_t error = OpenArchiveFd(fd, filename, &handle);
-  if (error) {
+  if (error != 0) {
     *error_msg = std::string(ErrorCodeString(error));
     CloseArchive(handle);
     return nullptr;
@@ -259,7 +267,7 @@ ZipEntry* ZipArchive::Find(const char* name, std::string* error_msg) const {
   // Resist the urge to delete the space. <: is a bigraph sequence.
   std::unique_ptr< ::ZipEntry> zip_entry(new ::ZipEntry);
   const int32_t error = FindEntry(handle_, name, zip_entry.get());
-  if (error) {
+  if (error != 0) {
     *error_msg = std::string(ErrorCodeString(error));
     return nullptr;
   }
