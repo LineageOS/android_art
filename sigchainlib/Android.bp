@@ -18,6 +18,10 @@ cc_library {
     name: "libsigchain",
     defaults: ["art_defaults"],
     visibility: [
+        // Visibility for prebuilt binaries from the prebuilt of this module.
+        // TODO(b/155921753): Restrict this when prebuilts are in their proper
+        // locations.
+        "//prebuilts:__subpackages__",
         // TODO(b/142944043, b/133140750): Clean this up.
         "//frameworks/base/cmds/app_process",
     ],
