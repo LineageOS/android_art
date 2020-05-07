@@ -2931,6 +2931,13 @@ static inline bool NeedToSubDividend(int64_t magic_number, int64_t divisor) {
   return divisor < 0 && magic_number > 0;
 }
 
+// Return true if the result of multiplication of the dividend by a sort of reciprocal
+// of the divisor (magic_number) needs to be corrected. This means additional operations will
+// be generated.
+static inline bool NeedToCorrectMulResult(int64_t magic_number, int64_t divisor) {
+  return NeedToAddDividend(magic_number, divisor) || NeedToSubDividend(magic_number, divisor);
+}
+
 void InstructionCodeGeneratorARM64::GenerateResultDivRemWithAnyConstant(
     bool is_rem,
     int final_right_shift,
@@ -3017,7 +3024,17 @@ void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
   // temp = get_high(dividend * magic)
   __ Mov(temp, magic);
   __ Smull(temp.X(), dividend, temp);
-  __ Lsr(temp.X(), temp.X(), 32);
+
+  if (NeedToCorrectMulResult(magic, imm)) {
+    __ Lsr(temp.X(), temp.X(), 32);
+  } else {
+    // As between 'lsr temp.X(), temp.X(), #32' and 'asr temp, temp, #shift' there are
+    // no other instructions modifying 'temp', they can be combined into one
+    // 'asr temp.X(), temp.X(), #32 + shift'.
+    DCHECK_LT(shift, 32);
+    __ Asr(temp.X(), temp.X(), 32 + shift);
+    shift = 0;
+  }
 
   GenerateResultDivRemWithAnyConstant(/* is_rem= */ instruction->IsRem(),
                                       /* final_right_shift= */ shift,
