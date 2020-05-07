@@ -36,6 +36,7 @@ using ProfileInlineCache = ProfileMethodInfo::ProfileInlineCache;
 using ProfileSampleAnnotation = ProfileCompilationInfo::ProfileSampleAnnotation;
 using ProfileIndexType = ProfileCompilationInfo::ProfileIndexType;
 using ProfileIndexTypeRegular = ProfileCompilationInfo::ProfileIndexTypeRegular;
+using ItemMetadata = FlattenProfileData::ItemMetadata;
 
 static constexpr size_t kMaxMethodIds = 65535;
 static uint32_t kMaxHotnessFlagBootIndex =
@@ -1705,6 +1706,68 @@ TEST_F(ProfileCompilationInfoTest, ClearDataAndAdjustVersionBootToRegular) {
   info.ClearDataAndAdjustVersion(/*for_boot_image=*/false);
   ASSERT_TRUE(info.IsEmpty());
   ASSERT_FALSE(info.IsForBootImage());
+}
+
+// Verify we can merge samples with annotations.
+TEST_F(ProfileCompilationInfoTest, ExtractProfileData) {
+  // Setup test data
+  ProfileCompilationInfo info;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+
+  for (uint16_t i = 0; i < 10; i++) {
+    // Add dex1 data with different annotations so that we can check the annotation count.
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+    ASSERT_TRUE(AddClass(&info, dex1, dex::TypeIndex(i), psa1));
+    ASSERT_TRUE(AddMethod(&info, dex1, /* method_idx= */ i, Hotness::kFlagStartup, psa2));
+    ASSERT_TRUE(AddClass(&info, dex1, dex::TypeIndex(i), psa2));
+    ASSERT_TRUE(AddMethod(&info, dex2, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+    // dex3 will not be used in the data extraction
+    ASSERT_TRUE(AddMethod(&info, dex3, /* method_idx= */ i, Hotness::kFlagHot, psa2));
+  }
+
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex1));
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex2));
+
+  // Run the test: extract the data for dex1 and dex2
+  std::unique_ptr<FlattenProfileData> flattenProfileData = info.ExtractProfileData(dex_files);
+
+  // Check the results
+  ASSERT_TRUE(flattenProfileData != nullptr);
+  ASSERT_EQ(flattenProfileData->GetMaxAggregationForMethods(), 2u);
+  ASSERT_EQ(flattenProfileData->GetMaxAggregationForClasses(), 2u);
+
+  const SafeMap<MethodReference, ItemMetadata>& methods = flattenProfileData->GetMethodData();
+  const SafeMap<TypeReference, ItemMetadata>& classes = flattenProfileData->GetClassData();
+  ASSERT_EQ(methods.size(), 20u);  // 10 methods in dex1, 10 in dex2
+  ASSERT_EQ(classes.size(), 10u);  // 10 methods in dex1
+
+  std::set<ProfileSampleAnnotation> expectedAnnotations1({psa1, psa2});
+  std::set<ProfileSampleAnnotation> expectedAnnotations2({psa2});
+  for (uint16_t i = 0; i < 10; i++) {
+    // Check dex1 methods.
+    auto mIt1 = methods.find(MethodReference(dex1, i));
+    ASSERT_TRUE(mIt1 != methods.end());
+    ASSERT_EQ(mIt1->second.GetFlags(), Hotness::kFlagHot | Hotness::kFlagStartup);
+    ASSERT_EQ(mIt1->second.GetAnnotations(), expectedAnnotations1);
+    // Check dex1 classes
+    auto cIt1 = classes.find(TypeReference(dex1, dex::TypeIndex(i)));
+    ASSERT_TRUE(cIt1 != classes.end());
+    ASSERT_EQ(cIt1->second.GetFlags(), 0);
+    ASSERT_EQ(cIt1->second.GetAnnotations(), expectedAnnotations1);
+    // Check dex2 methods.
+    auto mIt2 = methods.find(MethodReference(dex2, i));
+    ASSERT_TRUE(mIt2 != methods.end());
+    ASSERT_EQ(mIt2->second.GetFlags(), Hotness::kFlagHot);
+    ASSERT_EQ(mIt2->second.GetAnnotations(), expectedAnnotations2);
+  }
+
+  // Release the ownership as this is held by the test class;
+  for (std::unique_ptr<const DexFile>& dex : dex_files) {
+    UNUSED(dex.release());
+  }
 }
 
 }  // namespace art
