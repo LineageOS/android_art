@@ -774,6 +774,15 @@ class ThreadLocalHashOverride {
   Handle<mirror::Object> old_field_value_;
 };
 
+class OatKeyValueStore : public SafeMap<std::string, std::string> {
+ public:
+  using SafeMap::Put;
+
+  iterator Put(const std::string& k, bool v) {
+    return SafeMap::Put(k, v ? OatHeader::kTrueValue : OatHeader::kFalseValue);
+  }
+};
+
 class Dex2Oat final {
  public:
   explicit Dex2Oat(TimingLogger* timings) :
@@ -1111,7 +1120,7 @@ class Dex2Oat final {
     }
 
     // Fill some values into the key-value store for the oat header.
-    key_value_store_.reset(new SafeMap<std::string, std::string>());
+    key_value_store_.reset(new OatKeyValueStore());
 
     // Automatically force determinism for the boot image and boot image extensions in a host build.
     if (!kIsTargetBuild && (IsBootImage() || IsBootImageExtension())) {
@@ -1200,16 +1209,12 @@ class Dex2Oat final {
       }
       key_value_store_->Put(OatHeader::kDex2OatCmdLineKey, oss.str());
     }
-    key_value_store_->Put(
-        OatHeader::kDebuggableKey,
-        compiler_options_->debuggable_ ? OatHeader::kTrueValue : OatHeader::kFalseValue);
-    key_value_store_->Put(
-        OatHeader::kNativeDebuggableKey,
-        compiler_options_->GetNativeDebuggable() ? OatHeader::kTrueValue : OatHeader::kFalseValue);
+    key_value_store_->Put(OatHeader::kDebuggableKey, compiler_options_->debuggable_);
+    key_value_store_->Put(OatHeader::kNativeDebuggableKey,
+                          compiler_options_->GetNativeDebuggable());
     key_value_store_->Put(OatHeader::kCompilerFilter,
-        CompilerFilter::NameOfFilter(compiler_options_->GetCompilerFilter()));
-    key_value_store_->Put(OatHeader::kConcurrentCopying,
-                          kUseReadBarrier ? OatHeader::kTrueValue : OatHeader::kFalseValue);
+                          CompilerFilter::NameOfFilter(compiler_options_->GetCompilerFilter()));
+    key_value_store_->Put(OatHeader::kConcurrentCopying, kUseReadBarrier);
     if (invocation_file_.get() != -1) {
       std::ostringstream oss;
       for (int i = 0; i < argc; ++i) {
@@ -2983,7 +2988,7 @@ class Dex2Oat final {
   std::unique_ptr<CompilerOptions> compiler_options_;
   Compiler::Kind compiler_kind_;
 
-  std::unique_ptr<SafeMap<std::string, std::string> > key_value_store_;
+  std::unique_ptr<OatKeyValueStore> key_value_store_;
 
   std::unique_ptr<VerificationResults> verification_results_;
 
