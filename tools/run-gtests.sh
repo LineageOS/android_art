@@ -56,7 +56,7 @@ for t in $tests; do
     env ANDROID_ART_ROOT="$android_art_root" \
         ANDROID_I18N_ROOT="$android_i18n_root" \
         ANDROID_TZDATA_ROOT="$android_tzdata_root" \
-        $t --deadline_threshold_ms=600000 \
+        $t \
     || failing_tests+=("$t")
 done
 
