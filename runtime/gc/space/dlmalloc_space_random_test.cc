@@ -21,6 +21,7 @@
 namespace art {
 namespace gc {
 namespace space {
+namespace {
 
 MallocSpace* CreateDlMallocSpace(const std::string& name,
                                  size_t initial_size,
@@ -32,6 +33,7 @@ MallocSpace* CreateDlMallocSpace(const std::string& name,
 
 TEST_SPACE_CREATE_FN_RANDOM(DlMallocSpace, CreateDlMallocSpace)
 
+}  // namespace
 }  // namespace space
 }  // namespace gc
 }  // namespace art
