@@ -227,22 +227,30 @@ inline void PrimitiveArray<T>::Memcpy(int32_t dst_pos,
 
 template<typename T, PointerSize kPointerSize, VerifyObjectFlags kVerifyFlags>
 inline T PointerArray::GetElementPtrSize(uint32_t idx) {
-  // C style casts here since we sometimes have T be a pointer, or sometimes an integer
-  // (for stack traces).
   if (kPointerSize == PointerSize::k64) {
-    return (T)static_cast<uintptr_t>(AsLongArray<kVerifyFlags>()->GetWithoutChecks(idx));
+    DCHECK(IsLongArray<kVerifyFlags>());
+  } else {
+    DCHECK(IsIntArray<kVerifyFlags>());
   }
-  return (T)static_cast<uintptr_t>(AsIntArray<kVerifyFlags>()->GetWithoutChecks(idx));
+  return GetElementPtrSizeUnchecked<T, kPointerSize, kVerifyFlags>(idx);
 }
+
 template<typename T, PointerSize kPointerSize, VerifyObjectFlags kVerifyFlags>
 inline T PointerArray::GetElementPtrSizeUnchecked(uint32_t idx) {
   // C style casts here since we sometimes have T be a pointer, or sometimes an integer
   // (for stack traces).
+  using ConversionType = typename std::conditional_t<std::is_pointer_v<T>, uintptr_t, T>;
   if (kPointerSize == PointerSize::k64) {
-    return (T)static_cast<uintptr_t>(AsLongArrayUnchecked<kVerifyFlags>()->GetWithoutChecks(idx));
+    uint64_t value =
+        static_cast<uint64_t>(AsLongArrayUnchecked<kVerifyFlags>()->GetWithoutChecks(idx));
+    return (T) dchecked_integral_cast<ConversionType>(value);
+  } else {
+    uint32_t value =
+        static_cast<uint32_t>(AsIntArrayUnchecked<kVerifyFlags>()->GetWithoutChecks(idx));
+    return (T) dchecked_integral_cast<ConversionType>(value);
   }
-  return (T)static_cast<uintptr_t>(AsIntArrayUnchecked<kVerifyFlags>()->GetWithoutChecks(idx));
 }
+
 template<typename T, VerifyObjectFlags kVerifyFlags>
 inline T PointerArray::GetElementPtrSize(uint32_t idx, PointerSize ptr_size) {
   if (ptr_size == PointerSize::k64) {
