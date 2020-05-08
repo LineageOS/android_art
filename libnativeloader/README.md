@@ -34,7 +34,7 @@ libraries. As the platform is getting modularized with
 [APEX](https://android.googlesource.com/platform/system/apex/+/refs/heads/master/docs/README.md),
 some libraries are no longer provided from platform, but from the APEXes which
 have their own linker namespaces. For example, ICU libraries `libicuuc.so` and
-`libicui18n.so` are from the runtime APEX.
+`libicui18n.so` are from the I18n APEX.
 
 The list of public native libraries is not static. The default set of libraries
 are defined in AOSP, but partners can extend it to include their own libraries.
