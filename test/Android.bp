@@ -46,6 +46,7 @@ art_cc_defaults {
 
 art_cc_defaults {
     name: "art_gtest_defaults",
+    test_per_src: true,
     // These really are gtests, but the gtest library comes from libart-gtest.so
     gtest: false,
     defaults: [
@@ -114,10 +115,9 @@ art_cc_defaults {
         "libdexfiled",
         "libprofiled",
         "libartbased",
-        "liblog",
     ],
     static_libs: [
-        "libgtest_isolated",
+        "libgtest",
     ],
     target: {
         android32: {
@@ -150,7 +150,7 @@ art_cc_library {
         "libart-compiler-gtest",
         "libart-runtime-gtest",
         "libartbase-art-gtest",
-        "libgtest_isolated",
+        "libgtest",
     ],
     shared_libs: [
         "libartd",
@@ -160,7 +160,6 @@ art_cc_library {
         "libartbased",
         "libbase",
         "libbacktrace",
-        "liblog",
     ],
     target: {
         darwin: {
