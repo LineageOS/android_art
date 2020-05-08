@@ -797,7 +797,6 @@ if [ "$usage" = "yes" ]; then
         echo "    --zygote              Spawn the process from the Zygote." \
              "If used, then the"
         echo "                          other runtime options are ignored."
-        echo "    --no-dex2oat          Run as though dex2oat was failing."
         echo "    --prebuild            Run dex2oat on the files before starting test. (default)"
         echo "    --no-prebuild         Do not run dex2oat on the files before starting"
         echo "                          the test."
