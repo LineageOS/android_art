@@ -17,19 +17,53 @@ sdk {
     name: "art-module-sdk",
     host_supported: true,
     native_header_libs: [
+        "jni_headers",
         "libnativehelper_header_only",
+    ],
+    native_shared_libs: [
+        "libandroidio",
     ],
     target: {
         android: {
+            java_header_libs: [
+                // Needed by any module that builds against any non-numeric
+                // sdk_version other than "none".
+                //
+                // This is actually only used for compiling Java 8 and kotlin.
+                // Java 9 uses system modules which encapsulates this
+                // internally.
+                "core-lambda-stubs",
+
+                // Needed by any module that builds against any non-numeric
+                // sdk_version other than "none" or "core_platform".
+                //
+                // This is actually only used for compiling Java 8 and kotlin.
+                // Java 9 uses system modules which encapsulates this
+                // internally.
+                "core.current.stubs",
+
+                // Needed by any module that builds against an sdk_version of
+                // "core_platform".
+                //
+                // This is actually only used for compiling Java 8 and kotlin.
+                // Java 9 uses system modules which encapsulates this
+                // internally.
+                "core.platform.api.stubs",
+            ],
+
             java_system_modules: [
                 "art-module-public-api-stubs-system-modules",
                 "art-module-intra-core-api-stubs-system-modules",
                 "art-module-platform-api-stubs-system-modules",
+                "core-current-stubs-system-modules",
                 "core-platform-api-stubs-system-modules",
             ],
             native_static_libs: [
                 "libartimagevalues",
             ],
+        },
+        darwin: {
+            enabled: false,
         },
     },
 }
@@ -45,34 +79,61 @@ module_exports {
             // property is fixed to "both" in the sdk/module_exports
             // implementation and cannot be overridden any other way.
             compile_multilib: "64",
+
+            java_libs: [
+                "timezone-host",
+            ],
+            native_binaries: [
+                "hiddenapi",
+                "dex2oat",
+                "dex2oatd",
+            ],
+            native_shared_libs: [
+                // The following three libraries are internal implementation libraries
+                // that are needed by hiddenapi.
+                // TODO(http://b/155372760): Remove dependencies.
+                "libartbase",
+                "libartpalette",
+                "libdexfile",
+            ],
         },
         darwin: {
             enabled: false,
         },
     },
-    java_libs: [
-        "timezone-host",
-    ],
-    native_binaries: [
-        "hiddenapi",
-        "dex2oat",
-        "dex2oatd",
-    ],
 }
 
 // Exported tests and supporting libraries
 module_exports {
     name: "art-module-test-exports",
+    host_supported: true,
     java_libs: [
-        "core-compat-test-rules",
-        "core-test-rules",
-        "core-tests-support",
-        "okhttp-tests-nojarjar",
+        // The following bouncycastle modules are required by:
+        // * conscrypt-benchmarks (all)
+        // * conscrypt-tests (all)
+        // * signapk (all except ocsp)
+        "bouncycastle-unbundled",
+        "bouncycastle-bcpkix-unbundled",
+        "bouncycastle-ocsp-unbundled",
     ],
-    java_tests: [
-        "libcore-crypto-tests",
-    ],
-    native_shared_libs: [
-        "libjavacoretests",
-    ],
+    target: {
+        android: {
+            java_libs: [
+                "core-compat-test-rules",
+                "core-compat-test-rules",
+                "core-test-rules",
+                "core-tests-support",
+                "okhttp-tests-nojarjar",
+            ],
+            java_tests: [
+                "libcore-crypto-tests",
+            ],
+            native_shared_libs: [
+                "libjavacoretests",
+            ],
+        },
+        darwin: {
+            enabled: false,
+        },
+    },
 }
