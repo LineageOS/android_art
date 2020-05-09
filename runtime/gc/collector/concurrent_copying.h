@@ -371,9 +371,6 @@ class ConcurrentCopying : public GarbageCollector {
   static constexpr size_t kMarkStackPoolSize = 256;
   std::vector<accounting::ObjectStack*> pooled_mark_stacks_
       GUARDED_BY(mark_stack_lock_);
-  // TODO(lokeshgidra b/140119552): remove this after bug fix.
-  std::unordered_map<Thread*, accounting::ObjectStack*> thread_mark_stack_map_
-      GUARDED_BY(mark_stack_lock_);
   Thread* thread_running_gc_;
   bool is_marking_;                       // True while marking is ongoing.
   // True while we might dispatch on the read barrier entrypoints.
