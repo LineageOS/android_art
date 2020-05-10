@@ -33,11 +33,11 @@ namespace proxy_test {
 // Generate a proxy class with the given name and interfaces. This is a simplification from what
 // libcore does to fit to our test needs. We do not check for duplicated interfaces or methods and
 // we do not declare exceptions.
-inline ObjPtr<mirror::Class> GenerateProxyClass(ScopedObjectAccess& soa,
-                                                jobject jclass_loader,
-                                                ClassLinker* class_linker,
-                                                const char* className,
-                                                const std::vector<Handle<mirror::Class>>& interfaces)
+ObjPtr<mirror::Class> GenerateProxyClass(ScopedObjectAccess& soa,
+                                         jobject jclass_loader,
+                                         ClassLinker* class_linker,
+                                         const char* className,
+                                         const std::vector<Handle<mirror::Class>>& interfaces)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   StackHandleScope<1> hs(soa.Self());
   Handle<mirror::Class> javaLangObject = hs.NewHandle(GetClassRoot<mirror::Object>());
