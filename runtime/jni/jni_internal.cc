@@ -2304,6 +2304,7 @@ class JNI {
       return JNI_ERR;  // Not reached except in unit tests.
     }
     CHECK_NON_NULL_ARGUMENT_FN_NAME("RegisterNatives", java_class, JNI_ERR);
+    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
     ScopedObjectAccess soa(env);
     StackHandleScope<1> hs(soa.Self());
     Handle<mirror::Class> c = hs.NewHandle(soa.Decode<mirror::Class>(java_class));
@@ -2420,7 +2421,7 @@ class JNI {
         // TODO: make this a hard register error in the future.
       }
 
-      const void* final_function_ptr = m->RegisterNative(fnPtr);
+      const void* final_function_ptr = class_linker->RegisterNative(soa.Self(), m, fnPtr);
       UNUSED(final_function_ptr);
     }
     return JNI_OK;
@@ -2434,10 +2435,11 @@ class JNI {
     VLOG(jni) << "[Unregistering JNI native methods for " << mirror::Class::PrettyClass(c) << "]";
 
     size_t unregistered_count = 0;
-    auto pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+    ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+    auto pointer_size = class_linker->GetImagePointerSize();
     for (auto& m : c->GetMethods(pointer_size)) {
       if (m.IsNative()) {
-        m.UnregisterNative();
+        class_linker->UnregisterNative(soa.Self(), &m);
         unregistered_count++;
       }
     }

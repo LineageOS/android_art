@@ -124,6 +124,13 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
   }
 
+  if (method_load_kind != HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall &&
+      callee->IsCriticalNative()) {
+    DCHECK_NE(method_load_kind, HInvokeStaticOrDirect::MethodLoadKind::kRecursive);
+    DCHECK(callee->IsStatic());
+    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative;
+  }
+
   if (codegen->GetGraph()->IsDebuggable()) {
     // For debuggable apps always use the code pointer from ArtMethod
     // so that we don't circumvent instrumentation stubs if installed.

@@ -32,6 +32,7 @@
 #include "code_generator_x86_64.h"
 #endif
 
+#include "art_method-inl.h"
 #include "base/bit_utils.h"
 #include "base/bit_utils_iterator.h"
 #include "base/casts.h"
@@ -503,21 +504,67 @@ void CodeGenerator::CreateCommonInvokeLocationSummary(
 
   if (invoke->IsInvokeStaticOrDirect()) {
     HInvokeStaticOrDirect* call = invoke->AsInvokeStaticOrDirect();
-    switch (call->GetMethodLoadKind()) {
-      case HInvokeStaticOrDirect::MethodLoadKind::kRecursive:
-        locations->SetInAt(call->GetSpecialInputIndex(), visitor->GetMethodLocation());
-        break;
-      case HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall:
-        locations->AddTemp(visitor->GetMethodLocation());
-        locations->SetInAt(call->GetSpecialInputIndex(), Location::RequiresRegister());
-        break;
-      default:
-        locations->AddTemp(visitor->GetMethodLocation());
-        break;
+    HInvokeStaticOrDirect::MethodLoadKind method_load_kind = call->GetMethodLoadKind();
+    HInvokeStaticOrDirect::CodePtrLocation code_ptr_location = call->GetCodePtrLocation();
+    if (code_ptr_location == HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+      locations->AddTemp(Location::RequiresRegister());  // For target method.
+    }
+    if (code_ptr_location == HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative ||
+        method_load_kind == HInvokeStaticOrDirect::MethodLoadKind::kRecursive) {
+      // For `kCallCriticalNative` we need the current method as the hidden argument
+      // if we reach the dlsym lookup stub for @CriticalNative.
+      locations->SetInAt(call->GetCurrentMethodIndex(), visitor->GetMethodLocation());
+    } else {
+      locations->AddTemp(visitor->GetMethodLocation());
+      if (method_load_kind == HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall) {
+        locations->SetInAt(call->GetCurrentMethodIndex(), Location::RequiresRegister());
+      }
     }
   } else if (!invoke->IsInvokePolymorphic()) {
     locations->AddTemp(visitor->GetMethodLocation());
   }
+}
+
+void CodeGenerator::PrepareCriticalNativeArgumentMoves(
+    HInvokeStaticOrDirect* invoke,
+    /*inout*/InvokeDexCallingConventionVisitor* visitor,
+    /*out*/HParallelMove* parallel_move) {
+  LocationSummary* locations = invoke->GetLocations();
+  for (size_t i = 0, num = invoke->GetNumberOfArguments(); i != num; ++i) {
+    Location in_location = locations->InAt(i);
+    DataType::Type type = invoke->InputAt(i)->GetType();
+    DCHECK_NE(type, DataType::Type::kReference);
+    Location out_location = visitor->GetNextLocation(type);
+    if (out_location.IsStackSlot() || out_location.IsDoubleStackSlot()) {
+      // Stack arguments will need to be moved after adjusting the SP.
+      parallel_move->AddMove(in_location, out_location, type, /*instruction=*/ nullptr);
+    } else {
+      // Register arguments should have been assigned their final locations for register allocation.
+      DCHECK(out_location.Equals(in_location)) << in_location << " -> " << out_location;
+    }
+  }
+}
+
+void CodeGenerator::AdjustCriticalNativeArgumentMoves(size_t out_frame_size,
+                                                      /*inout*/HParallelMove* parallel_move) {
+  // Adjust the source stack offsets by `out_frame_size`, i.e. the additional
+  // frame size needed for outgoing stack arguments.
+  for (size_t i = 0, num = parallel_move->NumMoves(); i != num; ++i) {
+    MoveOperands* operands = parallel_move->MoveOperandsAt(i);
+    Location source = operands->GetSource();
+    if (operands->GetSource().IsStackSlot()) {
+      operands->SetSource(Location::StackSlot(source.GetStackIndex() +  out_frame_size));
+    } else if (operands->GetSource().IsDoubleStackSlot()) {
+      operands->SetSource(Location::DoubleStackSlot(source.GetStackIndex() +  out_frame_size));
+    }
+  }
+}
+
+const char* CodeGenerator::GetCriticalNativeShorty(HInvokeStaticOrDirect* invoke,
+                                                   uint32_t* shorty_len) {
+  ScopedObjectAccess soa(Thread::Current());
+  DCHECK(invoke->GetResolvedMethod()->IsCriticalNative());
+  return invoke->GetResolvedMethod()->GetShorty(shorty_len);
 }
 
 void CodeGenerator::GenerateInvokeStaticOrDirectRuntimeCall(

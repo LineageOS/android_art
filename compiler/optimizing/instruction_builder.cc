@@ -1530,8 +1530,8 @@ bool HInstructionBuilder::SetupInvokeArguments(HInstruction* invoke,
 
   if (invoke->IsInvokeStaticOrDirect() &&
       HInvokeStaticOrDirect::NeedsCurrentMethodInput(
-          invoke->AsInvokeStaticOrDirect()->GetMethodLoadKind())) {
-    DCHECK_EQ(argument_index, invoke->AsInvokeStaticOrDirect()->GetSpecialInputIndex());
+          invoke->AsInvokeStaticOrDirect()->GetDispatchInfo())) {
+    DCHECK_EQ(argument_index, invoke->AsInvokeStaticOrDirect()->GetCurrentMethodIndex());
     DCHECK(invoke->InputAt(argument_index) == nullptr);
     invoke->SetRawInputAt(argument_index, graph_->GetCurrentMethod());
   }

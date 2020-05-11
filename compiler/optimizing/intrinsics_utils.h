@@ -59,7 +59,12 @@ class IntrinsicSlowPath : public TSlowPathCode {
     Location method_loc = MoveArguments(codegen);
 
     if (invoke_->IsInvokeStaticOrDirect()) {
-      codegen->GenerateStaticOrDirectCall(invoke_->AsInvokeStaticOrDirect(), method_loc, this);
+      HInvokeStaticOrDirect* invoke_static_or_direct = invoke_->AsInvokeStaticOrDirect();
+      DCHECK_NE(invoke_static_or_direct->GetMethodLoadKind(),
+                HInvokeStaticOrDirect::MethodLoadKind::kRecursive);
+      DCHECK_NE(invoke_static_or_direct->GetCodePtrLocation(),
+                HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative);
+      codegen->GenerateStaticOrDirectCall(invoke_static_or_direct, method_loc, this);
     } else {
       codegen->GenerateVirtualCall(invoke_->AsInvokeVirtual(), method_loc, this);
     }

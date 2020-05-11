@@ -32,7 +32,6 @@
 #include "gc/accounting/card_table-inl.h"
 #include "imt_conflict_table.h"
 #include "imtable-inl.h"
-#include "index_bss_mapping.h"
 #include "instrumentation.h"
 #include "interpreter/interpreter.h"
 #include "interpreter/interpreter_common.h"
@@ -1319,26 +1318,9 @@ extern "C" const void* artQuickResolutionTrampoline(
     called = linker->ResolveMethod<ClassLinker::ResolveMode::kCheckICCEAndIAE>(
         self, called_method.index, caller, invoke_type);
 
-    // Update .bss entry in oat file if any.
-    if (called != nullptr && called_method.dex_file->GetOatDexFile() != nullptr) {
-      size_t bss_offset = IndexBssMappingLookup::GetBssOffset(
-          called_method.dex_file->GetOatDexFile()->GetMethodBssMapping(),
-          called_method.index,
-          called_method.dex_file->NumMethodIds(),
-          static_cast<size_t>(kRuntimePointerSize));
-      if (bss_offset != IndexBssMappingLookup::npos) {
-        DCHECK_ALIGNED(bss_offset, static_cast<size_t>(kRuntimePointerSize));
-        const OatFile* oat_file = called_method.dex_file->GetOatDexFile()->GetOatFile();
-        ArtMethod** method_entry = reinterpret_cast<ArtMethod**>(const_cast<uint8_t*>(
-            oat_file->BssBegin() + bss_offset));
-        DCHECK_GE(method_entry, oat_file->GetBssMethods().data());
-        DCHECK_LT(method_entry,
-                  oat_file->GetBssMethods().data() + oat_file->GetBssMethods().size());
-        std::atomic<ArtMethod*>* atomic_entry =
-            reinterpret_cast<std::atomic<ArtMethod*>*>(method_entry);
-        static_assert(sizeof(*method_entry) == sizeof(*atomic_entry), "Size check.");
-        atomic_entry->store(called, std::memory_order_release);
-      }
+    // If successful, update .bss entry in oat file if any.
+    if (called != nullptr) {
+      MaybeUpdateBssMethodEntry(called, called_method);
     }
   }
   const void* code = nullptr;

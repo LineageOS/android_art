@@ -61,7 +61,7 @@ class X86JniCallingConvention final : public JniCallingConvention {
   ManagedRegister IntReturnRegister() override;
   // JNI calling convention
   size_t FrameSize() const override;
-  size_t OutArgSize() const override;
+  size_t OutFrameSize() const override;
   ArrayRef<const ManagedRegister> CalleeSaveRegisters() const override;
   ManagedRegister ReturnScratchRegister() const override;
   uint32_t CoreSpillMask() const override;
