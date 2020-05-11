@@ -387,6 +387,10 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
     return num_evac_regions_ * kRegionSize;
   }
 
+  uint64_t GetMadviseTime() const {
+    return madvise_time_;
+  }
+
  private:
   RegionSpace(const std::string& name, MemMap&& mem_map, bool use_generational_cc);
 
@@ -747,6 +751,7 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
   const bool use_generational_cc_;
   uint32_t time_;                  // The time as the number of collections since the startup.
   size_t num_regions_;             // The number of regions in this space.
+  uint64_t madvise_time_;          // The amount of time spent in madvise for purging pages.
   // The number of non-free regions in this space.
   size_t num_non_free_regions_ GUARDED_BY(region_lock_);
 
