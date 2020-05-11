@@ -3813,6 +3813,9 @@ void ConcurrentCopying::DumpPerformanceInfo(std::ostream& os) {
      << ") / " << region_space_->GetNumRegions() / 2 << " ("
      << PrettySize(region_space_->GetNumRegions() * space::RegionSpace::kRegionSize / 2)
      << ")\n";
+  if (!young_gen_) {
+    os << "Total madvise time " << PrettyDuration(region_space_->GetMadviseTime()) << "\n";
+  }
 }
 
 }  // namespace collector
