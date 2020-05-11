@@ -965,8 +965,8 @@ bool JitCodeCache::Reserve(Thread* self,
 
   const uint8_t* code;
   const uint8_t* data;
-  // We might need to try the allocation twice (with GC in between to free up memory).
-  for (int i = 0; i < 2; i++) {
+  while (true) {
+    bool at_max_capacity = false;
     {
       ScopedThreadSuspension sts(self, kSuspended);
       MutexLock mu(self, *Locks::jit_lock_);
@@ -974,18 +974,23 @@ bool JitCodeCache::Reserve(Thread* self,
       ScopedCodeCacheWrite ccw(*region);
       code = region->AllocateCode(code_size);
       data = region->AllocateData(data_size);
+      at_max_capacity = IsAtMaxCapacity();
     }
-    if (code == nullptr || data == nullptr) {
-      Free(self, region, code, data);
-      if (i == 0) {
-        GarbageCollectCache(self);
-        continue;  // Retry after GC.
-      } else {
-        return false;  // Fail.
-      }
+    if (code != nullptr && data != nullptr) {
+      break;
     }
-    break;  // Success.
+    Free(self, region, code, data);
+    if (at_max_capacity) {
+      VLOG(jit) << "JIT failed to allocate code of size "
+                << PrettySize(code_size)
+                << ", and data of size "
+                << PrettySize(data_size);
+      return false;
+    }
+    // Run a code cache collection and try again.
+    GarbageCollectCache(self);
   }
+
   *reserved_code = ArrayRef<const uint8_t>(code, code_size);
   *reserved_data = ArrayRef<const uint8_t>(data, data_size);
 
@@ -1095,8 +1100,12 @@ void JitCodeCache::MarkCompiledCodeOnThreadStacks(Thread* self) {
   }
 }
 
+bool JitCodeCache::IsAtMaxCapacity() const {
+  return private_region_.GetCurrentCapacity() == private_region_.GetMaxCapacity();
+}
+
 bool JitCodeCache::ShouldDoFullCollection() {
-  if (private_region_.GetCurrentCapacity() == private_region_.GetMaxCapacity()) {
+  if (IsAtMaxCapacity()) {
     // Always do a full collection when the code cache is full.
     return true;
   } else if (private_region_.GetCurrentCapacity() < kReservedCapacity) {
