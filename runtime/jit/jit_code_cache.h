@@ -466,6 +466,9 @@ class JitCodeCache {
   // Notify all waiting threads that a collection is done.
   void NotifyCollectionDone(Thread* self) REQUIRES(Locks::jit_lock_);
 
+  // Return whether the code cache's capacity is at its maximum.
+  bool IsAtMaxCapacity() const REQUIRES(Locks::jit_lock_);
+
   // Return whether we should do a full collection given the current state of the cache.
   bool ShouldDoFullCollection()
       REQUIRES(Locks::jit_lock_)
