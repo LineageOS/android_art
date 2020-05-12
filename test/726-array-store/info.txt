@@ -1,0 +1,1 @@
+Regression test on storing an invalid type into an array.
