@@ -2947,11 +2947,22 @@ void InstructionCodeGeneratorARM64::GenerateResultDivRemWithAnyConstant(
     Register temp_result,
     Register out,
     UseScratchRegisterScope* temps_scope) {
+  // The multiplication result might need some corrections to be finalized.
+  // The last correction is to increment by 1, if the result is negative.
+  // Currently it is done with 'add result, temp_result, temp_result, lsr #31 or #63'.
+  // Such ADD usually has latency 2, e.g. on Cortex-A55.
+  // However if one of the corrections is ADD or SUB, the sign can be detected
+  // with ADDS/SUBS. They set the N flag if the result is negative.
+  // This allows to use CINC MI which has latency 1.
+  bool use_cond_inc = false;
+
   // As magic_number can be modified to fit into 32 bits, check whether the correction is needed.
   if (NeedToAddDividend(magic_number, divisor)) {
-    __ Add(temp_result, temp_result, dividend);
+    __ Adds(temp_result, temp_result, dividend);
+    use_cond_inc = true;
   } else if (NeedToSubDividend(magic_number, divisor)) {
-    __ Sub(temp_result, temp_result, dividend);
+    __ Subs(temp_result, temp_result, dividend);
+    use_cond_inc = true;
   }
 
   if (final_right_shift != 0) {
@@ -2959,7 +2970,11 @@ void InstructionCodeGeneratorARM64::GenerateResultDivRemWithAnyConstant(
   }
 
   Register& result = (is_rem) ? temp_result : out;
-  __ Add(result, temp_result, Operand(temp_result, LSR, temp_result.GetSizeInBits() - 1));
+  if (use_cond_inc) {
+    __ Cinc(result, temp_result, mi);
+  } else {
+    __ Add(result, temp_result, Operand(temp_result, LSR, temp_result.GetSizeInBits() - 1));
+  }
   if (is_rem) {
     // TODO: Strength reduction for msub.
     Register temp_imm = temps_scope->AcquireSameSizeAs(out);
