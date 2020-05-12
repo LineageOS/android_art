@@ -715,35 +715,31 @@ bpath_modules="core-oj core-libart okhttp bouncycastle apache-xml core-icu4j con
 bpath=""
 bpath_locations=""
 bpath_separator=""
+bpath_prefix=""
+bpath_location_prefix=""
 if [ "${HOST}" = "y" ]; then
-    framework="${ANDROID_HOST_OUT}/framework"
-    if [ "${ANDROID_HOST_OUT:0:${#ANDROID_BUILD_TOP}+1}" = "${ANDROID_BUILD_TOP}/" ]; then
-      framework_location="${ANDROID_HOST_OUT:${#ANDROID_BUILD_TOP}+1}/framework"
-    else
-      echo "error: ANDROID_BUILD_TOP/ is not a prefix of ANDROID_HOST_OUT"
-      echo "ANDROID_BUILD_TOP=${ANDROID_BUILD_TOP}"
-      echo "ANDROID_HOST_OUT=${ANDROID_HOST_OUT}"
-      exit
-    fi
-    bpath_suffix="-hostdex"
-    for bpath_module in ${bpath_modules}; do
-      bpath+="${bpath_separator}${framework}/${bpath_module}${bpath_suffix}.jar"
-      bpath_locations+="${bpath_separator}${framework_location}/${bpath_module}${bpath_suffix}.jar"
-      bpath_separator=":"
-    done
-else
-    for bpath_module in ${bpath_modules}; do
-      apex_module="com.android.art"
-      if [ "${bpath_module}" = "conscrypt" ]; then
-        apex_module="com.android.conscrypt"
-      elif [ "${bpath_module}" = "core-icu4j" ]; then
-        apex_module="com.android.i18n"
-      fi
-      bpath+="${bpath_separator}/apex/${apex_module}/javalib/${bpath_module}.jar"
-      bpath_locations+="${bpath_separator}/apex/${apex_module}/javalib/${bpath_module}.jar"
-      bpath_separator=":"
-    done
+  bpath_prefix="${ANDROID_HOST_OUT}"
+  if [ "${ANDROID_HOST_OUT:0:${#ANDROID_BUILD_TOP}+1}" = "${ANDROID_BUILD_TOP}/" ]; then
+    bpath_location_prefix="${ANDROID_HOST_OUT:${#ANDROID_BUILD_TOP}+1}"
+  else
+    echo "error: ANDROID_BUILD_TOP/ is not a prefix of ANDROID_HOST_OUT"
+    echo "ANDROID_BUILD_TOP=${ANDROID_BUILD_TOP}"
+    echo "ANDROID_HOST_OUT=${ANDROID_HOST_OUT}"
+    exit
+  fi
 fi
+for bpath_module in ${bpath_modules}; do
+  apex_module="com.android.art"
+  case "$bpath_module" in
+    (conscrypt)  apex_module="com.android.conscrypt";;
+    (core-icu4j) apex_module="com.android.i18n";;
+    (*)          apex_module="com.android.art";;
+  esac
+  bpath_jar="/apex/${apex_module}/javalib/${bpath_module}.jar"
+  bpath+="${bpath_separator}${bpath_prefix}${bpath_jar}"
+  bpath_locations+="${bpath_separator}${bpath_location_prefix}${bpath_jar}"
+  bpath_separator=":"
+done
 # Pass down the bootclasspath
 FLAGS="${FLAGS} -Xbootclasspath:${bpath}"
 FLAGS="${FLAGS} -Xbootclasspath-locations:${bpath_locations}"
@@ -1172,7 +1168,7 @@ if [ "$HOST" = "n" ]; then
     # Needed to access libarttest(d).so and JVMTI agent libraries.
     LD_LIBRARY_PATH="/data/$TEST_DIRECTORY/art/$ISA:$LD_LIBRARY_PATH"
     # Needed to access the boot (core) image files.
-    LD_LIBRARY_PATH="/data/art-test/$ISA:$LD_LIBRARY_PATH"
+    LD_LIBRARY_PATH="/apex/com.android.art/javalib/$ISA:$LD_LIBRARY_PATH"
     # Needed to access the test's Odex files.
     LD_LIBRARY_PATH="$DEX_LOCATION/oat/$ISA:$LD_LIBRARY_PATH"
     # Needed to access the test's native libraries (see e.g. 674-hiddenapi,
