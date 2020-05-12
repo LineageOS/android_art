@@ -23,7 +23,6 @@
 #include "art_method-inl.h"
 #include "base/enums.h"
 #include "base/globals.h"
-#include "class_root.h"
 #include "handle_scope.h"
 #include "jni/jni_internal.h"
 #include "jni_id_type.h"

@@ -18,7 +18,7 @@
 
 #include "android-base/stringprintf.h"
 
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_dex_operations.h"
 #include "common_throws.h"
 #include "interpreter/shadow_frame-inl.h"

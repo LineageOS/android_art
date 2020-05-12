@@ -29,7 +29,6 @@
 #include "base/mutex.h"
 #include "base/utils.h"
 #include "class_linker.h"
-#include "class_root.h"
 #include "deopt_manager.h"
 #include "dex/primitive.h"
 #include "events-inl.h"

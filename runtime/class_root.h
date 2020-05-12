@@ -17,20 +17,22 @@
 #ifndef ART_RUNTIME_CLASS_ROOT_H_
 #define ART_RUNTIME_CLASS_ROOT_H_
 
-#include "class_linker-inl.h"
-#include "gc_root-inl.h"
-#include "mirror/class.h"
-#include "mirror/object_array-inl.h"
-#include "obj_ptr-inl.h"
-#include "runtime.h"
+#include <stdint.h>
+
+#include "base/locks.h"
+#include "read_barrier_option.h"
 
 namespace art {
+
+class ClassLinker;
+template<class MirrorType> class ObjPtr;
 
 namespace mirror {
 class ArrayElementVarHandle;
 class ByteArrayViewVarHandle;
 class ByteBufferViewVarHandle;
 class CallSite;
+class Class;
 class ClassExt;
 class ClassLoader;
 class Constructor;
@@ -43,6 +45,7 @@ class MethodHandleImpl;
 class MethodHandlesLookup;
 class MethodType;
 class Object;
+template<class T> class ObjectArray;
 class Proxy;
 template<typename T> class PrimitiveArray;
 class Reference;
@@ -121,72 +124,26 @@ enum class ClassRoot : uint32_t {
 const char* GetClassRootDescriptor(ClassRoot class_root);
 
 template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot(
-    ClassRoot class_root,
-    ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots) REQUIRES_SHARED(Locks::mutator_lock_) {
-  DCHECK(class_roots != nullptr);
-  if (kReadBarrierOption == kWithReadBarrier) {
-    // With read barrier all references must point to the to-space.
-    // Without read barrier, this check could fail.
-    DCHECK_EQ(class_roots, Runtime::Current()->GetClassLinker()->GetClassRoots());
-  }
-  DCHECK_LT(static_cast<uint32_t>(class_root), static_cast<uint32_t>(ClassRoot::kMax));
-  int32_t index = static_cast<int32_t>(class_root);
-  ObjPtr<mirror::Class> klass =
-      class_roots->GetWithoutChecks<kDefaultVerifyFlags, kReadBarrierOption>(index);
-  DCHECK(klass != nullptr);
-  return klass;
-}
+ObjPtr<mirror::Class> GetClassRoot(ClassRoot class_root,
+                                   ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots)
+    REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot(ClassRoot class_root, ClassLinker* linker)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  return GetClassRoot<kReadBarrierOption>(class_root, linker->GetClassRoots<kReadBarrierOption>());
-}
+ObjPtr<mirror::Class> GetClassRoot(ClassRoot class_root, ClassLinker* linker)
+    REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot(ClassRoot class_root)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  return GetClassRoot<kReadBarrierOption>(class_root, Runtime::Current()->GetClassLinker());
-}
-
-namespace detail {
-
-class ClassNotFoundExceptionTag;
-template <class Tag> struct NoMirrorType;
-
-template <class MirrorType>
-struct ClassRootSelector;  // No definition for unspecialized ClassRoot selector.
-
-#define SPECIALIZE_CLASS_ROOT_SELECTOR(name, descriptor, mirror_type) \
-  template <>                                                         \
-  struct ClassRootSelector<mirror_type> {                             \
-    static constexpr ClassRoot value = ClassRoot::name;               \
-  };
-
-CLASS_ROOT_LIST(SPECIALIZE_CLASS_ROOT_SELECTOR)
-
-#undef SPECIALIZE_CLASS_ROOT_SELECTOR
-
-}  // namespace detail
+ObjPtr<mirror::Class> GetClassRoot(ClassRoot class_root) REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <class MirrorType, ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot(ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  return GetClassRoot<kReadBarrierOption>(detail::ClassRootSelector<MirrorType>::value,
-                                          class_roots);
-}
+ObjPtr<mirror::Class> GetClassRoot(ObjPtr<mirror::ObjectArray<mirror::Class>> class_roots)
+    REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <class MirrorType, ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot(ClassLinker* linker)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  return GetClassRoot<kReadBarrierOption>(detail::ClassRootSelector<MirrorType>::value, linker);
-}
+ObjPtr<mirror::Class> GetClassRoot(ClassLinker* linker) REQUIRES_SHARED(Locks::mutator_lock_);
 
 template <class MirrorType, ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
-inline ObjPtr<mirror::Class> GetClassRoot() REQUIRES_SHARED(Locks::mutator_lock_) {
-  return GetClassRoot<kReadBarrierOption>(detail::ClassRootSelector<MirrorType>::value);
-}
+ObjPtr<mirror::Class> GetClassRoot() REQUIRES_SHARED(Locks::mutator_lock_);
 
 }  // namespace art
 

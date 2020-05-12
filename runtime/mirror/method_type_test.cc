@@ -22,7 +22,7 @@
 #include "class-inl.h"
 #include "class_linker-inl.h"
 #include "class_loader.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_runtime_test.h"
 #include "handle_scope-inl.h"
 #include "object_array-alloc-inl.h"

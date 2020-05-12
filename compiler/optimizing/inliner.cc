@@ -21,7 +21,7 @@
 #include "base/logging.h"
 #include "builder.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "constant_folding.h"
 #include "data_type-inl.h"
 #include "dead_code_elimination.h"

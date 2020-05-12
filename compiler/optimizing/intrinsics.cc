@@ -20,7 +20,7 @@
 #include "art_method-inl.h"
 #include "base/utils.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/invoke_type.h"
 #include "driver/compiler_options.h"
 #include "gc/space/image_space.h"
