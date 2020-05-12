@@ -879,6 +879,12 @@ class ZygoteVerificationTask final : public Task {
   ZygoteVerificationTask() {}
 
   void Run(Thread* self) override {
+    // We are going to load class and run verification, which may also need to load
+    // classes. If the thread cannot load classes (typically when the runtime is
+    // debuggable), then just return.
+    if (!self->CanLoadClasses()) {
+      return;
+    }
     Runtime* runtime = Runtime::Current();
     ClassLinker* linker = runtime->GetClassLinker();
     const std::vector<const DexFile*>& boot_class_path =
@@ -908,7 +914,12 @@ class ZygoteVerificationTask final : public Task {
           continue;
         }
         ++number_of_classes;
-        linker->VerifyClass(self, klass);
+        if (linker->VerifyClass(self, klass) == verifier::FailureKind::kHardFailure) {
+          DCHECK(self->IsExceptionPending());
+          LOG(FATAL) << "Methods in the boot classpath failed to verify: "
+                     << self->GetException()->Dump();
+        }
+        CHECK(!self->IsExceptionPending());
       }
     }
     LOG(INFO) << "Verified "
