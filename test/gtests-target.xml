@@ -171,6 +171,12 @@
         <option name="push-file"
             key="art-gtest-jars-VerifySoftFailDuringClinit.jar"
             value="/data/nativetest/art/art-gtest-VerifySoftFailDuringClinit.jar"/>
+        <option name="push-file"
+            key="art-gtest-jars-Extension1.jar"
+            value="/data/nativetest/art/art-gtest-Extension1.jar"/>
+        <option name="push-file"
+            key="art-gtest-jars-Extension2.jar"
+            value="/data/nativetest/art/art-gtest-Extension2.jar"/>
     </target_preparer>
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
@@ -326,6 +332,12 @@
         <option name="push-file"
             key="art-gtest-jars-VerifySoftFailDuringClinit.jar"
             value="/data/nativetest64/art/art-gtest-VerifySoftFailDuringClinit.jar"/>
+        <option name="push-file"
+            key="art-gtest-jars-Extension1.jar"
+            value="/data/nativetest64/art/art-gtest-Extension1.jar"/>
+        <option name="push-file"
+            key="art-gtest-jars-Extension2.jar"
+            value="/data/nativetest64/art/art-gtest-Extension2.jar"/>
     </target_preparer>
     <target_preparer class="com.android.tradefed.targetprep.RunCommandTargetPreparer">
         <!-- only for debugging purposes -->
