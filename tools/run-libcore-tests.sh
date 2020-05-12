@@ -184,7 +184,7 @@ while [ -n "$1" ]; do
   case "$1" in
     --mode=device)
       vogar_args="$vogar_args --mode=device"
-      vogar_args="$vogar_args --vm-arg -Ximage:/data/art-test/core.art"
+      vogar_args="$vogar_args --vm-arg -Ximage:/apex/com.android.art/javalib/boot.art"
       vogar_args="$vogar_args $(boot_classpath_arg /apex/com.android.art/javalib $BOOT_CLASSPATH_JARS)"
       execution_mode="device"
       ;;
