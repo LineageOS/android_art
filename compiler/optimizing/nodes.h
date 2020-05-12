@@ -32,6 +32,7 @@
 #include "base/stl_util.h"
 #include "base/transform_array_ref.h"
 #include "art_method.h"
+#include "class_root.h"
 #include "data_type.h"
 #include "deoptimization_kind.h"
 #include "dex/dex_file.h"
@@ -302,11 +303,75 @@ class ReferenceTypeInfo : ValueObject {
 
 std::ostream& operator<<(std::ostream& os, const ReferenceTypeInfo& rhs);
 
+class HandleCache {
+ public:
+  explicit HandleCache(VariableSizedHandleScope* handles) : handles_(handles) { }
+
+  VariableSizedHandleScope* GetHandles() { return handles_; }
+
+  template <typename T>
+  MutableHandle<T> NewHandle(T* object) REQUIRES_SHARED(Locks::mutator_lock_) {
+    return handles_->NewHandle(object);
+  }
+
+  template <typename T>
+  MutableHandle<T> NewHandle(ObjPtr<T> object) REQUIRES_SHARED(Locks::mutator_lock_) {
+    return handles_->NewHandle(object);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetObjectClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangObject, &object_class_handle_);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetClassClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangClass, &class_class_handle_);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetMethodHandleClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangInvokeMethodHandleImpl, &method_handle_class_handle_);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetMethodTypeClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangInvokeMethodType, &method_type_class_handle_);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetStringClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangString, &string_class_handle_);
+  }
+
+  ReferenceTypeInfo::TypeHandle GetThrowableClassHandle() {
+    return GetRootHandle(ClassRoot::kJavaLangThrowable, &throwable_class_handle_);
+  }
+
+
+ private:
+  inline ReferenceTypeInfo::TypeHandle GetRootHandle(ClassRoot class_root,
+                                                     ReferenceTypeInfo::TypeHandle* cache) {
+    if (UNLIKELY(!ReferenceTypeInfo::IsValidHandle(*cache))) {
+      *cache = CreateRootHandle(handles_, class_root);
+    }
+    return *cache;
+  }
+
+  static ReferenceTypeInfo::TypeHandle CreateRootHandle(VariableSizedHandleScope* handles,
+                                                        ClassRoot class_root);
+
+  VariableSizedHandleScope* handles_;
+
+  ReferenceTypeInfo::TypeHandle object_class_handle_;
+  ReferenceTypeInfo::TypeHandle class_class_handle_;
+  ReferenceTypeInfo::TypeHandle method_handle_class_handle_;
+  ReferenceTypeInfo::TypeHandle method_type_class_handle_;
+  ReferenceTypeInfo::TypeHandle string_class_handle_;
+  ReferenceTypeInfo::TypeHandle throwable_class_handle_;
+};
+
 // Control-flow graph of a method. Contains a list of basic blocks.
 class HGraph : public ArenaObject<kArenaAllocGraph> {
  public:
   HGraph(ArenaAllocator* allocator,
          ArenaStack* arena_stack,
+         VariableSizedHandleScope* handles,
          const DexFile& dex_file,
          uint32_t method_idx,
          InstructionSet instruction_set,
@@ -319,6 +384,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
          int start_instruction_id = 0)
       : allocator_(allocator),
         arena_stack_(arena_stack),
+        handle_cache_(handles),
         blocks_(allocator->Adapter(kArenaAllocBlockList)),
         reverse_post_order_(allocator->Adapter(kArenaAllocReversePostOrder)),
         linear_order_(allocator->Adapter(kArenaAllocLinearOrder)),
@@ -350,7 +416,6 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         cached_double_constants_(std::less<int64_t>(), allocator->Adapter(kArenaAllocConstantsMap)),
         cached_current_method_(nullptr),
         art_method_(nullptr),
-        inexact_object_rti_(ReferenceTypeInfo::CreateInvalid()),
         osr_(osr),
         baseline_(baseline),
         cha_single_implementation_list_(allocator->Adapter(kArenaAllocCHA)),
@@ -358,11 +423,11 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
     blocks_.reserve(kDefaultNumberOfBlocks);
   }
 
-  // Acquires and stores RTI of inexact Object to be used when creating HNullConstant.
-  void InitializeInexactObjectRTI(VariableSizedHandleScope* handles);
-
   ArenaAllocator* GetAllocator() const { return allocator_; }
   ArenaStack* GetArenaStack() const { return arena_stack_; }
+
+  HandleCache* GetHandleCache() { return &handle_cache_; }
+
   const ArenaVector<HBasicBlock*>& GetBlocks() const { return blocks_; }
 
   bool IsInSsaForm() const { return in_ssa_form_; }
@@ -625,7 +690,9 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   // before cursor.
   HInstruction* InsertOppositeCondition(HInstruction* cond, HInstruction* cursor);
 
-  ReferenceTypeInfo GetInexactObjectRti() const { return inexact_object_rti_; }
+  ReferenceTypeInfo GetInexactObjectRti() {
+    return ReferenceTypeInfo::Create(handle_cache_.GetObjectClassHandle(), /* is_exact= */ false);
+  }
 
   uint32_t GetNumberOfCHAGuards() { return number_of_cha_guards_; }
   void SetNumberOfCHAGuards(uint32_t num) { number_of_cha_guards_ = num; }
@@ -667,6 +734,8 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
 
   ArenaAllocator* const allocator_;
   ArenaStack* const arena_stack_;
+
+  HandleCache handle_cache_;
 
   // List of blocks in insertion order.
   ArenaVector<HBasicBlock*> blocks_;
@@ -773,10 +842,6 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   // for example for methods whose declaring class could not be resolved
   // (such as when the superclass could not be found).
   ArtMethod* art_method_;
-
-  // Keep the RTI of inexact Object to avoid having to pass stack handle
-  // collection pointer to passes which may create NullConstant.
-  ReferenceTypeInfo inexact_object_rti_;
 
   // Whether we are compiling this graph for on stack replacement: this will
   // make all loops seen as irreducible and emit special stack maps to mark

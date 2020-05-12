@@ -64,7 +64,6 @@ namespace art {
 class HSelectGenerator : public HOptimization {
  public:
   HSelectGenerator(HGraph* graph,
-                   VariableSizedHandleScope* handles,
                    OptimizingCompilerStats* stats,
                    const char* name = kSelectGeneratorPassName);
 
@@ -73,7 +72,6 @@ class HSelectGenerator : public HOptimization {
   static constexpr const char* kSelectGeneratorPassName = "select_generator";
 
  private:
-  VariableSizedHandleScope* handle_scope_;
   DISALLOW_COPY_AND_ASSIGN(HSelectGenerator);
 };
 
