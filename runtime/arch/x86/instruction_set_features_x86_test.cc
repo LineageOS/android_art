@@ -27,9 +27,9 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromDefaultVariant) {
   ASSERT_TRUE(x86_features.get() != nullptr) << error_msg;
   EXPECT_EQ(x86_features->GetInstructionSet(), InstructionSet::kX86);
   EXPECT_TRUE(x86_features->Equals(x86_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_features->AsBitmap(), 0U);
+  EXPECT_EQ(InstructionSetFeatures::FromCppDefines()->GetFeatureString(),
+            x86_features->GetFeatureString());
+  EXPECT_EQ(x86_features->AsBitmap(), InstructionSetFeatures::FromCppDefines()->AsBitmap());
 }
 
 TEST(X86InstructionSetFeaturesTest, X86FeaturesFromAtomVariant) {
@@ -44,16 +44,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromAtomVariant) {
                x86_features->GetFeatureString().c_str());
   EXPECT_EQ(x86_features->AsBitmap(), 1U);
 
-  // Build features for a 32-bit x86 default processor.
-  std::unique_ptr<const InstructionSetFeatures> x86_default_features(
-      InstructionSetFeatures::FromVariant(InstructionSet::kX86, "default", &error_msg));
-  ASSERT_TRUE(x86_default_features.get() != nullptr) << error_msg;
-  EXPECT_EQ(x86_default_features->GetInstructionSet(), InstructionSet::kX86);
-  EXPECT_TRUE(x86_default_features->Equals(x86_default_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_default_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_default_features->AsBitmap(), 0U);
-
   // Build features for a 64-bit x86-64 atom processor.
   std::unique_ptr<const InstructionSetFeatures> x86_64_features(
       InstructionSetFeatures::FromVariant(InstructionSet::kX86_64, "atom", &error_msg));
@@ -65,8 +55,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromAtomVariant) {
   EXPECT_EQ(x86_64_features->AsBitmap(), 1U);
 
   EXPECT_FALSE(x86_64_features->Equals(x86_features.get()));
-  EXPECT_FALSE(x86_64_features->Equals(x86_default_features.get()));
-  EXPECT_FALSE(x86_features->Equals(x86_default_features.get()));
 }
 
 TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSandybridgeVariant) {
@@ -81,16 +69,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSandybridgeVariant) {
                x86_features->GetFeatureString().c_str());
   EXPECT_EQ(x86_features->AsBitmap(), 39U);
 
-  // Build features for a 32-bit x86 default processor.
-  std::unique_ptr<const InstructionSetFeatures> x86_default_features(
-      InstructionSetFeatures::FromVariant(InstructionSet::kX86, "default", &error_msg));
-  ASSERT_TRUE(x86_default_features.get() != nullptr) << error_msg;
-  EXPECT_EQ(x86_default_features->GetInstructionSet(), InstructionSet::kX86);
-  EXPECT_TRUE(x86_default_features->Equals(x86_default_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_default_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_default_features->AsBitmap(), 0U);
-
   // Build features for a 64-bit x86-64 sandybridge processor.
   std::unique_ptr<const InstructionSetFeatures> x86_64_features(
       InstructionSetFeatures::FromVariant(InstructionSet::kX86_64, "sandybridge", &error_msg));
@@ -102,8 +80,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSandybridgeVariant) {
   EXPECT_EQ(x86_64_features->AsBitmap(), 39U);
 
   EXPECT_FALSE(x86_64_features->Equals(x86_features.get()));
-  EXPECT_FALSE(x86_64_features->Equals(x86_default_features.get()));
-  EXPECT_FALSE(x86_features->Equals(x86_default_features.get()));
 }
 
 TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSilvermontVariant) {
@@ -118,16 +94,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSilvermontVariant) {
                x86_features->GetFeatureString().c_str());
   EXPECT_EQ(x86_features->AsBitmap(), 39U);
 
-  // Build features for a 32-bit x86 default processor.
-  std::unique_ptr<const InstructionSetFeatures> x86_default_features(
-      InstructionSetFeatures::FromVariant(InstructionSet::kX86, "default", &error_msg));
-  ASSERT_TRUE(x86_default_features.get() != nullptr) << error_msg;
-  EXPECT_EQ(x86_default_features->GetInstructionSet(), InstructionSet::kX86);
-  EXPECT_TRUE(x86_default_features->Equals(x86_default_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_default_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_default_features->AsBitmap(), 0U);
-
   // Build features for a 64-bit x86-64 silvermont processor.
   std::unique_ptr<const InstructionSetFeatures> x86_64_features(
       InstructionSetFeatures::FromVariant(InstructionSet::kX86_64, "silvermont", &error_msg));
@@ -139,8 +105,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromSilvermontVariant) {
   EXPECT_EQ(x86_64_features->AsBitmap(), 39U);
 
   EXPECT_FALSE(x86_64_features->Equals(x86_features.get()));
-  EXPECT_FALSE(x86_64_features->Equals(x86_default_features.get()));
-  EXPECT_FALSE(x86_features->Equals(x86_default_features.get()));
 }
 
 TEST(X86InstructionSetFeaturesTest, X86FeaturesFromKabylakeVariant) {
@@ -155,16 +119,6 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromKabylakeVariant) {
                x86_features->GetFeatureString().c_str());
   EXPECT_EQ(x86_features->AsBitmap(), 63U);
 
-  // Build features for a 32-bit x86 default processor.
-  std::unique_ptr<const InstructionSetFeatures> x86_default_features(
-      InstructionSetFeatures::FromVariant(InstructionSet::kX86, "default", &error_msg));
-  ASSERT_TRUE(x86_default_features.get() != nullptr) << error_msg;
-  EXPECT_EQ(x86_default_features->GetInstructionSet(), InstructionSet::kX86);
-  EXPECT_TRUE(x86_default_features->Equals(x86_default_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_default_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_default_features->AsBitmap(), 0U);
-
   // Build features for a 64-bit x86-64 kabylake processor.
   std::unique_ptr<const InstructionSetFeatures> x86_64_features(
       InstructionSetFeatures::FromVariant(InstructionSet::kX86_64, "kabylake", &error_msg));
@@ -176,7 +130,5 @@ TEST(X86InstructionSetFeaturesTest, X86FeaturesFromKabylakeVariant) {
   EXPECT_EQ(x86_64_features->AsBitmap(), 63U);
 
   EXPECT_FALSE(x86_64_features->Equals(x86_features.get()));
-  EXPECT_FALSE(x86_64_features->Equals(x86_default_features.get()));
-  EXPECT_FALSE(x86_features->Equals(x86_default_features.get()));
-  }
+}
 }  // namespace art

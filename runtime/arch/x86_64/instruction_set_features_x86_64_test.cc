@@ -27,9 +27,9 @@ TEST(X86_64InstructionSetFeaturesTest, X86Features) {
   ASSERT_TRUE(x86_64_features.get() != nullptr) << error_msg;
   EXPECT_EQ(x86_64_features->GetInstructionSet(), InstructionSet::kX86_64);
   EXPECT_TRUE(x86_64_features->Equals(x86_64_features.get()));
-  EXPECT_STREQ("-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt",
-               x86_64_features->GetFeatureString().c_str());
-  EXPECT_EQ(x86_64_features->AsBitmap(), 0U);
+  EXPECT_EQ(InstructionSetFeatures::FromCppDefines()->GetFeatureString(),
+            x86_64_features->GetFeatureString());
+  EXPECT_EQ(x86_64_features->AsBitmap(), InstructionSetFeatures::FromCppDefines()->AsBitmap());
 }
 
 }  // namespace art
