@@ -29,6 +29,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "android-base/parsebool.h"
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
 
@@ -148,15 +149,26 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("");
   UsageError("  --generate-boot-image-profile: Generate a boot image profile based on input");
   UsageError("      profiles. Requires passing in dex files to inspect properties of classes.");
-  UsageError("  --boot-image-class-threshold=<value>: specify minimum number of class occurrences");
-  UsageError("      to include a class in the boot image profile. Default is 10.");
-  UsageError("  --boot-image-clean-class-threshold=<value>: specify minimum number of clean class");
-  UsageError("      occurrences to include a class in the boot image profile. A clean class is a");
-  UsageError("      class that doesn't have any static fields or native methods and is likely to");
-  UsageError("      remain clean in the image. Default is 3.");
-  UsageError("  --boot-image-sampled-method-threshold=<value>: minimum number of profiles a");
-  UsageError("      non-hot method needs to be in order to be hot in the output profile. The");
-  UsageError("      default is max int.");
+  UsageError("  --method-threshold=percentage between 0 and 100"
+             "      what threshold to apply to the methods when deciding whether or not to"
+             "      include it in the final profile.");
+  UsageError("  --class-threshold=percentage between 0 and 100"
+             "      what threshold to apply to the classes when deciding whether or not to"
+             "      include it in the final profile.");
+  UsageError("  --clean-class-threshold=percentage between 0 and 100"
+             "      what threshold to apply to the clean classes when deciding whether or not to"
+             "      include it in the final profile.");
+  UsageError("  --preloaded-class-threshold=percentage between 0 and 100"
+            "      what threshold to apply to the classes when deciding whether or not to"
+            "       include it in the final preloaded classes.");
+  UsageError("  --upgrade-startup-to-hot=true|false:"
+             "      whether or not to upgrade startup methods to hot");
+  UsageError("  --special-package=pkg_name:percentage between 0 and 100"
+             "      what threshold to apply to the methods/classes that are used by the given"
+             "      package when deciding whether or not to include it in the final profile.");
+  UsageError("  --debug-append-uses=bool: whether or not to append package use as debug info.");
+  UsageError("  --out-profile-path=path: boot image profile output path");
+  UsageError("  --out-preloaded-classes-path=path: preloaded classes output path");
   UsageError("  --copy-and-update-profile-key: if present, profman will copy the profile from");
   UsageError("      the file passed with --profile-fd(file) to the profile passed with");
   UsageError("      --reference-profile-fd(file) and update at the same time the profile-key");
@@ -194,32 +206,60 @@ NO_RETURN static void Abort(const char* msg) {
   LOG(ERROR) << msg;
   exit(1);
 }
-
 template <typename T>
-static void ParseUintOption(const char* raw_option,
-                            std::string_view option_prefix,
-                            T* out) {
-  DCHECK(EndsWith(option_prefix, "="));
-  DCHECK(StartsWith(raw_option, option_prefix)) << raw_option << " " << option_prefix;
-  const char* value_string = raw_option + option_prefix.size();
+static void ParseUintValue(const std::string& option_name,
+                           const std::string& value,
+                           T* out,
+                           T min = std::numeric_limits<T>::min(),
+                           T max = std::numeric_limits<T>::max()) {
   int64_t parsed_integer_value = 0;
-  if (!android::base::ParseInt(value_string, &parsed_integer_value)) {
-    std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
-    Usage("Failed to parse %s '%s' as an integer", option_name.c_str(), value_string);
+  if (!android::base::ParseInt(
+      value,
+      &parsed_integer_value,
+      static_cast<int64_t>(min),
+      static_cast<int64_t>(max))) {
+    Usage("Failed to parse %s '%s' as an integer", option_name.c_str(), value.c_str());
   }
   if (parsed_integer_value < 0) {
-    std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
     Usage("%s passed a negative value %" PRId64, option_name.c_str(), parsed_integer_value);
   }
   if (static_cast<uint64_t>(parsed_integer_value) >
       static_cast<std::make_unsigned_t<T>>(std::numeric_limits<T>::max())) {
-    std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
     Usage("%s passed a value %" PRIu64 " above max (%" PRIu64 ")",
           option_name.c_str(),
           static_cast<uint64_t>(parsed_integer_value),
           static_cast<uint64_t>(std::numeric_limits<T>::max()));
   }
   *out = dchecked_integral_cast<T>(parsed_integer_value);
+}
+
+template <typename T>
+static void ParseUintOption(const char* raw_option,
+                            std::string_view option_prefix,
+                            T* out,
+                            T min = std::numeric_limits<T>::min(),
+                            T max = std::numeric_limits<T>::max()) {
+  DCHECK(EndsWith(option_prefix, "="));
+  DCHECK(StartsWith(raw_option, option_prefix)) << raw_option << " " << option_prefix;
+  std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
+  const char* value_string = raw_option + option_prefix.size();
+
+  ParseUintValue(option_name, value_string, out, min, max);
+}
+
+static void ParseBoolOption(const char* raw_option,
+                            std::string_view option_prefix,
+                            bool* out) {
+  DCHECK(EndsWith(option_prefix, "="));
+  DCHECK(StartsWith(raw_option, option_prefix)) << raw_option << " " << option_prefix;
+  const char* value_string = raw_option + option_prefix.size();
+  android::base::ParseBoolResult result = android::base::ParseBool(value_string);
+  if (result == android::base::ParseBoolResult::kError) {
+    std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
+    Usage("Failed to parse %s '%s' as an integer", option_name.c_str(), value_string);
+  }
+
+  *out = result == android::base::ParseBoolResult::kTrue;
 }
 
 // TODO(calin): This class has grown too much from its initial design. Split the functionality
@@ -279,18 +319,52 @@ class ProfMan final {
         generate_boot_profile_ = true;
       } else if (option == "--generate-boot-image-profile") {
         generate_boot_image_profile_ = true;
-      } else if (StartsWith(option, "--boot-image-class-threshold=")) {
+      } else if (StartsWith(option, "--method-threshold=")) {
         ParseUintOption(raw_option,
-                        "--boot-image-class-threshold=",
-                        &boot_image_options_.image_class_theshold);
-      } else if (StartsWith(option, "--boot-image-clean-class-threshold=")) {
+                        "--method-threshold=",
+                        &boot_image_options_.method_threshold,
+                        0u,
+                        100u);
+      } else if (StartsWith(option, "--class-threshold=")) {
         ParseUintOption(raw_option,
-                        "--boot-image-clean-class-threshold=",
-                        &boot_image_options_.image_class_clean_theshold);
-      } else if (StartsWith(option, "--boot-image-sampled-method-threshold=")) {
+                        "--class-threshold=",
+                        &boot_image_options_.image_class_threshold,
+                        0u,
+                        100u);
+      } else if (StartsWith(option, "--clean-class-threshold=")) {
         ParseUintOption(raw_option,
-                        "--boot-image-sampled-method-threshold=",
-                        &boot_image_options_.compiled_method_threshold);
+                        "--clean-class-threshold=",
+                        &boot_image_options_.image_class_clean_threshold,
+                        0u,
+                        100u);
+      } else if (StartsWith(option, "--preloaded-class-threshold=")) {
+        ParseUintOption(raw_option,
+                        "--preloaded-class-threshold=",
+                        &boot_image_options_.preloaded_class_threshold,
+                        0u,
+                        100u);
+      } else if (StartsWith(option, "--upgrade-startup-to-hot=")) {
+        ParseBoolOption(raw_option,
+                        "--upgrade-startup-to-hot=",
+                        &boot_image_options_.upgrade_startup_to_hot);
+      } else if (StartsWith(option, "--special-package=")) {
+        std::vector<std::string> values;
+        Split(std::string(option.substr(strlen("--special-package="))), ':', &values);
+        if (values.size() != 2) {
+          Usage("--special-package needs to be specified as pkg_name:threshold");
+        }
+        uint32_t threshold;
+        ParseUintValue("special-package", values[1], &threshold, 0u, 100u);
+        boot_image_options_.special_packages_thresholds.Overwrite(values[0], threshold);
+      } else if (StartsWith(option, "--debug-append-uses=")) {
+        ParseBoolOption(raw_option,
+                        "--debug-append-uses=",
+                        &boot_image_options_.append_package_use_list);
+      } else if (StartsWith(option, "--out-profile-path=")) {
+        boot_profile_out_path_ = std::string(option.substr(strlen("--out-profile-path=")));
+      } else if (StartsWith(option, "--out-preloaded-classes-path=")) {
+        preloaded_classes_out_path_ = std::string(
+            option.substr(strlen("--out-preloaded-classes-path=")));
       } else if (StartsWith(option, "--profile-file=")) {
         profile_files_.push_back(std::string(option.substr(strlen("--profile-file="))));
       } else if (StartsWith(option, "--profile-file-fd=")) {
@@ -1259,10 +1333,9 @@ class ProfMan final {
 
   // Create and store a ProfileCompilationInfo for the boot image.
   int CreateBootImageProfile() {
-    // Open the profile output file.
-    const int reference_fd = OpenReferenceProfile();
-    if (!FdIsValid(reference_fd)) {
-      PLOG(ERROR) << "Error opening reference profile";
+    // Open the input profile file.
+    if (profile_files_.size() != 1) {
+      LOG(ERROR) << "A single --profile-file must be specified.";
       return -1;
     }
     // Open the dex files.
@@ -1272,34 +1345,21 @@ class ProfMan final {
       PLOG(ERROR) << "Expected dex files for creating boot profile";
       return -2;
     }
-    // Open the input profiles.
-    std::vector<std::unique_ptr<const ProfileCompilationInfo>> profiles;
-    if (!profile_files_fd_.empty()) {
-      for (int profile_file_fd : profile_files_fd_) {
-        std::unique_ptr<const ProfileCompilationInfo> profile(LoadProfile("", profile_file_fd));
-        if (profile == nullptr) {
-          return -3;
-        }
-        profiles.emplace_back(std::move(profile));
-      }
+
+    ProfileCompilationInfo profile;
+    if (!profile.Load(profile_files_[0], /*clear_if_invalid=*/ false)) {
+      LOG(ERROR) << "Reference profile is not a valid profile.";
+      return -3;
     }
-    if (!profile_files_.empty()) {
-      for (const std::string& profile_file : profile_files_) {
-        std::unique_ptr<const ProfileCompilationInfo> profile(LoadProfile(profile_file, kInvalidFd));
-        if (profile == nullptr) {
-          return -4;
-        }
-        profiles.emplace_back(std::move(profile));
-      }
+
+    if (!GenerateBootImageProfile(dex_files,
+                                  profile,
+                                  boot_image_options_,
+                                  boot_profile_out_path_,
+                                  preloaded_classes_out_path_)) {
+      LOG(ERROR) << "There was an error when generating the boot image profiles";
+      return -4;
     }
-    ProfileCompilationInfo out_profile;
-    GenerateBootImageProfile(dex_files,
-                             profiles,
-                             boot_image_options_,
-                             VLOG_IS_ON(profiler),
-                             &out_profile);
-    out_profile.Save(reference_fd);
-    close(reference_fd);
     return 0;
   }
 
@@ -1453,6 +1513,8 @@ class ProfMan final {
   uint64_t start_ns_;
   bool copy_and_update_profile_key_;
   ProfileAssistant::Options profile_assistant_options_;
+  std::string boot_profile_out_path_;
+  std::string preloaded_classes_out_path_;
 };
 
 // See ProfileAssistant::ProcessingResult for return codes.
