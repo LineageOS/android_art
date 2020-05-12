@@ -57,6 +57,8 @@
 
 namespace art {
 
+using ProfileSampleAnnotation = ProfileCompilationInfo::ProfileSampleAnnotation;
+
 static int original_argc;
 static char** original_argv;
 
@@ -179,6 +181,8 @@ static const std::string kMissingTypesMarker = "missing_types";  // NOLINT [runt
 static const std::string kInvalidClassDescriptor = "invalid_class";  // NOLINT [runtime/string] [4]
 static const std::string kInvalidMethod = "invalid_method";  // NOLINT [runtime/string] [4]
 static const std::string kClassAllMethods = "*";  // NOLINT [runtime/string] [4]
+static constexpr char kAnnotationStart = '{';
+static constexpr char kAnnotationEnd = '}';
 static constexpr char kProfileParsingInlineChacheSep = '+';
 static constexpr char kProfileParsingTypeSep = ',';
 static constexpr char kProfileParsingFirstCharInSignature = '(';
@@ -936,18 +940,42 @@ class ProfMan final {
   // Process a line defining a class or a method and its inline caches.
   // Upon success return true and add the class or the method info to profile.
   // The possible line formats are:
-  // "LJustTheCass;".
+  // "LJustTheClass;".
   // "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;".
   // "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,invalid_class".
   // "LTestInline;->inlineMissingTypes(LSuper;)I+missing_types".
-  // "LTestInline;->inlineNoInlineCaches(LSuper;)I".
+  // "{annotation}LTestInline;->inlineNoInlineCaches(LSuper;)I".
   // "LTestInline;->*".
   // "invalid_class".
   // "LTestInline;->invalid_method".
   // The method and classes are searched only in the given dex files.
   bool ProcessLine(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                   const std::string& line,
+                   const std::string& maybe_annotated_line,
                    /*out*/ProfileCompilationInfo* profile) {
+    // First, process the annotation.
+    if (maybe_annotated_line.empty()) {
+      return true;
+    }
+    // Working line variable which will contain the user input without the annotations.
+    std::string line = maybe_annotated_line;
+
+    std::string annotation_string;
+    if (maybe_annotated_line[0] == kAnnotationStart) {
+      size_t end_pos = maybe_annotated_line.find(kAnnotationEnd, 0);
+      if (end_pos == std::string::npos || end_pos == 0) {
+        LOG(ERROR) << "Invalid line: " << maybe_annotated_line;
+        return false;
+      }
+      annotation_string = maybe_annotated_line.substr(1, end_pos - 1);
+      // Update the working line.
+      line = maybe_annotated_line.substr(end_pos + 1);
+    }
+
+    ProfileSampleAnnotation annotation = annotation_string.empty()
+        ? ProfileSampleAnnotation::kNone
+        : ProfileSampleAnnotation(annotation_string);
+
+    // Now process the rest of the lines.
     std::string klass;
     std::string method_str;
     bool is_hot = false;
@@ -1010,10 +1038,11 @@ class ProfMan final {
         }
       }
       // TODO: Check return values?
-      profile->AddMethods(methods, static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags));
+      profile->AddMethods(
+          methods, static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags), annotation);
       std::set<dex::TypeIndex> classes;
       classes.insert(class_ref.TypeIndex());
-      profile->AddClassesForDex(dex_file, classes.begin(), classes.end());
+      profile->AddClassesForDex(dex_file, classes.begin(), classes.end(), annotation);
       return true;
     }
 
@@ -1065,14 +1094,16 @@ class ProfMan final {
     MethodReference ref(class_ref.dex_file, method_index);
     if (is_hot) {
       profile->AddMethod(ProfileMethodInfo(ref, inline_caches),
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags));
+          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+          annotation);
     }
     if (flags != 0) {
       if (!profile->AddMethod(ProfileMethodInfo(ref),
-                              static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags))) {
+                              static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+                              annotation)) {
         return false;
       }
-      DCHECK(profile->GetMethodHotness(ref).IsInProfile());
+      DCHECK(profile->GetMethodHotness(ref, annotation).IsInProfile()) << method_spec;
     }
     return true;
   }
