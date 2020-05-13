@@ -540,7 +540,6 @@ GraphAnalysisResult SsaBuilder::BuildSsa() {
   ReferenceTypePropagation(graph_,
                            class_loader_,
                            dex_cache_,
-                           handles_,
                            /* is_first_run= */ true).Run();
 
   // HInstructionBuilder duplicated ArrayGet instructions with ambiguous type

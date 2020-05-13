@@ -37,7 +37,6 @@ class HInliner : public HOptimization {
            CodeGenerator* codegen,
            const DexCompilationUnit& outer_compilation_unit,
            const DexCompilationUnit& caller_compilation_unit,
-           VariableSizedHandleScope* handles,
            OptimizingCompilerStats* stats,
            size_t total_number_of_dex_registers,
            size_t total_number_of_instructions,
@@ -54,7 +53,6 @@ class HInliner : public HOptimization {
         parent_(parent),
         depth_(depth),
         inlining_budget_(0),
-        handles_(handles),
         inline_stats_(nullptr) {}
 
   bool Run() override;
@@ -330,7 +328,6 @@ class HInliner : public HOptimization {
 
   // The budget left for inlining, in number of instructions.
   size_t inlining_budget_;
-  VariableSizedHandleScope* const handles_;
 
   // Used to record stats about optimizations on the inlined graph.
   // If the inlining is successful, these stats are merged to the caller graph's stats.

@@ -855,7 +855,8 @@ bool HInliner::TryInlineMonomorphicCall(HInvoke* invoke_instruction,
 
   ClassLinker* class_linker = caller_compilation_unit_.GetClassLinker();
   PointerSize pointer_size = class_linker->GetImagePointerSize();
-  Handle<mirror::Class> monomorphic_type = handles_->NewHandle(GetMonomorphicType(classes));
+  Handle<mirror::Class> monomorphic_type =
+      graph_->GetHandleCache()->NewHandle(GetMonomorphicType(classes));
   resolved_method = ResolveMethodFromInlineCache(
       monomorphic_type, resolved_method, invoke_instruction, pointer_size);
 
@@ -891,7 +892,6 @@ bool HInliner::TryInlineMonomorphicCall(HInvoke* invoke_instruction,
   ReferenceTypePropagation rtp_fixup(graph_,
                                      outer_compilation_unit_.GetClassLoader(),
                                      outer_compilation_unit_.GetDexCache(),
-                                     handles_,
                                      /* is_first_run= */ false);
   rtp_fixup.Run();
 
@@ -1019,7 +1019,7 @@ bool HInliner::TryInlinePolymorphicCall(HInvoke* invoke_instruction,
     }
     ArtMethod* method = nullptr;
 
-    Handle<mirror::Class> handle = handles_->NewHandle(classes->Get(i));
+    Handle<mirror::Class> handle = graph_->GetHandleCache()->NewHandle(classes->Get(i));
     method = ResolveMethodFromInlineCache(
         handle, resolved_method, invoke_instruction, pointer_size);
     if (method == nullptr) {
@@ -1091,7 +1091,6 @@ bool HInliner::TryInlinePolymorphicCall(HInvoke* invoke_instruction,
   ReferenceTypePropagation rtp_fixup(graph_,
                                      outer_compilation_unit_.GetClassLoader(),
                                      outer_compilation_unit_.GetDexCache(),
-                                     handles_,
                                      /* is_first_run= */ false);
   rtp_fixup.Run();
   return true;
@@ -1287,7 +1286,6 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(
   ReferenceTypePropagation rtp_fixup(graph_,
                                      outer_compilation_unit_.GetClassLoader(),
                                      outer_compilation_unit_.GetDexCache(),
-                                     handles_,
                                      /* is_first_run= */ false);
   rtp_fixup.Run();
 
@@ -1411,7 +1409,6 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
     ReferenceTypePropagation(graph_,
                              outer_compilation_unit_.GetClassLoader(),
                              outer_compilation_unit_.GetDexCache(),
-                             handles_,
                              /* is_first_run= */ false).Run();
   }
   return true;
@@ -1729,11 +1726,11 @@ HInstanceFieldGet* HInliner::CreateInstanceFieldGet(uint32_t field_index,
       /* dex_pc= */ 0);
   if (iget->GetType() == DataType::Type::kReference) {
     // Use the same dex_cache that we used for field lookup as the hint_dex_cache.
-    Handle<mirror::DexCache> dex_cache = handles_->NewHandle(referrer->GetDexCache());
+    Handle<mirror::DexCache> dex_cache =
+        graph_->GetHandleCache()->NewHandle(referrer->GetDexCache());
     ReferenceTypePropagation rtp(graph_,
                                  outer_compilation_unit_.GetClassLoader(),
                                  dex_cache,
-                                 handles_,
                                  /* is_first_run= */ false);
     rtp.Visit(iget);
   }
@@ -1772,11 +1769,9 @@ HInstanceFieldSet* HInliner::CreateInstanceFieldSet(uint32_t field_index,
 }
 
 template <typename T>
-static inline Handle<T> NewHandleIfDifferent(ObjPtr<T> object,
-                                             Handle<T> hint,
-                                             VariableSizedHandleScope* handles)
+static inline Handle<T> NewHandleIfDifferent(ObjPtr<T> object, Handle<T> hint, HGraph* graph)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  return (object != hint.Get()) ? handles->NewHandle(object) : hint;
+  return (object != hint.Get()) ? graph->GetHandleCache()->NewHandle(object) : hint;
 }
 
 static bool CanEncodeInlinedMethodInStackMap(const DexFile& caller_dex_file, ArtMethod* callee)
@@ -1839,7 +1834,6 @@ void HInliner::SubstituteArguments(HGraph* callee_graph,
     ReferenceTypePropagation(callee_graph,
                              outer_compilation_unit_.GetClassLoader(),
                              dex_compilation_unit.GetDexCache(),
-                             handles_,
                              /* is_first_run= */ false).Run();
   }
 }
@@ -1997,13 +1991,14 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
   ClassLinker* class_linker = caller_compilation_unit_.GetClassLinker();
   Handle<mirror::DexCache> dex_cache = NewHandleIfDifferent(resolved_method->GetDexCache(),
                                                             caller_compilation_unit_.GetDexCache(),
-                                                            handles_);
+                                                            graph_);
   Handle<mirror::ClassLoader> class_loader =
       NewHandleIfDifferent(resolved_method->GetDeclaringClass()->GetClassLoader(),
                            caller_compilation_unit_.GetClassLoader(),
-                           handles_);
+                           graph_);
 
-  Handle<mirror::Class> compiling_class = handles_->NewHandle(resolved_method->GetDeclaringClass());
+  Handle<mirror::Class> compiling_class =
+      graph_->GetHandleCache()->NewHandle(resolved_method->GetDeclaringClass());
   DexCompilationUnit dex_compilation_unit(
       class_loader,
       class_linker,
@@ -2035,6 +2030,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
   HGraph* callee_graph = new (graph_->GetAllocator()) HGraph(
       graph_->GetAllocator(),
       graph_->GetArenaStack(),
+      graph_->GetHandleCache()->GetHandles(),
       callee_dex_file,
       method_index,
       codegen_->GetCompilerOptions().GetInstructionSet(),
@@ -2066,8 +2062,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
                         &outer_compilation_unit_,
                         codegen_,
                         inline_stats_,
-                        resolved_method->GetQuickenedInfo(),
-                        handles_);
+                        resolved_method->GetQuickenedInfo());
 
   if (builder.BuildGraph() != kAnalysisSuccess) {
     LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCannotBuild)
@@ -2158,7 +2153,6 @@ void HInliner::RunOptimizations(HGraph* callee_graph,
                    codegen_,
                    outer_compilation_unit_,
                    dex_compilation_unit,
-                   handles_,
                    inline_stats_,
                    total_number_of_dex_registers_ + accessor.RegistersSize(),
                    total_number_of_instructions_ + number_of_instructions,
@@ -2267,7 +2261,7 @@ void HInliner::FixUpReturnReferenceType(ArtMethod* resolved_method,
         DCHECK(return_replacement->IsPhi());
         ObjPtr<mirror::Class> cls = resolved_method->LookupResolvedReturnType();
         ReferenceTypeInfo rti = ReferenceTypePropagation::IsAdmissible(cls)
-            ? ReferenceTypeInfo::Create(handles_->NewHandle(cls))
+            ? ReferenceTypeInfo::Create(graph_->GetHandleCache()->NewHandle(cls))
             : graph_->GetInexactObjectRti();
         return_replacement->SetReferenceTypeInfo(rti);
       }
