@@ -118,11 +118,8 @@ X86FeaturesUniquePtr X86InstructionSetFeatures::FromVariant(
   // Verify that variant is known.
   bool known_variant = FindVariantInArray(x86_known_variants, arraysize(x86_known_variants),
                                           variant);
-  if (!known_variant) {
-    if (variant != "default") {
-      LOG(WARNING) << "Unexpected CPU variant for X86 using defaults: " << variant;
-    }
-    return FromCppDefines(x86_64);
+  if (!known_variant && variant != "default") {
+    LOG(WARNING) << "Unexpected CPU variant for X86 using defaults: " << variant;
   }
 
   return Create(x86_64, has_SSSE3, has_SSE4_1, has_SSE4_2, has_AVX, has_AVX2, has_POPCNT);
