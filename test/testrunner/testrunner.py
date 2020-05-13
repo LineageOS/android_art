@@ -61,6 +61,7 @@ except Exception:
   raise
 
 import contextlib
+import csv
 import datetime
 import fnmatch
 import itertools
@@ -80,7 +81,6 @@ import env
 from target_config import target_config
 from device_config import device_config
 
-# timeout for individual tests.
 # TODO: make it adjustable per tests and for buildbots
 #
 # Note: this needs to be larger than run-test timeouts, as long as this script
@@ -131,6 +131,8 @@ ignore_skips = False
 build = False
 gdb = False
 gdb_arg = ''
+csv_result = None
+csv_writer = None
 runtime_option = ''
 with_agent = []
 zipapex_loc = None
@@ -145,6 +147,31 @@ extra_arguments = { "host" : [], "target" : [] }
 # key: variant_type.
 # value: set of variants user wants to run of type <key>.
 _user_input_variants = collections.defaultdict(set)
+
+def setup_csv_result():
+  """Set up the CSV output if required."""
+  global csv_writer
+  csv_writer = csv.writer(csv_result)
+  # Write the header.
+  csv_writer.writerow(['target', 'run', 'prebuild', 'compiler', 'relocate', 'trace', 'gc',
+                       'jni', 'image', 'debuggable', 'jvmti', 'cdex_level', 'test', 'address_size', 'result'])
+
+
+def send_csv_result(test, result):
+  """
+  Write a line into the CSV results file if one is available.
+  """
+  if csv_writer is not None:
+    csv_writer.writerow(extract_test_name(test) + [result])
+
+def close_csv_file():
+  global csv_result
+  global csv_writer
+  if csv_result is not None:
+    csv_writer = None
+    csv_result.flush()
+    csv_result.close()
+    csv_result = None
 
 def gather_test_info():
   """The method gathers test information about the test to be run which includes
@@ -710,6 +737,7 @@ def print_test_info(test_count, test_name, result, failed_test_info="",
           progress_info,
           test_name,
           result_text)
+    send_csv_result(test_name, result)
     print_text(info)
   except Exception as e:
     print_text(('%s\n%s\n') % (test_name, str(e)))
@@ -909,6 +937,32 @@ def print_analysis():
     for failed_test in sorted([test_info[0] for test_info in failed_tests]):
       print_text(('%s\n' % (failed_test)))
 
+test_name_matcher = None
+def extract_test_name(test_name):
+  """Parses the test name and returns all the parts"""
+  global test_name_matcher
+  if test_name_matcher is None:
+    regex = '^test-art-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['target']) + ')-'
+    regex += 'run-test-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['run']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['prebuild']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['compiler']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['relocate']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['trace']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['gc']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['jni']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['image']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['debuggable']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['jvmti']) + ')-'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['cdex_level']) + ')-'
+    regex += '(' + '|'.join(RUN_TEST_SET) + ')'
+    regex += '(' + '|'.join(VARIANT_TYPE_DICT['address_sizes']) + ')$'
+    test_name_matcher = re.compile(regex)
+  match = test_name_matcher.match(test_name)
+  if match:
+    return list(match.group(i) for i in range(1,15))
+  raise ValueError(test_name + " is not a valid test")
 
 def parse_test_name(test_name):
   """Parses the testname provided by the user.
@@ -928,39 +982,21 @@ def parse_test_name(test_name):
   if test_set:
     return test_set
 
-  regex = '^test-art-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['target']) + ')-'
-  regex += 'run-test-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['run']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['prebuild']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['compiler']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['relocate']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['trace']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['gc']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['jni']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['image']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['debuggable']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['jvmti']) + ')-'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['cdex_level']) + ')-'
-  regex += '(' + '|'.join(RUN_TEST_SET) + ')'
-  regex += '(' + '|'.join(VARIANT_TYPE_DICT['address_sizes']) + ')$'
-  match = re.match(regex, test_name)
-  if match:
-    _user_input_variants['target'].add(match.group(1))
-    _user_input_variants['run'].add(match.group(2))
-    _user_input_variants['prebuild'].add(match.group(3))
-    _user_input_variants['compiler'].add(match.group(4))
-    _user_input_variants['relocate'].add(match.group(5))
-    _user_input_variants['trace'].add(match.group(6))
-    _user_input_variants['gc'].add(match.group(7))
-    _user_input_variants['jni'].add(match.group(8))
-    _user_input_variants['image'].add(match.group(9))
-    _user_input_variants['debuggable'].add(match.group(10))
-    _user_input_variants['jvmti'].add(match.group(11))
-    _user_input_variants['cdex_level'].add(match.group(12))
-    _user_input_variants['address_sizes'].add(match.group(14))
-    return {match.group(13)}
-  raise ValueError(test_name + " is not a valid test")
+  parsed = parse_test_name(test_name)
+  _user_input_variants['target'].add(parsed[0])
+  _user_input_variants['run'].add(parsed[1])
+  _user_input_variants['prebuild'].add(parsed[2])
+  _user_input_variants['compiler'].add(parsed[3])
+  _user_input_variants['relocate'].add(parsed[4])
+  _user_input_variants['trace'].add(parsed[5])
+  _user_input_variants['gc'].add(parsed[6])
+  _user_input_variants['jni'].add(parsed[7])
+  _user_input_variants['image'].add(parsed[8])
+  _user_input_variants['debuggable'].add(parsed[9])
+  _user_input_variants['jvmti'].add(parsed[10])
+  _user_input_variants['cdex_level'].add(parsed[11])
+  _user_input_variants['address_sizes'].add(parsed[13])
+  return {parsed[12]}
 
 
 def setup_env_for_build_target(build_target, parser, options):
@@ -1013,6 +1049,7 @@ def parse_option():
   global run_all_configs
   global with_agent
   global zipapex_loc
+  global csv_result
 
   parser = argparse.ArgumentParser(description="Runs all or a subset of the ART test suite.")
   parser.add_argument('-t', '--test', action='append', dest='tests', help='name(s) of the test(s)')
@@ -1057,6 +1094,8 @@ def parse_option():
                             help='Location for runtime zipapex.')
   global_group.add_argument('-a', '--all', action='store_true', dest='run_all',
                             help="Run all the possible configurations for the input test set")
+  global_group.add_argument('--csv-results', action='store', dest='csv_result', default=None,
+                            type=argparse.FileType('w'), help='Store a CSV record of all results.')
   for variant_type, variant_set in VARIANT_TYPE_DICT.items():
     var_group = parser.add_argument_group(
         '{}-type Options'.format(variant_type),
@@ -1070,6 +1109,9 @@ def parse_option():
       var_group.add_argument(flag, action='store_true', dest=variant)
 
   options = vars(parser.parse_args())
+  if options['csv_result'] is not None:
+    csv_result = options['csv_result']
+    setup_csv_result()
   # Handle the --all-<type> meta-options
   for variant_type, variant_set in VARIANT_TYPE_DICT.items():
     if options['all_' + variant_type]:
@@ -1147,6 +1189,7 @@ def main():
     run_tests(RUN_TEST_SET)
 
   print_analysis()
+  close_csv_file()
 
   exit_code = 0 if len(failed_tests) == 0 else 1
   sys.exit(exit_code)
