@@ -117,10 +117,9 @@ class OptimizingUnitTestHelper {
 
   void ResetPoolAndAllocator() {
     pool_and_allocator_.reset(new ArenaPoolAndAllocator());
-    handles_.reset();  // When getting rid of the old HGraph, we can also reset handles_.
   }
 
-  HGraph* CreateGraph() {
+  HGraph* CreateGraph(VariableSizedHandleScope* handles = nullptr) {
     ArenaAllocator* const allocator = pool_and_allocator_->GetAllocator();
 
     // Reserve a big array of 0s so the dex file constructor can offsets from the header.
@@ -140,6 +139,7 @@ class OptimizingUnitTestHelper {
     return new (allocator) HGraph(
         allocator,
         pool_and_allocator_->GetArenaStack(),
+        handles,
         *dex_files_.back(),
         /*method_idx*/-1,
         kRuntimeISA);
@@ -147,8 +147,9 @@ class OptimizingUnitTestHelper {
 
   // Create a control-flow graph from Dex instructions.
   HGraph* CreateCFG(const std::vector<uint16_t>& data,
-                    DataType::Type return_type = DataType::Type::kInt32) {
-    HGraph* graph = CreateGraph();
+                    DataType::Type return_type = DataType::Type::kInt32,
+                    VariableSizedHandleScope* handles = nullptr) {
+    HGraph* graph = CreateGraph(handles);
 
     // The code item data might not aligned to 4 bytes, copy it to ensure that.
     const size_t code_item_size = data.size() * sizeof(data.front());
@@ -158,13 +159,9 @@ class OptimizingUnitTestHelper {
     const dex::CodeItem* code_item = reinterpret_cast<const dex::CodeItem*>(aligned_data);
 
     {
-      ScopedObjectAccess soa(Thread::Current());
-      if (handles_ == nullptr) {
-        handles_.reset(new VariableSizedHandleScope(soa.Self()));
-      }
       const DexCompilationUnit* dex_compilation_unit =
           new (graph->GetAllocator()) DexCompilationUnit(
-              handles_->NewHandle<mirror::ClassLoader>(nullptr),
+              /* class_loader= */ Handle<mirror::ClassLoader>(),  // Invalid handle.
               /* class_linker= */ nullptr,
               graph->GetDexFile(),
               code_item,
@@ -172,9 +169,9 @@ class OptimizingUnitTestHelper {
               /* method_idx= */ dex::kDexNoIndex,
               /* access_flags= */ 0u,
               /* verified_method= */ nullptr,
-              handles_->NewHandle<mirror::DexCache>(nullptr));
+              /* dex_cache= */ Handle<mirror::DexCache>());  // Invalid handle.
       CodeItemDebugInfoAccessor accessor(graph->GetDexFile(), code_item, /*dex_method_idx*/ 0u);
-      HGraphBuilder builder(graph, dex_compilation_unit, accessor, handles_.get(), return_type);
+      HGraphBuilder builder(graph, dex_compilation_unit, accessor, return_type);
       bool graph_built = (builder.BuildGraph() == kAnalysisSuccess);
       return graph_built ? graph : nullptr;
     }
@@ -205,7 +202,6 @@ class OptimizingUnitTestHelper {
 
   std::vector<std::unique_ptr<const StandardDexFile>> dex_files_;
   std::unique_ptr<ArenaPoolAndAllocator> pool_and_allocator_;
-  std::unique_ptr<VariableSizedHandleScope> handles_;
 };
 
 class OptimizingUnitTest : public CommonCompilerTest, public OptimizingUnitTestHelper {};
