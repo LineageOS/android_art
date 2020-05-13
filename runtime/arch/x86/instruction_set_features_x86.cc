@@ -97,6 +97,12 @@ X86FeaturesUniquePtr X86InstructionSetFeatures::Create(bool x86_64,
 X86FeaturesUniquePtr X86InstructionSetFeatures::FromVariant(
     const std::string& variant, std::string* error_msg ATTRIBUTE_UNUSED,
     bool x86_64) {
+  const bool is_runtime_isa =
+      kRuntimeISA == (x86_64 ? InstructionSet::kX86_64 : InstructionSet::kX86);
+  if (is_runtime_isa && variant == "default") {
+    return FromCppDefines(x86_64);
+  }
+
   bool has_SSSE3 = FindVariantInArray(x86_variants_with_ssse3, arraysize(x86_variants_with_ssse3),
                                       variant);
   bool has_SSE4_1 = FindVariantInArray(x86_variants_with_sse4_1,
