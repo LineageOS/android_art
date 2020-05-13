@@ -27,7 +27,7 @@
 #include "base/runtime_debug.h"
 #include "base/scoped_flock.h"
 #include "base/utils.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debugger.h"
 #include "dex/type_lookup_table.h"
 #include "gc/space/image_space.h"

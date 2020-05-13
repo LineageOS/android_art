@@ -20,7 +20,7 @@
 #include "nativehelper/jni_macros.h"
 
 #include "art_method-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/dex_file_annotations.h"
 #include "handle.h"
 #include "jni/jni_internal.h"

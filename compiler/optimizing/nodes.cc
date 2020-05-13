@@ -23,7 +23,7 @@
 #include "base/logging.h"
 #include "base/stl_util.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "code_generator.h"
 #include "common_dominator.h"
 #include "intrinsics.h"

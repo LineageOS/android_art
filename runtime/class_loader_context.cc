@@ -28,7 +28,7 @@
 #include "base/stl_util.h"
 #include "class_linker.h"
 #include "class_loader_utils.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/dex_file.h"
 #include "dex/dex_file_loader.h"

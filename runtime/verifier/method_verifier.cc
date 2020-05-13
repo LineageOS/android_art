@@ -34,7 +34,7 @@
 #include "base/time_utils.h"
 #include "base/utils.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "compiler_callbacks.h"
 #include "dex/class_accessor-inl.h"
 #include "dex/descriptors_names.h"

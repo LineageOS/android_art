@@ -61,7 +61,7 @@
 #include "base/utils.h"
 #include "class_linker-inl.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "class_status.h"
 #include "debugger.h"
 #include "dex/art_dex_file_loader.h"

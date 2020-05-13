@@ -32,7 +32,6 @@
 #include "base/scoped_arena_allocator.h"
 #include "base/timing_logger.h"
 #include "builder.h"
-#include "class_root.h"
 #include "code_generator.h"
 #include "compiled_method.h"
 #include "compiler.h"
