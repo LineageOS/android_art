@@ -19,7 +19,7 @@
 #include "base/enums.h"
 #include "callee_save_frame.h"
 #include "common_throws.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debug_print.h"
 #include "debugger.h"
 #include "dex/dex_file-inl.h"

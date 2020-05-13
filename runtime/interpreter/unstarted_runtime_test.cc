@@ -23,7 +23,7 @@
 #include "base/enums.h"
 #include "base/memory_tool.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_runtime_test.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_instruction.h"

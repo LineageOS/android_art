@@ -24,7 +24,7 @@
 #include "art_method-inl.h"
 #include "base/sdk_version.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_instruction-inl.h"
 #include "jni/jni_internal.h"

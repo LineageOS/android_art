@@ -18,7 +18,7 @@
 
 #include "art_method-inl.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "data_type-inl.h"
 #include "escape.h"
 #include "intrinsics.h"

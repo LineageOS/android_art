@@ -22,7 +22,7 @@
 
 #include "art_method-inl.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/method.h"
 #include "obj_ptr-inl.h"

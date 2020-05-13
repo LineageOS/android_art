@@ -20,7 +20,7 @@
 #include "base/mutex.h"
 #include "base/time_utils.h"
 #include "base/utils.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "collector/garbage_collector.h"
 #include "jni/java_vm_ext.h"
 #include "mirror/class-inl.h"
