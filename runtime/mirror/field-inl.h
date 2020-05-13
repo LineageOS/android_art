@@ -21,7 +21,7 @@
 
 #include "art_field-inl.h"
 #include "class-alloc-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex_cache-inl.h"
 #include "object-inl.h"
 

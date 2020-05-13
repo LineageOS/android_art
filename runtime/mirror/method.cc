@@ -17,7 +17,7 @@
 #include "method.h"
 
 #include "art_method.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "mirror/class-alloc-inl.h"
 #include "mirror/object-inl.h"
 #include "obj_ptr-inl.h"

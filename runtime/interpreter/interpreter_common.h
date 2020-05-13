@@ -39,7 +39,7 @@
 #include "base/logging.h"
 #include "base/macros.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_dex_operations.h"
 #include "common_throws.h"
 #include "dex/dex_file-inl.h"
