@@ -615,7 +615,8 @@ fi
 function guess_target_arch_name() {
     # Check whether this is a device with native bridge. Currently this is hardcoded
     # to x86 + arm.
-    x86_arm=`ls ${ANDROID_PRODUCT_OUT}/data/art-test | sort | grep -E '^(arm|x86)$'`
+    local guess_path=${ANDROID_PRODUCT_OUT}/system/apex/com.android.art.testing/javalib
+    local x86_arm=`ls ${guess_path} | sort | grep -E '^(arm|x86)$'`
     # Collapse line-breaks into spaces
     x86_arm=$(echo $x86_arm)
     if [ "x$x86_arm" = "xarm x86" ] ; then
@@ -627,8 +628,8 @@ function guess_target_arch_name() {
             target_arch_name=x86
         fi
     else
-        grep32bit=`ls ${ANDROID_PRODUCT_OUT}/data/art-test | grep -E '^(arm|x86)$'`
-        grep64bit=`ls ${ANDROID_PRODUCT_OUT}/data/art-test | grep -E '^(arm64|x86_64)$'`
+        local grep32bit=`ls ${guess_path} | grep -E '^(arm|x86)$'`
+        local grep64bit=`ls ${guess_path} | grep -E '^(arm64|x86_64)$'`
         if [ "x${suffix64}" = "x64" ]; then
             target_arch_name=${grep64bit}
         else
@@ -675,12 +676,12 @@ if [ "$runtime" = "dalvik" ]; then
 elif [ "$runtime" = "art" ]; then
     if [ "$target_mode" = "no" ]; then
         guess_host_arch_name
-        run_args+=(--boot "${ANDROID_HOST_OUT}/framework/core.art:*")
+        run_args+=(--boot "${ANDROID_HOST_OUT}/apex/com.android.art/javalib/boot.art")
         run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
         run_args+=(--runtime-option "-Djava.library.path=/data/nativetest${suffix64}/art/${target_arch_name}")
-        run_args+=(--boot "/data/art-test/core.art:/data/art-test/*")
+        run_args+=(--boot "/apex/com.android.art/javalib/boot.art")
     fi
     if [ "$relocate" = "yes" ]; then
       run_args+=(--relocate)

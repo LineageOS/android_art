@@ -93,6 +93,7 @@
 %  op_aput(rINST_reg="rINSTq", store="movq", shift="8", data_offset="MIRROR_WIDE_ARRAY_DATA_OFFSET", wide="1")
 
 %def op_aput_object():
+    EXPORT_PC                               # for the art_quick_aput_obj call
     movzbq  2(rPC), %rax                    # rax <- BB
     movzbq  3(rPC), %rcx                    # rcx <- CC
     GET_VREG %edi, %rax                     # edi <- vBB (array object)

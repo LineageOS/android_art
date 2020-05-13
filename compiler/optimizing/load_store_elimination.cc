@@ -668,7 +668,7 @@ class LSEVisitor : public HGraphDelegateVisitor {
         // Keep the store inside irreducible loops.
       }
     }
-    if (possibly_redundant) {
+    if (possibly_redundant && !instruction->CanThrow()) {
       possibly_removed_stores_.push_back(instruction);
     }
 
