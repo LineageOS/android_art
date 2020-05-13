@@ -142,8 +142,7 @@ ArenaVector<HOptimization*> ConstructOptimizations(
     HGraph* graph,
     OptimizingCompilerStats* stats,
     CodeGenerator* codegen,
-    const DexCompilationUnit& dex_compilation_unit,
-    VariableSizedHandleScope* handles);
+    const DexCompilationUnit& dex_compilation_unit);
 
 }  // namespace art
 

@@ -33,7 +33,6 @@ class ReferenceTypePropagation : public HOptimization {
   ReferenceTypePropagation(HGraph* graph,
                            Handle<mirror::ClassLoader> class_loader,
                            Handle<mirror::DexCache> hint_dex_cache,
-                           VariableSizedHandleScope* handles,
                            bool is_first_run,
                            const char* name = kReferenceTypePropagationPassName);
 
@@ -57,42 +56,9 @@ class ReferenceTypePropagation : public HOptimization {
   // Fix the reference type for an instruction whose inputs have changed.
   // For a select instruction, the reference types of the inputs are merged
   // and the resulting reference type is set on the select instruction.
-  static void FixUpInstructionType(HInstruction* instruction,
-                                   VariableSizedHandleScope* handle_scope);
+  static void FixUpInstructionType(HInstruction* instruction, HandleCache* handle_cache);
 
  private:
-  class HandleCache {
-   public:
-    explicit HandleCache(VariableSizedHandleScope* handles) : handles_(handles) { }
-
-    template <typename T>
-    MutableHandle<T> NewHandle(T* object) REQUIRES_SHARED(Locks::mutator_lock_) {
-      return handles_->NewHandle(object);
-    }
-
-    template <typename T>
-    MutableHandle<T> NewHandle(ObjPtr<T> object) REQUIRES_SHARED(Locks::mutator_lock_) {
-      return handles_->NewHandle(object);
-    }
-
-    ReferenceTypeInfo::TypeHandle GetObjectClassHandle();
-    ReferenceTypeInfo::TypeHandle GetClassClassHandle();
-    ReferenceTypeInfo::TypeHandle GetMethodHandleClassHandle();
-    ReferenceTypeInfo::TypeHandle GetMethodTypeClassHandle();
-    ReferenceTypeInfo::TypeHandle GetStringClassHandle();
-    ReferenceTypeInfo::TypeHandle GetThrowableClassHandle();
-
-   private:
-    VariableSizedHandleScope* handles_;
-
-    ReferenceTypeInfo::TypeHandle object_class_handle_;
-    ReferenceTypeInfo::TypeHandle class_class_handle_;
-    ReferenceTypeInfo::TypeHandle method_handle_class_handle_;
-    ReferenceTypeInfo::TypeHandle method_type_class_handle_;
-    ReferenceTypeInfo::TypeHandle string_class_handle_;
-    ReferenceTypeInfo::TypeHandle throwable_class_handle_;
-  };
-
   class RTPVisitor;
 
   static ReferenceTypeInfo MergeTypes(const ReferenceTypeInfo& a,
@@ -108,7 +74,6 @@ class ReferenceTypePropagation : public HOptimization {
   // graph_->GetDexFile(). Since we may look up also in other dex files, it's used only
   // as a hint, to reduce the number of calls to the costly ClassLinker::FindDexCache().
   Handle<mirror::DexCache> hint_dex_cache_;
-  HandleCache handle_cache_;
 
   // Whether this reference type propagation is the first run we are doing.
   const bool is_first_run_;
