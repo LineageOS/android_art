@@ -1437,6 +1437,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithOutOfDateContext) {
 TEST_F(OatFileAssistantTest, GetDexLocation) {
   std::string dex_location = GetScratchDir() + "/TestDex.jar";
   std::string oat_location = GetOdexDir() + "/TestDex.odex";
+  std::string art_location = GetOdexDir() + "/TestDex.art";
 
   // Start the runtime to initialize the system's class loader.
   Thread::Current()->TransitionFromSuspendedToRunnable();
@@ -1463,6 +1464,7 @@ TEST_F(OatFileAssistantTest, GetDexLocation) {
     args.push_back("--dex-file=" + dex_location);
     args.push_back("--dex-location=TestDex.jar");
     args.push_back("--oat-file=" + oat_location);
+    args.push_back("--app-image-file=" + art_location);
     std::string error_msg;
     ASSERT_TRUE(DexoptTest::Dex2Oat(args, &error_msg)) << error_msg;
   }
@@ -1490,6 +1492,7 @@ TEST_F(OatFileAssistantTest, SystemFrameworkDir) {
   odex_dir = odex_dir + std::string(GetInstructionSetString(kRuntimeISA));
   mkdir(odex_dir.c_str(), 0700);
   std::string oat_location = odex_dir + "/" + filebase + ".odex";
+  std::string art_location = odex_dir + "/" + filebase + ".art";
   // Clean up in case previous run crashed.
   remove(oat_location.c_str());
 
@@ -1527,6 +1530,7 @@ TEST_F(OatFileAssistantTest, SystemFrameworkDir) {
     args.push_back("--dex-file=" + dex_location);
     args.push_back("--dex-location=" + filebase + ".jar");
     args.push_back("--oat-file=" + oat_location);
+    args.push_back("--app-image-file=" + art_location);
     std::string error_msg;
     ASSERT_TRUE(DexoptTest::Dex2Oat(args, &error_msg)) << error_msg;
   }
@@ -1552,6 +1556,41 @@ TEST_F(OatFileAssistantTest, SystemFrameworkDir) {
   EXPECT_EQ(oat_stored_dex_location, stored_dex_location);
   EXPECT_EQ(dex_files_second[0]->GetHiddenapiDomain(), hiddenapi::Domain::kPlatform);
   EXPECT_EQ(0, remove(oat_location.c_str()));
+}
+
+// Make sure OAT files that require app images are not loaded as executable.
+TEST_F(OatFileAssistantTest, LoadOatNoArt) {
+  std::string dex_location = GetScratchDir() + "/TestDex.jar";
+  std::string odex_location = GetOdexDir() + "/TestDex.odex";
+  std::string art_location = GetOdexDir() + "/TestDex.art";
+  Copy(GetDexSrc1(), dex_location);
+  GenerateOdexForTest(dex_location,
+                      odex_location,
+                      CompilerFilter::kSpeed,
+                      "install",
+                      {
+                          "--app-image-file=" + art_location,
+                      });
+
+  unlink(art_location.c_str());
+
+  std::vector<std::string> error_msgs;
+  const OatFile* oat_file = nullptr;
+
+  // Start the runtime to initialize the system's class loader.
+  Thread::Current()->TransitionFromSuspendedToRunnable();
+  runtime_->Start();
+
+  const auto dex_files = Runtime::Current()->GetOatFileManager().OpenDexFilesFromOat(
+      dex_location.c_str(),
+      Runtime::Current()->GetSystemClassLoader(),
+      /*dex_elements=*/nullptr,
+      &oat_file,
+      &error_msgs);
+
+  EXPECT_FALSE(dex_files.empty());
+  EXPECT_NE(oat_file, nullptr);
+  EXPECT_FALSE(oat_file->IsExecutable());
 }
 
 // TODO: More Tests:
