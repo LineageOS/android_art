@@ -38,7 +38,7 @@
 #include "mirror/throwable.h"
 #include "mirror/var_handle.h"
 
-#include "class_root.h"
+#include "class_root-inl.h"
 
 namespace art {
 

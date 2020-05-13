@@ -27,6 +27,7 @@
 #include "base/globals.h"
 #include "base/locks.h"
 #include "base/mutex.h"
+#include "class_root-inl.h"
 #include "gc/allocation_listener.h"
 #include "gc/heap.h"
 #include "jni/jni_internal.h"
