@@ -16,10 +16,12 @@
 
 #include "class_root.h"
 
+#include "base/logging.h"
+
 namespace art {
 
 const char* GetClassRootDescriptor(ClassRoot class_root) {
-  static const char* class_roots_descriptors[] = {
+  static const char* const class_roots_descriptors[] = {
 #define CLASS_ROOT_DESCRIPTOR(name, descriptor, mirror_type) descriptor,
       CLASS_ROOT_LIST(CLASS_ROOT_DESCRIPTOR)
 #undef CLASS_ROOT_DESCRIPTOR

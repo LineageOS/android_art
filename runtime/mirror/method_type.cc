@@ -17,7 +17,7 @@
 #include "method_type-inl.h"
 
 #include "class-alloc-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "method_handles.h"
 #include "obj_ptr-inl.h"
 #include "object_array-alloc-inl.h"

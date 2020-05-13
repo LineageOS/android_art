@@ -22,7 +22,7 @@
 #include "base/scoped_arena_containers.h"
 #include "base/enums.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "handle_scope-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/dex_cache.h"

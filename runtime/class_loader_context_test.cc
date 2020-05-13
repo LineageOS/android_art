@@ -23,7 +23,7 @@
 #include "base/dchecked_vector.h"
 #include "base/stl_util.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_runtime_test.h"
 #include "dex/dex_file.h"
 #include "handle_scope-inl.h"

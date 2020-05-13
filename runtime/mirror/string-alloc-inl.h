@@ -23,7 +23,7 @@
 #include "array.h"
 #include "base/bit_utils.h"
 #include "class.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "gc/allocator_type.h"
 #include "gc/heap-inl.h"
 #include "obj_ptr.h"

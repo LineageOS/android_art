@@ -17,7 +17,7 @@
 #include "method_handles_lookup.h"
 
 #include "class-alloc-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/modifiers.h"
 #include "handle_scope.h"
 #include "jni/jni_internal.h"
