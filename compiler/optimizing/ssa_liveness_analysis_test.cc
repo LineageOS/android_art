@@ -32,8 +32,9 @@ class SsaLivenessAnalysisTest : public OptimizingUnitTest {
   void SetUp() override {
     OptimizingUnitTest::SetUp();
     graph_ = CreateGraph();
+    compiler_options_ = CommonCompilerTest::CreateCompilerOptions(kRuntimeISA, "default");
     codegen_ = CodeGenerator::Create(graph_, *compiler_options_);
-    CHECK(codegen_ != nullptr) << instruction_set_ << " is not a supported target architecture.";
+    CHECK(codegen_ != nullptr);
     // Create entry block.
     entry_ = new (GetAllocator()) HBasicBlock(graph_);
     graph_->AddBlock(entry_);
@@ -50,6 +51,7 @@ class SsaLivenessAnalysisTest : public OptimizingUnitTest {
   }
 
   HGraph* graph_;
+  std::unique_ptr<CompilerOptions> compiler_options_;
   std::unique_ptr<CodeGenerator> codegen_;
   HBasicBlock* entry_;
 };

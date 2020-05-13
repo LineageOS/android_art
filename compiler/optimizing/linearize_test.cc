@@ -41,7 +41,9 @@ template <size_t number_of_blocks>
 void LinearizeTest::TestCode(const std::vector<uint16_t>& data,
                              const uint32_t (&expected_order)[number_of_blocks]) {
   HGraph* graph = CreateCFG(data);
-  std::unique_ptr<CodeGenerator> codegen = CodeGenerator::Create(graph, *compiler_options_);
+  std::unique_ptr<CompilerOptions> compiler_options =
+      CommonCompilerTest::CreateCompilerOptions(kRuntimeISA, "default");
+  std::unique_ptr<CodeGenerator> codegen = CodeGenerator::Create(graph, *compiler_options);
   SsaLivenessAnalysis liveness(graph, codegen.get(), GetScopedAllocator());
   liveness.Analyze();
 
