@@ -2167,7 +2167,8 @@ void HInliner::RunOptimizations(HGraph* callee_graph,
   inliner.Run();
 }
 
-static bool IsReferenceTypeRefinement(ReferenceTypeInfo declared_rti,
+static bool IsReferenceTypeRefinement(ObjPtr<mirror::Class> declared_class,
+                                      bool declared_is_exact,
                                       bool declared_can_be_null,
                                       HInstruction* actual_obj)
     REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -2176,22 +2177,29 @@ static bool IsReferenceTypeRefinement(ReferenceTypeInfo declared_rti,
   }
 
   ReferenceTypeInfo actual_rti = actual_obj->GetReferenceTypeInfo();
-  return (actual_rti.IsExact() && !declared_rti.IsExact()) ||
-          declared_rti.IsStrictSupertypeOf(actual_rti);
+  ObjPtr<mirror::Class> actual_class = actual_rti.GetTypeHandle().Get();
+  return (actual_rti.IsExact() && !declared_is_exact) ||
+         (declared_class != actual_class && declared_class->IsAssignableFrom(actual_class));
 }
 
-ReferenceTypeInfo HInliner::GetClassRTI(ObjPtr<mirror::Class> klass) {
-  return ReferenceTypePropagation::IsAdmissible(klass)
-      ? ReferenceTypeInfo::Create(handles_->NewHandle(klass))
-      : graph_->GetInexactObjectRti();
+static bool IsReferenceTypeRefinement(ObjPtr<mirror::Class> declared_class,
+                                      bool declared_can_be_null,
+                                      HInstruction* actual_obj)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  bool admissible = ReferenceTypePropagation::IsAdmissible(declared_class);
+  return IsReferenceTypeRefinement(
+      admissible ? declared_class : GetClassRoot<mirror::Class>(),
+      /*declared_is_exact=*/ admissible && declared_class->CannotBeAssignedFromOtherTypes(),
+      declared_can_be_null,
+      actual_obj);
 }
 
 bool HInliner::ArgumentTypesMoreSpecific(HInvoke* invoke_instruction, ArtMethod* resolved_method) {
   // If this is an instance call, test whether the type of the `this` argument
   // is more specific than the class which declares the method.
   if (!resolved_method->IsStatic()) {
-    if (IsReferenceTypeRefinement(GetClassRTI(resolved_method->GetDeclaringClass()),
-                                  /* declared_can_be_null= */ false,
+    if (IsReferenceTypeRefinement(resolved_method->GetDeclaringClass(),
+                                  /*declared_can_be_null=*/ false,
                                   invoke_instruction->InputAt(0u))) {
       return true;
     }
@@ -2210,9 +2218,7 @@ bool HInliner::ArgumentTypesMoreSpecific(HInvoke* invoke_instruction, ArtMethod*
     if (input->GetType() == DataType::Type::kReference) {
       ObjPtr<mirror::Class> param_cls = resolved_method->LookupResolvedClassFromTypeIndex(
           param_list->GetTypeItem(param_idx).type_idx_);
-      if (IsReferenceTypeRefinement(GetClassRTI(param_cls),
-                                    /* declared_can_be_null= */ true,
-                                    input)) {
+      if (IsReferenceTypeRefinement(param_cls, /*declared_can_be_null=*/ true, input)) {
         return true;
       }
     }
@@ -2227,8 +2233,10 @@ bool HInliner::ReturnTypeMoreSpecific(HInvoke* invoke_instruction,
   if (return_replacement != nullptr) {
     if (return_replacement->GetType() == DataType::Type::kReference) {
       // Test if the return type is a refinement of the declared return type.
-      if (IsReferenceTypeRefinement(invoke_instruction->GetReferenceTypeInfo(),
-                                    /* declared_can_be_null= */ true,
+      ReferenceTypeInfo invoke_rti = invoke_instruction->GetReferenceTypeInfo();
+      if (IsReferenceTypeRefinement(invoke_rti.GetTypeHandle().Get(),
+                                    invoke_rti.IsExact(),
+                                    /*declared_can_be_null=*/ true,
                                     return_replacement)) {
         return true;
       } else if (return_replacement->IsInstanceFieldGet()) {
@@ -2258,7 +2266,10 @@ void HInliner::FixUpReturnReferenceType(ArtMethod* resolved_method,
         // some functionality from the reference type propagation.
         DCHECK(return_replacement->IsPhi());
         ObjPtr<mirror::Class> cls = resolved_method->LookupResolvedReturnType();
-        return_replacement->SetReferenceTypeInfo(GetClassRTI(cls));
+        ReferenceTypeInfo rti = ReferenceTypePropagation::IsAdmissible(cls)
+            ? ReferenceTypeInfo::Create(handles_->NewHandle(cls))
+            : graph_->GetInexactObjectRti();
+        return_replacement->SetReferenceTypeInfo(rti);
       }
     }
   }

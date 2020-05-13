@@ -45,9 +45,11 @@ class ReferenceTypePropagation : public HOptimization {
   // Returns true if klass is admissible to the propagation: non-null and resolved.
   // For an array type, we also check if the component type is admissible.
   static bool IsAdmissible(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_) {
-    return klass != nullptr &&
-           klass->IsResolved() &&
-           (!klass->IsArrayClass() || IsAdmissible(klass->GetComponentType()));
+    while (klass != nullptr && klass->IsArrayClass()) {
+      DCHECK(klass->IsResolved());
+      klass = klass->GetComponentType();
+    }
+    return klass != nullptr && klass->IsResolved();
   }
 
   static constexpr const char* kReferenceTypePropagationPassName = "reference_type_propagation";
