@@ -56,7 +56,7 @@
 #include "base/to_str.h"
 #include "base/utils.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debugger.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"

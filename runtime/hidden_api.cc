@@ -22,7 +22,6 @@
 #include "art_method-inl.h"
 #include "base/dumpable.h"
 #include "base/file_utils.h"
-#include "class_root.h"
 #include "dex/class_accessor-inl.h"
 #include "dex/dex_file_loader.h"
 #include "mirror/class_ext.h"

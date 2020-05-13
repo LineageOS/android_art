@@ -21,7 +21,7 @@
 #include "class-inl.h"
 #include "class.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_throws.h"
 #include "dex/dex_file-inl.h"
 #include "gc/accounting/card_table-inl.h"

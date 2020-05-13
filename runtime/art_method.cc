@@ -26,7 +26,7 @@
 #include "base/enums.h"
 #include "base/stl_util.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debugger.h"
 #include "dex/class_accessor-inl.h"
 #include "dex/descriptors_names.h"
