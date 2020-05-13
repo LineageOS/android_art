@@ -30,16 +30,15 @@ namespace art {
  */
 class ReferenceTypePropagationTest : public OptimizingUnitTest {
  public:
-  ReferenceTypePropagationTest() : graph_(CreateGraph()), propagation_(nullptr) { }
+  ReferenceTypePropagationTest() : graph_(nullptr), propagation_(nullptr) { }
 
   ~ReferenceTypePropagationTest() { }
 
   void SetupPropagation(VariableSizedHandleScope* handles) {
-    graph_->InitializeInexactObjectRTI(handles);
+    graph_ = CreateGraph(handles);
     propagation_ = new (GetAllocator()) ReferenceTypePropagation(graph_,
                                                                  Handle<mirror::ClassLoader>(),
                                                                  Handle<mirror::DexCache>(),
-                                                                 handles,
                                                                  true,
                                                                  "test_prop");
   }
@@ -47,7 +46,7 @@ class ReferenceTypePropagationTest : public OptimizingUnitTest {
   // Relay method to merge type in reference type propagation.
   ReferenceTypeInfo MergeTypes(const ReferenceTypeInfo& a,
                                const ReferenceTypeInfo& b) REQUIRES_SHARED(Locks::mutator_lock_) {
-    return propagation_->MergeTypes(a, b, &propagation_->handle_cache_);
+    return propagation_->MergeTypes(a, b, graph_->GetHandleCache());
   }
 
   // Helper method to construct an invalid type.
@@ -57,12 +56,12 @@ class ReferenceTypePropagationTest : public OptimizingUnitTest {
 
   // Helper method to construct the Object type.
   ReferenceTypeInfo ObjectType(bool is_exact = true) REQUIRES_SHARED(Locks::mutator_lock_) {
-    return ReferenceTypeInfo::Create(propagation_->handle_cache_.GetObjectClassHandle(), is_exact);
+    return ReferenceTypeInfo::Create(graph_->GetHandleCache()->GetObjectClassHandle(), is_exact);
   }
 
   // Helper method to construct the String type.
   ReferenceTypeInfo StringType(bool is_exact = true) REQUIRES_SHARED(Locks::mutator_lock_) {
-    return ReferenceTypeInfo::Create(propagation_->handle_cache_.GetStringClassHandle(), is_exact);
+    return ReferenceTypeInfo::Create(graph_->GetHandleCache()->GetStringClassHandle(), is_exact);
   }
 
   // General building fields.
