@@ -1308,7 +1308,6 @@ TEST_F(Dex2oatDeterminism, UnloadCompile) {
   const std::string unload_vdex_name = out_dir + "/unload.vdex";
   const std::string no_unload_oat_name = out_dir + "/nounload.oat";
   const std::string no_unload_vdex_name = out_dir + "/nounload.vdex";
-  const std::string app_image_name = out_dir + "/unload.art";
   std::string error_msg;
   const std::vector<gc::space::ImageSpace*>& spaces = runtime->GetHeap()->GetBootImageSpaces();
   ASSERT_GT(spaces.size(), 0u);
@@ -1336,7 +1335,7 @@ TEST_F(Dex2oatDeterminism, UnloadCompile) {
       base_oat_name,
       CompilerFilter::Filter::kQuicken,
       &error_msg,
-      {"--force-determinism", "--avoid-storing-invocation", "--app-image-file=" + app_image_name});
+      {"--force-determinism", "--avoid-storing-invocation", "--compile-individually"});
   ASSERT_EQ(res2, 0);
   Copy(base_oat_name, no_unload_oat_name);
   Copy(base_vdex_name, no_unload_vdex_name);
@@ -1353,10 +1352,6 @@ TEST_F(Dex2oatDeterminism, UnloadCompile) {
       << unload_oat_name << " " << no_unload_oat_name;
   EXPECT_EQ(unload_vdex->Compare(no_unload_vdex.get()), 0)
       << unload_vdex_name << " " << no_unload_vdex_name;
-  // App image file.
-  std::unique_ptr<File> app_image_file(OS::OpenFileForReading(app_image_name.c_str()));
-  ASSERT_TRUE(app_image_file != nullptr);
-  EXPECT_GT(app_image_file->GetLength(), 0u);
 }
 
 // Test that dexlayout section info is correctly written to the oat file for profile based
