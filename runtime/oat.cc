@@ -396,6 +396,10 @@ bool OatHeader::IsNativeDebuggable() const {
   return IsKeyEnabled(OatHeader::kNativeDebuggableKey);
 }
 
+bool OatHeader::RequiresImage() const {
+  return IsKeyEnabled(OatHeader::kRequiresImage);
+}
+
 CompilerFilter::Filter OatHeader::GetCompilerFilter() const {
   CompilerFilter::Filter filter;
   const char* key_value = GetStoreValueByKey(kCompilerFilter);
