@@ -250,11 +250,6 @@ class HInliner : public HOptimization {
   void FixUpReturnReferenceType(ArtMethod* resolved_method, HInstruction* return_replacement)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Creates an instance of ReferenceTypeInfo from `klass` if `klass` is
-  // admissible (see ReferenceTypePropagation::IsAdmissible for details).
-  // Otherwise returns inexact Object RTI.
-  ReferenceTypeInfo GetClassRTI(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
-
   bool ArgumentTypesMoreSpecific(HInvoke* invoke_instruction, ArtMethod* resolved_method)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
