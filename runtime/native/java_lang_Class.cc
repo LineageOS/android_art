@@ -33,7 +33,7 @@
 #include "mirror/class-alloc-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/class_loader.h"
-#include "mirror/field-inl.h"
+#include "mirror/field.h"
 #include "mirror/method.h"
 #include "mirror/method_handles_lookup.h"
 #include "mirror/object-inl.h"
@@ -312,7 +312,7 @@ static ObjPtr<mirror::ObjectArray<mirror::Field>> GetDeclaredFields(
   for (ArtField& field : ifields) {
     if (IsDiscoverable(public_only, hiddenapi_context, &field)) {
       ObjPtr<mirror::Field> reflect_field =
-          mirror::Field::CreateFromArtField<kRuntimePointerSize>(self, &field, force_resolve);
+          mirror::Field::CreateFromArtField(self, &field, force_resolve);
       if (reflect_field == nullptr) {
         if (kIsDebugBuild) {
           self->AssertPendingException();
@@ -326,7 +326,7 @@ static ObjPtr<mirror::ObjectArray<mirror::Field>> GetDeclaredFields(
   for (ArtField& field : sfields) {
     if (IsDiscoverable(public_only, hiddenapi_context, &field)) {
       ObjPtr<mirror::Field> reflect_field =
-          mirror::Field::CreateFromArtField<kRuntimePointerSize>(self, &field, force_resolve);
+          mirror::Field::CreateFromArtField(self, &field, force_resolve);
       if (reflect_field == nullptr) {
         if (kIsDebugBuild) {
           self->AssertPendingException();
@@ -417,11 +417,11 @@ ALWAYS_INLINE static inline ObjPtr<mirror::Field> GetDeclaredField(Thread* self,
   }
   ArtField* art_field = FindFieldByName(name, c->GetIFieldsPtr());
   if (art_field != nullptr) {
-    return mirror::Field::CreateFromArtField<kRuntimePointerSize>(self, art_field, true);
+    return mirror::Field::CreateFromArtField(self, art_field, true);
   }
   art_field = FindFieldByName(name, c->GetSFieldsPtr());
   if (art_field != nullptr) {
-    return mirror::Field::CreateFromArtField<kRuntimePointerSize>(self, art_field, true);
+    return mirror::Field::CreateFromArtField(self, art_field, true);
   }
   return nullptr;
 }

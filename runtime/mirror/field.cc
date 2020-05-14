@@ -45,13 +45,57 @@ void Field::VisitTarget(ReflectiveValueVisitor* v) {
 
 ArtField* Field::GetArtField() {
   ObjPtr<mirror::Class> declaring_class = GetDeclaringClass();
-  DCHECK_LT(GetArtFieldIndex(),
-            IsStatic() ? declaring_class->NumStaticFields() : declaring_class->NumInstanceFields());
   if (IsStatic()) {
+    DCHECK_LT(GetArtFieldIndex(), declaring_class->NumStaticFields());
     return declaring_class->GetStaticField(GetArtFieldIndex());
   } else {
+    DCHECK_LT(GetArtFieldIndex(), declaring_class->NumInstanceFields());
     return declaring_class->GetInstanceField(GetArtFieldIndex());
   }
+}
+
+ObjPtr<mirror::Field> Field::CreateFromArtField(Thread* self,
+                                                ArtField* field,
+                                                bool force_resolve) {
+  StackHandleScope<2> hs(self);
+  // Try to resolve type before allocating since this is a thread suspension point.
+  Handle<mirror::Class> type = hs.NewHandle(field->ResolveType());
+
+  if (type == nullptr) {
+    DCHECK(self->IsExceptionPending());
+    if (force_resolve) {
+      return nullptr;
+    } else {
+      // Can't resolve, clear the exception if it isn't OOME and continue with a null type.
+      mirror::Throwable* exception = self->GetException();
+      if (exception->GetClass()->DescriptorEquals("Ljava/lang/OutOfMemoryError;")) {
+        return nullptr;
+      }
+      self->ClearException();
+    }
+  }
+  auto ret = hs.NewHandle(ObjPtr<Field>::DownCast(GetClassRoot<Field>()->AllocObject(self)));
+  if (UNLIKELY(ret == nullptr)) {
+    self->AssertPendingOOMException();
+    return nullptr;
+  }
+  // We're initializing a newly allocated object, so we do not need to record that under
+  // a transaction. If the transaction is aborted, the whole object shall be unreachable.
+  ret->SetType</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(type.Get());
+  ret->SetDeclaringClass</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetDeclaringClass());
+  ret->SetAccessFlags</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetAccessFlags());
+  auto iter_range = field->IsStatic() ? field->GetDeclaringClass()->GetSFields()
+                                      : field->GetDeclaringClass()->GetIFields();
+  auto position = std::find_if(
+      iter_range.begin(), iter_range.end(), [&](const auto& f) { return &f == field; });
+  DCHECK(position != iter_range.end());
+  ret->SetArtFieldIndex</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      std::distance(iter_range.begin(), position));
+  ret->SetOffset</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
+      field->GetOffset().Int32Value());
+  return ret.Get();
 }
 
 }  // namespace mirror
