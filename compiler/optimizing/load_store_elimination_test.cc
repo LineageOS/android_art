@@ -26,7 +26,7 @@
 
 namespace art {
 
-class LoadStoreEliminationTest : public ImprovedOptimizingUnitTest {
+class LoadStoreEliminationTest : public OptimizingUnitTest {
  public:
   void PerformLSE() {
     graph_->BuildDominatorTree();
@@ -61,11 +61,9 @@ class LoadStoreEliminationTest : public ImprovedOptimizingUnitTest {
   //      |
   //     exit
   void CreateTestControlFlowGraph() {
-    pre_header_ = new (GetAllocator()) HBasicBlock(graph_);
-    loop_ = new (GetAllocator()) HBasicBlock(graph_);
-
-    graph_->AddBlock(pre_header_);
-    graph_->AddBlock(loop_);
+    InitGraphAndParameters();
+    pre_header_ = AddNewBlock();
+    loop_ = AddNewBlock();
 
     entry_block_->ReplaceSuccessor(return_block_, pre_header_);
     pre_header_->AddSuccessor(loop_);
@@ -117,15 +115,12 @@ class LoadStoreEliminationTest : public ImprovedOptimizingUnitTest {
   //
   // Return: the basic blocks forming the CFG in the following order {upper, left, right, down}.
   std::tuple<HBasicBlock*, HBasicBlock*, HBasicBlock*, HBasicBlock*> CreateDiamondShapedCFG() {
+    InitGraphAndParameters();
     CreateEntryBlockInstructions();
 
-    HBasicBlock* upper = new (GetAllocator()) HBasicBlock(graph_);
-    HBasicBlock* left = new (GetAllocator()) HBasicBlock(graph_);
-    HBasicBlock* right = new (GetAllocator()) HBasicBlock(graph_);
-
-    graph_->AddBlock(upper);
-    graph_->AddBlock(left);
-    graph_->AddBlock(right);
+    HBasicBlock* upper = AddNewBlock();
+    HBasicBlock* left = AddNewBlock();
+    HBasicBlock* right = AddNewBlock();
 
     entry_block_->ReplaceSuccessor(return_block_, upper);
     upper->AddSuccessor(left);
@@ -232,21 +227,22 @@ class LoadStoreEliminationTest : public ImprovedOptimizingUnitTest {
     return store;
   }
 
-  void CreateParameters() override {
-    parameters_.push_back(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
-                                                               dex::TypeIndex(0),
-                                                               0,
-                                                               DataType::Type::kInt32));
+  void InitGraphAndParameters() {
+    InitGraph();
+    AddParameter(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
+                                                      dex::TypeIndex(0),
+                                                      0,
+                                                      DataType::Type::kInt32));
     array_ = parameters_.back();
-    parameters_.push_back(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
-                                                               dex::TypeIndex(1),
-                                                               1,
-                                                               DataType::Type::kInt32));
+    AddParameter(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
+                                                      dex::TypeIndex(1),
+                                                      1,
+                                                      DataType::Type::kInt32));
     i_ = parameters_.back();
-    parameters_.push_back(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
-                                                               dex::TypeIndex(1),
-                                                               2,
-                                                               DataType::Type::kInt32));
+    AddParameter(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
+                                                      dex::TypeIndex(1),
+                                                      2,
+                                                      DataType::Type::kInt32));
     j_ = parameters_.back();
   }
 
@@ -264,7 +260,6 @@ class LoadStoreEliminationTest : public ImprovedOptimizingUnitTest {
 };
 
 TEST_F(LoadStoreEliminationTest, ArrayGetSetElimination) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c1 = graph_->GetIntConstant(1);
@@ -293,7 +288,6 @@ TEST_F(LoadStoreEliminationTest, ArrayGetSetElimination) {
 }
 
 TEST_F(LoadStoreEliminationTest, SameHeapValue1) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c1 = graph_->GetIntConstant(1);
@@ -316,7 +310,6 @@ TEST_F(LoadStoreEliminationTest, SameHeapValue1) {
 }
 
 TEST_F(LoadStoreEliminationTest, SameHeapValue2) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   // Test LSE handling same value stores on vector.
@@ -334,7 +327,6 @@ TEST_F(LoadStoreEliminationTest, SameHeapValue2) {
 }
 
 TEST_F(LoadStoreEliminationTest, SameHeapValue3) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   // VecStore array[i...] = vdata;
@@ -350,7 +342,6 @@ TEST_F(LoadStoreEliminationTest, SameHeapValue3) {
 }
 
 TEST_F(LoadStoreEliminationTest, OverlappingLoadStore) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c1 = graph_->GetIntConstant(1);
@@ -408,7 +399,6 @@ TEST_F(LoadStoreEliminationTest, OverlappingLoadStore) {
 // }
 // a[j] = 1;
 TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithoutSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c1 = graph_->GetIntConstant(1);
@@ -438,7 +428,6 @@ TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithoutSideEffects) {
 //   a[j] = 0;
 // }
 TEST_F(LoadStoreEliminationTest, StoreAfterSIMDLoopWithSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -477,7 +466,6 @@ TEST_F(LoadStoreEliminationTest, StoreAfterSIMDLoopWithSideEffects) {
 //   x = a[j];
 // }
 TEST_F(LoadStoreEliminationTest, LoadAfterSIMDLoopWithSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -521,8 +509,6 @@ TEST_F(LoadStoreEliminationTest, LoadAfterSIMDLoopWithSideEffects) {
 //   'vstore3' is not removed.
 //   'vstore4' is not removed. Such cases are not supported at the moment.
 TEST_F(LoadStoreEliminationTest, MergePredecessorVecStores) {
-  InitGraph();
-
   HBasicBlock* upper;
   HBasicBlock* left;
   HBasicBlock* right;
@@ -564,8 +550,6 @@ TEST_F(LoadStoreEliminationTest, MergePredecessorVecStores) {
 //   'store2' is not removed.
 //   'store3' is removed.
 TEST_F(LoadStoreEliminationTest, MergePredecessorStores) {
-  InitGraph();
-
   HBasicBlock* upper;
   HBasicBlock* left;
   HBasicBlock* right;
@@ -604,7 +588,6 @@ TEST_F(LoadStoreEliminationTest, MergePredecessorStores) {
 //   'vload' is removed.
 //   'vstore3' is removed.
 TEST_F(LoadStoreEliminationTest, RedundantVStoreVLoadInLoop) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -639,7 +622,6 @@ TEST_F(LoadStoreEliminationTest, RedundantVStoreVLoadInLoop) {
 // This causes stores after such loops not to be removed, even
 // their values are known.
 TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -669,7 +651,6 @@ TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithSideEffects) {
 // As it is not allowed to use defaults for VecLoads, check if there is a new created array
 // a VecLoad used in a loop and after it is not replaced with a default.
 TEST_F(LoadStoreEliminationTest, VLoadDefaultValueInLoopWithoutWriteSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -694,7 +675,6 @@ TEST_F(LoadStoreEliminationTest, VLoadDefaultValueInLoopWithoutWriteSideEffects)
 // As it is not allowed to use defaults for VecLoads, check if there is a new created array
 // a VecLoad is not replaced with a default.
 TEST_F(LoadStoreEliminationTest, VLoadDefaultValue) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -718,7 +698,6 @@ TEST_F(LoadStoreEliminationTest, VLoadDefaultValue) {
 // As it is allowed to use defaults for ordinary loads, check if there is a new created array
 // a load used in a loop and after it is replaced with a default.
 TEST_F(LoadStoreEliminationTest, LoadDefaultValueInLoopWithoutWriteSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -743,7 +722,6 @@ TEST_F(LoadStoreEliminationTest, LoadDefaultValueInLoopWithoutWriteSideEffects) 
 // As it is allowed to use defaults for ordinary loads, check if there is a new created array
 // a load is replaced with a default.
 TEST_F(LoadStoreEliminationTest, LoadDefaultValue) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -768,7 +746,6 @@ TEST_F(LoadStoreEliminationTest, LoadDefaultValue) {
 // check if there is a new created array, a VecLoad and a load used in a loop and after it,
 // VecLoad is not replaced with a default but the load is.
 TEST_F(LoadStoreEliminationTest, VLoadAndLoadDefaultValueInLoopWithoutWriteSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -800,7 +777,6 @@ TEST_F(LoadStoreEliminationTest, VLoadAndLoadDefaultValueInLoopWithoutWriteSideE
 // check if there is a new created array, a VecLoad and a load,
 // VecLoad is not replaced with a default but the load is.
 TEST_F(LoadStoreEliminationTest, VLoadAndLoadDefaultValue) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -831,7 +807,6 @@ TEST_F(LoadStoreEliminationTest, VLoadAndLoadDefaultValue) {
 // loads getting the same value.
 // Check a load getting a known value is eliminated (a loop test case).
 TEST_F(LoadStoreEliminationTest, VLoadDefaultValueAndVLoadInLoopWithoutWriteSideEffects) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
@@ -863,7 +838,6 @@ TEST_F(LoadStoreEliminationTest, VLoadDefaultValueAndVLoadInLoopWithoutWriteSide
 // loads getting the same value.
 // Check a load getting a known value is eliminated.
 TEST_F(LoadStoreEliminationTest, VLoadDefaultValueAndVLoad) {
-  InitGraph();
   CreateTestControlFlowGraph();
 
   HInstruction* c0 = graph_->GetIntConstant(0);
