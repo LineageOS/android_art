@@ -109,7 +109,12 @@ class ArenaPoolAndAllocator {
 // multiple inheritance errors from having two gtest as a parent twice.
 class OptimizingUnitTestHelper {
  public:
-  OptimizingUnitTestHelper() : pool_and_allocator_(new ArenaPoolAndAllocator()) { }
+  OptimizingUnitTestHelper()
+      : pool_and_allocator_(new ArenaPoolAndAllocator()),
+        graph_(nullptr),
+        entry_block_(nullptr),
+        return_block_(nullptr),
+        exit_block_(nullptr) { }
 
   ArenaAllocator* GetAllocator() { return pool_and_allocator_->GetAllocator(); }
   ArenaStack* GetArenaStack() { return pool_and_allocator_->GetArenaStack(); }
@@ -136,13 +141,14 @@ class OptimizingUnitTestHelper {
         /*oat_dex_file*/ nullptr,
         /*container*/ nullptr));
 
-    return new (allocator) HGraph(
+    graph_ = new (allocator) HGraph(
         allocator,
         pool_and_allocator_->GetArenaStack(),
         handles,
         *dex_files_.back(),
         /*method_idx*/-1,
         kRuntimeISA);
+    return graph_;
   }
 
   // Create a control-flow graph from Dex instructions.
@@ -177,11 +183,42 @@ class OptimizingUnitTestHelper {
     }
   }
 
+  void InitGraph() {
+    CreateGraph();
+    entry_block_ = AddNewBlock();
+    return_block_ = AddNewBlock();
+    exit_block_ = AddNewBlock();
+
+    graph_->SetEntryBlock(entry_block_);
+    graph_->SetExitBlock(exit_block_);
+
+    entry_block_->AddSuccessor(return_block_);
+    return_block_->AddSuccessor(exit_block_);
+
+    return_block_->AddInstruction(new (GetAllocator()) HReturnVoid());
+    exit_block_->AddInstruction(new (GetAllocator()) HExit());
+  }
+
+  void AddParameter(HInstruction* parameter) {
+    entry_block_->AddInstruction(parameter);
+    parameters_.push_back(parameter);
+  }
+
+  HBasicBlock* AddNewBlock() {
+    HBasicBlock* block = new (GetAllocator()) HBasicBlock(graph_);
+    graph_->AddBlock(block);
+    return block;
+  }
+
   // Run GraphChecker with all checks.
   //
   // Return: the status whether the run is successful.
   bool CheckGraph(HGraph* graph) {
     return CheckGraph(graph, /*check_ref_type_info=*/true);
+  }
+
+  bool CheckGraph() {
+    return CheckGraph(graph_);
   }
 
   // Run GraphChecker with all checks except reference type information checks.
@@ -191,61 +228,8 @@ class OptimizingUnitTestHelper {
     return CheckGraph(graph, /*check_ref_type_info=*/false);
   }
 
- private:
-  bool CheckGraph(HGraph* graph, bool check_ref_type_info) {
-    GraphChecker checker(graph);
-    checker.SetRefTypeInfoCheckEnabled(check_ref_type_info);
-    checker.Run();
-    checker.Dump(std::cerr);
-    return checker.IsValid();
-  }
-
-  std::vector<std::unique_ptr<const StandardDexFile>> dex_files_;
-  std::unique_ptr<ArenaPoolAndAllocator> pool_and_allocator_;
-};
-
-class OptimizingUnitTest : public CommonCompilerTest, public OptimizingUnitTestHelper {};
-
-// OptimizingUnitTest with some handy functions to ease the graph creation.
-class ImprovedOptimizingUnitTest : public OptimizingUnitTest {
- public:
-  ImprovedOptimizingUnitTest() : graph_(CreateGraph()),
-                                 entry_block_(nullptr),
-                                 return_block_(nullptr),
-                                 exit_block_(nullptr) {}
-
-  virtual ~ImprovedOptimizingUnitTest() {}
-
-  void InitGraph() {
-    entry_block_ = new (GetAllocator()) HBasicBlock(graph_);
-    graph_->AddBlock(entry_block_);
-    graph_->SetEntryBlock(entry_block_);
-
-    return_block_ = new (GetAllocator()) HBasicBlock(graph_);
-    graph_->AddBlock(return_block_);
-
-    exit_block_ = new (GetAllocator()) HBasicBlock(graph_);
-    graph_->AddBlock(exit_block_);
-    graph_->SetExitBlock(exit_block_);
-
-    entry_block_->AddSuccessor(return_block_);
-    return_block_->AddSuccessor(exit_block_);
-
-    CreateParameters();
-    for (HInstruction* parameter : parameters_) {
-      entry_block_->AddInstruction(parameter);
-    }
-
-    return_block_->AddInstruction(new (GetAllocator()) HReturnVoid());
-    exit_block_->AddInstruction(new (GetAllocator()) HExit());
-  }
-
-  bool CheckGraph() {
-    return OptimizingUnitTestHelper::CheckGraph(graph_);
-  }
-
   bool CheckGraphSkipRefTypeInfoChecks() {
-    return OptimizingUnitTestHelper::CheckGraphSkipRefTypeInfoChecks(graph_);
+    return CheckGraphSkipRefTypeInfoChecks(graph_);
   }
 
   HEnvironment* ManuallyBuildEnvFor(HInstruction* instruction,
@@ -263,18 +247,26 @@ class ImprovedOptimizingUnitTest : public OptimizingUnitTest {
   }
 
  protected:
-  // Create parameters to be added to the graph entry block.
-  // Subclasses can override it to create parameters they need.
-  virtual void CreateParameters() { /* do nothing */ }
+  bool CheckGraph(HGraph* graph, bool check_ref_type_info) {
+    GraphChecker checker(graph);
+    checker.SetRefTypeInfoCheckEnabled(check_ref_type_info);
+    checker.Run();
+    checker.Dump(std::cerr);
+    return checker.IsValid();
+  }
+
+  std::vector<std::unique_ptr<const StandardDexFile>> dex_files_;
+  std::unique_ptr<ArenaPoolAndAllocator> pool_and_allocator_;
 
   HGraph* graph_;
-
   HBasicBlock* entry_block_;
   HBasicBlock* return_block_;
   HBasicBlock* exit_block_;
 
   std::vector<HInstruction*> parameters_;
 };
+
+class OptimizingUnitTest : public CommonCompilerTest, public OptimizingUnitTestHelper {};
 
 // Naive string diff data type.
 typedef std::list<std::pair<std::string, std::string>> diff_t;
