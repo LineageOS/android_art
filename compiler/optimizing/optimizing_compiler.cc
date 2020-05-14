@@ -32,7 +32,6 @@
 #include "base/scoped_arena_allocator.h"
 #include "base/timing_logger.h"
 #include "builder.h"
-#include "class_root.h"
 #include "code_generator.h"
 #include "compiled_method.h"
 #include "compiler.h"
@@ -308,7 +307,6 @@ class OptimizingCompiler final : public Compiler {
                         CodeGenerator* codegen,
                         const DexCompilationUnit& dex_compilation_unit,
                         PassObserver* pass_observer,
-                        VariableSizedHandleScope* handles,
                         const OptimizationDef definitions[],
                         size_t length) const {
     // Convert definitions to optimization passes.
@@ -319,8 +317,7 @@ class OptimizingCompiler final : public Compiler {
         graph,
         compilation_stats_.get(),
         codegen,
-        dex_compilation_unit,
-        handles);
+        dex_compilation_unit);
     DCHECK_EQ(length, optimizations.size());
     // Run the optimization passes one by one. Any "depends_on" pass refers back to
     // the most recent occurrence of that pass, skipped or executed.
@@ -351,17 +348,15 @@ class OptimizingCompiler final : public Compiler {
       CodeGenerator* codegen,
       const DexCompilationUnit& dex_compilation_unit,
       PassObserver* pass_observer,
-      VariableSizedHandleScope* handles,
       const OptimizationDef (&definitions)[length]) const {
     return RunOptimizations(
-        graph, codegen, dex_compilation_unit, pass_observer, handles, definitions, length);
+        graph, codegen, dex_compilation_unit, pass_observer, definitions, length);
   }
 
   void RunOptimizations(HGraph* graph,
                         CodeGenerator* codegen,
                         const DexCompilationUnit& dex_compilation_unit,
-                        PassObserver* pass_observer,
-                        VariableSizedHandleScope* handles) const;
+                        PassObserver* pass_observer) const;
 
  private:
   // Create a 'CompiledMethod' for an optimized graph.
@@ -397,14 +392,12 @@ class OptimizingCompiler final : public Compiler {
   bool RunArchOptimizations(HGraph* graph,
                             CodeGenerator* codegen,
                             const DexCompilationUnit& dex_compilation_unit,
-                            PassObserver* pass_observer,
-                            VariableSizedHandleScope* handles) const;
+                            PassObserver* pass_observer) const;
 
   bool RunBaselineOptimizations(HGraph* graph,
                                 CodeGenerator* codegen,
                                 const DexCompilationUnit& dex_compilation_unit,
-                                PassObserver* pass_observer,
-                                VariableSizedHandleScope* handles) const;
+                                PassObserver* pass_observer) const;
 
   std::vector<uint8_t> GenerateJitDebugInfo(const debug::MethodDebugInfo& method_debug_info);
 
@@ -457,8 +450,7 @@ static bool IsInstructionSetSupported(InstructionSet instruction_set) {
 bool OptimizingCompiler::RunBaselineOptimizations(HGraph* graph,
                                                   CodeGenerator* codegen,
                                                   const DexCompilationUnit& dex_compilation_unit,
-                                                  PassObserver* pass_observer,
-                                                  VariableSizedHandleScope* handles) const {
+                                                  PassObserver* pass_observer) const {
   switch (codegen->GetCompilerOptions().GetInstructionSet()) {
 #ifdef ART_ENABLE_CODEGEN_x86
     case InstructionSet::kX86: {
@@ -469,7 +461,6 @@ bool OptimizingCompiler::RunBaselineOptimizations(HGraph* graph,
                               codegen,
                               dex_compilation_unit,
                               pass_observer,
-                              handles,
                               x86_optimizations);
     }
 #endif
@@ -478,7 +469,6 @@ bool OptimizingCompiler::RunBaselineOptimizations(HGraph* graph,
       UNUSED(codegen);
       UNUSED(dex_compilation_unit);
       UNUSED(pass_observer);
-      UNUSED(handles);
       return false;
   }
 }
@@ -486,8 +476,7 @@ bool OptimizingCompiler::RunBaselineOptimizations(HGraph* graph,
 bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                                               CodeGenerator* codegen,
                                               const DexCompilationUnit& dex_compilation_unit,
-                                              PassObserver* pass_observer,
-                                              VariableSizedHandleScope* handles) const {
+                                              PassObserver* pass_observer) const {
   switch (codegen->GetCompilerOptions().GetInstructionSet()) {
 #if defined(ART_ENABLE_CODEGEN_arm)
     case InstructionSet::kThumb2:
@@ -502,7 +491,6 @@ bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                               codegen,
                               dex_compilation_unit,
                               pass_observer,
-                              handles,
                               arm_optimizations);
     }
 #endif
@@ -518,7 +506,6 @@ bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                               codegen,
                               dex_compilation_unit,
                               pass_observer,
-                              handles,
                               arm64_optimizations);
     }
 #endif
@@ -535,7 +522,6 @@ bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                               codegen,
                               dex_compilation_unit,
                               pass_observer,
-                              handles,
                               x86_optimizations);
     }
 #endif
@@ -551,7 +537,6 @@ bool OptimizingCompiler::RunArchOptimizations(HGraph* graph,
                               codegen,
                               dex_compilation_unit,
                               pass_observer,
-                              handles,
                               x86_64_optimizations);
     }
 #endif
@@ -596,8 +581,7 @@ static std::string ConvertPassNameToOptimizationName(const std::string& pass_nam
 void OptimizingCompiler::RunOptimizations(HGraph* graph,
                                           CodeGenerator* codegen,
                                           const DexCompilationUnit& dex_compilation_unit,
-                                          PassObserver* pass_observer,
-                                          VariableSizedHandleScope* handles) const {
+                                          PassObserver* pass_observer) const {
   const std::vector<std::string>* pass_names = GetCompilerOptions().GetPassesToRun();
   if (pass_names != nullptr) {
     // If passes were defined on command-line, build the optimization
@@ -613,7 +597,6 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
                      codegen,
                      dex_compilation_unit,
                      pass_observer,
-                     handles,
                      optimizations.data(),
                      length);
     return;
@@ -683,10 +666,9 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
                    codegen,
                    dex_compilation_unit,
                    pass_observer,
-                   handles,
                    optimizations);
 
-  RunArchOptimizations(graph, codegen, dex_compilation_unit, pass_observer, handles);
+  RunArchOptimizations(graph, codegen, dex_compilation_unit, pass_observer);
 }
 
 static ArenaVector<linker::LinkerPatch> EmitAndSortLinkerPatches(CodeGenerator* codegen) {
@@ -799,6 +781,7 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
   HGraph* graph = new (allocator) HGraph(
       allocator,
       arena_stack,
+      handles,
       dex_file,
       method_idx,
       compiler_options.GetInstructionSet(),
@@ -838,8 +821,7 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
                           &dex_compilation_unit,
                           codegen.get(),
                           compilation_stats_.get(),
-                          interpreter_metadata,
-                          handles);
+                          interpreter_metadata);
     GraphAnalysisResult result = builder.BuildGraph();
     if (result != kAnalysisSuccess) {
       switch (result) {
@@ -882,9 +864,9 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
   }
 
   if (baseline) {
-    RunBaselineOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer, handles);
+    RunBaselineOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer);
   } else {
-    RunOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer, handles);
+    RunOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer);
   }
 
   RegisterAllocator::Strategy regalloc_strategy =
@@ -927,6 +909,7 @@ CodeGenerator* OptimizingCompiler::TryCompileIntrinsic(
   HGraph* graph = new (allocator) HGraph(
       allocator,
       arena_stack,
+      handles,
       dex_file,
       method_idx,
       compiler_options.GetInstructionSet(),
@@ -963,8 +946,7 @@ CodeGenerator* OptimizingCompiler::TryCompileIntrinsic(
                           &dex_compilation_unit,
                           codegen.get(),
                           compilation_stats_.get(),
-                          /* interpreter_metadata= */ ArrayRef<const uint8_t>(),
-                          handles);
+                          /* interpreter_metadata= */ ArrayRef<const uint8_t>());
     builder.BuildIntrinsicGraph(method);
   }
 
@@ -977,10 +959,9 @@ CodeGenerator* OptimizingCompiler::TryCompileIntrinsic(
                    codegen.get(),
                    dex_compilation_unit,
                    &pass_observer,
-                   handles,
                    optimizations);
 
-  RunArchOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer, handles);
+  RunArchOptimizations(graph, codegen.get(), dex_compilation_unit, &pass_observer);
 
   AllocateRegisters(graph,
                     codegen.get(),

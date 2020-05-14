@@ -521,6 +521,9 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("");
   UsageError("  --max-image-block-size=<size>: Maximum solid block size for compressed images.");
   UsageError("");
+  UsageError("  --compile-individually: Compiles dex files individually, unloading classes in");
+  UsageError("      between compiling each file.");
+  UsageError("");
   std::cerr << "See log for usage error information\n";
   exit(EXIT_FAILURE);
 }
@@ -824,7 +827,8 @@ class Dex2Oat final {
       timings_(timings),
       force_determinism_(false),
       check_linkage_conditions_(false),
-      crash_on_linkage_violation_(false)
+      crash_on_linkage_violation_(false),
+      compile_individually_(false)
       {}
 
   ~Dex2Oat() {
@@ -1215,6 +1219,7 @@ class Dex2Oat final {
     key_value_store_->Put(OatHeader::kCompilerFilter,
                           CompilerFilter::NameOfFilter(compiler_options_->GetCompilerFilter()));
     key_value_store_->Put(OatHeader::kConcurrentCopying, kUseReadBarrier);
+    key_value_store_->Put(OatHeader::kRequiresImage, compiler_options_->IsGeneratingImage());
     if (invocation_file_.get() != -1) {
       std::ostringstream oss;
       for (int i = 0; i < argc; ++i) {
@@ -1375,6 +1380,7 @@ class Dex2Oat final {
     if (args.Exists(M::ForceDeterminism)) {
       force_determinism_ = true;
     }
+    AssignTrueIfExists(args, M::CompileIndividually, &compile_individually_);
 
     if (args.Exists(M::Base)) {
       ParseBase(*args.Get(M::Base));
@@ -2013,17 +2019,17 @@ class Dex2Oat final {
   }
 
   bool ShouldCompileDexFilesIndividually() const {
-    // Compile individually if we are:
-    // 1. not building an image,
-    // 2. not verifying a vdex file,
-    // 3. using multidex,
+    // Compile individually if we are specifically asked to, or
+    // 1. not building an image, and
+    // 2. not verifying a vdex file, and
+    // 3. using multidex, and
     // 4. not doing any AOT compilation.
     // This means extract, no-vdex verify, and quicken, will use the individual compilation
     // mode (to reduce RAM used by the compiler).
-    return !IsImage() &&
-        !update_input_vdex_ &&
-        compiler_options_->dex_files_for_oat_file_.size() > 1 &&
-        !CompilerFilter::IsAotCompilationEnabled(compiler_options_->GetCompilerFilter());
+    return compile_individually_ ||
+           (!IsImage() && !update_input_vdex_ &&
+            compiler_options_->dex_files_for_oat_file_.size() > 1 &&
+            !CompilerFilter::IsAotCompilationEnabled(compiler_options_->GetCompilerFilter()));
   }
 
   uint32_t GetCombinedChecksums() const {
@@ -3097,12 +3103,19 @@ class Dex2Oat final {
   // The reason for invoking the compiler.
   std::string compilation_reason_;
 
+  // Whether to force individual compilation.
+  bool compile_individually_;
+
   DISALLOW_IMPLICIT_CONSTRUCTORS(Dex2Oat);
 };
 
 static void b13564922() {
 #if defined(__linux__) && defined(__arm__)
-  if (KernelVersionLower(3, 4)) {
+  int major, minor;
+  struct utsname uts;
+  if (uname(&uts) != -1 &&
+      sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
+      ((major < 3) || ((major == 3) && (minor < 4)))) {
     // Kernels before 3.4 don't handle the ASLR well and we can run out of address
     // space (http://b/13564922). Work around the issue by inhibiting further mmap() randomization.
     int old_personality = personality(0xffffffff);

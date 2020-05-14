@@ -24,7 +24,7 @@
 #include "base/quasi_atomic.h"
 #include "base/stl_util.h"
 #include "base/systrace.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debugger.h"
 #include "gc/accounting/atomic_stack.h"
 #include "gc/accounting/heap_bitmap-inl.h"

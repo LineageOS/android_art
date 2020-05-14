@@ -44,7 +44,7 @@
 #include "base/unix_file/fd_file.h"
 #include "class_linker-inl.h"
 #include "class_linker.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "compiled_method.h"
 #include "debug/debug_info.h"
 #include "debug/elf_debug_writer.h"

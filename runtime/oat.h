@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: Change x86-64 @CriticalNative hidden arg register to RAX.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '1', '\0' } };
+  // Last oat version changed reason: Add requires-image flag.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '2', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";
@@ -44,6 +44,7 @@ class PACKED(4) OatHeader {
   static constexpr const char* kBootClassPathChecksumsKey = "bootclasspath-checksums";
   static constexpr const char* kConcurrentCopying = "concurrent-copying";
   static constexpr const char* kCompilationReasonKey = "compilation-reason";
+  static constexpr const char* kRequiresImage = "requires-image";
 
   static constexpr const char kTrueValue[] = "true";
   static constexpr const char kFalseValue[] = "false";
@@ -102,6 +103,7 @@ class PACKED(4) OatHeader {
   bool IsNativeDebuggable() const;
   CompilerFilter::Filter GetCompilerFilter() const;
   bool IsConcurrentCopying() const;
+  bool RequiresImage() const;
 
  private:
   bool KeyHasValue(const char* key, const char* value, size_t value_size) const;

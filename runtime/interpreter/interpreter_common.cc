@@ -20,7 +20,7 @@
 
 #include "base/casts.h"
 #include "base/enums.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "debugger.h"
 #include "dex/dex_file_types.h"
 #include "entrypoints/runtime_asm_entrypoints.h"

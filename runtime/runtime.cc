@@ -68,7 +68,7 @@
 #include "base/unix_file/fd_file.h"
 #include "base/utils.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "compiler_callbacks.h"
 #include "debugger.h"
 #include "dex/art_dex_file_loader.h"
