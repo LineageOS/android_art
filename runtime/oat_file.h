@@ -378,6 +378,9 @@ class OatFile {
     return external_dex_files_.empty();
   }
 
+  // Returns whether an image (e.g. app image) is required to safely execute this OAT file.
+  bool RequiresImage() const;
+
  protected:
   OatFile(const std::string& filename, bool executable);
 

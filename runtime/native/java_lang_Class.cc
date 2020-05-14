@@ -22,7 +22,7 @@
 #include "art_method-inl.h"
 #include "base/enums.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_throws.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"

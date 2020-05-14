@@ -57,7 +57,7 @@
 #include "cha.h"
 #include "class_linker-inl.h"
 #include "class_loader_utils.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "class_table-inl.h"
 #include "compiler_callbacks.h"
 #include "debug_print.h"

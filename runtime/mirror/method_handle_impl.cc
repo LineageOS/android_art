@@ -17,7 +17,7 @@
 #include "method_handle_impl-inl.h"
 
 #include "class-alloc-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 
 namespace art {
 namespace mirror {

@@ -34,7 +34,7 @@
 #include "base/array_slice.h"
 #include "base/logging.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "dex/dex_file.h"
 #include "fixed_up_dex_file.h"
 #include "handle.h"

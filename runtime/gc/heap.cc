@@ -42,7 +42,7 @@
 #include "base/systrace.h"
 #include "base/time_utils.h"
 #include "base/utils.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "common_throws.h"
 #include "debugger.h"
 #include "dex/dex_file-inl.h"
@@ -4187,11 +4187,6 @@ mirror::Object* Heap::AllocWithNewTLAB(Thread* self,
       return nullptr;
     }
     *bytes_tl_bulk_allocated = expand_bytes;
-    // Zero the TLAB pages as we MADV_FREE the regions in CC, which doesn't
-    // guarantee clean pages.
-    if (allocator_type == kAllocatorTypeRegionTLAB) {
-      region_space_->ZeroAllocRange(self->GetTlabEnd(), expand_bytes);
-    }
     self->ExpandTlab(expand_bytes);
     DCHECK_LE(alloc_size, self->TlabSize());
   } else if (allocator_type == kAllocatorTypeTLAB) {

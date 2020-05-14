@@ -23,7 +23,7 @@
 #include "base/logging.h"
 #include "base/stl_util.h"
 #include "class_linker-inl.h"
-#include "class_root.h"
+#include "class_root-inl.h"
 #include "code_generator.h"
 #include "common_dominator.h"
 #include "intrinsics.h"
@@ -39,12 +39,11 @@ namespace art {
 // double).
 static constexpr bool kEnableFloatingPointStaticEvaluation = (FLT_EVAL_METHOD == 0);
 
-void HGraph::InitializeInexactObjectRTI(VariableSizedHandleScope* handles) {
+ReferenceTypeInfo::TypeHandle HandleCache::CreateRootHandle(VariableSizedHandleScope* handles,
+                                                            ClassRoot class_root) {
+  // Mutator lock is required for NewHandle and GetClassRoot().
   ScopedObjectAccess soa(Thread::Current());
-  // Create the inexact Object reference type and store it in the HGraph.
-  inexact_object_rti_ = ReferenceTypeInfo::Create(
-      handles->NewHandle(GetClassRoot<mirror::Object>()),
-      /* is_exact= */ false);
+  return handles->NewHandle(GetClassRoot(class_root));
 }
 
 void HGraph::AddBlock(HBasicBlock* block) {
@@ -662,7 +661,7 @@ HNullConstant* HGraph::GetNullConstant(uint32_t dex_pc) {
   // id and/or any invariants the graph is assuming when adding new instructions.
   if ((cached_null_constant_ == nullptr) || (cached_null_constant_->GetBlock() == nullptr)) {
     cached_null_constant_ = new (allocator_) HNullConstant(dex_pc);
-    cached_null_constant_->SetReferenceTypeInfo(inexact_object_rti_);
+    cached_null_constant_->SetReferenceTypeInfo(GetInexactObjectRti());
     InsertConstant(cached_null_constant_);
   }
   if (kIsDebugBuild) {

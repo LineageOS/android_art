@@ -262,7 +262,9 @@ static Parser CreateArgumentParser() {
           .IntoKey(M::RuntimeOptions)
       .Define("--compilation-reason=_")
           .WithType<std::string>()
-          .IntoKey(M::CompilationReason);
+          .IntoKey(M::CompilationReason)
+      .Define("--compile-individually")
+          .IntoKey(M::CompileIndividually);
 
   AddCompilerOptionsArgumentParserOptions<Dex2oatArgumentMap>(*parser_builder);
 
