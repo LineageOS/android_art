@@ -20,7 +20,7 @@
 #include "art_field-inl.h"
 #include "base/enums.h"
 #include "common_runtime_test.h"
-#include "mirror/field-inl.h"
+#include "mirror/field.h"
 #include "proxy_test.h"
 #include "scoped_thread_state_change-inl.h"
 #include "well_known_classes.h"
@@ -173,17 +173,13 @@ TEST_F(ProxyTest, CheckArtMirrorFieldsOfProxyStaticFields) {
   ASSERT_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
   ASSERT_FALSE(Runtime::Current()->IsActiveTransaction());
   Handle<mirror::Field> field00 =
-      hs.NewHandle(mirror::Field::CreateFromArtField<kRuntimePointerSize>(
-          soa.Self(), &static_fields0->At(0), true));
+      hs.NewHandle(mirror::Field::CreateFromArtField(soa.Self(), &static_fields0->At(0), true));
   Handle<mirror::Field> field01 =
-      hs.NewHandle(mirror::Field::CreateFromArtField<kRuntimePointerSize>(
-          soa.Self(), &static_fields0->At(1), true));
+      hs.NewHandle(mirror::Field::CreateFromArtField(soa.Self(), &static_fields0->At(1), true));
   Handle<mirror::Field> field10 =
-      hs.NewHandle(mirror::Field::CreateFromArtField<kRuntimePointerSize>(
-          soa.Self(), &static_fields1->At(0), true));
+      hs.NewHandle(mirror::Field::CreateFromArtField(soa.Self(), &static_fields1->At(0), true));
   Handle<mirror::Field> field11 =
-      hs.NewHandle(mirror::Field::CreateFromArtField<kRuntimePointerSize>(
-          soa.Self(), &static_fields1->At(1), true));
+      hs.NewHandle(mirror::Field::CreateFromArtField(soa.Self(), &static_fields1->At(1), true));
   EXPECT_EQ(field00->GetArtField(), &static_fields0->At(0));
   EXPECT_EQ(field01->GetArtField(), &static_fields0->At(1));
   EXPECT_EQ(field10->GetArtField(), &static_fields1->At(0));
