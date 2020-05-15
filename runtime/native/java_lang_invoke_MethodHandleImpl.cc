@@ -43,8 +43,8 @@ static jobject MethodHandleImpl_getMemberInternal(JNIEnv* env, jobject thiz) {
   MutableHandle<mirror::Object> h_object(hs.NewHandle<mirror::Object>(nullptr));
   if (handle_kind >= mirror::MethodHandle::kFirstAccessorKind) {
     ArtField* const field = handle->GetTargetField();
-    h_object.Assign(mirror::Field::CreateFromArtField<kRuntimePointerSize>(
-        soa.Self(), field, /* force_resolve= */ false));
+    h_object.Assign(
+        mirror::Field::CreateFromArtField(soa.Self(), field, /* force_resolve= */ false));
   } else {
     ArtMethod* const method = handle->GetTargetMethod();
     if (method->IsConstructor()) {
