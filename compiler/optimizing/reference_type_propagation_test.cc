@@ -28,7 +28,7 @@ namespace art {
  * Fixture class for unit testing the ReferenceTypePropagation phase. Used to verify the
  * functionality of methods and situations that are hard to set up with checker tests.
  */
-class ReferenceTypePropagationTest : public OptimizingUnitTest {
+class ReferenceTypePropagationTest : public CommonCompilerTest, public OptimizingUnitTestHelper {
  public:
   ReferenceTypePropagationTest() : graph_(nullptr), propagation_(nullptr) { }
 

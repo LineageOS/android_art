@@ -380,13 +380,14 @@ bool HInstructionBuilder::Build() {
         AppendInstruction(new (allocator_) HNativeDebugInfo(dex_pc));
       }
 
-      DCHECK(!Thread::Current()->IsExceptionPending())
+      // Note: There may be no Thread for gtests.
+      DCHECK(Thread::Current() == nullptr || !Thread::Current()->IsExceptionPending())
           << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
           << " " << pair.Inst().Name() << "@" << dex_pc;
       if (!ProcessDexInstruction(pair.Inst(), dex_pc, quicken_index)) {
         return false;
       }
-      DCHECK(!Thread::Current()->IsExceptionPending())
+      DCHECK(Thread::Current() == nullptr || !Thread::Current()->IsExceptionPending())
           << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
           << " " << pair.Inst().Name() << "@" << dex_pc;
 
