@@ -673,6 +673,12 @@ extern "C" bool ArtPlugin_Initialize() {
     if (!runtime->AttachCurrentThread("perfetto_hprof_listener", /*as_daemon=*/ true,
                                       runtime->GetSystemThreadGroup(), /*create_peer=*/ false)) {
       LOG(ERROR) << "failed to attach thread.";
+      {
+        art::MutexLock lk(nullptr, GetStateMutex());
+        g_state = State::kUninitialized;
+        GetStateCV().Broadcast(nullptr);
+      }
+
       return;
     }
     art::Thread* self = art::Thread::Current();
@@ -707,10 +713,6 @@ extern "C" bool ArtPlugin_Initialize() {
   });
   th.detach();
 
-  art::MutexLock lk(art::Thread::Current(), GetStateMutex());
-  while (g_state == State::kWaitForListener) {
-    GetStateCV().Wait(art::Thread::Current());
-  }
   return true;
 }
 
@@ -725,10 +727,14 @@ extern "C" bool ArtPlugin_Deinitialize() {
 
   art::Thread* self = art::Thread::Current();
   art::MutexLock lk(self, GetStateMutex());
-  if (g_state != State::kWaitForListener) {
-    g_state = State::kUninitialized;
-    GetStateCV().Broadcast(self);
+  // Wait until after the thread was registered to the runtime. This is so
+  // we do not attempt to register it with the runtime after it had been torn
+  // down (ArtPlugin_Deinitialize gets called in the Runtime dtor).
+  while (g_state == State::kWaitForListener) {
+    GetStateCV().Wait(art::Thread::Current());
   }
+  g_state = State::kUninitialized;
+  GetStateCV().Broadcast(self);
   return true;
 }
 
