@@ -47,7 +47,7 @@
 #include "mirror/class-inl.h"
 #include "mirror/class_loader.h"
 #include "mirror/dex_cache-inl.h"
-#include "mirror/field-inl.h"
+#include "mirror/field.h"
 #include "mirror/method.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-alloc-inl.h"
@@ -544,7 +544,7 @@ class JNI {
     ScopedObjectAccess soa(env);
     ArtField* f = jni::DecodeArtField(fid);
     return soa.AddLocalReference<jobject>(
-        mirror::Field::CreateFromArtField<kRuntimePointerSize>(soa.Self(), f, true));
+        mirror::Field::CreateFromArtField(soa.Self(), f, true));
   }
 
   static jclass GetObjectClass(JNIEnv* env, jobject java_object) {
