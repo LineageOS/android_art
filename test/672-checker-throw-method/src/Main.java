@@ -70,7 +70,9 @@ public class Main {
   /// CHECK:                Throw
   /// CHECK: end_block
   static public void doit1(int[] a) {
-    String par = "a";
+    // Being in the boot image means we know the load string cannot throw. Create one that is
+    // unlikely to be there to ensure we handle that case.
+    String par = "stringUnlikelyToBeInBootImage";
     if (a == null)
       throw new Error("you are null: " + par);
     for (int i = 0; i < a.length; i++) {
@@ -98,7 +100,9 @@ public class Main {
   /// CHECK:                InvokeStaticOrDirect [<<Str>>] method_name:Main.doThrow
   /// CHECK: end_block
   static public void doit2(int[] a) {
-    String par = "a";
+    // Being in the boot image means we know the load string cannot throw. Create one that is
+    // unlikely to be there to ensure we handle that case.
+    String par = "stringUnlikelyToBeInBootImage";
     if (a == null)
       doThrow(par);
     for (int i = 0; i < a.length; i++) {
@@ -128,7 +132,9 @@ public class Main {
   /// CHECK:                Throw
   /// CHECK: end_block
   static public void doit3(int[] a) {
-    String par = "a";
+    // Being in the boot image means we know the load string cannot throw. Create one that is
+    // unlikely to be there to ensure we handle that case.
+    String par = "stringUnlikelyToBeInBootImage";
     checkNotNullDirect(a, par);
     for (int i = 0; i < a.length; i++) {
       a[i] = 3;
@@ -155,7 +161,9 @@ public class Main {
   /// CHECK:                InvokeStaticOrDirect [<<Str>>] method_name:Main.doThrow
   /// CHECK: end_block
   static public void doit4(int[] a) {
-    String par = "a";
+    // Being in the boot image means we know the load string cannot throw. Create one that is
+    // unlikely to be there to ensure we handle that case.
+    String par = "stringUnlikelyToBeInBootImage";
     checkNotNullSplit(a, par);  // resembles Kotlin runtime lib
                                 // (test is lined, doThrow is not)
     for (int i = 0; i < a.length; i++) {
@@ -166,7 +174,9 @@ public class Main {
   // Ensures Phi values are merged properly.
   static public int doit5(int[] a) {
     int t = 100;
-    String par = "a";
+    // Being in the boot image means we know the load string cannot throw. Create one that is
+    // unlikely to be there to ensure we handle that case.
+    String par = "stringUnlikelyToBeInBootImage";
     if (a == null) {
       doThrow(par);
     } else {
@@ -205,7 +215,7 @@ public class Main {
   /// CHECK-START: int Main.deleteNullCheck(int[]) dead_code_elimination$after_inlining (after)
   /// CHECK-NOT:              NullCheck
   static public int deleteNullCheck(int[] a) {
-    checkNotNullSplit(a, "a");
+    checkNotNullSplit(a, "stringUnlikelyToBeInBootImage");
     return a[0];
   }
 
@@ -215,7 +225,7 @@ public class Main {
   /// CHECK-START: int Main.deleteNullCheckAlt(int[]) dead_code_elimination$after_inlining (after)
   /// CHECK-NOT: NullCheck
   static public int deleteNullCheckAlt(int[] a) {
-    checkNotNullSplitAlt(a, "a");
+    checkNotNullSplitAlt(a, "stringUnlikeltyToBeInBootImage");
     return a[0];
   }
 
@@ -227,9 +237,9 @@ public class Main {
   /// CHECK-START: int Main.deleteNullChecks3(int[], int[], int[]) dead_code_elimination$after_inlining (after)
   /// CHECK-NOT: NullCheck
   static public int deleteNullChecks3(int[] a, int[] b, int[] c) {
-    checkNotNullSplit(a, "a");
-    checkNotNullSplit(b, "b");
-    checkNotNullSplit(c, "c");
+    checkNotNullSplit(a, "stringUnlikelytoBeInBootImage1");
+    checkNotNullSplit(b, "stringUnlikelytoBeInBootImage2");
+    checkNotNullSplit(c, "stringUnlikelytoBeInBootImage3");
     return a[0] + b[0] + c[0];
   }
 
