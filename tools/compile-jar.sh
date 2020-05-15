@@ -15,7 +15,7 @@
 # limitations under the License.
 
 #
-# This script creates a boot image profile based on input profiles.
+# This script runs dex2oat on the host to compile a provided JAR or APK.
 #
 
 if [[ "$#" -lt 1 ]]; then
@@ -31,9 +31,10 @@ shift
 ISA=$1
 shift
 
-dex2oat \
+# Use services.odex as a quick and dirty way to get correct BCP.
+dex2oatd \
     --runtime-arg -Xms64m --runtime-arg -Xmx512m \
-    --boot-image=${OUT}/apex/com.android.art/javalib/boot.art:${OUT}/system/framework/boot-framework.art \
+    --boot-image=${OUT}/apex/com.android.art.debug/javalib/boot.art:${OUT}/system/framework/boot-framework.art \
     $(${ANDROID_BUILD_TOP}/art/tools/host_bcp.sh ${OUT}/system/framework/oat/${ISA}/services.odex --use-first-dir) \
     --dex-file=${FILE} --dex-location=/system/framework/${FILE} \
     --oat-file=${OUTPUT} \
