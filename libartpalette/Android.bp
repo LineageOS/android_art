@@ -107,5 +107,4 @@ art_cc_test {
     host_supported: true,
     srcs: ["apex/palette_test.cc"],
     shared_libs: ["libartpalette"],
-    test_per_src: true,
 }
