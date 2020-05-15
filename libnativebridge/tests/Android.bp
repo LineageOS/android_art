@@ -80,7 +80,6 @@ cc_defaults {
         "art_defaults",
         "art_test_defaults",
     ],
-    test_per_src: true,
     // TODO(mast): Split up art_gtest_defaults so that it can be used for the
     // following without pulling in lots of libs.
     target: {
@@ -146,7 +145,6 @@ cc_test {
         "art_defaults",
         "art_test_defaults",
     ],
-    test_per_src: true,
     // TODO(mast): Split up art_gtest_defaults so that it can be used for the
     // following without pulling in lots of libs.
     target: {

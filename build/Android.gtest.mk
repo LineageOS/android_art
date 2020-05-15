@@ -14,6 +14,9 @@
 # limitations under the License.
 #
 
+# Build rules are excluded from Mac, since we can not run ART tests there in the first place.
+ifneq ($(HOST_OS),darwin)
+
 # The path for which all the dex files are relative, not actually the current directory.
 LOCAL_PATH := art/test
 
@@ -507,6 +510,7 @@ define define-art-gtest-rule-host
   gtest_exe := $(2)
   # Dependencies for all host gtests.
   gtest_deps := $$(ART_HOST_DEX_DEPENDENCIES) \
+    $$(ART_TEST_HOST_GTEST_DEPENDENCIES) \
     $$(HOST_BOOT_IMAGE_JARS) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libicu_jni$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
@@ -538,14 +542,14 @@ define define-art-gtest-rule-host
     gtest_deps += $$($(3)HOST_BOOT_IMAGE)
   endif
 
-  ART_TEST_HOST_GTEST_DEPENDENCIES += $$(gtest_deps)
-
 .PHONY: $$(gtest_rule)
 $$(gtest_rule): $$(gtest_output)
 
 # Re-run the tests, even if nothing changed. Until the build system has a dedicated "no cache"
 # option, claim to write a file that is never produced.
 $$(gtest_output): .KATI_IMPLICIT_OUTPUTS := $$(gtest_output)-nocache
+# Limit concurrent runs. Each test itself is already highly parallel (and thus memory hungry).
+$$(gtest_output): .KATI_NINJA_POOL := highmem_pool
 $$(gtest_output): NAME := $$(gtest_rule)
 ifeq (,$(SANITIZE_HOST))
 $$(gtest_output): $$(gtest_exe) $$(gtest_deps)
@@ -584,6 +588,40 @@ endif
   gtest_rule :=
   gtest_suffix :=
 endef  # define-art-gtest-rule-host
+
+# Global list of all dependencies. All tests depend on all tools.
+# Removal of test_per_src broke the naming convention for dependencies,
+# so the fine-grained dependencies no longer work for now.
+# TODO: Move all dependency tracking to the blueprint file.
+ART_GTEST_ALL_DEX_DEPS := \
+  EmptyUncompressed \
+  EmptyUncompressedAligned \
+  LinkageTest \
+  MainStripped \
+  MainUncompressedAligned \
+  MultiDexUncompressedAligned \
+  VerifierDeps \
+  VerifierDepsMulti  \
+  VerifySoftFailDuringClinit \
+  $(foreach dir,$(GTEST_DEX_DIRECTORIES),$(dir))
+ART_TEST_HOST_GTEST_DEPENDENCIES += \
+  $(HOST_OUT_EXECUTABLES)/dex2oatd \
+  $(HOST_OUT_EXECUTABLES)/dex2oatds \
+  $(HOST_OUT_EXECUTABLES)/dexanalyze \
+  $(HOST_OUT_EXECUTABLES)/dexdiag \
+  $(HOST_OUT_EXECUTABLES)/dexdump \
+  $(HOST_OUT_EXECUTABLES)/dexlayoutd  \
+  $(HOST_OUT_EXECUTABLES)/dexlist \
+  $(HOST_OUT_EXECUTABLES)/dexoptanalyzerd \
+  $(HOST_OUT_EXECUTABLES)/hiddenapid \
+  $(HOST_OUT_EXECUTABLES)/imgdiagd \
+  $(HOST_OUT_EXECUTABLES)/oatdumpd \
+  $(HOST_OUT_EXECUTABLES)/oatdumpds \
+  $(HOST_OUT_EXECUTABLES)/profmand \
+  $(foreach file,$(ART_GTEST_ALL_DEX_DEPS),$(ART_TEST_HOST_GTEST_$(file)_DEX))
+ART_TEST_TARGET_GTEST_DEPENDENCIES += \
+  $(TESTING_ART_APEX) \
+  $(foreach file,$(ART_GTEST_ALL_DEX_DEPS),$(ART_TEST_TARGET_GTEST_$(file)_DEX))
 
 # Add the additional dependencies for the specified test
 # $(1): test name
@@ -779,3 +817,5 @@ ART_TEST_HOST_GTEST_VerifySoftFailDuringClinit_DEX :=
 ART_TEST_TARGET_GTEST_VerifySoftFailDuringClinit_DEX :=
 GTEST_DEX_DIRECTORIES :=
 LOCAL_PATH :=
+
+endif # ifneq ($(HOST_OS),darwin)
