@@ -28,12 +28,15 @@
 namespace art {
 
 class LiveRangesTest : public OptimizingUnitTest {
- public:
+ protected:
   HGraph* BuildGraph(const std::vector<uint16_t>& data);
+
+  std::unique_ptr<CompilerOptions> compiler_options_;
 };
 
 HGraph* LiveRangesTest::BuildGraph(const std::vector<uint16_t>& data) {
   HGraph* graph = CreateCFG(data);
+  compiler_options_ = CommonCompilerTest::CreateCompilerOptions(kRuntimeISA, "default");
   // Suspend checks implementation may change in the future, and this test relies
   // on how instructions are ordered.
   RemoveSuspendChecks(graph);

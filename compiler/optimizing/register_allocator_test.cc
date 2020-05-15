@@ -41,9 +41,9 @@ using Strategy = RegisterAllocator::Strategy;
 class RegisterAllocatorTest : public OptimizingUnitTest {
  protected:
   void SetUp() override {
-    // This test is using the x86 ISA.
-    OverrideInstructionSetFeatures(InstructionSet::kX86, "default");
     OptimizingUnitTest::SetUp();
+    // This test is using the x86 ISA.
+    compiler_options_ = CommonCompilerTest::CreateCompilerOptions(InstructionSet::kX86, "default");
   }
 
   // These functions need to access private variables of LocationSummary, so we declare it
@@ -74,6 +74,8 @@ class RegisterAllocatorTest : public OptimizingUnitTest {
                                                 /* processing_core_registers= */ true,
                                                 /* log_fatal_on_failure= */ false);
   }
+
+  std::unique_ptr<CompilerOptions> compiler_options_;
 };
 
 // This macro should include all register allocation strategies that should be tested.
