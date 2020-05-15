@@ -188,9 +188,10 @@ class SchedulerTest : public OptimizingUnitTest {
       HInstructionScheduling scheduling(graph, target_config.GetInstructionSet());
       scheduling.Run(/*only_optimize_loop_blocks*/ false, /*schedule_randomly*/ true);
 
-      OverrideInstructionSetFeatures(target_config.GetInstructionSet(), "default");
+      std::unique_ptr<CompilerOptions> compiler_options =
+          CommonCompilerTest::CreateCompilerOptions(target_config.GetInstructionSet(), "default");
       RunCode(target_config,
-              *compiler_options_,
+              *compiler_options,
               graph,
               [](HGraph* graph_arg) { RemoveSuspendChecks(graph_arg); },
               has_result, expected);

@@ -15,6 +15,7 @@
  */
 
 #include "code_generator.h"
+#include "driver/compiler_options.h"
 #include "loop_optimization.h"
 #include "optimizing_unit_test.h"
 
@@ -28,12 +29,12 @@ namespace art {
 class LoopOptimizationTest : public OptimizingUnitTest {
  protected:
   void SetUp() override {
-    OverrideInstructionSetFeatures(instruction_set_, "default");
     OptimizingUnitTest::SetUp();
 
     graph_ = CreateGraph();
     BuildGraph();
     iva_  = new (GetAllocator()) HInductionVarAnalysis(graph_);
+    compiler_options_ = CommonCompilerTest::CreateCompilerOptions(kRuntimeISA, "default");
     DCHECK(compiler_options_ != nullptr);
     codegen_ = CodeGenerator::Create(graph_, *compiler_options_);
     DCHECK(codegen_.get() != nullptr);
@@ -43,6 +44,7 @@ class LoopOptimizationTest : public OptimizingUnitTest {
 
   void TearDown() override {
     codegen_.reset();
+    compiler_options_.reset();
     graph_ = nullptr;
     ResetPoolAndAllocator();
     OptimizingUnitTest::TearDown();
@@ -117,6 +119,7 @@ class LoopOptimizationTest : public OptimizingUnitTest {
   // General building fields.
   HGraph* graph_;
 
+  std::unique_ptr<CompilerOptions> compiler_options_;
   std::unique_ptr<CodeGenerator> codegen_;
   HInductionVarAnalysis* iva_;
   HLoopOptimization* loop_opt_;
