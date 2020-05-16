@@ -71,7 +71,6 @@ class MANAGED Field : public AccessibleObject {
 
   ArtField* GetArtField() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  template <PointerSize kPointerSize>
   static ObjPtr<mirror::Field> CreateFromArtField(Thread* self,
                                                   ArtField* field,
                                                   bool force_resolve)

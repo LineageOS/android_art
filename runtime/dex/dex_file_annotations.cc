@@ -553,10 +553,7 @@ bool ProcessAnnotationValue(const ClassData& klass,
           return false;
         }
         set_object = true;
-        PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-        element_object = (pointer_size == PointerSize::k64)
-            ? mirror::Field::CreateFromArtField<PointerSize::k64>(self, field, true)
-            : mirror::Field::CreateFromArtField<PointerSize::k32>(self, field, true);
+        element_object = mirror::Field::CreateFromArtField(self, field, true);
         if (element_object == nullptr) {
           return false;
         }

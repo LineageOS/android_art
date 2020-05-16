@@ -48,7 +48,7 @@
 #include "mirror/array-inl.h"
 #include "mirror/class-alloc-inl.h"
 #include "mirror/executable-inl.h"
-#include "mirror/field-inl.h"
+#include "mirror/field.h"
 #include "mirror/method.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-alloc-inl.h"
@@ -360,10 +360,7 @@ void UnstartedRuntime::UnstartedClassGetDeclaredField(
                            klass->PrettyDescriptor().c_str());
     return;
   }
-  PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-  ObjPtr<mirror::Field> field = (pointer_size == PointerSize::k64)
-      ? mirror::Field::CreateFromArtField<PointerSize::k64>(self, found, true)
-      : mirror::Field::CreateFromArtField<PointerSize::k32>(self, found, true);
+  ObjPtr<mirror::Field> field = mirror::Field::CreateFromArtField(self, found, true);
   result->SetL(field);
 }
 

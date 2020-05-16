@@ -30,7 +30,6 @@ public class Main {
 
         test.start();
         UNSAFE.unpark(test);
-        clearStack(10);
 
         System.out.println("GC'ing");
         System.gc();
@@ -83,28 +82,6 @@ public class Main {
         UNSAFE = (Unsafe) field.get(null);
     }
 
-    /**
-     * Scribbles on the stack to help ensure we don't have a fake
-     * pointer that would keep would-be garbage alive.
-     * TODO(hboehm): Remove this long useless cruft once we understand current failure.
-     */
-    private static void clearStack(int depth) {
-        int a = 0;
-        int b = 0;
-        int c = 0;
-        int d = 0;
-        int e = 0;
-        int f = 0;
-        int g = 0;
-        int h = 0;
-        int i = 0;
-        int j = 0;
-
-        if (depth > 0) {
-            clearStack(depth - 1);
-        }
-    }
-
     private static class ParkTester extends Thread {
         public volatile boolean parkNow = false;
         public volatile boolean success = false;
@@ -126,11 +103,13 @@ public class Main {
             long elapsed = System.currentTimeMillis() - start;
 
             if (elapsed > 200) {
-                System.out.println("park()ed for " + elapsed + " msec");
                 success = false;
+                System.out.println("park()ed for " + elapsed + " msec");
             } else {
-                System.out.println("park() returned quickly");
                 success = true;
+                // println is occasionally very slow.
+                // But output still appears before main thread output.
+                System.out.println("park() returned quickly");
                 finishTime = System.currentTimeMillis();
                 startTime = start;
                 elapsedTime = elapsed;
