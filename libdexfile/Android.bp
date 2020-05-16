@@ -356,7 +356,6 @@ cc_library {
 art_cc_test {
     name: "art_libdexfile_external_tests",
     host_supported: true,
-    test_per_src: true, // For consistency with other ART gtests.
     test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_ext_c_test.c",
@@ -393,9 +392,8 @@ cc_library {
     ],
 }
 
-// The same source file is used in two tests here, so unlike other ART gtests it
-// doesn't use test_per_src. Its test target is
-// test-art-{host,target}-gtest-art_libdexfile_support_tests.
+// The same source file is used in two tests here.
+// Its test target is test-art-{host,target}-gtest-art_libdexfile_support_tests.
 art_cc_test {
     name: "art_libdexfile_support_tests",
     defaults: [
@@ -462,9 +460,8 @@ cc_library_static {
     ],
 }
 
-// The same source file is used in two tests here, so unlike other ART gtests it
-// doesn't use test_per_src. Its test target is
-// test-art-{host,target}-gtest-art_libdexfile_support_static_tests.
+// The same source file is used in two tests here.
+// Its test target is test-art-{host,target}-gtest-art_libdexfile_support_static_tests.
 art_cc_test {
     name: "art_libdexfile_support_static_tests",
     host_supported: true,

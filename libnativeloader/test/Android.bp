@@ -77,7 +77,6 @@ cc_test {
         "art_defaults",
         "art_test_defaults",
     ],
-    test_per_src: true,
     srcs: [
         "api_test.c",
     ],
