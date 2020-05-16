@@ -462,7 +462,8 @@ std::vector<std::string> CommonArtTestImpl::GetLibCoreDexLocations(
     std::string prefix = GetAndroidBuildTop();
     for (std::string& location : result) {
       CHECK_GT(location.size(), prefix.size());
-      CHECK_EQ(location.compare(0u, prefix.size(), prefix), 0);
+      CHECK_EQ(location.compare(0u, prefix.size(), prefix), 0)
+          << " prefix=" << prefix << " location=" << location;
       location.erase(0u, prefix.size());
     }
   }

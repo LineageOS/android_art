@@ -21,6 +21,7 @@
 namespace art {
 namespace gc {
 namespace space {
+namespace {
 
 MallocSpace* CreateRosAllocSpace(const std::string& name,
                                  size_t initial_size,
@@ -35,6 +36,7 @@ MallocSpace* CreateRosAllocSpace(const std::string& name,
 
 TEST_SPACE_CREATE_FN_STATIC(RosAllocSpace, CreateRosAllocSpace)
 
+}  // namespace
 }  // namespace space
 }  // namespace gc
 }  // namespace art
