@@ -1909,7 +1909,7 @@ class InstructionHandler {
 };
 
 // Don't inline in ASAN. It would create massive stack frame.
-#ifdef ADDRESS_SANITIZER
+#if defined(ADDRESS_SANITIZER) || defined(HWADDRESS_SANITIZER)
 #define ASAN_NO_INLINE NO_INLINE
 #else
 #define ASAN_NO_INLINE ALWAYS_INLINE
