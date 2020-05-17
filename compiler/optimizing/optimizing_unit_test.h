@@ -56,11 +56,11 @@ namespace art {
 #define FIVE_REGISTERS_CODE_ITEM(...)  N_REGISTERS_CODE_ITEM(5, __VA_ARGS__)
 #define SIX_REGISTERS_CODE_ITEM(...)   N_REGISTERS_CODE_ITEM(6, __VA_ARGS__)
 
-LiveInterval* BuildInterval(const size_t ranges[][2],
-                            size_t number_of_ranges,
-                            ScopedArenaAllocator* allocator,
-                            int reg = -1,
-                            HInstruction* defined_by = nullptr) {
+inline LiveInterval* BuildInterval(const size_t ranges[][2],
+                                   size_t number_of_ranges,
+                                   ScopedArenaAllocator* allocator,
+                                   int reg = -1,
+                                   HInstruction* defined_by = nullptr) {
   LiveInterval* interval =
       LiveInterval::MakeInterval(allocator, DataType::Type::kInt32, defined_by);
   if (defined_by != nullptr) {
@@ -73,7 +73,7 @@ LiveInterval* BuildInterval(const size_t ranges[][2],
   return interval;
 }
 
-void RemoveSuspendChecks(HGraph* graph) {
+inline void RemoveSuspendChecks(HGraph* graph) {
   for (HBasicBlock* block : graph->GetBlocks()) {
     if (block != nullptr) {
       if (block->GetLoopInformation() != nullptr) {
@@ -266,7 +266,7 @@ class OptimizingUnitTestHelper {
   std::vector<HInstruction*> parameters_;
 };
 
-class OptimizingUnitTest : public CommonCompilerTest, public OptimizingUnitTestHelper {};
+class OptimizingUnitTest : public CommonArtTest, public OptimizingUnitTestHelper {};
 
 // Naive string diff data type.
 typedef std::list<std::pair<std::string, std::string>> diff_t;

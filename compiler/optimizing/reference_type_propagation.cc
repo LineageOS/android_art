@@ -126,8 +126,8 @@ ReferenceTypePropagation::ReferenceTypePropagation(HGraph* graph,
 }
 
 void ReferenceTypePropagation::ValidateTypes() {
-  // TODO: move this to the graph checker.
-  if (kIsDebugBuild) {
+  // TODO: move this to the graph checker. Note: There may be no Thread for gtests.
+  if (kIsDebugBuild && Thread::Current() != nullptr) {
     ScopedObjectAccess soa(Thread::Current());
     for (HBasicBlock* block : graph_->GetReversePostOrder()) {
       for (HInstructionIterator iti(block->GetInstructions()); !iti.Done(); iti.Advance()) {

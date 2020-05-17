@@ -44,6 +44,9 @@ template<class T> class Handle;
 
 class CommonCompilerTest : public CommonRuntimeTest {
  public:
+  static std::unique_ptr<CompilerOptions> CreateCompilerOptions(InstructionSet instruction_set,
+                                                                const std::string& variant);
+
   CommonCompilerTest();
   ~CommonCompilerTest();
 

@@ -75,7 +75,7 @@ const ProfileCompilationInfo::ProfileSampleAnnotation
   ProfileCompilationInfo::ProfileSampleAnnotation::kNone =
       ProfileCompilationInfo::ProfileSampleAnnotation("");
 
-static constexpr char kSampleMetdataSeparator = ':';
+static constexpr char kSampleMetadataSeparator = ':';
 
 static constexpr uint16_t kMaxDexFileKeyLength = PATH_MAX;
 
@@ -164,7 +164,7 @@ std::string ProfileCompilationInfo::GetProfileDexFileAugmentedKey(
   std::string base_key = GetProfileDexFileBaseKey(dex_location);
   return annotation == ProfileSampleAnnotation::kNone
       ? base_key
-      : base_key + kSampleMetdataSeparator + annotation.GetOriginPackageName();;
+      : base_key + kSampleMetadataSeparator + annotation.GetOriginPackageName();;
 }
 
 // Transform the actual dex location into a base profile key (represented as relative paths).
@@ -184,17 +184,25 @@ std::string ProfileCompilationInfo::GetProfileDexFileBaseKey(const std::string& 
 
 std::string ProfileCompilationInfo::GetBaseKeyFromAugmentedKey(
     const std::string& profile_key) {
-  size_t pos = profile_key.rfind(kSampleMetdataSeparator);
+  size_t pos = profile_key.rfind(kSampleMetadataSeparator);
   return (pos == std::string::npos) ? profile_key : profile_key.substr(0, pos);
 }
 
 std::string ProfileCompilationInfo::MigrateAnnotationInfo(
     const std::string& base_key,
     const std::string& augmented_key) {
-  size_t pos = augmented_key.rfind(kSampleMetdataSeparator);
+  size_t pos = augmented_key.rfind(kSampleMetadataSeparator);
   return (pos == std::string::npos)
       ? base_key
       : base_key + augmented_key.substr(pos);
+}
+
+ProfileCompilationInfo::ProfileSampleAnnotation ProfileCompilationInfo::GetAnnotationFromKey(
+     const std::string& augmented_key) {
+  size_t pos = augmented_key.rfind(kSampleMetadataSeparator);
+  return (pos == std::string::npos)
+      ? ProfileSampleAnnotation::kNone
+      : ProfileSampleAnnotation(augmented_key.substr(pos + 1));
 }
 
 bool ProfileCompilationInfo::AddMethods(const std::vector<ProfileMethodInfo>& methods,
@@ -688,6 +696,19 @@ const ProfileCompilationInfo::DexFileData* ProfileCompilationInfo::FindDexDataUs
   }
 
   return nullptr;
+}
+
+void ProfileCompilationInfo::FindAllDexData(
+    const DexFile* dex_file,
+    /*out*/ std::vector<const ProfileCompilationInfo::DexFileData*>* result) const {
+  std::string profile_key = GetProfileDexFileBaseKey(dex_file->GetLocation());
+  for (const DexFileData* dex_data : info_) {
+    if (profile_key == GetBaseKeyFromAugmentedKey(dex_data->profile_key)) {
+      if (ChecksumMatch(dex_data->checksum, dex_file->GetLocationChecksum())) {
+        result->push_back(dex_data);
+      }
+    }
+  }
 }
 
 bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
@@ -2263,4 +2284,76 @@ uint32_t ProfileCompilationInfo::SizeOfProfileIndexType() const {
     ? sizeof(ProfileIndexType)
     : sizeof(ProfileIndexTypeRegular);
 }
+
+FlattenProfileData::FlattenProfileData() :
+    max_aggregation_for_methods_(0),
+    max_aggregation_for_classes_(0) {
+}
+
+FlattenProfileData::ItemMetadata::ItemMetadata() :
+    flags_(0) {
+}
+
+FlattenProfileData::ItemMetadata::ItemMetadata(const ItemMetadata& other) :
+    flags_(other.flags_),
+    annotations_(other.annotations_) {
+}
+
+std::unique_ptr<FlattenProfileData> ProfileCompilationInfo::ExtractProfileData(
+    const std::vector<std::unique_ptr<const DexFile>>& dex_files) const {
+
+  std::unique_ptr<FlattenProfileData> result(new FlattenProfileData());
+
+  auto createMetadataFn = []() { return FlattenProfileData::ItemMetadata(); };
+
+  // Iterate through all the dex files, find the methods/classes associated with each of them,
+  // and add them to the flatten result.
+  for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
+    // Find all the dex data for the given dex file.
+    // We may have multiple dex data if the methods or classes were added using
+    // different annotations.
+    std::vector<const DexFileData*> all_dex_data;
+    FindAllDexData(dex_file.get(), &all_dex_data);
+    for (const DexFileData* dex_data : all_dex_data) {
+      // Extract the annotation from the key as we want to store it in the flatten result.
+      ProfileSampleAnnotation annotation = GetAnnotationFromKey(dex_data->profile_key);
+
+      // Check which methods from the current dex files are in the profile.
+      for (uint32_t method_idx = 0; method_idx < dex_data->num_method_ids; ++method_idx) {
+        MethodHotness hotness = dex_data->GetHotnessInfo(method_idx);
+        if (!hotness.IsInProfile()) {
+          // Not in the profile, continue.
+          continue;
+        }
+        // The method is in the profile, create metadata item for it and added to the result.
+        MethodReference ref(dex_file.get(), method_idx);
+        FlattenProfileData::ItemMetadata& metadata =
+            result->method_metadata_.GetOrCreate(ref, createMetadataFn);
+        metadata.flags_ |= hotness.flags_;
+        metadata.annotations_.insert(annotation);
+        // Update the max aggregation counter for methods.
+        // This is essentially a cache, to avoid traversing all the methods just to find out
+        // this value.
+        result->max_aggregation_for_methods_ = std::max(
+            result->max_aggregation_for_methods_,
+            static_cast<uint32_t>(metadata.annotations_.size()));
+      }
+
+      // Check which classes from the current dex files are in the profile.
+      for (const dex::TypeIndex& type_index : dex_data->class_set) {
+        TypeReference ref(dex_file.get(), type_index);
+        FlattenProfileData::ItemMetadata& metadata =
+            result->class_metadata_.GetOrCreate(ref, createMetadataFn);
+        metadata.annotations_.insert(annotation);
+        // Update the max aggregation counter for classes.
+        result->max_aggregation_for_classes_ = std::max(
+            result->max_aggregation_for_classes_,
+            static_cast<uint32_t>(metadata.annotations_.size()));
+      }
+    }
+  }
+
+  return result;
+}
+
 }  // namespace art
