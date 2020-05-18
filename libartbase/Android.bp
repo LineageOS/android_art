@@ -62,9 +62,9 @@ cc_defaults {
             static_libs: [
                 // ZipArchive support, the order matters here to get all symbols.
                 "libziparchive",
-                "libz",
             ],
             shared_libs: [
+                "libz",
                 "liblog",
                 // For ashmem.
                 "libartpalette",

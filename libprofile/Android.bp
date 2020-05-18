@@ -33,11 +33,11 @@ cc_defaults {
             shared_libs: [
                 "libartpalette",
                 "libbase",
+                "libz",
             ],
             static_libs: [
                 // ZipArchive support, the order matters here to get all symbols.
                 "libziparchive",
-                "libz",
             ],
             export_shared_lib_headers: ["libbase"],
         },
