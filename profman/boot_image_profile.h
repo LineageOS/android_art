@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/safe_map.h"
 #include "dex/dex_file.h"
 
 namespace art {
@@ -29,27 +30,51 @@ class ProfileCompilationInfo;
 
 struct BootImageOptions {
  public:
-  // Threshold for classes that may be dirty or clean. The threshold specifies how
-  // many different profiles need to have the class before it gets added to the boot profile.
-  uint32_t image_class_theshold = 10;
+  // Threshold for preloaded. The threshold specifies, as percentage
+  // of maximum number or aggregations, how many different profiles need to have the class
+  // before it gets added to the list of preloaded classes.
+  uint32_t preloaded_class_threshold = 10;
 
-  // Threshold for classes that are likely to remain clean. The threshold specifies how
-  // many different profiles need to have the class before it gets added to the boot profile.
-  uint32_t image_class_clean_theshold = 3;
+  // Threshold for classes that may be dirty or clean. The threshold specifies, as percentage
+  // of maximum number or aggregations, how many different profiles need to have the class
+  // before it gets added to the boot profile.
+  uint32_t image_class_threshold = 10;
 
-  // Threshold for non-hot methods to be compiled. The threshold specifies how
-  // many different profiles need to have the method before it gets added to the boot profile.
-  uint32_t compiled_method_threshold = std::numeric_limits<uint32_t>::max();
+  // Threshold for classes that are likely to remain clean. The threshold specifies, as percentage
+  // of maximum number or aggregations, how many different profiles need to have the class
+  // before it gets added to the boot profile.
+  uint32_t image_class_clean_threshold = 5;
+
+  // Threshold for including a method in the profile. The threshold specifies, as percentage
+  // of maximum number or aggregations, how many different profiles need to have the method
+  // before it gets added to the boot profile.
+  uint32_t method_threshold = 10;
+
+  // Whether or not we should upgrade the startup methods to hot.
+  bool upgrade_startup_to_hot = true;
+
+  // A special set of thresholds (classes and methods) that apply if a method/class is being used
+  // by a special package. This can be used to lower the thresholds for methods used by important
+  // packages (e.g. system server of system ui) or packages which have special needs (e.g. camera
+  // needs more hardware methods).
+  SafeMap<std::string, uint32_t> special_packages_thresholds;
+
+  // Whether or not to append package use list to each profile element.
+  // Should be use only for debugging as it will add additional elements to the text output
+  // that are not compatible with the default profile format.
+  bool append_package_use_list = false;
 };
 
-// Merge a bunch of profiles together to generate a boot profile. Classes and methods are added
-// to the out_profile if they meet the options.
-void GenerateBootImageProfile(
+// Generate a boot image profile according to the specified options.
+// Boot classpaths dex files are identified by the given vector and the output is
+// written to the two specified paths. The paths will be open with O_CREAT | O_WRONLY.
+// Returns true if the generation was successful, false otherwise.
+bool GenerateBootImageProfile(
     const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-    const std::vector<std::unique_ptr<const ProfileCompilationInfo>>& profiles,
+    const ProfileCompilationInfo& profile,
     const BootImageOptions& options,
-    bool verbose,
-    ProfileCompilationInfo* out_profile);
+    const std::string& boot_profile_out_path,
+    const std::string& preloaded_classes_out_path);
 
 }  // namespace art
 
