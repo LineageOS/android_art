@@ -49,3 +49,22 @@ sh_binary {
         },
     },
 }
+
+sh_binary {
+    name: "dex2oat-script",
+    host_supported: true,
+    src: "dex2oat_wrapper",
+    filename_from_src: true,
+    target: {
+        android: {
+            required: [
+                "com.android.art.release",
+            ],
+        },
+        host: {
+            required: [
+                "dex2oat",
+            ],
+        },
+    },
+}
