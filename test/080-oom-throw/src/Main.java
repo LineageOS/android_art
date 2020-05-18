@@ -53,6 +53,18 @@ public class Main {
         }
     }
 
+    private static int exhaustJavaHeap(Object[] data, int index, int size) {
+        while (index != data.length && size != 0) {
+            try {
+                data[index] = new byte[size];
+                ++index;
+            } catch (OutOfMemoryError oome) {
+                size /= 2;
+            }
+        }
+        return index;
+    }
+
     public static Object eatAllMemory() {
         Object[] result = null;
         int size = 1000000;
@@ -70,14 +82,10 @@ public class Main {
         }
         if (result != null) {
             int index = 0;
-            while (index != result.length && size != 0) {
-                try {
-                    result[index] = new byte[size];
-                    ++index;
-                } catch (OutOfMemoryError oome) {
-                    size /= 2;
-                }
-            }
+            // Repeat to ensure there is no space left on the heap.
+            index = exhaustJavaHeap(result, index, size);
+            index = exhaustJavaHeap(result, index, /*size*/ 8);
+            index = exhaustJavaHeap(result, index, /*size*/ 8);
         }
         return result;
     }
