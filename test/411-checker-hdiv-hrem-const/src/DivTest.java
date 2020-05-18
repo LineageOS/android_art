@@ -115,11 +115,13 @@ public class DivTest {
   // must be corrected by the 'add' instruction which is between 'lsr' and 'asr'
   // instructions. In such a case they cannot be combined into one 'asr'.
   //
+  // The test case also checks 'add' and 'add_shift' are optimized into 'adds' and 'cinc'.
+  //
   /// CHECK-START-ARM64: int DivTest.$noinline$IntDivBy7(int) disassembly (after)
   /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK-NEXT:            adds w{{\d+}}, w{{\d+}}, w{{\d+}}
   /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   private static int $noinline$IntDivBy7(int v) {
     int r = v / 7;
     return r;
@@ -130,11 +132,13 @@ public class DivTest {
   // must be corrected. In this case it is a 'sub' instruction which is between 'lsr' and 'asr'
   // instructions. So they cannot be combined into one 'asr'.
   //
+  // The test case also checks 'sub' and 'add_shift' are optimized into 'subs' and 'cinc'.
+  //
   /// CHECK-START-ARM64: int DivTest.$noinline$IntDivByMinus7(int) disassembly (after)
   /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            sub w{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK-NEXT:            subs w{{\d+}}, w{{\d+}}, w{{\d+}}
   /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   private static int $noinline$IntDivByMinus7(int v) {
     int r = v / -7;
     return r;
@@ -218,6 +222,22 @@ public class DivTest {
     expectEquals(1L, $noinline$LongDivByMinus6(-6L));
     expectEquals(-3L, $noinline$LongDivByMinus6(19L));
     expectEquals(3L, $noinline$LongDivByMinus6(-19L));
+
+    expectEquals(0L, $noinline$LongDivBy100(0L));
+    expectEquals(0L, $noinline$LongDivBy100(1L));
+    expectEquals(0L, $noinline$LongDivBy100(-1L));
+    expectEquals(1L, $noinline$LongDivBy100(100L));
+    expectEquals(-1L, $noinline$LongDivBy100(-100L));
+    expectEquals(3L, $noinline$LongDivBy100(301L));
+    expectEquals(-3L, $noinline$LongDivBy100(-301L));
+
+    expectEquals(0L, $noinline$LongDivByMinus100(0L));
+    expectEquals(0L, $noinline$LongDivByMinus100(1L));
+    expectEquals(0L, $noinline$LongDivByMinus100(-1L));
+    expectEquals(-1L, $noinline$LongDivByMinus100(100L));
+    expectEquals(1L, $noinline$LongDivByMinus100(-100L));
+    expectEquals(-3L, $noinline$LongDivByMinus100(301L));
+    expectEquals(3L, $noinline$LongDivByMinus100(-301L));
   }
 
   // Test cases for Int64 HDiv/HRem to check that optimizations implemented for Int32 are not
@@ -270,6 +290,30 @@ public class DivTest {
   /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
   private static long $noinline$LongDivByMinus6(long v) {
     long r = v / -6L;
+    return r;
+  }
+
+  // A test to check 'add' and 'add_shift' are optimized into 'adds' and 'cinc'.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$LongDivBy100(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            adds  x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            asr   x{{\d+}}, x{{\d+}}, #6
+  /// CHECK-NEXT:            cinc  x{{\d+}}, x{{\d+}}, mi
+  private static long $noinline$LongDivBy100(long v) {
+    long r = v / 100L;
+    return r;
+  }
+
+  // A test to check 'subs' and 'add_shift' are optimized into 'subs' and 'cinc'.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$LongDivByMinus100(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            subs  x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            asr   x{{\d+}}, x{{\d+}}, #6
+  /// CHECK-NEXT:            cinc  x{{\d+}}, x{{\d+}}, mi
+  private static long $noinline$LongDivByMinus100(long v) {
+    long r = v / -100L;
     return r;
   }
 }
