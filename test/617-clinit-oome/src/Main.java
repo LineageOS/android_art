@@ -15,6 +15,21 @@
  */
 
 public class Main {
+  private static int exhaustJavaHeap(Object[] data, int index, int size) {
+    while (true) {
+        try {
+            data[index] = new byte[size];
+            index++;
+        } catch (OutOfMemoryError e) {
+            size /= 2;
+            if (size == 0) {
+                break;
+            }
+        }
+    }
+    return index;
+  }
+
   public static void main(String[] args) {
     Class klass = Other.class;
     Object[] data = new Object[100000];
@@ -27,19 +42,13 @@ public class Main {
         System.runFinalization();
         Runtime.getRuntime().gc();
 
-        int size = 256 * 1024 * 1024;
         int index = 0;
-        while (true) {
-            try {
-                data[index] = new byte[size];
-                index++;
-            } catch (OutOfMemoryError e) {
-                size /= 2;
-                if (size == 0) {
-                    break;
-                }
-            }
-        }
+        int initial_size = 256 * 1024 * 1024;
+        // Repeat to ensure there is no space left on the heap.
+        index = exhaustJavaHeap(data, index, initial_size);
+        index = exhaustJavaHeap(data, index, /*size*/ 8);
+        index = exhaustJavaHeap(data, index, /*size*/ 8);
+
         // Initialize now that the heap is full.
         Other.print();
     } catch (OutOfMemoryError e) {
