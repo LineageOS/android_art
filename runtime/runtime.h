@@ -976,6 +976,10 @@ class Runtime {
     return verifier_missing_kthrow_fatal_;
   }
 
+  bool IsPerfettoHprofEnabled() const {
+    return perfetto_hprof_enabled_;
+  }
+
   // Return true if we should load oat files as executable or not.
   bool GetOatFilesExecutable() const;
 
@@ -1336,6 +1340,7 @@ class Runtime {
       gc::space::ImageSpaceLoadingOrder::kSystemFirst;
 
   bool verifier_missing_kthrow_fatal_;
+  bool perfetto_hprof_enabled_;
 
   // Note: See comments on GetFaultMessage.
   friend std::string GetFaultMessageForAbortLogging();
