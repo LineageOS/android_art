@@ -618,6 +618,7 @@ class ReleaseTargetChecker:
     # Check internal native library dependencies.
     self._checker.check_native_library('libcrypto')
     self._checker.check_native_library('libexpat')
+    self._checker.check_native_library('libz')
 
     # TODO(b/139046641): Fix proper 2nd arch checks. For now, just ignore these
     # directories.
