@@ -2931,56 +2931,32 @@ static inline bool NeedToSubDividend(int64_t magic_number, int64_t divisor) {
   return divisor < 0 && magic_number > 0;
 }
 
-// Return true if the result of multiplication of the dividend by a sort of reciprocal
-// of the divisor (magic_number) needs to be corrected. This means additional operations will
-// be generated.
-static inline bool NeedToCorrectMulResult(int64_t magic_number, int64_t divisor) {
-  return NeedToAddDividend(magic_number, divisor) || NeedToSubDividend(magic_number, divisor);
+// Generate code which increments the value in register 'in' by 1 if the value is negative.
+// It is done with 'add out, in, in, lsr #31 or #63'.
+// If the value is a result of an operation setting the N flag, CINC MI can be used
+// instead of ADD. 'use_cond_inc' controls this.
+void InstructionCodeGeneratorARM64::GenerateIncrementNegativeByOne(
+    Register out,
+    Register in,
+    bool use_cond_inc) {
+  if (use_cond_inc) {
+    __ Cinc(out, in, mi);
+  } else {
+    __ Add(out, in, Operand(in, LSR, in.GetSizeInBits() - 1));
+  }
 }
 
-void InstructionCodeGeneratorARM64::GenerateResultDivRemWithAnyConstant(
-    bool is_rem,
-    int final_right_shift,
-    int64_t magic_number,
-    int64_t divisor,
-    Register dividend,
-    Register temp_result,
+// Helper to generate code producing the result of HRem with a constant divisor.
+void InstructionCodeGeneratorARM64::GenerateResultRemWithAnyConstant(
     Register out,
+    Register dividend,
+    Register quotient,
+    int64_t divisor,
     UseScratchRegisterScope* temps_scope) {
-  // The multiplication result might need some corrections to be finalized.
-  // The last correction is to increment by 1, if the result is negative.
-  // Currently it is done with 'add result, temp_result, temp_result, lsr #31 or #63'.
-  // Such ADD usually has latency 2, e.g. on Cortex-A55.
-  // However if one of the corrections is ADD or SUB, the sign can be detected
-  // with ADDS/SUBS. They set the N flag if the result is negative.
-  // This allows to use CINC MI which has latency 1.
-  bool use_cond_inc = false;
-
-  // As magic_number can be modified to fit into 32 bits, check whether the correction is needed.
-  if (NeedToAddDividend(magic_number, divisor)) {
-    __ Adds(temp_result, temp_result, dividend);
-    use_cond_inc = true;
-  } else if (NeedToSubDividend(magic_number, divisor)) {
-    __ Subs(temp_result, temp_result, dividend);
-    use_cond_inc = true;
-  }
-
-  if (final_right_shift != 0) {
-    __ Asr(temp_result, temp_result, final_right_shift);
-  }
-
-  Register& result = (is_rem) ? temp_result : out;
-  if (use_cond_inc) {
-    __ Cinc(result, temp_result, mi);
-  } else {
-    __ Add(result, temp_result, Operand(temp_result, LSR, temp_result.GetSizeInBits() - 1));
-  }
-  if (is_rem) {
-    // TODO: Strength reduction for msub.
-    Register temp_imm = temps_scope->AcquireSameSizeAs(out);
-    __ Mov(temp_imm, divisor);
-    __ Msub(out, temp_result, temp_imm, dividend);
-  }
+  // TODO: Strength reduction for msub.
+  Register temp_imm = temps_scope->AcquireSameSizeAs(out);
+  __ Mov(temp_imm, divisor);
+  __ Msub(out, quotient, temp_imm, dividend);
 }
 
 void InstructionCodeGeneratorARM64::GenerateInt64DivRemWithAnyConstant(
@@ -3007,14 +2983,34 @@ void InstructionCodeGeneratorARM64::GenerateInt64DivRemWithAnyConstant(
   __ Mov(temp, magic);
   __ Smulh(temp, dividend, temp);
 
-  GenerateResultDivRemWithAnyConstant(/* is_rem= */ instruction->IsRem(),
-                                      /* final_right_shift= */ shift,
-                                      magic,
-                                      imm,
-                                      dividend,
-                                      temp,
-                                      out,
-                                      &temps);
+  // The multiplication result might need some corrections to be finalized.
+  // The last correction is to increment by 1, if the result is negative.
+  // Currently it is done with 'add result, temp_result, temp_result, lsr #31 or #63'.
+  // Such ADD usually has latency 2, e.g. on Cortex-A55.
+  // However if one of the corrections is ADD or SUB, the sign can be detected
+  // with ADDS/SUBS. They set the N flag if the result is negative.
+  // This allows to use CINC MI which has latency 1.
+  bool use_cond_inc = false;
+
+  // As magic_number can be modified to fit into 32 bits, check whether the correction is needed.
+  if (NeedToAddDividend(magic, imm)) {
+    __ Adds(temp, temp, dividend);
+    use_cond_inc = true;
+  } else if (NeedToSubDividend(magic, imm)) {
+    __ Subs(temp, temp, dividend);
+    use_cond_inc = true;
+  }
+
+  if (shift != 0) {
+    __ Asr(temp, temp, shift);
+  }
+
+  if (instruction->IsRem()) {
+    GenerateIncrementNegativeByOne(temp, temp, use_cond_inc);
+    GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+  } else {
+    GenerateIncrementNegativeByOne(out, temp, use_cond_inc);
+  }
 }
 
 void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
@@ -3040,25 +3036,35 @@ void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
   __ Mov(temp, magic);
   __ Smull(temp.X(), dividend, temp);
 
-  if (NeedToCorrectMulResult(magic, imm)) {
-    __ Lsr(temp.X(), temp.X(), 32);
-  } else {
-    // As between 'lsr temp.X(), temp.X(), #32' and 'asr temp, temp, #shift' there are
-    // no other instructions modifying 'temp', they can be combined into one
-    // 'asr temp.X(), temp.X(), #32 + shift'.
-    DCHECK_LT(shift, 32);
-    __ Asr(temp.X(), temp.X(), 32 + shift);
-    shift = 0;
+  // The multiplication result might need some corrections to be finalized.
+  // The last correction is to increment by 1, if the result is negative.
+  // Currently it is done with 'add result, temp_result, temp_result, lsr #31 or #63'.
+  // Such ADD usually has latency 2, e.g. on Cortex-A55.
+  // However if one of the corrections is ADD or SUB, the sign can be detected
+  // with ADDS/SUBS. They set the N flag if the result is negative.
+  // This allows to use CINC MI which has latency 1.
+  bool use_cond_inc = false;
+
+  // ADD/SUB correction is performed in the high 32 bits
+  // as high 32 bits are ignored because type are kInt32.
+  if (NeedToAddDividend(magic, imm)) {
+    __ Adds(temp.X(), temp.X(), Operand(dividend.X(), LSL, 32));
+    use_cond_inc = true;
+  } else if (NeedToSubDividend(magic, imm)) {
+    __ Subs(temp.X(), temp.X(), Operand(dividend.X(), LSL, 32));
+    use_cond_inc = true;
   }
 
-  GenerateResultDivRemWithAnyConstant(/* is_rem= */ instruction->IsRem(),
-                                      /* final_right_shift= */ shift,
-                                      magic,
-                                      imm,
-                                      dividend,
-                                      temp,
-                                      out,
-                                      &temps);
+  // Extract the result from the high 32 bits and apply the final right shift.
+  DCHECK_LT(shift, 32);
+  __ Asr(temp.X(), temp.X(), 32 + shift);
+
+  if (instruction->IsRem()) {
+    GenerateIncrementNegativeByOne(temp, temp, use_cond_inc);
+    GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+  } else {
+    GenerateIncrementNegativeByOne(out, temp, use_cond_inc);
+  }
 }
 
 void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperation* instruction) {

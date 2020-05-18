@@ -114,15 +114,15 @@ public class RemTest {
     return r;
   }
 
-  // A test case to check that 'lsr' and 'asr' are not combined into one 'asr'.
+  // A test case to check that 'lsr' and 'add' are combined into one 'adds'.
   // For divisor 7 seen in the core library the result of get_high(dividend * magic)
-  // must be corrected by the 'add' instruction which is between 'lsr' and 'asr'
-  // instructions. In such a case they cannot be combined into one 'asr'.
+  // must be corrected by the 'add' instruction.
+  //
+  // The test case also checks 'add' and 'add_shift' are optimized into 'adds' and 'cinc'.
   //
   /// CHECK-START-ARM64: int RemTest.$noinline$IntRemBy7(int) disassembly (after)
-  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            adds w{{\d+}}, w{{\d+}}, w{{\d+}}
-  /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
+  /// CHECK:                 adds x{{\d+}}, x{{\d+}}, x{{\d+}}, lsl #32
+  /// CHECK-NEXT:            asr  x{{\d+}}, x{{\d+}}, #34
   /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   /// CHECK-NEXT:            mov w{{\d+}}, #0x7
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
@@ -131,15 +131,15 @@ public class RemTest {
     return r;
   }
 
-  // A test case to check that 'lsr' and 'asr' are not combined into one 'asr'.
+  // A test case to check that 'lsr' and 'add' are combined into one 'adds'.
   // Divisor -7 has the same property as divisor 7: the result of get_high(dividend * magic)
-  // must be corrected. In this case it is a 'sub' instruction which is between 'lsr' and 'asr'
-  // instructions. So they cannot be combined into one 'asr'.
+  // must be corrected. In this case it is a 'sub' instruction.
+  //
+  // The test case also checks 'sub' and 'add_shift' are optimized into 'subs' and 'cinc'.
   //
   /// CHECK-START-ARM64: int RemTest.$noinline$IntRemByMinus7(int) disassembly (after)
-  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            subs w{{\d+}}, w{{\d+}}, w{{\d+}}
-  /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
+  /// CHECK:                 subs x{{\d+}}, x{{\d+}}, x{{\d+}}, lsl #32
+  /// CHECK-NEXT:            asr  x{{\d+}}, x{{\d+}}, #34
   /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   /// CHECK-NEXT:            mov w{{\d+}}, #0xfffffff9
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
