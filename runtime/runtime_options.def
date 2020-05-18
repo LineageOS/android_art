@@ -173,4 +173,17 @@ RUNTIME_OPTIONS_KEY (gc::space::ImageSpaceLoadingOrder, \
 RUNTIME_OPTIONS_KEY (bool,                FastClassNotFoundException,     true)
 RUNTIME_OPTIONS_KEY (bool,                VerifierMissingKThrowFatal,     true)
 
+// Whether to allow loading of the perfetto hprof plugin.
+// Even with this option set, we will still only actually load the plugin
+// if we are on a userdebug build or the app is debuggable or profileable.
+//
+// We do not want to enable this by default because PerfettoHprof does not
+// work on host, and we do not want to enable it in tests.
+//
+// Switching this on adds ~500us to the startup on userdebug builds, or for
+// profileable / debuggable apps.
+//
+// This is set to true in frameworks/base/core/jni/AndroidRuntime.cpp.
+RUNTIME_OPTIONS_KEY (bool,                PerfettoHprof,                  false)
+
 #undef RUNTIME_OPTIONS_KEY
