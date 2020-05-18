@@ -1,0 +1,127 @@
+# Copyright (C) 2020 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script is used on host and device. It uses a common subset
+# shell dialect that should work on the host (e.g. bash), and
+# Android (e.g. mksh).
+
+# The purpose of this script is to invoke dex2oat with the right
+# boot classpath and bootclasspath locations.
+
+function find_libdir() {
+  # Get the actual file, $1 is the BINARY_PATH and may be a symbolic link.
+  # Use realpath instead of readlink because Android does not have a readlink.
+  if [[ "$(realpath "$1")" == *dalvikvm64 ]]; then
+    echo "lib64"
+  else
+    echo "lib"
+  fi
+}
+
+# Follow all sym links to get the program name.
+if [[ -n "$BASH_SOURCE" ]]; then
+  PROG_NAME="$BASH_SOURCE"
+else
+  PROG_NAME="$0"
+fi
+while [ -h "$PROG_NAME" ]; do
+  # On Mac OS, readlink -f doesn't work.
+  PROG_NAME="$(readlink "$PROG_NAME")"
+done
+
+PROG_DIR="$(cd "${PROG_NAME%/*}" ; pwd -P)"
+ANDROID_ROOT="$(cd $PROG_DIR/..; pwd -P)"
+LIBDIR="$(find_libdir $PROG_DIR)"
+LD_LIBRARY_PATH=$ANDROID_ROOT/$LIBDIR
+
+declare -a args=("$@")
+arg_idx=0
+while true; do
+  if [[ $1 == "-Xbootclasspath:*" ]]; then
+    DEX2OAT_BCP=$1
+    # Remove '-Xbootclasspath:' from the arguments.
+    DEX2OAT_BCP=${DEX2OAT_BCP##-Xbootclasspath:}
+    unset args[arg_idx]
+    shift
+  elif [[ $1 == "-Xbootclasspath-locations:*" ]]; then
+    DEX2OAT_BCP_LOCS=$1
+    # Remove '-Xbootclasspath-locations:' from the argument.
+    DEX2OAT_BCP_LOCS=${DEX2OAT_BCP_LOCS##-Xbootclasspath-locations:}
+    unset args[arg_idx]
+    shift
+  elif [[ $1 == "--32" ]]; then
+    DEX2OAT_SUFFIX=32
+    unset args[arg_idx]
+    shift
+  elif [[ $1 == "--64" ]]; then
+    DEX2OAT_SUFFIX=32
+    unset args[arg_idx]
+    shift
+  elif [[ "$1" == "" ]]; then
+    break
+  else
+    shift
+  fi
+  arg_idx=$((arg_idx + 1))
+done
+
+if [[ "$DEX2OAT_BCP" = "" ]]; then
+  core_jars_list="core-oj core-libart okhttp bouncycastle apache-xml"
+  core_jars_suffix=
+  if [[ -f $ANDROID_ROOT/framework/core-oj-hostdex.jar ]]; then
+    # On host, conscrypt and icu4j are at the same location as the core jars.
+    core_jars_list="${core_jars_list} conscrypt core-icu4j"
+    core_jars_suffix=-hostdex
+    core_filenames_dir=$ANDROID_ROOT/framework
+    core_locations_dir=$ANDROID_ROOT/framework
+    prefix=$PWD/
+    if [[ ${core_locations_dir:0:${#prefix}} = $prefix ]]; then
+      core_locations_dir="${core_locations_dir##$prefix}"
+    fi
+  elif [[ -f $ANDROID_ROOT/apex/com.android.art/javalib/core-oj.jar ]]; then
+    core_jars_suffix=
+    core_filenames_dir=$ANDROID_ROOT/apex/com.android.art/javalib
+    core_locations_dir=/apex/com.android.art/javalib
+  else
+    echo "Can not find jar files for boot classpath"
+    exit 1
+  fi
+  boot_separator=""
+  for boot_module in ${core_jars_list}; do
+    DEX_FILENAME="$boot_module$core_jars_suffix.jar"
+    DEX2OAT_BCP+="$boot_separator$core_filenames_dir/${DEX_FILENAME}"
+    DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
+    boot_separator=":"
+  done
+  if [[ $core_jars_suffix = "" ]]; then
+    # For target, add conscrypt and icu4j
+    for boot_module in /apex/com.android.conscrypt/javalib/conscrypt.jar /apex/com.android.i18n/javalib/core-icu4j.jar; do
+      DEX2OAT_BCP+="$boot_separator$ANDROID_ROOT/$boot_module"
+      DEX2OAT_BCP_LOCS+="$boot_separator$boot_module"
+    done
+  fi
+fi
+
+# If the dex2oat binary with the bitness as a suffix doesn't exist,
+# try with a dex2oat without suffix.
+if [[ ! -f $ANDROID_ROOT/bin/dex2oat${DEX2OAT_SUFFIX} ]]; then
+  DEX2OAT_SUFFIX=""
+fi
+
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
+  $ANDROID_ROOT/bin/dex2oat${DEX2OAT_SUFFIX} \
+    --android-root=$ANDROID_ROOT \
+    --runtime-arg -Xbootclasspath:$DEX2OAT_BCP \
+    --runtime-arg -Xbootclasspath-locations:$DEX2OAT_BCP_LOCS \
+    ${args[@]}
