@@ -1,2 +1,2 @@
-Test the optimization of LSR+ASR into one ASR for integer division and remainder instructions when
+Checker test for optimizations of integer division and remainder instructions when
 the denominator is a constant, not power of 2.
