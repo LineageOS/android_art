@@ -982,7 +982,7 @@ def parse_test_name(test_name):
   if test_set:
     return test_set
 
-  parsed = parse_test_name(test_name)
+  parsed = extract_test_name(test_name)
   _user_input_variants['target'].add(parsed[0])
   _user_input_variants['run'].add(parsed[1])
   _user_input_variants['prebuild'].add(parsed[2])
