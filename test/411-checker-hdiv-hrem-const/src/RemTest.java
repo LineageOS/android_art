@@ -121,9 +121,9 @@ public class RemTest {
   //
   /// CHECK-START-ARM64: int RemTest.$noinline$IntRemBy7(int) disassembly (after)
   /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK-NEXT:            adds w{{\d+}}, w{{\d+}}, w{{\d+}}
   /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   /// CHECK-NEXT:            mov w{{\d+}}, #0x7
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
   private static int $noinline$IntRemBy7(int v) {
@@ -138,9 +138,9 @@ public class RemTest {
   //
   /// CHECK-START-ARM64: int RemTest.$noinline$IntRemByMinus7(int) disassembly (after)
   /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
-  /// CHECK-NEXT:            sub w{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK-NEXT:            subs w{{\d+}}, w{{\d+}}, w{{\d+}}
   /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #2
-  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  /// CHECK-NEXT:            cinc w{{\d+}}, w{{\d+}}, mi
   /// CHECK-NEXT:            mov w{{\d+}}, #0xfffffff9
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
   private static int $noinline$IntRemByMinus7(int v) {
@@ -230,6 +230,22 @@ public class RemTest {
     expectEquals(0L, $noinline$LongRemByMinus6(-6L));
     expectEquals(1L, $noinline$LongRemByMinus6(19L));
     expectEquals(-1L, $noinline$LongRemByMinus6(-19L));
+
+    expectEquals(0L, $noinline$LongRemBy100(0L));
+    expectEquals(1L, $noinline$LongRemBy100(1L));
+    expectEquals(-1L, $noinline$LongRemBy100(-1L));
+    expectEquals(0L, $noinline$LongRemBy100(100L));
+    expectEquals(0L, $noinline$LongRemBy100(-100L));
+    expectEquals(1L, $noinline$LongRemBy100(101L));
+    expectEquals(-1L, $noinline$LongRemBy100(-101L));
+
+    expectEquals(0L, $noinline$LongRemByMinus100(0L));
+    expectEquals(1L, $noinline$LongRemByMinus100(1L));
+    expectEquals(-1L, $noinline$LongRemByMinus100(-1L));
+    expectEquals(0L, $noinline$LongRemByMinus100(100L));
+    expectEquals(0L, $noinline$LongRemByMinus100(-100L));
+    expectEquals(1L, $noinline$LongRemByMinus100(101L));
+    expectEquals(-1L, $noinline$LongRemByMinus100(-101L));
   }
 
   // Test cases for Int64 HDiv/HRem to check that optimizations implemented for Int32 are not
@@ -294,6 +310,34 @@ public class RemTest {
   /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
   private static long $noinline$LongRemByMinus6(long v) {
     long r = v % -6L;
+    return r;
+  }
+
+  // A test to check 'add' and 'add_shift' are optimized into 'adds' and 'cinc'.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$LongRemBy100(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            adds  x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            asr   x{{\d+}}, x{{\d+}}, #6
+  /// CHECK-NEXT:            cinc  x{{\d+}}, x{{\d+}}, mi
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x64
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$LongRemBy100(long v) {
+    long r = v % 100L;
+    return r;
+  }
+
+  // A test to check 'sub' and 'add_shift' are optimized into 'subs' and 'cinc'.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$LongRemByMinus100(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            subs  x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            asr   x{{\d+}}, x{{\d+}}, #6
+  /// CHECK-NEXT:            cinc  x{{\d+}}, x{{\d+}}, mi
+  /// CHECK-NEXT:            mov x{{\d+}}, #0xffffffffffffff9c
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$LongRemByMinus100(long v) {
+    long r = v % -100L;
     return r;
   }
 }
