@@ -711,6 +711,7 @@ standalone-apex-files: deapexer \
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \
                         $(TARGET_OUT_EXECUTABLES)/art \
+                        $(TARGET_OUT_EXECUTABLES)/dex2oat_wrapper \
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(TARGET_CORE_IMG_OUT_BASE).art \
@@ -736,7 +737,8 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
 # Also include libartbenchmark, we always include it when running golem.
 ART_HOST_SHARED_LIBRARY_BENCHMARK := $(ART_HOST_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 build-art-host-golem: build-art-host \
-                      $(ART_HOST_SHARED_LIBRARY_BENCHMARK)
+                      $(ART_HOST_SHARED_LIBRARY_BENCHMARK) \
+                      $(HOST_OUT_EXECUTABLES)/dex2oat_wrapper
 
 ########################################################################
 # Phony target for building what go/lem requires for syncing /system to target.

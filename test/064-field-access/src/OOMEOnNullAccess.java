@@ -36,6 +36,16 @@ public class OOMEOnNullAccess {
 
     static ArrayList<Object> storage = new ArrayList<>(100000);
 
+    private static void exhaustJavaHeap(int size) {
+      while (size > 8) {
+        try {
+          storage.add(new byte[size]);
+        } catch (OutOfMemoryError e) {
+          size = size/2;
+        }
+      }
+    }
+
     public static void main(String[] args) {
         // Stop the JIT to be sure nothing is running that could be resolving classes or causing
         // verification.
@@ -48,14 +58,12 @@ public class OOMEOnNullAccess {
         System.runFinalization();
         Runtime.getRuntime().gc();
 
-        int l = 1024 * 1024;
-        while (l > 8) {
-          try {
-            storage.add(new byte[l]);
-          } catch (OutOfMemoryError e) {
-            l = l/2;
-          }
-        }
+        int initial_size = 1024 * 1024;
+        // Repeat to ensure there is no space left on the heap.
+        exhaustJavaHeap(initial_size);
+        exhaustJavaHeap(/*size*/ 8);
+        exhaustJavaHeap(/*size*/ 8);
+
 
         try {
             nullAccess(null);
