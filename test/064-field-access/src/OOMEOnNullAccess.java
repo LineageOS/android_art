@@ -37,7 +37,7 @@ public class OOMEOnNullAccess {
     static ArrayList<Object> storage = new ArrayList<>(100000);
 
     private static void exhaustJavaHeap(int size) {
-      while (size > 8) {
+      while (size > 0) {
         try {
           storage.add(new byte[size]);
         } catch (OutOfMemoryError e) {
