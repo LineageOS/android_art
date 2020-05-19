@@ -195,7 +195,7 @@ class Robin extends Thread {
  * Allocates useless objects in recursive calls.
  */
 class Deep extends Thread {
-    private static final int MAX_DEPTH = 61;
+    private static final int MAX_DEPTH = 50;
 
     private static String strong[] = new String[MAX_DEPTH];
     private static WeakReference weak[] = new WeakReference[MAX_DEPTH];
