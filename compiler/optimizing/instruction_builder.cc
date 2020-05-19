@@ -1352,18 +1352,18 @@ bool HInstructionBuilder::IsInitialized(ObjPtr<mirror::Class> cls) const {
 
   // Check if the class will be initialized at runtime.
   if (cls->IsInitialized()) {
-    Runtime* runtime = Runtime::Current();
-    if (runtime->IsAotCompiler()) {
+    const CompilerOptions& compiler_options = code_generator_->GetCompilerOptions();
+    if (compiler_options.IsAotCompiler()) {
       // Assume loaded only if klass is in the boot image. App classes cannot be assumed
       // loaded because we don't even know what class loader will be used to load them.
-      if (IsInBootImage(cls, code_generator_->GetCompilerOptions())) {
+      if (IsInBootImage(cls, compiler_options)) {
         return true;
       }
     } else {
-      DCHECK(runtime->UseJitCompilation());
+      DCHECK(compiler_options.IsJitCompiler());
       if (Runtime::Current()->GetJit()->CanAssumeInitialized(
               cls,
-              graph_->IsCompilingForSharedJitCode())) {
+              compiler_options.IsJitCompilerForSharedCode())) {
         // For JIT, the class cannot revert to an uninitialized state.
         return true;
       }

@@ -101,11 +101,11 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBssEntry;
     }
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
-  } else if (Runtime::Current()->UseJitCompilation()) {
+  } else if (compiler_options.IsJitCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     if (Runtime::Current()->GetJit()->CanEncodeMethod(
             callee,
-            codegen->GetGraph()->IsCompilingForSharedJitCode())) {
+            compiler_options.IsJitCompilerForSharedCode())) {
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress;
       method_load_data = reinterpret_cast<uintptr_t>(callee);
       code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
@@ -165,7 +165,7 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
     const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
     if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
       // Compiling boot image or boot image extension. Check if the class is a boot image class.
-      DCHECK(!runtime->UseJitCompilation());
+      DCHECK(!compiler_options.IsJitCompiler());
       if (!compiler_options.GetCompilePic()) {
         // Test configuration, do not sharpen.
         desired_load_kind = HLoadClass::LoadKind::kRuntimeCall;
@@ -184,14 +184,14 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
     } else {
       is_in_boot_image = (klass != nullptr) &&
           runtime->GetHeap()->ObjectIsInBootImageSpace(klass.Get());
-      if (runtime->UseJitCompilation()) {
+      if (compiler_options.IsJitCompiler()) {
         DCHECK(!compiler_options.GetCompilePic());
         if (is_in_boot_image) {
           desired_load_kind = HLoadClass::LoadKind::kJitBootImageAddress;
         } else if (klass != nullptr) {
           if (runtime->GetJit()->CanEncodeClass(
                   klass.Get(),
-                  codegen->GetGraph()->IsCompilingForSharedJitCode())) {
+                  compiler_options.IsJitCompilerForSharedCode())) {
             desired_load_kind = HLoadClass::LoadKind::kJitTableAddress;
           } else {
             // Shared JIT code cannot encode a literal that the GC can move.
@@ -239,7 +239,8 @@ static inline bool CanUseTypeCheckBitstring(ObjPtr<mirror::Class> klass, CodeGen
   DCHECK(!klass->IsProxyClass());
   DCHECK(!klass->IsArrayClass());
 
-  if (Runtime::Current()->UseJitCompilation()) {
+  const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
+  if (compiler_options.IsJitCompiler()) {
     // If we're JITting, try to assign a type check bitstring (fall through).
   } else if (codegen->GetCompilerOptions().IsBootImage()) {
     const char* descriptor = klass->GetDexFile().StringByTypeIdx(klass->GetDexTypeIndex());
@@ -259,8 +260,8 @@ static inline bool CanUseTypeCheckBitstring(ObjPtr<mirror::Class> klass, CodeGen
   if ((false) &&  // FIXME: Inliner does not respect CompilerDriver::ShouldCompileMethod()
                   // and we're hitting an unassigned bitstring in dex2oat_image_test. b/26687569
       kIsDebugBuild &&
-      codegen->GetCompilerOptions().IsBootImage() &&
-      codegen->GetCompilerOptions().IsForceDeterminism()) {
+      compiler_options.IsBootImage() &&
+      compiler_options.IsForceDeterminism()) {
     SubtypeCheckInfo::State old_state = SubtypeCheck<ObjPtr<mirror::Class>>::GetState(klass);
     CHECK(old_state == SubtypeCheckInfo::kAssigned || old_state == SubtypeCheckInfo::kOverflowed)
         << klass->PrettyDescriptor() << "/" << old_state
@@ -325,7 +326,7 @@ void HSharpening::ProcessLoadString(
     if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
       // Compiling boot image or boot image extension. Resolve the string and allocate it
       // if needed, to ensure the string will be added to the boot image.
-      DCHECK(!runtime->UseJitCompilation());
+      DCHECK(!compiler_options.IsJitCompiler());
       if (compiler_options.GetCompilePic()) {
         if (compiler_options.IsForceDeterminism()) {
           // Strings for methods we're compiling should be pre-resolved but Strings in inlined
@@ -354,7 +355,7 @@ void HSharpening::ProcessLoadString(
         // Test configuration, do not sharpen.
         desired_load_kind = HLoadString::LoadKind::kRuntimeCall;
       }
-    } else if (runtime->UseJitCompilation()) {
+    } else if (compiler_options.IsJitCompiler()) {
       DCHECK(!codegen->GetCompilerOptions().GetCompilePic());
       string = class_linker->LookupString(string_index, dex_cache.Get());
       if (string != nullptr) {
@@ -363,7 +364,7 @@ void HSharpening::ProcessLoadString(
           desired_load_kind = HLoadString::LoadKind::kJitBootImageAddress;
         } else if (runtime->GetJit()->CanEncodeString(
                   string,
-                  codegen->GetGraph()->IsCompilingForSharedJitCode())) {
+                  compiler_options.IsJitCompilerForSharedCode())) {
           desired_load_kind = HLoadString::LoadKind::kJitTableAddress;
         } else {
           // Shared JIT code cannot encode a literal that the GC can move.
