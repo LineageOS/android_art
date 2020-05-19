@@ -372,8 +372,6 @@ libart_cc_defaults {
             ],
             shared_libs: [
                 "libdl_android",
-            ],
-            static_libs: [
                 "libz", // For adler32.
             ],
         },
