@@ -510,18 +510,13 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libart-disassembler.so \
   lib/libartpalette.so \
   lib/libart.so \
-  lib/libbacktrace.so \
-  lib/libbase.so \
-  lib/libcrypto.so \
   lib/libdexfile_external.so \
   lib/libdexfile.so \
-  lib/libdexfile_support.so \
   lib/libdt_fd_forward.so \
   lib/libdt_socket.so \
   lib/libexpat.so \
   lib/libjavacore.so \
   lib/libjdwp.so \
-  lib/liblzma.so \
   lib/libmeminfo.so \
   lib/libnativebridge.so \
   lib/libnativehelper.so \
@@ -533,11 +528,7 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libpac.so \
   lib/libprocinfo.so \
   lib/libprofile.so \
-  lib/libsigchain.so \
-  lib/libunwindstack.so \
   lib/libvixl.so \
-  lib/libziparchive.so \
-  lib/libz.so \
   lib64/libadbconnection.so \
   lib64/libandroidio.so \
   lib64/libartbase.so \
@@ -546,18 +537,13 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libart-disassembler.so \
   lib64/libartpalette.so \
   lib64/libart.so \
-  lib64/libbacktrace.so \
-  lib64/libbase.so \
-  lib64/libcrypto.so \
   lib64/libdexfile_external.so \
   lib64/libdexfile.so \
-  lib64/libdexfile_support.so \
   lib64/libdt_fd_forward.so \
   lib64/libdt_socket.so \
   lib64/libexpat.so \
   lib64/libjavacore.so \
   lib64/libjdwp.so \
-  lib64/liblzma.so \
   lib64/libmeminfo.so \
   lib64/libnativebridge.so \
   lib64/libnativehelper.so \
@@ -569,11 +555,7 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libpac.so \
   lib64/libprocinfo.so \
   lib64/libprofile.so \
-  lib64/libsigchain.so \
-  lib64/libunwindstack.so \
   lib64/libvixl.so \
-  lib64/libziparchive.so \
-  lib64/libz.so \
 
 PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
   lib/libcrypto.so \
@@ -593,6 +575,32 @@ PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
   lib64/libicu_jni.so \
   lib64/libicuuc.so \
 
+# Extracts files from an APEX into a location. The APEX can be either a .apex
+# file in $(TARGET_OUT)/apex, or a directory in the same location. Files are
+# extracted to $(TARGET_OUT) with the same relative paths as under the APEX
+# root.
+# $(1): APEX base name
+# $(2): List of files to extract, with paths relative to the APEX root
+define extract-from-apex
+  apex_root=$(TARGET_OUT)/apex && \
+  apex_file=$$apex_root/$(1).apex && \
+  apex_dir=$$apex_root/$(1) && \
+  if [ -f $$apex_file ]; then \
+    rm -rf $$apex_dir && \
+    mkdir -p $$apex_dir && \
+    debugfs=$(HOST_OUT)/bin/debugfs_static && \
+    $(HOST_OUT)/bin/deapexer --debugfs_path $$debugfs extract $$apex_file $$apex_dir; \
+  fi && \
+  for f in $(2); do \
+    sf=$$apex_dir/$$f && \
+    df=$(TARGET_OUT)/$$f && \
+    if [ -e $$sf ]; then \
+      mkdir -p $$(dirname $$df) && \
+      cp -fd $$sf $$df; \
+    fi || exit 1; \
+  done
+endef
+
 # Generate copies of Bionic bootstrap artifacts and ART APEX
 # libraries in the `system` (TARGET_OUT) directory. This is dangerous
 # as these files could inadvertently stay in this directory and be
@@ -604,15 +612,7 @@ PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
 # - Bionic bootstrap libraries, copied from
 #   `$(TARGET_OUT)/lib(64)/bootstrap` (the `/system/lib(64)/bootstrap`
 #   directory to be sync'd to the target);
-# - Programs and libraries from the ART APEX; if the product
-#   to build uses flattened APEXes, these libraries are copied from
-#   `$(TARGET_OUT)/apex/com.android.art.debug` (the flattened
-#   (Debug) ART APEX directory to be sync'd to the target);
-#   otherwise, they are copied from
-#   `$(TARGET_OUT)/../apex/com.android.art.debug` (the local
-#   directory under the build tree containing the (Debug) ART APEX
-#   artifacts, which is not sync'd to the target).
-# - Libraries from the Conscrypt and I18n APEX may be loaded during golem runs.
+# - Programs and libraries from various APEXes.
 #
 # This target is only used by Golem now.
 #
@@ -636,38 +636,12 @@ standalone-apex-files: deapexer \
 	  tf=$(TARGET_OUT)/$$f; \
 	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
 	done
-	if [ "x$(TARGET_FLATTEN_APEX)" = xtrue ]; then \
-          apex_orig_dir=$(TARGET_OUT)/apex; \
-	else \
-          apex_orig_dir=""; \
-	fi; \
-	art_apex_orig_dir=$$apex_orig_dir/$(RELEASE_ART_APEX); \
-	for f in $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES); do \
-	  tf="$$art_apex_orig_dir/$$f"; \
-	  df="$(TARGET_OUT)/$$f"; \
-	  if [ -f $$tf ]; then \
-            if [ -h $$df ]; then rm $$df; fi; \
-            cp -fd $$tf $$df; \
-          fi; \
-	done; \
-	conscrypt_dir="$$apex_orig_dir/$(CONSCRYPT_APEX)"; \
-	conscrypt_apex="$$apex_orig_dir/$(CONSCRYPT_APEX).apex"; \
-	if [ -f $$conscrypt_apex ]; then \
-		rm -rf $$conscrypt_dir; \
-		mkdir $$conscrypt_dir; \
-		debugfs=$(HOST_OUT)/bin/debugfs_static; \
-		$(HOST_OUT)/bin/deapexer --debugfs_path $$debugfs extract $$conscrypt_apex $$conscrypt_dir; \
-	fi; \
-	conscrypt_apex_orig_dir=$$apex_orig_dir/$(CONSCRYPT_APEX); \
-	for f in $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS); do \
-	  tf="$$conscrypt_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
-	done; \
-	i18n_apex_orig_dir=$$apex_orig_dir/$(I18N_APEX); \
-	for f in $(PRIVATE_I18N_APEX_DEPENDENCY_LIBS); do \
-	  tf="$$i18n_apex_orig_dir/$$f"; \
-	  if [ -f $$tf ]; then cp -f $$tf $(TARGET_OUT)/$$f; fi; \
-	done; \
+	$(call extract-from-apex,$(RELEASE_ART_APEX),\
+	  $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES))
+	$(call extract-from-apex,$(CONSCRYPT_APEX),\
+	  $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS))
+	$(call extract-from-apex,$(I18N_APEX),\
+	  $(PRIVATE_I18N_APEX_DEPENDENCY_LIBS))
 
 ########################################################################
 # Phony target for only building what go/lem requires for pushing ART on /data.
