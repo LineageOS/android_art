@@ -105,6 +105,7 @@ class BitMemoryRegion final : public ValueObject {
   // The least significant bit is stored in the smallest memory offset.
   template<typename Result = size_t>
   ATTRIBUTE_NO_SANITIZE_ADDRESS  // We might touch extra bytes due to the alignment.
+  ATTRIBUTE_NO_SANITIZE_HWADDRESS  // The hwasan uses different attribute.
   ALWAYS_INLINE Result LoadBits(size_t bit_offset, size_t bit_length) const {
     static_assert(std::is_integral<Result>::value, "Result must be integral");
     static_assert(std::is_unsigned<Result>::value, "Result must be unsigned");

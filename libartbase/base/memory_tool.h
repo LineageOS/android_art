@@ -66,6 +66,12 @@ constexpr size_t kMemoryToolStackGuardSizeScale = 1;
 
 #endif
 
+#if __has_feature(hwaddress_sanitizer)
+# define ATTRIBUTE_NO_SANITIZE_HWADDRESS __attribute__((no_sanitize("hwaddress")))
+#else
+# define ATTRIBUTE_NO_SANITIZE_HWADDRESS
+#endif
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_MEMORY_TOOL_H_
