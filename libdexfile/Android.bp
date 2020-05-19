@@ -49,9 +49,10 @@ cc_defaults {
         android: {
             static_libs: [
                 "libziparchive",
-                "libz",
             ],
             shared_libs: [
+                // libz provides a stub from platform, shouldn't be statically linked
+                "libz",
                 // For MemMap.
                 "libartpalette",
                 "liblog",
