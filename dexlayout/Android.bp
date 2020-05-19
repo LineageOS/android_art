@@ -53,7 +53,7 @@ art_cc_defaults {
             ],
         },
     },
-    static_libs: ["libz"],
+    shared_libs: ["libz"],
 }
 
 cc_defaults {
