@@ -114,7 +114,8 @@ class PACKED(4) OatQuickMethodHeader {
   }
 
   bool Contains(uintptr_t pc) const {
-    uintptr_t code_start = reinterpret_cast<uintptr_t>(code_);
+    // Remove hwasan tag to make comparison below valid. The PC from the stack does not have it.
+    uintptr_t code_start = reinterpret_cast<uintptr_t>(HWASanUntag(code_));
     static_assert(kRuntimeISA != InstructionSet::kThumb2, "kThumb2 cannot be a runtime ISA");
     if (kRuntimeISA == InstructionSet::kArm) {
       // On Thumb-2, the pc is offset by one.
