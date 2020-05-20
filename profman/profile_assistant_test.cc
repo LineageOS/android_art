@@ -214,7 +214,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
     argv_str.push_back(profman_cmd);
     argv_str.push_back("--generate-test-profile=" + filename);
     std::string error;
-     return ExecAndReturnCode(argv_str, &error);
+    return ExecAndReturnCode(argv_str, &error);
   }
 
   bool GenerateTestProfileWithInputDex(const std::string& filename) {
