@@ -904,6 +904,7 @@ class Dex2Oat final {
   }
 
   void ProcessOptions(ParserOptions* parser_options) {
+    compiler_options_->compiler_type_ = CompilerOptions::CompilerType::kAotCompiler;
     compiler_options_->compile_pic_ = true;  // All AOT compilation is PIC.
 
     if (android_root_.empty()) {
