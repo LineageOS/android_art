@@ -1153,6 +1153,12 @@
         "description" : ["Test seems to timeout when run with gcstress due to slower unwinding by libbacktrace"]
     },
     {
+        "tests": ["708-jit-cache-churn"],
+        "variant": "gcstress",
+        "bug": "b/147358440",
+        "description" : ["Times out under gcstress since https://r.android.com/1200060."]
+    },
+    {
         "tests": ["712-varhandle-invocations"],
         "variant": "gcstress",
         "bug": "b/111630237",
@@ -1243,5 +1249,12 @@
         "env_vars": {"ART_READ_BARRIER_TYPE": "TABLELOOKUP"},
         "bug": "b/140507091",
         "description": ["Test containing Checker assertions expecting Baker read barriers."]
+    },
+    {
+
+        "tests": ["570-checker-osr-locals"],
+        "variant": "jvm",
+        "bug": "b/154802847",
+        "description": ["Failing on RI. Needs further investigating."]
     }
 ]
