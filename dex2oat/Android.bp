@@ -55,24 +55,14 @@ art_cc_defaults {
         },
     },
 
-    target: {
-        android: {
-            static_libs: [
-                "libz",
-            ],
-        },
-        host: {
-            shared_libs: [
-                "libz",
-            ],
-        },
-    },
     generated_sources: ["art_dex2oat_operator_srcs"],
     shared_libs: [
         "libbase",
 
         // For SHA-1 checksumming of build ID
         "libcrypto",
+
+        "libz",
     ],
     export_include_dirs: ["."],
 }
@@ -250,6 +240,7 @@ art_cc_binary {
         "libartpalette",
         "libbase",
         "libsigchain",
+        "libz",
     ],
     static_libs: [
         "libart-dex2oat",
@@ -277,14 +268,8 @@ art_cc_binary {
             lto: {
                 thin: true,
             },
-            static_libs: [
-                "libz",
-            ],
         },
         host: {
-            shared_libs: [
-                "libz",
-            ],
             // Override the prefer32 added by art_cc_binary when
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
@@ -322,20 +307,13 @@ art_cc_binary {
         "libartpalette",
         "libbase",
         "libsigchain",
+        "libz",
     ],
     static_libs: [
         "libartd-dex2oat",
     ],
     target: {
-        android: {
-            static_libs: [
-                "libz",
-            ],
-        },
         host: {
-            shared_libs: [
-                "libz",
-            ],
             // Override the prefer32 added by art_cc_binary when
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
