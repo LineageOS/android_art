@@ -65,7 +65,7 @@ while true; do
     unset args[arg_idx]
     shift
   elif [[ $1 == "--64" ]]; then
-    DEX2OAT_SUFFIX=32
+    DEX2OAT_SUFFIX=64
     unset args[arg_idx]
     shift
   elif [[ "$1" == "" ]]; then
