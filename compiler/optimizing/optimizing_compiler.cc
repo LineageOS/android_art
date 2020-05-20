@@ -379,7 +379,6 @@ class OptimizingCompiler final : public Compiler {
                             ArtMethod* method,
                             bool baseline,
                             bool osr,
-                            bool is_shared_jit_code,
                             VariableSizedHandleScope* handles) const;
 
   CodeGenerator* TryCompileIntrinsic(ArenaAllocator* allocator,
@@ -719,7 +718,6 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
                                               ArtMethod* method,
                                               bool baseline,
                                               bool osr,
-                                              bool is_shared_jit_code,
                                               VariableSizedHandleScope* handles) const {
   MaybeRecordStat(compilation_stats_.get(), MethodCompilationStat::kAttemptBytecodeCompilation);
   const CompilerOptions& compiler_options = GetCompilerOptions();
@@ -789,7 +787,6 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
       dead_reference_safe,
       compiler_options.GetDebuggable(),
       /* osr= */ osr,
-      /* is_shared_jit_code= */ is_shared_jit_code,
       /* baseline= */ baseline);
 
   if (method != nullptr) {
@@ -992,6 +989,7 @@ CompiledMethod* OptimizingCompiler::Compile(const dex::CodeItem* code_item,
                                             const DexFile& dex_file,
                                             Handle<mirror::DexCache> dex_cache) const {
   const CompilerOptions& compiler_options = GetCompilerOptions();
+  DCHECK(compiler_options.IsAotCompiler());
   CompiledMethod* compiled_method = nullptr;
   Runtime* runtime = Runtime::Current();
   DCHECK(runtime->IsAotCompiler());
@@ -1050,7 +1048,6 @@ CompiledMethod* OptimizingCompiler::Compile(const dex::CodeItem* code_item,
                        method,
                        compiler_options.IsBaseline(),
                        /* osr= */ false,
-                       /* is_shared_jit_code= */ false,
                        &handles));
       }
     }
@@ -1199,6 +1196,9 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                                     bool baseline,
                                     bool osr,
                                     jit::JitLogger* jit_logger) {
+  const CompilerOptions& compiler_options = GetCompilerOptions();
+  DCHECK(compiler_options.IsJitCompiler());
+  DCHECK_EQ(compiler_options.IsJitCompilerForSharedCode(), code_cache->IsSharedRegion(*region));
   StackHandleScope<3> hs(self);
   Handle<mirror::ClassLoader> class_loader(hs.NewHandle(
       method->GetDeclaringClass()->GetClassLoader()));
@@ -1215,7 +1215,6 @@ bool OptimizingCompiler::JitCompile(Thread* self,
   ArenaAllocator allocator(runtime->GetJitArenaPool());
 
   if (UNLIKELY(method->IsNative())) {
-    const CompilerOptions& compiler_options = GetCompilerOptions();
     JniCompiledMethod jni_compiled_method = ArtQuickJniCompileMethod(
         compiler_options, access_flags, method_idx, *dex_file);
     std::vector<Handle<mirror::Object>> roots;
@@ -1316,9 +1315,8 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                    &code_allocator,
                    dex_compilation_unit,
                    method,
-                   baseline || GetCompilerOptions().IsBaseline(),
+                   baseline || compiler_options.IsBaseline(),
                    osr,
-                   /* is_shared_jit_code= */ code_cache->IsSharedRegion(*region),
                    &handles));
     if (codegen.get() == nullptr) {
       return false;
@@ -1353,7 +1351,6 @@ bool OptimizingCompiler::JitCompile(Thread* self,
                      }));
 
   // Add debug info after we know the code location but before we update entry-point.
-  const CompilerOptions& compiler_options = GetCompilerOptions();
   std::vector<uint8_t> debug_info;
   if (compiler_options.GenerateAnyDebugInfo()) {
     debug::MethodDebugInfo info = {};
