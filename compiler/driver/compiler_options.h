@@ -69,6 +69,13 @@ class CompilerOptions final {
   static const size_t kDefaultInlineMaxCodeUnits = 32;
   static constexpr size_t kUnsetInlineMaxCodeUnits = -1;
 
+  enum class CompilerType : uint8_t {
+    kAotCompiler,             // AOT compiler.
+    kJitCompiler,             // Normal JIT compiler.
+    kSharedCodeJitCompiler,   // Zygote JIT producing code in the shared region area, putting
+                              // restrictions on, for example, how literals are being generated.
+  };
+
   enum class ImageType : uint8_t {
     kNone,                    // JIT or AOT app compilation producing only an oat file but no image.
     kBootImage,               // Creating boot image.
@@ -189,6 +196,19 @@ class CompilerOptions final {
 
   bool GetImplicitStackOverflowChecks() const {
     return implicit_so_checks_;
+  }
+
+  bool IsAotCompiler() const {
+    return compiler_type_ == CompilerType::kAotCompiler;
+  }
+
+  bool IsJitCompiler() const {
+    return compiler_type_ == CompilerType::kJitCompiler ||
+           compiler_type_ == CompilerType::kSharedCodeJitCompiler;
+  }
+
+  bool IsJitCompilerForSharedCode() const {
+    return compiler_type_ == CompilerType::kSharedCodeJitCompiler;
   }
 
   bool GetImplicitSuspendChecks() const {
@@ -394,6 +414,7 @@ class CompilerOptions final {
   // Results of AOT verification.
   const VerificationResults* verification_results_;
 
+  CompilerType compiler_type_;
   ImageType image_type_;
   bool compile_art_test_;
   bool baseline_;
