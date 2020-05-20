@@ -581,6 +581,9 @@ PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
 # root.
 # $(1): APEX base name
 # $(2): List of files to extract, with paths relative to the APEX root
+#
+# "cp -d" below doesn't work on Darwin, but this is only used for Golem builds
+# and won't run on mac anyway.
 define extract-from-apex
   apex_root=$(TARGET_OUT)/apex && \
   apex_file=$$apex_root/$(1).apex && \
@@ -594,7 +597,7 @@ define extract-from-apex
   for f in $(2); do \
     sf=$$apex_dir/$$f && \
     df=$(TARGET_OUT)/$$f && \
-    if [ -e $$sf ]; then \
+    if [ -f $$sf -o -h $$sf ]; then \
       mkdir -p $$(dirname $$df) && \
       cp -fd $$sf $$df; \
     fi || exit 1; \
