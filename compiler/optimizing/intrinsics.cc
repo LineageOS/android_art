@@ -215,12 +215,12 @@ void IntrinsicVisitor::ComputeIntegerValueOfLocations(HInvoke* invoke,
     if (cache == nullptr) {
       return;  // No cache in the boot image.
     }
-    if (runtime->UseJitCompilation()) {
+    if (compiler_options.IsJitCompiler()) {
       if (!CheckIntegerCache(self, runtime->GetClassLinker(), boot_image_live_objects, cache)) {
         return;  // The cache was somehow messed up, probably by using reflection.
       }
     } else {
-      DCHECK(runtime->IsAotCompiler());
+      DCHECK(compiler_options.IsAotCompiler());
       DCHECK(CheckIntegerCache(self, runtime->GetClassLinker(), boot_image_live_objects, cache));
       if (invoke->InputAt(0)->IsIntConstant()) {
         int32_t value = invoke->InputAt(0)->AsIntConstant()->GetValue();
@@ -287,8 +287,7 @@ IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo
   // we need to provide data that shall not lead to a crash even if the fields were
   // modified through reflection since ComputeIntegerValueOfLocations() when JITting.
 
-  Runtime* runtime = Runtime::Current();
-  ClassLinker* class_linker = runtime->GetClassLinker();
+  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
 
@@ -328,7 +327,7 @@ IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo
     ArtField* value_field = integer_class->FindDeclaredInstanceField(kValueFieldName, "I");
     DCHECK(value_field != nullptr);
     info.value_offset = value_field->GetOffset().Uint32Value();
-    if (runtime->UseJitCompilation()) {
+    if (compiler_options.IsJitCompiler()) {
       // Use the current `IntegerCache.low` for JIT to avoid truly surprising behavior if the
       // code messes up the `value` field in the lowest cached Integer using reflection.
       info.low = GetIntegerCacheLowFromIntegerCache(self, class_linker);

@@ -55,6 +55,10 @@ void JitCompiler::ParseCompilerOptions() {
       UNREACHABLE();
     }
   }
+  // Set to appropriate JIT compiler type.
+  compiler_options_->compiler_type_ = runtime->IsZygote()
+      ? CompilerOptions::CompilerType::kSharedCodeJitCompiler
+      : CompilerOptions::CompilerType::kJitCompiler;
   // JIT is never PIC, no matter what the runtime compiler options specify.
   compiler_options_->SetNonPic();
 
