@@ -1374,15 +1374,18 @@ extern "C" const void* artQuickResolutionTrampoline(
                                << invoke_type << " " << orig_called->GetVtableIndex();
     }
 
+    // Static invokes need class initialization check but instance invokes can proceed even if
+    // the class is erroneous, i.e. in the edge case of escaping instances of erroneous classes.
+    bool success = true;
     ObjPtr<mirror::Class> called_class = called->GetDeclaringClass();
     if (NeedsClinitCheckBeforeCall(called) && !called_class->IsVisiblyInitialized()) {
       // Ensure that the called method's class is initialized.
       StackHandleScope<1> hs(soa.Self());
       HandleWrapperObjPtr<mirror::Class> h_called_class(hs.NewHandleWrapper(&called_class));
-      linker->EnsureInitialized(soa.Self(), h_called_class, true, true);
+      success = linker->EnsureInitialized(soa.Self(), h_called_class, true, true);
     }
-    bool force_interpreter = self->IsForceInterpreter() && !called->IsNative();
-    if (called_class->IsInitialized() || called_class->IsInitializing()) {
+    if (success) {
+      bool force_interpreter = self->IsForceInterpreter() && !called->IsNative();
       if (UNLIKELY(force_interpreter)) {
         // If we are single-stepping or the called method is deoptimized (by a
         // breakpoint, for example), then we have to execute the called method
@@ -1398,6 +1401,7 @@ extern "C" const void* artQuickResolutionTrampoline(
       }
     } else {
       DCHECK(called_class->IsErroneous());
+      DCHECK(self->IsExceptionPending());
     }
   }
   CHECK_EQ(code == nullptr, self->IsExceptionPending());

@@ -50,6 +50,9 @@ public class Main {
         ncdfe.printStackTrace();
       }
     }
+
+    // Test that we handle bad instance correctly in the resolution trampoline.
+    bad.$noinline$testResolutionTrampoline();
   }
 
   public static void hierarchyTest() {
@@ -140,6 +143,15 @@ class Bad {
     public static int $inline$getBadStaticValue() {
       return Bad.staticValue;
     }
+  }
+
+  public void $noinline$testResolutionTrampoline() {
+    // The first call to private method uses the resolution trampoline when AOT-compiled.
+    $noinline$testResolutionTrampolineCallee();
+  }
+
+  private void $noinline$testResolutionTrampolineCallee() {
+    System.out.println("Bad.$noinline$testResolutionTrampolineCallee()");
   }
 }
 
