@@ -3,6 +3,7 @@ Bad.instanceValue = 33
 Caught NoClassDefFoundError.
 Bad.bar()
 Caught NoClassDefFoundError.
+Bad.$noinline$testResolutionTrampolineCallee()
 BadSuper.foo()
 BadSuper.superInstanceValue = 1
 Caught NoClassDefFoundError.
