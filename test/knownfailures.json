@@ -637,6 +637,12 @@
         "env_vars": {"SANITIZE_HOST": "address"}
     },
     {
+        "tests": "175-alloc-big-bignums",
+        "description": "ASAN runs out of memory due to huge allocations.",
+        "variant": "target",
+        "env_vars": {"SANITIZE_TARGET": "hwaddress"}
+    },
+    {
         "tests": "202-thread-oome",
         "description": "ASAN aborts when large thread stacks are requested.",
         "variant": "host",
@@ -701,6 +707,17 @@
         ],
         "variant": "interp-ac & target",
         "env_vars": {"SANITIZE_TARGET": "address"}
+    },
+    {
+        "tests": [
+            "074-gc-thrash"
+        ],
+        "description": [
+            "Interpreter with access checks stack frames are too large and result in",
+            "StackOverFlow errors being thrown."
+        ],
+        "variant": "interp-ac & target",
+        "env_vars": {"SANITIZE_TARGET": "hwaddress"}
     },
     {
         "tests": "071-dexfile-map-clean",
