@@ -303,8 +303,9 @@ libart_cc_defaults {
         arm64: {
             srcs: [
                 "interpreter/mterp/mterp.cc",
-                "interpreter/mterp/nterp_stub.cc",
+                "interpreter/mterp/nterp.cc",
                 ":libart_mterp.arm64",
+                ":libart_mterp.arm64ng",
                 "arch/arm64/context_arm64.cc",
                 "arch/arm64/entrypoints_init_arm64.cc",
                 "arch/arm64/jni_entrypoints_arm64.S",
@@ -764,6 +765,21 @@ genrule {
         "interpreter/mterp/x86_64ng/*.S",
         "interpreter/mterp/x86_64/arithmetic.S",
         "interpreter/mterp/x86_64/floating_point.S",
+    ],
+    tool_files: [
+        "interpreter/mterp/gen_mterp.py",
+        "interpreter/mterp/common/gen_setup.py",
+    ],
+    cmd: "$(location interpreter/mterp/gen_mterp.py) $(out) $(in)",
+}
+
+genrule {
+    name: "libart_mterp.arm64ng",
+    out: ["mterp_arm64ng.S"],
+    srcs: [
+        "interpreter/mterp/arm64ng/*.S",
+        "interpreter/mterp/arm64/arithmetic.S",
+        "interpreter/mterp/arm64/floating_point.S",
     ],
     tool_files: [
         "interpreter/mterp/gen_mterp.py",
