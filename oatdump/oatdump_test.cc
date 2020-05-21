@@ -97,8 +97,7 @@ TEST_F(OatDumpTest, TestExportDex) {
       "_export.dex";
   const std::string dexdump = GetExecutableFilePath("dexdump",
                                                     /*is_debug=*/false,
-                                                    /*is_static=*/false,
-                                                    /*bitness=*/false);
+                                                    /*is_static=*/false);
   std::string output;
   auto post_fork_fn = []() { return true; };
   ForkAndExecResult res = ForkAndExec({dexdump, "-d", dex_location}, post_fork_fn, &output);
