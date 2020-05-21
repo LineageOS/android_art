@@ -1394,11 +1394,6 @@ extern "C" const void* artQuickResolutionTrampoline(
           DCHECK_EQ(invoke_type, kStatic);
           // Go to JIT or oat and grab code.
           code = linker->GetQuickOatCodeFor(called);
-          if (called_class->IsInitialized()) {
-            // Only update the entrypoint once the class is initialized. Other
-            // threads still need to go through the resolution stub.
-            Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(called, code);
-          }
         }
       }
     } else {
