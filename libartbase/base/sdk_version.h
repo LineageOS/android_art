@@ -34,6 +34,7 @@ enum class SdkVersion : uint32_t {
   kO_MR1 = 27u,
   kP     = 28u,
   kQ     = 29u,
+  kR     = 30u,
   kMax   = std::numeric_limits<uint32_t>::max(),
 };
 
