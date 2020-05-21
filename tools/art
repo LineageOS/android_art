@@ -302,7 +302,7 @@ function run_art() {
 ######################################
 ART_BINARY=dalvikvm
 DEX2OAT_BINARY=dex2oat
-DEX2OAT_SUFFIX="32"
+DEX2OAT_SUFFIX=""
 DELETE_ANDROID_DATA="no"
 LAUNCH_WRAPPER=
 LIBART=libart.so
