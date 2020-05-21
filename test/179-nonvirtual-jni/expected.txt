@@ -1,0 +1,9 @@
+JNI_OnLoad called
+Call lookup: Base, caller: Base, Obj: Base
+Hello from Base
+Call lookup: Base, caller: Base, Obj: Ext
+Hello from Base
+Call lookup: Base, caller: Ext, Obj: Ext
+Hello from Base
+Call lookup: Ext, caller: Ext, Obj: Ext
+Hello from Ext
