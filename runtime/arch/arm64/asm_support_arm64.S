@@ -263,6 +263,22 @@
     DECREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS
 .endm
 
+.macro SAVE_ALL_CALLEE_SAVES offset
+    // FP callee-saves.
+    stp d8, d9,   [sp, #(0 + \offset)]
+    stp d10, d11, [sp, #(16 + \offset)]
+    stp d12, d13, [sp, #(32 + \offset)]
+    stp d14, d15, [sp, #(48 + \offset)]
+
+    // GP callee-saves
+    SAVE_TWO_REGS x19, x20, (64 + \offset)
+    SAVE_TWO_REGS x21, x22, (80 + \offset)
+    SAVE_TWO_REGS x23, x24, (96 + \offset)
+    SAVE_TWO_REGS x25, x26, (112 + \offset)
+    SAVE_TWO_REGS x27, x28, (128 + \offset)
+    SAVE_TWO_REGS x29, xLR, (144 + \offset)
+.endm
+
     /*
      * Macro that sets up the callee save frame to conform with
      * Runtime::CreateCalleeSaveMethod(kSaveAllCalleeSaves)
@@ -283,19 +299,7 @@
 #endif
 
     // Stack alignment filler [sp, #8].
-    // FP callee-saves.
-    stp d8, d9,   [sp, #16]
-    stp d10, d11, [sp, #32]
-    stp d12, d13, [sp, #48]
-    stp d14, d15, [sp, #64]
-
-    // GP callee-saves
-    SAVE_TWO_REGS x19, x20, 80
-    SAVE_TWO_REGS x21, x22, 96
-    SAVE_TWO_REGS x23, x24, 112
-    SAVE_TWO_REGS x25, x26, 128
-    SAVE_TWO_REGS x27, x28, 144
-    SAVE_TWO_REGS x29, xLR, 160
+    SAVE_ALL_CALLEE_SAVES 16
 
     // Store ArtMethod* Runtime::callee_save_methods_[kSaveAllCalleeSaves].
     str xIP0, [sp]
