@@ -8,12 +8,9 @@
 art_runtime_base_binaries_both = [
     "dalvikvm",
 ]
-art_runtime_base_binaries_both_on_device_first_on_host = [
+// - Base requirements (binaries for which a 32-bit version is preferred).
+art_runtime_base_binaries_prefer32 = [
     "dex2oat",
-]
-// - Base requirements (binaries for which a 32-bit version is preferred on device, but for which
-//   only the "first" (likely 64-bit) version is required on host).
-art_runtime_base_binaries_prefer32_on_device_first_on_host = [
     "dexoptanalyzer",
     "profman",
 ]
@@ -64,13 +61,16 @@ bionic_binaries_both = [
     "linker",
 ]
 
-// - Debug variants (binaries for which a 32-bit version is preferred on device, but for which
-//   only the "first" (likely 64-bit) version is required on host).
-art_runtime_debug_binaries_prefer32_on_device_first_on_host = [
+// - Debug variants (binaries for which a 32-bit version is preferred).
+art_runtime_debug_binaries_prefer32 = [
     "dexoptanalyzerd",
     "profmand",
 ]
-art_runtime_debug_binaries_both_on_device_first_on_host = [
+art_runtime_debug_binaries_prefer32_device = [
+    "dex2oatd",
+]
+
+art_runtime_debug_binaries_both_host = [
     "dex2oatd",
 ]
 
@@ -218,11 +218,10 @@ apex_defaults {
         libcore_native_shared_libs,
     multilib: {
         both: {
-            binaries: art_runtime_base_binaries_both +
-                art_runtime_base_binaries_both_on_device_first_on_host,
+            binaries: art_runtime_base_binaries_both,
         },
         prefer32: {
-            binaries: art_runtime_base_binaries_prefer32_on_device_first_on_host,
+            binaries: art_runtime_base_binaries_prefer32,
         },
         first: {
             binaries: art_tools_common_binaries +
@@ -247,11 +246,11 @@ apex_defaults {
         libcore_debug_native_shared_libs,
     multilib: {
         both: {
-            binaries: art_tools_debug_binaries_both +
-                art_runtime_debug_binaries_both_on_device_first_on_host,
+            binaries: art_tools_debug_binaries_both,
         },
         prefer32: {
-            binaries: art_runtime_debug_binaries_prefer32_on_device_first_on_host,
+            binaries: art_runtime_debug_binaries_prefer32 +
+                art_runtime_debug_binaries_prefer32_device,
         },
         first: {
             binaries: art_tools_debug_binaries +
@@ -337,16 +336,15 @@ art_apex_test_host {
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both +
+                art_runtime_debug_binaries_both_host +
                 art_tools_debug_binaries_both,
         },
         first: {
-            binaries: art_runtime_base_binaries_prefer32_on_device_first_on_host +
-                art_runtime_base_binaries_both_on_device_first_on_host +
-                art_runtime_debug_binaries_prefer32_on_device_first_on_host +
-                art_runtime_debug_binaries_both_on_device_first_on_host +
-                art_tools_common_binaries +
-                art_tools_debug_binaries + // Host APEX is always debug.
-                art_tools_host_only_binaries,
+            binaries: art_tools_common_binaries + // Host APEX is always debug.
+                art_tools_debug_binaries +
+                art_tools_host_only_binaries +
+                art_runtime_base_binaries_prefer32 +
+                art_runtime_debug_binaries_prefer32,
         },
     },
     key: "com.android.art.key",

@@ -187,7 +187,8 @@ cc_defaults {
 
     target: {
         android: {
-            compile_multilib: "both",
+            // Use the 32-bit version of dex2oat on devices.
+            compile_multilib: "prefer32",
         },
     },
     header_libs: [
@@ -255,15 +256,6 @@ art_cc_binary {
         "libart-dex2oat",
     ],
 
-    multilib: {
-        lib32: {
-            suffix: "32",
-        },
-        lib64: {
-            suffix: "64",
-        },
-    },
-
     pgo: {
         // Additional cflags just for dex2oat during PGO instrumentation
         cflags: [
@@ -292,8 +284,17 @@ art_cc_binary {
             // account. Note that this override cannot be in cc_default because
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
-            compile_multilib: "64",
+            compile_multilib: "both",
             symlink_preferred_arch: true,
+        },
+        linux_glibc_x86: {
+            suffix: "32",
+        },
+        linux_glibc_x86_64: {
+            suffix: "64",
+        },
+        linux_bionic_x86_64: {
+            suffix: "64",
         },
     },
     apex_available: [
@@ -331,6 +332,7 @@ art_cc_binary {
             static_libs: [
                 "libz",
             ],
+            compile_multilib: "prefer32",
         },
         host: {
             shared_libs: [
@@ -343,22 +345,22 @@ art_cc_binary {
             // account. Note that this override cannot be in cc_default because
             // it'd get overridden by the load hook even when it uses
             // PrependProperties.
-            compile_multilib: "64",
+            compile_multilib: "both",
             symlink_preferred_arch: true,
+        },
+        linux_glibc_x86: {
+            suffix: "32",
+        },
+        linux_glibc_x86_64: {
+            suffix: "64",
+        },
+        linux_bionic_x86_64: {
+            suffix: "64",
         },
     },
     apex_available: [
         "com.android.art.debug",
     ],
-
-    multilib: {
-        lib32: {
-            suffix: "32",
-        },
-        lib64: {
-            suffix: "64",
-        },
-    },
 }
 
 cc_defaults {

@@ -819,9 +819,6 @@ std::string Runtime::GetCompilerExecutable() const {
   if (kIsDebugBuild) {
     compiler_executable += 'd';
   }
-  if (kIsTargetBuild) {
-    compiler_executable += Is64BitInstructionSet(kRuntimeISA) ? "64" : "32";
-  }
   return compiler_executable;
 }
 
