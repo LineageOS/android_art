@@ -1909,7 +1909,7 @@ class InstructionHandler {
 };
 
 // Don't inline in ASAN. It would create massive stack frame.
-#ifdef ADDRESS_SANITIZER
+#if defined(ADDRESS_SANITIZER) || defined(HWADDRESS_SANITIZER)
 #define ASAN_NO_INLINE NO_INLINE
 #else
 #define ASAN_NO_INLINE ALWAYS_INLINE
@@ -1957,18 +1957,18 @@ void ExecuteSwitchImplCpp(SwitchImplContext* ctx) {
     TraceExecution(shadow_frame, inst, dex_pc);
     uint16_t inst_data = inst->Fetch16(0);
     bool exit = false;
+    bool success;  // Moved outside to keep frames small under asan.
     if (InstructionHandler<do_access_check, transaction_active, Instruction::kInvalidFormat>(
             ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, next, exit).
             Preamble()) {
+      DCHECK_EQ(self->IsExceptionPending(), inst->Opcode(inst_data) == Instruction::MOVE_EXCEPTION);
       switch (inst->Opcode(inst_data)) {
 #define OPCODE_CASE(OPCODE, OPCODE_NAME, NAME, FORMAT, i, a, e, v)                                \
         case OPCODE: {                                                                            \
-          DCHECK_EQ(self->IsExceptionPending(), (OPCODE == Instruction::MOVE_EXCEPTION));         \
           next = inst->RelativeAt(Instruction::SizeInCodeUnits(Instruction::FORMAT));             \
-          bool success = OP_##OPCODE_NAME<do_access_check, transaction_active>(                   \
+          success = OP_##OPCODE_NAME<do_access_check, transaction_active>(                        \
               ctx, instrumentation, self, shadow_frame, dex_pc, inst, inst_data, next, exit);     \
           if (success && LIKELY(!interpret_one_instruction)) {                                    \
-            DCHECK(!exit) << NAME;                                                                \
             continue;                                                                             \
           }                                                                                       \
           if (exit) {                                                                             \

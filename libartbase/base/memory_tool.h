@@ -67,10 +67,22 @@ constexpr size_t kMemoryToolStackGuardSizeScale = 1;
 #endif
 
 #if __has_feature(hwaddress_sanitizer)
+# define HWADDRESS_SANITIZER
 # define ATTRIBUTE_NO_SANITIZE_HWADDRESS __attribute__((no_sanitize("hwaddress")))
 #else
 # define ATTRIBUTE_NO_SANITIZE_HWADDRESS
 #endif
+
+// Removes the hwasan tag from the pointer (the top eight bits).
+// Those bits are used for verification by hwasan and they are ignored by normal ARM memory ops.
+template<typename PtrType>
+static inline PtrType* HWASanUntag(PtrType* p) {
+#if __has_feature(hwaddress_sanitizer) && defined(__aarch64__)
+  return reinterpret_cast<PtrType*>(reinterpret_cast<uintptr_t>(p) & ((1ULL << 56) - 1));
+#else
+  return p;
+#endif
+}
 
 }  // namespace art
 

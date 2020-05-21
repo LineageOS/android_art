@@ -414,7 +414,7 @@ ArtMethod* HInliner::TryCHADevirtualization(ArtMethod* resolved_method) {
 static bool IsMethodUnverified(const CompilerOptions& compiler_options, ArtMethod* method)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   if (!method->GetDeclaringClass()->IsVerified()) {
-    if (Runtime::Current()->UseJitCompilation()) {
+    if (compiler_options.IsJitCompiler()) {
       // We're at runtime, we know this is cold code if the class
       // is not verified, so don't bother analyzing.
       return true;
@@ -489,11 +489,19 @@ ArtMethod* HInliner::FindActualCallTarget(HInvoke* invoke_instruction, bool* cha
 }
 
 bool HInliner::TryInline(HInvoke* invoke_instruction) {
-  if (invoke_instruction->IsInvokeUnresolved() ||
-      invoke_instruction->IsInvokePolymorphic() ||
-      invoke_instruction->IsInvokeCustom()) {
-    return false;  // Don't bother to move further if we know the method is unresolved or the
-                   // invocation is polymorphic (invoke-{polymorphic,custom}).
+  MaybeRecordStat(stats_, MethodCompilationStat::kTryInline);
+
+  // Don't bother to move further if we know the method is unresolved or the invocation is
+  // polymorphic (invoke-{polymorphic,custom}).
+  if (invoke_instruction->IsInvokeUnresolved()) {
+    MaybeRecordStat(stats_, MethodCompilationStat::kNotInlinedUnresolved);
+    return false;
+  } else if (invoke_instruction->IsInvokePolymorphic()) {
+    MaybeRecordStat(stats_, MethodCompilationStat::kNotInlinedPolymorphic);
+    return false;
+  } else if (invoke_instruction->IsInvokeCustom()) {
+    MaybeRecordStat(stats_, MethodCompilationStat::kNotInlinedCustom);
+    return false;
   }
 
   ScopedObjectAccess soa(Thread::Current());
@@ -665,7 +673,7 @@ HInliner::InlineCacheType HInliner::GetInlineCacheJIT(
     StackHandleScope<1>* hs,
     /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  DCHECK(Runtime::Current()->UseJitCompilation());
+  DCHECK(codegen_->GetCompilerOptions().IsJitCompiler());
 
   ArtMethod* caller = graph_->GetArtMethod();
   // Under JIT, we should always know the caller.
@@ -1177,7 +1185,7 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(
     ArtMethod* resolved_method,
     Handle<mirror::ObjectArray<mirror::Class>> classes) {
   // This optimization only works under JIT for now.
-  if (!Runtime::Current()->UseJitCompilation()) {
+  if (!codegen_->GetCompilerOptions().IsJitCompiler()) {
     return false;
   }
 
@@ -2038,7 +2046,6 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
       callee_dead_reference_safe,
       graph_->IsDebuggable(),
       /* osr= */ false,
-      /* is_shared_jit_code= */ graph_->IsCompilingForSharedJitCode(),
       /* baseline= */ graph_->IsCompilingBaseline(),
       /* start_instruction_id= */ caller_instruction_counter);
   callee_graph->SetArtMethod(resolved_method);
