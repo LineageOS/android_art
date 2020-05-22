@@ -97,11 +97,12 @@ class ApiList {
     kGreylistMaxO = 3,
     kGreylistMaxP = 4,
     kGreylistMaxQ = 5,
+    kGreylistMaxR = 6,
 
     // Special values
     kInvalid =      (static_cast<uint32_t>(-1) & kValueBitMask),
     kMin =          kWhitelist,
-    kMax =          kGreylistMaxQ,
+    kMax =          kGreylistMaxR,
   };
 
   // Additional bit flags after the first kValueBitSize bits in dex flags.
@@ -137,6 +138,7 @@ class ApiList {
     "greylist-max-o",
     "greylist-max-p",
     "greylist-max-q",
+    "greylist-max-r",
   };
 
   // Names corresponding to DomainApis.
@@ -153,6 +155,7 @@ class ApiList {
     /* greylist-max-o */ SdkVersion::kO_MR1,
     /* greylist-max-p */ SdkVersion::kP,
     /* greylist-max-q */ SdkVersion::kQ,
+    /* greylist-max-r */ SdkVersion::kR,
   };
 
   explicit ApiList(Value val, uint32_t domain_apis = 0u)
@@ -194,6 +197,7 @@ class ApiList {
   static ApiList GreylistMaxO() { return ApiList(Value::kGreylistMaxO); }
   static ApiList GreylistMaxP() { return ApiList(Value::kGreylistMaxP); }
   static ApiList GreylistMaxQ() { return ApiList(Value::kGreylistMaxQ); }
+  static ApiList GreylistMaxR() { return ApiList(Value::kGreylistMaxR); }
   static ApiList CorePlatformApi() { return ApiList(DomainApi::kCorePlatformApi); }
   static ApiList TestApi() { return ApiList(DomainApi::kTestApi); }
 

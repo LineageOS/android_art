@@ -19,7 +19,9 @@
 
 #include "asm_support.h"
 
-#define FRAME_SIZE_SAVE_ALL_CALLEE_SAVES 176
+#define CALLEE_SAVES_SIZE (12 * 8 + 8 * 8)
+// +8 for the ArtMethod, +8 for alignment.
+#define FRAME_SIZE_SAVE_ALL_CALLEE_SAVES (CALLEE_SAVES_SIZE + 16)
 #define FRAME_SIZE_SAVE_REFS_ONLY 96
 #define FRAME_SIZE_SAVE_REFS_AND_ARGS 224
 #define FRAME_SIZE_SAVE_EVERYTHING 512
