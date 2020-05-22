@@ -46,6 +46,10 @@ class Arm64Context final : public Context {
     SetGPR(kPC, new_lr);
   }
 
+  void SetNterpDexPC(uintptr_t dex_pc_ptr) override {
+    SetGPR(X22, dex_pc_ptr);
+  }
+
   void SetArg0(uintptr_t new_arg0_value) override {
     SetGPR(X0, new_arg0_value);
   }

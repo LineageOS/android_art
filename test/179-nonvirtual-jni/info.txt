@@ -1,0 +1,1 @@
+Ensure that calls to InvokeNonVirtual resolve correctly

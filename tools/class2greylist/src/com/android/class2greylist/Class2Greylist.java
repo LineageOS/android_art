@@ -52,6 +52,7 @@ public class Class2Greylist {
     private static final String FLAG_GREYLIST_MAX_O = "greylist-max-o";
     private static final String FLAG_GREYLIST_MAX_P = "greylist-max-p";
     private static final String FLAG_GREYLIST_MAX_Q = "greylist-max-q";
+    private static final String FLAG_GREYLIST_MAX_R = "greylist-max-r";
 
     private static final String FLAG_PUBLIC_API = "public-api";
 
@@ -63,6 +64,7 @@ public class Class2Greylist {
         map.put(26, FLAG_GREYLIST_MAX_O);
         map.put(28, FLAG_GREYLIST_MAX_P);
         map.put(29, FLAG_GREYLIST_MAX_Q);
+        map.put(30, FLAG_GREYLIST_MAX_R);
         TARGET_SDK_TO_LIST_MAP = Collections.unmodifiableMap(map);
     }
 
