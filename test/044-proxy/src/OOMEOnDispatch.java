@@ -27,6 +27,7 @@ public class OOMEOnDispatch implements InvocationHandler {
     static ArrayList<Object> storage = new ArrayList<>(100000);
 
     private static void exhaustJavaHeap(int size) {
+      Runtime.getRuntime().gc();
       while (size > 0) {
         try {
           storage.add(new byte[size]);
@@ -51,13 +52,13 @@ public class OOMEOnDispatch implements InvocationHandler {
         // OOME to prevent GC thrashing, even if later allocations may succeed.
         Runtime.getRuntime().gc();
         System.runFinalization();
-        Runtime.getRuntime().gc();
+        // NOTE: There is a GC invocation in the exhaustJavaHeap(). So we don't need one here.
 
         int initial_size = 1024 * 1024;
         // Repeat to ensure there is no space left on the heap.
         exhaustJavaHeap(initial_size);
-        exhaustJavaHeap(/*size*/ 8);
-        exhaustJavaHeap(/*size*/ 8);
+        exhaustJavaHeap(/*size*/ 4);
+        exhaustJavaHeap(/*size*/ 4);
 
         try {
             inf.foo();
