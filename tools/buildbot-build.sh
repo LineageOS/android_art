@@ -83,7 +83,7 @@ elif [[ $mode == "target" ]]; then
     exit 1
   fi
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
-  make_command+=" libnetd_client-target toybox toolbox sh"
+  make_command+=" libnetd_client-target toybox sh"
   make_command+=" debuggerd su gdbserver"
   make_command+=" libstdc++ "
   # vogar requires the class files for conscrypt.
