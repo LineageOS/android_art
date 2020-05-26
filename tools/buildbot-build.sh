@@ -65,6 +65,14 @@ done
 # Allow to build successfully in master-art.
 extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
 
+apexes=(
+  "com.android.art.testing"
+  "com.android.conscrypt"
+  "com.android.i18n"
+  "com.android.runtime"
+  "com.android.tzdata"
+)
+
 if [[ $mode == "host" ]]; then
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-host-tests $common_targets"
   make_command+=" dx-tests junit-host"
@@ -81,30 +89,23 @@ elif [[ $mode == "target" ]]; then
   # vogar requires the class files for conscrypt.
   make_command+=" conscrypt "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
-  if [[ -n "$ART_TEST_CHROOT" ]]; then
-    # Targets required to generate a linker configuration on device within the
-    # chroot environment.
-    make_command+=" linkerconfig"
-    # Additional targets needed for the chroot environment.
-    make_command+=" crash_dump event-log-tags"
-  fi
+  # Targets required to generate a linker configuration for device within the
+  # chroot environment. The *.libraries.txt targets are required by
+  # linkerconfig but not included in host_linkerconfig_all_targets. We cannot
+  # use linkerconfig, because building the device binary statically might not
+  # work in an unbundled tree.
+  make_command+=" host_linkerconfig_all_targets sanitizer.libraries.txt vndkcorevariant.libraries.txt"
+  # Additional targets needed for the chroot environment.
+  make_command+=" crash_dump event-log-tags"
   # Needed to extract prebuilts apexes.
   make_command+=" deapexer "
-  # Build the Testing ART APEX (which is a superset of the Release and Debug ART APEXes).
-  make_command+=" com.android.art.testing"
-  # Build the Runtime (Bionic) APEX.
-  make_command+=" com.android.runtime"
   # Build the bootstrap Bionic artifacts links (linker, libc, libdl, libm).
   # These targets create these symlinks:
   # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
   # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
   make_command+=" linker libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap"
-  # Build the Conscrypt APEX.
-  make_command+=" com.android.conscrypt"
-  # Build the i18n APEX.
-  make_command+=" com.android.i18n"
-  # Build the Time Zone Data APEX.
-  make_command+=" com.android.tzdata"
+  # Build/install the required APEXes.
+  make_command+=" ${apexes[*]}"
 fi
 
 mode_specific_libraries="libjavacoretests libjdwp libwrapagentproperties libwrapagentpropertiesd"
@@ -118,6 +119,24 @@ echo "Executing $make_command"
 eval "$make_command"
 
 if [[ $mode == "target" ]]; then
+  if [[ -z "${ANDROID_HOST_OUT}" ]]; then
+    echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
+    ANDROID_HOST_OUT=$out_dir/host/linux-x86
+  fi
+
+  # Extract prebuilt APEXes.
+  debugfs=$ANDROID_HOST_OUT/bin/debugfs_static
+  for apex in ${apexes[@]}; do
+    dir="$ANDROID_PRODUCT_OUT/system/apex/${apex}"
+    file="$ANDROID_PRODUCT_OUT/system/apex/${apex}.apex"
+    if [ -f "${file}" ]; then
+      echo "Extracting APEX file: ${apex}"
+      rm -rf $dir
+      mkdir -p $dir
+      $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs extract $file $dir
+    fi
+  done
+
   # Create canonical name -> file name symlink in the symbol directory for the
   # Testing ART APEX.
   #
@@ -143,24 +162,8 @@ if [[ $mode == "target" ]]; then
     eval "$cmd"
   done
 
-
-  conscrypt_dir="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
-  conscrypt_apex="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt.apex"
-  if [ -f "${conscrypt_apex}" ]; then
-    # If there is a conscrypt apex prebuilt, extract it.
-    rm -rf $conscrypt_dir
-    mkdir $conscrypt_dir
-    if [[ -z "${ANDROID_HOST_OUT}" ]]; then
-      echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
-      ANDROID_HOST_OUT=$out_dir/host/linux-x86
-    fi
-    echo -e "Listing contents of the conscrypt apex"
-    ls -l $conscrypt_apex
-    debugfs=$ANDROID_HOST_OUT/bin/debugfs_static
-    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs list $conscrypt_apex
-    $ANDROID_HOST_OUT/bin/deapexer --debugfs_path $debugfs extract $conscrypt_apex $conscrypt_dir
-  fi
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
+  conscrypt_dir="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
   conscrypt_libs="libjavacrypto.so libcrypto.so libssl.so"
   if [ ! -d "${conscrypt_dir}" ]; then
     echo -e "Missing conscrypt APEX in build output: ${conscrypt_dir}"
@@ -184,4 +187,29 @@ if [[ $mode == "target" ]]; then
       fi
     done
   done
+
+  # Create linker config files. We run linkerconfig on host to avoid problems
+  # building it statically for device in an unbundled tree.
+
+  # For linkerconfig to pick up the APEXes correctly we need to make them
+  # available in $ANDROID_PRODUCT_OUT/apex.
+  mkdir -p $ANDROID_PRODUCT_OUT/apex
+  for apex in ${apexes[@]}; do
+    src="$ANDROID_PRODUCT_OUT/system/apex/${apex}"
+    if [[ $apex == com.android.art.* ]]; then
+      dst="$ANDROID_PRODUCT_OUT/apex/com.android.art"
+    else
+      dst="$ANDROID_PRODUCT_OUT/apex/${apex}"
+    fi
+    echo "Copying APEX directory from $src to $dst"
+    rm -rf $dst
+    cp -r $src $dst
+  done
+
+  platform_version=$(build/soong/soong_ui.bash --dumpvar-mode PLATFORM_VERSION)
+  linkerconfig_root=$ANDROID_PRODUCT_OUT/linkerconfig
+  echo "Generating linkerconfig in $linkerconfig_root"
+  rm -rf $linkerconfig_root
+  mkdir -p $linkerconfig_root
+  $ANDROID_HOST_OUT/bin/linkerconfig --target $linkerconfig_root --root $ANDROID_PRODUCT_OUT --vndk $platform_version
 fi
