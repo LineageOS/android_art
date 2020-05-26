@@ -54,17 +54,27 @@ if [[ "$(build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)" != "true
 fi
 
 
-# `/system` "partition" synchronization.
-# --------------------------------------
+# Sync relevant product directories
+# ---------------------------------
 
-# Sync the system directory to the chroot.
-echo -e "${green}Syncing system directory...${nc}"
-adb shell mkdir -p "$ART_TEST_CHROOT/system"
-adb push "$ANDROID_PRODUCT_OUT/system" "$ART_TEST_CHROOT/"
+sync_dir() {
+  local dir=${1}
+  echo -e "${green}Syncing $dir directory...${nc}"
+  adb shell mkdir -p "$ART_TEST_CHROOT/$dir"
+  adb push "$ANDROID_PRODUCT_OUT/$dir" "$ART_TEST_CHROOT/"
+}
+
+sync_dir system
+sync_dir linkerconfig
+sync_dir data
+
 # Overwrite the default public.libraries.txt file with a smaller one that
 # contains only the public libraries pushed to the chroot directory.
 adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
   "$ART_TEST_CHROOT/system/etc/public.libraries.txt"
+
+# Create the framework directory if it doesn't exist. Some gtests need it.
+adb shell mkdir -p "$ART_TEST_CHROOT/system/framework"
 
 
 # APEX packages activation.
@@ -98,35 +108,3 @@ activate_apex com.android.i18n
 activate_apex com.android.runtime
 activate_apex com.android.tzdata
 activate_apex com.android.conscrypt
-
-
-# Linker configuration.
-# ---------------------
-
-# Statically linked `linkerconfig` binary.
-linkerconfig_binary="/system/bin/linkerconfig"
-# Generated linker configuration file path (since Android R).
-ld_generated_config_file_path="/linkerconfig/ld.config.txt"
-# Location of the generated linker configuration file.
-ld_generated_config_file_location=$(dirname "$ld_generated_config_file_path")
-
-# Generate linker configuration files on device.
-echo -e "${green}Generating linker configuration files on device in" \
-  "\`$ld_generated_config_file_path\`${nc}..."
-adb shell chroot "$ART_TEST_CHROOT" \
-  "$linkerconfig_binary" --target "$ld_generated_config_file_location" || exit 1
-ld_generated_config_files=$(adb shell find $ART_TEST_CHROOT/linkerconfig ! -type d | sed 's/^/  /')
-echo -e "${green}Generated linker configuration files on device:${nc}"
-echo -e "${green}$ld_generated_config_files${nc}"
-
-
-# `/data` "partition" synchronization.
-# ------------------------------------
-
-# Sync the data directory to the chroot.
-echo -e "${green}Syncing data directory...${nc}"
-adb shell mkdir -p "$ART_TEST_CHROOT/data"
-adb push "$ANDROID_PRODUCT_OUT/data" "$ART_TEST_CHROOT/"
-
-# Create the framework directory if it doesn't exist. Some gtests need it.
-adb shell mkdir -p "$ART_TEST_CHROOT/system/framework"
