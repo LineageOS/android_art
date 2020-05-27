@@ -143,4 +143,11 @@ art_cc_test {
         "oatdump_test.cc",
         "oatdump_image_test.cc",
     ],
+    required: [
+        "oatdumpd",
+        "oatdumpds",
+        "dexdump",
+        "dex2oatd",
+        "dex2oatds"
+    ],
 }
