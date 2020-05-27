@@ -76,40 +76,38 @@ while true; do
   arg_idx=$((arg_idx + 1))
 done
 
-if [[ "$DEX2OAT_BCP" = "" ]]; then
-  core_jars_list="core-oj core-libart okhttp bouncycastle apache-xml"
-  core_jars_suffix=
-  if [[ -f $ANDROID_ROOT/framework/core-oj-hostdex.jar ]]; then
-    # On host, conscrypt and icu4j are at the same location as the core jars.
-    core_jars_list="${core_jars_list} conscrypt core-icu4j"
-    core_jars_suffix=-hostdex
-    core_filenames_dir=$ANDROID_ROOT/framework
-    core_locations_dir=$ANDROID_ROOT/framework
-    prefix=$PWD/
-    if [[ ${core_locations_dir:0:${#prefix}} = $prefix ]]; then
-      core_locations_dir="${core_locations_dir##$prefix}"
-    fi
-  elif [[ -f $ANDROID_ROOT/apex/com.android.art/javalib/core-oj.jar ]]; then
-    core_jars_suffix=
-    core_filenames_dir=$ANDROID_ROOT/apex/com.android.art/javalib
-    core_locations_dir=/apex/com.android.art/javalib
-  else
-    echo "Can not find jar files for boot classpath"
-    exit 1
-  fi
-  boot_separator=""
-  for boot_module in ${core_jars_list}; do
-    DEX_FILENAME="$boot_module$core_jars_suffix.jar"
-    DEX2OAT_BCP+="$boot_separator$core_filenames_dir/${DEX_FILENAME}"
-    DEX2OAT_BCP_LOCS+="$boot_separator$core_locations_dir/${DEX_FILENAME}"
-    boot_separator=":"
+# Create boot class path filename or location list.
+# It takes one optional argument which is the prefix to be inserted before each entry.
+function get_boot_class_path() {
+  # Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
+  local modules="core-oj core-libart okhttp bouncycastle apache-xml core-icu4j conscrypt"
+  local prefix="$1"
+  local result=""
+  local separator=""
+  for module in ${modules}; do
+    case "$module" in
+      (conscrypt)  local apex="com.android.conscrypt";;
+      (core-icu4j) local apex="com.android.i18n";;
+      (*)          local apex="com.android.art";;
+    esac
+    result+="${separator}${prefix}/apex/${apex}/javalib/${module}.jar"
+    separator=":"
   done
-  if [[ $core_jars_suffix = "" ]]; then
-    # For target, add conscrypt and icu4j
-    for boot_module in /apex/com.android.conscrypt/javalib/conscrypt.jar /apex/com.android.i18n/javalib/core-icu4j.jar; do
-      DEX2OAT_BCP+="$boot_separator$ANDROID_ROOT/$boot_module"
-      DEX2OAT_BCP_LOCS+="$boot_separator$boot_module"
-    done
+  echo "$result"
+}
+
+# Create default boot class path if none was provided.
+if [[ "$DEX2OAT_BCP" = "" ]]; then
+  ANDROID_ROOT_MINUS_PWD="${ANDROID_ROOT#$PWD/}"  # For example: out/host/linux-x86
+  if [[ "$ANDROID_ROOT_MINUS_PWD" == */host/* ]]; then
+    DEX2OAT_BCP="$(get_boot_class_path $ANDROID_ROOT)"
+    DEX2OAT_BCP_LOCS="$(get_boot_class_path $ANDROID_ROOT_MINUS_PWD)"
+  elif [[ "$ANDROID_ROOT_MINUS_PWD" == */target/* ]]; then
+    DEX2OAT_BCP="$(get_boot_class_path $ANDROID_ROOT)"
+    DEX2OAT_BCP_LOCS="$(get_boot_class_path)"
+  else
+    echo "Can not determine whether are running on host or target"
+    exit 1
   fi
 fi
 
