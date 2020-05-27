@@ -65,4 +65,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["dexdump_test.cc"],
+    required: ["dexdump"],
 }
