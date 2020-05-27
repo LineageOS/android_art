@@ -1789,8 +1789,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   }
 
   if (IsZygote() && IsPerfettoHprofEnabled()) {
-      constexpr const char* plugin_name = kIsDebugBuild ?
-      "libperfetto_hprofd.so" : "libperfetto_hprof.so";
+    constexpr const char* plugin_name = kIsDebugBuild ?
+    "libperfetto_hprofd.so" : "libperfetto_hprof.so";
     // Load eagerly in Zygote to improve app startup times. This will make
     // subsequent dlopens for the library no-ops.
     dlopen(plugin_name, RTLD_NOW | RTLD_LOCAL);
