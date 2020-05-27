@@ -36,5 +36,15 @@
           "org.apache.harmony.tests.java.text.DateFormatTest#test_getAvailableLocales",
           "org.apache.harmony.tests.java.util.TimerTest#testOverdueTaskExecutesImmediately",
           "org.apache.harmony.tests.java.util.WeakHashMapTest#test_keySet_hasNext"]
+},
+{
+  description: "Timeouts.",
+  result: EXEC_FAILED,
+  bug: 157520256,
+  modes: [device],
+  names: ["jsr166.ForkJoinPoolTest#testIsQuiescent",
+          "libcore.java.util.CalendarTest#testAllDefaultCalendar_Gregorian",
+          "org.apache.harmony.tests.java.util.regex.MatcherTest#testAllCodePoints_P",
+          "org.apache.harmony.tests.java.util.regex.MatcherTest#testAllCodePoints_p"]
 }
 ]
