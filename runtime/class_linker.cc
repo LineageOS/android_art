@@ -1133,8 +1133,10 @@ void ClassLinker::RunRootClinits(Thread* self) {
     if (!c->IsArrayClass() && !c->IsPrimitive()) {
       StackHandleScope<1> hs(self);
       Handle<mirror::Class> h_class(hs.NewHandle(c));
-      EnsureInitialized(self, h_class, true, true);
-      self->AssertNoPendingException();
+      if (!EnsureInitialized(self, h_class, true, true)) {
+        LOG(FATAL) << "Exception when initializing " << h_class->PrettyClass()
+            << ": " << self->GetException()->Dump();
+      }
     } else {
       DCHECK(c->IsInitialized());
     }
