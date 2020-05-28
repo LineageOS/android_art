@@ -6423,15 +6423,6 @@ bool ClassLinker::LinkVirtualMethods(
       ArtMethod* m = klass->GetVirtualMethodDuringLinking(i, image_pointer_size_);
       m->SetMethodIndex(i);
       if (!m->IsAbstract()) {
-        // If the dex file does not support default methods, throw ClassFormatError.
-        // This check is necessary to protect from odd cases, such as native default
-        // methods, that the dex file verifier permits for old dex file versions. b/157170505
-        if (!m->GetDexFile()->SupportsDefaultMethods()) {
-          ThrowClassFormatError(klass.Get(),
-                                "Dex file does not support default method '%s'",
-                                m->PrettyMethod().c_str());
-          return false;
-        }
         m->SetAccessFlags(m->GetAccessFlags() | kAccDefault);
         has_defaults = true;
       }
