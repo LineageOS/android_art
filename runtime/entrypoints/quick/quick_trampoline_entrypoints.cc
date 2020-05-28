@@ -1385,19 +1385,14 @@ extern "C" const void* artQuickResolutionTrampoline(
       success = linker->EnsureInitialized(soa.Self(), h_called_class, true, true);
     }
     if (success) {
-      bool force_interpreter = self->IsForceInterpreter() && !called->IsNative();
-      if (UNLIKELY(force_interpreter)) {
-        // If we are single-stepping or the called method is deoptimized (by a
-        // breakpoint, for example), then we have to execute the called method
-        // with the interpreter.
+      code = called->GetEntryPointFromQuickCompiledCode();
+      if (linker->IsQuickResolutionStub(code)) {
+        DCHECK_EQ(invoke_type, kStatic);
+        // Go to JIT or oat and grab code.
+        code = linker->GetQuickOatCodeFor(called);
+      }
+      if (linker->ShouldUseInterpreterEntrypoint(called, code)) {
         code = GetQuickToInterpreterBridge();
-      } else {
-        code = called->GetEntryPointFromQuickCompiledCode();
-        if (linker->IsQuickResolutionStub(code)) {
-          DCHECK_EQ(invoke_type, kStatic);
-          // Go to JIT or oat and grab code.
-          code = linker->GetQuickOatCodeFor(called);
-        }
       }
     } else {
       DCHECK(called_class->IsErroneous());

@@ -1133,8 +1133,10 @@ void ClassLinker::RunRootClinits(Thread* self) {
     if (!c->IsArrayClass() && !c->IsPrimitive()) {
       StackHandleScope<1> hs(self);
       Handle<mirror::Class> h_class(hs.NewHandle(c));
-      EnsureInitialized(self, h_class, true, true);
-      self->AssertNoPendingException();
+      if (!EnsureInitialized(self, h_class, true, true)) {
+        LOG(FATAL) << "Exception when initializing " << h_class->PrettyClass()
+            << ": " << self->GetException()->Dump();
+      }
     } else {
       DCHECK(c->IsInitialized());
     }
@@ -6430,6 +6432,15 @@ bool ClassLinker::LinkVirtualMethods(
       ArtMethod* m = klass->GetVirtualMethodDuringLinking(i, image_pointer_size_);
       m->SetMethodIndex(i);
       if (!m->IsAbstract()) {
+        // If the dex file does not support default methods, throw ClassFormatError.
+        // This check is necessary to protect from odd cases, such as native default
+        // methods, that the dex file verifier permits for old dex file versions. b/157170505
+        if (!m->GetDexFile()->SupportsDefaultMethods()) {
+          ThrowClassFormatError(klass.Get(),
+                                "Dex file does not support default method '%s'",
+                                m->PrettyMethod().c_str());
+          return false;
+        }
         m->SetAccessFlags(m->GetAccessFlags() | kAccDefault);
         has_defaults = true;
       }

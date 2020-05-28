@@ -72,4 +72,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["hiddenapi_test.cc"],
+    required: ["hiddenapid"],
 }

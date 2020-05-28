@@ -236,6 +236,10 @@ art_cc_test {
         "libartd-dexlayout",
     ],
     srcs: ["dexlayout_test.cc"],
+    required: [
+        "dexlayoutd",
+        "dexdump",
+    ],
 }
 
 art_cc_binary {
@@ -271,4 +275,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["dexdiag_test.cc"],
+    required: ["dexdiag"],
 }
