@@ -1479,7 +1479,7 @@ uint32_t Jit::CompileMethodsFromProfile(
   return added_to_queue;
 }
 
-static bool IgnoreSamplesForMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
+bool Jit::IgnoreSamplesForMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
   if (method->IsClassInitializer() || !method->IsCompilable() || method->IsPreCompiled()) {
     // We do not want to compile such methods.
     return true;
