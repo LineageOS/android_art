@@ -85,4 +85,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["imgdiag_test.cc"],
+    required: ["imgdiagd"],
 }
