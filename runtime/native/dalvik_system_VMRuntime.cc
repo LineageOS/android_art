@@ -399,7 +399,6 @@ static void PreloadDexCachesResolveString(
   if (string == nullptr) {
     return;
   }
-  // LOG(INFO) << "VMRuntime.preloadDexCaches resolved string=" << utf8;
   dex_cache->SetResolvedString(string_idx, string);
 }
 
@@ -419,17 +418,10 @@ static void PreloadDexCachesResolveType(Thread* self,
   ObjPtr<mirror::Class> klass = (class_name[1] == '\0')
       ? linker->LookupPrimitiveClass(class_name[0])
       : linker->LookupClass(self, class_name, nullptr);
-  if (klass == nullptr) {
+  if (klass == nullptr || !klass->IsResolved()) {
     return;
   }
-  // LOG(INFO) << "VMRuntime.preloadDexCaches resolved klass=" << class_name;
   dex_cache->SetResolvedType(type_idx, klass);
-  // Skip uninitialized classes because filled static storage entry implies it is initialized.
-  if (!klass->IsInitialized()) {
-    // LOG(INFO) << "VMRuntime.preloadDexCaches uninitialized klass=" << class_name;
-    return;
-  }
-  // LOG(INFO) << "VMRuntime.preloadDexCaches static storage klass=" << class_name;
 }
 
 // Based on ClassLinker::ResolveField.
