@@ -32,9 +32,9 @@ const uint8_t StandardDexFile::kDexMagicVersions[StandardDexFile::kNumDexVersion
   {'0', '3', '7', '\0'},
   // Dex version 038: Android "O" and beyond.
   {'0', '3', '8', '\0'},
-  // Dex verion 039: Android "P" and beyond.
+  // Dex version 039: Android "P" and beyond.
   {'0', '3', '9', '\0'},
-  // Dex verion 040: beyond Android "10" (previously known as Android "Q").
+  // Dex version 040: beyond Android "10" (previously known as Android "Q").
   {'0', '4', '0', '\0'},
 };
 
@@ -46,6 +46,11 @@ void StandardDexFile::WriteCurrentVersion(uint8_t* magic) {
   std::copy_n(kDexMagicVersions[StandardDexFile::kDexVersionLen - 1],
               kDexVersionLen,
               magic + kDexMagicSize);
+}
+
+
+void StandardDexFile::WriteVersionBeforeDefaultMethods(uint8_t* magic) {
+  std::copy_n(kDexMagicVersions[0u], kDexVersionLen, magic + kDexMagicSize);
 }
 
 bool StandardDexFile::IsMagicValid(const uint8_t* magic) {
