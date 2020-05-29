@@ -105,49 +105,4 @@ define ART_TEST_SKIP
      || $(call ART_TEST_ANNOUNCE_SKIP_BROKEN,$(1)) ) && false))
 endef
 
-# Create a build rule to create the dex file for a test.
-# $(1): module prefix, e.g. art-test-dex
-# $(2): input test directory in art/test, e.g. HelloWorld
-# $(3): target output module path (default module path is used on host)
-# $(4): additional dependencies
-# $(5): a make variable used to collate target dependencies, e.g ART_TEST_TARGET_OAT_HelloWorld_DEX
-# $(6): a make variable used to collate host dependencies, e.g ART_TEST_HOST_OAT_HelloWorld_DEX
-#
-# If the input test directory contains a file called main.list,
-# then a multi-dex file is created passing main.list as the --main-dex-list
-# argument to dx.
-define build-art-test-dex
-  ifeq ($(ART_BUILD_TARGET),true)
-    include $(CLEAR_VARS)
-    LOCAL_MODULE := $(1)-$(2)
-    LOCAL_SRC_FILES := $(call all-java-files-under, $(2))
-    LOCAL_NO_STANDARD_LIBRARIES := true
-    LOCAL_DEX_PREOPT := false
-    LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_test.mk $(4)
-    LOCAL_MODULE_TAGS := tests
-    LOCAL_MODULE_PATH := $(3)
-    ifneq ($(wildcard $(LOCAL_PATH)/$(2)/main.list),)
-      LOCAL_MIN_SDK_VERSION := 19
-      LOCAL_DX_FLAGS := --multi-dex --main-dex-list=$(LOCAL_PATH)/$(2)/main.list --minimal-main-dex
-    endif
-    include $(BUILD_JAVA_LIBRARY)
-    $(5) := $$(LOCAL_INSTALLED_MODULE)
-  endif
-  ifeq ($(ART_BUILD_HOST),true)
-    include $(CLEAR_VARS)
-    LOCAL_MODULE := $(1)-$(2)
-    LOCAL_SRC_FILES := $(call all-java-files-under, $(2))
-    LOCAL_NO_STANDARD_LIBRARIES := true
-    LOCAL_DEX_PREOPT := false
-    LOCAL_ADDITIONAL_DEPENDENCIES := art/build/Android.common_test.mk $(4)
-    LOCAL_JAVA_LIBRARIES := $(addsuffix -hostdex,$(CORE_IMG_JARS))
-    ifneq ($(wildcard $(LOCAL_PATH)/$(2)/main.list),)
-      LOCAL_MIN_SDK_VERSION := 19
-      LOCAL_DX_FLAGS := --multi-dex --main-dex-list=$(LOCAL_PATH)/$(2)/main.list --minimal-main-dex
-    endif
-    include $(BUILD_HOST_DALVIK_JAVA_LIBRARY)
-    $(6) := $$(LOCAL_INSTALLED_MODULE)
-  endif
-endef
-
 endif # ART_ANDROID_COMMON_TEST_MK
