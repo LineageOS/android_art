@@ -19,16 +19,6 @@
 # The purpose of this script is to invoke dex2oat with the right
 # boot classpath and bootclasspath locations.
 
-function find_libdir() {
-  # Get the actual file, $1 is the BINARY_PATH and may be a symbolic link.
-  # Use realpath instead of readlink because Android does not have a readlink.
-  if [[ "$(realpath "$1")" == *dalvikvm64 ]]; then
-    echo "lib64"
-  else
-    echo "lib"
-  fi
-}
-
 # Follow all sym links to get the program name.
 if [[ -n "$BASH_SOURCE" ]]; then
   PROG_NAME="$BASH_SOURCE"
@@ -42,8 +32,6 @@ done
 
 PROG_DIR="$(cd "${PROG_NAME%/*}" ; pwd -P)"
 ANDROID_ROOT="$(cd $PROG_DIR/..; pwd -P)"
-LIBDIR="$(find_libdir $PROG_DIR)"
-LD_LIBRARY_PATH=$ANDROID_ROOT/$LIBDIR
 
 declare -a args=("$@")
 arg_idx=0
@@ -61,11 +49,13 @@ while true; do
     unset args[arg_idx]
     shift
   elif [[ $1 == "--32" ]]; then
-    DEX2OAT_SUFFIX=32
+    BITNESS=32
+    LD_LIBRARY_PATH=$ANDROID_ROOT/lib:$LD_LIBRARY_PATH
     unset args[arg_idx]
     shift
   elif [[ $1 == "--64" ]]; then
-    DEX2OAT_SUFFIX=64
+    BITNESS=64
+    LD_LIBRARY_PATH=$ANDROID_ROOT/lib64:$LD_LIBRARY_PATH
     unset args[arg_idx]
     shift
   elif [[ "$1" == "" ]]; then
@@ -75,6 +65,11 @@ while true; do
   fi
   arg_idx=$((arg_idx + 1))
 done
+
+if [ -z "$BITNESS" ]; then
+  echo "Either --32 or --64 is required as argument to specify bitness"
+  exit 1
+fi
 
 # Create boot class path filename or location list.
 # It takes one optional argument which is the prefix to be inserted before each entry.
@@ -113,6 +108,7 @@ fi
 
 # If the dex2oat binary with the bitness as a suffix doesn't exist,
 # try with a dex2oat without suffix.
+DEX2OAT_SUFFIX=$BITNESS
 if [[ ! -f $ANDROID_ROOT/bin/dex2oat${DEX2OAT_SUFFIX} ]]; then
   DEX2OAT_SUFFIX=""
 fi
