@@ -2661,6 +2661,7 @@ class Dex2Oat final {
           "android.hardware.wifi",
           // "android.net.wifi",  // Covered by android.net below.
           "android.x.net.wifi",
+          "com.android.wifi.x",
           // Reserved framework-tethering package (includes sub-packages under this path).
           "android.net",
       });
