@@ -1,0 +1,3 @@
+Regression test for DCHECK() failure for copying a default native method from
+an interface to a class implementing that interface. The default native method
+should result in ClassFormatError before we reach that DCHECK().
