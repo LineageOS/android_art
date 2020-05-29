@@ -138,6 +138,9 @@ art_cc_test {
     defaults: [
         "art_gtest_defaults",
     ],
+    data: [
+        ":art-gtest-jars-ProfileTestMultiDex",
+    ],
     srcs: [
         "oatdump_app_test.cc",
         "oatdump_test.cc",
@@ -148,6 +151,6 @@ art_cc_test {
         "oatdumpds",
         "dexdump",
         "dex2oatd",
-        "dex2oatds"
+        "dex2oatds",
     ],
 }
