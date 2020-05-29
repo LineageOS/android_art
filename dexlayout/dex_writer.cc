@@ -794,8 +794,11 @@ void DexWriter::WriteHeader(Stream* stream) {
   StandardDexFile::Header header;
   if (CompactDexFile::IsMagicValid(header_->Magic())) {
     StandardDexFile::WriteMagic(header.magic_);
-    // TODO: Should we write older versions based on the feature flags?
-    StandardDexFile::WriteCurrentVersion(header.magic_);
+    if (header_->SupportDefaultMethods()) {
+      StandardDexFile::WriteCurrentVersion(header.magic_);
+    } else {
+      StandardDexFile::WriteVersionBeforeDefaultMethods(header.magic_);
+    }
   } else {
     // Standard dex -> standard dex, just reuse the same header.
     static constexpr size_t kMagicAndVersionLen =
