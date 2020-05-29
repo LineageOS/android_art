@@ -147,6 +147,7 @@ bool CanUseMterp()
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Runtime* const runtime = Runtime::Current();
   return
+      runtime->IsStarted() &&
       !runtime->IsAotCompiler() &&
       !runtime->GetInstrumentation()->IsActive() &&
       // mterp only knows how to deal with the normal exits. It cannot handle any of the
