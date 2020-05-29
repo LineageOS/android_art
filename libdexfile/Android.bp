@@ -250,6 +250,13 @@ art_cc_test {
         "dex/type_lookup_table_test.cc",
         "dex/utf_test.cc",
     ],
+    data: [
+        ":art-gtest-jars-GetMethodSignature",
+        ":art-gtest-jars-Lookup",
+        ":art-gtest-jars-Main",
+        ":art-gtest-jars-MultiDex",
+        ":art-gtest-jars-Nested",
+    ],
     header_libs: ["jni_headers"],
     shared_libs: [
         "libbacktrace",

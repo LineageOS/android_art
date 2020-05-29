@@ -337,6 +337,14 @@ class Checker:
       if not self._provider.get(test_path).is_exec:
         self.fail('%s is not executable', test_path)
 
+  def check_art_test_data(self, filename):
+    dirs = self.arch_dirs_for_path(ART_TEST_DIR)
+    if not dirs:
+      self.fail('ART test data missing: %s', filename)
+    for dir in dirs:
+      if not self.check_file('%s/%s' % (dir, filename)):
+        return
+
   def check_single_library(self, filename):
     lib_path = 'lib/%s' % filename
     lib64_path = 'lib64/%s' % filename
@@ -755,6 +763,59 @@ class TestingTargetChecker:
 
     # Check ART test tools.
     self._checker.check_executable('signal_dumper')
+
+    # Check ART jar files which are needed for gtests.
+    self._checker.check_art_test_data('art-gtest-jars-AbstractMethod.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MyClassNatives.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Main.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ProtoCompare.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Transaction.jar')
+    self._checker.check_art_test_data('art-gtest-jars-VerifierDepsMulti.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Nested.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MyClass.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ManyMethods.jar')
+    self._checker.check_art_test_data('art-gtest-jars-GetMethodSignature.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Lookup.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Instrumentation.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MainUncompressedAligned.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ForClassLoaderD.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ForClassLoaderC.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ErroneousA.jar')
+    self._checker.check_art_test_data('art-gtest-jars-DexToDexDecompiler.jar')
+    self._checker.check_art_test_data('art-gtest-jars-HiddenApiSignatures.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ForClassLoaderB.jar')
+    self._checker.check_art_test_data('art-gtest-jars-LinkageTest.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MethodTypes.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ErroneousInit.jar')
+    self._checker.check_art_test_data('art-gtest-jars-VerifierDeps.jar')
+    self._checker.check_art_test_data('art-gtest-jars-StringLiterals.jar')
+    self._checker.check_art_test_data('art-gtest-jars-XandY.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ExceptionHandle.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ImageLayoutB.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Interfaces.jar')
+    self._checker.check_art_test_data('art-gtest-jars-IMTB.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Extension2.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Extension1.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MainEmptyUncompressedAligned.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ErroneousB.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MultiDexModifiedSecondary.jar')
+    self._checker.check_art_test_data('art-gtest-jars-NonStaticLeafMethods.jar')
+    self._checker.check_art_test_data('art-gtest-jars-DefaultMethods.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MultiDexUncompressedAligned.jar')
+    self._checker.check_art_test_data('art-gtest-jars-StaticsFromCode.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ProfileTestMultiDex.jar')
+    self._checker.check_art_test_data('art-gtest-jars-VerifySoftFailDuringClinit.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MainStripped.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ForClassLoaderA.jar')
+    self._checker.check_art_test_data('art-gtest-jars-StaticLeafMethods.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MultiDex.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Packages.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ProtoCompare2.jar')
+    self._checker.check_art_test_data('art-gtest-jars-Statics.jar')
+    self._checker.check_art_test_data('art-gtest-jars-AllFields.jar')
+    self._checker.check_art_test_data('art-gtest-jars-IMTA.jar')
+    self._checker.check_art_test_data('art-gtest-jars-ImageLayoutA.jar')
+    self._checker.check_art_test_data('art-gtest-jars-MainEmptyUncompressed.jar')
 
 
 class NoSuperfluousBinariesChecker:
