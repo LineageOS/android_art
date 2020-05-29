@@ -83,6 +83,10 @@ class StandardDexFile : public DexFile {
   // Write the current version, note that the input is the address of the magic.
   static void WriteCurrentVersion(uint8_t* magic);
 
+  // Write the last version before default method support,
+  // note that the input is the address of the magic.
+  static void WriteVersionBeforeDefaultMethods(uint8_t* magic);
+
   static const uint8_t kDexMagic[kDexMagicSize];
   static constexpr size_t kNumDexVersions = 5;
   static const uint8_t kDexMagicVersions[kNumDexVersions][kDexVersionLen];
