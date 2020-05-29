@@ -20,6 +20,7 @@
 #include "class_linker.h"
 #include "dex/invoke_type.h"
 #include "intrinsics_enum.h"
+#include "intrinsics_list.h"
 #include "mirror/class.h"
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
@@ -29,14 +30,10 @@ namespace art {
 
 namespace {
 
-// Initialize an intrinsic. Returns true if the intrinsic is already
-// initialized, false otherwise.
-bool InitializeIntrinsic(Thread* self,
-                         Intrinsics intrinsic,
-                         InvokeType invoke_type,
-                         const char* class_name,
-                         const char* method_name,
-                         const char* signature)
+ArtMethod* FindIntrinsicMethod(Thread* self,
+                               const char* class_name,
+                               const char* method_name,
+                               const char* signature)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
   PointerSize image_size = class_linker->GetImagePointerSize();
@@ -50,6 +47,19 @@ bool InitializeIntrinsic(Thread* self,
     LOG(FATAL) << "Could not find method of intrinsic "
                << class_name << " " << method_name << " " << signature;
   }
+  return method;
+}
+
+// Initialize an intrinsic. Returns true if the intrinsic is already
+// initialized, false otherwise.
+bool InitializeIntrinsic(Thread* self,
+                         Intrinsics intrinsic,
+                         InvokeType invoke_type,
+                         const char* class_name,
+                         const char* method_name,
+                         const char* signature)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ArtMethod* method = FindIntrinsicMethod(self, class_name, method_name, signature);
 
   CHECK_EQ(method->GetInvokeType(), invoke_type);
   if (method->IsIntrinsic()) {
@@ -61,24 +71,55 @@ bool InitializeIntrinsic(Thread* self,
   }
 }
 
+// Returns true if the intrinsic is already initialized, false otherwise.
+bool IsIntrinsicInitialized(Thread* self,
+                            Intrinsics intrinsic,
+                            InvokeType invoke_type,
+                            const char* class_name,
+                            const char* method_name,
+                            const char* signature)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ArtMethod* method = FindIntrinsicMethod(self, class_name, method_name, signature);
+
+  CHECK_EQ(method->GetInvokeType(), invoke_type);
+  if (method->IsIntrinsic()) {
+    CHECK_EQ(method->GetIntrinsic(), static_cast<uint32_t>(intrinsic));
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool AreAllIntrinsicsInitialized() {
+  ScopedObjectAccess soa(Thread::Current());
+#define IS_INTRINSIC_INITIALIZED(Name, InvokeType, _, __, ___, ClassName, MethodName, Signature) \
+  IsIntrinsicInitialized(soa.Self(),                                                             \
+                         Intrinsics::k##Name,                                                    \
+                         InvokeType,                                                             \
+                         ClassName,                                                              \
+                         MethodName,                                                             \
+                         Signature) &&
+  bool result = INTRINSICS_LIST(IS_INTRINSIC_INITIALIZED) true;
+#undef IS_INTRINSIC_INITIALIZED
+  return result;
+}
+
 }  // namespace
 
 void InitializeIntrinsics() {
   ScopedObjectAccess soa(Thread::Current());
   // Initialization here uses the short-circuit operator || to stop
   // initializing if there's an already initialized intrinsic.
-#define SETUP_INTRINSICS(Name, InvokeType, _, __, ___, ClassName, MethodName, Signature) \
-  InitializeIntrinsic(soa.Self(),                                                        \
-                      Intrinsics::k##Name,                                               \
-                      InvokeType,                                                        \
-                      ClassName,                                                         \
-                      MethodName,                                                        \
+#define INITIALIZE_INTRINSIC(Name, InvokeType, _, __, ___, ClassName, MethodName, Signature) \
+  InitializeIntrinsic(soa.Self(),                                                            \
+                      Intrinsics::k##Name,                                                   \
+                      InvokeType,                                                            \
+                      ClassName,                                                             \
+                      MethodName,                                                            \
                       Signature) ||
-#include "intrinsics_list.h"
-  INTRINSICS_LIST(SETUP_INTRINSICS)
-#undef INTRINSICS_LIST
-#undef SETUP_INTRINSICS
-      true;
+  INTRINSICS_LIST(INITIALIZE_INTRINSIC) true;
+#undef INITIALIZE_INTRINSIC
+  DCHECK(AreAllIntrinsicsInitialized());
 }
 
 }  // namespace art
