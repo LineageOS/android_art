@@ -49,6 +49,9 @@ art_cc_test {
     defaults: [
         "art_gtest_defaults",
     ],
+    data: [
+        ":art-gtest-jars-MultiDex",
+    ],
     srcs: [
         "dexanalyze_test.cc",
     ],
