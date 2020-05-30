@@ -73,7 +73,7 @@ if [[ $core_jars_only == y ]]; then
   # defined in Android.common_path.mk, otherwise we would just use HOST-/TARGET_TEST_CORE_JARS.
 
   # Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
-  # because that's what we use for compiling the core.art image.
+  # because that's what we use for compiling the boot.art image.
   # It may contain additional modules from TEST_CORE_JARS.
   core_jars_list="core-oj core-libart okhttp bouncycastle apache-xml core-icu4j"
   boot_jars_list=""

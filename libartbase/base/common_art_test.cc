@@ -425,7 +425,7 @@ static std::string GetDexFileName(const std::string& jar_prefix, bool host) {
 
 std::vector<std::string> CommonArtTestImpl::GetLibCoreModuleNames() const {
   // Note: This must start with the CORE_IMG_JARS in Android.common_path.mk
-  // because that's what we use for compiling the core.art image.
+  // because that's what we use for compiling the boot.art image.
   // It may contain additional modules from TEST_CORE_JARS.
   return {
       // CORE_IMG_JARS modules.
