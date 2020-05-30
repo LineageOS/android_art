@@ -16,50 +16,5 @@
 
 LOCAL_PATH := $(call my-dir)
 
-########################################################################
-# oatdump targets
-
-ART_DUMP_OAT_PATH ?= $(OUT_DIR)
-
-OATDUMP := $(HOST_OUT_EXECUTABLES)/oatdump$(HOST_EXECUTABLE_SUFFIX)
-OATDUMPD := $(HOST_OUT_EXECUTABLES)/oatdumpd$(HOST_EXECUTABLE_SUFFIX)
-# TODO: for now, override with debug version for better error reporting
-OATDUMP := $(OATDUMPD)
-
 .PHONY: dump-oat
-dump-oat: dump-oat-core dump-oat-boot
-
-.PHONY: dump-oat-core
-dump-oat-core: dump-oat-core-host dump-oat-core-target
-
-.PHONY: dump-oat-core-host
-ifeq ($(ART_BUILD_HOST),true)
-dump-oat-core-host: $(HOST_CORE_IMG_OUTS) $(OATDUMP)
-	$(OATDUMP) --image=$(HOST_CORE_IMG_LOCATION) --output=$(ART_DUMP_OAT_PATH)/core.host.oatdump.txt
-	@echo Output in $(ART_DUMP_OAT_PATH)/core.host.oatdump.txt
-endif
-
-.PHONY: dump-oat-core-target-$(TARGET_ARCH)
-ifeq ($(ART_BUILD_TARGET),true)
-dump-oat-core-target-$(TARGET_ARCH): $(TARGET_CORE_IMAGE_DEFAULT_$(ART_PHONY_TEST_TARGET_SUFFIX)) $(OATDUMP)
-	$(OATDUMP) --image=$(TARGET_CORE_IMG_LOCATION) \
-	  --output=$(ART_DUMP_OAT_PATH)/core.target.$(TARGET_ARCH).oatdump.txt --instruction-set=$(TARGET_ARCH)
-	@echo Output in $(ART_DUMP_OAT_PATH)/core.target.$(TARGET_ARCH).oatdump.txt
-endif
-
-ifdef TARGET_2ND_ARCH
-.PHONY: dump-oat-core-target-$(TARGET_2ND_ARCH)
-ifeq ($(ART_BUILD_TARGET),true)
-dump-oat-core-target-$(TARGET_2ND_ARCH): $(TARGET_CORE_IMAGE_DEFAULT_$(2ND_ART_PHONY_TEST_TARGET_SUFFIX)) $(OATDUMP)
-	$(OATDUMP) --image=$(TARGET_CORE_IMG_LOCATION) \
-	  --output=$(ART_DUMP_OAT_PATH)/core.target.$(TARGET_2ND_ARCH).oatdump.txt --instruction-set=$(TARGET_2ND_ARCH)
-	@echo Output in $(ART_DUMP_OAT_PATH)/core.target.$(TARGET_2ND_ARCH).oatdump.txt
-endif
-endif
-
-.PHONY: dump-oat-core-target
-dump-oat-core-target: dump-oat-core-target-$(TARGET_ARCH)
-ifdef TARGET_2ND_ARCH
-dump-oat-core-target: dump-oat-core-target-$(TARGET_2ND_ARCH)
-endif
-
+dump-oat: dump-oat-boot

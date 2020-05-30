@@ -23,7 +23,6 @@ art_path := $(LOCAL_PATH)
 #
 
 include $(art_path)/build/Android.common_path.mk
-include $(art_path)/build/Android.oat.mk
 
 .PHONY: clean-oat
 clean-oat: clean-oat-host clean-oat-target
@@ -691,8 +690,6 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(TARGET_OUT_EXECUTABLES)/dex2oat_wrapper \
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
-                        $(TARGET_CORE_IMG_OUT_BASE).art \
-                        $(TARGET_CORE_IMG_OUT_BASE)-interpreter.art \
                         libartpalette-system \
                         libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap \
                         icu-data-art-test-i18n \
