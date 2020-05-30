@@ -509,14 +509,6 @@ def run_tests(tests):
       if address_size == '64':
         options_test += ' --64'
 
-        if env.DEX2OAT_HOST_INSTRUCTION_SET_FEATURES:
-          options_test += ' --instruction-set-features' + env.DEX2OAT_HOST_INSTRUCTION_SET_FEATURES
-
-      elif address_size == '32':
-        if env.HOST_2ND_ARCH_PREFIX_DEX2OAT_HOST_INSTRUCTION_SET_FEATURES:
-          options_test += ' --instruction-set-features ' + \
-                          env.HOST_2ND_ARCH_PREFIX_DEX2OAT_HOST_INSTRUCTION_SET_FEATURES
-
       # TODO(http://36039166): This is a temporary solution to
       # fix build breakages.
       options_test = (' --output-path %s') % (

@@ -61,8 +61,8 @@ NON_PASSES = ['builder', 'prepare_for_register_allocation',
 # position in the command.
 RAW_CMD_RUNTIME_ARGS_TAG = '{ARGS}'
 
-# Default core image path relative to ANDROID_HOST_OUT.
-DEFAULT_IMAGE_RELATIVE_PATH = '/framework/core.art'
+# Default boot image path relative to ANDROID_HOST_OUT.
+DEFAULT_IMAGE_RELATIVE_PATH = 'apex/com.android.art/javalib/boot.art'
 
 class Dex2OatWrapperTestable(object):
   """Class representing a testable compilation.
