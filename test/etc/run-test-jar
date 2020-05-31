@@ -242,6 +242,10 @@ while true; do
         shift
     elif [ "x$1" = "x--host" ]; then
         HOST="y"
+        ANDROID_ROOT="${ANDROID_HOST_OUT}"
+        ANDROID_ART_ROOT="${ANDROID_HOST_OUT}/com.android.art"
+        ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
+        ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
         # On host, we default to using the symlink, as the PREFER_32BIT
         # configuration is the only configuration building a 32bit version of
         # dex2oat.
@@ -456,20 +460,8 @@ while true; do
     fi
 done
 
+# HACK: Force the use of `signal_dumper` on host.
 if [[ "$HOST" = "y" ]]; then
-  ANDROID_ROOT="${ANDROID_HOST_OUT}"
-  ANDROID_ART_ROOT="${ANDROID_HOST_OUT}/com.android.art"
-  ANDROID_I18N_ROOT="${ANDROID_HOST_OUT}/com.android.i18n"
-  ANDROID_TZDATA_ROOT="${ANDROID_HOST_OUT}/com.android.tzdata"
-  if [ "$HOST_PREFER_32_BIT" = true ]; then
-    DEX2OAT_HOST_SUFFIX=32
-  else
-    DEX2OAT_HOST_SUFFIX=64
-  fi
-  DEX2OAT_NDEBUG_BINARY="${DEX2OAT_NDEBUG_BINARY}${DEX2OAT_HOST_SUFFIX}"
-  DEX2OAT_DEBUG_BINARY="${DEX2OAT_DEBUG_BINARY}${DEX2OAT_HOST_SUFFIX}"
-
-  # HACK: Force the use of `signal_dumper` on host.
   TIME_OUT="timeout"
 fi
 

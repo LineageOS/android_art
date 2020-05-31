@@ -1788,6 +1788,14 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
     callbacks_->NextRuntimePhase(RuntimePhaseCallback::RuntimePhase::kInitialAgents);
   }
 
+  if (IsZygote() && IsPerfettoHprofEnabled()) {
+    constexpr const char* plugin_name = kIsDebugBuild ?
+    "libperfetto_hprofd.so" : "libperfetto_hprof.so";
+    // Load eagerly in Zygote to improve app startup times. This will make
+    // subsequent dlopens for the library no-ops.
+    dlopen(plugin_name, RTLD_NOW | RTLD_LOCAL);
+  }
+
   VLOG(startup) << "Runtime::Init exiting";
 
   // Set OnlyUseSystemOatFiles only after boot classpath has been set up.
