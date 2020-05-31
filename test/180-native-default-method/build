@@ -1,5 +1,6 @@
+#!/bin/bash
 #
-# Copyright (C) 2011 The Android Open Source Project
+# Copyright 2020 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +13,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-LOCAL_PATH := $(call my-dir)
+# make us exit on a failure
+set -e
 
-.PHONY: dump-oat
-dump-oat: dump-oat-boot
+./default-build "$@"
+
+if [[ $@ != *"--jvm"* ]]; then
+  # Change the generated dex file to have a v35 magic number if it is version 39
+  if test -f classes.dex && head -c 7 classes.dex | grep -q 039; then
+    # place ascii value '035' into the classes.dex file starting at byte 4.
+    printf '035' | dd status=none conv=notrunc of=classes.dex bs=1 seek=4 count=3
+    rm -f $TEST_NAME.jar
+    zip $TEST_NAME.jar classes.dex
+  fi
+fi

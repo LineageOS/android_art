@@ -1777,7 +1777,7 @@ class ImgDiagDumper {
     return str.substr(idx + 1);
   }
 
-  // Return the image location, stripped of any directories, e.g. "boot.art" or "core.art"
+  // Return the image location, stripped of any directories, e.g. "boot.art"
   static std::string GetImageLocationBaseName(const std::string& image_location) {
     return BaseName(std::string(image_location));
   }

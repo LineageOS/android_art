@@ -259,7 +259,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   std::string image_dir = scratch_dir + GetInstructionSetString(kRuntimeISA);
   int mkdir_result = mkdir(image_dir.c_str(), 0700);
   ASSERT_EQ(0, mkdir_result);
-  std::string filename_prefix = image_dir + "/core";
+  std::string filename_prefix = image_dir + "/boot";
 
   // Copy the libcore dex files to a custom dir inside `scratch_dir` so that we do not
   // accidentally load pre-compiled core images from their original directory based on BCP paths.
@@ -288,7 +288,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
       full_bcp.SubArray(/*pos=*/ total_dex_files - 1u, /*length=*/ 1u);
 
   // Prepare the "head", "mid" and "tail" names and locations.
-  std::string base_name = "core.art";
+  std::string base_name = "boot.art";
   std::string base_location = scratch_dir + base_name;
   std::vector<std::string> expanded_mid = gc::space::ImageSpace::ExpandMultiImageLocations(
       mid_dex_files.SubArray(/*pos=*/ 0u, /*length=*/ 1u),
@@ -369,7 +369,7 @@ TEST_F(Dex2oatImageTest, TestExtension) {
   std::string single_image_dir = single_dir + GetInstructionSetString(kRuntimeISA);
   mkdir_result = mkdir(single_image_dir.c_str(), 0700);
   ASSERT_EQ(0, mkdir_result);
-  std::string single_filename_prefix = single_image_dir + "/core";
+  std::string single_filename_prefix = single_image_dir + "/boot";
 
   // The dex files for the single-image are everything not in the "head".
   ArrayRef<const std::string> single_dex_files = full_bcp.SubArray(/*pos=*/ head_dex_files.size());

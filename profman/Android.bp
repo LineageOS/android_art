@@ -98,6 +98,9 @@ art_cc_test {
     shared_libs: [
         "libprofiled",
     ],
+    data: [
+        ":art-gtest-jars-ProfileTestMultiDex",
+    ],
     srcs: ["profile_assistant_test.cc"],
     required: ["profmand"],
 }

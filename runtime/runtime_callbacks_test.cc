@@ -300,8 +300,8 @@ TEST_F(ClassLoadCallbackRuntimeCallbacksTest, ClassLoadCallback) {
       hs.NewHandle(class_linker_->FindClass(soa.Self(), descriptor_y, class_loader)));
   ASSERT_TRUE(h_Y != nullptr);
 
-  bool expect1 = Expect({ "PreDefine:LY; <art-gtest-XandY.jar>",
-                          "PreDefine:LX; <art-gtest-XandY.jar>",
+  bool expect1 = Expect({ "PreDefine:LY; <art-gtest-jars-XandY.jar>",
+                          "PreDefine:LX; <art-gtest-jars-XandY.jar>",
                           "Load:LX;",
                           "Prepare:LX;[LX;]",
                           "Load:LY;",
@@ -312,7 +312,7 @@ TEST_F(ClassLoadCallbackRuntimeCallbacksTest, ClassLoadCallback) {
 
   ASSERT_TRUE(class_linker_->EnsureInitialized(Thread::Current(), h_Y, true, true));
 
-  bool expect2 = Expect({ "PreDefine:LY$Z; <art-gtest-XandY.jar>",
+  bool expect2 = Expect({ "PreDefine:LY$Z; <art-gtest-jars-XandY.jar>",
                           "Load:LY$Z;",
                           "Prepare:LY$Z;[LY$Z;]" });
   EXPECT_TRUE(expect2);

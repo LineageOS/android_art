@@ -63,6 +63,7 @@
 #include "gc/space/space.h"
 #include "handle_scope-inl.h"
 #include "intrinsics_enum.h"
+#include "intrinsics_list.h"
 #include "jni/jni_internal.h"
 #include "linker/linker_patch.h"
 #include "mirror/class-inl.h"
@@ -331,12 +332,6 @@ void CompilerDriver::CompileAll(jobject class_loader,
 
   CheckThreadPools();
 
-  if (GetCompilerOptions().IsBootImage()) {
-    // All intrinsics must be in the primary boot image, so we don't need to setup
-    // the intrinsics for any other compilation, as those compilations will pick up
-    // a boot image that have the ArtMethod already set with the intrinsics flag.
-    InitializeIntrinsics();
-  }
   // Compile:
   // 1) Compile all classes and methods enabled for compilation. May fall back to dex-to-dex
   //    compilation.
@@ -1069,6 +1064,15 @@ class RecordImageClassesVisitor : public ClassVisitor {
   HashSet<std::string>* const image_classes_;
 };
 
+// Add classes which contain intrinsics methods to the list of image classes.
+static void AddClassesContainingIntrinsics(/* out */ HashSet<std::string>* image_classes) {
+#define ADD_INTRINSIC_OWNER_CLASS(_, __, ___, ____, _____, ClassName, ______, _______) \
+  image_classes->insert(ClassName);
+
+  INTRINSICS_LIST(ADD_INTRINSIC_OWNER_CLASS)
+#undef ADD_INTRINSIC_OWNER_CLASS
+}
+
 // Make a list of descriptors for classes to include in the image
 void CompilerDriver::LoadImageClasses(TimingLogger* timings,
                                       /*inout*/ HashSet<std::string>* image_classes) {
@@ -1093,6 +1097,16 @@ void CompilerDriver::LoadImageClasses(TimingLogger* timings,
   }
 
   TimingLogger::ScopedTiming t("LoadImageClasses", timings);
+
+  if (GetCompilerOptions().IsBootImage()) {
+    AddClassesContainingIntrinsics(image_classes);
+
+    // All intrinsics must be in the primary boot image, so we don't need to setup
+    // the intrinsics for any other compilation, as those compilations will pick up
+    // a boot image that have the ArtMethod already set with the intrinsics flag.
+    InitializeIntrinsics();
+  }
+
   // Make a first pass to load all classes explicitly listed in the file
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
