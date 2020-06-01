@@ -164,6 +164,7 @@ inline Class* DexCache::GetResolvedType(dex::TypeIndex type_idx) {
 
 inline void DexCache::SetResolvedType(dex::TypeIndex type_idx, ObjPtr<Class> resolved) {
   DCHECK(resolved != nullptr);
+  DCHECK(resolved->IsResolved()) << resolved->GetStatus();
   // TODO default transaction support.
   // Use a release store for SetResolvedType. This is done to prevent other threads from seeing a
   // class but not necessarily seeing the loaded members like the static fields array.
