@@ -57,6 +57,13 @@ public class Main {
 
     if (invokeMethod) {
       loader.loadClass("art.ClassB").getDeclaredMethod("printHello").invoke(null);
+
+      if (expectedBackedByOat) {
+        String filter = getCompilerFilter(loader.loadClass("art.ClassB"));
+        if (!("verify".equals(filter))) {
+          throw new Error("Expected verify, got " + filter);
+        }
+      }
     }
   }
 
@@ -118,6 +125,7 @@ public class Main {
   private static native boolean hasVdexFile(ClassLoader loader);
   private static native boolean isBackedByOatFile(ClassLoader loader);
   private static native boolean areClassesPreverified(ClassLoader loader);
+  private static native String getCompilerFilter(Class cls);
 
   // Defined in 674-hiddenapi.
   private static native void appendToBootClassLoader(String dexPath, boolean isCorePlatform);
