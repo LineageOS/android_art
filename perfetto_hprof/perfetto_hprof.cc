@@ -83,8 +83,8 @@ static State g_state = State::kUninitialized;
 int g_signal_pipe_fds[2];
 static struct sigaction g_orig_act = {};
 
-uint64_t FindOrAppend(std::map<std::string, uint64_t>* m,
-                      const std::string& s) {
+template <typename T>
+uint64_t FindOrAppend(std::map<T, uint64_t>* m, const T& s) {
   auto it = m->find(s);
   if (it == m->end()) {
     std::tie(it, std::ignore) = m->emplace(s, m->size());
@@ -510,6 +510,7 @@ void DumpPerfetto(art::Thread* self) {
             // (default proto value for a string).
             std::map<std::string, uint64_t> interned_fields{{"", 0}};
             std::map<std::string, uint64_t> interned_locations{{"", 0}};
+            std::map<uintptr_t, uint64_t> interned_classes{{0, 0}};
 
             std::map<art::RootType, std::vector<art::mirror::Object*>> root_objects;
             RootFinder rcf(&root_objects);
@@ -535,20 +536,21 @@ void DumpPerfetto(art::Thread* self) {
 
             art::Runtime::Current()->GetHeap()->VisitObjectsPaused(
                 [&writer, &interned_fields, &interned_locations,
-                &reference_field_ids, &reference_object_ids](
+                &reference_field_ids, &reference_object_ids, &interned_classes](
                     art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                   if (obj->IsClass()) {
                     art::mirror::Class* klass = obj->AsClass().Ptr();
                     perfetto::protos::pbzero::HeapGraphType* type_proto =
                       writer.GetHeapGraph()->add_types();
-                    type_proto->set_id(reinterpret_cast<uintptr_t>(klass));
+                    type_proto->set_id(FindOrAppend(&interned_classes,
+                          reinterpret_cast<uintptr_t>(klass)));
                     type_proto->set_class_name(PrettyType(klass));
                     type_proto->set_location_id(FindOrAppend(&interned_locations,
                           klass->GetLocation()));
                   }
 
                   art::mirror::Class* klass = obj->GetClass();
-                  uintptr_t class_id = reinterpret_cast<uintptr_t>(klass);
+                  uintptr_t class_ptr = reinterpret_cast<uintptr_t>(klass);
                   // We need to synethesize a new type for Class<Foo>, which does not exist
                   // in the runtime. Otherwise, all the static members of all classes would be
                   // attributed to java.lang.Class.
@@ -558,12 +560,15 @@ void DumpPerfetto(art::Thread* self) {
                       writer.GetHeapGraph()->add_types();
                     // All pointers are at least multiples of two, so this way we can make sure
                     // we are not colliding with a real class.
-                    class_id = reinterpret_cast<uintptr_t>(obj) | 1;
+                    class_ptr = reinterpret_cast<uintptr_t>(obj) | 1;
+                    auto class_id = FindOrAppend(&interned_classes, class_ptr);
                     type_proto->set_id(class_id);
                     type_proto->set_class_name(obj->PrettyTypeOf());
                     type_proto->set_location_id(FindOrAppend(&interned_locations,
                           obj->AsClass()->GetLocation()));
                   }
+
+                  auto class_id = FindOrAppend(&interned_classes, class_ptr);
 
                   perfetto::protos::pbzero::HeapGraphObject* object_proto =
                     writer.GetHeapGraph()->add_objects();
