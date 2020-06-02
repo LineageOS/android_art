@@ -2370,10 +2370,12 @@ bool DexFileVerifier::CheckIntraSection() {
         offset = section_offset + sizeof(uint32_t) + (map->size_ * sizeof(dex::MapItem));
         break;
 
-#define CHECK_INTRA_SECTION_ITERATE_CASE(type)                              \
-      case type:                                                            \
-        CheckIntraSectionIterate<type>(section_offset, section_count);      \
-        offset = ptr_ - begin_;                                             \
+#define CHECK_INTRA_SECTION_ITERATE_CASE(type)                                 \
+      case type:                                                               \
+        if (!CheckIntraSectionIterate<type>(section_offset, section_count)) {  \
+          return false;                                                        \
+        }                                                                      \
+        offset = ptr_ - begin_;                                                \
         break;
       CHECK_INTRA_SECTION_ITERATE_CASE(DexFile::kDexTypeMethodHandleItem)
       CHECK_INTRA_SECTION_ITERATE_CASE(DexFile::kDexTypeCallSiteIdItem)
