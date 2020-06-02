@@ -1425,13 +1425,17 @@ class OatFileBackedByVdex final : public OatFileBase {
     // SetVdex will take ownership of the VdexFile.
     SetVdex(vdex_file.release());
 
-    // Create a dummy OatHeader.
+    // Create a dummy OatHeader with a key store containing only the compiler
+    // filter (it helps debugging and is required by
+    // OatHeader::GetCompilerFilter).
     std::unique_ptr<const InstructionSetFeatures> isa_features =
         InstructionSetFeatures::FromCppDefines();
+    SafeMap<std::string, std::string> store;
+    store.Put(OatHeader::kCompilerFilter, CompilerFilter::NameOfFilter(CompilerFilter::kVerify));
     oat_header_.reset(OatHeader::Create(kRuntimeISA,
                                         isa_features.get(),
                                         dex_files.size(),
-                                        nullptr));
+                                        &store));
     const uint8_t* begin = reinterpret_cast<const uint8_t*>(oat_header_.get());
     SetBegin(begin);
     SetEnd(begin + oat_header_->GetHeaderSize());
