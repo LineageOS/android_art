@@ -131,7 +131,7 @@ inline uint32_t Class::GetVirtualMethodsStartOffset() {
 
 template<VerifyObjectFlags kVerifyFlags>
 inline ArraySlice<ArtMethod> Class::GetDirectMethodsSlice(PointerSize pointer_size) {
-  DCHECK(IsLoaded() || IsErroneous());
+  DCHECK(IsLoaded() || IsErroneous()) << GetStatus();
   return GetDirectMethodsSliceUnchecked(pointer_size);
 }
 
@@ -144,7 +144,7 @@ inline ArraySlice<ArtMethod> Class::GetDirectMethodsSliceUnchecked(PointerSize p
 
 template<VerifyObjectFlags kVerifyFlags>
 inline ArraySlice<ArtMethod> Class::GetDeclaredMethodsSlice(PointerSize pointer_size) {
-  DCHECK(IsLoaded() || IsErroneous());
+  DCHECK(IsLoaded() || IsErroneous()) << GetStatus();
   return GetDeclaredMethodsSliceUnchecked(pointer_size);
 }
 
@@ -157,7 +157,7 @@ inline ArraySlice<ArtMethod> Class::GetDeclaredMethodsSliceUnchecked(PointerSize
 
 template<VerifyObjectFlags kVerifyFlags>
 inline ArraySlice<ArtMethod> Class::GetDeclaredVirtualMethodsSlice(PointerSize pointer_size) {
-  DCHECK(IsLoaded() || IsErroneous());
+  DCHECK(IsLoaded() || IsErroneous()) << GetStatus();
   return GetDeclaredVirtualMethodsSliceUnchecked(pointer_size);
 }
 
