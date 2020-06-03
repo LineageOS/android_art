@@ -3584,14 +3584,9 @@ bool ImageSpace::LoadBootImage(
 
   // Step 0: Extra zygote work.
 
-  // Step 0.a: If we're the zygote, mark boot.
-  if (loader.IsZygote() && CanWriteToDalvikCache(image_isa)) {
-    MarkZygoteStart(image_isa, Runtime::Current()->GetZygoteMaxFailedBoots());
-  }
-
   loader.FindImageFiles();
 
-  // Step 0.b: If we're the zygote, check for free space, and prune the cache preemptively,
+  // Step 0.a: If we're the zygote, check for free space, and prune the cache preemptively,
   //           if necessary. While the runtime may be fine (it is pretty tolerant to
   //           out-of-disk-space situations), other parts of the platform are not.
   //
