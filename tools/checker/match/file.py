@@ -28,6 +28,134 @@ class MatchFailedException(Exception):
     self.lineNo = lineNo
     self.variables = variables
 
+class BadStructureException(Exception):
+  def __init__(self, msg, lineNo):
+    self.msg = msg
+    self.lineNo = lineNo
+
+class IfStack:
+  """
+  The purpose of this class is to keep track of which branch the cursor is in.
+  This will let us know if the line read by the cursor should be processed or not.
+  Furthermore, this class contains the methods to handle the CHECK-[IF, ELIF, ELSE, FI]
+  statements, and consequently update the stack with new information.
+
+  The following elements can appear on the stack:
+  - BranchTaken: a branch is taken if its condition evaluates to true and
+    its parent branch was also previously taken.
+  - BranchNotTakenYet: the branch's parent was taken, but this branch wasn't as its
+    condition did not evaluate to true.
+  - BranchNotTaken: a branch is not taken when its parent was either NotTaken or NotTakenYet.
+    It doesn't matter if the condition would evaluate to true, that's not even checked.
+
+  CHECK-IF is the only instruction that pushes a new element on the stack. CHECK-ELIF
+  and CHECK-ELSE will update the top of the stack to keep track of what's been seen.
+  That means that we can check if the line currently pointed to by the cursor should be
+  processed just by looking at the top of the stack.
+  CHECK-FI will pop the last element.
+
+  `BranchTaken`, `BranchNotTaken`, `BranchNotTakenYet` are implemented as positive integers.
+  Negated values of `BranchTaken` and `BranchNotTaken` may be appear; `-BranchTaken` and
+  `-BranchNotTaken` have the same meaning as `BranchTaken` and `BranchNotTaken`
+  (respectively), but they indicate that we went past the ELSE branch. Knowing that, we can
+  output a precise error message if the user creates a malformed branching structure.
+  """
+
+  BranchTaken, BranchNotTaken, BranchNotTakenYet = range(1, 4)
+
+  def __init__(self):
+    self.stack = []
+
+  def CanExecute(self):
+    """
+    Returns true if we're not in any branch, or the branch we're
+    currently in was taken.
+    """
+    if self.__isEmpty():
+      return True
+    return abs(self.__peek()) == IfStack.BranchTaken
+
+  def Handle(self, statement, variables):
+    """
+    This function is invoked if the cursor is pointing to a
+    CHECK-[IF, ELIF, ELSE, FI] line.
+    """
+    variant = statement.variant
+    if variant is TestStatement.Variant.If:
+      self.__if(statement, variables)
+    elif variant is TestStatement.Variant.Elif:
+      self.__elif(statement, variables)
+    elif variant is TestStatement.Variant.Else:
+      self.__else(statement)
+    else:
+      assert variant is TestStatement.Variant.Fi
+      self.__fi(statement)
+
+  def Eof(self):
+    """
+    The last line the cursor points to is always EOF.
+    """
+    if not self.__isEmpty():
+      raise BadStructureException("Missing CHECK-FI", -1)
+
+  def __isEmpty(self):
+    return len(self.stack) == 0
+
+  def __if(self, statement, variables):
+    if not self.__isEmpty() and abs(self.__peek()) in [ IfStack.BranchNotTaken,
+                                                        IfStack.BranchNotTakenYet ]:
+      self.__push(IfStack.BranchNotTaken)
+    elif EvaluateLine(statement, variables):
+      self.__push(IfStack.BranchTaken)
+    else:
+      self.__push(IfStack.BranchNotTakenYet)
+
+  def __elif(self, statement, variables):
+    if self.__isEmpty():
+      raise BadStructureException("CHECK-ELIF must be after CHECK-IF or CHECK-ELIF",
+                                  statement.lineNo)
+    if self.__peek() < 0:
+      raise BadStructureException("CHECK-ELIF cannot be after CHECK-ELSE", statement.lineNo)
+    if self.__peek() == IfStack.BranchTaken:
+      self.__setLast(IfStack.BranchNotTaken)
+    elif self.__peek() == IfStack.BranchNotTakenYet:
+      if EvaluateLine(statement, variables):
+        self.__setLast(IfStack.BranchTaken)
+      # else, the CHECK-ELIF condition is False, so do nothing: the last element on the stack is
+      # already set to BranchNotTakenYet.
+    else:
+      assert self.__peek() == IfStack.BranchNotTaken
+
+  def __else(self, statement):
+    if self.__isEmpty():
+      raise BadStructureException("CHECK-ELSE must be after CHECK-IF or CHECK-ELIF",
+                                  statement.lineNo)
+    if self.__peek() < 0:
+      raise BadStructureException("Consecutive CHECK-ELSE statements", statement.lineNo)
+    if self.__peek() in [ IfStack.BranchTaken, IfStack.BranchNotTaken ]:
+      # Notice that we're setting -BranchNotTaken rather that BranchNotTaken as we went past the
+      # ELSE branch.
+      self.__setLast(-IfStack.BranchNotTaken)
+    else:
+      assert self.__peek() == IfStack.BranchNotTakenYet
+      # Setting -BranchTaken rather BranchTaken for the same reason.
+      self.__setLast(-IfStack.BranchTaken)
+
+  def __fi(self, statement):
+    if self.__isEmpty():
+      raise BadStructureException("CHECK-FI does not have a matching CHECK-IF", statement.lineNo)
+    self.stack.pop()
+
+  def __peek(self):
+    assert not self.__isEmpty()
+    return self.stack[-1]
+
+  def __push(self, element):
+    self.stack.append(element)
+
+  def __setLast(self, element):
+    self.stack[-1] = element
+
 def findMatchingLine(statement, c1Pass, scope, variables, excludeLines=[]):
   """ Finds the first line in `c1Pass` which matches `statement`.
 
@@ -54,6 +182,8 @@ class ExecutionState(object):
     self.variables = ImmutableDict(variables)
     self.dagQueue = []
     self.notQueue = []
+    self.ifStack = IfStack()
+    self.lastVariant = None
 
   def moveCursor(self, match):
     assert self.cursor <= match.scope.end
@@ -127,6 +257,11 @@ class ExecutionState(object):
 
     Raises MatchFailedException if the current line does not match.
     """
+    if self.lastVariant not in [ TestStatement.Variant.InOrder, TestStatement.Variant.NextLine ]:
+      raise BadStructureException("A next-line statement can only be placed "
+                  "after an in-order statement or another next-line statement.",
+                  statement.lineNo)
+
     scope = MatchScope(self.cursor, self.cursor + 1)
     match = findMatchingLine(statement, self.c1Pass, scope, self.variables)
     self.moveCursor(match)
@@ -141,6 +276,19 @@ class ExecutionState(object):
 
   def handle(self, statement):
     variant = None if statement is None else statement.variant
+
+    if variant in [ TestStatement.Variant.If,
+                    TestStatement.Variant.Elif,
+                    TestStatement.Variant.Else,
+                    TestStatement.Variant.Fi ]:
+      self.ifStack.Handle(statement, self.variables)
+      return
+
+    if variant is None:
+      self.ifStack.Eof()
+
+    if not self.ifStack.CanExecute():
+      return
 
     # First non-DAG statement always triggers execution of any preceding
     # DAG statements.
@@ -160,6 +308,8 @@ class ExecutionState(object):
     else:
       assert variant is TestStatement.Variant.Eval
       self.handleEval(statement)
+
+    self.lastVariant = variant
 
 def MatchTestCase(testCase, c1Pass):
   """ Runs a test case against a C1visualizer graph dump.

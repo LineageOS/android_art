@@ -56,13 +56,6 @@ class TestCase(PrintableMixin):
     return self.parent.fileName
 
   def addStatement(self, new_statement):
-    if new_statement.variant == TestStatement.Variant.NextLine:
-      if not self.statements or \
-         (self.statements[-1].variant != TestStatement.Variant.InOrder and \
-          self.statements[-1].variant != TestStatement.Variant.NextLine):
-        Logger.fail("A next-line statement can only be placed after an "
-                    "in-order statement or another next-line statement.",
-                    new_statement.fileName, new_statement.lineNo)
     self.statements.append(new_statement)
 
   def __eq__(self, other):
@@ -75,7 +68,7 @@ class TestStatement(PrintableMixin):
 
   class Variant(object):
     """Supported types of statements."""
-    InOrder, NextLine, DAG, Not, Eval = range(5)
+    InOrder, NextLine, DAG, Not, Eval, If, Elif, Else, Fi = range(9)
 
   def __init__(self, parent, variant, originalText, lineNo):
     assert isinstance(parent, TestCase)
@@ -91,6 +84,21 @@ class TestStatement(PrintableMixin):
   @property
   def fileName(self):
     return self.parent.fileName
+
+  def isPatternMatchContentStatement(self):
+    return self.variant in [ TestStatement.Variant.InOrder,
+                             TestStatement.Variant.NextLine,
+                             TestStatement.Variant.DAG,
+                             TestStatement.Variant.Not ]
+
+  def isEvalContentStatement(self):
+    return self.variant in [ TestStatement.Variant.Eval,
+                             TestStatement.Variant.If,
+                             TestStatement.Variant.Elif ]
+
+  def isNoContentStatement(self):
+    return self.variant in [ TestStatement.Variant.Else,
+                             TestStatement.Variant.Fi ]
 
   def addExpression(self, new_expression):
     assert isinstance(new_expression, TestExpression)
