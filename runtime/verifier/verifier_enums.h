@@ -32,6 +32,7 @@ enum class VerifyMode : int8_t {
 // The outcome of verification.
 enum class FailureKind {
   kNoFailure,
+  kAccessChecksFailure,
   kSoftFailure,
   kHardFailure,
 };
