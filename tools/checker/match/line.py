@@ -15,6 +15,7 @@
 from common.logger              import Logger
 from file_format.checker.struct import TestExpression, TestStatement
 
+import os
 import re
 
 def headAndTail(list):
@@ -109,7 +110,7 @@ def getEvalText(expression, variables, pos):
     return getVariable(expression.name, variables, pos)
 
 def EvaluateLine(checkerLine, variables):
-  assert checkerLine.variant == TestStatement.Variant.Eval
+  assert checkerLine.isEvalContentStatement()
   eval_string = "".join(map(lambda expr: getEvalText(expr, variables, checkerLine),
                             checkerLine.expressions))
   return eval(eval_string)
