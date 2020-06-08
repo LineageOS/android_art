@@ -213,7 +213,6 @@ apex_defaults {
     },
     key: "com.android.art.key",
     required: [
-        "art_apex_boot_integrity",
         "com.android.i18n",
     ],
     // ART APEXes depend on bouncycastle which is disabled for PDK builds.
