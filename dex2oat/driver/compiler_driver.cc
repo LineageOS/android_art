@@ -301,7 +301,9 @@ std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateJniDlsymLookup
 
 std::unique_ptr<const std::vector<uint8_t>>
 CompilerDriver::CreateJniDlsymLookupCriticalTrampoline() const {
-  CREATE_TRAMPOLINE(JNI, kJniAbi, pDlsymLookupCritical)
+  // @CriticalNative calls do not have the `JNIEnv*` parameter, so this trampoline uses the
+  // architecture-dependent access to `Thread*` using the managed code ABI, i.e. `kQuickAbi`.
+  CREATE_TRAMPOLINE(JNI, kQuickAbi, pDlsymLookupCritical)
 }
 
 std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateQuickGenericJniTrampoline()
