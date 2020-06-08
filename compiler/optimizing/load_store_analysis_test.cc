@@ -66,7 +66,8 @@ TEST_F(LoadStoreAnalysisTest, ArrayHeapLocations) {
 
   // Test HeapLocationCollector initialization.
   // Should be no heap locations, no operations on the heap.
-  HeapLocationCollector heap_location_collector(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  HeapLocationCollector heap_location_collector(graph_, &allocator);
   ASSERT_EQ(heap_location_collector.GetNumberOfHeapLocations(), 0U);
   ASSERT_FALSE(heap_location_collector.HasHeapStores());
 
@@ -162,7 +163,8 @@ TEST_F(LoadStoreAnalysisTest, FieldHeapLocations) {
 
   // Test HeapLocationCollector initialization.
   // Should be no heap locations, no operations on the heap.
-  HeapLocationCollector heap_location_collector(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  HeapLocationCollector heap_location_collector(graph_, &allocator);
   ASSERT_EQ(heap_location_collector.GetNumberOfHeapLocations(), 0U);
   ASSERT_FALSE(heap_location_collector.HasHeapStores());
 
@@ -241,7 +243,8 @@ TEST_F(LoadStoreAnalysisTest, ArrayIndexAliasingTest) {
   entry->AddInstruction(arr_set7);  // array[1-i] = c0
   entry->AddInstruction(arr_set8);  // array[i-(-1)] = c0
 
-  LoadStoreAnalysis lsa(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  LoadStoreAnalysis lsa(graph_, &allocator);
   lsa.Run();
   const HeapLocationCollector& heap_location_collector = lsa.GetHeapLocationCollector();
 
@@ -407,7 +410,8 @@ TEST_F(LoadStoreAnalysisTest, ArrayAliasingTest) {
   entry->AddInstruction(vstore_i_add8);
   entry->AddInstruction(vstore_i_add6_vlen2);
 
-  LoadStoreAnalysis lsa(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  LoadStoreAnalysis lsa(graph_, &allocator);
   lsa.Run();
   const HeapLocationCollector& heap_location_collector = lsa.GetHeapLocationCollector();
 
@@ -565,7 +569,8 @@ TEST_F(LoadStoreAnalysisTest, ArrayIndexCalculationOverflowTest) {
   entry->AddInstruction(arr_set_7);
   entry->AddInstruction(arr_set_8);
 
-  LoadStoreAnalysis lsa(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  LoadStoreAnalysis lsa(graph_, &allocator);
   lsa.Run();
   const HeapLocationCollector& heap_location_collector = lsa.GetHeapLocationCollector();
 
@@ -654,7 +659,8 @@ TEST_F(LoadStoreAnalysisTest, TestHuntOriginalRef) {
   entry->AddInstruction(inter_addr);
   entry->AddInstruction(array_get4);
 
-  HeapLocationCollector heap_location_collector(graph_);
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  HeapLocationCollector heap_location_collector(graph_, &allocator);
   heap_location_collector.VisitBasicBlock(entry);
 
   // Test that the HeapLocationCollector should be able to tell
