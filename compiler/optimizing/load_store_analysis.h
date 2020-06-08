@@ -17,6 +17,8 @@
 #ifndef ART_COMPILER_OPTIMIZING_LOAD_STORE_ANALYSIS_H_
 #define ART_COMPILER_OPTIMIZING_LOAD_STORE_ANALYSIS_H_
 
+#include "base/bit_vector-inl.h"
+#include "base/scoped_arena_containers.h"
 #include "escape.h"
 #include "nodes.h"
 #include "optimization.h"
@@ -192,17 +194,20 @@ class HeapLocationCollector : public HGraphVisitor {
   // aliasing matrix of 8 heap locations.
   static constexpr uint32_t kInitialAliasingMatrixBitVectorSize = 32;
 
-  explicit HeapLocationCollector(HGraph* graph)
+  explicit HeapLocationCollector(HGraph* graph, ScopedArenaAllocator* allocator)
       : HGraphVisitor(graph),
-        ref_info_array_(graph->GetAllocator()->Adapter(kArenaAllocLSA)),
-        heap_locations_(graph->GetAllocator()->Adapter(kArenaAllocLSA)),
-        aliasing_matrix_(graph->GetAllocator(),
+        allocator_(allocator),
+        ref_info_array_(allocator->Adapter(kArenaAllocLSA)),
+        heap_locations_(allocator->Adapter(kArenaAllocLSA)),
+        aliasing_matrix_(allocator,
                          kInitialAliasingMatrixBitVectorSize,
                          true,
                          kArenaAllocLSA),
         has_heap_stores_(false),
         has_volatile_(false),
-        has_monitor_operations_(false) {}
+        has_monitor_operations_(false) {
+    aliasing_matrix_.ClearAllBits();
+  }
 
   void CleanUp() {
     heap_locations_.clear();
@@ -432,7 +437,7 @@ class HeapLocationCollector : public HGraphVisitor {
     ReferenceInfo* ref_info = FindReferenceInfoOf(instruction);
     if (ref_info == nullptr) {
       size_t pos = ref_info_array_.size();
-      ref_info = new (GetGraph()->GetAllocator()) ReferenceInfo(instruction, pos);
+      ref_info = new (allocator_) ReferenceInfo(instruction, pos);
       ref_info_array_.push_back(ref_info);
     }
     return ref_info;
@@ -457,7 +462,7 @@ class HeapLocationCollector : public HGraphVisitor {
     size_t heap_location_idx = FindHeapLocationIndex(
         ref_info, type, offset, index, vector_length, declaring_class_def_index);
     if (heap_location_idx == kHeapLocationNotFound) {
-      HeapLocation* heap_loc = new (GetGraph()->GetAllocator())
+      HeapLocation* heap_loc = new (allocator_)
           HeapLocation(ref_info, type, offset, index, vector_length, declaring_class_def_index);
       heap_locations_.push_back(heap_loc);
       return heap_loc;
@@ -584,8 +589,9 @@ class HeapLocationCollector : public HGraphVisitor {
     has_monitor_operations_ = true;
   }
 
-  ArenaVector<ReferenceInfo*> ref_info_array_;   // All references used for heap accesses.
-  ArenaVector<HeapLocation*> heap_locations_;    // All heap locations.
+  ScopedArenaAllocator* allocator_;
+  ScopedArenaVector<ReferenceInfo*> ref_info_array_;   // All references used for heap accesses.
+  ScopedArenaVector<HeapLocation*> heap_locations_;    // All heap locations.
   ArenaBitVector aliasing_matrix_;    // aliasing info between each pair of locations.
   bool has_heap_stores_;    // If there is no heap stores, LSE acts as GVN with better
                             // alias analysis and won't be as effective.
@@ -595,21 +601,20 @@ class HeapLocationCollector : public HGraphVisitor {
   DISALLOW_COPY_AND_ASSIGN(HeapLocationCollector);
 };
 
-class LoadStoreAnalysis : public HOptimization {
+class LoadStoreAnalysis {
  public:
-  explicit LoadStoreAnalysis(HGraph* graph, const char* name = kLoadStoreAnalysisPassName)
-    : HOptimization(graph, name),
-      heap_location_collector_(graph) {}
+  explicit LoadStoreAnalysis(HGraph* graph, ScopedArenaAllocator* local_allocator)
+    : graph_(graph),
+      heap_location_collector_(graph, local_allocator) {}
 
   const HeapLocationCollector& GetHeapLocationCollector() const {
     return heap_location_collector_;
   }
 
-  bool Run() override;
-
-  static constexpr const char* kLoadStoreAnalysisPassName = "load_store_analysis";
+  bool Run();
 
  private:
+  HGraph* graph_;
   HeapLocationCollector heap_location_collector_;
 
   DISALLOW_COPY_AND_ASSIGN(LoadStoreAnalysis);
