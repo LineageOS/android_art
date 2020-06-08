@@ -1221,8 +1221,8 @@
                   "2004-double-virtual-structural-abstract",
                   "2005-pause-all-redefine-multithreaded",
                   "2006-virtual-structural-finalizing",
-                  "2007-virtual-structural-finalizable"
-                ],
+                  "2007-virtual-structural-finalizable",
+                  "2035-structural-native-method"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
