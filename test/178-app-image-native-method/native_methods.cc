@@ -609,4 +609,33 @@ extern "C" JNIEXPORT jint JNICALL Java_CriticalSignatures_nativeFullArgs(
   return 42;
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_CriticalClinitCheck_nativeMethodVoid() {
+  return 42;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_CriticalClinitCheck_nativeMethod(jint i) {
+  return i;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_CriticalClinitCheck_nativeMethodWithManyParameters(
+    jint i1, jlong l1, jfloat f1, jdouble d1,
+    jint i2, jlong l2, jfloat f2, jdouble d2,
+    jint i3, jlong l3, jfloat f3, jdouble d3,
+    jint i4, jlong l4, jfloat f4, jdouble d4,
+    jint i5, jlong l5, jfloat f5, jdouble d5,
+    jint i6, jlong l6, jfloat f6, jdouble d6,
+    jint i7, jlong l7, jfloat f7, jdouble d7,
+    jint i8, jlong l8, jfloat f8, jdouble d8) {
+  bool ok = VerifyManyParameters(
+      i1, l1, f1, d1,
+      i2, l2, f2, d2,
+      i3, l3, f3, d3,
+      i4, l4, f4, d4,
+      i5, l5, f5, d5,
+      i6, l6, f6, d6,
+      i7, l7, f7, d7,
+      i8, l8, f8, d8);
+  return ok ? 42 : -1;
+}
+
 }  // namespace art
