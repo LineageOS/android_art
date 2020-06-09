@@ -32,17 +32,30 @@ public class Main {
     new CriticalSignatures();
     makeVisiblyInitialized();  // Make sure they are visibly initialized.
 
-    test();
-    testFast();
-    testCritical();
-    testMissing();
-    testMissingFast();
-    testMissingCritical();
+    $noinline$opt$test();
+    $noinline$opt$testFast();
+    $noinline$opt$testCritical();
+    $noinline$opt$testMissing();
+    $noinline$opt$testMissingFast();
+    $noinline$opt$testMissingCritical();
+    $noinline$opt$testCriticalSignatures();
 
-    testCriticalSignatures();
+    // For calls from AOT-compiled code, the first call shall use the resolution method
+    // retrieved from the .bss and the second call should find the .bss entry populated
+    // with the target method. Re-run these tests to exercise the second path.
+    $noinline$opt$test();
+    $noinline$opt$testFast();
+    $noinline$opt$testCritical();
+    $noinline$opt$testMissing();
+    $noinline$opt$testMissingFast();
+    $noinline$opt$testMissingCritical();
+    $noinline$opt$testCriticalSignatures();
+
+    new CriticalClinitCheck();
+    sTestCriticalClinitCheckOtherThread.join();
   }
 
-  static void test() {
+  static void $noinline$opt$test() {
     System.out.println("test");
     assertEquals(42, Test.nativeMethodVoid());
     assertEquals(42, Test.nativeMethod(42));
@@ -57,7 +70,7 @@ public class Main {
         81, 82L, 83.0f, 84.0d));
   }
 
-  static void testFast() {
+  static void $noinline$opt$testFast() {
     System.out.println("testFast");
     assertEquals(42, TestFast.nativeMethodVoid());
     assertEquals(42, TestFast.nativeMethod(42));
@@ -72,7 +85,7 @@ public class Main {
         81, 82L, 83.0f, 84.0d));
   }
 
-  static void testCritical() {
+  static void $noinline$opt$testCritical() {
     System.out.println("testCritical");
     assertEquals(42, TestCritical.nativeMethodVoid());
     assertEquals(42, TestCritical.nativeMethod(42));
@@ -87,7 +100,7 @@ public class Main {
         81, 82L, 83.0f, 84.0d));
   }
 
-  static void testMissing() {
+  static void $noinline$opt$testMissing() {
     System.out.println("testMissing");
 
     try {
@@ -114,7 +127,7 @@ public class Main {
     } catch (LinkageError expected) {}
   }
 
-  static void testMissingFast() {
+  static void $noinline$opt$testMissingFast() {
     System.out.println("testMissingFast");
 
     try {
@@ -141,7 +154,7 @@ public class Main {
     } catch (LinkageError expected) {}
   }
 
-  static void testMissingCritical() {
+  static void $noinline$opt$testMissingCritical() {
     System.out.println("testMissingCritical");
 
     try {
@@ -168,7 +181,7 @@ public class Main {
     } catch (LinkageError expected) {}
   }
 
-  static void testCriticalSignatures() {
+  static void $noinline$opt$testCriticalSignatures() {
     System.out.println("testCriticalSignatures");
     long l = 0xf00000000L;
     assertEquals(42, CriticalSignatures.nativeILFFFFD(1, l + 2L, 3.0f, 4.0f, 5.0f, 6.0f, 7.0));
@@ -355,6 +368,44 @@ public class Main {
         0xf00000000L + 252L,
         254));
   }
+
+  static void initializingCriticalClinitCheck() {
+    // Called from CriticalClinitCheck.<clinit>().
+    // Test @CriticalNative calls on the initializing thread.
+    $noinline$opt$testCriticalClinitCheck();
+    sTestCriticalClinitCheckOtherThread = new Thread() {
+      public void run() {
+        $noinline$opt$testCriticalClinitCheck();
+      }
+    };
+    sTestCriticalClinitCheckOtherThread.start();
+    // Sleep for a second to give the other thread an opportunity to run.
+    // We're testing that it performs a clinit check and blocks until we
+    // exit the class initializer after writing the output below.
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException ie) {
+      throw new Error(ie);
+    }
+    System.out.println("initializingCriticalClinitCheck finished");
+  }
+
+  static void $noinline$opt$testCriticalClinitCheck() {
+    assertEquals(42, CriticalClinitCheck.nativeMethodVoid());
+    assertEquals(42, CriticalClinitCheck.nativeMethod(42));
+    assertEquals(42, CriticalClinitCheck.nativeMethodWithManyParameters(
+        11, 12L, 13.0f, 14.0d,
+        21, 22L, 23.0f, 24.0d,
+        31, 32L, 33.0f, 34.0d,
+        41, 42L, 43.0f, 44.0d,
+        51, 52L, 53.0f, 54.0d,
+        61, 62L, 63.0f, 64.0d,
+        71, 72L, 73.0f, 74.0d,
+        81, 82L, 83.0f, 84.0d));
+    System.out.println("testCriticalClinitCheck passed");
+  }
+
+  static Thread sTestCriticalClinitCheckOtherThread = null;
 
   static void assertEquals(int expected, int actual) {
     if (expected != actual) {
@@ -748,4 +799,27 @@ class CriticalSignatures {
       int i251,
       long l252,
       int i254);
+}
+
+class CriticalClinitCheck {
+  @CriticalNative
+  public static native int nativeMethodVoid();
+
+  @CriticalNative
+  public static native int nativeMethod(int i);
+
+  @CriticalNative
+  public static native int nativeMethodWithManyParameters(
+      int i1, long l1, float f1, double d1,
+      int i2, long l2, float f2, double d2,
+      int i3, long l3, float f3, double d3,
+      int i4, long l4, float f4, double d4,
+      int i5, long l5, float f5, double d5,
+      int i6, long l6, float f6, double d6,
+      int i7, long l7, float f7, double d7,
+      int i8, long l8, float f8, double d8);
+
+  static {
+    Main.initializingCriticalClinitCheck();
+  }
 }
