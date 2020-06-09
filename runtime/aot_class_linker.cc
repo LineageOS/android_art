@@ -115,6 +115,9 @@ verifier::FailureKind AotClassLinker::PerformClassVerification(Thread* self,
   if (old_status >= ClassStatus::kVerified) {
     return verifier::FailureKind::kNoFailure;
   }
+  if (old_status >= ClassStatus::kVerifiedNeedsAccessChecks) {
+    return verifier::FailureKind::kAccessChecksFailure;
+  }
   // Does it need to be verified at runtime? Report soft failure.
   if (old_status >= ClassStatus::kRetryVerificationAtRuntime) {
     // Error messages from here are only reported through -verbose:class. It is not worth it to
