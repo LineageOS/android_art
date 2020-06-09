@@ -1486,6 +1486,36 @@ void InstructionCodeGeneratorARM64Neon::VisitVecStore(HVecStore* instruction) {
   }
 }
 
+void LocationsBuilderARM64Neon::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARM64Neon::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderARM64Neon::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARM64Neon::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderARM64Neon::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARM64Neon::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
 Location InstructionCodeGeneratorARM64Neon::AllocateSIMDScratchLocation(
     vixl::aarch64::UseScratchRegisterScope* scope) {
   DCHECK_EQ(codegen_->GetSIMDRegisterWidth(), kQRegSizeInBytes);
