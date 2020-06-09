@@ -68,7 +68,15 @@ namespace art {
 // this state if it encounters a soft failure at compile time. This
 // often happens when there are unresolved classes in other dex
 // files, and this status marks a class as needing to be verified
-// again at runtime.
+// again at runtime. This status is only set and seen during AOT
+// compilation, and the compiler will mark the class as resolved in the
+// image and/or oat file.
+//
+// kVerifiedNeedsAccessChecks: The verifier sets a class to
+// this state if it encounters access-checks only soft failure at compile
+// time. This happens when there are unresolved classes in other dex
+// files, and this status marks a class as verified but that will need to run
+// with access checks enabled in the interpreter.
 //
 // TODO: Explain the other states
 enum class ClassStatus : uint8_t {
@@ -82,7 +90,7 @@ enum class ClassStatus : uint8_t {
   kResolved = 7,  // Part of linking.
   kVerifying = 8,  // In the process of being verified.
   kRetryVerificationAtRuntime = 9,  // Compile time verification failed, retry at runtime.
-  kVerifyingAtRuntime = 10,  // Retrying verification at runtime.
+  kVerifiedNeedsAccessChecks = 10,  // Compile time verification only failed for access checks.
   kVerified = 11,  // Logically part of linking; done pre-init.
   kSuperclassValidated = 12,  // Superclass validation part of init done.
   kInitializing = 13,  // Class init in progress.
