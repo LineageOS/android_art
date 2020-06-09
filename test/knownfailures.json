@@ -891,7 +891,6 @@
           "452-multiple-returns2",
           "453-not-byte",
           "454-get-vreg",
-          "455-checker-gvn",
           "457-regs",
           "458-checker-instruct-simplification",
           "459-dead-phi",
