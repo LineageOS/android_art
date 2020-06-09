@@ -26,15 +26,20 @@
 
 namespace art {
 
+class CodeGenerator;
+
 // A control-flow graph visitor performing various checks.
 class GraphChecker : public HGraphDelegateVisitor {
  public:
-  explicit GraphChecker(HGraph* graph, const char* dump_prefix = "art::GraphChecker: ")
+  explicit GraphChecker(HGraph* graph,
+                        CodeGenerator* codegen = nullptr,
+                        const char* dump_prefix = "art::GraphChecker: ")
     : HGraphDelegateVisitor(graph),
       errors_(graph->GetAllocator()->Adapter(kArenaAllocGraphChecker)),
       dump_prefix_(dump_prefix),
       allocator_(graph->GetArenaStack()),
-      seen_ids_(&allocator_, graph->GetCurrentInstructionId(), false, kArenaAllocGraphChecker) {
+      seen_ids_(&allocator_, graph->GetCurrentInstructionId(), false, kArenaAllocGraphChecker),
+      codegen_(codegen) {
     seen_ids_.ClearAllBits();
   }
 
@@ -68,6 +73,8 @@ class GraphChecker : public HGraphDelegateVisitor {
   void VisitSelect(HSelect* instruction) override;
   void VisitTryBoundary(HTryBoundary* try_boundary) override;
   void VisitTypeConversion(HTypeConversion* instruction) override;
+
+  void VisitVecOperation(HVecOperation* instruction) override;
 
   void CheckTypeCheckBitstringInput(HTypeCheckInstruction* check,
                                     size_t input_pos,
@@ -124,6 +131,9 @@ class GraphChecker : public HGraphDelegateVisitor {
   // object references, e.g. HNewInstance, HLoadClass.
   // The default value is true.
   bool check_reference_type_info_ = true;
+
+  // Used to access target information.
+  CodeGenerator* codegen_;
 
   DISALLOW_COPY_AND_ASSIGN(GraphChecker);
 };

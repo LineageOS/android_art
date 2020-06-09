@@ -118,6 +118,7 @@ class PassObserver : public ValueObject {
         visualizer_output_(visualizer_output),
         visualizer_enabled_(!compiler_options.GetDumpCfgFileName().empty()),
         visualizer_(&visualizer_oss_, graph, *codegen),
+        codegen_(codegen),
         visualizer_dump_mutex_(dump_mutex),
         graph_in_bad_state_(false) {
     if (timing_logger_enabled_ || visualizer_enabled_) {
@@ -190,7 +191,7 @@ class PassObserver : public ValueObject {
     // Validate the HGraph if running in debug mode.
     if (kIsDebugBuild) {
       if (!graph_in_bad_state_) {
-        GraphChecker checker(graph_);
+        GraphChecker checker(graph_, codegen_);
         last_seen_graph_size_ = checker.Run(pass_change, last_seen_graph_size_);
         if (!checker.IsValid()) {
           LOG(FATAL) << "Error after " << pass_name << ": " << Dumpable<GraphChecker>(checker);
@@ -230,6 +231,7 @@ class PassObserver : public ValueObject {
   std::ostream* visualizer_output_;
   bool visualizer_enabled_;
   HGraphVisualizer visualizer_;
+  CodeGenerator* codegen_;
   Mutex& visualizer_dump_mutex_;
 
   // Flag to be set by the compiler if the pass failed and the graph is not
