@@ -124,10 +124,17 @@ class Arm64Assembler final : public Assembler {
   void GenerateMarkingRegisterCheck(vixl::aarch64::Register temp, int code = 0);
 
   void Bind(Label* label ATTRIBUTE_UNUSED) override {
-    UNIMPLEMENTED(FATAL) << "Do not use Bind for ARM64";
+    UNIMPLEMENTED(FATAL) << "Do not use Bind(Label*) for ARM64";
   }
   void Jump(Label* label ATTRIBUTE_UNUSED) override {
-    UNIMPLEMENTED(FATAL) << "Do not use Jump for ARM64";
+    UNIMPLEMENTED(FATAL) << "Do not use Jump(Label*) for ARM64";
+  }
+
+  void Bind(vixl::aarch64::Label* label) {
+    vixl_masm_.Bind(label);
+  }
+  void Jump(vixl::aarch64::Label* label) {
+    vixl_masm_.B(label);
   }
 
   static vixl::aarch64::Register reg_x(int code) {
