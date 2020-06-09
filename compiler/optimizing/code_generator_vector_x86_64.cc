@@ -1354,6 +1354,36 @@ void InstructionCodeGeneratorX86_64::VisitVecStore(HVecStore* instruction) {
   }
 }
 
+void LocationsBuilderX86_64::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorX86_64::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderX86_64::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorX86_64::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderX86_64::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorX86_64::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
 #undef __
 
 }  // namespace x86_64
