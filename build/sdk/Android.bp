@@ -48,15 +48,15 @@ sdk {
                 // This is actually only used for compiling Java 8 and kotlin.
                 // Java 9 uses system modules which encapsulates this
                 // internally.
-                "core.platform.api.stubs",
+                "legacy.core.platform.api.stubs",
             ],
 
             java_system_modules: [
                 "art-module-public-api-stubs-system-modules",
                 "art-module-intra-core-api-stubs-system-modules",
-                "art-module-platform-api-stubs-system-modules",
+                "legacy-art-module-platform-api-stubs-system-modules",
                 "core-current-stubs-system-modules",
-                "core-platform-api-stubs-system-modules",
+                "legacy-core-platform-api-stubs-system-modules",
             ],
             native_static_libs: [
                 "libartimagevalues",
