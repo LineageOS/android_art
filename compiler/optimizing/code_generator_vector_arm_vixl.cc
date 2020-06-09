@@ -1048,6 +1048,36 @@ void InstructionCodeGeneratorARMVIXL::VisitVecStore(HVecStore* instruction) {
   }
 }
 
+void LocationsBuilderARMVIXL::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARMVIXL::VisitVecPredSetAll(HVecPredSetAll* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderARMVIXL::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARMVIXL::VisitVecPredWhile(HVecPredWhile* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void LocationsBuilderARMVIXL::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
+void InstructionCodeGeneratorARMVIXL::VisitVecPredCondition(HVecPredCondition* instruction) {
+  LOG(FATAL) << "No SIMD for " << instruction->GetId();
+  UNREACHABLE();
+}
+
 #undef __
 
 }  // namespace arm
