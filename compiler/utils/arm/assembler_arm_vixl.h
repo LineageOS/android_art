@@ -180,10 +180,17 @@ class ArmVIXLAssembler final : public Assembler {
   void FinalizeInstructions(const MemoryRegion& region) override;
 
   void Bind(Label* label ATTRIBUTE_UNUSED) override {
-    UNIMPLEMENTED(FATAL) << "Do not use Bind for ARM";
+    UNIMPLEMENTED(FATAL) << "Do not use Bind(Label*) for ARM";
   }
   void Jump(Label* label ATTRIBUTE_UNUSED) override {
-    UNIMPLEMENTED(FATAL) << "Do not use Jump for ARM";
+    UNIMPLEMENTED(FATAL) << "Do not use Jump(Label*) for ARM";
+  }
+
+  void Bind(vixl::aarch32::Label* label) {
+    vixl_masm_.Bind(label);
+  }
+  void Jump(vixl::aarch32::Label* label) {
+    vixl_masm_.B(label);
   }
 
   //
