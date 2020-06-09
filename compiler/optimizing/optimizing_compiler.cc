@@ -646,7 +646,6 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
     // Other high-level optimizations.
     OptDef(OptimizationPass::kSideEffectsAnalysis,
            "side_effects$before_lse"),
-    OptDef(OptimizationPass::kLoadStoreAnalysis),
     OptDef(OptimizationPass::kLoadStoreElimination),
     OptDef(OptimizationPass::kCHAGuardOptimization),
     OptDef(OptimizationPass::kDeadCodeElimination,
