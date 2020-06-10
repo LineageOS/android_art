@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import java.lang.reflect.Method;
 
 public class Main {
 
@@ -125,14 +124,32 @@ public class Main {
     return incCounter();
   }
 
+  /// CHECK-START: int Main.InlineWithControlFlow(boolean) inliner (before)
+  /// CHECK-DAG:     <<Const1:i\d+>> IntConstant 1
+  /// CHECK-DAG:     <<Const3:i\d+>> IntConstant 3
+  /// CHECK-DAG:     <<Const5:i\d+>> IntConstant 5
+  /// CHECK-DAG:     <<Add:i\d+>>    InvokeStaticOrDirect [<<Const1>>,<<Const3>>{{(,[ij]\d+)?}}]
+  /// CHECK-DAG:     <<Sub:i\d+>>    InvokeStaticOrDirect [<<Const5>>,<<Const3>>{{(,[ij]\d+)?}}]
+  /// CHECK-DAG:     <<Phi:i\d+>>    Phi [<<Add>>,<<Sub>>]
+  /// CHECK-DAG:                     Return [<<Phi>>]
+
+  /// CHECK-START: int Main.InlineWithControlFlow(boolean) inliner (after)
+  /// CHECK-DAG:     <<Const4:i\d+>> IntConstant 4
+  /// CHECK-DAG:     <<Const2:i\d+>> IntConstant 2
+  /// CHECK-DAG:     <<Phi:i\d+>>    Phi [<<Const4>>,<<Const2>>]
+  /// CHECK-DAG:                     Return [<<Phi>>]
+
   public static int InlineWithControlFlow(boolean cond) {
-    try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("InlineWithControlFlow", boolean.class);
-      return (Integer) m.invoke(null, cond);
-    } catch (Throwable t) {
-      throw new RuntimeException(t);
+    int x, const1, const3, const5;
+    const1 = 1;
+    const3 = 3;
+    const5 = 5;
+    if (cond) {
+      x = returnAdd(const1, const3);
+    } else {
+      x = returnSub(const5, const3);
     }
+    return x;
   }
 
   /// CHECK-START: int Main.returnAbs(int) builder (after)
