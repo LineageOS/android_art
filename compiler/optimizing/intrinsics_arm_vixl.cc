@@ -21,6 +21,8 @@
 #include "code_generator_arm_vixl.h"
 #include "common_arm.h"
 #include "heap_poisoning.h"
+#include "intrinsics.h"
+#include "intrinsics_utils.h"
 #include "lock_word.h"
 #include "mirror/array-inl.h"
 #include "mirror/object_array-inl.h"
@@ -64,61 +66,9 @@ ArenaAllocator* IntrinsicCodeGeneratorARMVIXL::GetAllocator() {
   return codegen_->GetGraph()->GetAllocator();
 }
 
-// Default slow-path for fallback (calling the managed code to handle the intrinsic) in an
-// intrinsified call. This will copy the arguments into the positions for a regular call.
-//
-// Note: The actual parameters are required to be in the locations given by the invoke's location
-//       summary. If an intrinsic modifies those locations before a slowpath call, they must be
-//       restored!
-//
-// Note: If an invoke wasn't sharpened, we will put down an invoke-virtual here. That's potentially
-//       sub-optimal (compared to a direct pointer call), but this is a slow-path.
-
-class IntrinsicSlowPathARMVIXL : public SlowPathCodeARMVIXL {
- public:
-  explicit IntrinsicSlowPathARMVIXL(HInvoke* invoke)
-      : SlowPathCodeARMVIXL(invoke), invoke_(invoke) {}
-
-  Location MoveArguments(CodeGenerator* codegen) {
-    InvokeDexCallingConventionVisitorARMVIXL calling_convention_visitor;
-    IntrinsicVisitor::MoveArguments(invoke_, codegen, &calling_convention_visitor);
-    return calling_convention_visitor.GetMethodLocation();
-  }
-
-  void EmitNativeCode(CodeGenerator* codegen) override {
-    ArmVIXLAssembler* assembler = down_cast<ArmVIXLAssembler*>(codegen->GetAssembler());
-    __ Bind(GetEntryLabel());
-
-    SaveLiveRegisters(codegen, invoke_->GetLocations());
-
-    Location method_loc = MoveArguments(codegen);
-
-    if (invoke_->IsInvokeStaticOrDirect()) {
-      codegen->GenerateStaticOrDirectCall(invoke_->AsInvokeStaticOrDirect(), method_loc, this);
-    } else {
-      codegen->GenerateVirtualCall(invoke_->AsInvokeVirtual(), method_loc, this);
-    }
-
-    // Copy the result back to the expected output.
-    Location out = invoke_->GetLocations()->Out();
-    if (out.IsValid()) {
-      DCHECK(out.IsRegister());  // TODO: Replace this when we support output in memory.
-      DCHECK(!invoke_->GetLocations()->GetLiveRegisters()->ContainsCoreRegister(out.reg()));
-      codegen->MoveFromReturnRegister(out, invoke_->GetType());
-    }
-
-    RestoreLiveRegisters(codegen, invoke_->GetLocations());
-    __ B(GetExitLabel());
-  }
-
-  const char* GetDescription() const override { return "IntrinsicSlowPath"; }
-
- private:
-  // The instruction where this slow path is happening.
-  HInvoke* const invoke_;
-
-  DISALLOW_COPY_AND_ASSIGN(IntrinsicSlowPathARMVIXL);
-};
+using IntrinsicSlowPathARMVIXL = IntrinsicSlowPath<InvokeDexCallingConventionVisitorARMVIXL,
+                                                   SlowPathCodeARMVIXL,
+                                                   ArmVIXLAssembler>;
 
 // Compute base address for the System.arraycopy intrinsic in `base`.
 static void GenSystemArrayCopyBaseAddress(ArmVIXLAssembler* assembler,

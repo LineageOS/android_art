@@ -17,6 +17,7 @@
 #ifndef ART_COMPILER_OPTIMIZING_INTRINSICS_UTILS_H_
 #define ART_COMPILER_OPTIMIZING_INTRINSICS_UTILS_H_
 
+#include "base/casts.h"
 #include "base/macros.h"
 #include "code_generator.h"
 #include "locations.h"
@@ -36,10 +37,12 @@ namespace art {
 // Note: If an invoke wasn't sharpened, we will put down an invoke-virtual here. That's potentially
 //       sub-optimal (compared to a direct pointer call), but this is a slow-path.
 
-template <typename TDexCallingConvention>
-class IntrinsicSlowPath : public SlowPathCode {
+template <typename TDexCallingConvention,
+          typename TSlowPathCode = SlowPathCode,
+          typename TAssembler = Assembler>
+class IntrinsicSlowPath : public TSlowPathCode {
  public:
-  explicit IntrinsicSlowPath(HInvoke* invoke) : SlowPathCode(invoke), invoke_(invoke) { }
+  explicit IntrinsicSlowPath(HInvoke* invoke) : TSlowPathCode(invoke), invoke_(invoke) { }
 
   Location MoveArguments(CodeGenerator* codegen) {
     TDexCallingConvention calling_convention_visitor;
@@ -48,10 +51,10 @@ class IntrinsicSlowPath : public SlowPathCode {
   }
 
   void EmitNativeCode(CodeGenerator* codegen) override {
-    Assembler* assembler = codegen->GetAssembler();
-    assembler->Bind(GetEntryLabel());
+    TAssembler* assembler = down_cast<TAssembler*>(codegen->GetAssembler());
+    assembler->Bind(this->GetEntryLabel());
 
-    SaveLiveRegisters(codegen, invoke_->GetLocations());
+    this->SaveLiveRegisters(codegen, invoke_->GetLocations());
 
     Location method_loc = MoveArguments(codegen);
 
@@ -69,8 +72,8 @@ class IntrinsicSlowPath : public SlowPathCode {
       codegen->MoveFromReturnRegister(out, invoke_->GetType());
     }
 
-    RestoreLiveRegisters(codegen, invoke_->GetLocations());
-    assembler->Jump(GetExitLabel());
+    this->RestoreLiveRegisters(codegen, invoke_->GetLocations());
+    assembler->Jump(this->GetExitLabel());
   }
 
   const char* GetDescription() const override { return "IntrinsicSlowPath"; }

@@ -1632,6 +1632,7 @@ bool Redefiner::ClassRedefinition::CheckVerification(const RedefinitionDataIter&
       // were fixed. It would be nice to reflect this in the new implementations.
       return true;
     case art::verifier::FailureKind::kSoftFailure:
+    case art::verifier::FailureKind::kAccessChecksFailure:
       // Soft failures might require interpreter on some methods. It won't prevent redefinition but
       // it does mean we need to run the verifier again and potentially update method flags after
       // performing the swap.
@@ -2758,6 +2759,7 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   // Instead we need to update everything else.
   // Just replace the class and be done with it.
   art::Locks::mutator_lock_->AssertExclusiveHeld(driver_->self_);
+  art::ClassLinker* cl = driver_->runtime_->GetClassLinker();
   art::ScopedAssertNoThreadSuspension sants(__FUNCTION__);
   art::ObjPtr<art::mirror::Class> orig(holder.GetMirrorClass());
   art::ObjPtr<art::mirror::Class> replacement(holder.GetNewClassObject());
@@ -2799,12 +2801,24 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
                        old_instance,
                        old_instance->GetClass());
   }
-  // Mark old class obsolete.
-  for (auto old_class : old_classes->Iterate()) {
+  // Mark old class and methods obsolete. Copy over any native implementation as well.
+  for (auto [old_class, new_class] : art::ZipLeft(old_classes->Iterate(), new_classes->Iterate())) {
     old_class->SetObsoleteObject();
-    // Mark methods obsolete. We need to wait until later to actually clear the jit data.
+    // Mark methods obsolete and copy native implementation. We need to wait
+    // until later to actually clear the jit data. We copy the native
+    // implementation here since we don't want to race with any threads doing
+    // RegisterNatives.
     for (art::ArtMethod& m : old_class->GetMethods(art::kRuntimePointerSize)) {
+      if (m.IsNative()) {
+        art::ArtMethod* new_method =
+            new_class->FindClassMethod(m.GetNameView(), m.GetSignature(), art::kRuntimePointerSize);
+        DCHECK(new_class->GetMethodsSlice(art::kRuntimePointerSize).Contains(new_method))
+            << "Could not find method " << m.PrettyMethod() << " declared in new class!";
+        DCHECK(new_method->IsNative());
+        new_method->SetEntryPointFromJni(m.GetEntryPointFromJni());
+      }
       m.SetIsObsolete();
+      cl->SetEntryPointsForObsoleteMethod(&m);
       if (m.IsInvokable()) {
         m.SetDontCompile();
       }

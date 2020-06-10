@@ -891,7 +891,6 @@
           "452-multiple-returns2",
           "453-not-byte",
           "454-get-vreg",
-          "455-checker-gvn",
           "457-regs",
           "458-checker-instruct-simplification",
           "459-dead-phi",
@@ -1199,7 +1198,8 @@
                   "2009-structural-local-ref",
                   "2011-stack-walk-concurrent-instrument",
                   "2012-structural-redefinition-failures-jni-id",
-                  "2033-shutdown-mechanics"],
+                  "2033-shutdown-mechanics",
+                  "2035-structural-native-method"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },

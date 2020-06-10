@@ -1008,6 +1008,11 @@ class OatWriter::InitOatClassesMethodVisitor : public DexMethodVisitor {
         status = ClassStatus::kNotReady;
       }
     }
+    // We never emit kRetryVerificationAtRuntime, instead we mark the class as
+    // resolved and the class will therefore be re-verified at runtime.
+    if (status == ClassStatus::kRetryVerificationAtRuntime) {
+      status = ClassStatus::kResolved;
+    }
 
     writer_->oat_class_headers_.emplace_back(offset_,
                                              compiled_methods_with_code_,

@@ -25,6 +25,7 @@
 #include "base/bit_vector-inl.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
+#include "code_generator.h"
 #include "handle.h"
 #include "mirror/class.h"
 #include "obj_ptr-inl.h"
@@ -1138,6 +1139,28 @@ void GraphChecker::VisitTypeConversion(HTypeConversion* instruction) {
         instruction->GetId(),
         DataType::PrettyDescriptor(result_type),
         DataType::PrettyDescriptor(input_type)));
+  }
+}
+
+void GraphChecker::VisitVecOperation(HVecOperation* instruction) {
+  VisitInstruction(instruction);
+  if (codegen_ == nullptr) {
+    return;
+  }
+
+  if (!codegen_->SupportsPredicatedSIMD() && instruction->IsPredicated()) {
+    AddError(StringPrintf(
+             "%s %d must not be predicated.",
+             instruction->DebugName(),
+             instruction->GetId()));
+  }
+
+  if (codegen_->SupportsPredicatedSIMD() &&
+      (instruction->MustBePredicatedInPredicatedSIMDMode() != instruction->IsPredicated())) {
+    AddError(StringPrintf(
+             "%s %d predication mode is incorrect; see HVecOperation::MustBePredicated.",
+             instruction->DebugName(),
+             instruction->GetId()));
   }
 }
 
