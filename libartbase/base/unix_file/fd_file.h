@@ -162,7 +162,7 @@ class FdFile : public RandomAccessFile {
   DISALLOW_COPY_AND_ASSIGN(FdFile);
 };
 
-std::ostream& operator<<(std::ostream& os, const FdFile::GuardState& kind);
+std::ostream& operator<<(std::ostream& os, FdFile::GuardState kind);
 
 }  // namespace unix_file
 

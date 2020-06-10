@@ -54,7 +54,7 @@ enum VRegKind {
   kImpreciseConstant,
   kUndefined,
 };
-std::ostream& operator<<(std::ostream& os, const VRegKind& rhs);
+std::ostream& operator<<(std::ostream& os, VRegKind rhs);
 
 // Size in bytes of the should_deoptimize flag on stack.
 // We just need 4 bytes for our purpose regardless of the architecture. Frame size

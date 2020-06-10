@@ -2090,7 +2090,7 @@ class HEnvironment : public ArenaObject<kArenaAllocEnvironment> {
 class HInstruction : public ArenaObject<kArenaAllocInstruction> {
  public:
 #define DECLARE_KIND(type, super) k##type,
-  enum InstructionKind {
+  enum InstructionKind {  // private marker to avoid generate-operator-out.py from processing.
     FOR_EACH_CONCRETE_INSTRUCTION(DECLARE_KIND)
     kLastInstructionKind
   };
@@ -2648,7 +2648,7 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   friend class HGraph;
   friend class HInstructionList;
 };
-std::ostream& operator<<(std::ostream& os, const HInstruction::InstructionKind& rhs);
+std::ostream& operator<<(std::ostream& os, HInstruction::InstructionKind rhs);
 
 // Iterates over the instructions, while preserving the next instruction
 // in case the current instruction gets removed from the list by the user
@@ -3673,14 +3673,14 @@ class HBinaryOperation : public HExpression<2> {
 
 // The comparison bias applies for floating point operations and indicates how NaN
 // comparisons are treated:
-enum class ComparisonBias {
+enum class ComparisonBias {  // private marker to avoid generate-operator-out.py from processing.
   kNoBias,  // bias is not applicable (i.e. for long operation)
   kGtBias,  // return 1 for NaN comparisons
   kLtBias,  // return -1 for NaN comparisons
   kLast = kLtBias
 };
 
-std::ostream& operator<<(std::ostream& os, const ComparisonBias& rhs);
+std::ostream& operator<<(std::ostream& os, ComparisonBias rhs);
 
 class HCondition : public HBinaryOperation {
  public:
@@ -4565,7 +4565,7 @@ class HInvokeStaticOrDirect final : public HInvoke {
  public:
   // Requirements of this method call regarding the class
   // initialization (clinit) check of its declaring class.
-  enum class ClinitCheckRequirement {
+  enum class ClinitCheckRequirement {  // private marker to avoid generate-operator-out.py from processing.
     kNone,      // Class already initialized.
     kExplicit,  // Static call having explicit clinit check as last input.
     kImplicit,  // Static call implicitly requiring a clinit check.
@@ -7200,7 +7200,7 @@ class HThrow final : public HExpression<1> {
  * Implementation strategies for the code generator of a HInstanceOf
  * or `HCheckCast`.
  */
-enum class TypeCheckKind {
+enum class TypeCheckKind {  // private marker to avoid generate-operator-out.py from processing.
   kUnresolvedCheck,       // Check against an unresolved type.
   kExactCheck,            // Can do a single class compare.
   kClassHierarchyCheck,   // Can just walk the super class chain.
@@ -7474,7 +7474,7 @@ enum MemBarrierKind {
   kNTStoreStore,
   kLastBarrierKind = kNTStoreStore
 };
-std::ostream& operator<<(std::ostream& os, const MemBarrierKind& kind);
+std::ostream& operator<<(std::ostream& os, MemBarrierKind kind);
 
 class HMemoryBarrier final : public HExpression<0> {
  public:

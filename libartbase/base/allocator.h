@@ -67,7 +67,7 @@ enum AllocatorTag {
   kAllocatorTagRosAlloc,
   kAllocatorTagCount,  // Must always be last element.
 };
-std::ostream& operator<<(std::ostream& os, const AllocatorTag& tag);
+std::ostream& operator<<(std::ostream& os, AllocatorTag tag);
 
 namespace TrackedAllocators {
 

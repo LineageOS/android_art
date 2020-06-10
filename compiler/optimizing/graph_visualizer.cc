@@ -449,10 +449,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
   }
 
   void VisitCompare(HCompare* compare) override {
-    ComparisonBias bias = compare->GetBias();
-    StartAttributeStream("bias") << (bias == ComparisonBias::kGtBias
-                                     ? "gt"
-                                     : (bias == ComparisonBias::kLtBias ? "lt" : "none"));
+    StartAttributeStream("bias") << compare->GetBias();
   }
 
   void VisitInvoke(HInvoke* invoke) override {

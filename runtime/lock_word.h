@@ -316,7 +316,7 @@ class LockWord {
   // The encoded value holding all the state.
   uint32_t value_;
 };
-std::ostream& operator<<(std::ostream& os, const LockWord::LockState& code);
+std::ostream& operator<<(std::ostream& os, LockWord::LockState code);
 
 }  // namespace art
 
