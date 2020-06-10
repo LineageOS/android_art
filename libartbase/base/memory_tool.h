@@ -68,7 +68,9 @@ constexpr size_t kMemoryToolStackGuardSizeScale = 1;
 
 #if __has_feature(hwaddress_sanitizer)
 # define HWADDRESS_SANITIZER
-# define ATTRIBUTE_NO_SANITIZE_HWADDRESS __attribute__((no_sanitize("hwaddress")))
+// NB: The attribute also implies NO_INLINE. If inlined, the hwasan attribute would be lost.
+//     If method is also separately marked as ALWAYS_INLINE, the NO_INLINE takes precedence.
+# define ATTRIBUTE_NO_SANITIZE_HWADDRESS __attribute__((no_sanitize("hwaddress"), noinline))
 #else
 # define ATTRIBUTE_NO_SANITIZE_HWADDRESS
 #endif
