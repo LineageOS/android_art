@@ -2660,6 +2660,7 @@ class Dex2Oat final {
           "android.app",
           "android.os",
           "android.util",
+          "com.android.internal.statsd",
           // Reserved framework-permission packages (includes sub-packages under this path).
           "android.permission",
           // "android.app.role",  // Covered by android.app above.

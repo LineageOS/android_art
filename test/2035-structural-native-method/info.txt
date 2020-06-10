@@ -1,0 +1,5 @@
+Tests structural redefinition with register-natives
+
+Regression test for b/158476592. Structural redefinition was incorrectly
+clearing the JNI bindings of native methods. This could interfere with
+classes using 'JNIEnv::RegisterNatives'.

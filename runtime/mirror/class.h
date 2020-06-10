@@ -45,6 +45,10 @@ namespace hiddenapi {
 class AccessContext;
 }  // namespace hiddenapi
 
+namespace linker {
+class ImageWriter;
+}  // namespace linker
+
 template<typename T> class ArraySlice;
 class ArtField;
 class ArtMethod;
@@ -167,6 +171,13 @@ class MANAGED Class final : public Object {
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
   bool ShouldVerifyAtRuntime() REQUIRES_SHARED(Locks::mutator_lock_) {
     return GetStatus<kVerifyFlags>() == ClassStatus::kRetryVerificationAtRuntime;
+  }
+
+  // Returns true if the class has been verified at compile time, but should be
+  // executed with access checks.
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  bool IsVerifiedNeedsAccessChecks() REQUIRES_SHARED(Locks::mutator_lock_) {
+    return GetStatus<kVerifyFlags>() >= ClassStatus::kVerifiedNeedsAccessChecks;
   }
 
   // Returns true if the class has been verified.
@@ -1397,6 +1408,10 @@ class MANAGED Class final : public Object {
   void VisitReferences(ObjPtr<Class> klass, const Visitor& visitor)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Helper to set the status without any validity cheks.
+  void SetStatusInternal(ClassStatus new_status)
+      REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
+
   // 'Class' Object Fields
   // Order governed by java field ordering. See art::ClassLinker::LinkFields.
 
@@ -1551,6 +1566,7 @@ class MANAGED Class final : public Object {
   ART_FRIEND_TEST(DexCacheTest, TestResolvedFieldAccess);  // For ResolvedFieldAccessTest
   friend struct art::ClassOffsets;  // for verifying offset information
   friend class Object;  // For VisitReferences
+  friend class linker::ImageWriter;  // For SetStatusInternal
   DISALLOW_IMPLICIT_CONSTRUCTORS(Class);
 };
 
