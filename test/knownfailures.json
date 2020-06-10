@@ -901,7 +901,6 @@
           "471-uninitialized-locals",
           "472-unreachable-if-regression",
           "475-regression-inliner-ids",
-          "480-checker-dead-blocks",
           "496-checker-inlining-class-loader",
           "498-type-propagation",
           "501-null-constant-dce",
