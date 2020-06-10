@@ -995,7 +995,6 @@
           "649-vdex-duplicate-method",
           "652-deopt-intrinsic",
           "656-annotation-lookup-generic-jni",
-          "656-checker-simd-opt",
           "659-unpadded-array",
           "660-clinit",
           "660-store-8-16",
