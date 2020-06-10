@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import java.lang.reflect.Method;
 
 // This base class has a single final field;
 // the constructor should have one fence.
@@ -113,7 +112,14 @@ public class Main {
     return new Ellipse(vertex, covertex).getArea();
   }
 
+  /// CHECK-START: double Main.calcCircleAreaOrCircumference(double, boolean) load_store_elimination (before)
+  /// CHECK: NewInstance
+  /// CHECK: InstanceFieldSet
+  /// CHECK: ConstructorFence
+  /// CHECK: InstanceFieldGet
+
   /// CHECK-START: double Main.calcCircleAreaOrCircumference(double, boolean) load_store_elimination (after)
+  /// CHECK: NewInstance
   /// CHECK-NOT: ConstructorFence
 
   //
@@ -135,16 +141,6 @@ public class Main {
     }
 
     return calc.value;
-  }
-
-  static double calcCircleAreaOrCircumferenceSmali(double radius, boolean area_or_circumference) {
-    try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("calcCircleAreaOrCircumference", double.class, boolean.class);
-      return (Double) m.invoke(null, radius, area_or_circumference);
-    } catch (Exception ex) {
-      throw new Error(ex);
-    }
   }
 
   /// CHECK-START: Circle Main.makeCircle(double) load_store_elimination (after)
@@ -188,7 +184,6 @@ public class Main {
     assertDoubleEquals(Math.PI * Math.PI * Math.PI, calcCircleArea(Math.PI));
     assertDoubleEquals(Math.PI * Math.PI * Math.PI, calcEllipseArea(Math.PI, Math.PI));
     assertDoubleEquals(2 * Math.PI * Math.PI, calcCircleAreaOrCircumference(Math.PI, false));
-    assertDoubleEquals(2 * Math.PI * Math.PI, calcCircleAreaOrCircumferenceSmali(Math.PI, false));
     assertInstanceOf(makeCircle(Math.PI), Circle.class);
   }
 
