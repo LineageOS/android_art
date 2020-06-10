@@ -884,7 +884,6 @@
           "432-optimizing-cmp",
           "434-invoke-direct",
           "435-new-instance",
-          "441-checker-inliner",
           "442-checker-constant-folding",
           "448-multiple-returns",
           "449-checker-bce",
