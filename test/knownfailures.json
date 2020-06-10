@@ -919,7 +919,6 @@
           "520-equivalent-phi",
           "529-checker-unresolved",
           "530-checker-lse",
-          "530-checker-lse-ctor-fences",
           "530-checker-lse3",
           "530-checker-regression-reftyp-final",
           "536-checker-intrinsic-optimization",
