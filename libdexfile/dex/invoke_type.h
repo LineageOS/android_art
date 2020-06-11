@@ -32,7 +32,7 @@ enum InvokeType : uint32_t {
   kMaxInvokeType = kCustom
 };
 
-std::ostream& operator<<(std::ostream& os, const InvokeType& rhs);
+std::ostream& operator<<(std::ostream& os, InvokeType rhs);
 
 }  // namespace art
 

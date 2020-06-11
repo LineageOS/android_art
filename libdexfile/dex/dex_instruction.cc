@@ -547,7 +547,7 @@ struct InstructionStaticAsserts : private Instruction {
   #undef EXPERIMENTAL_CHECK
 };
 
-std::ostream& operator<<(std::ostream& os, const Instruction::Code& code) {
+std::ostream& operator<<(std::ostream& os, Instruction::Code code) {
   return os << Instruction::Name(code);
 }
 

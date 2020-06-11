@@ -117,7 +117,7 @@ class DexToDexCompiler {
   size_t num_code_items_ GUARDED_BY(lock_) = 0u;
 };
 
-std::ostream& operator<<(std::ostream& os, const DexToDexCompiler::CompilationLevel& rhs);
+std::ostream& operator<<(std::ostream& os, DexToDexCompiler::CompilationLevel rhs);
 
 }  // namespace optimizer
 
