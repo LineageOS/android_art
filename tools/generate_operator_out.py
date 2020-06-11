@@ -206,7 +206,7 @@ def main():
             print('namespace %s {' % namespace)
 
         print(
-            'std::ostream& operator<<(std::ostream& os, const %s& rhs) {' % enum_name)
+            'std::ostream& operator<<(std::ostream& os, %s rhs) {' % enum_name)
         print('  switch (rhs) {')
         for (enum_value, enum_text) in _ENUMS[enum_name]:
             print('    case %s: os << "%s"; break;' % (enum_value, enum_text))

@@ -33,7 +33,7 @@ enum WeakRootState {
   kWeakRootStateMarkNewRoots,
 };
 
-std::ostream& operator<<(std::ostream& os, const WeakRootState&);
+std::ostream& operator<<(std::ostream& os, WeakRootState weak_root_state);
 
 }  // namespace gc
 }  // namespace art

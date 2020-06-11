@@ -36,7 +36,7 @@ enum class FailureKind {
   kSoftFailure,
   kHardFailure,
 };
-std::ostream& operator<<(std::ostream& os, const FailureKind& rhs);
+std::ostream& operator<<(std::ostream& os, FailureKind rhs);
 
 // How to log hard failures during verification.
 enum class HardFailLogMode {
@@ -62,7 +62,7 @@ enum MethodType {
   METHOD_INTERFACE,   // interface
   METHOD_POLYMORPHIC  // polymorphic
 };
-std::ostream& operator<<(std::ostream& os, const MethodType& rhs);
+std::ostream& operator<<(std::ostream& os, MethodType rhs);
 
 /*
  * An enumeration of problems that can turn up during verification.
@@ -101,7 +101,7 @@ enum VerifyError : uint32_t {
                                              // code. May be removed once the compiler handles
                                              // unreachable code correctly.
 };
-std::ostream& operator<<(std::ostream& os, const VerifyError& rhs);
+std::ostream& operator<<(std::ostream& os, VerifyError rhs);
 
 }  // namespace verifier
 }  // namespace art
