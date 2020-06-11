@@ -82,7 +82,6 @@ gensrcs {
     tools: ["generate_operator_out"],
     srcs: [
         "dex/dex_to_dex_compiler.h",
-        "driver/compiler_driver.h",
         "linker/image_writer.h",
     ],
     output_extension: "operator_out.cc",

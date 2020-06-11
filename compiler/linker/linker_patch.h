@@ -287,7 +287,7 @@ class LinkerPatch {
   friend bool operator==(const LinkerPatch& lhs, const LinkerPatch& rhs);
   friend bool operator<(const LinkerPatch& lhs, const LinkerPatch& rhs);
 };
-std::ostream& operator<<(std::ostream& os, const LinkerPatch::Type& type);
+std::ostream& operator<<(std::ostream& os, LinkerPatch::Type type);
 
 inline bool operator==(const LinkerPatch& lhs, const LinkerPatch& rhs) {
   return lhs.literal_offset_ == rhs.literal_offset_ &&

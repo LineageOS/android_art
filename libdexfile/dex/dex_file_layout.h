@@ -45,7 +45,7 @@ enum class LayoutType : uint8_t {
   // Unused value, just the number of elements in the enum.
   kLayoutTypeCount,
 };
-std::ostream& operator<<(std::ostream& os, const LayoutType& collector_type);
+std::ostream& operator<<(std::ostream& os, LayoutType collector_type);
 
 // Return the "best" layout option if the same item has multiple different layouts.
 static inline LayoutType MergeLayoutType(LayoutType a, LayoutType b) {
@@ -60,7 +60,7 @@ enum class MadviseState : uint8_t {
   // Trim by madvising code that is unlikely to be too important in the future.
   kMadviseStateFinishedTrim,
 };
-std::ostream& operator<<(std::ostream& os, const MadviseState& collector_type);
+std::ostream& operator<<(std::ostream& os, MadviseState collector_type);
 
 // A dex layout section such as code items or strings. Each section is composed of subsections
 // that are laid out adjacently to each other such as (hot, unused, startup, etc...).
@@ -118,7 +118,7 @@ class DexLayoutSections {
   DexLayoutSection sections_[static_cast<size_t>(SectionType::kSectionCount)];
 };
 
-std::ostream& operator<<(std::ostream& os, const DexLayoutSections::SectionType& collector_type);
+std::ostream& operator<<(std::ostream& os, DexLayoutSections::SectionType collector_type);
 std::ostream& operator<<(std::ostream& os, const DexLayoutSection& section);
 std::ostream& operator<<(std::ostream& os, const DexLayoutSections& sections);
 

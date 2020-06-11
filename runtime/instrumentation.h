@@ -763,8 +763,8 @@ class Instrumentation {
 
   DISALLOW_COPY_AND_ASSIGN(Instrumentation);
 };
-std::ostream& operator<<(std::ostream& os, const Instrumentation::InstrumentationEvent& rhs);
-std::ostream& operator<<(std::ostream& os, const Instrumentation::InstrumentationLevel& rhs);
+std::ostream& operator<<(std::ostream& os, Instrumentation::InstrumentationEvent rhs);
+std::ostream& operator<<(std::ostream& os, Instrumentation::InstrumentationLevel rhs);
 
 // An element in the instrumentation side stack maintained in art::Thread.
 struct InstrumentationStackFrame {

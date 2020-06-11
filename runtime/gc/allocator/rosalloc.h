@@ -936,11 +936,11 @@ class RosAlloc {
       REQUIRES(Locks::mutator_lock_) REQUIRES(!lock_) REQUIRES(!bulk_free_lock_);
 
  private:
-  friend std::ostream& operator<<(std::ostream& os, const RosAlloc::PageMapKind& rhs);
+  friend std::ostream& operator<<(std::ostream& os, RosAlloc::PageMapKind rhs);
 
   DISALLOW_COPY_AND_ASSIGN(RosAlloc);
 };
-std::ostream& operator<<(std::ostream& os, const RosAlloc::PageMapKind& rhs);
+std::ostream& operator<<(std::ostream& os, RosAlloc::PageMapKind rhs);
 
 // Callback from rosalloc when it needs to increase the footprint. Must be implemented somewhere
 // else (currently rosalloc_space.cc).

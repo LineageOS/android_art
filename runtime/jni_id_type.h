@@ -35,7 +35,7 @@ enum class JniIdType {
   kDefault = kPointer,
 };
 
-std::ostream& operator<<(std::ostream& os, const JniIdType& rhs);
+std::ostream& operator<<(std::ostream& os, JniIdType rhs);
 
 }  // namespace art
 #endif  // ART_RUNTIME_JNI_ID_TYPE_H_
