@@ -445,6 +445,7 @@ cc_library_static {
         // Required for the simpleperf binary in the NDK. No other modules than
         // //system/extras/simpleperf:simpleperf_ndk are allowed to use it.
         "//system/extras/simpleperf",
+        "//cts/tests/tests/simpleperf",
     ],
     defaults: [
         "libdexfile_static_defaults",
