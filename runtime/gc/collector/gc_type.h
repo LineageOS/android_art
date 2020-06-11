@@ -37,7 +37,7 @@ enum GcType {
   // Number of different GC types.
   kGcTypeMax,
 };
-std::ostream& operator<<(std::ostream& os, const GcType& policy);
+std::ostream& operator<<(std::ostream& os, GcType policy);
 
 }  // namespace collector
 }  // namespace gc

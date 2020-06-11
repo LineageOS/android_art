@@ -32,7 +32,7 @@ enum class CalleeSaveType : uint32_t {
   kSaveEverythingForSuspendCheck,  // Special kSaveEverything for suspend check.
   kLastCalleeSaveType   // Value used for iteration.
 };
-std::ostream& operator<<(std::ostream& os, const CalleeSaveType& rhs);
+std::ostream& operator<<(std::ostream& os, CalleeSaveType rhs);
 
 static inline constexpr CalleeSaveType GetCanonicalCalleeSaveType(CalleeSaveType type) {
   if (type == CalleeSaveType::kSaveEverythingForClinit ||

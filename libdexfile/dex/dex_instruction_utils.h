@@ -45,7 +45,7 @@ enum DexMemAccessType : uint8_t {
   kDexMemAccessTypeCount
 };
 
-std::ostream& operator<<(std::ostream& os, const DexMemAccessType& type);
+std::ostream& operator<<(std::ostream& os, DexMemAccessType type);
 
 // NOTE: The following functions disregard quickened instructions.
 

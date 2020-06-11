@@ -97,7 +97,7 @@ enum IndirectRefKind {
   kWeakGlobal           = 3,           // <<weak global reference>>
   kLastKind             = kWeakGlobal
 };
-std::ostream& operator<<(std::ostream& os, const IndirectRefKind& rhs);
+std::ostream& operator<<(std::ostream& os, IndirectRefKind rhs);
 const char* GetIndirectRefKindString(const IndirectRefKind& kind);
 
 // Table definition.

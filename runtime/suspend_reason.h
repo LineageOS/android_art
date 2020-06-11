@@ -30,7 +30,7 @@ enum class SuspendReason : char {
   kForUserCode,
 };
 
-std::ostream& operator<<(std::ostream& os, const SuspendReason& thread);
+std::ostream& operator<<(std::ostream& os, SuspendReason thread);
 
 }  // namespace art
 
