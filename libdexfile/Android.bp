@@ -141,7 +141,6 @@ gensrcs {
         "dex/dex_instruction.h",
         "dex/dex_instruction_utils.h",
         "dex/invoke_type.h",
-        "dex/method_reference.h",
     ],
     output_extension: "operator_out.cc",
 }

@@ -26,7 +26,7 @@ enum ProcessState {
   kProcessStateJankImperceptible = 1,
 };
 
-std::ostream& operator<<(std::ostream& os, const ProcessState& process_state);
+std::ostream& operator<<(std::ostream& os, ProcessState process_state);
 
 }  // namespace art
 
