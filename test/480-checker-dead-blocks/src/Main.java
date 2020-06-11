@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import java.lang.reflect.Method;
 
 public class Main {
 
@@ -23,32 +22,76 @@ public class Main {
     }
   }
 
-  public static boolean inlineTrue() {
+  public static boolean $inline$constantTrue() {
     return true;
   }
 
-  public static boolean inlineFalse() {
+  public static boolean $inline$constantFalse() {
     return false;
   }
 
+  /// CHECK-START: int Main.testTrueBranch(int, int) dead_code_elimination$after_inlining (before)
+  /// CHECK-DAG:     <<ArgX:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<ArgY:i\d+>>    ParameterValue
+  /// CHECK-DAG:                      If
+  /// CHECK-DAG:     <<Add:i\d+>>     Add [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:     <<Sub:i\d+>>     Sub [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:     <<Phi:i\d+>>     Phi [<<Add>>,<<Sub>>]
+  /// CHECK-DAG:                      Return [<<Phi>>]
+
+  /// CHECK-START: int Main.testTrueBranch(int, int) dead_code_elimination$after_inlining (after)
+  /// CHECK-DAG:     <<ArgX:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<ArgY:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<Add:i\d+>>     Add [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:                      Return [<<Add>>]
+
+  /// CHECK-START: int Main.testTrueBranch(int, int) dead_code_elimination$after_inlining (after)
+  /// CHECK-NOT:                      If
+  /// CHECK-NOT:                      Sub
+  /// CHECK-NOT:                      Phi
+
   public static int testTrueBranch(int x, int y) {
-      try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("testTrueBranch", int.class, int.class);
-      return (Integer) m.invoke(null, x, y);
-    } catch (Throwable t) {
-      throw new RuntimeException(t);
+    int z;
+    if ($inline$constantTrue()) {
+      z = x + y;
+    } else {
+      z = x - y;
+      // Prevent HSelect simplification by having a branch with multiple instructions.
+      System.nanoTime();
     }
+    return z;
   }
 
+  /// CHECK-START: int Main.testFalseBranch(int, int) dead_code_elimination$after_inlining (before)
+  /// CHECK-DAG:     <<ArgX:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<ArgY:i\d+>>    ParameterValue
+  /// CHECK-DAG:                      If
+  /// CHECK-DAG:     <<Add:i\d+>>     Add [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:     <<Sub:i\d+>>     Sub [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:     <<Phi:i\d+>>     Phi [<<Add>>,<<Sub>>]
+  /// CHECK-DAG:                      Return [<<Phi>>]
+
+  /// CHECK-START: int Main.testFalseBranch(int, int) dead_code_elimination$after_inlining (after)
+  /// CHECK-DAG:     <<ArgX:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<ArgY:i\d+>>    ParameterValue
+  /// CHECK-DAG:     <<Sub:i\d+>>     Sub [<<ArgX>>,<<ArgY>>]
+  /// CHECK-DAG:                      Return [<<Sub>>]
+
+  /// CHECK-START: int Main.testFalseBranch(int, int) dead_code_elimination$after_inlining (after)
+  /// CHECK-NOT:                      If
+  /// CHECK-NOT:                      Add
+  /// CHECK-NOT:                      Phi
+
   public static int testFalseBranch(int x, int y) {
-      try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("testFalseBranch", int.class, int.class);
-      return (Integer) m.invoke(null, x, y);
-    } catch (Throwable t) {
-      throw new RuntimeException(t);
+    int z;
+    if ($inline$constantFalse()) {
+      z = x + y;
+    } else {
+      z = x - y;
+      // Prevent HSelect simplification by having a branch with multiple instructions.
+      System.nanoTime();
     }
+    return z;
   }
 
   /// CHECK-START: int Main.testRemoveLoop(int) dead_code_elimination$after_inlining (before)
@@ -58,7 +101,7 @@ public class Main {
   /// CHECK-NOT:                      Mul
 
   public static int testRemoveLoop(int x) {
-    if (inlineFalse()) {
+    if ($inline$constantFalse()) {
       for (int i = 0; i < x; ++i) {
         x *= x;
       }
@@ -75,7 +118,7 @@ public class Main {
   /// CHECK-NOT:                      Exit
 
   public static int testInfiniteLoop(int x) {
-    while (inlineTrue()) {
+    while ($inline$constantTrue()) {
       x++;
     }
     return x;
@@ -94,7 +137,7 @@ public class Main {
   /// CHECK-NOT:                      Add
 
   public static int testDeadLoop(int x) {
-    while (inlineFalse()) {
+    while ($inline$constantFalse()) {
       x++;
     }
     return x;
@@ -116,7 +159,7 @@ public class Main {
   public static int testUpdateLoopInformation(int x) {
     // Use of Or in the condition generates a dead loop where not all of its
     // blocks are removed. This forces DCE to update their loop information.
-    while (inlineFalse() || !inlineTrue()) {
+    while ($inline$constantFalse() || !$inline$constantTrue()) {
       x++;
     }
     return x;
@@ -137,7 +180,7 @@ public class Main {
     // Inner loop will leave behind the header with its SuspendCheck. DCE must
     // remove it, otherwise the outer loop would end up with two.
     while (y > 0) {
-      while (inlineFalse() || !inlineTrue()) {
+      while ($inline$constantFalse() || !$inline$constantTrue()) {
         x++;
       }
       y--;
