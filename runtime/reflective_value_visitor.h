@@ -98,7 +98,7 @@ enum ReflectionSourceType {
   kSourceDexCacheResolvedField,
   kSourceMiscInternal,
 };
-std::ostream& operator<<(std::ostream& os, const ReflectionSourceType& type);
+std::ostream& operator<<(std::ostream& os, ReflectionSourceType type);
 
 class ReflectionSourceInfo : public ValueObject {
  public:

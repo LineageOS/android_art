@@ -54,7 +54,7 @@ enum RootType {
   kRootVMInternal,
   kRootJNIMonitor,
 };
-std::ostream& operator<<(std::ostream& os, const RootType& root_type);
+std::ostream& operator<<(std::ostream& os, RootType root_type);
 
 // Only used by hprof. thread_id_ and type_ are only used by hprof.
 class RootInfo {

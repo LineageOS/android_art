@@ -150,7 +150,7 @@ enum LockLevel : uint8_t {
 
   kLockLevelCount  // Must come last.
 };
-std::ostream& operator<<(std::ostream& os, const LockLevel& rhs);
+std::ostream& operator<<(std::ostream& os, LockLevel rhs);
 
 // For StartNoThreadSuspension and EndNoThreadSuspension.
 class CAPABILITY("role") Role {

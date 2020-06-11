@@ -37,7 +37,7 @@ enum AllocatorType : char {
   kAllocatorTypeRegion,  // Use CAS-based contiguous bump-pointer allocation within a region. (*)
   kAllocatorTypeRegionTLAB,  // Use region pieces as TLABs. Default for most small objects. (*)
 };
-std::ostream& operator<<(std::ostream& os, const AllocatorType& rhs);
+std::ostream& operator<<(std::ostream& os, AllocatorType rhs);
 
 inline constexpr bool IsTLABAllocator(AllocatorType allocator) {
   return allocator == kAllocatorTypeTLAB || allocator == kAllocatorTypeRegionTLAB;

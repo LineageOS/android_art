@@ -141,7 +141,7 @@ class Instruction {
     kIndexProtoRef,           // prototype reference index
   };
 
-  enum Flags : uint8_t {
+  enum Flags : uint8_t {  // private marker to avoid generate-operator-out.py from processing.
     kBranch              = 0x01,  // conditional or unconditional branch
     kContinue            = 0x02,  // flow can continue to next statement
     kSwitch              = 0x04,  // switch statement
@@ -173,7 +173,7 @@ class Instruction {
     kRegBFieldOrConstant = 0x0800000,  // is the second virtual register a field or literal constant (vB)
   };
 
-  enum VerifyFlag : uint32_t {
+  enum VerifyFlag : uint32_t {  // private marker to avoid generate-operator-out.py from processing.
     kVerifyNothing            = 0x0000000,
     kVerifyRegA               = 0x0000001,
     kVerifyRegAWide           = 0x0000002,
@@ -692,10 +692,8 @@ class Instruction {
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Instruction);
 };
-std::ostream& operator<<(std::ostream& os, const Instruction::Code& code);
-std::ostream& operator<<(std::ostream& os, const Instruction::Format& format);
-std::ostream& operator<<(std::ostream& os, const Instruction::Flags& flags);
-std::ostream& operator<<(std::ostream& os, const Instruction::VerifyFlag& vflags);
+std::ostream& operator<<(std::ostream& os, Instruction::Code code);
+std::ostream& operator<<(std::ostream& os, Instruction::Format format);
 
 // Base class for accessing instruction operands. Unifies operand
 // access for instructions that have range and varargs forms
