@@ -70,7 +70,7 @@ enum OatClassType {
   kOatClassMax = 3,
 };
 
-std::ostream& operator<<(std::ostream& os, const OatClassType& rhs);
+std::ostream& operator<<(std::ostream& os, OatClassType rhs);
 
 class PACKED(4) OatMethodOffsets {
  public:

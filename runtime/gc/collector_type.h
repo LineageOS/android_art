@@ -60,7 +60,7 @@ enum CollectorType {
   // Fake collector type for ScopedGCCriticalSection
   kCollectorTypeCriticalSection,
 };
-std::ostream& operator<<(std::ostream& os, const CollectorType& collector_type);
+std::ostream& operator<<(std::ostream& os, CollectorType collector_type);
 
 static constexpr CollectorType kCollectorTypeDefault =
 #if ART_DEFAULT_GC_TYPE_IS_CMS

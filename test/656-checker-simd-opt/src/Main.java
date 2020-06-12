@@ -66,30 +66,77 @@ public class Main {
     }
   }
 
+  /// CHECK-START: void Main.stencilAddInt(int[], int[], int) loop_optimization (before)
+  /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                        loop:none
+  /// CHECK-DAG: <<CM1:i\d+>>   IntConstant -1                       loop:none
+  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                  loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CM1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get1:i\d+>>  ArrayGet [{{l\d+}},<<Add1>>]         loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get2:i\d+>>  ArrayGet [{{l\d+}},<<Phi>>]          loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add2:i\d+>>  Add [<<Get1>>,<<Get2>>]              loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get3:i\d+>>  ArrayGet [{{l\d+}},<<Add3>>]         loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add4:i\d+>>  Add [<<Add2>>,<<Get3>>]              loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG:                ArraySet [{{l\d+}},<<Phi>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+
+  /// CHECK-START-{X86_64,ARM64}: void Main.stencilAddInt(int[], int[], int) loop_optimization (after)
+  /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                         loop:none
+  /// CHECK-DAG: <<CP2:i\d+>>   IntConstant 2                         loop:none
+  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
   private static void stencilAddInt(int[] a, int[] b, int n) {
-    try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("stencilAddInt",
-          Array.newInstance(int.class, 1).getClass(),
-          Array.newInstance(int.class, 1).getClass(),
-          int.class);
-      m.invoke(null, a, b, n);
-    } catch (Exception ex) {
-      throw new Error(ex);
+    int minus1 = $inline$constMinus1();
+    for (int i = 1; i < n + minus1; i++) {
+      a[i] = b[i + minus1] + b[i] + b[i + 1];
     }
   }
 
+  private static int $inline$constMinus1() {
+    return -1;
+  }
+
+  /// CHECK-START: void Main.stencilSubInt(int[], int[], int) loop_optimization (before)
+  /// CHECK-DAG: <<PAR3:i\d+>>  ParameterValue                       loop:none
+  /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                        loop:none
+  /// CHECK-DAG: <<Sub1:i\d+>>  Sub [<<PAR3>>,<<CP1>>]               loop:none
+  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                  loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: <<Sub2:i\d+>>  Sub [<<Phi>>,<<CP1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get1:i\d+>>  ArrayGet [{{l\d+}},<<Sub2>>]         loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get2:i\d+>>  ArrayGet [{{l\d+}},<<Phi>>]          loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Get1>>,<<Get2>>]              loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add2:i\d+>>  Add [<<Phi>>,<<CP1>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get3:i\d+>>  ArrayGet [{{l\d+}},<<Add2>>]         loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Add1>>,<<Get3>>]              loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG:                ArraySet [{{l\d+}},<<Phi>>,<<Add3>>] loop:<<Loop>>      outer_loop:none
+
+  /// CHECK-START-{X86_64,ARM64}: void Main.stencilSubInt(int[], int[], int) loop_optimization (after)
+  /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                         loop:none
+  /// CHECK-DAG: <<CP2:i\d+>>   IntConstant 2                         loop:none
+  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
+  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
   private static void stencilSubInt(int[] a, int[] b, int n) {
-    try {
-      Class<?> c = Class.forName("Smali");
-      Method m = c.getMethod("stencilSubInt",
-          Array.newInstance(int.class, 1).getClass(),
-          Array.newInstance(int.class, 1).getClass(),
-          int.class);
-      m.invoke(null, a, b, n);
-    } catch (Exception ex) {
-      throw new Error(ex);
+    int plus1 = $inline$constPlus1();
+    for (int i = 1; i < n - plus1; i++) {
+      a[i] = b[i - plus1] + b[i] + b[i + 1];
     }
+  }
+
+  private static int $inline$constPlus1() {
+    return 1;
   }
 
   /// CHECK-START: long Main.longInductionReduction(long[]) loop_optimization (before)

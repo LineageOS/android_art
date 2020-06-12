@@ -99,7 +99,7 @@ enum class ClassStatus : uint8_t {
   kLast = kVisiblyInitialized
 };
 
-std::ostream& operator<<(std::ostream& os, const ClassStatus& rhs);
+std::ostream& operator<<(std::ostream& os, ClassStatus rhs);
 
 }  // namespace art
 
