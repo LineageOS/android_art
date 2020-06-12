@@ -51,7 +51,7 @@ inline JdwpProvider CanonicalizeJdwpProvider(JdwpProvider p, bool debuggable) {
   return JdwpProvider::kUnsetNonDebuggable;
 }
 
-std::ostream& operator<<(std::ostream& os, const JdwpProvider& rhs);
+std::ostream& operator<<(std::ostream& os, JdwpProvider rhs);
 
 }  // namespace art
 #endif  // ART_RUNTIME_JDWP_PROVIDER_H_

@@ -57,7 +57,7 @@ enum TracingMode {
   kMethodTracingActive,  // Trace activity synchronous with method progress.
   kSampleProfilingActive,  // Trace activity captured by sampling thread.
 };
-std::ostream& operator<<(std::ostream& os, const TracingMode& rhs);
+std::ostream& operator<<(std::ostream& os, TracingMode rhs);
 
 // File format:
 //     header

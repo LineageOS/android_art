@@ -216,7 +216,7 @@ class ImageWriter final {
     // Number of bins which are for mirror objects.
     kMirrorCount = kArtField,
   };
-  friend std::ostream& operator<<(std::ostream& stream, const Bin& bin);
+  friend std::ostream& operator<<(std::ostream& stream, Bin bin);
 
   enum class NativeObjectRelocationType {
     kArtField,
@@ -231,7 +231,7 @@ class ImageWriter final {
     kIMTConflictTable,
     kDexCacheArray,
   };
-  friend std::ostream& operator<<(std::ostream& stream, const NativeObjectRelocationType& type);
+  friend std::ostream& operator<<(std::ostream& stream, NativeObjectRelocationType type);
 
   enum class StubType {
     kJNIDlsymLookupTrampoline,
@@ -242,7 +242,7 @@ class ImageWriter final {
     kQuickToInterpreterBridge,
     kLast = kQuickToInterpreterBridge,
   };
-  friend std::ostream& operator<<(std::ostream& stream, const StubType& stub_type);
+  friend std::ostream& operator<<(std::ostream& stream, StubType stub_type);
 
   static constexpr size_t kBinBits =
       MinimumBitsToStore<uint32_t>(static_cast<size_t>(Bin::kMirrorCount) - 1);
@@ -746,6 +746,10 @@ class ImageWriter final {
 
   DISALLOW_COPY_AND_ASSIGN(ImageWriter);
 };
+
+std::ostream& operator<<(std::ostream& stream, ImageWriter::Bin bin);
+std::ostream& operator<<(std::ostream& stream, ImageWriter::NativeObjectRelocationType type);
+std::ostream& operator<<(std::ostream& stream, ImageWriter::StubType stub_type);
 
 }  // namespace linker
 }  // namespace art

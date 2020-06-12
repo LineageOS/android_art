@@ -440,8 +440,8 @@ class Location : public ValueObject {
   // way that none of them can be interpreted as a kConstant tag.
   uintptr_t value_;
 };
-std::ostream& operator<<(std::ostream& os, const Location::Kind& rhs);
-std::ostream& operator<<(std::ostream& os, const Location::Policy& rhs);
+std::ostream& operator<<(std::ostream& os, Location::Kind rhs);
+std::ostream& operator<<(std::ostream& os, Location::Policy rhs);
 
 class RegisterSet : public ValueObject {
  public:

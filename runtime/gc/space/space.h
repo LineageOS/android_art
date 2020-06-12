@@ -64,7 +64,7 @@ enum GcRetentionPolicy {
   // collections won't scan these areas such as the Zygote.
   kGcRetentionPolicyFullCollect,
 };
-std::ostream& operator<<(std::ostream& os, const GcRetentionPolicy& policy);
+std::ostream& operator<<(std::ostream& os, GcRetentionPolicy policy);
 
 enum SpaceType {
   kSpaceTypeImageSpace,
@@ -74,7 +74,7 @@ enum SpaceType {
   kSpaceTypeLargeObjectSpace,
   kSpaceTypeRegionSpace,
 };
-std::ostream& operator<<(std::ostream& os, const SpaceType& space_type);
+std::ostream& operator<<(std::ostream& os, SpaceType space_type);
 
 // A space contains memory allocated for managed objects.
 class Space {

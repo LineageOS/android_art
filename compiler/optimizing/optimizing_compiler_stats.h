@@ -110,7 +110,7 @@ enum class MethodCompilationStat {
   kJitOutOfMemoryForCommit,
   kLastStat
 };
-std::ostream& operator<<(std::ostream& os, const MethodCompilationStat& rhs);
+std::ostream& operator<<(std::ostream& os, MethodCompilationStat rhs);
 
 class OptimizingCompilerStats {
  public:

@@ -579,11 +579,12 @@ T ClearDexCacheNativeRefTags(T val) {
   return val & ~3u;
 }
 
-std::ostream& operator<<(std::ostream& os, const ImageHeader::ImageMethod& method);
-std::ostream& operator<<(std::ostream& os, const ImageHeader::ImageRoot& root);
-std::ostream& operator<<(std::ostream& os, const ImageHeader::ImageSections& section);
+std::ostream& operator<<(std::ostream& os, ImageHeader::ImageMethod method);
+std::ostream& operator<<(std::ostream& os, ImageHeader::ImageRoot root);
+std::ostream& operator<<(std::ostream& os, ImageHeader::ImageSections section);
+std::ostream& operator<<(std::ostream& os, ImageHeader::StorageMode mode);
+
 std::ostream& operator<<(std::ostream& os, const ImageSection& section);
-std::ostream& operator<<(std::ostream& os, const ImageHeader::StorageMode& mode);
 
 }  // namespace art
 

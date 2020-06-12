@@ -782,8 +782,8 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
   DISALLOW_COPY_AND_ASSIGN(RegionSpace);
 };
 
-std::ostream& operator<<(std::ostream& os, const RegionSpace::RegionState& value);
-std::ostream& operator<<(std::ostream& os, const RegionSpace::RegionType& value);
+std::ostream& operator<<(std::ostream& os, RegionSpace::RegionState value);
+std::ostream& operator<<(std::ostream& os, RegionSpace::RegionType value);
 
 }  // namespace space
 }  // namespace gc
