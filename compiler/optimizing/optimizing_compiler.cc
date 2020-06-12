@@ -643,7 +643,7 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
     // Simplification.
     OptDef(OptimizationPass::kConstantFolding,
            "constant_folding$after_bce"),
-    OptDef(OptimizationPass::kInstructionSimplifier,
+    OptDef(OptimizationPass::kAggressiveInstructionSimplifier,
            "instruction_simplifier$after_bce"),
     // Other high-level optimizations.
     OptDef(OptimizationPass::kSideEffectsAnalysis,
@@ -656,7 +656,7 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
     // The codegen has a few assumptions that only the instruction simplifier
     // can satisfy. For example, the code generator does not expect to see a
     // HTypeConversion from a type to the same type.
-    OptDef(OptimizationPass::kInstructionSimplifier,
+    OptDef(OptimizationPass::kAggressiveInstructionSimplifier,
            "instruction_simplifier$before_codegen"),
     // Eliminate constructor fences after code sinking to avoid
     // complicated sinking logic to split a fence with many inputs.
