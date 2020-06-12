@@ -37,7 +37,6 @@ cc_defaults {
         "libnativebridge-headers",
     ],
     cppflags: ["-fvisibility=protected"],
-    test_suites: ["general-tests"],
 }
 
 cc_library_shared {
