@@ -945,7 +945,7 @@ art_cc_test {
         ":com.android.art.testing",
         ":art-gtest-jars",
     ],
-    test_suites: ["general-tests"],
+    test_suites: ["device-tests"],
     test_config: "gtests-target.xml",
 }
 
