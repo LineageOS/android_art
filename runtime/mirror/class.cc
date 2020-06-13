@@ -218,9 +218,7 @@ static void CheckSetStatus(Thread* self, T thiz, ClassStatus new_status, ClassSt
   }
 }
 
-void Class::SetStatusLocked(ClassStatus new_status) {
-  ClassStatus old_status = GetStatus();
-  CheckSetStatus(Thread::Current(), this, new_status, old_status);
+void Class::SetStatusInternal(ClassStatus new_status) {
   if (kBitstringSubtypeCheckEnabled) {
     // FIXME: This looks broken with respect to aborted transactions.
     SubtypeCheck<ObjPtr<mirror::Class>>::WriteStatus(this, new_status);
@@ -228,9 +226,18 @@ void Class::SetStatusLocked(ClassStatus new_status) {
     // The ClassStatus is always in the 4 most-significant bits of status_.
     static_assert(sizeof(status_) == sizeof(uint32_t), "Size of status_ not equal to uint32");
     uint32_t new_status_value = static_cast<uint32_t>(new_status) << (32 - kClassStatusBitSize);
-    DCHECK(!Runtime::Current()->IsActiveTransaction());
-    SetField32Volatile<false>(StatusOffset(), new_status_value);
+    if (Runtime::Current()->IsActiveTransaction()) {
+      SetField32Volatile<true>(StatusOffset(), new_status_value);
+    } else {
+      SetField32Volatile<false>(StatusOffset(), new_status_value);
+    }
   }
+}
+
+void Class::SetStatusLocked(ClassStatus new_status) {
+  ClassStatus old_status = GetStatus();
+  CheckSetStatus(Thread::Current(), this, new_status, old_status);
+  SetStatusInternal(new_status);
 }
 
 void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self) {
@@ -263,20 +270,7 @@ void Class::SetStatus(Handle<Class> h_this, ClassStatus new_status, Thread* self
     self->AssertPendingException();
   }
 
-  if (kBitstringSubtypeCheckEnabled) {
-    // FIXME: This looks broken with respect to aborted transactions.
-    ObjPtr<mirror::Class> h_this_ptr = h_this.Get();
-    SubtypeCheck<ObjPtr<mirror::Class>>::WriteStatus(h_this_ptr, new_status);
-  } else {
-    // The ClassStatus is always in the 4 most-significant bits of status_.
-    static_assert(sizeof(status_) == sizeof(uint32_t), "Size of status_ not equal to uint32");
-    uint32_t new_status_value = static_cast<uint32_t>(new_status) << (32 - kClassStatusBitSize);
-    if (Runtime::Current()->IsActiveTransaction()) {
-      h_this->SetField32Volatile<true>(StatusOffset(), new_status_value);
-    } else {
-      h_this->SetField32Volatile<false>(StatusOffset(), new_status_value);
-    }
-  }
+  h_this->SetStatusInternal(new_status);
 
   // Setting the object size alloc fast path needs to be after the status write so that if the
   // alloc path sees a valid object size, we would know that it's initialized as long as it has a
