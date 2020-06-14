@@ -63,7 +63,7 @@ while true; do
 done
 
 # Allow to build successfully in master-art.
-extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true TARGET_BUILD_UNBUNDLED=true"
+extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
 
 apexes=(
   "com.android.art.testing"
