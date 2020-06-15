@@ -269,8 +269,6 @@ if [[ $mode == "golem" ]]; then
   execute lunch "$lunch_target"
   # Golem uses master-art repository which is missing a lot of other libraries.
   setenv SOONG_ALLOW_MISSING_DEPENDENCIES true
-  # Let the build system know we're not aiming to do a full platform build.
-  setenv TARGET_BUILD_UNBUNDLED true
   # Golem may be missing tools such as javac from its path.
   setenv_escape PATH "/usr/lib/jvm/java-8-openjdk-amd64/bin/:$PATH" '/usr/lib/jvm/java-8-openjdk-amd64/bin/:$PATH'
 else
