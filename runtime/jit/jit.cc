@@ -338,7 +338,7 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
             << " osr=" << std::boolalpha << osr
             << " baseline=" << std::boolalpha << baseline;
   bool success = jit_compiler_->CompileMethod(self, region, method_to_compile, baseline, osr);
-  code_cache_->DoneCompiling(method_to_compile, self, osr);
+  code_cache_->DoneCompiling(method_to_compile, self, osr, baseline);
   if (!success) {
     VLOG(jit) << "Failed to compile method "
               << ArtMethod::PrettyMethod(method_to_compile)
