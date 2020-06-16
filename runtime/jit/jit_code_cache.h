@@ -214,7 +214,7 @@ class JitCodeCache {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
-  void DoneCompiling(ArtMethod* method, Thread* self, bool osr)
+  void DoneCompiling(ArtMethod* method, Thread* self, bool osr, bool baseline)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -499,6 +499,22 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Record that `method` is being compiled with the given mode.
+  // TODO: introduce an enum for the mode.
+  void AddMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+      REQUIRES(Locks::jit_lock_);
+
+  // Remove `method` from the list of methods meing compiled with the given mode.
+  void RemoveMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+      REQUIRES(Locks::jit_lock_);
+
+  // Return whether `method` is being compiled with the given mode.
+  bool IsMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+      REQUIRES(Locks::jit_lock_);
+
+  // Return whether `method` is being compiled in any mode.
+  bool IsMethodBeingCompiled(ArtMethod* method) REQUIRES(Locks::jit_lock_);
+
   class JniStubKey;
   class JniStubData;
 
@@ -535,6 +551,11 @@ class JitCodeCache {
 
   // ProfilingInfo objects we have allocated.
   std::vector<ProfilingInfo*> profiling_infos_ GUARDED_BY(Locks::jit_lock_);
+
+  // Methods we are currently compiling, one set for each kind of compilation.
+  std::set<ArtMethod*> current_optimized_compilations_ GUARDED_BY(Locks::jit_lock_);
+  std::set<ArtMethod*> current_osr_compilations_ GUARDED_BY(Locks::jit_lock_);
+  std::set<ArtMethod*> current_baseline_compilations_ GUARDED_BY(Locks::jit_lock_);
 
   // Methods that the zygote has compiled and can be shared across processes
   // forked from the zygote.

@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <set>
 #include <sstream>
 
 #include <android-base/logging.h>
@@ -122,6 +123,11 @@ bool ContainsElement(const Container& container, const T& value, size_t start_po
   std::advance(start, start_pos);
   auto it = std::find(start, container.end(), value);
   return it != container.end();
+}
+
+template <typename T>
+bool ContainsElement(const std::set<T>& container, const T& value) {
+  return container.count(value) != 0u;
 }
 
 // 32-bit FNV-1a hash function suitable for std::unordered_map.
