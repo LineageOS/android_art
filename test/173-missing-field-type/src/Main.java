@@ -17,6 +17,5 @@
 public class Main {
     // Allow test to pass on RI without adding to knownfailures.json file.
     public static void main(String args[]) throws Exception {
-        System.out.println("passed");
     }
 }
