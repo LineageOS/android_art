@@ -30,9 +30,7 @@ ProfilingInfo::ProfilingInfo(ArtMethod* method, const std::vector<uint32_t>& ent
         method_(method),
         saved_entry_point_(nullptr),
         number_of_inline_caches_(entries.size()),
-        current_inline_uses_(0),
-        is_method_being_compiled_(false),
-        is_osr_method_being_compiled_(false) {
+        current_inline_uses_(0) {
   memset(&cache_, 0, number_of_inline_caches_ * sizeof(InlineCache));
   for (size_t i = 0; i < number_of_inline_caches_; ++i) {
     cache_[i].dex_pc_ = entries[i];
