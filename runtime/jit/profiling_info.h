@@ -83,20 +83,6 @@ class ProfilingInfo {
   InlineCache* GetInlineCache(uint32_t dex_pc)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool IsMethodBeingCompiled(bool osr) const {
-    return osr
-        ? is_osr_method_being_compiled_
-        : is_method_being_compiled_;
-  }
-
-  void SetIsMethodBeingCompiled(bool value, bool osr) {
-    if (osr) {
-      is_osr_method_being_compiled_ = value;
-    } else {
-      is_method_being_compiled_ = value;
-    }
-  }
-
   void SetSavedEntryPoint(const void* entry_point) {
     saved_entry_point_ = entry_point;
   }
@@ -122,8 +108,7 @@ class ProfilingInfo {
   }
 
   bool IsInUseByCompiler() const {
-    return IsMethodBeingCompiled(/*osr=*/ true) || IsMethodBeingCompiled(/*osr=*/ false) ||
-        (current_inline_uses_ > 0);
+    return current_inline_uses_ > 0;
   }
 
   static constexpr MemberOffset BaselineHotnessCountOffset() {
@@ -161,12 +146,6 @@ class ProfilingInfo {
   // When the compiler inlines the method associated to this ProfilingInfo,
   // it updates this counter so that the GC does not try to clear the inline caches.
   uint16_t current_inline_uses_;
-
-  // Whether the ArtMethod is currently being compiled. This flag
-  // is implicitly guarded by the JIT code cache lock.
-  // TODO: Make the JIT code cache lock global.
-  bool is_method_being_compiled_;
-  bool is_osr_method_being_compiled_;
 
   // Dynamically allocated array of size `number_of_inline_caches_`.
   InlineCache cache_[0];
