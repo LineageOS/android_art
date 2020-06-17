@@ -66,6 +66,7 @@ class HOptimization : public ArenaObject<kArenaAllocOptimization> {
 // field is preferred over a string lookup at places where performance matters.
 // TODO: generate this table and lookup methods below automatically?
 enum class OptimizationPass {
+  kAggressiveInstructionSimplifier,
   kBoundsCheckElimination,
   kCHAGuardOptimization,
   kCodeSinking,

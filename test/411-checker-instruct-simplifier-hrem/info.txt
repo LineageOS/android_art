@@ -1,0 +1,1 @@
+Checker test for instruction_simplifier optimizations of integer remainder instructions.

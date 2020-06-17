@@ -3067,7 +3067,6 @@ void InstructionCodeGeneratorARM64::GenerateResultRemWithAnyConstant(
     Register quotient,
     int64_t divisor,
     UseScratchRegisterScope* temps_scope) {
-  // TODO: Strength reduction for msub.
   Register temp_imm = temps_scope->AcquireSameSizeAs(out);
   __ Mov(temp_imm, divisor);
   __ Msub(out, quotient, temp_imm, dividend);
