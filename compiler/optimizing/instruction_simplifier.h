@@ -40,9 +40,11 @@ class InstructionSimplifier : public HOptimization {
   InstructionSimplifier(HGraph* graph,
                         CodeGenerator* codegen,
                         OptimizingCompilerStats* stats = nullptr,
-                        const char* name = kInstructionSimplifierPassName)
+                        const char* name = kInstructionSimplifierPassName,
+                        bool use_all_optimizations = false)
       : HOptimization(graph, name, stats),
-        codegen_(codegen) {}
+        codegen_(codegen),
+        use_all_optimizations_(use_all_optimizations) {}
 
   static constexpr const char* kInstructionSimplifierPassName = "instruction_simplifier";
 
@@ -50,6 +52,9 @@ class InstructionSimplifier : public HOptimization {
 
  private:
   CodeGenerator* codegen_;
+
+  // Use all optimizations without restrictions.
+  bool use_all_optimizations_;
 
   DISALLOW_COPY_AND_ASSIGN(InstructionSimplifier);
 };
