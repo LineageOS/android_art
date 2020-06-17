@@ -24,6 +24,7 @@ public class Main {
     System.out.println($noinline$foo(3, 4));
     System.out.println($noinline$mulAndIntrinsic());
     System.out.println($noinline$directIntrinsic(-5));
+    System.out.println($noinline$deoptimizeArray(new int[100]));
   }
 
   private static int $inline$add(int a, int b) {
@@ -89,5 +90,38 @@ public class Main {
     int abs1 = Math.abs(x);
     int abs2 = Math.abs(x);
     return abs1 + abs2;
+  }
+
+  public static class MyList {
+    public int[] arr;
+  }
+
+  // The 4 deoptimize are pairs of checking for null and array-length. The
+  // repetition is due to the two loops.
+  // NB This is a very degenerate example and improvements to our analysis could
+  // allow for this entire function to be removed.
+  /// CHECK-START: int Main.$noinline$deoptimizeArray(int[]) GVN$after_arch (before)
+  /// CHECK: Deoptimize
+  /// CHECK: Deoptimize
+  /// CHECK: Deoptimize
+  /// CHECK: Deoptimize
+  /// CHECK-NOT: Deoptimize
+  // Get rid of redundant deoptimizes
+  /// CHECK-START: int Main.$noinline$deoptimizeArray(int[]) GVN$after_arch (after)
+  /// CHECK: Deoptimize
+  /// CHECK: Deoptimize
+  /// CHECK-NOT: Deoptimize
+  public static int $noinline$deoptimizeArray(int[] arr) {
+    if (arr == null) {
+      arr = new int[100];
+    }
+    for (int i = 0; i < 10; i++) {
+      arr[i] = i;
+    }
+    int sum = 0;
+    for (int i = 0; i < 10; i++) {
+      sum += arr[i];
+    }
+    return sum;
   }
 }
