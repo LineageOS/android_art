@@ -1001,6 +1001,103 @@ class BCEVisitor : public HGraphVisitor {
     }
   }
 
+  // Check whether HSub is a result of the HRem optimization of:
+  //   q = Div(dividend, const_divisor)
+  //   r = Rem(dividend, const_divisor)
+  // into
+  //   q = Div(dividend, const_divisor)
+  //   t = Mul(q, const_divisor)
+  //   r = Sub(dividend, t)
+  // or for divisors 2^n + 1 into
+  //   q  = Div(dividend, const_divisor)
+  //   t1 = Shl(q, n)
+  //   t2 = Add(q, t1)
+  //   r  = Sub(dividend, t2)
+  // or for divisors 2^n - 1 into
+  //   q  = Div(dividend, const_divisor)
+  //   t1 = Shl(q, n)
+  //   t2 = Sub(t1, q)
+  //   r  = Sub(dividend, t2)
+  //
+  // If it is the case, the value range for the instruction is
+  // [1 - abs(const_divisor), abs(const_divisor) - 1] merged with
+  // the range of the left input is assigned and true is returned. Otherwise,
+  // no range is assigned and false is returned.
+  bool TryToAssignRangeIfOptimizedRemWithConstantDivisor(HSub* instruction) {
+    if (instruction->GetResultType() != DataType::Type::kInt32) {
+      return false;
+    }
+
+    auto is_needed_shl = [](HShl* shl) {
+      return shl != nullptr && shl->GetRight()->IsConstant() && shl->GetLeft()->IsDiv();
+    };
+
+    HDiv* div = nullptr;
+    int64_t const_divisor = 0;
+    if (HMul* mul = instruction->GetRight()->AsMul()) {
+      if (!mul->GetLeft()->IsDiv() || !mul->GetRight()->IsConstant()) {
+        return false;
+      }
+      div = mul->GetLeft()->AsDiv();
+      const_divisor = Int64FromConstant(mul->GetRight()->AsConstant());
+    } else if (HAdd* add = instruction->GetRight()->AsAdd()) {
+      HShl* shl = add->GetRight()->AsShl();
+      if (!is_needed_shl(shl)) {
+        return false;
+      }
+
+      div = shl->GetLeft()->AsDiv();
+      if (add->GetLeft() != div) {
+        return false;
+      }
+
+      int32_t n = shl->GetRight()->AsIntConstant()->GetValue();
+      if (n == BitSizeOf<int32_t>() - 1) {
+        // 2^n + 1 will be negative.
+        return false;
+      }
+      const_divisor = (1LL << n) + 1;
+    } else if (HSub* sub = instruction->GetRight()->AsSub()) {
+      HShl* shl = sub->GetLeft()->AsShl();
+      if (!is_needed_shl(shl)) {
+        return false;
+      }
+
+      div = shl->GetLeft()->AsDiv();
+      if (sub->GetRight() != div) {
+        return false;
+      }
+
+      int32_t n = shl->GetRight()->AsIntConstant()->GetValue();
+      const_divisor = (1LL << n) - 1;
+    }
+
+    if (div == nullptr || !IsInt64Value(div->GetRight()->AsConstant(), const_divisor) ||
+        div->GetLeft() != instruction->GetLeft()) {
+      return false;
+    }
+
+    ValueRange* range = nullptr;
+    if (const_divisor == DataType::MinValueOfIntegralType(DataType::Type::kInt32)) {
+      range = new (&allocator_) ValueRange(&allocator_,
+          ValueBound(nullptr, DataType::MinValueOfIntegralType(DataType::Type::kInt32) + 1),
+          ValueBound(nullptr, DataType::MaxValueOfIntegralType(DataType::Type::kInt32)));
+    } else {
+      DCHECK_GT(const_divisor, DataType::MinValueOfIntegralType(DataType::Type::kInt32));
+      DCHECK_LE(const_divisor, DataType::MaxValueOfIntegralType(DataType::Type::kInt32));
+      int32_t abs_const_divisor = static_cast<int32_t>(std::abs(const_divisor));
+      range = new (&allocator_) ValueRange(&allocator_,
+                                           ValueBound(nullptr, 1 - abs_const_divisor),
+                                           ValueBound(nullptr, abs_const_divisor - 1));
+    }
+    HBasicBlock* basic_block = instruction->GetBlock();
+    if (ValueRange* left_range = LookupValueRange(instruction->GetLeft(), basic_block)) {
+      range = range->Narrow(left_range);
+    }
+    AssignRange(basic_block, instruction, range);
+    return true;
+  }
+
   void VisitAdd(HAdd* add) override {
     HInstruction* right = add->GetRight();
     if (right->IsIntConstant()) {
@@ -1016,6 +1113,10 @@ class BCEVisitor : public HGraphVisitor {
   }
 
   void VisitSub(HSub* sub) override {
+    if (TryToAssignRangeIfOptimizedRemWithConstantDivisor(sub)) {
+      return;
+    }
+
     HInstruction* left = sub->GetLeft();
     HInstruction* right = sub->GetRight();
     if (right->IsIntConstant()) {

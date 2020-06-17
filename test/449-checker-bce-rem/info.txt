@@ -1,0 +1,2 @@
+Checker test for BCE optimizations of integer remainder operations which are optimized into
+HDiv+HMul+HSub or HDiv+HShl+HAdd+HSub or HDiv+HShl+HSub+HSub.
