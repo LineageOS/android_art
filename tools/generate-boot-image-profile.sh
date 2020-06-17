@@ -21,7 +21,7 @@
 if [[ "$#" -lt 2 ]]; then
   echo "Usage $0 <output> <profman args> <profiles>+"
   echo "Also outputs <output>.txt and <output>.preloaded-classes"
-  echo 'Example: generate-boot-image-profile.sh boot.prof --profman-arg --boot-image-sampled-method-threshold=1 profiles/0/*/primary.prof'
+  echo 'Example: generate-boot-image-profile.sh boot.prof --profman-arg --boot-image-sampled-method-threshold=1 profiles/cur/0/*/primary.prof'
   exit 1
 fi
 
@@ -46,13 +46,41 @@ for file in "$@"; do
   fi
 done
 
+# b/139391334: the stem of framework-minus-apex is framework
+real_jar_name() {
+  if [[ "$1" == "framework-minus-apex" ]]; then
+    echo "framework"
+  else
+    echo "$1"
+  fi
+}
+
 # Boot jars have hidden API access flags which do not pass dex file
 # verification. Skip it.
 jar_args=()
 boot_jars=$("$ANDROID_BUILD_TOP"/art/tools/bootjars.sh --target)
-jar_dir=$ANDROID_BUILD_TOP/$(get_build_var TARGET_OUT_JAVA_LIBRARIES)
-for file in $boot_jars; do
-  filename="$jar_dir/$file.jar"
+product_out=$ANDROID_BUILD_TOP/$(get_build_var PRODUCT_OUT)
+for pair in $boot_jars; do
+  words=( $(echo $pair | tr ':' ' ') )
+  if [[ ${#words[@]} -eq 2 ]]; then
+    # format in Android > R: <apex>:<jar>
+    apex="${words[0]}"
+    name="$(real_jar_name ${words[1]})"
+    case "$apex" in
+        platform*)   subdir=system/framework ;;
+        system_ext*) subdir=system_ext/framework ;;
+        *)           subdir=apex/$apex/javalib ;;
+    esac
+    filename="$product_out/$subdir/$name.jar"
+  else
+    # format in Android <= R: <jar>, have to infer location with `find`
+    name="$(real_jar_name ${words[0]})"
+    filename="$(find $product_out -name $name.jar 2>/dev/null)"
+    if [[ $(echo "$filename" | wc -w ) -ne 1 ]]; then
+      echo "expected to find $name.jar, got '$filename'"
+      exit 1
+    fi
+  fi
   jar_args+=("--apk=$filename")
   jar_args+=("--dex-location=$filename")
 done
