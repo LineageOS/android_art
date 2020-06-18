@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "android-base/file.h"
 #include "android-base/strings.h"
 #include "art_method-inl.h"
 #include "base/unix_file/fd_file.h"
@@ -213,7 +214,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
     argv_str.push_back(profman_cmd);
     argv_str.push_back("--generate-test-profile=" + filename);
     std::string error;
-    return ExecAndReturnCode(argv_str, &error);
+     return ExecAndReturnCode(argv_str, &error);
   }
 
   bool GenerateTestProfileWithInputDex(const std::string& filename) {
@@ -734,6 +735,11 @@ TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
   EXPECT_GT(method_count, 0u);
 }
 
+static std::string JoinProfileLines(const std::vector<std::string>& lines) {
+  std::string result = android::base::Join(lines, '\n');
+  return result + '\n';
+}
+
 TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   const std::string core_dex = GetLibCoreDexFileNames()[0];
 
@@ -746,102 +752,114 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   // Not in image becauseof not enough occurrences.
   const std::string kUncommonCleanClass = "Ljava/lang/Process;";
   const std::string kUncommonDirtyClass = "Ljava/lang/Package;";
-  // Method that is hot.
-  // Also adds the class through inference since it is in each dex.
-  const std::string kHotMethod = "Ljava/lang/Comparable;->compareTo(Ljava/lang/Object;)I";
-  // Method that doesn't add the class since its only in one profile. Should still show up in the
-  // boot profile.
-  const std::string kOtherMethod = "Ljava/util/HashMap;-><init>()V";
-  // Method that gets marked as hot since it's in multiple profiles.
-  const std::string kMultiMethod = "Ljava/util/ArrayList;->clear()V";
+  // Method that is common and hot. Should end up in profile.
+  const std::string kCommonHotMethod = "Ljava/lang/Comparable;->compareTo(Ljava/lang/Object;)I";
+  // Uncommon method, should not end up in profile
+  const std::string kUncommonMethod = "Ljava/util/HashMap;-><init>()V";
+  // Method that gets marked as hot since it's in multiple profile and marked as startup.
+  const std::string kStartupMethodForUpgrade = "Ljava/util/ArrayList;->clear()V";
+  // Startup method used by a special package which will get a different threshold;
+  const std::string kSpecialPackageStartupMethod =
+      "Ljava/lang/Object;->toString()Ljava/lang/String;";
+  // Method used by a special package which will get a different threshold;
+  const std::string kUncommonSpecialPackageMethod = "Ljava/lang/Object;->hashCode()I";
 
   // Thresholds for this test.
-  static const size_t kDirtyThreshold = 3;
-  static const size_t kCleanThreshold = 2;
-  static const size_t kMethodThreshold = 2;
+  static const size_t kDirtyThreshold = 100;
+  static const size_t kCleanThreshold = 50;
+  static const size_t kPreloadedThreshold = 100;
+  static const size_t kMethodThreshold = 75;
+  static const size_t kSpecialThreshold = 50;
+  const std::string kSpecialPackage = "dex4";
 
-  // Create a bunch of boot profiles.
-  std::string dex1 =
-      kCleanClass + "\n" +
-      kDirtyClass + "\n" +
-      kUncommonCleanClass + "\n" +
-      "H" + kHotMethod + "\n" +
-      kUncommonDirtyClass;
-  profiles.emplace_back(ScratchFile());
-  EXPECT_TRUE(CreateProfile(
-      dex1, profiles.back().GetFilename(), core_dex));
+  // Create boot profile content, attributing the classes and methods to different dex files.
+  std::vector<std::string> input_data = {
+      "{dex1}" + kCleanClass,
+      "{dex1}" + kDirtyClass,
+      "{dex1}" + kUncommonCleanClass,
+      "{dex1}H" + kCommonHotMethod,
+      "{dex1}P" + kStartupMethodForUpgrade,
+      "{dex1}" + kUncommonDirtyClass,
 
-  // Create a bunch of boot profiles.
-  std::string dex2 =
-      kCleanClass + "\n" +
-      kDirtyClass + "\n" +
-      "P" + kHotMethod + "\n" +
-      "P" + kMultiMethod + "\n" +
-      kUncommonDirtyClass;
-  profiles.emplace_back(ScratchFile());
-  EXPECT_TRUE(CreateProfile(
-      dex2, profiles.back().GetFilename(), core_dex));
+      "{dex2}" + kCleanClass,
+      "{dex2}" + kDirtyClass,
+      "{dex2}P" + kCommonHotMethod,
+      "{dex2}P" + kStartupMethodForUpgrade,
+      "{dex2}" + kUncommonDirtyClass,
 
-  // Create a bunch of boot profiles.
-  std::string dex3 =
-      "S" + kHotMethod + "\n" +
-      "P" + kOtherMethod + "\n" +
-      "P" + kMultiMethod + "\n" +
-      kDirtyClass + "\n";
-  profiles.emplace_back(ScratchFile());
-  EXPECT_TRUE(CreateProfile(
-      dex3, profiles.back().GetFilename(), core_dex));
+      "{dex3}P" + kUncommonMethod,
+      "{dex3}PS" + kStartupMethodForUpgrade,
+      "{dex3}S" + kCommonHotMethod,
+      "{dex3}S" + kSpecialPackageStartupMethod,
+      "{dex3}" + kDirtyClass,
+
+      "{dex4}" + kDirtyClass,
+      "{dex4}P" + kCommonHotMethod,
+      "{dex4}S" + kSpecialPackageStartupMethod,
+      "{dex4}P" + kUncommonSpecialPackageMethod
+  };
+  std::string input_file_contents = JoinProfileLines(input_data);
+
+  // Expected data
+  std::vector<std::string> expected_data = {
+      kCleanClass,
+      kDirtyClass,
+      "HSP" + kCommonHotMethod,
+      "HS" + kSpecialPackageStartupMethod,
+      "HSP" + kStartupMethodForUpgrade
+  };
+  std::string expected_profile_content = JoinProfileLines(expected_data);
+
+  std::vector<std::string> expected_preloaded_data = {
+       DescriptorToDot(kDirtyClass.c_str())
+  };
+  std::string expected_preloaded_content = JoinProfileLines(expected_preloaded_data);
+
+  ScratchFile profile;
+  EXPECT_TRUE(CreateProfile(input_file_contents, profile.GetFilename(), core_dex));
+
+  ProfileCompilationInfo bootProfile;
+  bootProfile.Load(profile.GetFilename(), /*for_boot_image*/ true);
 
   // Generate the boot profile.
   ScratchFile out_profile;
+  ScratchFile out_preloaded_classes;
+  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(out_preloaded_classes.GetFile()->ResetOffset());
   std::vector<std::string> args;
   args.push_back(GetProfmanCmd());
   args.push_back("--generate-boot-image-profile");
-  args.push_back("--boot-image-class-threshold=" + std::to_string(kDirtyThreshold));
-  args.push_back("--boot-image-clean-class-threshold=" + std::to_string(kCleanThreshold));
-  args.push_back("--boot-image-sampled-method-threshold=" + std::to_string(kMethodThreshold));
-  args.push_back("--reference-profile-file=" + out_profile.GetFilename());
+  args.push_back("--class-threshold=" + std::to_string(kDirtyThreshold));
+  args.push_back("--clean-class-threshold=" + std::to_string(kCleanThreshold));
+  args.push_back("--method-threshold=" + std::to_string(kMethodThreshold));
+  args.push_back("--preloaded-class-threshold=" + std::to_string(kPreloadedThreshold));
+  args.push_back(
+      "--special-package=" + kSpecialPackage + ":" + std::to_string(kSpecialThreshold));
+  args.push_back("--profile-file=" + profile.GetFilename());
+  args.push_back("--out-profile-path=" + out_profile.GetFilename());
+  args.push_back("--out-preloaded-classes-path=" + out_preloaded_classes.GetFilename());
   args.push_back("--apk=" + core_dex);
   args.push_back("--dex-location=" + core_dex);
-  for (const ScratchFile& profile : profiles) {
-    args.push_back("--profile-file=" + profile.GetFilename());
-  }
+
+
   std::string error;
-  EXPECT_EQ(ExecAndReturnCode(args, &error), 0) << error;
-  ASSERT_EQ(0, out_profile.GetFile()->Flush());
+  ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;
   ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
 
+  // std::vector<std::string> args1({"cp", out_profile.GetFilename(), "~/profile-test"});
+  // EXPECT_EQ(ExecAndReturnCode(args1, &error), 0) << error;
+
   // Verify the boot profile contents.
-  std::string output_file_contents;
-  EXPECT_TRUE(DumpClassesAndMethods(out_profile.GetFilename(), &output_file_contents));
-  // Common classes, should be in the classes of the profile.
-  EXPECT_NE(output_file_contents.find(kCleanClass + "\n"), std::string::npos)
-      << output_file_contents;
-  EXPECT_NE(output_file_contents.find(kDirtyClass + "\n"), std::string::npos)
-      << output_file_contents;
-  // Uncommon classes, should not fit preloaded class criteria and should not be in the profile.
-  EXPECT_EQ(output_file_contents.find(kUncommonCleanClass + "\n"), std::string::npos)
-      << output_file_contents;
-  EXPECT_EQ(output_file_contents.find(kUncommonDirtyClass + "\n"), std::string::npos)
-      << output_file_contents;
-  // Inferred class from a method common to all three profiles.
-  EXPECT_NE(output_file_contents.find("Ljava/lang/Comparable;\n"), std::string::npos)
-      << output_file_contents;
-  // Aggregated methods hotness information.
-  EXPECT_NE(output_file_contents.find("HSP" + kHotMethod), std::string::npos)
-      << output_file_contents;
-  EXPECT_NE(output_file_contents.find("P" + kOtherMethod), std::string::npos)
-      << output_file_contents;
-  // Not inferred class, method is only in one profile.
-  EXPECT_EQ(output_file_contents.find("Ljava/util/HashMap;\n"), std::string::npos)
-      << output_file_contents;
-  // Test the sampled methods that became hot.
-  // Other method is in only one profile, it should not become hot.
-  EXPECT_EQ(output_file_contents.find("HP" + kOtherMethod), std::string::npos)
-      << output_file_contents;
-  // Multi method is in at least two profiles, it should become hot.
-  EXPECT_NE(output_file_contents.find("HP" + kMultiMethod), std::string::npos)
-      << output_file_contents;
+  std::string output_profile_contents;
+  ASSERT_TRUE(android::base::ReadFileToString(
+      out_profile.GetFilename(), &output_profile_contents));
+  ASSERT_EQ(output_profile_contents, expected_profile_content);
+
+    // Verify the boot profile contents.
+  std::string output_preloaded_contents;
+  ASSERT_TRUE(android::base::ReadFileToString(
+      out_preloaded_classes.GetFilename(), &output_preloaded_contents));
+  ASSERT_EQ(output_preloaded_contents, expected_preloaded_content);
 }
 
 TEST_F(ProfileAssistantTest, TestProfileCreationOneNotMatched) {
