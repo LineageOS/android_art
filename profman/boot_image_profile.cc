@@ -185,10 +185,13 @@ static bool IncludeClassInProfile(const TypeReference& type_ref,
 
 // Returns true iff a class with the given metada should be included in the list of
 // prelaoded classes.
-static bool IncludeInPreloadedClasses(uint32_t max_aggregation_count,
+static bool IncludeInPreloadedClasses(const std::string& class_name,
+                                      uint32_t max_aggregation_count,
                                       const FlattenProfileData::ItemMetadata& metadata,
                                       const BootImageOptions& options) {
-  return IncludeItemInProfile(
+  bool blacklisted = options.preloaded_classes_blacklist.find(class_name) !=
+      options.preloaded_classes_blacklist.end();
+  return !blacklisted && IncludeItemInProfile(
       max_aggregation_count, options.preloaded_class_threshold, metadata, options);
 }
 
@@ -235,11 +238,13 @@ bool GenerateBootImageProfile(
             options)) {
       profile_classes.Put(BootImageRepresentation(it.first), it.second);
     }
+    std::string preloaded_class_representation = PreloadedClassesRepresentation(it.first);
     if (generate_preloaded_classes && IncludeInPreloadedClasses(
+            preloaded_class_representation,
             flattenData->GetMaxAggregationForClasses(),
             metadata,
             options)) {
-      preloaded_classes.Put(PreloadedClassesRepresentation(it.first), it.second);
+      preloaded_classes.Put(preloaded_class_representation, it.second);
     }
   }
 
