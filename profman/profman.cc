@@ -149,23 +149,25 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("");
   UsageError("  --generate-boot-image-profile: Generate a boot image profile based on input");
   UsageError("      profiles. Requires passing in dex files to inspect properties of classes.");
-  UsageError("  --method-threshold=percentage between 0 and 100"
-             "      what threshold to apply to the methods when deciding whether or not to"
-             "      include it in the final profile.");
-  UsageError("  --class-threshold=percentage between 0 and 100"
-             "      what threshold to apply to the classes when deciding whether or not to"
-             "      include it in the final profile.");
-  UsageError("  --clean-class-threshold=percentage between 0 and 100"
-             "      what threshold to apply to the clean classes when deciding whether or not to"
-             "      include it in the final profile.");
-  UsageError("  --preloaded-class-threshold=percentage between 0 and 100"
-            "      what threshold to apply to the classes when deciding whether or not to"
-            "       include it in the final preloaded classes.");
-  UsageError("  --upgrade-startup-to-hot=true|false:"
-             "      whether or not to upgrade startup methods to hot");
-  UsageError("  --special-package=pkg_name:percentage between 0 and 100"
-             "      what threshold to apply to the methods/classes that are used by the given"
-             "      package when deciding whether or not to include it in the final profile.");
+  UsageError("  --method-threshold=percentage between 0 and 100");
+  UsageError("      what threshold to apply to the methods when deciding whether or not to");
+  UsageError("      include it in the final profile.");
+  UsageError("  --class-threshold=percentage between 0 and 100");
+  UsageError("      what threshold to apply to the classes when deciding whether or not to");
+  UsageError("      include it in the final profile.");
+  UsageError("  --clean-class-threshold=percentage between 0 and 100");
+  UsageError("      what threshold to apply to the clean classes when deciding whether or not to");
+  UsageError("      include it in the final profile.");
+  UsageError("  --preloaded-class-threshold=percentage between 0 and 100");
+  UsageError("      what threshold to apply to the classes when deciding whether or not to");
+  UsageError("      include it in the final preloaded classes.");
+  UsageError("  --preloaded-classes-blacklist=file");
+  UsageError("      a file listing the classes that should not be preloaded in Zygote");
+  UsageError("  --upgrade-startup-to-hot=true|false:");
+  UsageError("      whether or not to upgrade startup methods to hot");
+  UsageError("  --special-package=pkg_name:percentage between 0 and 100");
+  UsageError("      what threshold to apply to the methods/classes that are used by the given");
+  UsageError("      package when deciding whether or not to include it in the final profile.");
   UsageError("  --debug-append-uses=bool: whether or not to append package use as debug info.");
   UsageError("  --out-profile-path=path: boot image profile output path");
   UsageError("  --out-preloaded-classes-path=path: preloaded classes output path");
@@ -343,6 +345,15 @@ class ProfMan final {
                         &boot_image_options_.preloaded_class_threshold,
                         0u,
                         100u);
+      } else if (StartsWith(option, "--preloaded-classes-blacklist=")) {
+        std::string preloaded_classes_blacklist =
+            std::string(option.substr(strlen("--preloaded-classes-blacklist=")));
+        // Read the user-specified list of methods.
+        std::unique_ptr<std::set<std::string>>
+            blacklist(ReadCommentedInputFromFile<std::set<std::string>>(
+                preloaded_classes_blacklist.c_str(), nullptr));  // No post-processing.
+        boot_image_options_.preloaded_classes_blacklist.insert(
+            blacklist->begin(), blacklist->end());
       } else if (StartsWith(option, "--upgrade-startup-to-hot=")) {
         ParseBoolOption(raw_option,
                         "--upgrade-startup-to-hot=",
