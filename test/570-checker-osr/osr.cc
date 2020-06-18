@@ -130,7 +130,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureHasOsrCode(JNIEnv* env,
           usleep(1000);
           // Will either ensure it's compiled or do the compilation itself.
           jit->CompileMethod(
-              m, Thread::Current(), /*baseline=*/ false, /*osr=*/ true, /*prejit=*/ false);
+              m, Thread::Current(), CompilationKind::kOsr, /*prejit=*/ false);
         }
       });
 }

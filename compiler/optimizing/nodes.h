@@ -33,6 +33,7 @@
 #include "base/transform_array_ref.h"
 #include "art_method.h"
 #include "class_root.h"
+#include "compilation_kind.h"
 #include "data_type.h"
 #include "deoptimization_kind.h"
 #include "dex/dex_file.h"
@@ -378,8 +379,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
          InvokeType invoke_type = kInvalidInvokeType,
          bool dead_reference_safe = false,
          bool debuggable = false,
-         bool osr = false,
-         bool baseline = false,
+         CompilationKind compilation_kind = CompilationKind::kOptimized,
          int start_instruction_id = 0)
       : allocator_(allocator),
         arena_stack_(arena_stack),
@@ -415,8 +415,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         cached_double_constants_(std::less<int64_t>(), allocator->Adapter(kArenaAllocConstantsMap)),
         cached_current_method_(nullptr),
         art_method_(nullptr),
-        osr_(osr),
-        baseline_(baseline),
+        compilation_kind_(compilation_kind),
         cha_single_implementation_list_(allocator->Adapter(kArenaAllocCHA)) {
     blocks_.reserve(kDefaultNumberOfBlocks);
   }
@@ -645,9 +644,11 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
     return instruction_set_;
   }
 
-  bool IsCompilingOsr() const { return osr_; }
+  bool IsCompilingOsr() const { return compilation_kind_ == CompilationKind::kOsr; }
 
-  bool IsCompilingBaseline() const { return baseline_; }
+  bool IsCompilingBaseline() const { return compilation_kind_ == CompilationKind::kBaseline; }
+
+  CompilationKind GetCompilationKind() const { return compilation_kind_; }
 
   ArenaSet<ArtMethod*>& GetCHASingleImplementationList() {
     return cha_single_implementation_list_;
@@ -837,14 +838,11 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   // (such as when the superclass could not be found).
   ArtMethod* art_method_;
 
-  // Whether we are compiling this graph for on stack replacement: this will
-  // make all loops seen as irreducible and emit special stack maps to mark
-  // compiled code entries which the interpreter can directly jump to.
-  const bool osr_;
-
-  // Whether we are compiling baseline (not running optimizations). This affects
-  // the code being generated.
-  const bool baseline_;
+  // How we are compiling the graph: either optimized, osr, or baseline.
+  // For osr, we will make all loops seen as irreducible and emit special
+  // stack maps to mark compiled code entries which the interpreter can
+  // directly jump to.
+  const CompilationKind compilation_kind_;
 
   // List of methods that are assumed to have single implementation.
   ArenaSet<ArtMethod*> cha_single_implementation_list_;
