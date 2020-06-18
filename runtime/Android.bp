@@ -485,6 +485,7 @@ gensrcs {
         "base/callee_save_type.h",
         "base/locks.h",
         "class_status.h",
+        "compilation_kind.h",
         "gc_root.h",
         "gc/allocator_type.h",
         "gc/allocator/rosalloc.h",
