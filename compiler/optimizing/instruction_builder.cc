@@ -34,6 +34,7 @@
 #include "oat_file.h"
 #include "optimizing_compiler_stats.h"
 #include "quicken_info.h"
+#include "reflective_handle_scope-inl.h"
 #include "scoped_thread_state_change-inl.h"
 #include "sharpening.h"
 #include "ssa_builder.h"
@@ -1934,7 +1935,14 @@ ArtField* HInstructionBuilder::ResolveField(uint16_t field_idx, bool is_static, 
     return nullptr;
   }
 
-  return resolved_field;
+  StackArtFieldHandleScope<1> rhs(soa.Self());
+  ReflectiveHandle<ArtField> resolved_field_handle(rhs.NewHandle(resolved_field));
+  if (resolved_field->ResolveType().IsNull()) {
+    // ArtField::ResolveType() may fail as evidenced with a dexing bug (b/78788577).
+    soa.Self()->ClearException();
+    return nullptr;  // Failure
+  }
+  return resolved_field_handle.Get();
 }
 
 void HInstructionBuilder::BuildStaticFieldAccess(const Instruction& instruction,
