@@ -37,10 +37,12 @@ class InstructionSimplifierVisitor : public HGraphDelegateVisitor {
  public:
   InstructionSimplifierVisitor(HGraph* graph,
                                CodeGenerator* codegen,
-                               OptimizingCompilerStats* stats)
+                               OptimizingCompilerStats* stats,
+                               bool be_loop_friendly)
       : HGraphDelegateVisitor(graph),
         codegen_(codegen),
-        stats_(stats) {}
+        stats_(stats),
+        be_loop_friendly_(be_loop_friendly) {}
 
   bool Run();
 
@@ -65,6 +67,7 @@ class InstructionSimplifierVisitor : public HGraphDelegateVisitor {
   bool TryHandleAssociativeAndCommutativeOperation(HBinaryOperation* instruction);
   bool TrySubtractionChainSimplification(HBinaryOperation* instruction);
   bool TryCombineVecMultiplyAccumulate(HVecMul* mul);
+  void TryToReuseDiv(HRem* rem);
 
   void VisitShift(HBinaryOperation* shift);
   void VisitEqual(HEqual* equal) override;
@@ -90,6 +93,7 @@ class InstructionSimplifierVisitor : public HGraphDelegateVisitor {
   void VisitAbove(HAbove* condition) override;
   void VisitAboveOrEqual(HAboveOrEqual* condition) override;
   void VisitDiv(HDiv* instruction) override;
+  void VisitRem(HRem* instruction) override;
   void VisitMul(HMul* instruction) override;
   void VisitNeg(HNeg* instruction) override;
   void VisitNot(HNot* instruction) override;
@@ -122,6 +126,13 @@ class InstructionSimplifierVisitor : public HGraphDelegateVisitor {
   OptimizingCompilerStats* stats_;
   bool simplification_occurred_ = false;
   int simplifications_at_current_position_ = 0;
+  // Prohibit optimizations which can affect HInductionVarAnalysis/HLoopOptimization
+  // and prevent loop optimizations:
+  //   true - avoid such optimizations.
+  //   false - allow such optimizations.
+  // Checked by the following optimizations:
+  //   - TryToReuseDiv: simplification of Div+Rem into Div+Mul+Sub.
+  bool be_loop_friendly_;
   // We ensure we do not loop infinitely. The value should not be too high, since that
   // would allow looping around the same basic block too many times. The value should
   // not be too low either, however, since we want to allow revisiting a basic block
@@ -135,7 +146,9 @@ bool InstructionSimplifier::Run() {
     visitor.VisitReversePostOrder();
   }
 
-  InstructionSimplifierVisitor visitor(graph_, codegen_, stats_);
+  bool be_loop_friendly = (use_all_optimizations_ == false);
+
+  InstructionSimplifierVisitor visitor(graph_, codegen_, stats_, be_loop_friendly);
   return visitor.Run();
 }
 
@@ -1689,6 +1702,71 @@ void InstructionSimplifierVisitor::VisitDiv(HDiv* instruction) {
       return;
     }
   }
+}
+
+
+// Search HDiv having the specified dividend and divisor which is in the specified basic block.
+// Return nullptr if nothing has been found.
+static HInstruction* FindDivWithInputsInBasicBlock(HInstruction* dividend,
+                                                   HInstruction* divisor,
+                                                   HBasicBlock* basic_block) {
+  for (const HUseListNode<HInstruction*>& use : dividend->GetUses()) {
+    HInstruction* user = use.GetUser();
+    if (user->GetBlock() == basic_block && user->IsDiv() && user->InputAt(1) == divisor) {
+      return user;
+    }
+  }
+  return nullptr;
+}
+
+// If there is Div with the same inputs as Rem and in the same basic block, it can be reused.
+// Rem is replaced with Mul+Sub which use the found Div.
+void InstructionSimplifierVisitor::TryToReuseDiv(HRem* rem) {
+  // As the optimization replaces Rem with Mul+Sub they prevent some loop optimizations
+  // if the Rem is in a loop.
+  // Check if it is allowed to optimize such Rems.
+  if (rem->IsInLoop() && be_loop_friendly_) {
+    return;
+  }
+  DataType::Type type = rem->GetResultType();
+  if (!DataType::IsIntOrLongType(type)) {
+    return;
+  }
+
+  HBasicBlock* basic_block = rem->GetBlock();
+  HInstruction* dividend = rem->GetLeft();
+  HInstruction* divisor = rem->GetRight();
+
+  if (divisor->IsConstant()) {
+    HConstant* input_cst = rem->GetConstantRight();
+    DCHECK(input_cst->IsIntConstant() || input_cst->IsLongConstant());
+    int64_t cst_value = Int64FromConstant(input_cst);
+    if (cst_value == std::numeric_limits<int64_t>::min() || IsPowerOfTwo(std::abs(cst_value))) {
+      // Such cases are usually handled in the code generator because they don't need Div at all.
+      return;
+    }
+  }
+
+  HInstruction* quotient = FindDivWithInputsInBasicBlock(dividend, divisor, basic_block);
+  if (quotient == nullptr) {
+    return;
+  }
+  if (!quotient->StrictlyDominates(rem)) {
+    quotient->MoveBefore(rem);
+  }
+
+  ArenaAllocator* allocator = GetGraph()->GetAllocator();
+  HInstruction* mul = new (allocator) HMul(type, quotient, divisor);
+  basic_block->InsertInstructionBefore(mul, rem);
+  HInstruction* sub = new (allocator) HSub(type, dividend, mul);
+  basic_block->InsertInstructionBefore(sub, rem);
+  rem->ReplaceWith(sub);
+  basic_block->RemoveInstruction(rem);
+  RecordSimplification();
+}
+
+void InstructionSimplifierVisitor::VisitRem(HRem* rem) {
+  TryToReuseDiv(rem);
 }
 
 void InstructionSimplifierVisitor::VisitMul(HMul* instruction) {
