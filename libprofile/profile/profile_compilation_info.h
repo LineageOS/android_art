@@ -17,6 +17,7 @@
 #ifndef ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
 #define ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
 
+#include <list>
 #include <set>
 #include <vector>
 
@@ -60,6 +61,8 @@ struct ProfileMethodInfo {
   MethodReference ref;
   std::vector<ProfileInlineCache> inline_caches;
 };
+
+class FlattenProfileData;
 
 /**
  * Profile information in a format suitable to be queried by the compiler and
@@ -306,6 +309,10 @@ class ProfileCompilationInfo {
 
     bool operator==(const ProfileSampleAnnotation& other) const;
 
+    bool operator<(const ProfileSampleAnnotation& other) const {
+      return origin_package_name_ < other.origin_package_name_;
+    }
+
     // A convenient empty annotation object that can be used to denote that no annotation should
     // be associated with the profile samples.
     static const ProfileSampleAnnotation kNone;
@@ -498,6 +505,10 @@ class ProfileCompilationInfo {
   // Returns a base key without the annotation information.
   static std::string GetBaseKeyFromAugmentedKey(const std::string& profile_key);
 
+  // Returns the annotations from an augmented key.
+  // If the key is a base key it return ProfileSampleAnnotation::kNone.
+  static ProfileSampleAnnotation GetAnnotationFromKey(const std::string& augmented_key);
+
   // Generate a test profile which will contain a percentage of the total maximum
   // number of methods and classes (method_ratio and class_ratio).
   static bool GenerateTestProfile(int fd,
@@ -560,6 +571,15 @@ class ProfileCompilationInfo {
 
   // Return the version of this profile.
   const uint8_t* GetVersion() const;
+
+  // Extracts the data that the profile has on the given dex files:
+  //  - for each method and class, a list of the corresponding annotations and flags
+  //  - the maximum number of aggregations for classes and classes across dex files with different
+  //    annotations (essentially this sums up how many different packages used the corresponding
+  //    method). This information is reconstructible from the other two pieces of info, but it's
+  //    convenient to have it precomputed.
+  std::unique_ptr<FlattenProfileData> ExtractProfileData(
+      const std::vector<std::unique_ptr<const DexFile>>& dex_files) const;
 
  private:
   enum ProfileLoadStatus {
@@ -694,6 +714,11 @@ class ProfileCompilationInfo {
   const DexFileData* FindDexDataUsingAnnotations(
       const DexFile* dex_file,
       const ProfileSampleAnnotation& annotation) const;
+
+  // Same as FindDexDataUsingAnnotations but extracts the data for all annotations.
+  void FindAllDexData(
+      const DexFile* dex_file,
+      /*out*/ std::vector<const ProfileCompilationInfo::DexFileData*>* result) const;
 
   // Inflate the input buffer (in_buffer) of size in_size. It returns a buffer of
   // compressed data for the input buffer of "compressed_data_size" size.
@@ -949,8 +974,78 @@ class ProfileCompilationInfo {
   uint8_t version_[kProfileVersionSize];
 };
 
+/**
+ * Flatten profile data that list all methods and type references together
+ * with their metadata (such as flags or annotation list).
+ */
+class FlattenProfileData {
+ public:
+  class ItemMetadata {
+   public:
+    ItemMetadata();
+    ItemMetadata(const ItemMetadata& other);
+
+    uint16_t GetFlags() const {
+      return flags_;
+    }
+
+    const std::set<ProfileCompilationInfo::ProfileSampleAnnotation>& GetAnnotations() const {
+      return annotations_;
+    }
+
+    void AddFlag(ProfileCompilationInfo::MethodHotness::Flag flag) {
+      flags_ |= flag;
+    }
+
+    bool HasFlagSet(ProfileCompilationInfo::MethodHotness::Flag flag) const {
+      return (flags_ & flag) != 0;
+    }
+
+   private:
+    // will be 0 for classes and MethodHotness::Flags for methods.
+    uint16_t flags_;
+    std::set<ProfileCompilationInfo::ProfileSampleAnnotation> annotations_;
+
+    friend class ProfileCompilationInfo;
+  };
+
+  FlattenProfileData();
+
+  const SafeMap<MethodReference, ItemMetadata>& GetMethodData() const {
+    return method_metadata_;
+  }
+
+  const SafeMap<TypeReference, ItemMetadata>& GetClassData() const {
+    return class_metadata_;
+  }
+
+  uint32_t GetMaxAggregationForMethods() const {
+    return max_aggregation_for_methods_;
+  }
+
+  uint32_t GetMaxAggregationForClasses() const {
+    return max_aggregation_for_classes_;
+  }
+
+ private:
+  // Method data.
+  SafeMap<MethodReference, ItemMetadata> method_metadata_;
+  // Class data.
+  SafeMap<TypeReference, ItemMetadata> class_metadata_;
+  // Maximum aggregation counter for all methods.
+  // This is essentially a cache equal to the max size of any method's annation set.
+  // It avoids the traversal of all the methods which can be quite expensive.
+  uint32_t max_aggregation_for_methods_;
+  // Maximum aggregation counter for all classes.
+  // Simillar to max_aggregation_for_methods_.
+  uint32_t max_aggregation_for_classes_;
+
+  friend class ProfileCompilationInfo;
+};
+
 std::ostream& operator<<(std::ostream& stream,
                          const ProfileCompilationInfo::DexReference& dex_ref);
+
 }  // namespace art
 
 #endif  // ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
