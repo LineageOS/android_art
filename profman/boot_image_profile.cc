@@ -198,6 +198,13 @@ bool GenerateBootImageProfile(
     const BootImageOptions& options,
     const std::string& boot_profile_out_path,
     const std::string& preloaded_classes_out_path) {
+  if (boot_profile_out_path.empty()) {
+    LOG(ERROR) << "No output file specified";
+    return false;
+  }
+
+  bool generate_preloaded_classes = !preloaded_classes_out_path.empty();
+
   std::unique_ptr<FlattenProfileData> flattenData = profile.ExtractProfileData(dex_files);
 
   // We want the output sorted by the method/class name.
@@ -228,7 +235,7 @@ bool GenerateBootImageProfile(
             options)) {
       profile_classes.Put(BootImageRepresentation(it.first), it.second);
     }
-    if (IncludeInPreloadedClasses(
+    if (generate_preloaded_classes && IncludeInPreloadedClasses(
             flattenData->GetMaxAggregationForClasses(),
             metadata,
             options)) {
@@ -247,13 +254,17 @@ bool GenerateBootImageProfile(
     profile_content += MethodToProfileFormat(it.first, it.second, options.append_package_use_list)
         + "\n";
   }
-  for (const auto& it : preloaded_classes) {
-    preloaded_content += ClassToProfileFormat(it.first, it.second, options.append_package_use_list)
-        + "\n";
+
+  if (generate_preloaded_classes) {
+    for (const auto& it : preloaded_classes) {
+      preloaded_content +=
+          ClassToProfileFormat(it.first, it.second, options.append_package_use_list) + "\n";
+    }
   }
 
   return android::base::WriteStringToFile(profile_content, boot_profile_out_path)
-      && android::base::WriteStringToFile(preloaded_content, preloaded_classes_out_path);
+      && (!generate_preloaded_classes
+          || android::base::WriteStringToFile(preloaded_content, preloaded_classes_out_path));
 }
 
 }  // namespace art
