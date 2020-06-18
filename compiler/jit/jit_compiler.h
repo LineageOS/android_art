@@ -18,6 +18,7 @@
 #define ART_COMPILER_JIT_JIT_COMPILER_H_
 
 #include "base/mutex.h"
+#include "compilation_kind.h"
 
 #include "jit/jit.h"
 
@@ -40,7 +41,7 @@ class JitCompiler : public JitCompilerInterface {
 
   // Compilation entrypoint. Returns whether the compilation succeeded.
   bool CompileMethod(
-      Thread* self, JitMemoryRegion* region, ArtMethod* method, bool baseline, bool osr)
+      Thread* self, JitMemoryRegion* region, ArtMethod* method, CompilationKind kind)
       REQUIRES_SHARED(Locks::mutator_lock_) override;
 
   const CompilerOptions& GetCompilerOptions() const {

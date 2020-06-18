@@ -2045,8 +2045,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
       invoke_type,
       callee_dead_reference_safe,
       graph_->IsDebuggable(),
-      /* osr= */ false,
-      /* baseline= */ graph_->IsCompilingBaseline(),
+      graph_->GetCompilationKind(),
       /* start_instruction_id= */ caller_instruction_counter);
   callee_graph->SetArtMethod(resolved_method);
 

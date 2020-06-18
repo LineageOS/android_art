@@ -32,6 +32,7 @@
 #include "base/mem_map.h"
 #include "base/mutex.h"
 #include "base/safe_map.h"
+#include "compilation_kind.h"
 #include "jit_memory_region.h"
 
 namespace art {
@@ -195,9 +196,8 @@ class JitCodeCache {
 
   bool NotifyCompilationOf(ArtMethod* method,
                            Thread* self,
-                           bool osr,
+                           CompilationKind compilation_kind,
                            bool prejit,
-                           bool baseline,
                            JitMemoryRegion* region)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
@@ -214,7 +214,7 @@ class JitCodeCache {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
-  void DoneCompiling(ArtMethod* method, Thread* self, bool osr, bool baseline)
+  void DoneCompiling(ArtMethod* method, Thread* self, CompilationKind compilation_kind)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -268,7 +268,7 @@ class JitCodeCache {
               ArrayRef<const uint8_t> stack_map,      // Compiler output (source).
               const std::vector<uint8_t>& debug_info,
               bool is_full_debug_info,
-              bool osr,
+              CompilationKind compilation_kind,
               bool has_should_deoptimize_flag,
               const ArenaSet<ArtMethod*>& cha_single_implementation_list)
       REQUIRES_SHARED(Locks::mutator_lock_)
@@ -500,16 +500,15 @@ class JitCodeCache {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Record that `method` is being compiled with the given mode.
-  // TODO: introduce an enum for the mode.
-  void AddMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+  void AddMethodBeingCompiled(ArtMethod* method, CompilationKind compilation_kind)
       REQUIRES(Locks::jit_lock_);
 
   // Remove `method` from the list of methods meing compiled with the given mode.
-  void RemoveMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+  void RemoveMethodBeingCompiled(ArtMethod* method, CompilationKind compilation_kind)
       REQUIRES(Locks::jit_lock_);
 
   // Return whether `method` is being compiled with the given mode.
-  bool IsMethodBeingCompiled(ArtMethod* method, bool osr, bool baseline)
+  bool IsMethodBeingCompiled(ArtMethod* method, CompilationKind compilation_kind)
       REQUIRES(Locks::jit_lock_);
 
   // Return whether `method` is being compiled in any mode.
