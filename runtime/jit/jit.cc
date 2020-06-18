@@ -28,6 +28,7 @@
 #include "base/scoped_flock.h"
 #include "base/utils.h"
 #include "class_root-inl.h"
+#include "compilation_kind.h"
 #include "debugger.h"
 #include "dex/type_lookup_table.h"
 #include "gc/space/image_space.h"
@@ -289,7 +290,10 @@ bool Jit::LoadCompilerLibrary(std::string* error_msg) {
   return true;
 }
 
-bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr, bool prejit) {
+bool Jit::CompileMethod(ArtMethod* method,
+                        Thread* self,
+                        CompilationKind compilation_kind,
+                        bool prejit) {
   DCHECK(Runtime::Current()->UseJitCompilation());
   DCHECK(!method->IsRuntimeMethod());
 
@@ -319,7 +323,7 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   }
 
   JitMemoryRegion* region = GetCodeCache()->GetCurrentRegion();
-  if (osr && GetCodeCache()->IsSharedRegion(*region)) {
+  if ((compilation_kind == CompilationKind::kOsr) && GetCodeCache()->IsSharedRegion(*region)) {
     VLOG(jit) << "JIT not osr compiling "
               << method->PrettyMethod()
               << " due to using shared region";
@@ -329,20 +333,20 @@ bool Jit::CompileMethod(ArtMethod* method, Thread* self, bool baseline, bool osr
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
   ArtMethod* method_to_compile = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
-  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, osr, prejit, baseline, region)) {
+  if (!code_cache_->NotifyCompilationOf(
+          method_to_compile, self, compilation_kind, prejit, region)) {
     return false;
   }
 
   VLOG(jit) << "Compiling method "
             << ArtMethod::PrettyMethod(method_to_compile)
-            << " osr=" << std::boolalpha << osr
-            << " baseline=" << std::boolalpha << baseline;
-  bool success = jit_compiler_->CompileMethod(self, region, method_to_compile, baseline, osr);
-  code_cache_->DoneCompiling(method_to_compile, self, osr, baseline);
+            << " kind=" << compilation_kind;
+  bool success = jit_compiler_->CompileMethod(self, region, method_to_compile, compilation_kind);
+  code_cache_->DoneCompiling(method_to_compile, self, compilation_kind);
   if (!success) {
     VLOG(jit) << "Failed to compile method "
               << ArtMethod::PrettyMethod(method_to_compile)
-              << " osr=" << std::boolalpha << osr;
+              << " kind=" << compilation_kind;
   }
   if (kIsDebugBuild) {
     if (self->IsExceptionPending()) {
@@ -758,12 +762,11 @@ class JitCompileTask final : public Task {
   enum class TaskKind {
     kAllocateProfile,
     kCompile,
-    kCompileBaseline,
-    kCompileOsr,
     kPreCompile,
   };
 
-  JitCompileTask(ArtMethod* method, TaskKind kind) : method_(method), kind_(kind), klass_(nullptr) {
+  JitCompileTask(ArtMethod* method, TaskKind task_kind, CompilationKind compilation_kind)
+      : method_(method), kind_(task_kind), compilation_kind_(compilation_kind), klass_(nullptr) {
     ScopedObjectAccess soa(Thread::Current());
     // For a non-bootclasspath class, add a global ref to the class to prevent class unloading
     // until compilation is done.
@@ -787,15 +790,12 @@ class JitCompileTask final : public Task {
     {
       ScopedObjectAccess soa(self);
       switch (kind_) {
-        case TaskKind::kPreCompile:
         case TaskKind::kCompile:
-        case TaskKind::kCompileBaseline:
-        case TaskKind::kCompileOsr: {
+        case TaskKind::kPreCompile: {
           Runtime::Current()->GetJit()->CompileMethod(
               method_,
               self,
-              /* baseline= */ (kind_ == TaskKind::kCompileBaseline),
-              /* osr= */ (kind_ == TaskKind::kCompileOsr),
+              compilation_kind_,
               /* prejit= */ (kind_ == TaskKind::kPreCompile));
           break;
         }
@@ -817,6 +817,7 @@ class JitCompileTask final : public Task {
  private:
   ArtMethod* const method_;
   const TaskKind kind_;
+  const CompilationKind compilation_kind_;
   jobject klass_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(JitCompileTask);
@@ -1343,9 +1344,10 @@ bool Jit::CompileMethodFromProfile(Thread* self,
       (entry_point == GetQuickResolutionStub())) {
     method->SetPreCompiled();
     if (!add_to_queue) {
-      CompileMethod(method, self, /* baseline= */ false, /* osr= */ false, /* prejit= */ true);
+      CompileMethod(method, self, CompilationKind::kOptimized, /* prejit= */ true);
     } else {
-      Task* task = new JitCompileTask(method, JitCompileTask::TaskKind::kPreCompile);
+      Task* task = new JitCompileTask(
+          method, JitCompileTask::TaskKind::kPreCompile, CompilationKind::kOptimized);
       if (compile_after_boot) {
         MutexLock mu(Thread::Current(), boot_completed_lock_);
         if (!boot_completed_) {
@@ -1553,7 +1555,10 @@ bool Jit::MaybeCompileMethod(Thread* self,
         // We failed allocating. Instead of doing the collection on the Java thread, we push
         // an allocation to a compiler thread, that will do the collection.
         thread_pool_->AddTask(
-            self, new JitCompileTask(method, JitCompileTask::TaskKind::kAllocateProfile));
+            self,
+            new JitCompileTask(method,
+                               JitCompileTask::TaskKind::kAllocateProfile,
+                               CompilationKind::kOptimized));  // Dummy compilation kind.
       }
     }
   }
@@ -1561,11 +1566,13 @@ bool Jit::MaybeCompileMethod(Thread* self,
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
       if (!code_cache_->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
         DCHECK(thread_pool_ != nullptr);
-        JitCompileTask::TaskKind kind =
+        CompilationKind compilation_kind =
             (options_->UseTieredJitCompilation() || options_->UseBaselineCompiler())
-                ? JitCompileTask::TaskKind::kCompileBaseline
-                : JitCompileTask::TaskKind::kCompile;
-        thread_pool_->AddTask(self, new JitCompileTask(method, kind));
+                ? CompilationKind::kBaseline
+                : CompilationKind::kOptimized;
+        thread_pool_->AddTask(
+            self,
+            new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, compilation_kind));
       }
     }
     if (old_count < OSRMethodThreshold() && new_count >= OSRMethodThreshold()) {
@@ -1576,7 +1583,8 @@ bool Jit::MaybeCompileMethod(Thread* self,
       if (!code_cache_->IsOsrCompiled(method)) {
         DCHECK(thread_pool_ != nullptr);
         thread_pool_->AddTask(
-            self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileOsr));
+            self,
+            new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, CompilationKind::kOsr));
       }
     }
   }
@@ -1592,7 +1600,10 @@ void Jit::EnqueueOptimizedCompilation(ArtMethod* method, Thread* self) {
   // task that will compile optimize the method.
   if (options_->UseTieredJitCompilation()) {
     thread_pool_->AddTask(
-        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+        self,
+        new JitCompileTask(method,
+                           JitCompileTask::TaskKind::kCompile,
+                           CompilationKind::kOptimized));
   }
 }
 
@@ -1623,7 +1634,8 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
       }
       // TODO(ngeoffray): For JIT at first use, use kPreCompile. Currently we don't due to
       // conflicts with jitzygote optimizations.
-      JitCompileTask compile_task(method, JitCompileTask::TaskKind::kCompile);
+      JitCompileTask compile_task(
+          method, JitCompileTask::TaskKind::kCompile, CompilationKind::kOptimized);
       // Fake being in a runtime thread so that class-load behavior will be the same as normal jit.
       ScopedSetRuntimeThread ssrt(thread);
       compile_task.Run(thread);
@@ -1852,16 +1864,21 @@ void Jit::EnqueueCompilationFromNterp(ArtMethod* method, Thread* self) {
     // If we already have compiled code for it, nterp may be stuck in a loop.
     // Compile OSR.
     thread_pool_->AddTask(
-        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileOsr));
+        self,
+        new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, CompilationKind::kOsr));
     return;
   }
   if (GetCodeCache()->CanAllocateProfilingInfo()) {
     ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
     thread_pool_->AddTask(
-        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompileBaseline));
+        self,
+        new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, CompilationKind::kBaseline));
   } else {
     thread_pool_->AddTask(
-        self, new JitCompileTask(method, JitCompileTask::TaskKind::kCompile));
+        self,
+        new JitCompileTask(method,
+                           JitCompileTask::TaskKind::kCompile,
+                           CompilationKind::kOptimized));
   }
 }
 

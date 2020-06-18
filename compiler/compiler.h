@@ -19,6 +19,7 @@
 
 #include "base/mutex.h"
 #include "base/os.h"
+#include "compilation_kind.h"
 #include "dex/invoke_type.h"
 
 namespace art {
@@ -75,8 +76,7 @@ class Compiler {
                           jit::JitCodeCache* code_cache ATTRIBUTE_UNUSED,
                           jit::JitMemoryRegion* region ATTRIBUTE_UNUSED,
                           ArtMethod* method ATTRIBUTE_UNUSED,
-                          bool baseline ATTRIBUTE_UNUSED,
-                          bool osr ATTRIBUTE_UNUSED,
+                          CompilationKind compilation_kind ATTRIBUTE_UNUSED,
                           jit::JitLogger* jit_logger ATTRIBUTE_UNUSED)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     return false;
