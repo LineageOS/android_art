@@ -2304,7 +2304,7 @@ std::unique_ptr<FlattenProfileData> ProfileCompilationInfo::ExtractProfileData(
 
   std::unique_ptr<FlattenProfileData> result(new FlattenProfileData());
 
-  auto createMetadataFn = []() { return FlattenProfileData::ItemMetadata(); };
+  auto create_metadata_fn = []() { return FlattenProfileData::ItemMetadata(); };
 
   // Iterate through all the dex files, find the methods/classes associated with each of them,
   // and add them to the flatten result.
@@ -2328,9 +2328,9 @@ std::unique_ptr<FlattenProfileData> ProfileCompilationInfo::ExtractProfileData(
         // The method is in the profile, create metadata item for it and added to the result.
         MethodReference ref(dex_file.get(), method_idx);
         FlattenProfileData::ItemMetadata& metadata =
-            result->method_metadata_.GetOrCreate(ref, createMetadataFn);
+            result->method_metadata_.GetOrCreate(ref, create_metadata_fn);
         metadata.flags_ |= hotness.flags_;
-        metadata.annotations_.insert(annotation);
+        metadata.annotations_.push_back(annotation);
         // Update the max aggregation counter for methods.
         // This is essentially a cache, to avoid traversing all the methods just to find out
         // this value.
@@ -2343,8 +2343,8 @@ std::unique_ptr<FlattenProfileData> ProfileCompilationInfo::ExtractProfileData(
       for (const dex::TypeIndex& type_index : dex_data->class_set) {
         TypeReference ref(dex_file.get(), type_index);
         FlattenProfileData::ItemMetadata& metadata =
-            result->class_metadata_.GetOrCreate(ref, createMetadataFn);
-        metadata.annotations_.insert(annotation);
+            result->class_metadata_.GetOrCreate(ref, create_metadata_fn);
+        metadata.annotations_.push_back(annotation);
         // Update the max aggregation counter for classes.
         result->max_aggregation_for_classes_ = std::max(
             result->max_aggregation_for_classes_,
@@ -2354,6 +2354,42 @@ std::unique_ptr<FlattenProfileData> ProfileCompilationInfo::ExtractProfileData(
   }
 
   return result;
+}
+
+void FlattenProfileData::MergeData(const FlattenProfileData& other) {
+  auto create_metadata_fn = []() { return FlattenProfileData::ItemMetadata(); };
+  for (const auto& it : other.method_metadata_) {
+    const MethodReference& otherRef = it.first;
+    const FlattenProfileData::ItemMetadata otherData = it.second;
+    const std::list<ProfileCompilationInfo::ProfileSampleAnnotation>& other_annotations =
+        otherData.GetAnnotations();
+
+    FlattenProfileData::ItemMetadata& metadata =
+        method_metadata_.GetOrCreate(otherRef, create_metadata_fn);
+    metadata.flags_ |= otherData.GetFlags();
+    metadata.annotations_.insert(
+        metadata.annotations_.end(), other_annotations.begin(), other_annotations.end());
+
+    max_aggregation_for_methods_ = std::max(
+          max_aggregation_for_methods_,
+          static_cast<uint32_t>(metadata.annotations_.size()));
+  }
+  for (const auto& it : other.class_metadata_) {
+    const TypeReference& otherRef = it.first;
+    const FlattenProfileData::ItemMetadata otherData = it.second;
+    const std::list<ProfileCompilationInfo::ProfileSampleAnnotation>& other_annotations =
+        otherData.GetAnnotations();
+
+    FlattenProfileData::ItemMetadata& metadata =
+        class_metadata_.GetOrCreate(otherRef, create_metadata_fn);
+    metadata.flags_ |= otherData.GetFlags();
+    metadata.annotations_.insert(
+        metadata.annotations_.end(), other_annotations.begin(), other_annotations.end());
+
+    max_aggregation_for_classes_ = std::max(
+          max_aggregation_for_classes_,
+          static_cast<uint32_t>(metadata.annotations_.size()));
+  }
 }
 
 }  // namespace art
