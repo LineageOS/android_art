@@ -860,20 +860,102 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;
   ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
 
-  // std::vector<std::string> args1({"cp", out_profile.GetFilename(), "~/profile-test"});
-  // EXPECT_EQ(ExecAndReturnCode(args1, &error), 0) << error;
-
   // Verify the boot profile contents.
   std::string output_profile_contents;
   ASSERT_TRUE(android::base::ReadFileToString(
       out_profile.GetFilename(), &output_profile_contents));
   ASSERT_EQ(output_profile_contents, expected_profile_content);
 
-    // Verify the boot profile contents.
+    // Verify the preloaded classes content.
   std::string output_preloaded_contents;
   ASSERT_TRUE(android::base::ReadFileToString(
       out_preloaded_classes.GetFilename(), &output_preloaded_contents));
   ASSERT_EQ(output_preloaded_contents, expected_preloaded_content);
+}
+
+TEST_F(ProfileAssistantTest, TestBootImageProfileWith2RawProfiles) {
+  const std::string core_dex = GetLibCoreDexFileNames()[0];
+
+  std::vector<ScratchFile> profiles;
+
+  const std::string kCommonClassUsedByDex1 = "Ljava/lang/CharSequence;";
+  const std::string kCommonClassUsedByDex1Dex2 = "Ljava/lang/Object;";
+  const std::string kUncommonClass = "Ljava/lang/Process;";
+  const std::string kCommonHotMethodUsedByDex1 =
+      "Ljava/lang/Comparable;->compareTo(Ljava/lang/Object;)I";
+  const std::string kCommonHotMethodUsedByDex1Dex2 = "Ljava/lang/Object;->hashCode()I";
+  const std::string kUncommonHotMethod = "Ljava/util/HashMap;-><init>()V";
+
+
+  // Thresholds for this test.
+  static const size_t kDirtyThreshold = 100;
+  static const size_t kCleanThreshold = 100;
+  static const size_t kMethodThreshold = 100;
+
+    // Create boot profile content, attributing the classes and methods to different dex files.
+  std::vector<std::string> input_data1 = {
+      "{dex1}" + kCommonClassUsedByDex1,
+      "{dex1}" + kCommonClassUsedByDex1Dex2,
+      "{dex1}" + kUncommonClass,
+      "{dex1}H" + kCommonHotMethodUsedByDex1Dex2,
+      "{dex1}" + kCommonHotMethodUsedByDex1,
+  };
+  std::vector<std::string> input_data2 = {
+      "{dex1}" + kCommonClassUsedByDex1,
+      "{dex2}" + kCommonClassUsedByDex1Dex2,
+      "{dex1}H" + kCommonHotMethodUsedByDex1,
+      "{dex2}" + kCommonHotMethodUsedByDex1Dex2,
+      "{dex1}" + kUncommonHotMethod,
+  };
+  std::string input_file_contents1 = JoinProfileLines(input_data1);
+  std::string input_file_contents2 = JoinProfileLines(input_data2);
+
+  // Expected data
+  std::vector<std::string> expected_data = {
+      kCommonClassUsedByDex1,
+      kCommonClassUsedByDex1Dex2,
+      "H" + kCommonHotMethodUsedByDex1,
+      "H" + kCommonHotMethodUsedByDex1Dex2
+  };
+  std::string expected_profile_content = JoinProfileLines(expected_data);
+
+  ScratchFile profile1;
+  ScratchFile profile2;
+  EXPECT_TRUE(CreateProfile(input_file_contents1, profile1.GetFilename(), core_dex));
+  EXPECT_TRUE(CreateProfile(input_file_contents2, profile2.GetFilename(), core_dex));
+
+  ProfileCompilationInfo boot_profile1;
+  ProfileCompilationInfo boot_profile2;
+  boot_profile1.Load(profile1.GetFilename(), /*for_boot_image*/ true);
+  boot_profile2.Load(profile2.GetFilename(), /*for_boot_image*/ true);
+
+  // Generate the boot profile.
+  ScratchFile out_profile;
+  ScratchFile out_preloaded_classes;
+  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
+  ASSERT_TRUE(out_preloaded_classes.GetFile()->ResetOffset());
+  std::vector<std::string> args;
+  args.push_back(GetProfmanCmd());
+  args.push_back("--generate-boot-image-profile");
+  args.push_back("--class-threshold=" + std::to_string(kDirtyThreshold));
+  args.push_back("--clean-class-threshold=" + std::to_string(kCleanThreshold));
+  args.push_back("--method-threshold=" + std::to_string(kMethodThreshold));
+  args.push_back("--profile-file=" + profile1.GetFilename());
+  args.push_back("--profile-file=" + profile2.GetFilename());
+  args.push_back("--out-profile-path=" + out_profile.GetFilename());
+  args.push_back("--out-preloaded-classes-path=" + out_preloaded_classes.GetFilename());
+  args.push_back("--apk=" + core_dex);
+  args.push_back("--dex-location=" + core_dex);
+
+  std::string error;
+  ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;
+  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
+
+  // Verify the boot profile contents.
+  std::string output_profile_contents;
+  ASSERT_TRUE(android::base::ReadFileToString(
+      out_profile.GetFilename(), &output_profile_contents));
+  ASSERT_EQ(output_profile_contents, expected_profile_content);
 }
 
 TEST_F(ProfileAssistantTest, TestProfileCreationOneNotMatched) {

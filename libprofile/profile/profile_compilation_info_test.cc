@@ -1708,7 +1708,14 @@ TEST_F(ProfileCompilationInfoTest, ClearDataAndAdjustVersionBootToRegular) {
   ASSERT_FALSE(info.IsForBootImage());
 }
 
-// Verify we can merge samples with annotations.
+template<class T>
+static std::list<T> sort(const std::list<T>& list) {
+  std::list<T> copy(list);
+  copy.sort();
+  return copy;
+}
+
+// Verify we can extract profile data
 TEST_F(ProfileCompilationInfoTest, ExtractProfileData) {
   // Setup test data
   ProfileCompilationInfo info;
@@ -1744,24 +1751,91 @@ TEST_F(ProfileCompilationInfoTest, ExtractProfileData) {
   ASSERT_EQ(methods.size(), 20u);  // 10 methods in dex1, 10 in dex2
   ASSERT_EQ(classes.size(), 10u);  // 10 methods in dex1
 
-  std::set<ProfileSampleAnnotation> expectedAnnotations1({psa1, psa2});
-  std::set<ProfileSampleAnnotation> expectedAnnotations2({psa2});
+  std::list<ProfileSampleAnnotation> expectedAnnotations1({psa1, psa2});
+  std::list<ProfileSampleAnnotation> expectedAnnotations2({psa2});
   for (uint16_t i = 0; i < 10; i++) {
     // Check dex1 methods.
     auto mIt1 = methods.find(MethodReference(dex1, i));
     ASSERT_TRUE(mIt1 != methods.end());
     ASSERT_EQ(mIt1->second.GetFlags(), Hotness::kFlagHot | Hotness::kFlagStartup);
-    ASSERT_EQ(mIt1->second.GetAnnotations(), expectedAnnotations1);
+    ASSERT_EQ(sort(mIt1->second.GetAnnotations()), expectedAnnotations1);
     // Check dex1 classes
     auto cIt1 = classes.find(TypeReference(dex1, dex::TypeIndex(i)));
     ASSERT_TRUE(cIt1 != classes.end());
     ASSERT_EQ(cIt1->second.GetFlags(), 0);
-    ASSERT_EQ(cIt1->second.GetAnnotations(), expectedAnnotations1);
+    ASSERT_EQ(sort(cIt1->second.GetAnnotations()), expectedAnnotations1);
     // Check dex2 methods.
     auto mIt2 = methods.find(MethodReference(dex2, i));
     ASSERT_TRUE(mIt2 != methods.end());
     ASSERT_EQ(mIt2->second.GetFlags(), Hotness::kFlagHot);
-    ASSERT_EQ(mIt2->second.GetAnnotations(), expectedAnnotations2);
+    ASSERT_EQ(sort(mIt2->second.GetAnnotations()), expectedAnnotations2);
+  }
+
+  // Release the ownership as this is held by the test class;
+  for (std::unique_ptr<const DexFile>& dex : dex_files) {
+    UNUSED(dex.release());
+  }
+}
+
+// Verify we can merge 2 previously flatten data.
+TEST_F(ProfileCompilationInfoTest, MergeFlattenData) {
+  // Setup test data: two profiles with different content which will be used
+  // to extract FlattenProfileData, later to be merged.
+  ProfileCompilationInfo info1;
+  ProfileCompilationInfo info2;
+
+  ProfileSampleAnnotation psa1("test1");
+  ProfileSampleAnnotation psa2("test2");
+
+  for (uint16_t i = 0; i < 10; i++) {
+    // Add dex1 data with different annotations so that we can check the annotation count.
+    ASSERT_TRUE(AddMethod(&info1, dex1, /* method_idx= */ i, Hotness::kFlagHot, psa1));
+    ASSERT_TRUE(AddClass(&info2, dex1, dex::TypeIndex(i), psa1));
+    ASSERT_TRUE(AddMethod(&info1, dex1, /* method_idx= */ i, Hotness::kFlagStartup, psa2));
+    ASSERT_TRUE(AddClass(&info1, dex1, dex::TypeIndex(i), psa2));
+    ASSERT_TRUE(AddMethod(i % 2 == 0 ? &info1 : &info2, dex2,
+                          /* method_idx= */ i,
+                          Hotness::kFlagHot,
+                          psa2));
+  }
+
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex1));
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex2));
+
+  // Run the test: extract the data for dex1 and dex2 and then merge it into
+  std::unique_ptr<FlattenProfileData> flattenProfileData1 = info1.ExtractProfileData(dex_files);
+  std::unique_ptr<FlattenProfileData> flattenProfileData2 = info2.ExtractProfileData(dex_files);
+
+  flattenProfileData1->MergeData(*flattenProfileData2);
+  // Check the results
+  ASSERT_EQ(flattenProfileData1->GetMaxAggregationForMethods(), 2u);
+  ASSERT_EQ(flattenProfileData1->GetMaxAggregationForClasses(), 2u);
+
+  const SafeMap<MethodReference, ItemMetadata>& methods = flattenProfileData1->GetMethodData();
+  const SafeMap<TypeReference, ItemMetadata>& classes = flattenProfileData1->GetClassData();
+  ASSERT_EQ(methods.size(), 20u);  // 10 methods in dex1, 10 in dex2
+  ASSERT_EQ(classes.size(), 10u);  // 10 methods in dex1
+
+  std::list<ProfileSampleAnnotation> expectedAnnotations1({psa1, psa2});
+  std::list<ProfileSampleAnnotation> expectedAnnotations2({psa2});
+  for (uint16_t i = 0; i < 10; i++) {
+    // Check dex1 methods.
+    auto mIt1 = methods.find(MethodReference(dex1, i));
+    ASSERT_TRUE(mIt1 != methods.end());
+    ASSERT_EQ(mIt1->second.GetFlags(), Hotness::kFlagHot | Hotness::kFlagStartup);
+    ASSERT_EQ(sort(mIt1->second.GetAnnotations()), expectedAnnotations1);
+    // Check dex1 classes
+    auto cIt1 = classes.find(TypeReference(dex1, dex::TypeIndex(i)));
+    ASSERT_TRUE(cIt1 != classes.end());
+    ASSERT_EQ(cIt1->second.GetFlags(), 0);
+    ASSERT_EQ(sort(cIt1->second.GetAnnotations()).size(), expectedAnnotations1.size());
+    ASSERT_EQ(sort(cIt1->second.GetAnnotations()), expectedAnnotations1);
+    // Check dex2 methods.
+    auto mIt2 = methods.find(MethodReference(dex2, i));
+    ASSERT_TRUE(mIt2 != methods.end());
+    ASSERT_EQ(mIt2->second.GetFlags(), Hotness::kFlagHot);
+    ASSERT_EQ(sort(mIt2->second.GetAnnotations()), expectedAnnotations2);
   }
 
   // Release the ownership as this is held by the test class;
