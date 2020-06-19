@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,22 @@
  * limitations under the License.
  */
 
-public class Main {
-    // Allow test to pass on RI without adding to knownfailures.json file.
-    public static void main(String args[]) throws Exception {
-    }
-}
+#ifndef ART_RUNTIME_COMPILATION_KIND_H_
+#define ART_RUNTIME_COMPILATION_KIND_H_
+
+#include <iosfwd>
+#include <stdint.h>
+
+namespace art {
+
+enum class CompilationKind {
+  kOsr,
+  kBaseline,
+  kOptimized,
+};
+
+std::ostream& operator<<(std::ostream& os, CompilationKind rhs);
+
+}  // namespace art
+
+#endif  // ART_RUNTIME_COMPILATION_KIND_H_

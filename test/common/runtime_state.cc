@@ -284,7 +284,7 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
       // this before checking if we will execute JIT code to make sure the
       // method is compiled 'optimized' and not baseline (tests expect optimized
       // compilation).
-      jit->CompileMethod(method, self, /*baseline=*/ false, /*osr=*/ false, /*prejit=*/ false);
+      jit->CompileMethod(method, self, CompilationKind::kOptimized, /*prejit=*/ false);
       if (code_cache->WillExecuteJitCode(method)) {
         break;
       }
