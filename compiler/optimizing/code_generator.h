@@ -570,6 +570,28 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
   static void CreateCommonInvokeLocationSummary(
       HInvoke* invoke, InvokeDexCallingConventionVisitor* visitor);
 
+  template <typename CriticalNativeCallingConventionVisitor,
+            size_t kNativeStackAlignment,
+            size_t GetCriticalNativeDirectCallFrameSize(const char* shorty, uint32_t shorty_len)>
+  static size_t PrepareCriticalNativeCall(HInvokeStaticOrDirect* invoke,
+                                          /*out*/HParallelMove* parallel_move) {
+      DCHECK(!invoke->GetLocations()->Intrinsified());
+      CriticalNativeCallingConventionVisitor calling_convention_visitor(
+          /*for_register_allocation=*/ false);
+      PrepareCriticalNativeArgumentMoves(invoke, &calling_convention_visitor, parallel_move);
+      size_t out_frame_size =
+          RoundUp(calling_convention_visitor.GetStackOffset(), kNativeStackAlignment);
+      if (kIsDebugBuild) {
+        uint32_t shorty_len;
+        const char* shorty = GetCriticalNativeShorty(invoke, &shorty_len);
+        DCHECK_EQ(GetCriticalNativeDirectCallFrameSize(shorty, shorty_len), out_frame_size);
+      }
+      if (out_frame_size != 0u) {
+        AdjustCriticalNativeArgumentMoves(out_frame_size, parallel_move);
+      }
+      return out_frame_size;
+  }
+
   void GenerateInvokeStaticOrDirectRuntimeCall(
       HInvokeStaticOrDirect* invoke, Location temp, SlowPathCode* slow_path);
 
@@ -798,6 +820,16 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
                        SlowPathCode* slow_path,
                        bool needs_vreg_info = true);
   void EmitVRegInfo(HEnvironment* environment, SlowPathCode* slow_path);
+
+  static void PrepareCriticalNativeArgumentMoves(
+      HInvokeStaticOrDirect* invoke,
+      /*inout*/InvokeDexCallingConventionVisitor* visitor,
+      /*out*/HParallelMove* parallel_move);
+
+  static void AdjustCriticalNativeArgumentMoves(size_t out_frame_size,
+                                                /*inout*/HParallelMove* parallel_move);
+
+  static const char* GetCriticalNativeShorty(HInvokeStaticOrDirect* invoke, uint32_t* shorty_len);
 
   OptimizingCompilerStats* stats_;
 

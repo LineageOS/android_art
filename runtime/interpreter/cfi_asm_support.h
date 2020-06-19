@@ -50,10 +50,28 @@
     0x92 /* bregx */, reg, (offset & 0x7F),                                    \
     0x06 /* DW_OP_DEREF */,                                                    \
     0x23 /* DW_OP_plus_uconst */, size
+
+  #define CFI_EXPRESSION_BREG_1(n, b, offset) .cfi_escape       \
+      0x10,                       /* DW_CFA_expression */       \
+      n,                          /* rule for register n */     \
+      2,                          /* expression length */       \
+      0x70+b,                     /* DW_OP_BREG<b>() */         \
+      (offset) & 0x7f             /* SLEB128 offset */
+
+  #define CFI_EXPRESSION_BREG_2(n, b, offset) .cfi_escape       \
+      0x10,                       /* DW_CFA_expression */       \
+      n,                          /* rule for register n */     \
+      3,                          /* expression length */       \
+      0x70+b,                     /* DW_OP_BREG<b>() */         \
+      ((offset) & 0x7f) | 0x80,   /* SLEB128 offset, byte 1 */  \
+      ((offset) >> 7) & 0x7f      /* SLEB128 offset, byte 2 */
+
 #else
   // Mac OS doesn't like cfi_* directives.
   #define CFI_DEFINE_DEX_PC_WITH_OFFSET(tmpReg, dexReg, dexOffset)
   #define CFI_DEFINE_CFA_DEREF(reg, offset)
+  #define CFI_EXPRESSION_BREG_1(n, b, offset)
+  #define CFI_EXPRESSION_BREG_2(n, b, offset)
 #endif
 
 #endif  // ART_RUNTIME_INTERPRETER_CFI_ASM_SUPPORT_H_

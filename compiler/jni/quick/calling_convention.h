@@ -303,9 +303,9 @@ class JniCallingConvention : public CallingConvention {
   // always at the bottom of a frame, but this doesn't work for outgoing
   // native args). Includes alignment.
   virtual size_t FrameSize() const = 0;
-  // Size of outgoing arguments (stack portion), including alignment.
+  // Size of outgoing frame, i.e. stack arguments, @CriticalNative return PC if needed, alignment.
   // -- Arguments that are passed via registers are excluded from this size.
-  virtual size_t OutArgSize() const = 0;
+  virtual size_t OutFrameSize() const = 0;
   // Number of references in stack indirect reference table
   size_t ReferenceCount() const;
   // Location where the segment state of the local indirect reference table is saved

@@ -18,6 +18,7 @@
 #define ART_RUNTIME_ARCH_X86_ASM_SUPPORT_X86_S_
 
 #include "asm_support_x86.h"
+#include "interpreter/cfi_asm_support.h"
 
 // Regular gas(1) & current clang/llvm assembler support named macro parameters.
 #define MACRO0(macro_name) .macro macro_name
@@ -77,6 +78,7 @@
     #define CFI_DEF_CFA_REGISTER(reg) .cfi_def_cfa_register reg
     #define CFI_RESTORE(reg) .cfi_restore reg
     #define CFI_REL_OFFSET(reg,size) .cfi_rel_offset reg,size
+    #define CFI_REGISTER(orig_reg, current_reg) .cfi_register orig_reg, current_reg
     #define CFI_REMEMBER_STATE .cfi_remember_state
     // The spec is not clear whether the CFA is part of the saved state and tools
     // differ in the behaviour, so explicitly set the CFA to avoid any ambiguity.
@@ -93,10 +95,33 @@
     #define CFI_DEF_CFA_REGISTER(reg)
     #define CFI_RESTORE(reg)
     #define CFI_REL_OFFSET(reg,size)
+    #define CFI_REGISTER(orig_reg, current_reg)
     #define CFI_REMEMBER_STATE
     #define CFI_RESTORE_STATE_AND_DEF_CFA(reg,off)
     #define CFI_ESCAPE(...)
 #endif
+
+#define CFI_REG_eax 0
+#define CFI_REG_ecx 1
+#define CFI_REG_edx 2
+#define CFI_REG_ebx 3
+#define CFI_REG_esp 4
+#define CFI_REG_ebp 5
+#define CFI_REG_esi 6
+#define CFI_REG_edi 7
+#define CFI_REG_eip 8
+
+#define CFI_REG(reg) CFI_REG_##reg
+
+MACRO3(CFI_EXPRESSION_BREG, n, b, offset)
+    .if (-0x40 <= (\offset)) && ((\offset) < 0x40)
+        CFI_EXPRESSION_BREG_1(\n, \b, \offset)
+    .elseif (-0x2000 <= (\offset)) && ((\offset) < 0x2000)
+        CFI_EXPRESSION_BREG_2(\n, \b, \offset)
+    .else
+        .error "Unsupported offset"
+    .endif
+END_MACRO
 
     // Symbols. On a Mac, we need a leading underscore.
 #if !defined(__APPLE__)
@@ -172,6 +197,16 @@ MACRO1(CFI_RESTORE_REG, reg)
     CFI_RESTORE(REG_VAR(reg))
 END_MACRO
 
+MACRO1(INCREASE_FRAME, frame_adjustment)
+    subl MACRO_LITERAL(RAW_VAR(frame_adjustment)), %esp
+    CFI_ADJUST_CFA_OFFSET((RAW_VAR(frame_adjustment)))
+END_MACRO
+
+MACRO1(DECREASE_FRAME, frame_adjustment)
+    addl MACRO_LITERAL(RAW_VAR(frame_adjustment)), %esp
+    CFI_ADJUST_CFA_OFFSET(-(RAW_VAR(frame_adjustment)))
+END_MACRO
+
 #define UNREACHABLE int3
 
 MACRO1(UNIMPLEMENTED,name)
@@ -195,6 +230,13 @@ MACRO1(SETUP_GOT_NOSAVE, got_reg)
       .error "Unknown GOT register \got_reg"
     .endif
 #endif
+END_MACRO
+
+MACRO2(LOAD_RUNTIME_INSTANCE, reg, got_reg)
+    SETUP_GOT_NOSAVE \got_reg
+    // Load Runtime::instance_ from GOT.
+    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(reg)
+    movl (REG_VAR(reg)), REG_VAR(reg)
 END_MACRO
 
 // Macros to poison (negate) the reference for heap poisoning.
@@ -223,8 +265,7 @@ MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY)
     PUSH_ARG edx
     PUSH_ARG ecx
     // Create space for FPR args.
-    subl MACRO_LITERAL(4 * 8), %esp
-    CFI_ADJUST_CFA_OFFSET(4 * 8)
+    INCREASE_FRAME 4 * 8
     // Save FPRs.
     movsd %xmm0, 0(%esp)
     movsd %xmm1, 8(%esp)
@@ -246,8 +287,7 @@ MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
     movsd 20(%esp), %xmm2
     movsd 28(%esp), %xmm3
 
-    addl MACRO_LITERAL(36), %esp  // Remove FPRs and method pointer.
-    CFI_ADJUST_CFA_OFFSET(-36)
+    DECREASE_FRAME 36             // Remove FPRs and method pointer.
 
     POP_ARG ecx                   // Restore args
     POP_ARG edx
@@ -263,12 +303,12 @@ END_MACRO
      */
 MACRO0(DELIVER_PENDING_EXCEPTION_FRAME_READY)
     // Outgoing argument set up
-    subl MACRO_LITERAL(12), %esp               // alignment padding
-    CFI_ADJUST_CFA_OFFSET(12)
+    INCREASE_FRAME 12                          // alignment padding
     pushl %fs:THREAD_SELF_OFFSET               // pass Thread::Current()
     CFI_ADJUST_CFA_OFFSET(4)
     call SYMBOL(artDeliverPendingExceptionFromCode)  // artDeliverPendingExceptionFromCode(Thread*)
     UNREACHABLE
+    CFI_ADJUST_CFA_OFFSET(-16)                 // Reset CFA in case there is more code afterwards.
 END_MACRO
 
 #endif  // ART_RUNTIME_ARCH_X86_ASM_SUPPORT_X86_S_
