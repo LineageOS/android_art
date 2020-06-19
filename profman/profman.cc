@@ -1345,8 +1345,8 @@ class ProfMan final {
   // Create and store a ProfileCompilationInfo for the boot image.
   int CreateBootImageProfile() {
     // Open the input profile file.
-    if (profile_files_.size() != 1) {
-      LOG(ERROR) << "A single --profile-file must be specified.";
+    if (profile_files_.size() < 1) {
+      LOG(ERROR) << "At least one --profile-file must be specified.";
       return -1;
     }
     // Open the dex files.
@@ -1357,14 +1357,8 @@ class ProfMan final {
       return -2;
     }
 
-    ProfileCompilationInfo profile;
-    if (!profile.Load(profile_files_[0], /*clear_if_invalid=*/ false)) {
-      LOG(ERROR) << "Reference profile is not a valid profile.";
-      return -3;
-    }
-
     if (!GenerateBootImageProfile(dex_files,
-                                  profile,
+                                  profile_files_,
                                   boot_image_options_,
                                   boot_profile_out_path_,
                                   preloaded_classes_out_path_)) {
