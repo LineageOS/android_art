@@ -392,24 +392,6 @@ void ArtMethod::Invoke(Thread* self, uint32_t* args, uint32_t args_size, JValue*
   self->PopManagedStackFragment(fragment);
 }
 
-const void* ArtMethod::RegisterNative(const void* native_method) {
-  CHECK(IsNative()) << PrettyMethod();
-  CHECK(native_method != nullptr) << PrettyMethod();
-  void* new_native_method = nullptr;
-  Runtime::Current()->GetRuntimeCallbacks()->RegisterNativeMethod(this,
-                                                                  native_method,
-                                                                  /*out*/&new_native_method);
-  SetEntryPointFromJni(new_native_method);
-  return new_native_method;
-}
-
-void ArtMethod::UnregisterNative() {
-  CHECK(IsNative()) << PrettyMethod();
-  // restore stub to lookup native pointer via dlsym
-  SetEntryPointFromJni(
-      IsCriticalNative() ? GetJniDlsymLookupCriticalStub() : GetJniDlsymLookupStub());
-}
-
 bool ArtMethod::IsOverridableByDefaultMethod() {
   return GetDeclaringClass()->IsInterface();
 }

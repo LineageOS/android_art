@@ -31,10 +31,7 @@ MACRO2(SETUP_SAVE_ALL_CALLEE_SAVES_FRAME, got_reg, temp_reg)
     PUSH ebp
     subl MACRO_LITERAL(12), %esp  // Grow stack by 3 words.
     CFI_ADJUST_CFA_OFFSET(12)
-    SETUP_GOT_NOSAVE RAW_VAR(got_reg)
-    // Load Runtime::instance_ from GOT.
-    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(temp_reg)
-    movl (REG_VAR(temp_reg)), REG_VAR(temp_reg)
+    LOAD_RUNTIME_INSTANCE \temp_reg, \got_reg
     // Push save all callee-save method.
     pushl RUNTIME_SAVE_ALL_CALLEE_SAVES_METHOD_OFFSET(REG_VAR(temp_reg))
     CFI_ADJUST_CFA_OFFSET(4)
@@ -57,10 +54,7 @@ MACRO2(SETUP_SAVE_REFS_ONLY_FRAME, got_reg, temp_reg)
     PUSH ebp
     subl MACRO_LITERAL(12), %esp  // Grow stack by 3 words.
     CFI_ADJUST_CFA_OFFSET(12)
-    SETUP_GOT_NOSAVE RAW_VAR(got_reg)
-    // Load Runtime::instance_ from GOT.
-    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(temp_reg)
-    movl (REG_VAR(temp_reg)), REG_VAR(temp_reg)
+    LOAD_RUNTIME_INSTANCE \temp_reg, \got_reg
     // Push save all callee-save method.
     pushl RUNTIME_SAVE_REFS_ONLY_METHOD_OFFSET(REG_VAR(temp_reg))
     CFI_ADJUST_CFA_OFFSET(4)
@@ -87,10 +81,7 @@ MACRO2(SETUP_SAVE_REFS_ONLY_FRAME_PRESERVE_GOT_REG, got_reg, temp_reg)
     subl MACRO_LITERAL(8), %esp  // Grow stack by 2 words.
     CFI_ADJUST_CFA_OFFSET(8)
 
-    SETUP_GOT_NOSAVE RAW_VAR(got_reg)
-    // Load Runtime::instance_ from GOT.
-    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(temp_reg)
-    movl (REG_VAR(temp_reg)), REG_VAR(temp_reg)
+    LOAD_RUNTIME_INSTANCE \temp_reg, \got_reg
     // Push save all callee-save method.
     pushl RUNTIME_SAVE_REFS_ONLY_METHOD_OFFSET(REG_VAR(temp_reg))
     CFI_ADJUST_CFA_OFFSET(4)
@@ -122,10 +113,7 @@ END_MACRO
 MACRO2(SETUP_SAVE_REFS_AND_ARGS_FRAME, got_reg, temp_reg)
     SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
 
-    SETUP_GOT_NOSAVE RAW_VAR(got_reg)
-    // Load Runtime::instance_ from GOT.
-    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(temp_reg)
-    movl (REG_VAR(temp_reg)), REG_VAR(temp_reg)
+    LOAD_RUNTIME_INSTANCE \temp_reg, \got_reg
     // Push save all callee-save method.
     pushl RUNTIME_SAVE_REFS_AND_ARGS_METHOD_OFFSET(REG_VAR(temp_reg))
     CFI_ADJUST_CFA_OFFSET(4)
@@ -196,10 +184,7 @@ MACRO3(SETUP_SAVE_EVERYTHING_FRAME_EDI_ESI_SAVED, got_reg, temp_reg, runtime_met
     movsd %xmm6, 60(%esp)
     movsd %xmm7, 68(%esp)
 
-    SETUP_GOT_NOSAVE RAW_VAR(got_reg)
-    // Load Runtime::instance_ from GOT.
-    movl SYMBOL(_ZN3art7Runtime9instance_E)@GOT(REG_VAR(got_reg)), REG_VAR(temp_reg)
-    movl (REG_VAR(temp_reg)), REG_VAR(temp_reg)
+    LOAD_RUNTIME_INSTANCE \temp_reg, \got_reg
     // Push save everything callee-save method.
     pushl \runtime_method_offset(REG_VAR(temp_reg))
     CFI_ADJUST_CFA_OFFSET(4)

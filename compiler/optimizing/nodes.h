@@ -4604,6 +4604,11 @@ class HInvokeStaticOrDirect final : public HInvoke {
     // Recursive call, use local PC-relative call instruction.
     kCallSelf,
 
+    // Use native pointer from the Artmethod*.
+    // Used for @CriticalNative to avoid going through the compiled stub. This call goes through
+    // a special resolution stub if the class is not initialized or no native code is registered.
+    kCallCriticalNative,
+
     // Use code pointer from the ArtMethod*.
     // Used when we don't know the target code. This is also the last-resort-kind used when
     // other kinds are unimplemented or impractical (i.e. slow) on a particular architecture.
@@ -4633,9 +4638,9 @@ class HInvokeStaticOrDirect final : public HInvoke {
       : HInvoke(kInvokeStaticOrDirect,
                 allocator,
                 number_of_arguments,
-                // There is potentially one extra argument for the HCurrentMethod node, and
-                // potentially one other if the clinit check is explicit.
-                (NeedsCurrentMethodInput(dispatch_info.method_load_kind) ? 1u : 0u) +
+                // There is potentially one extra argument for the HCurrentMethod input,
+                // and one other if the clinit check is explicit. These can be removed later.
+                (NeedsCurrentMethodInput(dispatch_info) ? 1u : 0u) +
                     (clinit_check_requirement == ClinitCheckRequirement::kExplicit ? 1u : 0u),
                 return_type,
                 dex_pc,
@@ -4649,31 +4654,23 @@ class HInvokeStaticOrDirect final : public HInvoke {
 
   bool IsClonable() const override { return true; }
 
-  void SetDispatchInfo(const DispatchInfo& dispatch_info) {
+  void SetDispatchInfo(DispatchInfo dispatch_info) {
     bool had_current_method_input = HasCurrentMethodInput();
-    bool needs_current_method_input = NeedsCurrentMethodInput(dispatch_info.method_load_kind);
+    bool needs_current_method_input = NeedsCurrentMethodInput(dispatch_info);
 
     // Using the current method is the default and once we find a better
     // method load kind, we should not go back to using the current method.
     DCHECK(had_current_method_input || !needs_current_method_input);
 
     if (had_current_method_input && !needs_current_method_input) {
-      DCHECK_EQ(InputAt(GetSpecialInputIndex()), GetBlock()->GetGraph()->GetCurrentMethod());
-      RemoveInputAt(GetSpecialInputIndex());
+      DCHECK_EQ(InputAt(GetCurrentMethodIndex()), GetBlock()->GetGraph()->GetCurrentMethod());
+      RemoveInputAt(GetCurrentMethodIndex());
     }
     dispatch_info_ = dispatch_info;
   }
 
   DispatchInfo GetDispatchInfo() const {
     return dispatch_info_;
-  }
-
-  void AddSpecialInput(HInstruction* input) {
-    // We allow only one special input.
-    DCHECK(!IsStringInit() && !HasCurrentMethodInput());
-    DCHECK(InputCount() == GetSpecialInputIndex() ||
-           (InputCount() == GetSpecialInputIndex() + 1 && IsStaticWithExplicitClinitCheck()));
-    InsertInputAt(GetSpecialInputIndex(), input);
   }
 
   using HInstruction::GetInputRecords;  // Keep the const version visible.
@@ -4696,7 +4693,7 @@ class HInvokeStaticOrDirect final : public HInvoke {
   }
 
   bool CanDoImplicitNullCheckOn(HInstruction* obj ATTRIBUTE_UNUSED) const override {
-    // We access the method via the dex cache so we can't do an implicit null check.
+    // We do not access the method via object reference, so we cannot do an implicit null check.
     // TODO: for intrinsics we can generate implicit null checks.
     return false;
   }
@@ -4704,14 +4701,6 @@ class HInvokeStaticOrDirect final : public HInvoke {
   bool CanBeNull() const override {
     return GetType() == DataType::Type::kReference && !IsStringInit();
   }
-
-  // Get the index of the special input, if any.
-  //
-  // If the invoke HasCurrentMethodInput(), the "special input" is the current
-  // method pointer; otherwise there may be one platform-specific special input,
-  // such as PC-relative addressing base.
-  uint32_t GetSpecialInputIndex() const { return GetNumberOfArguments(); }
-  bool HasSpecialInput() const { return GetNumberOfArguments() != InputCount(); }
 
   MethodLoadKind GetMethodLoadKind() const { return dispatch_info_.method_load_kind; }
   CodePtrLocation GetCodePtrLocation() const { return dispatch_info_.code_ptr_location; }
@@ -4723,17 +4712,6 @@ class HInvokeStaticOrDirect final : public HInvoke {
     return GetMethodLoadKind() == MethodLoadKind::kBootImageLinkTimePcRelative ||
            GetMethodLoadKind() == MethodLoadKind::kBootImageRelRo ||
            GetMethodLoadKind() == MethodLoadKind::kBssEntry;
-  }
-  bool HasCurrentMethodInput() const {
-    // This function can be called only after the invoke has been fully initialized by the builder.
-    if (NeedsCurrentMethodInput(GetMethodLoadKind())) {
-      DCHECK(InputAt(GetSpecialInputIndex())->IsCurrentMethod());
-      return true;
-    } else {
-      DCHECK(InputCount() == GetSpecialInputIndex() ||
-             !InputAt(GetSpecialInputIndex())->IsCurrentMethod());
-      return false;
-    }
   }
 
   QuickEntrypointEnum GetStringInitEntryPoint() const {
@@ -4759,6 +4737,60 @@ class HInvokeStaticOrDirect final : public HInvoke {
 
   MethodReference GetTargetMethod() const {
     return target_method_;
+  }
+
+  // Does this method load kind need the current method as an input?
+  static bool NeedsCurrentMethodInput(DispatchInfo dispatch_info) {
+    return dispatch_info.method_load_kind == MethodLoadKind::kRecursive ||
+           dispatch_info.method_load_kind == MethodLoadKind::kRuntimeCall ||
+           dispatch_info.code_ptr_location == CodePtrLocation::kCallCriticalNative;
+  }
+
+  // Get the index of the current method input.
+  size_t GetCurrentMethodIndex() const {
+    DCHECK(HasCurrentMethodInput());
+    return GetCurrentMethodIndexUnchecked();
+  }
+  size_t GetCurrentMethodIndexUnchecked() const {
+    return GetNumberOfArguments();
+  }
+
+  // Check if the method has a current method input.
+  bool HasCurrentMethodInput() const {
+    if (NeedsCurrentMethodInput(GetDispatchInfo())) {
+      DCHECK(InputAt(GetCurrentMethodIndexUnchecked()) == nullptr ||  // During argument setup.
+             InputAt(GetCurrentMethodIndexUnchecked())->IsCurrentMethod());
+      return true;
+    } else {
+      DCHECK(InputCount() == GetCurrentMethodIndexUnchecked() ||
+             InputAt(GetCurrentMethodIndexUnchecked()) == nullptr ||  // During argument setup.
+             !InputAt(GetCurrentMethodIndexUnchecked())->IsCurrentMethod());
+      return false;
+    }
+  }
+
+  // Get the index of the special input.
+  size_t GetSpecialInputIndex() const {
+    DCHECK(HasSpecialInput());
+    return GetSpecialInputIndexUnchecked();
+  }
+  size_t GetSpecialInputIndexUnchecked() const {
+    return GetNumberOfArguments() + (HasCurrentMethodInput() ? 1u : 0u);
+  }
+
+  // Check if the method has a special input.
+  bool HasSpecialInput() const {
+    size_t other_inputs =
+        GetSpecialInputIndexUnchecked() + (IsStaticWithExplicitClinitCheck() ? 1u : 0u);
+    size_t input_count = InputCount();
+    DCHECK_LE(input_count - other_inputs, 1u) << other_inputs << " " << input_count;
+    return other_inputs != input_count;
+  }
+
+  void AddSpecialInput(HInstruction* input) {
+    // We allow only one special input.
+    DCHECK(!HasSpecialInput());
+    InsertInputAt(GetSpecialInputIndexUnchecked(), input);
   }
 
   // Remove the HClinitCheck or the replacement HLoadClass (set as last input by
@@ -4788,11 +4820,6 @@ class HInvokeStaticOrDirect final : public HInvoke {
     return IsStatic() && (GetClinitCheckRequirement() == ClinitCheckRequirement::kImplicit);
   }
 
-  // Does this method load kind need the current method as an input?
-  static bool NeedsCurrentMethodInput(MethodLoadKind kind) {
-    return kind == MethodLoadKind::kRecursive || kind == MethodLoadKind::kRuntimeCall;
-  }
-
   DECLARE_INSTRUCTION(InvokeStaticOrDirect);
 
  protected:
@@ -4815,6 +4842,7 @@ class HInvokeStaticOrDirect final : public HInvoke {
   DispatchInfo dispatch_info_;
 };
 std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::MethodLoadKind rhs);
+std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::CodePtrLocation rhs);
 std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::ClinitCheckRequirement rhs);
 
 class HInvokeVirtual final : public HInvoke {
