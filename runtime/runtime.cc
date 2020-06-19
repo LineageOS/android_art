@@ -2307,8 +2307,10 @@ ArtMethod* Runtime::CreateResolutionMethod() {
   if (IsAotCompiler()) {
     PointerSize pointer_size = GetInstructionSetPointerSize(instruction_set_);
     method->SetEntryPointFromQuickCompiledCodePtrSize(nullptr, pointer_size);
+    method->SetEntryPointFromJniPtrSize(nullptr, pointer_size);
   } else {
     method->SetEntryPointFromQuickCompiledCode(GetQuickResolutionStub());
+    method->SetEntryPointFromJni(GetJniDlsymLookupCriticalStub());
   }
   return method;
 }

@@ -220,7 +220,7 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
   // 1. Build the frame saving all callee saves, Method*, and PC return address.
   //    For @CriticalNative, this includes space for out args, otherwise just the managed frame.
   const size_t managed_frame_size = main_jni_conv->FrameSize();
-  const size_t main_out_arg_size = main_jni_conv->OutArgSize();
+  const size_t main_out_arg_size = main_jni_conv->OutFrameSize();
   size_t current_frame_size = is_critical_native ? main_out_arg_size : managed_frame_size;
   ManagedRegister method_register =
       is_critical_native ? ManagedRegister::NoRegister() : mr_conv->MethodRegister();
@@ -582,7 +582,7 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
 
   if (LIKELY(!is_critical_native)) {
     // Increase frame size for out args if needed by the end_jni_conv.
-    const size_t end_out_arg_size = end_jni_conv->OutArgSize();
+    const size_t end_out_arg_size = end_jni_conv->OutFrameSize();
     if (end_out_arg_size > current_out_arg_size) {
       size_t out_arg_size_diff = end_out_arg_size - current_out_arg_size;
       current_out_arg_size = end_out_arg_size;

@@ -18,6 +18,7 @@
 #define ART_RUNTIME_ARCH_ARM_ASM_SUPPORT_ARM_S_
 
 #include "asm_support_arm.h"
+#include "interpreter/cfi_asm_support.h"
 
 // Define special registers.
 
@@ -36,6 +37,16 @@
 .syntax unified
 .arch armv7-a
 .thumb
+
+.macro CFI_EXPRESSION_BREG n, b, offset
+    .if (-0x40 <= (\offset)) && ((\offset) < 0x40)
+        CFI_EXPRESSION_BREG_1(\n, \b, \offset)
+    .elseif (-0x2000 <= (\offset)) && ((\offset) < 0x2000)
+        CFI_EXPRESSION_BREG_2(\n, \b, \offset)
+    .else
+        .error "Unsupported offset"
+    .endif
+.endm
 
 // Macro to generate the value of Runtime::Current into rDest. As it uses labels
 // then the labels need to be unique. We bind these to the function name in the ENTRY macros.
@@ -147,6 +158,16 @@
 #ifdef USE_HEAP_POISONING
     rsb \rRef, \rRef, #0
 #endif  // USE_HEAP_POISONING
+.endm
+
+.macro INCREASE_FRAME frame_adjustment
+    sub sp, sp, #(\frame_adjustment)
+    .cfi_adjust_cfa_offset (\frame_adjustment)
+.endm
+
+.macro DECREASE_FRAME frame_adjustment
+    add sp, sp, #(\frame_adjustment)
+    .cfi_adjust_cfa_offset -(\frame_adjustment)
 .endm
 
 // Macro to refresh the Marking Register (R8).

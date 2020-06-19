@@ -420,7 +420,7 @@ size_t ArmJniCallingConvention::FrameSize() const {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t ArmJniCallingConvention::OutArgSize() const {
+size_t ArmJniCallingConvention::OutFrameSize() const {
   // Count param args, including JNIEnv* and jclass*; count 8-byte args twice.
   size_t all_args = NumberOfExtraArgumentsForJni() + NumArgs() + NumLongOrDoubleArgs();
   // Account for arguments passed through r0-r3. (No FP args, AAPCS32 is soft-float.)
@@ -440,7 +440,7 @@ size_t ArmJniCallingConvention::OutArgSize() const {
   }
   size_t out_args_size = RoundUp(size, kAapcsStackAlignment);
   if (UNLIKELY(IsCriticalNative())) {
-    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+    DCHECK_EQ(out_args_size, GetCriticalNativeStubFrameSize(GetShorty(), NumArgs() + 1u));
   }
   return out_args_size;
 }
@@ -512,9 +512,9 @@ FrameOffset ArmJniCallingConvention::CurrentParamStackOffset() {
   CHECK_GE(itr_slots_, kJniArgumentRegisterCount);
   size_t offset =
       displacement_.Int32Value()
-          - OutArgSize()
+          - OutFrameSize()
           + ((itr_slots_ - kJniArgumentRegisterCount) * kFramePointerSize);
-  CHECK_LT(offset, OutArgSize());
+  CHECK_LT(offset, OutFrameSize());
   return FrameOffset(offset);
 }
 
@@ -537,7 +537,7 @@ ManagedRegister ArmJniCallingConvention::HiddenArgumentRegister() const {
 // Whether to use tail call (used only for @CriticalNative).
 bool ArmJniCallingConvention::UseTailCall() const {
   CHECK(IsCriticalNative());
-  return OutArgSize() == 0u;
+  return OutFrameSize() == 0u;
 }
 
 }  // namespace arm

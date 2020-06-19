@@ -16,6 +16,7 @@
 
 #include "code_generator_x86_64.h"
 
+#include "arch/x86_64/jni_frame_x86_64.h"
 #include "art_method-inl.h"
 #include "class_table.h"
 #include "code_generator_utils.h"
@@ -978,6 +979,16 @@ inline Condition X86_64FPCondition(IfCondition cond) {
   UNREACHABLE();
 }
 
+void CodeGeneratorX86_64::BlockNonVolatileXmmRegisters(LocationSummary* locations) {
+  // We have to ensure that the native code we call directly (such as @CriticalNative
+  // or some intrinsic helpers, say Math.sin()) doesn't clobber the XMM registers
+  // which are non-volatile for ART, but volatile for Native calls.  This will ensure
+  // that they are saved in the prologue and properly restored.
+  for (FloatRegister fp_reg : non_volatile_xmm_regs) {
+    locations->AddTemp(Location::FpuRegisterLocation(fp_reg));
+  }
+}
+
 HInvokeStaticOrDirect::DispatchInfo CodeGeneratorX86_64::GetSupportedInvokeStaticOrDirectDispatch(
       const HInvokeStaticOrDirect::DispatchInfo& desired_dispatch_info,
       ArtMethod* method ATTRIBUTE_UNUSED) {
@@ -998,7 +1009,7 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
       break;
     }
     case HInvokeStaticOrDirect::MethodLoadKind::kRecursive:
-      callee_method = invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex());
+      callee_method = invoke->GetLocations()->InAt(invoke->GetCurrentMethodIndex());
       break;
     case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative:
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
@@ -1032,15 +1043,61 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
   switch (invoke->GetCodePtrLocation()) {
     case HInvokeStaticOrDirect::CodePtrLocation::kCallSelf:
       __ call(&frame_entry_label_);
+      RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       break;
+    case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
+      HParallelMove parallel_move(GetGraph()->GetAllocator());
+      size_t out_frame_size =
+          PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorX86_64,
+                                    kNativeStackAlignment,
+                                    GetCriticalNativeDirectCallFrameSize>(invoke, &parallel_move);
+      if (out_frame_size != 0u) {
+        __ subq(CpuRegister(RSP), Immediate(out_frame_size));
+        __ cfi().AdjustCFAOffset(out_frame_size);
+        GetMoveResolver()->EmitNativeCode(&parallel_move);
+      }
+      // (callee_method + offset_of_jni_entry_point)()
+      __ call(Address(callee_method.AsRegister<CpuRegister>(),
+                      ArtMethod::EntryPointFromJniOffset(kX86_64PointerSize).SizeValue()));
+      RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
+      // Zero-/sign-extend the result when needed due to native and managed ABI mismatch.
+      switch (invoke->GetType()) {
+        case DataType::Type::kBool:
+          __ movzxb(CpuRegister(RAX), CpuRegister(RAX));
+          break;
+        case DataType::Type::kInt8:
+          __ movsxb(CpuRegister(RAX), CpuRegister(RAX));
+          break;
+        case DataType::Type::kUint16:
+          __ movzxw(CpuRegister(RAX), CpuRegister(RAX));
+          break;
+        case DataType::Type::kInt16:
+          __ movsxw(CpuRegister(RAX), CpuRegister(RAX));
+          break;
+        case DataType::Type::kInt32:
+        case DataType::Type::kInt64:
+        case DataType::Type::kFloat32:
+        case DataType::Type::kFloat64:
+        case DataType::Type::kVoid:
+          break;
+        default:
+          DCHECK(false) << invoke->GetType();
+          break;
+      }
+      if (out_frame_size != 0u) {
+        __ addq(CpuRegister(RSP), Immediate(out_frame_size));
+        __ cfi().AdjustCFAOffset(-out_frame_size);
+      }
+      break;
+    }
     case HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod:
       // (callee_method + offset_of_quick_compiled_code)()
       __ call(Address(callee_method.AsRegister<CpuRegister>(),
                       ArtMethod::EntryPointFromQuickCompiledCodeOffset(
                           kX86_64PointerSize).SizeValue()));
+      RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       break;
   }
-  RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
 
   DCHECK(!IsLeafMethod());
 }
@@ -2493,6 +2550,51 @@ Location InvokeDexCallingConventionVisitorX86_64::GetNextLocation(DataType::Type
   return Location::NoLocation();
 }
 
+Location CriticalNativeCallingConventionVisitorX86_64::GetNextLocation(DataType::Type type) {
+  DCHECK_NE(type, DataType::Type::kReference);
+
+  Location location = Location::NoLocation();
+  if (DataType::IsFloatingPointType(type)) {
+    if (fpr_index_ < kParameterFloatRegistersLength) {
+      location = Location::FpuRegisterLocation(kParameterFloatRegisters[fpr_index_]);
+      ++fpr_index_;
+    }
+  } else {
+    // Native ABI uses the same registers as managed, except that the method register RDI
+    // is a normal argument.
+    if (gpr_index_ < 1u + kParameterCoreRegistersLength) {
+      location = Location::RegisterLocation(
+          gpr_index_ == 0u ? RDI : kParameterCoreRegisters[gpr_index_ - 1u]);
+      ++gpr_index_;
+    }
+  }
+  if (location.IsInvalid()) {
+    if (DataType::Is64BitType(type)) {
+      location = Location::DoubleStackSlot(stack_offset_);
+    } else {
+      location = Location::StackSlot(stack_offset_);
+    }
+    stack_offset_ += kFramePointerSize;
+
+    if (for_register_allocation_) {
+      location = Location::Any();
+    }
+  }
+  return location;
+}
+
+Location CriticalNativeCallingConventionVisitorX86_64::GetReturnLocation(DataType::Type type)
+    const {
+  // We perform conversion to the managed ABI return register after the call if needed.
+  InvokeDexCallingConventionVisitorX86_64 dex_calling_convention;
+  return dex_calling_convention.GetReturnLocation(type);
+}
+
+Location CriticalNativeCallingConventionVisitorX86_64::GetMethodLocation() const {
+  // Pass the method in the hidden argument RAX.
+  return Location::RegisterLocation(RAX);
+}
+
 void LocationsBuilderX86_64::VisitInvokeUnresolved(HInvokeUnresolved* invoke) {
   // The trampoline uses the same calling convention as dex calling conventions,
   // except instead of loading arg0/r0 with the target Method*, arg0/r0 will contain
@@ -2514,7 +2616,14 @@ void LocationsBuilderX86_64::VisitInvokeStaticOrDirect(HInvokeStaticOrDirect* in
     return;
   }
 
-  HandleInvoke(invoke);
+  if (invoke->GetCodePtrLocation() == HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+    CriticalNativeCallingConventionVisitorX86_64 calling_convention_visitor(
+        /*for_register_allocation=*/ true);
+    CodeGenerator::CreateCommonInvokeLocationSummary(invoke, &calling_convention_visitor);
+    CodeGeneratorX86_64::BlockNonVolatileXmmRegisters(invoke->GetLocations());
+  } else {
+    HandleInvoke(invoke);
+  }
 }
 
 static bool TryGenerateIntrinsicCode(HInvoke* invoke, CodeGeneratorX86_64* codegen) {

@@ -65,7 +65,7 @@ class ArmJniCallingConvention final : public JniCallingConvention {
   // JNI calling convention
   void Next() override;  // Override default behavior for AAPCS
   size_t FrameSize() const override;
-  size_t OutArgSize() const override;
+  size_t OutFrameSize() const override;
   ArrayRef<const ManagedRegister> CalleeSaveRegisters() const override;
   ManagedRegister ReturnScratchRegister() const override;
   uint32_t CoreSpillMask() const override;

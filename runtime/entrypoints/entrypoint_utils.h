@@ -44,6 +44,7 @@ class ArtField;
 class ArtMethod;
 class HandleScope;
 enum InvokeType : uint32_t;
+class MethodReference;
 class OatQuickMethodHeader;
 class ScopedObjectAccessAlreadyRunnable;
 class Thread;
@@ -217,6 +218,10 @@ constexpr size_t kJniCookieSize = sizeof(uint32_t);
 
 inline HandleScope* GetGenericJniHandleScope(ArtMethod** managed_sp,
                                              size_t num_handle_scope_references);
+
+// Update .bss method entrypoint if the `callee_reference` has an associated oat file
+// and that oat file has a .bss entry for the `callee_reference`.
+void MaybeUpdateBssMethodEntry(ArtMethod* callee, MethodReference callee_reference);
 
 }  // namespace art
 
