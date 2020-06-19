@@ -989,7 +989,7 @@ class FlattenProfileData {
       return flags_;
     }
 
-    const std::set<ProfileCompilationInfo::ProfileSampleAnnotation>& GetAnnotations() const {
+    const std::list<ProfileCompilationInfo::ProfileSampleAnnotation>& GetAnnotations() const {
       return annotations_;
     }
 
@@ -1004,9 +1004,12 @@ class FlattenProfileData {
    private:
     // will be 0 for classes and MethodHotness::Flags for methods.
     uint16_t flags_;
-    std::set<ProfileCompilationInfo::ProfileSampleAnnotation> annotations_;
+    // This is a list that may contain duplicates after a merge operation.
+    // It represents that a method was used multiple times across different devices.
+    std::list<ProfileCompilationInfo::ProfileSampleAnnotation> annotations_;
 
     friend class ProfileCompilationInfo;
+    friend class FlattenProfileData;
   };
 
   FlattenProfileData();
@@ -1026,6 +1029,8 @@ class FlattenProfileData {
   uint32_t GetMaxAggregationForClasses() const {
     return max_aggregation_for_classes_;
   }
+
+  void MergeData(const FlattenProfileData& other);
 
  private:
   // Method data.
