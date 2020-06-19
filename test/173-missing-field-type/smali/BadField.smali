@@ -16,8 +16,9 @@
 .class public LBadField;
 .super Ljava/lang/Object;
 
-# This is a bad field since there is no class Widget in this test.
+# These are bad fields since there is no class Widget in this test.
 .field public static widget:LWidget;
+.field public iwidget:LWidget;
 
 .method public constructor <init>()V
     .registers 2
@@ -25,10 +26,36 @@
     return-void
 .end method
 
-.method public static constructor <clinit>()V
+.method public static storeStaticObject()V
     .registers 1
     new-instance v0, Ljava/lang/Object;
     invoke-direct {v0}, Ljava/lang/Object;-><init>()V
     sput-object v0, LBadField;->widget:LWidget;
+    return-void
+.end method
+
+.method public static storeStaticNull()V
+    .registers 1
+    const/4 v0, 0
+    sput-object v0, LBadField;->widget:LWidget;
+    return-void
+.end method
+
+.method public static storeInstanceObject()V
+    .registers 2
+    new-instance v1, LBadField;
+    invoke-direct {v1}, LBadField;-><init>()V
+    new-instance v0, Ljava/lang/Object;
+    invoke-direct {v0}, Ljava/lang/Object;-><init>()V
+    iput-object v0, v1, LBadField;->iwidget:LWidget;
+    return-void
+.end method
+
+.method public static storeInstanceNull()V
+    .registers 2
+    new-instance v1, LBadField;
+    invoke-direct {v1}, LBadField;-><init>()V
+    const/4 v0, 0
+    iput-object v0, v1, LBadField;->iwidget:LWidget;
     return-void
 .end method
