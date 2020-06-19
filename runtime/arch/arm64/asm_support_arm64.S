@@ -18,6 +18,7 @@
 #define ART_RUNTIME_ARCH_ARM64_ASM_SUPPORT_ARM64_S_
 
 #include "asm_support_arm64.h"
+#include "interpreter/cfi_asm_support.h"
 
 // Define special registers.
 
@@ -39,6 +40,16 @@
 // collector, with the Baker read barrier configuration.
 #define wMR w20
 #endif
+
+.macro CFI_EXPRESSION_BREG n, b, offset
+    .if (-0x40 <= (\offset)) && ((\offset) < 0x40)
+        CFI_EXPRESSION_BREG_1(\n, \b, \offset)
+    .elseif (-0x2000 <= (\offset)) && ((\offset) < 0x2000)
+        CFI_EXPRESSION_BREG_2(\n, \b, \offset)
+    .else
+        .error "Unsupported offset"
+    .endif
+.endm
 
 .macro ENTRY_ALIGNED name, alignment
     .type \name, #function
@@ -98,9 +109,13 @@
     .cfi_rel_offset \reg, (\offset)
 .endm
 
-.macro RESTORE_REG reg, offset
-    ldr \reg, [sp, #(\offset)]
+.macro RESTORE_REG_BASE base, reg, offset
+    ldr \reg, [\base, #(\offset)]
     .cfi_restore \reg
+.endm
+
+.macro RESTORE_REG reg, offset
+    RESTORE_REG_BASE sp, \reg, \offset
 .endm
 
 .macro SAVE_TWO_REGS_BASE base, reg1, reg2, offset
@@ -125,11 +140,11 @@
 
 .macro LOAD_RUNTIME_INSTANCE reg
 #if __has_feature(hwaddress_sanitizer) && __clang_major__ >= 10
-    adrp xIP0, :pg_hi21_nc:_ZN3art7Runtime9instance_E
+    adrp \reg, :pg_hi21_nc:_ZN3art7Runtime9instance_E
 #else
-    adrp xIP0, _ZN3art7Runtime9instance_E
+    adrp \reg, _ZN3art7Runtime9instance_E
 #endif
-    ldr xIP0, [xIP0, #:lo12:_ZN3art7Runtime9instance_E]
+    ldr \reg, [\reg, #:lo12:_ZN3art7Runtime9instance_E]
 .endm
 
 // Macro to refresh the Marking Register (W20).

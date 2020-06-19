@@ -30,6 +30,10 @@
 #include "stack.h"
 #endif
 
+ASM_DEFINE(ACCESS_FLAGS_METHOD_IS_NATIVE,
+           art::kAccNative)
+ASM_DEFINE(ACCESS_FLAGS_METHOD_IS_NATIVE_BIT,
+           art::MostSignificantBit(art::kAccNative))
 ASM_DEFINE(ACCESS_FLAGS_METHOD_IS_FAST_NATIVE,
            art::kAccFastNative)
 ASM_DEFINE(ACCESS_FLAGS_METHOD_IS_CRITICAL_NATIVE,

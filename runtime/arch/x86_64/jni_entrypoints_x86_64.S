@@ -28,8 +28,7 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
     PUSH_ARG rdx  // Arg.
     PUSH_ARG rcx  // Arg.
     // Create space for FPR args, plus padding for alignment
-    subq LITERAL(72), %rsp
-    CFI_ADJUST_CFA_OFFSET(72)
+    INCREASE_FRAME 72
     // Save FPRs.
     movq %xmm0, 0(%rsp)
     movq %xmm1, 8(%rsp)
@@ -48,10 +47,10 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
     movq (%rax), %rax                                // ArtMethod* method
     testl LITERAL(ACCESS_FLAGS_METHOD_IS_FAST_NATIVE | ACCESS_FLAGS_METHOD_IS_CRITICAL_NATIVE), \
           ART_METHOD_ACCESS_FLAGS_OFFSET(%rax)
-    jne .Llookup_stub_fast_native
+    jne .Llookup_stub_fast_or_critical_native
     call SYMBOL(artFindNativeMethod)  // (Thread*)
     jmp .Llookup_stub_continue
-.Llookup_stub_fast_native:
+.Llookup_stub_fast_or_critical_native:
     call SYMBOL(artFindNativeMethodRunnable)  // (Thread*)
 .Llookup_stub_continue:
     // restore arguments
@@ -63,8 +62,7 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_stub
     movq 40(%rsp), %xmm5
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
-    addq LITERAL(72), %rsp
-    CFI_ADJUST_CFA_OFFSET(-72)
+    DECREASE_FRAME 72
     POP_ARG rcx  // Arg.
     POP_ARG rdx  // Arg.
     POP_ARG rsi  // Arg.
@@ -84,29 +82,16 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     testq LITERAL(1), %rax
     jnz art_jni_dlsym_lookup_stub
 
-    // We need to create a GenericJNI managed frame above the stack args.
-
-    // GenericJNI frame is similar to SaveRegsAndArgs frame with the native method
-    // instead of runtime method saved at the bottom.
-
-    // As we always have "stack args" on x86-64 (due to xmm12-xmm15 being callee-save
-    // in managed ABI but caller-save in native ABI), do not create a proper frame yet
-    // as we do on other architectures where it's useful for no stack args case.
-
-    // Reserve space for the frame (return PC is on stack).
-    subq MACRO_LITERAL(FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__), %rsp
-    CFI_ADJUST_CFA_OFFSET(FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__)
-
-    // Save GPR args.
+    // Save GPR args and method.
     PUSH_ARG r9
     PUSH_ARG r8
     PUSH_ARG rdi
     PUSH_ARG rsi
     PUSH_ARG rdx
     PUSH_ARG rcx
+    PUSH_ARG rax
     // Create space for FPR args.
-    subq LITERAL(64), %rsp
-    CFI_ADJUST_CFA_OFFSET(64)
+    INCREASE_FRAME 8 * 8
     // Save FPRs.
     movq %xmm0, 0(%rsp)
     movq %xmm1, 8(%rsp)
@@ -116,119 +101,15 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     movq %xmm5, 40(%rsp)
     movq %xmm6, 48(%rsp)
     movq %xmm7, 56(%rsp)
+    // Note: It's the caller's responsibility to preserve xmm12-xmm15 as the tail call
+    // to native shall always risk clobbering those.
 
-    // Add alignment padding.
-    subq MACRO_LITERAL(__SIZEOF_POINTER__), %rsp
-    CFI_ADJUST_CFA_OFFSET(__SIZEOF_POINTER__)
-    // Save hidden arg.
-    PUSH_ARG rax
+    // Call artCriticalNativeFrameSize(method, caller_pc).
+    movq %rax, %rdi       // Pass the method from hidden arg.
+    movq 120(%rsp), %rsi  // Pass caller PC.
+    call SYMBOL(artCriticalNativeFrameSize)
 
-    // Call artCriticalNativeOutArgsSize(method).
-    movq %rax, %rdi  // Pass the method from hidden arg.
-    call SYMBOL(artCriticalNativeOutArgsSize)
-
-    // Calculate the address of the end of the move destination and redefine CFI to take
-    // ownership of the JNI stub frame.
-    leaq 16 * __SIZEOF_POINTER__(%rsp, %rax, 1), %r10  // 16 QWORDs of registers saved above.
-    CFI_DEF_CFA(%r10, FRAME_SIZE_SAVE_REFS_AND_ARGS)
-
-    // Calculate the number of QWORDs to move.
-    shrq LITERAL(3), %rax
-    leaq -1(%rax), %rcx  // Do not move the return PC.
-
-    // Load our return PC to EAX.
-    movq FRAME_SIZE_SAVE_REFS_AND_ARGS + (16 - 1) * __SIZEOF_POINTER__(%rsp), %rax
-
-    // Mov the stack args.
-    leaq 16 * __SIZEOF_POINTER__(%rsp), %rdi
-    leaq FRAME_SIZE_SAVE_REFS_AND_ARGS(%rdi), %rsi
-    rep movsq
-
-    // Save our return PC.
-    movq %rax, (%rdi)
-
-    // Pop the hidden arg and alignment padding.
-    popq %rax    // No `.cfi_adjust_cfa_offset`, CFA register is currently R10, not RSP.
-    addq MACRO_LITERAL(__SIZEOF_POINTER__), %rsp  // ditto
-
-    // Fill the SaveRefsAndArgs frame above the args, without actual args. Note that
-    // the runtime shall not examine the args here, otherwise we would have to move them in
-    // registers and stack to account for the difference between managed and native ABIs.
-    SAVE_REG_BASE r10, r15, 192
-    SAVE_REG_BASE r10, r14, 184
-    SAVE_REG_BASE r10, r13, 176
-    SAVE_REG_BASE r10, r12, 168
-    // Skip args r9, r8, rsi.
-    SAVE_REG_BASE r10, rbp, 136
-    SAVE_REG_BASE r10, rbx, 128
-    // Skip args rdx, rcx.
-    // Skip args xmm0-xmm7.
-    // Copy managed callee-saves xmm12-xmm15 from out args to the managed frame as they
-    // may theoretically store variables or unwinding data. (The compiled stub preserves
-    // them but the artCriticalNativeOutArgsSize() call above may clobber them.)
-    movq -5 * __SIZEOF_POINTER__(%r10), %xmm12
-    movq -4 * __SIZEOF_POINTER__(%r10), %xmm13
-    movq -3 * __SIZEOF_POINTER__(%r10), %xmm14
-    movq -2 * __SIZEOF_POINTER__(%r10), %xmm15
-    movq %xmm12, 80(%r10)
-    movq %xmm13, 88(%r10)
-    movq %xmm14, 96(%r10)
-    movq %xmm15, 104(%r10)
-    // Save the hidden arg as method pointer at the bottom of the stack.
-    movq %rax, (%r10)
-
-    // Move the frame register to a callee-save register.
-    movq %r10, %rbp
-    CFI_DEF_CFA_REGISTER(%rbp)
-
-    // Place tagged managed sp in Thread::Current()->top_quick_frame.
-    leaq 1(%rbp), %rax  // Tag as GenericJNI frame.
-    movq %rax, %gs:THREAD_TOP_QUICK_FRAME_OFFSET
-
-    // Call artFindNativeMethodRunnable()
-    movq %gs:THREAD_SELF_OFFSET, %rdi  // pass Thread::Current()
-    call SYMBOL(artFindNativeMethodRunnable)  // (Thread*)
-
-    // Check for exception.
-    test %rax, %rax
-    jz 2f
-
-    // Restore the frame. We shall not need the method anymore.
-    .cfi_remember_state
-    movq %rbp, %r10
-    CFI_DEF_CFA_REGISTER(%r10)
-    // Skip args xmm0-xmm7 and managed callee-saves xmm12-xmm15 (not needed for native call).
-    // Skip args rdx, rcx.
-    RESTORE_REG_BASE r10, rbx, 128
-    RESTORE_REG_BASE r10, rbp, 136
-    // Skip args r9, r8, rsi.
-    RESTORE_REG_BASE r10, r12, 168
-    RESTORE_REG_BASE r10, r13, 176
-    RESTORE_REG_BASE r10, r14, 184
-    RESTORE_REG_BASE r10, r15, 192
-
-    // Remember our return PC in R11.
-    movq -__SIZEOF_POINTER__(%r10), %r11
-
-    // Calculate the number of DWORDs to move.
-    leaq -(1 + 14) * __SIZEOF_POINTER__(%r10), %rcx  // Do not move return PC, 14 arg regs saved.
-    subq %rsp, %rcx
-    shrq LITERAL(3), %rcx
-
-    // Mov stack args to their original place.
-    leaq -2 * __SIZEOF_POINTER__(%r10), %rsi
-    leaq FRAME_SIZE_SAVE_REFS_AND_ARGS - 2 * __SIZEOF_POINTER__(%r10), %rdi
-    std
-    rep movsq
-    cld
-
-    // Store our return PC.
-    movq %r11, (%rdi)
-
-    // Redefine CFI to release ownership of the JNI stub frame.
-    CFI_DEF_CFA(%rsp, FRAME_SIZE_SAVE_REFS_AND_ARGS + 14 * __SIZEOF_POINTER__)
-
-    // Restore args.
+    // Restore registers.
     movq 0(%rsp), %xmm0
     movq 8(%rsp), %xmm1
     movq 16(%rsp), %xmm2
@@ -237,8 +118,8 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     movq 40(%rsp), %xmm5
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
-    addq LITERAL(64), %rsp
-    CFI_ADJUST_CFA_OFFSET(-64)
+    DECREASE_FRAME 8 * 8
+    POP_ARG r10  // Restore method to R10.
     POP_ARG rcx
     POP_ARG rdx
     POP_ARG rsi
@@ -246,17 +127,185 @@ DEFINE_FUNCTION art_jni_dlsym_lookup_critical_stub
     POP_ARG r8
     POP_ARG r9
 
+    // Load caller PC to R11 and redefine return PC for CFI.
+    movq (%rsp), %r11
+    CFI_REGISTER(%rip, %r11)
+
+    // Reserve space for a SaveRefsAndArgs managed frame, either for the actual runtime
+    // method or for a GenericJNI frame which is similar but has a native method and a tag.
+    INCREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__
+
+    // Calculate the number of QWORDs to move.
+    shrq LITERAL(3), %rax
+    jz .Lcritical_skip_copy_args
+
+    // Save RDI, RSI, RCX so that we can use them for moving stack args.
+    PUSH_ARG rdi
+    PUSH_ARG rsi
+    PUSH_ARG rcx
+
+    // Move the stack args.
+    movq %rax, %rcx
+    leaq 3 * __SIZEOF_POINTER__(%rsp), %rdi
+    leaq FRAME_SIZE_SAVE_REFS_AND_ARGS(%rdi), %rsi
+    rep movsq
+
+    // Restore RDI, RSI, RCX.
+    POP_ARG rcx
+    POP_ARG rsi
+    POP_ARG rdi
+
+.Lcritical_skip_copy_args:
+    // Calculate the base address of the managed frame.
+    leaq (%rsp, %rax, 8), %rax
+
+    // Spill registers for the SaveRefsAndArgs frame above the stack args.
+    // Note that the runtime shall not examine the args here, otherwise we would have to
+    // move them in registers and stack to account for the difference between managed and
+    // native ABIs. Do not update CFI while we hold the frame address in RAX and the values
+    // in registers are unchanged.
+    movq %r15, 192(%rax)
+    movq %r14, 184(%rax)
+    movq %r13, 176(%rax)
+    movq %r12, 168(%rax)
+    movq %r9, 160(%rax)
+    movq %r8, 152(%rax)
+    movq %rsi, 144(%rax)
+    movq %rbp, 136(%rax)
+    movq %rbx, 128(%rax)
+    movq %rdx, 120(%rax)
+    movq %rcx, 112(%rax)
+    movq %xmm0, 16(%rax)
+    movq %xmm1, 24(%rax)
+    movq %xmm2, 32(%rax)
+    movq %xmm3, 40(%rax)
+    movq %xmm4, 48(%rax)
+    movq %xmm5, 56(%rax)
+    movq %xmm6, 64(%rax)
+    movq %xmm7, 72(%rax)
+    // Skip managed ABI callee-saves xmm12-xmm15.
+
+    // Move the managed frame address to native callee-save register RBP and update CFI.
+    movq %rax, %rbp
+    CFI_EXPRESSION_BREG CFI_REG(r15), CFI_REG(rbp), 192
+    CFI_EXPRESSION_BREG CFI_REG(r14), CFI_REG(rbp), 184
+    CFI_EXPRESSION_BREG CFI_REG(r13), CFI_REG(rbp), 176
+    CFI_EXPRESSION_BREG CFI_REG(r12), CFI_REG(rbp), 168
+    // Skip args r9, r8, rsi.
+    CFI_EXPRESSION_BREG CFI_REG(rbp), CFI_REG(rbp), 136
+    CFI_EXPRESSION_BREG CFI_REG(rbx), CFI_REG(rbp), 128
+    // Skip args rdx, rcx.
+    // Skip args xmm0-xmm7.
+
+    leaq 1(%rbp), %rax            // Prepare managed SP tagged for a GenericJNI frame.
+    testl LITERAL(ACCESS_FLAGS_METHOD_IS_NATIVE), ART_METHOD_ACCESS_FLAGS_OFFSET(%r10)
+    jnz .Lcritical_skip_prepare_runtime_method
+
+    // Save the return PC for managed stack walk.
+    // (When coming from a compiled stub, the correct return PC is already there.)
+    movq %r11, FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__(%rbp)
+
+    // Replace the target method with the SaveRefsAndArgs runtime method.
+    LOAD_RUNTIME_INSTANCE r10
+    movq RUNTIME_SAVE_REFS_AND_ARGS_METHOD_OFFSET(%r10), %r10
+
+    movq %rbp, %rax               // Prepare untagged managed SP for the runtime method.
+
+.Lcritical_skip_prepare_runtime_method:
+    // Store the method on the bottom of the managed frame.
+    movq %r10, (%rbp)
+
+    // Place (maybe tagged) managed SP in Thread::Current()->top_quick_frame.
+    movq %rax, %gs:THREAD_TOP_QUICK_FRAME_OFFSET
+
+    // Save our return PC in the padding.
+    movq %r11, __SIZEOF_POINTER__(%rbp)
+    CFI_EXPRESSION_BREG CFI_REG(rip), CFI_REG(rbp), __SIZEOF_POINTER__
+
+    // Preserve the native arg register RDI in callee-save register RBX which was saved above.
+    movq %rdi, %rbx
+
+    // Call artFindNativeMethodRunnable()
+    movq %gs:THREAD_SELF_OFFSET, %rdi  // pass Thread::Current()
+    call SYMBOL(artFindNativeMethodRunnable)  // (Thread*)
+
+    // Check for exception.
+    test %rax, %rax
+    jz .Lcritical_deliver_exception
+
+    CFI_REMEMBER_STATE
+
+    // Restore the native arg register RDI.
+    movq %rbx, %rdi
+
+    // Remember our return PC in R11.
+    movq __SIZEOF_POINTER__(%rbp), %r11
+    CFI_REGISTER(%rip, %r11)
+
+    // Remember the frame base address in r10 but do not redefine CFI.
+    movq %rbp, %r10
+
+    // Restore the frame. We shall not need the method anymore.
+    movq 16(%rbp), %xmm0
+    movq 24(%rbp), %xmm1
+    movq 32(%rbp), %xmm2
+    movq 40(%rbp), %xmm3
+    movq 48(%rbp), %xmm4
+    movq 56(%rbp), %xmm5
+    movq 64(%rbp), %xmm6
+    movq 72(%rbp), %xmm7
+    // Skip managed callee-saves xmm12-xmm15.
+    movq 112(%rbp), %rcx
+    movq 120(%rbp), %rdx
+    RESTORE_REG_BASE rbp, rbx, 128
+    // Delay restoring RBP as it's the managed frame base.
+    movq 144(%rbp), %rsi
+    movq 152(%rbp), %r8
+    movq 160(%rbp), %r9
+    RESTORE_REG_BASE rbp, r12, 168
+    RESTORE_REG_BASE rbp, r13, 176
+    RESTORE_REG_BASE rbp, r14, 184
+    RESTORE_REG_BASE rbp, r15, 192
+    // Restore RBP last.
+    RESTORE_REG_BASE rbp, rbp, 136
+
+    cmp %r10, %rsp
+    je .Lcritical_skip_copy_args_back
+
+    // Save RDI, RSI, RCX so that we can use them for moving stack args.
+    PUSH_ARG rdi
+    PUSH_ARG rsi
+    PUSH_ARG rcx
+
+    // Calculate the number of QWORDs to move.
+    leaq -3 * __SIZEOF_POINTER__(%r10), %rcx
+    subq %rsp, %rcx
+    shrq LITERAL(3), %rcx
+
+    // Move the stack args.
+    leaq -__SIZEOF_POINTER__(%r10), %rsi
+    leaq FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__(%r10), %rdi
+    std
+    rep movsq
+    cld
+
+    // Restore RDI, RSI, RCX.
+    POP_ARG rcx
+    POP_ARG rsi
+    POP_ARG rdi
+
+.Lcritical_skip_copy_args_back:
     // Remove the frame reservation.
-    addq LITERAL(FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__), %rsp
-    CFI_ADJUST_CFA_OFFSET(-(FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__))
+    DECREASE_FRAME FRAME_SIZE_SAVE_REFS_AND_ARGS - __SIZEOF_POINTER__
+
+    // Store our return PC.
+    movq %r11, (%rsp)
+    CFI_REL_OFFSET(%rip, 0)
 
     // Do the tail call.
     jmp *%rax
     CFI_RESTORE_STATE_AND_DEF_CFA(%rbp, FRAME_SIZE_SAVE_REFS_AND_ARGS)
 
-2:
-    // Drop the args from the stack (the RAX and padding was already removed).
-    addq LITERAL(14 * __SIZEOF_POINTER__), %rsp
-
+.Lcritical_deliver_exception:
     DELIVER_PENDING_EXCEPTION_FRAME_READY
 END_FUNCTION art_jni_dlsym_lookup_critical_stub

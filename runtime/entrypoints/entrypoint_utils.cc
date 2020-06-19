@@ -23,16 +23,19 @@
 #include "base/sdk_version.h"
 #include "class_linker-inl.h"
 #include "dex/dex_file-inl.h"
+#include "dex/method_reference.h"
 #include "entrypoints/entrypoint_utils-inl.h"
 #include "entrypoints/quick/callee_save_frame.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
 #include "gc/accounting/card_table-inl.h"
+#include "index_bss_mapping.h"
 #include "jni/java_vm_ext.h"
 #include "mirror/class-inl.h"
 #include "mirror/method.h"
 #include "mirror/object-inl.h"
 #include "mirror/object_array-inl.h"
 #include "nth_caller_visitor.h"
+#include "oat_file.h"
 #include "oat_quick_method_header.h"
 #include "reflection.h"
 #include "scoped_thread_state_change-inl.h"
@@ -279,6 +282,30 @@ ObjPtr<mirror::MethodType> ResolveMethodTypeFromCode(ArtMethod* referrer,
     method_type = class_linker->ResolveMethodType(hs.Self(), proto_idx, dex_cache, class_loader);
   }
   return method_type;
+}
+
+void MaybeUpdateBssMethodEntry(ArtMethod* callee, MethodReference callee_reference) {
+  DCHECK(callee != nullptr);
+  if (callee_reference.dex_file->GetOatDexFile() != nullptr) {
+    size_t bss_offset = IndexBssMappingLookup::GetBssOffset(
+        callee_reference.dex_file->GetOatDexFile()->GetMethodBssMapping(),
+        callee_reference.index,
+        callee_reference.dex_file->NumMethodIds(),
+        static_cast<size_t>(kRuntimePointerSize));
+    if (bss_offset != IndexBssMappingLookup::npos) {
+      DCHECK_ALIGNED(bss_offset, static_cast<size_t>(kRuntimePointerSize));
+      const OatFile* oat_file = callee_reference.dex_file->GetOatDexFile()->GetOatFile();
+      ArtMethod** method_entry = reinterpret_cast<ArtMethod**>(const_cast<uint8_t*>(
+          oat_file->BssBegin() + bss_offset));
+      DCHECK_GE(method_entry, oat_file->GetBssMethods().data());
+      DCHECK_LT(method_entry,
+                oat_file->GetBssMethods().data() + oat_file->GetBssMethods().size());
+      std::atomic<ArtMethod*>* atomic_entry =
+          reinterpret_cast<std::atomic<ArtMethod*>*>(method_entry);
+      static_assert(sizeof(*method_entry) == sizeof(*atomic_entry), "Size check.");
+      atomic_entry->store(callee, std::memory_order_release);
+    }
+  }
 }
 
 }  // namespace art

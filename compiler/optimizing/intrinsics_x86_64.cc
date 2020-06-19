@@ -398,12 +398,7 @@ static void CreateFPToFPCallLocations(ArenaAllocator* allocator, HInvoke* invoke
   locations->SetInAt(0, Location::FpuRegisterLocation(calling_convention.GetFpuRegisterAt(0)));
   locations->SetOut(Location::FpuRegisterLocation(XMM0));
 
-  // We have to ensure that the native code doesn't clobber the XMM registers which are
-  // non-volatile for ART, but volatile for Native calls.  This will ensure that they are
-  // saved in the prologue and properly restored.
-  for (FloatRegister fp_reg : non_volatile_xmm_regs) {
-    locations->AddTemp(Location::FpuRegisterLocation(fp_reg));
-  }
+  CodeGeneratorX86_64::BlockNonVolatileXmmRegisters(locations);
 }
 
 static void GenFPToFPCall(HInvoke* invoke, CodeGeneratorX86_64* codegen,
@@ -535,12 +530,7 @@ static void CreateFPFPToFPCallLocations(ArenaAllocator* allocator, HInvoke* invo
   locations->SetInAt(1, Location::FpuRegisterLocation(calling_convention.GetFpuRegisterAt(1)));
   locations->SetOut(Location::FpuRegisterLocation(XMM0));
 
-  // We have to ensure that the native code doesn't clobber the XMM registers which are
-  // non-volatile for ART, but volatile for Native calls.  This will ensure that they are
-  // saved in the prologue and properly restored.
-  for (FloatRegister fp_reg : non_volatile_xmm_regs) {
-    locations->AddTemp(Location::FpuRegisterLocation(fp_reg));
-  }
+  CodeGeneratorX86_64::BlockNonVolatileXmmRegisters(locations);
 }
 
 void IntrinsicLocationsBuilderX86_64::VisitMathAtan2(HInvoke* invoke) {
