@@ -2088,6 +2088,7 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
     static_assert(ArtMethod::MaxCounter() == 0xFFFF, "asm is probably wrong");
     if (!is_frame_entry) {
       __ Push(vixl32::Register(kMethodRegister));
+      GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize);
       GetAssembler()->LoadFromOffset(kLoadWord, kMethodRegister, sp, kArmWordSize);
     }
     // Load with zero extend to clear the high bits for integer overflow check.
@@ -2098,6 +2099,7 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
     __ Strh(temp, MemOperand(kMethodRegister, ArtMethod::HotnessCountOffset().Int32Value()));
     if (!is_frame_entry) {
       __ Pop(vixl32::Register(kMethodRegister));
+      GetAssembler()->cfi().AdjustCFAOffset(-static_cast<int>(kArmWordSize));
     }
   }
 
@@ -2111,6 +2113,7 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
       temps.Exclude(ip);
       if (!is_frame_entry) {
         __ Push(r4);  // Will be used as temporary. For frame entry, r4 is always available.
+        GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize);
       }
       __ Mov(r4, address);
       __ Ldrh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
@@ -2118,6 +2121,7 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
       __ Strh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
       if (!is_frame_entry) {
         __ Pop(r4);
+        GetAssembler()->cfi().AdjustCFAOffset(-static_cast<int>(kArmWordSize));
       }
       __ Lsls(ip, ip, 16);
       __ B(ne, &done);
@@ -2130,9 +2134,12 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
         uint32_t core_spill_mask =
             (1 << lr.GetCode()) | (1 << r0.GetCode()) | (1 << r1.GetCode()) | (1 << r2.GetCode());
         __ Push(RegisterList(core_spill_mask));
+        GetAssembler()->cfi().AdjustCFAOffset(kArmWordSize * POPCOUNT(core_spill_mask));
         __ Ldr(lr, MemOperand(tr, entry_point_offset));
         __ Blx(lr);
         __ Pop(RegisterList(core_spill_mask));
+        GetAssembler()->cfi().AdjustCFAOffset(
+            -static_cast<int>(kArmWordSize) * POPCOUNT(core_spill_mask));
       } else {
         if (!RequiresCurrentMethod()) {
           CHECK(is_frame_entry);
@@ -2240,8 +2247,7 @@ void CodeGeneratorARMVIXL::GenerateFrameEntry() {
       __ Push(RegisterList(MaxInt<uint32_t>(fp_spills_offset / kArmWordSize)));
       GetAssembler()->cfi().AdjustCFAOffset(fp_spills_offset);
     } else {
-      __ Sub(sp, sp, dchecked_integral_cast<int32_t>(fp_spills_offset));
-      GetAssembler()->cfi().AdjustCFAOffset(fp_spills_offset);
+      IncreaseFrame(fp_spills_offset);
       if (RequiresCurrentMethod()) {
         GetAssembler()->StoreToOffset(kStoreWord, kMethodRegister, sp, 0);
       }
@@ -2297,8 +2303,7 @@ void CodeGeneratorARMVIXL::GenerateFrameExit() {
     }
   } else {
     GetAssembler()->cfi().RememberState();
-    __ Add(sp, sp, fp_spills_offset);
-    GetAssembler()->cfi().AdjustCFAOffset(-dchecked_integral_cast<int32_t>(fp_spills_offset));
+    DecreaseFrame(fp_spills_offset);
     if (fpu_spill_mask_ != 0) {
       uint32_t first = LeastSignificantBit(fpu_spill_mask_);
 
@@ -2993,6 +2998,16 @@ void LocationsBuilderARMVIXL::VisitNativeDebugInfo(HNativeDebugInfo* info) {
 
 void InstructionCodeGeneratorARMVIXL::VisitNativeDebugInfo(HNativeDebugInfo*) {
   // MaybeRecordNativeDebugInfo is already called implicitly in CodeGenerator::Compile.
+}
+
+void CodeGeneratorARMVIXL::IncreaseFrame(size_t adjustment) {
+  __ Claim(adjustment);
+  GetAssembler()->cfi().AdjustCFAOffset(adjustment);
+}
+
+void CodeGeneratorARMVIXL::DecreaseFrame(size_t adjustment) {
+  __ Drop(adjustment);
+  GetAssembler()->cfi().AdjustCFAOffset(-adjustment);
 }
 
 void CodeGeneratorARMVIXL::GenerateNop() {
@@ -9013,16 +9028,10 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
       }
       break;
     case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
-      HParallelMove parallel_move(GetGraph()->GetAllocator());
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorARMVIXL,
                                     kAapcsStackAlignment,
-                                    GetCriticalNativeDirectCallFrameSize>(invoke, &parallel_move);
-      if (out_frame_size != 0u) {
-        __ Claim(out_frame_size);
-        GetAssembler()->cfi().AdjustCFAOffset(out_frame_size);
-        GetMoveResolver()->EmitNativeCode(&parallel_move);
-      }
+                                    GetCriticalNativeDirectCallFrameSize>(invoke);
       call_code_pointer_member(ArtMethod::EntryPointFromJniOffset(kArmPointerSize));
       // Move the result when needed due to native and managed ABI mismatch.
       switch (invoke->GetType()) {
@@ -9045,8 +9054,7 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
           break;
       }
       if (out_frame_size != 0u) {
-        __ Drop(out_frame_size);
-        GetAssembler()->cfi().AdjustCFAOffset(-out_frame_size);
+        DecreaseFrame(out_frame_size);
       }
       break;
     }
