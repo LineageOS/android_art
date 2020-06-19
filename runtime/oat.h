@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: Change ClassStatus bits with kVerifiedNeedsAccessChecks.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '3', '\0' } };
+  // Last oat version changed reason: Direct calls to @CriticalNative code.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '4', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";

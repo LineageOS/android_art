@@ -220,11 +220,10 @@ size_t X86JniCallingConvention::FrameSize() const {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t X86JniCallingConvention::OutArgSize() const {
-  // Count param args, including JNIEnv* and jclass*; count 8-byte args twice.
-  size_t all_args = NumberOfExtraArgumentsForJni() + NumArgs() + NumLongOrDoubleArgs();
-  // The size of outgoiong arguments.
-  size_t size = all_args * kFramePointerSize;
+size_t X86JniCallingConvention::OutFrameSize() const {
+  // The size of outgoing arguments.
+  size_t size = GetNativeOutArgsSize(/*num_args=*/ NumberOfExtraArgumentsForJni() + NumArgs(),
+                                     NumLongOrDoubleArgs());
 
   // @CriticalNative can use tail call as all managed callee saves are preserved by AAPCS.
   static_assert((kCoreCalleeSpillMask & ~kNativeCoreCalleeSpillMask) == 0u);
@@ -244,14 +243,16 @@ size_t X86JniCallingConvention::OutArgSize() const {
     if (return_type_ok && size == kFramePointerSize) {
       // Note: This is not aligned to kNativeStackAlignment but that's OK for tail call.
       static_assert(kFramePointerSize < kNativeStackAlignment);
-      DCHECK_EQ(kFramePointerSize, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+      // The stub frame size is considered 0 in the callee where the return PC is a part of
+      // the callee frame but it is kPointerSize in the compiled stub before the tail call.
+      DCHECK_EQ(0u, GetCriticalNativeStubFrameSize(GetShorty(), NumArgs() + 1u));
       return kFramePointerSize;
     }
   }
 
   size_t out_args_size = RoundUp(size, kNativeStackAlignment);
   if (UNLIKELY(IsCriticalNative())) {
-    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+    DCHECK_EQ(out_args_size, GetCriticalNativeStubFrameSize(GetShorty(), NumArgs() + 1u));
   }
   return out_args_size;
 }
@@ -279,7 +280,8 @@ ManagedRegister X86JniCallingConvention::CurrentParamRegister() {
 }
 
 FrameOffset X86JniCallingConvention::CurrentParamStackOffset() {
-  return FrameOffset(displacement_.Int32Value() - OutArgSize() + (itr_slots_ * kFramePointerSize));
+  return
+      FrameOffset(displacement_.Int32Value() - OutFrameSize() + (itr_slots_ * kFramePointerSize));
 }
 
 ManagedRegister X86JniCallingConvention::HiddenArgumentRegister() const {
@@ -295,7 +297,7 @@ ManagedRegister X86JniCallingConvention::HiddenArgumentRegister() const {
 
 bool X86JniCallingConvention::UseTailCall() const {
   CHECK(IsCriticalNative());
-  return OutArgSize() == kFramePointerSize;
+  return OutFrameSize() == kFramePointerSize;
 }
 
 }  // namespace x86

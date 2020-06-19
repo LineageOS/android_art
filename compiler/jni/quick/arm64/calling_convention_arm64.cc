@@ -265,20 +265,14 @@ size_t Arm64JniCallingConvention::FrameSize() const {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t Arm64JniCallingConvention::OutArgSize() const {
+size_t Arm64JniCallingConvention::OutFrameSize() const {
   // Count param args, including JNIEnv* and jclass*.
   size_t all_args = NumberOfExtraArgumentsForJni() + NumArgs();
   size_t num_fp_args = NumFloatOrDoubleArgs();
   DCHECK_GE(all_args, num_fp_args);
   size_t num_non_fp_args = all_args - num_fp_args;
-  // Account for FP arguments passed through v0-v7.
-  size_t num_stack_fp_args =
-      num_fp_args - std::min(kMaxFloatOrDoubleRegisterArguments, num_fp_args);
-  // Account for other (integer and pointer) arguments passed through GPR (x0-x7).
-  size_t num_stack_non_fp_args =
-      num_non_fp_args - std::min(kMaxIntLikeRegisterArguments, num_non_fp_args);
   // The size of outgoing arguments.
-  size_t size = (num_stack_fp_args + num_stack_non_fp_args) * kFramePointerSize;
+  size_t size = GetNativeOutArgsSize(num_fp_args, num_non_fp_args);
 
   // @CriticalNative can use tail call as all managed callee saves are preserved by AAPCS64.
   static_assert((kCoreCalleeSpillMask & ~kAapcs64CoreCalleeSpillMask) == 0u);
@@ -291,7 +285,7 @@ size_t Arm64JniCallingConvention::OutArgSize() const {
   }
   size_t out_args_size = RoundUp(size, kAapcs64StackAlignment);
   if (UNLIKELY(IsCriticalNative())) {
-    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+    DCHECK_EQ(out_args_size, GetCriticalNativeStubFrameSize(GetShorty(), NumArgs() + 1u));
   }
   return out_args_size;
 }
@@ -355,8 +349,8 @@ FrameOffset Arm64JniCallingConvention::CurrentParamStackOffset() {
                              static_cast<size_t>(itr_float_and_doubles_))
                   - std::min(kMaxIntLikeRegisterArguments,
                              static_cast<size_t>(itr_args_ - itr_float_and_doubles_));
-  size_t offset = displacement_.Int32Value() - OutArgSize() + (args_on_stack * kFramePointerSize);
-  CHECK_LT(offset, OutArgSize());
+  size_t offset = displacement_.Int32Value() - OutFrameSize() + (args_on_stack * kFramePointerSize);
+  CHECK_LT(offset, OutFrameSize());
   return FrameOffset(offset);
 }
 
@@ -378,7 +372,7 @@ ManagedRegister Arm64JniCallingConvention::HiddenArgumentRegister() const {
 // Whether to use tail call (used only for @CriticalNative).
 bool Arm64JniCallingConvention::UseTailCall() const {
   CHECK(IsCriticalNative());
-  return OutArgSize() == 0u;
+  return OutFrameSize() == 0u;
 }
 
 }  // namespace arm64
