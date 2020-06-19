@@ -121,38 +121,27 @@ class DwarfTest : public CommonCompilerTest {
   void CheckObjdumpOutput(bool is64bit, const char* args) {
     std::vector<std::string> actual_lines = Objdump(is64bit, args);
     auto actual_line = actual_lines.begin();
-    for (const ExpectedLine& expected_line : expected_lines_) {
-      const std::string& substring = expected_line.substring;
-      if (actual_line == actual_lines.end()) {
-        ADD_FAILURE_AT(expected_line.at_file, expected_line.at_line) <<
-            "Expected '" << substring << "'.\n" <<
-            "Seen end of output.";
-      } else if (expected_line.next) {
-        if (actual_line->find(substring) == std::string::npos) {
-          ADD_FAILURE_AT(expected_line.at_file, expected_line.at_line) <<
-            "Expected '" << substring << "'.\n" <<
-            "Seen '" << actual_line->data() << "'.";
-        } else {
-          // printf("Found '%s' in '%s'.\n", substring.data(), actual_line->data());
-        }
-        actual_line++;
+    bool failed = false;
+    for (const ExpectedLine& expected : expected_lines_) {
+      const std::string& substring = expected.substring;
+      auto it = std::find_if(actual_line, actual_lines.end(),
+          [&](const std::string& line) { return line.find(substring) != std::string::npos; });
+      if (it == actual_lines.end()) {
+        failed = true;
+        ADD_FAILURE_AT(expected.at_file, expected.at_line) << "'" << substring << "' not found.";
       } else {
-        bool found = false;
-        for (auto it = actual_line; it < actual_lines.end(); it++) {
-          if (it->find(substring) != std::string::npos) {
-            actual_line = it;
-            found = true;
-            break;
-          }
+        if (expected.next && it != actual_line) {
+          failed = true;
+          ADD_FAILURE_AT(expected.at_file, expected.at_line)
+              << "'" << substring << "' found, but not on the immediate next line as expected.";
         }
-        if (!found) {
-          ADD_FAILURE_AT(expected_line.at_file, expected_line.at_line) <<
-            "Expected '" << substring << "'.\n" <<
-            "Not found anywhere in the rest of the output.";
-        } else {
-          // printf("Found '%s' in '%s'.\n", substring.data(), actual_line->data());
-          actual_line++;
-        }
+        actual_line = ++it;
+      }
+    }
+    if (failed) {
+      LOG(ERROR) << "objdump output:";
+      for (const std::string& it : actual_lines) {
+        LOG(ERROR) << it;
       }
     }
   }
