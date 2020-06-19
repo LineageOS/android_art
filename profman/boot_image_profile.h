@@ -75,7 +75,7 @@ struct BootImageOptions {
 // Returns true if the generation was successful, false otherwise.
 bool GenerateBootImageProfile(
     const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-    const ProfileCompilationInfo& profile,
+    const std::vector<std::string>& profile_files,
     const BootImageOptions& options,
     const std::string& boot_profile_out_path,
     const std::string& preloaded_classes_out_path);
