@@ -314,6 +314,12 @@ class JniCompilerTest : public CommonCompilerTest {
     }
     ASSERT_TRUE(jmethod_ != nullptr) << method_name << " " << method_sig;
 
+    // Make sure the test class is visibly initialized so that the RegisterNatives() below
+    // sets the JNI entrypoint rather than leaving it as null (this test pretends to be an
+    // AOT compiler and therefore the ClassLinker skips entrypoint initialization). Even
+    // if the ClassLinker initialized it with a stub, we would not want to test that here.
+    class_linker_->MakeInitializedClassesVisiblyInitialized(Thread::Current(), /*wait=*/ true);
+
     if (native_fnptr != nullptr) {
       JNINativeMethod methods[] = { { method_name, method_sig, native_fnptr } };
       ASSERT_EQ(JNI_OK, env_->RegisterNatives(jklass_, methods, 1))
