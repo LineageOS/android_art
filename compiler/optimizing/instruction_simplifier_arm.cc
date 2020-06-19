@@ -27,6 +27,7 @@ namespace art {
 
 using helpers::CanFitInShifterOperand;
 using helpers::HasShifterOperand;
+using helpers::IsSubRightSubLeftShl;
 
 namespace arm {
 
@@ -73,6 +74,7 @@ class InstructionSimplifierArmVisitor : public HGraphVisitor {
   void VisitOr(HOr* instruction) override;
   void VisitShl(HShl* instruction) override;
   void VisitShr(HShr* instruction) override;
+  void VisitSub(HSub* instruction) override;
   void VisitTypeConversion(HTypeConversion* instruction) override;
   void VisitUShr(HUShr* instruction) override;
 
@@ -265,6 +267,15 @@ void InstructionSimplifierArmVisitor::VisitShl(HShl* instruction) {
 void InstructionSimplifierArmVisitor::VisitShr(HShr* instruction) {
   if (instruction->InputAt(1)->IsConstant()) {
     TryMergeIntoUsersShifterOperand(instruction);
+  }
+}
+
+void InstructionSimplifierArmVisitor::VisitSub(HSub* instruction) {
+  if (IsSubRightSubLeftShl(instruction)) {
+    HInstruction* shl = instruction->GetRight()->InputAt(0);
+    if (shl->InputAt(1)->IsConstant() && TryReplaceSubSubWithSubAdd(instruction)) {
+      TryMergeIntoUsersShifterOperand(shl);
+    }
   }
 }
 
