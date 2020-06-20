@@ -231,6 +231,31 @@ class InvokeDexCallingConventionVisitorARM64 : public InvokeDexCallingConvention
   DISALLOW_COPY_AND_ASSIGN(InvokeDexCallingConventionVisitorARM64);
 };
 
+class CriticalNativeCallingConventionVisitorARM64 : public InvokeDexCallingConventionVisitor {
+ public:
+  explicit CriticalNativeCallingConventionVisitorARM64(bool for_register_allocation)
+      : for_register_allocation_(for_register_allocation) {}
+
+  virtual ~CriticalNativeCallingConventionVisitorARM64() {}
+
+  Location GetNextLocation(DataType::Type type) override;
+  Location GetReturnLocation(DataType::Type type) const override;
+  Location GetMethodLocation() const override;
+
+  size_t GetStackOffset() const { return stack_offset_; }
+
+ private:
+  // Register allocator does not support adjusting frame size, so we cannot provide final locations
+  // of stack arguments for register allocation. We ask the register allocator for any location and
+  // move these arguments to the right place after adjusting the SP when generating the call.
+  const bool for_register_allocation_;
+  size_t gpr_index_ = 0u;
+  size_t fpr_index_ = 0u;
+  size_t stack_offset_ = 0u;
+
+  DISALLOW_COPY_AND_ASSIGN(CriticalNativeCallingConventionVisitorARM64);
+};
+
 class FieldAccessCallingConventionARM64 : public FieldAccessCallingConvention {
  public:
   FieldAccessCallingConventionARM64() {}

@@ -18,6 +18,7 @@
 #define ART_RUNTIME_ARCH_X86_64_ASM_SUPPORT_X86_64_S_
 
 #include "asm_support_x86_64.h"
+#include "interpreter/cfi_asm_support.h"
 
 // Regular gas(1) & current clang/llvm assembler support named macro parameters.
 #define MACRO0(macro_name) .macro macro_name
@@ -76,6 +77,7 @@
     #define CFI_DEF_CFA_REGISTER(reg) .cfi_def_cfa_register reg
     #define CFI_RESTORE(reg) .cfi_restore reg
     #define CFI_REL_OFFSET(reg,size) .cfi_rel_offset reg,size
+    #define CFI_REGISTER(orig_reg, current_reg) .cfi_register orig_reg, current_reg
     #define CFI_REMEMBER_STATE .cfi_remember_state
     // The spec is not clear whether the CFA is part of the saved state and tools
     // differ in the behaviour, so explicitly set the CFA to avoid any ambiguity.
@@ -92,10 +94,42 @@
     #define CFI_DEF_CFA_REGISTER(reg)
     #define CFI_RESTORE(reg)
     #define CFI_REL_OFFSET(reg,size)
+    #define CFI_REGISTER(orig_reg, current_reg)
     #define CFI_REMEMBER_STATE
     #define CFI_RESTORE_STATE_AND_DEF_CFA(off)
     #define CFI_RESTORE_STATE
 #endif
+
+// The register numbers are a bit mixed up for x86-64.
+#define CFI_REG_rax 0
+#define CFI_REG_rcx 2
+#define CFI_REG_rdx 1
+#define CFI_REG_rbx 3
+#define CFI_REG_rsp 7
+#define CFI_REG_rbp 6
+#define CFI_REG_rsi 4
+#define CFI_REG_rdi 5
+#define CFI_REG_r8 8
+#define CFI_REG_r9 9
+#define CFI_REG_r10 10
+#define CFI_REG_r11 11
+#define CFI_REG_r12 12
+#define CFI_REG_r13 13
+#define CFI_REG_r14 14
+#define CFI_REG_r15 15
+#define CFI_REG_rip 16
+
+#define CFI_REG(reg) CFI_REG_##reg
+
+MACRO3(CFI_EXPRESSION_BREG, n, b, offset)
+    .if (-0x40 <= (\offset)) && ((\offset) < 0x40)
+        CFI_EXPRESSION_BREG_1(\n, \b, \offset)
+    .elseif (-0x2000 <= (\offset)) && ((\offset) < 0x2000)
+        CFI_EXPRESSION_BREG_2(\n, \b, \offset)
+    .else
+        .error "Unsupported offset"
+    .endif
+END_MACRO
 
     // Symbols.
 #if !defined(__APPLE__)
@@ -178,6 +212,16 @@ MACRO3(RESTORE_REG_BASE, base, reg, offset)
     CFI_RESTORE(REG_VAR(reg))
 END_MACRO
 
+MACRO1(INCREASE_FRAME, frame_adjustment)
+    subq MACRO_LITERAL(RAW_VAR(frame_adjustment)), %rsp
+    CFI_ADJUST_CFA_OFFSET((RAW_VAR(frame_adjustment)))
+END_MACRO
+
+MACRO1(DECREASE_FRAME, frame_adjustment)
+    addq MACRO_LITERAL(RAW_VAR(frame_adjustment)), %rsp
+    CFI_ADJUST_CFA_OFFSET(-(RAW_VAR(frame_adjustment)))
+END_MACRO
+
 MACRO1(UNIMPLEMENTED,name)
     FUNCTION_TYPE(SYMBOL(\name))
     ASM_HIDDEN VAR(name)
@@ -197,6 +241,11 @@ END_MACRO
 
 MACRO0(UNTESTED)
     int3
+END_MACRO
+
+MACRO1(LOAD_RUNTIME_INSTANCE, reg)
+    movq _ZN3art7Runtime9instance_E@GOTPCREL(%rip), REG_VAR(reg)
+    movq (REG_VAR(reg)), REG_VAR(reg)
 END_MACRO
 
 // Macros to poison (negate) the reference for heap poisoning.
@@ -223,8 +272,7 @@ MACRO0(SETUP_SAVE_REFS_ONLY_FRAME)
     int3
 #else
     // R10 := Runtime::Current()
-    movq _ZN3art7Runtime9instance_E@GOTPCREL(%rip), %r10
-    movq (%r10), %r10
+    LOAD_RUNTIME_INSTANCE r10
     // Save callee and GPR args, mixed together to agree with core spills bitmap.
     PUSH r15  // Callee save.
     PUSH r14  // Callee save.
@@ -233,8 +281,7 @@ MACRO0(SETUP_SAVE_REFS_ONLY_FRAME)
     PUSH rbp  // Callee save.
     PUSH rbx  // Callee save.
     // Create space for FPR args, plus space for ArtMethod*.
-    subq LITERAL(8 + 4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(8 + 4 * 8)
+    INCREASE_FRAME 8 + 4 * 8
     // Save FPRs.
     movq %xmm12, 8(%rsp)
     movq %xmm13, 16(%rsp)
@@ -260,8 +307,7 @@ MACRO0(RESTORE_SAVE_REFS_ONLY_FRAME)
     movq 16(%rsp), %xmm13
     movq 24(%rsp), %xmm14
     movq 32(%rsp), %xmm15
-    addq LITERAL(8 + 4*8), %rsp
-    CFI_ADJUST_CFA_OFFSET(-8 - 4*8)
+    DECREASE_FRAME 8 + 4*8
     // TODO: optimize by not restoring callee-saves restored by the ABI
     POP rbx
     POP rbp
@@ -289,8 +335,7 @@ MACRO0(SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY)
     PUSH_ARG rdx  // Quick arg 2.
     PUSH_ARG rcx  // Quick arg 3.
     // Create space for FPR args and create 2 slots for ArtMethod*.
-    subq MACRO_LITERAL(16 + 12 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(16 + 12 * 8)
+    INCREASE_FRAME 16 + 12 * 8
     // Save FPRs.
     movq %xmm0, 16(%rsp)
     movq %xmm1, 24(%rsp)
@@ -326,8 +371,7 @@ MACRO0(RESTORE_SAVE_REFS_AND_ARGS_FRAME)
     movq 88(%rsp), %xmm13
     movq 96(%rsp), %xmm14
     movq 104(%rsp), %xmm15
-    addq MACRO_LITERAL(80 + 4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(-(80 + 4 * 8))
+    DECREASE_FRAME 80 + 4 * 8
     // Restore callee and GPR args, mixed together to agree with core spills bitmap.
     POP_ARG rcx
     POP_ARG rdx
@@ -352,8 +396,7 @@ MACRO0(SETUP_SAVE_ALL_CALLEE_SAVES_FRAME)
     int3
 #else
     // R10 := Runtime::Current()
-    movq _ZN3art7Runtime9instance_E@GOTPCREL(%rip), %r10
-    movq (%r10), %r10
+    LOAD_RUNTIME_INSTANCE r10
     // Save callee save registers to agree with core spills bitmap.
     PUSH r15  // Callee save.
     PUSH r14  // Callee save.
@@ -362,8 +405,7 @@ MACRO0(SETUP_SAVE_ALL_CALLEE_SAVES_FRAME)
     PUSH rbp  // Callee save.
     PUSH rbx  // Callee save.
     // Create space for FPR args, plus space for ArtMethod*.
-    subq MACRO_LITERAL(4 * 8 + 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(4 * 8 + 8)
+    INCREASE_FRAME 4 * 8 + 8
     // Save FPRs.
     movq %xmm12, 8(%rsp)
     movq %xmm13, 16(%rsp)
@@ -386,8 +428,7 @@ END_MACRO
 
 MACRO0(SETUP_FP_CALLEE_SAVE_FRAME)
     // Create space for ART FP callee-saved registers
-    subq MACRO_LITERAL(4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(4 * 8)
+    INCREASE_FRAME 4 * 8
     movq %xmm12, 0(%rsp)
     movq %xmm13, 8(%rsp)
     movq %xmm14, 16(%rsp)
@@ -400,8 +441,7 @@ MACRO0(RESTORE_FP_CALLEE_SAVE_FRAME)
     movq 8(%rsp), %xmm13
     movq 16(%rsp), %xmm14
     movq 24(%rsp), %xmm15
-    addq MACRO_LITERAL(4 * 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(- 4 * 8)
+    DECREASE_FRAME 4 * 8
 END_MACRO
 
     /*

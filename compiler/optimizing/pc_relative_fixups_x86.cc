@@ -195,15 +195,6 @@ class PCRelativeHandlerVisitor : public HGraphVisitor {
   void HandleInvoke(HInvoke* invoke) {
     HInvokeStaticOrDirect* invoke_static_or_direct = invoke->AsInvokeStaticOrDirect();
 
-    // We can't add the method address if we already have a current method pointer.
-    // This may arise when sharpening doesn't remove the current method pointer from the invoke.
-    if (invoke_static_or_direct != nullptr && invoke_static_or_direct->HasCurrentMethodInput()) {
-      // Note: This happens only for recursive calls (including compiling an intrinsic
-      // by faking a call to itself; we use kRuntimeCall for this case).
-      DCHECK(!invoke_static_or_direct->HasPcRelativeMethodLoadKind());
-      return;
-    }
-
     // If this is an invoke-static/-direct with PC-relative addressing (within boot image
     // or using .bss or .data.bimg.rel.ro), we need the PC-relative address base.
     bool base_added = false;
@@ -246,7 +237,6 @@ class PCRelativeHandlerVisitor : public HGraphVisitor {
         // This intrinsic needs the constant area.
         if (!base_added) {
           DCHECK(invoke_static_or_direct != nullptr);
-          DCHECK(!invoke_static_or_direct->HasCurrentMethodInput());
           HX86ComputeBaseMethodAddress* method_address = GetPCRelativeBasePointer(invoke);
           invoke_static_or_direct->AddSpecialInput(method_address);
         }
