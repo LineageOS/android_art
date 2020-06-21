@@ -18,6 +18,7 @@
 #define ART_RUNTIME_CLASS_LINKER_H_
 
 #include <list>
+#include <map>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -40,6 +41,27 @@
 #include "verifier/verifier_enums.h"
 
 namespace art {
+
+class ArtField;
+class ArtMethod;
+class ClassHierarchyAnalysis;
+enum class ClassRoot : uint32_t;
+class ClassTable;
+class DexFile;
+template<class T> class Handle;
+class ImtConflictTable;
+template<typename T> class LengthPrefixedArray;
+template<class T> class MutableHandle;
+class InternTable;
+class LinearAlloc;
+class OatFile;
+template<class T> class ObjectLock;
+class Runtime;
+class ScopedObjectAccessAlreadyRunnable;
+template<size_t kNumReferences> class PACKED(4) StackHandleScope;
+class Thread;
+
+enum VisitRootFlags : uint8_t;
 
 namespace dex {
 struct ClassDef;
@@ -74,27 +96,6 @@ template <typename T> struct NativeDexCachePair;
 using MethodDexCachePair = NativeDexCachePair<ArtMethod>;
 using MethodDexCacheType = std::atomic<MethodDexCachePair>;
 }  // namespace mirror
-
-class ArtField;
-class ArtMethod;
-class ClassHierarchyAnalysis;
-enum class ClassRoot : uint32_t;
-class ClassTable;
-class DexFile;
-template<class T> class Handle;
-class ImtConflictTable;
-template<typename T> class LengthPrefixedArray;
-template<class T> class MutableHandle;
-class InternTable;
-class LinearAlloc;
-class OatFile;
-template<class T> class ObjectLock;
-class Runtime;
-class ScopedObjectAccessAlreadyRunnable;
-template<size_t kNumReferences> class PACKED(4) StackHandleScope;
-class Thread;
-
-enum VisitRootFlags : uint8_t;
 
 class ClassVisitor {
  public:
@@ -780,6 +781,19 @@ class ClassLinker {
 
   void MakeInitializedClassesVisiblyInitialized(Thread* self, bool wait);
 
+  // Registers the native method and returns the new entry point. NB The returned entry point
+  // might be different from the native_method argument if some MethodCallback modifies it.
+  const void* RegisterNative(Thread* self, ArtMethod* method, const void* native_method)
+      REQUIRES_SHARED(Locks::mutator_lock_) WARN_UNUSED;
+
+  // Unregister native code for a method.
+  void UnregisterNative(Thread* self, ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Get the registered native method entrypoint, if any, otherwise null.
+  const void* GetRegisteredNative(Thread* self, ArtMethod* method)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!critical_native_code_with_clinit_check_lock_);
+
   struct DexCacheData {
     // Construct an invalid data object.
     DexCacheData()
@@ -956,7 +970,8 @@ class ClassLinker {
                   ArtMethod* dst)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void FixupStaticTrampolines(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_);
+  void FixupStaticTrampolines(Thread* self, ObjPtr<mirror::Class> klass)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Finds a class in a Path- or DexClassLoader, loading it if necessary without using JNI. Hash
   // function is supposed to be ComputeModifiedUtf8Hash(descriptor). Returns true if the
@@ -1442,6 +1457,13 @@ class ClassLinker {
       GUARDED_BY(visibly_initialized_callback_lock_);
   IntrusiveForwardList<VisiblyInitializedCallback> running_visibly_initialized_callbacks_
       GUARDED_BY(visibly_initialized_callback_lock_);
+
+  // Registered native code for @CriticalNative methods of classes that are not visibly
+  // initialized. These code pointers cannot be stored in ArtMethod as that would risk
+  // skipping the class initialization check for direct calls from compiled code.
+  Mutex critical_native_code_with_clinit_check_lock_;
+  std::map<ArtMethod*, void*> critical_native_code_with_clinit_check_
+      GUARDED_BY(critical_native_code_with_clinit_check_lock_);
 
   std::unique_ptr<ClassHierarchyAnalysis> cha_;
 

@@ -191,25 +191,38 @@ if [[ $mode == "target" ]]; then
   # Create linker config files. We run linkerconfig on host to avoid problems
   # building it statically for device in an unbundled tree.
 
+  # temporary root for linkerconfig
+  linkerconfig_root=$ANDROID_PRODUCT_OUT/art_linkerconfig_root
+
+  rm -rf $linkerconfig_root
+
+  # Linkerconfig reads files from /system/etc
+  mkdir -p $linkerconfig_root/system
+  cp -r $ANDROID_PRODUCT_OUT/system/etc $linkerconfig_root/system
+
   # For linkerconfig to pick up the APEXes correctly we need to make them
-  # available in $ANDROID_PRODUCT_OUT/apex.
-  mkdir -p $ANDROID_PRODUCT_OUT/apex
+  # available in $linkerconfig_root/apex.
+  mkdir -p $linkerconfig_root/apex
   for apex in ${apexes[@]}; do
     src="$ANDROID_PRODUCT_OUT/system/apex/${apex}"
     if [[ $apex == com.android.art.* ]]; then
-      dst="$ANDROID_PRODUCT_OUT/apex/com.android.art"
+      dst="$linkerconfig_root/apex/com.android.art"
     else
-      dst="$ANDROID_PRODUCT_OUT/apex/${apex}"
+      dst="$linkerconfig_root/apex/${apex}"
     fi
     echo "Copying APEX directory from $src to $dst"
     rm -rf $dst
     cp -r $src $dst
   done
 
+  # To avoid warnings from linkerconfig when it checks following two partitions
+  mkdir -p $linkerconfig_root/product
+  mkdir -p $linkerconfig_root/system_ext
+
   platform_version=$(build/soong/soong_ui.bash --dumpvar-mode PLATFORM_VERSION)
-  linkerconfig_root=$ANDROID_PRODUCT_OUT/linkerconfig
-  echo "Generating linkerconfig in $linkerconfig_root"
-  rm -rf $linkerconfig_root
-  mkdir -p $linkerconfig_root
-  $ANDROID_HOST_OUT/bin/linkerconfig --target $linkerconfig_root --root $ANDROID_PRODUCT_OUT --vndk $platform_version
+  linkerconfig_out=$ANDROID_PRODUCT_OUT/linkerconfig
+  echo "Generating linkerconfig in $linkerconfig_out"
+  rm -rf $linkerconfig_out
+  mkdir -p $linkerconfig_out
+  $ANDROID_HOST_OUT/bin/linkerconfig --target $linkerconfig_out --root $linkerconfig_root --vndk $platform_version
 fi

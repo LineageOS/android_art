@@ -208,21 +208,14 @@ size_t X86_64JniCallingConvention::FrameSize() const {
   return RoundUp(total_size, kStackAlignment);
 }
 
-size_t X86_64JniCallingConvention::OutArgSize() const {
+size_t X86_64JniCallingConvention::OutFrameSize() const {
   // Count param args, including JNIEnv* and jclass*.
   size_t all_args = NumberOfExtraArgumentsForJni() + NumArgs();
   size_t num_fp_args = NumFloatOrDoubleArgs();
   DCHECK_GE(all_args, num_fp_args);
   size_t num_non_fp_args = all_args - num_fp_args;
-  // Account for FP arguments passed through Xmm0..Xmm7.
-  size_t num_stack_fp_args =
-      num_fp_args - std::min(kMaxFloatOrDoubleRegisterArguments, num_fp_args);
-  // Account for other (integer) arguments passed through GPR (RDI, RSI, RDX, RCX, R8, R9).
-  size_t num_stack_non_fp_args =
-      num_non_fp_args - std::min(kMaxIntLikeRegisterArguments, num_non_fp_args);
   // The size of outgoing arguments.
-  static_assert(kFramePointerSize == kMmxSpillSize);
-  size_t size = (num_stack_fp_args + num_stack_non_fp_args) * kFramePointerSize;
+  size_t size = GetNativeOutArgsSize(num_fp_args, num_non_fp_args);
 
   if (UNLIKELY(IsCriticalNative())) {
     // We always need to spill xmm12-xmm15 as they are managed callee-saves
@@ -239,7 +232,7 @@ size_t X86_64JniCallingConvention::OutArgSize() const {
 
   size_t out_args_size = RoundUp(size, kNativeStackAlignment);
   if (UNLIKELY(IsCriticalNative())) {
-    DCHECK_EQ(out_args_size, GetCriticalNativeOutArgsSize(GetShorty(), NumArgs() + 1u));
+    DCHECK_EQ(out_args_size, GetCriticalNativeStubFrameSize(GetShorty(), NumArgs() + 1u));
   }
   return out_args_size;
 }
@@ -297,8 +290,8 @@ FrameOffset X86_64JniCallingConvention::CurrentParamStackOffset() {
       - std::min(kMaxIntLikeRegisterArguments,
                  static_cast<size_t>(itr_args_ - itr_float_and_doubles_));
           // Integer arguments passed through GPR
-  size_t offset = displacement_.Int32Value() - OutArgSize() + (args_on_stack * kFramePointerSize);
-  CHECK_LT(offset, OutArgSize());
+  size_t offset = displacement_.Int32Value() - OutFrameSize() + (args_on_stack * kFramePointerSize);
+  CHECK_LT(offset, OutFrameSize());
   return FrameOffset(offset);
 }
 

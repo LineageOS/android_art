@@ -336,4 +336,26 @@ bool TryExtractVecArrayAccessAddress(HVecMemoryOperation* access, HInstruction* 
   return true;
 }
 
+bool TryReplaceSubSubWithSubAdd(HSub* last_sub) {
+  DCHECK(last_sub->GetRight()->IsSub());
+  HBasicBlock* basic_block = last_sub->GetBlock();
+  ArenaAllocator* allocator = basic_block->GetGraph()->GetAllocator();
+  HInstruction* last_sub_right = last_sub->GetRight();
+  HInstruction* last_sub_left = last_sub->GetLeft();
+  if (last_sub_right->GetUses().HasExactlyOneElement()) {
+    // Reorder operands of last_sub_right: Sub(a, b) -> Sub(b, a).
+    HInstruction* a = last_sub_right->InputAt(0);
+    HInstruction* b = last_sub_right->InputAt(1);
+    last_sub_right->ReplaceInput(b, 0);
+    last_sub_right->ReplaceInput(a, 1);
+
+    // Replace Sub(c, Sub(a, b)) with Add(c, Sub(b, a).
+    HAdd* add = new (allocator) HAdd(last_sub->GetType(), last_sub_left, last_sub_right);
+    basic_block->ReplaceAndRemoveInstructionWith(last_sub, add);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 }  // namespace art
