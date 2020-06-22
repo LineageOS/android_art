@@ -67,7 +67,7 @@ ART_TARGET_DEX_DEPENDENCIES := com.android.art.testing com.android.conscrypt com
 
 ART_CORE_SHARED_LIBRARIES := libjavacore libopenjdk libopenjdkjvm libopenjdkjvmti
 ART_CORE_SHARED_DEBUG_LIBRARIES := libopenjdkd libopenjdkjvmd libopenjdkjvmtid
-ART_HOST_CORE_SHARED_LIBRARIES := $(ART_CORE_SHARED_LIBRARIES) libicuuc-host libicui18n-host libicu_jni
+ART_HOST_CORE_SHARED_LIBRARIES := $(ART_CORE_SHARED_LIBRARIES) libandroidicu-host libicuuc-host libicui18n-host libicu_jni
 ART_HOST_SHARED_LIBRARY_DEPENDENCIES := $(foreach lib,$(ART_HOST_CORE_SHARED_LIBRARIES), $(ART_HOST_OUT_SHARED_LIBRARIES)/$(lib)$(ART_HOST_SHLIB_EXTENSION))
 ART_HOST_SHARED_LIBRARY_DEBUG_DEPENDENCIES := $(foreach lib,$(ART_CORE_SHARED_DEBUG_LIBRARIES), $(ART_HOST_OUT_SHARED_LIBRARIES)/$(lib)$(ART_HOST_SHLIB_EXTENSION))
 ifdef HOST_2ND_ARCH
