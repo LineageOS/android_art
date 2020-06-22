@@ -258,7 +258,7 @@ endef  # define-art-gtest-host-both
 ifeq ($(ART_BUILD_TARGET),true)
   $(foreach name,$(ART_TARGET_GTEST_NAMES), $(eval $(call add-art-gtest-dependencies,$(name),)))
   ART_TEST_TARGET_GTEST_DEPENDENCIES += \
-    libicu_jni.com.android.i18n \
+    com.android.i18n \
     libjavacore.com.android.art.testing \
     libopenjdkd.com.android.art.testing \
     com.android.art.testing \
