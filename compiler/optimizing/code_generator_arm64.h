@@ -894,6 +894,9 @@ class CodeGeneratorARM64 : public CodeGenerator {
   // artReadBarrierForRootSlow.
   void GenerateReadBarrierForRootSlow(HInstruction* instruction, Location out, Location root);
 
+  void IncreaseFrame(size_t adjustment) override;
+  void DecreaseFrame(size_t adjustment) override;
+
   void GenerateNop() override;
 
   void GenerateImplicitNullCheck(HNullCheck* instruction) override;

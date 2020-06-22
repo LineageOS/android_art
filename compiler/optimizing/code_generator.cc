@@ -545,8 +545,10 @@ void CodeGenerator::PrepareCriticalNativeArgumentMoves(
   }
 }
 
-void CodeGenerator::AdjustCriticalNativeArgumentMoves(size_t out_frame_size,
-                                                      /*inout*/HParallelMove* parallel_move) {
+void CodeGenerator::FinishCriticalNativeFrameSetup(size_t out_frame_size,
+                                                   /*inout*/HParallelMove* parallel_move) {
+  DCHECK_NE(out_frame_size, 0u);
+  IncreaseFrame(out_frame_size);
   // Adjust the source stack offsets by `out_frame_size`, i.e. the additional
   // frame size needed for outgoing stack arguments.
   for (size_t i = 0, num = parallel_move->NumMoves(); i != num; ++i) {
@@ -558,6 +560,8 @@ void CodeGenerator::AdjustCriticalNativeArgumentMoves(size_t out_frame_size,
       operands->SetSource(Location::DoubleStackSlot(source.GetStackIndex() +  out_frame_size));
     }
   }
+  // Emit the moves.
+  GetMoveResolver()->EmitNativeCode(parallel_move);
 }
 
 const char* CodeGenerator::GetCriticalNativeShorty(HInvokeStaticOrDirect* invoke,
