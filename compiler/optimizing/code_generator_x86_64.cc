@@ -1046,16 +1046,10 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
       RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       break;
     case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
-      HParallelMove parallel_move(GetGraph()->GetAllocator());
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorX86_64,
                                     kNativeStackAlignment,
-                                    GetCriticalNativeDirectCallFrameSize>(invoke, &parallel_move);
-      if (out_frame_size != 0u) {
-        __ subq(CpuRegister(RSP), Immediate(out_frame_size));
-        __ cfi().AdjustCFAOffset(out_frame_size);
-        GetMoveResolver()->EmitNativeCode(&parallel_move);
-      }
+                                    GetCriticalNativeDirectCallFrameSize>(invoke);
       // (callee_method + offset_of_jni_entry_point)()
       __ call(Address(callee_method.AsRegister<CpuRegister>(),
                       ArtMethod::EntryPointFromJniOffset(kX86_64PointerSize).SizeValue()));
@@ -1085,8 +1079,7 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
           break;
       }
       if (out_frame_size != 0u) {
-        __ addq(CpuRegister(RSP), Immediate(out_frame_size));
-        __ cfi().AdjustCFAOffset(-out_frame_size);
+        DecreaseFrame(out_frame_size);
       }
       break;
     }
@@ -1477,8 +1470,7 @@ void CodeGeneratorX86_64::GenerateFrameEntry() {
     }
 
     int adjust = GetFrameSize() - GetCoreSpillSize();
-    __ subq(CpuRegister(RSP), Immediate(adjust));
-    __ cfi().AdjustCFAOffset(adjust);
+    IncreaseFrame(adjust);
     uint32_t xmm_spill_location = GetFpuSpillStart();
     size_t xmm_spill_slot_size = GetCalleePreservedFPWidth();
 
@@ -1523,8 +1515,7 @@ void CodeGeneratorX86_64::GenerateFrameExit() {
     }
 
     int adjust = GetFrameSize() - GetCoreSpillSize();
-    __ addq(CpuRegister(RSP), Immediate(adjust));
-    __ cfi().AdjustCFAOffset(-adjust);
+    DecreaseFrame(adjust);
 
     for (size_t i = 0; i < arraysize(kCoreCalleeSaves); ++i) {
       Register reg = kCoreCalleeSaves[i];
@@ -2043,6 +2034,16 @@ void LocationsBuilderX86_64::VisitNativeDebugInfo(HNativeDebugInfo* info) {
 
 void InstructionCodeGeneratorX86_64::VisitNativeDebugInfo(HNativeDebugInfo*) {
   // MaybeRecordNativeDebugInfo is already called implicitly in CodeGenerator::Compile.
+}
+
+void CodeGeneratorX86_64::IncreaseFrame(size_t adjustment) {
+  __ subq(CpuRegister(RSP), Immediate(adjustment));
+  __ cfi().AdjustCFAOffset(adjustment);
+}
+
+void CodeGeneratorX86_64::DecreaseFrame(size_t adjustment) {
+  __ addq(CpuRegister(RSP), Immediate(adjustment));
+  __ cfi().AdjustCFAOffset(-adjustment);
 }
 
 void CodeGeneratorX86_64::GenerateNop() {
