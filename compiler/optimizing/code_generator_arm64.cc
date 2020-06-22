@@ -1157,9 +1157,9 @@ void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
       __ B(ne, &done);
       if (is_frame_entry) {
         if (HasEmptyFrame()) {
-          // The entyrpoint expects the method at the bottom of the stack. We
+          // The entrypoint expects the method at the bottom of the stack. We
           // claim stack space necessary for alignment.
-          __ Claim(kStackAlignment);
+          IncreaseFrame(kStackAlignment);
           __ Stp(kArtMethodRegister, lr, MemOperand(sp, 0));
         } else if (!RequiresCurrentMethod()) {
           __ Str(kArtMethodRegister, MemOperand(sp, 0));
@@ -1176,7 +1176,7 @@ void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
       if (HasEmptyFrame()) {
         CHECK(is_frame_entry);
         __ Ldr(lr, MemOperand(sp, 8));
-        __ Drop(kStackAlignment);
+        DecreaseFrame(kStackAlignment);
       }
       __ Bind(&done);
     }
@@ -3654,6 +3654,16 @@ void InstructionCodeGeneratorARM64::VisitNativeDebugInfo(HNativeDebugInfo*) {
   // MaybeRecordNativeDebugInfo is already called implicitly in CodeGenerator::Compile.
 }
 
+void CodeGeneratorARM64::IncreaseFrame(size_t adjustment) {
+  __ Claim(adjustment);
+  GetAssembler()->cfi().AdjustCFAOffset(adjustment);
+}
+
+void CodeGeneratorARM64::DecreaseFrame(size_t adjustment) {
+  __ Drop(adjustment);
+  GetAssembler()->cfi().AdjustCFAOffset(-adjustment);
+}
+
 void CodeGeneratorARM64::GenerateNop() {
   __ Nop();
 }
@@ -4448,16 +4458,10 @@ void CodeGeneratorARM64::GenerateStaticOrDirectCall(
       }
       break;
     case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
-      HParallelMove parallel_move(GetGraph()->GetAllocator());
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorARM64,
                                     kAapcs64StackAlignment,
-                                    GetCriticalNativeDirectCallFrameSize>(invoke, &parallel_move);
-      if (out_frame_size != 0u) {
-        __ Claim(out_frame_size);
-        GetAssembler()->cfi().AdjustCFAOffset(out_frame_size);
-        GetMoveResolver()->EmitNativeCode(&parallel_move);
-      }
+                                    GetCriticalNativeDirectCallFrameSize>(invoke);
       call_code_pointer_member(ArtMethod::EntryPointFromJniOffset(kArm64PointerSize));
       // Zero-/sign-extend the result when needed due to native and managed ABI mismatch.
       switch (invoke->GetType()) {
@@ -4484,8 +4488,7 @@ void CodeGeneratorARM64::GenerateStaticOrDirectCall(
           break;
       }
       if (out_frame_size != 0u) {
-        __ Drop(out_frame_size);
-        GetAssembler()->cfi().AdjustCFAOffset(-out_frame_size);
+        DecreaseFrame(out_frame_size);
       }
       break;
     }
