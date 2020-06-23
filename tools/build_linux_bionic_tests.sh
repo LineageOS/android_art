@@ -26,6 +26,14 @@ if [ ! -d art ]; then
   exit 1
 fi
 
+soong_args=""
+
+# Switch the build system to unbundled mode in the reduced manifest branch.
+# TODO(b/159109002): Clean this up.
+if [ ! -d frameworks/base ]; then
+  soong_args="$soong_args TARGET_BUILD_UNBUNDLED=true"
+fi
+
 source build/envsetup.sh >&/dev/null # for get_build_var
 
 out_dir=$(get_build_var OUT_DIR)
@@ -38,7 +46,7 @@ host_out=$(get_build_var HOST_OUT)
 
 # First build all the targets still in .mk files (also build normal glibc host
 # targets so we know what's needed to run the tests).
-build/soong/soong_ui.bash --make-mode "$@" test-art-host-run-test-dependencies build-art-host-tests
+build/soong/soong_ui.bash --make-mode $soong_args "$@" test-art-host-run-test-dependencies build-art-host-tests
 if [ $? != 0 ]; then
   exit 1
 fi
@@ -88,7 +96,7 @@ bionic_targets=(
 
 echo building ${bionic_targets[*]}
 
-build/soong/soong_ui.bash --make-mode --skip-make "$@" ${bionic_targets[*]}
+build/soong/soong_ui.bash --make-mode --skip-make $soong_args "$@" ${bionic_targets[*]}
 ret=$?
 
 mv $tmp_soong_var $out_dir/soong/soong.variables
