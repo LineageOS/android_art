@@ -647,6 +647,9 @@ class CodeGeneratorX86 : public CodeGenerator {
     }
   }
 
+  void IncreaseFrame(size_t adjustment) override;
+  void DecreaseFrame(size_t adjustment) override;
+
   void GenerateNop() override;
   void GenerateImplicitNullCheck(HNullCheck* instruction) override;
   void GenerateExplicitNullCheck(HNullCheck* instruction) override;

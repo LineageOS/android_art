@@ -1080,6 +1080,7 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
       reg = kMethodRegisterArgument;
     } else {
       __ pushl(EAX);
+      __ cfi().AdjustCFAOffset(4);
       __ movl(EAX, Address(ESP, kX86WordSize));
     }
     NearLabel overflow;
@@ -1091,6 +1092,7 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
     __ Bind(&overflow);
     if (!is_frame_entry) {
       __ popl(EAX);
+      __ cfi().AdjustCFAOffset(-4);
     }
   }
 
@@ -1103,8 +1105,7 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
       if (HasEmptyFrame()) {
         CHECK(is_frame_entry);
         // Alignment
-        __ subl(ESP, Immediate(8));
-        __ cfi().AdjustCFAOffset(8);
+        IncreaseFrame(8);
         // We need a temporary. The stub also expects the method at bottom of stack.
         __ pushl(EAX);
         __ cfi().AdjustCFAOffset(4);
@@ -1119,8 +1120,7 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
         // code easier to reason about.
         __ popl(EAX);
         __ cfi().AdjustCFAOffset(-4);
-        __ addl(ESP, Immediate(8));
-        __ cfi().AdjustCFAOffset(-8);
+        DecreaseFrame(8);
       } else {
         if (!RequiresCurrentMethod()) {
           CHECK(is_frame_entry);
@@ -1167,8 +1167,7 @@ void CodeGeneratorX86::GenerateFrameEntry() {
     }
 
     int adjust = GetFrameSize() - FrameEntrySpillSize();
-    __ subl(ESP, Immediate(adjust));
-    __ cfi().AdjustCFAOffset(adjust);
+    IncreaseFrame(adjust);
     // Save the current method if we need it. Note that we do not
     // do this in HCurrentMethod, as the instruction might have been removed
     // in the SSA graph.
@@ -1189,8 +1188,7 @@ void CodeGeneratorX86::GenerateFrameExit() {
   __ cfi().RememberState();
   if (!HasEmptyFrame()) {
     int adjust = GetFrameSize() - FrameEntrySpillSize();
-    __ addl(ESP, Immediate(adjust));
-    __ cfi().AdjustCFAOffset(-adjust);
+    DecreaseFrame(adjust);
 
     for (size_t i = 0; i < arraysize(kCoreCalleeSaves); ++i) {
       Register reg = kCoreCalleeSaves[i];
@@ -1401,15 +1399,14 @@ void CodeGeneratorX86::Move64(Location destination, Location source) {
       __ movsd(destination.AsFpuRegister<XmmRegister>(), Address(ESP, source.GetStackIndex()));
     } else if (source.IsRegisterPair()) {
       size_t elem_size = DataType::Size(DataType::Type::kInt32);
-      // Create stack space for 2 elements.
-      __ subl(ESP, Immediate(2 * elem_size));
-      __ cfi().AdjustCFAOffset(2 * elem_size);
-      __ movl(Address(ESP, 0), source.AsRegisterPairLow<Register>());
-      __ movl(Address(ESP, elem_size), source.AsRegisterPairHigh<Register>());
+      // Push the 2 source registers to the stack.
+      __ pushl(source.AsRegisterPairHigh<Register>());
+      __ cfi().AdjustCFAOffset(elem_size);
+      __ pushl(source.AsRegisterPairLow<Register>());
+      __ cfi().AdjustCFAOffset(elem_size);
       __ movsd(destination.AsFpuRegister<XmmRegister>(), Address(ESP, 0));
       // And remove the temporary stack space we allocated.
-      __ addl(ESP, Immediate(2 * elem_size));
-      __ cfi().AdjustCFAOffset(-(2 * elem_size));
+      DecreaseFrame(2 * elem_size);
     } else {
       LOG(FATAL) << "Unimplemented";
     }
@@ -1968,6 +1965,16 @@ void LocationsBuilderX86::VisitNativeDebugInfo(HNativeDebugInfo* info) {
 
 void InstructionCodeGeneratorX86::VisitNativeDebugInfo(HNativeDebugInfo*) {
   // MaybeRecordNativeDebugInfo is already called implicitly in CodeGenerator::Compile.
+}
+
+void CodeGeneratorX86::IncreaseFrame(size_t adjustment) {
+  __ subl(ESP, Immediate(adjustment));
+  __ cfi().AdjustCFAOffset(adjustment);
+}
+
+void CodeGeneratorX86::DecreaseFrame(size_t adjustment) {
+  __ addl(ESP, Immediate(adjustment));
+  __ cfi().AdjustCFAOffset(-adjustment);
 }
 
 void CodeGeneratorX86::GenerateNop() {
@@ -3025,8 +3032,7 @@ void InstructionCodeGeneratorX86::VisitTypeConversion(HTypeConversion* conversio
           // TODO: enhance register allocator to ask for stack temporaries.
           if (!in.IsDoubleStackSlot() || !out.IsStackSlot()) {
             adjustment = DataType::Size(DataType::Type::kInt64);
-            __ subl(ESP, Immediate(adjustment));
-            __ cfi().AdjustCFAOffset(adjustment);
+            codegen_->IncreaseFrame(adjustment);
           }
 
           // Load the value to the FP stack, using temporaries if needed.
@@ -3042,8 +3048,7 @@ void InstructionCodeGeneratorX86::VisitTypeConversion(HTypeConversion* conversio
 
           // Remove the temporary stack space we allocated.
           if (adjustment != 0) {
-            __ addl(ESP, Immediate(adjustment));
-            __ cfi().AdjustCFAOffset(-adjustment);
+            codegen_->DecreaseFrame(adjustment);
           }
           break;
         }
@@ -3077,8 +3082,7 @@ void InstructionCodeGeneratorX86::VisitTypeConversion(HTypeConversion* conversio
           // TODO: enhance register allocator to ask for stack temporaries.
           if (!in.IsDoubleStackSlot() || !out.IsDoubleStackSlot()) {
             adjustment = DataType::Size(DataType::Type::kInt64);
-            __ subl(ESP, Immediate(adjustment));
-            __ cfi().AdjustCFAOffset(adjustment);
+            codegen_->IncreaseFrame(adjustment);
           }
 
           // Load the value to the FP stack, using temporaries if needed.
@@ -3094,8 +3098,7 @@ void InstructionCodeGeneratorX86::VisitTypeConversion(HTypeConversion* conversio
 
           // Remove the temporary stack space we allocated.
           if (adjustment != 0) {
-            __ addl(ESP, Immediate(adjustment));
-            __ cfi().AdjustCFAOffset(-adjustment);
+            codegen_->DecreaseFrame(adjustment);
           }
           break;
         }
@@ -3591,8 +3594,7 @@ void InstructionCodeGeneratorX86::GenerateRemFP(HRem *rem) {
 
   // Create stack space for 2 elements.
   // TODO: enhance register allocator to ask for stack temporaries.
-  __ subl(ESP, Immediate(2 * elem_size));
-  __ cfi().AdjustCFAOffset(2 * elem_size);
+  codegen_->IncreaseFrame(2 * elem_size);
 
   // Load the values to the FP stack in reverse order, using temporaries if needed.
   const bool is_wide = !is_float;
@@ -3632,8 +3634,7 @@ void InstructionCodeGeneratorX86::GenerateRemFP(HRem *rem) {
   }
 
   // And remove the temporary stack space we allocated.
-  __ addl(ESP, Immediate(2 * elem_size));
-  __ cfi().AdjustCFAOffset(-(2 * elem_size));
+  codegen_->DecreaseFrame(2 * elem_size);
 }
 
 
@@ -5054,16 +5055,10 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
       RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       break;
     case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
-      HParallelMove parallel_move(GetGraph()->GetAllocator());
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorX86,
                                     kNativeStackAlignment,
-                                    GetCriticalNativeDirectCallFrameSize>(invoke, &parallel_move);
-      if (out_frame_size != 0u) {
-        __ subl(ESP, Immediate(out_frame_size));
-        __ cfi().AdjustCFAOffset(out_frame_size);
-        GetMoveResolver()->EmitNativeCode(&parallel_move);
-      }
+                                    GetCriticalNativeDirectCallFrameSize>(invoke);
       // (callee_method + offset_of_jni_entry_point)()
       __ call(Address(callee_method.AsRegister<Register>(),
                       ArtMethod::EntryPointFromJniOffset(kX86PointerSize).Int32Value()));
@@ -5071,8 +5066,7 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
       if (out_frame_size == 0u && DataType::IsFloatingPointType(invoke->GetType())) {
         // Create space for conversion.
         out_frame_size = 8u;
-        __ subl(ESP, Immediate(out_frame_size));
-        __ cfi().AdjustCFAOffset(out_frame_size);
+        IncreaseFrame(out_frame_size);
       }
       // Zero-/sign-extend or move the result when needed due to native and managed ABI mismatch.
       switch (invoke->GetType()) {
@@ -5105,8 +5099,7 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
           break;
       }
       if (out_frame_size != 0u) {
-        __ addl(ESP, Immediate(out_frame_size));
-        __ cfi().AdjustCFAOffset(-out_frame_size);
+        DecreaseFrame(out_frame_size);
       }
       break;
     }
@@ -6466,7 +6459,7 @@ void ParallelMoveResolverX86::EmitMove(size_t index) {
       __ movl(destination.AsRegisterPairHigh<Register>(), source.AsRegisterPairHigh<Register>());
     } else if (destination.IsFpuRegister()) {
       size_t elem_size = DataType::Size(DataType::Type::kInt32);
-      // Push the 2 source registers to stack.
+      // Push the 2 source registers to the stack.
       __ pushl(source.AsRegisterPairHigh<Register>());
       __ cfi().AdjustCFAOffset(elem_size);
       __ pushl(source.AsRegisterPairLow<Register>());
@@ -6474,8 +6467,7 @@ void ParallelMoveResolverX86::EmitMove(size_t index) {
       // Load the destination register.
       __ movsd(destination.AsFpuRegister<XmmRegister>(), Address(ESP, 0));
       // And remove the temporary stack space we allocated.
-      __ addl(ESP, Immediate(2 * elem_size));
-      __ cfi().AdjustCFAOffset(-(2 * elem_size));
+      codegen_->DecreaseFrame(2 * elem_size);
     } else {
       DCHECK(destination.IsDoubleStackSlot());
       __ movl(Address(ESP, destination.GetStackIndex()), source.AsRegisterPairLow<Register>());
@@ -6490,8 +6482,7 @@ void ParallelMoveResolverX86::EmitMove(size_t index) {
     } else if (destination.IsRegisterPair()) {
       size_t elem_size = DataType::Size(DataType::Type::kInt32);
       // Create stack space for 2 elements.
-      __ subl(ESP, Immediate(2 * elem_size));
-      __ cfi().AdjustCFAOffset(2 * elem_size);
+      codegen_->IncreaseFrame(2 * elem_size);
       // Store the source register.
       __ movsd(Address(ESP, 0), source.AsFpuRegister<XmmRegister>());
       // And pop the values into destination registers.
@@ -6600,8 +6591,7 @@ void ParallelMoveResolverX86::EmitMove(size_t index) {
           __ pushl(low);
           __ cfi().AdjustCFAOffset(4);
           __ movsd(dest, Address(ESP, 0));
-          __ addl(ESP, Immediate(8));
-          __ cfi().AdjustCFAOffset(-8);
+          codegen_->DecreaseFrame(8);
         }
       } else {
         DCHECK(destination.IsDoubleStackSlot()) << destination;
@@ -6638,13 +6628,11 @@ void ParallelMoveResolverX86::Exchange32(XmmRegister reg, int mem) {
 
 void ParallelMoveResolverX86::Exchange128(XmmRegister reg, int mem) {
   size_t extra_slot = 4 * kX86WordSize;
-  __ subl(ESP, Immediate(extra_slot));
-  __ cfi().AdjustCFAOffset(extra_slot);
+  codegen_->IncreaseFrame(extra_slot);
   __ movups(Address(ESP, 0), XmmRegister(reg));
   ExchangeMemory(0, mem + extra_slot, 4);
   __ movups(XmmRegister(reg), Address(ESP, 0));
-  __ addl(ESP, Immediate(extra_slot));
-  __ cfi().AdjustCFAOffset(-extra_slot);
+  codegen_->DecreaseFrame(extra_slot);
 }
 
 void ParallelMoveResolverX86::ExchangeMemory(int mem1, int mem2, int number_of_words) {
