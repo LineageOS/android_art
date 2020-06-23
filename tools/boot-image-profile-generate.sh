@@ -56,8 +56,6 @@ BOOT_ZIP="$2"
 PRELOADED_BLACKLIST="$3"
 shift 3
 
-IN
-
 # Read the profile input args.
 profman_profile_input_args=()
 while [[ "$#" -ge 1 ]] && [[ ! "$1" = '--profman-arg' ]]; do
