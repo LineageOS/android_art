@@ -90,8 +90,7 @@ public class Main {
   /// CHECK-NEXT: ArrayLength
   /// CHECK-NEXT: BelowOrEqual
   //
-  /// CHECK:      ArrayGet loop:none
-  /// CHECK-NEXT: Return
+  /// CHECK:      Return
   static double $noinline$test02(double a[], int n) {
     double b[] = new double[n];
     a[0] = a[0] / 2;
@@ -103,7 +102,7 @@ public class Main {
       b[i] += a[i];
     }
 
-    norma = a[0];
+    norma = a[0]; // ArrayGet should be removed by LSE.
     return norma;
   }
 
