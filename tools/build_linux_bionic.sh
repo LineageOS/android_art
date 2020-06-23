@@ -31,21 +31,13 @@ if [ ! -d art ]; then
   exit 1
 fi
 
-soong_args=""
-
-# Switch the build system to unbundled mode in the reduced manifest branch.
-# TODO(b/159109002): Clean this up.
-if [ ! -d frameworks/base ]; then
-  soong_args="$soong_args TARGET_BUILD_UNBUNDLED=true"
-fi
-
 source build/envsetup.sh >&/dev/null # for get_build_var
 # Soong needs a bunch of variables set and will not run if they are missing.
 # The default values of these variables is only contained in make, so use
 # nothing to create the variables then remove all the other artifacts.
 # Lunch since it seems we cannot find the build-number otherwise.
 lunch aosp_x86-eng
-build/soong/soong_ui.bash --make-mode $soong_args nothing
+build/soong/soong_ui.bash --make-mode nothing
 
 if [ $? != 0 ]; then
   exit 1
@@ -94,4 +86,4 @@ rm $tmp_soong_var
 # Write a new build-number
 echo ${tmp_build_number}_SOONG_ONLY_BUILD > ${out_dir}/soong/build_number.txt
 
-build/soong/soong_ui.bash --make-mode --skip-make $soong_args $@
+build/soong/soong_ui.bash --make-mode --skip-make $@
