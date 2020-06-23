@@ -188,14 +188,6 @@ if [[ $mode == "target" ]]; then
     done
   done
 
-  # TODO(b/159355595): Ensure there is a tzdata in system to avoid warnings on
-  # stderr from Bionic.
-  if [ ! -f $ANDROID_PRODUCT_OUT/system/usr/share/zoneinfo/tzdata ]; then
-    mkdir -p $ANDROID_PRODUCT_OUT/system/usr/share/zoneinfo
-    cp $ANDROID_PRODUCT_OUT/system/apex/com.android.tzdata/etc/tz/tzdata \
-      $ANDROID_PRODUCT_OUT/system/usr/share/zoneinfo/tzdata
-  fi
-
   # Create linker config files. We run linkerconfig on host to avoid problems
   # building it statically for device in an unbundled tree.
 
