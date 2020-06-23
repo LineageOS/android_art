@@ -91,8 +91,9 @@ elif [[ $mode == "target" ]]; then
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
   make_command+=" libnetd_client-target toybox sh"
   make_command+=" debuggerd su gdbserver"
+  make_command+=" libstdc++ "
   # vogar requires the class files for conscrypt.
-  make_command+=" conscrypt"
+  make_command+=" conscrypt "
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   # Targets required to generate a linker configuration for device within the
   # chroot environment. The *.libraries.txt targets are required by
@@ -101,9 +102,14 @@ elif [[ $mode == "target" ]]; then
   # work in an unbundled tree.
   make_command+=" host_linkerconfig_all_targets sanitizer.libraries.txt vndkcorevariant.libraries.txt"
   # Additional targets needed for the chroot environment.
-  make_command+=" event-log-tags"
-  # Needed to extract prebuilt APEXes.
-  make_command+=" deapexer"
+  make_command+=" crash_dump event-log-tags"
+  # Needed to extract prebuilts apexes.
+  make_command+=" deapexer "
+  # Build the bootstrap Bionic artifacts links (linker, libc, libdl, libm).
+  # These targets create these symlinks:
+  # - from /system/bin/linker(64) to /apex/com.android.runtime/bin/linker(64); and
+  # - from /system/lib(64)/$lib to /apex/com.android.runtime/lib(64)/$lib.
+  make_command+=" linker libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap"
   # Build/install the required APEXes.
   make_command+=" ${apexes[*]}"
 fi
@@ -195,23 +201,6 @@ if [[ $mode == "target" ]]; then
     cp $ANDROID_PRODUCT_OUT/system/apex/com.android.tzdata/etc/tz/tzdata \
       $ANDROID_PRODUCT_OUT/system/usr/share/zoneinfo/tzdata
   fi
-
-  # Create system symlinks for the Runtime APEX. Normally handled by
-  # installSymlinkToRuntimeApex in soong/cc/binary.go, but we have to replicate
-  # it here since we don't run the install rules for the Runtime APEX.
-  for b in linker{,_asan}{,64}; do
-    echo "Symlinking /apex/com.android.runtime/bin/$b to /system/bin"
-    ln -sf /apex/com.android.runtime/bin/$b $ANDROID_PRODUCT_OUT/system/bin/$b
-  done
-  for p in $ANDROID_PRODUCT_OUT/system/apex/com.android.runtime/lib{,64}/bionic/*; do
-    lib_dir=$(expr $p : '.*/\(lib[0-9]*\)/.*')
-    lib_file=$(basename $p)
-    src=/apex/com.android.runtime/${lib_dir}/bionic/${lib_file}
-    dst=$ANDROID_PRODUCT_OUT/system/${lib_dir}/${lib_file}
-    echo "Symlinking $src into /system/${lib_dir}"
-    mkdir -p $(dirname $dst)
-    ln -sf $src $dst
-  done
 
   # Create linker config files. We run linkerconfig on host to avoid problems
   # building it statically for device in an unbundled tree.

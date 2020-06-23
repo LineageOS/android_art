@@ -474,6 +474,23 @@ build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CO
 .PHONY: build-art-target
 build-art-target: $(TARGET_OUT_EXECUTABLES)/art $(ART_TARGET_DEPENDENCIES) $(TARGET_CORE_IMG_OUTS)
 
+########################################################################
+# Workaround for not using symbolic links for linker and bionic libraries
+# in a minimal setup (eg buildbot or golem).
+########################################################################
+
+PRIVATE_BIONIC_FILES := \
+  bin/bootstrap/linker \
+  bin/bootstrap/linker64 \
+  lib/bootstrap/libc.so \
+  lib/bootstrap/libm.so \
+  lib/bootstrap/libdl.so \
+  lib/bootstrap/libdl_android.so \
+  lib64/bootstrap/libc.so \
+  lib64/bootstrap/libm.so \
+  lib64/bootstrap/libdl.so \
+  lib64/bootstrap/libdl_android.so \
+
 PRIVATE_ART_APEX_DEPENDENCY_FILES := \
   bin/dalvikvm32 \
   bin/dalvikvm64 \
@@ -538,18 +555,6 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libprofile.so \
   lib64/libvixl.so \
 
-PRIVATE_RUNTIME_APEX_DEPENDENCY_FILES := \
-  bin/linker \
-  bin/linker64 \
-  lib/bionic/libc.so \
-  lib/bionic/libdl.so \
-  lib/bionic/libdl_android.so \
-  lib/bionic/libm.so \
-  lib64/bionic/libc.so \
-  lib64/bionic/libdl.so \
-  lib64/bionic/libdl_android.so \
-  lib64/bionic/libm.so \
-
 PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
   lib/libcrypto.so \
   lib/libjavacrypto.so \
@@ -597,9 +602,18 @@ define extract-from-apex
   done
 endef
 
-# Copy or extract some required files from APEXes to the `system` (TARGET_OUT)
-# directory. This is dangerous as these files could inadvertently stay in this
-# directory and be included in a system image.
+# Generate copies of Bionic bootstrap artifacts and ART APEX
+# libraries in the `system` (TARGET_OUT) directory. This is dangerous
+# as these files could inadvertently stay in this directory and be
+# included in a system image.
+#
+# Copy some libraries into `$(TARGET_OUT)/lib(64)` (the
+# `/system/lib(64)` directory to be sync'd to the target) for ART testing
+# purposes:
+# - Bionic bootstrap libraries, copied from
+#   `$(TARGET_OUT)/lib(64)/bootstrap` (the `/system/lib(64)/bootstrap`
+#   directory to be sync'd to the target);
+# - Programs and libraries from various APEXes.
 #
 # This target is only used by Golem now.
 #
@@ -611,21 +625,20 @@ endef
 # ART APEX.
 .PHONY: standalone-apex-files
 standalone-apex-files: deapexer \
+                       libc.bootstrap \
+                       libdl.bootstrap \
+                       libdl_android.bootstrap \
+                       libm.bootstrap \
+                       linker \
                        $(RELEASE_ART_APEX) \
-                       $(RUNTIME_APEX) \
                        $(CONSCRYPT_APEX) \
                        $(I18N_APEX)
+	for f in $(PRIVATE_BIONIC_FILES); do \
+	  tf=$(TARGET_OUT)/$$f; \
+	  if [ -f $$tf ]; then cp -f $$tf $$(echo $$tf | sed 's,bootstrap/,,'); fi; \
+	done
 	$(call extract-from-apex,$(RELEASE_ART_APEX),\
 	  $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES))
-	# The Runtime APEX has the Bionic libs in ${LIB}/bionic subdirectories,
-	# so we need to move them up a level after extraction.
-	$(call extract-from-apex,$(RUNTIME_APEX),\
-	  $(PRIVATE_RUNTIME_APEX_DEPENDENCY_FILES)) && \
-	  for libdir in $(TARGET_OUT)/lib $(TARGET_OUT)/lib64; do \
-	    if [ -d $$libdir/bionic ]; then \
-	      mv -f $$libdir/bionic/*.so $$libdir; \
-	    fi || exit 1; \
-	  done
 	$(call extract-from-apex,$(CONSCRYPT_APEX),\
 	  $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS))
 	$(call extract-from-apex,$(I18N_APEX),\
@@ -638,8 +651,10 @@ standalone-apex-files: deapexer \
 # Also include libartbenchmark, we always include it when running golem.
 # libstdc++ is needed when building for ART_TARGET_LINUX.
 
-# Also include the Bionic libraries (libc, libdl, libdl_android, libm) and
-# linker.
+# Also include the bootstrap Bionic libraries (libc, libdl, libdl_android,
+# libm). These are required as the "main" libc, libdl, libdl_android, and libm
+# have moved to the ART APEX. This is a temporary change needed until Golem
+# fully supports the ART APEX.
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
@@ -675,6 +690,7 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         libartpalette-system \
+                        libc.bootstrap libdl.bootstrap libdl_android.bootstrap libm.bootstrap \
                         icu-data-art-test-i18n \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
                         tz_version-art-test-tzdata icu_overlay-art-test-tzdata \
