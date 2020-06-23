@@ -44,6 +44,15 @@ function setup_die {
 flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)\
   || setup_die
 
+# Switch the build system to unbundled mode in the reduced manifest branch.
+# TODO(b/159109002): Clean this up.
+if [ ! -d $ANDROID_BUILD_TOP/frameworks/base ]; then
+  export TARGET_BUILD_UNBUNDLED=true
+  # Flattening is not supported in unbundled mode, regardless what
+  # TARGET_FLATTEN_APEX says.
+  flattened_apex_p=false
+fi
+
 have_debugfs_p=false
 if $flattened_apex_p; then :; else
   if [ ! -e "$ANDROID_HOST_OUT/bin/debugfs" ] ; then
