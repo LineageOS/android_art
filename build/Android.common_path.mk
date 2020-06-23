@@ -120,8 +120,6 @@ DEBUG_ART_APEX := com.android.art.debug
 # Testing ART APEX, used in ART device testing.
 TESTING_ART_APEX := com.android.art.testing
 
-# Runtime (Bionic) APEX
-RUNTIME_APEX := com.android.runtime
 # Conscrypt APEX
 CONSCRYPT_APEX := com.android.conscrypt
 # i18n APEX
