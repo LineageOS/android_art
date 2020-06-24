@@ -17,6 +17,52 @@
 # Build rules are excluded from Mac, since we can not run ART tests there in the first place.
 ifneq ($(HOST_OS),darwin)
 
+###################################################################################################
+# Create module in testcases to hold all common data and tools needed for ART host tests.
+
+# ART binary tools and libraries (automatic list of all art_cc_binary/art_cc_library modules).
+my_files := $(ART_TESTCASES_CONTENT)
+
+# Manually add system libraries that we need to run the host ART tools.
+my_files += \
+  $(foreach lib, \
+    libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack libziparchive, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so) \
+  $(foreach lib, \
+    libcrypto libz, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so)
+
+# Add apex directories for art, conscrypt and i18n.
+my_files += $(foreach infix,_ _VDEX_,$(foreach suffix,$(HOST_ARCH) $(HOST_2ND_ARCH), \
+  $(DEXPREOPT_IMAGE$(infix)BUILT_INSTALLED_art_host_$(suffix))))
+my_files += \
+  $(foreach jar,$(CORE_IMG_JARS),\
+    $(HOST_OUT_JAVA_LIBRARIES)/$(jar)-hostdex.jar:apex/com.android.art/javalib/$(jar).jar) \
+  $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar:apex/com.android.conscrypt/javalib/conscrypt.jar\
+  $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar
+
+# Create dummy module that will copy all the data files into testcases directory.
+# For now, this copies everything to "out/host/linux-x86/" subdirectory, since it
+# is hard-coded in many places. TODO: Refactor tests to remove the need for this.
+include $(CLEAR_VARS)
+LOCAL_IS_HOST_MODULE := true
+LOCAL_MODULE := art_common
+LOCAL_MODULE_TAGS := tests
+LOCAL_MODULE_CLASS := NATIVE_TESTS
+LOCAL_MODULE_SUFFIX := .txt
+LOCAL_COMPATIBILITY_SUITE := general-tests
+LOCAL_COMPATIBILITY_SUPPORT_FILES := \
+	$(foreach f,$(my_files),$(call word-colon,1,$f):out/host/linux-x86/$(call word-colon,2,$f))
+include $(BUILD_SYSTEM)/base_rules.mk
+
+$(LOCAL_BUILT_MODULE):
+	@mkdir -p $(dir $@)
+	echo "This directory contains common data and tools needed for ART host tests" > $@
+
+my_files :=
+include $(CLEAR_VARS)
+###################################################################################################
+
 # The path for which all the dex files are relative, not actually the current directory.
 LOCAL_PATH := art/test
 
