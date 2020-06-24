@@ -17,6 +17,7 @@ package art
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/google/blueprint/proptools"
@@ -274,6 +275,32 @@ func testInstall(ctx android.InstallHookContext) {
 	testMap[name] = tests
 }
 
+var testcasesContentKey = android.NewOnceKey("artTestcasesContent")
+
+func testcasesContent(config android.Config) map[string]string {
+	return config.Once(testcasesContentKey, func() interface{} {
+		return make(map[string]string)
+	}).(map[string]string)
+}
+
+// Binaries and libraries also need to be copied in the testcases directory for
+// running tests on host.  This method adds module to the list of needed files.
+// The 'key' is the file in testcases and 'value' is the path to copy it from.
+// The actual copy will be done in make since soong does not do installations.
+func addTestcasesFile(ctx android.InstallHookContext) {
+	testcasesContent := testcasesContent(ctx.Config())
+
+	artTestMutex.Lock()
+	defer artTestMutex.Unlock()
+
+	if ctx.Os().Class == android.Host {
+		path := ctx.Path().ToMakePath().String()
+		parts := strings.Split(path, "/")
+		// Keep last two parts of the path (e.g. bin/dex2oat).
+		testcasesContent[strings.Join(parts[len(parts)-2:], "/")] = path
+	}
+}
+
 var artTestMutex sync.Mutex
 
 func init() {
@@ -392,6 +419,7 @@ func artLibrary() android.Module {
 
 	installCodegenCustomizer(module, staticAndSharedLibrary)
 
+	android.AddInstallHook(module, addTestcasesFile)
 	return module
 }
 
@@ -408,6 +436,7 @@ func artBinary() android.Module {
 
 	android.AddLoadHook(module, customLinker)
 	android.AddLoadHook(module, prefer32Bit)
+	android.AddInstallHook(module, addTestcasesFile)
 	return module
 }
 
