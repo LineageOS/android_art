@@ -65,6 +65,12 @@ done
 # Allow to build successfully in master-art.
 extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
 
+# Switch the build system to unbundled mode in the reduced manifest branch.
+# TODO(b/159109002): Clean this up.
+if [ ! -d frameworks/base ]; then
+  extra_args="$extra_args TARGET_BUILD_UNBUNDLED=true"
+fi
+
 apexes=(
   "com.android.art.testing"
   "com.android.conscrypt"
