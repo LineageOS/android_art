@@ -998,6 +998,10 @@ def setup_env_for_build_target(build_target, parser, options):
   """
   os.environ.update(build_target['env'])
   os.environ['SOONG_ALLOW_MISSING_DEPENDENCIES'] = 'true'
+  # Switch the build system to unbundled mode in the reduced manifest branch.
+  # TODO(b/159109002): Clean this up.
+  if not os.path.isdir(env.ANDROID_BUILD_TOP + '/frameworks/base'):
+    os.environ['TARGET_BUILD_UNBUNDLED'] = 'true'
   print_text('%s\n' % (str(os.environ)))
 
   target_options = vars(parser.parse_args(build_target['flags']))
