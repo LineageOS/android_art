@@ -27,7 +27,7 @@ cc_library_headers {
     ],
 }
 
-cc_library {
+art_cc_library {
     name: "libnativebridge",
     defaults: ["libnativebridge-defaults"],
     visibility: [

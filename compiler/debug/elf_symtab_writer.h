@@ -89,7 +89,7 @@ static void WriteDebugSymbols(ElfBuilder<ElfTypes>* builder,
       DCHECK(info.dex_file != nullptr);
       std::string name = info.dex_file->PrettyMethod(info.dex_method_index, !mini_debug_info);
       if (deduped_addresses.find(info.code_address) != deduped_addresses.end()) {
-        name += " [DEDUPED]";
+        name = "[DEDUPED] " + name;
       }
       name_offset = strtab->Write(name);
     }

@@ -60,6 +60,10 @@ target = target_config[options.build_target]
 n_threads = options.n_threads
 custom_env = target.get('env', {})
 custom_env['SOONG_ALLOW_MISSING_DEPENDENCIES'] = 'true'
+# Switch the build system to unbundled mode in the reduced manifest branch.
+# TODO(b/159109002): Clean this up.
+if not os.path.isdir(env.ANDROID_BUILD_TOP + '/frameworks/base'):
+  custom_env['TARGET_BUILD_UNBUNDLED'] = 'true'
 print(custom_env)
 os.environ.update(custom_env)
 

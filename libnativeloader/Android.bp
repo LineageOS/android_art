@@ -10,7 +10,7 @@ cc_defaults {
     export_header_lib_headers: ["libnativeloader-headers"],
 }
 
-cc_library {
+art_cc_library {
     name: "libnativeloader",
     defaults: ["libnativeloader-defaults"],
     visibility: [
