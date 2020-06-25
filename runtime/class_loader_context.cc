@@ -16,6 +16,8 @@
 
 #include "class_loader_context.h"
 
+#include <algorithm>
+
 #include <android-base/parseint.h>
 #include <android-base/strings.h>
 
@@ -1400,31 +1402,32 @@ bool ClassLoaderContext::ClassLoaderInfoMatch(
   }
 }
 
-std::vector<const DexFile*> ClassLoaderContext::CheckForDuplicateDexFiles(
+std::set<const DexFile*> ClassLoaderContext::CheckForDuplicateDexFiles(
     const std::vector<const DexFile*>& dex_files_to_check) {
   DCHECK(dex_files_open_attempted_);
   DCHECK(dex_files_open_result_);
 
-  std::vector<const DexFile*> result;
+  std::set<const DexFile*> result;
 
-  if (special_shared_library_) {
+  // If we are the special shared library or the chain is null there's nothing
+  // we can check, return an empty list;
+  // The class loader chain can be null if there were issues when creating the
+  // class loader context (e.g. tests).
+  if (special_shared_library_ || class_loader_chain_ == nullptr) {
     return result;
   }
 
-  std::vector<ClassLoaderInfo*> work_list;
-  work_list.push_back(class_loader_chain_.get());
-  while (!work_list.empty()) {
-    ClassLoaderInfo* info = work_list.back();
-    work_list.pop_back();
-    for (size_t k = 0; k < info->classpath.size(); k++) {
-      for (const DexFile* dex_file : dex_files_to_check) {
-        if (info->checksums[k] == dex_file->GetLocationChecksum()
-            && AreDexNameMatching(info->classpath[k], dex_file->GetLocation())) {
-          result.push_back(dex_file);
-        }
+  // We only check the current Class Loader which the first one in the chain.
+  // Cross class-loader duplicates may be a valid scenario (though unlikely
+  // in the Android world) - and as such we decide not to warn on them.
+  ClassLoaderInfo* info = class_loader_chain_.get();
+  for (size_t k = 0; k < info->classpath.size(); k++) {
+    for (const DexFile* dex_file : dex_files_to_check) {
+      if (info->checksums[k] == dex_file->GetLocationChecksum()
+          && AreDexNameMatching(info->classpath[k], dex_file->GetLocation())) {
+        result.insert(dex_file);
       }
     }
-    AddToWorkList(info, work_list);
   }
 
   return result;
