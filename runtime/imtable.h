@@ -17,10 +17,6 @@
 #ifndef ART_RUNTIME_IMTABLE_H_
 #define ART_RUNTIME_IMTABLE_H_
 
-#ifndef IMT_SIZE
-#error IMT_SIZE not defined
-#endif
-
 #include "base/casts.h"
 #include "base/enums.h"
 #include "base/locks.h"
@@ -36,7 +32,8 @@ class ImTable {
   // Interface method table size. Increasing this value reduces the chance of two interface methods
   // colliding in the interface method table but increases the size of classes that implement
   // (non-marker) interfaces.
-  static constexpr size_t kSize = IMT_SIZE;
+  // When this value changes, old images become incompatible, so image file version must change too.
+  static constexpr size_t kSize = 43;
 
   uint8_t* AddressOfElement(size_t index, PointerSize pointer_size) {
     return reinterpret_cast<uint8_t*>(this) + OffsetOfElement(index, pointer_size);
