@@ -2794,12 +2794,6 @@ class Dex2Oat final {
         std::make_pair("imageinstructionset",
                        GetInstructionSetString(compiler_options_->GetInstructionSet())));
 
-    // Only allow no boot image for the runtime if we're compiling one. When we compile an app,
-    // we don't want fallback mode, it will abort as we do not push a boot classpath (it might
-    // have been stripped in preopting, anyways).
-    if (!IsBootImage()) {
-      raw_options.push_back(std::make_pair("-Xno-dex-file-fallback", nullptr));
-    }
     // Never allow implicit image compilation.
     raw_options.push_back(std::make_pair("-Xnoimage-dex2oat", nullptr));
     // Disable libsigchain. We don't don't need it during compilation and it prevents us
