@@ -88,6 +88,7 @@
 #include "imtable-inl.h"
 #include "intern_table-inl.h"
 #include "interpreter/interpreter.h"
+#include "interpreter/mterp/nterp.h"
 #include "jit/debugger_interface.h"
 #include "jit/jit.h"
 #include "jit/jit_code_cache.h"

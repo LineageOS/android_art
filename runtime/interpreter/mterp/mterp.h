@@ -28,24 +28,15 @@
 extern "C" void* artMterpAsmInstructionStart[];
 extern "C" void* artMterpAsmInstructionEnd[];
 
-extern "C" void* artNterpAsmInstructionStart[];
-extern "C" void* artNterpAsmInstructionEnd[];
-
 namespace art {
 
-class ArtMethod;
 class Thread;
 
 namespace interpreter {
 
 void InitMterpTls(Thread* self);
 void CheckMterpAsmConstants();
-void CheckNterpAsmConstants();
 bool CanUseMterp();
-bool IsNterpSupported();
-bool CanRuntimeUseNterp();
-bool CanMethodUseNterp(ArtMethod* method);
-const void* GetNterpEntryPoint();
 
 // Poison value for TestExportPC.  If we segfault with this value, it means that a mterp
 // handler for a recent opcode failed to export the Dalvik PC prior to a possible exit from
@@ -55,9 +46,6 @@ constexpr uintptr_t kExportPCPoison = 0xdead00ff;
 constexpr bool kTestExportPC = false;
 
 constexpr size_t kMterpHandlerSize = 128;
-
-// The maximum we will allow an nterp frame to be.
-constexpr size_t kMaxNterpFrame = 3 * KB;
 
 }  // namespace interpreter
 }  // namespace art

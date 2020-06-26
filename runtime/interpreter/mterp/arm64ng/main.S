@@ -313,7 +313,7 @@ END \name
     ldr x0, [sp]
     ldrh w2, [x0, #ART_METHOD_HOTNESS_COUNT_OFFSET]
     add x2, x2, #1
-    and w2, w2, #0xffff
+    and w2, w2, #NTERP_HOTNESS_MASK
     strh w2, [x0, #ART_METHOD_HOTNESS_COUNT_OFFSET]
     // If the counter overflows, handle this in the runtime.
     cbz w2, NterpHandleHotnessOverflow
@@ -382,7 +382,7 @@ END \name
     ldr x0, [sp]
     ldrh w2, [x0, #ART_METHOD_HOTNESS_COUNT_OFFSET]
     add x2, x2, #1
-    and w2, w2, #0xffff
+    and w2, w2, #NTERP_HOTNESS_MASK
     strh w2, [x0, #ART_METHOD_HOTNESS_COUNT_OFFSET]
     // If the counter overflows, handle this in the runtime.
     cbz w2, 2f

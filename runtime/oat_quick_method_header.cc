@@ -20,7 +20,7 @@
 #include "art_method.h"
 #include "dex/dex_file_types.h"
 #include "interpreter/interpreter_mterp_impl.h"
-#include "interpreter/mterp/mterp.h"
+#include "interpreter/mterp/nterp.h"
 #include "nterp_helpers.h"
 #include "scoped_thread_state_change-inl.h"
 #include "stack_map.h"
