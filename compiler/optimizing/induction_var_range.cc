@@ -70,28 +70,6 @@ static int64_t IntPow(int64_t b, int64_t e, /*out*/ bool* overflow) {
   return pow;
 }
 
-/**
- * Detects an instruction that is >= 0. As long as the value is carried by
- * a single instruction, arithmetic wrap-around cannot occur.
- */
-static bool IsGEZero(HInstruction* instruction) {
-  DCHECK(instruction != nullptr);
-  if (instruction->IsArrayLength()) {
-    return true;
-  } else if (instruction->IsMin()) {
-    // Instruction MIN(>=0, >=0) is >= 0.
-    return IsGEZero(instruction->InputAt(0)) &&
-           IsGEZero(instruction->InputAt(1));
-  } else if (instruction->IsAbs()) {
-    // Instruction ABS(>=0) is >= 0.
-    // NOTE: ABS(minint) = minint prevents assuming
-    //       >= 0 without looking at the argument.
-    return IsGEZero(instruction->InputAt(0));
-  }
-  int64_t value = -1;
-  return IsInt64AndGet(instruction, &value) && value >= 0;
-}
-
 /** Hunts "under the hood" for a suitable instruction at the hint. */
 static bool IsMaxAtHint(
     HInstruction* instruction, HInstruction* hint, /*out*/HInstruction** suitable) {
