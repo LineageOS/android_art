@@ -50,9 +50,6 @@ func globalFlags(ctx android.LoadHookContext) ([]string, []string) {
 		cflags = append(cflags, "-DART_USE_TLAB=1")
 	}
 
-	imtSize := ctx.Config().GetenvWithDefault("ART_IMT_SIZE", "43")
-	cflags = append(cflags, "-DIMT_SIZE="+imtSize)
-
 	if ctx.Config().IsEnvTrue("ART_HEAP_POISONING") {
 		cflags = append(cflags, "-DART_HEAP_POISONING=1")
 		asflags = append(asflags, "-DART_HEAP_POISONING=1")
