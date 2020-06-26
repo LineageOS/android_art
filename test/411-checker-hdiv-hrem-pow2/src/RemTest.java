@@ -88,10 +88,16 @@ public class RemTest {
     expectEquals(Integer.MAX_VALUE, $noinline$IntModIntMin(Integer.MAX_VALUE));
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer RemTest.$noinline$IntMod2(int) disassembly (after)
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #31
+  /// CHECK:                 bfc       r{{\d+}}, #0, #1
+  /// CHECK:                 sub{{s?}} r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
   /// CHECK-START-ARM64: java.lang.Integer RemTest.$noinline$IntMod2(int) disassembly (after)
   /// CHECK:                 cmp w{{\d+}}, #0x0
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0x1
   /// CHECK:                 cneg w{{\d+}}, w{{\d+}}, lt
+  //
   /// CHECK-START-X86_64: java.lang.Integer RemTest.$noinline$IntMod2(int) disassembly (after)
   /// CHECK:          Rem [{{i\d+}},{{i\d+}}]
   /// CHECK-NOT:      imul
@@ -108,10 +114,16 @@ public class RemTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer RemTest.$noinline$IntModMinus2(int) disassembly (after)
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #31
+  /// CHECK:                 bfc       r{{\d+}}, #0, #1
+  /// CHECK:                 sub{{s?}} r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
   /// CHECK-START-ARM64: java.lang.Integer RemTest.$noinline$IntModMinus2(int) disassembly (after)
   /// CHECK:                 cmp w{{\d+}}, #0x0
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0x1
   /// CHECK:                 cneg w{{\d+}}, w{{\d+}}, lt
+  //
   /// CHECK-START-X86_64: java.lang.Integer RemTest.$noinline$IntModMinus2(int) disassembly (after)
   /// CHECK:          Rem [{{i\d+}},{{i\d+}}]
   /// CHECK-NOT:      imul
@@ -128,11 +140,18 @@ public class RemTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer RemTest.$noinline$IntMod16(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #28
+  /// CHECK:                 bfc       r{{\d+}}, #0, #4
+  /// CHECK:                 sub{{s?}} r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
   /// CHECK-START-ARM64: java.lang.Integer RemTest.$noinline$IntMod16(int) disassembly (after)
   /// CHECK:                 negs w{{\d+}}, w{{\d+}}
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                 csneg w{{\d+}}, w{{\d+}}, mi
+  //
   /// CHECK-START-X86_64: java.lang.Integer RemTest.$noinline$IntMod16(int) disassembly (after)
   /// CHECK:          Rem [{{i\d+}},{{i\d+}}]
   /// CHECK-NOT:      imul
@@ -149,11 +168,18 @@ public class RemTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer RemTest.$noinline$IntModMinus16(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #28
+  /// CHECK:                 bfc       r{{\d+}}, #0, #4
+  /// CHECK:                 sub{{s?}} r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
   /// CHECK-START-ARM64: java.lang.Integer RemTest.$noinline$IntModMinus16(int) disassembly (after)
   /// CHECK:                 negs w{{\d+}}, w{{\d+}}
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                 csneg w{{\d+}}, w{{\d+}}, mi
+  //
   /// CHECK-START-X86_64: java.lang.Integer RemTest.$noinline$IntModMinus16(int) disassembly (after)
   /// CHECK:          Rem [{{i\d+}},{{i\d+}}]
   /// CHECK-NOT:      imul
@@ -170,11 +196,18 @@ public class RemTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer RemTest.$noinline$IntModIntMin(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #1
+  /// CHECK:                 bfc       r{{\d+}}, #0, #31
+  /// CHECK:                 sub{{s?}} r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
   /// CHECK-START-ARM64: java.lang.Integer RemTest.$noinline$IntModIntMin(int) disassembly (after)
   /// CHECK:                 negs w{{\d+}}, w{{\d+}}
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0x7fffffff
   /// CHECK:                 and w{{\d+}}, w{{\d+}}, #0x7fffffff
   /// CHECK:                 csneg w{{\d+}}, w{{\d+}}, mi
+  //
   /// CHECK-START-X86_64: java.lang.Integer RemTest.$noinline$IntModIntMin(int) disassembly (after)
   /// CHECK:          Rem [{{i\d+}},{{i\d+}}]
   /// CHECK-NOT:      imul
