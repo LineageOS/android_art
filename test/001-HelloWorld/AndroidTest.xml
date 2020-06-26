@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2020 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<configuration description="Test module config for ART run-test 001-HelloWorld">
+    <!-- Root access is needed to push the test JAR file to the device. -->
+    <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer" />
+    <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
+      <!-- TODO: Place files in a different directory (e.g.
+           /data/local/tmp/art-run-test/001-HelloWorld)? -->
+        <option name="cleanup" value="true" />
+        <!-- TODO: Use option `push-file` instead of deprecated option
+             `push`. -->
+        <option name="push" value="art-run-test-001-HelloWorld.jar->/data/local/tmp/art-run-test-001-HelloWorld/art-run-test-001-HelloWorld.jar" />
+    </target_preparer>
+    <test class="com.android.tradefed.testtype.ArtRunTest">
+        <option name="run-test-name" value="art-run-test-001-HelloWorld" />
+        <option name="classpath" value="/data/local/tmp/art-run-test-001-HelloWorld/art-run-test-001-HelloWorld.jar" />
+    </test>
+</configuration>
