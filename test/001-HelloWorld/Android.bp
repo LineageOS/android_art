@@ -1,0 +1,7 @@
+java_test {
+    name: "art-run-test-001-HelloWorld",
+    srcs: ["src/*.java"],
+    sdk_version: "core_platform",
+    data: ["expected.txt"],
+    test_suites: ["general-tests"],
+}
