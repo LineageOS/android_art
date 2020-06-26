@@ -4222,18 +4222,16 @@ void InstructionCodeGeneratorARMVIXL::DivRemByPowerOfTwo(HBinaryOperation* instr
 
   vixl32::Register out = OutputRegister(instruction);
   vixl32::Register dividend = InputRegisterAt(instruction, 0);
-  vixl32::Register temp = RegisterFrom(locations->GetTemp(0));
   int32_t imm = Int32ConstantFrom(second);
   uint32_t abs_imm = static_cast<uint32_t>(AbsOrMin(imm));
   int ctz_imm = CTZ(abs_imm);
 
-  if (ctz_imm == 1) {
-    __ Lsr(temp, dividend, 32 - ctz_imm);
-  } else {
-    __ Asr(temp, dividend, 31);
-    __ Lsr(temp, temp, 32 - ctz_imm);
+  vixl32::Register add_right_input = dividend;
+  if (ctz_imm > 1) {
+    __ Asr(out, dividend, 31);
+    add_right_input = out;
   }
-  __ Add(out, temp, dividend);
+  __ Add(out, dividend, Operand(add_right_input, vixl32::LSR, 32 - ctz_imm));
 
   if (instruction->IsDiv()) {
     __ Asr(out, out, ctz_imm);
@@ -4241,8 +4239,8 @@ void InstructionCodeGeneratorARMVIXL::DivRemByPowerOfTwo(HBinaryOperation* instr
       __ Rsb(out, out, 0);
     }
   } else {
-    __ Ubfx(out, out, 0, ctz_imm);
-    __ Sub(out, out, temp);
+    __ Bfc(out, 0, ctz_imm);
+    __ Sub(out, dividend, out);
   }
 }
 
@@ -4329,16 +4327,17 @@ void LocationsBuilderARMVIXL::VisitDiv(HDiv* div) {
       if (div->InputAt(1)->IsConstant()) {
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::ConstantLocation(div->InputAt(1)->AsConstant()));
-        locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
         int32_t value = Int32ConstantFrom(div->InputAt(1));
+        Location::OutputOverlap out_overlaps = Location::kNoOutputOverlap;
         if (value == 1 || value == 0 || value == -1) {
           // No temp register required.
+        } else if (IsPowerOfTwo(AbsOrMin(value))) {
+          // The "out" register is used as a temporary, so it overlaps with the inputs.
+          out_overlaps = Location::kOutputOverlap;
         } else {
-          locations->AddTemp(Location::RequiresRegister());
-          if (!IsPowerOfTwo(AbsOrMin(value))) {
-            locations->AddTemp(Location::RequiresRegister());
-          }
+          locations->AddRegisterTemps(2);
         }
+        locations->SetOut(Location::RequiresRegister(), out_overlaps);
       } else if (codegen_->GetInstructionSetFeatures().HasDivideInstruction()) {
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::RequiresRegister());
@@ -4442,16 +4441,17 @@ void LocationsBuilderARMVIXL::VisitRem(HRem* rem) {
       if (rem->InputAt(1)->IsConstant()) {
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::ConstantLocation(rem->InputAt(1)->AsConstant()));
-        locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
         int32_t value = Int32ConstantFrom(rem->InputAt(1));
+        Location::OutputOverlap out_overlaps = Location::kNoOutputOverlap;
         if (value == 1 || value == 0 || value == -1) {
           // No temp register required.
+        } else if (IsPowerOfTwo(AbsOrMin(value))) {
+          // The "out" register is used as a temporary, so it overlaps with the inputs.
+          out_overlaps = Location::kOutputOverlap;
         } else {
-          locations->AddTemp(Location::RequiresRegister());
-          if (!IsPowerOfTwo(AbsOrMin(value))) {
-            locations->AddTemp(Location::RequiresRegister());
-          }
+          locations->AddRegisterTemps(2);
         }
+        locations->SetOut(Location::RequiresRegister(), out_overlaps);
       } else if (codegen_->GetInstructionSetFeatures().HasDivideInstruction()) {
         locations->SetInAt(0, Location::RequiresRegister());
         locations->SetInAt(1, Location::RequiresRegister());
