@@ -91,9 +91,14 @@ public class DivTest {
     expectEquals(0, $noinline$IntDivByIntMin(Integer.MAX_VALUE));
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.$noinline$IntDivBy2(int) disassembly (after)
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #31
+  /// CHECK:                 asr{{s?}} r{{\d+}}, #1
+  //
   /// CHECK-START-ARM64: java.lang.Integer DivTest.$noinline$IntDivBy2(int) disassembly (after)
   /// CHECK:                 add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
   /// CHECK:                 asr w{{\d+}}, w{{\d+}}, #1
+  //
   /// CHECK-START-X86_64: java.lang.Integer DivTest.$noinline$IntDivBy2(int) disassembly (after)
   /// CHECK-NOT:             cmovnl/geq
   /// CHECK:                 add
@@ -102,9 +107,15 @@ public class DivTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.$noinline$IntDivByMinus2(int) disassembly (after)
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #31
+  /// CHECK:                 asr{{s?}} r{{\d+}}, #1
+  /// CHECK:                 rsb{{s?}} r{{\d+}}, #0
+  //
   /// CHECK-START-ARM64: java.lang.Integer DivTest.$noinline$IntDivByMinus2(int) disassembly (after)
   /// CHECK:                 add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
   /// CHECK:                 neg w{{\d+}}, w{{\d+}}, asr #1
+  //
   /// CHECK-START-X86_64: java.lang.Integer DivTest.$noinline$IntDivByMinus2(int) disassembly (after)
   /// CHECK-NOT:             cmovnl/geq
   /// CHECK:                 add
@@ -113,6 +124,11 @@ public class DivTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.$noinline$IntDivBy16(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #28
+  /// CHECK:                 asr{{s?}} r{{\d+}}, #4
+  //
   /// CHECK-START-ARM64: java.lang.Integer DivTest.$noinline$IntDivBy16(int) disassembly (after)
   /// CHECK:                add w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                cmp w{{\d+}}, #0x0
@@ -123,6 +139,12 @@ public class DivTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.$noinline$IntDivByMinus16(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #28
+  /// CHECK:                 asr{{s?}} r{{\d+}}, #4
+  /// CHECK:                 rsb{{s?}} r{{\d+}}, #0
+  //
   /// CHECK-START-ARM64: java.lang.Integer DivTest.$noinline$IntDivByMinus16(int) disassembly (after)
   /// CHECK:                add w{{\d+}}, w{{\d+}}, #0xf
   /// CHECK:                cmp w{{\d+}}, #0x0
@@ -133,6 +155,12 @@ public class DivTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.$noinline$IntDivByIntMin(int) disassembly (after)
+  /// CHECK:                 asr{{s?}} r{{\d+}}, r{{\d+}}, #31
+  /// CHECK:                 add       r{{\d+}}, r{{\d+}}, r{{\d+}}, lsr #1
+  /// CHECK:                 asr{{s?}} r{{\d+}}, #31
+  /// CHECK:                 rsb{{s?}} r{{\d+}}, #0
+  //
   /// CHECK-START-ARM64: java.lang.Integer DivTest.$noinline$IntDivByIntMin(int) disassembly (after)
   /// CHECK:                mov w{{\d+}}, #0x7fffffff
   /// CHECK:                add w{{\d+}}, w{{\d+}}, w{{\d+}}
