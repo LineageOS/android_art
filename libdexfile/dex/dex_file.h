@@ -77,14 +77,14 @@ class DexFile {
   static constexpr size_t kDexVersionLen = 4;
 
   // First Dex format version enforcing class definition ordering rules.
-  static const uint32_t kClassDefinitionOrderEnforcedVersion = 37;
+  static constexpr uint32_t kClassDefinitionOrderEnforcedVersion = 37;
 
   static constexpr size_t kSha1DigestSize = 20;
   static constexpr uint32_t kDexEndianConstant = 0x12345678;
 
   // The value of an invalid index.
-  static const uint16_t kDexNoIndex16 = 0xFFFF;
-  static const uint32_t kDexNoIndex32 = 0xFFFFFFFF;
+  static constexpr uint16_t kDexNoIndex16 = 0xFFFF;
+  static constexpr uint32_t kDexNoIndex32 = 0xFFFFFFFF;
 
   // Raw header_item.
   struct Header {
@@ -789,7 +789,7 @@ class DexFile {
 
  protected:
   // First Dex format version supporting default methods.
-  static const uint32_t kDefaultMethodsVersion = 37;
+  static constexpr uint32_t kDefaultMethodsVersion = 37;
 
   DexFile(const uint8_t* base,
           size_t size,
