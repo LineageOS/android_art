@@ -491,13 +491,16 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libart-disassembler.so \
   lib/libartpalette.so \
   lib/libart.so \
+  lib/libbacktrace.so \
   lib/libdexfile_external.so \
+  lib/libdexfile_support.so \
   lib/libdexfile.so \
   lib/libdt_fd_forward.so \
   lib/libdt_socket.so \
   lib/libexpat.so \
   lib/libjavacore.so \
   lib/libjdwp.so \
+  lib/liblzma.so \
   lib/libmeminfo.so \
   lib/libnativebridge.so \
   lib/libnativehelper.so \
@@ -509,7 +512,10 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libpac.so \
   lib/libprocinfo.so \
   lib/libprofile.so \
+  lib/libsigchain.so \
+  lib/libunwindstack.so \
   lib/libvixl.so \
+  lib/libziparchive.so \
   lib64/libadbconnection.so \
   lib64/libandroidio.so \
   lib64/libartbase.so \
@@ -518,13 +524,16 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libart-disassembler.so \
   lib64/libartpalette.so \
   lib64/libart.so \
+  lib64/libbacktrace.so \
   lib64/libdexfile_external.so \
+  lib64/libdexfile_support.so \
   lib64/libdexfile.so \
   lib64/libdt_fd_forward.so \
   lib64/libdt_socket.so \
   lib64/libexpat.so \
   lib64/libjavacore.so \
   lib64/libjdwp.so \
+  lib64/liblzma.so \
   lib64/libmeminfo.so \
   lib64/libnativebridge.so \
   lib64/libnativehelper.so \
@@ -536,7 +545,10 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libpac.so \
   lib64/libprocinfo.so \
   lib64/libprofile.so \
+  lib64/libsigchain.so \
+  lib64/libunwindstack.so \
   lib64/libvixl.so \
+  lib64/libziparchive.so \
 
 PRIVATE_RUNTIME_APEX_DEPENDENCY_FILES := \
   bin/linker \
@@ -674,6 +686,7 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(TARGET_OUT_EXECUTABLES)/dex2oat_wrapper \
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
+                        $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
                         libartpalette-system \
                         icu-data-art-test-i18n \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
