@@ -255,6 +255,9 @@ END_FUNCTION \name
     GOTO_NEXT
 3:
     movq (%rsp), %rdi
+#if (NTERP_HOTNESS_MASK != 0xffff)
+#error "Nterp x86_64 expects Nterp hotness mask to be 0xffff"
+#endif
     addw $$1, ART_METHOD_HOTNESS_COUNT_OFFSET(%rdi)
     // If the counter overflows, handle this in the runtime.
     jo NterpHandleHotnessOverflow
@@ -741,6 +744,9 @@ END_FUNCTION \name
 // Increase method hotness and do suspend check before starting executing the method.
 .macro START_EXECUTING_INSTRUCTIONS
    movq (%rsp), %rdi
+#if (NTERP_HOTNESS_MASK != 0xffff)
+#error "Nterp x86_64 expects Nterp hotness mask to be 0xffff"
+#endif
    addw $$1, ART_METHOD_HOTNESS_COUNT_OFFSET(%rdi)
    jo 2f
    testl $$(THREAD_SUSPEND_OR_CHECKPOINT_REQUEST), rSELF:THREAD_FLAGS_OFFSET
