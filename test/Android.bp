@@ -193,6 +193,17 @@ filegroup {
     ],
 }
 
+java_defaults {
+    name: "art-run-test-defaults",
+    // Compile against the "core" bootclasspath, not the "default" one (current
+    // platform). See also function `javac_with_bootclasspath` in
+    // `test/etc/default-build`, as well as `art/test/etc/default-build`).
+    sdk_version: "core_platform",
+    data: ["expected.txt"],
+    test_config_template: ":art-run-test-template",
+    test_suites: ["general-tests"],
+}
+
 art_cc_test_library {
     name: "libarttest",
     defaults: ["libarttest-defaults"],
