@@ -13,19 +13,18 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<configuration description="Test module config for ART run-test 001-HelloWorld">
+<!-- Note: This test config for {MODULE} is generated from a template. -->
+<configuration description="Test module config for {MODULE}">
     <!-- Root access is needed to push the test JAR file to the device. -->
     <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
-      <!-- TODO: Place files in a different directory (e.g.
-           /data/local/tmp/art-run-test/001-HelloWorld)? -->
         <option name="cleanup" value="true" />
         <!-- TODO: Use option `push-file` instead of deprecated option
              `push`. -->
-        <option name="push" value="art-run-test-001-HelloWorld.jar->/data/local/tmp/art-run-test-001-HelloWorld/art-run-test-001-HelloWorld.jar" />
+        <option name="push" value="{MODULE}.jar->/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </target_preparer>
     <test class="com.android.tradefed.testtype.ArtRunTest">
-        <option name="run-test-name" value="art-run-test-001-HelloWorld" />
-        <option name="classpath" value="/data/local/tmp/art-run-test-001-HelloWorld/art-run-test-001-HelloWorld.jar" />
+        <option name="run-test-name" value="{MODULE}" />
+        <option name="classpath" value="/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </test>
 </configuration>
