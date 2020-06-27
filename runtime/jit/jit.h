@@ -27,7 +27,7 @@
 #include "compilation_kind.h"
 #include "handle.h"
 #include "offsets.h"
-#include "interpreter/mterp/mterp.h"
+#include "interpreter/mterp/nterp.h"
 #include "jit/debugger_interface.h"
 #include "jit/profile_saver_options.h"
 #include "obj_ptr.h"

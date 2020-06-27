@@ -17,7 +17,7 @@
 #include "art_method-inl.h"
 #include "dex/code_item_accessors.h"
 #include "entrypoints/quick/callee_save_frame.h"
-#include "interpreter/interpreter_mterp_impl.h"
+#include "interpreter/mterp/nterp.h"
 #include "nterp_helpers.h"
 #include "oat_quick_method_header.h"
 #include "quick/quick_method_frame_info.h"
