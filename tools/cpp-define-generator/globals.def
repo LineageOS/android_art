@@ -23,6 +23,7 @@
 #include "gc/accounting/card_table.h"
 #include "gc/heap.h"
 #include "interpreter/mterp/mterp.h"
+#include "interpreter/mterp/nterp.h"
 #include "jit/jit.h"
 #include "mirror/object.h"
 #include "mirror/object_reference.h"
@@ -80,3 +81,5 @@ ASM_DEFINE(STD_MEMORY_ORDER_RELAXED,
            std::memory_order_relaxed)
 ASM_DEFINE(STACK_OVERFLOW_RESERVED_BYTES,
            GetStackOverflowReservedBytes(art::kRuntimeISA))
+ASM_DEFINE(NTERP_HOTNESS_MASK,
+           art::interpreter::kNterpHotnessMask)

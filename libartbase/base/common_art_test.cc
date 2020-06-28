@@ -141,53 +141,40 @@ void ScratchFile::Unlink() {
 
 void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
   if (IsHost()) {
-    // Make sure that ANDROID_BUILD_TOP is set. If not, set it from CWD.
-    const char* android_build_top_from_env = getenv("ANDROID_BUILD_TOP");
-    if (android_build_top_from_env == nullptr) {
-      // Not set by build server, so default to current directory.
-      char* cwd = getcwd(nullptr, 0);
-      setenv("ANDROID_BUILD_TOP", cwd, 1);
-      free(cwd);
-      android_build_top_from_env = getenv("ANDROID_BUILD_TOP");
-    }
-
-    const char* android_host_out_from_env = getenv("ANDROID_HOST_OUT");
-    if (android_host_out_from_env == nullptr) {
-      // Not set by build server, so default to the usual value of
-      // ANDROID_HOST_OUT.
-      std::string android_host_out;
-#if defined(__linux__)
-      // Fallback
-      android_host_out = std::string(android_build_top_from_env) + "/out/host/linux-x86";
-      // Look at how we were invoked
-      std::string argv;
-      if (android::base::ReadFileToString("/proc/self/cmdline", &argv)) {
-        // /proc/self/cmdline is the programs 'argv' with elements delimited by '\0'.
-        std::string cmdpath(argv.substr(0, argv.find('\0')));
-        std::filesystem::path path(cmdpath);
-        // If the path is relative then prepend the android_build_top_from_env to it
-        if (path.is_relative()) {
-          path = std::filesystem::path(android_build_top_from_env).append(cmdpath);
-          DCHECK(path.is_absolute()) << path;
-        }
-        // Walk up until we find the linux-x86 directory or we hit the root directory.
-        while (path.has_parent_path() && path.parent_path() != path &&
-               path.filename() != std::filesystem::path("linux-x86")) {
-          path = path.parent_path();
-        }
-        // If we found a linux-x86 directory path is now android_host_out
+    // Look at how we were invoked to extract reasonable default paths.
+    std::string argv;
+    if (android::base::ReadFileToString("/proc/self/cmdline", &argv)) {
+      // /proc/self/cmdline is the programs 'argv' with elements delimited by '\0'.
+      std::filesystem::path path(argv.substr(0, argv.find('\0')));
+      path = std::filesystem::absolute(path);
+      // Walk up until we find the one of the well-known directories.
+      for (; path.parent_path() != path; path = path.parent_path()) {
+        // We are running tests from out/host/linux-x86 on developer machine.
         if (path.filename() == std::filesystem::path("linux-x86")) {
-          android_host_out = path.string();
+          char* cwd = getcwd(nullptr, 0);
+          setenv("ANDROID_BUILD_TOP", cwd, /*overwrite=*/ 0);  // No-op if already set.
+          free(cwd);
+          setenv("ANDROID_HOST_OUT", path.c_str(), /*overwrite=*/ 0);  // No-op if already set.
+          break;
+        }
+        // We are running tests from testcases (extracted from zip) on tradefed.
+        if (path.filename() == std::filesystem::path("testcases")) {
+          path.append("art_common");
+          bool ok = chdir(path.c_str()) == 0;
+          CHECK(ok);
+          setenv("ANDROID_BUILD_TOP", path.c_str(), /*overwrite=*/ 0);  // No-op if already set.
+          path.append("out/host/linux-x86");
+          setenv("ANDROID_HOST_OUT", path.c_str(), /*overwrite=*/ 0);  // No-op if already set.
+          break;
         }
       }
-#elif defined(__APPLE__)
-      android_host_out = std::string(android_build_top_from_env) + "/out/host/darwin-x86";
-#else
-#error unsupported OS
-#endif
-      setenv("ANDROID_HOST_OUT", android_host_out.c_str(), 1);
-      android_host_out_from_env = getenv("ANDROID_HOST_OUT");
     }
+    const char* android_build_top_from_env = getenv("ANDROID_BUILD_TOP");
+    DCHECK(android_build_top_from_env != nullptr);
+    DCHECK(std::filesystem::exists(android_build_top_from_env)) << android_build_top_from_env;
+    const char* android_host_out_from_env = getenv("ANDROID_HOST_OUT");
+    DCHECK(android_host_out_from_env != nullptr);
+    DCHECK(std::filesystem::exists(android_host_out_from_env)) << android_host_out_from_env;
 
     // Environment variable ANDROID_ROOT is set on the device, but not
     // necessarily on the host.

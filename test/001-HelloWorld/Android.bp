@@ -1,0 +1,5 @@
+java_test {
+    name: "art-run-test-001-HelloWorld",
+    defaults: ["art-run-test-defaults"],
+    srcs: ["src/*.java"],
+}
