@@ -173,4 +173,7 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
 
   # Create /linkerconfig directory in chroot.
   adb shell mkdir -p "$ART_TEST_CHROOT/linkerconfig"
+
+  # Create /bin symlink for shebang compatibility.
+  adb shell ln -s system/bin "$ART_TEST_CHROOT/bin"
 fi
