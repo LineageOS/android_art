@@ -79,11 +79,11 @@ inline void UpdateHotness(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock
   // Convert to uint32_t to handle uint16_t overflow.
   uint32_t counter = method->GetCounter();
   uint32_t new_counter = counter + kNterpHotnessLookup;
-  if ((new_counter & kNterpHotnessMask) == 0) {
+  if (new_counter > kNterpHotnessMask) {
     // Let the nterp code actually call the compilation: we want to make sure
     // there's at least a second execution of the method or a back-edge to avoid
     // compiling straightline initialization methods.
-    method->SetCounter(kNterpHotnessMask - 1);
+    method->SetCounter(kNterpHotnessMask);
   } else {
     method->SetCounter(new_counter);
   }
