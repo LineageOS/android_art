@@ -129,6 +129,7 @@ verbose = False
 dry_run = False
 ignore_skips = False
 build = False
+dist = False
 gdb = False
 gdb_arg = ''
 csv_result = None
@@ -1036,6 +1037,7 @@ def parse_option():
   global ignore_skips
   global n_thread
   global build
+  global dist
   global gdb
   global gdb_arg
   global runtime_option
@@ -1068,6 +1070,11 @@ def parse_option():
                             action='store_true', dest='build',
                             help="""Build dependencies under all circumstances. By default we will
                             not build dependencies unless ART_TEST_RUN_TEST_BUILD=true.""")
+  global_group.add_argument('--dist',
+                            action='store_true', dest='dist',
+                            help="""If dependencies are to be built, pass `dist` to the build
+                            command line. You may want to also set the DIST_DIR environment
+                            variable when using this flag.""")
   global_group.add_argument('--build-target', dest='build_target', help='master-art-host targets')
   global_group.set_defaults(build = env.ART_TEST_RUN_TEST_BUILD)
   global_group.add_argument('--gdb', action='store_true', dest='gdb')
@@ -1139,6 +1146,7 @@ def parse_option():
     dry_run = True
     verbose = True
   build = options['build']
+  dist = options['dist']
   if options['gdb']:
     n_thread = 1
     gdb = True
@@ -1172,6 +1180,8 @@ def main():
       build_targets += 'test-art-host-run-test-dependencies '
     build_command = env.ANDROID_BUILD_TOP + '/build/soong/soong_ui.bash --make-mode'
     build_command += ' DX='
+    if dist:
+      build_command += ' dist'
     build_command += ' ' + build_targets
     print_text('Build command: %s\n' % build_command)
     if subprocess.call(build_command.split()):
