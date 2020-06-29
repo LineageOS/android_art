@@ -468,8 +468,15 @@ endif
 .PHONY: build-art
 build-art: build-art-host build-art-target
 
+# For host, we extract the ICU data from the apex and install it to HOST_OUT/I18N_APEX.
+host-i18n-data-file := $(HOST_OUT)/$(I18N_APEX)/etc
+$(host-i18n-data-file): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bin/deapexer
+	$(call extract-from-apex,$(I18N_APEX))
+	mkdir -p $(HOST_OUT)/$(I18N_APEX)/
+	cp -R $(TARGET_OUT)/apex/$(I18N_APEX)/etc/ $(HOST_OUT)/$(I18N_APEX)/
+
 .PHONY: build-art-host
-build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS)
+build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(host-i18n-data-file)
 
 .PHONY: build-art-target
 build-art-target: $(TARGET_OUT_EXECUTABLES)/art $(ART_TARGET_DEPENDENCIES) $(TARGET_CORE_IMG_OUTS)
@@ -657,16 +664,6 @@ standalone-apex-files: deapexer \
 # ART APEX.
 
 # Also include:
-# - a copy of the ICU prebuilt .dat file in /system/etc/icu on target
-#   (see module `icu-data-art-test-i18n`); and
-# so that it can be found even if the ART APEX is not available, by setting the
-# environment variable `ART_TEST_ANDROID_ART_ROOT` to "/system" on device. This
-# is a temporary change needed until Golem fully supports the ART APEX.
-#
-# TODO(b/129332183): Remove this when Golem has full support for the
-# ART APEX.
-
-# Also include:
 # - a copy of the time zone data prebuilt files in
 #   /system/etc/tzdata_module/etc/tz and /system/etc/tzdata_module/etc/icu
 #   on target, (see modules `tzdata-art-test-tzdata`,
@@ -688,7 +685,6 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
                         libartpalette-system \
-                        icu-data-art-test-i18n \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
                         tz_version-art-test-tzdata icu_overlay-art-test-tzdata \
                         standalone-apex-files
