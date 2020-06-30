@@ -242,6 +242,10 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
 
   ClassAccessor accessor(*dex_file, class_def);
   SCOPED_TRACE << "VerifyClass " << PrettyDescriptor(accessor.GetDescriptor());
+  uint64_t start_ns = 0u;
+  if (VLOG_IS_ON(verifier)) {
+    start_ns = NanoTime();
+  }
 
   int64_t previous_method_idx[2] = { -1, -1 };
   MethodVerifier::FailureData failure_data;
@@ -303,6 +307,8 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
     }
     failure_data.Merge(result);
   }
+  VLOG(verifier) << "VerifyClass took " << PrettyDuration(NanoTime() - start_ns)
+                 << ", class: " << PrettyDescriptor(dex_file->GetClassDescriptor(class_def));
 
   if (failure_data.kind == FailureKind::kNoFailure) {
     return FailureKind::kNoFailure;
