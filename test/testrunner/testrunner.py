@@ -992,28 +992,6 @@ def parse_test_name(test_name):
   return {parsed[12]}
 
 
-def setup_env_for_build_target(build_target, parser, options):
-  """Setup environment for the build target
-
-  The method setup environment for the master-art-host targets.
-  """
-  os.environ.update(build_target['env'])
-  os.environ['SOONG_ALLOW_MISSING_DEPENDENCIES'] = 'true'
-  # Switch the build system to unbundled mode in the reduced manifest branch.
-  # TODO(b/159109002): Clean this up.
-  if not os.path.isdir(env.ANDROID_BUILD_TOP + '/frameworks/base'):
-    os.environ['TARGET_BUILD_UNBUNDLED'] = 'true'
-  print_text('%s\n' % (str(os.environ)))
-
-  target_options = vars(parser.parse_args(build_target['flags']))
-  target_options['host'] = True
-  target_options['verbose'] = True
-  target_options['build'] = True
-  target_options['n_thread'] = options['n_thread']
-  target_options['dry_run'] = options['dry_run']
-
-  return target_options
-
 def get_default_threads(target):
   if target == 'target':
     adb_command = 'adb shell cat /sys/devices/system/cpu/present'
@@ -1075,7 +1053,6 @@ def parse_option():
                             help="""If dependencies are to be built, pass `dist` to the build
                             command line. You may want to also set the DIST_DIR environment
                             variable when using this flag.""")
-  global_group.add_argument('--build-target', dest='build_target', help='master-art-host targets')
   global_group.set_defaults(build = env.ART_TEST_RUN_TEST_BUILD)
   global_group.add_argument('--gdb', action='store_true', dest='gdb')
   global_group.add_argument('--gdb-arg', dest='gdb_arg')
@@ -1120,10 +1097,6 @@ def parse_option():
     if options['all_' + variant_type]:
       for variant in variant_set:
         options[variant] = True
-
-  if options['build_target']:
-    options = setup_env_for_build_target(target_config[options['build_target']],
-                                         parser, options)
 
   tests = None
   env.EXTRA_DISABLED_TESTS.update(set(options['skips']))
