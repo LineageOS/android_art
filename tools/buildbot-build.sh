@@ -91,8 +91,8 @@ elif [[ $mode == "target" ]]; then
   make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
   make_command+=" libnetd_client-target toybox sh"
   make_command+=" debuggerd su gdbserver"
-  # vogar requires the class files for conscrypt.
-  make_command+=" conscrypt"
+  # vogar requires the class files for conscrypt and ICU.
+  make_command+=" conscrypt core-icu4j"
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   # Targets required to generate a linker configuration for device within the
   # chroot environment. The *.libraries.txt targets are required by

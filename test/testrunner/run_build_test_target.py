@@ -129,6 +129,8 @@ if 'run-test' in target:
     run_test_command += ['4']
   if '--no-build-dependencies' not in test_flags:
     run_test_command += ['-b']
+    if env.DIST_DIR:
+      run_test_command += ['--dist']
   run_test_command += ['--verbose']
 
   sys.stdout.write(str(run_test_command) + '\n')
