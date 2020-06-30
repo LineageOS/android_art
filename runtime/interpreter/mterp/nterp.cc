@@ -74,7 +74,7 @@ void CheckNterpAsmConstants() {
 inline void UpdateHotness(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
   // The hotness we will add to a method when we perform a
   // field/method/class/string lookup.
-  constexpr uint16_t kNterpHotnessLookup = 0xff;
+  constexpr uint16_t kNterpHotnessLookup = 0xf;
 
   // Convert to uint32_t to handle uint16_t overflow.
   uint32_t counter = method->GetCounter();
