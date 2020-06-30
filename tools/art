@@ -1,3 +1,4 @@
+#! /bin/sh
 # Copyright (C) 2011 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,11 @@
 
 # This script is used on host and device. It uses a common subset
 # shell dialect that should work on the host (e.g. bash), and
-# Android (e.g. mksh).
+# Android (e.g. mksh). Try to switch to bash if the shebang above
+# has launched a pessimal shell on host.
+if [ -z "$KSH_VERSION" -a -z "$BASH_VERSION" -a -n "$(which bash)" ]; then
+  exec bash -c ". $0" -- "$@"
+fi
 
 ######################################
 # Functions

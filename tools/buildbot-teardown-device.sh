@@ -92,6 +92,9 @@ if [[ -n "$ART_TEST_CHROOT" ]]; then
            fi
     }
 
+    # Remove /bin symlink from chroot.
+    adb shell rm -f "$ART_TEST_CHROOT/bin"
+
     # Remove /apex from chroot.
     adb shell rm -rf "$ART_TEST_CHROOT/apex"
 
