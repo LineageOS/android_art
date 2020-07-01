@@ -51,7 +51,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
 LOCAL_COMPATIBILITY_SUITE := general-tests
-LOCAL_COMPATIBILITY_SUPPORT_FILES := \
+LOCAL_COMPATIBILITY_SUPPORT_FILES := $(ART_TESTCASES_PREBUILT_CONTENT) \
 	$(foreach f,$(my_files),$(call word-colon,1,$f):out/host/linux-x86/$(call word-colon,2,$f))
 include $(BUILD_SYSTEM)/base_rules.mk
 
