@@ -35,19 +35,6 @@ art_cc_library {
         "libbase",
     ],
     target: {
-        // Library search path needed for running host tests remotely (from testcases directory).
-        linux_glibc_x86: {
-            ldflags: [
-                "-Wl,-rpath,$ORIGIN/../art_common/out/host/linux-x86/lib",
-                "-Wl,--enable-new-dtags",
-            ],
-        },
-        linux_glibc_x86_64: {
-            ldflags: [
-                "-Wl,-rpath,$ORIGIN/../art_common/out/host/linux-x86/lib64",
-                "-Wl,--enable-new-dtags",
-            ],
-        },
         android: {
             srcs: [
                 "library_namespaces.cpp",
