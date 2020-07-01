@@ -15,18 +15,22 @@
 package art
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"android/soong/android"
+	"android/soong/cc/config"
 )
 
 var (
-	pctx = android.NewPackageContext("android/soong/art")
+	pctx                  = android.NewPackageContext("android/soong/art")
+	prebuiltToolsForTests = []string{"as", "addr2line", "objdump"}
 )
 
 func init() {
 	android.RegisterMakeVarsProvider(pctx, makeVarsProvider)
+	pctx.Import("android/soong/cc/config")
 }
 
 func makeVarsProvider(ctx android.MakeVarsContext) {
@@ -52,4 +56,25 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 		copy_cmds = append(copy_cmds, testcasesContent[key]+":"+key)
 	}
 	ctx.Strict("ART_TESTCASES_CONTENT", strings.Join(copy_cmds, " "))
+
+	// Add prebuilt tools.
+	copy_cmds = []string{}
+	for _, cmd := range prebuiltToolsForTests {
+		target := ctx.Config().Targets[android.BuildOs][0]
+		toolchain := config.FindToolchain(target.Os, target.Arch)
+		gccRoot, gccTriple := toolchain.GccRoot(), toolchain.GccTriple()
+		eval := func(path ...string) string {
+			result, err := ctx.Eval(filepath.Join(path...))
+			if err != nil {
+				panic(err)
+			}
+			return result
+		}
+		src := eval(gccRoot, "bin", gccTriple+"-"+cmd)
+		// Different tests use different paths, so we need to copy to two locations.
+		// TODO: Unify the test code so that this is no longer necessary.
+		copy_cmds = append(copy_cmds, src+":"+eval(gccRoot, "bin", gccTriple+"-"+cmd))
+		copy_cmds = append(copy_cmds, src+":"+eval(gccRoot, gccTriple, "bin", cmd))
+	}
+	ctx.Strict("ART_TESTCASES_PREBUILT_CONTENT", strings.Join(copy_cmds, " "))
 }
