@@ -738,7 +738,6 @@ class AssemblerTest : public testing::Test {
   AssemblerTest() {}
 
   void SetUp() override {
-    CommonArtTest::SetUpAndroidRootEnvVars();
     allocator_.reset(new ArenaAllocator(&pool_));
     assembler_.reset(CreateAssembler(allocator_.get()));
     test_helper_.reset(
