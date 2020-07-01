@@ -25,12 +25,13 @@ my_files := $(ART_TESTCASES_CONTENT)
 
 # Manually add system libraries that we need to run the host ART tools.
 my_files += \
-  $(foreach lib, \
-    libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack libziparchive, \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so) \
-  $(foreach lib, \
-    libcrypto libz, \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so)
+  $(foreach lib, libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack \
+    libziparchive libjavacore libandroidio libopenjdkd, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib).so) \
+  $(foreach lib, libcrypto libz libicuuc libicui18n libandroidicu libexpat, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib)-host.so)
 
 # Add apex directories for art, conscrypt and i18n.
 my_files += $(foreach infix,_ _VDEX_,$(foreach suffix,$(HOST_ARCH) $(HOST_2ND_ARCH), \
