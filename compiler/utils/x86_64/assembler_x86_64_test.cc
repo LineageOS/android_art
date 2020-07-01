@@ -947,7 +947,7 @@ TEST_F(AssemblerX86_64Test, XorlImm) {
 }
 
 TEST_F(AssemblerX86_64Test, Xchgq) {
-  DriverStr(RepeatRR(&x86_64::X86_64Assembler::xchgq, "xchgq %{reg2}, %{reg1}"), "xchgq");
+  DriverStr(RepeatRR(&x86_64::X86_64Assembler::xchgq, "xchgq %{reg1}, %{reg2}"), "xchgq");
 }
 
 TEST_F(AssemblerX86_64Test, Xchgl) {
@@ -1123,7 +1123,7 @@ TEST_F(AssemblerX86_64Test, RepMovsw) {
 }
 
 TEST_F(AssemblerX86_64Test, Movsxd) {
-  DriverStr(RepeatRr(&x86_64::X86_64Assembler::movsxd, "movsxd %{reg2}, %{reg1}"), "movsxd");
+  DriverStr(RepeatRr(&x86_64::X86_64Assembler::movsxd, "movslq %{reg2}, %{reg1}"), "movsxd");
 }
 
 TEST_F(AssemblerX86_64Test, Movaps) {
