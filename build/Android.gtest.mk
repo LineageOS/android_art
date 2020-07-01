@@ -25,13 +25,12 @@ my_files := $(ART_TESTCASES_CONTENT)
 
 # Manually add system libraries that we need to run the host ART tools.
 my_files += \
-  $(foreach lib, libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack \
-    libziparchive libjavacore libandroidio libopenjdkd, \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib).so) \
-  $(foreach lib, libcrypto libz libicuuc libicui18n libandroidicu libexpat, \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so \
-    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib)-host.so)
+  $(foreach lib, \
+    libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack libziparchive, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so) \
+  $(foreach lib, \
+    libcrypto libz, \
+    $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so)
 
 # Add apex directories for art, conscrypt and i18n.
 my_files += $(foreach infix,_ _VDEX_,$(foreach suffix,$(HOST_ARCH) $(HOST_2ND_ARCH), \
@@ -40,8 +39,7 @@ my_files += \
   $(foreach jar,$(CORE_IMG_JARS),\
     $(HOST_OUT_JAVA_LIBRARIES)/$(jar)-hostdex.jar:apex/com.android.art/javalib/$(jar).jar) \
   $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar:apex/com.android.conscrypt/javalib/conscrypt.jar\
-  $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar \
-  $(HOST_OUT)/com.android.i18n/etc/icu/icudt66l.dat:com.android.i18n/etc/icu/icudt66l.dat
+  $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar
 
 # Create dummy module that will copy all the data files into testcases directory.
 # For now, this copies everything to "out/host/linux-x86/" subdirectory, since it
@@ -53,7 +51,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
 LOCAL_COMPATIBILITY_SUITE := general-tests
-LOCAL_COMPATIBILITY_SUPPORT_FILES := $(ART_TESTCASES_PREBUILT_CONTENT) \
+LOCAL_COMPATIBILITY_SUPPORT_FILES := \
 	$(foreach f,$(my_files),$(call word-colon,1,$f):out/host/linux-x86/$(call word-colon,2,$f))
 include $(BUILD_SYSTEM)/base_rules.mk
 
