@@ -4310,27 +4310,70 @@ void InstructionCodeGeneratorARMVIXL::GenerateDivRemWithAnyConstant(HBinaryOpera
   int shift;
   CalculateMagicAndShiftForDivRem(imm, /* is_long= */ false, &magic, &shift);
 
-  // TODO(VIXL): Change the static cast to Operand::From() after VIXL is fixed.
-  __ Mov(temp1, static_cast<int32_t>(magic));
-  __ Smull(temp2, temp1, dividend, temp1);
+  auto generate_unsigned_div_code =[this, magic, shift](vixl32::Register out,
+                                                        vixl32::Register dividend,
+                                                        vixl32::Register temp1,
+                                                        vixl32::Register temp2) {
+    // TODO(VIXL): Change the static cast to Operand::From() after VIXL is fixed.
+    __ Mov(temp1, static_cast<int32_t>(magic));
+    if (magic > 0 && shift == 0) {
+      __ Smull(temp2, out, dividend, temp1);
+    } else {
+      __ Smull(temp2, temp1, dividend, temp1);
+      if (magic < 0) {
+        // The negative magic M = static_cast<int>(m) means that the multiplier m is greater
+        // than INT32_MAX. In such a case shift is never 0.
+        // Proof:
+        //   m = (2^p + d - 2^p % d) / d, where p = 32 + shift, d > 2
+        //
+        //   If shift == 0, m = (2^32 + d - 2^32 % d) / d =
+        //   = (2^32 + d - (2^32 - (2^32 / d) * d)) / d =
+        //   = (d + (2^32 / d) * d) / d = 1 + (2^32 / d), here '/' is the integer division.
+        //
+        //   1 + (2^32 / d) is decreasing when d is increasing.
+        //   The maximum is 1 431 655 766, when d == 3. This value is less than INT32_MAX.
+        //   the minimum is 3, when d = 2^31 -1.
+        //   So for all values of d in [3, INT32_MAX] m with p == 32 is in [3, INT32_MAX) and
+        //   is never less than 0.
+        __ Add(temp1, temp1, dividend);
+      }
+      DCHECK_NE(shift, 0);
+      __ Lsr(out, temp1, shift);
+    }
+  };
 
-  if (imm > 0 && magic < 0) {
-    __ Add(temp1, temp1, dividend);
-  } else if (imm < 0 && magic > 0) {
-    __ Sub(temp1, temp1, dividend);
-  }
-
-  if (shift != 0) {
-    __ Asr(temp1, temp1, shift);
-  }
-
-  if (instruction->IsDiv()) {
-    __ Sub(out, temp1, Operand(temp1, vixl32::Shift(ASR), 31));
+  if (imm > 0 && IsGEZero(instruction->GetLeft())) {
+    // No need to adjust the result for a non-negative dividend and a positive divisor.
+    if (instruction->IsDiv()) {
+      generate_unsigned_div_code(out, dividend, temp1, temp2);
+    } else {
+      generate_unsigned_div_code(temp1, dividend, temp1, temp2);
+      __ Mov(temp2, imm);
+      __ Mls(out, temp1, temp2, dividend);
+    }
   } else {
-    __ Sub(temp1, temp1, Operand(temp1, vixl32::Shift(ASR), 31));
-    // TODO: Strength reduction for mls.
-    __ Mov(temp2, imm);
-    __ Mls(out, temp1, temp2, dividend);
+    // TODO(VIXL): Change the static cast to Operand::From() after VIXL is fixed.
+    __ Mov(temp1, static_cast<int32_t>(magic));
+    __ Smull(temp2, temp1, dividend, temp1);
+
+    if (imm > 0 && magic < 0) {
+      __ Add(temp1, temp1, dividend);
+    } else if (imm < 0 && magic > 0) {
+      __ Sub(temp1, temp1, dividend);
+    }
+
+    if (shift != 0) {
+      __ Asr(temp1, temp1, shift);
+    }
+
+    if (instruction->IsDiv()) {
+      __ Sub(out, temp1, Operand(temp1, vixl32::Shift(ASR), 31));
+    } else {
+      __ Sub(temp1, temp1, Operand(temp1, vixl32::Shift(ASR), 31));
+      // TODO: Strength reduction for mls.
+      __ Mov(temp2, imm);
+      __ Mls(out, temp1, temp2, dividend);
+    }
   }
 }
 
