@@ -100,4 +100,15 @@ bool IsBooleanValueOrMaterializedCondition(HInstruction* cond_input) {
   return !cond_input->IsCondition() || !cond_input->IsEmittedAtUseSite();
 }
 
+bool HasNonNegativeResultOrMinInt(HInstruction* instruction) {
+  // 1. The instruction itself has always a non-negative result or the min value of
+  //    the integral type if the instruction has the integral type.
+  // 2. TODO: The instruction can be an expression which uses an induction variable.
+  //    Induction variable often start from 0 and are only increased. Such an
+  //    expression might be always non-negative.
+  return instruction->IsAbs() ||
+         IsInt64Value(instruction, DataType::MinValueOfIntegralType(instruction->GetType())) ||
+         IsGEZero(instruction);
+}
+
 }  // namespace art
