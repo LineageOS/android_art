@@ -49,12 +49,6 @@
                         "loaded systems."]
     },
     {
-        "tests": "147-stripped-dex-fallback",
-        "variant": "target",
-        "description": ["147-stripped-dex-fallback isn't supported on device",
-                        "because --strip-dex  requires the zip command."]
-    },
-    {
         "tests": "569-checker-pattern-replacement",
         "variant": "target",
         "description": ["569-checker-pattern-replacement tests behaviour",
@@ -62,15 +56,13 @@
     },
     {
         "tests": ["116-nodex2oat",
-                  "118-noimage-dex2oat",
-                  "134-nodex2oat-nofallback"],
+                  "118-noimage-dex2oat"],
         "variant": "prebuild",
         "description": ["Note 116-nodex2oat is not broken per-se it just",
                         "doesn't (and isn't meant to) work with --prebuild."]
     },
     {
-        "tests": ["147-stripped-dex-fallback",
-                  "608-checker-unresolved-lse"],
+        "tests": ["608-checker-unresolved-lse"],
         "variant": "no-prebuild"
     },
     {
@@ -168,12 +160,6 @@
         "description": ["Turned on for debug builds since debug builds have",
                         "duplicate classes checks enabled"],
         "bug": "http://b/2133391"
-    },
-    {
-        "tests": "147-stripped-dex-fallback",
-        "variant": "no-image",
-        "description": ["147-stripped-dex-fallback is disabled because it",
-                        "requires --prebuild."]
     },
     {
         "tests": ["116-nodex2oat",
@@ -341,8 +327,6 @@
     },
     {
         "tests": ["000-nop",
-                  "134-nodex2oat-nofallback",
-                  "147-stripped-dex-fallback",
                   "595-profile-saving"],
         "description": "The doesn't compile anything",
         "env_vars": {"ART_TEST_BISECTION": "true"},
@@ -843,7 +827,6 @@
           "130-hprof",
           "1337-gc-coverage",
           "1338-gc-no-los",
-          "134-nodex2oat-nofallback",
           "134-reg-promotion",
           "135-MirandaDispatch",
           "136-daemon-jni-shutdown",
@@ -857,7 +840,6 @@
           "144-static-field-sigquit",
           "145-alloc-tracking-stress",
           "146-bad-interface",
-          "147-stripped-dex-fallback",
           "148-multithread-gc-annotations",
           "150-loadlibrary",
           "154-gc-loop",

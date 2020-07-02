@@ -656,10 +656,6 @@ class Runtime {
     }
   }
 
-  bool IsDexFileFallbackEnabled() const {
-    return allow_dex_file_fallback_;
-  }
-
   const std::vector<std::string>& GetCpuAbilist() const {
     return cpu_abilist_;
   }
@@ -1171,10 +1167,6 @@ class Runtime {
 
   // If kNone, verification is disabled. kEnable by default.
   verifier::VerifyMode verify_;
-
-  // If true, the runtime may use dex files directly with the interpreter if an oat file is not
-  // available/usable.
-  bool allow_dex_file_fallback_;
 
   // List of supported cpu abis.
   std::vector<std::string> cpu_abilist_;
