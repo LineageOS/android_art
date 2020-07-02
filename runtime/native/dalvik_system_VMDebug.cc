@@ -161,16 +161,6 @@ static void VMDebug_stopMethodTracing(JNIEnv*, jclass) {
   Trace::Stop();
 }
 
-static void VMDebug_startEmulatorTracing(JNIEnv*, jclass) {
-  UNIMPLEMENTED(WARNING);
-  // dvmEmulatorTraceStart();
-}
-
-static void VMDebug_stopEmulatorTracing(JNIEnv*, jclass) {
-  UNIMPLEMENTED(WARNING);
-  // dvmEmulatorTraceStop();
-}
-
 static jboolean VMDebug_isDebuggerConnected(JNIEnv*, jclass) {
   // This function will be replaced by the debugger when it's connected. See
   // external/oj-libjdwp/src/share/vmDebug.c for implementation when debugger is connected.
@@ -649,13 +639,11 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMDebug, resetAllocCount, "(I)V"),
   NATIVE_METHOD(VMDebug, resetInstructionCount, "()V"),
   NATIVE_METHOD(VMDebug, startAllocCounting, "()V"),
-  NATIVE_METHOD(VMDebug, startEmulatorTracing, "()V"),
   NATIVE_METHOD(VMDebug, startInstructionCounting, "()V"),
   NATIVE_METHOD(VMDebug, startMethodTracingDdmsImpl, "(IIZI)V"),
   NATIVE_METHOD(VMDebug, startMethodTracingFd, "(Ljava/lang/String;IIIZIZ)V"),
   NATIVE_METHOD(VMDebug, startMethodTracingFilename, "(Ljava/lang/String;IIZI)V"),
   NATIVE_METHOD(VMDebug, stopAllocCounting, "()V"),
-  NATIVE_METHOD(VMDebug, stopEmulatorTracing, "()V"),
   NATIVE_METHOD(VMDebug, stopInstructionCounting, "()V"),
   NATIVE_METHOD(VMDebug, stopMethodTracing, "()V"),
   FAST_NATIVE_METHOD(VMDebug, threadCpuTimeNanos, "()J"),
