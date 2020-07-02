@@ -41,6 +41,11 @@ public class DivTest {
     expectEquals(3, $noinline$IntDivBy18(65));
     expectEquals(-3, $noinline$IntDivBy18(-65));
 
+    expectEquals(0, $noinline$IntALenDivBy18(new int[0]));
+    expectEquals(0, $noinline$IntALenDivBy18(new int[1]));
+    expectEquals(1, $noinline$IntALenDivBy18(new int[18]));
+    expectEquals(3, $noinline$IntALenDivBy18(new int[65]));
+
     expectEquals(0, $noinline$IntDivByMinus18(0));
     expectEquals(0, $noinline$IntDivByMinus18(1));
     expectEquals(0, $noinline$IntDivByMinus18(-1));
@@ -57,6 +62,11 @@ public class DivTest {
     expectEquals(3, $noinline$IntDivBy7(22));
     expectEquals(-3, $noinline$IntDivBy7(-22));
 
+    expectEquals(0, $noinline$IntALenDivBy7(new int[0]));
+    expectEquals(0, $noinline$IntALenDivBy7(new int[1]));
+    expectEquals(1, $noinline$IntALenDivBy7(new int[7]));
+    expectEquals(3, $noinline$IntALenDivBy7(new int[22]));
+
     expectEquals(0, $noinline$IntDivByMinus7(0));
     expectEquals(0, $noinline$IntDivByMinus7(1));
     expectEquals(0, $noinline$IntDivByMinus7(-1));
@@ -72,6 +82,11 @@ public class DivTest {
     expectEquals(-1, $noinline$IntDivBy6(-6));
     expectEquals(3, $noinline$IntDivBy6(19));
     expectEquals(-3, $noinline$IntDivBy6(-19));
+
+    expectEquals(0, $noinline$IntALenDivBy6(new int[0]));
+    expectEquals(0, $noinline$IntALenDivBy6(new int[1]));
+    expectEquals(1, $noinline$IntALenDivBy6(new int[6]));
+    expectEquals(3, $noinline$IntALenDivBy6(new int[19]));
 
     expectEquals(0, $noinline$IntDivByMinus6(0));
     expectEquals(0, $noinline$IntDivByMinus6(1));
@@ -93,6 +108,22 @@ public class DivTest {
   /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
   private static int $noinline$IntDivBy18(int v) {
     int r = v / 18;
+    return r;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$IntALenDivBy18(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, r{{\d+}}, #2
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$IntALenDivBy18(int[]) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$IntALenDivBy18(int[] arr) {
+    int r = arr.length / 18;
     return r;
   }
 
@@ -125,6 +156,24 @@ public class DivTest {
     return r;
   }
 
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$IntALenDivBy7(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            add{{s?}} r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, r{{\d+}}, #2
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$IntALenDivBy7(int[]) disassembly (after)
+  /// CHECK:                 adds x{{\d+}}, x{{\d+}}, x{{\d+}}, lsl #32
+  /// CHECK-NEXT:            lsr  x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             cinc w{{\d+}}, w{{\d+}}, mi
+  private static int $noinline$IntALenDivBy7(int[] arr) {
+    int r = arr.length / 7;
+    return r;
+  }
+
   // A test case to check that 'lsr' and 'add' are combined into one 'adds'.
   // Divisor -7 has the same property as divisor 7: the result of get_high(dividend * magic)
   // must be corrected. In this case it is a 'sub' instruction.
@@ -152,6 +201,21 @@ public class DivTest {
   /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
   private static int $noinline$IntDivBy6(int v) {
     int r = v / 6;
+    return r;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$IntALenDivBy6(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$IntALenDivBy6(int[]) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$IntALenDivBy6(int[] arr) {
+    int r = arr.length / 6;
     return r;
   }
 
