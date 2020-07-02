@@ -55,7 +55,8 @@ class LibraryNamespaces {
   }
   Result<NativeLoaderNamespace*> Create(JNIEnv* env, uint32_t target_sdk_version,
                                         jobject class_loader, bool is_shared, jstring dex_path,
-                                        jstring java_library_path, jstring java_permitted_path);
+                                        jstring java_library_path, jstring java_permitted_path,
+                                        jstring uses_library_list);
   NativeLoaderNamespace* FindNamespaceByClassLoader(JNIEnv* env, jobject class_loader);
 
  private:

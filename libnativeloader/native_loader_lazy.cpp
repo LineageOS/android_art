@@ -51,10 +51,10 @@ void InitializeNativeLoader() {
 
 jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobject class_loader,
                                    bool is_shared, jstring dex_path, jstring library_path,
-                                   jstring permitted_path) {
+                                   jstring permitted_path, jstring uses_library_list) {
   static auto f = GET_FUNC_PTR(CreateClassLoaderNamespace);
   return f(env, target_sdk_version, class_loader, is_shared, dex_path, library_path,
-           permitted_path);
+           permitted_path, uses_library_list);
 }
 
 void* OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* path,
