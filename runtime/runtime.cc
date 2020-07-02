@@ -268,7 +268,6 @@ Runtime::Runtime()
       dump_gc_performance_on_shutdown_(false),
       preinitialization_transactions_(),
       verify_(verifier::VerifyMode::kNone),
-      allow_dex_file_fallback_(true),
       target_sdk_version_(static_cast<uint32_t>(SdkVersion::kUnset)),
       implicit_null_checks_(false),
       implicit_so_checks_(false),
@@ -1315,7 +1314,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   intern_table_ = new InternTable;
 
   verify_ = runtime_options.GetOrDefault(Opt::Verify);
-  allow_dex_file_fallback_ = !runtime_options.Exists(Opt::NoDexFileFallback);
 
   target_sdk_version_ = runtime_options.GetOrDefault(Opt::TargetSdkVersion);
 
@@ -1418,11 +1416,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
                        runtime_options.Exists(Opt::DumpRegionInfoBeforeGC),
                        runtime_options.Exists(Opt::DumpRegionInfoAfterGC),
                        image_space_loading_order_);
-
-  if (!heap_->HasBootImageSpace() && !allow_dex_file_fallback_) {
-    LOG(ERROR) << "Dex file fallback disabled, cannot continue without image.";
-    return false;
-  }
 
   dump_gc_performance_on_shutdown_ = runtime_options.Exists(Opt::DumpGCPerformanceOnShutdown);
 
