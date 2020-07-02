@@ -1,2 +1,0 @@
-Verify that we fallback to running out of dex code in the oat file if there is
-no image and the original dex code has been stripped.
