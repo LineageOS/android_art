@@ -3060,22 +3060,50 @@ void InstructionCodeGeneratorARM64::GenerateIntDivForPower2Denom(HDiv* instructi
   Register out = OutputRegister(instruction);
   Register dividend = InputRegisterAt(instruction, 0);
 
-  if (abs_imm == 2) {
-    int bits = DataType::Size(instruction->GetResultType()) * kBitsPerByte;
-    __ Add(out, dividend, Operand(dividend, LSR, bits - 1));
+  Register final_dividend;
+  if (HasNonNegativeResultOrMinInt(instruction->GetLeft())) {
+    // No need to adjust the result for non-negative dividends or the INT32_MIN/INT64_MIN dividends.
+    // NOTE: The generated code for HDiv correctly works for the INT32_MIN/INT64_MIN dividends:
+    //   imm == 2
+    //     add out, dividend(0x80000000), dividend(0x80000000), lsr #31 => out = 0x80000001
+    //     asr out, out(0x80000001), #1 => out = 0xc0000000
+    //     This is the same as 'asr out, 0x80000000, #1'
+    //
+    //   imm > 2
+    //     add temp, dividend(0x80000000), imm - 1 => temp = 0b10..01..1, where the number
+    //         of the rightmost 1s is ctz_imm.
+    //     cmp dividend(0x80000000), 0 => N = 1, V = 0 (lt is true)
+    //     csel out, temp(0b10..01..1), dividend(0x80000000), lt => out = 0b10..01..1
+    //     asr out, out(0b10..01..1), #ctz_imm => out = 0b1..10..0, where the number of the
+    //         leftmost 1s is ctz_imm + 1.
+    //     This is the same as 'asr out, dividend(0x80000000), #ctz_imm'.
+    //
+    //   imm == INT32_MIN
+    //     add tmp, dividend(0x80000000), #0x7fffffff => tmp = -1
+    //     cmp dividend(0x80000000), 0 => N = 1, V = 0 (lt is true)
+    //     csel out, temp(-1), dividend(0x80000000), lt => out = -1
+    //     neg out, out(-1), asr #31 => out = 1
+    //     This is the same as 'neg out, dividend(0x80000000), asr #31'.
+    final_dividend = dividend;
   } else {
-    UseScratchRegisterScope temps(GetVIXLAssembler());
-    Register temp = temps.AcquireSameSizeAs(out);
-    __ Add(temp, dividend, abs_imm - 1);
-    __ Cmp(dividend, 0);
-    __ Csel(out, temp, dividend, lt);
+    if (abs_imm == 2) {
+      int bits = DataType::Size(instruction->GetResultType()) * kBitsPerByte;
+      __ Add(out, dividend, Operand(dividend, LSR, bits - 1));
+    } else {
+      UseScratchRegisterScope temps(GetVIXLAssembler());
+      Register temp = temps.AcquireSameSizeAs(out);
+      __ Add(temp, dividend, abs_imm - 1);
+      __ Cmp(dividend, 0);
+      __ Csel(out, temp, dividend, lt);
+    }
+    final_dividend = out;
   }
 
   int ctz_imm = CTZ(abs_imm);
   if (imm > 0) {
-    __ Asr(out, out, ctz_imm);
+    __ Asr(out, final_dividend, ctz_imm);
   } else {
-    __ Neg(out, Operand(out, ASR, ctz_imm));
+    __ Neg(out, Operand(final_dividend, ASR, ctz_imm));
   }
 }
 
@@ -5587,18 +5615,27 @@ void InstructionCodeGeneratorARM64::GenerateIntRemForPower2Denom(HRem *instructi
   Register out = OutputRegister(instruction);
   Register dividend = InputRegisterAt(instruction, 0);
 
-  if (abs_imm == 2) {
-    __ Cmp(dividend, 0);
-    __ And(out, dividend, 1);
-    __ Csneg(out, out, out, ge);
-  } else {
-    UseScratchRegisterScope temps(GetVIXLAssembler());
-    Register temp = temps.AcquireSameSizeAs(out);
-
-    __ Negs(temp, dividend);
+  if (HasNonNegativeResultOrMinInt(instruction->GetLeft())) {
+    // No need to adjust the result for non-negative dividends or the INT32_MIN/INT64_MIN dividends.
+    // NOTE: The generated code for HRem correctly works for the INT32_MIN/INT64_MIN dividends.
+    // INT*_MIN % imm must be 0 for any imm of power 2. 'and' works only with bits
+    // 0..30 (Int32 case)/0..62 (Int64 case) of a dividend. For INT32_MIN/INT64_MIN they are zeros.
+    // So 'and' always produces zero.
     __ And(out, dividend, abs_imm - 1);
-    __ And(temp, temp, abs_imm - 1);
-    __ Csneg(out, out, temp, mi);
+  } else {
+    if (abs_imm == 2) {
+      __ Cmp(dividend, 0);
+      __ And(out, dividend, 1);
+      __ Csneg(out, out, out, ge);
+    } else {
+      UseScratchRegisterScope temps(GetVIXLAssembler());
+      Register temp = temps.AcquireSameSizeAs(out);
+
+      __ Negs(temp, dividend);
+      __ And(out, dividend, abs_imm - 1);
+      __ And(temp, temp, abs_imm - 1);
+      __ Csneg(out, out, temp, mi);
+    }
   }
 }
 
