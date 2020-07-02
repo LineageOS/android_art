@@ -40,8 +40,7 @@ my_files += \
   $(foreach jar,$(CORE_IMG_JARS),\
     $(HOST_OUT_JAVA_LIBRARIES)/$(jar)-hostdex.jar:apex/com.android.art/javalib/$(jar).jar) \
   $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar:apex/com.android.conscrypt/javalib/conscrypt.jar\
-  $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar \
-  $(HOST_OUT)/com.android.i18n/etc/icu/icudt66l.dat:com.android.i18n/etc/icu/icudt66l.dat
+  $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar
 
 # Create dummy module that will copy all the data files into testcases directory.
 # For now, this copies everything to "out/host/linux-x86/" subdirectory, since it
