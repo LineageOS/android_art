@@ -3242,13 +3242,23 @@ void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
 
   // Extract the result from the high 32 bits and apply the final right shift.
   DCHECK_LT(shift, 32);
-  __ Asr(temp.X(), temp.X(), 32 + shift);
-
-  if (instruction->IsRem()) {
-    GenerateIncrementNegativeByOne(temp, temp, use_cond_inc);
-    GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+  if (imm > 0 && IsGEZero(instruction->GetLeft())) {
+    // No need to adjust the result for a non-negative dividend and a positive divisor.
+    if (instruction->IsDiv()) {
+      __ Lsr(out.X(), temp.X(), 32 + shift);
+    } else {
+      __ Lsr(temp.X(), temp.X(), 32 + shift);
+      GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+    }
   } else {
-    GenerateIncrementNegativeByOne(out, temp, use_cond_inc);
+    __ Asr(temp.X(), temp.X(), 32 + shift);
+
+    if (instruction->IsRem()) {
+      GenerateIncrementNegativeByOne(temp, temp, use_cond_inc);
+      GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+    } else {
+      GenerateIncrementNegativeByOne(out, temp, use_cond_inc);
+    }
   }
 }
 
