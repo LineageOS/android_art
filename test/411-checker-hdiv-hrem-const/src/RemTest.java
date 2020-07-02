@@ -41,6 +41,11 @@ public class RemTest {
     expectEquals(11, $noinline$IntRemBy18(65));
     expectEquals(-11, $noinline$IntRemBy18(-65));
 
+    expectEquals(0, $noinline$IntALenRemBy18(new int[0]));
+    expectEquals(1, $noinline$IntALenRemBy18(new int[1]));
+    expectEquals(0, $noinline$IntALenRemBy18(new int[18]));
+    expectEquals(11, $noinline$IntALenRemBy18(new int[65]));
+
     expectEquals(0, $noinline$IntRemByMinus18(0));
     expectEquals(1, $noinline$IntRemByMinus18(1));
     expectEquals(-1, $noinline$IntRemByMinus18(-1));
@@ -57,6 +62,11 @@ public class RemTest {
     expectEquals(1, $noinline$IntRemBy7(22));
     expectEquals(-1, $noinline$IntRemBy7(-22));
 
+    expectEquals(0, $noinline$IntALenRemBy7(new int[0]));
+    expectEquals(1, $noinline$IntALenRemBy7(new int[1]));
+    expectEquals(0, $noinline$IntALenRemBy7(new int[7]));
+    expectEquals(1, $noinline$IntALenRemBy7(new int[22]));
+
     expectEquals(0, $noinline$IntRemByMinus7(0));
     expectEquals(1, $noinline$IntRemByMinus7(1));
     expectEquals(-1, $noinline$IntRemByMinus7(-1));
@@ -72,6 +82,11 @@ public class RemTest {
     expectEquals(0, $noinline$IntRemBy6(-6));
     expectEquals(1, $noinline$IntRemBy6(19));
     expectEquals(-1, $noinline$IntRemBy6(-19));
+
+    expectEquals(0, $noinline$IntALenRemBy6(new int[0]));
+    expectEquals(1, $noinline$IntALenRemBy6(new int[1]));
+    expectEquals(0, $noinline$IntALenRemBy6(new int[6]));
+    expectEquals(1, $noinline$IntALenRemBy6(new int[19]));
 
     expectEquals(0, $noinline$IntRemByMinus6(0));
     expectEquals(1, $noinline$IntRemByMinus6(1));
@@ -95,6 +110,24 @@ public class RemTest {
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
   private static int $noinline$IntRemBy18(int v) {
     int r = v % 18;
+    return r;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$IntALenRemBy18(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, #2
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #18
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$IntALenRemBy18(int[]) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x12
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$IntALenRemBy18(int[] arr) {
+    int r = arr.length % 18;
     return r;
   }
 
@@ -131,6 +164,25 @@ public class RemTest {
     return r;
   }
 
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$IntALenRemBy7(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            add{{s?}} r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, #2
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #7
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$IntALenRemBy7(int[]) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x7
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$IntALenRemBy7(int[] arr) {
+    int r = arr.length % 7;
+    return r;
+  }
+
   // A test case to check that 'lsr' and 'add' are combined into one 'adds'.
   // Divisor -7 has the same property as divisor 7: the result of get_high(dividend * magic)
   // must be corrected. In this case it is a 'sub' instruction.
@@ -162,6 +214,23 @@ public class RemTest {
   /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
   private static int $noinline$IntRemBy6(int v) {
     int r = v % 6;
+    return r;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$IntALenRemBy6(int[]) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$IntALenRemBy6(int[]) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$IntALenRemBy6(int[] arr) {
+    int r = arr.length % 6;
     return r;
   }
 
