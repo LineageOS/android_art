@@ -3173,4 +3173,22 @@ void HInvoke::SetResolvedMethod(ArtMethod* method) {
   resolved_method_ = method;
 }
 
+bool IsGEZero(HInstruction* instruction) {
+  DCHECK(instruction != nullptr);
+  if (instruction->IsArrayLength()) {
+    return true;
+  } else if (instruction->IsMin()) {
+    // Instruction MIN(>=0, >=0) is >= 0.
+    return IsGEZero(instruction->InputAt(0)) &&
+           IsGEZero(instruction->InputAt(1));
+  } else if (instruction->IsAbs()) {
+    // Instruction ABS(>=0) is >= 0.
+    // NOTE: ABS(minint) = minint prevents assuming
+    //       >= 0 without looking at the argument.
+    return IsGEZero(instruction->InputAt(0));
+  }
+  int64_t value = -1;
+  return IsInt64AndGet(instruction, &value) && value >= 0;
+}
+
 }  // namespace art
