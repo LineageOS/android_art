@@ -4226,21 +4226,69 @@ void InstructionCodeGeneratorARMVIXL::DivRemByPowerOfTwo(HBinaryOperation* instr
   uint32_t abs_imm = static_cast<uint32_t>(AbsOrMin(imm));
   int ctz_imm = CTZ(abs_imm);
 
-  vixl32::Register add_right_input = dividend;
-  if (ctz_imm > 1) {
-    __ Asr(out, dividend, 31);
-    add_right_input = out;
-  }
-  __ Add(out, dividend, Operand(add_right_input, vixl32::LSR, 32 - ctz_imm));
-
-  if (instruction->IsDiv()) {
-    __ Asr(out, out, ctz_imm);
+  auto generate_div_code = [this, imm, ctz_imm](vixl32::Register out, vixl32::Register in) {
+    __ Asr(out, in, ctz_imm);
     if (imm < 0) {
       __ Rsb(out, out, 0);
     }
+  };
+
+  if (HasNonNegativeResultOrMinInt(instruction->GetLeft())) {
+    // No need to adjust the result for non-negative dividends or the INT32_MIN dividend.
+    // NOTE: The generated code for HDiv/HRem correctly works for the INT32_MIN dividend:
+    //   imm == 2
+    //     HDiv
+    //      add out, dividend(0x80000000), dividend(0x80000000), lsr #31 => out = 0x80000001
+    //      asr out, out(0x80000001), #1 => out = 0xc0000000
+    //      This is the same as 'asr out, dividend(0x80000000), #1'
+    //
+    //   imm > 2
+    //     HDiv
+    //      asr out, dividend(0x80000000), #31 => out = -1
+    //      add out, dividend(0x80000000), out(-1), lsr #(32 - ctz_imm) => out = 0b10..01..1,
+    //          where the number of the rightmost 1s is ctz_imm.
+    //      asr out, out(0b10..01..1), #ctz_imm => out = 0b1..10..0, where the number of the
+    //          leftmost 1s is ctz_imm + 1.
+    //      This is the same as 'asr out, dividend(0x80000000), #ctz_imm'.
+    //
+    //   imm == INT32_MIN
+    //     HDiv
+    //      asr out, dividend(0x80000000), #31 => out = -1
+    //      add out, dividend(0x80000000), out(-1), lsr #1 => out = 0xc0000000
+    //      asr out, out(0xc0000000), #31 => out = -1
+    //      rsb out, out(-1), #0 => out = 1
+    //      This is the same as
+    //        asr out, dividend(0x80000000), #31
+    //        rsb out, out, #0
+    //
+    //
+    //   INT_MIN % imm must be 0 for any imm of power 2. 'and' and 'ubfx' work only with bits
+    //   0..30 of a dividend. For INT32_MIN those bits are zeros. So 'and' and 'ubfx' always
+    //   produce zero.
+    if (instruction->IsDiv()) {
+      generate_div_code(out, dividend);
+    } else {
+      if (GetVIXLAssembler()->IsModifiedImmediate(abs_imm - 1)) {
+        __ And(out, dividend, abs_imm - 1);
+      } else {
+        __ Ubfx(out, dividend, 0, ctz_imm);
+      }
+      return;
+    }
   } else {
-    __ Bfc(out, 0, ctz_imm);
-    __ Sub(out, dividend, out);
+    vixl32::Register add_right_input = dividend;
+    if (ctz_imm > 1) {
+      __ Asr(out, dividend, 31);
+      add_right_input = out;
+    }
+    __ Add(out, dividend, Operand(add_right_input, vixl32::LSR, 32 - ctz_imm));
+
+    if (instruction->IsDiv()) {
+      generate_div_code(out, out);
+    } else {
+      __ Bfc(out, 0, ctz_imm);
+      __ Sub(out, dividend, out);
+    }
   }
 }
 
@@ -4331,7 +4379,10 @@ void LocationsBuilderARMVIXL::VisitDiv(HDiv* div) {
         Location::OutputOverlap out_overlaps = Location::kNoOutputOverlap;
         if (value == 1 || value == 0 || value == -1) {
           // No temp register required.
-        } else if (IsPowerOfTwo(AbsOrMin(value))) {
+        } else if (IsPowerOfTwo(AbsOrMin(value)) &&
+                   value != 2 &&
+                   value != -2 &&
+                   !HasNonNegativeResultOrMinInt(div)) {
           // The "out" register is used as a temporary, so it overlaps with the inputs.
           out_overlaps = Location::kOutputOverlap;
         } else {
@@ -4445,7 +4496,7 @@ void LocationsBuilderARMVIXL::VisitRem(HRem* rem) {
         Location::OutputOverlap out_overlaps = Location::kNoOutputOverlap;
         if (value == 1 || value == 0 || value == -1) {
           // No temp register required.
-        } else if (IsPowerOfTwo(AbsOrMin(value))) {
+        } else if (IsPowerOfTwo(AbsOrMin(value)) && !HasNonNegativeResultOrMinInt(rem)) {
           // The "out" register is used as a temporary, so it overlaps with the inputs.
           out_overlaps = Location::kOutputOverlap;
         } else {
