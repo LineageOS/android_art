@@ -8209,6 +8209,10 @@ void RemoveEnvironmentUses(HInstruction* instruction);
 bool HasEnvironmentUsedByOthers(HInstruction* instruction);
 void ResetEnvironmentInputRecords(HInstruction* instruction);
 
+// Detects an instruction that is >= 0. As long as the value is carried by
+// a single instruction, arithmetic wrap-around cannot occur.
+bool IsGEZero(HInstruction* instruction);
+
 }  // namespace art
 
 #endif  // ART_COMPILER_OPTIMIZING_NODES_H_

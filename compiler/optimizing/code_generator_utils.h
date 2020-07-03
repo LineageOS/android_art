@@ -40,6 +40,10 @@ template <typename T> T AbsOrMin(T value) {
       : std::abs(value);
 }
 
+// Return true if the specified instruction produces only non-negative results or the min value of
+// the integral type if the instruction has the integral type.
+bool HasNonNegativeResultOrMinInt(HInstruction* instruction);
+
 }  // namespace art
 
 #endif  // ART_COMPILER_OPTIMIZING_CODE_GENERATOR_UTILS_H_

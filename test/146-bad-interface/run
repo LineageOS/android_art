@@ -14,6 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# We want to run as no-dex-file-fallback to confirm that even though the -ex file has a symbolic
-# reference to A, there's no class-def, so we don't detect a collision.
 exec ${RUN} --secondary "${@}"
