@@ -267,7 +267,8 @@ JitCodeCache::JitCodeCache()
       collection_in_progress_(false),
       last_collection_increased_code_cache_(false),
       garbage_collect_code_(true),
-      number_of_compilations_(0),
+      number_of_baseline_compilations_(0),
+      number_of_optimized_compilations_(0),
       number_of_osr_compilations_(0),
       number_of_collections_(0),
       histogram_stack_map_memory_use_("Memory used for stack maps", 16),
@@ -694,7 +695,17 @@ bool JitCodeCache::Commit(Thread* self,
     return false;
   }
 
-  number_of_compilations_++;
+  switch (compilation_kind) {
+    case CompilationKind::kOsr:
+      number_of_osr_compilations_++;
+      break;
+    case CompilationKind::kBaseline:
+      number_of_baseline_compilations_++;
+      break;
+    case CompilationKind::kOptimized:
+      number_of_optimized_compilations_++;
+      break;
+  }
 
   // We need to update the debug info before the entry point gets set.
   // At the same time we want to do under JIT lock so that debug info and JIT maps are in sync.
@@ -750,7 +761,6 @@ bool JitCodeCache::Commit(Thread* self,
         method_code_map_.Put(code_ptr, method);
       }
       if (compilation_kind == CompilationKind::kOsr) {
-        number_of_osr_compilations_++;
         osr_code_map_.Put(method, code_ptr);
       } else if (NeedsClinitCheckBeforeCall(method) &&
                  !method->GetDeclaringClass()->IsVisiblyInitialized()) {
@@ -1913,7 +1923,8 @@ void JitCodeCache::Dump(std::ostream& os) {
      << "Current JIT capacity: " << PrettySize(GetCurrentRegion()->GetCurrentCapacity()) << "\n"
      << "Current number of JIT JNI stub entries: " << jni_stubs_map_.size() << "\n"
      << "Current number of JIT code cache entries: " << method_code_map_.size() << "\n"
-     << "Total number of JIT compilations: " << number_of_compilations_ << "\n"
+     << "Total number of JIT baseline compilations: " << number_of_baseline_compilations_ << "\n"
+     << "Total number of JIT optimized compilations: " << number_of_optimized_compilations_ << "\n"
      << "Total number of JIT compilations for on stack replacement: "
         << number_of_osr_compilations_ << "\n"
      << "Total number of JIT code cache collections: " << number_of_collections_ << std::endl;
@@ -1947,7 +1958,8 @@ void JitCodeCache::PostForkChildAction(bool is_system_server, bool is_zygote) {
   }
 
   // Reset all statistics to be specific to this process.
-  number_of_compilations_ = 0;
+  number_of_baseline_compilations_ = 0;
+  number_of_optimized_compilations_ = 0;
   number_of_osr_compilations_ = 0;
   number_of_collections_ = 0;
   histogram_stack_map_memory_use_.Reset();
