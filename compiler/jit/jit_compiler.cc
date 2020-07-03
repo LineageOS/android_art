@@ -181,7 +181,12 @@ bool JitCompiler::CompileMethod(
   // Do the compilation.
   bool success = false;
   {
-    TimingLogger::ScopedTiming t2("Compiling", &logger);
+    TimingLogger::ScopedTiming t2(compilation_kind == CompilationKind::kOsr
+                                      ? "Compiling OSR"
+                                      : compilation_kind == CompilationKind::kOptimized
+                                          ? "Compiling optimized"
+                                          : "Compiling baseline",
+                                  &logger);
     JitCodeCache* const code_cache = runtime->GetJit()->GetCodeCache();
     uint64_t start_ns = NanoTime();
     success = compiler_->JitCompile(
