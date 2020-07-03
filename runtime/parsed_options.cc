@@ -321,8 +321,6 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       .Define("-Xzygote-max-boot-retry=_")
           .WithType<unsigned int>()
           .IntoKey(M::ZygoteMaxFailedBoots)
-      .Define("-Xno-dex-file-fallback")
-          .IntoKey(M::NoDexFileFallback)
       .Define("-Xno-sig-chain")
           .IntoKey(M::NoSigChain)
       .Define("--cpu-abilist=_")
