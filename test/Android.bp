@@ -201,6 +201,12 @@ java_defaults {
     sdk_version: "none",
     system_modules: "core-all-system-modules",
 
+    // Some ART run-tests contain constructs which break ErrorProne checks;
+    // disable them on `errorprone` builds.
+    errorprone: {
+        javacflags: ["-XepDisableAllChecks"],
+    },
+
     data: ["expected.txt"],
     test_config_template: ":art-run-test-template",
     test_suites: ["general-tests"],
