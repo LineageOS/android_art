@@ -80,6 +80,7 @@ cc_library {
     host_supported: false,
     srcs: ["native_loader_lazy.cpp"],
     required: ["libnativeloader"],
+    shared_libs: ["liblog"],
 }
 
 cc_library_headers {
