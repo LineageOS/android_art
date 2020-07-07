@@ -48,9 +48,20 @@ class HashMapWrapper {
   Fn fn_;
 };
 
+template <typename Key, typename Value>
+class DefaultMapEmptyFn {
+ public:
+  void MakeEmpty(std::pair<Key, Value>& item) const {
+    item = std::pair<Key, Value>();
+  }
+  bool IsEmpty(const std::pair<Key, Value>& item) const {
+    return item.first == Key();
+  }
+};
+
 template <class Key,
           class Value,
-          class EmptyFn,
+          class EmptyFn = DefaultMapEmptyFn<Key, Value>,
           class HashFn = DefaultHashFn<Key>,
           class Pred = DefaultPred<Key>,
           class Alloc = std::allocator<std::pair<Key, Value>>>
