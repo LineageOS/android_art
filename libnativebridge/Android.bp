@@ -80,6 +80,7 @@ cc_library {
     host_supported: false,
     srcs: ["native_bridge_lazy.cc"],
     required: ["libnativebridge"],
+    shared_libs: ["liblog"],
 }
 
 subdirs = ["tests"]
