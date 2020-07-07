@@ -320,16 +320,12 @@ class Jit {
 
   void NotifyInterpreterToCompiledCodeTransition(Thread* self, ArtMethod* caller)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!IgnoreSamplesForMethod(caller)) {
-      AddSamples(self, caller, options_->GetInvokeTransitionWeight(), false);
-    }
+    AddSamples(self, caller, options_->GetInvokeTransitionWeight(), false);
   }
 
   void NotifyCompiledCodeToInterpreterTransition(Thread* self, ArtMethod* callee)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (!IgnoreSamplesForMethod(callee)) {
-      AddSamples(self, callee, options_->GetInvokeTransitionWeight(), false);
-    }
+    AddSamples(self, callee, options_->GetInvokeTransitionWeight(), false);
   }
 
   // Starts the profile saver if the config options allow profile recording.
@@ -448,10 +444,6 @@ class Jit {
 
  private:
   Jit(JitCodeCache* code_cache, JitOptions* options);
-
-  // Whether we should not add hotness counts for the given method.
-  bool IgnoreSamplesForMethod(ArtMethod* method)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Compile an individual method listed in a profile. If `add_to_queue` is
   // true and the method was resolved, return true. Otherwise return false.
