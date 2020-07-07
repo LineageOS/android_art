@@ -37,20 +37,13 @@ bool IsNterpSupported() {
 }
 
 bool CanRuntimeUseNterp() REQUIRES_SHARED(Locks::mutator_lock_) {
-  Runtime* runtime = Runtime::Current();
-  instrumentation::Instrumentation* instr = runtime->GetInstrumentation();
-  // Nterp shares the same restrictions as Mterp.
-  // If the runtime is interpreter only, we currently don't use nterp as some
-  // parts of the runtime (like instrumentation) make assumption on an
-  // interpreter-only runtime to always be in a switch-like interpreter.
-  return IsNterpSupported() && CanUseMterp() && !instr->InterpretOnly();
+  // Nterp has the same restrictions as Mterp.
+  return IsNterpSupported() && CanUseMterp();
 }
 
 bool CanMethodUseNterp(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
-  return !method->IsNative() &&
-      method->SkipAccessChecks() &&
-      method->IsInvokable() &&
-      !method->MustCountLocks() &&
+  return method->SkipAccessChecks() &&
+      !method->IsNative() &&
       method->GetDexFile()->IsStandardDexFile() &&
       NterpGetFrameSize(method) < kNterpMaxFrame;
 }
@@ -530,12 +523,11 @@ static mirror::Object* DoFilledNewArray(Thread* self,
     DCHECK_LE(length, 5);
   }
   uint16_t type_idx = is_range ? inst->VRegB_3rc() : inst->VRegB_35c();
-  ObjPtr<mirror::Class> array_class =
-      ResolveVerifyAndClinit(dex::TypeIndex(type_idx),
-                             caller,
-                             self,
-                             /* can_run_clinit= */ true,
-                             /* verify_access= */ !caller->SkipAccessChecks());
+  ObjPtr<mirror::Class> array_class = ResolveVerifyAndClinit(dex::TypeIndex(type_idx),
+                                                             caller,
+                                                             self,
+                                                             /* can_run_clinit= */ true,
+                                                             /* verify_access= */ false);
   if (UNLIKELY(array_class == nullptr)) {
     DCHECK(self->IsExceptionPending());
     return nullptr;
