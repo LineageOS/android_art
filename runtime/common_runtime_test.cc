@@ -80,29 +80,6 @@ CommonRuntimeTestImpl::~CommonRuntimeTestImpl() {
   runtime_.reset();
 }
 
-std::string CommonRuntimeTestImpl::GetAndroidTargetToolsDir(InstructionSet isa) {
-  switch (isa) {
-    case InstructionSet::kArm:
-    case InstructionSet::kThumb2:
-      return GetAndroidToolsDir("prebuilts/gcc/linux-x86/arm",
-                                "arm-linux-androideabi",
-                                "arm-linux-androideabi");
-    case InstructionSet::kArm64:
-      return GetAndroidToolsDir("prebuilts/gcc/linux-x86/aarch64",
-                                "aarch64-linux-android",
-                                "aarch64-linux-android");
-    case InstructionSet::kX86:
-    case InstructionSet::kX86_64:
-      return GetAndroidToolsDir("prebuilts/gcc/linux-x86/x86",
-                                "x86_64-linux-android",
-                                "x86_64-linux-android");
-    default:
-      break;
-  }
-  ADD_FAILURE() << "Invalid isa " << isa;
-  return "";
-}
-
 void CommonRuntimeTestImpl::SetUp() {
   CommonArtTestImpl::SetUp();
 
