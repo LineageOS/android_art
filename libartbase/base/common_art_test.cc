@@ -488,7 +488,14 @@ std::string CommonArtTestImpl::GetTestDexFileName(const char* name) const {
   UniqueCPtr<char[]> executable_path(realpath(cmdline.c_str(), nullptr));
   CHECK(executable_path != nullptr);
   std::string executable_dir = dirname(executable_path.get());
-  return executable_dir + "/art-gtest-jars-" + name + ".jar";
+  for (auto ext : {".jar", ".dex"}) {
+    std::string path = executable_dir + "/art-gtest-jars-" + name + ext;
+    if (OS::FileExists(path.c_str())) {
+      return path;
+    }
+  }
+  LOG(FATAL) << "Test file " << name << " not found";
+  UNREACHABLE();
 }
 
 std::vector<std::unique_ptr<const DexFile>> CommonArtTestImpl::OpenDexFiles(const char* filename) {
