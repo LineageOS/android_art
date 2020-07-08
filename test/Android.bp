@@ -1410,30 +1410,35 @@ java_library {
     ],
 }
 
+// Smali compiled files.
+// Since they are not compiled by javac, we use different extension for them.
+// The .jar extension for them would cause subtle failures in the test infra,
+// which finds and opens all jar files and expects them to be valid zip files.
+
 genrule {
     name: "art-gtest-jars-VerifierDeps",
     defaults: ["art-gtest-jars-smali-defaults"],
     srcs: ["VerifierDeps/**/*.smali"],
-    out: ["art-gtest-jars-VerifierDeps.jar"],
+    out: ["art-gtest-jars-VerifierDeps.dex"],
 }
 
 genrule {
     name: "art-gtest-jars-VerifierDepsMulti",
     defaults: ["art-gtest-jars-smali-defaults"],
     srcs: ["VerifierDepsMulti/**/*.smali"],
-    out: ["art-gtest-jars-VerifierDepsMulti.jar"],
+    out: ["art-gtest-jars-VerifierDepsMulti.dex"],
 }
 
 genrule {
     name: "art-gtest-jars-VerifySoftFailDuringClinit",
     defaults: ["art-gtest-jars-smali-defaults"],
     srcs: ["VerifySoftFailDuringClinit/**/*.smali"],
-    out: ["art-gtest-jars-VerifySoftFailDuringClinit.jar"],
+    out: ["art-gtest-jars-VerifySoftFailDuringClinit.dex"],
 }
 
 genrule {
     name: "art-gtest-jars-LinkageTest",
     defaults: ["art-gtest-jars-smali-defaults"],
     srcs: ["LinkageTest/*.smali"],
-    out: ["art-gtest-jars-LinkageTest.jar"],
+    out: ["art-gtest-jars-LinkageTest.dex"],
 }
