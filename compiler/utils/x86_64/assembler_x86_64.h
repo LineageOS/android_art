@@ -782,6 +782,8 @@ class X86_64Assembler final : public Assembler {
 
   void idivl(CpuRegister reg);
   void idivq(CpuRegister reg);
+  void divl(CpuRegister reg);
+  void divq(CpuRegister reg);
 
   void imull(CpuRegister dst, CpuRegister src);
   void imull(CpuRegister reg, const Immediate& imm);
