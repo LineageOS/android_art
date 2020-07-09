@@ -1230,4 +1230,20 @@ TEST_F(AssemblerX86Test, Cmpw) {
   DriverStr(RepeatAI(&x86::X86Assembler::cmpw, /*imm_bytes*/ 2U, "cmpw ${imm}, {mem}"), "cmpw");
 }
 
+TEST_F(AssemblerX86Test, Idiv) {
+  DriverStr(RepeatR(&x86::X86Assembler::idivl, "idivl %{reg}"), "idivl");
+}
+
+TEST_F(AssemblerX86Test, Div) {
+  DriverStr(RepeatR(&x86::X86Assembler::divl, "divl %{reg}"), "divl");
+}
+
+TEST_F(AssemblerX86Test, Negl) {
+  DriverStr(RepeatR(&x86::X86Assembler::negl, "negl %{reg}"), "negl");
+}
+
+TEST_F(AssemblerX86Test, Notl) {
+  DriverStr(RepeatR(&x86::X86Assembler::notl, "notl %{reg}"), "notl");
+}
+
 }  // namespace art
