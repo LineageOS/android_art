@@ -4374,6 +4374,22 @@ void X86_64Assembler::idivq(CpuRegister reg) {
 }
 
 
+void X86_64Assembler::divl(CpuRegister reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitOptionalRex32(reg);
+  EmitUint8(0xF7);
+  EmitUint8(0xF0 | reg.LowBits());
+}
+
+
+void X86_64Assembler::divq(CpuRegister reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitRex64(reg);
+  EmitUint8(0xF7);
+  EmitUint8(0xF0 | reg.LowBits());
+}
+
+
 void X86_64Assembler::imull(CpuRegister dst, CpuRegister src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitOptionalRex32(dst, src);
