@@ -868,6 +868,22 @@ TEST_F(AssemblerX86_64Test, Testl) {
   DriverStr(Repeatrr(&x86_64::X86_64Assembler::testl, "testl %{reg1}, %{reg2}"), "testl");
 }
 
+TEST_F(AssemblerX86_64Test, Idivq) {
+  DriverStr(RepeatR(&x86_64::X86_64Assembler::idivq, "idivq %{reg}"), "idivq");
+}
+
+TEST_F(AssemblerX86_64Test, Idivl) {
+  DriverStr(Repeatr(&x86_64::X86_64Assembler::idivl, "idivl %{reg}"), "idivl");
+}
+
+TEST_F(AssemblerX86_64Test, Divq) {
+  DriverStr(RepeatR(&x86_64::X86_64Assembler::divq, "divq %{reg}"), "divq");
+}
+
+TEST_F(AssemblerX86_64Test, Divl) {
+  DriverStr(Repeatr(&x86_64::X86_64Assembler::divl, "divl %{reg}"), "divl");
+}
+
 TEST_F(AssemblerX86_64Test, Negq) {
   DriverStr(RepeatR(&x86_64::X86_64Assembler::negq, "negq %{reg}"), "negq");
 }
