@@ -82,6 +82,7 @@ public class Main {
     test_Memory_pokeShort();
     test_Memory_pokeInt();
     test_Memory_pokeLong();
+    test_Integer_divideUnsigned();
     test_Integer_numberOfTrailingZeros();
     test_Long_numberOfTrailingZeros();
     test_Integer_rotateRight();
@@ -1374,6 +1375,31 @@ public class Main {
       throw new Error();
     }
     return 0;
+  }
+
+  public static void test_Integer_divideUnsigned() {
+    Assert.assertEquals(Integer.divideUnsigned(100, 10), 10);
+    Assert.assertEquals(Integer.divideUnsigned(100, 1), 100);
+    Assert.assertEquals(Integer.divideUnsigned(1024, 128), 8);
+    Assert.assertEquals(Integer.divideUnsigned(12345678, 264), 46763);
+    Assert.assertEquals(Integer.divideUnsigned(13, 5), 2);
+    Assert.assertEquals(Integer.divideUnsigned(-2, 2), Integer.MAX_VALUE);
+    Assert.assertEquals(Integer.divideUnsigned(-1, 2), Integer.MAX_VALUE);
+    Assert.assertEquals(Integer.divideUnsigned(100000, -1), 0);
+    Assert.assertEquals(Integer.divideUnsigned(Integer.MAX_VALUE, -1), 0);
+    Assert.assertEquals(Integer.divideUnsigned(-2, -1), 0);
+    Assert.assertEquals(Integer.divideUnsigned(-173448, 13), 330368757);
+    Assert.assertEquals(Integer.divideUnsigned(Integer.MIN_VALUE, 2), (1 << 30));
+    Assert.assertEquals(Integer.divideUnsigned(-1, Integer.MIN_VALUE), 1);
+    Assert.assertEquals(Integer.divideUnsigned(Integer.MAX_VALUE, Integer.MIN_VALUE), 0);
+    Assert.assertEquals(Integer.divideUnsigned(Integer.MIN_VALUE, Integer.MAX_VALUE), 1);
+
+    try {
+      Integer.divideUnsigned(1, 0);
+    } catch (ArithmeticException e) {
+      return;
+    }
+    Assert.fail("Unreachable");
   }
 
   public static void test_Integer_numberOfLeadingZeros() {
