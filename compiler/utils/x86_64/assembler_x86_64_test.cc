@@ -144,13 +144,8 @@ class AssemblerX86_64Test : public AssemblerTest<x86_64::X86_64Assembler,
                              x86_64::Immediate>;
 
  protected:
-  // Get the typically used name for this architecture, e.g., aarch64, x86-64, ...
-  std::string GetArchitectureString() override {
-    return "x86_64";
-  }
-
-  std::string GetDisassembleParameters() override {
-    return " -D -bbinary -mi386:x86-64 -Mx86-64,addr64,data32 --no-show-raw-insn";
+  InstructionSet GetIsa() override {
+    return InstructionSet::kX86_64;
   }
 
   void SetUpHelpers() override {
@@ -2319,13 +2314,8 @@ class JNIMacroAssemblerX86_64Test : public JNIMacroAssemblerTest<x86_64::X86_64J
   using Base = JNIMacroAssemblerTest<x86_64::X86_64JNIMacroAssembler>;
 
  protected:
-  // Get the typically used name for this architecture, e.g., aarch64, x86-64, ...
-  std::string GetArchitectureString() override {
-    return "x86_64";
-  }
-
-  std::string GetDisassembleParameters() override {
-    return " -D -bbinary -mi386:x86-64 -Mx86-64,addr64,data32 --no-show-raw-insn";
+  InstructionSet GetIsa() override {
+    return InstructionSet::kX86_64;
   }
 
  private:
