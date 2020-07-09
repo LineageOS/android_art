@@ -51,16 +51,8 @@ class AssemblerX86Test : public AssemblerTest<x86::X86Assembler,
                              x86::Immediate>;
 
  protected:
-  std::string GetArchitectureString() override {
-    return "x86";
-  }
-
-  std::string GetAssemblerParameters() override {
-    return " --32";
-  }
-
-  std::string GetDisassembleParameters() override {
-    return " -D -bbinary -mi386 --no-show-raw-insn";
+  InstructionSet GetIsa() override {
+    return InstructionSet::kX86;
   }
 
   void SetUpHelpers() override {
