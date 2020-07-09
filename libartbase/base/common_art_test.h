@@ -45,7 +45,7 @@ class DexFile;
 
 class ScratchDir {
  public:
-  ScratchDir();
+  explicit ScratchDir(bool keep_files = false);
 
   ~ScratchDir();
 
@@ -55,6 +55,7 @@ class ScratchDir {
 
  private:
   std::string path_;
+  bool keep_files_;  // Useful for debugging.
 
   DISALLOW_COPY_AND_ASSIGN(ScratchDir);
 };
