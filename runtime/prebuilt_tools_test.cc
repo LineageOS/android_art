@@ -26,39 +26,24 @@ namespace art {
 #ifndef ART_TARGET_ANDROID
 
 class PrebuiltToolsTest : public CommonRuntimeTest {
-};
-
-static void CheckToolsExist(const std::string& tools_dir) {
-  const char* tools[] = { "as", "objcopy", "objdump" };
-  for (const char* tool : tools) {
-    struct stat exec_st;
-    std::string exec_path = tools_dir + tool;
-    if (stat(exec_path.c_str(), &exec_st) != 0) {
-      ADD_FAILURE() << "Cannot find " << tool << " in " << tools_dir;
+ public:
+  static void CheckToolsExist(InstructionSet isa) {
+    const char* tools[] = { "as", "objcopy", "objdump" };
+    for (const char* tool : tools) {
+      std::string path = GetAndroidTool(tool, isa);
+      ASSERT_TRUE(OS::FileExists(path.c_str())) << path;
     }
   }
-}
+};
 
 TEST_F(PrebuiltToolsTest, CheckHostTools) {
-  std::string tools_dir = GetAndroidHostToolsDir();
-  if (tools_dir.empty()) {
-    ADD_FAILURE() << "Cannot find Android tools directory for host";
-  } else {
-    CheckToolsExist(tools_dir);
-  }
+  CheckToolsExist(InstructionSet::kX86);
+  CheckToolsExist(InstructionSet::kX86_64);
 }
 
 TEST_F(PrebuiltToolsTest, CheckTargetTools) {
-  // Other prebuilts are missing from the build server's repo manifest.
-  InstructionSet isas[] = { InstructionSet::kThumb2 };
-  for (InstructionSet isa : isas) {
-    std::string tools_dir = GetAndroidTargetToolsDir(isa);
-    if (tools_dir.empty()) {
-      ADD_FAILURE() << "Cannot find Android tools directory for " << isa;
-    } else {
-      CheckToolsExist(tools_dir);
-    }
-  }
+  CheckToolsExist(InstructionSet::kThumb2);
+  CheckToolsExist(InstructionSet::kArm64);
 }
 
 #endif  // ART_TARGET_ANDROID
