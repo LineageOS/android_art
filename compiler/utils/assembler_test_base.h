@@ -35,12 +35,6 @@
 
 namespace art {
 
-// Location of prebuilt tools (e.g. objdump).
-// The path needs to be updated when the prebuilt tools are updated.
-// TODO: Consider moving this logic to the build system.
-static constexpr char kPrebuiltToolsPath[] =
-    "prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9/x86_64-linux-android/bin/";
-
 // If you want to take a look at the differences between the ART assembler and clang,
 // set this flag to true. The disassembled files will then remain in the tmp directory.
 static constexpr bool kKeepDisassembledFiles = false;
@@ -137,29 +131,49 @@ class AssemblerTestBase : public testing::Test {
   virtual InstructionSet GetIsa() = 0;
 
   std::string FindTool(const std::string& tool_name) {
-    return GetRootPath() + kPrebuiltToolsPath + tool_name;
+    return CommonArtTest::GetAndroidTool(tool_name.c_str(), GetIsa());
   }
 
   virtual std::vector<std::string> GetAssemblerCommand() {
-    return {FindTool("as"), Is64BitInstructionSet(GetIsa()) ? "--64" : "--32"};
+    switch (GetIsa()) {
+      case InstructionSet::kX86:
+        return {FindTool("as"), "--32"};
+      case InstructionSet::kX86_64:
+        return {FindTool("as"), "--64"};
+      default:
+        return {FindTool("as")};
+    }
   }
 
   virtual std::vector<std::string> GetDisassemblerCommand() {
-    return {FindTool("objdump"), "--disassemble", "--no-show-raw-insn"};
+    switch (GetIsa()) {
+      case InstructionSet::kThumb2:
+        return {FindTool("objdump"), "--disassemble", "-M", "force-thumb"};
+      default:
+        return {FindTool("objdump"), "--disassemble", "--no-show-raw-insn"};
+    }
   }
 
- private:
   bool Assemble(const std::string& asm_file, const std::string& obj_file) {
     std::vector<std::string> args = GetAssemblerCommand();
     args.insert(args.end(), {"-o", obj_file, asm_file});
     std::string output;
-    return CommonArtTestImpl::ForkAndExec(args, [](){ return true; }, &output).StandardSuccess();
+    bool ok = CommonArtTestImpl::ForkAndExec(args, [](){ return true; }, &output).StandardSuccess();
+    if (!ok) {
+      LOG(ERROR) << "Assembler error:\n" << output;
+    }
+    return ok;
   }
 
   bool Disassemble(const std::string& obj_file, std::string* output) {
     std::vector<std::string> args = GetDisassemblerCommand();
     args.insert(args.end(), {obj_file});
-    return CommonArtTestImpl::ForkAndExec(args, [](){ return true; }, output).StandardSuccess();
+    bool ok = CommonArtTestImpl::ForkAndExec(args, [](){ return true; }, output).StandardSuccess();
+    if (!ok) {
+      LOG(ERROR) << "Disassembler error:\n" << *output;
+    }
+    *output = Replace(*output, "\t", " ");
+    return ok;
   }
 
   std::vector<uint8_t> ReadFile(const std::string& filename) {
@@ -219,9 +233,16 @@ class AssemblerTestBase : public testing::Test {
     return getcwd(temp, 1024) ? std::string(temp) + "/" : std::string("");
   }
 
-  std::string& Replace(std::string& str, const std::string& from, const std::string& to) {
-    auto it = str.find(from);
-    return (it != std::string::npos) ? str.replace(it, it + from.size(), to) : str;
+  std::string Replace(const std::string& str, const std::string& from, const std::string& to) {
+    std::string output;
+    size_t pos = 0;
+    for (auto match = str.find(from); match != str.npos; match = str.find(from, pos)) {
+      output += str.substr(pos, match - pos);
+      output += to;
+      pos = match + from.size();
+    }
+    output += str.substr(pos, str.size() - pos);
+    return output;
   }
 
   std::optional<ScratchDir> scratch_dir_;

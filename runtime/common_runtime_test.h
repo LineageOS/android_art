@@ -75,8 +75,6 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   CommonRuntimeTestImpl();
   virtual ~CommonRuntimeTestImpl();
 
-  static std::string GetAndroidTargetToolsDir(InstructionSet isa);
-
   // A helper function to fill the heap.
   static void FillHeap(Thread* self,
                        ClassLinker* class_linker,
