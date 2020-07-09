@@ -3027,6 +3027,42 @@ void IntrinsicLocationsBuilderX86::VisitReachabilityFence(HInvoke* invoke) {
 
 void IntrinsicCodeGeneratorX86::VisitReachabilityFence(HInvoke* invoke ATTRIBUTE_UNUSED) { }
 
+void IntrinsicLocationsBuilderX86::VisitIntegerDivideUnsigned(HInvoke* invoke) {
+  LocationSummary* locations = new (allocator_) LocationSummary(invoke,
+                                                                LocationSummary::kCallOnSlowPath,
+                                                                kIntrinsified);
+  locations->SetInAt(0, Location::RegisterLocation(EAX));
+  locations->SetInAt(1, Location::RequiresRegister());
+  locations->SetOut(Location::SameAsFirstInput());
+  // Intel uses edx:eax as the dividend.
+  locations->AddTemp(Location::RegisterLocation(EDX));
+}
+
+void IntrinsicCodeGeneratorX86::VisitIntegerDivideUnsigned(HInvoke* invoke) {
+  X86Assembler* assembler = GetAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+  Location out = locations->Out();
+  Location first = locations->InAt(0);
+  Location second = locations->InAt(1);
+  Register edx = locations->GetTemp(0).AsRegister<Register>();
+  Register second_reg = second.AsRegister<Register>();
+
+  DCHECK_EQ(EAX, first.AsRegister<Register>());
+  DCHECK_EQ(EAX, out.AsRegister<Register>());
+  DCHECK_EQ(EDX, edx);
+
+  // Check if divisor is zero, bail to managed implementation to handle.
+  __ testl(second_reg, second_reg);
+  SlowPathCode* slow_path = new (codegen_->GetScopedAllocator()) IntrinsicSlowPathX86(invoke);
+  codegen_->AddSlowPath(slow_path);
+  __ j(kEqual, slow_path->GetEntryLabel());
+
+  __ xorl(edx, edx);
+  __ divl(second_reg);
+
+  __ Bind(slow_path->GetExitLabel());
+}
+
 UNIMPLEMENTED_INTRINSIC(X86, MathRoundDouble)
 UNIMPLEMENTED_INTRINSIC(X86, ReferenceGetReferent)
 UNIMPLEMENTED_INTRINSIC(X86, FloatIsInfinite)
