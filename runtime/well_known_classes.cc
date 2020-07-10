@@ -117,6 +117,7 @@ jmethodID WellKnownClasses::java_lang_Thread_init;
 jmethodID WellKnownClasses::java_lang_Thread_run;
 jmethodID WellKnownClasses::java_lang_ThreadGroup_add;
 jmethodID WellKnownClasses::java_lang_ThreadGroup_removeThread;
+jmethodID WellKnownClasses::java_nio_Buffer_isDirect;
 jmethodID WellKnownClasses::java_nio_DirectByteBuffer_init;
 jmethodID WellKnownClasses::java_util_function_Consumer_accept;
 jmethodID WellKnownClasses::libcore_reflect_AnnotationFactory_createAnnotation;
@@ -405,6 +406,7 @@ void WellKnownClasses::InitFieldsAndMethodsOnly(JNIEnv* env) {
   java_lang_Thread_run = CacheMethod(env, java_lang_Thread, false, "run", "()V");
   java_lang_ThreadGroup_add = CacheMethod(env, java_lang_ThreadGroup, false, "add", "(Ljava/lang/Thread;)V");
   java_lang_ThreadGroup_removeThread = CacheMethod(env, java_lang_ThreadGroup, false, "threadTerminated", "(Ljava/lang/Thread;)V");
+  java_nio_Buffer_isDirect = CacheMethod(env, java_nio_Buffer, false, "isDirect", "()Z");
   java_nio_DirectByteBuffer_init = CacheMethod(env, java_nio_DirectByteBuffer, false, "<init>", "(JI)V");
   java_util_function_Consumer_accept = CacheMethod(env, java_util_function_Consumer, false, "accept", "(Ljava/lang/Object;)V");
   libcore_reflect_AnnotationFactory_createAnnotation = CacheMethod(env, libcore_reflect_AnnotationFactory, true, "createAnnotation", "(Ljava/lang/Class;[Llibcore/reflect/AnnotationMember;)Ljava/lang/annotation/Annotation;");
@@ -575,6 +577,7 @@ void WellKnownClasses::Clear() {
   java_lang_Thread_run = nullptr;
   java_lang_ThreadGroup_add = nullptr;
   java_lang_ThreadGroup_removeThread = nullptr;
+  java_nio_Buffer_isDirect = nullptr;
   java_nio_DirectByteBuffer_init = nullptr;
   libcore_reflect_AnnotationFactory_createAnnotation = nullptr;
   libcore_reflect_AnnotationMember_init = nullptr;
