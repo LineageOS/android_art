@@ -577,6 +577,97 @@ public class Main {
            s24 + s25 + s26 + s27 + s28 + s29 + s30 + s31;
   }
 
+  // Ensure spilling saves regular FP values correctly when the graph HasSIMD()
+  // is true.
+  /// CHECK-START-ARM64: float Main.$noinline$ensureSlowPathFPSpillFill(float[], float[], float[], float[], int[]) loop_optimization (after)
+  //
+  //  Both regular and SIMD accesses are present.
+  /// CHECK-DAG: VecLoad
+  /// CHECK-DAG: ArrayGet
+  private static final float $noinline$ensureSlowPathFPSpillFill(float[] a,
+                                                                 float[] b,
+                                                                 float[] c,
+                                                                 float[] d,
+                                                                 int[] e) {
+    // This loop should be vectorized so the graph->HasSIMD() will be true.
+    // A power-of-2 number of iterations is chosen to avoid peeling/unrolling interference.
+    for (int i = 0; i < 64; i++) {
+      // The actual values of the array elements don't matter, just the
+      // presence of a SIMD loop.
+      e[i]++;
+    }
+
+    float f0 = 0;
+    float f1 = 0;
+    float f2 = 0;
+    float f3 = 0;
+    float f4 = 0;
+    float f5 = 0;
+    float f6 = 0;
+    float f7 = 0;
+    float f8 = 0;
+    float f9 = 0;
+    float f10 = 0;
+    float f11 = 0;
+    float f12 = 0;
+    float f13 = 0;
+    float f14 = 0;
+    float f15 = 0;
+    float f16 = 0;
+    float f17 = 0;
+    float f18 = 0;
+    float f19 = 0;
+    float f20 = 0;
+    float f21 = 0;
+    float f22 = 0;
+    float f23 = 0;
+    float f24 = 0;
+    float f25 = 0;
+    float f26 = 0;
+    float f27 = 0;
+    float f28 = 0;
+    float f29 = 0;
+    float f30 = 0;
+    float f31 = 0;
+    for (int i = 0; i < 100; i++) {
+      f0 += a[i];
+      f1 += b[i];
+      f2 += c[i];
+      f3 += d[i];
+      f4 += a[i];
+      f5 += b[i];
+      f6 += c[i];
+      f7 += d[i];
+      f8 += a[i];
+      f9 += b[i];
+      f10 += c[i];
+      f11 += d[i];
+      f12 += a[i];
+      f13 += b[i];
+      f14 += c[i];
+      f15 += d[i];
+      f16 += a[i];
+      f17 += b[i];
+      f18 += c[i];
+      f19 += d[i];
+      f20 += a[i];
+      f21 += b[i];
+      f22 += c[i];
+      f23 += d[i];
+      f24 += a[i];
+      f25 += b[i];
+      f26 += c[i];
+      f27 += d[i];
+      f28 += a[i];
+      f29 += b[i];
+      f30 += c[i];
+      f31 += d[i];
+    }
+    return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14 + f15 +
+           f16 + f17 + f18 + f19 + f20 + f21 + f22 + f23 +
+           f24 + f25 + f26 + f27 + f28 + f29 + f30 + f31;
+  }
+
   public static int reductionIntoReplication() {
     int[] a = { 1, 2, 3, 4 };
     int x = 0;
@@ -975,6 +1066,21 @@ public class Main {
         a4[i] = i % 16;
       }
       expectEquals(85800, reduction32Values(a1, a2, a3, a4));
+    }
+    {
+      float[] a1 = new float[100];
+      float[] a2 = new float[100];
+      float[] a3 = new float[100];
+      float[] a4 = new float[100];
+      int[] a5 = new int[100];
+
+      for (int i = 0; i < 100; i++) {
+        a1[i] = (float)i;
+        a2[i] = (float)1;
+        a3[i] = (float)(100 - i);
+        a4[i] = (i % 16);
+      }
+      expectEquals(86608.0f, $noinline$ensureSlowPathFPSpillFill(a1, a2, a3, a4, a5));
     }
 
     expectEquals(10, reductionIntoReplication());
