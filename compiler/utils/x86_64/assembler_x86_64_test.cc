@@ -144,13 +144,8 @@ class AssemblerX86_64Test : public AssemblerTest<x86_64::X86_64Assembler,
                              x86_64::Immediate>;
 
  protected:
-  // Get the typically used name for this architecture, e.g., aarch64, x86-64, ...
-  std::string GetArchitectureString() override {
-    return "x86_64";
-  }
-
-  std::string GetDisassembleParameters() override {
-    return " -D -bbinary -mi386:x86-64 -Mx86-64,addr64,data32 --no-show-raw-insn";
+  InstructionSet GetIsa() override {
+    return InstructionSet::kX86_64;
   }
 
   void SetUpHelpers() override {
@@ -866,6 +861,22 @@ TEST_F(AssemblerX86_64Test, Testl) {
   // Note: uses different order for GCC than usual. This makes GCC happy, and doesn't have an
   // impact on functional correctness.
   DriverStr(Repeatrr(&x86_64::X86_64Assembler::testl, "testl %{reg1}, %{reg2}"), "testl");
+}
+
+TEST_F(AssemblerX86_64Test, Idivq) {
+  DriverStr(RepeatR(&x86_64::X86_64Assembler::idivq, "idivq %{reg}"), "idivq");
+}
+
+TEST_F(AssemblerX86_64Test, Idivl) {
+  DriverStr(Repeatr(&x86_64::X86_64Assembler::idivl, "idivl %{reg}"), "idivl");
+}
+
+TEST_F(AssemblerX86_64Test, Divq) {
+  DriverStr(RepeatR(&x86_64::X86_64Assembler::divq, "divq %{reg}"), "divq");
+}
+
+TEST_F(AssemblerX86_64Test, Divl) {
+  DriverStr(Repeatr(&x86_64::X86_64Assembler::divl, "divl %{reg}"), "divl");
 }
 
 TEST_F(AssemblerX86_64Test, Negq) {
@@ -2303,13 +2314,8 @@ class JNIMacroAssemblerX86_64Test : public JNIMacroAssemblerTest<x86_64::X86_64J
   using Base = JNIMacroAssemblerTest<x86_64::X86_64JNIMacroAssembler>;
 
  protected:
-  // Get the typically used name for this architecture, e.g., aarch64, x86-64, ...
-  std::string GetArchitectureString() override {
-    return "x86_64";
-  }
-
-  std::string GetDisassembleParameters() override {
-    return " -D -bbinary -mi386:x86-64 -Mx86-64,addr64,data32 --no-show-raw-insn";
+  InstructionSet GetIsa() override {
+    return InstructionSet::kX86_64;
   }
 
  private:

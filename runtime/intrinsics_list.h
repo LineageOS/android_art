@@ -99,6 +99,7 @@
   V(IntegerReverseBytes, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "reverseBytes", "(I)I") \
   V(IntegerBitCount, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "bitCount", "(I)I") \
   V(IntegerCompare, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "compare", "(II)I") \
+  V(IntegerDivideUnsigned, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kCanThrow, "Ljava/lang/Integer;", "divideUnsigned", "(II)I") \
   V(IntegerHighestOneBit, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "highestOneBit", "(I)I") \
   V(IntegerLowestOneBit, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "lowestOneBit", "(I)I") \
   V(IntegerNumberOfLeadingZeros, kStatic, kNeedsEnvironmentOrCache, kNoSideEffects, kNoThrow, "Ljava/lang/Integer;", "numberOfLeadingZeros", "(I)I") \

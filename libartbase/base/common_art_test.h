@@ -45,7 +45,7 @@ class DexFile;
 
 class ScratchDir {
  public:
-  ScratchDir();
+  explicit ScratchDir(bool keep_files = false);
 
   ~ScratchDir();
 
@@ -55,6 +55,7 @@ class ScratchDir {
 
  private:
   std::string path_;
+  bool keep_files_;  // Useful for debugging.
 
   DISALLOW_COPY_AND_ASSIGN(ScratchDir);
 };
@@ -193,9 +194,6 @@ class CommonArtTestImpl {
   static std::string GetClassPathOption(const char* option,
                                         const std::vector<std::string>& class_path);
 
-  // Returns bin directory which contains host's prebuild tools.
-  static std::string GetAndroidHostToolsDir();
-
   // Retuerns the filename for a test dex (i.e. XandY or ManyMethods).
   std::string GetTestDexFileName(const char* name) const;
 
@@ -248,6 +246,9 @@ class CommonArtTestImpl {
                                        const PostForkFn& post_fork,
                                        std::string* output);
 
+  // Helper - find prebuilt tool (e.g. objdump).
+  static std::string GetAndroidTool(const char* name, InstructionSet isa = InstructionSet::kX86_64);
+
  protected:
   static bool IsHost() {
     return !kIsTargetBuild;
@@ -256,11 +257,8 @@ class CommonArtTestImpl {
   // Returns ${ANDROID_BUILD_TOP}. Ensure it has tailing /.
   static std::string GetAndroidBuildTop();
 
-  // Helper - find directory with the following format:
-  // ${ANDROID_BUILD_TOP}/${subdir1}/${subdir2}-${version}/${subdir3}/bin/
-  static std::string GetAndroidToolsDir(const std::string& subdir1,
-                                        const std::string& subdir2,
-                                        const std::string& subdir3);
+  // Returns ${ANDROID_HOST_OUT}.
+  static std::string GetAndroidHostOut();
 
   // File location to boot.art, e.g. /apex/com.android.art/javalib/boot.art
   static std::string GetCoreArtLocation();
