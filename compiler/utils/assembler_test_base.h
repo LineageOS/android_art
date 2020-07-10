@@ -135,24 +135,22 @@ class AssemblerTestBase : public testing::Test {
   }
 
   virtual std::vector<std::string> GetAssemblerCommand() {
-    InstructionSet isa = GetIsa();
-    switch (isa) {
+    switch (GetIsa()) {
       case InstructionSet::kX86:
-        return {FindTool("clang"), "--compile", "-target", "i386-linux-gnu"};
+        return {FindTool("as"), "--32"};
       case InstructionSet::kX86_64:
-        return {FindTool("clang"), "--compile", "-target", "x86_64-linux-gnu"};
+        return {FindTool("as"), "--64"};
       default:
-        LOG(FATAL) << "Unknown instruction set: " << isa;
-        UNREACHABLE();
+        return {FindTool("as")};
     }
   }
 
   virtual std::vector<std::string> GetDisassemblerCommand() {
     switch (GetIsa()) {
       case InstructionSet::kThumb2:
-        return {FindTool("llvm-objdump"), "--disassemble", "-triple", "thumbv7a-linux-gnueabi"};
+        return {FindTool("objdump"), "--disassemble", "-M", "force-thumb"};
       default:
-        return {FindTool("llvm-objdump"), "--disassemble", "--no-show-raw-insn"};
+        return {FindTool("objdump"), "--disassemble", "--no-show-raw-insn"};
     }
   }
 
