@@ -2281,30 +2281,11 @@ TEST_F(JniInternalTest, NewDirectBuffer_GetDirectBufferAddress_GetDirectBufferCa
   ASSERT_NE(buffer_class, nullptr);
 
   char bytes[1024];
-  jobject direct_buffer = env_->NewDirectByteBuffer(bytes, sizeof(bytes));
-  ASSERT_NE(direct_buffer, nullptr);
-  ASSERT_TRUE(env_->IsInstanceOf(direct_buffer, buffer_class));
-  ASSERT_EQ(env_->GetDirectBufferAddress(direct_buffer), bytes);
-  ASSERT_EQ(env_->GetDirectBufferCapacity(direct_buffer), static_cast<jlong>(sizeof(bytes)));
-
-  // Check we don't crash if a nullptr is passed to field accessors.
-  ASSERT_EQ(env_->GetDirectBufferAddress(nullptr), nullptr);
-  ASSERT_EQ(env_->GetDirectBufferCapacity(nullptr), -1L);
-
-  // Check if j.n.Buffer types backed by heap memory return the invalid values described in the
-  // RETURNS clauses of JNI spec for GetDirectBufferAddress() and GetDirectBufferCapacity().
-  ScopedLocalRef<jclass> bb(env_, env_->FindClass("java/nio/ByteBuffer"));
-  jmethodID bb_allocate = env_->GetStaticMethodID(bb.get(), "allocate", "(I)Ljava/nio/ByteBuffer;");
-  jobject heap_buffer = env_->CallStaticObjectMethod(bb.get(), bb_allocate, 128);
-  ASSERT_NE(heap_buffer, nullptr);
-  ASSERT_EQ(env_->GetDirectBufferAddress(heap_buffer), nullptr);
-  ASSERT_EQ(env_->GetDirectBufferCapacity(heap_buffer), -1L);
-
-  // Check invalid values are returned if the buffer argument has an object type is not a sub-type
-  // of j.n.Buffer.
-  jobject not_buffer = env_->NewStringUTF("A String");
-  ASSERT_EQ(env_->GetDirectBufferAddress(not_buffer), nullptr);
-  ASSERT_EQ(env_->GetDirectBufferCapacity(not_buffer), -1L);
+  jobject buffer = env_->NewDirectByteBuffer(bytes, sizeof(bytes));
+  ASSERT_NE(buffer, nullptr);
+  ASSERT_TRUE(env_->IsInstanceOf(buffer, buffer_class));
+  ASSERT_EQ(env_->GetDirectBufferAddress(buffer), bytes);
+  ASSERT_EQ(env_->GetDirectBufferCapacity(buffer), static_cast<jlong>(sizeof(bytes)));
 
   {
     CheckJniAbortCatcher check_jni_abort_catcher;
