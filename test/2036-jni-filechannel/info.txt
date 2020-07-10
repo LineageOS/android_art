@@ -1,0 +1,2 @@
+Test that GetDirectBufferCapacity works correctly for a mapped buffer
+from a zero length file.
