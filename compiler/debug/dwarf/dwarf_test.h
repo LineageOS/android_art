@@ -86,8 +86,8 @@ class DwarfTest : public CommonCompilerTest {
 
     // Read the elf file back using objdump.
     std::vector<std::string> lines;
-    std::string cmd = GetAndroidHostToolsDir();
-    cmd = cmd + "objdump " + args + " " + file.GetFilename() + " 2>&1";
+    std::string cmd = GetAndroidTool("objdump");
+    cmd = cmd + " " + args + " " + file.GetFilename() + " 2>&1";
     FILE* output = popen(cmd.data(), "r");
     char buffer[1024];
     const char* line;
