@@ -28,7 +28,7 @@ namespace art {
 class PrebuiltToolsTest : public CommonRuntimeTest {
  public:
   static void CheckToolsExist(InstructionSet isa) {
-    const char* tools[] = { "as", "objcopy", "objdump" };
+    const char* tools[] = { "clang", "llvm-objdump" };
     for (const char* tool : tools) {
       std::string path = GetAndroidTool(tool, isa);
       ASSERT_TRUE(OS::FileExists(path.c_str())) << path;
