@@ -641,6 +641,7 @@ cc_defaults {
         "2011-stack-walk-concurrent-instrument/stack_walk_concurrent.cc",
         "2031-zygote-compiled-frame-deopt/native-wait.cc",
         "2033-shutdown-mechanics/native_shutdown.cc",
+        "2036-jni-filechannel/jni_filechannel.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],
