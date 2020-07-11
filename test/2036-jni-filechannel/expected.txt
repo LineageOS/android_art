@@ -1,0 +1,2 @@
+JNI_OnLoad called
+Expected 0 got 0 PASS

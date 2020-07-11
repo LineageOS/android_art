@@ -2520,29 +2520,13 @@ class JNI {
   }
 
   static void* GetDirectBufferAddress(JNIEnv* env, jobject java_buffer) {
-    // Return null if |java_buffer| is not defined.
-    if (java_buffer == nullptr) {
-      return nullptr;
-    }
-
-    // Return null if |java_buffer| is not a java.nio.Buffer instance.
-    if (!IsInstanceOf(env, java_buffer, WellKnownClasses::java_nio_Buffer)) {
-      return nullptr;
-    }
-
-    // Buffer.address is non-null when the |java_buffer| is direct.
     return reinterpret_cast<void*>(env->GetLongField(
-        java_buffer, WellKnownClasses::java_nio_Buffer_address));
+        java_buffer, WellKnownClasses::java_nio_DirectByteBuffer_effectiveDirectAddress));
   }
 
   static jlong GetDirectBufferCapacity(JNIEnv* env, jobject java_buffer) {
-    // Check if |java_buffer| is a direct buffer, bail if not.
-    if (GetDirectBufferAddress(env, java_buffer) == nullptr) {
-      return -1;
-    }
-
     return static_cast<jlong>(env->GetIntField(
-        java_buffer, WellKnownClasses::java_nio_Buffer_capacity));
+        java_buffer, WellKnownClasses::java_nio_DirectByteBuffer_capacity));
   }
 
   static jobjectRefType GetObjectRefType(JNIEnv* env ATTRIBUTE_UNUSED, jobject java_object) {
