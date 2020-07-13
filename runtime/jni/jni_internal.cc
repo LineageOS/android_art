@@ -2519,14 +2519,43 @@ class JNI {
     return static_cast<JNIEnvExt*>(env)->self_->IsExceptionPending() ? nullptr : result;
   }
 
+  ALWAYS_INLINE static jboolean IsJavaNioBufferInstance(JNIEnv* env, jobject java_buffer) {
+    if (UNLIKELY(java_buffer == nullptr)) {
+      return JNI_FALSE;
+    }
+    return IsInstanceOf(env, java_buffer, WellKnownClasses::java_nio_Buffer);
+  }
+
   static void* GetDirectBufferAddress(JNIEnv* env, jobject java_buffer) {
-    return reinterpret_cast<void*>(env->GetLongField(
-        java_buffer, WellKnownClasses::java_nio_DirectByteBuffer_effectiveDirectAddress));
+    if (UNLIKELY(!IsJavaNioBufferInstance(env, java_buffer))) {
+      return nullptr;
+    }
+
+    // Buffer.address is non-null when the |java_buffer| is direct.
+    return reinterpret_cast<void*>(env->GetLongField(java_buffer,
+                                                     WellKnownClasses::java_nio_Buffer_address));
   }
 
   static jlong GetDirectBufferCapacity(JNIEnv* env, jobject java_buffer) {
-    return static_cast<jlong>(env->GetIntField(
-        java_buffer, WellKnownClasses::java_nio_DirectByteBuffer_capacity));
+    if (UNLIKELY(!IsJavaNioBufferInstance(env, java_buffer))) {
+      return -1;
+    }
+
+    // Fast-path check for whether buffer is direct: if buffer has an address it is direct.
+    if (UNLIKELY(env->GetLongField(java_buffer, WellKnownClasses::java_nio_Buffer_address) != 0L)) {
+      // When checking the buffer capacity, it's important to note that a zero-sized direct buffer
+      // may have a null address field. This means we can't tell whether it is direct or not based
+      // just on the address, we need to call Buffer.isDirect() to be sure. One path that creates
+      // such a buffer is FileChannel.map(): when the mapped file size is zero, a MappedByteBuffer
+      // is created with zero capacity and a null address field (b/122025675).
+      jboolean direct = env->CallBooleanMethod(java_buffer,
+                                               WellKnownClasses::java_nio_Buffer_isDirect);
+      if (!direct) {
+        return -1;
+      }
+    }
+    return static_cast<jlong>(env->GetIntField(java_buffer,
+                                               WellKnownClasses::java_nio_Buffer_capacity));
   }
 
   static jobjectRefType GetObjectRefType(JNIEnv* env ATTRIBUTE_UNUSED, jobject java_object) {
