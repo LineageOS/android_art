@@ -28,11 +28,251 @@ fi
 
 me=$(basename "$0")
 
+# Known failing tests.
+# TODO(rpl): Investigate and address the causes of failures.
+known_failing_tests=(
+  art-run-test-004-SignalTest
+  art-run-test-004-UnsafeTest
+  art-run-test-030-bad-finalizer
+  art-run-test-034-call-null
+  art-run-test-038-inner-null
+  art-run-test-044-proxy
+  art-run-test-051-thread
+  art-run-test-054-uncaught
+  art-run-test-086-null-super
+  art-run-test-087-gc-after-link
+  art-run-test-096-array-copy-concurrent-gc
+  art-run-test-115-native-bridge
+  art-run-test-116-nodex2oat
+  art-run-test-1336-short-finalizer-timeout
+  art-run-test-1337-gc-coverage
+  art-run-test-1339-dead-reference-safe
+  art-run-test-134-nodex2oat-nofallback
+  art-run-test-136-daemon-jni-shutdown
+  art-run-test-139-register-natives
+  art-run-test-148-multithread-gc-annotations
+  art-run-test-149-suspend-all-stress
+  art-run-test-150-loadlibrary
+  art-run-test-154-gc-loop
+  art-run-test-158-app-image-class-table
+  art-run-test-169-threadgroup-jni
+  art-run-test-172-app-image-twice
+  art-run-test-177-visibly-initialized-deadlock
+  art-run-test-178-app-image-native-method
+  art-run-test-179-nonvirtual-jni
+  art-run-test-1900-track-alloc
+  art-run-test-1901-get-bytecodes
+  art-run-test-1902-suspend
+  art-run-test-1903-suspend-self
+  art-run-test-1904-double-suspend
+  art-run-test-1905-suspend-native
+  art-run-test-1906-suspend-list-me-first
+  art-run-test-1907-suspend-list-self-twice
+  art-run-test-1908-suspend-native-resume-self
+  art-run-test-1909-per-agent-tls
+  art-run-test-1910-transform-with-default
+  art-run-test-1911-get-local-var-table
+  art-run-test-1912-get-set-local-primitive
+  art-run-test-1913-get-set-local-objects
+  art-run-test-1914-get-local-instance
+  art-run-test-1915-get-set-local-current-thread
+  art-run-test-1916-get-set-current-frame
+  art-run-test-1917-get-stack-frame
+  art-run-test-1919-vminit-thread-start-timing
+  art-run-test-1920-suspend-native-monitor
+  art-run-test-1921-suspend-native-recursive-monitor
+  art-run-test-1922-owned-monitors-info
+  art-run-test-1923-frame-pop
+  art-run-test-1924-frame-pop-toggle
+  art-run-test-1925-self-frame-pop
+  art-run-test-1926-missed-frame-pop
+  art-run-test-1927-exception-event
+  art-run-test-1928-exception-event-exception
+  art-run-test-1930-monitor-info
+  art-run-test-1931-monitor-events
+  art-run-test-1932-monitor-events-misc
+  art-run-test-1933-monitor-current-contended
+  art-run-test-1934-jvmti-signal-thread
+  art-run-test-1935-get-set-current-frame-jit
+  art-run-test-1936-thread-end-events
+  art-run-test-1937-transform-soft-fail
+  art-run-test-1938-transform-abstract-single-impl
+  art-run-test-1939-proxy-frames
+  art-run-test-1941-dispose-stress
+  art-run-test-1942-suspend-raw-monitor-exit
+  art-run-test-1943-suspend-raw-monitor-wait
+  art-run-test-1945-proxy-method-arguments
+  art-run-test-1947-breakpoint-redefine-deopt
+  art-run-test-1949-short-dex-file
+  art-run-test-1951-monitor-enter-no-suspend
+  art-run-test-1953-pop-frame
+  art-run-test-1954-pop-frame-jit
+  art-run-test-1955-pop-frame-jit-called
+  art-run-test-1956-pop-frame-jit-calling
+  art-run-test-1957-error-ext
+  art-run-test-1958-transform-try-jit
+  art-run-test-1959-redefine-object-instrument
+  art-run-test-1960-obsolete-jit-multithread-native
+  art-run-test-1961-obsolete-jit-multithread
+  art-run-test-1962-multi-thread-events
+  art-run-test-1963-add-to-dex-classloader-in-memory
+  art-run-test-1967-get-set-local-bad-slot
+  art-run-test-1968-force-early-return
+  art-run-test-1969-force-early-return-void
+  art-run-test-1970-force-early-return-long
+  art-run-test-1971-multi-force-early-return
+  art-run-test-1972-jni-id-swap-indices
+  art-run-test-1973-jni-id-swap-pointer
+  art-run-test-1974-resize-array
+  art-run-test-1975-hello-structural-transformation
+  art-run-test-1976-hello-structural-static-methods
+  art-run-test-1977-hello-structural-obsolescence
+  art-run-test-1978-regular-obsolete-then-structural-obsolescence
+  art-run-test-1979-threaded-structural-transformation
+  art-run-test-1980-obsolete-object-cleared
+  art-run-test-1982-no-virtuals-structural-redefinition
+  art-run-test-1984-structural-redefine-field-trace
+  art-run-test-1985-structural-redefine-stack-scope
+  art-run-test-1986-structural-redefine-multi-thread-stack-scope
+  art-run-test-1987-structural-redefine-recursive-stack-scope
+  art-run-test-1988-multi-structural-redefine
+  art-run-test-1989-transform-bad-monitor
+  art-run-test-1990-structural-bad-verify
+  art-run-test-1991-hello-structural-retransform
+  art-run-test-1992-retransform-no-such-field
+  art-run-test-1993-fallback-non-structural
+  art-run-test-1994-final-virtual-structural
+  art-run-test-1995-final-virtual-structural-multithread
+  art-run-test-1996-final-override-virtual-structural
+  art-run-test-1997-structural-shadow-method
+  art-run-test-1998-structural-shadow-field
+  art-run-test-1999-virtual-structural
+  art-run-test-2003-double-virtual-structural
+  art-run-test-2004-double-virtual-structural-abstract
+  art-run-test-2005-pause-all-redefine-multithreaded
+  art-run-test-2008-redefine-then-old-reflect-field
+  art-run-test-2011-stack-walk-concurrent-instrument
+  art-run-test-203-multi-checkpoint
+  art-run-test-2031-zygote-compiled-frame-deopt
+  art-run-test-2033-shutdown-mechanics
+  art-run-test-2036-jni-filechannel
+  art-run-test-305-other-fault-handler
+  art-run-test-449-checker-bce
+  art-run-test-454-get-vreg
+  art-run-test-461-get-reference-vreg
+  art-run-test-466-get-live-vreg
+  art-run-test-497-inlining-and-class-loader
+  art-run-test-530-regression-lse
+  art-run-test-555-UnsafeGetLong-regression
+  art-run-test-566-polymorphic-inlining
+  art-run-test-595-profile-saving
+  art-run-test-597-deopt-busy-loop
+  art-run-test-597-deopt-invoke-stub
+  art-run-test-597-deopt-new-string
+  art-run-test-602-deoptimizeable
+  art-run-test-604-hot-static-interface
+  art-run-test-616-cha-abstract
+  art-run-test-616-cha-interface
+  art-run-test-616-cha-miranda
+  art-run-test-616-cha-native
+  art-run-test-616-cha-regression-proxy-method
+  art-run-test-616-cha
+  art-run-test-623-checker-loop-regressions
+  art-run-test-626-set-resolved-string
+  art-run-test-629-vdex-speed
+  art-run-test-638-checker-inline-cache-intrinsic
+  art-run-test-642-fp-callees
+  art-run-test-647-jni-get-field-id
+  art-run-test-652-deopt-intrinsic
+  art-run-test-655-jit-clinit
+  art-run-test-656-loop-deopt
+  art-run-test-660-clinit
+  art-run-test-661-oat-writer-layout
+  art-run-test-664-aget-verifier
+  art-run-test-667-jit-jni-stub
+  art-run-test-674-hotness-compiled
+  art-run-test-679-locks
+  art-run-test-680-checker-deopt-dex-pc-0
+  art-run-test-685-deoptimizeable
+  art-run-test-687-deopt
+  art-run-test-689-zygote-jit-deopt
+  art-run-test-693-vdex-inmem-loader-evict
+  art-run-test-707-checker-invalid-profile
+  art-run-test-708-jit-cache-churn
+  art-run-test-717-integer-value-of
+  art-run-test-720-thread-priority
+  art-run-test-900-hello-plugin
+  art-run-test-901-hello-ti-agent
+  art-run-test-902-hello-transformation
+  art-run-test-903-hello-tagging
+  art-run-test-904-object-allocation
+  art-run-test-905-object-free
+  art-run-test-906-iterate-heap
+  art-run-test-907-get-loaded-classes
+  art-run-test-908-gc-start-finish
+  art-run-test-910-methods
+  art-run-test-911-get-stack-trace
+  art-run-test-913-heaps
+  art-run-test-914-hello-obsolescence
+  art-run-test-915-obsolete-2
+  art-run-test-916-obsolete-jit
+  art-run-test-917-fields-transformation
+  art-run-test-918-fields
+  art-run-test-919-obsolete-fields
+  art-run-test-920-objects
+  art-run-test-921-hello-failure
+  art-run-test-922-properties
+  art-run-test-923-monitors
+  art-run-test-924-threads
+  art-run-test-925-threadgroups
+  art-run-test-926-multi-obsolescence
+  art-run-test-927-timers
+  art-run-test-928-jni-table
+  art-run-test-930-hello-retransform
+  art-run-test-931-agent-thread
+  art-run-test-932-transform-saves
+  art-run-test-933-misc-events
+  art-run-test-937-hello-retransform-package
+  art-run-test-939-hello-transformation-bcp
+  art-run-test-940-recursive-obsolete
+  art-run-test-941-recursive-obsolete-jit
+  art-run-test-942-private-recursive
+  art-run-test-943-private-recursive-jit
+  art-run-test-944-transform-classloaders
+  art-run-test-945-obsolete-native
+  art-run-test-946-obsolete-throw
+  art-run-test-947-reflect-method
+  art-run-test-949-in-memory-transform
+  art-run-test-950-redefine-intrinsic
+  art-run-test-951-threaded-obsolete
+  art-run-test-982-ok-no-retransform
+  art-run-test-983-source-transform-verify
+  art-run-test-984-obsolete-invoke
+  art-run-test-985-re-obsolete
+  art-run-test-986-native-method-bind
+  art-run-test-987-agent-bind
+  art-run-test-988-method-trace
+  art-run-test-989-method-trace-throw
+  art-run-test-990-field-trace
+  art-run-test-991-field-trace-2
+  art-run-test-992-source-data
+  art-run-test-993-breakpoints
+  art-run-test-994-breakpoint-line
+  art-run-test-995-breakpoints-throw
+  art-run-test-996-breakpoint-obsolete
+  art-run-test-997-single-step
+)
+
 cd "$ANDROID_BUILD_TOP/art"
 
 tests_dir=test
-num_gen_bp_files=0
 num_tests=0
+
+# List of tests for which a Blueprint file is generated.
+declare -a handled_tests
+
+# Regenerate Blueprint files.
+# ---------------------------
 
 while read run_test; do
   ((++num_tests))
@@ -62,18 +302,71 @@ while read run_test; do
   # Ignore tests with Hidden API specs.
   [[ -f "$tests_dir/$run_test/hiddenapi-flags.csv" ]] && continue
 
+  run_test_name="art-run-test-$run_test"
   cat >"$bp_file" <<EOF
 // Generated by \`$me\`. Do not edit manually.
 java_test {
-    name: "art-run-test-$run_test",
+    name: "$run_test_name",
     defaults: ["art-run-test-defaults"],
     srcs: ["src/**/*.java"],
 }
 EOF
-  ((++num_gen_bp_files))
+  # Record test name.
+  handled_tests+=("$run_test_name")
 done <<< $(ls -1 $tests_dir | grep -E '^[0-9]{3,}-')
 
-percentage=$((num_gen_bp_files * 100 / num_tests))
+handled_tests_percentage=$((${#handled_tests[@]} * 100 / num_tests))
 
-echo "Generated Blueprint files for $num_gen_bp_files ART run-tests ouf of $num_tests" \
-  "($percentage%)."
+echo "Generated Blueprint files for ${#handled_tests[@]} ART run-tests ouf of $num_tests" \
+  "($handled_tests_percentage%)."
+
+# Regenerate `TEST_MAPPING` file.
+# -------------------------------
+
+# Complement of `known_failing_tests` in `handled_tests`.
+declare -a expected_succeeding_tests
+for run_test in "${handled_tests[@]}"; do
+  for fail in "${known_failing_tests[@]}"; do
+    [[ "$run_test" == "$fail" ]] && continue 2
+  done
+  expected_succeeding_tests+=("$run_test")
+done
+
+# Prologue.
+cat >TEST_MAPPING <<EOF
+// Generated by \`$me\`. Do not edit manually.
+{
+  "presubmit": [
+    {
+      "name": "CtsJdwpTestCases"
+    }
+  ],
+  "postsubmit": [
+    {
+      "name": "ArtGtestsTarget"
+    }
+  ],
+  "art-run-tests": [
+EOF
+# Only include tests expected to succeed for now.
+trailer=,
+for ((i=0; i < ${#expected_succeeding_tests[@]}; ++i)); do
+  # Do not print a trailing comma for the last test (JSON does not allow
+  # superfluous trailing commas).
+  [[ $((i + 1)) -eq ${#expected_succeeding_tests[@]} ]] && trailer=
+  cat >>TEST_MAPPING <<EOF
+    {
+      "name": "${expected_succeeding_tests[$i]}"
+    }$trailer
+EOF
+done
+# Epilogue.
+cat >>TEST_MAPPING <<EOF
+  ]
+}
+EOF
+
+expected_succeeding_tests_percentage=$((${#expected_succeeding_tests[@]} * 100 / num_tests))
+
+echo "Generated TEST_MAPPING entries for ${#expected_succeeding_tests[@]} ART run-tests ouf of" \
+  "$num_tests ($expected_succeeding_tests_percentage%)."
