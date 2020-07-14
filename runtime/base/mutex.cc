@@ -457,7 +457,8 @@ void Mutex::ExclusiveLock(Thread* self) {
             SleepIfRuntimeDeleted(self);
             // Retry until not held. In heavy contention situations we otherwise get redundant
             // futex wakeups as a result of repeatedly decrementing and incrementing contenders.
-          } while ((state_and_contenders_.load(std::memory_order_relaxed) & kHeldMask) != 0);
+            cur_state = state_and_contenders_.load(std::memory_order_relaxed);
+          } while ((cur_state & kHeldMask) != 0);
           decrement_contenders();
         }
       }
