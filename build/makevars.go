@@ -20,12 +20,21 @@ import (
 	"strings"
 
 	"android/soong/android"
-	"android/soong/cc/config"
 )
 
 var (
-	pctx                  = android.NewPackageContext("android/soong/art")
-	prebuiltToolsForTests = []string{"as", "addr2line", "objdump"}
+	pctx = android.NewPackageContext("android/soong/art")
+
+	// Copy the following prebuilts to the testcases directory.
+	// The original prebuilts directory is not accessible when running tests remotely.
+	prebuiltToolsForTests = []string{
+		"bin/clang",
+		"bin/clang.real",
+		"bin/llvm-addr2line",
+		"bin/llvm-dwarfdump",
+		"bin/llvm-objdump",
+		"lib64/libc++.so.1",
+	}
 )
 
 func init() {
@@ -58,23 +67,14 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 	ctx.Strict("ART_TESTCASES_CONTENT", strings.Join(copy_cmds, " "))
 
 	// Add prebuilt tools.
+	clang_path, err := ctx.Eval("${config.ClangPath}")
+	if err != nil {
+		panic(err)
+	}
 	copy_cmds = []string{}
-	for _, cmd := range prebuiltToolsForTests {
-		target := ctx.Config().Targets[android.BuildOs][0]
-		toolchain := config.FindToolchain(target.Os, target.Arch)
-		gccRoot, gccTriple := toolchain.GccRoot(), toolchain.GccTriple()
-		eval := func(path ...string) string {
-			result, err := ctx.Eval(filepath.Join(path...))
-			if err != nil {
-				panic(err)
-			}
-			return result
-		}
-		src := eval(gccRoot, "bin", gccTriple+"-"+cmd)
-		// Different tests use different paths, so we need to copy to two locations.
-		// TODO: Unify the test code so that this is no longer necessary.
-		copy_cmds = append(copy_cmds, src+":"+eval(gccRoot, "bin", gccTriple+"-"+cmd))
-		copy_cmds = append(copy_cmds, src+":"+eval(gccRoot, gccTriple, "bin", cmd))
+	for _, tool := range prebuiltToolsForTests {
+		src := filepath.Join(clang_path, "/", tool)
+		copy_cmds = append(copy_cmds, src+":"+src)
 	}
 	ctx.Strict("ART_TESTCASES_PREBUILT_CONTENT", strings.Join(copy_cmds, " "))
 }
