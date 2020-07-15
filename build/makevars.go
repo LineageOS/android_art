@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"android/soong/android"
+	"android/soong/cc/config"
 )
 
 var (
@@ -67,10 +68,7 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 	ctx.Strict("ART_TESTCASES_CONTENT", strings.Join(copy_cmds, " "))
 
 	// Add prebuilt tools.
-	clang_path, err := ctx.Eval("${config.ClangPath}")
-	if err != nil {
-		panic(err)
-	}
+	clang_path := filepath.Join(config.ClangDefaultBase, ctx.Config().PrebuiltOS(), config.ClangDefaultVersion)
 	copy_cmds = []string{}
 	for _, tool := range prebuiltToolsForTests {
 		src := filepath.Join(clang_path, "/", tool)
