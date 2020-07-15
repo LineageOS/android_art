@@ -300,24 +300,8 @@ void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
 
 // Get prebuilt binary tool.
 // The paths need to be updated when Android prebuilts update.
-std::string CommonArtTestImpl::GetAndroidTool(const char* name, InstructionSet isa) {
-  std::string path = GetAndroidBuildTop() + "prebuilts/gcc/linux-x86/";
-  switch (isa) {
-    case InstructionSet::kX86:
-    case InstructionSet::kX86_64:
-      path += "host/x86_64-linux-glibc2.17-4.8/x86_64-linux/bin/";
-      break;
-    case InstructionSet::kArm:
-    case InstructionSet::kThumb2:
-      path += "arm/arm-linux-androideabi-4.9/arm-linux-androideabi/bin/";
-      break;
-    case InstructionSet::kArm64:
-      path += "aarch64/aarch64-linux-android-4.9/aarch64-linux-android/bin/";
-      break;
-    default:
-      LOG(FATAL) << "Unknown ISA: " << isa;
-      break;
-  }
+std::string CommonArtTestImpl::GetAndroidTool(const char* name, InstructionSet) {
+  std::string path = GetAndroidBuildTop() + "prebuilts/clang/host/linux-x86/clang-r383902b/bin/";
   CHECK(OS::DirectoryExists(path.c_str())) << path;
   path += name;
   CHECK(OS::FileExists(path.c_str())) << path;
