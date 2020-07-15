@@ -1279,6 +1279,27 @@ public class Main {
     return a[0] + (a[0] & 0xff);
   }
 
+  /// CHECK-START: void Main.$noinline$testThrowingArraySet(java.lang.Object[], java.lang.Object) load_store_elimination (before)
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+
+  /// CHECK-START: void Main.$noinline$testThrowingArraySet(java.lang.Object[], java.lang.Object) load_store_elimination (after)
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  private static void $noinline$testThrowingArraySet(Object[] a, Object o) {
+    Object olda0 = a[0];
+    a[0] = null;
+    a[1] = olda0;
+    a[0] = o;
+    a[1] = null;
+  }
+
   static void assertIntEquals(int result, int expected) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result);
@@ -1422,6 +1443,18 @@ public class Main {
     assertIntEquals(testLocalArrayMerge3(false), 1);
     assertIntEquals(testLocalArrayMerge4(true), 2);
     assertIntEquals(testLocalArrayMerge4(false), 2);
+
+    TestClass[] tca = new TestClass[] { new TestClass(), null };
+    try {
+      $noinline$testThrowingArraySet(tca, new TestClass2());
+    } catch (ArrayStoreException expected) {
+      if (tca[0] != null) {
+        throw new Error("tca[0] is not null");
+      }
+      if (tca[1] == null) {
+        throw new Error("tca[1] is null");
+      }
+    }
   }
 
   static boolean sFlag;
