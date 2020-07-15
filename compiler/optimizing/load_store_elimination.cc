@@ -648,6 +648,9 @@ class LSEVisitor : public HGraphDelegateVisitor {
       instruction->GetBlock()->RemoveInstruction(instruction);
       return;
     } else {
+      if (instruction->CanThrow()) {
+        HandleExit(instruction->GetBlock());
+      }
       HLoopInformation* loop_info = instruction->GetBlock()->GetLoopInformation();
       if (loop_info == nullptr) {
         // Store is not in a loop. We try to precisely track the heap value by
