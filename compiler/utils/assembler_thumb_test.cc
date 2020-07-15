@@ -18,8 +18,10 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
+
 #include <fstream>
 #include <map>
+#include <regex>
 
 #include "gtest/gtest.h"
 
@@ -51,10 +53,15 @@ class ArmVIXLAssemblerTest : public AssemblerTestBase {
     std::string disassembly;
     ASSERT_TRUE(Disassemble(obj_file, &disassembly));
 
+    // objdump on buildbot seems to sometimes add annotation like in "bne #226 <.text+0x1e8>".
+    // It is unclear why it does not reproduce locally. As work-around, remove the annotation.
+    std::regex annotation_re(" <\\.text\\+\\w+>");
+    disassembly = std::regex_replace(disassembly, annotation_re, "");
+
     std::string expected2 = "\n" +
-        obj_file + ":     file format elf32-littlearm\n\n\n"
+        obj_file + ": file format ELF32-arm-little\n\n\n"
         "Disassembly of section .text:\n\n"
-        "00000000 <.text>:\n" +
+        "00000000 .text:\n" +
         expected;
     EXPECT_EQ(expected2, disassembly);
     if (expected2 != disassembly) {
