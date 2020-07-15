@@ -17,6 +17,7 @@ package art
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -25,6 +26,7 @@ import (
 	"android/soong/android"
 	"android/soong/apex"
 	"android/soong/cc"
+	"android/soong/cc/config"
 )
 
 var supportedArches = []string{"arm", "arm64", "x86", "x86_64"}
@@ -166,6 +168,9 @@ func hostFlags(ctx android.LoadHookContext) []string {
 		// We enable full sanitization on the host by default.
 		cflags = append(cflags, "-DART_ENABLE_ADDRESS_SANITIZER=1")
 	}
+
+	clang_path := filepath.Join(config.ClangDefaultBase, ctx.Config().PrebuiltOS(), config.ClangDefaultVersion)
+	cflags = append(cflags, "-DART_CLANG_PATH=\""+clang_path+"\"")
 
 	return cflags
 }

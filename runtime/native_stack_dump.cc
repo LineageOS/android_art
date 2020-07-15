@@ -69,14 +69,12 @@ using android::base::StringPrintf;
 static constexpr bool kUseAddr2line = !kIsTargetBuild;
 
 std::string FindAddr2line() {
-  if (!kIsTargetBuild) {
-    constexpr const char* kAddr2linePrebuiltPath =
-      "/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-addr2line";
-    const char* env_value = getenv("ANDROID_BUILD_TOP");
-    if (env_value != nullptr) {
-      return std::string(env_value) + kAddr2linePrebuiltPath;
-    }
+#ifndef ART_TARGET_ANDROID
+  const char* env_value = getenv("ANDROID_BUILD_TOP");
+  if (env_value != nullptr) {
+    return std::string(env_value) + "/" + ART_CLANG_PATH + "/bin/llvm-addr2line";
   }
+#endif
   return std::string("/usr/bin/addr2line");
 }
 
@@ -274,7 +272,7 @@ static void Addr2line(const std::string& map_src,
   }
 
   // Send the offset.
-  const std::string hex_offset = StringPrintf("%zx\n", offset);
+  const std::string hex_offset = StringPrintf("0x%zx\n", offset);
 
   if (!pipe_ptr->out.WriteFully(hex_offset.data(), hex_offset.length())) {
     // Error. :-(
