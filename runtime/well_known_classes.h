@@ -88,7 +88,6 @@ struct WellKnownClasses {
   static jclass java_lang_Thread;
   static jclass java_lang_ThreadGroup;
   static jclass java_lang_Throwable;
-  static jclass java_nio_Buffer;
   static jclass java_nio_ByteBuffer;
   static jclass java_nio_DirectByteBuffer;
   static jclass java_util_Collections;
@@ -167,7 +166,6 @@ struct WellKnownClasses {
   static jfieldID java_lang_Throwable_stackState;
   static jfieldID java_lang_Throwable_suppressedExceptions;
   static jfieldID java_nio_Buffer_address;
-  static jfieldID java_nio_Buffer_capacity;
   static jfieldID java_nio_Buffer_elementSizeShift;
   static jfieldID java_nio_Buffer_limit;
   static jfieldID java_nio_Buffer_position;
@@ -176,6 +174,8 @@ struct WellKnownClasses {
   static jfieldID java_nio_ByteBuffer_isReadOnly;
   static jfieldID java_nio_ByteBuffer_limit;
   static jfieldID java_nio_ByteBuffer_offset;
+  static jfieldID java_nio_DirectByteBuffer_capacity;
+  static jfieldID java_nio_DirectByteBuffer_effectiveDirectAddress;
 
   static jfieldID java_util_Collections_EMPTY_LIST;
   static jfieldID libcore_util_EmptyArray_STACK_TRACE_ELEMENT;
