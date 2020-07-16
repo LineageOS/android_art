@@ -20,14 +20,13 @@
 #include <cstddef>
 
 #include "android-base/stringprintf.h"
+
 #include "arch/context.h"
 #include "art_method-inl.h"
 #include "base/enums.h"
 #include "base/stl_util.h"
 #include "class_linker-inl.h"
 #include "class_root-inl.h"
-#include "code_simulator.h"
-#include "code_simulator_container.h"
 #include "debugger.h"
 #include "dex/class_accessor-inl.h"
 #include "dex/descriptors_names.h"
@@ -100,11 +99,6 @@ ArtMethod* ArtMethod::GetSingleImplementation(PointerSize pointer_size) {
     return this;
   }
   return reinterpret_cast<ArtMethod*>(GetDataPtrSize(pointer_size));
-}
-
-bool ArtMethod::CanBeSimulated() REQUIRES_SHARED(Locks::mutator_lock_) {
-  CodeSimulatorContainer* simulator = Thread::Current()->GetSimulator();
-  return simulator->Get()->CanSimulate(this);
 }
 
 ArtMethod* ArtMethod::FromReflectedMethod(const ScopedObjectAccessAlreadyRunnable& soa,
@@ -361,9 +355,7 @@ void ArtMethod::Invoke(Thread* self, uint32_t* args, uint32_t args_size, JValue*
       }
 
       // Ensure that we won't be accidentally calling quick compiled code when -Xint.
-      if (kIsDebugBuild &&
-          runtime->GetInstrumentation()->IsForcedInterpretOnly() &&
-          !Runtime::SimulatorMode()) {
+      if (kIsDebugBuild && runtime->GetInstrumentation()->IsForcedInterpretOnly()) {
         CHECK(!runtime->UseJitCompilation());
         const void* oat_quick_code =
             (IsNative() || !IsInvokable() || IsProxyMethod() || IsObsolete())
@@ -373,10 +365,7 @@ void ArtMethod::Invoke(Thread* self, uint32_t* args, uint32_t args_size, JValue*
             << "Don't call compiled code when -Xint " << PrettyMethod();
       }
 
-      if (Runtime::SimulatorMode() && CanBeSimulated()) {
-        CodeSimulatorContainer* simulator = Thread::Current()->GetSimulator();
-        simulator->Get()->Invoke(this, args, args_size, self, result, shorty, IsStatic());
-      } else if (!IsStatic()) {
+      if (!IsStatic()) {
         (*art_quick_invoke_stub)(this, args, args_size, self, result, shorty);
       } else {
         (*art_quick_invoke_static_stub)(this, args, args_size, self, result, shorty);
@@ -578,10 +567,6 @@ const OatQuickMethodHeader* ArtMethod::GetOatQuickMethodHeader(uintptr_t pc) {
   DCHECK_NE(pc, reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc()));
 
   if (IsRuntimeMethod()) {
-    return nullptr;
-  }
-
-  if (Runtime::SimulatorMode()) {
     return nullptr;
   }
 

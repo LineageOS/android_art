@@ -143,10 +143,8 @@ static jobjectArray VMClassLoader_getBootClassPathEntries(JNIEnv* env, jclass) {
     const DexFile* dex_file = path[i];
 
     // For multidex locations, e.g., x.jar!classes2.dex, we want to look into x.jar.
-    std::string location(DexFileLoader::GetBaseLocation(dex_file->GetLocation()));
-    if (Runtime::SimulatorMode()) {
-      location = getenv("ANDROID_PRODUCT_OUT") + location;
-    }
+    const std::string location(DexFileLoader::GetBaseLocation(dex_file->GetLocation()));
+
     ScopedLocalRef<jstring> javaPath(env, env->NewStringUTF(location.c_str()));
     if (javaPath.get() == nullptr) {
       DCHECK(env->ExceptionCheck());
