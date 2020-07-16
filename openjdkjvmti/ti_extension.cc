@@ -599,15 +599,16 @@ jvmtiError ExtensionUtil::GetExtensionEvents(jvmtiEnv* env,
   jvmtiError error;
   error = add_extension(
       ArtJvmtiEvent::kDdmPublishChunk,
-      "com.android.art.internal.ddm.publish_chunk",
+      "com.android.art.internal.ddm.publish_chunk_safe",
       "Called when there is new ddms information that the agent or other clients can use. The"
       " agent is given the 'type' of the ddms chunk and a 'data_size' byte-buffer in 'data'."
       " The 'data' pointer is only valid for the duration of the publish_chunk event. The agent"
       " is responsible for interpreting the information present in the 'data' buffer. This is"
       " provided for backwards-compatibility support only. Agents should prefer to use relevant"
-      " JVMTI events and functions above listening for this event.",
+      " JVMTI events and functions above listening for this event. Previous publish_chunk"
+      " event was inherently unsafe since using the JNIEnv could cause deadlocks in some scenarios."
+      " The current version does not have these issues.",
       {
-        { "jni_env", JVMTI_KIND_IN_PTR, JVMTI_TYPE_JNIENV, false },
         { "type", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
         { "data_size", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
         { "data",  JVMTI_KIND_IN_BUF, JVMTI_TYPE_JBYTE, false },
