@@ -18,8 +18,14 @@
 #define ART_SIMULATOR_INCLUDE_CODE_SIMULATOR_H_
 
 #include "arch/instruction_set.h"
+#include "runtime.h"
 
 namespace art {
+
+class ArtMethod;
+union JValue;
+class Thread;
+struct QuickEntryPoints;
 
 class CodeSimulator {
  public:
@@ -34,6 +40,13 @@ class CodeSimulator {
   virtual bool GetCReturnBool() const = 0;
   virtual int32_t GetCReturnInt32() const = 0;
   virtual int64_t GetCReturnInt64() const = 0;
+
+  virtual bool CanSimulate(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) = 0;
+  virtual void Invoke(ArtMethod* method, uint32_t* args, uint32_t args_size, Thread* self,
+                      JValue* result, const char* shorty, bool isStatic)
+      REQUIRES_SHARED(Locks::mutator_lock_) = 0;
+
+  virtual void InitEntryPoints(QuickEntryPoints* qpoints) = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(CodeSimulator);

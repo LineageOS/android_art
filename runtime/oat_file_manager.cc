@@ -236,10 +236,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
     std::unique_ptr<ClassLoaderContext> context(
         ClassLoaderContext::CreateContextForClassLoader(class_loader, dex_elements));
 
-    OatFileAssistant oat_file_assistant(dex_location,
-                                        kRuntimeISA,
-                                        runtime->GetOatFilesExecutable(),
-                                        only_use_system_oat_files_);
+  OatFileAssistant oat_file_assistant(dex_location,
+                                      Runtime::GetQuickCodeISA(),
+                                      runtime->GetOatFilesExecutable(),
+                                      only_use_system_oat_files_);
 
     // Get the oat file on disk.
     std::unique_ptr<const OatFile> oat_file(oat_file_assistant.GetBestOatFile().release());
