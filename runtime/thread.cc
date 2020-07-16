@@ -57,6 +57,8 @@
 #include "base/utils.h"
 #include "class_linker-inl.h"
 #include "class_root-inl.h"
+#include "code_simulator.h"
+#include "code_simulator_container.h"
 #include "debugger.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
@@ -164,6 +166,15 @@ void Thread::SetIsGcMarkingAndUpdateEntrypoints(bool is_marking) {
   UpdateReadBarrierEntrypoints(&tlsPtr_.quick_entrypoints, /* is_active= */ is_marking);
 }
 
+void Thread::InitSimulator() {
+  tlsPtr_.simulator = new CodeSimulatorContainer(Runtime::Current()->GetSimulateISA());
+}
+
+CodeSimulatorContainer* Thread::GetSimulator() {
+  DCHECK(tlsPtr_.simulator != nullptr);
+  return tlsPtr_.simulator;
+}
+
 void Thread::InitTlsEntryPoints() {
   ScopedTrace trace("InitTlsEntryPoints");
   // Insert a placeholder so we can easily tell if we call an unimplemented entry point.
@@ -174,6 +185,14 @@ void Thread::InitTlsEntryPoints() {
     *it = reinterpret_cast<uintptr_t>(UnimplementedEntryPoint);
   }
   InitEntryPoints(&tlsPtr_.jni_entrypoints, &tlsPtr_.quick_entrypoints);
+
+  // Initialize entry points for simulator because some entry points are not needed in normal run,
+  // but required in simulator mode.
+  if (Runtime::SimulatorMode()) {
+    CodeSimulatorContainer *simulator = GetSimulator();
+    DCHECK(simulator->CanSimulate());
+    simulator->Get()->InitEntryPoints(&tlsPtr_.quick_entrypoints);
+  }
 }
 
 void Thread::ResetQuickAllocEntryPointsForThread() {
@@ -934,6 +953,9 @@ bool Thread::Init(ThreadList* thread_list, JavaVMExt* java_vm, JNIEnvExt* jni_en
     return false;
   }
   InitCpu();
+  if (Runtime::SimulatorMode()) {
+    InitSimulator();
+  }
   InitTlsEntryPoints();
   RemoveSuspendTrigger();
   InitCardTable();
@@ -2486,6 +2508,10 @@ Thread::~Thread() {
 
   if (initialized) {
     CleanupCpu();
+  }
+
+  if (tlsPtr_.simulator != nullptr) {
+    delete tlsPtr_.simulator;
   }
 
   delete tlsPtr_.instrumentation_stack;
