@@ -109,6 +109,7 @@ TEST_F(ParsedOptionsTest, ParsedOptions) {
   EXPECT_FALSE(VLOG_IS_ON(startup));
   EXPECT_FALSE(VLOG_IS_ON(third_party_jni));
   EXPECT_FALSE(VLOG_IS_ON(threads));
+  EXPECT_PARSED_EQ(InstructionSet::kNone, Opt::SimulateInstructionSet);
 
   auto&& properties_list = map.GetOrDefault(Opt::PropertiesList);
   ASSERT_EQ(2U, properties_list.size());
@@ -179,6 +180,20 @@ TEST_F(ParsedOptionsTest, ParsedOptionsInstructionSet) {
     InstructionSet isa = map.GetOrDefault(Opt::ImageInstructionSet);
     EXPECT_EQ(ISAs[i], isa);
   }
+}
+
+TEST_F(ParsedOptionsTest, ParsedOptionSimulateInstructionSet) {
+  RuntimeOptions options;
+  options.push_back(std::make_pair("--simulate-isa=arm64", nullptr));
+
+  RuntimeArgumentMap map;
+  bool parsed = ParsedOptions::Parse(options, false, &map);
+  ASSERT_TRUE(parsed);
+  ASSERT_NE(0u, map.Size());
+
+  using Opt = RuntimeArgumentMap;
+
+  EXPECT_PARSED_EQ(InstructionSet::kArm64, Opt::SimulateInstructionSet);
 }
 
 }  // namespace art
