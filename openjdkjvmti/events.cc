@@ -300,7 +300,6 @@ class JvmtiDdmChunkListener : public art::DdmCallback {
       art::Thread* self = art::Thread::Current();
       handler_->DispatchEvent<ArtJvmtiEvent::kDdmPublishChunk>(
           self,
-          static_cast<JNIEnv*>(self->GetJniEnv()),
           static_cast<jint>(type),
           static_cast<jint>(data.size()),
           reinterpret_cast<const jbyte*>(data.data()));
