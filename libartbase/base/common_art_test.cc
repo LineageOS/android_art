@@ -301,9 +301,9 @@ void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
 // Get prebuilt binary tool.
 // The paths need to be updated when Android prebuilts update.
 std::string CommonArtTestImpl::GetAndroidTool(const char* name, InstructionSet) {
-#ifdef ART_TARGET_ANDROID
+#ifndef ART_CLANG_PATH
   UNUSED(name);
-  LOG(FATAL) << "There are no prebuilt tools available when running on target.";
+  LOG(FATAL) << "There are no prebuilt tools available.";
   UNREACHABLE();
 #else
   std::string path = GetAndroidBuildTop() + ART_CLANG_PATH + "/bin/";
