@@ -633,6 +633,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtDir) {
 
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
   // Load file from a system/framework directory and check that it is flagged as a framework dex.
+  std::filesystem::create_directory(GetAndroidRoot() + "/framework");
   std::string system_framework_location_path = GetAndroidRoot() + "/framework/foo.jar";
   ASSERT_TRUE(LocationIsOnSystemFramework(system_framework_location_path.c_str()));
 

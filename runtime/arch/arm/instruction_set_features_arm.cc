@@ -257,7 +257,7 @@ ArmFeaturesUniquePtr ArmInstructionSetFeatures::FromAssembly() {
 
   // Use compile time features to "detect" LPAE support.
   // TODO: write an assembly LPAE support test.
-#if defined(__ARM_FEATURE_LPAE)
+#if defined (__ARM_ARCH_8A__) || defined(__ARM_FEATURE_LPAE)
   const bool has_atomic_ldrd_strd = true;
 #else
   const bool has_atomic_ldrd_strd = false;
