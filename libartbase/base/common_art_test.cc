@@ -300,28 +300,18 @@ void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
 
 // Get prebuilt binary tool.
 // The paths need to be updated when Android prebuilts update.
-std::string CommonArtTestImpl::GetAndroidTool(const char* name, InstructionSet isa) {
-  std::string path = GetAndroidBuildTop() + "prebuilts/gcc/linux-x86/";
-  switch (isa) {
-    case InstructionSet::kX86:
-    case InstructionSet::kX86_64:
-      path += "host/x86_64-linux-glibc2.17-4.8/x86_64-linux/bin/";
-      break;
-    case InstructionSet::kArm:
-    case InstructionSet::kThumb2:
-      path += "arm/arm-linux-androideabi-4.9/arm-linux-androideabi/bin/";
-      break;
-    case InstructionSet::kArm64:
-      path += "aarch64/aarch64-linux-android-4.9/aarch64-linux-android/bin/";
-      break;
-    default:
-      LOG(FATAL) << "Unknown ISA: " << isa;
-      break;
-  }
+std::string CommonArtTestImpl::GetAndroidTool(const char* name, InstructionSet) {
+#ifdef ART_TARGET_ANDROID
+  UNUSED(name);
+  LOG(FATAL) << "There are no prebuilt tools available when running on target.";
+  UNREACHABLE();
+#else
+  std::string path = GetAndroidBuildTop() + ART_CLANG_PATH + "/bin/";
   CHECK(OS::DirectoryExists(path.c_str())) << path;
   path += name;
   CHECK(OS::FileExists(path.c_str())) << path;
   return path;
+#endif
 }
 
 std::string CommonArtTestImpl::GetCoreArtLocation() {
@@ -338,7 +328,7 @@ std::unique_ptr<const DexFile> CommonArtTestImpl::LoadExpectSingleDexFile(const 
   MemMap::Init();
   static constexpr bool kVerifyChecksum = true;
   const ArtDexFileLoader dex_file_loader;
-  std::string filename(location);
+  std::string filename(IsHost() ? GetAndroidBuildTop() + location : location);
   if (!dex_file_loader.Open(filename.c_str(),
                             std::string(location),
                             /* verify= */ true,

@@ -58,7 +58,9 @@ TEST_F(FileUtilsTest, GetSystemImageFilename) {
                GetSystemImageFilename("/system/framework/boot.art", InstructionSet::kArm).c_str());
 }
 
-TEST_F(FileUtilsTest, GetAndroidRootSafe) {
+// TODO(dsrbecky): b/160885380: This test is failing in eng-prod because libartbase
+//                              is loaded from different path (under testcases).
+TEST_F(FileUtilsTest, DISABLED_GetAndroidRootSafe) {
   std::string error_msg;
 
   // We don't expect null returns for most cases, so don't check and let std::string crash.
@@ -78,6 +80,7 @@ TEST_F(FileUtilsTest, GetAndroidRootSafe) {
   // Set a bogus value for ANDROID_ROOT. This should be an error.
   ASSERT_EQ(0, setenv("ANDROID_ROOT", "/this/is/obviously/bogus", /* overwrite */ 1));
   EXPECT_EQ(GetAndroidRootSafe(&error_msg), "");
+  error_msg = "";
 
   // Inferring the Android Root from the location of libartbase only works on host.
   if (!kIsTargetBuild) {
