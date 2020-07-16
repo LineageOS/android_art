@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <queue>
+#include <vector>
+
 #include "jvmti.h"
 
 // Test infrastructure
@@ -33,10 +36,16 @@ using DdmHandleChunk = jvmtiError(*)(jvmtiEnv* env,
                                      jint* len_data_out,
                                      jbyte** data_out);
 
+struct DdmCallbackData {
+ public:
+  DdmCallbackData(jint type, jint size, jbyte* data) : type_(type), data_(data, data + size) {}
+  jint type_;
+  std::vector<jbyte> data_;
+};
 struct DdmsTrackingData {
   DdmHandleChunk send_ddm_chunk;
-  jclass test_klass;
-  jmethodID publish_method;
+  jrawMonitorID callback_mon;
+  std::queue<DdmCallbackData> callbacks_received;
 };
 
 template <typename T>
@@ -111,21 +120,52 @@ static void DeallocParams(jvmtiParamInfo* params, jint n_params) {
   }
 }
 
-static void JNICALL PublishCB(jvmtiEnv* jvmti, JNIEnv* jnienv, jint type, jint size, jbyte* bytes) {
+extern "C" JNIEXPORT void JNICALL Java_art_Test1940_publishListen(JNIEnv* env,
+                                                                  jclass test_klass,
+                                                                  jobject publish) {
+  jmethodID publish_method = env->FromReflectedMethod(publish);
   DdmsTrackingData* data = nullptr;
-  if (JvmtiErrorToException(jnienv, jvmti,
-                            jvmti->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&data)))) {
+  if (JvmtiErrorToException(
+          env, jvmti_env, jvmti_env->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&data)))) {
     return;
   }
-  ScopedLocalRef<jbyteArray> res(jnienv, jnienv->NewByteArray(size));
-  jnienv->SetByteArrayRegion(res.get(), 0, size, bytes);
-  jnienv->CallStaticVoidMethod(data->test_klass, data->publish_method, type, res.get());
+  std::vector<DdmCallbackData> callbacks;
+  while (true) {
+    if (JvmtiErrorToException(env, jvmti_env, jvmti_env->RawMonitorEnter(data->callback_mon))) {
+      return;
+    }
+    while (data->callbacks_received.empty()) {
+      if (JvmtiErrorToException(env, jvmti_env, jvmti_env->RawMonitorWait(data->callback_mon, 0))) {
+        CHECK_EQ(JVMTI_ERROR_NONE, jvmti_env->RawMonitorExit(data->callback_mon));
+        return;
+      }
+    }
+    while (!data->callbacks_received.empty()) {
+      callbacks.emplace_back(std::move(data->callbacks_received.front()));
+      data->callbacks_received.pop();
+    }
+    if (JvmtiErrorToException(env, jvmti_env, jvmti_env->RawMonitorExit(data->callback_mon))) {
+      return;
+    }
+    for (auto cb : callbacks) {
+      ScopedLocalRef<jbyteArray> res(env, env->NewByteArray(cb.data_.size()));
+      env->SetByteArrayRegion(res.get(), 0, cb.data_.size(), cb.data_.data());
+      env->CallStaticVoidMethod(test_klass, publish_method, cb.type_, res.get());
+    }
+    callbacks.clear();
+  }
 }
 
-extern "C" JNIEXPORT void JNICALL Java_art_Test1940_initializeTest(JNIEnv* env,
-                                                                   jclass,
-                                                                   jclass method_klass,
-                                                                   jobject publish_method) {
+static void JNICALL PublishCB(jvmtiEnv* jvmti, jint type, jint size, jbyte* bytes) {
+  DdmsTrackingData* data = nullptr;
+  CHECK_EQ(JVMTI_ERROR_NONE, jvmti->GetEnvironmentLocalStorage(reinterpret_cast<void**>(&data)));
+  CHECK_EQ(JVMTI_ERROR_NONE, jvmti->RawMonitorEnter(data->callback_mon));
+  data->callbacks_received.emplace(type, size, bytes);
+  CHECK_EQ(JVMTI_ERROR_NONE, jvmti->RawMonitorNotifyAll(data->callback_mon));
+  CHECK_EQ(JVMTI_ERROR_NONE, jvmti->RawMonitorExit(data->callback_mon));
+}
+
+extern "C" JNIEXPORT void JNICALL Java_art_Test1940_initializeTest(JNIEnv* env, jclass) {
   void* old_data = nullptr;
   if (JvmtiErrorToException(env, jvmti_env, jvmti_env->GetEnvironmentLocalStorage(&old_data))) {
     return;
@@ -134,17 +174,16 @@ extern "C" JNIEXPORT void JNICALL Java_art_Test1940_initializeTest(JNIEnv* env,
     env->ThrowNew(rt_exception.get(), "Environment already has local storage set!");
     return;
   }
-  DdmsTrackingData* data = nullptr;
+  void* mem = nullptr;
   if (JvmtiErrorToException(env,
                             jvmti_env,
                             jvmti_env->Allocate(sizeof(DdmsTrackingData),
-                                                reinterpret_cast<unsigned char**>(&data)))) {
+                                                reinterpret_cast<unsigned char**>(&mem)))) {
     return;
   }
-  memset(data, 0, sizeof(DdmsTrackingData));
-  data->test_klass = reinterpret_cast<jclass>(env->NewGlobalRef(method_klass));
-  data->publish_method = env->FromReflectedMethod(publish_method);
-  if (env->ExceptionCheck()) {
+  DdmsTrackingData* data = new (mem) DdmsTrackingData{};
+  if (JvmtiErrorToException(
+          env, jvmti_env, jvmti_env->CreateRawMonitor("callback-mon", &data->callback_mon))) {
     return;
   }
   // Get the extensions.
@@ -181,7 +220,7 @@ extern "C" JNIEXPORT void JNICALL Java_art_Test1940_initializeTest(JNIEnv* env,
   }
   for (jint i = 0; i < n_ext; i++) {
     jvmtiExtensionEventInfo* cur_info = &events[i];
-    if (strcmp("com.android.art.internal.ddm.publish_chunk", cur_info->id) == 0) {
+    if (strcmp("com.android.art.internal.ddm.publish_chunk_safe", cur_info->id) == 0) {
       found_event = true;
       event_index = cur_info->extension_event_index;
     }
