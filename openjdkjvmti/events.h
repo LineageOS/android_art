@@ -99,7 +99,6 @@ constexpr jint kInternalEventCount = static_cast<jint>(ArtJvmtiEvent::kMaxIntern
                                      static_cast<jint>(ArtJvmtiEvent::kMinInternalEventTypeVal) + 1;
 
 using ArtJvmtiEventDdmPublishChunk = void (*)(jvmtiEnv *jvmti_env,
-                                              JNIEnv* jni_env,
                                               jint data_type,
                                               jint data_len,
                                               const jbyte* data);
