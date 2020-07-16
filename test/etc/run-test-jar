@@ -109,6 +109,7 @@ ANDROID_FLAGS="${ANDROID_FLAGS} -XX:SlowDebug=true"
 # The same for dex2oatd, both prebuild and runtime-driven.
 ANDROID_FLAGS="${ANDROID_FLAGS} -Xcompiler-option --runtime-arg -Xcompiler-option -XX:SlowDebug=true"
 COMPILER_FLAGS="${COMPILER_FLAGS} --runtime-arg -XX:SlowDebug=true"
+SIMULATOR="none"
 
 # Let the compiler and runtime know that we are running tests.
 COMPILE_FLAGS="${COMPILE_FLAGS} --compile-art-test"
@@ -468,6 +469,14 @@ while true; do
     elif [ "x$1" = "x--random-profile" ]; then
         RANDOM_PROFILE="y"
         shift
+    elif [ "x$1" = "x--simulate-isa" ]; then
+        HOST="y"
+        ANDROID_ROOT="${ANDROID_PRODUCT_OUT}/system"
+        ANDROID_RUNTIME_ROOT="${ANDROID_PRODUCT_OUT}/apex/com.android.runtime.debug"
+        shift
+        SIMULATOR=$1
+        FLAGS="${FLAGS} --simulate-isa=${SIMULATOR}"
+        shift
     elif expr "x$1" : "x--" >/dev/null 2>&1; then
         echo "unknown $0 option: $1" 1>&2
         exit 1
@@ -713,7 +722,11 @@ bpath_locations=""
 bpath_separator=""
 bpath_prefix=""
 bpath_location_prefix=""
-if [ "${HOST}" = "y" ]; then
+if [ "$SIMULATOR" != "none" ]; then
+  # Simulator mode uses a mix of host and target bootclasspath locations.
+  bpath_prefix="${ANDROID_HOST_OUT}"
+  bpath_location_prefix=""
+elif [ "${HOST}" = "y" ]; then
   bpath_prefix="${ANDROID_HOST_OUT}"
   if [ "${ANDROID_HOST_OUT:0:${#ANDROID_BUILD_TOP}+1}" = "${ANDROID_BUILD_TOP}/" ]; then
     bpath_location_prefix="${ANDROID_HOST_OUT:${#ANDROID_BUILD_TOP}+1}"
@@ -857,13 +870,15 @@ if [ ${#VDEX_NAME} -gt $max_filename_size ]; then
     exit 1
 fi
 
-if [ "$HOST" = "y" ]; then
+if [ "$HOST" = "y" ] && [ "$SIMULATOR" = "none" ]; then
   # On host, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the `bin`
   # directory under the "Android Root" (usually `out/host/linux-x86`).
   #
   # TODO(b/130295968): Adjust this if/when ART host artifacts are installed
   # under the ART root (usually `out/host/linux-x86/com.android.art`).
   ANDROID_ART_BIN_DIR=$ANDROID_ROOT/bin
+elif [ "$SIMULATOR" != "none" ]; then
+  ANDROID_ART_BIN_DIR=$ANDROID_HOST_OUT/bin
 else
   # On target, run binaries (`dex2oat(d)`, `dalvikvm`, `profman`) from the ART
   # APEX's `bin` directory. This means the linker will observe the ART APEX
@@ -873,6 +888,10 @@ else
 fi
 
 profman_cmdline="true"
+if [ "$SIMULATOR" != "none" ]; then
+  ISA=$SIMULATOR
+fi
+
 dex2oat_cmdline="true"
 vdex_cmdline="true"
 dm_cmdline="true"
