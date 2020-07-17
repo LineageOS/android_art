@@ -27,9 +27,16 @@ cc_object {
         "art_libartbase_headers", // For base/bit_utils.h
         "jni_headers",
         "libart_runtime_headers_ndk",
-        "libc_headers", // TODO(b/153662223): Clean this up.
         "libdexfile_all_headers", // For dex/modifiers.h
     ],
+    target: {
+        android: {
+            header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
+        },
+        linux_bionic: {
+            header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
+        },
+    },
     // Produce text file rather than binary.
     cflags: ["-S"],
     srcs: ["asm_defines.cc"],
