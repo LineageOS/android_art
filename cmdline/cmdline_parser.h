@@ -19,20 +19,25 @@
 
 #define CMDLINE_NDEBUG 1  // Do not output any debugging information for parsing.
 
-#include "detail/cmdline_debug_detail.h"
-#include "detail/cmdline_parse_argument_detail.h"
-#include "detail/cmdline_parser_detail.h"
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
+#include "base/indenter.h"
+#include "base/variant_map.h"
 #include "cmdline_parse_result.h"
 #include "cmdline_result.h"
 #include "cmdline_type_parser.h"
 #include "cmdline_types.h"
+#include "detail/cmdline_debug_detail.h"
+#include "detail/cmdline_parse_argument_detail.h"
+#include "detail/cmdline_parser_detail.h"
 #include "token_range.h"
-
-#include "base/variant_map.h"
-
-#include <memory>
-#include <vector>
 
 namespace art {
 // Build a parser for command line arguments with a small domain specific language.
@@ -165,6 +170,16 @@ struct CmdlineParser {
       return *this;
     }
 
+    ArgumentBuilder<TArg>& WithMetavar(const char* sv) {
+      argument_info_.metavar_ = sv;
+      return *this;
+    }
+
+    ArgumentBuilder<TArg>& WithHelp(const char* sv) {
+      argument_info_.help_ = sv;
+      return *this;
+    }
+
     // Convenience type alias for the variant map key type definition.
     using MapKey = TVariantMapKey<TArg>;
 
@@ -231,6 +246,17 @@ struct CmdlineParser {
       argument_info_.names_ = names;
     }
 
+    void SetHelp(std::optional<const char*>&& val) {
+      argument_info_.help_ = val;
+    }
+
+    void SetCategory(std::optional<const char*>&& val) {
+      argument_info_.category_ = val;
+    }
+    void SetMetavar(std::optional<const char*>&& val) {
+      argument_info_.metavar_ = val;
+    }
+
    private:
     // Copying is bad. Move only.
     ArgumentBuilder(const ArgumentBuilder&) = delete;
@@ -291,6 +317,21 @@ struct CmdlineParser {
       return CreateTypedBuilder<TArg>();
     }
 
+    UntypedArgumentBuilder& WithHelp(const char* sv) {
+      SetHelp(sv);
+      return *this;
+    }
+
+    UntypedArgumentBuilder& WithCategory(const char* sv) {
+      SetCategory(sv);
+      return *this;
+    }
+
+    UntypedArgumentBuilder& WithMetavar(const char* sv) {
+      SetMetavar(sv);
+      return *this;
+    }
+
     // When used with multiple aliases, map the position of the alias to the value position.
     template <typename TArg>
     ArgumentBuilder<TArg> WithValues(std::initializer_list<TArg> values) {
@@ -324,6 +365,18 @@ struct CmdlineParser {
       names_ = names;
     }
 
+    void SetHelp(std::optional<const char*> sv) {
+      help_.swap(sv);
+    }
+
+    void SetMetavar(std::optional<const char*> sv) {
+      metavar_.swap(sv);
+    }
+
+    void SetCategory(std::optional<const char*> sv) {
+      category_.swap(sv);
+    }
+
    private:
     // No copying. Move instead.
     UntypedArgumentBuilder(const UntypedArgumentBuilder&) = delete;
@@ -333,6 +386,9 @@ struct CmdlineParser {
       auto&& b = CreateArgumentBuilder<TArg>(parent_);
       InitializeTypedBuilder(&b);  // Type-specific initialization
       b.SetNames(std::move(names_));
+      b.SetHelp(std::move(help_));
+      b.SetCategory(std::move(category_));
+      b.SetMetavar(std::move(metavar_));
       return std::move(b);
     }
 
@@ -356,6 +412,9 @@ struct CmdlineParser {
 
     CmdlineParser::Builder& parent_;
     std::vector<const char*> names_;
+    std::optional<const char*> category_;
+    std::optional<const char*> help_;
+    std::optional<const char*> metavar_;
   };
 
   // Build a new parser given a chain of calls to define arguments.
@@ -367,10 +426,26 @@ struct CmdlineParser {
       return Define({name});
     }
 
+    Builder& ClearCategory() {
+      default_category_.reset();
+      return *this;
+    }
+
+    Builder& SetCategory(const char* sv) {
+      default_category_ = sv;
+      return *this;
+    }
+
+    Builder& OrderCategories(std::vector<const char*> categories) {
+      category_order_.swap(categories);
+      return *this;
+    }
+
     // Define a single argument with multiple aliases.
     UntypedArgumentBuilder Define(std::initializer_list<const char*> names) {
       auto&& b = UntypedArgumentBuilder(*this);
       b.SetNames(names);
+      b.SetCategory(default_category_);
       return std::move(b);
     }
 
@@ -382,6 +457,8 @@ struct CmdlineParser {
 
     // Provide a list of arguments to ignore for backwards compatibility.
     Builder& Ignore(std::initializer_list<const char*> ignore_list) {
+      auto current_cat = default_category_;
+      default_category_ = "Ignored";
       for (auto&& ignore_name : ignore_list) {
         std::string ign = ignore_name;
 
@@ -403,6 +480,7 @@ struct CmdlineParser {
         }
       }
       ignore_list_ = ignore_list;
+      default_category_ = current_cat;
       return *this;
     }
 
@@ -415,7 +493,8 @@ struct CmdlineParser {
       auto&& p = CmdlineParser(ignore_unrecognized_,
                                std::move(ignore_list_),
                                save_destination_,
-                               std::move(completed_arguments_));
+                               std::move(completed_arguments_),
+                               std::move(category_order_));
 
       return std::move(p);
     }
@@ -439,9 +518,13 @@ struct CmdlineParser {
     bool ignore_unrecognized_ = false;
     std::vector<const char*> ignore_list_;
     std::shared_ptr<SaveDestination> save_destination_;
+    std::optional<const char*> default_category_;
+    std::vector<const char*> category_order_;
 
     std::vector<std::unique_ptr<detail::CmdlineParseArgumentAny>> completed_arguments_;
   };
+
+  void DumpHelp(VariableIndentationOutputStream& vios);
 
   CmdlineResult Parse(const std::string& argv) {
     std::vector<std::string> tokenized;
@@ -500,11 +583,13 @@ struct CmdlineParser {
   CmdlineParser(bool ignore_unrecognized,
                 std::vector<const char*>&& ignore_list,
                 std::shared_ptr<SaveDestination> save_destination,
-                std::vector<std::unique_ptr<detail::CmdlineParseArgumentAny>>&& completed_arguments)
+                std::vector<std::unique_ptr<detail::CmdlineParseArgumentAny>>&& completed_arguments,
+                std::vector<const char*>&& category_order)
     : ignore_unrecognized_(ignore_unrecognized),
       ignore_list_(std::move(ignore_list)),
       save_destination_(save_destination),
-      completed_arguments_(std::move(completed_arguments)) {
+      completed_arguments_(std::move(completed_arguments)),
+      category_order_(category_order) {
     assert(save_destination != nullptr);
   }
 
@@ -606,6 +691,7 @@ struct CmdlineParser {
   std::vector<const char*> ignore_list_;
   std::shared_ptr<SaveDestination> save_destination_;
   std::vector<std::unique_ptr<detail::CmdlineParseArgumentAny>> completed_arguments_;
+  std::vector<const char*> category_order_;
 };
 
 // This has to be defined after everything else, since we want the builders to call this.
@@ -626,6 +712,54 @@ void CmdlineParser<TVariantMap, TVariantMapKey>::AppendCompletedArgument(
     CmdlineParser<TVariantMap, TVariantMapKey>::Builder& builder,
     detail::CmdlineParseArgumentAny* arg) {
   builder.AppendCompletedArgument(arg);
+}
+
+template <typename TVariantMap,
+          template <typename TKeyValue> class TVariantMapKey>
+void CmdlineParser<TVariantMap, TVariantMapKey>::DumpHelp(VariableIndentationOutputStream& vios) {
+  std::vector<detail::CmdlineParseArgumentAny*> uncat;
+  std::unordered_map<std::string, std::vector<detail::CmdlineParseArgumentAny*>> args;
+  for (const std::unique_ptr<detail::CmdlineParseArgumentAny>& it : completed_arguments_) {
+    auto cat = it->GetCategory();
+    if (cat) {
+      if (args.find(cat.value()) == args.end()) {
+        args[cat.value()] = {};
+      }
+      args.at(cat.value()).push_back(it.get());
+    } else {
+      uncat.push_back(it.get());
+    }
+  }
+  args.erase("Ignored");
+  for (auto arg : uncat) {
+    arg->DumpHelp(vios);
+    vios.Stream();
+  }
+  for (auto it : category_order_) {
+    auto cur = args.find(it);
+    if (cur != args.end() && !cur->second.empty()) {
+      vios.Stream() << "The following " << it << " arguments are supported:" << std::endl;
+      ScopedIndentation si(&vios);
+      for (detail::CmdlineParseArgumentAny* arg : cur->second) {
+        arg->DumpHelp(vios);
+        vios.Stream();
+      }
+      args.erase(cur->first);
+    }
+  }
+  for (auto [cat, lst] : args) {
+    vios.Stream() << "The following " << cat << " arguments are supported:" << std::endl;
+    ScopedIndentation si(&vios);
+    for (auto& arg : completed_arguments_) {
+      arg->DumpHelp(vios);
+      vios.Stream();
+    }
+  }
+  vios.Stream() << "The following arguments are ignored for compatibility:" << std::endl;
+  ScopedIndentation si(&vios);
+  for (auto ign : ignore_list_) {
+    vios.Stream() << ign << std::endl;
+  }
 }
 
 }  // namespace art
