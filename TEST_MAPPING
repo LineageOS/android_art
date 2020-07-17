@@ -6,11 +6,11 @@
     }
   ],
   "postsubmit": [
+    // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    }
-  ],
-  "art-run-tests": [
+    },
+    // ART run-tests.
     {
       "name": "art-run-test-001-HelloWorld"
     },
