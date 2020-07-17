@@ -223,12 +223,15 @@ static void VerifyGeneratedCode(InstructionSet target_isa,
                                 Expected expected) {
   ASSERT_TRUE(CanExecute(target_isa)) << "Target isa is not executable.";
 
-  // Verify on simulator.
-  CodeSimulatorContainer simulator(target_isa);
-  if (simulator.CanSimulate()) {
-    Expected result = SimulatorExecute<Expected>(simulator.Get(), f);
-    if (has_result) {
-      ASSERT_EQ(expected, result);
+  // Simulator cannot run without runtime, because it needs quick entrypoints.
+  if (Runtime::Current() != nullptr) {
+    // Verify on simulator.
+    CodeSimulatorContainer simulator(target_isa);
+    if (simulator.CanSimulate()) {
+      Expected result = SimulatorExecute<Expected>(simulator.Get(), f);
+      if (has_result) {
+        ASSERT_EQ(expected, result);
+      }
     }
   }
 
