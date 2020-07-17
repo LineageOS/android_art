@@ -18,6 +18,7 @@
 #define ART_RUNTIME_PARSED_OPTIONS_H_
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <jni.h>
