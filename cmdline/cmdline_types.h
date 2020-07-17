@@ -19,7 +19,9 @@
 #define CMDLINE_NDEBUG 1  // Do not output any debugging information for parsing.
 
 #include <list>
+#include <ostream>
 
+#include "android-base/stringprintf.h"
 #include "cmdline_type_parser.h"
 #include "detail/cmdline_debug_detail.h"
 #include "memory_representation.h"
@@ -87,6 +89,7 @@ struct CmdlineType<JdwpProvider> : CmdlineTypeParser<JdwpProvider> {
     }
   }
   static const char* Name() { return "JdwpProvider"; }
+  static const char* DescribeType() { return "none|adbconnection|default"; }
 };
 
 template <size_t Divisor>
@@ -173,6 +176,13 @@ struct CmdlineType<Memory<Divisor>> : CmdlineTypeParser<Memory<Divisor>> {
   }
 
   static const char* Name() { return Memory<Divisor>::Name(); }
+  static const char* DescribeType() {
+    static std::string str;
+    if (str.empty()) {
+      str = "Memory with granularity of " + std::to_string(Divisor) + " bytes";
+    }
+    return str.c_str();
+  }
 };
 
 template <>
@@ -194,6 +204,7 @@ struct CmdlineType<double> : CmdlineTypeParser<double> {
   }
 
   static const char* Name() { return "double"; }
+  static const char* DescribeType() { return "double value"; }
 };
 
 template <typename T>
@@ -226,6 +237,7 @@ struct CmdlineType<unsigned int> : CmdlineTypeParser<unsigned int> {
   }
 
   static const char* Name() { return "unsigned integer"; }
+  static const char* DescribeType() { return "unsigned integer value"; }
 };
 
 template <>
@@ -235,6 +247,7 @@ struct CmdlineType<int> : CmdlineTypeParser<int> {
   }
 
   static const char* Name() { return "integer"; }
+  static const char* DescribeType() { return "integer value"; }
 };
 
 // Lightweight nanosecond value type. Allows parser to convert user-input from milliseconds
@@ -289,6 +302,7 @@ struct CmdlineType<MillisecondsToNanoseconds> : CmdlineTypeParser<MillisecondsTo
   }
 
   static const char* Name() { return "MillisecondsToNanoseconds"; }
+  static const char* DescribeType() { return "millisecond value"; }
 };
 
 template <>
@@ -307,6 +321,7 @@ struct CmdlineType<std::string> : CmdlineTypeParser<std::string> {
     }
     return Result::SuccessNoValue();
   }
+  static const char* DescribeType() { return "string value"; }
 };
 
 template <>
@@ -323,6 +338,7 @@ struct CmdlineType<std::vector<Plugin>> : CmdlineTypeParser<std::vector<Plugin>>
   }
 
   static const char* Name() { return "std::vector<Plugin>"; }
+  static const char* DescribeType() { return "/path/to/libplugin.so"; }
 };
 
 template <>
@@ -339,6 +355,7 @@ struct CmdlineType<std::list<ti::AgentSpec>> : CmdlineTypeParser<std::list<ti::A
   }
 
   static const char* Name() { return "std::list<ti::AgentSpec>"; }
+  static const char* DescribeType() { return "/path/to/libagent.so=options"; }
 };
 
 template <>
@@ -355,6 +372,7 @@ struct CmdlineType<std::vector<std::string>> : CmdlineTypeParser<std::vector<std
   }
 
   static const char* Name() { return "std::vector<std::string>"; }
+  static const char* DescribeType() { return "string value"; }
 };
 
 template <char Separator>
@@ -400,6 +418,13 @@ struct CmdlineType<ParseStringList<Separator>> : CmdlineTypeParser<ParseStringLi
   }
 
   static const char* Name() { return "ParseStringList<Separator>"; }
+  static const char* DescribeType() {
+    static std::string str;
+    if (str.empty()) {
+      str = android::base::StringPrintf("list separated by '%c'", Separator);
+    }
+    return str.c_str();
+  }
 };
 
 template <>
@@ -433,6 +458,7 @@ struct CmdlineType<std::vector<int32_t>> : CmdlineTypeParser<std::vector<int32_t
   }
 
   static const char* Name() { return "std::vector<int32_t>"; }
+  static const char* DescribeType() { return "unsigned integer value"; }
 };
 
 static gc::CollectorType ParseCollectorType(const std::string& option) {
@@ -534,6 +560,11 @@ struct CmdlineType<XGcOption> : CmdlineTypeParser<XGcOption> {
   }
 
   static const char* Name() { return "XgcOption"; }
+  static const char* DescribeType() {
+    return "MS|nonconccurent|concurrent|CMS|SS|CC|[no]preverify[_rosalloc]|"
+           "[no]presweepingverify[_rosalloc]|[no]generation_cc|[no]postverify[_rosalloc]|"
+           "[no]gcstress|measure|[no]precisce|[no]verifycardtable";
+  }
 };
 
 struct BackgroundGcOption {
@@ -573,6 +604,9 @@ struct CmdlineType<BackgroundGcOption>
   }
 
   static const char* Name() { return "BackgroundGcOption"; }
+  static const char* DescribeType() {
+    return "HSpaceCompact|MS|nonconccurent|CMS|concurrent|SS|CC";
+  }
 };
 
 template <>
@@ -642,6 +676,11 @@ struct CmdlineType<LogVerbosity> : CmdlineTypeParser<LogVerbosity> {
   }
 
   static const char* Name() { return "LogVerbosity"; }
+  static const char* DescribeType() {
+    return "class|collector|compiler|deopt|gc|heap|interpreter|jdwp|jit|jni|monitor|oat|profiler|"
+           "signals|simulator|startup|third-party-jni|threads|verifier|verifier-debug|image|"
+           "systrace-locks|plugin|agents|dex";
+  }
 };
 
 template <>
@@ -754,6 +793,7 @@ struct CmdlineType<ProfileSaverOptions> : CmdlineTypeParser<ProfileSaverOptions>
   }
 
   static const char* Name() { return "ProfileSaverOptions"; }
+  static const char* DescribeType() { return "string|unsigned integer"; }
   static constexpr bool kCanParseBlankless = true;
 };
 
@@ -769,6 +809,7 @@ struct CmdlineType<ExperimentalFlags> : CmdlineTypeParser<ExperimentalFlags> {
   }
 
   static const char* Name() { return "ExperimentalFlags"; }
+  static const char* DescribeType() { return "none"; }
 };
 }  // namespace art
 #endif  // ART_CMDLINE_CMDLINE_TYPES_H_
