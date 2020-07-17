@@ -177,7 +177,7 @@ define define-art-gtest-rule-host
   # Dependencies for all host gtests.
   gtest_deps := $$(ART_HOST_DEX_DEPENDENCIES) \
     $$(ART_TEST_HOST_GTEST_DEPENDENCIES) \
-    $$(HOST_OUT)/$$(I18N_APEX)/etc \
+    $$(HOST_OUT)/$$(I18N_APEX)/timestamp \
     $$(HOST_BOOT_IMAGE_JARS) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libicu_jni$$(ART_HOST_SHLIB_EXTENSION) \
     $$($(3)ART_HOST_OUT_SHARED_LIBRARIES)/libjavacore$$(ART_HOST_SHLIB_EXTENSION) \
@@ -256,7 +256,7 @@ endif
   gtest_suffix :=
 endef  # define-art-gtest-rule-host
 
-ART_TEST_HOST_GTEST_DEPENDENCIES := $(host-i18n-data-file)
+ART_TEST_HOST_GTEST_DEPENDENCIES := $(host-i18n-data-timestamp)
 ART_TEST_TARGET_GTEST_DEPENDENCIES := $(TESTING_ART_APEX)
 
 # Add the additional dependencies for the specified test
