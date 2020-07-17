@@ -49,6 +49,8 @@ class BacktraceMap;
 
 namespace art {
 
+class CodeSimulatorContainer;
+
 namespace gc {
 namespace accounting {
 template<class T> class AtomicStack;
@@ -191,6 +193,8 @@ class Thread {
   // high cost and so we favor passing self around when possible.
   // TODO: mark as PURE so the compiler may coalesce and remove?
   static Thread* Current();
+
+  CodeSimulatorContainer* GetSimulator();
 
   // On a runnable thread, check for pending thread suspension request and handle if pending.
   void AllowThreadSuspension() REQUIRES_SHARED(Locks::mutator_lock_);
@@ -1419,6 +1423,7 @@ class Thread {
       REQUIRES(Locks::runtime_shutdown_lock_);
   void InitCardTable();
   void InitCpu();
+  void InitSimulator();
   void CleanupCpu();
   void InitTlsEntryPoints();
   void InitTid();
@@ -1683,7 +1688,7 @@ class Thread {
       thread_local_objects(0), mterp_current_ibase(nullptr), thread_local_alloc_stack_top(nullptr),
       thread_local_alloc_stack_end(nullptr),
       flip_function(nullptr), method_verifier(nullptr), thread_local_mark_stack(nullptr),
-      async_exception(nullptr), top_reflective_handle_scope(nullptr) {
+      async_exception(nullptr), top_reflective_handle_scope(nullptr), simulator(nullptr) {
       std::fill(held_mutexes, held_mutexes + kLockLevelCount, nullptr);
     }
 
@@ -1842,6 +1847,9 @@ class Thread {
 
     // Top of the linked-list for reflective-handle scopes or null if none.
     BaseReflectiveHandleScope* top_reflective_handle_scope;
+
+    // A pointer to the simulator container.
+    CodeSimulatorContainer* simulator;
   } tlsPtr_;
 
   // Small thread-local cache to be used from the interpreter.
