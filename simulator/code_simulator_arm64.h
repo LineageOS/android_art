@@ -27,9 +27,12 @@
 
 #include "arch/instruction_set.h"
 #include "code_simulator.h"
+#include "entrypoints/quick/quick_entrypoints.h"
 
 namespace art {
 namespace arm64 {
+
+class CustomSimulator;
 
 class CodeSimulatorArm64 : public CodeSimulator {
  public:
@@ -42,11 +45,24 @@ class CodeSimulatorArm64 : public CodeSimulator {
   int32_t GetCReturnInt32() const override;
   int64_t GetCReturnInt64() const override;
 
+  bool CanSimulate(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) override;
+  void Invoke(ArtMethod* method, uint32_t* args, uint32_t args_size, Thread* self, JValue* result,
+              const char* shorty, bool isStatic) override REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void InitEntryPoints(QuickEntryPoints* qpoints) override;
+
  private:
   CodeSimulatorArm64();
 
+  void InitRegistersForInvokeStub(ArtMethod* method, uint32_t* args, uint32_t args_size,
+                                  Thread* self, JValue* result, const char* shorty, bool isStatic)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  void GetResultFromShorty(JValue* result, const char* shorty);
+
   vixl::aarch64::Decoder* decoder_;
-  vixl::aarch64::Simulator* simulator_;
+  CustomSimulator* simulator_;
+  int64_t saved_sp_;
 
   // TODO: Enable CodeSimulatorArm64 for more host ISAs once Simulator supports them.
   static constexpr bool kCanSimulate = (kRuntimeISA == InstructionSet::kX86_64);

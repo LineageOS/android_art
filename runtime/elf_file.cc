@@ -31,6 +31,7 @@
 #include "base/utils.h"
 #include "elf/elf_utils.h"
 #include "elf_file_impl.h"
+#include "runtime.h"
 
 namespace art {
 
@@ -1101,9 +1102,9 @@ bool ElfFileImpl<ElfTypes>::Load(File* file,
 
   if (executable) {
     InstructionSet elf_ISA = GetInstructionSetFromELF(GetHeader().e_machine, GetHeader().e_flags);
-    if (elf_ISA != kRuntimeISA) {
+    if (elf_ISA != Runtime::GetQuickCodeISA()) {
       std::ostringstream oss;
-      oss << "Expected ISA " << kRuntimeISA << " but found " << elf_ISA;
+      oss << "Expected ISA " << Runtime::GetQuickCodeISA() << " but found " << elf_ISA;
       *error_msg = oss.str();
       return false;
     }
