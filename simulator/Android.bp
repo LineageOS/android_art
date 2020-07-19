@@ -18,12 +18,15 @@ cc_library_headers {
     name: "libart_simulator_headers",
     host_supported: true,
     export_include_dirs: ["include"],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
+    ],
 }
 
 cc_defaults {
     name: "libart_simulator_defaults",
     host_supported: true,
-    device_supported: false,
 
     defaults: ["art_defaults"],
     srcs: [
@@ -36,7 +39,12 @@ cc_defaults {
     ],
     cflags: ["-DVIXL_INCLUDE_SIMULATOR_AARCH64"],
 
-    header_libs: ["libart_simulator_headers"],
+    header_libs: [
+        "jni_platform_headers",
+        "libdexfile_all_headers",
+        "libart_runtime_headers_ndk",
+        "libart_simulator_headers",
+    ],
 }
 
 art_cc_library {
@@ -47,6 +55,7 @@ art_cc_library {
         "libartbase",
         "libvixl",
     ],
+    device_supported: false,
 }
 
 art_cc_library {
@@ -60,6 +69,7 @@ art_cc_library {
         "libartbased",
         "libvixld",
     ],
+    device_supported: false,
 }
 
 cc_defaults {
@@ -73,8 +83,12 @@ cc_defaults {
     shared_libs: [
         "libbase",
     ],
-
-    header_libs: ["libart_simulator_headers"],
+    header_libs: [
+        "jni_platform_headers",
+        "libdexfile_all_headers",
+        "libart_runtime_headers_ndk",
+        "libart_simulator_headers",
+    ],
     export_include_dirs: ["."], // TODO: Consider a proper separation.
 }
 
@@ -83,7 +97,10 @@ art_cc_library {
     defaults: ["libart_simulator_container_defaults"],
     shared_libs: [
         "libartbase",
-        "libart",
+    ],
+    apex_available: [
+        "com.android.art.release",
+        "com.android.art.debug",
     ],
 }
 
@@ -95,7 +112,6 @@ art_cc_library {
     ],
     shared_libs: [
         "libartbased",
-        "libartd",
     ],
     apex_available: [
         "com.android.art.debug",

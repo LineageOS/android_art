@@ -22,11 +22,13 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
 #include "android-base/strings.h"
 
+#include "base/indenter.h"
 #include "cmdline_parse_result.h"
 #include "cmdline_types.h"
 #include "token_range.h"
@@ -35,6 +37,7 @@
 namespace art {
 // Implementation details for the parser. Do not look inside if you hate templates.
 namespace detail {
+
 // A non-templated base class for argument parsers. Used by the general parser
 // to parse arguments, without needing to know the argument type at compile time.
 //
@@ -77,6 +80,10 @@ struct CmdlineParseArgumentAny {
   // Returns how many tokens were either matched (or ignored because there was a
   // wildcard present). 0 means no match. If the Size() tokens are returned.
   virtual size_t MaybeMatches(const TokenRange& tokens) = 0;
+
+  virtual void DumpHelp(VariableIndentationOutputStream& os) = 0;
+
+  virtual const std::optional<const char*>& GetCategory() = 0;
 };
 
 template <typename T>
@@ -135,6 +142,49 @@ struct CmdlineParserArgumentInfo {
 
     return std::make_pair(best_match_ptr, best_match);
   }
+
+  template <typename T = TArg>  // Necessary to get SFINAE to kick in.
+  void DumpHelp(VariableIndentationOutputStream& vios) {
+    for (auto cname : names_) {
+      std::string_view name = cname;
+      auto& os = vios.Stream();
+      std::function<void()> print_once;
+      if (using_blanks_) {
+        std::string_view nblank = name.substr(0, name.find("_"));
+        print_once = [&]() {
+          os << nblank;
+          if (has_value_map_) {
+            bool first = true;
+            for (auto [val, unused] : value_map_) {
+              os << (first ? "{" : "|") << val;
+              first = false;
+            }
+            os << "}";
+          } else if (metavar_) {
+            os << metavar_.value();
+          } else {
+            os << "{" << CmdlineType<T>::DescribeType() << "}";
+          }
+        };
+      } else {
+        print_once = [&]() {
+          os << name;
+        };
+      }
+      print_once();
+      if (appending_values_) {
+        os << " [";
+        print_once();
+        os << "...]";
+      }
+      os << std::endl;
+    }
+    if (help_) {
+      ScopedIndentation si(&vios);
+      vios.Stream() << help_.value() << std::endl;
+    }
+  }
+
 
   // Mark the argument definition as completed, do not mutate the object anymore after this
   // call is done.
@@ -279,6 +329,10 @@ struct CmdlineParserArgumentInfo {
   bool has_value_list_ = false;
   std::vector<TArg> value_list_;
 
+  std::optional<const char*> help_;
+  std::optional<const char*> category_;
+  std::optional<const char*> metavar_;
+
   // Make sure there's a default constructor.
   CmdlineParserArgumentInfo() = default;
 
@@ -378,6 +432,14 @@ struct CmdlineParseArgument : CmdlineParseArgumentAny {
     }
 
     return ParseArgumentSingle(blank_value);
+  }
+
+  virtual void DumpHelp(VariableIndentationOutputStream& os) {
+    argument_info_.DumpHelp(os);
+  }
+
+  virtual const std::optional<const char*>& GetCategory() {
+    return argument_info_.category_;
   }
 
  private:

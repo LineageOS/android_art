@@ -54,6 +54,7 @@ struct CmdlineTypeParser {
 
   // Runtime type name of T, so that we can print more useful error messages.
   static const char* Name() { assert(false); return "UnspecializedType"; }
+  static const char* DescribeType() { assert(false); return "UnspecializedType"; }
 
   // Whether or not your type can parse argument definitions defined without a "_"
   // e.g. -Xenable-profiler just mutates the existing profiler struct in-place

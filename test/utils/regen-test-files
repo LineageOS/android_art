@@ -342,11 +342,11 @@ cat >TEST_MAPPING <<EOF
     }
   ],
   "postsubmit": [
+    // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    }
-  ],
-  "art-run-tests": [
+    },
+    // ART run-tests.
 EOF
 # Only include tests expected to succeed for now.
 trailer=,
