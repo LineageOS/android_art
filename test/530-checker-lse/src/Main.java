@@ -42,6 +42,7 @@ class TestClass {
   volatile int k;
   TestClass next;
   String str;
+  byte b;
   static int si;
   static TestClass sTestClassObj;
 }
@@ -639,6 +640,63 @@ public class Main {
     return a;
   }
 
+  /// CHECK-START: int Main.$noinline$testConversion1(TestClass, int) load_store_elimination (before)
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+
+  /// CHECK-START: int Main.$noinline$testConversion1(TestClass, int) load_store_elimination (after)
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     TypeConversion
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+  static int $noinline$testConversion1(TestClass obj, int x) {
+    obj.i = x;
+    if ((x & 1) != 0) {
+      obj.b = (byte) x;
+      obj.i = obj.b;
+    }
+    return obj.i;
+  }
+
+  /// CHECK-START: int Main.$noinline$testConversion2(TestClass, int) load_store_elimination (before)
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+
+  /// CHECK-START: int Main.$noinline$testConversion2(TestClass, int) load_store_elimination (after)
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     TypeConversion
+  /// CHECK-DAG:                     InstanceFieldSet
+  /// CHECK-DAG:                     InstanceFieldGet
+
+  /// CHECK-START: int Main.$noinline$testConversion2(TestClass, int) load_store_elimination (after)
+  /// CHECK:                         TypeConversion
+  /// CHECK-NOT:                     TypeConversion
+  static int $noinline$testConversion2(TestClass obj, int x) {
+    int tmp = 0;
+    obj.i = x;
+    if ((x & 1) != 0) {
+      // The instruction simplifier can remove this TypeConversion if there are
+      // no environment uses. Currently, there is an environment use in NullCheck,
+      // so this TypeConversion remains and GVN removes the second TypeConversion
+      // below. Since we really want to test that the TypeConversion from below
+      // can be moved and used for the load of `obj.b`, we have a similar test
+      // written in smali in 530-checker-lse3, StoreLoad.test3(int), except that
+      // it's using static fields (which would not help with the environment use).
+      obj.b = (byte) x;
+      obj.i = obj.b;
+      tmp = (byte) x;
+    }
+    return obj.i + tmp;
+  }
+
   /// CHECK-START: void Main.testFinalizable() load_store_elimination (before)
   /// CHECK: NewInstance
   /// CHECK: InstanceFieldSet
@@ -1157,6 +1215,25 @@ public class Main {
     array[1] = obj;    // store the same value as the defaut value.
   }
 
+  /// CHECK-START: int Main.$noinline$testByteArrayDefaultValue() load_store_elimination (before)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG: <<Value:b\d+>>  ArrayGet
+  /// CHECK-DAG:                 Return [<<Value>>]
+
+  /// CHECK-START: int Main.$noinline$testByteArrayDefaultValue() load_store_elimination (after)
+  /// CHECK-DAG: <<Const0:i\d+>> IntConstant 0
+  /// CHECK-DAG:                 Return [<<Const0>>]
+
+  /// CHECK-START: int Main.$noinline$testByteArrayDefaultValue() load_store_elimination (after)
+  /// CHECK-NOT:                 NewArray
+  /// CHECK-NOT:                 ArrayGet
+  /// CHECK-NOT:                 TypeConversion
+  private static int $noinline$testByteArrayDefaultValue() {
+    byte[] array = new byte[2];
+    array[1] = 1;  // FIXME: Without any stores, LSA tells LSE not to run.
+    return array[0];
+  }
+
   static Object[] sArray;
 
   /// CHECK-START: int Main.testLocalArrayMerge1(boolean) load_store_elimination (before)
@@ -1367,6 +1444,11 @@ public class Main {
     assertDoubleEquals(Math.PI * Math.PI * Math.PI, getCircleArea(Math.PI, true));
     assertDoubleEquals(0d, getCircleArea(Math.PI, false));
 
+    assertIntEquals($noinline$testConversion1(new TestClass(), 300), 300);
+    assertIntEquals($noinline$testConversion1(new TestClass(), 301), 45);
+    assertIntEquals($noinline$testConversion2(new TestClass(), 300), 300);
+    assertIntEquals($noinline$testConversion2(new TestClass(), 301), 90);
+
     int[] iarray = {0, 0, 0};
     double[] darray = {0d, 0d, 0d};
     try {
@@ -1434,6 +1516,8 @@ public class Main {
     assertIntEquals(testclass2.i, 55);
 
     assertIntEquals(testStoreStoreWithDeoptimize(new int[4]), 4);
+
+    assertIntEquals($noinline$testByteArrayDefaultValue(), 0);
 
     assertIntEquals(testLocalArrayMerge1(true), 1);
     assertIntEquals(testLocalArrayMerge1(false), 1);
