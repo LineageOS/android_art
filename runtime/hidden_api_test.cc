@@ -19,6 +19,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "android-base/stringprintf.h"
 #include "base/file_utils.h"
 #include "base/sdk_version.h"
 #include "base/stl_util.h"
@@ -29,6 +30,7 @@
 
 namespace art {
 
+using android::base::StringPrintf;
 using hiddenapi::detail::MemberSignature;
 using hiddenapi::detail::ShouldDenyAccessToMemberImpl;
 
@@ -534,6 +536,14 @@ static bool LoadDexFiles(const std::string& path,
   return true;
 }
 
+static bool Remove(const std::string& path, /*out*/ std::string* error_msg) {
+  if (TEMP_FAILURE_RETRY(remove(path.c_str())) == 0) {
+    return true;
+  }
+  *error_msg = StringPrintf("Unable to remove(\"%s\"): %s", path.c_str(), strerror(errno));
+  return false;
+}
+
 static bool CheckAllDexFilesInDomain(ObjPtr<mirror::ClassLoader> loader,
                                      const std::vector<std::unique_ptr<const DexFile>>& dex_files,
                                      hiddenapi::Domain expected_domain,
@@ -582,7 +592,7 @@ TEST_F(HiddenApiTest, DexDomain_DataDir) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(data_location_path.c_str()));
+  ASSERT_TRUE(Remove(data_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemDir) {
@@ -605,7 +615,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemDir) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtDir) {
@@ -628,7 +638,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtDir) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_ext_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_ext_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
@@ -656,7 +666,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_framework_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_framework_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir) {
@@ -683,7 +693,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_ext_framework_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_ext_framework_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_DataDir_MultiDex) {
@@ -707,7 +717,7 @@ TEST_F(HiddenApiTest, DexDomain_DataDir_MultiDex) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(data_multi_location_path.c_str()));
+  ASSERT_TRUE(Remove(data_multi_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemDir_MultiDex) {
@@ -732,7 +742,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemDir_MultiDex) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_multi_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_multi_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
@@ -757,7 +767,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_ext_multi_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_ext_multi_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
@@ -786,7 +796,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_framework_multi_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_framework_multi_location_path, &error_msg)) << error_msg;
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir_MultiDex) {
@@ -815,7 +825,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir_MultiDex) {
                                        &error_msg)) << error_msg;
 
   dex_files.clear();
-  ASSERT_EQ(0, remove(system_ext_framework_multi_location_path.c_str()));
+  ASSERT_TRUE(Remove(system_ext_framework_multi_location_path, &error_msg)) << error_msg;
 }
 
 }  // namespace art
