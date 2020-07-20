@@ -44,5 +44,17 @@ public class Main {
     if (b != (byte)0x78) {
       throw new Error("Expected 0xef, got " + b);
     }
+
+    m = c.getMethod("test3", int.class);
+    result = (Integer)m.invoke(null, 300);
+    assertIntEquals(result, 300);
+    result = (Integer)m.invoke(null, 301);
+    assertIntEquals(result, 90);
+  }
+
+  private static void assertIntEquals(int result, int expected) {
+    if (result != expected) {
+      throw new Error("Expected " + expected + ", got " + result);
+    }
   }
 }
