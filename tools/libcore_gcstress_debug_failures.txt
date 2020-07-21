@@ -60,5 +60,15 @@
     "libcore.libcore.icu.RelativeDateTimeFormatterTest#test_getRelativeTimeSpanStringFrench",
     "libcore.libcore.icu.RelativeDateTimeFormatterTest#test_getRelativeTimeSpanStringGerman"
   ]
+},
+{
+  description: "Timeouts relating to ICU implementation change.",
+  result: EXEC_FAILED,
+  bug: 161420453,
+  modes: [host],
+  names: [
+    "libcore.java.text.DecimalFormatTest#testCurrencySymbolSpacing",
+    "libcore.java.text.SimpleDateFormatTest#testLocales"
+  ]
 }
 ]
