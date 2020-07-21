@@ -27,6 +27,7 @@ cc_library_headers {
 cc_defaults {
     name: "libart_simulator_defaults",
     host_supported: true,
+    device_supported: false,
 
     defaults: ["art_defaults"],
     srcs: [
@@ -55,7 +56,6 @@ art_cc_library {
         "libartbase",
         "libvixl",
     ],
-    device_supported: false,
 }
 
 art_cc_library {
@@ -69,7 +69,6 @@ art_cc_library {
         "libartbased",
         "libvixld",
     ],
-    device_supported: false,
 }
 
 cc_defaults {
