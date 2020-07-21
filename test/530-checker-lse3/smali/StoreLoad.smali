@@ -58,5 +58,43 @@
     return v0
 .end method
 
+## CHECK-START: int StoreLoad.test3(int) load_store_elimination (before)
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldGet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldGet
+
+## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     TypeConversion
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldGet
+
+## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
+## CHECK:                         TypeConversion
+## CHECK-NOT:                     TypeConversion
+.method public static test3(I)I
+    .registers 3
+    const/4 v0, 0
+    sput p0, LStoreLoad;->intField:I
+    and-int/lit8 v1, p0, 1
+    if-eqz v1, :skip
+
+    sput-byte p0, LStoreLoad;->byteField:B
+    sget-byte v1, LStoreLoad;->byteField:B
+    sput v1, LStoreLoad;->intField:I
+    # Test that this TypeConversion is moved and used for the
+    # sget-byte above instead of creating a new one.
+    int-to-byte v0, p0
+
+    :skip
+    sget v1, LStoreLoad;->intField:I
+    add-int v0, v1, v0
+    return v0
+.end method
+
+.field public static intField:I
 .field public static byteField:B
 .field public static byteField2:B

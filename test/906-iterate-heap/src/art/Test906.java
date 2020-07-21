@@ -29,9 +29,15 @@ public class Test906 {
   // the middle of a GC we could incorrectly fail. This is expected to be incredibly rare so 10
   // retries should be more than sufficient.
   private static final int ITERATE_RETRIES = 10;
+  private static final class Foobar {}
+
   private static void testHeapCount() throws Exception {
     IllegalStateException lastThrow = new IllegalStateException(
         "Failed to get consistent counts after " + ITERATE_RETRIES + " retries");
+    Foobar[] foobars = new Foobar[123];
+    for (int i = 0; i < foobars.length; i++) {
+      foobars[i] = new Foobar();
+    }
     for (int i = 0; i < ITERATE_RETRIES; i++) {
       try {
         int all = iterateThroughHeapCount(0, null, Integer.MAX_VALUE);
@@ -41,6 +47,7 @@ public class Test906 {
             Integer.MAX_VALUE);
         int untaggedClass = iterateThroughHeapCount(HEAP_FILTER_OUT_CLASS_TAGGED, null,
             Integer.MAX_VALUE);
+        int filteredClass = iterateThroughHeapCount(0, Foobar.class, Integer.MAX_VALUE);
 
         if (all != tagged + untagged) {
           throw new IllegalStateException("Instances: " + all + " != " + tagged + " + " + untagged);
@@ -48,6 +55,10 @@ public class Test906 {
         if (all != taggedClass + untaggedClass) {
           throw new IllegalStateException("By class: " + all + " != " + taggedClass + " + " +
               untaggedClass);
+        }
+        if (filteredClass != foobars.length) {
+          throw new IllegalStateException(
+              "Missed objects of foobar type. " + filteredClass + " != " + foobars.length);
         }
         if (tagged != 6) {
           throw new IllegalStateException(tagged + " tagged objects");
