@@ -2569,18 +2569,21 @@ class Dex2Oat final {
     // cleaning up before that (e.g. the oat writers are created before the
     // runtime).
     profile_compilation_info_.reset(new ProfileCompilationInfo());
-    ScopedFlock profile_file;
-    std::string error;
+    // Dex2oat only uses the reference profile and that is not updated concurrently by the app or
+    // other processes. So we don't need to lock (as we have to do in profman or when writing the
+    // profile info).
+    std::unique_ptr<File> profile_file;
     if (profile_file_fd_ != -1) {
-      profile_file = LockedFile::DupOf(profile_file_fd_, "profile",
-                                       true /* read_only_mode */, &error);
+      profile_file.reset(new File(DupCloexec(profile_file_fd_),
+                                  "profile",
+                                  /* check_usage= */ false,
+                                  /* read_only_mode= */ true));
     } else if (profile_file_ != "") {
-      profile_file = LockedFile::Open(profile_file_.c_str(), O_RDONLY, true, &error);
+      profile_file.reset(OS::OpenFileForReading(profile_file_.c_str()));
     }
 
-    // Return early if we're unable to obtain a lock on the profile.
     if (profile_file.get() == nullptr) {
-      LOG(ERROR) << "Cannot lock profiles: " << error;
+      PLOG(ERROR) << "Cannot lock profiles";
       return false;
     }
 
