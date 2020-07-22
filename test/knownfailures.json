@@ -1176,7 +1176,8 @@
                   "2011-stack-walk-concurrent-instrument",
                   "2012-structural-redefinition-failures-jni-id",
                   "2033-shutdown-mechanics",
-                  "2035-structural-native-method"],
+                  "2035-structural-native-method",
+                  "2036-structural-subclass-shadow"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
