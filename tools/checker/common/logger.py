@@ -44,14 +44,14 @@ class Logger(object):
   Verbosity = Level.Info
 
   @staticmethod
-  def log(text, level=Level.Info, color=Color.Default, newLine=True, out=sys.stdout):
+  def log(content, level=Level.Info, color=Color.Default, newLine=True, out=sys.stdout):
     if level <= Logger.Verbosity:
-      text = Logger.Color.terminalCode(color, out) + text + \
+      content = Logger.Color.terminalCode(color, out) + str(content) + \
              Logger.Color.terminalCode(Logger.Color.Default, out)
       if newLine:
-        print(text, file=out)
+        print(content, file=out)
       else:
-        print(text, end="", file=out)
+        print(content, end="", file=out)
       out.flush()
 
   @staticmethod
