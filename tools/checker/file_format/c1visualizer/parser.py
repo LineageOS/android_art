@@ -25,7 +25,7 @@ class C1ParserState:
     self.currentState = C1ParserState.OutsideBlock
     self.lastMethodName = None
 
-def __parseC1Line(line, lineNo, state, fileName):
+def __parseC1Line(c1File, line, lineNo, state, fileName):
   """ This function is invoked on each line of the output file and returns
       a triplet which instructs the parser how the line should be handled. If the
       line is to be included in the current group, it is returned in the first
@@ -58,7 +58,25 @@ def __parseC1Line(line, lineNo, state, fileName):
       methodName = line.split("\"")[1].strip()
       if not methodName:
         Logger.fail("Empty method name in output", fileName, lineNo)
-      state.lastMethodName = methodName
+
+      m = re.match("isa_features:([\w,-]+)", methodName)
+      if (m):
+        rawFeatures = m.group(1).split(",")
+        # Create a map of features in the form {featureName: isEnabled}.
+        features = {}
+        for rf in rawFeatures:
+          featureName = rf
+          isEnabled = True
+          # A '-' in front of the feature name indicates that the feature wasn't enabled at compile
+          # time.
+          if rf[0] == '-':
+            featureName = rf[1:]
+            isEnabled = False
+          features[featureName] = isEnabled
+
+        c1File.setISAFeatures(features)
+      else:
+        state.lastMethodName = methodName
     elif line == "end_compilation":
       state.currentState = C1ParserState.OutsideBlock
     return (None, None, None)
@@ -81,7 +99,7 @@ def __parseC1Line(line, lineNo, state, fileName):
 def ParseC1visualizerStream(fileName, stream):
   c1File = C1visualizerFile(fileName)
   state = C1ParserState()
-  fnProcessLine = lambda line, lineNo: __parseC1Line(line, lineNo, state, fileName)
+  fnProcessLine = lambda line, lineNo: __parseC1Line(c1File, line, lineNo, state, fileName)
   fnLineOutsideChunk = lambda line, lineNo: \
       Logger.fail("C1visualizer line not inside a group", fileName, lineNo)
   for passName, passLines, startLineNo, testArch in \
