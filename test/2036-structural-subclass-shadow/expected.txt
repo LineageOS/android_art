@@ -1,0 +1,8 @@
+value-getter is 42
+value is 42
+static-call is 1337
+static-value is 3.14
+value-getter is 0
+value is 0
+static-call is -559038737
+static-value is 0.0
