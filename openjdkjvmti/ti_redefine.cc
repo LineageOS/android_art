@@ -2761,8 +2761,6 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   art::Locks::mutator_lock_->AssertExclusiveHeld(driver_->self_);
   art::ClassLinker* cl = driver_->runtime_->GetClassLinker();
   art::ScopedAssertNoThreadSuspension sants(__FUNCTION__);
-  art::ObjPtr<art::mirror::Class> orig(holder.GetMirrorClass());
-  art::ObjPtr<art::mirror::Class> replacement(holder.GetNewClassObject());
   art::ObjPtr<art::mirror::ObjectArray<art::mirror::Class>> new_classes(holder.GetNewClasses());
   art::ObjPtr<art::mirror::ObjectArray<art::mirror::Class>> old_classes(holder.GetOldClasses());
   // Collect mappings from old to new fields/methods
@@ -2773,8 +2771,6 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
       holder.GetNewInstanceObjects());
   art::ObjPtr<art::mirror::ObjectArray<art::mirror::Object>> old_instances(
       holder.GetOldInstanceObjects());
-  CHECK(!orig.IsNull());
-  CHECK(!replacement.IsNull());
   // Once we do the ReplaceReferences old_classes will have the new_classes in it. We want to keep
   // ahold of the old classes so copy them now.
   std::vector<art::ObjPtr<art::mirror::Class>> old_classes_vec(old_classes->Iterate().begin(),
@@ -2848,16 +2844,26 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
       }
     }
     // We can only shadow things from our superclasses
-    if (LIKELY(!field_or_method->GetDeclaringClass()->IsAssignableFrom(orig))) {
+    auto orig_classes_iter = old_classes->Iterate();
+    auto replacement_classes_iter = new_classes->Iterate();
+    art::ObjPtr<art::mirror::Class> f_or_m_class = field_or_method->GetDeclaringClass();
+    if (LIKELY(!f_or_m_class->IsAssignableFrom(holder.GetMirrorClass()) &&
+               std::find(orig_classes_iter.begin(), orig_classes_iter.end(), f_or_m_class) ==
+                   orig_classes_iter.end())) {
       return false;
     }
     if constexpr (is_method) {
-      auto direct_methods = replacement->GetDirectMethods(art::kRuntimePointerSize);
-      return std::find_if(direct_methods.begin(),
-                          direct_methods.end(),
-                          [&](art::ArtMethod& m) REQUIRES(art::Locks::mutator_lock_) {
-                            return UNLIKELY(m.HasSameNameAndSignature(field_or_method));
-                          }) != direct_methods.end();
+      return std::any_of(
+          replacement_classes_iter.begin(),
+          replacement_classes_iter.end(),
+          [&](art::ObjPtr<art::mirror::Class> cand) REQUIRES(art::Locks::mutator_lock_) {
+            auto direct_methods = cand->GetDirectMethods(art::kRuntimePointerSize);
+            return std::find_if(direct_methods.begin(),
+                                direct_methods.end(),
+                                [&](art::ArtMethod& m) REQUIRES(art::Locks::mutator_lock_) {
+                                  return UNLIKELY(m.HasSameNameAndSignature(field_or_method));
+                                }) != direct_methods.end();
+          });
     } else {
       auto pred = [&](art::ArtField& f) REQUIRES(art::Locks::mutator_lock_) {
         return std::string_view(f.GetName()) == std::string_view(field_or_method->GetName()) &&
@@ -2865,11 +2871,21 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
                    std::string_view(field_or_method->GetTypeDescriptor());
       };
       if (field_or_method->IsStatic()) {
-        auto sfields = replacement->GetSFields();
-        return std::find_if(sfields.begin(), sfields.end(), pred) != sfields.end();
+        return std::any_of(
+            replacement_classes_iter.begin(),
+            replacement_classes_iter.end(),
+            [&](art::ObjPtr<art::mirror::Class> cand) REQUIRES(art::Locks::mutator_lock_) {
+              auto sfields = cand->GetSFields();
+              return std::find_if(sfields.begin(), sfields.end(), pred) != sfields.end();
+            });
       } else {
-        auto ifields = replacement->GetIFields();
-        return std::find_if(ifields.begin(), ifields.end(), pred) != ifields.end();
+        return std::any_of(
+            replacement_classes_iter.begin(),
+            replacement_classes_iter.end(),
+            [&](art::ObjPtr<art::mirror::Class> cand) REQUIRES(art::Locks::mutator_lock_) {
+              auto ifields = cand->GetIFields();
+              return std::find_if(ifields.begin(), ifields.end(), pred) != ifields.end();
+            });
       }
     }
   };
@@ -2879,28 +2895,28 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
       [&](art::ArtField* f, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
         DCHECK(f != nullptr) << info;
         auto it = field_map.find(f);
-        if (it != field_map.end()) {
+        if (UNLIKELY(could_change_resolution_of(f, info))) {
+          // Dex-cache Resolution might change. Just clear the resolved value.
+          VLOG(plugin) << "Clearing resolution " << info << " for (field) " << f->PrettyField();
+          return static_cast<art::ArtField*>(nullptr);
+        } else if (it != field_map.end()) {
           VLOG(plugin) << "Updating " << info << " object for (field) "
                        << it->second->PrettyField();
           return it->second;
-        } else if (UNLIKELY(could_change_resolution_of(f, info))) {
-          // Resolution might change. Just clear the resolved value.
-          VLOG(plugin) << "Clearing resolution " << info << " for (field) " << f->PrettyField();
-          return static_cast<art::ArtField*>(nullptr);
         }
         return f;
       },
       [&](art::ArtMethod* m, const auto& info) REQUIRES(art::Locks::mutator_lock_) {
         DCHECK(m != nullptr) << info;
         auto it = method_map.find(m);
-        if (it != method_map.end()) {
+        if (UNLIKELY(could_change_resolution_of(m, info))) {
+          // Dex-cache Resolution might change. Just clear the resolved value.
+          VLOG(plugin) << "Clearing resolution " << info << " for (method) " << m->PrettyMethod();
+          return static_cast<art::ArtMethod*>(nullptr);
+        } else if (it != method_map.end()) {
           VLOG(plugin) << "Updating " << info << " object for (method) "
                       << it->second->PrettyMethod();
           return it->second;
-        } else if (UNLIKELY(could_change_resolution_of(m, info))) {
-          // Resolution might change. Just clear the resolved value.
-          VLOG(plugin) << "Clearing resolution " << info << " for (method) " << m->PrettyMethod();
-          return static_cast<art::ArtMethod*>(nullptr);
         }
         return m;
       });
@@ -2955,18 +2971,25 @@ void Redefiner::ClassRedefinition::UpdateClassStructurally(const RedefinitionDat
   if (art::kIsDebugBuild) {
     // Just make sure we didn't screw up any of the now obsolete methods or fields. We need their
     // declaring-class to still be the obolete class
-    orig->VisitMethods([&](art::ArtMethod* method) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-      if (method->IsCopied()) {
-        // Copied methods have interfaces as their declaring class.
-        return;
-      }
-      DCHECK_EQ(method->GetDeclaringClass(), orig) << method->GetDeclaringClass()->PrettyClass()
-                                                   << " vs " << orig->PrettyClass();
-    }, art::kRuntimePointerSize);
-    orig->VisitFields([&](art::ArtField* field) REQUIRES_SHARED(art::Locks::mutator_lock_) {
-      DCHECK_EQ(field->GetDeclaringClass(), orig) << field->GetDeclaringClass()->PrettyClass()
-                                                  << " vs " << orig->PrettyClass();
-    });
+    std::for_each(
+        old_classes_vec.cbegin(),
+        old_classes_vec.cend(),
+        [](art::ObjPtr<art::mirror::Class> orig) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+          orig->VisitMethods(
+              [&](art::ArtMethod* method) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+                if (method->IsCopied()) {
+                  // Copied methods have interfaces as their declaring class.
+                  return;
+                }
+                DCHECK_EQ(method->GetDeclaringClass(), orig)
+                    << method->GetDeclaringClass()->PrettyClass() << " vs " << orig->PrettyClass();
+              },
+              art::kRuntimePointerSize);
+          orig->VisitFields([&](art::ArtField* field) REQUIRES_SHARED(art::Locks::mutator_lock_) {
+            DCHECK_EQ(field->GetDeclaringClass(), orig)
+                << field->GetDeclaringClass()->PrettyClass() << " vs " << orig->PrettyClass();
+          });
+        });
   }
 }
 
