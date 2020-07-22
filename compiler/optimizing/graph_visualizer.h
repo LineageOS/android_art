@@ -107,6 +107,11 @@ class HGraphVisualizer : public ValueObject {
   void DumpGraph(const char* pass_name, bool is_after_pass, bool graph_in_bad_state) const;
   void DumpGraphWithDisassembly() const;
 
+  // C1visualizer file format does not support inserting arbitrary metadata into a cfg
+  // file. As a workaround a fake compilation block with the metadata in the name and the
+  // method attributes is used. Such empty blocks don't break the c1visualizer parser.
+  static std::string InsertMetaDataAsCompilationBlock(const std::string& meta_data);
+
  private:
   std::ostream* const output_;
   HGraph* const graph_;
