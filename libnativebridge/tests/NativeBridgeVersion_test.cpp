@@ -24,7 +24,7 @@ TEST_F(NativeBridgeTest, Version) {
     // When a bridge isn't loaded, we expect 0.
     EXPECT_EQ(NativeBridgeGetVersion(), 0U);
 
-    // After our dummy bridge has been loaded, we expect 1.
+    // After our fake bridge has been loaded, we expect 1.
     ASSERT_TRUE(LoadNativeBridge(kNativeBridgeLibrary, nullptr));
     EXPECT_EQ(NativeBridgeGetVersion(), 1U);
 

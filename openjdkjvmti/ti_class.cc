@@ -661,7 +661,7 @@ jvmtiError ClassUtil::GetImplementedInterfaces(jvmtiEnv* env,
   // spec says these should not be reported.
   if (klass->IsArrayClass()) {
     *interface_count_ptr = 0;
-    *interfaces_ptr = nullptr;  // TODO: Should we allocate a dummy here?
+    *interfaces_ptr = nullptr;  // TODO: Should we allocate a placeholder here?
     return ERR(NONE);
   }
 

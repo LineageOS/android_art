@@ -277,7 +277,7 @@ using BitStructUint =
 #define BITSTRUCT_UINT(bit_offset, bit_width)                                  \
     BitStructUint<(bit_offset), (bit_width), StorageType>
 
-// End the definition of a bitstruct, and insert a sanity check
+// End the definition of a bitstruct, and insert a check
 // to ensure that the bitstruct did not exceed the specified size.
 //
 // See top of file for usage example.

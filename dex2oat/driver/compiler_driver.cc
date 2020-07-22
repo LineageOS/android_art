@@ -2014,7 +2014,7 @@ class VerifyClassVisitor : public CompilationVisitor {
       } else if (failure_kind == verifier::FailureKind::kSoftFailure) {
         manager_->GetCompiler()->AddSoftVerifierFailure();
       } else {
-        // Force a soft failure for the VerifierDeps. This is a sanity measure, as
+        // Force a soft failure for the VerifierDeps. This is a validity measure, as
         // the vdex file already records that the class hasn't been resolved. It avoids
         // trying to do future verification optimizations when processing the vdex file.
         DCHECK(failure_kind == verifier::FailureKind::kNoFailure ||
@@ -2319,8 +2319,8 @@ class InitializeClassVisitor : public CompilationVisitor {
             VLOG(compiler) << "Initializing: " << descriptor;
             // TODO multithreading support. We should ensure the current compilation thread has
             // exclusive access to the runtime and the transaction. To achieve this, we could use
-            // a ReaderWriterMutex but we're holding the mutator lock so we fail mutex sanity
-            // checks in Thread::AssertThreadSuspensionIsAllowable.
+            // a ReaderWriterMutex but we're holding the mutator lock so we fail the check of mutex
+            // validity in Thread::AssertThreadSuspensionIsAllowable.
 
             // Resolve and initialize the exception type before enabling the transaction in case
             // the transaction aborts and cannot resolve the type.

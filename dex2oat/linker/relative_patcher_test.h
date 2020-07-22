@@ -214,7 +214,7 @@ class RelativePatcherTest : public testing::Test {
   }
 
   bool CheckLinkedMethod(MethodReference method_ref, const ArrayRef<const uint8_t>& expected_code) {
-    // Sanity check: original code size must match linked_code.size().
+    // Check that the original code size must match linked_code.size().
     size_t idx = 0u;
     for (auto ref : compiled_method_refs_) {
       if (ref == method_ref) {
