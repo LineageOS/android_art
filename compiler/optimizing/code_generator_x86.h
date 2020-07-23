@@ -657,9 +657,9 @@ class CodeGeneratorX86 : public CodeGenerator {
   void MaybeGenerateInlineCacheCheck(HInstruction* instruction, Register klass);
   void MaybeIncrementHotness(bool is_frame_entry);
 
-  // When we don't know the proper offset for the value, we use kDummy32BitOffset.
+  // When we don't know the proper offset for the value, we use kPlaceholder32BitOffset.
   // The correct value will be inserted when processing Assembler fixups.
-  static constexpr int32_t kDummy32BitOffset = 256;
+  static constexpr int32_t kPlaceholder32BitOffset = 256;
 
  private:
   struct X86PcRelativePatchInfo : PatchInfo<Label> {

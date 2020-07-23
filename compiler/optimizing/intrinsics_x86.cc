@@ -2977,7 +2977,8 @@ void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
       DCHECK(method_address != nullptr);
       Register method_address_reg =
           invoke->GetLocations()->InAt(method_address_index).AsRegister<Register>();
-      __ movl(out, Address(method_address_reg, out, TIMES_4, CodeGeneratorX86::kDummy32BitOffset));
+      __ movl(out,
+              Address(method_address_reg, out, TIMES_4, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageIntrinsicPatch(method_address, info.array_data_boot_image_reference);
     } else {
       // Note: We're about to clobber the index in `out`, so we need to use `in` and

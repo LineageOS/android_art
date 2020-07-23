@@ -639,9 +639,9 @@ class CodeGeneratorX86_64 : public CodeGenerator {
 
   static void BlockNonVolatileXmmRegisters(LocationSummary* locations);
 
-  // When we don't know the proper offset for the value, we use kDummy32BitOffset.
+  // When we don't know the proper offset for the value, we use kPlaceholder32BitOffset.
   // We will fix this up in the linker later to have the right value.
-  static constexpr int32_t kDummy32BitOffset = 256;
+  static constexpr int32_t kPlaceholder32BitOffset = 256;
 
  private:
   template <linker::LinkerPatch (*Factory)(size_t, const DexFile*, uint32_t, uint32_t)>
