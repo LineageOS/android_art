@@ -452,10 +452,13 @@ art_cc_test {
         "libnativehelper_header_only",
     ],
 
+    static_libs: [
+        "libartd-simulator-container",
+    ],
+
     shared_libs: [
         "libprofiled",
         "libartd-compiler",
-        "libartd-simulator-container",
         "libvixld",
 
         "libbacktrace",
