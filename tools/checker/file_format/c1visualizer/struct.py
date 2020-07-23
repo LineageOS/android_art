@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from common.logger import Logger
-from common.mixins import PrintableMixin
+from common.immutables import ImmutableDict
+from common.logger     import Logger
+from common.mixins     import PrintableMixin
 
 class C1visualizerFile(PrintableMixin):
 
   def __init__(self, fileName):
     self.fileName = fileName
     self.passes = []
+    self.instructionSetFeatures = ImmutableDict()
+
+  def setISAFeatures(self, features):
+    self.instructionSetFeatures = ImmutableDict(features)
 
   def addPass(self, new_pass):
     self.passes.append(new_pass)
@@ -32,7 +37,8 @@ class C1visualizerFile(PrintableMixin):
 
   def __eq__(self, other):
     return isinstance(other, self.__class__) \
-       and self.passes == other.passes
+       and self.passes == other.passes \
+       and self.instructionSetFeatures == other.instructionSetFeatures
 
 
 class C1visualizerPass(PrintableMixin):

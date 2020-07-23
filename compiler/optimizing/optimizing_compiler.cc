@@ -400,6 +400,9 @@ class OptimizingCompiler final : public Compiler {
 
   std::vector<uint8_t> GenerateJitDebugInfo(const debug::MethodDebugInfo& method_debug_info);
 
+  // This must be called before any other function that dumps data to the cfg
+  void DumpInstructionSetFeaturesToCfg() const;
+
   std::unique_ptr<OptimizingCompilerStats> compilation_stats_;
 
   std::unique_ptr<std::ostream> visualizer_output_;
@@ -421,6 +424,7 @@ OptimizingCompiler::OptimizingCompiler(const CompilerOptions& compiler_options,
     std::ios_base::openmode cfg_file_mode =
         compiler_options.GetDumpCfgAppend() ? std::ofstream::app : std::ofstream::out;
     visualizer_output_.reset(new std::ofstream(cfg_file_name, cfg_file_mode));
+    DumpInstructionSetFeaturesToCfg();
   }
   if (compiler_options.GetDumpStats()) {
     compilation_stats_.reset(new OptimizingCompilerStats());
@@ -431,6 +435,16 @@ OptimizingCompiler::~OptimizingCompiler() {
   if (compilation_stats_.get() != nullptr) {
     compilation_stats_->Log();
   }
+}
+
+void OptimizingCompiler::DumpInstructionSetFeaturesToCfg() const {
+  const CompilerOptions& compiler_options = GetCompilerOptions();
+  const InstructionSetFeatures* features = compiler_options.GetInstructionSetFeatures();
+  std::string features_string = "isa_features:" + features->GetFeatureString();
+  // It is assumed that visualizer_output_ is empty when calling this function, hence the fake
+  // compilation block containing the ISA features will be printed at the beginning of the .cfg
+  // file.
+  *visualizer_output_ << HGraphVisualizer::InsertMetaDataAsCompilationBlock(features_string);
 }
 
 bool OptimizingCompiler::CanCompileMethod(uint32_t method_idx ATTRIBUTE_UNUSED,
