@@ -226,6 +226,7 @@ inline bool ClassLinker::CheckInvokeClassMismatch(ObjPtr<mirror::DexCache> dex_c
   switch (type) {
     case kStatic:
     case kSuper:
+    case kPolymorphic:
       break;
     case kInterface: {
       // We have to check whether the method id really belongs to an interface (dex static bytecode
