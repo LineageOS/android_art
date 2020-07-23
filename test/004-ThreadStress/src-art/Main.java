@@ -638,8 +638,8 @@ public class Main implements Runnable {
                     : new Daemon(lock, t, operations, mainThread, startBarrier);
         }
 
-        // Enable to dump operation counts per thread to make sure its
-        // sane compared to frequencyMap.
+        // Enable to dump operation counts per thread to see that it is
+        // commensurate with the frequencyMap.
         if (DEBUG) {
             for (int t = 0; t < threadStresses.length; t++) {
                 Operation[] operations = threadStresses[t].operations;

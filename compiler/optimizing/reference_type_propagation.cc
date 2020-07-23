@@ -481,7 +481,7 @@ void ReferenceTypePropagation::RTPVisitor::BoundTypeForIfInstanceOf(HBasicBlock*
 
   ReferenceTypeInfo class_rti = instanceOf->GetTargetClassRTI();
   if (!class_rti.IsValid()) {
-    // He have loaded an unresolved class. Don't bother bounding the type.
+    // We have loaded an unresolved class. Don't bother bounding the type.
     return;
   }
 
