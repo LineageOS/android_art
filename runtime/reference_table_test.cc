@@ -109,7 +109,7 @@ TEST_F(ReferenceTableTest, Basics) {
     EXPECT_EQ(oss.str().find("short[]"), std::string::npos) << oss.str();
   }
 
-  // Add a second object 10 times and check dumping is sane.
+  // Add a second object 10 times so we can then check dumping works as expected.
   Handle<mirror::ShortArray> o2 = hs.NewHandle(mirror::ShortArray::Alloc(soa.Self(), 0));
   for (size_t i = 0; i < 10; ++i) {
     rt.Add(o2.Get());
