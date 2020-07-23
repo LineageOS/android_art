@@ -5019,14 +5019,15 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       Register base_reg = GetInvokeStaticOrDirectExtraParameter(invoke,
                                                                 temp.AsRegister<Register>());
-      __ leal(temp.AsRegister<Register>(), Address(base_reg, CodeGeneratorX86::kDummy32BitOffset));
+      __ leal(temp.AsRegister<Register>(),
+              Address(base_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
       RecordBootImageMethodPatch(invoke);
       break;
     }
     case HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo: {
       Register base_reg = GetInvokeStaticOrDirectExtraParameter(invoke,
                                                                 temp.AsRegister<Register>());
-      __ movl(temp.AsRegister<Register>(), Address(base_reg, kDummy32BitOffset));
+      __ movl(temp.AsRegister<Register>(), Address(base_reg, kPlaceholder32BitOffset));
       RecordBootImageRelRoPatch(
           invoke->InputAt(invoke->GetSpecialInputIndex())->AsX86ComputeBaseMethodAddress(),
           GetBootImageOffset(invoke));
@@ -5035,7 +5036,7 @@ void CodeGeneratorX86::GenerateStaticOrDirectCall(
     case HInvokeStaticOrDirect::MethodLoadKind::kBssEntry: {
       Register base_reg = GetInvokeStaticOrDirectExtraParameter(invoke,
                                                                 temp.AsRegister<Register>());
-      __ movl(temp.AsRegister<Register>(), Address(base_reg, kDummy32BitOffset));
+      __ movl(temp.AsRegister<Register>(), Address(base_reg, kPlaceholder32BitOffset));
       RecordMethodBssEntryPatch(invoke);
       // No need for memory fence, thanks to the x86 memory model.
       break;
@@ -5222,7 +5223,7 @@ void CodeGeneratorX86::LoadBootImageAddress(Register reg,
     DCHECK(method_address != nullptr);
     Register method_address_reg =
         invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex()).AsRegister<Register>();
-    __ leal(reg, Address(method_address_reg, CodeGeneratorX86::kDummy32BitOffset));
+    __ leal(reg, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
     RecordBootImageIntrinsicPatch(method_address, boot_image_reference);
   } else if (GetCompilerOptions().GetCompilePic()) {
     HX86ComputeBaseMethodAddress* method_address =
@@ -5230,7 +5231,7 @@ void CodeGeneratorX86::LoadBootImageAddress(Register reg,
     DCHECK(method_address != nullptr);
     Register method_address_reg =
         invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex()).AsRegister<Register>();
-    __ movl(reg, Address(method_address_reg, CodeGeneratorX86::kDummy32BitOffset));
+    __ movl(reg, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
     RecordBootImageRelRoPatch(method_address, boot_image_reference);
   } else {
     DCHECK(GetCompilerOptions().IsJitCompiler());
@@ -5254,7 +5255,7 @@ void CodeGeneratorX86::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invok
     DCHECK(method_address != nullptr);
     Register method_address_reg =
         invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex()).AsRegister<Register>();
-    __ leal(argument, Address(method_address_reg, CodeGeneratorX86::kDummy32BitOffset));
+    __ leal(argument, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
     MethodReference target_method = invoke->GetTargetMethod();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     boot_image_type_patches_.emplace_back(method_address, target_method.dex_file, type_idx.index_);
@@ -6837,21 +6838,21 @@ void InstructionCodeGeneratorX86::VisitLoadClass(HLoadClass* cls) NO_THREAD_SAFE
              codegen_->GetCompilerOptions().IsBootImageExtension());
       DCHECK_EQ(read_barrier_option, kWithoutReadBarrier);
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      __ leal(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
+      __ leal(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageTypePatch(cls);
       break;
     }
     case HLoadClass::LoadKind::kBootImageRelRo: {
       DCHECK(!codegen_->GetCompilerOptions().IsBootImage());
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      __ movl(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
+      __ movl(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageRelRoPatch(cls->InputAt(0)->AsX86ComputeBaseMethodAddress(),
                                           codegen_->GetBootImageOffset(cls));
       break;
     }
     case HLoadClass::LoadKind::kBssEntry: {
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      Address address(method_address, CodeGeneratorX86::kDummy32BitOffset);
+      Address address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset);
       Label* fixup_label = codegen_->NewTypeBssEntryPatch(cls);
       GenerateGcRootFieldLoad(cls, out_loc, address, fixup_label, read_barrier_option);
       // No need for memory fence, thanks to the x86 memory model.
@@ -6866,7 +6867,7 @@ void InstructionCodeGeneratorX86::VisitLoadClass(HLoadClass* cls) NO_THREAD_SAFE
       break;
     }
     case HLoadClass::LoadKind::kJitTableAddress: {
-      Address address = Address::Absolute(CodeGeneratorX86::kDummy32BitOffset);
+      Address address = Address::Absolute(CodeGeneratorX86::kPlaceholder32BitOffset);
       Label* fixup_label = codegen_->NewJitRootClassPatch(
           cls->GetDexFile(), cls->GetTypeIndex(), cls->GetClass());
       // /* GcRoot<mirror::Class> */ out = *address
@@ -7034,21 +7035,21 @@ void InstructionCodeGeneratorX86::VisitLoadString(HLoadString* load) NO_THREAD_S
       DCHECK(codegen_->GetCompilerOptions().IsBootImage() ||
              codegen_->GetCompilerOptions().IsBootImageExtension());
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      __ leal(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
+      __ leal(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageStringPatch(load);
       return;
     }
     case HLoadString::LoadKind::kBootImageRelRo: {
       DCHECK(!codegen_->GetCompilerOptions().IsBootImage());
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      __ movl(out, Address(method_address, CodeGeneratorX86::kDummy32BitOffset));
+      __ movl(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageRelRoPatch(load->InputAt(0)->AsX86ComputeBaseMethodAddress(),
                                           codegen_->GetBootImageOffset(load));
       return;
     }
     case HLoadString::LoadKind::kBssEntry: {
       Register method_address = locations->InAt(0).AsRegister<Register>();
-      Address address = Address(method_address, CodeGeneratorX86::kDummy32BitOffset);
+      Address address = Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset);
       Label* fixup_label = codegen_->NewStringBssEntryPatch(load);
       // /* GcRoot<mirror::String> */ out = *address  /* PC-relative */
       GenerateGcRootFieldLoad(load, out_loc, address, fixup_label, kCompilerReadBarrierOption);
@@ -7067,7 +7068,7 @@ void InstructionCodeGeneratorX86::VisitLoadString(HLoadString* load) NO_THREAD_S
       return;
     }
     case HLoadString::LoadKind::kJitTableAddress: {
-      Address address = Address::Absolute(CodeGeneratorX86::kDummy32BitOffset);
+      Address address = Address::Absolute(CodeGeneratorX86::kPlaceholder32BitOffset);
       Label* fixup_label = codegen_->NewJitRootStringPatch(
           load->GetDexFile(), load->GetStringIndex(), load->GetString());
       // /* GcRoot<mirror::String> */ out = *address
@@ -8511,7 +8512,7 @@ Address CodeGeneratorX86::LiteralDoubleAddress(double v,
                                                Register reg) {
   AssemblerFixup* fixup =
       new (GetGraph()->GetAllocator()) RIPFixup(*this, method_base, __ AddDouble(v));
-  return Address(reg, kDummy32BitOffset, fixup);
+  return Address(reg, kPlaceholder32BitOffset, fixup);
 }
 
 Address CodeGeneratorX86::LiteralFloatAddress(float v,
@@ -8519,7 +8520,7 @@ Address CodeGeneratorX86::LiteralFloatAddress(float v,
                                               Register reg) {
   AssemblerFixup* fixup =
       new (GetGraph()->GetAllocator()) RIPFixup(*this, method_base, __ AddFloat(v));
-  return Address(reg, kDummy32BitOffset, fixup);
+  return Address(reg, kPlaceholder32BitOffset, fixup);
 }
 
 Address CodeGeneratorX86::LiteralInt32Address(int32_t v,
@@ -8527,7 +8528,7 @@ Address CodeGeneratorX86::LiteralInt32Address(int32_t v,
                                               Register reg) {
   AssemblerFixup* fixup =
       new (GetGraph()->GetAllocator()) RIPFixup(*this, method_base, __ AddInt32(v));
-  return Address(reg, kDummy32BitOffset, fixup);
+  return Address(reg, kPlaceholder32BitOffset, fixup);
 }
 
 Address CodeGeneratorX86::LiteralInt64Address(int64_t v,
@@ -8535,7 +8536,7 @@ Address CodeGeneratorX86::LiteralInt64Address(int64_t v,
                                               Register reg) {
   AssemblerFixup* fixup =
       new (GetGraph()->GetAllocator()) RIPFixup(*this, method_base, __ AddInt64(v));
-  return Address(reg, kDummy32BitOffset, fixup);
+  return Address(reg, kPlaceholder32BitOffset, fixup);
 }
 
 void CodeGeneratorX86::Load32BitValue(Register dest, int32_t value) {
@@ -8590,7 +8591,7 @@ Address CodeGeneratorX86::LiteralCaseTable(HX86PackedSwitch* switch_instr,
   fixups_to_jump_tables_.push_back(table_fixup);
 
   // We want a scaled address, as we are extracting the correct offset from the table.
-  return Address(reg, value, TIMES_4, kDummy32BitOffset, table_fixup);
+  return Address(reg, value, TIMES_4, kPlaceholder32BitOffset, table_fixup);
 }
 
 // TODO: target as memory.
