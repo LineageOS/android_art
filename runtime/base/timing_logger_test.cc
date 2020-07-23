@@ -46,7 +46,7 @@ TEST_F(TimingLoggerTest, StartNewEnd) {
   logger.NewTiming(split2name);
   logger.NewTiming(split3name);
   logger.EndTiming();
-  // Get the timings and verify that they are sane.
+  // Get the timings and verify that they are appropriate.
   const auto& timings = logger.GetTimings();
   // 6 timings in the timing logger at this point.
   EXPECT_EQ(6U, timings.size());
