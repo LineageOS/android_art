@@ -433,6 +433,36 @@ libart_cc_defaults {
     export_shared_lib_headers: ["libbase"],
 }
 
+cc_defaults {
+    name: "libart_pgo",
+
+    pgo: {
+        sampling: true,
+    },
+    target: {
+        android_arm64: {
+            pgo: {
+                profile_file: "art/libart_arm_arm64.profdata",
+            },
+        },
+        android_arm: {
+            pgo: {
+                profile_file: "art/libart_arm_arm64.profdata",
+            },
+        },
+        android_x86_64: {
+            pgo: {
+                profile_file: "art/libart_x86_x86_64.profdata",
+            },
+        },
+        android_x86: {
+            pgo: {
+                profile_file: "art/libart_x86_x86_64.profdata",
+            },
+        },
+    },
+}
+
 libart_static_cc_defaults {
     name: "libart_static_base_defaults",
     static_libs: [
@@ -523,6 +553,7 @@ art_cc_library {
     defaults: [
         "libart_defaults",
         "libart_nativeunwind_defaults",
+        "libart_pgo",
     ],
     whole_static_libs: [
     ],
