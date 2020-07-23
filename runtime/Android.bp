@@ -559,10 +559,10 @@ art_cc_library {
     ],
     static_libs: [
         "libelffile",
+        "libart-simulator-container",
     ],
     shared_libs: [
         "libartbase",
-        "libart-simulator-container",
         "libdexfile",
         // We need to eagerly load it so libdexfile_support used from libunwindstack can find it.
         "libdexfile_external",
@@ -594,10 +594,10 @@ art_cc_library {
     ],
     static_libs: [
         "libelffiled",
+        "libartd-simulator-container",
     ],
     shared_libs: [
         "libartbased",
-        "libartd-simulator-container",
         "libdexfiled",
         // We need to eagerly preload it, so that libunwindstack can find it.
         // Otherwise, it would try to load the non-debug version with dlopen.
