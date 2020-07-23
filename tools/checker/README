@@ -93,9 +93,23 @@ Branching is possible thanks to the following statements:
  - CHECK-FI:
 
 CHECK-IF and CHECK-ELIF take a Python expression as input that will be evaluated by `eval`.
-Like CHECK-EVAL, they support only referencing of variables, defining new variables as part
-of the statement input is not allowed. Any other surrounding text will be passed to Python's `eval`
-as is. CHECK-ELSE and CHECK-FI must not have any input.
+
+A possible use case of branching is to check whether the generated code exploits the instruction
+architecture features enabled at compile time. For that purpose, you can call the custom made
+function isaHasFeature("feature_name").
+
+Example:
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdComplex(byte[], byte[]) disassembly (after)
+  /// CHECK:        VecDotProd
+  /// CHECK-IF:     isaHasFeature("dotprod")
+  ///               CHECK:        sdot
+  /// CHECK-ELSE:
+  ///               CHECK-NOT:    sdot
+  /// CHECK-FI:
+
+Like CHECK-EVAL, CHECK-IF and CHECK-ELIF support only referencing of variables, defining new
+variables as part of the statement input is not allowed. Any other surrounding text will be passed
+to Python's `eval` as is. CHECK-ELSE and CHECK-FI must not have any input.
 
 Example:
   /// CHECK-START: int MyClass.MyMethod() constant_folding (after)
