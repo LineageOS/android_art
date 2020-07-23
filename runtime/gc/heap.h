@@ -510,7 +510,7 @@ class Heap {
     verify_object_mode_ = kVerifyObjectModeDisabled;
   }
 
-  // Other checks may be performed if we know the heap should be in a sane state.
+  // Other checks may be performed if we know the heap should be in a healthy state.
   bool IsObjectValidationEnabled() const {
     return verify_object_mode_ > kVerifyObjectModeDisabled;
   }

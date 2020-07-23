@@ -45,7 +45,7 @@ inline size_t Array::SizeOf() {
   // Don't need to check this since we already check this in GetClass.
   int32_t component_count =
       GetLength<static_cast<VerifyObjectFlags>(kVerifyFlags & ~kVerifyThis)>();
-  // This is safe from overflow because the array was already allocated, so we know it's sane.
+  // This is safe from overflow because the array was already allocated.
   size_t header_size = DataOffset(1U << component_size_shift).SizeValue();
   size_t data_size = component_count << component_size_shift;
   return header_size + data_size;
