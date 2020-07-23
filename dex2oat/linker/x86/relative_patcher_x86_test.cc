@@ -116,7 +116,7 @@ TEST_F(X86RelativePatcherTest, StringBssEntry) {
   static const uint8_t raw_code[] = {
       0xe8, 0x00, 0x00, 0x00, 0x00,         // call +0
       0x5b,                                 // pop ebx
-      0x8b, 0x83, 0x00, 0x01, 0x00, 0x00,   // mov eax, [ebx + 256 (kDummy32BitValue)]
+      0x8b, 0x83, 0x00, 0x01, 0x00, 0x00,   // mov eax, [ebx + 256 (kPlaceholder32BitOffset)]
   };
   constexpr uint32_t anchor_offset = 5u;  // After call +0.
   ArrayRef<const uint8_t> code(raw_code);
@@ -148,7 +148,7 @@ TEST_F(X86RelativePatcherTest, StringReference) {
   static const uint8_t raw_code[] = {
       0xe8, 0x00, 0x00, 0x00, 0x00,         // call +0
       0x5b,                                 // pop ebx
-      0x8d, 0x83, 0x00, 0x01, 0x00, 0x00,   // lea eax, [ebx + 256 (kDummy32BitValue)]
+      0x8d, 0x83, 0x00, 0x01, 0x00, 0x00,   // lea eax, [ebx + 256 (kPlaceholder32BitOffset)]
   };
   constexpr uint32_t anchor_offset = 5u;  // After call +0.
   ArrayRef<const uint8_t> code(raw_code);
