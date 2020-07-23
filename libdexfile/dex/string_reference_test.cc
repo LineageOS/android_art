@@ -33,14 +33,14 @@ TEST(StringReference, ValueComparator) {
   // that it's the wrong string. Without the fix the strings would then compare equal.
   TestDexFileBuilder builder1;
   builder1.AddString("String1");
-  std::unique_ptr<const DexFile> dex_file1 = builder1.Build("dummy location 1");
+  std::unique_ptr<const DexFile> dex_file1 = builder1.Build("fake location 1");
   ASSERT_EQ(1u, dex_file1->NumStringIds());
   ASSERT_STREQ("String1", dex_file1->GetStringData(dex_file1->GetStringId(dex::StringIndex(0))));
   StringReference sr1(dex_file1.get(), dex::StringIndex(0));
 
   TestDexFileBuilder builder2;
   builder2.AddString("String2");
-  std::unique_ptr<const DexFile> dex_file2 = builder2.Build("dummy location 2");
+  std::unique_ptr<const DexFile> dex_file2 = builder2.Build("fake location 2");
   ASSERT_EQ(1u, dex_file2->NumStringIds());
   ASSERT_STREQ("String2", dex_file2->GetStringData(dex_file2->GetStringId(dex::StringIndex(0))));
   StringReference sr2(dex_file2.get(), dex::StringIndex(0));
@@ -78,7 +78,7 @@ TEST(StringReference, ValueComparator2) {
   for (const char* s : kDexFile1Strings) {
     builder1.AddString(s);
   }
-  std::unique_ptr<const DexFile> dex_file1 = builder1.Build("dummy location 1");
+  std::unique_ptr<const DexFile> dex_file1 = builder1.Build("fake location 1");
   ASSERT_EQ(arraysize(kDexFile1Strings), dex_file1->NumStringIds());
   for (size_t index = 0; index != arraysize(kDexFile1Strings); ++index) {
     ASSERT_STREQ(kDexFile1Strings[index],
@@ -89,7 +89,7 @@ TEST(StringReference, ValueComparator2) {
   for (const char* s : kDexFile2Strings) {
     builder2.AddString(s);
   }
-  std::unique_ptr<const DexFile> dex_file2 = builder2.Build("dummy location 1");
+  std::unique_ptr<const DexFile> dex_file2 = builder2.Build("fake location 1");
   ASSERT_EQ(arraysize(kDexFile2Strings), dex_file2->NumStringIds());
   for (size_t index = 0; index != arraysize(kDexFile2Strings); ++index) {
     ASSERT_STREQ(kDexFile2Strings[index],
