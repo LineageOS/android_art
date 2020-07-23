@@ -119,12 +119,12 @@ static std::string CurrentJniStringSuffix() {
   }
 }
 
-// Dummy values passed to our JNI handlers when we enter @CriticalNative.
+// Fake values passed to our JNI handlers when we enter @CriticalNative.
 // Normally @CriticalNative calling convention strips out the "JNIEnv*, jclass" parameters.
 // However to avoid duplicating every single test method we have a templated handler
-// that inserts dummy parameters (0,1) to make it compatible with a regular JNI handler.
-static JNIEnv* const kCriticalDummyJniEnv = reinterpret_cast<JNIEnv*>(0xDEADFEAD);
-static jclass const kCriticalDummyJniClass = reinterpret_cast<jclass>(0xBEAFBEEF);
+// that inserts fake parameters (0,1) to make it compatible with a regular JNI handler.
+static JNIEnv* const kCriticalFakeJniEnv = reinterpret_cast<JNIEnv*>(0xDEADFEAD);
+static jclass const kCriticalFakeJniClass = reinterpret_cast<jclass>(0xBEAFBEEF);
 
 // Type trait. Returns true if "T" is the same type as one of the types in Args...
 //
@@ -212,8 +212,8 @@ template <typename R, typename Arg1, typename Arg2, typename ... Args, R (*fn)(A
 struct remove_extra_parameters_helper<R(Arg1, Arg2, Args...), fn> {
   // Note: Do not use Args&& here to maintain C-style parameter types.
   static R apply(Args... args) {
-    JNIEnv* env = kCriticalDummyJniEnv;
-    jclass kls = kCriticalDummyJniClass;
+    JNIEnv* env = kCriticalFakeJniEnv;
+    jclass kls = kCriticalFakeJniClass;
     return fn(env, kls, args...);
   }
 };
@@ -502,8 +502,8 @@ static void expectValidJniEnvAndClass(JNIEnv* env, jclass kls) {
                                   static_cast<jobject>(kls)));
   } else {
     // This is pretty much vacuously true but catch any testing setup mistakes.
-    EXPECT_EQ(env, kCriticalDummyJniEnv);
-    EXPECT_EQ(kls, kCriticalDummyJniClass);
+    EXPECT_EQ(env, kCriticalFakeJniEnv);
+    EXPECT_EQ(kls, kCriticalFakeJniClass);
   }
 }
 
@@ -511,7 +511,7 @@ static void expectValidJniEnvAndClass(JNIEnv* env, jclass kls) {
 // that the jclass we got in the JNI handler is the same one as the class the method was looked
 // up for.
 //
-// (Checks are skipped for @CriticalNative since the two values are dummy).
+// (Checks are skipped for @CriticalNative since the two values are fake).
 #define EXPECT_JNI_ENV_AND_CLASS_FOR_CURRENT_JNI(env, kls) expectValidJniEnvAndClass(env, kls)
 
 // Temporarily disable the EXPECT_NUM_STACK_REFERENCES check (for a single test).
