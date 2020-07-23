@@ -165,7 +165,7 @@ MACRO2(DEFINE_FUNCTION_CUSTOM_CFA, c_name, cfa_offset)
     ALIGN_FUNCTION_ENTRY
 CALLVAR(c_name):
     CFI_STARTPROC
-    // Ensure we get a sane starting CFA.
+    // Ensure we get an appropriate starting CFA.
     CFI_DEF_CFA(rsp, RAW_VAR(cfa_offset))
 END_MACRO
 

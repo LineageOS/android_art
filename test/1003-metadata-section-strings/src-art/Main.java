@@ -29,7 +29,7 @@ class Main {
   }
 
   private static void runTest() {
-    // Test that reference equality is sane regarding the cache.
+    // Test that reference equality works regarding the cache.
     System.out.println(Other.getString(1) == "string1");
     System.out.println(Other.getString(2000) == "string2000");
     System.out.println(Other.getString(3000) == "string3000");

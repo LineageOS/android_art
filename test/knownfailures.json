@@ -167,7 +167,7 @@
                   "137-cfi",
                   "138-duplicate-classes-check2"],
         "variant": "no-image",
-        "description": ["All these tests check that we have sane behavior if we",
+        "description": ["All these tests check that we have appropriate behavior if we",
                         "don't have a dex2oat. Therefore we",
                         "shouldn't run them in situations where we actually",
                         "don't have these since they explicitly test for them.",

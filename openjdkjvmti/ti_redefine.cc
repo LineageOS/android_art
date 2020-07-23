@@ -186,7 +186,7 @@ class ObsoleteMap {
       DCHECK(obsolete_dex_caches_->Get(next_free_slot_) != nullptr);
       next_free_slot_++;
     }
-    // Sanity check that the same slot in obsolete_dex_caches_ is free.
+    // Check that the same slot in obsolete_dex_caches_ is free.
     DCHECK(obsolete_dex_caches_->Get(next_free_slot_) == nullptr);
   }
 
@@ -260,7 +260,7 @@ class ObsoleteMap {
 };
 
 // This visitor walks thread stacks and allocates and sets up the obsolete methods. It also does
-// some basic sanity checks that the obsolete method is sane.
+// some basic soundness checks that the obsolete method is valid.
 class ObsoleteMethodStackVisitor : public art::StackVisitor {
  protected:
   ObsoleteMethodStackVisitor(
@@ -1173,7 +1173,7 @@ bool Redefiner::ClassRedefinition::CheckRedefinitionIsValid() {
 class RedefinitionDataIter;
 
 // A wrapper that lets us hold onto the arbitrary sized data needed for redefinitions in a
-// reasonably sane way. This adds no fields to the normal ObjectArray. By doing this we can avoid
+// reasonable way. This adds no fields to the normal ObjectArray. By doing this we can avoid
 // having to deal with the fact that we need to hold an arbitrary number of references live.
 class RedefinitionDataHolder {
  public:
