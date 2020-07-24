@@ -211,7 +211,7 @@ TEST_F(Dex2oatImageTest, TestModesAndFilters) {
     std::cout << "All methods and classes sizes " << everything_sizes << std::endl;
     // Putting all classes as image classes should increase art size
     EXPECT_GE(everything_sizes.art_size, base_sizes.art_size);
-    // Check the validity that dex is the same size.
+    // Check that dex is the same size.
     EXPECT_EQ(everything_sizes.vdex_size, base_sizes.vdex_size);
   }
   static size_t kMethodFrequency = 3;
