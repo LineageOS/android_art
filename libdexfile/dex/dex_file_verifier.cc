@@ -667,7 +667,7 @@ bool DexFileVerifier::CheckMap() {
   uint32_t data_items_left = header_->data_size_;
   uint32_t used_bits = 0;
 
-  // Sanity check the size of the map list.
+  // Check the validity of the size of the map list.
   if (!CheckListSize(item, count, sizeof(dex::MapItem), "map size")) {
     return false;
   }
@@ -2269,7 +2269,7 @@ bool DexFileVerifier::CheckIntraDataSection(size_t offset, uint32_t count) {
   size_t data_start = header_->data_off_;
   size_t data_end = data_start + header_->data_size_;
 
-  // Sanity check the offset of the section.
+  // Check the validity of the offset of the section.
   if (UNLIKELY((offset < data_start) || (offset > data_end))) {
     ErrorStringPrintf("Bad offset for data subsection: %zx", offset);
     return false;

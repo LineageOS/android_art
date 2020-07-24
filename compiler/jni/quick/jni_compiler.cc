@@ -573,8 +573,8 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
         // -- For example VMOV {r0, r1} -> D0; VMOV r0 -> S0.
         __ Move(mr_return_reg, jni_return_reg, main_jni_conv->SizeOfReturnValue());
       } else if (jni_return_reg.IsNoRegister() && mr_return_reg.IsNoRegister()) {
-        // Sanity check: If the return value is passed on the stack for some reason,
-        // then make sure the size matches.
+        // Check that if the return value is passed on the stack for some reason,
+        // that the size matches.
         CHECK_EQ(main_jni_conv->SizeOfReturnValue(), mr_conv->SizeOfReturnValue());
       }
     }

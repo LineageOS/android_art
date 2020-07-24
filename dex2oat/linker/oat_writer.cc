@@ -3558,7 +3558,7 @@ bool OatWriter::OpenDexFiles(
     const uint8_t* raw_dex_file = vdex_begin_ + oat_dex_file.dex_file_offset_;
 
     if (kIsDebugBuild) {
-      // Sanity check our input files.
+      // Check the validity of the input files.
       // Note that ValidateDexFileHeader() logs error messages.
       CHECK(ValidateDexFileHeader(raw_dex_file, oat_dex_file.GetLocation()))
           << "Failed to verify written dex file header!"
