@@ -63,7 +63,7 @@ static bool IsExitTryBoundaryIntoExitBlock(HBasicBlock* block) {
 size_t GraphChecker::Run(bool pass_change, size_t last_size) {
   size_t current_size = GetGraph()->GetReversePostOrder().size();
   if (!pass_change) {
-    // Nothing changed for certain. Do a quick sanity check on that assertion
+    // Nothing changed for certain. Do a quick check of the validity on that assertion
     // for anything other than the first call (when last size was still 0).
     if (last_size != 0) {
       if (current_size != last_size) {
