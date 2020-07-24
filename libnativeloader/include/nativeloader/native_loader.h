@@ -38,7 +38,7 @@ void InitializeNativeLoader();
 
 __attribute__((visibility("default"))) jstring CreateClassLoaderNamespace(
     JNIEnv* env, int32_t target_sdk_version, jobject class_loader, bool is_shared, jstring dex_path,
-    jstring library_path, jstring permitted_path);
+    jstring library_path, jstring permitted_path, jstring uses_library_list);
 
 __attribute__((visibility("default"))) void* OpenNativeLibrary(
     JNIEnv* env, int32_t target_sdk_version, const char* path, jobject class_loader,
