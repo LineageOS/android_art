@@ -549,33 +549,32 @@ bool ElfFileImpl<ElfTypes>::SetMap(File* file, MemMap&& map, std::string* error_
 
 template <typename ElfTypes>
 typename ElfTypes::Ehdr& ElfFileImpl<ElfTypes>::GetHeader() const {
-  CHECK(header_ != nullptr);  // Header has been checked in SetMap. This is a sanity check.
+  CHECK(header_ != nullptr);  // Header has been checked in SetMap
   return *header_;
 }
 
 template <typename ElfTypes>
 uint8_t* ElfFileImpl<ElfTypes>::GetProgramHeadersStart() const {
-  CHECK(program_headers_start_ != nullptr);  // Header has been set in Setup. This is a sanity
-                                             // check.
+  CHECK(program_headers_start_ != nullptr);  // Header has been set in Setup
   return program_headers_start_;
 }
 
 template <typename ElfTypes>
 uint8_t* ElfFileImpl<ElfTypes>::GetSectionHeadersStart() const {
   CHECK(!program_header_only_);              // Only used in "full" mode.
-  CHECK(section_headers_start_ != nullptr);  // Is checked in CheckSectionsExist. Sanity check.
+  CHECK(section_headers_start_ != nullptr);  // Is checked in CheckSectionsExist
   return section_headers_start_;
 }
 
 template <typename ElfTypes>
 typename ElfTypes::Phdr& ElfFileImpl<ElfTypes>::GetDynamicProgramHeader() const {
-  CHECK(dynamic_program_header_ != nullptr);  // Is checked in CheckSectionsExist. Sanity check.
+  CHECK(dynamic_program_header_ != nullptr);  // Is checked in CheckSectionsExist
   return *dynamic_program_header_;
 }
 
 template <typename ElfTypes>
 typename ElfTypes::Dyn* ElfFileImpl<ElfTypes>::GetDynamicSectionStart() const {
-  CHECK(dynamic_section_start_ != nullptr);  // Is checked in CheckSectionsExist. Sanity check.
+  CHECK(dynamic_section_start_ != nullptr);  // Is checked in CheckSectionsExist
   return dynamic_section_start_;
 }
 
@@ -678,7 +677,7 @@ typename ElfTypes::Word ElfFileImpl<ElfTypes>::GetProgramHeaderNum() const {
 
 template <typename ElfTypes>
 typename ElfTypes::Phdr* ElfFileImpl<ElfTypes>::GetProgramHeader(Elf_Word i) const {
-  CHECK_LT(i, GetProgramHeaderNum()) << file_path_;  // Sanity check for caller.
+  CHECK_LT(i, GetProgramHeaderNum()) << file_path_;  // Validity check for caller.
   uint8_t* program_header = GetProgramHeadersStart() + (i * GetHeader().e_phentsize);
   CHECK_LT(program_header, End());
   return reinterpret_cast<Elf_Phdr*>(program_header);

@@ -1768,7 +1768,7 @@ TEST_F(ClassLinkerClassLoaderTest, CreateClassLoaderChain) {
   // in the top parent.
   VerifyClassResolution("LDefinedInAC;", class_loader_d, class_loader_a);
 
-  // Sanity check that we don't find an undefined class.
+  // Check that we don't find an undefined class.
   VerifyClassResolution("LNotDefined;", class_loader_d, nullptr, /*should_find=*/ false);
 }
 
