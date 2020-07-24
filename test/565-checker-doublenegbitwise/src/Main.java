@@ -18,9 +18,6 @@ import java.lang.reflect.Method;
 
 public class Main {
 
-  // A dummy value to defeat inlining of these routines.
-  static boolean doThrow = false;
-
   public static void assertIntEquals(int expected, int result) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result);
@@ -40,8 +37,6 @@ public class Main {
   }
 
   public static <T> T $noinline$runSmaliTest(String name, Class<T> klass, T input1, T input2) {
-    if (doThrow) { throw new Error(); }
-
     Class<T> inputKlass = (Class<T>)input1.getClass();
     try {
       Class<?> c = Class.forName("SmaliTests");
