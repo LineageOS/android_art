@@ -39,14 +39,14 @@ void X86RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
   DCHECK_EQ((*code)[anchor_literal_offset - 1u], 0x00u);
   DCHECK_EQ((*code)[anchor_literal_offset] & 0xf8u, 0x58u);
 
-  // Check that the patched data contains kDummy32BitOffset.
-  // Must match X86Mir2Lir::kDummy32BitOffset and CodeGeneratorX86_64::kDummy32BitOffset.
-  constexpr int kDummy32BitOffset = 256;
+  // Check that the patched data contains kPlaceholder32BitOffset.
+  // Must match CodeGeneratorX86_64::kPlaceholder32BitOffset.
+  constexpr int kPlaceholder32BitOffset = 256;
   DCHECK_LE(literal_offset, code->size());
-  DCHECK_EQ((*code)[literal_offset + 0u], static_cast<uint8_t>(kDummy32BitOffset >> 0));
-  DCHECK_EQ((*code)[literal_offset + 1u], static_cast<uint8_t>(kDummy32BitOffset >> 8));
-  DCHECK_EQ((*code)[literal_offset + 2u], static_cast<uint8_t>(kDummy32BitOffset >> 16));
-  DCHECK_EQ((*code)[literal_offset + 3u], static_cast<uint8_t>(kDummy32BitOffset >> 24));
+  DCHECK_EQ((*code)[literal_offset + 0u], static_cast<uint8_t>(kPlaceholder32BitOffset >> 0));
+  DCHECK_EQ((*code)[literal_offset + 1u], static_cast<uint8_t>(kPlaceholder32BitOffset >> 8));
+  DCHECK_EQ((*code)[literal_offset + 2u], static_cast<uint8_t>(kPlaceholder32BitOffset >> 16));
+  DCHECK_EQ((*code)[literal_offset + 3u], static_cast<uint8_t>(kPlaceholder32BitOffset >> 24));
 
   // Apply patch.
   uint32_t anchor_offset = patch_offset - literal_offset + anchor_literal_offset;

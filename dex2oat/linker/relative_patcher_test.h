@@ -145,15 +145,15 @@ class RelativePatcherTest : public testing::Test {
 
     // Write data.
     DCHECK(output_.empty());
-    uint8_t dummy_trampoline[kTrampolineSize];
-    memset(dummy_trampoline, 0, sizeof(dummy_trampoline));
-    out_->WriteFully(dummy_trampoline, kTrampolineSize);
+    uint8_t fake_trampoline[kTrampolineSize];
+    memset(fake_trampoline, 0, sizeof(fake_trampoline));
+    out_->WriteFully(fake_trampoline, kTrampolineSize);
     offset = kTrampolineSize;
     static const uint8_t kPadding[] = {
         0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
     };
-    uint8_t dummy_header[sizeof(OatQuickMethodHeader)];
-    memset(dummy_header, 0, sizeof(dummy_header));
+    uint8_t fake_header[sizeof(OatQuickMethodHeader)];
+    memset(fake_header, 0, sizeof(fake_header));
     for (auto& compiled_method : compiled_methods_) {
       offset = patcher_->WriteThunks(out_.get(), offset);
 
@@ -162,7 +162,7 @@ class RelativePatcherTest : public testing::Test {
       out_->WriteFully(kPadding, alignment_size);
       offset += alignment_size;
 
-      out_->WriteFully(dummy_header, sizeof(OatQuickMethodHeader));
+      out_->WriteFully(fake_header, sizeof(OatQuickMethodHeader));
       offset += sizeof(OatQuickMethodHeader);
       ArrayRef<const uint8_t> code = compiled_method->GetQuickCode();
       if (!compiled_method->GetPatches().empty()) {

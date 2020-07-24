@@ -342,7 +342,7 @@ static bool DoMethodHandleInvokeCommon(Thread* self,
 
   // Initialize |result| to 0 as this is the default return value for
   // polymorphic invocations of method handle types with void return
-  // and provides sane return result in error cases.
+  // and provides a sensible return result in error cases.
   result->SetJ(0);
 
   // The invoke_method_idx here is the name of the signature polymorphic method that
