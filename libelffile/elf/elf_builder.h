@@ -733,7 +733,7 @@ class ElfBuilder final {
     // Buckets.  Having just one makes it linear search.
     hash.push_back(1);  // Point to first non-NULL symbol.
     // Chains.  This creates linked list of symbols.
-    hash.push_back(0);  // Dummy entry for the NULL symbol.
+    hash.push_back(0);  // Placeholder entry for the NULL symbol.
     for (int i = 1; i < count - 1; i++) {
       hash.push_back(i + 1);  // Each symbol points to the next one.
     }
