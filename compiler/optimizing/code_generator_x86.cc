@@ -2483,10 +2483,17 @@ void InstructionCodeGeneratorX86::VisitInvokeInterface(HInvokeInterface* invoke)
 }
 
 void LocationsBuilderX86::VisitInvokePolymorphic(HInvokePolymorphic* invoke) {
+  IntrinsicLocationsBuilderX86 intrinsic(codegen_);
+  if (intrinsic.TryDispatch(invoke)) {
+    return;
+  }
   HandleInvoke(invoke);
 }
 
 void InstructionCodeGeneratorX86::VisitInvokePolymorphic(HInvokePolymorphic* invoke) {
+  if (TryGenerateIntrinsicCode(invoke, codegen_)) {
+    return;
+  }
   codegen_->GenerateInvokePolymorphicCall(invoke);
 }
 

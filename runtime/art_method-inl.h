@@ -120,6 +120,8 @@ inline bool ArtMethod::CheckIncompatibleClassChange(InvokeType type) {
       ObjPtr<mirror::Class> methods_class = GetDeclaringClass();
       return IsDirect() || !(methods_class->IsInterface() || methods_class->IsObjectClass());
     }
+    case kPolymorphic:
+      return !IsPolymorphicSignature();
     default:
       LOG(FATAL) << "Unreachable - invocation type: " << type;
       UNREACHABLE();
