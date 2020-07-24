@@ -135,7 +135,7 @@ void Thread::InitCpu() {
   // Allow easy indirection back to Thread*.
   tlsPtr_.self = this;
 
-  // Sanity check that reads from %fs point to this Thread*.
+  // Check that the reads from %fs point to this Thread*.
   Thread* self_check;
   CHECK_EQ(THREAD_SELF_OFFSET, SelfOffset<PointerSize::k32>().Int32Value());
   __asm__ __volatile__("movl %%fs:(%1), %0"
@@ -144,7 +144,7 @@ void Thread::InitCpu() {
       :);  // clobber
   CHECK_EQ(self_check, this);
 
-  // Sanity check other offsets.
+  // Check the other offsets
   CHECK_EQ(THREAD_EXCEPTION_OFFSET, ExceptionOffset<PointerSize::k32>().Int32Value());
   CHECK_EQ(THREAD_CARD_TABLE_OFFSET, CardTableOffset<PointerSize::k32>().Int32Value());
   CHECK_EQ(THREAD_ID_OFFSET, ThinLockIdOffset<PointerSize::k32>().Int32Value());
@@ -153,7 +153,7 @@ void Thread::InitCpu() {
 void Thread::CleanupCpu() {
   MutexLock mu(this, *Locks::modify_ldt_lock_);
 
-  // Sanity check that reads from %fs point to this Thread*.
+  // Check that the reads from %fs point to this Thread*.
   Thread* self_check;
   __asm__ __volatile__("movl %%fs:(%1), %0"
       : "=r"(self_check)  // output

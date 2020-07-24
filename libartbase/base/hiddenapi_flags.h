@@ -123,7 +123,7 @@ class ApiList {
   static_assert(kValueBitSize >= MinimumBitsToStore(helper::ToUint(Value::kMax)),
                 "Not enough bits to store all ApiList values");
 
-  // Sanity checks that all Values are covered by kValueBitMask.
+  // Checks that all Values are covered by kValueBitMask.
   static_assert(helper::MatchesBitMask(Value::kMin, kValueBitMask));
   static_assert(helper::MatchesBitMask(Value::kMax, kValueBitMask));
 

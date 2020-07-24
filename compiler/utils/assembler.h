@@ -229,7 +229,7 @@ class AssemblerBuffer {
 
   // When building the C++ tests, assertion code is enabled. To allow
   // asserting that the user of the assembler buffer has ensured the
-  // capacity needed for emitting, we add a dummy method in non-debug mode.
+  // capacity needed for emitting, we add a placeholder method in non-debug mode.
   bool HasEnsuredCapacity() const { return true; }
 
 #endif
