@@ -49,10 +49,10 @@ static inline ArtJvmtiEvent GetArtJvmtiEvent(ArtJvmTiEnv* env, jvmtiEvent e) {
 
 namespace impl {
 
-// Helper for ensuring that the dispatch environment is sane. Events with JNIEnvs need to stash
-// pending exceptions since they can cause new ones to be thrown. In accordance with the JVMTI
-// specification we allow exceptions originating from events to overwrite the current exception,
-// including exceptions originating from earlier events.
+// Helper for ensuring that the dispatch environment is suitably provisioned. Events with JNIEnvs
+// need to stash pending exceptions since they can cause new ones to be thrown. In accordance with
+// the JVMTI specification we allow exceptions originating from events to overwrite the current
+// exception, including exceptions originating from earlier events.
 class ScopedEventDispatchEnvironment final : public art::ValueObject {
  public:
   ScopedEventDispatchEnvironment() : env_(nullptr), throw_(nullptr, nullptr) {
