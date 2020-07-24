@@ -502,12 +502,12 @@ public class Main {
     /*
      * Test some generic type stuff.
      */
-    public List<String> dummy;
+    public List<String> stringList;
     public Map<Integer,String> fancyMethod(ArrayList<String> blah) { return null; }
     public static void checkGeneric() {
         Field field;
         try {
-            field = Main.class.getField("dummy");
+            field = Main.class.getField("stringList");
         } catch (NoSuchFieldException nsfe) {
             throw new RuntimeException(nsfe);
         }
@@ -561,8 +561,8 @@ public class Main {
     public static void checkUnique() {
         Field field1, field2;
         try {
-            field1 = Main.class.getField("dummy");
-            field2 = Main.class.getField("dummy");
+            field1 = Main.class.getField("stringList");
+            field2 = Main.class.getField("stringList");
         } catch (NoSuchFieldException nsfe) {
             throw new RuntimeException(nsfe);
         }

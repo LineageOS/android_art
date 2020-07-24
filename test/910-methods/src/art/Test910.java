@@ -33,7 +33,7 @@ public class Test910 {
 
     testMethod(getProxyClass(), "run");
 
-    // Find a synthetic method in the dummy inner class. Do not print the name. Javac and Jack
+    // Find a synthetic method in the placeholder inner class. Do not print the name. Javac and Jack
     // disagree on the naming of synthetic accessors.
     testMethod(findSyntheticMethod(), NestedSynthetic.class, false);
   }
@@ -106,11 +106,11 @@ public class Test910 {
 
   private static class NestedSynthetic {
     // Accessing this private field will create a synthetic accessor method;
-    private static String dummy;
+    private static String placeholder;
   }
 
-  private static void dummyAccess() {
-    System.out.println(NestedSynthetic.dummy);
+  private static void placeholderAccess() {
+    System.out.println(NestedSynthetic.placeholder);
   }
 
   private static Method findSyntheticMethod() throws Exception {

@@ -210,31 +210,31 @@ class LinkMethodBlacklistAndCorePlatformApi {
 
 class LinkMethodInterfaceWhitelist {
   public static int access() {
-    return DummyClass.getInterfaceInstance().methodPublicWhitelist();
+    return SampleClass.getInterfaceInstance().methodPublicWhitelist();
   }
 }
 
 class LinkMethodInterfaceLightGreylist {
   public static int access() {
-    return DummyClass.getInterfaceInstance().methodPublicLightGreylist();
+    return SampleClass.getInterfaceInstance().methodPublicLightGreylist();
   }
 }
 
 class LinkMethodInterfaceDarkGreylist {
   public static int access() {
-    return DummyClass.getInterfaceInstance().methodPublicDarkGreylist();
+    return SampleClass.getInterfaceInstance().methodPublicDarkGreylist();
   }
 }
 
 class LinkMethodInterfaceBlacklist {
   public static int access() {
-    return DummyClass.getInterfaceInstance().methodPublicBlacklist();
+    return SampleClass.getInterfaceInstance().methodPublicBlacklist();
   }
 }
 
 class LinkMethodInterfaceBlacklistAndCorePlatformApi {
   public static int access() {
-    return DummyClass.getInterfaceInstance().methodPublicBlacklistAndCorePlatformApi();
+    return SampleClass.getInterfaceInstance().methodPublicBlacklistAndCorePlatformApi();
   }
 }
 

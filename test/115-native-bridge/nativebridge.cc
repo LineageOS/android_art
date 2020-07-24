@@ -579,7 +579,7 @@ static bool StandardSignalHandler(int sig, siginfo_t* info ATTRIBUTE_UNUSED,
   return true;
 }
 
-// A dummy special handler, continueing after the faulting location. This code comes from
+// A placeholder special handler, continueing after the faulting location. This code comes from
 // 004-SignalTest.
 static bool nb_signalhandler(int sig, siginfo_t* info, void* context) {
   printf("NB signal handler with signal %d.\n", sig);

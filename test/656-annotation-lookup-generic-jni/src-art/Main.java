@@ -48,7 +48,7 @@ public class Main {
     Method nativeMethodWithAnnotation = testClass.getMethod("nativeMethodWithAnnotation");
     // Invoking the native method Test.nativeMethodWithAnnotation used
     // to crash the Generic JNI trampoline during the resolution of
-    // the method's annotations (DummyAnnotation) (see b/38454151).
+    // the method's annotations (SampleAnnotation) (see b/38454151).
     nativeMethodWithAnnotation.invoke(null);
 
     zipFile.close();
