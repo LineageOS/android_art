@@ -1992,7 +1992,7 @@ TEST_F(Dex2oatTest, DontExtract) {
 
   // Generate a quickened dex by using the input dm file to verify.
   generate_and_check(CompilerFilter::Filter::kQuicken);
-  // Use verify compiler filter to sanity check that FastVerify works for that filter too.
+  // Use verify compiler filter to verify that FastVerify works for that filter too.
   generate_and_check(CompilerFilter::Filter::kVerify);
 }
 

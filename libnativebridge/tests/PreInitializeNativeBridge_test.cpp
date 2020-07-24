@@ -38,7 +38,7 @@ TEST_F(NativeBridgeTest, PreInitializeNativeBridge) {
 
     // Try to create our mount namespace.
     if (unshare(CLONE_NEWNS) != -1) {
-        // Create a dummy file.
+        // Create a placeholder file.
         FILE* cpuinfo = fopen("./cpuinfo", "w");
         ASSERT_NE(nullptr, cpuinfo) << strerror(errno);
         fprintf(cpuinfo, kTestData);
