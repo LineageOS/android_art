@@ -131,17 +131,24 @@ std::string FormatDuration(uint64_t nano_duration, TimeUnit time_unit,
 }
 
 std::string GetIsoDate() {
-  time_t now = time(nullptr);
   tm tmbuf;
+  int ns;
 #ifdef _WIN32
+  time_t now = time(nullptr);
   localtime_s(&tmbuf, &now);
   tm* ptm = &tmbuf;
+  ns = 0;
 #else
-  tm* ptm = localtime_r(&now, &tmbuf);
+  timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  tm* ptm = localtime_r(&now.tv_sec, &tmbuf);
+  ns = now.tv_nsec;
 #endif
-  return StringPrintf("%04d-%02d-%02d %02d:%02d:%02d",
+  char zone[16] = {};
+  strftime(zone, sizeof(zone), "%z", ptm);
+  return StringPrintf("%04d-%02d-%02d %02d:%02d:%02d.%09d%s",
       ptm->tm_year + 1900, ptm->tm_mon+1, ptm->tm_mday,
-      ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
+      ptm->tm_hour, ptm->tm_min, ptm->tm_sec, ns, zone);
 }
 
 uint64_t MilliTime() {
