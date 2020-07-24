@@ -140,11 +140,42 @@ void LibraryNamespaces::Initialize() {
   }
 }
 
+// "ALL" is a magic name that allows all public libraries even when the
+// target SDK is > 30. Currently this is used for (Java) shared libraries
+// which don't use <uses-native-library>
+// TODO(b/142191088) remove this hack
+static constexpr const char LIBRARY_ALL[] = "ALL";
+
+// Returns the colon-separated list of library names by filtering uses_libraries from
+// public_libraries. The returned names will actually be available to the app. If the app is pre-S
+// (<= 30), the filtering is not done; the entire public_libraries are provided.
+static const std::string filter_public_libraries(
+    uint32_t target_sdk_version, const std::vector<std::string>& uses_libraries,
+    const std::string& public_libraries) {
+  // Apps targeting Android 11 or earlier gets all public libraries
+  if (target_sdk_version <= 30) {
+    return public_libraries;
+  }
+  if (std::find(uses_libraries.begin(), uses_libraries.end(), LIBRARY_ALL) !=
+      uses_libraries.end()) {
+    return public_libraries;
+  }
+  std::vector<std::string> filtered;
+  std::vector<std::string> orig = android::base::Split(public_libraries, ":");
+  for (const auto& lib : uses_libraries) {
+    if (std::find(orig.begin(), orig.end(), lib) != orig.end()) {
+      filtered.emplace_back(lib);
+    }
+  }
+  return android::base::Join(filtered, ":");
+}
+
 Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t target_sdk_version,
                                                          jobject class_loader, bool is_shared,
                                                          jstring dex_path_j,
                                                          jstring java_library_path,
-                                                         jstring java_permitted_path) {
+                                                         jstring java_permitted_path,
+                                                         jstring uses_library_list) {
   std::string library_path;  // empty string by default.
   std::string dex_path;
 
@@ -156,6 +187,23 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   if (dex_path_j != nullptr) {
     ScopedUtfChars dex_path_chars(env, dex_path_j);
     dex_path = dex_path_chars.c_str();
+  }
+
+  std::vector<std::string> uses_libraries;
+  if (uses_library_list != nullptr) {
+    ScopedUtfChars names(env, uses_library_list);
+    uses_libraries = android::base::Split(names.c_str(), ":");
+  } else {
+    // uses_library_list could be nullptr when System.loadLibrary is called from a
+    // custom classloader. In that case, we don't know the list of public
+    // libraries because we don't know which apk the classloader is for. Only
+    // choices we can have are 1) allowing all public libs (as before), or 2)
+    // not allowing all but NDK libs. Here we take #1 because #2 would surprise
+    // developers unnecessarily.
+    // TODO(b/142191088) finalize the policy here. We could either 1) allow all
+    // public libs, 2) disallow any lib, or 3) use the libs that were granted to
+    // the first (i.e. app main) classloader.
+    uses_libraries.emplace_back(LIBRARY_ALL);
   }
 
   ApkOrigin apk_origin = GetApkOriginFromDexPath(dex_path);
@@ -220,10 +268,12 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     ALOGD("classloader namespace configured for unbundled %s apk. library_path=%s",
           origin_partition, library_path.c_str());
   } else {
+    auto libs = filter_public_libraries(target_sdk_version, uses_libraries,
+                                        extended_public_libraries());
     // extended public libraries are NOT available to vendor apks, otherwise it
     // would be system->vendor violation.
-    if (!extended_public_libraries().empty()) {
-      system_exposed_libraries = system_exposed_libraries + ':' + extended_public_libraries();
+    if (!libs.empty()) {
+      system_exposed_libraries = system_exposed_libraries + ':' + libs;
     }
   }
 
@@ -338,12 +388,14 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     }
   }
 
-  if (!vendor_public_libraries().empty()) {
+  auto vendor_libs = filter_public_libraries(target_sdk_version, uses_libraries,
+                                             vendor_public_libraries());
+  if (!vendor_libs.empty()) {
     auto vendor_ns = NativeLoaderNamespace::GetExportedNamespace(kVendorNamespaceName, is_bridged);
     // when vendor_ns is not configured, link to the system namespace
     auto target_ns = vendor_ns.ok() ? vendor_ns : system_ns;
     if (target_ns.ok()) {
-      linked = app_ns->Link(*target_ns, vendor_public_libraries());
+      linked = app_ns->Link(*target_ns, vendor_libs);
       if (!linked.ok()) {
         return linked.error();
       }
