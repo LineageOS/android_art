@@ -16,9 +16,6 @@
 
 public class Main {
 
-  // A dummy value to defeat inlining of these routines.
-  static boolean doThrow = false;
-
   public static void assertIntEquals(int expected, int result) {
     if (expected != result) {
       throw new Error("Expected: " + expected + ", found: " + result);
@@ -77,7 +74,6 @@ public class Main {
   /// CHECK:                            bic r{{\d+}}, r{{\d+}}, r{{\d+}}
 
   public static int $opt$noinline$notAnd(int base, int mask) {
-    if (doThrow) throw new Error();
     return base & ~mask;
   }
 
@@ -127,7 +123,6 @@ public class Main {
   /// CHECK:                            orn r{{\d+}}, r{{\d+}}, r{{\d+}}
 
   public static long $opt$noinline$notOr(long base, long mask) {
-    if (doThrow) throw new Error();
     return base | ~mask;
   }
 
@@ -174,7 +169,6 @@ public class Main {
   /// CHECK-NOT:                        BitwiseNegatedRight
 
   public static int $opt$noinline$notXor(int base, int mask) {
-    if (doThrow) throw new Error();
     return base ^ ~mask;
   }
 
@@ -210,7 +204,6 @@ public class Main {
   /// CHECK:                            Return [<<NegOp>>]
 
   public static int $opt$noinline$notAndConstant(int mask) {
-    if (doThrow) throw new Error();
     return 0xf & ~mask;
   }
 
@@ -266,7 +259,6 @@ public class Main {
   /// CHECK-NOT:                        BitwiseNegatedRight
 
   public static int $opt$noinline$notAndMultipleUses(int base, int mask) {
-    if (doThrow) throw new Error();
     int tmp = ~mask;
     return (tmp & 0x1) + (base & tmp);
   }
@@ -285,7 +277,6 @@ public class Main {
   /// CHECK-NOT:                        BitwiseNegatedRight
 
   public static int $opt$noinline$deMorganOr(int a, int b) {
-    if (doThrow) throw new Error();
     return ~a | ~b;
   }
 

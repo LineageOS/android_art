@@ -46,13 +46,6 @@
     .param p1, "b"    # I
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return ~a & ~b;
     not-int v0, p0
     not-int v1, p1
@@ -95,13 +88,6 @@
     .param p1, "b"    # Z
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return !a & !b;
     xor-int/lit8 v0, p0, 0x1
     xor-int/lit8 v1, p1, 0x1
@@ -138,13 +124,6 @@
     .param p2, "b"    # J
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return ~a | ~b;
     not-long v0, p0
     not-long v2, p2
@@ -186,13 +165,6 @@
     .param p1, "b"    # Z
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return !a | !b;
     xor-int/lit8 v0, p0, 0x1
     xor-int/lit8 v1, p1, 0x1
@@ -238,13 +210,6 @@
     .param p1, "b"    # I
 
     .prologue
-    sget-boolean v4, LSmaliTests;->doThrow:Z
-    if-eqz v4, :cond_a
-    new-instance v4, Ljava/lang/Error;
-    invoke-direct {v4}, Ljava/lang/Error;-><init>()V
-    throw v4
-
-  :cond_a
     # int a1 = a + 1;
     add-int/lit8 v0, p0, 0x1
     # int not_a1 = ~a1;
@@ -284,13 +249,6 @@
     .param p1, "b"    # I
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return ~a ^ ~b;
     not-int v0, p0
     not-int v1, p1
@@ -327,13 +285,6 @@
     .param p1, "b"    # Z
 
     .prologue
-    sget-boolean v0, LSmaliTests;->doThrow:Z
-    if-eqz v0, :cond_a
-    new-instance v0, Ljava/lang/Error;
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-    throw v0
-
-  :cond_a
     # return !a ^ !b;
     xor-int/lit8 v0, p0, 0x1
     xor-int/lit8 v1, p1, 0x1
@@ -373,13 +324,6 @@
     .param p1, "b"    # I
 
     .prologue
-    sget-boolean v1, LSmaliTests;->doThrow:Z
-    if-eqz v1, :cond_a
-    new-instance v1, Ljava/lang/Error;
-    invoke-direct {v1}, Ljava/lang/Error;-><init>()V
-    throw v1
-
-  :cond_a
     # int tmp = ~b;
     not-int v0, p1
     # return (tmp & 0x1) + (~a & tmp);
@@ -388,20 +332,6 @@
     and-int/2addr v2, v0
     add-int/2addr v1, v2
     return v1
-.end method
-
-# static fields
-.field static doThrow:Z # boolean
-
-# direct methods
-.method static constructor <clinit>()V
-    .registers 1
-
-    .prologue
-    # doThrow = false
-    const/4 v0, 0x0
-    sput-boolean v0, LSmaliTests;->doThrow:Z
-    return-void
 .end method
 
 
@@ -435,7 +365,6 @@
 # Original java source:
 #
 #     public static int $opt$noinline$andToOr(int a, int b) {
-#       if (doThrow) throw new Error();
 #       return ~a & ~b;
 #     }
 
@@ -446,18 +375,6 @@
 
     .prologue
     .line 85
-    sget-boolean v0, LMain;->doThrow:Z
-
-    if-eqz v0, :cond_a
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 86
-    :cond_a
     xor-int/lit8 v0, p0, -0x1
 
     xor-int/lit8 v1, p1, -0x1
@@ -501,7 +418,6 @@
 # Original java source:
 #
 #     public static boolean $opt$noinline$booleanAndToOr(boolean a, boolean b) {
-#       if (doThrow) throw new Error();
 #       return !a & !b;
 #     }
 
@@ -516,18 +432,6 @@
     const/4 v1, 0x0
 
     .line 122
-    sget-boolean v2, LMain;->doThrow:Z
-
-    if-eqz v2, :cond_c
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 123
-    :cond_c
     if-nez p0, :cond_13
 
     move v2, v0
@@ -582,7 +486,6 @@
 # Original java source:
 #
 #     public static long $opt$noinline$orToAnd(long a, long b) {
-#       if (doThrow) throw new Error();
 #       return ~a | ~b;
 #     }
 
@@ -595,18 +498,6 @@
     const-wide/16 v2, -0x1
 
     .line 156
-    sget-boolean v0, LMain;->doThrow:Z
-
-    if-eqz v0, :cond_c
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 157
-    :cond_c
     xor-long v0, p0, v2
 
     xor-long/2addr v2, p2
@@ -649,7 +540,6 @@
 # Original java source:
 #
 #     public static boolean $opt$noinline$booleanOrToAnd(boolean a, boolean b) {
-#       if (doThrow) throw new Error();
 #       return !a | !b;
 #     }
 
@@ -664,18 +554,6 @@
     const/4 v1, 0x0
 
     .line 193
-    sget-boolean v2, LMain;->doThrow:Z
-
-    if-eqz v2, :cond_c
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 194
-    :cond_c
     if-nez p0, :cond_13
 
     move v2, v0
@@ -737,7 +615,6 @@
 # Original java source:
 #
 #     public static int $opt$noinline$regressInputsAway(int a, int b) {
-#       if (doThrow) throw new Error();
 #       int a1 = a + 1;
 #       int not_a1 = ~a1;
 #       int b1 = b + 1;
@@ -752,18 +629,6 @@
 
     .prologue
     .line 234
-    sget-boolean v4, LMain;->doThrow:Z
-
-    if-eqz v4, :cond_a
-
-    new-instance v4, Ljava/lang/Error;
-
-    invoke-direct {v4}, Ljava/lang/Error;-><init>()V
-
-    throw v4
-
-    .line 235
-    :cond_a
     add-int/lit8 v0, p0, 0x1
 
     .line 236
@@ -810,7 +675,6 @@
 # Original java source:
 #
 #     public static int $opt$noinline$notXorToXor(int a, int b) {
-#       if (doThrow) throw new Error();
 #       return ~a ^ ~b;
 #     }
 
@@ -821,18 +685,6 @@
 
     .prologue
     .line 266
-    sget-boolean v0, LMain;->doThrow:Z
-
-    if-eqz v0, :cond_a
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 267
-    :cond_a
     xor-int/lit8 v0, p0, -0x1
 
     xor-int/lit8 v1, p1, -0x1
@@ -871,7 +723,6 @@
 # Original java source:
 #
 #     public static boolean $opt$noinline$booleanNotXorToXor(boolean a, boolean b) {
-#       if (doThrow) throw new Error();
 #       return !a ^ !b;
 #     }
 
@@ -886,18 +737,6 @@
     const/4 v1, 0x0
 
     .line 298
-    sget-boolean v2, LMain;->doThrow:Z
-
-    if-eqz v2, :cond_c
-
-    new-instance v0, Ljava/lang/Error;
-
-    invoke-direct {v0}, Ljava/lang/Error;-><init>()V
-
-    throw v0
-
-    .line 299
-    :cond_c
     if-nez p0, :cond_13
 
     move v2, v0
@@ -953,7 +792,6 @@
 # Original java source:
 #
 #     public static int $opt$noinline$notMultipleUses(int a, int b) {
-#       if (doThrow) throw new Error();
 #       int tmp = ~b;
 #       return (tmp & 0x1) + (~a & tmp);
 #     }
@@ -965,18 +803,6 @@
 
     .prologue
     .line 333
-    sget-boolean v1, LMain;->doThrow:Z
-
-    if-eqz v1, :cond_a
-
-    new-instance v1, Ljava/lang/Error;
-
-    invoke-direct {v1}, Ljava/lang/Error;-><init>()V
-
-    throw v1
-
-    .line 334
-    :cond_a
     xor-int/lit8 v0, p1, -0x1
 
     .line 335

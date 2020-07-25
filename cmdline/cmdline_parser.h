@@ -484,8 +484,8 @@ struct CmdlineParser {
       return *this;
     }
 
-    // Finish building the parser; performs sanity checks. Return value is moved, not copied.
-    // Do not call this more than once.
+    // Finish building the parser; performs a check of the validity. Return value is moved, not
+    // copied. Do not call this more than once.
     CmdlineParser Build() {
       assert(!built_);
       built_ = true;

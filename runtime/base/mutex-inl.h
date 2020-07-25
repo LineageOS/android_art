@@ -57,8 +57,8 @@ static inline pid_t SafeGetTid(const Thread* self) {
 }
 
 static inline void CheckUnattachedThread(LockLevel level) NO_THREAD_SAFETY_ANALYSIS {
-  // The check below enumerates the cases where we expect not to be able to sanity check locks
-  // on a thread. Lock checking is disabled to avoid deadlock when checking shutdown lock.
+  // The check below enumerates the cases where we expect not to be able to check the validity of
+  // locks on a thread. Lock checking is disabled to avoid deadlock when checking shutdown lock.
   // TODO: tighten this check.
   if (kDebugLocking) {
     CHECK(!Locks::IsSafeToCallAbortRacy() ||
@@ -227,7 +227,7 @@ inline bool Mutex::IsExclusiveHeld(const Thread* self) const {
   DCHECK(self == nullptr || self == Thread::Current());
   bool result = (GetExclusiveOwnerTid() == SafeGetTid(self));
   if (kDebugLocking) {
-    // Sanity debug check that if we think it is locked we have it in our held mutexes.
+    // Debug check that if we think it is locked we have it in our held mutexes.
     if (result && self != nullptr && level_ != kMonitorLock && !gAborting) {
       if (level_ == kThreadWaitLock && self->GetHeldMutex(kThreadWaitLock) != this) {
         CHECK_EQ(self->GetHeldMutex(kThreadWaitWakeLock), this);
@@ -257,7 +257,7 @@ inline bool ReaderWriterMutex::IsExclusiveHeld(const Thread* self) const {
   DCHECK(self == nullptr || self == Thread::Current());
   bool result = (GetExclusiveOwnerTid() == SafeGetTid(self));
   if (kDebugLocking) {
-    // Sanity that if the pthread thinks we own the lock the Thread agrees.
+    // Verify that if the pthread thinks we own the lock the Thread agrees.
     if (self != nullptr && result)  {
       CHECK_EQ(self->GetHeldMutex(level_), this);
     }
