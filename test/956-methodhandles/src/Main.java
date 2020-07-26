@@ -1172,13 +1172,13 @@ public class Main {
 
     // boolean -> int
     try {
-        int dummy = (int) mh.invoke("True");
+        int unexpectedValue = (int) mh.invoke("True");
         fail();
     } catch (WrongMethodTypeException e) {}
 
     // boolean -> Integer
     try {
-        Integer dummy = (Integer) mh.invoke("True");
+        Integer unexpectedValue = (Integer) mh.invoke("True");
         fail();
     } catch (WrongMethodTypeException e) {}
 
@@ -1190,13 +1190,13 @@ public class Main {
 
     // Boolean -> int
     try {
-        int dummy = (int) mh.invoke(false);
+        int unexpectedValue = (int) mh.invoke(false);
         fail();
     } catch (WrongMethodTypeException e) {}
 
     // Boolean -> Integer
     try {
-        Integer dummy = (Integer) mh.invoke("True");
+        Integer unexpectedValue = (Integer) mh.invoke("True");
         fail();
     } catch (WrongMethodTypeException e) {}
 

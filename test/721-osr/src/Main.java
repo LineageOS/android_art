@@ -33,9 +33,9 @@ public class Main {
         }
 
         // Loop enough to potentially trigger OSR.
-        List<Integer> dummyObjects = new ArrayList<Integer>(200_000);
+        List<Integer> placeholderObjects = new ArrayList<Integer>(200_000);
         for (int i = 0; i < 200_000; i++) {
-            dummyObjects.add(1024);
+            placeholderObjects.add(1024);
         }
 
         if (testFloat != 1000.0f) {

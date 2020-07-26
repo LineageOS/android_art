@@ -15,7 +15,7 @@
  */
 
 public class Main {
-  static class Dummy {
+  static class ValueHolder {
     static int getValue() {
       return 1;
     }
@@ -128,7 +128,7 @@ public class Main {
     int i = 0;
     int sum = 0;
     do {
-      sum += Dummy.getValue();
+      sum += ValueHolder.getValue();
       i++;
     } while (i < 10);
     return sum;

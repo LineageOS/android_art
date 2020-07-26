@@ -27,7 +27,7 @@
 .catchall {:Label1 .. :Label2} :Handler
 .end method
 
-# Just a dummy.
+# Just a placeholder.
 .method public static run()V
 .registers 1
        return-void

@@ -26,6 +26,6 @@ public class Main {
     // TypeId in the current DexFile, we erroneously provided the type index from the
     // declaring DexFile and that caused a crash. This was fixed by changing the
     // ClinitCheck entrypoint to take the Class reference from LoadClass.
-    int dummy = MyTimeZone.getDefaultTimeZoneType();
+    int placeholder = MyTimeZone.getDefaultTimeZoneType();
   }
 }

@@ -627,8 +627,8 @@ public class Main {
   /// CHECK-DAG:                      InstanceFieldSet
   /// CHECK-NOT:                      InstanceFieldSet
 
-  public static double constructBase(int intValue, long dummy) {
-    Base b = new Base(intValue, dummy);
+  public static double constructBase(int intValue, long placeholder) {
+    Base b = new Base(intValue, placeholder);
     return b.intField + b.doubleField;
   }
 
@@ -1145,8 +1145,8 @@ public class Main {
   /// CHECK-NOT:                      ConstructorFence
   /// CHECK-NOT:                      InstanceFieldSet
 
-  public static int constructDerivedInSecondDex(long dummy) {
-    DerivedInSecondDex d = new DerivedInSecondDex(dummy);
+  public static int constructDerivedInSecondDex(long placeholder) {
+    DerivedInSecondDex d = new DerivedInSecondDex(placeholder);
     return d.intField;
   }
 
@@ -1168,7 +1168,7 @@ public class Main {
     assertEquals(42, getInt(s));
     assertEquals(-42.0, getDouble(s));
     assertEquals(null, getObject(s));
-    assertEquals("dummy", getString(s));
+    assertEquals("placeholder", getString(s));
     // Not replaced IGET pattern.
     assertEquals(42, staticGetInt(s));
     assertEquals(-42.0, getDoubleFromParam(s));
@@ -1198,9 +1198,9 @@ public class Main {
     assertEquals(-34.0, constructBase(19, 15.0, null));
     assertEquals(-22.5, constructBaseWith0DoubleNull(22.5));
     assertEquals(-8.0, constructBase(2, 14.0, null, null));
-    assertEquals(-64.0, constructBase(4, 28.0, null, "dummy"));
+    assertEquals(-64.0, constructBase(4, 28.0, null, "placeholder"));
     assertEquals(13.0, constructBase(24, 2.0, new Object(), null));
-    assertEquals(30.0, constructBase(11, 4.0, new Object(), "dummy"));
+    assertEquals(30.0, constructBase(11, 4.0, new Object(), "placeholder"));
     assertEquals(43.0, constructBase(43.0));
     assertEquals(0.0, constructBaseWith0d());
     assertEquals(1.0, constructBase(new Object()));
@@ -1216,9 +1216,9 @@ public class Main {
     assertEquals(-7.0, constructDerived(5, 7.0, new Object()));
     assertEquals(-4.0, constructDerived(9, 4.0, null));
     assertEquals(0.0, constructDerived(1, 9.0, null, null));
-    assertEquals(0.0, constructDerived(2, 8.0, null, "dummy"));
+    assertEquals(0.0, constructDerived(2, 8.0, null, "placeholder"));
     assertEquals(0.0, constructDerived(3, 7.0, new Object(), null));
-    assertEquals(0.0, constructDerived(4, 6.0, new Object(), "dummy"));
+    assertEquals(0.0, constructDerived(4, 6.0, new Object(), "placeholder"));
     assertEquals(17.0, constructDerived(17.0f));
     assertEquals(-5.5, constructDerived(6, -7.0, new Object(), 6.5f));
 
