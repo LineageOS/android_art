@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-public class DummyClass implements ParentInterface {
+public class SampleClass implements ParentInterface {
   public int methodPublicWhitelist() { return 1; }
   public int methodPublicLightGreylist() { return 2; }
   public int methodPublicDarkGreylist() { return 3; }
@@ -22,6 +22,6 @@ public class DummyClass implements ParentInterface {
   public int methodPublicBlacklistAndCorePlatformApi() { return 5; }
 
   public static ParentInterface getInterfaceInstance() {
-    return new DummyClass();
+    return new SampleClass();
   }
 }

@@ -71,7 +71,7 @@ public class Main {
   public static native boolean isAotCompiled(Class<?> cls, String methodName);
   public static native int getHotnessCounter(Class<?> cls, String methodName);
 
-  private static final String TEMP_FILE_NAME_PREFIX = "dummy";
+  private static final String TEMP_FILE_NAME_PREFIX = "temp";
   private static final String TEMP_FILE_NAME_SUFFIX = "-file";
 
   private static File createTempFile() throws Exception {

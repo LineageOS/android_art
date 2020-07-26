@@ -21,11 +21,11 @@ public interface MirandaInterface {
 
     public boolean inInterface();
 
-    // A couple of dummy methods to fill the method table.
-    public void inInterfaceDummy1();
-    public void inInterfaceDummy2();
-    public void inInterfaceDummy3();
-    public void inInterfaceDummy4();
-    public void inInterfaceDummy5();
+    // Otherwise unused methods to fill the method table.
+    public void inInterfaceUnused1();
+    public void inInterfaceUnused2();
+    public void inInterfaceUnused3();
+    public void inInterfaceUnused4();
+    public void inInterfaceUnused5();
 
 }

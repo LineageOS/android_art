@@ -22,7 +22,7 @@ public class Test {
     System.loadLibrary(libname);
   }
 
-  @DummyAnnotation
+  @SampleAnnotation
   public static native void nativeMethodWithAnnotation();
 
 }
