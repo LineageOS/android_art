@@ -16,11 +16,11 @@
 public class Main {
     class A {
         int fieldA;
-        int dummy;
+        int placeholder;
     }
 
     class B {
-        int dummy;
+        int placeholder;
         int fieldB;
     }
     public static void assertIntEquals(int expected, int result) {

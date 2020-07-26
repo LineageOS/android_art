@@ -55,7 +55,7 @@ public class Main {
 
   // sMain1.foo()/sMain2.foo() will be always be Base.foo() before Main3 is loaded/linked.
   // So sMain1.foo() can be devirtualized to Base.foo() and be inlined.
-  // After Dummy.createMain3() which links in Main3, live testImplement() on stack
+  // After Helper.createMain3() which links in Main3, live testImplement() on stack
   // should be deoptimized.
   static void testImplement(boolean createMain3, boolean wait, boolean setHasJIT) {
     if (setHasJIT) {
@@ -84,7 +84,7 @@ public class Main {
       while (!sOtherThreadStarted);
       // Create an Main2 instance and assign it to sMain2.
       // sMain1 is kept the same.
-      sMain3 = Dummy.createMain3();
+      sMain3 = Helper.createMain3();
       // Wake up the other thread.
       synchronized(Main.class) {
         Main.class.notify();
@@ -102,7 +102,7 @@ public class Main {
     }
 
     // There should be a deoptimization here right after Main3 is linked by
-    // calling Dummy.createMain3(), even though sMain1 didn't change.
+    // calling Helper.createMain3(), even though sMain1 didn't change.
     // The behavior here would be different if inline-cache is used, which
     // doesn't deoptimize since sMain1 still hits the type cache.
     if (sMain1.foo(getValue(sMain1.getClass())) != 11) {
@@ -169,7 +169,7 @@ public class Main {
 }
 
 // Put createMain3() in another class to avoid class loading due to verifier.
-class Dummy {
+class Helper {
   static Base createMain3() {
     return new Main3();
   }
