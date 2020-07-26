@@ -70,7 +70,7 @@ public class Main {
   // Returns true if the profile is for the boot image.
   public static native boolean isForBootImage(String profile);
 
-  private static final String TEMP_FILE_NAME_PREFIX = "dummy";
+  private static final String TEMP_FILE_NAME_PREFIX = "temp";
   private static final String TEMP_FILE_NAME_SUFFIX = "-file";
 
   static native String getProfileInfoDump(
