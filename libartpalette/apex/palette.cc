@@ -93,7 +93,7 @@ void* PaletteLoader::GetMethod(void* palette_lib, const char* name) {
     return reinterpret_cast<void*>(PaletteMethodNotSupported);
   }
   // TODO(oth): consider new GetMethodSignature() in the Palette API which
-  // would allow sanity checking the type signatures.
+  // would allow checking the validity of the type signatures.
   return method;
 }
 

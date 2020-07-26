@@ -510,7 +510,7 @@ class HeapChunkContext {
     Write4BE(&p_, reinterpret_cast<uintptr_t>(chunk_ptr));  // virtual address of segment start.
     Write4BE(&p_, 0);  // offset of this piece (relative to the virtual address).
     // [u4]: length of piece, in allocation units
-    // We won't know this until we're done, so save the offset and stuff in a dummy value.
+    // We won't know this until we're done, so save the offset and stuff in a fake value.
     pieceLenField_ = p_;
     Write4BE(&p_, 0x55555555);
     needHeader_ = false;

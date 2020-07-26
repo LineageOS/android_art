@@ -1479,7 +1479,7 @@ TEST_F(ProfileCompilationInfoTest, AddAnnotationsToMethods) {
       EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i)) != nullptr);
     }
 
-    // Sanity check that methods cannot be found with a non existing annotation.
+    // Check that the methods cannot be found with a non existing annotation.
     MethodReference ref(dex1, 0);
     ProfileSampleAnnotation not_exisiting("A");
     EXPECT_FALSE(info.GetMethodHotness(ref, not_exisiting).IsInProfile());
@@ -1541,7 +1541,7 @@ TEST_F(ProfileCompilationInfoTest, AddAnnotationsToClasses) {
       EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(i)));
     }
 
-    // Sanity check that classes cannot be found with a non existing annotation.
+    // Check that the classes cannot be found with a non existing annotation.
     EXPECT_FALSE(info.ContainsClass(*dex1, dex::TypeIndex(0), ProfileSampleAnnotation("new_test")));
   };
 

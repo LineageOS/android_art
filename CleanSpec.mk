@@ -105,6 +105,9 @@ $(call add-clean-step, find $(OUT_DIR) -name "*.oat" -o -name "*.odex" -o -name 
 # Remove empty dir for art APEX because it will be created on demand while mounting release|debug
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex/com.android.art)
 
+# Remove 'libart[d]?-simulator-container.so' which was briefly in the ART AREX.
+$(call add-clean-step, find $(OUT_DIR) -name 'libart*-simulator-container.so' -type f | xargs rm -f)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************

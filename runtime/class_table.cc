@@ -266,7 +266,7 @@ size_t ClassTable::WriteToMemory(uint8_t* ptr) const {
     }
   }
   const size_t ret = combined.WriteToMemory(ptr);
-  // Sanity check.
+  // Validity check
   if (kIsDebugBuild && ptr != nullptr) {
     size_t read_count;
     ClassSet class_set(ptr, /*make copy*/false, &read_count);
