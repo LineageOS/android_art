@@ -24,19 +24,19 @@ class MirandaClass2 extends MirandaAbstract {
     }
 
     // Better not hit any of these...
-    public void inInterfaceDummy1() {
-        System.out.println("inInterfaceDummy1");
+    public void inInterfaceUnused1() {
+        System.out.println("inInterfaceUnused1");
     }
-    public void inInterfaceDummy2() {
-        System.out.println("inInterfaceDummy2");
+    public void inInterfaceUnused2() {
+        System.out.println("inInterfaceUnused2");
     }
-    public void inInterfaceDummy3() {
-        System.out.println("inInterfaceDummy3");
+    public void inInterfaceUnused3() {
+        System.out.println("inInterfaceUnused3");
     }
-    public void inInterfaceDummy4() {
-        System.out.println("inInterfaceDummy4");
+    public void inInterfaceUnused4() {
+        System.out.println("inInterfaceUnused4");
     }
-    public void inInterfaceDummy5() {
-        System.out.println("inInterfaceDummy5");
+    public void inInterfaceUnused5() {
+        System.out.println("inInterfaceUnused5");
     }
 }

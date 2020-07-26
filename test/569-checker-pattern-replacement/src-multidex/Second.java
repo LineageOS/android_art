@@ -95,7 +95,7 @@ public final class Second {
   public int instanceIntField = 42;
   public double instanceDoubleField = -42.0;
   public Object instanceObjectField = null;
-  public String instanceStringField = "dummy";
+  public String instanceStringField = "placeholder";
   public long instanceLongField = 0;  // Overwritten by setters.
 
   public static int staticIntField = 4242;
