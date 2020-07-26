@@ -227,7 +227,7 @@ public class Main {
   }
 
   public Main() {}
-  public Main(int dummy) {}
+  public Main(int unused) {}
 
   private Main g() {
     // avoids inlining

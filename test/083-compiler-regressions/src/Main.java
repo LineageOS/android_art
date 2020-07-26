@@ -277,13 +277,13 @@ public class Main {
         sum += foo.getBar0();
         foo.setBar5ReturnBarArg(1,2,3,4,sum);
         sum += foo.getBar0();
-        foo.setBar2ReturnDummyArg1(1,sum);
+        foo.setBar2ReturnArg1(1,sum);
         sum += foo.getBar0();
-        foo.setBar3ReturnDummyArg2(1,2,sum);
+        foo.setBar3ReturnArg2(1,2,sum);
         sum += foo.getBar0();
-        foo.setBar4ReturnDummyArg3(1,2,3,sum);
+        foo.setBar4ReturnArg3(1,2,3,sum);
         sum += foo.getBar0();
-        foo.setBar5ReturnDummyArg4(1,2,3,4,sum);
+        foo.setBar5ReturnArg4(1,2,3,4,sum);
         sum += foo.getBar0();
         Foo nullFoo = Foo.getNullFoo();
         try {
@@ -337,22 +337,22 @@ public class Main {
             sum += 10 * 404;
         }
         try {
-            nullFoo.setBar2ReturnDummyArg1(1, sum);
+            nullFoo.setBar2ReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 11 * 404;
         }
         try {
-            nullFoo.setBar3ReturnDummyArg2(1, 2, sum);
+            nullFoo.setBar3ReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 12 * 404;
         }
         try {
-            nullFoo.setBar4ReturnDummyArg3(1, 2, 3, sum);
+            nullFoo.setBar4ReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 13 * 404;
         }
         try {
-            nullFoo.setBar5ReturnDummyArg4(1, 2, 3, 4, sum);
+            nullFoo.setBar5ReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 14 * 404;
         }
@@ -369,7 +369,7 @@ public class Main {
     static void setterTestWithReturnArgUseReturn() {
         Foo foo = new Foo();
         int sum = foo.getBar0();
-        int sumDummy = 0;
+        int sumTally = 0;
         sum += foo.getBar0();
         Foo foo2 = foo.setBar1ReturnThis(sum);
         sum += foo2.getBar0();
@@ -391,13 +391,13 @@ public class Main {
         sum += foo.getBar0();
         sum += foo.setBar5ReturnBarArg(1,2,3,4,sum);
         sum += foo.getBar0();
-        sumDummy += foo.setBar2ReturnDummyArg1(1,sum);
+        sumTally += foo.setBar2ReturnArg1(1,sum);
         sum += foo.getBar0();
-        sumDummy += foo.setBar3ReturnDummyArg2(1,2,sum);
+        sumTally += foo.setBar3ReturnArg2(1,2,sum);
         sum += foo.getBar0();
-        sumDummy += foo.setBar4ReturnDummyArg3(1,2,3,sum);
+        sumTally += foo.setBar4ReturnArg3(1,2,3,sum);
         sum += foo.getBar0();
-        sumDummy += foo.setBar5ReturnDummyArg4(1,2,3,4,sum);
+        sumTally += foo.setBar5ReturnArg4(1,2,3,4,sum);
         sum += foo.getBar0();
         Foo nullFoo = Foo.getNullFoo();
         try {
@@ -451,34 +451,34 @@ public class Main {
             sum += 10 * 404;
         }
         try {
-            sumDummy += nullFoo.setBar2ReturnDummyArg1(1, sum);
+            sumTally += nullFoo.setBar2ReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 11 * 404;
         }
         try {
-            sumDummy += nullFoo.setBar3ReturnDummyArg2(1, 2, sum);
+            sumTally += nullFoo.setBar3ReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 12 * 404;
         }
         try {
-            sumDummy += nullFoo.setBar4ReturnDummyArg3(1, 2, 3, sum);
+            sumTally += nullFoo.setBar4ReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 13 * 404;
         }
         try {
-            sumDummy += nullFoo.setBar5ReturnDummyArg4(1, 2, 3, 4, sum);
+            sumTally += nullFoo.setBar5ReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 14 * 404;
         }
         int expected = (1234 << 10) * 3 * 3 * 3 * 3 * 3 + 404 * (15 * 14 / 2);
-        int expectedDummy = 5 * 4 / 2;
-        if (sum == expected && sumDummy == expectedDummy) {
+        int expectedTally = 5 * 4 / 2;
+        if (sum == expected && sumTally == expectedTally) {
             System.out.println("setterTestWithReturnArgUseReturn passes");
         }
         else {
             System.out.println("setterTestWithReturnArgUseReturn fails: " + sum +
-                               " (expecting " + expected + "), sumDummy = " + sumDummy +
-                               "(expecting " + expectedDummy + ")");
+                               " (expecting " + expected + "), sumTally = " + sumTally +
+                               "(expecting " + expectedTally + ")");
         }
     }
 
@@ -514,21 +514,21 @@ public class Main {
         sum += foo.wideGetBar0();
         foo.wideSetBar5iReturnBarArg(1,2,3,4,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar2ReturnDummyArg1(1,sum);
+        foo.wideSetBar2ReturnArg1(1,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar3ReturnDummyArg2(1,2,sum);
+        foo.wideSetBar3ReturnArg2(1,2,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar4ReturnDummyArg3(1,2,3,sum);
+        foo.wideSetBar4ReturnArg3(1,2,3,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar5ReturnDummyArg4(1,2,3,4,sum);
+        foo.wideSetBar5ReturnArg4(1,2,3,4,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar2iReturnDummyArg1(1,sum);
+        foo.wideSetBar2iReturnArg1(1,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar3iReturnDummyArg2(1,2,sum);
+        foo.wideSetBar3iReturnArg2(1,2,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar4iReturnDummyArg3(1,2,3,sum);
+        foo.wideSetBar4iReturnArg3(1,2,3,sum);
         sum += foo.wideGetBar0();
-        foo.wideSetBar5iReturnDummyArg4(1,2,3,4,sum);
+        foo.wideSetBar5iReturnArg4(1,2,3,4,sum);
         sum += foo.wideGetBar0();
         Foo nullFoo = Foo.getNullFoo();
         try {
@@ -602,42 +602,42 @@ public class Main {
             sum += 14 * 404;
         }
         try {
-            nullFoo.wideSetBar2ReturnDummyArg1(1, sum);
+            nullFoo.wideSetBar2ReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 15 * 404;
         }
         try {
-            nullFoo.wideSetBar3ReturnDummyArg2(1, 2, sum);
+            nullFoo.wideSetBar3ReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 16 * 404;
         }
         try {
-            nullFoo.wideSetBar4ReturnDummyArg3(1, 2, 3, sum);
+            nullFoo.wideSetBar4ReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 17 * 404;
         }
         try {
-            nullFoo.wideSetBar5ReturnDummyArg4(1, 2, 3, 4, sum);
+            nullFoo.wideSetBar5ReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 18 * 404;
         }
         try {
-            nullFoo.wideSetBar2iReturnDummyArg1(1, sum);
+            nullFoo.wideSetBar2iReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 19 * 404;
         }
         try {
-            nullFoo.wideSetBar3iReturnDummyArg2(1, 2, sum);
+            nullFoo.wideSetBar3iReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 20 * 404;
         }
         try {
-            nullFoo.wideSetBar4iReturnDummyArg3(1, 2, 3, sum);
+            nullFoo.wideSetBar4iReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 21 * 404;
         }
         try {
-            nullFoo.wideSetBar5iReturnDummyArg4(1, 2, 3, 4, sum);
+            nullFoo.wideSetBar5iReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 22 * 404;
         }
@@ -654,7 +654,7 @@ public class Main {
     static void wideSetterTestWithReturnArgUseReturn() {
         Foo foo = new Foo();
         long sum = foo.wideGetBar0();
-        long sumDummy = 0;
+        long sumTally = 0;
         sum += foo.wideGetBar0();
         Foo foo2 = foo.wideSetBar1ReturnThis(sum);
         sum += foo2.wideGetBar0();
@@ -684,21 +684,21 @@ public class Main {
         sum += foo.wideGetBar0();
         sum += foo.wideSetBar5iReturnBarArg(1,2,3,4,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar2ReturnDummyArg1(1,sum);
+        sumTally += foo.wideSetBar2ReturnArg1(1,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar3ReturnDummyArg2(1,2,sum);
+        sumTally += foo.wideSetBar3ReturnArg2(1,2,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar4ReturnDummyArg3(1,2,3,sum);
+        sumTally += foo.wideSetBar4ReturnArg3(1,2,3,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar5ReturnDummyArg4(1,2,3,4,sum);
+        sumTally += foo.wideSetBar5ReturnArg4(1,2,3,4,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar2iReturnDummyArg1(1,sum);
+        sumTally += foo.wideSetBar2iReturnArg1(1,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar3iReturnDummyArg2(1,2,sum);
+        sumTally += foo.wideSetBar3iReturnArg2(1,2,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar4iReturnDummyArg3(1,2,3,sum);
+        sumTally += foo.wideSetBar4iReturnArg3(1,2,3,sum);
         sum += foo.wideGetBar0();
-        sumDummy += foo.wideSetBar5iReturnDummyArg4(1,2,3,4,sum);
+        sumTally += foo.wideSetBar5iReturnArg4(1,2,3,4,sum);
         sum += foo.wideGetBar0();
         Foo nullFoo = Foo.getNullFoo();
         try {
@@ -772,54 +772,54 @@ public class Main {
             sum += 14 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar2ReturnDummyArg1(1, sum);
+            sumTally += nullFoo.wideSetBar2ReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 15 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar3ReturnDummyArg2(1, 2, sum);
+            sumTally += nullFoo.wideSetBar3ReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 16 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar4ReturnDummyArg3(1, 2, 3, sum);
+            sumTally += nullFoo.wideSetBar4ReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 17 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar5ReturnDummyArg4(1, 2, 3, 4, sum);
+            sumTally += nullFoo.wideSetBar5ReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 18 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar2iReturnDummyArg1(1, sum);
+            sumTally += nullFoo.wideSetBar2iReturnArg1(1, sum);
         } catch(NullPointerException npe) {
             sum += 19 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar3iReturnDummyArg2(1, 2, sum);
+            sumTally += nullFoo.wideSetBar3iReturnArg2(1, 2, sum);
         } catch(NullPointerException npe) {
             sum += 20 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar4iReturnDummyArg3(1, 2, 3, sum);
+            sumTally += nullFoo.wideSetBar4iReturnArg3(1, 2, 3, sum);
         } catch(NullPointerException npe) {
             sum += 21 * 404;
         }
         try {
-            sumDummy += nullFoo.wideSetBar5iReturnDummyArg4(1, 2, 3, 4, sum);
+            sumTally += nullFoo.wideSetBar5iReturnArg4(1, 2, 3, 4, sum);
         } catch(NullPointerException npe) {
             sum += 22 * 404;
         }
         long expected = (1234L << 14) * 3 * 3 * 3 * 3 * 3 * 3 * 3 * 3 * 3  + 404 * (23 * 22 / 2);
-        long expectedDummy = 2 * (5 * 4 / 2);
-        if (sum == expected && sumDummy == expectedDummy) {
+        long expectedTally = 2 * (5 * 4 / 2);
+        if (sum == expected && sumTally == expectedTally) {
             System.out.println("wideSetterTestWithReturnArgUseReturn passes");
         }
         else {
             System.out.println("wideSetterTestWithReturnArgUseReturn fails: " + sum +
-                               " (expecting " + expected + "), sumDummy = " + sumDummy +
-                               "(expecting " + expectedDummy + ")");
+                               " (expecting " + expected + "), sumTally = " + sumTally +
+                               "(expecting " + expectedTally + ")");
         }
     }
 
@@ -9632,51 +9632,51 @@ class Foo {
         lbar = a5;
         return a5;
     }
-    public int setBar2ReturnDummyArg1(int a1, int a2) {
+    public int setBar2ReturnArg1(int a1, int a2) {
         bar = a2;
         return a1;
     }
-    public int setBar3ReturnDummyArg2(int a1, int a2, int a3) {
+    public int setBar3ReturnArg2(int a1, int a2, int a3) {
         bar = a3;
         return a2;
     }
-    public int setBar4ReturnDummyArg3(int a1, int a2, int a3, int a4) {
+    public int setBar4ReturnArg3(int a1, int a2, int a3, int a4) {
         bar = a4;
         return a3;
     }
-    public int setBar5ReturnDummyArg4(int a1, int a2, int a3, int a4, int a5) {
+    public int setBar5ReturnArg4(int a1, int a2, int a3, int a4, int a5) {
         bar = a5;
         return a4;
     }
-    public long wideSetBar2ReturnDummyArg1(long a1, long a2) {
+    public long wideSetBar2ReturnArg1(long a1, long a2) {
         lbar = a2;
         return a1;
     }
-    public long wideSetBar3ReturnDummyArg2(long a1, long a2, long a3) {
+    public long wideSetBar3ReturnArg2(long a1, long a2, long a3) {
         lbar = a3;
         return a2;
     }
-    public long wideSetBar4ReturnDummyArg3(long a1, long a2, long a3, long a4) {
+    public long wideSetBar4ReturnArg3(long a1, long a2, long a3, long a4) {
         lbar = a4;
         return a3;
     }
-    public long wideSetBar5ReturnDummyArg4(long a1, long a2, long a3, long a4, long a5) {
+    public long wideSetBar5ReturnArg4(long a1, long a2, long a3, long a4, long a5) {
         lbar = a5;
         return a4;
     }
-    public int wideSetBar2iReturnDummyArg1(int a1, long a2) {
+    public int wideSetBar2iReturnArg1(int a1, long a2) {
         lbar = a2;
         return a1;
     }
-    public int wideSetBar3iReturnDummyArg2(int a1, int a2, long a3) {
+    public int wideSetBar3iReturnArg2(int a1, int a2, long a3) {
         lbar = a3;
         return a2;
     }
-    public int wideSetBar4iReturnDummyArg3(int a1, int a2, int a3, long a4) {
+    public int wideSetBar4iReturnArg3(int a1, int a2, int a3, long a4) {
         lbar = a4;
         return a3;
     }
-    public int wideSetBar5iReturnDummyArg4(int a1, int a2, int a3, int a4, long a5) {
+    public int wideSetBar5iReturnArg4(int a1, int a2, int a3, int a4, long a5) {
         lbar = a5;
         return a4;
     }

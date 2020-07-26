@@ -20,7 +20,7 @@
 
 namespace art {
 
-// Native method annotated with `DummyAnnotation` in Java source.
+// Native method annotated with `SampleAnnotation` in Java source.
 extern "C" JNIEXPORT void JNICALL Java_Test_nativeMethodWithAnnotation(JNIEnv*, jclass) {
   std::cout << "Java_Test_nativeMethodWithAnnotation" << std::endl;
 }

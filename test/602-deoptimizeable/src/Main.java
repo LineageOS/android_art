@@ -19,16 +19,16 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 
-class DummyObject {
+class TestObject {
     public static boolean sHashCodeInvoked = false;
     private int i;
 
-    public DummyObject(int i) {
+    public TestObject(int i) {
         this.i = i;
     }
 
     public boolean equals(Object obj) {
-        return (obj instanceof DummyObject) && (i == ((DummyObject)obj).i);
+        return (obj instanceof TestObject) && (i == ((TestObject)obj).i);
     }
 
     public int hashCode() {
@@ -52,7 +52,7 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         System.loadLibrary(args[0]);
-        final HashMap<DummyObject, Long> map = new HashMap<DummyObject, Long>();
+        final HashMap<TestObject, Long> map = new HashMap<TestObject, Long>();
 
         // Single-frame deoptimization that covers partial fragment.
         execute(new Runnable() {
@@ -103,9 +103,9 @@ public class Main {
         execute(new Runnable() {
             public void run() {
                 try {
-                    map.put(new DummyObject(10), Long.valueOf(100));
-                    if (map.get(new DummyObject(10)) == null) {
-                        System.out.println("Expected map to contain DummyObject(10)");
+                    map.put(new TestObject(10), Long.valueOf(100));
+                    if (map.get(new TestObject(10)) == null) {
+                        System.out.println("Expected map to contain TestObject(10)");
                     }
                 } catch (Exception e) {
                     e.printStackTrace(System.out);
@@ -115,10 +115,10 @@ public class Main {
 
         undeoptimizeAll();  // Make compiled code useable again.
 
-        if (!DummyObject.sHashCodeInvoked) {
+        if (!TestObject.sHashCodeInvoked) {
             System.out.println("hashCode() method not invoked!");
         }
-        if (map.get(new DummyObject(10)) != 100) {
+        if (map.get(new TestObject(10)) != 100) {
             System.out.println("Wrong hashmap value!");
         }
         System.out.println("Finishing");
