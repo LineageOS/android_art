@@ -417,8 +417,8 @@ class HashSet {
 
   // Find an element, returns end() if not found.
   // Allows custom key (K) types, example of when this is useful:
-  // Set of Class* sorted by name, want to find a class with a name but can't allocate a dummy
-  // object in the heap for performance solution.
+  // Set of Class* indexed by name, want to find a class with a name but can't allocate
+  // a temporary Class object in the heap for performance solution.
   template <typename K>
   iterator find(const K& key) {
     return FindWithHash(key, hashfn_(key));
