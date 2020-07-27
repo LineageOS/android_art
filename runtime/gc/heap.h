@@ -211,6 +211,7 @@ class Heap {
        size_t long_pause_threshold,
        size_t long_gc_threshold,
        bool ignore_target_footprint,
+       bool always_log_explicit_gcs,
        bool use_tlab,
        bool verify_pre_gc_heap,
        bool verify_pre_sweeping_heap,
@@ -1304,6 +1305,10 @@ class Heap {
   // If we ignore the target footprint it lets the heap grow until it hits the heap capacity, this
   // is useful for benchmarking since it reduces time spent in GC to a low %.
   const bool ignore_target_footprint_;
+
+  // If we are running tests or some other configurations we might not actually
+  // want logs for explicit gcs since they can get spammy.
+  const bool always_log_explicit_gcs_;
 
   // Lock which guards zygote space creation.
   Mutex zygote_creation_lock_;
