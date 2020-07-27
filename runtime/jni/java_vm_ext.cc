@@ -59,9 +59,11 @@ namespace art {
 using android::base::StringAppendF;
 using android::base::StringAppendV;
 
-static constexpr size_t kGlobalsMax = 51200;  // Arbitrary sanity check. (Must fit in 16 bits.)
+// Maximum number of global references (must fit in 16 bits).
+static constexpr size_t kGlobalsMax = 51200;
 
-static constexpr size_t kWeakGlobalsMax = 51200;  // Arbitrary sanity check. (Must fit in 16 bits.)
+// Maximum number of weak global references (must fit in 16 bits).
+static constexpr size_t kWeakGlobalsMax = 51200;
 
 bool JavaVMExt::IsBadJniVersion(int version) {
   // We don't support JNI_VERSION_1_1. These are the only other valid versions.
