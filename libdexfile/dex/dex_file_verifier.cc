@@ -1724,7 +1724,7 @@ bool DexFileVerifier::CheckIntraStringDataItem() {
 }
 
 bool DexFileVerifier::CheckIntraDebugInfoItem() {
-  DECODE_UNSIGNED_CHECKED_FROM(ptr_, dummy);
+  DECODE_UNSIGNED_CHECKED_FROM(ptr_, unused_line_start);
   DECODE_UNSIGNED_CHECKED_FROM(ptr_, parameters_size);
   if (UNLIKELY(parameters_size > 65536)) {
     ErrorStringPrintf("Invalid parameters_size: %x", parameters_size);
@@ -1748,11 +1748,11 @@ bool DexFileVerifier::CheckIntraDebugInfoItem() {
         return true;
       }
       case DexFile::DBG_ADVANCE_PC: {
-        DECODE_UNSIGNED_CHECKED_FROM(ptr_, advance_pc_dummy);
+        DECODE_UNSIGNED_CHECKED_FROM(ptr_, unused_advance_pc);
         break;
       }
       case DexFile::DBG_ADVANCE_LINE: {
-        DECODE_SIGNED_CHECKED_FROM(ptr_, advance_line_dummy);
+        DECODE_SIGNED_CHECKED_FROM(ptr_, unused_advance_line);
         break;
       }
       case DexFile::DBG_START_LOCAL: {
