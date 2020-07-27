@@ -40,7 +40,7 @@ namespace art {
 using android::base::StringPrintf;
 
 static constexpr size_t kMonitorsInitial = 32;  // Arbitrary.
-static constexpr size_t kMonitorsMax = 4096;  // Arbitrary sanity check.
+static constexpr size_t kMonitorsMax = 4096;  // Maximum number of monitors held by JNI code.
 
 const JNINativeInterface* JNIEnvExt::table_override_ = nullptr;
 
