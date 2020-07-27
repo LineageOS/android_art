@@ -389,7 +389,7 @@ MemMap MemMap::MapAnonymous(const char* name,
                 reuse);
 }
 
-MemMap MemMap::MapDummy(const char* name, uint8_t* addr, size_t byte_count) {
+MemMap MemMap::MapPlaceholder(const char* name, uint8_t* addr, size_t byte_count) {
   if (byte_count == 0) {
     return Invalid();
   }
