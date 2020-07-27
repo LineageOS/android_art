@@ -255,10 +255,6 @@ class Thread {
     return tls32_.user_code_suspend_count;
   }
 
-  int GetDebugSuspendCount() const REQUIRES(Locks::thread_suspend_count_lock_) {
-    return tls32_.debug_suspend_count;
-  }
-
   bool IsSuspended() const {
     union StateAndFlags state_and_flags;
     state_and_flags.as_int = tls32_.state_and_flags.as_int;
@@ -1541,7 +1537,6 @@ class Thread {
 
     explicit tls_32bit_sized_values(bool is_daemon)
         : suspend_count(0),
-          debug_suspend_count(0),
           thin_lock_thread_id(0),
           tid(0),
           daemon(is_daemon),
@@ -1568,10 +1563,6 @@ class Thread {
     // A non-zero value is used to tell the current thread to enter a safe point
     // at the next poll.
     int suspend_count GUARDED_BY(Locks::thread_suspend_count_lock_);
-
-    // How much of 'suspend_count_' is by request of the debugger, used to set things right
-    // when the debugger detaches. Must be <= suspend_count_.
-    int debug_suspend_count GUARDED_BY(Locks::thread_suspend_count_lock_);
 
     // Thin lock thread id. This is a small integer used by the thin lock implementation.
     // This is not to be confused with the native thread's tid, nor is it the value returned
