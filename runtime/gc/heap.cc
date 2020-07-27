@@ -230,6 +230,7 @@ Heap::Heap(size_t initial_size,
            size_t long_pause_log_threshold,
            size_t long_gc_log_threshold,
            bool ignore_target_footprint,
+           bool always_log_explicit_gcs,
            bool use_tlab,
            bool verify_pre_gc_heap,
            bool verify_pre_sweeping_heap,
@@ -265,6 +266,7 @@ Heap::Heap(size_t initial_size,
       pre_gc_weighted_allocated_bytes_(0.0),
       post_gc_weighted_allocated_bytes_(0.0),
       ignore_target_footprint_(ignore_target_footprint),
+      always_log_explicit_gcs_(always_log_explicit_gcs),
       zygote_creation_lock_("zygote creation lock", kZygoteCreationLock),
       zygote_space_(nullptr),
       large_object_threshold_(large_object_threshold),
@@ -2699,7 +2701,7 @@ void Heap::LogGC(GcCause gc_cause, collector::GarbageCollector* collector) {
   const std::vector<uint64_t>& pause_times = GetCurrentGcIteration()->GetPauseTimes();
   // Print the GC if it is an explicit GC (e.g. Runtime.gc()) or a slow GC
   // (mutator time blocked >= long_pause_log_threshold_).
-  bool log_gc = kLogAllGCs || gc_cause == kGcCauseExplicit;
+  bool log_gc = kLogAllGCs || (gc_cause == kGcCauseExplicit && always_log_explicit_gcs_);
   if (!log_gc && CareAboutPauseTimes()) {
     // GC for alloc pauses the allocating thread, so consider it as a pause.
     log_gc = duration > long_gc_log_threshold_ ||
