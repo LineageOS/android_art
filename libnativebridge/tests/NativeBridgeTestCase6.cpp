@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// A dummy implementation of the native-bridge interface.
+// An implementation of the native-bridge interface for testing.
 
 #include "nativebridge/native_bridge.h"
 
