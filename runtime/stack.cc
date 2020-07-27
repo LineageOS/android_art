@@ -758,7 +758,7 @@ void StackVisitor::SanityCheckFrame() const {
     }
     if (cur_quick_frame_ != nullptr) {
       AssertPcIsWithinQuickCode(method, cur_quick_frame_pc_);
-      // Frame sanity.
+      // Frame consistency checks.
       size_t frame_size = GetCurrentQuickFrameInfo().FrameSizeInBytes();
       CHECK_NE(frame_size, 0u);
       // For compiled code, we could try to have a rough guess at an upper size we expect

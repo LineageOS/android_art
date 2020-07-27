@@ -1036,7 +1036,8 @@ bool MethodVerifier<kVerifierDebug>::Verify() {
     }
   }
 
-  // Sanity-check the register counts. ins + locals = registers, so make sure that ins <= registers.
+  // Consistency-check of the register counts.
+  // ins + locals = registers, so make sure that ins <= registers.
   if (code_item_accessor_.InsSize() > code_item_accessor_.RegistersSize()) {
     Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "bad register counts (ins="
                                       << code_item_accessor_.InsSize()
@@ -1900,7 +1901,7 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
       work_line_->CopyFromLine(reg_table_.GetLine(insn_idx));
     } else if (kIsDebugBuild) {
       /*
-       * Sanity check: retrieve the stored register line (assuming
+       * Consistency check: retrieve the stored register line (assuming
        * a full table) and make sure it actually matches.
        */
       RegisterLine* register_line = reg_table_.GetLine(insn_idx);
