@@ -84,7 +84,7 @@ cc_defaults {
         // Try to get rid of it.
         "-z muldefs",
     ],
-    static_libs: ["libsigchain_dummy"],
+    static_libs: ["libsigchain_fake"],
 }
 
 art_cc_binary {
