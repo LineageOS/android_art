@@ -15,7 +15,7 @@
 //
 
 cc_defaults {
-    name: "libnativebridge-dummy-defaults",
+    name: "libnativebridge-test-case-defaults",
     defaults: [
         "art_defaults",
         "art_test_defaults",
@@ -40,37 +40,37 @@ cc_defaults {
 }
 
 cc_library_shared {
-    name: "libnativebridge-dummy",
-    srcs: ["DummyNativeBridge.cpp"],
-    defaults: ["libnativebridge-dummy-defaults"],
+    name: "libnativebridge-test-case",
+    srcs: ["NativeBridgeTestCase.cpp"],
+    defaults: ["libnativebridge-test-case-defaults"],
 }
 
 cc_library_shared {
-    name: "libnativebridge2-dummy",
-    srcs: ["DummyNativeBridge2.cpp"],
-    defaults: ["libnativebridge-dummy-defaults"],
+    name: "libnativebridge2-test-case",
+    srcs: ["NativeBridgeTestCase2.cpp"],
+    defaults: ["libnativebridge-test-case-defaults"],
 }
 
 cc_library_shared {
-    name: "libnativebridge3-dummy",
-    srcs: ["DummyNativeBridge3.cpp"],
-    defaults: ["libnativebridge-dummy-defaults"],
+    name: "libnativebridge3-test-case",
+    srcs: ["NativeBridgeTestCase3.cpp"],
+    defaults: ["libnativebridge-test-case-defaults"],
 }
 
 cc_library_shared {
-    name: "libnativebridge6-dummy",
-    srcs: ["DummyNativeBridge6.cpp"],
-    defaults: ["libnativebridge-dummy-defaults"],
+    name: "libnativebridge6-test-case",
+    srcs: ["NativeBridgeTestCase6.cpp"],
+    defaults: ["libnativebridge-test-case-defaults"],
     shared_libs: [
         "libnativebridge6prezygotefork",
     ],
 }
 
-// A helper library to produce dummy side effect of PreZygoteForkNativeBridge.
+// A helper library to produce test-case side effect of PreZygoteForkNativeBridge.
 cc_library_shared {
     name: "libnativebridge6prezygotefork",
     srcs: ["NativeBridge6PreZygoteFork_lib.cpp"],
-    defaults: ["libnativebridge-dummy-defaults"],
+    defaults: ["libnativebridge-test-case-defaults"],
 }
 
 // Build the unit tests.
@@ -119,7 +119,7 @@ cc_defaults {
 
     shared_libs: [
         "liblog",
-        "libnativebridge-dummy",
+        "libnativebridge-test-case",
         "libnativebridge6prezygotefork",
     ],
     header_libs: ["libbase_headers"],
