@@ -104,7 +104,7 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
   jit_options->thread_pool_pthread_priority_ =
       options.GetOrDefault(RuntimeArgumentMap::JITPoolThreadPthreadPriority);
 
-  // Set default compile threshold to aide with sanity checking defaults.
+  // Set default compile threshold to aid with checking defaults.
   jit_options->compile_threshold_ =
       kIsDebugBuild
       ? (Jit::kSlowMode
@@ -115,7 +115,7 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
   // When not running in slow-mode, thresholds are quantized to kJitSamplesbatchsize.
   const uint32_t kJitThresholdStep = Jit::kSlowMode ? 1u : kJitSamplesBatchSize;
 
-  // Set default warm-up threshold to aide with sanity checking defaults.
+  // Set default warm-up threshold to aid with checking defaults.
   jit_options->warmup_threshold_ =
       kIsDebugBuild ? (Jit::kSlowMode
                        ? kJitSlowStressDefaultWarmUpThreshold
@@ -1558,7 +1558,7 @@ bool Jit::MaybeCompileMethod(Thread* self,
             self,
             new JitCompileTask(method,
                                JitCompileTask::TaskKind::kAllocateProfile,
-                               CompilationKind::kOptimized));  // Dummy compilation kind.
+                               CompilationKind::kOptimized));  // Arbitrary compilation kind.
       }
     }
   }
