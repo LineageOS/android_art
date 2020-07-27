@@ -21,7 +21,7 @@
 
 namespace android {
 
-constexpr const char* kNativeBridgeLibrary2 = "libnativebridge2-dummy.so";
+constexpr const char* kNativeBridgeLibrary2 = "libnativebridge2-test-case.so";
 
 TEST_F(NativeBridgeTest, V2_Signal) {
     // Init
