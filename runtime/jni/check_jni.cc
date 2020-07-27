@@ -2729,8 +2729,8 @@ class CheckJNI {
     JniValueType args[2] = {{.E = env}, {.L = buf}};
     if (sc.Check(soa, true, "EL", args)) {
       JniValueType result;
-      // Note: this is implemented in the base environment by a GetLongField which will sanity
-      // check the type of buf in GetLongField above.
+      // Note: this is implemented in the base environment by a GetLongField which will check the
+      // type of buf in GetLongField above.
       result.p = baseEnv(env)->GetDirectBufferAddress(env, buf);
       if (sc.Check(soa, false, "p", &result)) {
         return const_cast<void*>(result.p);
@@ -2746,8 +2746,8 @@ class CheckJNI {
     JniValueType args[2] = {{.E = env}, {.L = buf}};
     if (sc.Check(soa, true, "EL", args)) {
       JniValueType result;
-      // Note: this is implemented in the base environment by a GetIntField which will sanity
-      // check the type of buf in GetIntField above.
+      // Note: this is implemented in the base environment by a GetIntField which will check the
+      // type of buf in GetIntField above.
       result.J = baseEnv(env)->GetDirectBufferCapacity(env, buf);
       if (sc.Check(soa, false, "J", &result)) {
         return result.J;
