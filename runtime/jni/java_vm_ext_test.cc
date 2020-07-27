@@ -151,7 +151,7 @@ TEST_F(JavaVmExtStackTraceTest, TestEnableDisable) {
   ASSERT_EQ(JNI_OK, ok);
 
   std::vector<jobject> global_refs_;
-  jobject local_ref = env->NewStringUTF("Dummy");
+  jobject local_ref = env->NewStringUTF("Hello");
   for (size_t i = 0; i < 2000; ++i) {
     global_refs_.push_back(env->NewGlobalRef(local_ref));
   }
