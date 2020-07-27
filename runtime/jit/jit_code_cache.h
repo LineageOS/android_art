@@ -287,9 +287,9 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Given the 'pc', try to find the JIT compiled code associated with it.
-  // Return null if 'pc' is not in the code cache. 'method' is passed for
-  // sanity check.
+  // Given the 'pc', try to find the JIT compiled code associated with it.  'method' may be null
+  // when LookupMethodHeader is called from MarkCodeClosure::Run() in debug builds.  Return null
+  // if 'pc' is not in the code cache.
   OatQuickMethodHeader* LookupMethodHeader(uintptr_t pc, ArtMethod* method)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
