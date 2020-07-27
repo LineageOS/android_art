@@ -27,7 +27,7 @@ static const char gtest_output_xml[] = "\
 <?xml version=\"1.0\"?>\n\
 <testsuites tests=\"0\" failures=\"0\" disabled=\"0\" errors=\"0\" name=\"AllTests\">";
 
-/* Writes a dummy gtest xml report to the given path. */
+/* Writes a fake gtest xml report to the given path. */
 static int write_gtest_output_xml(char* gtest_output_path) {
   FILE* output_fd = fopen(gtest_output_path, "w");
   if (output_fd == NULL) {
