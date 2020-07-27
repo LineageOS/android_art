@@ -440,11 +440,14 @@ OptimizingCompiler::~OptimizingCompiler() {
 void OptimizingCompiler::DumpInstructionSetFeaturesToCfg() const {
   const CompilerOptions& compiler_options = GetCompilerOptions();
   const InstructionSetFeatures* features = compiler_options.GetInstructionSetFeatures();
+  std::string isa_string =
+      std::string("isa:") + GetInstructionSetString(features->GetInstructionSet());
   std::string features_string = "isa_features:" + features->GetFeatureString();
   // It is assumed that visualizer_output_ is empty when calling this function, hence the fake
   // compilation block containing the ISA features will be printed at the beginning of the .cfg
   // file.
-  *visualizer_output_ << HGraphVisualizer::InsertMetaDataAsCompilationBlock(features_string);
+  *visualizer_output_
+      << HGraphVisualizer::InsertMetaDataAsCompilationBlock(isa_string + ' ' + features_string);
 }
 
 bool OptimizingCompiler::CanCompileMethod(uint32_t method_idx ATTRIBUTE_UNUSED,
