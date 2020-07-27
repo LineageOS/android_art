@@ -1070,7 +1070,7 @@ class MarkCodeClosure final : public Closure {
     if (kIsDebugBuild) {
       // The stack walking code queries the side instrumentation stack if it
       // sees an instrumentation exit pc, so the JIT code of methods in that stack
-      // must have been seen. We sanity check this below.
+      // must have been seen. We check this below.
       for (const auto& it : *thread->GetInstrumentationStack()) {
         // The 'method_' in InstrumentationStackFrame is the one that has return_pc_ in
         // its stack frame, it is not the method owning return_pc_. We just pass null to
@@ -1389,7 +1389,7 @@ void JitCodeCache::DoCollection(Thread* self, bool collect_profiling_info) {
           }
         }
       } else if (kIsDebugBuild) {
-        // Sanity check that the profiling infos do not have a dangling entry point.
+        // Check that the profiling infos do not have a dangling entry point.
         for (ProfilingInfo* info : profiling_infos_) {
           DCHECK(!Runtime::Current()->IsZygote());
           const void* entry_point = info->GetSavedEntryPoint();
