@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// A dummy implementation of the native-bridge interface.
+// An implementation of the native-bridge interface for testing.
 
 #include "nativebridge/native_bridge.h"
 
@@ -50,7 +50,7 @@ extern "C" bool native_bridge2_is_compatible_compatible_with(uint32_t version) {
   return version <= 2;
 }
 
-static bool native_bridge2_dummy_signal_handler(int, siginfo_t*, void*) {
+static bool native_bridge2_test_case_signal_handler(int, siginfo_t*, void*) {
   // TODO: Implement something here. We'd either have to have a death test with a log here, or
   //       we'd have to be able to resume after the faulting instruction...
   return true;
@@ -58,7 +58,7 @@ static bool native_bridge2_dummy_signal_handler(int, siginfo_t*, void*) {
 
 extern "C" android::NativeBridgeSignalHandlerFn native_bridge2_get_signal_handler(int signal) {
   if (signal == SIGSEGV) {
-    return &native_bridge2_dummy_signal_handler;
+    return &native_bridge2_test_case_signal_handler;
   }
   return nullptr;
 }
