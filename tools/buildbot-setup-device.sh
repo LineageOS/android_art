@@ -101,7 +101,7 @@ $verbose && adb logcat -p
 echo -e "${green}Kill stalled dalvikvm processes${nc}"
 # 'ps' on M can sometimes hang.
 timeout 2s adb shell "ps" >/dev/null
-if [ $? = 124 ]; then
+if [[ $? == 124 ]] && [[ "$ART_TEST_DONT_REBOOT_DEVICE" != true ]]; then
   echo -e "${green}Rebooting device to fix 'ps'${nc}"
   adb reboot
   adb wait-for-device root
