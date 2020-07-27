@@ -64,7 +64,7 @@ void ArtInterpreterToInterpreterBridge(Thread* self,
                                        JValue* result)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-// One-time sanity check.
+// One-time check of assembler constants.
 void CheckInterpreterAsmConstants();
 
 void InitInterpreterTls(Thread* self);
