@@ -242,7 +242,7 @@ void SpaceTest<Super>::SizeFootPrintGrowthLimitAndTrimBody(MallocSpace* space,
       space->Trim();
     }
 
-    // Bounds sanity
+    // Bounds consistency check.
     footprint = space->GetFootprint();
     EXPECT_LE(amount_allocated, growth_limit);
     EXPECT_GE(footprint, amount_allocated);
@@ -299,16 +299,16 @@ void SpaceTest<Super>::SizeFootPrintGrowthLimitAndTrimBody(MallocSpace* space,
   }
   EXPECT_TRUE(large_object != nullptr);
 
-  // Sanity check footprint
+  // Consistency check of the footprint.
   footprint = space->GetFootprint();
   EXPECT_LE(footprint, growth_limit);
   EXPECT_GE(space->Size(), footprint);
   EXPECT_LE(space->Size(), growth_limit);
 
-  // Clean up
+  // Clean up.
   space->Free(self, large_object.Assign(nullptr));
 
-  // Sanity check footprint
+  // Consistency check of the footprint.
   footprint = space->GetFootprint();
   EXPECT_LE(footprint, growth_limit);
   EXPECT_GE(space->Size(), footprint);
@@ -328,7 +328,7 @@ void SpaceTest<Super>::SizeFootPrintGrowthLimitAndTrimDriver(size_t object_size,
   MallocSpace* space(create_space("test", initial_size, growth_limit, capacity));
   ASSERT_TRUE(space != nullptr);
 
-  // Basic sanity
+  // Basic consistency check.
   EXPECT_EQ(space->Capacity(), growth_limit);
   EXPECT_EQ(space->NonGrowthLimitCapacity(), capacity);
 

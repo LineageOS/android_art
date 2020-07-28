@@ -501,7 +501,7 @@ static FrameIdToShadowFrame* FindFrameIdToShadowFrame(FrameIdToShadowFrame* head
   for (FrameIdToShadowFrame* record = head; record != nullptr; record = record->GetNext()) {
     if (record->GetFrameId() == frame_id) {
       if (kIsDebugBuild) {
-        // Sanity check we have at most one record for this frame.
+        // Check we have at most one record for this frame.
         CHECK(found == nullptr) << "Multiple records for the frame " << frame_id;
         found = record;
       } else {
@@ -678,7 +678,7 @@ Thread* Thread::FromManagedThread(const ScopedObjectAccessAlreadyRunnable& soa,
                                   ObjPtr<mirror::Object> thread_peer) {
   ArtField* f = jni::DecodeArtField(WellKnownClasses::java_lang_Thread_nativePeer);
   Thread* result = reinterpret_cast64<Thread*>(f->GetLong(thread_peer));
-  // Sanity check that if we have a result it is either suspended or we hold the thread_list_lock_
+  // Check that if we have a result it is either suspended or we hold the thread_list_lock_
   // to stop it from going away.
   if (kIsDebugBuild) {
     MutexLock mu(soa.Self(), *Locks::thread_suspend_count_lock_);
@@ -1356,7 +1356,7 @@ bool Thread::InitStackHwm() {
     InstallImplicitProtection();
   }
 
-  // Sanity check.
+  // Consistency check.
   CHECK_GT(FindStackTop(), reinterpret_cast<void*>(tlsPtr_.stack_end));
 
   return true;

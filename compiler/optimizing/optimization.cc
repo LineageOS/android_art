@@ -309,7 +309,7 @@ ArenaVector<HOptimization*> ConstructOptimizations(
 
     // Add each next optimization to result vector.
     CHECK(opt != nullptr);
-    DCHECK_STREQ(pass_name, opt->GetPassName());  // sanity
+    DCHECK_STREQ(pass_name, opt->GetPassName());  // Consistency check.
     optimizations.push_back(opt);
   }
 
