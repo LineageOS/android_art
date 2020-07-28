@@ -357,7 +357,7 @@ TEST_F(HashSetTest, TestReserve) {
 }
 
 TEST_F(HashSetTest, IteratorConversion) {
-  const char* test_string = "dummy";
+  const char* test_string = "test string";
   HashSet<std::string> hash_set;
   HashSet<std::string>::iterator it = hash_set.insert(test_string).first;
   HashSet<std::string>::const_iterator cit = it;
@@ -366,7 +366,7 @@ TEST_F(HashSetTest, IteratorConversion) {
 }
 
 TEST_F(HashSetTest, StringSearchStringView) {
-  const char* test_string = "dummy";
+  const char* test_string = "test string";
   HashSet<std::string> hash_set;
   HashSet<std::string>::iterator insert_pos = hash_set.insert(test_string).first;
   HashSet<std::string>::iterator it = hash_set.find(std::string_view(test_string));
@@ -374,7 +374,7 @@ TEST_F(HashSetTest, StringSearchStringView) {
 }
 
 TEST_F(HashSetTest, DoubleInsert) {
-  const char* test_string = "dummy";
+  const char* test_string = "test string";
   HashSet<std::string> hash_set;
   hash_set.insert(test_string);
   hash_set.insert(test_string);

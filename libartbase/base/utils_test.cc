@@ -112,7 +112,7 @@ TEST_F(UtilsTest, GetProcessStatus) {
   EXPECT_EQ("R (running)", GetProcessStatus("State"));
   EXPECT_EQ("<unknown>", GetProcessStatus("tate"));
   EXPECT_EQ("<unknown>", GetProcessStatus("e"));
-  EXPECT_EQ("<unknown>", GetProcessStatus("Dummy"));
+  EXPECT_EQ("<unknown>", GetProcessStatus("InvalidFieldName"));
 }
 
 }  // namespace art

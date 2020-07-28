@@ -103,7 +103,7 @@ TEST_F(OutputStreamTest, Vector) {
 TEST_F(OutputStreamTest, BufferedFlush) {
   struct CheckingOutputStream : OutputStream {
     CheckingOutputStream()
-        : OutputStream("dummy"),
+        : OutputStream("fake-location"),
           flush_called(false) { }
     ~CheckingOutputStream() override {}
 
