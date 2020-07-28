@@ -34,7 +34,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdSimple(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdSimple(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -48,6 +48,16 @@ public class TestByte {
   //
   /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
   /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+
+
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdSimple(byte[], byte[]) disassembly (after)
+  /// CHECK:        VecDotProd
+  /// CHECK-IF:     hasIsaFeature("dotprod")
+  ///               CHECK-NEXT:   sdot v{{\d+}}.4s, v{{\d+}}.16b, v{{\d+}}.16b
+  /// CHECK-ELSE:
+  ///               CHECK-NOT:    sdot
+  ///               CHECK-NOT:    udot
+  /// CHECK-FI:
   public static final int testDotProdSimple(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
@@ -72,7 +82,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdComplex(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdComplex(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -109,7 +119,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdSimpleUnsigned(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdSimpleUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -123,6 +133,15 @@ public class TestByte {
   //
   /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
   /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdSimpleUnsigned(byte[], byte[]) disassembly (after)
+  /// CHECK:        VecDotProd
+  /// CHECK-IF:     hasIsaFeature("dotprod")
+  ///               CHECK-NEXT:   udot v{{\d+}}.4s, v{{\d+}}.16b, v{{\d+}}.16b
+  /// CHECK-ELSE:
+  ///               CHECK-NOT:    sdot
+  ///               CHECK-NOT:    udot
+  /// CHECK-FI:
   public static final int testDotProdSimpleUnsigned(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
@@ -147,7 +166,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdComplexUnsigned(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -188,7 +207,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdComplexUnsignedCastedToSigned(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexUnsignedCastedToSigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -229,7 +248,7 @@ public class TestByte {
   /// CHECK-DAG:                  Add [<<Phi2>>,<<Mul>>]                                loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG:                  Add [<<Phi1>>,<<Const1>>]                             loop:<<Loop>>      outer_loop:none
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdComplexSignedCastedToUnsigned(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexSignedCastedToUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
   /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
@@ -255,7 +274,7 @@ public class TestByte {
     return s - 1;
   }
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdSignedWidening(byte[], byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdSignedWidening(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG:                  VecDotProd type:Int8
   public static final int testDotProdSignedWidening(byte[] a, byte[] b) {
     int s = 1;
@@ -266,7 +285,7 @@ public class TestByte {
     return s - 1;
   }
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdParamSigned(int, byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdParamSigned(int, byte[]) loop_optimization (after)
   /// CHECK-DAG:                  VecDotProd type:Int8
   public static final int testDotProdParamSigned(int x, byte[] b) {
     int s = 1;
@@ -277,7 +296,7 @@ public class TestByte {
     return s - 1;
   }
 
-  /// CHECK-START-{ARM64}: int other.TestByte.testDotProdParamUnsigned(int, byte[]) loop_optimization (after)
+  /// CHECK-START-ARM64: int other.TestByte.testDotProdParamUnsigned(int, byte[]) loop_optimization (after)
   /// CHECK-DAG:                  VecDotProd type:Uint8
   public static final int testDotProdParamUnsigned(int x, byte[] b) {
     int s = 1;
