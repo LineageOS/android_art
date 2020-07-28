@@ -350,11 +350,11 @@ class Monitor {
   // - If contention reporting is enabled, we use the lock_owner_request_ field to have the
   //   contending thread request them. The current owner then sets them when releasing the monitor,
   //   making them available when the contending thread acquires the monitor.
-  // - If both are enabled, we blindly do both. This usually prevents us from switching between
-  //   reporting the end and beginning of critical sections for contention logging when tracing is
-  //   enabled.  We expect that tracing overhead is normally much higher than for contention
-  //   logging, so the added cost should be small. It also minimizes glitches when enabling and
-  //   disabling traces.
+  // - If tracing and contention reporting are enabled, we do both. This usually prevents us from
+  //   switching between reporting the end and beginning of critical sections for contention logging
+  //   when tracing is enabled.  We expect that tracing overhead is normally much higher than for
+  //   contention logging, so the added cost should be small. It also minimizes glitches when
+  //   enabling and disabling traces.
   // We're tolerant of missing information. E.g. when tracing is initially turned on, we may
   // not have the lock holder information if the holder acquired the lock with tracing off.
   //
