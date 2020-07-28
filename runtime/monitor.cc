@@ -1541,7 +1541,7 @@ bool Monitor::IsValidLockWord(LockWord lock_word) {
       // Nothing to check.
       return true;
     case LockWord::kThinLocked:
-      // Basic sanity check of owner.
+      // Basic consistency check of owner.
       return lock_word.ThinLockOwner() != ThreadList::kInvalidThreadId;
     case LockWord::kFatLocked: {
       // Check the  monitor appears in the monitor list.

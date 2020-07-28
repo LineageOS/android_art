@@ -30,8 +30,8 @@ void VerifyObjectImpl(ObjPtr<mirror::Object> obj) {
     // Slow object verification, try the heap right away.
     Runtime::Current()->GetHeap()->VerifyObjectBody(obj);
   } else {
-    // Fast object verification, only call the heap if our quick sanity tests fail. The heap will
-    // print the diagnostic message.
+    // Fast object verification, only call the heap if our quick checks fail.
+    // The heap will print the diagnostic message.
     bool failed = !IsAligned<kObjectAlignment>(obj.Ptr());
     if (!failed) {
       mirror::Class* c = obj->GetClass<kVerifyNone>();
