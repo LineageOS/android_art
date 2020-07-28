@@ -145,3 +145,33 @@ class C1visualizerParser_Test(unittest.TestCase):
       ( ImmutableDict({"feature1": True, "feature2": False}), [
         ( "MyMethod1 pass1", [ "foo", "bar" ] )
       ]))
+    self.assertParsesTo(
+      """
+        begin_compilation
+          name "isa:some_isa isa_features:feature1,-feature2"
+          method "isa:some_isa isa_features:feature1,-feature2"
+          date 1234
+        end_compilation
+      """,
+      ( ImmutableDict({"feature1": True, "feature2": False}), []))
+    self.assertParsesTo(
+      """
+        begin_compilation
+          name "isa:some_isa isa_features:feature1,-feature2"
+          method "isa:some_isa isa_features:feature1,-feature2"
+          date 1234
+        end_compilation
+        begin_compilation
+          name "xyz1"
+          method "MyMethod1"
+          date 1234
+        end_compilation
+        begin_cfg
+          name "pass1"
+          foo
+          bar
+        end_cfg
+      """,
+      ( ImmutableDict({"feature1": True, "feature2": False}), [
+        ( "MyMethod1 pass1", [ "foo", "bar" ] )
+      ]))
