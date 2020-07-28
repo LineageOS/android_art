@@ -76,7 +76,7 @@ const char* const VixlJniHelpersResults = {
   "      f0: bc f1 00 0f                   cmp.w r12, #0\n"
   "      f4: 18 bf                         it ne\n"
   "      f6: 0d f2 01 4c                   addwne r12, sp, #1025\n"
-  "      fa: d9 f8 a4 c0                   ldr.w r12, [r9, #164]\n"
+  "      fa: d9 f8 9c c0                   ldr.w r12, [r9, #156]\n"
   "      fe: bc f1 00 0f                   cmp.w r12, #0\n"
   "     102: 71 d1                         bne #226\n"
   "     104: cd f8 ff c7                   str.w r12, [sp, #2047]\n"
@@ -150,10 +150,10 @@ const char* const VixlJniHelpersResults = {
   "     212: 09 b0                         add sp, #36\n"
   "     214: bd ec 10 8a                   vpop {s16, s17, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27, s28, s29, s30, s31}\n"
   "     218: bd e8 e0 4d                   pop.w {r5, r6, r7, r8, r10, r11, lr}\n"
-  "     21c: d9 f8 34 80                   ldr.w r8, [r9, #52]\n"
+  "     21c: d9 f8 30 80                   ldr.w r8, [r9, #48]\n"
   "     220: 70 47                         bx lr\n"
   "     222: 60 46                         mov r0, r12\n"
-  "     224: d9 f8 e8 e2                   ldr.w lr, [r9, #744]\n"
+  "     224: d9 f8 e0 e2                   ldr.w lr, [r9, #736]\n"
   "     228: f0 47                         blx lr\n"
 };
 
