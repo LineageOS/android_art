@@ -682,7 +682,7 @@ class Hprof : public SingleRootVisitor {
   }
 
   void WriteStackTraces() REQUIRES_SHARED(Locks::mutator_lock_) {
-    // Write a dummy stack trace record so the analysis tools don't freak out.
+    // Write a fake stack trace record so the analysis tools don't freak out.
     output_->StartNewRecord(HPROF_TAG_STACK_TRACE, kHprofTime);
     __ AddStackTraceSerialNumber(kHprofNullStackTrace);
     __ AddU4(kHprofNullThread);
