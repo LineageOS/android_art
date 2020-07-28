@@ -1501,8 +1501,8 @@ class ImageSpace::Loader {
         }
       }
 
-      // Fixup objects may read fields in the boot image, use the mutator lock here for sanity.
-      // Though its probably not required.
+      // Fixup objects may read fields in the boot image so we hold the mutator lock (although it is
+      // probably not required).
       TimingLogger::ScopedTiming timing("Fixup objects", &logger);
       ScopedObjectAccess soa(Thread::Current());
       // Need to update the image to be at the target base.
