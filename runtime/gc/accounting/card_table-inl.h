@@ -215,7 +215,7 @@ inline void* CardTable::AddrFromCard(const uint8_t *card_addr) const {
 
 inline uint8_t* CardTable::CardFromAddr(const void *addr) const {
   uint8_t *card_addr = biased_begin_ + (reinterpret_cast<uintptr_t>(addr) >> kCardShift);
-  // Sanity check the caller was asking for address covered by the card table
+  // Check that the caller was asking for an address covered by the card table.
   DCHECK(IsValidCard(card_addr)) << "addr: " << addr
       << " card_addr: " << reinterpret_cast<void*>(card_addr);
   return card_addr;
