@@ -40,13 +40,9 @@ using helpers::XRegisterFrom;
 
 #define __ GetVIXLAssembler()->
 
-// Build-time switch for Armv8.4-a dot product instructions.
-// TODO: Enable dot product when there is a device to test it on.
-static constexpr bool kArm64EmitDotProdInstructions = false;
-
 // Returns whether dot product instructions should be emitted.
 static bool ShouldEmitDotProductInstructions(const CodeGeneratorARM64* codegen_) {
-  return kArm64EmitDotProdInstructions && codegen_->GetInstructionSetFeatures().HasDotProd();
+  return codegen_->GetInstructionSetFeatures().HasDotProd();
 }
 
 void LocationsBuilderARM64Sve::VisitVecReplicateScalar(HVecReplicateScalar* instruction) {
