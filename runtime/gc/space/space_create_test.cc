@@ -87,7 +87,7 @@ TEST_P(SpaceCreateTest, InitTestBody) {
 // allocations after the ZygoteSpace is created. The test should also do some GCs to ensure that
 // the GC works with the ZygoteSpace.
 TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
-  size_t dummy;
+  size_t unused;
   MallocSpace* space(CreateSpace("test", 4 * MB, 16 * MB, 16 * MB));
   ASSERT_TRUE(space != nullptr);
 
@@ -112,7 +112,7 @@ TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
   EXPECT_EQ(ptr1_bytes_tl_bulk_allocated, ptr1_bytes_allocated);
 
   // Fails, requires a higher footprint limit.
-  mirror::Object* ptr2 = Alloc(space, self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr2 = Alloc(space, self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr2 == nullptr);
 
   // Succeeds, adjusts the footprint.
@@ -130,11 +130,11 @@ TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
   EXPECT_EQ(ptr3_bytes_tl_bulk_allocated, ptr3_bytes_allocated);
 
   // Fails, requires a higher footprint limit.
-  mirror::Object* ptr4 = space->Alloc(self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr4 = space->Alloc(self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr4 == nullptr);
 
   // Also fails, requires a higher allowed footprint.
-  mirror::Object* ptr5 = space->AllocWithGrowth(self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr5 = space->AllocWithGrowth(self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr5 == nullptr);
 
   // Release some memory.
@@ -163,7 +163,7 @@ TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
   EXPECT_LE(1U * MB, free1);
 
   // Make sure that the zygote space isn't directly at the start of the space.
-  EXPECT_TRUE(space->Alloc(self, 1U * MB, &dummy, nullptr, &dummy) != nullptr);
+  EXPECT_TRUE(space->Alloc(self, 1U * MB, &unused, nullptr, &unused) != nullptr);
 
   gc::Heap* heap = Runtime::Current()->GetHeap();
   space::Space* old_space = space;
@@ -197,7 +197,7 @@ TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
   EXPECT_EQ(ptr1_bytes_tl_bulk_allocated, ptr1_bytes_allocated);
 
   // Fails, requires a higher footprint limit.
-  ptr2 = Alloc(space, self, 8 * MB, &dummy, nullptr, &dummy);
+  ptr2 = Alloc(space, self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr2 == nullptr);
 
   // Succeeds, adjusts the footprint.
@@ -221,7 +221,7 @@ TEST_P(SpaceCreateTest, ZygoteSpaceTestBody) {
 }
 
 TEST_P(SpaceCreateTest, AllocAndFreeTestBody) {
-  size_t dummy = 0;
+  size_t unused = 0;
   MallocSpace* space(CreateSpace("test", 4 * MB, 16 * MB, 16 * MB));
   ASSERT_TRUE(space != nullptr);
   Thread* self = Thread::Current();
@@ -246,7 +246,7 @@ TEST_P(SpaceCreateTest, AllocAndFreeTestBody) {
   EXPECT_EQ(ptr1_bytes_tl_bulk_allocated, ptr1_bytes_allocated);
 
   // Fails, requires a higher footprint limit.
-  mirror::Object* ptr2 = Alloc(space, self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr2 = Alloc(space, self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr2 == nullptr);
 
   // Succeeds, adjusts the footprint.
@@ -264,11 +264,11 @@ TEST_P(SpaceCreateTest, AllocAndFreeTestBody) {
   EXPECT_EQ(ptr3_bytes_tl_bulk_allocated, ptr3_bytes_allocated);
 
   // Fails, requires a higher footprint limit.
-  mirror::Object* ptr4 = Alloc(space, self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr4 = Alloc(space, self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr4 == nullptr);
 
   // Also fails, requires a higher allowed footprint.
-  mirror::Object* ptr5 = AllocWithGrowth(space, self, 8 * MB, &dummy, nullptr, &dummy);
+  mirror::Object* ptr5 = AllocWithGrowth(space, self, 8 * MB, &unused, nullptr, &unused);
   EXPECT_TRUE(ptr5 == nullptr);
 
   // Release some memory.
