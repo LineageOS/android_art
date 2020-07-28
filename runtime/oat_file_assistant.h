@@ -121,8 +121,6 @@ class OatFileAssistant {
                    int oat_fd,
                    int zip_fd);
 
-  ~OatFileAssistant();
-
   // Returns true if the dex location refers to an element of the boot class
   // path.
   bool IsInBootClassPath();
@@ -399,11 +397,6 @@ class OatFileAssistant {
 
   // Validates the boot class path checksum of an OatFile.
   bool ValidateBootClassPathChecksums(const OatFile& oat_file);
-
-  // To implement Lock(), we lock a dummy file where the oat file would go
-  // (adding ".flock" to the target file name) and retain the lock for the
-  // remaining lifetime of the OatFileAssistant object.
-  ScopedFlock flock_;
 
   std::string dex_location_;
 
