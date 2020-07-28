@@ -187,7 +187,7 @@ class DexMember {
                   GetName() == other.GetName() &&
                   GetSignature() == other.GetSignature();
 
-    // Sanity checks if they do match.
+    // Soundness check that they do match.
     if (equals) {
       CHECK_EQ(IsVirtualMethod(), other.IsVirtualMethod());
     }
