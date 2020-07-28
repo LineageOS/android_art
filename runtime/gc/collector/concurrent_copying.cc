@@ -561,7 +561,7 @@ class ConcurrentCopying::FlipCallback : public Closure {
       }
     }
     // May be null during runtime creation, in this case leave java_lang_Object null.
-    // This is safe since single threaded behavior should mean FillDummyObject does not
+    // This is safe since single threaded behavior should mean FillWithFakeObject does not
     // happen when java_lang_Object_ is null.
     if (WellKnownClasses::java_lang_Object != nullptr) {
       cc->java_lang_Object_ = down_cast<mirror::Class*>(cc->Mark(thread,
@@ -3231,17 +3231,17 @@ class ConcurrentCopying::ScopedGcGraysImmuneObjects {
   bool enabled_;
 };
 
-// Fill the given memory block with a dummy object. Used to fill in a
+// Fill the given memory block with a fake object. Used to fill in a
 // copy of objects that was lost in race.
-void ConcurrentCopying::FillWithDummyObject(Thread* const self,
-                                            mirror::Object* dummy_obj,
-                                            size_t byte_size) {
+void ConcurrentCopying::FillWithFakeObject(Thread* const self,
+                                           mirror::Object* fake_obj,
+                                           size_t byte_size) {
   // GC doesn't gray immune objects while scanning immune objects. But we need to trigger the read
   // barriers here because we need the updated reference to the int array class, etc. Temporary set
   // gc_grays_immune_objects_ to true so that we won't cause a DCHECK failure in MarkImmuneSpace().
   ScopedGcGraysImmuneObjects scoped_gc_gray_immune_objects(this);
   CHECK_ALIGNED(byte_size, kObjectAlignment);
-  memset(dummy_obj, 0, byte_size);
+  memset(fake_obj, 0, byte_size);
   // Avoid going through read barrier for since kDisallowReadBarrierDuringScan may be enabled.
   // Explicitly mark to make sure to get an object in the to-space.
   mirror::Class* int_array_class = down_cast<mirror::Class*>(
@@ -3260,19 +3260,19 @@ void ConcurrentCopying::FillWithDummyObject(Thread* const self,
       AssertToSpaceInvariant(nullptr, MemberOffset(0), java_lang_Object_);
     }
     CHECK_EQ(byte_size, java_lang_Object_->GetObjectSize<kVerifyNone>());
-    dummy_obj->SetClass(java_lang_Object_);
-    CHECK_EQ(byte_size, (dummy_obj->SizeOf<kVerifyNone>()));
+    fake_obj->SetClass(java_lang_Object_);
+    CHECK_EQ(byte_size, (fake_obj->SizeOf<kVerifyNone>()));
   } else {
     // Use an int array.
-    dummy_obj->SetClass(int_array_class);
-    CHECK(dummy_obj->IsArrayInstance<kVerifyNone>());
+    fake_obj->SetClass(int_array_class);
+    CHECK(fake_obj->IsArrayInstance<kVerifyNone>());
     int32_t length = (byte_size - data_offset) / component_size;
-    ObjPtr<mirror::Array> dummy_arr = dummy_obj->AsArray<kVerifyNone>();
-    dummy_arr->SetLength(length);
-    CHECK_EQ(dummy_arr->GetLength(), length)
+    ObjPtr<mirror::Array> fake_arr = fake_obj->AsArray<kVerifyNone>();
+    fake_arr->SetLength(length);
+    CHECK_EQ(fake_arr->GetLength(), length)
         << "byte_size=" << byte_size << " length=" << length
         << " component_size=" << component_size << " data_offset=" << data_offset;
-    CHECK_EQ(byte_size, (dummy_obj->SizeOf<kVerifyNone>()))
+    CHECK_EQ(byte_size, (fake_obj->SizeOf<kVerifyNone>()))
         << "byte_size=" << byte_size << " length=" << length
         << " component_size=" << component_size << " data_offset=" << data_offset;
   }
@@ -3295,7 +3295,7 @@ mirror::Object* ConcurrentCopying::AllocateInSkippedBlock(Thread* const self, si
     byte_size = it->first;
     CHECK_GE(byte_size, alloc_size);
     if (byte_size > alloc_size && byte_size - alloc_size < min_object_size) {
-      // If remainder would be too small for a dummy object, retry with a larger request size.
+      // If remainder would be too small for a fake object, retry with a larger request size.
       it = skipped_blocks_map_.lower_bound(alloc_size + min_object_size);
       if (it == skipped_blocks_map_.end()) {
         // Not found.
@@ -3322,12 +3322,12 @@ mirror::Object* ConcurrentCopying::AllocateInSkippedBlock(Thread* const self, si
     // Return the remainder to the map.
     CHECK_ALIGNED(byte_size - alloc_size, space::RegionSpace::kAlignment);
     CHECK_GE(byte_size - alloc_size, min_object_size);
-    // FillWithDummyObject may mark an object, avoid holding skipped_blocks_lock_ to prevent lock
+    // FillWithFakeObject may mark an object, avoid holding skipped_blocks_lock_ to prevent lock
     // violation and possible deadlock. The deadlock case is a recursive case:
-    // FillWithDummyObject -> Mark(IntArray.class) -> Copy -> AllocateInSkippedBlock.
-    FillWithDummyObject(self,
-                        reinterpret_cast<mirror::Object*>(addr + alloc_size),
-                        byte_size - alloc_size);
+    // FillWithFakeObject -> Mark(IntArray.class) -> Copy -> AllocateInSkippedBlock.
+    FillWithFakeObject(self,
+                       reinterpret_cast<mirror::Object*>(addr + alloc_size),
+                       byte_size - alloc_size);
     CHECK(region_space_->IsInToSpace(reinterpret_cast<mirror::Object*>(addr + alloc_size)));
     {
       MutexLock mu(self, skipped_blocks_lock_);
@@ -3360,10 +3360,10 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
   size_t region_space_bytes_allocated = 0U;
   size_t non_moving_space_bytes_allocated = 0U;
   size_t bytes_allocated = 0U;
-  size_t dummy;
+  size_t unused_size;
   bool fall_back_to_non_moving = false;
   mirror::Object* to_ref = region_space_->AllocNonvirtual</*kForEvac=*/ true>(
-      region_space_alloc_size, &region_space_bytes_allocated, nullptr, &dummy);
+      region_space_alloc_size, &region_space_bytes_allocated, nullptr, &unused_size);
   bytes_allocated = region_space_bytes_allocated;
   if (LIKELY(to_ref != nullptr)) {
     DCHECK_EQ(region_space_alloc_size, region_space_bytes_allocated);
@@ -3389,8 +3389,8 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
                   << " skipped_objects="
                   << to_space_objects_skipped_.load(std::memory_order_relaxed);
       }
-      to_ref = heap_->non_moving_space_->Alloc(self, obj_size,
-                                               &non_moving_space_bytes_allocated, nullptr, &dummy);
+      to_ref = heap_->non_moving_space_->Alloc(
+          self, obj_size, &non_moving_space_bytes_allocated, nullptr, &unused_size);
       if (UNLIKELY(to_ref == nullptr)) {
         LOG(FATAL_WITHOUT_ABORT) << "Fall-back non-moving space allocation failed for a "
                                  << obj_size << " byte object in region type "
@@ -3423,9 +3423,9 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
     if (old_lock_word.GetState() == LockWord::kForwardingAddress) {
       // Lost the race. Another thread (either GC or mutator) stored
       // the forwarding pointer first. Make the lost copy (to_ref)
-      // look like a valid but dead (dummy) object and keep it for
+      // look like a valid but dead (fake) object and keep it for
       // future reuse.
-      FillWithDummyObject(self, to_ref, bytes_allocated);
+      FillWithFakeObject(self, to_ref, bytes_allocated);
       if (!fall_back_to_non_moving) {
         DCHECK(region_space_->IsInToSpace(to_ref));
         if (bytes_allocated > space::RegionSpace::kRegionSize) {
