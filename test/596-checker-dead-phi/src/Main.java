@@ -23,7 +23,7 @@ public class Main {
   public static void main(String[] args) throws Exception {
     Class<?> c = Class.forName("IrreducibleLoop");
     // Note that we don't actually enter the loops in the 'liveness'
-    // method, so this is just a sanity check that part of the code we
+    // method, so this is just a verification that that part of the code we
     // generated for that method is correct.
     Method m = c.getMethod("liveness", int.class);
     Object[] arguments = { 42 };

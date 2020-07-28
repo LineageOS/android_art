@@ -24,7 +24,7 @@ public class Main {
     Class<?> c = Class.forName("IrreducibleLoop");
     Method m = c.getMethod("test", int.class);
     Object[] arguments = { 42 };
-    // Invoke the code just for sanity checking.
+    // Invoke the code just for validation purposes.
     System.out.println(m.invoke(null, arguments));
   }
 }
