@@ -118,7 +118,7 @@ void DexCache::InitializeDexCache(Thread* self,
   static_assert(alignof(StringDexCacheType) == 8u,
                 "Expected StringDexCacheType to have align of 8.");
   if (kIsDebugBuild) {
-    // Sanity check to make sure all the dex cache arrays are empty. b/28992179
+    // Consistency check to make sure all the dex cache arrays are empty. b/28992179
     for (size_t i = 0; i < num_strings; ++i) {
       CHECK_EQ(strings[i].load(std::memory_order_relaxed).index, 0u);
       CHECK(strings[i].load(std::memory_order_relaxed).object.IsNull());

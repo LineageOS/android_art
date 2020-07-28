@@ -523,7 +523,7 @@ class MANAGED Class final : public Object {
   };
 
   // Creates a raw object instance but does not invoke the default constructor.
-  // kCheckAddFinalizer controls whether we use a DCHECK to sanity check that we create a
+  // kCheckAddFinalizer controls whether we use a DCHECK to check that we create a
   // finalizer-reference if needed. This should only be disabled when doing structural class
   // redefinition.
   template <bool kIsInstrumented = true,
