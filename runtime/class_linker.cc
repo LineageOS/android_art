@@ -575,8 +575,8 @@ static void WrapExceptionInInitializer(Handle<mirror::Class> klass)
   ScopedLocalRef<jthrowable> cause(env, env->ExceptionOccurred());
   CHECK(cause.get() != nullptr);
 
-  // Boot classpath classes should not fail initialization. This is a sanity debug check. This
-  // cannot in general be guaranteed, but in all likelihood leads to breakage down the line.
+  // Boot classpath classes should not fail initialization. This is a consistency debug check.
+  // This cannot in general be guaranteed, but in all likelihood leads to breakage down the line.
   if (klass->GetClassLoader() == nullptr && !Runtime::Current()->IsAotCompiler()) {
     std::string tmp;
     // We want to LOG(FATAL) on debug builds since this really shouldn't be happening but we need to
@@ -965,8 +965,7 @@ bool ClassLinker::InitWithoutImage(std::vector<std::unique_ptr<const DexFile>> b
   object_array_class->GetIfTable()->SetInterface(0, java_lang_Cloneable.Get());
   object_array_class->GetIfTable()->SetInterface(1, java_io_Serializable.Get());
 
-  // Sanity check Class[] and Object[]'s interfaces. GetDirectInterface may cause thread
-  // suspension.
+  // Check Class[] and Object[]'s interfaces. GetDirectInterface may cause thread suspension.
   CHECK_EQ(java_lang_Cloneable.Get(),
            mirror::Class::GetDirectInterface(self, class_array_class.Get(), 0));
   CHECK_EQ(java_io_Serializable.Get(),
@@ -1797,7 +1796,7 @@ void AppImageLoadingHelper::HandleAppImageStrings(gc::space::ImageSpace* space) 
         }
       }, /*visit_boot_images=*/false, /*visit_non_boot_images=*/true);
     }
-    // Sanity check to ensure correctness.
+    // Consistency check to ensure correctness.
     if (kIsDebugBuild) {
       for (GcRoot<mirror::String>& root : interns) {
         ObjPtr<mirror::String> string = root.Read();
@@ -5230,7 +5229,7 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     callback->MakeVisible(self);
   }
 
-  // sanity checks
+  // Consistency checks.
   if (kIsDebugBuild) {
     CHECK(klass->GetIFieldsPtr() == nullptr);
     CheckProxyConstructor(klass->GetDirectMethod(0, image_pointer_size_));
@@ -5324,7 +5323,7 @@ void ClassLinker::CreateProxyMethod(Handle<mirror::Class> klass, ArtMethod* prot
 }
 
 void ClassLinker::CheckProxyMethod(ArtMethod* method, ArtMethod* prototype) const {
-  // Basic sanity
+  // Basic consistency checks.
   CHECK(!prototype->IsFinal());
   CHECK(method->IsFinal());
   CHECK(method->IsInvokable());
