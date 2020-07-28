@@ -710,11 +710,11 @@ public class Parser {
   }
 
   /**
-   * Dummy value representing a reference to an instance that has not yet been
+   * Placeholder value representing a reference to an instance that has not yet been
    * resolved.
    * When first initializing class static fields, we don't yet know what kinds
    * of objects Object references refer to. We use DeferredInstanceValue as
-   * a dummy kind of value to store the id of an object. In the fixup pass we
+   * a placeholder kind of value to store the id of an object. In the fixup pass we
    * resolve all the DeferredInstanceValues into their proper InstanceValues.
    */
   private static class DeferredInstanceValue extends Value {
