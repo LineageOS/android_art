@@ -31,7 +31,7 @@ public class Main {
         wrefs[2] = new WeakReference(str2);
         wrefs[3] = new WeakReference(str3);
         wrefs[4] = new WeakReference(str4);
-        // Clear a couple as a sanity check.
+        // Clear a couple as a soundness check.
         str1 = null;
         str2 = null;
         // str<n> dead here; in the future we will possibly reuse the registers.

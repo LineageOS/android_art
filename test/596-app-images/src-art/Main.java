@@ -111,7 +111,7 @@ class Main {
   public static void testLoadingSecondaryAppImage() throws Exception {
     final ClassLoader parent = Main.class.getClassLoader();
 
-    // Sanity check that the image isn't already loaded so we don't get bogus results below
+    // Initial check that the image isn't already loaded so we don't get bogus results below
     assertFalse("Secondary app image isn't already loaded",
         checkAppImageLoaded("596-app-images-ex"));
 

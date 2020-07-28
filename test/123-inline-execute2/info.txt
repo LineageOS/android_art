@@ -1,1 +1,1 @@
-Sanity checks for added InlineNative methods.
+Checks for added InlineNative methods.
