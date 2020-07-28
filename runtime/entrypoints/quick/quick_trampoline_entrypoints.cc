@@ -617,19 +617,19 @@ static void HandleDeoptimization(JValue* result,
 
   // Ensure that the stack is still in order.
   if (kIsDebugBuild) {
-    class DummyStackVisitor : public StackVisitor {
+    class EntireStackVisitor : public StackVisitor {
      public:
-      explicit DummyStackVisitor(Thread* self_in) REQUIRES_SHARED(Locks::mutator_lock_)
+      explicit EntireStackVisitor(Thread* self_in) REQUIRES_SHARED(Locks::mutator_lock_)
           : StackVisitor(self_in, nullptr, StackVisitor::StackWalkKind::kIncludeInlinedFrames) {}
 
       bool VisitFrame() override REQUIRES_SHARED(Locks::mutator_lock_) {
-        // Nothing to do here. In a debug build, SanityCheckFrame will do the work in the walking
+        // Nothing to do here. In a debug build, ValidateFrame will do the work in the walking
         // logic. Just always say we want to continue.
         return true;
       }
     };
-    DummyStackVisitor dsv(self);
-    dsv.WalkStack();
+    EntireStackVisitor esv(self);
+    esv.WalkStack();
   }
 
   // Restore the exception that was pending before deoptimization then interpret the
@@ -1311,9 +1311,9 @@ extern "C" const void* artQuickResolutionTrampoline(
   // Resolve method filling in dex cache.
   if (!called_method_known_on_entry) {
     StackHandleScope<1> hs(self);
-    mirror::Object* dummy = nullptr;
+    mirror::Object* fake_receiver = nullptr;
     HandleWrapper<mirror::Object> h_receiver(
-        hs.NewHandleWrapper(virtual_or_interface ? &receiver : &dummy));
+        hs.NewHandleWrapper(virtual_or_interface ? &receiver : &fake_receiver));
     DCHECK_EQ(caller->GetDexFile(), called_method.dex_file);
     called = linker->ResolveMethod<ClassLinker::ResolveMode::kCheckICCEAndIAE>(
         self, called_method.index, caller, invoke_type);
