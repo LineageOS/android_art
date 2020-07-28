@@ -54,7 +54,7 @@ public class Main {
   }
 
   public static void main(String[] args) {
-    // Simple sanity checks.
+    // Simple checks.
     byte[] a = new byte[2];
     Object[] o = new Object[2];
 
