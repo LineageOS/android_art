@@ -145,7 +145,7 @@ public class AhatSnapshot implements Diffable<AhatSnapshot> {
    * Returns a list of heaps in the snapshot in canonical order.
    * <p>
    * Note: modifications to the returned list are visible to this
-   * AhatSnapshot, which is used by diff to insert place holder heaps.
+   * AhatSnapshot, which is used by diff to insert placeholder heaps.
    *
    * @return list of heaps
    */
