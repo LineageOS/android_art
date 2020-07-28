@@ -1063,7 +1063,7 @@ def art_apex_test_default(test_parser):
     sys.exit(1)
   host_out = os.environ['ANDROID_HOST_OUT']
 
-  test_args = test_parser.parse_args(['dummy'])  # For consistency.
+  test_args = test_parser.parse_args(['unused'])  # For consistency.
   test_args.debugfs = '%s/bin/debugfs' % host_out
   test_args.tmpdir = '.'
   test_args.tree = False
