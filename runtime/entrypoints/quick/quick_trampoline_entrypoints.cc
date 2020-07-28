@@ -588,8 +588,8 @@ static void HandleDeoptimization(JValue* result,
   // Coming from partial-fragment deopt.
   Thread* self = Thread::Current();
   if (kIsDebugBuild) {
-    // Sanity-check: are the methods as expected? We check that the last shadow frame (the bottom
-    // of the call-stack) corresponds to the called method.
+    // Consistency-check: are the methods as expected? We check that the last shadow frame
+    // (the bottom of the call-stack) corresponds to the called method.
     ShadowFrame* linked = deopt_frame;
     while (linked->GetLink() != nullptr) {
       linked = linked->GetLink();
@@ -1094,7 +1094,7 @@ extern "C" TwoWordReturn artInstrumentationMethodExitFromCode(Thread* self,
   // Instrumentation exit stub must not be entered with a pending exception.
   CHECK(!self->IsExceptionPending()) << "Enter instrumentation exit stub with pending exception "
                                      << self->GetException()->Dump();
-  // Compute address of return PC and sanity check that it currently holds 0.
+  // Compute address of return PC and check that it currently holds 0.
   constexpr size_t return_pc_offset =
       RuntimeCalleeSaveFrame::GetReturnPcOffset(CalleeSaveType::kSaveEverything);
   uintptr_t* return_pc_addr = reinterpret_cast<uintptr_t*>(reinterpret_cast<uint8_t*>(sp) +

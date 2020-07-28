@@ -1583,7 +1583,7 @@ void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat
     DCHECK_EQ(oat_index, GetOatIndexForClass(as_klass));
     DCHECK(!as_klass->IsErroneous()) << as_klass->GetStatus();
     if (compiler_options_.IsAppImage()) {
-      // Extra sanity, no boot loader classes should be left!
+      // Extra consistency check: no boot loader classes should be left!
       CHECK(!IsBootClassLoaderClass(as_klass)) << as_klass->PrettyClass();
     }
     LengthPrefixedArray<ArtField>* fields[] = {

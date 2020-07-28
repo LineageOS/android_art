@@ -1511,7 +1511,7 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self,
   InstrumentationStackFrame instrumentation_frame = it->second;
   stack->erase(it);
 
-  // Set return PC and check the sanity of the stack.
+  // Set return PC and check the consistency of the stack.
   // We don't cache the return pc value in a local as it may change after
   // sending a method exit event.
   *return_pc_addr = instrumentation_frame.return_pc_;
