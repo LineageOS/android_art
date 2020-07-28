@@ -1668,7 +1668,8 @@ bool VarHandle::GetAccessModeByMethodName(const char* method_name, AccessMode* a
   if (method_name == nullptr) {
     return false;
   }
-  VarHandleAccessorToAccessModeEntry target = { method_name, /*dummy*/VarHandle::AccessMode::kGet };
+  const auto kUnusedAccessMode = VarHandle::AccessMode::kGet;  // arbitrary value.
+  VarHandleAccessorToAccessModeEntry target = { method_name, kUnusedAccessMode };
   auto last = std::cend(kAccessorToAccessMode);
   auto it = std::lower_bound(std::cbegin(kAccessorToAccessMode),
                              last,
