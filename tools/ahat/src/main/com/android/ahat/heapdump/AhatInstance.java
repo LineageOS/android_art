@@ -686,7 +686,7 @@ public abstract class AhatInstance implements Diffable<AhatInstance> {
   }
 
   /**
-   * Returns a new place holder instance corresponding to this instance.
+   * Returns a new placeholder instance corresponding to this instance.
    */
   AhatInstance newPlaceHolderInstance() {
     return new AhatPlaceHolderInstance(this);

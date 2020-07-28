@@ -37,7 +37,7 @@ public interface Diffable<T> {
    * Returns true if this is a placeholder object.
    * A placeholder object is used to indicate there is some object in the
    * baseline heap dump that is not in this heap dump. In that case, we create
-   * a place holder object in this heap dump as an indicator of the
+   * a placeholder object in this heap dump as an indicator of the
    * object removed from the baseline heap dump.
    *
    * @return true if the object is a placeholder
