@@ -44,7 +44,7 @@ my_files += \
   $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar:apex/com.android.i18n/javalib/core-icu4j.jar \
   $(icu_data_file):com.android.i18n/etc/icu/$(notdir $(icu_data_file))
 
-# Create a module that will copy all the data files into testcases directory.
+# Create phony module that will copy all the data files into testcases directory.
 # For now, this copies everything to "out/host/linux-x86/" subdirectory, since it
 # is hard-coded in many places. TODO: Refactor tests to remove the need for this.
 include $(CLEAR_VARS)
