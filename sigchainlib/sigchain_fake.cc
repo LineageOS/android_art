@@ -22,7 +22,7 @@
 
 #define ATTRIBUTE_UNUSED __attribute__((__unused__))
 
-// We cannot annotate the declarations, as they are not no-return in the non-dummy version.
+// We cannot annotate the declarations, as they are not no-return in the non-fake version.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wmissing-noreturn"

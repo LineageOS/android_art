@@ -411,7 +411,7 @@ genrule {
         " --flavor release" +
         " $(in)" +
         " && touch $(out)",
-    out: ["art-check-release-apex-gen.dummy"],
+    out: ["art-check-release-apex-gen.unused"],
 }
 
 cc_prebuilt_binary {
@@ -428,7 +428,7 @@ genrule {
         " --flavor debug" +
         " $(in)" +
         " && touch $(out)",
-    out: ["art-check-debug-apex-gen.dummy"],
+    out: ["art-check-debug-apex-gen.unused"],
 }
 
 cc_prebuilt_binary {
@@ -445,7 +445,7 @@ genrule {
         " --flavor testing" +
         " $(in)" +
         " && touch $(out)",
-    out: ["art-check-testing-apex-gen.dummy"],
+    out: ["art-check-testing-apex-gen.unused"],
 }
 
 cc_prebuilt_binary {
