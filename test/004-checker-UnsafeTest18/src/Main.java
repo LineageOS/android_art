@@ -167,7 +167,7 @@ public class Main {
       throw new Error("No offset: " + e);
     }
 
-    // Some sanity on setters and adders within same thread.
+    // Some checks on setters and adders within same thread.
 
     set32(m, intOffset, 3);
     expectEqual32(3, m.i);
@@ -184,7 +184,7 @@ public class Main {
     add64(m, longOffset, 13L);
     expectEqual64(20L, m.l);
 
-    // Some sanity on setters within different threads.
+    // Some checks on setters within different threads.
 
     fork(new Runnable() {
       public void run() {
@@ -213,7 +213,7 @@ public class Main {
     join();
     expectEqualObj(sThreads[9], m.o);  // one thread's last value wins
 
-    // Some sanity on adders within different threads.
+    // Some checks on adders within different threads.
 
     fork(new Runnable() {
       public void run() {
@@ -233,8 +233,8 @@ public class Main {
     join();
     expectEqual64(659L, m.l);  // all values accounted for
 
-    // Some sanity on fences within same thread. Note that memory fences within one
-    // thread make little sense, but the sanity check ensures nothing bad happens.
+    // Some checks on fences within same thread. Note that memory fences within one
+    // thread make little sense, but the assertion ensures nothing bad happens.
 
     m.i = -1;
     m.l = -2L;
@@ -248,7 +248,7 @@ public class Main {
     expectEqual64(-2L, m.l);
     expectEqualObj(null, m.o);
 
-    // Some sanity on full fence within different threads. We write the non-volatile m.l after
+    // Some checks on full fence within different threads. We write the non-volatile m.l after
     // the fork(), which means there is no happens-before relation in the Java memory model
     // with respect to the read in the threads. This relation is enforced by the memory fences
     // and the weak-set() -> get() guard. Note that the guard semantics used here are actually
@@ -271,7 +271,7 @@ public class Main {
     while (!guard1.weakCompareAndSet(false, true));  // relaxed memory order
     join();
 
-    // Some sanity on release/acquire fences within different threads. We write the non-volatile
+    // Some checks on release/acquire fences within different threads. We write the non-volatile
     // m.l after the fork(), which means there is no happens-before relation in the Java memory
     // model with respect to the read in the threads. This relation is enforced by the memory fences
     // and the weak-set() -> get() guard. Note that the guard semantics used here are actually
@@ -294,9 +294,9 @@ public class Main {
     while (!guard2.weakCompareAndSet(false, true));  // relaxed memory order
     join();
 
-    // Some sanity on release/acquire fences within different threads using a test suggested by
-    // Hans Boehm. Even this test remains with the realm of sanity only, since having the threads
-    // read the same value consistently would be a valid outcome.
+    // Some checks on release/acquire fences within different threads using a test suggested by
+    // Hans Boehm. Even this test remains with the realm of soundness checking only, since having
+    // the threads read the same value consistently would be a valid outcome.
 
     m.x_value = -1;
     m.y_value = -1;
