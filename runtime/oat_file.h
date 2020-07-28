@@ -55,7 +55,7 @@ struct ClassDef;
 
 namespace gc {
 namespace collector {
-class DummyOatFile;
+class FakeOatFile;
 }  // namespace collector
 }  // namespace gc
 
@@ -463,7 +463,7 @@ class OatFile {
   // by the `dex_filenames` parameter, in case the OatFile does not embed the dex code.
   std::vector<std::unique_ptr<const DexFile>> external_dex_files_;
 
-  friend class gc::collector::DummyOatFile;  // For modifying begin_ and end_.
+  friend class gc::collector::FakeOatFile;  // For modifying begin_ and end_.
   friend class OatClass;
   friend class art::OatDexFile;
   friend class OatDumper;  // For GetBase and GetLimit
