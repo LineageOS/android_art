@@ -28,7 +28,7 @@ art_cc_defaults {
         "art_cmdlineparser_headers",
     ],
     static_libs: [
-        "libsigchain_dummy",
+        "libsigchain_fake",
     ],
     target: {
         android: {
