@@ -156,13 +156,6 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
   }
 }
 
-OatFileAssistant::~OatFileAssistant() {
-  // Clean up the lock file.
-  if (flock_.get() != nullptr) {
-    unlink(flock_->GetPath().c_str());
-  }
-}
-
 bool OatFileAssistant::UseFdToReadFiles() {
   return zip_fd_ >= 0;
 }

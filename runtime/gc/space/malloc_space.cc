@@ -84,7 +84,7 @@ MemMap MallocSpace::CreateMemMap(const std::string& name,
                                  size_t* initial_size,
                                  size_t* growth_limit,
                                  size_t* capacity) {
-  // Sanity check arguments
+  // Consistency check of the arguments.
   if (starting_size > *initial_size) {
     *initial_size = starting_size;
   }

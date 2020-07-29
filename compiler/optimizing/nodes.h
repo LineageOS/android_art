@@ -4508,6 +4508,9 @@ class HInvokePolymorphic final : public HInvoke {
                      DataType::Type return_type,
                      uint32_t dex_pc,
                      uint32_t dex_method_index,
+                     // resolved_method is the ArtMethod object corresponding to the polymorphic
+                     // method (e.g. VarHandle.get), resolved using the class linker. It is needed
+                     // to pass intrinsic information to the HInvokePolymorphic node.
                      ArtMethod* resolved_method)
       : HInvoke(kInvokePolymorphic,
                 allocator,
@@ -4517,7 +4520,7 @@ class HInvokePolymorphic final : public HInvoke {
                 dex_pc,
                 dex_method_index,
                 resolved_method,
-                kVirtual) {
+                kPolymorphic) {
   }
 
   bool IsClonable() const override { return true; }

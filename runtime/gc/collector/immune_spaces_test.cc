@@ -30,21 +30,21 @@ class Object;
 namespace gc {
 namespace collector {
 
-class DummyOatFile : public OatFile {
+class FakeOatFile : public OatFile {
  public:
-  DummyOatFile(uint8_t* begin, uint8_t* end) : OatFile("Location", /*executable=*/ false) {
+  FakeOatFile(uint8_t* begin, uint8_t* end) : OatFile("Location", /*executable=*/ false) {
     begin_ = begin;
     end_ = end;
   }
 };
 
-class DummyImageSpace : public space::ImageSpace {
+class FakeImageSpace : public space::ImageSpace {
  public:
-  DummyImageSpace(MemMap&& map,
-                  accounting::ContinuousSpaceBitmap&& live_bitmap,
-                  std::unique_ptr<DummyOatFile>&& oat_file,
-                  MemMap&& oat_map)
-      : ImageSpace("DummyImageSpace",
+  FakeImageSpace(MemMap&& map,
+                 accounting::ContinuousSpaceBitmap&& live_bitmap,
+                 std::unique_ptr<FakeOatFile>&& oat_file,
+                 MemMap&& oat_map)
+      : ImageSpace("FakeImageSpace",
                    /*image_location=*/"",
                    /*profile_file=*/"",
                    std::move(map),
@@ -66,7 +66,7 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
   ImmuneSpacesTest() {}
 
   void ReserveBitmaps() {
-    // Create a bunch of dummy bitmaps since these are required to create image spaces. The bitmaps
+    // Create a bunch of fake bitmaps since these are required to create image spaces. The bitmaps
     // do not need to cover the image spaces though.
     for (size_t i = 0; i < kMaxBitmaps; ++i) {
       accounting::ContinuousSpaceBitmap bitmap(
@@ -79,14 +79,14 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
   }
 
   // Create an image space, the oat file is optional.
-  DummyImageSpace* CreateImageSpace(size_t image_size,
-                                    size_t oat_size,
-                                    MemMap* image_reservation,
-                                    MemMap* oat_reservation) {
+  FakeImageSpace* CreateImageSpace(size_t image_size,
+                                   size_t oat_size,
+                                   MemMap* image_reservation,
+                                   MemMap* oat_reservation) {
     DCHECK(image_reservation != nullptr);
     DCHECK(oat_reservation != nullptr);
     std::string error_str;
-    MemMap image_map = MemMap::MapAnonymous("DummyImageSpace",
+    MemMap image_map = MemMap::MapAnonymous("FakeImageSpace",
                                             image_size,
                                             PROT_READ | PROT_WRITE,
                                             /*low_4gb=*/ true,
@@ -109,7 +109,7 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
       LOG(ERROR) << error_str;
       return nullptr;
     }
-    std::unique_ptr<DummyOatFile> oat_file(new DummyOatFile(oat_map.Begin(), oat_map.End()));
+    std::unique_ptr<FakeOatFile> oat_file(new FakeOatFile(oat_map.Begin(), oat_map.End()));
     // Create image header.
     ImageSection sections[ImageHeader::kSectionCount];
     new (image_map.Begin()) ImageHeader(
@@ -130,22 +130,22 @@ class ImmuneSpacesTest : public CommonRuntimeTest {
         /*boot_image_component_count=*/ 0u,
         /*boot_image_checksum=*/ 0u,
         /*pointer_size=*/ sizeof(void*));
-    return new DummyImageSpace(std::move(image_map),
-                               std::move(live_bitmap),
-                               std::move(oat_file),
-                               std::move(oat_map));
+    return new FakeImageSpace(std::move(image_map),
+                              std::move(live_bitmap),
+                              std::move(oat_file),
+                              std::move(oat_map));
   }
 
  private:
-  // Bitmap pool for pre-allocated dummy bitmaps. We need to pre-allocate them since we don't want
+  // Bitmap pool for pre-allocated fake bitmaps. We need to pre-allocate them since we don't want
   // them to randomly get placed somewhere where we want an image space.
   std::vector<accounting::ContinuousSpaceBitmap> live_bitmaps_;
 };
 
-class DummySpace : public space::ContinuousSpace {
+class FakeSpace : public space::ContinuousSpace {
  public:
-  DummySpace(uint8_t* begin, uint8_t* end)
-      : ContinuousSpace("DummySpace",
+  FakeSpace(uint8_t* begin, uint8_t* end)
+      : ContinuousSpace("FakeSpace",
                         space::kGcRetentionPolicyNeverCollect,
                         begin,
                         end,
@@ -171,8 +171,8 @@ class DummySpace : public space::ContinuousSpace {
 TEST_F(ImmuneSpacesTest, AppendBasic) {
   ImmuneSpaces spaces;
   uint8_t* const base = reinterpret_cast<uint8_t*>(0x1000);
-  DummySpace a(base, base + 45 * KB);
-  DummySpace b(a.Limit(), a.Limit() + 813 * KB);
+  FakeSpace a(base, base + 45 * KB);
+  FakeSpace b(a.Limit(), a.Limit() + 813 * KB);
   {
     WriterMutexLock mu(Thread::Current(), *Locks::heap_bitmap_lock_);
     spaces.AddSpace(&a);
@@ -203,16 +203,16 @@ TEST_F(ImmuneSpacesTest, AppendAfterImage) {
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
 
-  std::unique_ptr<DummyImageSpace> image_space(CreateImageSpace(kImageSize,
-                                                                kImageOatSize,
-                                                                &image_reservation,
-                                                                &reservation));
+  std::unique_ptr<FakeImageSpace> image_space(CreateImageSpace(kImageSize,
+                                                               kImageOatSize,
+                                                               &image_reservation,
+                                                               &reservation));
   ASSERT_TRUE(image_space != nullptr);
   ASSERT_FALSE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
 
   const ImageHeader& image_header = image_space->GetImageHeader();
-  DummySpace space(image_header.GetOatFileEnd(), image_header.GetOatFileEnd() + kOtherSpaceSize);
+  FakeSpace space(image_header.GetOatFileEnd(), image_header.GetOatFileEnd() + kOtherSpaceSize);
 
   EXPECT_EQ(image_header.GetImageSize(), kImageSize);
   EXPECT_EQ(static_cast<size_t>(image_header.GetOatFileEnd() - image_header.GetOatFileBegin()),
@@ -266,18 +266,18 @@ TEST_F(ImmuneSpacesTest, MultiImage) {
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
 
-  std::unique_ptr<DummyImageSpace> space1(CreateImageSpace(kImage1Size,
-                                                           kImage1OatSize,
-                                                           &image_reservation,
-                                                           &reservation));
+  std::unique_ptr<FakeImageSpace> space1(CreateImageSpace(kImage1Size,
+                                                          kImage1OatSize,
+                                                          &image_reservation,
+                                                          &reservation));
   ASSERT_TRUE(space1 != nullptr);
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
 
-  std::unique_ptr<DummyImageSpace> space2(CreateImageSpace(kImage2Size,
-                                                           kImage2OatSize,
-                                                           &image_reservation,
-                                                           &reservation));
+  std::unique_ptr<FakeImageSpace> space2(CreateImageSpace(kImage2Size,
+                                                          kImage2OatSize,
+                                                          &image_reservation,
+                                                          &reservation));
   ASSERT_TRUE(space2 != nullptr);
   ASSERT_FALSE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
@@ -286,10 +286,10 @@ TEST_F(ImmuneSpacesTest, MultiImage) {
   image_reservation = reservation.TakeReservedMemory(kImage3Size);
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
-  std::unique_ptr<DummyImageSpace> space3(CreateImageSpace(kImage3Size,
-                                                           kImage3OatSize,
-                                                           &image_reservation,
-                                                           &reservation));
+  std::unique_ptr<FakeImageSpace> space3(CreateImageSpace(kImage3Size,
+                                                          kImage3OatSize,
+                                                          &image_reservation,
+                                                          &reservation));
   ASSERT_TRUE(space3 != nullptr);
   ASSERT_FALSE(image_reservation.IsValid());
   ASSERT_FALSE(reservation.IsValid());
@@ -343,10 +343,10 @@ TEST_F(ImmuneSpacesTest, MultiImage) {
   image_reservation = reservation.TakeReservedMemory(kImage4Size);
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
-  std::unique_ptr<DummyImageSpace> space4(CreateImageSpace(kImage4Size,
-                                                           kImage4OatSize,
-                                                           &image_reservation,
-                                                           &reservation));
+  std::unique_ptr<FakeImageSpace> space4(CreateImageSpace(kImage4Size,
+                                                          kImage4OatSize,
+                                                          &image_reservation,
+                                                          &reservation));
   ASSERT_TRUE(space4 != nullptr);
   ASSERT_FALSE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
@@ -382,10 +382,10 @@ TEST_F(ImmuneSpacesTest, MultiImage) {
   image_reservation = reservation.TakeReservedMemory(kImage5Size);
   ASSERT_TRUE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());
-  std::unique_ptr<DummyImageSpace> space5(CreateImageSpace(kImage5Size,
-                                                           kImage5OatSize,
-                                                           &image_reservation,
-                                                           &reservation));
+  std::unique_ptr<FakeImageSpace> space5(CreateImageSpace(kImage5Size,
+                                                          kImage5OatSize,
+                                                          &image_reservation,
+                                                          &reservation));
   ASSERT_TRUE(space5 != nullptr);
   ASSERT_FALSE(image_reservation.IsValid());
   ASSERT_TRUE(reservation.IsValid());

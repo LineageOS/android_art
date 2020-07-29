@@ -360,7 +360,7 @@ cc_defaults {
     ],
     static_libs: [
         "libbase",
-        "libsigchain_dummy",
+        "libsigchain_fake",
         "libz",
     ],
 }

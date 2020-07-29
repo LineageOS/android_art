@@ -129,7 +129,7 @@ class DocString {
    *
    * Nothing is printed for a size of zero.
    * Set isPlaceHolder to true to indicate that the size field corresponds to
-   * for a place holder object that should be annotated specially.
+   * for a placeholder object that should be annotated specially.
    */
   public static DocString size(long size, boolean isPlaceHolder) {
     DocString string = new DocString();

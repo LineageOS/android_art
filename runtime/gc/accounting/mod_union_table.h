@@ -82,8 +82,8 @@ class ModUnionTable {
   // Visit all of the objects that may contain references to other spaces.
   virtual void VisitObjects(ObjectCallback callback, void* arg) = 0;
 
-  // Verification, sanity checks that we don't have clean cards which conflict with out cached data
-  // for said cards. Exclusive lock is required since verify sometimes uses
+  // Verification: consistency checks that we don't have clean cards which conflict with out
+  // cached data for said cards. Exclusive lock is required since verify sometimes uses
   // SpaceBitmap::VisitMarkedRange and VisitMarkedRange can't know if the callback will modify the
   // bitmap or not.
   virtual void Verify() REQUIRES(Locks::heap_bitmap_lock_) = 0;

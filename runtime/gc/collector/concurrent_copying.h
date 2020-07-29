@@ -257,7 +257,7 @@ class ConcurrentCopying : public GarbageCollector {
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(Locks::heap_bitmap_lock_);
   void MarkZygoteLargeObjects()
       REQUIRES_SHARED(Locks::mutator_lock_);
-  void FillWithDummyObject(Thread* const self, mirror::Object* dummy_obj, size_t byte_size)
+  void FillWithFakeObject(Thread* const self, mirror::Object* fake_obj, size_t byte_size)
       REQUIRES(!mark_stack_lock_, !skipped_blocks_lock_, !immune_gray_stack_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
   mirror::Object* AllocateInSkippedBlock(Thread* const self, size_t alloc_size)
@@ -462,7 +462,7 @@ class ConcurrentCopying : public GarbageCollector {
   std::vector<mirror::Object*> immune_gray_stack_ GUARDED_BY(immune_gray_stack_lock_);
 
   // Class of java.lang.Object. Filled in from WellKnownClasses in FlipCallback. Must
-  // be filled in before flipping thread roots so that FillDummyObject can run. Not
+  // be filled in before flipping thread roots so that FillWithFakeObject can run. Not
   // ObjPtr since the GC may transition to suspended and runnable between phases.
   mirror::Class* java_lang_Object_;
 

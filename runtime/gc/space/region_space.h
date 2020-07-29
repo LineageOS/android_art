@@ -769,7 +769,7 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
 
   Region* current_region_;         // The region currently used for allocation.
   Region* evac_region_;            // The region currently used for evacuation.
-  Region full_region_;             // The dummy/sentinel region that looks full.
+  Region full_region_;             // The fake/sentinel region that looks full.
 
   // Index into the region array pointing to the starting region when
   // trying to allocate a new region. Only used when

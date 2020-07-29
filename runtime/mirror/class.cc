@@ -496,8 +496,8 @@ void Class::DumpClass(std::ostream& os, int flags) {
 
 void Class::SetReferenceInstanceOffsets(uint32_t new_reference_offsets) {
   if (kIsDebugBuild && new_reference_offsets != kClassWalkSuper) {
-    // Sanity check that the number of bits set in the reference offset bitmap
-    // agrees with the number of references
+    // Check that the number of bits set in the reference offset bitmap
+    // agrees with the number of references.
     uint32_t count = 0;
     for (ObjPtr<Class> c = this; c != nullptr; c = c->GetSuperClass()) {
       count += c->NumReferenceInstanceFieldsDuringLinking();
