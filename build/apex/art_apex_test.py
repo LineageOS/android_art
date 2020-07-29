@@ -759,6 +759,7 @@ class TestingTargetChecker:
 
     # Check ART test (internal) libraries.
     self._checker.check_native_library('libart-gtest')
+    self._checker.check_native_library('libartd-simulator-container')
 
     # Check ART test tools.
     self._checker.check_executable('signal_dumper')
