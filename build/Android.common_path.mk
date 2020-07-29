@@ -127,4 +127,7 @@ CONSCRYPT_APEX := com.android.conscrypt
 # i18n APEX
 I18N_APEX := com.android.i18n
 
+# A phony file to create the ICU data file for host.
+host-i18n-data-timestamp := $(HOST_OUT)/$(I18N_APEX)/timestamp
+
 endif # ART_ANDROID_COMMON_PATH_MK

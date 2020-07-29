@@ -469,7 +469,6 @@ endif
 build-art: build-art-host build-art-target
 
 # For host, we extract the ICU data from the apex and install it to HOST_OUT/I18N_APEX.
-host-i18n-data-timestamp := $(HOST_OUT)/$(I18N_APEX)/timestamp
 $(host-i18n-data-timestamp): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bin/deapexer
 	$(call extract-from-apex,$(I18N_APEX))
 	rm -rf $(HOST_OUT)/$(I18N_APEX)
