@@ -2184,14 +2184,9 @@ bool ClassLinker::AddImageSpace(
     header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
       if (!method.IsRuntimeMethod()) {
         DCHECK(method.GetDeclaringClass() != nullptr);
-        if (!method.IsResolutionMethod()) {
-          if (!method.IsNative()) {
-            method.SetEntryPointFromQuickCompiledCodePtrSize(GetQuickToInterpreterBridge(),
-                                                             image_pointer_size_);
-          } else if (Runtime::SimulatorMode()) {
-            method.SetEntryPointFromQuickCompiledCodePtrSize(GetQuickGenericJniStub(),
-                                                             image_pointer_size_);
-          }
+        if (!method.IsNative() && !method.IsResolutionMethod()) {
+          method.SetEntryPointFromQuickCompiledCodePtrSize(GetQuickToInterpreterBridge(),
+                                                            image_pointer_size_);
         }
       }
     }, space->Begin(), image_pointer_size_);
@@ -3558,10 +3553,6 @@ bool ClassLinker::ShouldUseInterpreterEntrypoint(ArtMethod* method, const void* 
     return true;
   }
 
-  if (Runtime::SimulatorMode()) {
-    return !method->CanBeSimulated();
-  }
-
   Runtime* runtime = Runtime::Current();
   instrumentation::Instrumentation* instr = runtime->GetInstrumentation();
   if (instr->InterpretOnly()) {
@@ -3679,7 +3670,7 @@ void ClassLinker::FixupStaticTrampolines(Thread* self, ObjPtr<mirror::Class> kla
     }
 
     // Check whether the method is native, in which case it's generic JNI.
-    if ((Runtime::SimulatorMode() || quick_code == nullptr) && method->IsNative()) {
+    if (quick_code == nullptr && method->IsNative()) {
       quick_code = GetQuickGenericJniStub();
     } else if (ShouldUseInterpreterEntrypoint(method, quick_code)) {
       // Use interpreter entry point.
@@ -3739,7 +3730,7 @@ static void LinkCode(ClassLinker* class_linker,
   // Note: this mimics the logic in image_writer.cc that installs the resolution
   // stub only if we have compiled code and the method needs a class initialization
   // check.
-  if (quick_code == nullptr || Runtime::SimulatorMode()) {
+  if (quick_code == nullptr) {
     method->SetEntryPointFromQuickCompiledCode(
         method->IsNative() ? GetQuickGenericJniStub() : GetQuickToInterpreterBridge());
   } else if (enter_interpreter) {

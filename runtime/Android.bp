@@ -410,7 +410,6 @@ libart_cc_defaults {
     export_generated_headers: ["cpp-define-generator-asm-support"],
     header_libs: [
         "art_cmdlineparser_headers",
-        "libart_simulator_headers",
         "cpp-define-generator-definitions",
         "jni_platform_headers",
         "libnativehelper_header_only",
@@ -467,7 +466,6 @@ libart_static_cc_defaults {
     name: "libart_static_base_defaults",
     static_libs: [
         "libartpalette",
-        "libart-simulator-container",
         "libbacktrace",
         "libbase",
         "liblog",
@@ -559,7 +557,6 @@ art_cc_library {
     ],
     static_libs: [
         "libelffile",
-        "libart-simulator-container",
     ],
     shared_libs: [
         "libartbase",
@@ -594,7 +591,6 @@ art_cc_library {
     ],
     static_libs: [
         "libelffiled",
-        "libartd-simulator-container",
     ],
     shared_libs: [
         "libartbased",
