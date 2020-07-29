@@ -426,7 +426,7 @@ cc_defaults {
         "external/dex_file_supp.cc",
     ],
     cflags: ["-DSTATIC_LIB"],
-    // Using whole_static_libs here only as a "poor man's transitivity" kludge.
+    // Using whole_static_libs here only as an "approximate transitivity" kludge.
     whole_static_libs: [
         "libbase",
         "liblog",
