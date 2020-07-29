@@ -24,7 +24,7 @@ namespace art {
 
 class ArenaPool;
 
-// TODO: Support freeing if we add poor man's class unloading.
+// TODO: Support freeing if we add class unloading.
 class LinearAlloc {
  public:
   explicit LinearAlloc(ArenaPool* pool);
