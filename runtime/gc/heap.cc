@@ -2248,8 +2248,9 @@ class ZygoteCompactingCollector final : public collector::SemiSpace {
     if (it == bins_.end()) {
       // No available space in the bins, place it in the target space instead (grows the zygote
       // space).
-      size_t bytes_allocated, dummy;
-      forward_address = to_space_->Alloc(self_, alloc_size, &bytes_allocated, nullptr, &dummy);
+      size_t bytes_allocated, unused_bytes_tl_bulk_allocated;
+      forward_address = to_space_->Alloc(
+          self_, alloc_size, &bytes_allocated, nullptr, &unused_bytes_tl_bulk_allocated);
       if (to_space_live_bitmap_ != nullptr) {
         to_space_live_bitmap_->Set(forward_address);
       } else {
@@ -2400,7 +2401,7 @@ void Heap::PreZygoteFork() {
   // the old alloc space's bitmaps to null.
   RemoveSpace(old_alloc_space);
   if (collector::SemiSpace::kUseRememberedSet) {
-    // Sanity bound check.
+    // Consistency bound check.
     FindRememberedSetFromSpace(old_alloc_space)->AssertAllDirtyCardsAreWithinSpace();
     // Remove the remembered set for the now zygote space (the old
     // non-moving space). Note now that we have compacted objects into

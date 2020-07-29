@@ -951,12 +951,12 @@ jbyteArray Dbg::GetRecentAllocations() {
   {
     MutexLock mu(self, *Locks::alloc_tracker_lock_);
     gc::AllocRecordObjectMap* records = Runtime::Current()->GetHeap()->GetAllocationRecords();
-    // In case this method is called when allocation tracker is disabled,
+    // In case this method is called when allocation tracker is not enabled,
     // we should still send some data back.
-    gc::AllocRecordObjectMap dummy;
+    gc::AllocRecordObjectMap fallback_record_map;
     if (records == nullptr) {
       CHECK(!Runtime::Current()->GetHeap()->IsAllocTrackingEnabled());
-      records = &dummy;
+      records = &fallback_record_map;
     }
     // We don't need to wait on the condition variable records->new_record_condition_, because this
     // function only reads the class objects, which are already marked so it doesn't change their

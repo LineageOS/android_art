@@ -346,7 +346,7 @@ class StackVisitor {
   ShadowFrame* PrepareSetVReg(ArtMethod* m, uint16_t vreg, bool wide)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void SanityCheckFrame() const REQUIRES_SHARED(Locks::mutator_lock_);
+  void ValidateFrame() const REQUIRES_SHARED(Locks::mutator_lock_);
 
   ALWAYS_INLINE CodeInfo* GetCurrentInlineInfo() const;
   ALWAYS_INLINE StackMap* GetCurrentStackMap() const;

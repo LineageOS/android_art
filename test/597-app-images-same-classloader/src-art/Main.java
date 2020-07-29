@@ -37,7 +37,7 @@ class Main {
   public static native boolean checkInitialized(Class<?> klass);
 
   public static void testLoadingSecondaryAppImageInLoadedClassLoader() throws Exception {
-    // Sanity check that the image isn't already loaded so we don't get bogus results below
+    // Initial check that the image isn't already loaded so we don't get bogus results below
     assertFalse("Secondary app image isn't already loaded",
         checkAppImageLoaded(SECONDARY_NAME));
 

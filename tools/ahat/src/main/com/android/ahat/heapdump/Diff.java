@@ -154,9 +154,9 @@ public class Diff {
   }
 
   /**
-   * Recursively create place holder instances for the given instance and
+   * Recursively create placeholder instances for the given instance and
    * every instance dominated by that instance.
-   * Returns the place holder instance created for the given instance.
+   * Returns the placeholder instance created for the given instance.
    * Adds all allocated placeholders to the given placeholders list.
    */
   private static AhatInstance createPlaceHolders(AhatInstance inst,
@@ -260,7 +260,7 @@ public class Diff {
    *
    * This requires that instances have already been diffed. In particular, we
    * require all AhatClassObjs in one snapshot have corresponding (possibly
-   * place-holder) AhatClassObjs in the other snapshot.
+   * placeholder) AhatClassObjs in the other snapshot.
    */
   private static void sites(Site a, Site b) {
     // Set the sites as baselines of each other.

@@ -713,7 +713,7 @@ static void AssertPcIsWithinQuickCode(ArtMethod* method, uintptr_t pc)
       << " code_size=" << code_size;
 }
 
-void StackVisitor::SanityCheckFrame() const {
+void StackVisitor::ValidateFrame() const {
   if (kIsDebugBuild) {
     ArtMethod* method = GetMethod();
     ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass();
@@ -758,7 +758,7 @@ void StackVisitor::SanityCheckFrame() const {
     }
     if (cur_quick_frame_ != nullptr) {
       AssertPcIsWithinQuickCode(method, cur_quick_frame_pc_);
-      // Frame sanity.
+      // Frame consistency checks.
       size_t frame_size = GetCurrentQuickFrameInfo().FrameSizeInBytes();
       CHECK_NE(frame_size, 0u);
       // For compiled code, we could try to have a rough guess at an upper size we expect
@@ -886,7 +886,7 @@ void StackVisitor::WalkStack(bool include_transitions) {
           cur_oat_quick_method_header_ = method->GetOatQuickMethodHeader(cur_quick_frame_pc_);
         }
         header_retrieved = false;  // Force header retrieval in next iteration.
-        SanityCheckFrame();
+        ValidateFrame();
 
         if ((walk_kind_ == StackWalkKind::kIncludeInlinedFrames)
             && (cur_oat_quick_method_header_ != nullptr)
@@ -980,7 +980,7 @@ void StackVisitor::WalkStack(bool include_transitions) {
       cur_oat_quick_method_header_ = nullptr;
     } else if (cur_shadow_frame_ != nullptr) {
       do {
-        SanityCheckFrame();
+        ValidateFrame();
         bool should_continue = VisitFrame();
         if (UNLIKELY(!should_continue)) {
           return;

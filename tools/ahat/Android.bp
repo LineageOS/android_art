@@ -12,19 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-droiddoc_host {
-    name: "ahat-docs",
+droidstubs_host {
+    name: "ahat-docs-stubs",
     srcs: [
         "src/main/**/*.java",
     ],
-    custom_template: "droiddoc-templates-sdk",
-    args: "-stubpackages com.android.ahat:com.android.ahat.*",
     check_api: {
         current: {
             api_file: "etc/ahat_api.txt",
             removed_api_file: "etc/ahat_removed_api.txt",
         },
     },
+    flags: ["-stubpackages com.android.ahat:com.android.ahat.*"],
+    create_doc_stubs: true,
+}
+
+droiddoc_host {
+    name: "ahat-docs",
+    srcs: [
+        ":ahat-docs-stubs",
+    ],
+    custom_template: "droiddoc-templates-sdk",
+    create_stubs: false,
 }
 
 // --- ahat.jar ----------------

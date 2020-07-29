@@ -144,7 +144,7 @@ public class SimdInt {
   }
 
   //
-  // Shift sanity.
+  // Shift checks.
   //
 
   // Expose constants to optimizing compiler, but not to front-end.

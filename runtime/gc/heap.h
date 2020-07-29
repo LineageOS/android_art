@@ -332,7 +332,7 @@ class Heap {
   // proper lock ordering for it.
   void VerifyObjectBody(ObjPtr<mirror::Object> o) NO_THREAD_SAFETY_ANALYSIS;
 
-  // Check sanity of all live references.
+  // Consistency check of all live references.
   void VerifyHeap() REQUIRES(!Locks::heap_bitmap_lock_);
   // Returns how many failures occured.
   size_t VerifyHeapReferences(bool verify_referents = true)
