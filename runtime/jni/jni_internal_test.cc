@@ -784,7 +784,7 @@ TEST_F(JniInternalTest, GetMethodID) {
   jclass jlnsme = env_->FindClass("java/lang/NoSuchMethodError");
   jclass jncrbc = env_->FindClass("java/nio/channels/ReadableByteChannel");
 
-  // Sanity check that no exceptions are pending.
+  // Check that no exceptions are pending.
   ASSERT_FALSE(env_->ExceptionCheck());
 
   // Check that java.lang.Object.foo() doesn't exist and NoSuchMethodError is
@@ -905,7 +905,7 @@ TEST_F(JniInternalTest, GetStaticMethodID) {
   jclass jlobject = env_->FindClass("java/lang/Object");
   jclass jlnsme = env_->FindClass("java/lang/NoSuchMethodError");
 
-  // Sanity check that no exceptions are pending
+  // Check that no exceptions are pending
   ASSERT_FALSE(env_->ExceptionCheck());
 
   // Check that java.lang.Object.foo() doesn't exist and NoSuchMethodError is
@@ -1035,7 +1035,7 @@ TEST_F(JniInternalTest, RegisterAndUnregisterNatives) {
   jclass jlnsme = env_->FindClass("java/lang/NoSuchMethodError");
   void* native_function = reinterpret_cast<void*>(BogusMethod);
 
-  // Sanity check that no exceptions are pending.
+  // Check that no exceptions are pending.
   ASSERT_FALSE(env_->ExceptionCheck());
 
   // The following can print errors to the log we'd like to ignore.
