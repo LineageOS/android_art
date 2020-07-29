@@ -260,7 +260,7 @@ class LOCKABLE Mutex : public BaseMutex {
 
   int32_t get_contenders() {
     // Result is guaranteed to include any contention added by this thread; otherwise approximate.
-    // Treat contenders as unsigned because we're paranoid about overflow; should never matter.
+    // Treat contenders as unsigned because we're concerned about overflow; should never matter.
     return static_cast<uint32_t>(state_and_contenders_.load(std::memory_order_relaxed))
         >> kContenderShift;
   }
