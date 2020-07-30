@@ -256,7 +256,7 @@ endif
   gtest_suffix :=
 endef  # define-art-gtest-rule-host
 
-ART_TEST_HOST_GTEST_DEPENDENCIES := $(host-i18n-data-timestamp)
+ART_TEST_HOST_GTEST_DEPENDENCIES := $(HOST_I18N_DATA)
 ART_TEST_TARGET_GTEST_DEPENDENCIES := $(TESTING_ART_APEX)
 
 # Add the additional dependencies for the specified test
