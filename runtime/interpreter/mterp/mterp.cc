@@ -150,9 +150,6 @@ bool CanUseMterp()
       runtime->IsStarted() &&
       !runtime->IsAotCompiler() &&
       !runtime->GetInstrumentation()->IsActive() &&
-      // In simulator mode, mterp and its fast path are avoided to ensure every
-      // called method can go through ArtMethod::Invoke().
-      !Runtime::SimulatorMode() &&
       // mterp only knows how to deal with the normal exits. It cannot handle any of the
       // non-standard force-returns.
       !runtime->AreNonStandardExitsEnabled() &&

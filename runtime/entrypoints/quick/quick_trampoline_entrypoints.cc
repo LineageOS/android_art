@@ -1433,7 +1433,6 @@ extern "C" const void* artQuickResolutionTrampoline(
 template<class T> class BuildNativeCallFrameStateMachine {
  public:
 #if defined(__arm__)
-  // TODO: These are all dummy values!
   static constexpr bool kNativeSoftFloatAbi = true;
   static constexpr size_t kNumNativeGprArgs = 4;  // 4 arguments passed in GPRs, r0-r3
   static constexpr size_t kNumNativeFprArgs = 0;  // 0 arguments passed in FPRs.
@@ -1458,7 +1457,6 @@ template<class T> class BuildNativeCallFrameStateMachine {
   static constexpr bool kAlignLongOnStack = false;
   static constexpr bool kAlignDoubleOnStack = false;
 #elif defined(__i386__)
-  // TODO: Check these!
   static constexpr bool kNativeSoftFloatAbi = false;  // Not using int registers for fp
   static constexpr size_t kNumNativeGprArgs = 0;  // 0 arguments passed in GPRs.
   static constexpr size_t kNumNativeFprArgs = 0;  // 0 arguments passed in FPRs.
