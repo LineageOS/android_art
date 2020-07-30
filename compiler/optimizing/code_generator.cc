@@ -630,12 +630,13 @@ void CodeGenerator::GenerateInvokeUnresolvedRuntimeCall(HInvokeUnresolved* invok
   InvokeRuntime(entrypoint, invoke, invoke->GetDexPc(), nullptr);
 }
 
-void CodeGenerator::GenerateInvokePolymorphicCall(HInvokePolymorphic* invoke) {
+void CodeGenerator::GenerateInvokePolymorphicCall(HInvokePolymorphic* invoke,
+                                                  SlowPathCode* slow_path) {
   // invoke-polymorphic does not use a temporary to convey any additional information (e.g. a
   // method index) since it requires multiple info from the instruction (registers A, B, H). Not
   // using the reservation has no effect on the registers used in the runtime call.
   QuickEntrypointEnum entrypoint = kQuickInvokePolymorphic;
-  InvokeRuntime(entrypoint, invoke, invoke->GetDexPc(), nullptr);
+  InvokeRuntime(entrypoint, invoke, invoke->GetDexPc(), slow_path);
 }
 
 void CodeGenerator::GenerateInvokeCustomCall(HInvokeCustom* invoke) {
