@@ -8,6 +8,16 @@ args: --test-local --test-remote --secondary
 JNI_OnLoad called
 Java_Main_sigstop
 PASS
+args: --test-local --test-remote
+JNI_OnLoad called
+Java_Main_unwindInProcess
+PASS
+Java_Main_startSecondaryProcess
+Java_Main_unwindOtherProcess
+args: --test-local --test-remote --secondary
+JNI_OnLoad called
+Java_Main_sigstop
+PASS
 args: --test-remote
 JNI_OnLoad called
 Java_Main_startSecondaryProcess
