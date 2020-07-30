@@ -469,7 +469,7 @@ endif
 build-art: build-art-host build-art-target
 
 # For host, we extract the ICU data from the apex and install it to HOST_OUT/I18N_APEX.
-$(host-i18n-data-timestamp): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bin/deapexer
+$(HOST_I18N_DATA): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bin/deapexer
 	$(call extract-from-apex,$(I18N_APEX))
 	rm -rf $(HOST_OUT)/$(I18N_APEX)
 	mkdir -p $(HOST_OUT)/$(I18N_APEX)/
@@ -477,7 +477,7 @@ $(host-i18n-data-timestamp): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bi
 	touch $@
 
 .PHONY: build-art-host
-build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(host-i18n-data-timestamp)
+build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(HOST_I18N_DATA)
 
 .PHONY: build-art-target
 build-art-target: $(TARGET_OUT_EXECUTABLES)/art $(ART_TARGET_DEPENDENCIES) $(TARGET_CORE_IMG_OUTS)
