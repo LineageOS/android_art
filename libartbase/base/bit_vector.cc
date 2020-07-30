@@ -154,7 +154,7 @@ bool BitVector::Union(const BitVector* src) {
 
     EnsureSize(highest_bit);
 
-    // Paranoid: storage size should be big enough to hold this bit now.
+    // Check: storage size should be big enough to hold this bit now.
     DCHECK_LT(static_cast<uint32_t> (highest_bit), storage_size_ * kWordBits);
   }
 
@@ -186,7 +186,7 @@ bool BitVector::UnionIfNotIn(const BitVector* union_with, const BitVector* not_i
   if (storage_size_ < union_with_size) {
     EnsureSize(highest_bit);
 
-    // Paranoid: storage size should be big enough to hold this bit now.
+    // Check: storage size should be big enough to hold this bit now.
     DCHECK_LT(static_cast<uint32_t> (highest_bit), storage_size_ * kWordBits);
   }
 
