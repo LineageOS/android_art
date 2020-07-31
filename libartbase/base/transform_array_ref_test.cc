@@ -174,7 +174,15 @@ TEST(TransformArrayRef, ConstAndNonConstRef) {
   ASSERT_EQ(std::vector<int>({ 1, 0, 1, 0, 3, 1 }), output);
   output.clear();
 
+  std::copy(std::begin(ctaref), std::end(ctaref), std::back_inserter(output));
+  ASSERT_EQ(std::vector<int>({ 1, 0, 1, 0, 3, 1 }), output);
+  output.clear();
+
   std::copy(ctaref.cbegin(), ctaref.cend(), std::back_inserter(output));
+  ASSERT_EQ(std::vector<int>({ 1, 0, 1, 0, 3, 1 }), output);
+  output.clear();
+
+  std::copy(std::cbegin(ctaref), std::cend(ctaref), std::back_inserter(output));
   ASSERT_EQ(std::vector<int>({ 1, 0, 1, 0, 3, 1 }), output);
   output.clear();
 
@@ -182,7 +190,15 @@ TEST(TransformArrayRef, ConstAndNonConstRef) {
   ASSERT_EQ(std::vector<int>({ 1, 3, 0, 1, 0, 1 }), output);
   output.clear();
 
+  std::copy(std::rbegin(ctaref), std::rend(ctaref), std::back_inserter(output));
+  ASSERT_EQ(std::vector<int>({ 1, 3, 0, 1, 0, 1 }), output);
+  output.clear();
+
   std::copy(ctaref.crbegin(), ctaref.crend(), std::back_inserter(output));
+  ASSERT_EQ(std::vector<int>({ 1, 3, 0, 1, 0, 1 }), output);
+  output.clear();
+
+  std::copy(std::crbegin(ctaref), std::crend(ctaref), std::back_inserter(output));
   ASSERT_EQ(std::vector<int>({ 1, 3, 0, 1, 0, 1 }), output);
   output.clear();
 
