@@ -745,7 +745,11 @@ art_cc_test {
         "verifier/method_verifier_test.cc",
         "verifier/reg_type_test.cc",
     ],
-    required: ["dex2oatd"],
+    target: {
+        host: {
+            required: ["dex2oatd"],
+        },
+    },
     shared_libs: [
         "libbacktrace",
     ],
@@ -763,7 +767,11 @@ art_cc_test {
         "reflection_test.cc",
         "module_exclusion_test.cc",
     ],
-    required: ["dex2oatd"],
+    target: {
+        host: {
+            required: ["dex2oatd"],
+        },
+    },
     data: [
         ":art-gtest-jars-Main",
         ":art-gtest-jars-NonStaticLeafMethods",
