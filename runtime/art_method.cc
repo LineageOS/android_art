@@ -762,9 +762,17 @@ void ArtMethod::CopyFrom(ArtMethod* src, PointerSize image_pointer_size) {
           image_pointer_size);
     }
   }
-  // Clear the profiling info for the same reasons as the JIT code.
+    if (interpreter::IsNterpSupported() &&
+        (GetEntryPointFromQuickCompiledCodePtrSize(image_pointer_size) ==
+            interpreter::GetNterpEntryPoint())) {
+    // If the entrypoint is nterp, it's too early to check if the new method
+    // will support it. So for simplicity, use the interpreter bridge.
+    SetEntryPointFromQuickCompiledCodePtrSize(GetQuickToInterpreterBridge(), image_pointer_size);
+  }
+
+  // Clear the data pointer, it will be set if needed by the caller.
   if (!src->IsNative()) {
-    SetProfilingInfoPtrSize(nullptr, image_pointer_size);
+    SetDataPtrSize(nullptr, image_pointer_size);
   }
   // Clear hotness to let the JIT properly decide when to compile this method.
   hotness_count_ = 0;

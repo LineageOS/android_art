@@ -45,6 +45,9 @@ bool CanMethodUseNterp(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) 
   return method->SkipAccessChecks() &&
       !method->IsNative() &&
       method->GetDexFile()->IsStandardDexFile() &&
+      // Proxy methods do not go through the JIT like other methods, so we don't
+      // run them with nterp.
+      !method->IsProxyMethod() &&
       NterpGetFrameSize(method) < kNterpMaxFrame;
 }
 
