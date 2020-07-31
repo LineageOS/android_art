@@ -523,11 +523,14 @@ class ArtMethod final {
   }
 
   ALWAYS_INLINE void SetProfilingInfo(ProfilingInfo* info) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetDataPtrSize(info, kRuntimePointerSize);
+    SetProfilingInfoPtrSize(info, kRuntimePointerSize);
   }
 
   ALWAYS_INLINE void SetProfilingInfoPtrSize(ProfilingInfo* info, PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(!IsProxyMethod());
+    DCHECK(!IsNative());
+    DCHECK(IsInvokable());
     SetDataPtrSize(info, pointer_size);
   }
 
