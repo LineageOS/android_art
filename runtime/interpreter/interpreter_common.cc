@@ -85,10 +85,6 @@ bool UseFastInterpreterToInterpreterInvoke(ArtMethod* method) {
   if (method->IsStatic() && !method->GetDeclaringClass()->IsVisiblyInitialized()) {
     return false;
   }
-  ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
-  if ((profiling_info != nullptr) && (profiling_info->GetSavedEntryPoint() != nullptr)) {
-    return false;
-  }
   return true;
 }
 
