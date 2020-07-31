@@ -579,6 +579,7 @@ void DumpPerfetto(art::Thread* self) {
                     type_proto->set_class_name(PrettyType(klass));
                     type_proto->set_location_id(FindOrAppend(&interned_locations,
                           klass->GetLocation()));
+                    type_proto->set_object_size(klass->GetObjectSize());
                   }
 
                   art::mirror::Class* klass = obj->GetClass();
@@ -606,7 +607,10 @@ void DumpPerfetto(art::Thread* self) {
                     writer.GetHeapGraph()->add_objects();
                   object_proto->set_id(GetObjectId(obj));
                   object_proto->set_type_id(class_id);
-                  object_proto->set_self_size(obj->SizeOf());
+
+                  // Arrays / strings are magic and have an instance dependent size.
+                  if (obj->SizeOf() != klass->GetObjectSize())
+                    object_proto->set_self_size(obj->SizeOf());
 
                   std::vector<std::pair<std::string, art::mirror::Object*>>
                       referred_objects;
