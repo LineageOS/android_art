@@ -51,6 +51,22 @@
     .endif
 .endm
 
+.macro CFI_DEF_CFA_BREG_PLUS_UCONST reg, offset, size
+    .if ((\size) < 0)
+        .error "Size should be positive"
+    .endif
+    .if (((\offset) < -0x40) || ((\offset) >= 0x40))
+        .error "Unsupported offset"
+    .endif
+    .if ((\size) < 0x80)
+        CFI_DEF_CFA_BREG_PLUS_UCONST_1_1(\reg, \offset, \size)
+    .elseif ((\size) < 0x4000)
+        CFI_DEF_CFA_BREG_PLUS_UCONST_1_2(\reg, \offset, \size)
+    .else
+        .error "Unsupported size"
+    .endif
+.endm
+
 .macro ENTRY_ALIGNED name, alignment
     .type \name, #function
     .hidden \name  // Hide this as a global symbol, so we do not incur plt calls.
