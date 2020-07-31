@@ -93,7 +93,7 @@ class TransformArrayRef {
   const_iterator begin() const { return MakeIterator(base().cbegin()); }
   const_iterator cbegin() const { return MakeIterator(base().cbegin()); }
   iterator end() { return MakeIterator(base().end()); }
-  const_iterator end() const { MakeIterator(base().cend()); }
+  const_iterator end() const { return MakeIterator(base().cend()); }
   const_iterator cend() const { return MakeIterator(base().cend()); }
   reverse_iterator rbegin() { return reverse_iterator(end()); }
   const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
