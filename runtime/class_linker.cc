@@ -227,6 +227,22 @@ static void HandleEarlierVerifyError(Thread* self,
   self->AssertPendingException();
 }
 
+static void ChangeInterpreterBridgeToNterp(ArtMethod* method, ClassLinker* class_linker)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  Runtime* runtime = Runtime::Current();
+  if (class_linker->IsQuickToInterpreterBridge(method->GetEntryPointFromQuickCompiledCode()) &&
+      interpreter::CanMethodUseNterp(method)) {
+    if (method->GetDeclaringClass()->IsVisiblyInitialized() ||
+        !NeedsClinitCheckBeforeCall(method)) {
+      runtime->GetInstrumentation()->UpdateMethodsCode(method, interpreter::GetNterpEntryPoint());
+    } else {
+      // Put the resolution stub, which will initialize the class and then
+      // call the method with nterp.
+      runtime->GetInstrumentation()->UpdateMethodsCode(method, GetQuickResolutionStub());
+    }
+  }
+}
+
 // Ensures that methods have the kAccSkipAccessChecks bit set. We use the
 // kAccVerificationAttempted bit on the class access flags to determine whether this has been done
 // before.
@@ -241,16 +257,7 @@ static void EnsureSkipAccessChecksMethods(Handle<mirror::Class> klass, PointerSi
     // to methods that currently use the switch interpreter.
     if (interpreter::CanRuntimeUseNterp()) {
       for (ArtMethod& m : klass->GetMethods(pointer_size)) {
-        if (class_linker->IsQuickToInterpreterBridge(m.GetEntryPointFromQuickCompiledCode()) &&
-            interpreter::CanMethodUseNterp(&m)) {
-          if (klass->IsVisiblyInitialized() || !NeedsClinitCheckBeforeCall(&m)) {
-            runtime->GetInstrumentation()->UpdateMethodsCode(&m, interpreter::GetNterpEntryPoint());
-          } else {
-            // Put the resolution stub, which will initialize the class and then
-            // call the method with nterp.
-            runtime->GetInstrumentation()->UpdateMethodsCode(&m, GetQuickResolutionStub());
-          }
-        }
+        ChangeInterpreterBridgeToNterp(&m, class_linker);
       }
     }
   }
@@ -2195,11 +2202,7 @@ bool ClassLinker::AddImageSpace(
   if (interpreter::CanRuntimeUseNterp()) {
     // Set image methods' entry point that point to the interpreter bridge to the nterp entry point.
     header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
-      if (IsQuickToInterpreterBridge(method.GetEntryPointFromQuickCompiledCode()) &&
-          interpreter::CanMethodUseNterp(&method)) {
-        method.SetEntryPointFromQuickCompiledCodePtrSize(interpreter::GetNterpEntryPoint(),
-                                                         image_pointer_size_);
-      }
+      ChangeInterpreterBridgeToNterp(&method, this);
     }, space->Begin(), image_pointer_size_);
   }
 
