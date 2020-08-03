@@ -150,6 +150,10 @@ class MANAGED VarHandle : public Object {
   // VarHandle access method, such as "setOpaque". Returns false otherwise.
   static bool GetAccessModeByMethodName(const char* method_name, AccessMode* access_mode);
 
+  static MemberOffset AccessModesBitMaskOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(VarHandle, access_modes_bit_mask_));
+  }
+
  private:
   ObjPtr<Class> GetCoordinateType0() REQUIRES_SHARED(Locks::mutator_lock_);
   ObjPtr<Class> GetCoordinateType1() REQUIRES_SHARED(Locks::mutator_lock_);
@@ -170,10 +174,6 @@ class MANAGED VarHandle : public Object {
 
   static MemberOffset CoordinateType1Offset() {
     return MemberOffset(OFFSETOF_MEMBER(VarHandle, coordinate_type1_));
-  }
-
-  static MemberOffset AccessModesBitMaskOffset() {
-    return MemberOffset(OFFSETOF_MEMBER(VarHandle, access_modes_bit_mask_));
   }
 
   HeapReference<mirror::Class> coordinate_type0_;
