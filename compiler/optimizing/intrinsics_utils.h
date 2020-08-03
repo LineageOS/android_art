@@ -65,15 +65,18 @@ class IntrinsicSlowPath : public TSlowPathCode {
       DCHECK_NE(invoke_static_or_direct->GetCodePtrLocation(),
                 HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative);
       codegen->GenerateStaticOrDirectCall(invoke_static_or_direct, method_loc, this);
-    } else {
+    } else if (invoke_->IsInvokeVirtual()) {
       codegen->GenerateVirtualCall(invoke_->AsInvokeVirtual(), method_loc, this);
+    } else {
+      DCHECK(invoke_->IsInvokePolymorphic());
+      codegen->GenerateInvokePolymorphicCall(invoke_->AsInvokePolymorphic(), this);
     }
 
     // Copy the result back to the expected output.
     Location out = invoke_->GetLocations()->Out();
     if (out.IsValid()) {
-      DCHECK(out.IsRegister());  // TODO: Replace this when we support output in memory.
-      DCHECK(!invoke_->GetLocations()->GetLiveRegisters()->ContainsCoreRegister(out.reg()));
+      DCHECK(out.IsRegisterKind());  // TODO: Replace this when we support output in memory.
+      DCHECK(!invoke_->GetLocations()->GetLiveRegisters()->OverlapsRegisters(out));
       codegen->MoveFromReturnRegister(out, invoke_->GetType());
     }
 

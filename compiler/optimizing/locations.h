@@ -478,6 +478,23 @@ class RegisterSet : public ValueObject {
     return (register_set & (1 << reg)) != 0;
   }
 
+  bool OverlapsRegisters(Location out) {
+    DCHECK(out.IsRegisterKind());
+    switch (out.GetKind()) {
+      case Location::Kind::kRegister:
+        return ContainsCoreRegister(out.reg());
+      case Location::Kind::kFpuRegister:
+        return ContainsFloatingPointRegister(out.reg());
+      case Location::Kind::kRegisterPair:
+        return ContainsCoreRegister(out.low()) || ContainsCoreRegister(out.high());
+      case Location::Kind::kFpuRegisterPair:
+        return ContainsFloatingPointRegister(out.low()) ||
+               ContainsFloatingPointRegister(out.high());
+      default:
+        return false;
+    }
+  }
+
   size_t GetNumberOfRegisters() const {
     return POPCOUNT(core_registers_) + POPCOUNT(floating_point_registers_);
   }
