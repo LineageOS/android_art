@@ -27,8 +27,8 @@
 namespace art {
 namespace Test674HiddenApi {
 
-// Should be the same as dalvik.system.VMRuntime.PREVENT_META_REFLECTION_BLACKLIST_ACCESS
-static constexpr uint64_t kPreventMetaReflectionBlacklistAccess = 142365358;
+// Should be the same as dalvik.system.VMRuntime.PREVENT_META_REFLECTION_BLOCKLIST_ACCESS
+static constexpr uint64_t kPreventMetaReflectionBlocklistAccess = 142365358;
 
 std::vector<std::vector<std::unique_ptr<const DexFile>>> opened_dex_files;
 
@@ -324,10 +324,10 @@ extern "C" JNIEXPORT void JNICALL Java_Reflection_setHiddenApiCheckHardening(JNI
   std::set<uint64_t> disabled_changes = Runtime::Current()->GetDisabledCompatChanges();
   if (value == JNI_TRUE) {
     // If hidden api check hardening is enabled, remove it from the set of disabled changes.
-    disabled_changes.erase(kPreventMetaReflectionBlacklistAccess);
+    disabled_changes.erase(kPreventMetaReflectionBlocklistAccess);
   } else {
     // If hidden api check hardening is disabled, add it to the set of disabled changes.
-    disabled_changes.insert(kPreventMetaReflectionBlacklistAccess);
+    disabled_changes.insert(kPreventMetaReflectionBlocklistAccess);
   }
   Runtime::Current()->SetDisabledCompatChanges(disabled_changes);
 }
