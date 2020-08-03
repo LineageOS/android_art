@@ -62,3 +62,9 @@ TEST_F(PaletteClientTest, Trace) {
   EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceEnd());
   EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceIntegerValue("Beans", /*value=*/ 3));
 }
+
+TEST_F(PaletteClientTest, GetHooks) {
+  PaletteHooks* hooks = nullptr;
+  PaletteStatus status = PaletteGetHooks(&hooks);
+  ASSERT_TRUE(status == PaletteStatus::kOkay || status == PaletteStatus::kNotSupported);
+}
