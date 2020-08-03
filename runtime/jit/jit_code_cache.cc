@@ -1191,25 +1191,8 @@ void JitCodeCache::GarbageCollectCache(Thread* self) {
 
       // Start polling the liveness of compiled code to prepare for the next full collection.
       if (next_collection_will_be_full) {
-        if (Runtime::Current()->GetJITOptions()->CanCompileBaseline()) {
-          for (ProfilingInfo* info : profiling_infos_) {
-            info->SetBaselineHotnessCount(0);
-          }
-        } else {
-          // Save the entry point of methods we have compiled, and update the entry
-          // point of those methods to the interpreter. If the method is invoked, the
-          // interpreter will update its entry point to the compiled code and call it.
-          for (ProfilingInfo* info : profiling_infos_) {
-            const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
-            if (!IsInZygoteDataSpace(info) && ContainsPc(entry_point)) {
-              info->SetSavedEntryPoint(entry_point);
-              // Don't call Instrumentation::UpdateMethodsCode(), as it can check the declaring
-              // class of the method. We may be concurrently running a GC which makes accessing
-              // the class unsafe. We know it is OK to bypass the instrumentation as we've just
-              // checked that the current entry point is JIT compiled code.
-              info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
-            }
-          }
+        for (ProfilingInfo* info : profiling_infos_) {
+          info->SetBaselineHotnessCount(0);
         }
 
         // Change entry points of native methods back to the GenericJNI entrypoint.
@@ -1349,54 +1332,24 @@ void JitCodeCache::DoCollection(Thread* self, bool collect_profiling_info) {
   {
     MutexLock mu(self, *Locks::jit_lock_);
 
-    if (Runtime::Current()->GetJITOptions()->CanCompileBaseline()) {
-      // Update to interpreter the methods that have baseline entrypoints and whose baseline
-      // hotness count is zero.
-      // Note that these methods may be in thread stack or concurrently revived
-      // between. That's OK, as the thread executing it will mark it.
-      for (ProfilingInfo* info : profiling_infos_) {
-        if (info->GetBaselineHotnessCount() == 0) {
-          const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
-          if (ContainsPc(entry_point)) {
-            OatQuickMethodHeader* method_header =
-                OatQuickMethodHeader::FromEntryPoint(entry_point);
-            if (CodeInfo::IsBaseline(method_header->GetOptimizedCodeInfoPtr())) {
-              info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
-            }
+    // Update to interpreter the methods that have baseline entrypoints and whose baseline
+    // hotness count is zero.
+    // Note that these methods may be in thread stack or concurrently revived
+    // between. That's OK, as the thread executing it will mark it.
+    for (ProfilingInfo* info : profiling_infos_) {
+      if (info->GetBaselineHotnessCount() == 0) {
+        const void* entry_point = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
+        if (ContainsPc(entry_point)) {
+          OatQuickMethodHeader* method_header =
+              OatQuickMethodHeader::FromEntryPoint(entry_point);
+          if (CodeInfo::IsBaseline(method_header->GetOptimizedCodeInfoPtr())) {
+            info->GetMethod()->SetEntryPointFromQuickCompiledCode(GetQuickToInterpreterBridge());
           }
-        }
-      }
-      // TODO: collect profiling info
-      // TODO: collect optimized code?
-    } else {
-      if (collect_profiling_info) {
-        // Clear the profiling info of methods that do not have compiled code as entrypoint.
-        // Also remove the saved entry point from the ProfilingInfo objects.
-        for (ProfilingInfo* info : profiling_infos_) {
-          const void* ptr = info->GetMethod()->GetEntryPointFromQuickCompiledCode();
-          if (!ContainsPc(ptr) &&
-              !IsMethodBeingCompiled(info->GetMethod()) &&
-              !info->IsInUseByCompiler() &&
-              !IsInZygoteDataSpace(info)) {
-            info->GetMethod()->SetProfilingInfo(nullptr);
-          }
-
-          if (info->GetSavedEntryPoint() != nullptr) {
-            info->SetSavedEntryPoint(nullptr);
-            // We are going to move this method back to interpreter. Clear the counter now to
-            // give it a chance to be hot again.
-            ClearMethodCounter(info->GetMethod(), /*was_warm=*/ true);
-          }
-        }
-      } else if (kIsDebugBuild) {
-        // Check that the profiling infos do not have a dangling entry point.
-        for (ProfilingInfo* info : profiling_infos_) {
-          DCHECK(!Runtime::Current()->IsZygote());
-          const void* entry_point = info->GetSavedEntryPoint();
-          DCHECK(entry_point == nullptr || IsInZygoteExecSpace(entry_point));
         }
       }
     }
+    // TODO: collect profiling info
+    // TODO: collect optimized code
 
     // Mark compiled code that are entrypoints of ArtMethods. Compiled code that is not
     // an entry point is either:
