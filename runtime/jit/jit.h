@@ -121,12 +121,6 @@ class JitOptions {
     return use_tiered_jit_compilation_;
   }
 
-  bool CanCompileBaseline() const {
-    return use_tiered_jit_compilation_ ||
-           use_baseline_compiler_ ||
-           interpreter::IsNterpSupported();
-  }
-
   void SetUseJitCompilation(bool b) {
     use_jit_compilation_ = b;
   }
@@ -310,12 +304,6 @@ class Jit {
                                 ArtMethod* method,
                                 uint16_t samples,
                                 bool with_backedges)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  void InvokeVirtualOrInterface(ObjPtr<mirror::Object> this_object,
-                                ArtMethod* caller,
-                                uint32_t dex_pc,
-                                ArtMethod* callee)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   void NotifyInterpreterToCompiledCodeTransition(Thread* self, ArtMethod* caller)

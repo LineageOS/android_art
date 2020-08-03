@@ -928,16 +928,6 @@ void Instrumentation::UpdateMethodsCodeImpl(ArtMethod* method, const void* quick
                  // Proxy.<init> correctly in all cases.
                  method != jni::DecodeArtMethod(WellKnownClasses::java_lang_reflect_Proxy_init)) {
         new_quick_code = GetQuickInstrumentationEntryPoint();
-        if (!method->IsNative() && Runtime::Current()->GetJit() != nullptr) {
-          // Native methods use trampoline entrypoints during interpreter tracing.
-          DCHECK(!Runtime::Current()->GetJit()->GetCodeCache()->GetGarbageCollectCodeUnsafe());
-          ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
-          // Tracing will look at the saved entry point in the profiling info to know the actual
-          // entrypoint, so we store it here.
-          if (profiling_info != nullptr) {
-            profiling_info->SetSavedEntryPoint(quick_code);
-          }
-        }
       } else {
         new_quick_code = quick_code;
       }
