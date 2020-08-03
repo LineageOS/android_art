@@ -597,7 +597,7 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
 
   void GenerateInvokeUnresolvedRuntimeCall(HInvokeUnresolved* invoke);
 
-  void GenerateInvokePolymorphicCall(HInvokePolymorphic* invoke);
+  void GenerateInvokePolymorphicCall(HInvokePolymorphic* invoke, SlowPathCode* slow_path = nullptr);
 
   void GenerateInvokeCustomCall(HInvokeCustom* invoke);
 
