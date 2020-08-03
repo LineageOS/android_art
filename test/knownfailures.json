@@ -1345,5 +1345,10 @@
         "variant": "jvm",
         "bug": "b/154802847",
         "description": ["Failing on RI. Needs further investigating."]
+    },
+    {
+        "tests": "566-polymorphic-inlining",
+        "description": "Test needs to be rewritten for tiered JIT.",
+        "bug": "b/112676029"
     }
 ]
