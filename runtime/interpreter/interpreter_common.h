@@ -299,10 +299,6 @@ static ALWAYS_INLINE bool DoInvoke(Thread* self,
   }
 
   jit::Jit* jit = Runtime::Current()->GetJit();
-  if (jit != nullptr && (type == kVirtual || type == kInterface)) {
-    jit->InvokeVirtualOrInterface(receiver, sf_method, shadow_frame.GetDexPC(), called_method);
-  }
-
   if (is_mterp && !is_range && called_method->IsIntrinsic()) {
     if (MterpHandleIntrinsic(&shadow_frame, called_method, inst, inst_data,
                              shadow_frame.GetResultRegister())) {
