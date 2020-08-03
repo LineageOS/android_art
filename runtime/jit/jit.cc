@@ -1534,45 +1534,14 @@ bool Jit::MaybeCompileMethod(Thread* self,
   DCHECK_GE(PriorityThreadWeight(), 1);
   DCHECK_LE(PriorityThreadWeight(), HotMethodThreshold());
 
-  if (old_count < WarmMethodThreshold() && new_count >= WarmMethodThreshold()) {
-    // Note: Native method have no "warm" state or profiling info.
-    if (!method->IsNative() &&
-        (method->GetProfilingInfo(kRuntimePointerSize) == nullptr) &&
-        code_cache_->CanAllocateProfilingInfo() &&
-        !options_->UseTieredJitCompilation()) {
-      bool success = ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
-      if (success) {
-        VLOG(jit) << "Start profiling " << method->PrettyMethod();
-      }
-
-      if (thread_pool_ == nullptr) {
-        // Calling ProfilingInfo::Create might put us in a suspended state, which could
-        // lead to the thread pool being deleted when we are shutting down.
-        return false;
-      }
-
-      if (!success) {
-        // We failed allocating. Instead of doing the collection on the Java thread, we push
-        // an allocation to a compiler thread, that will do the collection.
-        thread_pool_->AddTask(
-            self,
-            new JitCompileTask(method,
-                               JitCompileTask::TaskKind::kAllocateProfile,
-                               CompilationKind::kOptimized));  // Arbitrary compilation kind.
-      }
-    }
-  }
   if (UseJitCompilation()) {
     if (old_count < HotMethodThreshold() && new_count >= HotMethodThreshold()) {
       if (!code_cache_->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
         DCHECK(thread_pool_ != nullptr);
-        CompilationKind compilation_kind =
-            (options_->UseTieredJitCompilation() || options_->UseBaselineCompiler())
-                ? CompilationKind::kBaseline
-                : CompilationKind::kOptimized;
         thread_pool_->AddTask(
             self,
-            new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, compilation_kind));
+            new JitCompileTask(
+                method, JitCompileTask::TaskKind::kCompile, CompilationKind::kBaseline));
       }
     }
     if (old_count < OSRMethodThreshold() && new_count >= OSRMethodThreshold()) {
@@ -1643,30 +1612,7 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
     return;
   }
 
-  ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
-  // Update the entrypoint if the ProfilingInfo has one. The interpreter will call it
-  // instead of interpreting the method. We don't update it for instrumentation as the entrypoint
-  // must remain the instrumentation entrypoint.
-  if ((profiling_info != nullptr) &&
-      (profiling_info->GetSavedEntryPoint() != nullptr) &&
-      (method->GetEntryPointFromQuickCompiledCode() != GetQuickInstrumentationEntryPoint())) {
-    Runtime::Current()->GetInstrumentation()->UpdateMethodsCode(
-        method, profiling_info->GetSavedEntryPoint());
-  } else {
-    AddSamples(thread, method, 1, /* with_backedges= */false);
-  }
-}
-
-void Jit::InvokeVirtualOrInterface(ObjPtr<mirror::Object> this_object,
-                                   ArtMethod* caller,
-                                   uint32_t dex_pc,
-                                   ArtMethod* callee ATTRIBUTE_UNUSED) {
-  ScopedAssertNoThreadSuspension ants(__FUNCTION__);
-  DCHECK(this_object != nullptr);
-  ProfilingInfo* info = caller->GetProfilingInfo(kRuntimePointerSize);
-  if (info != nullptr) {
-    info->AddInvokeInfo(dex_pc, this_object->GetClass());
-  }
+  AddSamples(thread, method, 1, /* with_backedges= */false);
 }
 
 void Jit::WaitForCompilationToFinish(Thread* self) {
