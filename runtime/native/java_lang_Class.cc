@@ -56,9 +56,9 @@
 
 namespace art {
 
-// Should be the same as dalvik.system.VMRuntime.PREVENT_META_REFLECTION_BLACKLIST_ACCESS.
+// Should be the same as dalvik.system.VMRuntime.PREVENT_META_REFLECTION_BLOCKLIST_ACCESS.
 // Corresponds to a bug id.
-static constexpr uint64_t kPreventMetaReflectionBlacklistAccess = 142365358;
+static constexpr uint64_t kPreventMetaReflectionBlocklistAccess = 142365358;
 
 // Walks the stack, finds the caller of this reflective call and returns
 // a hiddenapi AccessContext formed from its declaring class.
@@ -105,7 +105,7 @@ static hiddenapi::AccessContext GetReflectionCaller(Thread* self)
         // (e.g. in 691-hiddenapi-proxy).
         ObjPtr<mirror::Class> proxy_class = GetClassRoot<mirror::Proxy>();
         if (declaring_class->IsInSamePackage(proxy_class) && declaring_class != proxy_class) {
-          if (Runtime::Current()->isChangeEnabled(kPreventMetaReflectionBlacklistAccess)) {
+          if (Runtime::Current()->isChangeEnabled(kPreventMetaReflectionBlocklistAccess)) {
             return true;
           }
         }
