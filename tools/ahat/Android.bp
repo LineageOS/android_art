@@ -33,7 +33,6 @@ droiddoc_host {
         ":ahat-docs-stubs",
     ],
     custom_template: "droiddoc-templates-sdk",
-    create_stubs: false,
 }
 
 // --- ahat.jar ----------------
