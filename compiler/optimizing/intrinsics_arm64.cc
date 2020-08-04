@@ -20,6 +20,7 @@
 #include "art_method.h"
 #include "code_generator_arm64.h"
 #include "common_arm64.h"
+#include "data_type-inl.h"
 #include "entrypoints/quick/quick_entrypoints.h"
 #include "heap_poisoning.h"
 #include "intrinsics.h"
@@ -29,6 +30,7 @@
 #include "mirror/object_array-inl.h"
 #include "mirror/reference.h"
 #include "mirror/string-inl.h"
+#include "mirror/var_handle.h"
 #include "scoped_thread_state_change-inl.h"
 #include "thread-current-inl.h"
 #include "utils/arm64/assembler_arm64.h"
@@ -3059,7 +3061,7 @@ void IntrinsicCodeGeneratorARM64::VisitCRC32UpdateBytes(HInvoke* invoke) {
   LocationSummary* locations = invoke->GetLocations();
 
   SlowPathCodeARM64* slow_path =
-    new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
   codegen_->AddSlowPath(slow_path);
 
   Register length = WRegisterFrom(locations->InAt(3));
@@ -3327,6 +3329,100 @@ void IntrinsicCodeGeneratorARM64::VisitFP16LessEquals(HInvoke* invoke) {
   GenerateFP16Compare(invoke, codegen_, masm, ls);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
+  if (invoke->GetNumberOfArguments() == 1u) {
+    // Static field Get.
+    switch (invoke->GetType()) {
+      case DataType::Type::kBool:
+      case DataType::Type::kInt8:
+      case DataType::Type::kUint16:
+      case DataType::Type::kInt16:
+      case DataType::Type::kInt32:
+      case DataType::Type::kInt64: {
+        ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
+        LocationSummary* locations = new (allocator) LocationSummary(
+            invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+        locations->SetInAt(0, Location::RequiresRegister());
+        locations->SetOut(Location::RequiresRegister());
+        locations->AddTemp(Location::RequiresRegister());
+        break;
+      }
+      case DataType::Type::kFloat32:
+      case DataType::Type::kFloat64: {
+        ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
+        LocationSummary* locations = new (allocator) LocationSummary(
+            invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+        locations->SetInAt(0, Location::RequiresRegister());
+        locations->SetOut(Location::RequiresFpuRegister());
+        locations->AddTemp(Location::RequiresRegister());
+        locations->AddTemp(Location::RequiresRegister());
+        break;
+      }
+      default:
+        // TODO: Implement for kReference.
+        break;
+    }
+  }
+  // TODO: Support instance fields, arrays, etc.
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
+  // Implemented only for primitive static fields.
+  DCHECK_EQ(invoke->GetNumberOfArguments(), 1u);
+  DataType::Type type = invoke->GetType();
+  DCHECK_NE(type, DataType::Type::kVoid);
+  DCHECK_NE(type, DataType::Type::kReference);
+  Primitive::Type primitive_type = DataTypeToPrimitive(type);
+
+  MacroAssembler* masm = GetVIXLAssembler();
+  Register varhandle = InputRegisterAt(invoke, 0).X();
+  CPURegister out = helpers::OutputCPURegister(invoke);
+  Register temp = WRegisterFrom(invoke->GetLocations()->GetTemp(0));
+
+  SlowPathCodeARM64* slow_path =
+      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen_->AddSlowPath(slow_path);
+
+  // Check that the operation is permitted. For static field Get, this
+  // should be the same as checking that the field is not volatile.
+  mirror::VarHandle::AccessMode access_mode =
+      mirror::VarHandle::GetAccessModeByIntrinsic(invoke->GetIntrinsic());
+  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::AccessModesBitMaskOffset().Int32Value()));
+  __ Tbz(temp, static_cast<uint32_t>(access_mode), slow_path->GetEntryLabel());
+
+  // Check the varType.primitiveType against the type we're trying to retrieve. We do not need a
+  // read barrier when loading a reference only for loading constant field through the reference.
+  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::VarTypeOffset().Int32Value()));
+  __ Ldrh(temp, MemOperand(temp.X(), mirror::Class::PrimitiveTypeOffset().Int32Value()));
+  __ Cmp(temp, static_cast<uint16_t>(primitive_type));
+  __ B(slow_path->GetEntryLabel(), ne);
+
+  // Check that the VarHandle references a static field by checking that coordinateType0 == null.
+  // Do not emit read barrier for comparing to null.
+  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::CoordinateType0Offset().Int32Value()));
+  __ Cbz(temp, slow_path->GetEntryLabel());
+
+  // Use `out` for offset if it is a core register.
+  Register offset = DataType::IsFloatingPointType(type)
+      ? WRegisterFrom(invoke->GetLocations()->GetTemp(1))
+      : out.W();
+
+  // Load the ArtField, the offset and declaring class.
+  __ Ldr(temp.X(), MemOperand(varhandle, mirror::FieldVarHandle::ArtFieldOffset().Int32Value()));
+  __ Ldr(offset, MemOperand(temp.X(), ArtField::OffsetOffset().Int32Value()));
+  codegen_->GenerateGcRootFieldLoad(invoke,
+                                    LocationFrom(temp),
+                                    temp.X(),
+                                    ArtField::DeclaringClassOffset().Int32Value(),
+                                    /*fixup_label=*/ nullptr,
+                                    kCompilerReadBarrierOption);
+
+  // Load the value from the field.
+  codegen_->Load(type, out, MemOperand(temp.X(), offset.X()));
+
+  __ Bind(slow_path->GetExitLabel());
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 UNIMPLEMENTED_INTRINSIC(ARM64, IntegerDivideUnsigned)
 
@@ -3366,7 +3462,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchange)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchangeAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchangeRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndSet)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGet)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAdd)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAddAcquire)

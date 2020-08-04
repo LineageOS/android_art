@@ -150,6 +150,18 @@ class MANAGED VarHandle : public Object {
   // VarHandle access method, such as "setOpaque". Returns false otherwise.
   static bool GetAccessModeByMethodName(const char* method_name, AccessMode* access_mode);
 
+  static MemberOffset VarTypeOffset() {
+    return MemberOffset(OFFSETOF_MEMBER(VarHandle, var_type_));
+  }
+
+  static MemberOffset CoordinateType0Offset() {
+    return MemberOffset(OFFSETOF_MEMBER(VarHandle, coordinate_type0_));
+  }
+
+  static MemberOffset CoordinateType1Offset() {
+    return MemberOffset(OFFSETOF_MEMBER(VarHandle, coordinate_type1_));
+  }
+
   static MemberOffset AccessModesBitMaskOffset() {
     return MemberOffset(OFFSETOF_MEMBER(VarHandle, access_modes_bit_mask_));
   }
@@ -163,18 +175,6 @@ class MANAGED VarHandle : public Object {
                                                        ObjPtr<VarHandle> var_handle,
                                                        AccessMode access_mode)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  static MemberOffset VarTypeOffset() {
-    return MemberOffset(OFFSETOF_MEMBER(VarHandle, var_type_));
-  }
-
-  static MemberOffset CoordinateType0Offset() {
-    return MemberOffset(OFFSETOF_MEMBER(VarHandle, coordinate_type0_));
-  }
-
-  static MemberOffset CoordinateType1Offset() {
-    return MemberOffset(OFFSETOF_MEMBER(VarHandle, coordinate_type1_));
-  }
 
   HeapReference<mirror::Class> coordinate_type0_;
   HeapReference<mirror::Class> coordinate_type1_;
@@ -201,11 +201,11 @@ class MANAGED FieldVarHandle : public VarHandle {
   // Used for updating var-handles to obsolete fields.
   void VisitTarget(ReflectiveValueVisitor* v) REQUIRES(Locks::mutator_lock_);
 
- private:
   static MemberOffset ArtFieldOffset() {
     return MemberOffset(OFFSETOF_MEMBER(FieldVarHandle, art_field_));
   }
 
+ private:
   // ArtField instance corresponding to variable for accessors.
   int64_t art_field_;
 
