@@ -297,7 +297,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   // racing here.
   auto app_ns = NativeLoaderNamespace::Create(
       namespace_name, library_path, permitted_path, parent_ns, is_shared,
-      target_sdk_version < 24 /* is_greylist_enabled */, also_used_as_anonymous);
+      target_sdk_version < 24 /* is_exempt_list_enabled */, also_used_as_anonymous);
   if (!app_ns.ok()) {
     return app_ns.error();
   }
