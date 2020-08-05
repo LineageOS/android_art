@@ -41,13 +41,10 @@ public class Main implements Itf {
     itfs[1] = mains[1] = new Subclass();
     itfs[2] = mains[2] = new OtherSubclass();
 
-    // Create the profiling info eagerly to make sure they are filled.
-    ensureProfilingInfo566();
-
     // Make $noinline$testInvokeVirtual and $noinline$testInvokeInterface hot to get them jitted.
     // We pass Main and Subclass to get polymorphic inlining based on calling
     // the same method.
-    for (int i = 0; i < 1000000; ++i) {
+    for (int i = 0; i < 0x30000; ++i) {
       $noinline$testInvokeVirtual(mains[0]);
       $noinline$testInvokeVirtual(mains[1]);
       $noinline$testInvokeInterface(itfs[0]);
@@ -78,7 +75,7 @@ public class Main implements Itf {
 
     // Run this once to make sure we execute the JITted code.
     $noinline$testInlineToSameTarget(mains[0]);
-    assertEquals(2000001, counter);
+    assertEquals(0x60000 + 1, counter);
   }
 
   public Class<?> sameInvokeVirtual() {
@@ -125,7 +122,6 @@ public class Main implements Itf {
   public Object field = new Object();
 
   public static native void ensureJittedAndPolymorphicInline566();
-  public static native void ensureProfilingInfo566();
 
   public void increment() {
     field.getClass(); // null check to ensure we get an inlined frame in the CodeInfo
