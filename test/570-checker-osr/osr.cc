@@ -109,7 +109,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureHasProfilingInfo(JNIEnv* env,
       method_name,
       [&](const art::StackVisitor* stack_visitor) REQUIRES_SHARED(Locks::mutator_lock_) {
         ArtMethod* m = stack_visitor->GetMethod();
-        ProfilingInfo::Create(Thread::Current(), m, /* retry_allocation */ true);
+        ProfilingInfo::Create(Thread::Current(), m);
       });
 }
 
