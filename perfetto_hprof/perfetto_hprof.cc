@@ -580,6 +580,11 @@ void DumpPerfetto(art::Thread* self) {
                     type_proto->set_location_id(FindOrAppend(&interned_locations,
                           klass->GetLocation()));
                     type_proto->set_object_size(klass->GetObjectSize());
+                    if (klass->GetSuperClass().Ptr()) {
+                      type_proto->set_superclass_id(
+                        FindOrAppend(&interned_classes,
+                                     reinterpret_cast<uintptr_t>(klass->GetSuperClass().Ptr())));
+                    }
                   }
 
                   art::mirror::Class* klass = obj->GetClass();

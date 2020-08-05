@@ -40,6 +40,25 @@ constexpr DataType::Type DataTypeFromPrimitive(Primitive::Type type) {
   UNREACHABLE();
 }
 
+// Note: Not declared in data_type.h to avoid pulling in "primitive.h".
+constexpr Primitive::Type DataTypeToPrimitive(DataType::Type type) {
+  switch (type) {
+    case DataType::Type::kReference: return Primitive::kPrimNot;
+    case DataType::Type::kBool: return Primitive::kPrimBoolean;
+    case DataType::Type::kInt8: return Primitive::kPrimByte;
+    case DataType::Type::kUint16: return Primitive::kPrimChar;
+    case DataType::Type::kInt16: return Primitive::kPrimShort;
+    case DataType::Type::kInt32: return Primitive::kPrimInt;
+    case DataType::Type::kInt64: return Primitive::kPrimLong;
+    case DataType::Type::kFloat32: return Primitive::kPrimFloat;
+    case DataType::Type::kFloat64: return Primitive::kPrimDouble;
+    case DataType::Type::kVoid: return Primitive::kPrimVoid;
+    default:
+      LOG(FATAL) << "Unexpected type " << type;
+      UNREACHABLE();
+  }
+}
+
 constexpr DataType::Type DataType::FromShorty(char type) {
   return DataTypeFromPrimitive(Primitive::GetType(type));
 }
