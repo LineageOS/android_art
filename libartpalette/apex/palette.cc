@@ -163,4 +163,10 @@ enum PaletteStatus PaletteAshmemSetProtRegion(int fd, int prot) {
   return m(fd, prot);
 }
 
+enum PaletteStatus PaletteGetHooks(PaletteHooks** hooks) {
+  PaletteGetHooksMethod m =
+      PaletteLoader::Instance().GetPaletteGetHooksMethod();
+  return m(hooks);
+}
+
 }  // extern "C"
