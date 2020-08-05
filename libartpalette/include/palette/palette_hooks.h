@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_H_
-#define ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_H_
+#ifndef ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_HOOKS_H_
+#define ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_HOOKS_H_
 
-#include "palette_hooks.h"
 #include "palette_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Palette method signatures are defined in palette_method_list.h.
+// Functions provided by the Palette Hooks object, called by ART.
+typedef struct paletteHooksInterface_ {
+  // TODO: add functions. Currently only one field to ensure the struct has a
+  // size.
+  void* empty;
+} paletteHooksInterface;
 
-#define PALETTE_METHOD_DECLARATION(Name, ...) \
-  enum PaletteStatus Name(__VA_ARGS__);
-#include "palette_method_list.h"
-PALETTE_METHOD_LIST(PALETTE_METHOD_DECLARATION)
-#undef PALETTE_METHOD_DECLARATION
+struct PaletteHooks {
+  const struct paletteHooksInterface_* functions;
+#ifdef __cplusplus
+  // TODO: Add member functions.
+#endif
+};
 
 #ifdef __cplusplus
 }
 #endif  // __cplusplus
 
-#endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_H_
+#endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_HOOKS_H_

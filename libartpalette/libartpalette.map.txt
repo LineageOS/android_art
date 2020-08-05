@@ -27,6 +27,7 @@ LIBARTPALETTE_1 {
     PaletteTraceIntegerValue;
     PaletteAshmemCreateRegion;
     PaletteAshmemSetProtRegion;
+    PaletteGetHooks;
 
   local:
     *;
