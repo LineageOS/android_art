@@ -1160,16 +1160,6 @@ const void* Instrumentation::GetCodeForInvoke(ArtMethod* method) const {
     // If we don't need a debug version we should see what the oat file/class linker has to say.
     result = class_linker->GetQuickOatCodeFor(method);
   }
-  // If both those fail try the jit.
-  if (result == GetQuickToInterpreterBridge()) {
-    jit::Jit* jit = Runtime::Current()->GetJit();
-    if (jit != nullptr) {
-      const void* res = jit->GetCodeCache()->FindCompiledCodeForInstrumentation(method);
-      if (res != nullptr) {
-        result = res;
-      }
-    }
-  }
   return result;
 }
 
