@@ -117,10 +117,6 @@ class JitOptions {
     return use_jit_compilation_;
   }
 
-  bool UseTieredJitCompilation() const {
-    return use_tiered_jit_compilation_;
-  }
-
   void SetUseJitCompilation(bool b) {
     use_jit_compilation_ = b;
   }
@@ -152,7 +148,6 @@ class JitOptions {
   static uint32_t RoundUpThreshold(uint32_t threshold);
 
   bool use_jit_compilation_;
-  bool use_tiered_jit_compilation_;
   bool use_baseline_compiler_;
   size_t code_cache_initial_capacity_;
   size_t code_cache_max_capacity_;
@@ -167,7 +162,6 @@ class JitOptions {
 
   JitOptions()
       : use_jit_compilation_(false),
-        use_tiered_jit_compilation_(false),
         use_baseline_compiler_(false),
         code_cache_initial_capacity_(0),
         code_cache_max_capacity_(0),
