@@ -76,7 +76,6 @@ RUNTIME_OPTIONS_KEY (Unit,                LowMemoryMode)
 RUNTIME_OPTIONS_KEY (bool,                UseTLAB,                        (kUseTlab || kUseReadBarrier))
 RUNTIME_OPTIONS_KEY (bool,                EnableHSpaceCompactForOOM,      true)
 RUNTIME_OPTIONS_KEY (bool,                UseJitCompilation,              true)
-RUNTIME_OPTIONS_KEY (bool,                UseTieredJitCompilation,        interpreter::IsNterpSupported())
 RUNTIME_OPTIONS_KEY (bool,                DumpNativeStackOnSigQuit,       true)
 RUNTIME_OPTIONS_KEY (bool,                MadviseRandomAccess,            false)
 RUNTIME_OPTIONS_KEY (JniIdType,           OpaqueJniIds,                   JniIdType::kDefault)  // -Xopaque-jni-ids:{true, false, swapable}
