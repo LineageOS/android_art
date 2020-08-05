@@ -59,11 +59,6 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureJittedAndPolymorphicInline566(
     return;
   }
 
-  if (kIsDebugBuild) {
-    // A debug build might often compile the methods without profiling informations filled.
-    return;
-  }
-
   do_checks(cls, "$noinline$testInvokeVirtual");
   do_checks(cls, "$noinline$testInvokeInterface");
   do_checks(cls, "$noinline$testInvokeInterface2");
