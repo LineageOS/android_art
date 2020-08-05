@@ -31,6 +31,7 @@
   M(PaletteTraceEnd)                                                        \
   M(PaletteTraceIntegerValue, const char* name, int32_t value)              \
   M(PaletteAshmemCreateRegion, const char* name, size_t size, int* fd)      \
-  M(PaletteAshmemSetProtRegion, int, int)
+  M(PaletteAshmemSetProtRegion, int, int)                                   \
+  M(PaletteGetHooks, /*out*/PaletteHooks**)
 
 #endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_METHOD_LIST_H_
