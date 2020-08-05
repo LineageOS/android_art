@@ -1972,7 +1972,8 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
   uint32_t oat_class_offset = GetOatClassOffset(class_def_index);
 
   const uint8_t* oat_class_pointer = oat_file_->Begin() + oat_class_offset;
-  CHECK_LT(oat_class_pointer, oat_file_->End()) << oat_file_->GetLocation();
+  CHECK_LT(reinterpret_cast<const void*>(oat_class_pointer),
+           reinterpret_cast<const void*>(oat_file_->End())) << oat_file_->GetLocation();
 
   const uint8_t* status_pointer = oat_class_pointer;
   CHECK_LT(status_pointer, oat_file_->End()) << oat_file_->GetLocation();
