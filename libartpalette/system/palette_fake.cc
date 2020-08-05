@@ -87,3 +87,8 @@ enum PaletteStatus PaletteAshmemSetProtRegion(int fd ATTRIBUTE_UNUSED,
                                               int prot ATTRIBUTE_UNUSED) {
   return PaletteStatus::kNotSupported;
 }
+
+enum PaletteStatus PaletteGetHooks(PaletteHooks** hooks) {
+  *hooks = nullptr;
+  return PaletteStatus::kNotSupported;
+}
