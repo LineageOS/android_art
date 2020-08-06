@@ -36,7 +36,7 @@ ProfilingInfo::ProfilingInfo(ArtMethod* method, const std::vector<uint32_t>& ent
   }
 }
 
-ProfilingInfo* ProfilingInfo::Create(Thread* self, ArtMethod* method) {
+bool ProfilingInfo::Create(Thread* self, ArtMethod* method, bool retry_allocation) {
   // Walk over the dex instructions of the method and keep track of
   // instructions we are interested in profiling.
   DCHECK(!method->IsNative());
@@ -63,7 +63,7 @@ ProfilingInfo* ProfilingInfo::Create(Thread* self, ArtMethod* method) {
 
   // Allocate the `ProfilingInfo` object int the JIT's data space.
   jit::JitCodeCache* code_cache = Runtime::Current()->GetJit()->GetCodeCache();
-  return code_cache->AddProfilingInfo(self, method, entries);
+  return code_cache->AddProfilingInfo(self, method, entries, retry_allocation) != nullptr;
 }
 
 InlineCache* ProfilingInfo::GetInlineCache(uint32_t dex_pc) {
