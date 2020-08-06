@@ -146,15 +146,11 @@ art_cc_test {
         "oatdump_test.cc",
         "oatdump_image_test.cc",
     ],
-    target: {
-        host: {
-            required: [
-                "dex2oatd",
-                "dex2oatds",
-                "dexdump",
-                "oatdumpd",
-                "oatdumpds",
-            ],
-        },
-    },
+    required: [
+        "oatdumpd",
+        "oatdumpds",
+        "dexdump",
+        "dex2oatd",
+        "dex2oatds",
+    ],
 }
