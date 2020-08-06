@@ -266,10 +266,6 @@ java_library {
         hostdex: {
             required: ["libjavacrypto"],
         },
-        darwin: {
-            // required module "libjavacrypto" is disabled on darwin
-            enabled: false,
-        },
     },
 }
 
