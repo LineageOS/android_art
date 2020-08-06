@@ -54,5 +54,9 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["dexlist_test.cc"],
-    required: ["dexlist"],
+    target: {
+        host: {
+            required: ["dexlist"],
+        },
+    },
 }
