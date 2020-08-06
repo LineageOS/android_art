@@ -55,7 +55,10 @@ public class Main implements Itf {
       $noinline$testInlineToSameTarget(mains[1]);
     }
 
-    ensureJittedAndPolymorphicInline566();
+    ensureJittedAndPolymorphicInline("$noinline$testInvokeVirtual");
+    ensureJittedAndPolymorphicInline("$noinline$testInvokeInterface");
+    ensureJittedAndPolymorphicInline("$noinline$testInvokeInterface2");
+    ensureJittedAndPolymorphicInline("$noinline$testInlineToSameTarget");
 
     // At this point, the JIT should have compiled both methods, and inline
     // sameInvokeVirtual and sameInvokeInterface.
@@ -121,7 +124,13 @@ public class Main implements Itf {
 
   public Object field = new Object();
 
-  public static native void ensureJittedAndPolymorphicInline566();
+  public static void ensureJittedAndPolymorphicInline(String methodName) {
+    if (!ensureJittedAndPolymorphicInline566(methodName)) {
+      throw new Error("Didn't find an inlined method in " + methodName);
+    }
+  }
+
+  public static native boolean ensureJittedAndPolymorphicInline566(String methodName);
 
   public void increment() {
     field.getClass(); // null check to ensure we get an inlined frame in the CodeInfo
