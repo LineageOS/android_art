@@ -90,8 +90,6 @@ JitCompilerInterface* (*Jit::jit_load_)(void) = nullptr;
 JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& options) {
   auto* jit_options = new JitOptions;
   jit_options->use_jit_compilation_ = options.GetOrDefault(RuntimeArgumentMap::UseJitCompilation);
-  jit_options->use_tiered_jit_compilation_ =
-      options.GetOrDefault(RuntimeArgumentMap::UseTieredJitCompilation);
 
   jit_options->code_cache_initial_capacity_ =
       options.GetOrDefault(RuntimeArgumentMap::JITCodeCacheInitialCapacity);
@@ -1565,9 +1563,9 @@ void Jit::EnqueueOptimizedCompilation(ArtMethod* method, Thread* self) {
     return;
   }
   // We arrive here after a baseline compiled code has reached its baseline
-  // hotness threshold. If tiered compilation is enabled, enqueue a compilation
+  // hotness threshold. If we're not only using the baseline compiler, enqueue a compilation
   // task that will compile optimize the method.
-  if (options_->UseTieredJitCompilation()) {
+  if (!options_->UseBaselineCompiler()) {
     thread_pool_->AddTask(
         self,
         new JitCompileTask(method,

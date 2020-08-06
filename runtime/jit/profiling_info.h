@@ -83,14 +83,6 @@ class ProfilingInfo {
   InlineCache* GetInlineCache(uint32_t dex_pc)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void SetSavedEntryPoint(const void* entry_point) {
-    saved_entry_point_ = entry_point;
-  }
-
-  const void* GetSavedEntryPoint() const {
-    return saved_entry_point_;
-  }
-
   // Increments the number of times this method is currently being inlined.
   // Returns whether it was successful, that is it could increment without
   // overflowing.
@@ -135,10 +127,6 @@ class ProfilingInfo {
   // Not 'const' as JVMTI introduces obsolete methods that we implement by creating new ArtMethods.
   // See JitCodeCache::MoveObsoleteMethod.
   ArtMethod* method_;
-
-  // Entry point of the corresponding ArtMethod, while the JIT code cache
-  // is poking for the liveness of compiled code.
-  const void* saved_entry_point_;
 
   // Number of instructions we are profiling in the ArtMethod.
   const uint32_t number_of_inline_caches_;
