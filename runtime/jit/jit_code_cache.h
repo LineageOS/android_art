@@ -375,12 +375,6 @@ class JitCodeCache {
     return &zygote_map_;
   }
 
-  // If Jit-gc has been disabled (and instrumentation has been enabled) this will return the
-  // jit-compiled entrypoint for this method.  Otherwise it will return null.
-  const void* FindCompiledCodeForInstrumentation(ArtMethod* method)
-      REQUIRES(!Locks::jit_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Fetch the code of a method that was JITted, but the JIT could not
   // update its entrypoint due to the resolution trampoline.
   const void* GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method)

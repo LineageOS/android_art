@@ -3393,12 +3393,13 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
   // Check the varType.primitiveType against the type we're trying to retrieve. We do not need a
   // read barrier when loading a reference only for loading constant field through the reference.
   __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::VarTypeOffset().Int32Value()));
+  codegen_->GetAssembler()->MaybeUnpoisonHeapReference(temp);
   __ Ldrh(temp, MemOperand(temp.X(), mirror::Class::PrimitiveTypeOffset().Int32Value()));
   __ Cmp(temp, static_cast<uint16_t>(primitive_type));
   __ B(slow_path->GetEntryLabel(), ne);
 
   // Check that the VarHandle references a static field by checking that coordinateType0 == null.
-  // Do not emit read barrier for comparing to null.
+  // Do not emit read barrier (or unpoison the reference) for comparing to null.
   __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::CoordinateType0Offset().Int32Value()));
   __ Cbz(temp, slow_path->GetEntryLabel());
 

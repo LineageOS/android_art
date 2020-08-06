@@ -53,32 +53,9 @@ static void do_checks(jclass cls, const char* method_name) {
   CHECK(info.HasInlineInfo()) << method->PrettyMethod();
 }
 
-static void allocate_profiling_info(jclass cls, const char* method_name) {
-  ScopedObjectAccess soa(Thread::Current());
-  ObjPtr<mirror::Class> klass = soa.Decode<mirror::Class>(cls);
-  ArtMethod* method = klass->FindDeclaredDirectMethodByName(method_name, kRuntimePointerSize);
-  ProfilingInfo::Create(soa.Self(), method, /* retry_allocation */ true);
-}
-
-extern "C" JNIEXPORT void JNICALL Java_Main_ensureProfilingInfo566(JNIEnv*, jclass cls) {
-  jit::Jit* jit = Runtime::Current()->GetJit();
-  if (jit == nullptr) {
-    return;
-  }
-
-  allocate_profiling_info(cls, "$noinline$testInvokeVirtual");
-  allocate_profiling_info(cls, "$noinline$testInvokeInterface");
-  allocate_profiling_info(cls, "$noinline$testInlineToSameTarget");
-}
-
 extern "C" JNIEXPORT void JNICALL Java_Main_ensureJittedAndPolymorphicInline566(JNIEnv*, jclass cls) {
   jit::Jit* jit = Runtime::Current()->GetJit();
   if (jit == nullptr) {
-    return;
-  }
-
-  if (kIsDebugBuild) {
-    // A debug build might often compile the methods without profiling informations filled.
     return;
   }
 

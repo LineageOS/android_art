@@ -291,8 +291,6 @@ bool JitCodeCache::WillExecuteJitCode(ArtMethod* method) {
   ScopedAssertNoThreadSuspension sants(__FUNCTION__);
   if (ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
     return true;
-  } else if (method->GetEntryPointFromQuickCompiledCode() == GetQuickInstrumentationEntryPoint()) {
-    return FindCompiledCodeForInstrumentation(method) != nullptr;
   }
   return false;
 }
@@ -330,22 +328,6 @@ const void* JitCodeCache::GetJniStubCode(ArtMethod* method) {
     }
   }
   return nullptr;
-}
-
-const void* JitCodeCache::FindCompiledCodeForInstrumentation(ArtMethod* method) {
-  // If jit-gc is still on we use the SavedEntryPoint field for doing that and so cannot use it to
-  // find the instrumentation entrypoint.
-  if (LIKELY(GetGarbageCollectCode())) {
-    return nullptr;
-  }
-  ProfilingInfo* info = method->GetProfilingInfo(kRuntimePointerSize);
-  if (info == nullptr) {
-    return nullptr;
-  }
-  // When GC is disabled for trampoline tracing we will use SavedEntrypoint to hold the actual
-  // jit-compiled version of the method. If jit-gc is disabled for other reasons this will just be
-  // nullptr.
-  return info->GetSavedEntryPoint();
 }
 
 const void* JitCodeCache::GetSavedEntryPointOfPreCompiledMethod(ArtMethod* method) {
@@ -904,8 +886,6 @@ void JitCodeCache::MoveObsoleteMethod(ArtMethod* old_method, ArtMethod* new_meth
     // checks should always pass.
     DCHECK(!info->IsInUseByCompiler());
     new_method->SetProfilingInfo(info);
-    // Get rid of the old saved entrypoint if it is there.
-    info->SetSavedEntryPoint(nullptr);
     info->method_ = new_method;
   }
   // Update method_code_map_ to point to the new method.
@@ -1265,19 +1245,8 @@ bool JitCodeCache::GetGarbageCollectCode() {
 void JitCodeCache::SetGarbageCollectCode(bool value) {
   Thread* self = Thread::Current();
   MutexLock mu(self, *Locks::jit_lock_);
-  if (garbage_collect_code_ != value) {
-    if (garbage_collect_code_) {
-      // When dynamically disabling the garbage collection, we neee
-      // to make sure that a potential current collection is finished, and also
-      // clear the saved entry point in profiling infos to avoid dangling pointers.
-      WaitForPotentialCollectionToComplete(self);
-      for (ProfilingInfo* info : profiling_infos_) {
-        info->SetSavedEntryPoint(nullptr);
-      }
-    }
-    // Update the flag while holding the lock to ensure no thread will try to GC.
-    garbage_collect_code_ = value;
-  }
+  // Update the flag while holding the lock to ensure no thread will try to GC.
+  garbage_collect_code_ = value;
 }
 
 void JitCodeCache::RemoveMethodBeingCompiled(ArtMethod* method, CompilationKind kind) {
@@ -1804,7 +1773,6 @@ void JitCodeCache::InvalidateAllCompiledCode() {
   for (ProfilingInfo* pi : profiling_infos_) {
     // NB Due to OSR we might run this on some methods multiple times but this should be fine.
     ArtMethod* meth = pi->GetMethod();
-    pi->SetSavedEntryPoint(nullptr);
     // We had a ProfilingInfo so we must be warm.
     ClearMethodCounter(meth, /*was_warm=*/true);
     ClassLinker* linker = Runtime::Current()->GetClassLinker();
@@ -1824,13 +1792,6 @@ void JitCodeCache::InvalidateCompiledCodeFor(ArtMethod* method,
   DCHECK(!method->IsNative());
   ProfilingInfo* profiling_info = method->GetProfilingInfo(kRuntimePointerSize);
   const void* method_entrypoint = method->GetEntryPointFromQuickCompiledCode();
-  if ((profiling_info != nullptr) &&
-      (profiling_info->GetSavedEntryPoint() == header->GetEntryPoint())) {
-    // When instrumentation is set, the actual entrypoint is the one in the profiling info.
-    method_entrypoint = profiling_info->GetSavedEntryPoint();
-    // Prevent future uses of the compiled code.
-    profiling_info->SetSavedEntryPoint(nullptr);
-  }
 
   // Clear the method counter if we are running jitted code since we might want to jit this again in
   // the future.
