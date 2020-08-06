@@ -47,6 +47,9 @@ sh_binary {
                 "dex2oat",
             ],
         },
+        darwin: {
+            enabled: false,
+        },
     },
 }
 
@@ -65,6 +68,9 @@ sh_binary {
             required: [
                 "dex2oat",
             ],
+        },
+        darwin: {
+            enabled: false,
         },
     },
 }
