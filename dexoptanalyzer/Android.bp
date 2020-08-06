@@ -82,8 +82,12 @@ art_cc_test {
         ":art-gtest-jars-VerifierDepsMulti",
     ],
     srcs: ["dexoptanalyzer_test.cc"],
-    required: [
-        "dex2oatd",
-        "dexoptanalyzerd",
-    ],
+    target: {
+        host: {
+            required: [
+                "dex2oatd",
+                "dexoptanalyzerd",
+            ],
+        },
+    },
 }
