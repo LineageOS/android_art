@@ -239,14 +239,10 @@ art_cc_test {
         ":art-gtest-jars-ManyMethods",
     ],
     srcs: ["dexlayout_test.cc"],
-    target: {
-        host: {
-            required: [
-                "dexdump",
-                "dexlayoutd",
-            ],
-        },
-    },
+    required: [
+        "dexlayoutd",
+        "dexdump",
+    ],
 }
 
 art_cc_binary {
@@ -282,9 +278,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["dexdiag_test.cc"],
-    target: {
-        host: {
-            required: ["dexdiag"],
-        },
-    },
+    required: ["dexdiag"],
 }
