@@ -39,7 +39,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureProfilingInfo(JNIEnv* env,
   ScopedObjectAccess soa(env);
   ObjPtr<mirror::Executable> exec = soa.Decode<mirror::Executable>(method);
   ArtMethod* art_method = exec->GetArtMethod();
-  if (!ProfilingInfo::Create(soa.Self(), art_method, /* retry_allocation */ true)) {
+  if (ProfilingInfo::Create(soa.Self(), art_method) == nullptr) {
     LOG(ERROR) << "Failed to create profiling info for method " << art_method->PrettyMethod();
   }
 }
