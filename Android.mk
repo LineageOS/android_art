@@ -413,7 +413,6 @@ include $(BUILD_PHONY_PACKAGE)
 # The art-tools package depends on helpers and tools that are useful for developers. Similar
 # dependencies exist for the APEX builds for these tools (see build/apex/Android.bp).
 
-ifneq ($(HOST_OS),darwin)
 include $(CLEAR_VARS)
 LOCAL_MODULE := art-tools
 LOCAL_IS_HOST_MODULE := true
@@ -434,7 +433,6 @@ LOCAL_REQUIRED_MODULES += \
 endif
 
 include $(BUILD_PHONY_PACKAGE)
-endif # HOST_OS != darwin
 
 ####################################################################################################
 # Fake packages to ensure generation of libopenjdkd when one builds with mm/mmm/mmma.
@@ -447,7 +445,6 @@ endif # HOST_OS != darwin
 #         64-bit systems, even if it is the default.
 
 # ART on the host.
-ifneq ($(HOST_OS),darwin)
 ifeq ($(ART_BUILD_HOST_DEBUG),true)
 include $(CLEAR_VARS)
 LOCAL_MODULE := art-libartd-libopenjdkd-host-dependency
@@ -456,7 +453,6 @@ LOCAL_REQUIRED_MODULES := libopenjdkd
 LOCAL_IS_HOST_MODULE := true
 include $(BUILD_PHONY_PACKAGE)
 endif
-endif # HOST_OS != darwin
 
 # ART on the target.
 ifeq ($(ART_BUILD_TARGET_DEBUG),true)
