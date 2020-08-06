@@ -331,7 +331,8 @@ bool Jit::CompileMethod(ArtMethod* method,
   // If we get a request to compile a proxy method, we pass the actual Java method
   // of that proxy method, as the compiler does not expect a proxy method.
   ArtMethod* method_to_compile = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
-  if (!code_cache_->NotifyCompilationOf(method_to_compile, self, compilation_kind, prejit)) {
+  if (!code_cache_->NotifyCompilationOf(
+          method_to_compile, self, compilation_kind, prejit, region)) {
     return false;
   }
 
@@ -757,6 +758,7 @@ void Jit::NotifyZygoteCompilationDone() {
 class JitCompileTask final : public Task {
  public:
   enum class TaskKind {
+    kAllocateProfile,
     kCompile,
     kPreCompile,
   };
@@ -793,6 +795,12 @@ class JitCompileTask final : public Task {
               self,
               compilation_kind_,
               /* prejit= */ (kind_ == TaskKind::kPreCompile));
+          break;
+        }
+        case TaskKind::kAllocateProfile: {
+          if (ProfilingInfo::Create(self, method_, /* retry_allocation= */ true)) {
+            VLOG(jit) << "Start profiling " << ArtMethod::PrettyMethod(method_);
+          }
           break;
         }
       }
@@ -1587,6 +1595,10 @@ void Jit::MethodEntered(Thread* thread, ArtMethod* method) {
   if (UNLIKELY(runtime->UseJitCompilation() && JitAtFirstUse())) {
     ArtMethod* np_method = method->GetInterfaceMethodIfProxy(kRuntimePointerSize);
     if (np_method->IsCompilable()) {
+      if (!np_method->IsNative() && GetCodeCache()->CanAllocateProfilingInfo()) {
+        // The compiler requires a ProfilingInfo object for non-native methods.
+        ProfilingInfo::Create(thread, np_method, /* retry_allocation= */ true);
+      }
       // TODO(ngeoffray): For JIT at first use, use kPreCompile. Currently we don't due to
       // conflicts with jitzygote optimizations.
       JitCompileTask compile_task(
@@ -1801,6 +1813,7 @@ void Jit::EnqueueCompilationFromNterp(ArtMethod* method, Thread* self) {
     return;
   }
   if (GetCodeCache()->CanAllocateProfilingInfo()) {
+    ProfilingInfo::Create(self, method, /* retry_allocation= */ false);
     thread_pool_->AddTask(
         self,
         new JitCompileTask(method, JitCompileTask::TaskKind::kCompile, CompilationKind::kBaseline));
