@@ -66,7 +66,7 @@ struct BootImageOptions {
   bool append_package_use_list = false;
 
   // The set of classes that should not be preloaded in Zygote
-  std::set<std::string> preloaded_classes_blacklist;
+  std::set<std::string> preloaded_classes_denylist;
 };
 
 // Generate a boot image profile according to the specified options.
