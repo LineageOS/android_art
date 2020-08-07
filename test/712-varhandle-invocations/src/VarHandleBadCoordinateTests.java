@@ -76,6 +76,11 @@ public class VarHandleBadCoordinateTests {
                 failUnreachable();
             } catch (NullPointerException ex) {
             }
+            try {
+                byte unused = (byte) vh.get();
+                failUnreachable();
+            } catch (WrongMethodTypeException ex) {
+            }
         }
 
         public static void main(String[] args) {
