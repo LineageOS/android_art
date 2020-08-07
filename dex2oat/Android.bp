@@ -460,7 +460,11 @@ art_cc_test {
         "linker/oat_writer_test.cc",
         "verifier_deps_test.cc",
     ],
-    required: ["dex2oatd"],
+    target: {
+        host: {
+            required: ["dex2oatd"],
+        },
+    },
 
     codegen: {
         arm: {
