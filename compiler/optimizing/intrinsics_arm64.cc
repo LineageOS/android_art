@@ -3401,7 +3401,7 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
   // Check that the VarHandle references a static field by checking that coordinateType0 == null.
   // Do not emit read barrier (or unpoison the reference) for comparing to null.
   __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::CoordinateType0Offset().Int32Value()));
-  __ Cbz(temp, slow_path->GetEntryLabel());
+  __ Cbnz(temp, slow_path->GetEntryLabel());
 
   // Use `out` for offset if it is a core register.
   Register offset = DataType::IsFloatingPointType(type)
