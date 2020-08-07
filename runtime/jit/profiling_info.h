@@ -63,9 +63,8 @@ class InlineCache {
  */
 class ProfilingInfo {
  public:
-  // Create a ProfilingInfo for 'method'. Return whether it succeeded, or if it is
-  // not needed in case the method does not have virtual/interface invocations.
-  static bool Create(Thread* self, ArtMethod* method, bool retry_allocation)
+  // Create a ProfilingInfo for 'method'.
+  static ProfilingInfo* Create(Thread* self, ArtMethod* method)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Add information from an executed INVOKE instruction to the profile.

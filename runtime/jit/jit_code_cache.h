@@ -197,8 +197,7 @@ class JitCodeCache {
   bool NotifyCompilationOf(ArtMethod* method,
                            Thread* self,
                            CompilationKind compilation_kind,
-                           bool prejit,
-                           JitMemoryRegion* region)
+                           bool prejit)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::jit_lock_);
 
@@ -227,10 +226,6 @@ class JitCodeCache {
 
   // Return true if the code cache contains this pc in the private region (i.e. not from zygote).
   bool PrivateRegionContainsPc(const void* pc) const;
-
-  // Returns true if either the method's entrypoint is JIT compiled code or it is the
-  // instrumentation entrypoint and we can jump to jit code for this method. For testing use only.
-  bool WillExecuteJitCode(ArtMethod* method) REQUIRES(!Locks::jit_lock_);
 
   // Return true if the code cache contains this method.
   bool ContainsMethod(ArtMethod* method) REQUIRES(!Locks::jit_lock_);
@@ -314,12 +309,10 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Create a 'ProfileInfo' for 'method'. If 'retry_allocation' is true,
-  // will collect and retry if the first allocation is unsuccessful.
+  // Create a 'ProfileInfo' for 'method'.
   ProfilingInfo* AddProfilingInfo(Thread* self,
                                   ArtMethod* method,
-                                  const std::vector<uint32_t>& entries,
-                                  bool retry_allocation)
+                                  const std::vector<uint32_t>& entries)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
