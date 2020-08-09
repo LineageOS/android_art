@@ -20,24 +20,25 @@
 #include "jit/jit_code_cache.h"
 #include "jit/profiling_info.h"
 #include "mirror/class.h"
+#include "nativehelper/ScopedUtfChars.h"
 #include "oat_quick_method_header.h"
 #include "scoped_thread_state_change-inl.h"
 #include "stack_map.h"
 
 namespace art {
 
-static void do_checks(jclass cls, const char* method_name) {
-  ScopedObjectAccess soa(Thread::Current());
-  ObjPtr<mirror::Class> klass = soa.Decode<mirror::Class>(cls);
+static bool do_checks(ArtMethod* method, ScopedObjectAccess& soa)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
   jit::Jit* jit = Runtime::Current()->GetJit();
   jit::JitCodeCache* code_cache = jit->GetCodeCache();
-  ArtMethod* method = klass->FindDeclaredDirectMethodByName(method_name, kRuntimePointerSize);
 
   OatQuickMethodHeader* header = nullptr;
   // Infinite loop... Test harness will have its own timeout.
   while (true) {
     const void* pc = method->GetEntryPointFromQuickCompiledCode();
-    if (code_cache->ContainsPc(pc)) {
+    if (code_cache->ContainsPc(pc) &&
+        !CodeInfo::IsBaseline(
+            OatQuickMethodHeader::FromEntryPoint(pc)->GetOptimizedCodeInfoPtr())) {
       header = OatQuickMethodHeader::FromEntryPoint(pc);
       break;
     } else {
@@ -50,19 +51,32 @@ static void do_checks(jclass cls, const char* method_name) {
   }
 
   CodeInfo info(header);
-  CHECK(info.HasInlineInfo()) << method->PrettyMethod();
+  return info.HasInlineInfo();
 }
 
-extern "C" JNIEXPORT void JNICALL Java_Main_ensureJittedAndPolymorphicInline566(JNIEnv*, jclass cls) {
+extern "C" JNIEXPORT bool JNICALL Java_Main_ensureJittedAndPolymorphicInline566(JNIEnv* env,
+                                                                                jclass cls,
+                                                                                jstring method_name) {
   jit::Jit* jit = Runtime::Current()->GetJit();
   if (jit == nullptr) {
-    return;
+    return true;
   }
 
-  do_checks(cls, "$noinline$testInvokeVirtual");
-  do_checks(cls, "$noinline$testInvokeInterface");
-  do_checks(cls, "$noinline$testInvokeInterface2");
-  do_checks(cls, "$noinline$testInlineToSameTarget");
+  // The test only works when we use tiered JIT.
+  if (jit->JitAtFirstUse()) {
+    return true;
+  }
+
+  ScopedObjectAccess soa(Thread::Current());
+  ScopedUtfChars chars(env, method_name);
+  ArtMethod* method = soa.Decode<mirror::Class>(cls)->FindDeclaredDirectMethodByName(
+      chars.c_str(), kRuntimePointerSize);
+
+  if (method == nullptr) {
+    return false;
+  }
+
+  return do_checks(method, soa);
 }
 
 }  // namespace art
