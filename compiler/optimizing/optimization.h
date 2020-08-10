@@ -85,6 +85,7 @@ enum class OptimizationPass {
   kSideEffectsAnalysis,
 #ifdef ART_ENABLE_CODEGEN_arm
   kInstructionSimplifierArm,
+  kCriticalNativeAbiFixupArm,
 #endif
 #ifdef ART_ENABLE_CODEGEN_arm64
   kInstructionSimplifierArm64,
