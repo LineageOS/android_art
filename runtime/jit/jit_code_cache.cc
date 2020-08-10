@@ -286,15 +286,6 @@ bool JitCodeCache::ContainsPc(const void* ptr) const {
   return PrivateRegionContainsPc(ptr) || shared_region_.IsInExecSpace(ptr);
 }
 
-bool JitCodeCache::WillExecuteJitCode(ArtMethod* method) {
-  ScopedObjectAccess soa(art::Thread::Current());
-  ScopedAssertNoThreadSuspension sants(__FUNCTION__);
-  if (ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
-    return true;
-  }
-  return false;
-}
-
 bool JitCodeCache::ContainsMethod(ArtMethod* method) {
   MutexLock mu(Thread::Current(), *Locks::jit_lock_);
   if (UNLIKELY(method->IsNative())) {
@@ -1469,30 +1460,18 @@ OatQuickMethodHeader* JitCodeCache::LookupOsrMethodHeader(ArtMethod* method) {
 
 ProfilingInfo* JitCodeCache::AddProfilingInfo(Thread* self,
                                               ArtMethod* method,
-                                              const std::vector<uint32_t>& entries,
-                                              bool retry_allocation)
-    // No thread safety analysis as we are using TryLock/Unlock explicitly.
-    NO_THREAD_SAFETY_ANALYSIS {
+                                              const std::vector<uint32_t>& entries) {
   DCHECK(CanAllocateProfilingInfo());
   ProfilingInfo* info = nullptr;
-  if (!retry_allocation) {
-    // If we are allocating for the interpreter, just try to lock, to avoid
-    // lock contention with the JIT.
-    if (Locks::jit_lock_->ExclusiveTryLock(self)) {
-      info = AddProfilingInfoInternal(self, method, entries);
-      Locks::jit_lock_->ExclusiveUnlock(self);
-    }
-  } else {
-    {
-      MutexLock mu(self, *Locks::jit_lock_);
-      info = AddProfilingInfoInternal(self, method, entries);
-    }
+  {
+    MutexLock mu(self, *Locks::jit_lock_);
+    info = AddProfilingInfoInternal(self, method, entries);
+  }
 
-    if (info == nullptr) {
-      GarbageCollectCache(self);
-      MutexLock mu(self, *Locks::jit_lock_);
-      info = AddProfilingInfoInternal(self, method, entries);
-    }
+  if (info == nullptr) {
+    GarbageCollectCache(self);
+    MutexLock mu(self, *Locks::jit_lock_);
+    info = AddProfilingInfoInternal(self, method, entries);
   }
   return info;
 }
@@ -1625,8 +1604,7 @@ bool JitCodeCache::IsOsrCompiled(ArtMethod* method) {
 bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
                                        Thread* self,
                                        CompilationKind compilation_kind,
-                                       bool prejit,
-                                       JitMemoryRegion* region) {
+                                       bool prejit) {
   const void* existing_entry_point = method->GetEntryPointFromQuickCompiledCode();
   if (compilation_kind != CompilationKind::kOsr && ContainsPc(existing_entry_point)) {
     OatQuickMethodHeader* method_header =
@@ -1700,21 +1678,11 @@ bool JitCodeCache::NotifyCompilationOf(ArtMethod* method,
     }
     return new_compilation;
   } else {
-    ProfilingInfo* info = method->GetProfilingInfo(kRuntimePointerSize);
     if (CanAllocateProfilingInfo() &&
         (compilation_kind == CompilationKind::kBaseline) &&
-        (info == nullptr)) {
-      // We can retry allocation here as we're the JIT thread.
-      if (ProfilingInfo::Create(self, method, /* retry_allocation= */ true)) {
-        info = method->GetProfilingInfo(kRuntimePointerSize);
-      }
-    }
-    if (info == nullptr) {
-      // When prejitting, we don't allocate a profiling info.
-      if (!prejit && !IsSharedRegion(*region)) {
-        VLOG(jit) << method->PrettyMethod() << " needs a ProfilingInfo to be compiled";
-        // Because the counter is not atomic, there are some rare cases where we may not hit the
-        // threshold for creating the ProfilingInfo. Reset the counter now to "correct" this.
+        (method->GetProfilingInfo(kRuntimePointerSize) == nullptr)) {
+      if (ProfilingInfo::Create(self, method) == nullptr) {
+        VLOG(jit) << method->PrettyMethod() << " needs a ProfilingInfo to be compiled baseline";
         ClearMethodCounter(method, /*was_warm=*/ false);
         return false;
       }
@@ -1768,23 +1736,20 @@ void JitCodeCache::DoneCompiling(ArtMethod* method,
 
 void JitCodeCache::InvalidateAllCompiledCode() {
   art::MutexLock mu(Thread::Current(), *Locks::jit_lock_);
-  size_t cnt = profiling_infos_.size();
-  size_t osr_size = osr_code_map_.size();
-  for (ProfilingInfo* pi : profiling_infos_) {
-    // NB Due to OSR we might run this on some methods multiple times but this should be fine.
-    ArtMethod* meth = pi->GetMethod();
-    // We had a ProfilingInfo so we must be warm.
+  VLOG(jit) << "Invalidating all compiled code";
+  ClassLinker* linker = Runtime::Current()->GetClassLinker();
+  for (auto it : method_code_map_) {
+    ArtMethod* meth = it.second;
+    // We were compiled, so we must be warm.
     ClearMethodCounter(meth, /*was_warm=*/true);
-    ClassLinker* linker = Runtime::Current()->GetClassLinker();
     if (meth->IsObsolete()) {
       linker->SetEntryPointsForObsoleteMethod(meth);
     } else {
       linker->SetEntryPointsToInterpreter(meth);
     }
   }
+  saved_compiled_methods_map_.clear();
   osr_code_map_.clear();
-  VLOG(jit) << "Invalidated the compiled code of " << (cnt - osr_size) << " methods and "
-            << osr_size << " OSRs.";
 }
 
 void JitCodeCache::InvalidateCompiledCodeFor(ArtMethod* method,
