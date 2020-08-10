@@ -1038,6 +1038,10 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
 
     HInvokeStaticOrDirect::DispatchInfo dispatch_info =
         HSharpening::SharpenInvokeStaticOrDirect(resolved_method, code_generator_);
+    if (dispatch_info.code_ptr_location ==
+            HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+      graph_->SetHasDirectCriticalNativeCall(true);
+    }
     invoke = new (allocator_) HInvokeStaticOrDirect(allocator_,
                                                     number_of_arguments,
                                                     return_type,
