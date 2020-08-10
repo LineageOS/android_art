@@ -399,6 +399,7 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         has_simd_(false),
         has_loops_(false),
         has_irreducible_loops_(false),
+        has_direct_critical_native_call_(false),
         dead_reference_safe_(dead_reference_safe),
         debuggable_(debuggable),
         current_instruction_id_(start_instruction_id),
@@ -677,6 +678,9 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   bool HasIrreducibleLoops() const { return has_irreducible_loops_; }
   void SetHasIrreducibleLoops(bool value) { has_irreducible_loops_ = value; }
 
+  bool HasDirectCriticalNativeCall() const { return has_direct_critical_native_call_; }
+  void SetHasDirectCriticalNativeCall(bool value) { has_direct_critical_native_call_ = value; }
+
   ArtMethod* GetArtMethod() const { return art_method_; }
   void SetArtMethod(ArtMethod* method) { art_method_ = method; }
 
@@ -787,6 +791,10 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   // best effort to keep it up to date in the presence of code elimination
   // so there might be false positives.
   bool has_irreducible_loops_;
+
+  // Flag whether there are any direct calls to native code registered
+  // for @CriticalNative methods.
+  bool has_direct_critical_native_call_;
 
   // Is the code known to be robust against eliminating dead references
   // and the effects of early finalization? If false, dead reference variables
