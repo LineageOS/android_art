@@ -40,15 +40,15 @@ static constexpr uint64_t kHideMaxtargetsdkPHiddenApis = 149997251;
 static constexpr uint64_t kHideMaxtargetsdkQHiddenApis = 149994052;
 
 // Set to true if we should always print a warning in logcat for all hidden API accesses, not just
-// dark grey and black. This can be set to true for developer preview / beta builds, but should be
-// false for public release builds.
+// conditionally and unconditionally blocked. This can be set to true for developer preview / beta
+// builds, but should be false for public release builds.
 // Note that when flipping this flag, you must also update the expectations of test 674-hiddenapi
-// as it affects whether or not we warn for light grey APIs that have been added to the exemptions
+// as it affects whether or not we warn for unsupported APIs that have been added to the exemptions
 // list.
 static constexpr bool kLogAllAccesses = false;
 
 // Exemptions for logcat warning. Following signatures do not produce a warning as app developers
-// should not be alerted on the usage of these greylised APIs. See b/154851649.
+// should not be alerted on the usage of these unsupported APIs. See b/154851649.
 static const std::vector<std::string> kWarningExemptions = {
     "Ljava/nio/Buffer;",
     "Llibcore/io/Memory;",
@@ -412,7 +412,7 @@ uint32_t GetDexFlags(T* member) REQUIRES_SHARED(Locks::mutator_lock_) {
           << "Only proxy classes are expected not to have a class def";
       DCHECK(kMemberIsField)
           << "Interface methods should be inspected instead of proxy class methods";
-      flags = ApiList::Greylist();
+      flags = ApiList::Unsupported();
     } else {
       uint32_t member_index = GetMemberDexIndex(member);
       auto fn_visit = [&](const AccessorType& dex_member) {
@@ -483,11 +483,11 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
 
   MemberSignature member_signature(member);
 
-  // Check for an exemption first. Exempted APIs are treated as white list.
+  // Check for an exemption first. Exempted APIs are treated as SDK.
   if (member_signature.DoesPrefixMatchAny(runtime->GetHiddenApiExemptions())) {
     // Avoid re-examining the exemption list next time.
     // Note this results in no warning for the member, which seems like what one would expect.
-    // Exemptions effectively adds new members to the whitelist.
+    // Exemptions effectively adds new members to the public API list.
     MaybeUpdateAccessFlags(runtime, member, kAccPublicApi);
     return false;
   }
@@ -514,7 +514,7 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
   }
 
   if (access_method != AccessMethod::kNone) {
-    // Warn if non-greylisted signature is being accessed or it is not exempted.
+    // Warn if blocked signature is being accessed or it is not exempted.
     if (deny_access || !member_signature.DoesPrefixMatchAny(kWarningExemptions)) {
       // Print a log message with information about this class member access.
       // We do this if we're about to deny access, or the app is debuggable.
@@ -539,7 +539,7 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
       }
     }
 
-    // If this access was not denied, move the member into whitelist and skip
+    // If this access was not denied, flag member as SDK and skip
     // the warning the next time the member is accessed.
     if (!deny_access) {
       MaybeUpdateAccessFlags(runtime, member, kAccPublicApi);

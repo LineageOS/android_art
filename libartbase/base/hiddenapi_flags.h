@@ -86,23 +86,23 @@ class ApiList {
 
   enum class Value : uint32_t {
     // Values independent of target SDK version of app
-    kWhitelist =    0,
-    kGreylist =     1,
-    kBlacklist =    2,
+    kSdk =    0,
+    kUnsupported =     1,
+    kBlocked =    2,
 
     // Values dependent on target SDK version of app. Put these last as
     // their list will be extended in future releases.
     // The max release code implicitly includes all maintenance releases,
-    // e.g. GreylistMaxO is accessible to targetSdkVersion <= 27 (O_MR1).
-    kGreylistMaxO = 3,
-    kGreylistMaxP = 4,
-    kGreylistMaxQ = 5,
-    kGreylistMaxR = 6,
+    // e.g. MaxTargetO is accessible to targetSdkVersion <= 27 (O_MR1).
+    kMaxTargetO = 3,
+    kMaxTargetP = 4,
+    kMaxTargetQ = 5,
+    kMaxTargetR = 6,
 
     // Special values
     kInvalid =      (static_cast<uint32_t>(-1) & kValueBitMask),
-    kMin =          kWhitelist,
-    kMax =          kGreylistMaxR,
+    kMin =          kSdk,
+    kMax =          kMaxTargetR,
   };
 
   // Additional bit flags after the first kValueBitSize bits in dex flags.
@@ -149,13 +149,13 @@ class ApiList {
 
   // Maximum SDK versions allowed to access ApiList of given Value.
   static constexpr SdkVersion kMaxSdkVersions[] {
-    /* whitelist */ SdkVersion::kMax,
-    /* greylist */ SdkVersion::kMax,
-    /* blacklist */ SdkVersion::kMin,
-    /* greylist-max-o */ SdkVersion::kO_MR1,
-    /* greylist-max-p */ SdkVersion::kP,
-    /* greylist-max-q */ SdkVersion::kQ,
-    /* greylist-max-r */ SdkVersion::kR,
+    /* sdk */ SdkVersion::kMax,
+    /* unsupported */ SdkVersion::kMax,
+    /* blocklist */ SdkVersion::kMin,
+    /* max-target-o */ SdkVersion::kO_MR1,
+    /* max-target-p */ SdkVersion::kP,
+    /* max-target-q */ SdkVersion::kQ,
+    /* max-target-r */ SdkVersion::kR,
   };
 
   explicit ApiList(Value val, uint32_t domain_apis = 0u)
@@ -191,13 +191,13 @@ class ApiList {
   }
 
   // Helpers for conveniently constructing ApiList instances.
-  static ApiList Whitelist() { return ApiList(Value::kWhitelist); }
-  static ApiList Greylist() { return ApiList(Value::kGreylist); }
-  static ApiList Blacklist() { return ApiList(Value::kBlacklist); }
-  static ApiList GreylistMaxO() { return ApiList(Value::kGreylistMaxO); }
-  static ApiList GreylistMaxP() { return ApiList(Value::kGreylistMaxP); }
-  static ApiList GreylistMaxQ() { return ApiList(Value::kGreylistMaxQ); }
-  static ApiList GreylistMaxR() { return ApiList(Value::kGreylistMaxR); }
+  static ApiList Sdk() { return ApiList(Value::kSdk); }
+  static ApiList Unsupported() { return ApiList(Value::kUnsupported); }
+  static ApiList Blocked() { return ApiList(Value::kBlocked); }
+  static ApiList MaxTargetO() { return ApiList(Value::kMaxTargetO); }
+  static ApiList MaxTargetP() { return ApiList(Value::kMaxTargetP); }
+  static ApiList MaxTargetQ() { return ApiList(Value::kMaxTargetQ); }
+  static ApiList MaxTargetR() { return ApiList(Value::kMaxTargetR); }
   static ApiList CorePlatformApi() { return ApiList(DomainApi::kCorePlatformApi); }
   static ApiList TestApi() { return ApiList(DomainApi::kTestApi); }
 
@@ -294,9 +294,9 @@ class ApiList {
   // Returns true when no ApiList is specified and no domain_api flags either.
   bool IsEmpty() const { return (GetValue() == Value::kInvalid) && (GetDomainApis() == 0); }
 
-  // Returns true if the ApiList is on blacklist.
-  bool IsBlacklisted() const {
-    return GetValue() == Value::kBlacklist;
+  // Returns true if the ApiList is on blocklist.
+  bool IsBlocked() const {
+    return GetValue() == Value::kBlocked;
   }
 
   // Returns true if the ApiList is a test API.
