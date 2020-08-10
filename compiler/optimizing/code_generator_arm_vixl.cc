@@ -9029,29 +9029,24 @@ void CodeGeneratorARMVIXL::GenerateReadBarrierForRootSlow(HInstruction* instruct
 HInvokeStaticOrDirect::DispatchInfo CodeGeneratorARMVIXL::GetSupportedInvokeStaticOrDirectDispatch(
     const HInvokeStaticOrDirect::DispatchInfo& desired_dispatch_info,
     ArtMethod* method) {
-  if (desired_dispatch_info.code_ptr_location ==
+  if (method->IsIntrinsic() &&
+      desired_dispatch_info.code_ptr_location ==
           HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
-    // TODO: Work around CheckTypeConsistency() in code_generator.cc that does not allow
-    // putting FP values in core registers as we need to do for the soft-float native ABI.
+    // As a work-around for soft-float native ABI interfering with type checks, we are
+    // inserting fake calls to Float.floatToRawIntBits() or Double.doubleToRawLongBits()
+    // when a float or double argument is passed in core registers but we cannot do that
+    // for actual intrinsic implementations that expect them in FP registers. Therefore
+    // we do not use `kCallCriticalNative` for intrinsics with FP arguments; if they are
+    // properly intrinsified, the dispatch type does not matter anyway.
     ScopedObjectAccess soa(Thread::Current());
     uint32_t shorty_len;
     const char* shorty = method->GetShorty(&shorty_len);
-    size_t reg = 0u;
     for (uint32_t i = 1; i != shorty_len; ++i) {
-      size_t next_reg = reg + 1u;
-      if (shorty[i] == 'D' || shorty[i] == 'J') {
-        reg = RoundUp(reg, 2u);
-        next_reg = reg + 2u;
-      }
-      if (reg == 4u) {
-        break;
-      }
       if (shorty[i] == 'D' || shorty[i] == 'F') {
         HInvokeStaticOrDirect::DispatchInfo dispatch_info = desired_dispatch_info;
         dispatch_info.code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
         return dispatch_info;
       }
-      reg = next_reg;
     }
   }
   return desired_dispatch_info;
