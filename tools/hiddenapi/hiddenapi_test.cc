@@ -179,7 +179,7 @@ class HiddenApiTest : public CommonRuntimeTest {
     CHECK(accessor.HasClassData()) << "Class " << accessor.GetDescriptor() << " has no data";
 
     if (!accessor.HasHiddenapiClassData()) {
-      return hiddenapi::ApiList::Whitelist();
+      return hiddenapi::ApiList::Sdk();
     }
 
     for (const ClassAccessor::Field& field : accessor.GetFields()) {
@@ -206,7 +206,7 @@ class HiddenApiTest : public CommonRuntimeTest {
     CHECK(accessor.HasClassData()) << "Class " << accessor.GetDescriptor() << " has no data";
 
     if (!accessor.HasHiddenapiClassData()) {
-      return hiddenapi::ApiList::Whitelist();
+      return hiddenapi::ApiList::Sdk();
     }
 
     for (const ClassAccessor::Method& method : accessor.GetMethods()) {
@@ -272,7 +272,7 @@ TEST_F(HiddenApiTest, InstanceFieldNoMatch) {
       << "LMain;->ifield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetIFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldLightGreylistMatch) {
@@ -283,7 +283,7 @@ TEST_F(HiddenApiTest, InstanceFieldLightGreylistMatch) {
       << "LMain;->ifield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetIFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldDarkGreylistMatch) {
@@ -294,7 +294,7 @@ TEST_F(HiddenApiTest, InstanceFieldDarkGreylistMatch) {
       << "LMain;->ifield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetIFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldBlacklistMatch) {
@@ -305,7 +305,7 @@ TEST_F(HiddenApiTest, InstanceFieldBlacklistMatch) {
       << "LMain;->ifield:I,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetIFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldTwoListsMatch1) {
@@ -343,7 +343,7 @@ TEST_F(HiddenApiTest, StaticFieldNoMatch) {
       << "LMain;->sfield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetSFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetSFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticFieldLightGreylistMatch) {
@@ -354,7 +354,7 @@ TEST_F(HiddenApiTest, StaticFieldLightGreylistMatch) {
       << "LMain;->sfield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetSFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetSFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticFieldDarkGreylistMatch) {
@@ -365,7 +365,7 @@ TEST_F(HiddenApiTest, StaticFieldDarkGreylistMatch) {
       << "LMain;->sfield:LBadType3;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetSFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetSFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticFieldBlacklistMatch) {
@@ -376,7 +376,7 @@ TEST_F(HiddenApiTest, StaticFieldBlacklistMatch) {
       << "LMain;->sfield:Ljava/lang/Object;,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetSFieldHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetSFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticFieldTwoListsMatch1) {
@@ -414,7 +414,7 @@ TEST_F(HiddenApiTest, InstanceMethodNoMatch) {
       << "LMain;->imethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetIMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetIMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceMethodLightGreylistMatch) {
@@ -425,7 +425,7 @@ TEST_F(HiddenApiTest, InstanceMethodLightGreylistMatch) {
       << "LMain;->imethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetIMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetIMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceMethodDarkGreylistMatch) {
@@ -436,7 +436,7 @@ TEST_F(HiddenApiTest, InstanceMethodDarkGreylistMatch) {
       << "LMain;->imethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetIMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetIMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceMethodBlacklistMatch) {
@@ -447,7 +447,7 @@ TEST_F(HiddenApiTest, InstanceMethodBlacklistMatch) {
       << "LMain;->imethod(J)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetIMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetIMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceMethodTwoListsMatch1) {
@@ -485,7 +485,7 @@ TEST_F(HiddenApiTest, StaticMethodNoMatch) {
       << "LMain;->smethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetSMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetSMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticMethodLightGreylistMatch) {
@@ -496,7 +496,7 @@ TEST_F(HiddenApiTest, StaticMethodLightGreylistMatch) {
       << "LMain;->smethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetSMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetSMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticMethodDarkGreylistMatch) {
@@ -507,7 +507,7 @@ TEST_F(HiddenApiTest, StaticMethodDarkGreylistMatch) {
       << "LMain;->smethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetSMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetSMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticMethodBlacklistMatch) {
@@ -518,7 +518,7 @@ TEST_F(HiddenApiTest, StaticMethodBlacklistMatch) {
       << "LMain;->smethod(Ljava/lang/Object;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetSMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetSMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticMethodTwoListsMatch1) {
@@ -556,7 +556,7 @@ TEST_F(HiddenApiTest, InstanceNativeMethodNoMatch) {
       << "LMain;->inmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetINMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetINMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceNativeMethodLightGreylistMatch) {
@@ -567,7 +567,7 @@ TEST_F(HiddenApiTest, InstanceNativeMethodLightGreylistMatch) {
       << "LMain;->inmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetINMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetINMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceNativeMethodDarkGreylistMatch) {
@@ -578,7 +578,7 @@ TEST_F(HiddenApiTest, InstanceNativeMethodDarkGreylistMatch) {
       << "LMain;->inmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetINMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetINMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceNativeMethodBlacklistMatch) {
@@ -589,7 +589,7 @@ TEST_F(HiddenApiTest, InstanceNativeMethodBlacklistMatch) {
       << "LMain;->inmethod(C)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetINMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetINMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceNativeMethodTwoListsMatch1) {
@@ -627,7 +627,7 @@ TEST_F(HiddenApiTest, StaticNativeMethodNoMatch) {
       << "LMain;->snmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Whitelist(), GetSNMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetSNMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticNativeMethodLightGreylistMatch) {
@@ -638,7 +638,7 @@ TEST_F(HiddenApiTest, StaticNativeMethodLightGreylistMatch) {
       << "LMain;->snmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Greylist(), GetSNMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetSNMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticNativeMethodDarkGreylistMatch) {
@@ -649,7 +649,7 @@ TEST_F(HiddenApiTest, StaticNativeMethodDarkGreylistMatch) {
       << "LMain;->snmethod(LBadType3;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::GreylistMaxO(), GetSNMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetO(), GetSNMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticNativeMethodBlacklistMatch) {
@@ -660,7 +660,7 @@ TEST_F(HiddenApiTest, StaticNativeMethodBlacklistMatch) {
       << "LMain;->snmethod(Ljava/lang/Integer;)V,blacklist" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
-  ASSERT_EQ(hiddenapi::ApiList::Blacklist(), GetSNMethodHiddenFlags(*dex_file));
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetSNMethodHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, StaticNativeMethodTwoListsMatch1) {
@@ -699,7 +699,7 @@ TEST_F(HiddenApiTest, InstanceFieldCorePlatformApiMatch) {
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
   ASSERT_EQ(hiddenapi::ApiList::CorePlatformApi() |
-  hiddenapi::ApiList::Greylist(), GetIFieldHiddenFlags(*dex_file));
+  hiddenapi::ApiList::Unsupported(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldTestApiMatch) {
@@ -711,7 +711,7 @@ TEST_F(HiddenApiTest, InstanceFieldTestApiMatch) {
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_NE(dex_file.get(), nullptr);
   ASSERT_EQ(hiddenapi::ApiList::TestApi()
-  | hiddenapi::ApiList::Greylist(), GetIFieldHiddenFlags(*dex_file));
+  | hiddenapi::ApiList::Unsupported(), GetIFieldHiddenFlags(*dex_file));
 }
 
 TEST_F(HiddenApiTest, InstanceFieldUnknownFlagMatch) {
