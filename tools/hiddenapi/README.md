@@ -2,17 +2,17 @@ HiddenApi
 =========
 
 This tool iterates over all class members inside given DEX files and modifies
-their access flags if their signatures appear on one of two lists - greylist and
-blacklist - provided as text file inputs. These access flags denote to the
+their access flags if their signatures appear on one of two lists - unsupported and
+blocklist - provided as text file inputs. These access flags denote to the
 runtime that the marked methods/fields should be treated as internal APIs with
 access restricted only to platform code. Methods/fields not mentioned on the two
-lists are assumed to be on a whitelist and left accessible by all code.
+lists are assumed to be part of the SDK and left accessible by all code.
 
 API signatures
 ==============
 
-The methods/fields to be marked are specified in two text files (greylist,
-blacklist) provided an input. Only one signature per line is allowed.
+The methods/fields to be marked are specified in two text files (unsupported,
+blocklist) provided an input. Only one signature per line is allowed.
 
 Types are expected in their DEX format - class descriptors are to be provided in
 "slash" form, e.g. "Ljava/lang/Object;", primitive types in their shorty form,
@@ -49,6 +49,6 @@ LEB128 encoding. The following bits are used:
 
 Two following bit encoding is used to denote the membership of a method/field:
 
- * whitelist: `false`, `false`
- * greylist: `true`, `false`
- * blacklist: `true`, `true`
+ * sdk: `false`, `false`
+ * unsupported: `true`, `false`
+ * blocklist: `true`, `true`
