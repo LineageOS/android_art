@@ -89,7 +89,7 @@ public class Main {
   }
 
   private static void doTest(DexDomain parentDomain, DexDomain childDomain,
-      boolean whitelistAllApis) throws Exception {
+      boolean addAllApisToSdk) throws Exception {
     // Load parent dex if it is not in boot class path.
     ClassLoader parentLoader = null;
     if (parentDomain == DexDomain.Application) {
@@ -114,17 +114,17 @@ public class Main {
     // be loaded once, but for some reason even classes from a class loader
     // cannot register their native methods against symbols in a shared library
     // loaded by their parent class loader.
-    String nativeLibCopy = createNativeLibCopy(parentDomain, childDomain, whitelistAllApis);
+    String nativeLibCopy = createNativeLibCopy(parentDomain, childDomain, addAllApisToSdk);
 
-    // Set exemptions to "L" (matches all classes) if we are testing whitelisting.
-    setWhitelistAll(whitelistAllApis);
+    // Set exemptions to "L" (matches all classes) if we are testing sdk APIs.
+    setSdkAll(addAllApisToSdk);
 
     // Invoke ChildClass.runTest
     Class<?> childClass = Class.forName("ChildClass", true, childLoader);
     Method runTestMethod = childClass.getDeclaredMethod(
         "runTest", String.class, Integer.TYPE, Integer.TYPE, Boolean.TYPE);
     runTestMethod.invoke(null, nativeLibCopy, parentDomain.ordinal(), childDomain.ordinal(),
-        whitelistAllApis);
+        addAllApisToSdk);
   }
 
   // Routine which tries to figure out the absolute path of our native library.
@@ -150,10 +150,10 @@ public class Main {
   // Copy native library to a new file with a unique name so it does not
   // conflict with other loaded instance of the same binary file.
   private static String createNativeLibCopy(DexDomain parentDomain, DexDomain childDomain,
-      boolean whitelistAllApis) throws Exception {
+      boolean addAllApisToSdk) throws Exception {
     String tempFileName = System.mapLibraryName(
         "hiddenapitest_" + (parentDomain.ordinal()) + (childDomain.ordinal()) +
-        (whitelistAllApis ? "1" : "0"));
+        (addAllApisToSdk ? "1" : "0"));
     File tempFile = new File(System.getenv("DEX_LOCATION"), tempFileName);
     Files.copy(new File(nativeLibFileName).toPath(), tempFile.toPath());
     return tempFile.getAbsolutePath();
@@ -181,5 +181,5 @@ public class Main {
   private static native int appendToBootClassLoader(String dexPath, boolean isCorePlatform);
   private static native void setDexDomain(int index, boolean isCorePlatform);
   private static native void init();
-  private static native void setWhitelistAll(boolean value);
+  private static native void setSdkAll(boolean value);
 }
