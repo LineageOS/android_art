@@ -1688,8 +1688,7 @@ void CodeGenerator::ValidateInvokeRuntimeWithoutRecordingPcInfo(HInstruction* in
          instruction->IsLoadString() ||
          instruction->IsInstanceOf() ||
          instruction->IsCheckCast() ||
-         (instruction->IsInvokeVirtual() && instruction->GetLocations()->Intrinsified()) ||
-         (instruction->IsInvokeStaticOrDirect() && instruction->GetLocations()->Intrinsified()))
+         (instruction->IsInvoke() && instruction->GetLocations()->Intrinsified()))
       << "instruction->DebugName()=" << instruction->DebugName()
       << " slow_path->GetDescription()=" << slow_path->GetDescription();
 }
