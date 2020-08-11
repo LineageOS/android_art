@@ -275,6 +275,11 @@ test-art-target-jit$(2ND_ART_PHONY_TEST_TARGET_SUFFIX): test-art-target-run-test
 	$(hide) $(call ART_TEST_PREREQ_FINISHED,$@)
 endif
 
+#######################
+# Reset LOCAL_PATH because previous includes may override its value.
+# Keep this after all "include $(art_path)/..." are done, and before any
+# "include $(BUILD_...)".
+LOCAL_PATH := $(art_path)
 
 #######################
 # ART APEX.
