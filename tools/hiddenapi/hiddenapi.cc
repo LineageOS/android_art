@@ -969,7 +969,7 @@ class HiddenApi final {
             bool api_list_found = (it != api_list.end());
             CHECK(!force_assign_all_ || api_list_found)
                 << "Could not find hiddenapi flags for dex entry: " << boot_member.GetApiEntry();
-            builder.WriteFlags(api_list_found ? it->second : ApiList::Whitelist());
+            builder.WriteFlags(api_list_found ? it->second : ApiList::Sdk());
           };
           auto fn_field = [&](const ClassAccessor::Field& boot_field) {
             fn_shared(DexMember(boot_class, boot_field));

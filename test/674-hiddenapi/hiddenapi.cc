@@ -37,7 +37,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_init(JNIEnv*, jclass) {
   runtime->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime->SetCorePlatformApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime->SetTargetSdkVersion(
-      static_cast<uint32_t>(hiddenapi::ApiList::GreylistMaxO().GetMaxAllowedSdkVersion()));
+      static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetO().GetMaxAllowedSdkVersion()));
   runtime->SetDedupeHiddenApiWarnings(false);
 }
 
@@ -85,7 +85,7 @@ extern "C" JNIEXPORT jint JNICALL Java_Main_appendToBootClassLoader(
   return int_index;
 }
 
-extern "C" JNIEXPORT void JNICALL Java_Main_setWhitelistAll(JNIEnv*, jclass, jboolean value) {
+extern "C" JNIEXPORT void JNICALL Java_Main_setSdkAll(JNIEnv*, jclass, jboolean value) {
   std::vector<std::string> exemptions;
   if (value != JNI_FALSE) {
     exemptions.push_back("L");

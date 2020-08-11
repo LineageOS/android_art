@@ -110,7 +110,9 @@ struct WellKnownClasses {
   static jmethodID java_lang_Daemons_start;
   static jmethodID java_lang_Daemons_stop;
   static jmethodID java_lang_Daemons_waitForDaemonStart;
+  static jmethodID java_lang_Double_doubleToRawLongBits;
   static jmethodID java_lang_Double_valueOf;
+  static jmethodID java_lang_Float_floatToRawIntBits;
   static jmethodID java_lang_Float_valueOf;
   static jmethodID java_lang_Integer_valueOf;
   static jmethodID java_lang_invoke_MethodHandles_lookup;

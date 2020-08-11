@@ -38,7 +38,7 @@ namespace hiddenapi {
 enum class EnforcementPolicy {
   kDisabled             = 0,
   kJustWarn             = 1,  // keep checks enabled, but allow everything (enables logging)
-  kEnabled              = 2,  // ban dark grey & blacklist
+  kEnabled              = 2,  // ban conditionally blocked & blocklist
   kMax = kEnabled,
 };
 
@@ -241,7 +241,7 @@ ALWAYS_INLINE inline uint32_t CreateRuntimeFlags_Impl(uint32_t dex_flags) {
   ApiList api_list(dex_flags);
   DCHECK(api_list.IsValid());
 
-  if (api_list.Contains(ApiList::Whitelist())) {
+  if (api_list.Contains(ApiList::Sdk())) {
     runtime_flags |= kAccPublicApi;
   } else {
     // Only add domain-specific flags for non-public API members.
