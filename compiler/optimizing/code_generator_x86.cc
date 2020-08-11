@@ -489,8 +489,7 @@ class ReadBarrierMarkSlowPathX86 : public SlowPathCode {
            instruction_->IsLoadString() ||
            instruction_->IsInstanceOf() ||
            instruction_->IsCheckCast() ||
-           (instruction_->IsInvokeVirtual() && instruction_->GetLocations()->Intrinsified()) ||
-           (instruction_->IsInvokeStaticOrDirect() && instruction_->GetLocations()->Intrinsified()))
+           (instruction_->IsInvoke() && instruction_->GetLocations()->Intrinsified()))
         << "Unexpected instruction in read barrier marking slow path: "
         << instruction_->DebugName();
 
@@ -1436,6 +1435,63 @@ void CodeGeneratorX86::Move64(Location destination, Location source) {
           Location::StackSlot(destination.GetHighStackIndex(kX86WordSize)),
           DataType::Type::kInt32);
     }
+  }
+}
+
+static Address CreateAddress(Register base,
+                             Register index = Register::kNoRegister,
+                             ScaleFactor scale = TIMES_1,
+                             int32_t disp = 0) {
+  if (index == Register::kNoRegister) {
+    return Address(base, disp);
+  }
+
+  return Address(base, index, scale, disp);
+}
+
+void CodeGeneratorX86::MoveFromMemory(DataType::Type dst_type,
+                                      Location dst,
+                                      Register src_base,
+                                      Register src_index,
+                                      ScaleFactor src_scale,
+                                      int32_t src_disp) {
+  DCHECK(src_base != Register::kNoRegister);
+  Address src = CreateAddress(src_base, src_index, src_scale, src_disp);
+
+  switch (dst_type) {
+    case DataType::Type::kBool:
+    case DataType::Type::kUint8:
+      __ movzxb(dst.AsRegister<Register>(), src);
+      break;
+    case DataType::Type::kInt8:
+      __ movsxb(dst.AsRegister<Register>(), src);
+      break;
+    case DataType::Type::kInt16:
+      __ movsxw(dst.AsRegister<Register>(), src);
+      break;
+    case DataType::Type::kUint16:
+      __ movzxw(dst.AsRegister<Register>(), src);
+      break;
+    case DataType::Type::kInt32:
+    case DataType::Type::kUint32:
+      __ movl(dst.AsRegister<Register>(), src);
+      break;
+    case DataType::Type::kInt64:
+    case DataType::Type::kUint64: {
+      Address src_next_4_bytes = CreateAddress(src_base, src_index, src_scale, src_disp + 4);
+      __ movl(dst.AsRegisterPairLow<Register>(), src);
+      __ movl(dst.AsRegisterPairHigh<Register>(), src_next_4_bytes);
+      break;
+    }
+    case DataType::Type::kFloat32:
+      __ movss(dst.AsFpuRegister<XmmRegister>(), src);
+      break;
+    case DataType::Type::kFloat64:
+      __ movsd(dst.AsFpuRegister<XmmRegister>(), src);
+      break;
+    case DataType::Type::kVoid:
+    case DataType::Type::kReference:
+      LOG(FATAL) << "Unreachable type " << dst_type;
   }
 }
 
