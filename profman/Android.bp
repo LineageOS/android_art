@@ -102,5 +102,9 @@ art_cc_test {
         ":art-gtest-jars-ProfileTestMultiDex",
     ],
     srcs: ["profile_assistant_test.cc"],
-    required: ["profmand"],
+    target: {
+        host: {
+            required: ["profmand"],
+        },
+    },
 }
