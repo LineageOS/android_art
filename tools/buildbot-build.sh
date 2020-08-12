@@ -96,10 +96,8 @@ elif [[ $mode == "target" ]]; then
   make_command+=" ${ANDROID_PRODUCT_OUT#"${ANDROID_BUILD_TOP}/"}/system/etc/public.libraries.txt"
   # Targets required to generate a linker configuration for device within the
   # chroot environment. The *.libraries.txt targets are required by
-  # linkerconfig but not included in host_linkerconfig_all_targets. We cannot
-  # use linkerconfig, because building the device binary statically might not
-  # work in an unbundled tree.
-  make_command+=" host_linkerconfig_all_targets sanitizer.libraries.txt vndkcorevariant.libraries.txt"
+  # the source linkerconfig but not included in the prebuilt one.
+  make_command+=" linkerconfig sanitizer.libraries.txt vndkcorevariant.libraries.txt"
   # Additional targets needed for the chroot environment.
   make_command+=" event-log-tags"
   # Needed to extract prebuilt APEXes.
