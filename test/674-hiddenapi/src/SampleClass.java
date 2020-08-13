@@ -15,11 +15,11 @@
  */
 
 public class SampleClass implements ParentInterface {
-  public int methodPublicWhitelist() { return 1; }
-  public int methodPublicLightGreylist() { return 2; }
-  public int methodPublicDarkGreylist() { return 3; }
-  public int methodPublicBlacklist() { return 4; }
-  public int methodPublicBlacklistAndCorePlatformApi() { return 5; }
+  public int methodPublicSdk() { return 1; }
+  public int methodPublicUnsupported() { return 2; }
+  public int methodPublicConditionallyBlocked() { return 3; }
+  public int methodPublicBlocklist() { return 4; }
+  public int methodPublicBlocklistAndCorePlatformApi() { return 5; }
 
   public static ParentInterface getInterfaceInstance() {
     return new SampleClass();
