@@ -1321,7 +1321,7 @@
     },
     {
         "tests": ["175-alloc-big-bignums"],
-        "variant": "interpreter | interp-ac | trace | no-image",
+        "variant": "interpreter | interp-ac | trace | no-image | debuggable",
         "description": "Interpreting BigInteger.add() is too slow (timeouts)"
     },
     {
