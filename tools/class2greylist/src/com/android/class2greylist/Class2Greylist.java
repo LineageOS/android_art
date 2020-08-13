@@ -39,32 +39,32 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Build time tool for extracting a list of members from jar files that have the @UsedByApps
- * annotation, for building the greylist.
+ * Build time tool for extracting a list of members from jar files that have the
+ * @UnsupportedAppUsage annotation, for building the non SDK API lists.
  */
 public class Class2Greylist {
 
     private static final String UNSUPPORTED_APP_USAGE_ANNOTATION =
             "android.compat.annotation.UnsupportedAppUsage";
 
-    private static final String FLAG_GREYLIST = "greylist";
-    private static final String FLAG_BLACKLIST = "blacklist";
-    private static final String FLAG_GREYLIST_MAX_O = "greylist-max-o";
-    private static final String FLAG_GREYLIST_MAX_P = "greylist-max-p";
-    private static final String FLAG_GREYLIST_MAX_Q = "greylist-max-q";
-    private static final String FLAG_GREYLIST_MAX_R = "greylist-max-r";
+    private static final String FLAG_UNSUPPORTED = "unsupported";
+    private static final String FLAG_BLOCKED = "blocked";
+    private static final String FLAG_MAX_TARGET_O = "max-target-o";
+    private static final String FLAG_MAX_TARGET_P = "max-target-p";
+    private static final String FLAG_MAX_TARGET_Q = "max-target-q";
+    private static final String FLAG_MAX_TARGET_R = "max-target-r";
 
     private static final String FLAG_PUBLIC_API = "public-api";
 
     private static final Map<Integer, String> TARGET_SDK_TO_LIST_MAP;
     static {
         Map<Integer, String> map = new HashMap<>();
-        map.put(null, FLAG_GREYLIST);
-        map.put(0, FLAG_BLACKLIST);
-        map.put(26, FLAG_GREYLIST_MAX_O);
-        map.put(28, FLAG_GREYLIST_MAX_P);
-        map.put(29, FLAG_GREYLIST_MAX_Q);
-        map.put(30, FLAG_GREYLIST_MAX_R);
+        map.put(null, FLAG_UNSUPPORTED);
+        map.put(0, FLAG_BLOCKED);
+        map.put(26, FLAG_MAX_TARGET_O);
+        map.put(28, FLAG_MAX_TARGET_P);
+        map.put(29, FLAG_MAX_TARGET_Q);
+        map.put(30, FLAG_MAX_TARGET_R);
         TARGET_SDK_TO_LIST_MAP = Collections.unmodifiableMap(map);
     }
 
