@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-public class NullaryConstructorWhitelist {
-  public NullaryConstructorWhitelist() { x = 22; }
-  public NullaryConstructorWhitelist(int y) { x = y; }
+public class NullaryConstructorUnsupported {
+  public NullaryConstructorUnsupported() { x = 22; }
+  public NullaryConstructorUnsupported(int y) { x = y; }
   protected int x;
 }
