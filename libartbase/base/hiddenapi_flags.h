@@ -132,13 +132,13 @@ class ApiList {
 
   // Names corresponding to Values.
   static constexpr const char* kValueNames[] = {
-    "whitelist",
-    "greylist",
-    "blacklist",
-    "greylist-max-o",
-    "greylist-max-p",
-    "greylist-max-q",
-    "greylist-max-r",
+    "sdk",
+    "unsupported",
+    "blocked",
+    "max-target-o",
+    "max-target-p",
+    "max-target-q",
+    "max-target-r",
   };
 
   // Names corresponding to DomainApis.
