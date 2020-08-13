@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-public class NullaryConstructorDarkGreylist {
-  public NullaryConstructorDarkGreylist() { x = 22; }
-  public NullaryConstructorDarkGreylist(int y) { x = y; }
+public class NullaryConstructorSdk {
+  public NullaryConstructorSdk() { x = 22; }
+  public NullaryConstructorSdk(int y) { x = y; }
   protected int x;
 }
