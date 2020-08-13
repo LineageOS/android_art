@@ -203,8 +203,8 @@ class MemberSignature {
   void LogAccessToEventLog(uint32_t sampled_value, AccessMethod access_method, bool access_denied);
 
   // Calls back into managed code to notify VMRuntime.nonSdkApiUsageConsumer that
-  // |member| was accessed. This is usually called when an API is on the black,
-  // dark grey or light grey lists. Given that the callback can execute arbitrary
+  // |member| was accessed. This is usually called when an API is unsupported,
+  // conditionally or unconditionally blocked. Given that the callback can execute arbitrary
   // code, a call to this method can result in thread suspension.
   void NotifyHiddenApiListener(AccessMethod access_method);
 };

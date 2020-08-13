@@ -28,7 +28,7 @@ if [[ -e ${SCRIPT_DIR}/veridex && \
   exec ${SCRIPT_DIR}/veridex \
     --core-stubs=${SCRIPT_DIR}/system-stubs.zip:${SCRIPT_DIR}/org.apache.http.legacy-stubs.zip \
     --api-flags=${SCRIPT_DIR}/hiddenapi-flags.csv \
-    --exclude-api-lists=whitelist,invalid \
+    --exclude-api-lists=sdk,invalid \
     $@
 fi
 

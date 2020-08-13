@@ -1,2 +1,2 @@
-Lart/Test999;->foo()V,blacklist
-Lart/Test999;->bar:I,blacklist
+Lart/Test999;->foo()V,blocked
+Lart/Test999;->bar:I,blocked
