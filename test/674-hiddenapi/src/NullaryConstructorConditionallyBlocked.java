@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-public class NullaryConstructorLightGreylist {
-  public NullaryConstructorLightGreylist() { x = 22; }
-  public NullaryConstructorLightGreylist(int y) { x = y; }
+public class NullaryConstructorConditionallyBlocked {
+  public NullaryConstructorConditionallyBlocked() { x = 22; }
+  public NullaryConstructorConditionallyBlocked(int y) { x = y; }
   protected int x;
 }
