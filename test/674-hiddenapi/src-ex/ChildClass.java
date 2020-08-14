@@ -42,11 +42,11 @@ public class ChildClass {
   }
 
   enum Hiddenness {
-    Whitelist(PrimitiveType.TShort),
-    LightGreylist(PrimitiveType.TBoolean),
-    DarkGreylist(PrimitiveType.TByte),
-    Blacklist(PrimitiveType.TCharacter),
-    BlacklistAndCorePlatformApi(PrimitiveType.TInteger);
+    Sdk(PrimitiveType.TShort),
+    Unsupported(PrimitiveType.TBoolean),
+    ConditionallyBlocked(PrimitiveType.TByte),
+    Blocklist(PrimitiveType.TCharacter),
+    BlocklistAndCorePlatformApi(PrimitiveType.TInteger);
 
     Hiddenness(PrimitiveType type) { mAssociatedType = type; }
     public PrimitiveType mAssociatedType;
@@ -78,14 +78,14 @@ public class ChildClass {
   private static final boolean booleanValues[] = new boolean[] { false, true };
 
   public static void runTest(String libFileName, int parentDomainOrdinal,
-      int childDomainOrdinal, boolean everythingWhitelisted) throws Exception {
+      int childDomainOrdinal, boolean everythingSdked) throws Exception {
     System.load(libFileName);
 
     parentDomain = DexDomain.values()[parentDomainOrdinal];
     childDomain = DexDomain.values()[childDomainOrdinal];
 
     configMessage = "parentDomain=" + parentDomain.name() + ", childDomain=" + childDomain.name()
-        + ", everythingWhitelisted=" + everythingWhitelisted;
+        + ", everythingSdked=" + everythingSdked;
 
     // Check expectations about loading into boot class path.
     boolean isParentInBoot = (ParentClass.class.getClassLoader().getParent() == null);
@@ -100,7 +100,7 @@ public class ChildClass {
       throw new RuntimeException("Expected ChildClass " + (expectedChildInBoot ? "" : "not ") +
                                  "in boot class path");
     }
-    ChildClass.everythingWhitelisted = everythingWhitelisted;
+    ChildClass.everythingSdked = everythingSdked;
 
     boolean isSameBoot = (isParentInBoot == isChildInBoot);
 
@@ -117,18 +117,18 @@ public class ChildClass {
       final boolean invokesMemberCallback;
       // Warnings are now disabled whenever access is granted, even for
       // greylisted APIs. This is the behaviour for release builds.
-      if (everythingWhitelisted || hiddenness == Hiddenness.Whitelist) {
+      if (everythingSdked || hiddenness == Hiddenness.Sdk) {
         expected = Behaviour.Granted;
         invokesMemberCallback = false;
       } else if (parentDomain == DexDomain.CorePlatform && childDomain == DexDomain.Platform) {
-        expected = (hiddenness == Hiddenness.BlacklistAndCorePlatformApi)
+        expected = (hiddenness == Hiddenness.BlocklistAndCorePlatformApi)
             ? Behaviour.Granted : Behaviour.Denied;
         invokesMemberCallback = false;
       } else if (isSameBoot) {
         expected = Behaviour.Granted;
         invokesMemberCallback = false;
-      } else if (hiddenness == Hiddenness.Blacklist ||
-                 hiddenness == Hiddenness.BlacklistAndCorePlatformApi) {
+      } else if (hiddenness == Hiddenness.Blocklist ||
+                 hiddenness == Hiddenness.BlocklistAndCorePlatformApi) {
         expected = Behaviour.Denied;
         invokesMemberCallback = true;
       } else {
@@ -551,7 +551,7 @@ public class ChildClass {
 
   private static DexDomain parentDomain;
   private static DexDomain childDomain;
-  private static boolean everythingWhitelisted;
+  private static boolean everythingSdked;
 
   private static String configMessage;
 }
