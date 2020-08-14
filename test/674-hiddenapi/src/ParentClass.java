@@ -19,125 +19,125 @@ public class ParentClass {
 
   // INSTANCE FIELD
 
-  public int fieldPublicWhitelist = 211;
-  int fieldPackageWhitelist = 212;
-  protected int fieldProtectedWhitelist = 213;
-  private int fieldPrivateWhitelist = 214;
-  public int fieldPublicWhitelistB = 215;
+  public int fieldPublicSdk = 211;
+  int fieldPackageSdk = 212;
+  protected int fieldProtectedSdk = 213;
+  private int fieldPrivateSdk = 214;
+  public int fieldPublicSdkB = 215;
 
-  public int fieldPublicLightGreylist = 221;
-  int fieldPackageLightGreylist = 222;
-  protected int fieldProtectedLightGreylist = 223;
-  private int fieldPrivateLightGreylist = 224;
-  public int fieldPublicLightGreylistB = 225;
+  public int fieldPublicUnsupported = 221;
+  int fieldPackageUnsupported = 222;
+  protected int fieldProtectedUnsupported = 223;
+  private int fieldPrivateUnsupported = 224;
+  public int fieldPublicUnsupportedB = 225;
 
-  public int fieldPublicDarkGreylist = 231;
-  int fieldPackageDarkGreylist = 232;
-  protected int fieldProtectedDarkGreylist = 233;
-  private int fieldPrivateDarkGreylist = 234;
-  public int fieldPublicDarkGreylistB = 235;
+  public int fieldPublicConditionallyBlocked = 231;
+  int fieldPackageConditionallyBlocked = 232;
+  protected int fieldProtectedConditionallyBlocked = 233;
+  private int fieldPrivateConditionallyBlocked = 234;
+  public int fieldPublicConditionallyBlockedB = 235;
 
-  public int fieldPublicBlacklist = 241;
-  int fieldPackageBlacklist = 242;
-  protected int fieldProtectedBlacklist = 243;
-  private int fieldPrivateBlacklist = 244;
-  public int fieldPublicBlacklistB = 245;
+  public int fieldPublicBlocklist = 241;
+  int fieldPackageBlocklist = 242;
+  protected int fieldProtectedBlocklist = 243;
+  private int fieldPrivateBlocklist = 244;
+  public int fieldPublicBlocklistB = 245;
 
-  public int fieldPublicBlacklistAndCorePlatformApi = 251;
-  int fieldPackageBlacklistAndCorePlatformApi = 252;
-  protected int fieldProtectedBlacklistAndCorePlatformApi = 253;
-  private int fieldPrivateBlacklistAndCorePlatformApi = 254;
-  public int fieldPublicBlacklistAndCorePlatformApiB = 255;
+  public int fieldPublicBlocklistAndCorePlatformApi = 251;
+  int fieldPackageBlocklistAndCorePlatformApi = 252;
+  protected int fieldProtectedBlocklistAndCorePlatformApi = 253;
+  private int fieldPrivateBlocklistAndCorePlatformApi = 254;
+  public int fieldPublicBlocklistAndCorePlatformApiB = 255;
 
   // STATIC FIELD
 
-  public static int fieldPublicStaticWhitelist = 111;
-  static int fieldPackageStaticWhitelist = 112;
-  protected static int fieldProtectedStaticWhitelist = 113;
-  private static int fieldPrivateStaticWhitelist = 114;
-  public static int fieldPublicStaticWhitelistB = 115;
+  public static int fieldPublicStaticSdk = 111;
+  static int fieldPackageStaticSdk = 112;
+  protected static int fieldProtectedStaticSdk = 113;
+  private static int fieldPrivateStaticSdk = 114;
+  public static int fieldPublicStaticSdkB = 115;
 
-  public static int fieldPublicStaticLightGreylist = 121;
-  static int fieldPackageStaticLightGreylist = 122;
-  protected static int fieldProtectedStaticLightGreylist = 123;
-  private static int fieldPrivateStaticLightGreylist = 124;
-  public static int fieldPublicStaticLightGreylistB = 125;
+  public static int fieldPublicStaticUnsupported = 121;
+  static int fieldPackageStaticUnsupported = 122;
+  protected static int fieldProtectedStaticUnsupported = 123;
+  private static int fieldPrivateStaticUnsupported = 124;
+  public static int fieldPublicStaticUnsupportedB = 125;
 
-  public static int fieldPublicStaticDarkGreylist = 131;
-  static int fieldPackageStaticDarkGreylist = 132;
-  protected static int fieldProtectedStaticDarkGreylist = 133;
-  private static int fieldPrivateStaticDarkGreylist = 134;
-  public static int fieldPublicStaticDarkGreylistB = 135;
+  public static int fieldPublicStaticConditionallyBlocked = 131;
+  static int fieldPackageStaticConditionallyBlocked = 132;
+  protected static int fieldProtectedStaticConditionallyBlocked = 133;
+  private static int fieldPrivateStaticConditionallyBlocked = 134;
+  public static int fieldPublicStaticConditionallyBlockedB = 135;
 
-  public static int fieldPublicStaticBlacklist = 141;
-  static int fieldPackageStaticBlacklist = 142;
-  protected static int fieldProtectedStaticBlacklist = 143;
-  private static int fieldPrivateStaticBlacklist = 144;
-  public static int fieldPublicStaticBlacklistB = 145;
+  public static int fieldPublicStaticBlocklist = 141;
+  static int fieldPackageStaticBlocklist = 142;
+  protected static int fieldProtectedStaticBlocklist = 143;
+  private static int fieldPrivateStaticBlocklist = 144;
+  public static int fieldPublicStaticBlocklistB = 145;
 
-  public static int fieldPublicStaticBlacklistAndCorePlatformApi = 151;
-  static int fieldPackageStaticBlacklistAndCorePlatformApi = 152;
-  protected static int fieldProtectedStaticBlacklistAndCorePlatformApi = 153;
-  private static int fieldPrivateStaticBlacklistAndCorePlatformApi = 154;
-  public static int fieldPublicStaticBlacklistAndCorePlatformApiB = 155;
+  public static int fieldPublicStaticBlocklistAndCorePlatformApi = 151;
+  static int fieldPackageStaticBlocklistAndCorePlatformApi = 152;
+  protected static int fieldProtectedStaticBlocklistAndCorePlatformApi = 153;
+  private static int fieldPrivateStaticBlocklistAndCorePlatformApi = 154;
+  public static int fieldPublicStaticBlocklistAndCorePlatformApiB = 155;
 
   // INSTANCE METHOD
 
-  public int methodPublicWhitelist() { return 411; }
-  int methodPackageWhitelist() { return 412; }
-  protected int methodProtectedWhitelist() { return 413; }
-  private int methodPrivateWhitelist() { return 414; }
+  public int methodPublicSdk() { return 411; }
+  int methodPackageSdk() { return 412; }
+  protected int methodProtectedSdk() { return 413; }
+  private int methodPrivateSdk() { return 414; }
 
-  public int methodPublicLightGreylist() { return 421; }
-  int methodPackageLightGreylist() { return 422; }
-  protected int methodProtectedLightGreylist() { return 423; }
-  private int methodPrivateLightGreylist() { return 424; }
+  public int methodPublicUnsupported() { return 421; }
+  int methodPackageUnsupported() { return 422; }
+  protected int methodProtectedUnsupported() { return 423; }
+  private int methodPrivateUnsupported() { return 424; }
 
-  public int methodPublicDarkGreylist() { return 431; }
-  int methodPackageDarkGreylist() { return 432; }
-  protected int methodProtectedDarkGreylist() { return 433; }
-  private int methodPrivateDarkGreylist() { return 434; }
+  public int methodPublicConditionallyBlocked() { return 431; }
+  int methodPackageConditionallyBlocked() { return 432; }
+  protected int methodProtectedConditionallyBlocked() { return 433; }
+  private int methodPrivateConditionallyBlocked() { return 434; }
 
-  public int methodPublicBlacklist() { return 441; }
-  int methodPackageBlacklist() { return 442; }
-  protected int methodProtectedBlacklist() { return 443; }
-  private int methodPrivateBlacklist() { return 444; }
+  public int methodPublicBlocklist() { return 441; }
+  int methodPackageBlocklist() { return 442; }
+  protected int methodProtectedBlocklist() { return 443; }
+  private int methodPrivateBlocklist() { return 444; }
 
-  public int methodPublicBlacklistAndCorePlatformApi() { return 451; }
-  int methodPackageBlacklistAndCorePlatformApi() { return 452; }
-  protected int methodProtectedBlacklistAndCorePlatformApi() { return 453; }
-  private int methodPrivateBlacklistAndCorePlatformApi() { return 454; }
+  public int methodPublicBlocklistAndCorePlatformApi() { return 451; }
+  int methodPackageBlocklistAndCorePlatformApi() { return 452; }
+  protected int methodProtectedBlocklistAndCorePlatformApi() { return 453; }
+  private int methodPrivateBlocklistAndCorePlatformApi() { return 454; }
 
   // STATIC METHOD
 
-  public static int methodPublicStaticWhitelist() { return 311; }
-  static int methodPackageStaticWhitelist() { return 312; }
-  protected static int methodProtectedStaticWhitelist() { return 313; }
-  private static int methodPrivateStaticWhitelist() { return 314; }
+  public static int methodPublicStaticSdk() { return 311; }
+  static int methodPackageStaticSdk() { return 312; }
+  protected static int methodProtectedStaticSdk() { return 313; }
+  private static int methodPrivateStaticSdk() { return 314; }
 
-  public static int methodPublicStaticLightGreylist() { return 321; }
-  static int methodPackageStaticLightGreylist() { return 322; }
-  protected static int methodProtectedStaticLightGreylist() { return 323; }
-  private static int methodPrivateStaticLightGreylist() { return 324; }
+  public static int methodPublicStaticUnsupported() { return 321; }
+  static int methodPackageStaticUnsupported() { return 322; }
+  protected static int methodProtectedStaticUnsupported() { return 323; }
+  private static int methodPrivateStaticUnsupported() { return 324; }
 
-  public static int methodPublicStaticDarkGreylist() { return 331; }
-  static int methodPackageStaticDarkGreylist() { return 332; }
-  protected static int methodProtectedStaticDarkGreylist() { return 333; }
-  private static int methodPrivateStaticDarkGreylist() { return 334; }
+  public static int methodPublicStaticConditionallyBlocked() { return 331; }
+  static int methodPackageStaticConditionallyBlocked() { return 332; }
+  protected static int methodProtectedStaticConditionallyBlocked() { return 333; }
+  private static int methodPrivateStaticConditionallyBlocked() { return 334; }
 
-  public static int methodPublicStaticBlacklist() { return 341; }
-  static int methodPackageStaticBlacklist() { return 342; }
-  protected static int methodProtectedStaticBlacklist() { return 343; }
-  private static int methodPrivateStaticBlacklist() { return 344; }
+  public static int methodPublicStaticBlocklist() { return 341; }
+  static int methodPackageStaticBlocklist() { return 342; }
+  protected static int methodProtectedStaticBlocklist() { return 343; }
+  private static int methodPrivateStaticBlocklist() { return 344; }
 
-  public static int methodPublicStaticBlacklistAndCorePlatformApi() { return 351; }
-  static int methodPackageStaticBlacklistAndCorePlatformApi() { return 352; }
-  protected static int methodProtectedStaticBlacklistAndCorePlatformApi() { return 353; }
-  private static int methodPrivateStaticBlacklistAndCorePlatformApi() { return 354; }
+  public static int methodPublicStaticBlocklistAndCorePlatformApi() { return 351; }
+  static int methodPackageStaticBlocklistAndCorePlatformApi() { return 352; }
+  protected static int methodProtectedStaticBlocklistAndCorePlatformApi() { return 353; }
+  private static int methodPrivateStaticBlocklistAndCorePlatformApi() { return 354; }
 
   // CONSTRUCTOR
 
-  // Whitelist
+  // Sdk
   public ParentClass(int x, short y) {}
   ParentClass(float x, short y) {}
   protected ParentClass(long x, short y) {}
@@ -155,13 +155,13 @@ public class ParentClass {
   protected ParentClass(long x, byte y) {}
   private ParentClass(double x, byte y) {}
 
-  // Blacklist
+  // Blocklist
   public ParentClass(int x, char y) {}
   ParentClass(float x, char y) {}
   protected ParentClass(long x, char y) {}
   private ParentClass(double x, char y) {}
 
-  // Blacklist and CorePlatformApi
+  // Blocklist and CorePlatformApi
   public ParentClass(int x, int y) {}
   ParentClass(float x, int y) {}
   protected ParentClass(long x, int y) {}
@@ -169,31 +169,31 @@ public class ParentClass {
 
   // HELPERS
 
-  public int callMethodPublicWhitelist() { return methodPublicWhitelist(); }
-  public int callMethodPackageWhitelist() { return methodPackageWhitelist(); }
-  public int callMethodProtectedWhitelist() { return methodProtectedWhitelist(); }
+  public int callMethodPublicSdk() { return methodPublicSdk(); }
+  public int callMethodPackageSdk() { return methodPackageSdk(); }
+  public int callMethodProtectedSdk() { return methodProtectedSdk(); }
 
-  public int callMethodPublicLightGreylist() { return methodPublicLightGreylist(); }
-  public int callMethodPackageLightGreylist() { return methodPackageLightGreylist(); }
-  public int callMethodProtectedLightGreylist() { return methodProtectedLightGreylist(); }
+  public int callMethodPublicUnsupported() { return methodPublicUnsupported(); }
+  public int callMethodPackageUnsupported() { return methodPackageUnsupported(); }
+  public int callMethodProtectedUnsupported() { return methodProtectedUnsupported(); }
 
-  public int callMethodPublicDarkGreylist() { return methodPublicDarkGreylist(); }
-  public int callMethodPackageDarkGreylist() { return methodPackageDarkGreylist(); }
-  public int callMethodProtectedDarkGreylist() { return methodProtectedDarkGreylist(); }
+  public int callMethodPublicConditionallyBlocked() { return methodPublicConditionallyBlocked(); }
+  public int callMethodPackageConditionallyBlocked() { return methodPackageConditionallyBlocked(); }
+  public int callMethodProtectedConditionallyBlocked() { return methodProtectedConditionallyBlocked(); }
 
-  public int callMethodPublicBlacklist() { return methodPublicBlacklist(); }
-  public int callMethodPackageBlacklist() { return methodPackageBlacklist(); }
-  public int callMethodProtectedBlacklist() { return methodProtectedBlacklist(); }
+  public int callMethodPublicBlocklist() { return methodPublicBlocklist(); }
+  public int callMethodPackageBlocklist() { return methodPackageBlocklist(); }
+  public int callMethodProtectedBlocklist() { return methodProtectedBlocklist(); }
 
-  public int callMethodPublicBlacklistAndCorePlatformApi() {
-    return methodPublicBlacklistAndCorePlatformApi();
+  public int callMethodPublicBlocklistAndCorePlatformApi() {
+    return methodPublicBlocklistAndCorePlatformApi();
   }
 
-  public int callMethodPackageBlacklistAndCorePlatformApi() {
-    return methodPackageBlacklistAndCorePlatformApi();
+  public int callMethodPackageBlocklistAndCorePlatformApi() {
+    return methodPackageBlocklistAndCorePlatformApi();
   }
 
-  public int callMethodProtectedBlacklistAndCorePlatformApi() {
-    return methodProtectedBlacklistAndCorePlatformApi();
+  public int callMethodProtectedBlocklistAndCorePlatformApi() {
+    return methodProtectedBlocklistAndCorePlatformApi();
   }
 }

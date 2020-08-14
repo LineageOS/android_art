@@ -1320,6 +1320,11 @@
                         "zipapex runner."]
     },
     {
+        "tests": ["175-alloc-big-bignums"],
+        "variant": "interpreter | interp-ac | trace | no-image | debuggable",
+        "description": "Interpreting BigInteger.add() is too slow (timeouts)"
+    },
+    {
         "tests": ["2029-contended-monitors"],
         "variant": "interpreter | interp-ac | gcstress | trace",
         "description": ["Slow test. Prone to timeouts."]

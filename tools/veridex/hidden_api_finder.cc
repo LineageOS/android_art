@@ -33,7 +33,7 @@ void HiddenApiFinder::CheckMethod(uint32_t method_id,
                                   VeridexResolver* resolver,
                                   MethodReference ref) {
   // Note: we always query whether a method is in boot, as the app
-  // might define blacklisted APIs (which won't be used at runtime).
+  // might define blocked APIs (which won't be used at runtime).
   const auto& name = HiddenApi::GetApiMethodName(resolver->GetDexFile(), method_id);
   method_locations_[name].push_back(ref);
 }
@@ -42,7 +42,7 @@ void HiddenApiFinder::CheckField(uint32_t field_id,
                                  VeridexResolver* resolver,
                                  MethodReference ref) {
   // Note: we always query whether a field is in a boot, as the app
-  // might define blacklisted APIs (which won't be used at runtime).
+  // might define blocked APIs (which won't be used at runtime).
   const auto& name = HiddenApi::GetApiFieldName(resolver->GetDexFile(), field_id);
   field_locations_[name].push_back(ref);
 }
