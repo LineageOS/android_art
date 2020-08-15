@@ -175,7 +175,7 @@ static void DdmVmInternal_threadNotify(JNIEnv*, jclass, jboolean enable) {
   Dbg::DdmSetThreadNotification(enable);
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   NATIVE_METHOD(DdmVmInternal, enableRecentAllocations, "(Z)V"),
   FAST_NATIVE_METHOD(DdmVmInternal, getRecentAllocations, "()[B"),
   FAST_NATIVE_METHOD(DdmVmInternal, getRecentAllocationStatus, "()Z"),

@@ -98,7 +98,7 @@ static jobject Parameter_getAnnotationNative(JNIEnv* env,
       annotations::GetAnnotationForMethodParameter(method, parameterIndex, klass));
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(
       Parameter,
       getAnnotationNative,

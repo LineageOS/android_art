@@ -42,7 +42,7 @@ static jobject FinalizerReference_getReferent(JNIEnv* env, jobject javaThis) {
   return soa.AddLocalReference<jobject>(referent);
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(FinalizerReference, makeCircularListIfUnenqueued, "()Z"),
   FAST_NATIVE_METHOD(FinalizerReference, getReferent, "()Ljava/lang/Object;"),
 };

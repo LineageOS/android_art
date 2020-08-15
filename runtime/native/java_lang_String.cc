@@ -109,7 +109,7 @@ static jcharArray String_toCharArray(JNIEnv* env, jobject java_this) {
   return soa.AddLocalReference<jcharArray>(s->ToCharArray(soa.Self()));
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(String, charAt, "(I)C"),
   FAST_NATIVE_METHOD(String, compareTo, "(Ljava/lang/String;)I"),
   FAST_NATIVE_METHOD(String, concat, "(Ljava/lang/String;)Ljava/lang/String;"),

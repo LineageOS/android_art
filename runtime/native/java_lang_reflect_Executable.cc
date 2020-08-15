@@ -383,7 +383,7 @@ static jint Executable_getParameterCountInternal(JNIEnv* env, jobject javaMethod
 }
 
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(Executable, compareMethodParametersInternal,
                      "(Ljava/lang/reflect/Method;)I"),
   FAST_NATIVE_METHOD(Executable, getAnnotationNative,

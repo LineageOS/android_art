@@ -38,7 +38,7 @@
 static void NativeMethods_emptyJniStaticSynchronizedMethod0(JNIEnv*, jclass) { }
 static void NativeMethods_emptyJniSynchronizedMethod0(JNIEnv*, jclass) { }
 
-static JNINativeMethod gMethods_NormalOnly[] = {
+static const JNINativeMethod gMethods_NormalOnly[] = {
   NATIVE_METHOD(NativeMethods, emptyJniStaticSynchronizedMethod0, "()V"),
   NATIVE_METHOD(NativeMethods, emptyJniSynchronizedMethod0, "()V"),
 };
@@ -53,7 +53,7 @@ static void NativeMethods_emptyJniStaticMethod6L(JNIEnv*, jclass, jobject, jarra
 static void NativeMethods_emptyJniStaticMethod0(JNIEnv*, jclass) { }
 static void NativeMethods_emptyJniStaticMethod6(JNIEnv*, jclass, int, int, int, int, int, int) { }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   NATIVE_METHOD(NativeMethods, emptyJniMethod0, "()V"),
   NATIVE_METHOD(NativeMethods, emptyJniMethod6, "(IIIIII)V"),
   NATIVE_METHOD(NativeMethods, emptyJniMethod6L, "(Ljava/lang/String;[Ljava/lang/String;[[ILjava/lang/Object;[Ljava/lang/Object;[[[[Ljava/lang/Object;)V"),
@@ -72,7 +72,7 @@ static void NativeMethods_emptyJniStaticMethod6L_Fast(JNIEnv*, jclass, jobject, 
 static void NativeMethods_emptyJniStaticMethod0_Fast(JNIEnv*, jclass) { }
 static void NativeMethods_emptyJniStaticMethod6_Fast(JNIEnv*, jclass, int, int, int, int, int, int) { }
 
-static JNINativeMethod gMethods_Fast[] = {
+static const JNINativeMethod gMethods_Fast[] = {
   NATIVE_METHOD(NativeMethods, emptyJniMethod0_Fast, "()V"),
   NATIVE_METHOD(NativeMethods, emptyJniMethod6_Fast, "(IIIIII)V"),
   NATIVE_METHOD(NativeMethods, emptyJniMethod6L_Fast, "(Ljava/lang/String;[Ljava/lang/String;[[ILjava/lang/Object;[Ljava/lang/Object;[[[[Ljava/lang/Object;)V"),
@@ -88,7 +88,7 @@ DEFINE_CRITICAL_JNI_METHOD(void, emptyJniStaticMethod0_1Critical)() { }
 DEFINE_NORMAL_JNI_METHOD(void,   emptyJniStaticMethod6_1Critical)(JNIEnv*, jclass, int, int, int, int, int, int) { }
 DEFINE_CRITICAL_JNI_METHOD(void, emptyJniStaticMethod6_1Critical)(int, int, int, int, int, int) { }
 
-static JNINativeMethod gMethods_Critical[] = {
+static const JNINativeMethod gMethods_Critical[] = {
   // Don't use NATIVE_METHOD because the name is mangled differently.
   { "emptyJniStaticMethod0_Critical", "()V",
         reinterpret_cast<void*>(NAME_CRITICAL_JNI_METHOD(emptyJniStaticMethod0_1Critical)) },

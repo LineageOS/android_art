@@ -52,7 +52,7 @@ static jint Object_identityHashCodeNative(JNIEnv* env, jclass, jobject javaObjec
   return static_cast<jint>(o->IdentityHashCode());
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(Object, internalClone, "()Ljava/lang/Object;"),
   FAST_NATIVE_METHOD(Object, notify, "()V"),
   FAST_NATIVE_METHOD(Object, notifyAll, "()V"),

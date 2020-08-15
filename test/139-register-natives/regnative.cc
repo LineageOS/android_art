@@ -22,7 +22,7 @@ namespace art {
 static void foo(JNIEnv*, jclass) {
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
     { "foo", "()V", reinterpret_cast<void*>(foo) }
 };
 

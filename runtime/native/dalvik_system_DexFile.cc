@@ -897,7 +897,7 @@ static void DexFile_setTrusted(JNIEnv* env, jclass, jobject j_cookie) {
   }
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   NATIVE_METHOD(DexFile, closeDexFile, "(Ljava/lang/Object;)Z"),
   NATIVE_METHOD(DexFile,
                 defineClassNative,

@@ -33,7 +33,7 @@ static JavaVM* jvm = nullptr;
 static jint Java_Main_intFastNativeMethod(JNIEnv*, jclass, jint a, jint b, jint c);
 static jint Java_Main_intCriticalNativeMethod(jint a, jint b, jint c);
 
-static JNINativeMethod sMainMethods[] = {
+static const JNINativeMethod sMainMethods[] = {
   {"intFastNativeMethod", "(III)I", reinterpret_cast<void*>(Java_Main_intFastNativeMethod) },
   {"intCriticalNativeMethod", "(III)I", reinterpret_cast<void*>(Java_Main_intCriticalNativeMethod) },
 };

@@ -239,7 +239,7 @@ static void System_arraycopyBooleanUnchecked(JNIEnv* env,
       javaDst, dstPos, count);
 }
 
-static JNINativeMethod gMethods[] = {
+static const JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(System, arraycopy, "(Ljava/lang/Object;ILjava/lang/Object;II)V"),
   FAST_NATIVE_METHOD(System, arraycopyCharUnchecked, "([CI[CII)V"),
   FAST_NATIVE_METHOD(System, arraycopyByteUnchecked, "([BI[BII)V"),
