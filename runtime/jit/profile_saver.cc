@@ -386,9 +386,7 @@ static void SampleClassesAndExecutedMethods(pthread_t profiler_pthread,
           const uint16_t counter = method.GetCounter();
           // Mark startup methods as hot if they have more than hot_method_sample_threshold
           // samples. This means they will get compiled by the compiler driver.
-          if (method.GetProfilingInfo(kRuntimePointerSize) != nullptr ||
-              method.PreviouslyWarm() ||
-              counter >= hot_method_sample_threshold) {
+          if (method.PreviouslyWarm() || counter >= hot_method_sample_threshold) {
             hot_methods->AddReference(method.GetDexFile(), method.GetDexMethodIndex());
           } else if (counter != 0) {
             sampled_methods->AddReference(method.GetDexFile(), method.GetDexMethodIndex());

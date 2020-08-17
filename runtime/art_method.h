@@ -515,30 +515,6 @@ class ArtMethod final {
     SetDataPtrSize(table, pointer_size);
   }
 
-  ProfilingInfo* GetProfilingInfo(PointerSize pointer_size) REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (UNLIKELY(IsNative() || IsProxyMethod() || !IsInvokable())) {
-      return nullptr;
-    }
-    return reinterpret_cast<ProfilingInfo*>(GetDataPtrSize(pointer_size));
-  }
-
-  ALWAYS_INLINE void SetProfilingInfo(ProfilingInfo* info) REQUIRES_SHARED(Locks::mutator_lock_) {
-    SetProfilingInfoPtrSize(info, kRuntimePointerSize);
-  }
-
-  ALWAYS_INLINE void SetProfilingInfoPtrSize(ProfilingInfo* info, PointerSize pointer_size)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    DCHECK(!IsProxyMethod());
-    DCHECK(!IsNative());
-    DCHECK(IsInvokable());
-    SetDataPtrSize(info, pointer_size);
-  }
-
-  static MemberOffset ProfilingInfoOffset() {
-    DCHECK(IsImagePointerSize(kRuntimePointerSize));
-    return DataOffset(kRuntimePointerSize);
-  }
-
   template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier>
   ALWAYS_INLINE bool HasSingleImplementation() REQUIRES_SHARED(Locks::mutator_lock_);
 

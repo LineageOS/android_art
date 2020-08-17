@@ -536,7 +536,7 @@ class JitCodeCache {
   SafeMap<ArtMethod*, const void*> osr_code_map_ GUARDED_BY(Locks::jit_lock_);
 
   // ProfilingInfo objects we have allocated.
-  std::vector<ProfilingInfo*> profiling_infos_ GUARDED_BY(Locks::jit_lock_);
+  SafeMap<ArtMethod*, ProfilingInfo*> profiling_infos_ GUARDED_BY(Locks::jit_lock_);
 
   // Methods we are currently compiling, one set for each kind of compilation.
   std::set<ArtMethod*> current_optimized_compilations_ GUARDED_BY(Locks::jit_lock_);
