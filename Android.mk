@@ -639,11 +639,17 @@ standalone-apex-files: deapexer \
 	  $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES))
 	# The Runtime APEX has the Bionic libs in ${LIB}/bionic subdirectories,
 	# so we need to move them up a level after extraction.
+	# Also, platform libraries are installed in prebuilts, so copy them over.
 	$(call extract-from-apex,$(RUNTIME_APEX),\
 	  $(PRIVATE_RUNTIME_APEX_DEPENDENCY_FILES)) && \
 	  for libdir in $(TARGET_OUT)/lib $(TARGET_OUT)/lib64; do \
 	    if [ -d $$libdir/bionic ]; then \
 	      mv -f $$libdir/bionic/*.so $$libdir; \
+	    fi || exit 1; \
+	  done && \
+	  for libdir in $(TARGET_OUT)/lib $(TARGET_OUT)/lib64; do \
+	    if [ -d $$libdir ]; then \
+          cp prebuilts/runtime/mainline/platform/impl/$(TARGET_ARCH)/*.so $$libdir; \
 	    fi || exit 1; \
 	  done
 	$(call extract-from-apex,$(CONSCRYPT_APEX),\
@@ -679,11 +685,17 @@ standalone-apex-files: deapexer \
 # ART APEX (and TZ Data APEX).
 
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
+ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES := \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libcutils.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libprocessgroup.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libtombstoned_client.so
+
 build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \
                         $(TARGET_OUT_EXECUTABLES)/art \
                         $(TARGET_OUT_EXECUTABLES)/dex2oat_wrapper \
                         $(TARGET_OUT)/etc/public.libraries.txt \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
+                        $(ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES) \
                         $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
                         libartpalette-system \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
