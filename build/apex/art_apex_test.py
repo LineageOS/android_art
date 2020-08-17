@@ -627,12 +627,6 @@ class ReleaseTargetChecker:
     self._checker.check_native_library('libcrypto')
     self._checker.check_native_library('libexpat')
 
-    # TODO(b/139046641): Fix proper 2nd arch checks. For now, just ignore these
-    # directories.
-    self._checker.ignore_path('bin/arm')
-    self._checker.ignore_path('lib/arm')
-    self._checker.ignore_path('lib64/arm')
-
 
 class ReleaseHostChecker:
   def __init__(self, checker):
