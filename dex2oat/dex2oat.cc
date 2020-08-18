@@ -2895,13 +2895,13 @@ class Dex2Oat final {
   template <typename T>
   static std::unique_ptr<T> ReadCommentedInputFromFile(
       const char* input_filename, std::function<std::string(const char*)>* process) {
-    std::unique_ptr<std::ifstream> input_file(new std::ifstream(input_filename, std::ifstream::in));
-    if (input_file.get() == nullptr) {
+    std::ifstream input_file(input_filename, std::ifstream::in);
+    if (!input_file.good()) {
       LOG(ERROR) << "Failed to open input file " << input_filename;
       return nullptr;
     }
-    std::unique_ptr<T> result = ReadCommentedInputStream<T>(*input_file, process);
-    input_file->close();
+    std::unique_ptr<T> result = ReadCommentedInputStream<T>(input_file, process);
+    input_file.close();
     return result;
   }
 
