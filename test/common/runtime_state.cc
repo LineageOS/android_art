@@ -266,7 +266,7 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
   // Update the code cache to make sure the JIT code does not get deleted.
   // Note: this will apply to all JIT compilations.
   code_cache->SetGarbageCollectCode(false);
-  while (!code_cache->ContainsPc(method->GetEntryPointFromQuickCompiledCode())) {
+  do {
     // Sleep to yield to the compiler thread.
     usleep(1000);
     ScopedObjectAccess soa(self);
@@ -275,7 +275,7 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
     // method is compiled 'optimized' and not baseline (tests expect optimized
     // compilation).
     jit->CompileMethod(method, self, CompilationKind::kOptimized, /*prejit=*/ false);
-  }
+  } while (!code_cache->ContainsPc(method->GetEntryPointFromQuickCompiledCode()));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_Main_ensureMethodJitCompiled(JNIEnv*, jclass, jobject meth) {
