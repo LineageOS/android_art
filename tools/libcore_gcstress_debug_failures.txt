@@ -16,8 +16,6 @@
           "libcore.libcore.icu.RelativeDateTimeFormatterTest#test_bug25821045",
           "libcore.libcore.icu.RelativeDateTimeFormatterTest#test_bug25883157",
           "libcore.java.lang.ref.ReferenceQueueTest#testRemoveWithDelayedResultAndTimeout",
-          "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
-          "libcore.java.math.BigIntegerTest#test_probablePrime",
           "libcore.java.text.DecimalFormatTest#testWhitespaceError",
           "libcore.java.text.DecimalFormatTest#testWhitespaceTolerated",
           "libcore.java.text.DecimalFormatTest#test_exponentSeparator",
@@ -28,7 +26,6 @@
           "libcore.java.util.TimeZoneTest#testSetDefaultDeadlock",
           "libcore.javax.crypto.CipherBasicsTest#testBasicEncryption",
           "org.apache.harmony.tests.java.lang.ref.ReferenceQueueTest#test_removeJ",
-          "org.apache.harmony.tests.java.math.BigIntegerConstructorsTest#testConstructorPrime",
           "org.apache.harmony.tests.java.text.MessageFormatTest#test_parseLjava_lang_String",
           "org.apache.harmony.tests.java.util.ControlTest#test_toBundleName_LStringLLocale",
           "org.apache.harmony.tests.java.util.TimerTest#testThrowingTaskKillsTimerThread"
