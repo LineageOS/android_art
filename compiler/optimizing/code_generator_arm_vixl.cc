@@ -4241,7 +4241,7 @@ void InstructionCodeGeneratorARMVIXL::DivRemByPowerOfTwo(HBinaryOperation* instr
     }
   };
 
-  if (HasNonNegativeResultOrMinInt(instruction->GetLeft())) {
+  if (HasNonNegativeOrMinIntInputAt(instruction, 0)) {
     // No need to adjust the result for non-negative dividends or the INT32_MIN dividend.
     // NOTE: The generated code for HDiv/HRem correctly works for the INT32_MIN dividend:
     //   imm == 2
@@ -4350,7 +4350,7 @@ void InstructionCodeGeneratorARMVIXL::GenerateDivRemWithAnyConstant(HBinaryOpera
     }
   };
 
-  if (imm > 0 && IsGEZero(instruction->GetLeft())) {
+  if (imm > 0 && HasNonNegativeInputAt(instruction, 0)) {
     // No need to adjust the result for a non-negative dividend and a positive divisor.
     if (instruction->IsDiv()) {
       generate_unsigned_div_code(out, dividend, temp1, temp2);
@@ -4433,7 +4433,7 @@ void LocationsBuilderARMVIXL::VisitDiv(HDiv* div) {
         } else if (IsPowerOfTwo(AbsOrMin(value)) &&
                    value != 2 &&
                    value != -2 &&
-                   !HasNonNegativeResultOrMinInt(div)) {
+                   !HasNonNegativeOrMinIntInputAt(div, 0)) {
           // The "out" register is used as a temporary, so it overlaps with the inputs.
           out_overlaps = Location::kOutputOverlap;
         } else {
@@ -4547,7 +4547,7 @@ void LocationsBuilderARMVIXL::VisitRem(HRem* rem) {
         Location::OutputOverlap out_overlaps = Location::kNoOutputOverlap;
         if (value == 1 || value == 0 || value == -1) {
           // No temp register required.
-        } else if (IsPowerOfTwo(AbsOrMin(value)) && !HasNonNegativeResultOrMinInt(rem)) {
+        } else if (IsPowerOfTwo(AbsOrMin(value)) && !HasNonNegativeOrMinIntInputAt(rem, 0)) {
           // The "out" register is used as a temporary, so it overlaps with the inputs.
           out_overlaps = Location::kOutputOverlap;
         } else {
