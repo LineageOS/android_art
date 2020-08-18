@@ -1,0 +1,2 @@
+Tests for compiling with unresolved classes, including unresolved
+class of the method being compiled.
