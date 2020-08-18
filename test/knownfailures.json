@@ -1336,6 +1336,12 @@
         "description": ["Timeouts."]
     },
     {
+        "tests": ["727-checker-unresolved-class"],
+        "variant": "target",
+        "bug": "b/161898207",
+        "description": ["The run script evaluates $PWD on host."]
+    },
+    {
         "tests": ["003-omnibus-opcodes",
                   "051-thread",
                   "427-bounds",
