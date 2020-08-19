@@ -17,5 +17,5 @@
 if [[ "$TEST_RUNTIME" == "jvm" ]]; then
   exec ${RUN} $@
 else
-  exec ${RUN} $@ -Xcompiler-option --updatable-bcp-packages-file="$PWD/updateable.txt"
+  exec ${RUN} $@ -Xcompiler-option --updatable-bcp-packages-file="$DEX_LOCATION/res/updateable.txt"
 fi
