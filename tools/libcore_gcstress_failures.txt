@@ -46,7 +46,6 @@
   bug: 157520256,
   modes: [device],
   names: ["jsr166.ForkJoinPoolTest#testIsQuiescent",
-          "libcore.java.util.CalendarTest#testAllDefaultCalendar_Gregorian",
           "org.apache.harmony.tests.java.util.regex.MatcherTest#testAllCodePoints_P",
           "org.apache.harmony.tests.java.util.regex.MatcherTest#testAllCodePoints_p"]
 }
