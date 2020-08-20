@@ -29,6 +29,18 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class Test1931 {
+  private static Monitors.LockController CONTENTION_SUPPRESSED = null;
+
+  public static AutoCloseable SuppressContention(Monitors.LockController controller) {
+    if (CONTENTION_SUPPRESSED != null) {
+      throw new IllegalStateException("Only one contention suppression is possible at a time.");
+    }
+    CONTENTION_SUPPRESSED = controller;
+    return () -> {
+      CONTENTION_SUPPRESSED = null;
+    };
+  }
+
   public static void printStackTrace(Throwable t) {
     System.out.println("Caught exception: " + t);
     for (Throwable c = t.getCause(); c != null; c = c.getCause()) {
@@ -39,10 +51,16 @@ public class Test1931 {
   }
 
   public static void handleMonitorEnter(Thread thd, Object lock) {
+    if (CONTENTION_SUPPRESSED != null && CONTENTION_SUPPRESSED.IsWorkerThread(thd)) {
+      return;
+    }
     System.out.println(thd.getName() + " contended-LOCKING " + lock);
   }
 
   public static void handleMonitorEntered(Thread thd, Object lock) {
+    if (CONTENTION_SUPPRESSED != null && CONTENTION_SUPPRESSED.IsWorkerThread(thd)) {
+      return;
+    }
     System.out.println(thd.getName() + " LOCKED " + lock);
   }
   public static void handleMonitorWait(Thread thd, Object lock, long timeout) {
@@ -170,10 +188,14 @@ public class Test1931 {
     controller1.waitForLockToBeHeld();
     controller1.DoWait();
     controller1.waitForNotifySleep();
-    controller2.DoLock();
-    controller2.waitForLockToBeHeld();
-    controller2.DoNotifyAll();
-    controller2.DoUnlock();
+    try (AutoCloseable suppress = SuppressContention(controller2)) {
+      // If controller1 has a spurious wakeup we could see contention here. Suppress it so it won't
+      // cause the test to fail.
+      controller2.DoLock();
+      controller2.waitForLockToBeHeld();
+      controller2.DoNotifyAll();
+      controller2.DoUnlock();
+    }
     controller1.waitForLockToBeHeld();
     controller1.DoUnlock();
   }
@@ -187,10 +209,14 @@ public class Test1931 {
     controller1.waitForLockToBeHeld();
     controller1.DoTimedWait();
     controller1.waitForNotifySleep();
-    controller2.DoLock();
-    controller2.waitForLockToBeHeld();
-    controller2.DoNotifyAll();
-    controller2.DoUnlock();
+    try (AutoCloseable suppress = SuppressContention(controller2)) {
+      // If controller1 has a spurious wakeup we could see contention here. Suppress it so it won't
+      // cause the test to fail.
+      controller2.DoLock();
+      controller2.waitForLockToBeHeld();
+      controller2.DoNotifyAll();
+      controller2.DoUnlock();
+    }
     controller1.waitForLockToBeHeld();
     controller1.DoUnlock();
   }
