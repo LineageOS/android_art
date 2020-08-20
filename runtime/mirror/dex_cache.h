@@ -305,8 +305,6 @@ class MANAGED DexCache final : public Object {
                                        ArtMethod* resolved,
                                        PointerSize ptr_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  ALWAYS_INLINE void ClearResolvedMethod(uint32_t method_idx, PointerSize ptr_size)
-      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Pointer sized variant, used for patching.
   ALWAYS_INLINE ArtField* GetResolvedField(uint32_t idx, PointerSize ptr_size)
@@ -314,8 +312,6 @@ class MANAGED DexCache final : public Object {
 
   // Pointer sized variant, used for patching.
   ALWAYS_INLINE void SetResolvedField(uint32_t idx, ArtField* field, PointerSize ptr_size)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  ALWAYS_INLINE void ClearResolvedField(uint32_t idx, PointerSize ptr_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   MethodType* GetResolvedMethodType(dex::ProtoIndex proto_idx) REQUIRES_SHARED(Locks::mutator_lock_);
