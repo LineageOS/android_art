@@ -295,6 +295,15 @@ enum {
   kNoPermitWaiterWaiting = 2
 };
 
+static inline time_t SaturatedTimeT(int64_t secs) {
+  if (sizeof(time_t) < sizeof(int64_t)) {
+    return static_cast<time_t>(std::min(secs,
+                                        static_cast<int64_t>(std::numeric_limits<time_t>::max())));
+  } else {
+    return secs;
+  }
+}
+
 void Thread::Park(bool is_absolute, int64_t time) {
   DCHECK(this == Thread::Current());
 #if ART_USE_FUTEXES
@@ -340,7 +349,7 @@ void Thread::Park(bool is_absolute, int64_t time) {
       if (is_absolute) {
         // Time is millis when scheduled for an absolute time
         timespec.tv_nsec = (time % 1000) * 1000000;
-        timespec.tv_sec = time / 1000;
+        timespec.tv_sec = SaturatedTimeT(time / 1000);
         // This odd looking pattern is recommended by futex documentation to
         // wait until an absolute deadline, with otherwise identical behavior to
         // FUTEX_WAIT_PRIVATE. This also allows parkUntil() to return at the
@@ -353,7 +362,7 @@ void Thread::Park(bool is_absolute, int64_t time) {
                        FUTEX_BITSET_MATCH_ANY);
       } else {
         // Time is nanos when scheduled for a relative time
-        timespec.tv_sec = time / 1000000000;
+        timespec.tv_sec = SaturatedTimeT(time / 1000000000);
         timespec.tv_nsec = time % 1000000000;
         result = futex(tls32_.park_state_.Address(),
                        FUTEX_WAIT_PRIVATE,
