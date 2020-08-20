@@ -257,18 +257,6 @@ inline void DexCache::SetResolvedField(uint32_t field_idx, ArtField* field, Poin
   SetNativePairPtrSize(GetResolvedFields(), FieldSlotIndex(field_idx), pair, ptr_size);
 }
 
-inline void DexCache::ClearResolvedField(uint32_t field_idx, PointerSize ptr_size) {
-  DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), ptr_size);
-  uint32_t slot_idx = FieldSlotIndex(field_idx);
-  auto* resolved_fields = GetResolvedFields();
-  // This is racy but should only be called from the single-threaded ImageWriter.
-  DCHECK(Runtime::Current()->IsAotCompiler());
-  if (GetNativePairPtrSize(resolved_fields, slot_idx, ptr_size).index == field_idx) {
-    FieldDexCachePair cleared(nullptr, FieldDexCachePair::InvalidIndexForSlot(slot_idx));
-    SetNativePairPtrSize(resolved_fields, slot_idx, cleared, ptr_size);
-  }
-}
-
 inline uint32_t DexCache::MethodSlotIndex(uint32_t method_idx) {
   DCHECK_LT(method_idx, GetDexFile()->NumMethodIds());
   const uint32_t slot_idx = method_idx % kDexCacheMethodCacheSize;
@@ -289,18 +277,6 @@ inline void DexCache::SetResolvedMethod(uint32_t method_idx,
   DCHECK(method != nullptr);
   MethodDexCachePair pair(method, method_idx);
   SetNativePairPtrSize(GetResolvedMethods(), MethodSlotIndex(method_idx), pair, ptr_size);
-}
-
-inline void DexCache::ClearResolvedMethod(uint32_t method_idx, PointerSize ptr_size) {
-  DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), ptr_size);
-  uint32_t slot_idx = MethodSlotIndex(method_idx);
-  auto* resolved_methods = GetResolvedMethods();
-  // This is racy but should only be called from the single-threaded ImageWriter.
-  DCHECK(Runtime::Current()->IsAotCompiler());
-  if (GetNativePairPtrSize(resolved_methods, slot_idx, ptr_size).index == method_idx) {
-    MethodDexCachePair cleared(nullptr, MethodDexCachePair::InvalidIndexForSlot(slot_idx));
-    SetNativePairPtrSize(resolved_methods, slot_idx, cleared, ptr_size);
-  }
 }
 
 template <typename T>
