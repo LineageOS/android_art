@@ -140,7 +140,7 @@ size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
   return deduped_offset;
 }
 
-StackMap CodeInfo::GetStackMapForNativePcOffset(uint32_t pc, InstructionSet isa) const {
+StackMap CodeInfo::GetStackMapForNativePcOffset(uintptr_t pc, InstructionSet isa) const {
   uint32_t packed_pc = StackMap::PackNativePc(pc, isa);
   // Binary search.  All catch stack maps are stored separately at the end.
   auto it = std::partition_point(
