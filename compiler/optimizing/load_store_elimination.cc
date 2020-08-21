@@ -121,7 +121,7 @@
  * replacement search, there are additional dependencies to consider, see below.
  *
  * In the successful case (no unknown inputs found) we use the Floyd-Warshal
- * algorith to determine transitive closures for each found Phi placeholder,
+ * algorithm to determine transitive closures for each found Phi placeholder,
  * and then match or materialize Phis from the smallest transitive closure,
  * so that we can determine if such subset has a single other input. This has
  * time complexity
@@ -170,7 +170,7 @@
  *
  * 3. Determine which stores to keep and which to eliminate.
  *
- * During instruction processing in phase 1 an re-processing in phase 2, we are
+ * During instruction processing in phase 1 and re-processing in phase 2, we are
  * keeping a record of the stores and Phi placeholders that become observable
  * and now propagate the observable Phi placeholders to all actual stores that
  * feed them. Having determined observable stores, we look for stores that just
@@ -184,7 +184,7 @@
  * loop, just use that input. If this succeeds and the old value is identical to
  * the value we're storing, such store shall be eliminated.
  *
- * The work is similar to the phase 2, except that we're not re-rocessing loads
+ * The work is similar to the phase 2, except that we're not re-processing loads
  * and stores anymore, so the time complexity of phase 3 is
  *    O(heap_locations^3 * blocks^3) .
  *
@@ -1680,7 +1680,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
   }
 
   if (phase == Phase::kStoreElimination) {
-    // We're not creting Phis during the final store elimination phase.
+    // We're not creating Phis during the final store elimination phase.
     return false;
   }
 
@@ -1735,7 +1735,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_m
   // Use local allocator to reduce peak memory usage.
   ScopedArenaAllocator allocator(allocator_.GetArenaStack());
 
-  // We want to recognize when a subset of these loop Phis that do not needed other
+  // We want to recognize when a subset of these loop Phis that do not need other
   // loop Phis, i.e. a transitive closure, has only one other instruction as an input,
   // i.e. that instruction can be used instead of each Phi in the set. See for example
   // Main.testLoop{5,6,7,8}() in the test 530-checker-lse. To do that, we shall

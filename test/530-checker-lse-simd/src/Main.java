@@ -231,7 +231,6 @@ public class Main {
   /// CHECK-NEXT:        ArrayLength
   //
   /// CHECK:             VecLoad loop:{{B\d+}}
-  /// CHECK-NEXT:        VecStore
   /// CHECK-NEXT:        VecAdd
   /// CHECK-NEXT:        VecAdd
   /// CHECK-NEXT:        VecStore
