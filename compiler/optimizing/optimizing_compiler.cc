@@ -675,8 +675,6 @@ void OptimizingCompiler::RunOptimizations(HGraph* graph,
     OptDef(OptimizationPass::kAggressiveInstructionSimplifier,
            "instruction_simplifier$after_bce"),
     // Other high-level optimizations.
-    OptDef(OptimizationPass::kSideEffectsAnalysis,
-           "side_effects$before_lse"),
     OptDef(OptimizationPass::kLoadStoreElimination),
     OptDef(OptimizationPass::kCHAGuardOptimization),
     OptDef(OptimizationPass::kDeadCodeElimination,

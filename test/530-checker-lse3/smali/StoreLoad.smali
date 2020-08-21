@@ -63,6 +63,8 @@
 ## CHECK-DAG:                     StaticFieldSet
 ## CHECK-DAG:                     StaticFieldGet
 ## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     TypeConversion
+## CHECK-DAG:                     Phi
 ## CHECK-DAG:                     StaticFieldGet
 
 ## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
@@ -70,11 +72,20 @@
 ## CHECK-DAG:                     StaticFieldSet
 ## CHECK-DAG:                     TypeConversion
 ## CHECK-DAG:                     StaticFieldSet
-## CHECK-DAG:                     StaticFieldGet
+## CHECK-DAG:                     Phi
+## CHECK-DAG:                     Phi
+
+## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
+## CHECK:                         Phi
+## CHECK:                         Phi
+## CHECK-NOT:                     Phi
 
 ## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
 ## CHECK:                         TypeConversion
 ## CHECK-NOT:                     TypeConversion
+
+## CHECK-START: int StoreLoad.test3(int) load_store_elimination (after)
+## CHECK-NOT:                     StaticFieldGet
 .method public static test3(I)I
     .registers 3
     const/4 v0, 0
@@ -93,6 +104,48 @@
     sget v1, LStoreLoad;->intField:I
     add-int v0, v1, v0
     return v0
+.end method
+
+## CHECK-START: int StoreLoad.test4(int) load_store_elimination (before)
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+
+## CHECK-START: int StoreLoad.test4(int) load_store_elimination (after)
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+## CHECK-DAG:                     StaticFieldSet
+.method public static test4(I)I
+    # Test that stores are kept properly for an irreducible loop.
+    .registers 3
+    const/4 v0, 0
+    const/4 v1, 7
+    if-gt p0, v1, :skip1
+
+    const/4 v1, 1
+    sput v1, LStoreLoad;->intField:I
+    goto :irreducible_loop_middle
+
+    :skip1
+    const/4 v1, 2
+    sput v1, LStoreLoad;->intField:I
+    # Fall through to the irreducible loop
+
+    :irreducible_loop
+    const/4 v1, 3
+    sput v1, LStoreLoad;->intField:I
+    if-eq v0, p0, :end
+
+    :irreducible_loop_middle
+    const/4 v1, 4
+    sput v1, LStoreLoad;->intField:I
+    add-int/lit8 v0, v0, 1
+    goto :irreducible_loop
+
+    :end
+    return p0
 .end method
 
 .field public static intField:I

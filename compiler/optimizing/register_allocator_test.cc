@@ -864,8 +864,8 @@ TEST_F(RegisterAllocatorTest, SpillInactive) {
   // We create a synthesized user requesting a register, to avoid just spilling the
   // intervals.
   HPhi* user = new (GetAllocator()) HPhi(GetAllocator(), 0, 1, DataType::Type::kInt32);
-  user->AddInput(one);
   user->SetBlock(block);
+  user->AddInput(one);
   LocationSummary* locations = new (GetAllocator()) LocationSummary(user, LocationSummary::kNoCall);
   locations->SetInAt(0, Location::RequiresRegister());
   static constexpr size_t phi_ranges[][2] = {{20, 30}};
