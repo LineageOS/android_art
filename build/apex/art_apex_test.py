@@ -672,7 +672,6 @@ class DebugChecker:
 
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnectiond')
-    self._checker.check_native_library('libart-disassembler')
     self._checker.check_native_library('libartbased')
     self._checker.check_native_library('libartd')
     self._checker.check_native_library('libartd-compiler')
