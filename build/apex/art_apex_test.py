@@ -617,7 +617,6 @@ class ReleaseTargetChecker:
     self._checker.check_multilib_executable('dex2oat')
 
     # Check internal libraries for ART.
-    self._checker.check_prefer64_library('libart-disassembler')
     self._checker.check_native_library('libperfetto_hprof')
 
     # Check exported native libraries for Managed Core Library.
