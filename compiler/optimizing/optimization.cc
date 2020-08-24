@@ -217,11 +217,6 @@ ArenaVector<HOptimization*> ConstructOptimizations(
         opt = new (allocator) BoundsCheckElimination(
             graph, *most_recent_side_effects, most_recent_induction, pass_name);
         break;
-      case OptimizationPass::kLoadStoreElimination:
-        CHECK(most_recent_side_effects != nullptr && most_recent_induction != nullptr);
-        opt = new (allocator) LoadStoreElimination(
-            graph, *most_recent_side_effects, stats, pass_name);
-        break;
       //
       // Regular passes.
       //
@@ -268,6 +263,9 @@ ArenaVector<HOptimization*> ConstructOptimizations(
         break;
       case OptimizationPass::kConstructorFenceRedundancyElimination:
         opt = new (allocator) ConstructorFenceRedundancyElimination(graph, stats, pass_name);
+        break;
+      case OptimizationPass::kLoadStoreElimination:
+        opt = new (allocator) LoadStoreElimination(graph, stats, pass_name);
         break;
       case OptimizationPass::kScheduling:
         opt = new (allocator) HInstructionScheduling(
