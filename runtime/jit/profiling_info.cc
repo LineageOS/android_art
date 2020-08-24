@@ -73,6 +73,7 @@ InlineCache* ProfilingInfo::GetInlineCache(uint32_t dex_pc) {
       return &cache_[i];
     }
   }
+  ScopedObjectAccess soa(Thread::Current());
   LOG(FATAL) << "No inline cache found for "  << ArtMethod::PrettyMethod(method_) << "@" << dex_pc;
   UNREACHABLE();
 }
@@ -105,6 +106,21 @@ void ProfilingInfo::AddInvokeInfo(uint32_t dex_pc, mirror::Class* cls) {
   }
   // Unsuccessfull - cache is full, making it megamorphic. We do not DCHECK it though,
   // as the garbage collector might clear the entries concurrently.
+}
+
+ScopedProfilingInfoUse::ScopedProfilingInfoUse(jit::Jit* jit, ArtMethod* method, Thread* self)
+    : jit_(jit),
+      method_(method),
+      self_(self),
+      // Fetch the profiling info ahead of using it. If it's null when fetching,
+      // we should not call JitCodeCache::DoneCompilerUse.
+      profiling_info_(jit->GetCodeCache()->NotifyCompilerUse(method, self)) {
+}
+
+ScopedProfilingInfoUse::~ScopedProfilingInfoUse() {
+  if (profiling_info_ != nullptr) {
+    jit_->GetCodeCache()->DoneCompilerUse(method_, self_);
+  }
 }
 
 }  // namespace art
