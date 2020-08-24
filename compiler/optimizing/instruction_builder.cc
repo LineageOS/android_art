@@ -42,6 +42,44 @@
 
 namespace art {
 
+namespace {
+
+class SamePackageCompare {
+ public:
+  explicit SamePackageCompare(const DexCompilationUnit& dex_compilation_unit)
+      : dex_compilation_unit_(dex_compilation_unit) {}
+
+  bool operator()(ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_) {
+    if (klass->GetClassLoader() != dex_compilation_unit_.GetClassLoader().Get()) {
+      return false;
+    }
+    if (referrers_descriptor_ == nullptr) {
+      const DexFile* dex_file = dex_compilation_unit_.GetDexFile();
+      uint32_t referrers_method_idx = dex_compilation_unit_.GetDexMethodIndex();
+      referrers_descriptor_ =
+          dex_file->StringByTypeIdx(dex_file->GetMethodId(referrers_method_idx).class_idx_);
+      referrers_package_length_ = PackageLength(referrers_descriptor_);
+    }
+    std::string temp;
+    const char* klass_descriptor = klass->GetDescriptor(&temp);
+    size_t klass_package_length = PackageLength(klass_descriptor);
+    return (referrers_package_length_ == klass_package_length) &&
+           memcmp(referrers_descriptor_, klass_descriptor, referrers_package_length_) == 0;
+  };
+
+ private:
+  static size_t PackageLength(const char* descriptor) {
+    const char* slash_pos = strrchr(descriptor, '/');
+    return (slash_pos != nullptr) ? static_cast<size_t>(slash_pos - descriptor) : 0u;
+  }
+
+  const DexCompilationUnit& dex_compilation_unit_;
+  const char* referrers_descriptor_ = nullptr;
+  size_t referrers_package_length_ = 0u;
+};
+
+}  // anonymous namespace
+
 HInstructionBuilder::HInstructionBuilder(HGraph* graph,
                                          HBasicBlockBuilder* block_builder,
                                          SsaBuilder* ssa_builder,
@@ -858,8 +896,29 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
   // resolved because, for example, we don't find a superclass in the classpath.
   if (referrer == nullptr) {
     // The class linker cannot check access without a referrer, so we have to do it.
-    // Fall back to HInvokeUnresolved if the method isn't public.
-    if (!resolved_method->IsPublic()) {
+    // Check if the declaring class or referencing class is accessible.
+    SamePackageCompare same_package(dex_compilation_unit);
+    ObjPtr<mirror::Class> declaring_class = resolved_method->GetDeclaringClass();
+    bool declaring_class_accessible = declaring_class->IsPublic() || same_package(declaring_class);
+    if (!declaring_class_accessible) {
+      // It is possible to access members from an inaccessible superclass
+      // by referencing them through an accessible subclass.
+      ObjPtr<mirror::Class> referenced_class = class_linker->LookupResolvedType(
+          dex_compilation_unit.GetDexFile()->GetMethodId(method_idx).class_idx_,
+          dex_compilation_unit.GetDexCache().Get(),
+          class_loader.Get());
+      DCHECK(referenced_class != nullptr);  // Must have been resolved when resolving the method.
+      if (!referenced_class->IsPublic() && !same_package(referenced_class)) {
+        return nullptr;
+      }
+    }
+    // Check whether the method itself is accessible.
+    // Since the referrer is unresolved but the method is resolved, it cannot be
+    // inside the same class, so a private method is known to be inaccessible.
+    // And without a resolved referrer, we cannot check for protected member access
+    // in superlass, so we handle only access to public member or within the package.
+    if (resolved_method->IsPrivate() ||
+        (!resolved_method->IsPublic() && !declaring_class_accessible)) {
       return nullptr;
     }
   }
