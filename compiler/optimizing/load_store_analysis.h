@@ -107,16 +107,10 @@ class HeapLocation : public ArenaObject<kArenaAllocLSA> {
         index_(index),
         vector_length_(vector_length),
         declaring_class_def_index_(declaring_class_def_index),
-        value_killed_by_loop_side_effects_(true),
         has_aliased_locations_(false) {
     DCHECK(ref_info != nullptr);
     DCHECK((offset == kInvalidFieldOffset && index != nullptr) ||
            (offset != kInvalidFieldOffset && index == nullptr));
-    if (ref_info->IsSingleton() && !IsArray()) {
-      // Assume this location's value cannot be killed by loop side effects
-      // until proven otherwise.
-      value_killed_by_loop_side_effects_ = false;
-    }
   }
 
   ReferenceInfo* GetReferenceInfo() const { return ref_info_; }
@@ -133,14 +127,6 @@ class HeapLocation : public ArenaObject<kArenaAllocLSA> {
 
   bool IsArray() const {
     return index_ != nullptr;
-  }
-
-  bool IsValueKilledByLoopSideEffects() const {
-    return value_killed_by_loop_side_effects_;
-  }
-
-  void SetValueKilledByLoopSideEffects(bool val) {
-    value_killed_by_loop_side_effects_ = val;
   }
 
   bool HasAliasedLocations() const {
@@ -170,12 +156,6 @@ class HeapLocation : public ArenaObject<kArenaAllocLSA> {
   // Declaring class's def's dex index.
   // Invalid when this HeapLocation is not field access.
   const int16_t declaring_class_def_index_;
-
-  // Value of this location may be killed by loop side effects
-  // because this location is stored into inside a loop.
-  // This gives better info on whether a singleton's location
-  // value may be killed by loop side effects.
-  bool value_killed_by_loop_side_effects_;
 
   // Has aliased heap locations in the method, due to either the
   // reference is aliased or the array element is aliased via different
@@ -451,12 +431,12 @@ class HeapLocationCollector : public HGraphVisitor {
     GetOrCreateReferenceInfo(instruction);
   }
 
-  HeapLocation* GetOrCreateHeapLocation(HInstruction* ref,
-                                        DataType::Type type,
-                                        size_t offset,
-                                        HInstruction* index,
-                                        size_t vector_length,
-                                        int16_t declaring_class_def_index) {
+  void MaybeCreateHeapLocation(HInstruction* ref,
+                               DataType::Type type,
+                               size_t offset,
+                               HInstruction* index,
+                               size_t vector_length,
+                               int16_t declaring_class_def_index) {
     HInstruction* original_ref = HuntForOriginalReference(ref);
     ReferenceInfo* ref_info = GetOrCreateReferenceInfo(original_ref);
     size_t heap_location_idx = FindHeapLocationIndex(
@@ -465,31 +445,29 @@ class HeapLocationCollector : public HGraphVisitor {
       HeapLocation* heap_loc = new (allocator_)
           HeapLocation(ref_info, type, offset, index, vector_length, declaring_class_def_index);
       heap_locations_.push_back(heap_loc);
-      return heap_loc;
     }
-    return heap_locations_[heap_location_idx];
   }
 
-  HeapLocation* VisitFieldAccess(HInstruction* ref, const FieldInfo& field_info) {
+  void VisitFieldAccess(HInstruction* ref, const FieldInfo& field_info) {
     if (field_info.IsVolatile()) {
       has_volatile_ = true;
     }
     DataType::Type type = field_info.GetFieldType();
     const uint16_t declaring_class_def_index = field_info.GetDeclaringClassDefIndex();
     const size_t offset = field_info.GetFieldOffset().SizeValue();
-    return GetOrCreateHeapLocation(ref,
-                                   type,
-                                   offset,
-                                   nullptr,
-                                   HeapLocation::kScalar,
-                                   declaring_class_def_index);
+    MaybeCreateHeapLocation(ref,
+                            type,
+                            offset,
+                            nullptr,
+                            HeapLocation::kScalar,
+                            declaring_class_def_index);
   }
 
   void VisitArrayAccess(HInstruction* array,
                         HInstruction* index,
                         DataType::Type type,
                         size_t vector_length) {
-    GetOrCreateHeapLocation(array,
+    MaybeCreateHeapLocation(array,
                             type,
                             HeapLocation::kInvalidFieldOffset,
                             index,
@@ -503,29 +481,8 @@ class HeapLocationCollector : public HGraphVisitor {
   }
 
   void VisitInstanceFieldSet(HInstanceFieldSet* instruction) override {
-    HeapLocation* location = VisitFieldAccess(instruction->InputAt(0), instruction->GetFieldInfo());
+    VisitFieldAccess(instruction->InputAt(0), instruction->GetFieldInfo());
     has_heap_stores_ = true;
-    if (location->GetReferenceInfo()->IsSingleton()) {
-      // A singleton's location value may be killed by loop side effects if it's
-      // defined before that loop, and it's stored into inside that loop.
-      HLoopInformation* loop_info = instruction->GetBlock()->GetLoopInformation();
-      if (loop_info != nullptr) {
-        HInstruction* ref = location->GetReferenceInfo()->GetReference();
-        DCHECK(ref->IsNewInstance());
-        if (loop_info->IsDefinedOutOfTheLoop(ref)) {
-          // ref's location value may be killed by this loop's side effects.
-          location->SetValueKilledByLoopSideEffects(true);
-        } else {
-          // ref is defined inside this loop so this loop's side effects cannot
-          // kill its location value at the loop header since ref/its location doesn't
-          // exist yet at the loop header.
-        }
-      }
-    } else {
-      // For non-singletons, value_killed_by_loop_side_effects_ is inited to
-      // true.
-      DCHECK_EQ(location->IsValueKilledByLoopSideEffects(), true);
-    }
   }
 
   void VisitStaticFieldGet(HStaticFieldGet* instruction) override {

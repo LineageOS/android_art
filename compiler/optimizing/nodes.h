@@ -2243,8 +2243,9 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
     DCHECK(user != nullptr);
     // Note: fixup_end remains valid across push_front().
     auto fixup_end = uses_.empty() ? uses_.begin() : ++uses_.begin();
+    ArenaAllocator* allocator = user->GetBlock()->GetGraph()->GetAllocator();
     HUseListNode<HInstruction*>* new_node =
-        new (GetBlock()->GetGraph()->GetAllocator()) HUseListNode<HInstruction*>(user, index);
+        new (allocator) HUseListNode<HInstruction*>(user, index);
     uses_.push_front(*new_node);
     FixUpUserRecordsAfterUseInsertion(fixup_end);
   }
