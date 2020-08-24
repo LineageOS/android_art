@@ -20,8 +20,8 @@
 #   1) the boot.zip file which contains the boot classpath and system server jars.
 #      This file can be obtained from running `m dist` or by configuring the device with
 #      the `art/tools/boot-image-profile-configure-device.sh` script.
-#   2) the preloaded classes blacklist which specify what clases should not be preloaded
-#      in Zygote. Usually located in usually in frameworks/base/config/preloaded-classes-blacklist
+#   2) the preloaded classes denylist which specify what clases should not be preloaded
+#      in Zygote. Usually located in usually in frameworks/base/config/preloaded-classes-denylist
 #   3) a list of raw boot image profiles extracted from devices. An example how to do that is
 #      by running `art/tools/boot-image-profile-extract-profile.sh` script.
 #
@@ -39,11 +39,11 @@ if [[ -z "$ANDROID_BUILD_TOP" ]]; then
 fi
 
 if [[ "$#" -lt 4 ]]; then
-  echo "Usage $0 <output-dir> <boot.zip-location> <preloaded-blacklist-location> <profile-input1> <profile-input2> ... <profman args>"
+  echo "Usage $0 <output-dir> <boot.zip-location> <preloaded-denylist-location> <profile-input1> <profile-input2> ... <profman args>"
   echo "Without any profman args the script will use defaults."
-  echo "Example: $0 output-dir boot.zip frameworks/base/config/preloaded-classes-blacklist android1.prof android2.prof"
-  echo "         $0 output-dir boot.zip frameworks/base/config/preloaded-classes-blacklist android.prof --profman-arg --upgrade-startup-to-hot=true"
-  echo "preloaded.black-list is usually in frameworks/base/config/preloaded-classes-blacklist"
+  echo "Example: $0 output-dir boot.zip frameworks/base/config/preloaded-classes-denylist android1.prof android2.prof"
+  echo "         $0 output-dir boot.zip frameworks/base/config/preloaded-classes-denylist android.prof --profman-arg --upgrade-startup-to-hot=true"
+  echo "preloaded-deny-list-location is usually frameworks/base/config/preloaded-classes-denylist"
   exit 1
 fi
 
@@ -53,7 +53,7 @@ mkdir -p "$WORK_DIR"
 
 OUT_DIR="$1"
 BOOT_ZIP="$2"
-PRELOADED_BLACKLIST="$3"
+PRELOADED_DENYLIST="$3"
 shift 3
 
 # Read the profile input args.
@@ -119,7 +119,7 @@ profman \
   "${profman_profile_input_args[@]}" \
   --out-profile-path="$OUT_BOOT_PROFILE" \
   --out-preloaded-classes-path="$OUT_PRELOADED_CLASSES" \
-  --preloaded-classes-blacklist="$PRELOADED_BLACKLIST" \
+  --preloaded-classes-denylist="$PRELOADED_DENYLIST" \
   --special-package=android:1 \
   --special-package=com.android.systemui:1 \
   "${profman_args[@]}"
