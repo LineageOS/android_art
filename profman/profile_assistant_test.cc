@@ -763,8 +763,8 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
       "Ljava/lang/Object;->toString()Ljava/lang/String;";
   // Method used by a special package which will get a different threshold;
   const std::string kUncommonSpecialPackageMethod = "Ljava/lang/Object;->hashCode()I";
-  // Blacklisted class
-  const std::string kPreloadedBlacklistedClass = "Ljava/lang/Thread;";
+  // Denylisted class
+  const std::string kPreloadedDenylistedClass = "Ljava/lang/Thread;";
 
   // Thresholds for this test.
   static const size_t kDirtyThreshold = 100;
@@ -782,42 +782,42 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
       "{dex1}H" + kCommonHotMethod,
       "{dex1}P" + kStartupMethodForUpgrade,
       "{dex1}" + kUncommonDirtyClass,
-      "{dex1}" + kPreloadedBlacklistedClass,
+      "{dex1}" + kPreloadedDenylistedClass,
 
       "{dex2}" + kCleanClass,
       "{dex2}" + kDirtyClass,
       "{dex2}P" + kCommonHotMethod,
       "{dex2}P" + kStartupMethodForUpgrade,
       "{dex2}" + kUncommonDirtyClass,
-      "{dex2}" + kPreloadedBlacklistedClass,
+      "{dex2}" + kPreloadedDenylistedClass,
 
       "{dex3}P" + kUncommonMethod,
       "{dex3}PS" + kStartupMethodForUpgrade,
       "{dex3}S" + kCommonHotMethod,
       "{dex3}S" + kSpecialPackageStartupMethod,
       "{dex3}" + kDirtyClass,
-      "{dex3}" + kPreloadedBlacklistedClass,
+      "{dex3}" + kPreloadedDenylistedClass,
 
       "{dex4}" + kDirtyClass,
       "{dex4}P" + kCommonHotMethod,
       "{dex4}S" + kSpecialPackageStartupMethod,
       "{dex4}P" + kUncommonSpecialPackageMethod,
-      "{dex4}" + kPreloadedBlacklistedClass,
+      "{dex4}" + kPreloadedDenylistedClass,
   };
   std::string input_file_contents = JoinProfileLines(input_data);
 
-  ScratchFile preloaded_class_blacklist;
-  std::string blacklist_content = DescriptorToDot(kPreloadedBlacklistedClass.c_str());
-  EXPECT_TRUE(preloaded_class_blacklist.GetFile()->WriteFully(
-      blacklist_content.c_str(), blacklist_content.length()));
+  ScratchFile preloaded_class_denylist;
+  std::string denylist_content = DescriptorToDot(kPreloadedDenylistedClass.c_str());
+  EXPECT_TRUE(preloaded_class_denylist.GetFile()->WriteFully(
+      denylist_content.c_str(), denylist_content.length()));
 
-  EXPECT_EQ(0, preloaded_class_blacklist.GetFile()->Flush());
-  EXPECT_TRUE(preloaded_class_blacklist.GetFile()->ResetOffset());
+  EXPECT_EQ(0, preloaded_class_denylist.GetFile()->Flush());
+  EXPECT_TRUE(preloaded_class_denylist.GetFile()->ResetOffset());
   // Expected data
   std::vector<std::string> expected_data = {
       kCleanClass,
       kDirtyClass,
-      kPreloadedBlacklistedClass,
+      kPreloadedDenylistedClass,
       "HSP" + kCommonHotMethod,
       "HS" + kSpecialPackageStartupMethod,
       "HSP" + kStartupMethodForUpgrade
@@ -854,7 +854,7 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   args.push_back("--out-preloaded-classes-path=" + out_preloaded_classes.GetFilename());
   args.push_back("--apk=" + core_dex);
   args.push_back("--dex-location=" + core_dex);
-  args.push_back("--preloaded-classes-blacklist=" + preloaded_class_blacklist.GetFilename());
+  args.push_back("--preloaded-classes-denylist=" + preloaded_class_denylist.GetFilename());
 
   std::string error;
   ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;

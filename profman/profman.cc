@@ -161,7 +161,7 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("  --preloaded-class-threshold=percentage between 0 and 100");
   UsageError("      what threshold to apply to the classes when deciding whether or not to");
   UsageError("      include it in the final preloaded classes.");
-  UsageError("  --preloaded-classes-blacklist=file");
+  UsageError("  --preloaded-classes-denylist=file");
   UsageError("      a file listing the classes that should not be preloaded in Zygote");
   UsageError("  --upgrade-startup-to-hot=true|false:");
   UsageError("      whether or not to upgrade startup methods to hot");
@@ -345,15 +345,15 @@ class ProfMan final {
                         &boot_image_options_.preloaded_class_threshold,
                         0u,
                         100u);
-      } else if (StartsWith(option, "--preloaded-classes-blacklist=")) {
-        std::string preloaded_classes_blacklist =
-            std::string(option.substr(strlen("--preloaded-classes-blacklist=")));
+      } else if (StartsWith(option, "--preloaded-classes-denylist=")) {
+        std::string preloaded_classes_denylist =
+            std::string(option.substr(strlen("--preloaded-classes-denylist=")));
         // Read the user-specified list of methods.
         std::unique_ptr<std::set<std::string>>
-            blacklist(ReadCommentedInputFromFile<std::set<std::string>>(
-                preloaded_classes_blacklist.c_str(), nullptr));  // No post-processing.
-        boot_image_options_.preloaded_classes_blacklist.insert(
-            blacklist->begin(), blacklist->end());
+            denylist(ReadCommentedInputFromFile<std::set<std::string>>(
+                preloaded_classes_denylist.c_str(), nullptr));  // No post-processing.
+        boot_image_options_.preloaded_classes_denylist.insert(
+            denylist->begin(), denylist->end());
       } else if (StartsWith(option, "--upgrade-startup-to-hot=")) {
         ParseBoolOption(raw_option,
                         "--upgrade-startup-to-hot=",
