@@ -37,7 +37,12 @@ class ReferenceTypePropagation : public HOptimization {
                            const char* name = kReferenceTypePropagationPassName);
 
   // Visit a single instruction.
+  // Used when a pass, such as Inliner or LSE, adds a single instruction.
   void Visit(HInstruction* instruction);
+
+  // Visit instructions and process dependencies between them.
+  // Used when a pass, such as LSE, adds multiple dependent instructions, including Phis.
+  void Visit(ArrayRef<HInstruction* const> instructions);
 
   bool Run() override;
 

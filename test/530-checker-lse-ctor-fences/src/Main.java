@@ -113,19 +113,21 @@ public class Main {
   }
 
   /// CHECK-START: double Main.calcCircleAreaOrCircumference(double, boolean) load_store_elimination (before)
-  /// CHECK: NewInstance
-  /// CHECK: InstanceFieldSet
-  /// CHECK: ConstructorFence
-  /// CHECK: InstanceFieldGet
+  /// CHECK-DAG: NewInstance
+  /// CHECK-DAG: InstanceFieldSet
+  /// CHECK-DAG: ConstructorFence
+  /// CHECK-DAG: InstanceFieldGet
 
   /// CHECK-START: double Main.calcCircleAreaOrCircumference(double, boolean) load_store_elimination (after)
-  /// CHECK: NewInstance
+  /// CHECK:     Phi
+  /// CHECK-NOT: Phi
+
+  /// CHECK-START: double Main.calcCircleAreaOrCircumference(double, boolean) load_store_elimination (after)
+  /// CHECK-NOT: NewInstance
   /// CHECK-NOT: ConstructorFence
 
-  //
-  // The object allocation will not be eliminated by LSE because of aliased stores.
-  // However the object is still a singleton, so it never escapes the current thread.
-  // There should not be a constructor fence here after LSE.
+  // The object allocation shall be eliminated by LSE and the load shall be replaced
+  // by a Phi with the values that were previously being stored.
   static double calcCircleAreaOrCircumference(double radius, boolean area_or_circumference) {
     CalcCircleAreaOrCircumference calc =
       new CalcCircleAreaOrCircumference(

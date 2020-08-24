@@ -166,6 +166,17 @@ void ReferenceTypePropagation::Visit(HInstruction* instruction) {
   instruction->Accept(&visitor);
 }
 
+void ReferenceTypePropagation::Visit(ArrayRef<HInstruction* const> instructions) {
+  RTPVisitor visitor(graph_,
+                     class_loader_,
+                     hint_dex_cache_,
+                     is_first_run_);
+  for (HInstruction* instruction : instructions) {
+    instruction->Accept(&visitor);
+  }
+  visitor.ProcessWorklist();
+}
+
 // Check if we should create a bound type for the given object at the specified
 // position. Because of inlining and the fact we run RTP more than once and we
 // might have a HBoundType already. If we do, we should not create a new one.
