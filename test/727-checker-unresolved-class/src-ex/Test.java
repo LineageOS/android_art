@@ -14,22 +14,14 @@
  * limitations under the License.
  */
 
-package resolved;
+import resolved.SubclassOfUnresolvedClass;
+import resolved.SubclassOfUnresolvedClass2;
+import unresolved.UnresolvedClass;
 
-class ResolvedPackagePrivateClass {
-    public static int publicIntField;
-    private static int privateIntField;
-    static int intField;
-
-    public static void $noinline$publicStaticMethod() {
-      System.out.println("ResolvedPackagePrivateClass.$noinline$publicStaticMethod()");
-    }
-
-    private static void $noinline$privateStaticMethod() {
-      System.out.println("ResolvedPackagePrivateClass.$noinline$privateStaticMethod()");
-    }
-
-    static void $noinline$staticMethod() {
-      System.out.println("ResolvedPackagePrivateClass.$noinline$staticMethod()");
-    }
+public class Test {
+  public static void $noinline$main() {
+    UnresolvedClass.$noinline$main();
+    SubclassOfUnresolvedClass.$noinline$main();
+    SubclassOfUnresolvedClass2.$noinline$main();
+  }
 }
