@@ -258,5 +258,12 @@
   description: "Fails on non-Android and Android versions < R",
   result: EXEC_FAILED,
   names: ["libcore.android.system.OsTest#test_NetlinkSocket"]
+},
+{
+  description: "Times out on device",
+  result: EXEC_FAILED,
+  modes: [device],
+  bug: 161898207,
+  names: ["libcore.java.util.zip.ZipFileTest#testZipFileWithLotsOfEntries"]
 }
 ]
