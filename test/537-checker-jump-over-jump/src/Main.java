@@ -19,14 +19,29 @@ public class Main {
   public static int FIBCOUNT = 64;
   public static int[] fibs;
 
+  /// CHECK-START-X86_64: int Main.test() licm (before)
+  /// CHECK-DAG:                        StaticFieldGet field_name:Main.fibs loop:none
+  /// CHECK-DAG:                        StaticFieldGet field_name:Main.fibs loop:B{{\d+}}
+
+  /// CHECK-START-X86_64: int Main.test() licm (after)
+  /// CHECK:                            StaticFieldGet field_name:Main.fibs loop:none
+  /// CHECK:                            StaticFieldGet field_name:Main.fibs loop:none
+
+  /// CHECK-START-X86_64: int Main.test() licm (after)
+  /// CHECK-NOT:                        StaticFieldGet field_name:Main.fibs loop:B{{\d+}}
+
+  /// CHECK-START-X86_64: int Main.test() load_store_elimination (after)
+  /// CHECK:                            StaticFieldGet field_name:Main.fibs
+  /// CHECK-NOT:                        StaticFieldGet field_name:Main.fibs
+
   /// CHECK-START-X86_64: int Main.test() disassembly (after)
   /// CHECK-DAG:   <<Zero:i\d+>>        IntConstant 0
+  /// CHECK-DAG:   <<Fibs:l\d+>>        StaticFieldGet field_name:Main.fibs
   //
   /// CHECK:                            If
   /// CHECK-NEXT:                       cmp
   /// CHECK-NEXT:                       jle/ng
   //
-  /// CHECK-DAG:   <<Fibs:l\d+>>        StaticFieldGet
   /// CHECK-DAG:                        NullCheck [<<Fibs>>]
   /// CHECK-NOT:                        jmp
   /// CHECK-DAG:   <<FibsAtZero:i\d+>>  ArrayGet [<<Fibs>>,<<Zero>>]

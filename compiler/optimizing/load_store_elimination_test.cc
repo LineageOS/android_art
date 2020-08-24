@@ -20,7 +20,6 @@
 #include "load_store_elimination.h"
 #include "nodes.h"
 #include "optimizing_unit_test.h"
-#include "side_effects_analysis.h"
 
 #include "gtest/gtest.h"
 
@@ -30,9 +29,7 @@ class LoadStoreEliminationTest : public OptimizingUnitTest {
  public:
   void PerformLSE() {
     graph_->BuildDominatorTree();
-    SideEffectsAnalysis side_effects(graph_);
-    side_effects.Run();
-    LoadStoreElimination lse(graph_, side_effects, /*stats=*/ nullptr);
+    LoadStoreElimination lse(graph_, /*stats=*/ nullptr);
     lse.Run();
     EXPECT_TRUE(CheckGraphSkipRefTypeInfoChecks());
   }
@@ -581,9 +578,12 @@ TEST_F(LoadStoreEliminationTest, MergePredecessorStores) {
 //     vstore2: b[i,... i + 3] = x
 //     vstore3: a[i,... i + 3] = [1,...1]
 //
+// Return 'a' from the method to make it escape.
+//
 // Expected:
 //   'vstore1' is not removed.
 //   'vload' is removed.
+//   'vstore2' is removed because 'b' does not escape.
 //   'vstore3' is removed.
 TEST_F(LoadStoreEliminationTest, RedundantVStoreVLoadInLoop) {
   CreateTestControlFlowGraph();
@@ -594,6 +594,10 @@ TEST_F(LoadStoreEliminationTest, RedundantVStoreVLoadInLoop) {
   HInstruction* array_a = new (GetAllocator()) HNewArray(c0, c128, 0, 0);
   pre_header_->InsertInstructionBefore(array_a, pre_header_->GetLastInstruction());
   array_a->CopyEnvironmentFrom(suspend_check_->GetEnvironment());
+
+  ASSERT_TRUE(return_block_->GetLastInstruction()->IsReturnVoid());
+  HInstruction* ret = new (GetAllocator()) HReturn(array_a);
+  return_block_->ReplaceAndRemoveInstructionWith(return_block_->GetLastInstruction(), ret);
 
   HInstruction* array_b = new (GetAllocator()) HNewArray(c0, c128, 0, 0);
   pre_header_->InsertInstructionBefore(array_b, pre_header_->GetLastInstruction());
@@ -606,19 +610,18 @@ TEST_F(LoadStoreEliminationTest, RedundantVStoreVLoadInLoop) {
   //    a[i,... i + 3] = [1,...1]
   HInstruction* vstore1 = AddVecStore(loop_, array_a, phi_);
   HInstruction* vload = AddVecLoad(loop_, array_a, phi_);
-  AddVecStore(loop_, array_b, phi_, vload->AsVecLoad());
+  HInstruction* vstore2 = AddVecStore(loop_, array_b, phi_, vload->AsVecLoad());
   HInstruction* vstore3 = AddVecStore(loop_, array_a, phi_, vstore1->InputAt(2));
 
   PerformLSE();
 
   ASSERT_FALSE(IsRemoved(vstore1));
   ASSERT_TRUE(IsRemoved(vload));
+  ASSERT_TRUE(IsRemoved(vstore2));
   ASSERT_TRUE(IsRemoved(vstore3));
 }
 
-// Loop write side effects invalidate all stores.
-// This causes stores after such loops not to be removed, even
-// their values are known.
+// Loop writes invalidate only possibly aliased heap locations.
 TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithSideEffects) {
   CreateTestControlFlowGraph();
 
@@ -630,20 +633,55 @@ TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithSideEffects) {
   // loop:
   //   b[i] = array[i]
   // array[0] = 2
-  AddArraySet(entry_block_, array_, c0, c2);
+  HInstruction* store1 = AddArraySet(entry_block_, array_, c0, c2);
 
   HInstruction* array_b = new (GetAllocator()) HNewArray(c0, c128, 0, 0);
   pre_header_->InsertInstructionBefore(array_b, pre_header_->GetLastInstruction());
   array_b->CopyEnvironmentFrom(suspend_check_->GetEnvironment());
 
   HInstruction* load = AddArrayGet(loop_, array_, phi_);
-  AddArraySet(loop_, array_b, phi_, load);
+  HInstruction* store2 = AddArraySet(loop_, array_b, phi_, load);
 
-  HInstruction* store = AddArraySet(return_block_, array_, c0, c2);
+  HInstruction* store3 = AddArraySet(return_block_, array_, c0, c2);
 
   PerformLSE();
 
-  ASSERT_FALSE(IsRemoved(store));
+  ASSERT_FALSE(IsRemoved(store1));
+  ASSERT_TRUE(IsRemoved(store2));
+  ASSERT_TRUE(IsRemoved(store3));
+}
+
+// Loop writes invalidate only possibly aliased heap locations.
+TEST_F(LoadStoreEliminationTest, StoreAfterLoopWithSideEffects2) {
+  CreateTestControlFlowGraph();
+
+  // Add another array parameter that may alias with `array_`.
+  // Note: We're not adding it to the suspend check environment.
+  AddParameter(new (GetAllocator()) HParameterValue(graph_->GetDexFile(),
+                                                    dex::TypeIndex(0),
+                                                    3,
+                                                    DataType::Type::kInt32));
+  HInstruction* array2 = parameters_.back();
+
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+
+  // array[0] = 2;
+  // loop:
+  //   array2[i] = array[i]
+  // array[0] = 2
+  HInstruction* store1 = AddArraySet(entry_block_, array_, c0, c2);
+
+  HInstruction* load = AddArrayGet(loop_, array_, phi_);
+  HInstruction* store2 = AddArraySet(loop_, array2, phi_, load);
+
+  HInstruction* store3 = AddArraySet(return_block_, array_, c0, c2);
+
+  PerformLSE();
+
+  ASSERT_FALSE(IsRemoved(store1));
+  ASSERT_FALSE(IsRemoved(store2));
+  ASSERT_FALSE(IsRemoved(store3));
 }
 
 // As it is not allowed to use defaults for VecLoads, check if there is a new created array
