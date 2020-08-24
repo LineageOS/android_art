@@ -61,9 +61,6 @@ sdk {
                 "legacy-core-platform-api-stubs-system-modules",
                 "stable-core-platform-api-stubs-system-modules",
             ],
-            native_static_libs: [
-                "libartimagevalues",
-            ],
         },
         darwin: {
             enabled: false,
