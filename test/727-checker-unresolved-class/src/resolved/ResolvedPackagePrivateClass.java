@@ -17,8 +17,22 @@
 package resolved;
 
 // This class is used for compiling code that accesses its fields but it is
-// replaced by a package-private class from src2/ to make that access illegal.
+// replaced by a package-private class from src2/ with reduced access to
+// some members to test different access checks.
 public class ResolvedPackagePrivateClass {
     public static int publicIntField;
-    static int intField;
+    public static int privateIntField;
+    public static int intField;
+
+    public static void $noinline$publicStaticMethod() {
+      System.out.println("ResolvedPackagePrivateClass.$noinline$publicStaticMethod()");
+    }
+
+    public static void $noinline$privateStaticMethod() {
+      System.out.println("ResolvedPackagePrivateClass.$noinline$privateStaticMethod()");
+    }
+
+    public static void $noinline$staticMethod() {
+      System.out.println("ResolvedPackagePrivateClass.$noinline$staticMethod()");
+    }
 }

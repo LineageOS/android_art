@@ -542,6 +542,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libartpalette')
     self._checker.check_native_library('libdexfile')
     self._checker.check_native_library('libdexfile_support')
+    self._checker.check_native_library('libdt_fd_forward')
     self._checker.check_native_library('libopenjdkjvm')
     self._checker.check_native_library('libopenjdkjvmti')
     self._checker.check_native_library('libprofile')
@@ -575,7 +576,6 @@ class ReleaseChecker:
     self._checker.check_native_library('libbacktrace')
     self._checker.check_native_library('libbase')
     self._checker.check_native_library('libc++')
-    self._checker.check_native_library('libdt_fd_forward')
     self._checker.check_native_library('libdt_socket')
     self._checker.check_native_library('libjdwp')
     self._checker.check_native_library('liblzma')
@@ -617,7 +617,6 @@ class ReleaseTargetChecker:
     self._checker.check_multilib_executable('dex2oat')
 
     # Check internal libraries for ART.
-    self._checker.check_prefer64_library('libart-disassembler')
     self._checker.check_native_library('libperfetto_hprof')
 
     # Check exported native libraries for Managed Core Library.
@@ -672,7 +671,6 @@ class DebugChecker:
 
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnectiond')
-    self._checker.check_native_library('libart-disassembler')
     self._checker.check_native_library('libartbased')
     self._checker.check_native_library('libartd')
     self._checker.check_native_library('libartd-compiler')

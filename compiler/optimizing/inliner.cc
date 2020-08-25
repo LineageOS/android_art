@@ -319,33 +319,6 @@ static dex::TypeIndex FindClassIndexIn(ObjPtr<mirror::Class> cls,
   return index;
 }
 
-class ScopedProfilingInfoInlineUse {
- public:
-  explicit ScopedProfilingInfoInlineUse(ArtMethod* method, Thread* self)
-      : method_(method),
-        self_(self),
-        // Fetch the profiling info ahead of using it. If it's null when fetching,
-        // we should not call JitCodeCache::DoneInlining.
-        profiling_info_(
-            Runtime::Current()->GetJit()->GetCodeCache()->NotifyCompilerUse(method, self)) {
-  }
-
-  ~ScopedProfilingInfoInlineUse() {
-    if (profiling_info_ != nullptr) {
-      PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-      DCHECK_EQ(profiling_info_, method_->GetProfilingInfo(pointer_size));
-      Runtime::Current()->GetJit()->GetCodeCache()->DoneCompilerUse(method_, self_);
-    }
-  }
-
-  ProfilingInfo* GetProfilingInfo() const { return profiling_info_; }
-
- private:
-  ArtMethod* const method_;
-  Thread* const self_;
-  ProfilingInfo* const profiling_info_;
-};
-
 HInliner::InlineCacheType HInliner::GetInlineCacheType(
     const Handle<mirror::ObjectArray<mirror::Class>>& classes)
   REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -678,8 +651,8 @@ HInliner::InlineCacheType HInliner::GetInlineCacheJIT(
   ArtMethod* caller = graph_->GetArtMethod();
   // Under JIT, we should always know the caller.
   DCHECK(caller != nullptr);
-  ScopedProfilingInfoInlineUse spiis(caller, Thread::Current());
-  ProfilingInfo* profiling_info = spiis.GetProfilingInfo();
+  ScopedProfilingInfoUse spiu(Runtime::Current()->GetJit(), caller, Thread::Current());
+  ProfilingInfo* profiling_info = spiu.GetProfilingInfo();
 
   if (profiling_info == nullptr) {
     return kInlineCacheNoData;

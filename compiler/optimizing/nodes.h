@@ -2243,8 +2243,9 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
     DCHECK(user != nullptr);
     // Note: fixup_end remains valid across push_front().
     auto fixup_end = uses_.empty() ? uses_.begin() : ++uses_.begin();
+    ArenaAllocator* allocator = user->GetBlock()->GetGraph()->GetAllocator();
     HUseListNode<HInstruction*>* new_node =
-        new (GetBlock()->GetGraph()->GetAllocator()) HUseListNode<HInstruction*>(user, index);
+        new (allocator) HUseListNode<HInstruction*>(user, index);
     uses_.push_front(*new_node);
     FixUpUserRecordsAfterUseInsertion(fixup_end);
   }
@@ -4513,6 +4514,7 @@ class HInvokePolymorphic final : public HInvoke {
  public:
   HInvokePolymorphic(ArenaAllocator* allocator,
                      uint32_t number_of_arguments,
+                     uint32_t number_of_other_inputs,
                      DataType::Type return_type,
                      uint32_t dex_pc,
                      uint32_t dex_method_index,
@@ -4523,7 +4525,7 @@ class HInvokePolymorphic final : public HInvoke {
       : HInvoke(kInvokePolymorphic,
                 allocator,
                 number_of_arguments,
-                /* number_of_other_inputs= */ 0u,
+                number_of_other_inputs,
                 return_type,
                 dex_pc,
                 dex_method_index,

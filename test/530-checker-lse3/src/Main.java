@@ -50,6 +50,12 @@ public class Main {
     assertIntEquals(result, 300);
     result = (Integer)m.invoke(null, 301);
     assertIntEquals(result, 90);
+
+    m = c.getMethod("test4", int.class);
+    result = (Integer)m.invoke(null, 5);
+    assertIntEquals(result, 5);
+    result = (Integer)m.invoke(null, 10);
+    assertIntEquals(result, 10);
   }
 
   private static void assertIntEquals(int result, int expected) {
