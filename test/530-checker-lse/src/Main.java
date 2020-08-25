@@ -2116,6 +2116,37 @@ public class Main {
     return a[1];
   }
 
+  /// CHECK-START: int Main.testLocalArrayMerge8(boolean) load_store_elimination (before)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArrayGet
+
+  /// CHECK-START: int Main.testLocalArrayMerge8(boolean) load_store_elimination (after)
+  /// CHECK-NOT:                 NewArray
+  /// CHECK-NOT:                 ArraySet
+  /// CHECK-NOT:                 ArrayGet
+
+  // Test Merging default value and an identical value.
+  private static int testLocalArrayMerge8(boolean x) {
+    int[] a = new int[2];
+    if (x) {
+      a[0] = 1;  // Make sure the store below is not eliminated immediately as
+                 // storing the same value already present in the heap location.
+      a[0] = 0;  // Store the same value as default value to test merging with
+                 // the default value from else-block.
+    } else {
+      // Do the same as then-block for a different heap location to avoid
+      // relying on block ordering. (Test both `default+0` and `0+default`.)
+      a[1] = 1;
+      a[1] = 0;
+    }
+    return a[0] + a[1];
+  }
+
   /// CHECK-START: void Main.$noinline$testThrowingArraySet(java.lang.Object[], java.lang.Object) load_store_elimination (before)
   /// CHECK-DAG:                 ArrayGet
   /// CHECK-DAG:                 ArraySet
@@ -3801,6 +3832,8 @@ public class Main {
     assertIntEquals(testLocalArrayMerge7(new int[2], true, false), 2);
     assertIntEquals(testLocalArrayMerge7(new int[2], false, true), 0);
     assertIntEquals(testLocalArrayMerge7(new int[2], false, false), 0);
+    assertIntEquals(testLocalArrayMerge8(true), 0);
+    assertIntEquals(testLocalArrayMerge8(false), 0);
 
     TestClass[] tca = new TestClass[] { new TestClass(), null };
     try {
