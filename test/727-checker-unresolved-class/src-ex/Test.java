@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ART_LIBARTIMAGEVALUES_ART_IMAGE_VALUES_H_
-#define ART_LIBARTIMAGEVALUES_ART_IMAGE_VALUES_H_
+import resolved.SubclassOfUnresolvedClass;
+import resolved.SubclassOfUnresolvedClass2;
+import unresolved.UnresolvedClass;
 
-#include <cstdint>
-
-namespace android {
-namespace art {
-namespace imagevalues {
-
-uint32_t GetImageBaseAddress();
-int32_t GetImageMinBaseAddressDelta();
-int32_t GetImageMaxBaseAddressDelta();
-
-}  // namespace imagevalues
-}  // namespace art
-}  // namespace android
-
-#endif  // ART_LIBARTIMAGEVALUES_ART_IMAGE_VALUES_H_
+public class Test {
+  public static void $noinline$main() {
+    UnresolvedClass.$noinline$main();
+    SubclassOfUnresolvedClass.$noinline$main();
+    SubclassOfUnresolvedClass2.$noinline$main();
+  }
+}

@@ -76,9 +76,6 @@
           "libcore.icu.DateIntervalFormatTest#test10209343_when_not_this_year",
           "libcore.icu.DateIntervalFormatTest#test10560853_for_single_day_events",
           "libcore.icu.DateIntervalFormatTest#test10560853_when_time_not_displayed",
-          "libcore.icu.RelativeDateTimeFormatterTest#test_getRelativeDateTimeString",
-          "libcore.icu.RelativeDateTimeFormatterTest#test_getRelativeTimeSpanString",
-          "libcore.icu.RelativeDateTimeFormatterTest#test_getRelativeTimeSpanStringAbbrev",
           "libcore.java.text.OldDateFormatTest#test_parseLString",
           "libcore.java.text.SimpleDateFormatTest#testDstZoneNameWithNonDstTimestamp",
           "libcore.java.text.SimpleDateFormatTest#testDstZoneWithNonDstTimestampForNonHourDstZone",
@@ -227,17 +224,6 @@
   ]
 },
 {
-  description: "Apex related",
-  result: EXEC_FAILED,
-  modes: [device],
-  bug: 122642227,
-  names: [
-    "libcore.libcore.icu.TimeZoneIntegrationTest#testTimeZoneDataVersion",
-    "libcore.libcore.icu.TimeZoneIntegrationTest#testTimeZoneDebugInfo",
-    "libcore.libcore.icu.TimeZoneIntegrationTest#testTzDataSetVersions"
-  ]
-},
-{
   description: "Timeout on walleye bots, currenlty on OPM1.171019.019. But test passes on Q, so just mark it fail here.",
   result: EXEC_FAILED,
   modes: [device],
@@ -272,5 +258,12 @@
   description: "Fails on non-Android and Android versions < R",
   result: EXEC_FAILED,
   names: ["libcore.android.system.OsTest#test_NetlinkSocket"]
+},
+{
+  description: "Times out on device",
+  result: EXEC_FAILED,
+  modes: [device],
+  bug: 161898207,
+  names: ["libcore.java.util.zip.ZipFileTest#testZipFileWithLotsOfEntries"]
 }
 ]
