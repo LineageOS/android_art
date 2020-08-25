@@ -72,7 +72,7 @@ fi
 
 # If --exclude-api-lists is not passed directly, exclude whitelist APIs.
 if [[ "$@" != "*--exclude-api-lists=*" ]]; then
-  extra_flags="${extra_flags} --exclude-api-lists=whitelist,invalid"
+  extra_flags="${extra_flags} --exclude-api-lists=sdk,invalid"
 fi
 
 ${ANDROID_HOST_OUT}/bin/veridex \
