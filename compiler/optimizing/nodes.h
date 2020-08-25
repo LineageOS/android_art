@@ -4514,7 +4514,6 @@ class HInvokePolymorphic final : public HInvoke {
  public:
   HInvokePolymorphic(ArenaAllocator* allocator,
                      uint32_t number_of_arguments,
-                     uint32_t number_of_other_inputs,
                      DataType::Type return_type,
                      uint32_t dex_pc,
                      uint32_t dex_method_index,
@@ -4525,7 +4524,7 @@ class HInvokePolymorphic final : public HInvoke {
       : HInvoke(kInvokePolymorphic,
                 allocator,
                 number_of_arguments,
-                number_of_other_inputs,
+                /* number_of_other_inputs= */ 0u,
                 return_type,
                 dex_pc,
                 dex_method_index,
