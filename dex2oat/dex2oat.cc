@@ -71,7 +71,6 @@
 #include "dex/quick_compiler_callbacks.h"
 #include "dex/verification_results.h"
 #include "dex2oat_options.h"
-#include "dex2oat_return_codes.h"
 #include "dexlayout.h"
 #include "driver/compiler_driver.h"
 #include "driver/compiler_options.h"
@@ -105,6 +104,14 @@
 #include "well_known_classes.h"
 
 namespace art {
+
+namespace dex2oat {
+  enum class ReturnCode : int {
+    kNoFailure = 0,          // No failure, execution completed successfully.
+    kOther = 1,              // Some other not closer specified error occurred.
+    kCreateRuntime = 2,      // Dex2oat failed creating a runtime.
+  };
+}  // namespace dex2oat
 
 using android::base::StringAppendV;
 using android::base::StringPrintf;
