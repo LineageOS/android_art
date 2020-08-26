@@ -31,17 +31,19 @@
  * We use load-store analysis to collect a list of heap locations and perform
  * alias analysis of those heap locations. LSE then keeps track of a list of
  * heap values corresponding to the heap locations and stores that put those
- * values in these locations. In phase 1, we visit basic blocks in reverse post
- * order and for each basic block, visit instructions sequentially, recording
- * heap values and looking for loads and stores to eliminate without relying on
- * loop Phis. In phase, we look for loads that can be replaced by creating loop
- * Phis or using a loop-invariant value. In phase 3, we determine which stores
- * are dead and can be eliminated and based on that information we re-evaluate
- * whether some kept stores are storing the same value as the value in the heap
- * location; such stores are also marked for elimination. In phase 4, we commit
- * the changes, replacing loads marked for elimination in previous processing
- * and removing stores not marked for keeping. We also remove allocations that
- * are no longer needed.
+ * values in these locations.
+ *  - In phase 1, we visit basic blocks in reverse post order and for each basic
+ *    block, visit instructions sequentially, recording heap values and looking
+ *    for loads and stores to eliminate without relying on loop Phis.
+ *  - In phase 2, we look for loads that can be replaced by creating loop Phis
+ *    or using a loop-invariant value.
+ *  - In phase 3, we determine which stores are dead and can be eliminated and
+ *    based on that information we re-evaluate whether some kept stores are
+ *    storing the same value as the value in the heap location; such stores are
+ *    also marked for elimination.
+ *  - In phase 4, we commit the changes, replacing loads marked for elimination
+ *    in previous processing and removing stores not marked for keeping. We also
+ *    remove allocations that are no longer needed.
  *
  * 1. Walk over blocks and their instructions.
  *
@@ -213,12 +215,10 @@
  * The time complexity of this phase is
  *    O(instructions + instruction_uses) .
  *
- * FIXME: The time complexity described above assumes that FindSubstitute()
- * is O(1) but it is currently O(removed_loads_.size()); this can be fixed
- * by introducing a vector of replacements indexed by instruction id.
- * It also assumes that the HeapLocationCollector finds a heap location for
- * an instruction in O(1) time but it is currently O(heap_locations); this
- * can be fixed by adding a hash map to the HeapLocationCollector.
+ * FIXME: The time complexity described above assumes that the
+ * HeapLocationCollector finds a heap location for an instruction in O(1)
+ * time but it is currently O(heap_locations); this can be fixed by adding
+ * a hash map to the HeapLocationCollector.
  */
 
 namespace art {
@@ -481,18 +481,14 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   // Find an instruction's substitute if it's a removed load.
   // Return the same instruction if it should not be removed.
   HInstruction* FindSubstitute(HInstruction* instruction) const {
-    if (!IsLoad(instruction)) {
+    size_t id = static_cast<size_t>(instruction->GetId());
+    if (id >= substitute_instructions_for_loads_.size()) {
+      DCHECK(!IsLoad(instruction));  // New Phi (may not be in the graph yet) or default value.
       return instruction;
     }
-    for (size_t i = 0u, size = removed_loads_.size(); i != size; ++i) {
-      if (removed_loads_[i] == instruction) {
-        HInstruction* substitute = substitute_instructions_for_loads_[i];
-        // The substitute list is a flat hierarchy.
-        DCHECK_EQ(FindSubstitute(substitute), substitute);
-        return substitute;
-      }
-    }
-    return instruction;
+    HInstruction* substitute = substitute_instructions_for_loads_[id];
+    DCHECK(substitute == nullptr || IsLoad(instruction));
+    return (substitute != nullptr) ? substitute : instruction;
   }
 
   void AddRemovedLoad(HInstruction* load, HInstruction* heap_value) {
@@ -516,9 +512,8 @@ class LSEVisitor final : private HGraphDelegateVisitor {
     HTypeConversion* type_conversion = FindOrAddTypeConversionIfNecessary(
         load, heap_value, load->GetType());
 
-    removed_loads_.push_back(load);
-    substitute_instructions_for_loads_.push_back(
-        type_conversion != nullptr ? type_conversion : heap_value);
+    substitute_instructions_for_loads_[load->GetId()] =
+        type_conversion != nullptr ? type_conversion : heap_value;
   }
 
   static bool IsLoad(HInstruction* instruction) {
@@ -921,11 +916,6 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   // One array of heap value records for each block.
   ScopedArenaVector<ScopedArenaVector<ValueRecord>> heap_values_for_;
 
-  // We record the instructions that should be eliminated but may be
-  // used by heap locations. They'll be removed in the end.
-  ScopedArenaVector<HInstruction*> removed_loads_;
-  ScopedArenaVector<HInstruction*> substitute_instructions_for_loads_;
-
   // We record loads and stores for re-processing when we find a loop Phi placeholder
   // with unknown value from a predecessor, and also for removing stores that are
   // found to be dead, i.e. not marked in `kept_stores_` at the end.
@@ -934,6 +924,11 @@ class LSEVisitor final : private HGraphDelegateVisitor {
     size_t heap_location_index;
   };
   ScopedArenaVector<LoadStoreRecord> loads_and_stores_;
+
+  // We record the substitute instructions for loads that should be
+  // eliminated but may be used by heap locations. They'll be removed
+  // in the end. These are indexed by the load's id.
+  ScopedArenaVector<HInstruction*> substitute_instructions_for_loads_;
 
   // Record stores to keep in a bit vector indexed by instruction ID.
   ArenaBitVector kept_stores_;
@@ -1017,11 +1012,12 @@ LSEVisitor::LSEVisitor(HGraph* graph,
       heap_values_for_(graph->GetBlocks().size(),
                        ScopedArenaVector<ValueRecord>(allocator_.Adapter(kArenaAllocLSE)),
                        allocator_.Adapter(kArenaAllocLSE)),
-      removed_loads_(allocator_.Adapter(kArenaAllocLSE)),
-      substitute_instructions_for_loads_(allocator_.Adapter(kArenaAllocLSE)),
       loads_and_stores_(allocator_.Adapter(kArenaAllocLSE)),
-      // We may add new instructions (default values, Phis) but we're not adding stores,
-      // so we do not need the following BitVector to be expandable.
+      // We may add new instructions (default values, Phis) but we're not adding loads
+      // or stores, so we shall not need to resize following vector and BitVector.
+      substitute_instructions_for_loads_(graph->GetCurrentInstructionId(),
+                                         nullptr,
+                                         allocator_.Adapter(kArenaAllocLSE)),
       kept_stores_(&allocator_,
                    /*start_bits=*/ graph->GetCurrentInstructionId(),
                    /*expandable=*/ false,
@@ -1889,13 +1885,10 @@ void LSEVisitor::ProcessLoopPhiWithUnknownInput(const PhiPlaceholder* loop_phi_w
   }
 
   // Use local allocator to reduce peak memory usage.
-  // FIXME: This is currently incompatible with calls to AddRemovedLoad();
-  //        that function should change also for performance reasons as
-  //        searches in `removed_loads_` are O(n).
-  // ScopedArenaAllocator allocator(allocator_.GetArenaStack());
+  ScopedArenaAllocator allocator(allocator_.GetArenaStack());
   // Reuse one temporary vector for all remaining blocks.
   size_t num_heap_locations = heap_location_collector_.GetNumberOfHeapLocations();
-  ScopedArenaVector<Value> local_heap_values(allocator_.Adapter(kArenaAllocLSE));
+  ScopedArenaVector<Value> local_heap_values(allocator.Adapter(kArenaAllocLSE));
 
   auto get_initial_value = [this](HBasicBlock* block, size_t idx) {
     Value value;
@@ -1945,7 +1938,21 @@ void LSEVisitor::ProcessLoopPhiWithUnknownInput(const PhiPlaceholder* loop_phi_w
         continue;  // This load or store never needed a loop Phi.
       }
       ValueRecord& record = it->second;
-      if (!is_store) {
+      if (is_store) {
+        // Process the store by updating `local_heap_values[idx]`. The last update shall
+        // be propagated to the `heap_values[idx].value` if it previously needed a loop Phi
+        // at the end of the block.
+        Value replacement = ReplacementOrValue(record.value);
+        if (replacement.NeedsLoopPhi()) {
+          // No replacement yet, use the Phi placeholder from the load.
+          DCHECK(record.value.NeedsLoopPhi());
+          local_heap_values[idx] = record.value;
+        } else {
+          // If the load fetched a known value, use it, otherwise use the load.
+          local_heap_values[idx] = Value::ForInstruction(
+              replacement.IsUnknown() ? stored_value : replacement.GetInstruction());
+        }
+      } else {
         // Process the load unless it has previously been marked unreplaceable.
         if (record.value.NeedsLoopPhi()) {
           if (local_heap_values[idx].IsInvalid()) {
@@ -1974,20 +1981,6 @@ void LSEVisitor::ProcessLoopPhiWithUnknownInput(const PhiPlaceholder* loop_phi_w
             AddRemovedLoad(load_or_store, heap_value);
             TryRemovingNullCheck(load_or_store);
           }
-        }
-      } else {
-        // Process the store by updating `local_heap_values[idx]`. The last update shall
-        // be propagated to the `heap_values[idx].value` if it previously needed a loop Phi
-        // at the end of the block.
-        Value replacement = ReplacementOrValue(record.value);
-        if (replacement.NeedsLoopPhi()) {
-          // No replacement yet, use the Phi placeholder from the load.
-          DCHECK(record.value.NeedsLoopPhi());
-          local_heap_values[idx] = record.value;
-        } else {
-          // If the load fetched a known value, use it, otherwise use the load.
-          local_heap_values[idx] = Value::ForInstruction(
-              replacement.IsUnknown() ? stored_value : replacement.GetInstruction());
         }
       }
     }
@@ -2217,15 +2210,16 @@ void LSEVisitor::Run() {
   // 4. Replace loads and remove unnecessary stores and singleton allocations.
 
   // Remove recorded load instructions that should be eliminated.
-  size_t size = removed_loads_.size();
-  DCHECK_EQ(size, substitute_instructions_for_loads_.size());
-  for (size_t i = 0; i != size; ++i) {
-    HInstruction* load = removed_loads_[i];
+  for (const LoadStoreRecord& record : loads_and_stores_) {
+    size_t id = dchecked_integral_cast<size_t>(record.load_or_store->GetId());
+    HInstruction* substitute = substitute_instructions_for_loads_[id];
+    if (substitute == nullptr) {
+      continue;
+    }
+    HInstruction* load = record.load_or_store;
     DCHECK(load != nullptr);
     DCHECK(IsLoad(load));
     DCHECK(load->GetBlock() != nullptr) << load->DebugName() << "@" << load->GetDexPc();
-    HInstruction* substitute = substitute_instructions_for_loads_[i];
-    DCHECK(substitute != nullptr);
     // We proactively retrieve the substitute for a removed load, so
     // a load that has a substitute should not be observed as a heap
     // location value.
