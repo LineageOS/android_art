@@ -79,6 +79,7 @@ void CheckNterpAsmConstants() {
       LOG(FATAL) << "ERROR: unexpected asm interp size " << interp_size
                  << "(did an instruction handler exceed " << width << " bytes?)";
   }
+  static_assert(IsPowerOfTwo(kNterpHotnessMask + 1), "Hotness mask must be a (power of 2) - 1");
 }
 
 inline void UpdateHotness(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
