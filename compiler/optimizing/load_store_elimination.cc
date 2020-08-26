@@ -1167,25 +1167,16 @@ void LSEVisitor::MergePredecessorRecords(HBasicBlock* block) {
     }
     ArrayRef<HBasicBlock* const> predecessors(block->GetPredecessors());
     Value merged_stored_by = heap_values_for_[predecessors[0]->GetBlockId()][idx].stored_by;
-    if (merged_value.IsDefault()) {
-      DCHECK(std::all_of(predecessors.begin(),
-                         predecessors.end(),
-                         [this, idx](HBasicBlock* predecessor) {
-                           uint32_t predecessor_block_id = predecessor->GetBlockId();
-                           return heap_values_for_[predecessor_block_id][idx].stored_by.IsUnknown();
-                         }));
-      DCHECK(merged_stored_by.IsUnknown());
-    } else if (predecessors.size() >= 2u &&
-               !std::all_of(predecessors.begin() + 1,
-                            predecessors.end(),
-                            [this, idx, merged_stored_by](HBasicBlock* predecessor) {
-                               uint32_t predecessor_block_id = predecessor->GetBlockId();
-                               return heap_values_for_[predecessor_block_id][idx].stored_by.Equals(
-                                   merged_stored_by);
-                            })) {
-      // Use the Phi placeholder to track that we need to keep stores from all predecessors.
-      const PhiPlaceholder* phi_placeholder = GetPhiPlaceholder(block->GetBlockId(), idx);
-      merged_stored_by = Value::ForNonLoopPhiPlaceholder(phi_placeholder);
+    for (size_t predecessor_idx = 1u; predecessor_idx != predecessors.size(); ++predecessor_idx) {
+      uint32_t predecessor_block_id = predecessors[predecessor_idx]->GetBlockId();
+      Value stored_by = heap_values_for_[predecessor_block_id][idx].stored_by;
+      if ((!stored_by.IsUnknown() || !merged_stored_by.IsUnknown()) &&
+          !merged_stored_by.Equals(stored_by)) {
+        // Use the Phi placeholder to track that we need to keep stores from all predecessors.
+        const PhiPlaceholder* phi_placeholder = GetPhiPlaceholder(block->GetBlockId(), idx);
+        merged_stored_by = Value::ForNonLoopPhiPlaceholder(phi_placeholder);
+        break;
+      }
     }
     heap_values.push_back({ merged_value, merged_stored_by });
   }
@@ -1292,7 +1283,7 @@ void LSEVisitor::VisitGetLocation(HInstruction* instruction, size_t idx) {
     record.value = Value::Unknown();
   }
   if (record.value.IsDefault()) {
-    DCHECK(record.stored_by.IsUnknown());
+    KeepStores(record.stored_by);
     HInstruction* constant = GetDefaultValue(instruction->GetType());
     AddRemovedLoad(instruction, constant);
     record.value = Value::ForInstruction(constant);
