@@ -25,15 +25,37 @@ extern "C" {
 
 // Functions provided by the Palette Hooks object, called by ART.
 typedef struct paletteHooksInterface_ {
-  // TODO: add functions. Currently only one field to ensure the struct has a
-  // size.
-  void* empty;
+  // Notify the Hooks object that dex2oat is starting compilation of the given
+  // `source_fd` dex/apk/zip file, and will generate .art/.oat/.vdex files with
+  // the given file descriptors.
+  void (*NotifyStartDex2oatCompilation)(int source_fd, int art_fd, int oat_fd, int vdex_fd);
+
+  // Notify the Hooks object that dex2oat has ended compilation of the given
+  // `source_fd` dex/apk/zip file, and has written the contents into the given file descriptors.
+  void (*NotifyEndDex2oatCompilation)(int source_fd, int art_fd, int oat_fd, int vdex_fd);
+
+  // Notify the Hooks object that the runtime is loading a dex file.
+  void (*NotifyDexFileLoaded)(const char* path);
+
+  // Notify the Hooks object that the runtime is loading a .oat file.
+  void (*NotifyOatFileLoaded)(const char* path);
 } paletteHooksInterface;
 
 struct PaletteHooks {
   const struct paletteHooksInterface_* functions;
 #ifdef __cplusplus
-  // TODO: Add member functions.
+  void NotifyStartDex2oatCompilation(int source_fd, int art_fd, int oat_fd, int vdex_fd) {
+    return functions->NotifyStartDex2oatCompilation(source_fd, art_fd, oat_fd, vdex_fd);
+  }
+  void NotifyEndDex2oatCompilation(int source_fd, int art_fd, int oat_fd, int vdex_fd) {
+    return functions->NotifyEndDex2oatCompilation(source_fd, art_fd, oat_fd, vdex_fd);
+  }
+  void NotifyDexFileLoaded(const char* path) {
+    return functions->NotifyDexFileLoaded(path);
+  }
+  void NotifyOatFileLoaded(const char* path) {
+    return functions->NotifyOatFileLoaded(path);
+  }
 #endif
 };
 
