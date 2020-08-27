@@ -1246,6 +1246,105 @@ public class VarHandleTypeConversionTests {
         }
     }
 
+    public static class InterfaceTest extends VarHandleUnitTest {
+        public interface ParentInterface {
+            int getValue();
+        }
+
+        public interface ChildInterface extends ParentInterface {
+            void setValue(int newValue);
+        }
+
+        public class A implements ParentInterface {
+            protected int value = 0;
+            public int getValue() { return value; }
+        }
+
+        public class B extends A implements ChildInterface {
+            public void setValue(int newValue) { value = newValue; }
+        }
+
+        private ParentInterface pi;
+        private A obj;
+
+        private VarHandle vh_pi;
+        private VarHandle vh_obj;
+        {
+            try {
+                vh_pi = MethodHandles.lookup().findVarHandle(InterfaceTest.class, "pi",
+                                                             InterfaceTest.ParentInterface.class);
+                vh_obj = MethodHandles.lookup().findVarHandle(InterfaceTest.class, "obj",
+                                                              InterfaceTest.A.class);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public static void main(String[] args) {
+            new InterfaceTest().run();
+        }
+
+        @Override
+        public void doTest() {
+            // Tests using VarHandle to field of type ParentInterface.
+            {
+                pi = (ParentInterface) new A();
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                try {
+                    ChildInterface c = (ChildInterface) vh_pi.get(this);
+                    failUnreachable();
+                } catch (ClassCastException expected) {}
+            }
+            {
+                pi = new B();
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                B b = (B) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                ChildInterface c = (ChildInterface) vh_pi.get(this);
+            }
+            {
+                pi = null;
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                B b = (B) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                ChildInterface c = (ChildInterface) vh_pi.get(this);
+            }
+
+            // Tests using VarHandle to field of type A.
+            {
+                obj = new A();
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                try {
+                    B b = (B) vh_obj.get(this);
+                    failUnreachable();
+                } catch (ClassCastException e) {}
+                try {
+                    ChildInterface c = (ChildInterface) vh_obj.get(this);
+                    failUnreachable();
+                } catch (ClassCastException e) {}
+            }
+            {
+                obj = new B();
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                B b = (B) vh_obj.get(this);
+                ChildInterface c = (ChildInterface) vh_obj.get(this);
+            }
+            {
+                obj = null;
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                B b = (B) vh_obj.get(this);
+                ChildInterface c = (ChildInterface) vh_obj.get(this);
+            }
+        }
+    }
+
     public static class ImplicitBoxingIntegerTest extends VarHandleUnitTest {
         private static Integer field;
         private static final VarHandle vh;
@@ -1337,6 +1436,7 @@ public class VarHandleTypeConversionTests {
 
         SubtypeTest.main(args);
         SupertypeTest.main(args);
+        InterfaceTest.main(args);
 
         ImplicitBoxingIntegerTest.main(args);
     }
