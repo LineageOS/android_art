@@ -722,6 +722,16 @@ def emit_reference_accessor_tests(output_path):
         for accessor in VAR_HANDLE_ACCESSORS:
             emit_accessor_test(var_handle_kind, accessor, ref_type, output_path)
 
+def emit_interface_accessor_tests(output_path):
+    ref_type = JavaType("WidgetInterface", [ "Widget.ONE", "Widget.TWO", "null" ])
+    for var_handle_kind in ALL_VAR_HANDLE_KINDS:
+        if var_handle_kind.is_view():
+            # Views as reference type arrays are not supported. They
+            # fail instantiation. This is tested in 710-varhandle-creation.
+            continue
+        for accessor in VAR_HANDLE_ACCESSORS:
+            emit_accessor_test(var_handle_kind, accessor, ref_type, output_path)
+
 def emit_boxing_value_type_accessor_test(accessor, var_type, output_path):
     test_class = "Boxing" + capitalize_first(accessor.method_name) + capitalize_first(var_type.name)
     GENERATED_TEST_CLASSES.append(test_class)
@@ -873,6 +883,7 @@ def main(argv):
         sys.exit(1)
     emit_value_type_accessor_tests(final_java_dir)
     emit_reference_accessor_tests(final_java_dir)
+    emit_interface_accessor_tests(final_java_dir)
     emit_boxing_value_type_accessor_tests(final_java_dir)
     emit_main(final_java_dir, argv[2:])
 
