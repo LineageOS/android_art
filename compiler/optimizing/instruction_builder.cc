@@ -2419,9 +2419,11 @@ bool HInstructionBuilder::LoadClassNeedsAccessCheck(ObjPtr<mirror::Class> klass)
     return true;
   } else if (klass->IsPublic()) {
     return false;
+  } else if (dex_compilation_unit_->GetCompilingClass() != nullptr) {
+    return !dex_compilation_unit_->GetCompilingClass()->CanAccess(klass);
   } else {
-    ObjPtr<mirror::Class> compiling_class = dex_compilation_unit_->GetCompilingClass().Get();
-    return compiling_class == nullptr || !compiling_class->CanAccess(klass);
+    SamePackageCompare same_package(*dex_compilation_unit_);
+    return !same_package(klass);
   }
 }
 
