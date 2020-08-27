@@ -15,7 +15,7 @@
  */
 
 // Widget class for reference type accessor tests.
-public class Widget {
+public class Widget implements WidgetInterface {
     protected int requisitionNumber;
 
     public Widget(int requisitionNumber) {
@@ -33,6 +33,8 @@ public class Widget {
         Widget wo = (Widget) o;
         return requisitionNumber == wo.requisitionNumber;
     }
+
+    public int getRequisitionNumber() { return requisitionNumber; }
 
     public static final Widget ONE = new Widget(1);
     public static final Widget TWO = new Widget(2);
