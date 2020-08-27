@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-public class MissingSuperClass {
+public interface MissingInterface {
 }

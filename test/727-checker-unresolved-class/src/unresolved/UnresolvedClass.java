@@ -51,12 +51,11 @@ public class UnresolvedClass {
   }
 
   /// CHECK-START: void unresolved.UnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void unresolved.UnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() {
-    // TODO: Use StaticFieldSet when the referenced class is public.
     ResolvedPublicSubclassOfPackagePrivateClass.publicIntField = 42;
   }
 
