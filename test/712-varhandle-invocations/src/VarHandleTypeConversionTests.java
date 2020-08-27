@@ -39,12 +39,14 @@ public class VarHandleTypeConversionTests {
             // Void is always okay for a return type.
             vh.setVolatile(this, 33);
             vh.get(this);
-            vh.compareAndSet(this, 33, 44);
-            vh.compareAndSet(this, 27, 16);
-            vh.weakCompareAndSet(this, 17, 19);
             vh.getAndSet(this, 200000);
             vh.getAndBitwiseXor(this, 0x5a5a5a5a);
             vh.getAndAdd(this, 99);
+
+            // Return type of these is boolean (JLS9 S15.12), but check anyway.
+            vh.compareAndSet(this, 33, 44);
+            vh.compareAndSet(this, 27, 16);
+            vh.weakCompareAndSet(this, 17, 19);
         }
 
         public static void main(String[] args) {
@@ -668,7 +670,7 @@ public class VarHandleTypeConversionTests {
             vh.set((short) 1);
             vh.set((int) 1);
             vh.set((long) 1);
-            vh.set((double) 1.0f);
+            vh.set((float) 1.0f);
             vh.set((double) 1.0);
         }
 
@@ -1377,26 +1379,29 @@ public class VarHandleTypeConversionTests {
             } catch (WrongMethodTypeException e) {
             }
             try {
-                vh.set((short) 1);
+                vh.set('A');
                 failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
-                vh.set('A');
+                vh.set((short) 1);
                 failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             vh.set(2);
             try {
                 vh.setRelease(Long.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
                 vh.setRelease(Float.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
                 vh.setRelease(Double.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             vh.set(null);
