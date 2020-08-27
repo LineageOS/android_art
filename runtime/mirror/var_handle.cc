@@ -1429,18 +1429,19 @@ VarHandle::MatchKind VarHandle::GetMethodTypeMatchForAccessMode(AccessMode acces
   ObjPtr<VarHandle> vh = this;
   ObjPtr<Class> var_type = vh->GetVarType();
   ObjPtr<Class> mt_rtype = method_type->GetRType();
+  ObjPtr<Class> void_type = WellKnownClasses::ToClass(WellKnownClasses::java_lang_Void);
   AccessModeTemplate access_mode_template = GetAccessModeTemplate(access_mode);
 
-  // Check return type first. If the return type of the method
-  // of the VarHandle is immaterial.
-  if (mt_rtype->GetPrimitiveType() != Primitive::Type::kPrimVoid) {
-    ObjPtr<Class> vh_rtype = GetReturnType(access_mode_template, var_type);
-    if (vh_rtype != mt_rtype) {
-      if (!IsReturnTypeConvertible(vh_rtype, mt_rtype)) {
-        return MatchKind::kNone;
-      }
-      match = MatchKind::kWithConversions;
+  // Check return type first.
+  ObjPtr<Class> vh_rtype = GetReturnType(access_mode_template, var_type);
+  if (mt_rtype->GetPrimitiveType() != Primitive::Type::kPrimVoid &&
+      !mt_rtype->IsAssignableFrom(vh_rtype)) {
+    // Call-site is an expression (expects a return value) and the value returned by the accessor
+    // is not assignable to the expected return type.
+    if (!IsReturnTypeConvertible(vh_rtype, mt_rtype)) {
+      return MatchKind::kNone;
     }
+    match = MatchKind::kWithConversions;
   }
 
   // Check the number of parameters matches.
@@ -1457,7 +1458,12 @@ VarHandle::MatchKind VarHandle::GetMethodTypeMatchForAccessMode(AccessMode acces
   // Check the parameter types are compatible.
   ObjPtr<ObjectArray<Class>> mt_ptypes = method_type->GetPTypes();
   for (int32_t i = 0; i < vh_ptypes_count; ++i) {
-    if (mt_ptypes->Get(i) == vh_ptypes[i]) {
+    if (vh_ptypes[i]->IsAssignableFrom(mt_ptypes->Get(i))) {
+      continue;
+    }
+    if (mt_ptypes->Get(i) == void_type && !vh_ptypes[i]->IsPrimitive()) {
+      // The expected parameter is a reference and the parameter type from the call site is j.l.Void
+      // which means the value is null. It is always valid for a reference parameter to be null.
       continue;
     }
     if (!IsParameterTypeConvertible(mt_ptypes->Get(i), vh_ptypes[i])) {
@@ -1466,47 +1472,6 @@ VarHandle::MatchKind VarHandle::GetMethodTypeMatchForAccessMode(AccessMode acces
     match = MatchKind::kWithConversions;
   }
   return match;
-}
-
-bool VarHandle::IsInvokerMethodTypeCompatible(AccessMode access_mode,
-                                              ObjPtr<MethodType> method_type) {
-  StackHandleScope<3> hs(Thread::Current());
-  Handle<Class> mt_rtype(hs.NewHandle(method_type->GetRType()));
-  Handle<VarHandle> vh(hs.NewHandle(this));
-  Handle<Class> var_type(hs.NewHandle(vh->GetVarType()));
-  AccessModeTemplate access_mode_template = GetAccessModeTemplate(access_mode);
-
-  // Check return type first.
-  if (mt_rtype->GetPrimitiveType() == Primitive::Type::kPrimVoid) {
-    // The result of the operation will be discarded. The return type
-    // of the VarHandle is immaterial.
-  } else {
-    ObjPtr<Class> vh_rtype(GetReturnType(access_mode_template, var_type.Get()));
-    if (!IsReturnTypeConvertible(vh_rtype, mt_rtype.Get())) {
-      return false;
-    }
-  }
-
-  // Check the number of parameters matches (ignoring the VarHandle parameter).
-  static const int32_t kVarHandleParameters = 1;
-  ObjPtr<Class> vh_ptypes[VarHandle::kMaxAccessorParameters];
-  const int32_t vh_ptypes_count = BuildParameterArray(vh_ptypes,
-                                                      access_mode_template,
-                                                      var_type.Get(),
-                                                      GetCoordinateType0(),
-                                                      GetCoordinateType1());
-  if (vh_ptypes_count != method_type->GetPTypes()->GetLength() - kVarHandleParameters) {
-    return false;
-  }
-
-  // Check the parameter types are compatible (ignoring the VarHandle parameter).
-  ObjPtr<ObjectArray<Class>> mt_ptypes = method_type->GetPTypes();
-  for (int32_t i = 0; i < vh_ptypes_count; ++i) {
-    if (!IsParameterTypeConvertible(mt_ptypes->Get(i + kVarHandleParameters), vh_ptypes[i])) {
-      return false;
-    }
-  }
-  return true;
 }
 
 ObjPtr<MethodType> VarHandle::GetMethodTypeForAccessMode(Thread* self,
