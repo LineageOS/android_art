@@ -53,12 +53,11 @@ public class SubclassOfUnresolvedClass2 extends UnresolvedClass {
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass2.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass2.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() {
-    // TODO: Use StaticFieldSet.
     ResolvedPublicSubclassOfPackagePrivateClass.publicIntField = 42;
   }
 
