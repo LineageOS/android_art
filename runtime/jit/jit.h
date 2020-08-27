@@ -261,6 +261,10 @@ class Jit {
       REQUIRES(!lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  int GetThreadPoolPthreadPriority() const {
+    return options_->GetThreadPoolPthreadPriority();
+  }
+
   uint16_t OSRMethodThreshold() const {
     return options_->GetOsrThreshold();
   }
