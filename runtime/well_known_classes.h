@@ -88,6 +88,7 @@ struct WellKnownClasses {
   static jclass java_lang_Thread;
   static jclass java_lang_ThreadGroup;
   static jclass java_lang_Throwable;
+  static jclass java_lang_Void;
   static jclass java_nio_Buffer;
   static jclass java_nio_ByteBuffer;
   static jclass java_nio_DirectByteBuffer;
