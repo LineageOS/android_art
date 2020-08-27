@@ -915,6 +915,11 @@ TEST_F(AssemblerX86_64Test, AndlImm) {
                      "andl ${imm}, %{reg}"), "andli");
 }
 
+TEST_F(AssemblerX86_64Test, Andw) {
+  DriverStr(
+      RepeatAI(&x86_64::X86_64Assembler::andw, /*imm_bytes*/2U, "andw ${imm}, {mem}"), "andw");
+}
+
 TEST_F(AssemblerX86_64Test, OrqRegs) {
   DriverStr(RepeatRR(&x86_64::X86_64Assembler::orq, "orq %{reg2}, %{reg1}"), "orq");
 }
