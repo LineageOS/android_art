@@ -38,22 +38,20 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInResolvedPackagePrivateClass() {
-    // TODO: Use StaticFieldSet.
     ResolvedPackagePrivateClass.publicIntField = 42;
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() {
-    // TODO: Use StaticFieldSet.
     ResolvedPublicSubclassOfPackagePrivateClass.publicIntField = 42;
   }
 
@@ -82,22 +80,20 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() {
-    // TODO: Use StaticFieldSet.
     ResolvedPackagePrivateClass.intField = 42;
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK: UnresolvedStaticFieldSet
+  /// CHECK: StaticFieldSet
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
-  /// CHECK-NOT: StaticFieldSet
+  /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() {
-    // TODO: Use StaticFieldSet.
     ResolvedPublicSubclassOfPackagePrivateClass.intField = 42;
   }
 
