@@ -80,6 +80,8 @@ void CheckNterpAsmConstants() {
                  << "(did an instruction handler exceed " << width << " bytes?)";
   }
   static_assert(IsPowerOfTwo(kNterpHotnessMask + 1), "Hotness mask must be a (power of 2) - 1");
+  static_assert(IsPowerOfTwo(kTieredHotnessMask + 1),
+                "Tiered hotness mask must be a (power of 2) - 1");
 }
 
 inline void UpdateHotness(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
