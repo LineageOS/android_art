@@ -30,6 +30,7 @@
 #include "gc/accounting/card_table.h"
 #include "gc/space/image_space.h"
 #include "heap_poisoning.h"
+#include "interpreter/mterp/nterp.h"
 #include "intrinsics.h"
 #include "intrinsics_arm64.h"
 #include "linker/linker_patch.h"
@@ -1153,9 +1154,9 @@ void CodeGeneratorARM64::MaybeIncrementHotness(bool is_frame_entry) {
       __ Mov(temp, address);
       __ Ldrh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
       __ Add(counter, counter, 1);
+      __ And(counter, counter, interpreter::kTieredHotnessMask);
       __ Strh(counter, MemOperand(temp, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
-      __ Tst(counter, 0xffff);
-      __ B(ne, &done);
+      __ Cbnz(counter, &done);
       if (is_frame_entry) {
         if (HasEmptyFrame()) {
           // The entrypoint expects the method at the bottom of the stack. We
