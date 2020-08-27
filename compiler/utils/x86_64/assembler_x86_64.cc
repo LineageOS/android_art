@@ -4096,6 +4096,15 @@ void X86_64Assembler::andq(CpuRegister dst, const Address& src) {
 }
 
 
+void X86_64Assembler::andw(const Address& address, const Immediate& imm) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  CHECK(imm.is_uint16() || imm.is_int16()) << imm.value();
+  EmitUint8(0x66);
+  EmitOptionalRex32(address);
+  EmitComplex(4, address, imm, /* is_16_op= */ true);
+}
+
+
 void X86_64Assembler::orl(CpuRegister dst, CpuRegister src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitOptionalRex32(dst, src);
