@@ -20,6 +20,9 @@ import unresolved.UnresolvedClass;
 
 public class SubclassOfUnresolvedClass extends UnresolvedClass {
   public static void $noinline$main() {
+    $noinline$testResolvedPublicClass();
+    $noinline$testResolvedPackagePrivateClass();
+
     $noinline$testPublicFieldInResolvedPackagePrivateClass();
     $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass();
     $noinline$testPrivateFieldInResolvedPackagePrivateClass();
@@ -35,6 +38,18 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
     System.out.println("SubclassOfUnresolvedClass passed");
+  }
+
+  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testResolvedPublicClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.ResolvedPublicSubclassOfPackagePrivateClass needs_access_check:false
+  static void $noinline$testResolvedPublicClass() {
+    Class<?> c = ResolvedPublicSubclassOfPackagePrivateClass.class;
+  }
+
+  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testResolvedPackagePrivateClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.ResolvedPackagePrivateClass needs_access_check:false
+  static void $noinline$testResolvedPackagePrivateClass() {
+    Class<?> c = ResolvedPackagePrivateClass.class;
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
