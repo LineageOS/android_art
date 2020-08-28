@@ -1148,10 +1148,6 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
   DCHECK_EQ(1 + ArtMethod::NumArgRegisters(shorty), operands.GetNumberOfOperands());
   DataType::Type return_type = DataType::FromShorty(shorty[0]);
   size_t number_of_arguments = strlen(shorty);
-  // Other inputs are needed to propagate type information regarding the MethodType of the
-  // call site. We need this when generating code to check that VarHandle accessors are
-  // called correctly (for references).
-  size_t number_of_other_inputs = 0u;
   // We use ResolveMethod which is also used in BuildInvoke in order to
   // not duplicate code. As such, we need to provide is_string_constructor
   // even if we don't need it afterwards.
@@ -1164,36 +1160,34 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
                                             /* target_method= */ nullptr,
                                             &is_string_constructor);
 
-  bool needs_other_inputs =
-      resolved_method->GetIntrinsic() == static_cast<uint32_t>(Intrinsics::kVarHandleGet) &&
-      return_type == DataType::Type::kReference &&
-      number_of_arguments == 1u;
-  if (needs_other_inputs) {
-    // The extra argument here is the loaded callsite return type, which needs to be checked
-    // against the runtime VarHandle type.
-    number_of_other_inputs++;
-  }
-
   HInvoke* invoke = new (allocator_) HInvokePolymorphic(allocator_,
                                                         number_of_arguments,
-                                                        number_of_other_inputs,
                                                         return_type,
                                                         dex_pc,
                                                         method_idx,
                                                         resolved_method);
 
-  if (needs_other_inputs) {
+  if (!HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false)) {
+    return false;
+  }
+
+  bool needs_ret_type_check =
+      resolved_method->GetIntrinsic() == static_cast<uint32_t>(Intrinsics::kVarHandleGet) &&
+      return_type == DataType::Type::kReference &&
+      // VarHandle.get() is only implemented for static fields for now.
+      number_of_arguments == 1u;
+  if (needs_ret_type_check) {
     ScopedObjectAccess soa(Thread::Current());
     ArtMethod* referrer = graph_->GetArtMethod();
     dex::TypeIndex ret_type_index = referrer->GetDexFile()->GetProtoId(proto_idx).return_type_idx_;
-    HLoadClass* load_cls = BuildLoadClass(ret_type_index, dex_pc);
-    size_t last_index = invoke->InputCount() - 1;
 
-    DCHECK(invoke->InputAt(last_index) == nullptr);
-    invoke->SetRawInputAt(last_index, load_cls);
+    // Type check is needed because intrinsic implementations do not type check the retrieved
+    // reference.
+    BuildTypeCheck(/* is_instance_of= */ false, invoke, ret_type_index, dex_pc);
+    latest_result_ = current_block_->GetLastInstruction();
   }
 
-  return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
+  return true;
 }
 
 
@@ -2441,13 +2435,10 @@ void HInstructionBuilder::BuildLoadMethodType(dex::ProtoIndex proto_index, uint3
   AppendInstruction(load_method_type);
 }
 
-void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
-                                         uint8_t destination,
-                                         uint8_t reference,
+void HInstructionBuilder::BuildTypeCheck(bool is_instance_of,
+                                         HInstruction* object,
                                          dex::TypeIndex type_index,
                                          uint32_t dex_pc) {
-  HInstruction* object = LoadLocal(reference, DataType::Type::kReference);
-
   ScopedObjectAccess soa(Thread::Current());
   const DexFile& dex_file = *dex_compilation_unit_->GetDexFile();
   Handle<mirror::Class> klass = ResolveClass(soa, type_index);
@@ -2473,7 +2464,7 @@ void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
   }
   DCHECK(class_or_null != nullptr);
 
-  if (instruction.Opcode() == Instruction::INSTANCE_OF) {
+  if (is_instance_of) {
     AppendInstruction(new (allocator_) HInstanceOf(object,
                                                    class_or_null,
                                                    check_kind,
@@ -2482,9 +2473,7 @@ void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
                                                    allocator_,
                                                    bitstring_path_to_root,
                                                    bitstring_mask));
-    UpdateLocal(destination, current_block_->GetLastInstruction());
   } else {
-    DCHECK_EQ(instruction.Opcode(), Instruction::CHECK_CAST);
     // We emit a CheckCast followed by a BoundType. CheckCast is a statement
     // which may throw. If it succeeds BoundType sets the new type of `object`
     // for all subsequent uses.
@@ -2498,6 +2487,23 @@ void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
                                     bitstring_path_to_root,
                                     bitstring_mask));
     AppendInstruction(new (allocator_) HBoundType(object, dex_pc));
+  }
+}
+
+void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
+                                         uint8_t destination,
+                                         uint8_t reference,
+                                         dex::TypeIndex type_index,
+                                         uint32_t dex_pc) {
+  HInstruction* object = LoadLocal(reference, DataType::Type::kReference);
+  bool is_instance_of = instruction.Opcode() == Instruction::INSTANCE_OF;
+
+  BuildTypeCheck(is_instance_of, object, type_index, dex_pc);
+
+  if (is_instance_of) {
+    UpdateLocal(destination, current_block_->GetLastInstruction());
+  } else {
+    DCHECK_EQ(instruction.Opcode(), Instruction::CHECK_CAST);
     UpdateLocal(reference, current_block_->GetLastInstruction());
   }
 }
