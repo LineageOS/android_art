@@ -1190,7 +1190,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   using Opt = RuntimeArgumentMap;
   Opt runtime_options(std::move(runtime_options_in));
   ScopedTrace trace(__FUNCTION__);
-  CHECK_EQ(sysconf(_SC_PAGE_SIZE), kPageSize);
+  CHECK_EQ(static_cast<size_t>(sysconf(_SC_PAGE_SIZE)), kPageSize);
 
   // Early override for logging output.
   if (runtime_options.Exists(Opt::UseStderrLogger)) {
