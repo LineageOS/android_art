@@ -1174,8 +1174,8 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
   bool needs_ret_type_check =
       resolved_method->GetIntrinsic() == static_cast<uint32_t>(Intrinsics::kVarHandleGet) &&
       return_type == DataType::Type::kReference &&
-      // VarHandle.get() is only implemented for static fields for now.
-      number_of_arguments == 1u;
+      // VarHandle.get() is only implemented for fields now.
+      number_of_arguments < 3u;
   if (needs_ret_type_check) {
     ScopedObjectAccess soa(Thread::Current());
     ArtMethod* referrer = graph_->GetArtMethod();
