@@ -69,22 +69,31 @@ uint64_t ThreadCpuNanoTime();
 uint64_t ProcessCpuNanoTime();
 
 // Converts the given number of nanoseconds to milliseconds.
-static constexpr inline uint64_t NsToMs(uint64_t ns) {
+static constexpr uint64_t NsToMs(uint64_t ns) {
   return ns / 1000 / 1000;
 }
 
 // Converts the given number of milliseconds to nanoseconds
-static constexpr inline uint64_t MsToNs(uint64_t ms) {
+static constexpr uint64_t MsToNs(uint64_t ms) {
   return ms * 1000 * 1000;
 }
 
 // Converts the given number of milliseconds to microseconds
-static constexpr inline uint64_t MsToUs(uint64_t ms) {
+static constexpr uint64_t MsToUs(uint64_t ms) {
   return ms * 1000;
 }
 
-static constexpr inline uint64_t UsToNs(uint64_t us) {
+static constexpr uint64_t UsToNs(uint64_t us) {
   return us * 1000;
+}
+
+static constexpr time_t SaturatedTimeT(int64_t secs) {
+  if (sizeof(time_t) < sizeof(int64_t)) {
+    return static_cast<time_t>(std::min(secs,
+                                        static_cast<int64_t>(std::numeric_limits<time_t>::max())));
+  } else {
+    return secs;
+  }
 }
 
 #if defined(__APPLE__)
