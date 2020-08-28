@@ -214,7 +214,7 @@ std::ostream& operator<<(std::ostream& os, const X86ManagedRegister& reg);
 
 }  // namespace x86
 
-constexpr inline x86::X86ManagedRegister ManagedRegister::AsX86() const {
+constexpr x86::X86ManagedRegister ManagedRegister::AsX86() const {
   x86::X86ManagedRegister reg(id_);
   CHECK(reg.IsNoRegister() || reg.IsValidManagedRegister());
   return reg;
