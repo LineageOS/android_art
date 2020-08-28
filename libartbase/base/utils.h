@@ -40,14 +40,14 @@ static inline uint32_t PointerToLowMemUInt32(const void* p) {
 }
 
 // Returns a human-readable size string such as "1MB".
-std::string PrettySize(int64_t size_in_bytes);
+std::string PrettySize(uint64_t size_in_bytes);
 
 // Splits a string using the given separator character into a vector of
 // strings. Empty strings will be omitted.
 void Split(const std::string& s, char separator, std::vector<std::string>* result);
 
 // Returns the calling thread's tid. (The C libraries don't expose this.)
-pid_t GetTid();
+uint32_t GetTid();
 
 // Returns the given thread's name.
 std::string GetThreadName(pid_t tid);
