@@ -882,6 +882,8 @@ void ReferenceTypePropagation::RTPVisitor::VisitInvoke(HInvoke* instr) {
   }
 
   ScopedObjectAccess soa(Thread::Current());
+  // FIXME: Treat InvokePolymorphic separately, as we can get a more specific return type from
+  // protoId than the one obtained from the resolved method.
   ArtMethod* method = instr->GetResolvedMethod();
   ObjPtr<mirror::Class> klass = (method == nullptr) ? nullptr : method->LookupResolvedReturnType();
   SetClassAsTypeInfo(instr, klass, /* is_exact= */ false);

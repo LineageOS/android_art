@@ -203,6 +203,10 @@ class HInstructionBuilder : public ValueObject {
                               uint32_t dex_pc);
 
   // Builds a `HInstanceOf`, or a `HCheckCast` instruction.
+  void BuildTypeCheck(bool is_instance_of,
+                      HInstruction* object,
+                      dex::TypeIndex type_index,
+                      uint32_t dex_pc);
   void BuildTypeCheck(const Instruction& instruction,
                       uint8_t destination,
                       uint8_t reference,

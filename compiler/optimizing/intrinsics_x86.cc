@@ -3093,12 +3093,7 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleGet(HInvoke* invoke) {
         locations->AddTemp(Location::RequiresRegister());
         FALLTHROUGH_INTENDED;
       case DataType::Type::kInt32:
-        locations->SetOut(Location::RequiresRegister());
-        break;
       case DataType::Type::kReference:
-        // The second input is not an instruction argument. It is the callsite return type
-        // used to check the compatibility with VarHandle type.
-        locations->SetInAt(1, Location::RequiresRegister());
         locations->SetOut(Location::RequiresRegister());
         break;
       default:
@@ -3124,10 +3119,11 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
   mirror::VarHandle::AccessMode access_mode =
       mirror::VarHandle::GetAccessModeByIntrinsic(invoke->GetIntrinsic());
   const uint32_t access_mode_bit = 1u << static_cast<uint32_t>(access_mode);
-  const uint32_t var_type_offset = mirror::VarHandle::VarTypeOffset().Uint32Value();
   const uint32_t coordtype0_offset = mirror::VarHandle::CoordinateType0Offset().Uint32Value();
-  const uint32_t super_class_offset = mirror::Class::SuperClassOffset().Uint32Value();
+  const uint32_t var_type_offset = mirror::VarHandle::VarTypeOffset().Uint32Value();
+  const uint32_t primitive_type_offset = mirror::Class::PrimitiveTypeOffset().Uint32Value();
   DataType::Type type = invoke->GetType();
+  const uint32_t primitive_type = static_cast<uint32_t>(DataTypeToPrimitive(type));
   DCHECK_NE(type, DataType::Type::kVoid);
   Register temp = locations->GetTemp(0).AsRegister<Register>();
   InstructionCodeGeneratorX86* instr_codegen =
@@ -3143,38 +3139,15 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
   // Do not emit read barrier (or unpoison the reference) for comparing to null.
   __ cmpl(Address(varhandle_object, coordtype0_offset), Immediate(0));
   __ j(kNotEqual, slow_path->GetEntryLabel());
-  // For primitive types, we do not need a read barrier when loading a reference only for loading
-  // constant field through the reference. For reference types, we deliberately avoid the read
-  // barrier, letting the slow path handle the false negatives.
+
+  // Check the varType.primitiveType against the type we're trying to retrieve. Reference types
+  // are also checked later by a HCheckCast node as an additional check.
+  // We do not need a read barrier when loading a reference only for loading a constant field
+  // through the reference.
   __ movl(temp, Address(varhandle_object, var_type_offset));
   __ MaybeUnpoisonHeapReference(temp);
-  // Check the varType against the type we're trying to retrieve.
-  if (type == DataType::Type::kReference) {
-    // For reference types, check the type's class reference and if it's not an exact match,
-    // check if it is an inherited type.
-    Register callsite_ret_type = locations->InAt(1).AsRegister<Register>();
-    NearLabel check_ret_type_compatibility, ret_type_matched;
-
-    __ Bind(&check_ret_type_compatibility);
-    __ cmpl(temp, callsite_ret_type);
-    __ j(kEqual, &ret_type_matched);
-    // Load the super class.
-    __ movl(temp, Address(temp, super_class_offset));
-    __ MaybeUnpoisonHeapReference(temp);
-    // If the super class is null, we reached the root of the hierarchy. The types are not
-    // compatible.
-    __ cmpl(temp, Immediate(0));
-    __ j(kEqual, slow_path->GetEntryLabel());
-    __ jmp(&check_ret_type_compatibility);
-    __ Bind(&ret_type_matched);
-  } else {
-    // For primitive types, check the varType.primitiveType field.
-    uint32_t primitive_type = static_cast<uint32_t>(DataTypeToPrimitive(type));
-    const uint32_t primitive_type_offset = mirror::Class::PrimitiveTypeOffset().Uint32Value();
-
-    __ cmpw(Address(temp, primitive_type_offset), Immediate(primitive_type));
-    __ j(kNotEqual, slow_path->GetEntryLabel());
-  }
+  __ cmpw(Address(temp, primitive_type_offset), Immediate(primitive_type));
+  __ j(kNotEqual, slow_path->GetEntryLabel());
 
   Location out = locations->Out();
   // Use 'out' as a temporary register if it's a core register
