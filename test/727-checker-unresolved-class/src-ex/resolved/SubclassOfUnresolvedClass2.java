@@ -23,6 +23,9 @@ import unresolved.UnresolvedClass;
 // loader is illegal even though the package name is the same.
 public class SubclassOfUnresolvedClass2 extends UnresolvedClass {
   public static void $noinline$main() {
+    $noinline$testResolvedPublicClass();
+    $noinline$testResolvedPackagePrivateClass();
+
     $noinline$testPublicFieldInResolvedPackagePrivateClass();
     $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass();
     $noinline$testPrivateFieldInResolvedPackagePrivateClass();
@@ -38,6 +41,21 @@ public class SubclassOfUnresolvedClass2 extends UnresolvedClass {
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
     System.out.println("SubclassOfUnresolvedClass2 passed");
+  }
+
+  /// CHECK-START: void resolved.SubclassOfUnresolvedClass2.$noinline$testResolvedPublicClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.ResolvedPublicSubclassOfPackagePrivateClass needs_access_check:false
+  static void $noinline$testResolvedPublicClass() {
+    Class<?> c = ResolvedPublicSubclassOfPackagePrivateClass.class;
+  }
+
+  /// CHECK-START: void resolved.SubclassOfUnresolvedClass2.$noinline$testResolvedPackagePrivateClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.ResolvedPackagePrivateClass needs_access_check:true
+  static void $noinline$testResolvedPackagePrivateClass() {
+    try {
+      Class<?> c = ResolvedPackagePrivateClass.class;
+      throw new Error("Unreachable");
+    } catch (IllegalAccessError expected) {}
   }
 
   /// CHECK-START: void resolved.SubclassOfUnresolvedClass2.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
