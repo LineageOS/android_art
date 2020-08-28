@@ -39,12 +39,14 @@ public class VarHandleTypeConversionTests {
             // Void is always okay for a return type.
             vh.setVolatile(this, 33);
             vh.get(this);
-            vh.compareAndSet(this, 33, 44);
-            vh.compareAndSet(this, 27, 16);
-            vh.weakCompareAndSet(this, 17, 19);
             vh.getAndSet(this, 200000);
             vh.getAndBitwiseXor(this, 0x5a5a5a5a);
             vh.getAndAdd(this, 99);
+
+            // Return type of these is boolean (JLS9 S15.12), but check anyway.
+            vh.compareAndSet(this, 33, 44);
+            vh.compareAndSet(this, 27, 16);
+            vh.weakCompareAndSet(this, 17, 19);
         }
 
         public static void main(String[] args) {
@@ -668,7 +670,7 @@ public class VarHandleTypeConversionTests {
             vh.set((short) 1);
             vh.set((int) 1);
             vh.set((long) 1);
-            vh.set((double) 1.0f);
+            vh.set((float) 1.0f);
             vh.set((double) 1.0);
         }
 
@@ -1246,6 +1248,105 @@ public class VarHandleTypeConversionTests {
         }
     }
 
+    public static class InterfaceTest extends VarHandleUnitTest {
+        public interface ParentInterface {
+            int getValue();
+        }
+
+        public interface ChildInterface extends ParentInterface {
+            void setValue(int newValue);
+        }
+
+        public class A implements ParentInterface {
+            protected int value = 0;
+            public int getValue() { return value; }
+        }
+
+        public class B extends A implements ChildInterface {
+            public void setValue(int newValue) { value = newValue; }
+        }
+
+        private ParentInterface pi;
+        private A obj;
+
+        private VarHandle vh_pi;
+        private VarHandle vh_obj;
+        {
+            try {
+                vh_pi = MethodHandles.lookup().findVarHandle(InterfaceTest.class, "pi",
+                                                             InterfaceTest.ParentInterface.class);
+                vh_obj = MethodHandles.lookup().findVarHandle(InterfaceTest.class, "obj",
+                                                              InterfaceTest.A.class);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public static void main(String[] args) {
+            new InterfaceTest().run();
+        }
+
+        @Override
+        public void doTest() {
+            // Tests using VarHandle to field of type ParentInterface.
+            {
+                pi = (ParentInterface) new A();
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                try {
+                    ChildInterface c = (ChildInterface) vh_pi.get(this);
+                    failUnreachable();
+                } catch (ClassCastException expected) {}
+            }
+            {
+                pi = new B();
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                B b = (B) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                ChildInterface c = (ChildInterface) vh_pi.get(this);
+            }
+            {
+                pi = null;
+                ParentInterface p = (ParentInterface) vh_pi.get(this);
+                B b = (B) vh_pi.get(this);
+                Object o = (Object) vh_pi.get(this);
+                ChildInterface c = (ChildInterface) vh_pi.get(this);
+            }
+
+            // Tests using VarHandle to field of type A.
+            {
+                obj = new A();
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                try {
+                    B b = (B) vh_obj.get(this);
+                    failUnreachable();
+                } catch (ClassCastException e) {}
+                try {
+                    ChildInterface c = (ChildInterface) vh_obj.get(this);
+                    failUnreachable();
+                } catch (ClassCastException e) {}
+            }
+            {
+                obj = new B();
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                B b = (B) vh_obj.get(this);
+                ChildInterface c = (ChildInterface) vh_obj.get(this);
+            }
+            {
+                obj = null;
+                ParentInterface p = (ParentInterface) vh_obj.get(this);
+                Object o = (Object) vh_obj.get(this);
+                A a = (A) vh_obj.get(this);
+                B b = (B) vh_obj.get(this);
+                ChildInterface c = (ChildInterface) vh_obj.get(this);
+            }
+        }
+    }
+
     public static class ImplicitBoxingIntegerTest extends VarHandleUnitTest {
         private static Integer field;
         private static final VarHandle vh;
@@ -1278,26 +1379,29 @@ public class VarHandleTypeConversionTests {
             } catch (WrongMethodTypeException e) {
             }
             try {
-                vh.set((short) 1);
+                vh.set('A');
                 failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
-                vh.set('A');
+                vh.set((short) 1);
                 failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             vh.set(2);
             try {
                 vh.setRelease(Long.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
                 vh.setRelease(Float.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             try {
                 vh.setRelease(Double.MAX_VALUE);
+                failUnreachable();
             } catch (WrongMethodTypeException e) {
             }
             vh.set(null);
@@ -1337,6 +1441,7 @@ public class VarHandleTypeConversionTests {
 
         SubtypeTest.main(args);
         SupertypeTest.main(args);
+        InterfaceTest.main(args);
 
         ImplicitBoxingIntegerTest.main(args);
     }

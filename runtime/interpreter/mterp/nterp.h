@@ -37,6 +37,10 @@ const void* GetNterpEntryPoint();
 // The hotness threshold where we trigger JIT compilation or OSR.
 constexpr uint16_t kNterpHotnessMask = 0xffff;
 
+// The hotness threshold for the baseline compiler to trigger optimized
+// compilation.
+constexpr uint16_t kTieredHotnessMask = 0xffff;
+
 // The maximum we allow an nterp frame to be.
 constexpr size_t kNterpMaxFrame = 3 * KB;
 
