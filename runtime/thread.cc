@@ -120,6 +120,9 @@
 #endif
 #endif  // ART_USE_FUTEXES
 
+#pragma clang diagnostic push
+#pragma clang diagnostic error "-Wconversion"
+
 namespace art {
 
 using android::base::StringAppendV;
@@ -350,7 +353,7 @@ void Thread::Park(bool is_absolute, int64_t time) {
                        /* sleep if val = */ kNoPermitWaiterWaiting,
                        &timespec,
                        nullptr,
-                       FUTEX_BITSET_MATCH_ANY);
+                       static_cast<int>(FUTEX_BITSET_MATCH_ANY));
       } else {
         // Time is nanos when scheduled for a relative time
         timespec.tv_sec = SaturatedTimeT(time / 1000000000);
@@ -737,7 +740,8 @@ void Thread::InstallImplicitProtection() {
   if (ProtectStack(/* fatal_on_error= */ false)) {
     // Tell the kernel that we won't be needing these pages any more.
     // NB. madvise will probably write zeroes into the memory (on linux it does).
-    uint32_t unwanted_size = stack_top - pregion - kPageSize;
+    size_t unwanted_size =
+        reinterpret_cast<uintptr_t>(stack_top) - reinterpret_cast<uintptr_t>(pregion) - kPageSize;
     madvise(pregion, unwanted_size, MADV_DONTNEED);
     return;
   }
@@ -809,7 +813,8 @@ void Thread::InstallImplicitProtection() {
 
   // Tell the kernel that we won't be needing these pages any more.
   // NB. madvise will probably write zeroes into the memory (on linux it does).
-  uint32_t unwanted_size = stack_top - pregion - kPageSize;
+  size_t unwanted_size =
+      reinterpret_cast<uintptr_t>(stack_top) - reinterpret_cast<uintptr_t>(pregion) - kPageSize;
   madvise(pregion, unwanted_size, MADV_DONTNEED);
 }
 
@@ -1260,7 +1265,7 @@ static void GetThreadStack(pthread_t thread,
   // If we're the main thread, check whether we were run with an unlimited stack. In that case,
   // glibc will have reported a 2GB stack for our 32-bit process, and our stack overflow detection
   // will be broken because we'll die long before we get close to 2GB.
-  bool is_main_thread = (::art::GetTid() == getpid());
+  bool is_main_thread = (::art::GetTid() == static_cast<uint32_t>(getpid()));
   if (is_main_thread) {
     rlimit stack_limit;
     if (getrlimit(RLIMIT_STACK, &stack_limit) == -1) {
@@ -1379,7 +1384,8 @@ uint64_t Thread::GetCpuMicroTime() const {
   pthread_getcpuclockid(tlsPtr_.pthread_self, &cpu_clock_id);
   timespec now;
   clock_gettime(cpu_clock_id, &now);
-  return static_cast<uint64_t>(now.tv_sec) * UINT64_C(1000000) + now.tv_nsec / UINT64_C(1000);
+  return static_cast<uint64_t>(now.tv_sec) * UINT64_C(1000000) +
+         static_cast<uint64_t>(now.tv_nsec) / UINT64_C(1000);
 #else  // __APPLE__
   UNIMPLEMENTED(WARNING);
   return -1;
@@ -1891,7 +1897,7 @@ void Thread::DumpState(std::ostream& os, const Thread* thread, pid_t tid) {
   }
 
   os << "  | sysTid=" << tid
-     << " nice=" << getpriority(PRIO_PROCESS, tid)
+     << " nice=" << getpriority(PRIO_PROCESS, static_cast<id_t>(tid))
      << " cgrp=" << scheduler_group_name;
   if (thread != nullptr) {
     int policy;
@@ -2543,7 +2549,7 @@ bool Thread::HandleScopeContains(jobject obj) const {
   return tlsPtr_.managed_stack.ShadowFramesContain(hs_entry);
 }
 
-void Thread::HandleScopeVisitRoots(RootVisitor* visitor, pid_t thread_id) {
+void Thread::HandleScopeVisitRoots(RootVisitor* visitor, uint32_t thread_id) {
   BufferedRootVisitor<kDefaultBufferedRootCount> buffered_visitor(
       visitor, RootInfo(kRootNativeStack, thread_id));
   for (BaseHandleScope* cur = tlsPtr_.top_handle_scope; cur; cur = cur->GetLink()) {
@@ -2706,13 +2712,13 @@ class FetchStackTraceVisitor : public StackVisitor {
 
 class BuildInternalStackTraceVisitor : public StackVisitor {
  public:
-  BuildInternalStackTraceVisitor(Thread* self, Thread* thread, int skip_depth)
+  BuildInternalStackTraceVisitor(Thread* self, Thread* thread, uint32_t skip_depth)
       : StackVisitor(thread, nullptr, StackVisitor::StackWalkKind::kIncludeInlinedFrames),
         self_(self),
         skip_depth_(skip_depth),
         pointer_size_(Runtime::Current()->GetClassLinker()->GetImagePointerSize()) {}
 
-  bool Init(int depth) REQUIRES_SHARED(Locks::mutator_lock_) ACQUIRE(Roles::uninterruptible_) {
+  bool Init(uint32_t depth) REQUIRES_SHARED(Locks::mutator_lock_) ACQUIRE(Roles::uninterruptible_) {
     // Allocate method trace as an object array where the first element is a pointer array that
     // contains the ArtMethod pointers and dex PCs. The rest of the elements are the declaring
     // class of the ArtMethod pointers.
@@ -2723,8 +2729,8 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
     // The first element is the methods and dex pc array, the other elements are declaring classes
     // for the methods to ensure classes in the stack trace don't get unloaded.
     Handle<mirror::ObjectArray<mirror::Object>> trace(
-        hs.NewHandle(
-            mirror::ObjectArray<mirror::Object>::Alloc(hs.Self(), array_class, depth + 1)));
+        hs.NewHandle(mirror::ObjectArray<mirror::Object>::Alloc(
+            hs.Self(), array_class, static_cast<int32_t>(depth) + 1)));
     if (trace == nullptr) {
       // Acquire uninterruptible_ in all paths.
       self_->StartAssertNoThreadSuspension("Building internal stack trace");
@@ -2771,11 +2777,11 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
     methods_and_pcs->SetElementPtrSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
         count_, method, pointer_size_);
     methods_and_pcs->SetElementPtrSize</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
-        methods_and_pcs->GetLength() / 2 + count_, dex_pc, pointer_size_);
+        static_cast<uint32_t>(methods_and_pcs->GetLength()) / 2 + count_, dex_pc, pointer_size_);
     // Save the declaring class of the method to ensure that the declaring classes of the methods
     // do not get unloaded while the stack trace is live.
     trace_->Set</*kTransactionActive=*/ false, /*kCheckTransaction=*/ false>(
-        count_ + 1, method->GetDeclaringClass());
+        static_cast<int32_t>(count_) + 1, method->GetDeclaringClass());
     ++count_;
   }
 
@@ -2790,7 +2796,7 @@ class BuildInternalStackTraceVisitor : public StackVisitor {
  private:
   Thread* const self_;
   // How many more frames to skip.
-  int32_t skip_depth_;
+  uint32_t skip_depth_;
   // Current position down stack trace.
   uint32_t count_ = 0;
   // An object array where the first element is a pointer array that contains the ArtMethod
@@ -2882,7 +2888,7 @@ static ObjPtr<mirror::StackTraceElement> CreateStackTraceElement(
       // Make the line_number field of StackTraceElement hold the dex pc.
       // source_name_object is intentionally left null if we failed to map the dex pc to
       // a line number (most probably because there is no debug info). See b/30183883.
-      line_number = dex_pc;
+      line_number = static_cast<int32_t>(dex_pc);
     } else {
       if (source_file != nullptr) {
         source_name_object.Assign(mirror::String::AllocFromModifiedUtf8(soa.Self(), source_file));
@@ -2931,7 +2937,7 @@ jobjectArray Thread::InternalStackTraceToStackTraceElementArray(
   } else {
     // Create java_trace array and place in local reference table
     ObjPtr<mirror::ObjectArray<mirror::StackTraceElement>> java_traces =
-        class_linker->AllocStackTraceElementArray(soa.Self(), depth);
+        class_linker->AllocStackTraceElementArray(soa.Self(), static_cast<size_t>(depth));
     if (java_traces == nullptr) {
       return nullptr;
     }
@@ -2942,7 +2948,7 @@ jobjectArray Thread::InternalStackTraceToStackTraceElementArray(
     *stack_depth = depth;
   }
 
-  for (int32_t i = 0; i < depth; ++i) {
+  for (uint32_t i = 0; i < static_cast<uint32_t>(depth); ++i) {
     ObjPtr<mirror::ObjectArray<mirror::Object>> decoded_traces =
         soa.Decode<mirror::Object>(internal)->AsObjectArray<mirror::Object>();
     // Methods and dex PC trace is element 0.
@@ -2952,13 +2958,14 @@ jobjectArray Thread::InternalStackTraceToStackTraceElementArray(
     // Prepare parameters for StackTraceElement(String cls, String method, String file, int line)
     ArtMethod* method = method_trace->GetElementPtrSize<ArtMethod*>(i, kRuntimePointerSize);
     uint32_t dex_pc = method_trace->GetElementPtrSize<uint32_t>(
-        i + method_trace->GetLength() / 2, kRuntimePointerSize);
+        i + static_cast<uint32_t>(method_trace->GetLength()) / 2, kRuntimePointerSize);
     const ObjPtr<mirror::StackTraceElement> obj = CreateStackTraceElement(soa, method, dex_pc);
     if (obj == nullptr) {
       return nullptr;
     }
     // We are called from native: use non-transactional mode.
-    soa.Decode<mirror::ObjectArray<mirror::StackTraceElement>>(result)->Set<false>(i, obj);
+    soa.Decode<mirror::ObjectArray<mirror::StackTraceElement>>(result)->Set<false>(
+        static_cast<int32_t>(i), obj);
   }
   return result;
 }
@@ -3097,7 +3104,7 @@ jobjectArray Thread::CreateAnnotatedStackTrace(const ScopedObjectAccessAlreadyRu
         soa.Self(), h_aste_class.Get(), "blockedOn", "Ljava/lang/Object;");
   DCHECK(blocked_on_field != nullptr);
 
-  size_t length = dumper.stack_trace_elements_.size();
+  int32_t length = static_cast<int32_t>(dumper.stack_trace_elements_.size());
   ObjPtr<mirror::ObjectArray<mirror::Object>> array =
       mirror::ObjectArray<mirror::Object>::Alloc(soa.Self(), h_aste_array_class.Get(), length);
   if (array == nullptr) {
@@ -3110,7 +3117,7 @@ jobjectArray Thread::CreateAnnotatedStackTrace(const ScopedObjectAccessAlreadyRu
   MutableHandle<mirror::Object> handle(hs.NewHandle<mirror::Object>(nullptr));
   MutableHandle<mirror::ObjectArray<mirror::Object>> handle2(
       hs.NewHandle<mirror::ObjectArray<mirror::Object>>(nullptr));
-  for (size_t i = 0; i != length; ++i) {
+  for (size_t i = 0; i != static_cast<size_t>(length); ++i) {
     handle.Assign(h_aste_class->AllocObject(soa.Self()));
     if (handle == nullptr) {
       soa.Self()->AssertPendingOOMException();
@@ -3123,9 +3130,8 @@ jobjectArray Thread::CreateAnnotatedStackTrace(const ScopedObjectAccessAlreadyRu
 
     // Create locked-on array.
     if (!dumper.lock_objects_[i].empty()) {
-      handle2.Assign(mirror::ObjectArray<mirror::Object>::Alloc(soa.Self(),
-                                                                h_o_array_class.Get(),
-                                                                dumper.lock_objects_[i].size()));
+      handle2.Assign(mirror::ObjectArray<mirror::Object>::Alloc(
+          soa.Self(), h_o_array_class.Get(), static_cast<int32_t>(dumper.lock_objects_[i].size())));
       if (handle2 == nullptr) {
         soa.Self()->AssertPendingOOMException();
         return nullptr;
@@ -3151,7 +3157,7 @@ jobjectArray Thread::CreateAnnotatedStackTrace(const ScopedObjectAccessAlreadyRu
     }
 
     ScopedLocalRef<jobject> elem(soa.Env(), soa.AddLocalReference<jobject>(handle.Get()));
-    soa.Env()->SetObjectArrayElement(result.get(), i, elem.get());
+    soa.Env()->SetObjectArrayElement(result.get(), static_cast<jsize>(i), elem.get());
     DCHECK(!soa.Self()->IsExceptionPending());
   }
 
@@ -3828,7 +3834,7 @@ class ReferenceMapVisitor : public StackVisitor {
       }
       // Visit callee-save registers that hold pointers.
       uint32_t register_mask = code_info.GetRegisterMaskOf(map);
-      for (size_t i = 0; i < BitSizeOf<uint32_t>(); ++i) {
+      for (uint32_t i = 0; i < BitSizeOf<uint32_t>(); ++i) {
         if (register_mask & (1 << i)) {
           mirror::Object** ref_addr = reinterpret_cast<mirror::Object**>(GetGPRAddress(i));
           if (kIsDebugBuild && ref_addr == nullptr) {
@@ -3991,7 +3997,7 @@ void Thread::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
 
 template <bool kPrecise>
 void Thread::VisitRoots(RootVisitor* visitor) {
-  const pid_t thread_id = GetThreadId();
+  const uint32_t thread_id = GetThreadId();
   visitor->VisitRootIfNonNull(&tlsPtr_.opeer, RootInfo(kRootThreadObject, thread_id));
   if (tlsPtr_.exception != nullptr && tlsPtr_.exception != GetDeoptimizationException()) {
     visitor->VisitRoot(reinterpret_cast<mirror::Object**>(&tlsPtr_.exception),
@@ -4345,3 +4351,5 @@ ScopedExceptionStorage::~ScopedExceptionStorage() {
 }
 
 }  // namespace art
+
+#pragma clang diagnostic pop  // -Wconversion
