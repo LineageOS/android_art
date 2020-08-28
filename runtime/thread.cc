@@ -46,12 +46,12 @@
 #include "base/atomic.h"
 #include "base/bit_utils.h"
 #include "base/casts.h"
-#include "arch/context.h"
 #include "base/file_utils.h"
 #include "base/memory_tool.h"
 #include "base/mutex.h"
 #include "base/stl_util.h"
 #include "base/systrace.h"
+#include "base/time_utils.h"
 #include "base/timing_logger.h"
 #include "base/to_str.h"
 #include "base/utils.h"
@@ -294,15 +294,6 @@ enum {
   kNoPermit = 1,  // Incrementing marks as waiter waiting
   kNoPermitWaiterWaiting = 2
 };
-
-static inline time_t SaturatedTimeT(int64_t secs) {
-  if (sizeof(time_t) < sizeof(int64_t)) {
-    return static_cast<time_t>(std::min(secs,
-                                        static_cast<int64_t>(std::numeric_limits<time_t>::max())));
-  } else {
-    return secs;
-  }
-}
 
 void Thread::Park(bool is_absolute, int64_t time) {
   DCHECK(this == Thread::Current());
