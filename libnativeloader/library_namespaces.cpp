@@ -50,7 +50,6 @@ constexpr const char* kApexPath = "/apex/";
 constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
 constexpr const char* kVndkProductNamespaceName = "vndk_product";
-constexpr const char* kStatsdNamespaceName = "com_android_os_statsd";
 
 // classloader-namespace is a linker namespace that is created for the loaded
 // app. To be specific, it is created for the app classloader. When
@@ -355,16 +354,6 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
           return linked.error();
         }
       }
-    }
-  }
-
-  // Give access to StatsdAPI libraries
-  auto statsd_ns =
-      NativeLoaderNamespace::GetExportedNamespace(kStatsdNamespaceName, is_bridged);
-  if (statsd_ns.ok()) {
-    linked = app_ns->Link(*statsd_ns, statsd_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
     }
   }
 
