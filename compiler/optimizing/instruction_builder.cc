@@ -2023,9 +2023,29 @@ ArtField* HInstructionBuilder::ResolveField(uint16_t field_idx, bool is_static, 
   // Check access.
   Handle<mirror::Class> compiling_class = dex_compilation_unit_->GetCompilingClass();
   if (compiling_class == nullptr) {
-    // For unresolved compiling class, handle only the simple case of a public field
-    // in a public class and use a slow runtime call for all other cases.
-    if (!resolved_field->IsPublic() || !resolved_field->GetDeclaringClass()->IsPublic()) {
+    // Check if the declaring class or referencing class is accessible.
+    SamePackageCompare same_package(*dex_compilation_unit_);
+    ObjPtr<mirror::Class> declaring_class = resolved_field->GetDeclaringClass();
+    bool declaring_class_accessible = declaring_class->IsPublic() || same_package(declaring_class);
+    if (!declaring_class_accessible) {
+      // It is possible to access members from an inaccessible superclass
+      // by referencing them through an accessible subclass.
+      ObjPtr<mirror::Class> referenced_class = class_linker->LookupResolvedType(
+          dex_compilation_unit_->GetDexFile()->GetFieldId(field_idx).class_idx_,
+          dex_compilation_unit_->GetDexCache().Get(),
+          class_loader.Get());
+      DCHECK(referenced_class != nullptr);  // Must have been resolved when resolving the field.
+      if (!referenced_class->IsPublic() && !same_package(referenced_class)) {
+        return nullptr;
+      }
+    }
+    // Check whether the field itself is accessible.
+    // Since the referrer is unresolved but the field is resolved, it cannot be
+    // inside the same class, so a private field is known to be inaccessible.
+    // And without a resolved referrer, we cannot check for protected member access
+    // in superlass, so we handle only access to public member or within the package.
+    if (resolved_field->IsPrivate() ||
+        (!resolved_field->IsPublic() && !declaring_class_accessible)) {
       return nullptr;
     }
   } else if (!compiling_class->CanAccessResolvedField(resolved_field->GetDeclaringClass(),

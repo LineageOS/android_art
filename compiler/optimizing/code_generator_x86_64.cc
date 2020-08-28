@@ -25,6 +25,7 @@
 #include "gc/accounting/card_table.h"
 #include "gc/space/image_space.h"
 #include "heap_poisoning.h"
+#include "interpreter/mterp/nterp.h"
 #include "intrinsics.h"
 #include "intrinsics_x86_64.h"
 #include "jit/profiling_info.h"
@@ -1425,7 +1426,9 @@ void CodeGeneratorX86_64::MaybeIncrementHotness(bool is_frame_entry) {
       __ movq(CpuRegister(TMP), Immediate(address));
       __ addw(Address(CpuRegister(TMP), ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
               Immediate(1));
-      __ j(kCarryClear, &done);
+      __ andw(Address(CpuRegister(TMP), ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+              Immediate(interpreter::kTieredHotnessMask));
+      __ j(kNotZero, &done);
       if (HasEmptyFrame()) {
         CHECK(is_frame_entry);
         // Frame alignment, and the stub expects the method on the stack.

@@ -111,13 +111,6 @@ class MANAGED VarHandle : public Object {
   MatchKind GetMethodTypeMatchForAccessMode(AccessMode access_mode, ObjPtr<MethodType> method_type)
         REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Returns true if the MethodType specified is compatible with the
-  // specified access_mode if the first parameter of method_type is
-  // ignored. This is useful for comparing MethodType instances when
-  // invoking a VarHandleAccessor via a MethodHandle invoker.
-  bool IsInvokerMethodTypeCompatible(AccessMode access_mode, ObjPtr<MethodType> method_type)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Allocates and returns the MethodType associated with the
   // AccessMode. No check is made for whether the AccessMode is a
   // supported operation so the MethodType can be used when raising a

@@ -7046,9 +7046,6 @@ void ClassLinker::FillIMTAndConflictTables(ObjPtr<mirror::Class> klass) {
                        &new_conflict,
                        &imt_data[0]);
   }
-  if (!klass->ShouldHaveImt()) {
-    return;
-  }
   // Compare the IMT with the super class including the conflict methods. If they are equivalent,
   // we can just use the same pointer.
   ImTable* imt = nullptr;
