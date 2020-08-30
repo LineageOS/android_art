@@ -36,7 +36,7 @@ static constexpr size_t kStackAlignment = 16;
 
 // System page size. We check this against sysconf(_SC_PAGE_SIZE) at runtime, but use a simple
 // compile-time constant so the compiler can generate better code.
-static constexpr int kPageSize = 4096;
+static constexpr size_t kPageSize = 4096;
 
 // Clion, clang analyzer, etc can falsely believe that "if (kIsDebugBuild)" always
 // returns the same value. By wrapping into a call to another constexpr function, we force it

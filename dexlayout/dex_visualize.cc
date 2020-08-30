@@ -70,7 +70,7 @@ class Dumper {
         if (printed_one) {
           fprintf(out_file_, ", ");
         }
-        fprintf(out_file_, "\"%s\" %d", s.name.c_str(), s.offset / kPageSize);
+        fprintf(out_file_, "\"%s\" %" PRIuPTR, s.name.c_str(), s.offset / kPageSize);
         printed_one = true;
       }
     }
@@ -331,7 +331,7 @@ void ShowDexSectionStatistics(dex_ir::Header* header, size_t dex_file_index) {
       bytes = FindNextByteAfterSection(header, sorted_sections, i) - file_section.offset;
     }
     fprintf(stdout,
-            "%-10s %8d %8d %8d %8d %%%02d\n",
+            "%-10s %8d %8d %8d %8" PRIuPTR " %%%02d\n",
             file_section.name.c_str(),
             file_section.offset,
             file_section.size,
