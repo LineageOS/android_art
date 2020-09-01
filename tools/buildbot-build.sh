@@ -16,6 +16,8 @@
 
 set -e
 
+shopt -s failglob
+
 if [ ! -d art ]; then
   echo "Script needs to be run at the root of the android tree"
   exit 1
@@ -221,14 +223,18 @@ if [[ $mode == "target" ]]; then
     echo "Symlinking /apex/com.android.runtime/bin/$b to /system/bin"
     ln -sf /apex/com.android.runtime/bin/$b $ANDROID_PRODUCT_OUT/system/bin/$b
   done
-  for p in $ANDROID_PRODUCT_OUT/system/apex/com.android.runtime/lib{,64}/bionic/*; do
-    lib_dir=$(expr $p : '.*/\(lib[0-9]*\)/.*')
-    lib_file=$(basename $p)
-    src=/apex/com.android.runtime/${lib_dir}/bionic/${lib_file}
-    dst=$ANDROID_PRODUCT_OUT/system/${lib_dir}/${lib_file}
-    echo "Symlinking $src into /system/${lib_dir}"
-    mkdir -p $(dirname $dst)
-    ln -sf $src $dst
+  for d in $ANDROID_PRODUCT_OUT/system/apex/com.android.runtime/lib{,64}/bionic; do
+    if [ -d $d ]; then
+      for p in $d/*; do
+        lib_dir=$(expr $p : '.*/\(lib[0-9]*\)/.*')
+        lib_file=$(basename $p)
+        src=/apex/com.android.runtime/${lib_dir}/bionic/${lib_file}
+        dst=$ANDROID_PRODUCT_OUT/system/${lib_dir}/${lib_file}
+        echo "Symlinking $src into /system/${lib_dir}"
+        mkdir -p $(dirname $dst)
+        ln -sf $src $dst
+      done
+    fi
   done
 
   # Create linker config files. We run linkerconfig on host to avoid problems
