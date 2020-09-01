@@ -1496,6 +1496,84 @@ void CodeGeneratorX86::MoveFromMemory(DataType::Type dst_type,
   }
 }
 
+void CodeGeneratorX86::MoveToMemory(DataType::Type src_type,
+                                    Location src,
+                                    Register dst_base,
+                                    Register dst_index,
+                                    ScaleFactor dst_scale,
+                                    int32_t dst_disp) {
+  DCHECK(dst_base != Register::kNoRegister);
+  Address dst = CreateAddress(dst_base, dst_index, dst_scale, dst_disp);
+
+  switch (src_type) {
+    case DataType::Type::kBool:
+    case DataType::Type::kUint8:
+    case DataType::Type::kInt8: {
+      if (src.IsConstant()) {
+        __ movb(dst, Immediate(CodeGenerator::GetInt8ValueOf(src.GetConstant())));
+      } else {
+        __ movb(dst, src.AsRegister<ByteRegister>());
+      }
+      break;
+    }
+    case DataType::Type::kUint16:
+    case DataType::Type::kInt16: {
+      if (src.IsConstant()) {
+        __ movw(dst, Immediate(CodeGenerator::GetInt16ValueOf(src.GetConstant())));
+      } else {
+        __ movw(dst, src.AsRegister<Register>());
+      }
+      break;
+    }
+    case DataType::Type::kUint32:
+    case DataType::Type::kInt32: {
+      if (src.IsConstant()) {
+        int32_t v = CodeGenerator::GetInt32ValueOf(src.GetConstant());
+        __ movl(dst, Immediate(v));
+      } else {
+        __ movl(dst, src.AsRegister<Register>());
+      }
+      break;
+    }
+    case DataType::Type::kUint64:
+    case DataType::Type::kInt64: {
+      Address dst_next_4_bytes = CreateAddress(dst_base, dst_index, dst_scale, dst_disp + 4);
+      if (src.IsConstant()) {
+        int64_t v = CodeGenerator::GetInt64ValueOf(src.GetConstant());
+        __ movl(dst, Immediate(Low32Bits(v)));
+        __ movl(dst_next_4_bytes, Immediate(High32Bits(v)));
+      } else {
+        __ movl(dst, src.AsRegisterPairLow<Register>());
+        __ movl(dst_next_4_bytes, src.AsRegisterPairHigh<Register>());
+      }
+      break;
+    }
+    case DataType::Type::kFloat32: {
+      if (src.IsConstant()) {
+        int32_t v = CodeGenerator::GetInt32ValueOf(src.GetConstant());
+        __ movl(dst, Immediate(v));
+      } else {
+        __ movss(dst, src.AsFpuRegister<XmmRegister>());
+      }
+      break;
+    }
+    case DataType::Type::kFloat64: {
+      Address dst_next_4_bytes = CreateAddress(dst_base, dst_index, dst_scale, dst_disp + 4);
+      if (src.IsConstant()) {
+        int64_t v = CodeGenerator::GetInt64ValueOf(src.GetConstant());
+        __ movl(dst, Immediate(Low32Bits(v)));
+        __ movl(dst_next_4_bytes, Immediate(High32Bits(v)));
+      } else {
+        __ movsd(dst, src.AsFpuRegister<XmmRegister>());
+      }
+      break;
+    }
+    case DataType::Type::kVoid:
+    case DataType::Type::kReference:
+      LOG(FATAL) << "Unreachable type " << src_type;
+  }
+}
+
 void CodeGeneratorX86::MoveConstant(Location location, int32_t value) {
   DCHECK(location.IsRegister());
   __ movl(location.AsRegister<Register>(), Immediate(value));
