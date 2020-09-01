@@ -2670,6 +2670,7 @@ class Dex2Oat final {
           "android.app",
           "android.os",
           "android.util",
+          "com.android.internal.statsd",
           // Reserved framework-permission packages (includes sub-packages under this path).
           "android.permission",
           // "android.app.role",  // Covered by android.app above.
@@ -2678,7 +2679,7 @@ class Dex2Oat final {
           // Reserved framework-wifi packages (includes sub-packages under these paths).
           "android.hardware.wifi",
           // "android.net.wifi",  // Covered by android.net below.
-          "android.x.net.wifi",
+          "com.android.wifi.x",
           // Reserved framework-tethering package (includes sub-packages under this path).
           "android.net",
       });
