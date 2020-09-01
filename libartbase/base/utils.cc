@@ -218,21 +218,16 @@ std::string PrettySize(uint64_t byte_count) {
     10*MB,    // MB up to...
     10ULL*GB  // GB from here.
   };
-  static const int64_t kBytesPerUnit[] = { 1, KB, MB, GB };
+  static const uint64_t kBytesPerUnit[] = { 1, KB, MB, GB };
   static const char* const kUnitStrings[] = { "B", "KB", "MB", "GB" };
-  const char* negative_str = "";
-  if (byte_count < 0) {
-    negative_str = "-";
-    byte_count = -byte_count;
-  }
   int i = arraysize(kUnitThresholds);
   while (--i > 0) {
     if (byte_count >= kUnitThresholds[i]) {
       break;
     }
   }
-  return StringPrintf("%s%" PRId64 "%s",
-                      negative_str, byte_count / kBytesPerUnit[i], kUnitStrings[i]);
+  return StringPrintf("%" PRIu64 "%s",
+                      byte_count / kBytesPerUnit[i], kUnitStrings[i]);
 }
 
 void Split(const std::string& s, char separator, std::vector<std::string>* result) {
