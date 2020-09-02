@@ -1744,6 +1744,7 @@ void Jit::PostZygoteFork() {
     CHECK(code_cache_->GetZygoteMap()->IsCompilationNotified());
   }
   thread_pool_->CreateThreads();
+  thread_pool_->SetPthreadPriority(options_->GetThreadPoolPthreadPriority());
 }
 
 void Jit::BootCompleted() {

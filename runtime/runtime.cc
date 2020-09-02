@@ -685,8 +685,14 @@ void Runtime::PreZygoteFork() {
 }
 
 void Runtime::PostZygoteFork() {
-  if (GetJit() != nullptr) {
-    GetJit()->PostZygoteFork();
+  jit::Jit* jit = GetJit();
+  if (jit != nullptr) {
+    jit->PostZygoteFork();
+    // Ensure that the threads in the JIT pool have been created with the right
+    // priority.
+    if (kIsDebugBuild && jit->GetThreadPool() != nullptr) {
+      jit->GetThreadPool()->CheckPthreadPriority(jit->GetThreadPoolPthreadPriority());
+    }
   }
   // Reset all stats.
   ResetStats(0xFFFFFFFF);
