@@ -126,7 +126,7 @@ class StackVisitor {
                StackWalkKind walk_kind,
                bool check_suspended = true);
 
-  bool GetRegisterIfAccessible(uint32_t reg, VRegKind kind, uint32_t* val) const
+  bool GetRegisterIfAccessible(uint32_t reg, DexRegisterLocation::Kind kind, uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
  public:
@@ -326,21 +326,24 @@ class StackVisitor {
 
   bool GetVRegFromDebuggerShadowFrame(uint16_t vreg, VRegKind kind, uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
-  bool GetVRegFromOptimizedCode(ArtMethod* m, uint16_t vreg, VRegKind kind,
+  bool GetVRegFromOptimizedCode(ArtMethod* m,
+                                uint16_t vreg,
+                                VRegKind kind,
                                 uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool GetVRegPairFromDebuggerShadowFrame(uint16_t vreg, VRegKind kind_lo, VRegKind kind_hi,
+  bool GetVRegPairFromDebuggerShadowFrame(uint16_t vreg,
+                                          VRegKind kind_lo,
+                                          VRegKind kind_hi,
                                           uint64_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
-  bool GetVRegPairFromOptimizedCode(ArtMethod* m, uint16_t vreg,
-                                    VRegKind kind_lo, VRegKind kind_hi,
+  bool GetVRegPairFromOptimizedCode(ArtMethod* m,
+                                    uint16_t vreg,
+                                    VRegKind kind_lo,
+                                    VRegKind kind_hi,
                                     uint64_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
-  bool GetVRegFromOptimizedCode(DexRegisterLocation location, VRegKind kind, uint32_t* val) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  bool GetRegisterPairIfAccessible(uint32_t reg_lo, uint32_t reg_hi, VRegKind kind_lo,
-                                   uint64_t* val) const
+  bool GetVRegFromOptimizedCode(DexRegisterLocation location, uint32_t* val) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   ShadowFrame* PrepareSetVReg(ArtMethod* m, uint16_t vreg, bool wide)
