@@ -240,6 +240,11 @@ bool CompilerFilter::ParseCompilerFilter(const char* option, Filter* filter) {
   return true;
 }
 
+const char* CompilerFilter::DescribeOptions() {
+  return "assume-verified|extract|verify|quicken|space{,-profile}|speed{,-profile}|"
+          "everything{,-profile}";
+}
+
 std::ostream& operator<<(std::ostream& os, const CompilerFilter::Filter& rhs) {
   return os << CompilerFilter::NameOfFilter(rhs);
 }
