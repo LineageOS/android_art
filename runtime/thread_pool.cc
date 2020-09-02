@@ -96,6 +96,14 @@ void ThreadPoolWorker::SetPthreadPriority(int priority) {
 #endif
 }
 
+int ThreadPoolWorker::GetPthreadPriority() {
+#if defined(ART_TARGET_ANDROID)
+  return getpriority(PRIO_PROCESS, pthread_gettid_np(pthread_));
+#else
+  return 0;
+#endif
+}
+
 void ThreadPoolWorker::Run() {
   Thread* self = Thread::Current();
   Task* task = nullptr;
@@ -311,6 +319,16 @@ void ThreadPool::SetPthreadPriority(int priority) {
   for (ThreadPoolWorker* worker : threads_) {
     worker->SetPthreadPriority(priority);
   }
+}
+
+void ThreadPool::CheckPthreadPriority(int priority) {
+#if defined(ART_TARGET_ANDROID)
+  for (ThreadPoolWorker* worker : threads_) {
+    CHECK_EQ(worker->GetPthreadPriority(), priority);
+  }
+#else
+  UNUSED(priority);
+#endif
 }
 
 }  // namespace art
