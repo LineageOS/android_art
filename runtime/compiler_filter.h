@@ -101,6 +101,8 @@ class CompilerFilter final {
   // 'filter' must be non-null.
   static bool ParseCompilerFilter(const char* name, /*out*/Filter* filter);
 
+  static const char* DescribeOptions();
+
  private:
   DISALLOW_COPY_AND_ASSIGN(CompilerFilter);
 };

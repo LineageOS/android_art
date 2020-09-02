@@ -145,6 +145,8 @@ struct CmdlineParserArgumentInfo {
 
   template <typename T = TArg>  // Necessary to get SFINAE to kick in.
   void DumpHelp(VariableIndentationOutputStream& vios) {
+    // Separate arguments
+    vios.Stream() << std::endl;
     for (auto cname : names_) {
       std::string_view name = cname;
       auto& os = vios.Stream();
