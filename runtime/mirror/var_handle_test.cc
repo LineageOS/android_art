@@ -417,6 +417,65 @@ TEST_F(VarHandleTest, InstanceFieldVarHandle) {
   }
 }
 
+TEST_F(VarHandleTest, AccessModeTemplate) {
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGet));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kSet));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetVolatile));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kSetVolatile));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kSetRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetOpaque));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kSetOpaque));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kCompareAndSet));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndExchange,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kCompareAndExchange));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndExchange,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kCompareAndExchangeAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndExchange,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kCompareAndExchangeRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kWeakCompareAndSetPlain));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kWeakCompareAndSet));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kWeakCompareAndSetAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kCompareAndSet,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kWeakCompareAndSetRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndSet));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndSetAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndSetRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseOr));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseOrRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseOrAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseAnd));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseAndRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseAndAcquire));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseXor));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseXorRelease));
+  EXPECT_EQ(VarHandle::AccessModeTemplate::kGetAndUpdate,
+            VarHandle::GetAccessModeTemplate(VarHandle::AccessMode::kGetAndBitwiseXorAcquire));
+}
+
 TEST_F(VarHandleTest, StaticFieldVarHandle) {
   Thread * const self = Thread::Current();
   ScopedObjectAccess soa(self);

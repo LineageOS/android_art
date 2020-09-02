@@ -57,6 +57,12 @@ class MANAGED VarHandle : public Object {
   // method can take.
   static constexpr size_t kMaxVarTypeParameters = 2;
 
+  // The minimum number of CoordinateType parameters a VarHandle acessor method may take.
+  static constexpr size_t kMinCoordinateTypes = 0;
+
+  // The maximum number of CoordinateType parameters a VarHandle acessor method may take.
+  static constexpr size_t kMaxCoordinateTypes = 2;
+
   // Enumeration of the possible access modes. This mirrors the enum
   // in java.lang.invoke.VarHandle.
   enum class AccessMode : uint32_t {
@@ -94,6 +100,15 @@ class MANAGED VarHandle : public Object {
     kLast = kGetAndBitwiseXorAcquire,
   };
   constexpr static size_t kNumberOfAccessModes = static_cast<size_t>(AccessMode::kLast) + 1u;
+
+  // Enumeration for describing the parameter and return types of an AccessMode.
+  enum class AccessModeTemplate : uint32_t {
+    kGet,                 // T Op(C0..CN)
+    kSet,                 // void Op(C0..CN, T)
+    kCompareAndSet,       // boolean Op(C0..CN, T, T)
+    kCompareAndExchange,  // T Op(C0..CN, T, T)
+    kGetAndUpdate,        // T Op(C0..CN, T)
+  };
 
   // Returns true if the AccessMode specified is a supported operation.
   bool IsAccessModeSupported(AccessMode accessMode) REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -142,6 +157,15 @@ class MANAGED VarHandle : public Object {
   // Returns true and sets access_mode if method_name corresponds to a
   // VarHandle access method, such as "setOpaque". Returns false otherwise.
   static bool GetAccessModeByMethodName(const char* method_name, AccessMode* access_mode);
+
+  // Returns the AccessModeTemplate for a given mode.
+  static AccessModeTemplate GetAccessModeTemplate(AccessMode access_mode);
+
+  // Returns the AccessModeTemplate corresponding to a VarHandle accessor intrinsic.
+  static AccessModeTemplate GetAccessModeTemplateByIntrinsic(Intrinsics ordinal);
+
+  // Returns the number of VarType parameters for an access mode template.
+  static int32_t GetNumberOfVarTypeParameters(AccessModeTemplate access_mode_template);
 
   static MemberOffset VarTypeOffset() {
     return MemberOffset(OFFSETOF_MEMBER(VarHandle, var_type_));
