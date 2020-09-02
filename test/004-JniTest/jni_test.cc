@@ -90,6 +90,35 @@ static void testFindClassOnAttachedNativeThread(JNIEnv* env) {
   CHECK(!env->ExceptionCheck());
 }
 
+extern "C" JNIEXPORT void JNICALL Java_Main_testUTFRegion(JNIEnv* env, jclass, jstring null_str) {
+  jstring foo_str = env->NewStringUTF("FOOBAR");
+  jstring emoji_str = env->NewStringUTF("SKI ⛷ SKI");
+  char buf[1024];
+  memset(buf, 'Y', sizeof(buf));
+  buf[1023] = '\0';
+
+  env->GetStringUTFRegion(foo_str, 3, 1, buf);
+  buf[1023] = '\0';
+  CHECK_EQ(strcmp("B", buf), 0) << buf;
+
+  // Null char on 0 len region
+  env->GetStringUTFRegion(foo_str, 3, 0, buf);
+  buf[1023] = '\0';
+  CHECK_EQ(strcmp("", buf), 0) << buf;
+
+  // No SEGV
+  env->GetStringUTFRegion(foo_str, 3, 0, nullptr);
+
+  env->GetStringUTFRegion(null_str, 1, 1, buf);
+  buf[1023] = '\0';
+  std::array<uint8_t, 3> nullbuf{ 0xc0, 0x80, 0x00 };
+  CHECK_EQ(memcmp(nullbuf.data(), buf, 3), 0);
+
+  env->GetStringUTFRegion(emoji_str, 1, 6, buf);
+  buf[1023] = '\0';
+  CHECK_EQ(strcmp("KI ⛷ S", buf), 0);
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_Main_getFieldSubclass(JNIEnv* env,
                                                              jclass,
                                                              jobject f_obj,
