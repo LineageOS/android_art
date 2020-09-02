@@ -504,7 +504,7 @@ class DeoptimizeStackVisitor final : public StackVisitor {
         case DexRegisterLocation::Kind::kInFpuRegister:
         case DexRegisterLocation::Kind::kInFpuRegisterHigh: {
           uint32_t reg = vreg_map[vreg].GetMachineRegister();
-          bool result = GetRegisterIfAccessible(reg, ToVRegKind(location), &value);
+          bool result = GetRegisterIfAccessible(reg, location, &value);
           CHECK(result);
           if (location == DexRegisterLocation::Kind::kInRegister) {
             if (((1u << reg) & register_mask) != 0) {
