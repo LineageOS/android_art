@@ -72,6 +72,8 @@ struct Dex2oatArgumentMap : CompilerOptionsMap<Dex2oatArgumentMap, Dex2oatArgume
 #include "dex2oat_options.def"
 };
 
+CmdlineParser<Dex2oatArgumentMap, Dex2oatArgumentMap::Key> CreateDex2oatArgumentParser();
+
 extern template struct CompilerOptionsMap<Dex2oatArgumentMap, Dex2oatArgumentMapKey>;
 
 }  // namespace art
