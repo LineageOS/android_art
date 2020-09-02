@@ -16,6 +16,7 @@
 
 package resolved;
 
+import getters.GetPublicSubclassOfUnresolvedClass2;
 import unresolved.UnresolvedPublicClass;
 
 // This class is defined by the child class loader, so access to
@@ -23,6 +24,10 @@ import unresolved.UnresolvedPublicClass;
 // loader is illegal even though the package name is the same.
 public class PublicSubclassOfUnresolvedClass2 extends UnresolvedPublicClass {
   public static void $noinline$main() {
+    $noinline$testReferrersClass();
+    $noinline$testInlinedReferrersClass();
+    $noinline$testInlinedReferrersClassFromSamePackage();
+
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
 
@@ -41,6 +46,30 @@ public class PublicSubclassOfUnresolvedClass2 extends UnresolvedPublicClass {
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
     System.out.println("PublicSubclassOfUnresolvedClass2 passed");
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass2.$noinline$testReferrersClass() builder (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass2 needs_access_check:false
+  static void $noinline$testReferrersClass() {
+    Class<?> c = PublicSubclassOfUnresolvedClass2.class;
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass2.$noinline$testInlinedReferrersClass() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass2 needs_access_check:false
+  static void $noinline$testInlinedReferrersClass() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetPublicSubclassOfUnresolvedClass2.get();
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass2.$noinline$testInlinedReferrersClassFromSamePackage() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass2 needs_access_check:true
+  static void $noinline$testInlinedReferrersClassFromSamePackage() {
+    // Trying to resolve this class by name in parent class loader throws NoClassDefFoundError.
+    try{
+      // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+      Class<?> c = GetPublicSubclassOfUnresolvedClass2FromSamePackage.get();
+      throw new Error("Unreachable");
+    } catch (NoClassDefFoundError expected) {}
   }
 
   /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass2.$noinline$testResolvedPublicClass() builder (after)
