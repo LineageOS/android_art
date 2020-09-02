@@ -241,7 +241,7 @@ bool StackVisitor::GetVReg(ArtMethod* m,
         uint32_t val2 = *val;
         // The caller already known the register location, so we can use the faster overload
         // which does not decode the stack maps.
-        result = GetVRegFromOptimizedCode(location.value(), kind, val);
+        result = GetVRegFromOptimizedCode(location.value(), val);
         // Compare to the slower overload.
         DCHECK_EQ(result, GetVRegFromOptimizedCode(m, vreg, kind, &val2));
         DCHECK_EQ(*val, val2);
@@ -269,7 +269,9 @@ bool StackVisitor::GetVReg(ArtMethod* m,
   }
 }
 
-bool StackVisitor::GetVRegFromOptimizedCode(ArtMethod* m, uint16_t vreg, VRegKind kind,
+bool StackVisitor::GetVRegFromOptimizedCode(ArtMethod* m,
+                                            uint16_t vreg,
+                                            VRegKind kind,
                                             uint32_t* val) const {
   DCHECK_EQ(m, GetMethod());
   // Can't be null or how would we compile its instructions?
@@ -309,7 +311,7 @@ bool StackVisitor::GetVRegFromOptimizedCode(ArtMethod* m, uint16_t vreg, VRegKin
       if (kind == kReferenceVReg && !(register_mask & (1 << reg))) {
         return false;
       }
-      return GetRegisterIfAccessible(reg, kind, val);
+      return GetRegisterIfAccessible(reg, location_kind, val);
     }
     case DexRegisterLocation::Kind::kInRegisterHigh:
     case DexRegisterLocation::Kind::kInFpuRegister:
@@ -318,7 +320,7 @@ bool StackVisitor::GetVRegFromOptimizedCode(ArtMethod* m, uint16_t vreg, VRegKin
         return false;
       }
       uint32_t reg = dex_register_map[vreg].GetMachineRegister();
-      return GetRegisterIfAccessible(reg, kind, val);
+      return GetRegisterIfAccessible(reg, location_kind, val);
     }
     case DexRegisterLocation::Kind::kConstant: {
       uint32_t result = dex_register_map[vreg].GetConstant();
@@ -336,9 +338,7 @@ bool StackVisitor::GetVRegFromOptimizedCode(ArtMethod* m, uint16_t vreg, VRegKin
   }
 }
 
-bool StackVisitor::GetVRegFromOptimizedCode(DexRegisterLocation location,
-                                            VRegKind kind,
-                                            uint32_t* val) const {
+bool StackVisitor::GetVRegFromOptimizedCode(DexRegisterLocation location, uint32_t* val) const {
   switch (location.GetKind()) {
     case DexRegisterLocation::Kind::kInvalid:
       break;
@@ -351,7 +351,7 @@ bool StackVisitor::GetVRegFromOptimizedCode(DexRegisterLocation location,
     case DexRegisterLocation::Kind::kInRegisterHigh:
     case DexRegisterLocation::Kind::kInFpuRegister:
     case DexRegisterLocation::Kind::kInFpuRegisterHigh:
-      return GetRegisterIfAccessible(location.GetMachineRegister(), kind, val);
+      return GetRegisterIfAccessible(location.GetMachineRegister(), location.GetKind(), val);
     case DexRegisterLocation::Kind::kConstant:
       *val = location.GetConstant();
       return true;
@@ -362,13 +362,18 @@ bool StackVisitor::GetVRegFromOptimizedCode(DexRegisterLocation location,
   UNREACHABLE();
 }
 
-bool StackVisitor::GetRegisterIfAccessible(uint32_t reg, VRegKind kind, uint32_t* val) const {
-  const bool is_float = (kind == kFloatVReg) || (kind == kDoubleLoVReg) || (kind == kDoubleHiVReg);
+bool StackVisitor::GetRegisterIfAccessible(uint32_t reg,
+                                           DexRegisterLocation::Kind location_kind,
+                                           uint32_t* val) const {
+  const bool is_float = (location_kind == DexRegisterLocation::Kind::kInFpuRegister) ||
+                        (location_kind == DexRegisterLocation::Kind::kInFpuRegisterHigh);
 
   if (kRuntimeISA == InstructionSet::kX86 && is_float) {
     // X86 float registers are 64-bit and each XMM register is provided as two separate
     // 32-bit registers by the context.
-    reg = (kind == kDoubleHiVReg) ? (2 * reg + 1) : (2 * reg);
+    reg = (location_kind == DexRegisterLocation::Kind::kInFpuRegisterHigh)
+        ? (2 * reg + 1)
+        : (2 * reg);
   }
 
   if (!IsAccessibleRegister(reg, is_float)) {
@@ -377,14 +382,10 @@ bool StackVisitor::GetRegisterIfAccessible(uint32_t reg, VRegKind kind, uint32_t
   uintptr_t ptr_val = GetRegister(reg, is_float);
   const bool target64 = Is64BitInstructionSet(kRuntimeISA);
   if (target64) {
-    const bool wide_lo = (kind == kLongLoVReg) || (kind == kDoubleLoVReg);
-    const bool wide_hi = (kind == kLongHiVReg) || (kind == kDoubleHiVReg);
+    const bool is_high = (location_kind == DexRegisterLocation::Kind::kInRegisterHigh) ||
+                         (location_kind == DexRegisterLocation::Kind::kInFpuRegisterHigh);
     int64_t value_long = static_cast<int64_t>(ptr_val);
-    if (wide_lo) {
-      ptr_val = static_cast<uintptr_t>(Low32Bits(value_long));
-    } else if (wide_hi) {
-      ptr_val = static_cast<uintptr_t>(High32Bits(value_long));
-    }
+    ptr_val = static_cast<uintptr_t>(is_high ? High32Bits(value_long) : Low32Bits(value_long));
   }
   *val = ptr_val;
   return true;
@@ -447,25 +448,6 @@ bool StackVisitor::GetVRegPairFromOptimizedCode(ArtMethod* m, uint16_t vreg,
     *val = (static_cast<uint64_t>(high_32bits) << 32) | static_cast<uint64_t>(low_32bits);
   }
   return success;
-}
-
-bool StackVisitor::GetRegisterPairIfAccessible(uint32_t reg_lo, uint32_t reg_hi,
-                                               VRegKind kind_lo, uint64_t* val) const {
-  const bool is_float = (kind_lo == kDoubleLoVReg);
-  if (!IsAccessibleRegister(reg_lo, is_float) || !IsAccessibleRegister(reg_hi, is_float)) {
-    return false;
-  }
-  uintptr_t ptr_val_lo = GetRegister(reg_lo, is_float);
-  uintptr_t ptr_val_hi = GetRegister(reg_hi, is_float);
-  bool target64 = Is64BitInstructionSet(kRuntimeISA);
-  if (target64) {
-    int64_t value_long_lo = static_cast<int64_t>(ptr_val_lo);
-    int64_t value_long_hi = static_cast<int64_t>(ptr_val_hi);
-    ptr_val_lo = static_cast<uintptr_t>(Low32Bits(value_long_lo));
-    ptr_val_hi = static_cast<uintptr_t>(High32Bits(value_long_hi));
-  }
-  *val = (static_cast<uint64_t>(ptr_val_hi) << 32) | static_cast<uint32_t>(ptr_val_lo);
-  return true;
 }
 
 ShadowFrame* StackVisitor::PrepareSetVReg(ArtMethod* m, uint16_t vreg, bool wide) {
