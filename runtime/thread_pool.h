@@ -83,8 +83,11 @@ class ThreadPoolWorker {
 
   virtual ~ThreadPoolWorker();
 
-  // Set the "nice" priorty for this worker.
+  // Set the "nice" priority for this worker.
   void SetPthreadPriority(int priority);
+
+  // Get the "nice" priority for this worker.
+  int GetPthreadPriority();
 
   Thread* GetThread() const { return thread_; }
 
@@ -160,8 +163,12 @@ class ThreadPool {
   // thread count of the thread pool.
   void SetMaxActiveWorkers(size_t threads) REQUIRES(!task_queue_lock_);
 
-  // Set the "nice" priorty for threads in the pool.
+  // Set the "nice" priority for threads in the pool.
   void SetPthreadPriority(int priority);
+
+  // CHECK that the "nice" priority of threads in the pool is the given
+  // `priority`.
+  void CheckPthreadPriority(int priority);
 
   // Wait for workers to be created.
   void WaitForWorkersToBeCreated();
