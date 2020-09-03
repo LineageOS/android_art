@@ -101,11 +101,33 @@ void CustomDisassembler::VisitLoadStoreUnsignedOffset(const Instruction* instr) 
   Disassembler::VisitLoadStoreUnsignedOffset(instr);
 
   if (instr->GetRn() == TR) {
-    int64_t offset = instr->GetImmLSUnsigned() << instr->GetSizeLS();
-    std::ostringstream tmp_stream;
-    options_->thread_offset_name_function_(tmp_stream, static_cast<uint32_t>(offset));
-    AppendToOutput(" ; %s", tmp_stream.str().c_str());
+    AppendThreadOfsetName(instr);
   }
+}
+
+void CustomDisassembler::VisitUnconditionalBranch(const Instruction* instr) {
+  Disassembler::VisitUnconditionalBranch(instr);
+
+  if (instr->Mask(UnconditionalBranchMask) == BL) {
+    const Instruction* target = instr->GetImmPCOffsetTarget();
+    if (target >= base_address_ &&
+        target < end_address_ &&
+        target->Mask(LoadStoreMask) == LDR_x &&
+        target->GetRn() == TR &&
+        target->GetRt() == IP0 &&
+        target->GetNextInstruction() < end_address_ &&
+        target->GetNextInstruction()->Mask(UnconditionalBranchToRegisterMask) == BR &&
+        target->GetNextInstruction()->GetRn() == IP0) {
+      AppendThreadOfsetName(target);
+    }
+  }
+}
+
+void CustomDisassembler::AppendThreadOfsetName(const vixl::aarch64::Instruction* instr) {
+  int64_t offset = instr->GetImmLSUnsigned() << instr->GetSizeLS();
+  std::ostringstream tmp_stream;
+  options_->thread_offset_name_function_(tmp_stream, static_cast<uint32_t>(offset));
+  AppendToOutput(" ; %s", tmp_stream.str().c_str());
 }
 
 size_t DisassemblerArm64::Dump(std::ostream& os, const uint8_t* begin) {
