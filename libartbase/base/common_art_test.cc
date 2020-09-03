@@ -172,8 +172,12 @@ std::string CommonArtTestImpl::GetAndroidBuildTop() {
   android_build_top = std::filesystem::path(android_build_top).string();
   CHECK(!android_build_top.empty());
   if (android_build_top_from_env != nullptr) {
-    CHECK_EQ(std::filesystem::weakly_canonical(android_build_top).string(),
-             std::filesystem::weakly_canonical(android_build_top_from_env).string());
+    if (std::filesystem::weakly_canonical(android_build_top).string() !=
+        std::filesystem::weakly_canonical(android_build_top_from_env).string()) {
+      LOG(WARNING) << "Execution path (" << argv << ") not below ANDROID_BUILD_TOP ("
+                   << android_build_top_from_env << ")! Using env-var.";
+      android_build_top = android_build_top_from_env;
+    }
   } else {
     setenv("ANDROID_BUILD_TOP", android_build_top.c_str(), /*overwrite=*/0);
   }
