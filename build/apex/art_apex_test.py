@@ -519,6 +519,7 @@ class ReleaseChecker:
     self._checker.check_file('apex_manifest.pb')
 
     # Check binaries for ART.
+    self._checker.check_executable("compile_bcp.sh")
     self._checker.check_first_executable('dex2oat')
     self._checker.check_executable('dexdump')
     self._checker.check_executable('dexlist')
@@ -613,6 +614,7 @@ class ReleaseTargetChecker:
     # removed in Android R.
 
     # Check binaries for ART.
+    self._checker.check_executable("compile_bcp.sh")
     self._checker.check_executable('oatdump')
     self._checker.check_multilib_executable('dex2oat')
 
