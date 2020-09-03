@@ -314,7 +314,7 @@ class ArtMethod final {
 
   bool IsProxyMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool IsPolymorphicSignature() REQUIRES_SHARED(Locks::mutator_lock_);
+  bool IsSignaturePolymorphic() REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool UseFastInterpreterToInterpreterInvoke() const {
     // The bit is applicable only if the method is not intrinsic.
