@@ -755,10 +755,12 @@ void CmdlineParser<TVariantMap, TVariantMapKey>::DumpHelp(VariableIndentationOut
       vios.Stream();
     }
   }
-  vios.Stream() << "The following arguments are ignored for compatibility:" << std::endl;
-  ScopedIndentation si(&vios);
-  for (auto ign : ignore_list_) {
-    vios.Stream() << ign << std::endl;
+  if (!ignore_list_.empty()) {
+    vios.Stream() << "The following arguments are ignored for compatibility:" << std::endl;
+    ScopedIndentation si(&vios);
+    for (auto ign : ignore_list_) {
+      vios.Stream() << ign << std::endl;
+    }
   }
 }
 

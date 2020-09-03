@@ -27,17 +27,29 @@ public class Main {
     Class<?> c = Class.forName("PhiLiveness");
     Method m = c.getMethod("mergeOk", boolean.class, byte.class);
     m.invoke(null, new Boolean(true), new Byte((byte)2));
+    ensureMethodJitCompiled(m);
+    m.invoke(null, new Boolean(true), new Byte((byte)2));
 
     m = c.getMethod("mergeNotOk", boolean.class, float.class);
+    m.invoke(null, new Boolean(true), new Float(4.0f));
+    ensureMethodJitCompiled(m);
     m.invoke(null, new Boolean(true), new Float(4.0f));
 
     m = c.getMethod("mergeReferences", Main.class);
     m.invoke(null, new Main());
+    ensureMethodJitCompiled(m);
+    m.invoke(null, new Main());
 
     m = c.getMethod("phiEquivalent");
+    m.invoke(null);
+    ensureMethodJitCompiled(m);
     m.invoke(null);
 
     m = c.getMethod("phiAllEquivalents", Main.class);
     m.invoke(null, new Main());
+    ensureMethodJitCompiled(m);
+    m.invoke(null, new Main());
   }
+
+  public native static void ensureMethodJitCompiled(Method method);
 }

@@ -65,6 +65,7 @@ public class Main {
         testClinitMethodLookup();
 
         testDoubleLoad(args[0]);
+        testUTFRegion("\0\0\0");
     }
 
     static class ABC { public static int XYZ = 12; }
@@ -77,6 +78,8 @@ public class Main {
         throw new RuntimeException("Failed to test get static field on a subclass", e);
       }
     }
+
+    public static native void testUTFRegion(String null_str);
 
     public static native int getFieldSubclass(Field f, Class sub);
 

@@ -3080,30 +3080,40 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleGet(HInvoke* invoke) {
     return;
   }
 
-  if (invoke->GetNumberOfArguments() == 1u) {
-    // Static field get
-    ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
-    LocationSummary* locations = new (allocator) LocationSummary(
-        invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
-    locations->SetInAt(0, Location::RequiresRegister());
-    locations->AddTemp(Location::RequiresRegister());
-
-    switch (DataType::Kind(type)) {
-      case DataType::Type::kInt64:
-        locations->AddTemp(Location::RequiresRegister());
-        FALLTHROUGH_INTENDED;
-      case DataType::Type::kInt32:
-      case DataType::Type::kReference:
-        locations->SetOut(Location::RequiresRegister());
-        break;
-      default:
-        DCHECK(DataType::IsFloatingPointType(type));
-        locations->AddTemp(Location::RequiresRegister());
-        locations->SetOut(Location::RequiresFpuRegister());
-    }
+  if (invoke->GetNumberOfArguments() > 2) {
+    // Only field VarHandle is supported now. TODO: support arrays, etc.
+    return;
   }
 
-  // TODO: support instance fields, arrays, etc.
+  if (invoke->GetNumberOfArguments() == 2 &&
+      invoke->InputAt(1u)->GetType() != DataType::Type::kReference) {
+    // For an instance field, the source object must be a reference.
+    return;
+  }
+
+  ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
+  LocationSummary* locations = new (allocator) LocationSummary(
+      invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (invoke->GetNumberOfArguments() == 2) {
+    // For instance fields, this is the source object.
+    locations->SetInAt(1, Location::RequiresRegister());
+  }
+  locations->AddTemp(Location::RequiresRegister());
+
+  switch (DataType::Kind(type)) {
+    case DataType::Type::kInt64:
+      locations->AddTemp(Location::RequiresRegister());
+      FALLTHROUGH_INTENDED;
+    case DataType::Type::kInt32:
+    case DataType::Type::kReference:
+      locations->SetOut(Location::RequiresRegister());
+      break;
+    default:
+      DCHECK(DataType::IsFloatingPointType(type));
+      locations->AddTemp(Location::RequiresRegister());
+      locations->SetOut(Location::RequiresFpuRegister());
+  }
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
@@ -3135,11 +3145,6 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
   codegen_->AddSlowPath(slow_path);
   __ j(kZero, slow_path->GetEntryLabel());
 
-  // Check that the varhandle references a static field by checking that coordinateType0 == null.
-  // Do not emit read barrier (or unpoison the reference) for comparing to null.
-  __ cmpl(Address(varhandle_object, coordtype0_offset), Immediate(0));
-  __ j(kNotEqual, slow_path->GetEntryLabel());
-
   // Check the varType.primitiveType against the type we're trying to retrieve. Reference types
   // are also checked later by a HCheckCast node as an additional check.
   // We do not need a read barrier when loading a reference only for loading a constant field
@@ -3160,11 +3165,50 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
   // Load the ArtField, the offset and declaring class
   __ movl(temp, Address(varhandle_object, artfield_offset));
   __ movl(offset, Address(temp, offset_offset));
-  instr_codegen->GenerateGcRootFieldLoad(invoke,
-                                         Location::RegisterLocation(temp),
-                                         Address(temp, declaring_class_offset),
-                                         /* fixup_label= */ nullptr,
-                                         kCompilerReadBarrierOption);
+  if (invoke->GetNumberOfArguments() == 1) {
+    // Check that the varhandle references a static field by checking that coordinateType0 == null.
+    // Do not emit read barrier (or unpoison the reference) for comparing to null.
+    __ cmpl(Address(varhandle_object, coordtype0_offset), Immediate(0));
+    __ j(kNotEqual, slow_path->GetEntryLabel());
+    instr_codegen->GenerateGcRootFieldLoad(invoke,
+                                          Location::RegisterLocation(temp),
+                                          Address(temp, declaring_class_offset),
+                                          /* fixup_label= */ nullptr,
+                                          kCompilerReadBarrierOption);
+  } else {
+    // Instance field
+    DCHECK_EQ(invoke->GetNumberOfArguments(), 2u);
+    Register object = locations->InAt(1).AsRegister<Register>();
+    const uint32_t class_offset = mirror::Object::ClassOffset().Uint32Value();
+    const uint32_t super_class_offset = mirror::Class::SuperClassOffset().Uint32Value();
+    const uint32_t coordtype1_offset = mirror::VarHandle::CoordinateType1Offset().Uint32Value();
+    NearLabel check_type_compatibility, type_matched;
+
+    // Check that the VarHandle references an instance field by checking that
+    // coordinateType1 == null. coordinateType0 should be not null, but this is handled by the
+    // type compatibility check with the source object's type, which will fail for null.
+    __ cmpl(Address(varhandle_object, coordtype1_offset), Immediate(0));
+    __ j(kNotEqual, slow_path->GetEntryLabel());
+
+    // Check the object's class against coordinateType0. Do not unpoison for in-memory comparison.
+    // We deliberately avoid the read barrier, letting the slow path handle the false negatives.
+    __ movl(temp, Address(object, class_offset));
+    __ Bind(&check_type_compatibility);
+    __ cmpl(temp, Address(varhandle_object, coordtype0_offset));
+    __ j(kEqual, &type_matched);
+    // Load the super class.
+    __ MaybeUnpoisonHeapReference(temp);
+    __ movl(temp, Address(temp, super_class_offset));
+    // If the super class is null, we reached the root of the hierarchy. The types are not
+    // compatible.
+    __ testl(temp, temp);
+    __ j(kEqual, slow_path->GetEntryLabel());
+    __ jmp(&check_type_compatibility);
+    __ Bind(&type_matched);
+
+    // Move the object to temp register, to load the field
+    __ movl(temp, object);
+  }
 
   // Load the value from the field
   CodeGeneratorX86* codegen_x86 = down_cast<CodeGeneratorX86*>(codegen_);
