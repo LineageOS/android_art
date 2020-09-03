@@ -68,6 +68,22 @@ class DisassemblerArm::CustomDisassembler final : public PrintDisassembler {
           PrintLiteral(type, offset);
           return *this;
         }
+        case kCodeLocation:
+          DisassemblerStream::operator<<(label);
+          // Improve the disassembly of branch to thunk jumping to pointer from thread entrypoint.
+          if (disasm_->GetIsT32() && GetCurrentInstructionType() == vixl::aarch32::kBl) {
+            const uintptr_t begin = reinterpret_cast<uintptr_t>(options_->base_address_);
+            const uintptr_t end = reinterpret_cast<uintptr_t>(options_->end_address_);
+            uintptr_t address = label.GetLocation() + (options_->absolute_addresses_ ? 0u : begin);
+            if ((address >= begin && address < end && end - address >= 4u) &&
+                reinterpret_cast<const uint16_t*>(address)[0] == 0xf8d9 &&  // LDR Rt, [tr, #imm12]
+                (reinterpret_cast<const uint16_t*>(address)[1] >> 12) == 0xf) {  // Rt == PC
+              uint32_t imm12 = reinterpret_cast<const uint16_t*>(address)[1] & 0xfffu;
+              os() << " ; ";
+              options_->thread_offset_name_function_(os(), imm12);
+            }
+          }
+          return *this;
         default:
           return DisassemblerStream::operator<<(label);
       }
