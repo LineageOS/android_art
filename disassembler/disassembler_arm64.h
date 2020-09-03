@@ -53,7 +53,12 @@ class CustomDisassembler final : public vixl::aarch64::Disassembler {
   // Improve the disassembly of thread offset.
   void VisitLoadStoreUnsignedOffset(const vixl::aarch64::Instruction* instr) override;
 
+  // Improve the disassembly of branch to thunk jumping to pointer from thread entrypoint.
+  void VisitUnconditionalBranch(const vixl::aarch64::Instruction* instr) override;
+
  private:
+  void AppendThreadOfsetName(const vixl::aarch64::Instruction* instr);
+
   // Indicate if the disassembler should read data loaded from literal pools.
   // This should only be enabled if reading the target of literal loads is safe.
   // Here are possible outputs when the option is on or off:
