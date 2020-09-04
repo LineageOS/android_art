@@ -121,7 +121,7 @@ inline bool ArtMethod::CheckIncompatibleClassChange(InvokeType type) {
       return IsDirect() || !(methods_class->IsInterface() || methods_class->IsObjectClass());
     }
     case kPolymorphic:
-      return !IsPolymorphicSignature();
+      return !IsSignaturePolymorphic();
     default:
       LOG(FATAL) << "Unreachable - invocation type: " << type;
       UNREACHABLE();
