@@ -120,12 +120,14 @@ art_tools_debug_binaries_both = [
 
 // Tools exclusively for the device APEX derived from art-tools in art/Android.mk.
 art_tools_device_only_binaries = [
+    "compile_bcp.sh",
     // oatdump cannot link with host linux_bionic due to not using clang lld;
     // TODO: Make it work with clang lld.
     "oatdump",
 ]
 // Same, but for only for debug packages.
 art_tools_debug_device_only_binaries = [
+    "compile_bcp.sh",
     // oatdumpd cannot link with host linux_bionic due to not using clang lld;
     // TODO: Make it work with clang lld.
     "oatdumpd",
