@@ -137,8 +137,6 @@ art_global_defaults {
     target: {
         android: {
             cflags: [
-                "-DART_TARGET",
-
                 // To use oprofile_android --callgraph, uncomment this and recompile with
                 //    mmma -j art
                 // "-fno-omit-frame-pointer",
