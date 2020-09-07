@@ -127,7 +127,6 @@ art_tools_device_only_binaries = [
 ]
 // Same, but for only for debug packages.
 art_tools_debug_device_only_binaries = [
-    "compile_bcp.sh",
     // oatdumpd cannot link with host linux_bionic due to not using clang lld;
     // TODO: Make it work with clang lld.
     "oatdumpd",
