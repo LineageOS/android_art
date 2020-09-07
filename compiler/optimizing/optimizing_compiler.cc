@@ -1050,8 +1050,11 @@ CompiledMethod* OptimizingCompiler::Compile(const dex::CodeItem* code_item,
           /*verified_method=*/ nullptr,  // Not needed by the Optimizing compiler.
           dex_cache,
           compiling_class);
+      // All signature polymorphic methods are native.
+      DCHECK(method == nullptr || !method->IsSignaturePolymorphic());
       // Go to native so that we don't block GC during compilation.
       ScopedThreadSuspension sts(soa.Self(), kNative);
+      // Try to compile a fully intrinsified implementation.
       if (method != nullptr && UNLIKELY(method->IsIntrinsic())) {
         DCHECK(compiler_options.IsBootImage());
         codegen.reset(
@@ -1154,7 +1157,10 @@ CompiledMethod* OptimizingCompiler::JniCompile(uint32_t access_flags,
     ScopedObjectAccess soa(Thread::Current());
     ArtMethod* method = runtime->GetClassLinker()->LookupResolvedMethod(
         method_idx, dex_cache.Get(), /*class_loader=*/ nullptr);
-    if (method != nullptr && UNLIKELY(method->IsIntrinsic())) {
+    // Try to compile a fully intrinsified implementation. Do not try to do this for
+    // signature polymorphic methods as the InstructionBuilder cannot handle them;
+    // and it would be useless as they always have a slow path for type conversions.
+    if (method != nullptr && UNLIKELY(method->IsIntrinsic()) && !method->IsSignaturePolymorphic()) {
       VariableSizedHandleScope handles(soa.Self());
       ScopedNullHandle<mirror::ClassLoader> class_loader;  // null means boot class path loader.
       Handle<mirror::Class> compiling_class = handles.NewHandle(method->GetDeclaringClass());
