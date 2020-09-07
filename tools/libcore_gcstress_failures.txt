@@ -31,7 +31,6 @@
           "libcore.java.lang.StringTest#testFastPathString_wellFormedUtf8Sequence",
           "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
           "libcore.java.math.BigIntegerTest#test_probablePrime",
-          "libcore.java.text.DecimalFormatTest#testCurrencySymbolSpacing",
           "libcore.java.text.SimpleDateFormatTest#testLocales",
           "org.apache.harmony.tests.java.lang.ref.ReferenceQueueTest#test_remove",
           "org.apache.harmony.tests.java.lang.String2Test#test_getBytes",
