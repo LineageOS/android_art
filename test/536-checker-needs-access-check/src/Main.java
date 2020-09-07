@@ -42,6 +42,9 @@ public class Main {
         } catch (IllegalAccessError e) {
             System.out.println("Got expected error instanceof (keep LoadClass with access check)");
         }
+
+        InaccessibleClassProxy.testGetReferrersClass();
+        InaccessibleClassProxy.testGetReferrersClassViaAnotherClass();
     }
 
     /// CHECK-START: boolean Main.testInstanceOf() register (after)
