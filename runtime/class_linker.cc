@@ -2199,10 +2199,21 @@ bool ClassLinker::AddImageSpace(
     }, space->Begin(), image_pointer_size_);
   }
 
-  if (interpreter::CanRuntimeUseNterp()) {
-    // Set image methods' entry point that point to the interpreter bridge to the nterp entry point.
+  if (!runtime->IsAotCompiler()) {
+    bool can_use_nterp = interpreter::CanRuntimeUseNterp();
     header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
-      ChangeInterpreterBridgeToNterp(&method, this);
+      // In the image, the `data` pointer field of the ArtMethod contains the code
+      // item offset. Change this to the actual pointer to the code item.
+      if (method.HasCodeItem()) {
+        const dex::CodeItem* code_item = method.GetDexFile()->GetCodeItem(
+            reinterpret_cast32<uint32_t>(method.GetDataPtrSize(image_pointer_size_)));
+        method.SetDataPtrSize(code_item, image_pointer_size_);
+      }
+      // Set image methods' entry point that point to the interpreter bridge to the
+      // nterp entry point.
+      if (can_use_nterp) {
+        ChangeInterpreterBridgeToNterp(&method, this);
+      }
     }, space->Begin(), image_pointer_size_);
   }
 
@@ -3977,7 +3988,6 @@ void ClassLinker::LoadMethod(const DexFile& dex_file,
   ScopedAssertNoThreadSuspension ants("LoadMethod");
   dst->SetDexMethodIndex(dex_method_idx);
   dst->SetDeclaringClass(klass.Get());
-  dst->SetCodeItemOffset(method.GetCodeItemOffset());
 
   // Get access flags from the DexFile and set hiddenapi runtime access flags.
   uint32_t access_flags = method.GetAccessFlags() | hiddenapi::CreateRuntimeFlags(method);
@@ -4025,6 +4035,18 @@ void ClassLinker::LoadMethod(const DexFile& dex_file,
   // Must be done after SetAccessFlags since IsAbstract depends on it.
   if (klass->IsInterface() && dst->IsAbstract()) {
     dst->CalculateAndSetImtIndex();
+  }
+  if (dst->HasCodeItem()) {
+    DCHECK_NE(method.GetCodeItemOffset(), 0u);
+    if (Runtime::Current()->IsAotCompiler()) {
+      dst->SetDataPtrSize(reinterpret_cast32<void*>(method.GetCodeItemOffset()), image_pointer_size_);
+    } else {
+      dst->SetDataPtrSize(dst->GetDexFile()->GetCodeItem(method.GetCodeItemOffset()),
+                          image_pointer_size_);
+    }
+  } else {
+    dst->SetDataPtrSize(nullptr, image_pointer_size_);
+    DCHECK_EQ(method.GetCodeItemOffset(), 0u);
   }
 }
 
@@ -5303,10 +5325,6 @@ void ClassLinker::CreateProxyMethod(Handle<mirror::Class> klass, ArtMethod* prot
   // Mark kAccCompileDontBother so that we don't take JIT samples for the method. b/62349349
   const uint32_t kAddFlags = kAccFinal | kAccCompileDontBother;
   out->SetAccessFlags((out->GetAccessFlags() & ~kRemoveFlags) | kAddFlags);
-
-  // Clear the dex_code_item_offset_. It needs to be 0 since proxy methods have no CodeItems but the
-  // method they copy might (if it's a default method).
-  out->SetCodeItemOffset(0);
 
   // Set the original interface method.
   out->SetDataPtrSize(prototype, image_pointer_size_);

@@ -2583,7 +2583,10 @@ void Redefiner::ClassRedefinition::UpdateMethods(art::ObjPtr<art::mirror::Class>
     uint32_t dex_method_idx = dex_file_->GetIndexForMethodId(*method_id);
     method.SetDexMethodIndex(dex_method_idx);
     linker->SetEntryPointsToInterpreter(&method);
-    method.SetCodeItemOffset(dex_file_->FindCodeItemOffset(class_def, dex_method_idx));
+    if (method.HasCodeItem()) {
+      method.SetCodeItem(
+          dex_file_->GetCodeItem(dex_file_->FindCodeItemOffset(class_def, dex_method_idx)));
+    }
     // Clear all the intrinsics related flags.
     method.SetNotIntrinsic();
   }
