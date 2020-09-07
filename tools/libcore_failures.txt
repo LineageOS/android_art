@@ -265,5 +265,12 @@
   modes: [device],
   bug: 161898207,
   names: ["libcore.java.util.zip.ZipFileTest#testZipFileWithLotsOfEntries"]
+},
+{
+  description: "Times out on device with gcstress and poisoning configurations",
+  result: EXEC_FAILED,
+  modes: [device],
+  bug: 161420453,
+  names: ["libcore.java.text.DecimalFormatTest#testCurrencySymbolSpacing"]
 }
 ]
