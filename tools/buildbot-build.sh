@@ -264,6 +264,24 @@ if [[ $mode == "target" ]]; then
     cp -r $src $dst
   done
 
+  # Linkerconfig also looks at /apex/apex-info-list.xml to check for system APEXes.
+  apex_xml_file=$linkerconfig_root/apex/apex-info-list.xml
+  echo "Creating $apex_xml_file"
+  cat <<EOF > $apex_xml_file
+<?xml version="1.0" encoding="utf-8"?>
+<apex-info-list>
+EOF
+  for apex in ${apexes[@]}; do
+    [[ $apex == com.android.art.* ]] && apex=com.android.art
+    cat <<EOF >> $apex_xml_file
+    <apex-info moduleName="${apex}" modulePath="/system/apex/${apex}.apex" preinstalledModulePath="/system/apex/${apex}.apex" versionCode="1" versionName="" isFactory="true" isActive="true">
+    </apex-info>
+EOF
+  done
+  cat <<EOF >> $apex_xml_file
+</apex-info-list>
+EOF
+
   # To avoid warnings from linkerconfig when it checks following two partitions
   mkdir -p $linkerconfig_root/product
   mkdir -p $linkerconfig_root/system_ext
