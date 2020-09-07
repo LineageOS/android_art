@@ -75,12 +75,8 @@ sh_binary {
     },
 }
 
-cc_prebuilt_binary {
+sh_binary {
     name: "compile_bcp.sh",
     host_supported: false,
-    srcs: ["compile_bcp.sh"],
-    apex_available: [
-        "com.android.art.debug",
-        "com.android.art.release",
-    ],
+    src: "compile_bcp.sh",
 }
