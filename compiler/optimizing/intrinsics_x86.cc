@@ -3340,14 +3340,11 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleSet(HInvoke* invoke) {
+  DCHECK(invoke->IsInvokePolymorphic());
+
   // The only read barrier implementation supporting the
   // VarHandleGet intrinsic is the Baker-style read barriers.
   if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
-    return;
-  }
-
-  // TODO: Investigate why we're getting other invokes here.
-  if (!invoke->IsInvokePolymorphic()) {
     return;
   }
 
