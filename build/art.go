@@ -132,11 +132,6 @@ func deviceFlags(ctx android.LoadHookContext) []string {
 	)
 
 	cflags = append(cflags, "-DART_BASE_ADDRESS="+ctx.Config().LibartImgDeviceBaseAddress())
-	if ctx.Config().IsEnvTrue("ART_TARGET_LINUX") {
-		cflags = append(cflags, "-DART_TARGET_LINUX")
-	} else {
-		cflags = append(cflags, "-DART_TARGET_ANDROID")
-	}
 	minDelta := ctx.Config().GetenvWithDefault("LIBART_IMG_TARGET_MIN_BASE_ADDRESS_DELTA", "-0x1000000")
 	maxDelta := ctx.Config().GetenvWithDefault("LIBART_IMG_TARGET_MAX_BASE_ADDRESS_DELTA", "0x1000000")
 	cflags = append(cflags, "-DART_BASE_ADDRESS_MIN_DELTA="+minDelta)
@@ -202,6 +197,26 @@ func globalDefaults(ctx android.LoadHookContext) {
 		p.Sanitize.Recover = []string{
 			"address",
 		}
+	}
+
+	ctx.AppendProperties(p)
+}
+
+// Hook that adds flags that are implicit for all cc_art_* modules.
+func addImplicitFlags(ctx android.LoadHookContext) {
+	type props struct {
+		Target struct {
+			Android struct {
+				Cflags []string
+			}
+		}
+	}
+
+	p := &props{}
+	if ctx.Config().IsEnvTrue("ART_TARGET_LINUX") {
+		p.Target.Android.Cflags = []string{"-DART_TARGET", "-DART_TARGET_LINUX"}
+	} else {
+		p.Target.Android.Cflags = []string{"-DART_TARGET", "-DART_TARGET_ANDROID"}
 	}
 
 	ctx.AppendProperties(p)
@@ -381,6 +396,7 @@ func artHostTestApexBundleFactory() android.Module {
 
 func artGlobalDefaultsFactory() android.Module {
 	module := artDefaultsFactory()
+	android.AddLoadHook(module, addImplicitFlags)
 	android.AddLoadHook(module, globalDefaults)
 
 	return module
@@ -422,6 +438,7 @@ func artLibrary() android.Module {
 
 	installCodegenCustomizer(module, staticAndSharedLibrary)
 
+	android.AddLoadHook(module, addImplicitFlags)
 	android.AddInstallHook(module, addTestcasesFile)
 	return module
 }
@@ -431,12 +448,14 @@ func artStaticLibrary() android.Module {
 
 	installCodegenCustomizer(module, staticLibrary)
 
+	android.AddLoadHook(module, addImplicitFlags)
 	return module
 }
 
 func artBinary() android.Module {
 	module := cc.BinaryFactory()
 
+	android.AddLoadHook(module, addImplicitFlags)
 	android.AddLoadHook(module, customLinker)
 	android.AddLoadHook(module, prefer32Bit)
 	android.AddInstallHook(module, addTestcasesFile)
@@ -448,6 +467,7 @@ func artTest() android.Module {
 
 	installCodegenCustomizer(module, binary)
 
+	android.AddLoadHook(module, addImplicitFlags)
 	android.AddLoadHook(module, customLinker)
 	android.AddLoadHook(module, prefer32Bit)
 	android.AddInstallHook(module, testInstall)
@@ -459,6 +479,7 @@ func artTestLibrary() android.Module {
 
 	installCodegenCustomizer(module, staticAndSharedLibrary)
 
+	android.AddLoadHook(module, addImplicitFlags)
 	android.AddLoadHook(module, prefer32Bit)
 	android.AddInstallHook(module, testInstall)
 	return module

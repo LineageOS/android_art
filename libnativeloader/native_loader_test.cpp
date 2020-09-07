@@ -20,6 +20,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -95,14 +96,17 @@ class Platform {
 
 // These represents built-in namespaces created by the linker according to ld.config.txt
 static std::unordered_map<std::string, Platform::mock_namespace_handle> namespaces = {
-    {"system", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("system"))},
-    {"default", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("default"))},
-    {"com_android_i18n", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_i18n"))},
-    {"sphal", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("sphal"))},
-    {"vndk", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk"))},
-    {"vndk_product", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("vndk_product"))},
-    {"com_android_neuralnetworks", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_neuralnetworks"))},
-    {"com_android_os_statsd", TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("com_android_os_statsd"))},
+#define NAMESPACE_ENTRY(ns) {ns, TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE(ns))}
+  NAMESPACE_ENTRY("com_android_i18n"),
+  NAMESPACE_ENTRY("com_android_neuralnetworks"),
+  NAMESPACE_ENTRY("com_android_os_statsd"),
+  NAMESPACE_ENTRY("com_android_art"),
+  NAMESPACE_ENTRY("default"),
+  NAMESPACE_ENTRY("sphal"),
+  NAMESPACE_ENTRY("system"),
+  NAMESPACE_ENTRY("vndk"),
+  NAMESPACE_ENTRY("vndk_product"),
+#undef NAMESPACE_ENTRY
 };
 
 // The actual gmock object
@@ -116,7 +120,9 @@ class MockPlatform : public Platform {
           if (namespaces.find(name) != namespaces.end()) {
             return namespaces[name];
           }
-          return TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE("(namespace not found"));
+          std::string msg = android::base::StringPrintf("(namespace %s not found)", name);
+          // The strdup'ed string will leak, but the test is already failing if we get here.
+          return TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE(strdup(msg.c_str())));
         }));
   }
 
@@ -438,7 +444,7 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     jstring err = CreateClassLoaderNamespace(
         env(), target_sdk_version, env()->NewStringUTF(class_loader.c_str()), is_shared,
         env()->NewStringUTF(dex_path.c_str()), env()->NewStringUTF(library_path.c_str()),
-        env()->NewStringUTF(permitted_path.c_str()));
+        env()->NewStringUTF(permitted_path.c_str()), /*uses_library_list=*/ nullptr);
 
     // no error
     EXPECT_EQ(err, nullptr) << "Error is: " << std::string(ScopedUtfChars(env(), err).c_str());
@@ -579,7 +585,7 @@ TEST_P(NativeLoaderTest_Create, TwoApks) {
       env(), second_app_target_sdk_version, env()->NewStringUTF(second_app_class_loader.c_str()),
       second_app_is_shared, env()->NewStringUTF(second_app_dex_path.c_str()),
       env()->NewStringUTF(second_app_library_path.c_str()),
-      env()->NewStringUTF(second_app_permitted_path.c_str()));
+      env()->NewStringUTF(second_app_permitted_path.c_str()), /*uses_library_list=*/ nullptr);
 
   // success
   EXPECT_EQ(err, nullptr) << "Error is: " << std::string(ScopedUtfChars(env(), err).c_str());
