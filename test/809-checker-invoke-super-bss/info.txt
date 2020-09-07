@@ -1,0 +1,2 @@
+Test that the dex invoke index of an HInvokeStaticOrDirect coming for a super
+call is that of the resolved method. The BSS logic at runtime depends on it.
