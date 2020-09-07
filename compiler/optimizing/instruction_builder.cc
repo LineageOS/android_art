@@ -1165,7 +1165,8 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
                                                         return_type,
                                                         dex_pc,
                                                         method_idx,
-                                                        resolved_method);
+                                                        resolved_method,
+                                                        proto_idx);
 
   if (!HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false)) {
     return false;
