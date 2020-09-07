@@ -1238,7 +1238,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
 
   const DexFile* dex_file = method->GetDexFile();
   const uint16_t class_def_idx = method->GetClassDefIndex();
-  const dex::CodeItem* code_item = dex_file->GetCodeItem(method->GetCodeItemOffset());
+  const dex::CodeItem* code_item = method->GetCodeItem();
   const uint32_t method_idx = method->GetDexMethodIndex();
   const uint32_t access_flags = method->GetAccessFlags();
 
