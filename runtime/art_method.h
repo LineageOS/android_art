@@ -78,7 +78,7 @@ class ArtMethod final {
   // constexpr, and ensure that the value is correct in art_method.cc.
   static constexpr uint32_t kRuntimeMethodDexMethodIndex = 0xFFFFFFFF;
 
-  ArtMethod() : access_flags_(0), dex_code_item_offset_(0), dex_method_index_(0),
+  ArtMethod() : access_flags_(0), dex_method_index_(0),
       method_index_(0), hotness_count_(0) { }
 
   ArtMethod(ArtMethod* src, PointerSize image_pointer_size) {
@@ -419,15 +419,6 @@ class ArtMethod final {
     return MemberOffset(OFFSETOF_MEMBER(ArtMethod, imt_index_));
   }
 
-  uint32_t GetCodeItemOffset() const {
-    return dex_code_item_offset_;
-  }
-
-  void SetCodeItemOffset(uint32_t new_code_off) REQUIRES_SHARED(Locks::mutator_lock_) {
-    // Not called within a transaction.
-    dex_code_item_offset_ = new_code_off;
-  }
-
   // Number of 32bit registers that would be required to hold all the arguments
   static size_t NumArgRegisters(const char* shorty);
 
@@ -587,6 +578,15 @@ class ArtMethod final {
     return dex_method_index_ == kRuntimeMethodDexMethodIndex;
   }
 
+  bool HasCodeItem() REQUIRES_SHARED(Locks::mutator_lock_) {
+    return !IsRuntimeMethod() && !IsNative() && !IsProxyMethod() && !IsAbstract();
+  }
+
+  void SetCodeItem(const dex::CodeItem* code_item) REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(HasCodeItem());
+    SetDataPtrSize(code_item, kRuntimePointerSize);
+  }
+
   // Is this a hand crafted method used for something like describing callee saves?
   bool IsCalleeSaveMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -742,7 +742,6 @@ class ArtMethod final {
     DCHECK(IsImagePointerSize(kRuntimePointerSize));
     visitor(this, &declaring_class_, "declaring_class_");
     visitor(this, &access_flags_, "access_flags_");
-    visitor(this, &dex_code_item_offset_, "dex_code_item_offset_");
     visitor(this, &dex_method_index_, "dex_method_index_");
     visitor(this, &method_index_, "method_index_");
     visitor(this, &hotness_count_, "hotness_count_");
@@ -782,9 +781,6 @@ class ArtMethod final {
 
   /* Dex file fields. The defining dex file is available via declaring_class_->dex_cache_ */
 
-  // Offset to the CodeItem.
-  uint32_t dex_code_item_offset_;
-
   // Index into method_ids of the dex file associated with this method.
   uint32_t dex_method_index_;
 
@@ -816,7 +812,8 @@ class ArtMethod final {
     //   - conflict method: ImtConflictTable,
     //   - abstract/interface method: the single-implementation if any,
     //   - proxy method: the original interface method or constructor,
-    //   - other methods: the profiling data.
+    //   - other methods: during AOT the code item offset, at runtime a pointer
+    //                    to the code item.
     void* data_;
 
     // Method dispatch from quick compiled code invokes this pointer which may cause bridging into

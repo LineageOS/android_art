@@ -645,13 +645,10 @@ END \name
    ldp x0, x1, [sp], #16
 .endm
 
+// Input:  x0 contains the ArtMethod
 // Output: x8 contains the code item
 .macro GET_CODE_ITEM
-   // TODO: Get code item in a better way.
-   stp x0, x1, [sp, #-16]!
-   bl NterpGetCodeItem
-   mov x8, x0
-   ldp x0, x1, [sp], #16
+   ldr x8, [x0, #ART_METHOD_DATA_OFFSET_64]
 .endm
 
 .macro DO_ENTRY_POINT_CHECK call_compiled_code
@@ -1498,11 +1495,9 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     bl NterpGetShorty
     // Save shorty in callee-save xIBASE.
     mov xIBASE, x0
-    mov x0, xINST
-    bl NterpGetCodeItem
-    mov xPC, x0
 
     RESTORE_ALL_ARGUMENTS
+    ldr xPC, [xINST, #ART_METHOD_DATA_OFFSET_64]
 
     // Setup the stack for executing the method.
     SETUP_STACK_FRAME xPC, xREFS, xFP, CFI_REFS

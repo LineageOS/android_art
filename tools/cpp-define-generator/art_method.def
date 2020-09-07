@@ -28,6 +28,10 @@ ASM_DEFINE(ART_METHOD_JNI_OFFSET_32,
            art::ArtMethod::EntryPointFromJniOffset(art::PointerSize::k32).Int32Value())
 ASM_DEFINE(ART_METHOD_JNI_OFFSET_64,
            art::ArtMethod::EntryPointFromJniOffset(art::PointerSize::k64).Int32Value())
+ASM_DEFINE(ART_METHOD_DATA_OFFSET_32,
+           art::ArtMethod::DataOffset(art::PointerSize::k32).Int32Value())
+ASM_DEFINE(ART_METHOD_DATA_OFFSET_64,
+           art::ArtMethod::DataOffset(art::PointerSize::k64).Int32Value())
 ASM_DEFINE(ART_METHOD_QUICK_CODE_OFFSET_32,
            art::ArtMethod::EntryPointFromQuickCompiledCodeOffset(art::PointerSize::k32).Int32Value())
 ASM_DEFINE(ART_METHOD_QUICK_CODE_OFFSET_64,
