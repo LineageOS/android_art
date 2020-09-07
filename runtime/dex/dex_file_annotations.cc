@@ -1745,7 +1745,7 @@ bool IsClassAnnotationPresent(Handle<mirror::Class> klass, Handle<mirror::Class>
 int32_t GetLineNumFromPC(const DexFile* dex_file, ArtMethod* method, uint32_t rel_pc) {
   // For native method, lineno should be -2 to indicate it is native. Note that
   // "line number == -2" is how libcore tells from StackTraceElement.
-  if (method->GetCodeItemOffset() == 0) {
+  if (!method->HasCodeItem()) {
     return -2;
   }
 

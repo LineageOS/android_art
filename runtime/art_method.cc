@@ -771,7 +771,7 @@ void ArtMethod::CopyFrom(ArtMethod* src, PointerSize image_pointer_size) {
   }
 
   // Clear the data pointer, it will be set if needed by the caller.
-  if (!src->IsNative()) {
+  if (!src->HasCodeItem() && !src->IsNative()) {
     SetDataPtrSize(nullptr, image_pointer_size);
   }
   // Clear hotness to let the JIT properly decide when to compile this method.
