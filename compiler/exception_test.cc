@@ -17,6 +17,7 @@
 #include <memory>
 #include <type_traits>
 
+#include "art_method-inl.h"
 #include "base/arena_allocator.h"
 #include "base/callee_save_type.h"
 #include "base/enums.h"
@@ -128,7 +129,7 @@ class ExceptionTest : public CommonRuntimeTest {
 
 TEST_F(ExceptionTest, FindCatchHandler) {
   ScopedObjectAccess soa(Thread::Current());
-  CodeItemDataAccessor accessor(*dex_, dex_->GetCodeItem(method_f_->GetCodeItemOffset()));
+  CodeItemDataAccessor accessor(*dex_, method_f_->GetCodeItem());
 
   ASSERT_TRUE(accessor.HasCodeItem());
 
