@@ -118,7 +118,7 @@ class HInliner : public HOptimization {
 
   // Try to recognize known simple patterns and replace invoke call with appropriate instructions.
   bool TryPatternSubstitution(HInvoke* invoke_instruction,
-                              ArtMethod* resolved_method,
+                              ArtMethod* method,
                               HInstruction** return_replacement)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -166,10 +166,7 @@ class HInliner : public HOptimization {
                                             bool* is_final = nullptr);
 
   // Try inlining the invoke instruction using inline caches.
-  bool TryInlineFromInlineCache(
-      const DexFile& caller_dex_file,
-      HInvoke* invoke_instruction,
-      ArtMethod* resolved_method)
+  bool TryInlineFromInlineCache(HInvoke* invoke_instruction)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try getting the inline cache from JIT code cache.
@@ -184,7 +181,7 @@ class HInliner : public HOptimization {
   // Try getting the inline cache from AOT offline profile.
   // Return true if the inline cache was successfully allocated and the
   // invoke info was found in the profile info.
-  InlineCacheType GetInlineCacheAOT(const DexFile& caller_dex_file,
+  InlineCacheType GetInlineCacheAOT(
       HInvoke* invoke_instruction,
       StackHandleScope<1>* hs,
       /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
@@ -209,18 +206,15 @@ class HInliner : public HOptimization {
   // if (receiver.getClass() != ic.GetMonomorphicType()) deopt
   // ... // inlined code
   bool TryInlineMonomorphicCall(HInvoke* invoke_instruction,
-                                ArtMethod* resolved_method,
                                 Handle<mirror::ObjectArray<mirror::Class>> classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try to inline targets of a polymorphic call.
   bool TryInlinePolymorphicCall(HInvoke* invoke_instruction,
-                                ArtMethod* resolved_method,
                                 Handle<mirror::ObjectArray<mirror::Class>> classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool TryInlinePolymorphicCallToSameTarget(HInvoke* invoke_instruction,
-                                            ArtMethod* resolved_method,
                                             Handle<mirror::ObjectArray<mirror::Class>> classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
