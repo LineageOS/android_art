@@ -16,8 +16,10 @@
 
 #include "intrinsics_arm64.h"
 
+#include "arch/arm64/callee_save_frame_arm64.h"
 #include "arch/arm64/instruction_set_features_arm64.h"
 #include "art_method.h"
+#include "base/bit_utils.h"
 #include "code_generator_arm64.h"
 #include "common_arm64.h"
 #include "data_type-inl.h"
@@ -51,6 +53,8 @@ namespace arm64 {
 using helpers::DRegisterFrom;
 using helpers::HeapOperand;
 using helpers::LocationFrom;
+using helpers::InputCPURegisterOrZeroRegAt;
+using helpers::IsConstantZeroBitPattern;
 using helpers::OperandFrom;
 using helpers::RegisterFrom;
 using helpers::SRegisterFrom;
@@ -3329,97 +3333,367 @@ void IntrinsicCodeGeneratorARM64::VisitFP16LessEquals(HInvoke* invoke) {
   GenerateFP16Compare(invoke, codegen_, masm, ls);
 }
 
-void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
-  if (invoke->GetNumberOfArguments() == 1u) {
-    // Static field Get.
-    switch (invoke->GetType()) {
-      case DataType::Type::kBool:
-      case DataType::Type::kInt8:
-      case DataType::Type::kUint16:
-      case DataType::Type::kInt16:
-      case DataType::Type::kInt32:
-      case DataType::Type::kInt64: {
-        ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
-        LocationSummary* locations = new (allocator) LocationSummary(
-            invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
-        locations->SetInAt(0, Location::RequiresRegister());
-        locations->SetOut(Location::RequiresRegister());
-        locations->AddTemp(Location::RequiresRegister());
-        break;
-      }
-      case DataType::Type::kFloat32:
-      case DataType::Type::kFloat64: {
-        ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
-        LocationSummary* locations = new (allocator) LocationSummary(
-            invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
-        locations->SetInAt(0, Location::RequiresRegister());
-        locations->SetOut(Location::RequiresFpuRegister());
-        locations->AddTemp(Location::RequiresRegister());
-        locations->AddTemp(Location::RequiresRegister());
-        break;
-      }
-      default:
-        // TODO: Implement for kReference.
-        break;
-    }
+// Check access mode and the primitive type from VarHandle.varType.
+// The `var_type_no_rb`, if valid, shall be filled with VarHandle.varType read without read barrier.
+static void GenerateVarHandleAccessModeAndVarTypeChecks(HInvoke* invoke,
+                                                        CodeGeneratorARM64* codegen,
+                                                        SlowPathCodeARM64* slow_path,
+                                                        DataType::Type type,
+                                                        Register var_type_no_rb = Register()) {
+  mirror::VarHandle::AccessMode access_mode =
+      mirror::VarHandle::GetAccessModeByIntrinsic(invoke->GetIntrinsic());
+  Primitive::Type primitive_type = DataTypeToPrimitive(type);
+
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  Register varhandle = InputRegisterAt(invoke, 0);
+
+  const MemberOffset var_type_offset = mirror::VarHandle::VarTypeOffset();
+  const MemberOffset access_mode_bit_mask_offset = mirror::VarHandle::AccessModesBitMaskOffset();
+  const MemberOffset primitive_type_offset = mirror::Class::PrimitiveTypeOffset();
+
+  UseScratchRegisterScope temps(masm);
+  if (!var_type_no_rb.IsValid()) {
+    var_type_no_rb = temps.AcquireW();
   }
-  // TODO: Support instance fields, arrays, etc.
+  Register temp2 = temps.AcquireW();
+
+  // Check that the operation is permitted and the primitive type of varhandle.varType.
+  // We do not need a read barrier when loading a reference only for loading constant
+  // primitive field through the reference. Use LDP to load the fields together.
+  DCHECK_EQ(var_type_offset.Int32Value() + 4, access_mode_bit_mask_offset.Int32Value());
+  __ Ldp(var_type_no_rb, temp2, HeapOperand(varhandle, var_type_offset.Int32Value()));
+  codegen->GetAssembler()->MaybeUnpoisonHeapReference(var_type_no_rb);
+  __ Tbz(temp2, static_cast<uint32_t>(access_mode), slow_path->GetEntryLabel());
+  __ Ldrh(temp2, HeapOperand(var_type_no_rb, primitive_type_offset.Int32Value()));
+  __ Cmp(temp2, static_cast<uint16_t>(primitive_type));
+  __ B(slow_path->GetEntryLabel(), ne);
+}
+
+// Generate subtype check without read barriers.
+static void GenerateSubTypeObjectCheckNoReadBarrier(CodeGeneratorARM64* codegen,
+                                                    SlowPathCodeARM64* slow_path,
+                                                    Register object,
+                                                    Register type,
+                                                    bool object_can_be_null = true) {
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+
+  const MemberOffset class_offset = mirror::Object::ClassOffset();
+  const MemberOffset super_class_offset = mirror::Class::SuperClassOffset();
+
+  vixl::aarch64::Label success;
+  if (object_can_be_null) {
+    __ Cbz(object, &success);
+  }
+
+  UseScratchRegisterScope temps(masm);
+  Register temp = temps.AcquireW();
+
+  __ Ldr(temp, HeapOperand(object, class_offset.Int32Value()));
+  codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp);
+  vixl::aarch64::Label loop;
+  __ Bind(&loop);
+  __ Cmp(type, temp);  // For heap poisoning, compare poisoned references.
+  __ B(&success, eq);
+  __ Ldr(temp, HeapOperand(temp, super_class_offset.Int32Value()));
+  codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp);
+  __ Cbz(temp, slow_path->GetEntryLabel());
+  __ B(&loop);
+  __ Bind(&success);
+}
+
+static void GenerateVarHandleStaticFieldCheck(HInvoke* invoke,
+                                              CodeGeneratorARM64* codegen,
+                                              SlowPathCodeARM64* slow_path) {
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  Register varhandle = InputRegisterAt(invoke, 0);
+
+  const MemberOffset coordinate_type0_offset = mirror::VarHandle::CoordinateType0Offset();
+
+  UseScratchRegisterScope temps(masm);
+  Register temp = temps.AcquireW();
+
+  // Check that the VarHandle references a static field by checking that coordinateType0 == null.
+  // Do not emit read barrier (or unpoison the reference) for comparing to null.
+  __ Ldr(temp, HeapOperand(varhandle, coordinate_type0_offset.Int32Value()));
+  __ Cbnz(temp, slow_path->GetEntryLabel());
+}
+
+static void GenerateVarHandleInstanceFieldCheck(HInvoke* invoke,
+                                                CodeGeneratorARM64* codegen,
+                                                SlowPathCodeARM64* slow_path) {
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  Register varhandle = InputRegisterAt(invoke, 0);
+  Register object = InputRegisterAt(invoke, 1);
+
+  const MemberOffset coordinate_type0_offset = mirror::VarHandle::CoordinateType0Offset();
+  const MemberOffset coordinate_type1_offset = mirror::VarHandle::CoordinateType1Offset();
+
+  UseScratchRegisterScope temps(masm);
+  Register temp = temps.AcquireW();
+  Register temp2 = temps.AcquireW();
+
+  // Null-check the object.
+  __ Cbz(object, slow_path->GetEntryLabel());
+
+  // Check that the VarHandle references an instance field by checking that
+  // coordinateType1 == null. coordinateType0 should not be null, but this is handled by the
+  // type compatibility check with the source object's type, which will fail for null.
+  DCHECK_EQ(coordinate_type0_offset.Int32Value() + 4, coordinate_type1_offset.Int32Value());
+  __ Ldp(temp, temp2, HeapOperand(varhandle, coordinate_type0_offset.Int32Value()));
+  __ Cbnz(temp2, slow_path->GetEntryLabel());
+
+  // Check that the object has the correct type.
+  // We deliberately avoid the read barrier, letting the slow path handle the false negatives.
+  temps.Release(temp2);  // Needed by GenerateSubTypeObjectCheckNoReadBarrier().
+  GenerateSubTypeObjectCheckNoReadBarrier(
+      codegen, slow_path, object, temp, /*object_can_be_null=*/ false);
+}
+
+static void GenerateVarHandleFieldCheck(HInvoke* invoke,
+                                        CodeGeneratorARM64* codegen,
+                                        SlowPathCodeARM64* slow_path) {
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  DCHECK_LE(expected_coordinates_count, 1u);
+  if (expected_coordinates_count == 0u) {
+    GenerateVarHandleStaticFieldCheck(invoke, codegen, slow_path);
+  } else {
+    GenerateVarHandleInstanceFieldCheck(invoke, codegen, slow_path);
+  }
+}
+
+static void GenerateVarHandleFieldReference(HInvoke* invoke,
+                                            CodeGeneratorARM64* codegen,
+                                            Register object,
+                                            Register offset) {
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  Register varhandle = InputRegisterAt(invoke, 0);
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  DCHECK_LE(expected_coordinates_count, 1u);
+
+  // For static fields, we need to fill the `object` with the declaring class, so
+  // we can use `object` as temporary for the `ArtMethod*`. For instance fields,
+  // we do not need the declaring class, so we can forget the `ArtMethod*` when
+  // we load the `offset`, so use the `offset` to hold the `ArtMethod*`.
+  Register method = (expected_coordinates_count == 0) ? object : offset;
+
+  const MemberOffset art_field_offset = mirror::FieldVarHandle::ArtFieldOffset();
+  const MemberOffset offset_offset = ArtField::OffsetOffset();
+
+  // Load the ArtField, the offset and, if needed, declaring class.
+  __ Ldr(method.X(), HeapOperand(varhandle, art_field_offset.Int32Value()));
+  __ Ldr(offset, MemOperand(method.X(), offset_offset.Int32Value()));
+  if (expected_coordinates_count == 0u) {
+    codegen->GenerateGcRootFieldLoad(invoke,
+                                     LocationFrom(object),
+                                     method.X(),
+                                     ArtField::DeclaringClassOffset().Int32Value(),
+                                     /*fixup_label=*/ nullptr,
+                                     kCompilerReadBarrierOption);
+  }
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
+  DataType::Type type = invoke->GetType();
+  if (type == DataType::Type::kVoid) {
+    // Return type should not be void for get.
+    return;
+  }
+
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  if (expected_coordinates_count > 1u) {
+    // Only field VarHandle is currently supported.
+    return;
+  }
+  if (expected_coordinates_count == 1u &&
+      invoke->InputAt(1)->GetType() != DataType::Type::kReference) {
+    // For an instance field, the object must be a reference.
+    return;
+  }
+
+  ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
+  LocationSummary* locations =
+      new (allocator) LocationSummary(invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (expected_coordinates_count == 1u) {
+    // For instance fields, this is the source object.
+    locations->SetInAt(1, Location::RequiresRegister());
+  } else {
+    // Add a temporary to hold the declaring class.
+    locations->AddTemp(Location::RequiresRegister());
+  }
+  if (DataType::IsFloatingPointType(type)) {
+    locations->SetOut(Location::RequiresFpuRegister());
+  } else {
+    locations->SetOut(Location::RequiresRegister());
+  }
+  // Add a temporary for offset if we cannot use the output register.
+  if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
+    // To preserve the offset value across the non-Baker read barrier
+    // slow path, use a fixed callee-save register.
+    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+  } else if (DataType::IsFloatingPointType(type)) {
+    locations->AddTemp(Location::RequiresRegister());
+  }
 }
 
 void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
-  // Implemented only for primitive static fields.
-  DCHECK_EQ(invoke->GetNumberOfArguments(), 1u);
+  // Implemented only for fields.
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  DCHECK_LE(expected_coordinates_count, 1u);
   DataType::Type type = invoke->GetType();
   DCHECK_NE(type, DataType::Type::kVoid);
-  DCHECK_NE(type, DataType::Type::kReference);
-  Primitive::Type primitive_type = DataTypeToPrimitive(type);
 
+  LocationSummary* locations = invoke->GetLocations();
   MacroAssembler* masm = GetVIXLAssembler();
-  Register varhandle = InputRegisterAt(invoke, 0).X();
   CPURegister out = helpers::OutputCPURegister(invoke);
-  Register temp = WRegisterFrom(invoke->GetLocations()->GetTemp(0));
 
   SlowPathCodeARM64* slow_path =
       new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
   codegen_->AddSlowPath(slow_path);
 
-  // Check that the operation is permitted. For static field Get, this
-  // should be the same as checking that the field is not volatile.
-  mirror::VarHandle::AccessMode access_mode =
-      mirror::VarHandle::GetAccessModeByIntrinsic(invoke->GetIntrinsic());
-  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::AccessModesBitMaskOffset().Int32Value()));
-  __ Tbz(temp, static_cast<uint32_t>(access_mode), slow_path->GetEntryLabel());
+  GenerateVarHandleFieldCheck(invoke, codegen_, slow_path);
+  GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen_, slow_path, type);
 
-  // Check the varType.primitiveType against the type we're trying to retrieve. We do not need a
-  // read barrier when loading a reference only for loading constant field through the reference.
-  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::VarTypeOffset().Int32Value()));
-  codegen_->GetAssembler()->MaybeUnpoisonHeapReference(temp);
-  __ Ldrh(temp, MemOperand(temp.X(), mirror::Class::PrimitiveTypeOffset().Int32Value()));
-  __ Cmp(temp, static_cast<uint16_t>(primitive_type));
-  __ B(slow_path->GetEntryLabel(), ne);
+  // Use `out` for offset if it is a core register, except for non-Baker read barrier.
+  Register offset =
+      ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) || DataType::IsFloatingPointType(type))
+          ? WRegisterFrom(locations->GetTemp(expected_coordinates_count == 0u ? 1u : 0u))
+          : out.W();
+  // The object reference from which to load the field.
+  Register object = (expected_coordinates_count == 0u)
+      ? WRegisterFrom(locations->GetTemp(0u))
+      : InputRegisterAt(invoke, 1).W();
 
-  // Check that the VarHandle references a static field by checking that coordinateType0 == null.
-  // Do not emit read barrier (or unpoison the reference) for comparing to null.
-  __ Ldr(temp, MemOperand(varhandle, mirror::VarHandle::CoordinateType0Offset().Int32Value()));
-  __ Cbnz(temp, slow_path->GetEntryLabel());
-
-  // Use `out` for offset if it is a core register.
-  Register offset = DataType::IsFloatingPointType(type)
-      ? WRegisterFrom(invoke->GetLocations()->GetTemp(1))
-      : out.W();
-
-  // Load the ArtField, the offset and declaring class.
-  __ Ldr(temp.X(), MemOperand(varhandle, mirror::FieldVarHandle::ArtFieldOffset().Int32Value()));
-  __ Ldr(offset, MemOperand(temp.X(), ArtField::OffsetOffset().Int32Value()));
-  codegen_->GenerateGcRootFieldLoad(invoke,
-                                    LocationFrom(temp),
-                                    temp.X(),
-                                    ArtField::DeclaringClassOffset().Int32Value(),
-                                    /*fixup_label=*/ nullptr,
-                                    kCompilerReadBarrierOption);
+  GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
 
   // Load the value from the field.
-  codegen_->Load(type, out, MemOperand(temp.X(), offset.X()));
+  if (type == DataType::Type::kReference && kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
+    // Piggy-back on the field load path using introspection for the Baker read barrier.
+    // The `offset` is either the `out` or a temporary, use it for field address.
+    __ Add(offset.X(), object.X(), offset.X());
+    codegen_->GenerateFieldLoadWithBakerReadBarrier(invoke,
+                                                    locations->Out(),
+                                                    object,
+                                                    MemOperand(offset.X()),
+                                                    /*needs_null_check=*/ false,
+                                                    /*is_volatile=*/ false);
+  } else {
+    codegen_->Load(type, out, MemOperand(object.X(), offset.X()));
+    if (type == DataType::Type::kReference) {
+      DCHECK(out.IsW());
+      Location out_loc = locations->Out();
+      Location object_loc = LocationFrom(object);
+      Location offset_loc = LocationFrom(offset);
+      codegen_->MaybeGenerateReadBarrierSlow(invoke, out_loc, out_loc, object_loc, 0u, offset_loc);
+    }
+  }
+
+  __ Bind(slow_path->GetExitLabel());
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleSet(HInvoke* invoke) {
+  if (invoke->GetType() != DataType::Type::kVoid) {
+    // Return type should be void for set.
+    return;
+  }
+
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  if (expected_coordinates_count > 1u) {
+    // Only field VarHandle is currently supported.
+    return;
+  }
+  if (expected_coordinates_count == 1u &&
+      invoke->InputAt(1)->GetType() != DataType::Type::kReference) {
+    // For an instance field, the object must be a reference.
+    return;
+  }
+
+  // The last argument should be the value we intend to set.
+  uint32_t value_index = invoke->GetNumberOfArguments() - 1;
+  HInstruction* value = invoke->InputAt(value_index);
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, value_index);
+
+  ArenaAllocator* allocator = invoke->GetBlock()->GetGraph()->GetAllocator();
+  LocationSummary* locations =
+      new (allocator) LocationSummary(invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
+    // To preserve the offset value across the non-Baker read barrier
+    // slow path, use a fixed callee-save register.
+    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+  } else {
+    locations->AddTemp(Location::RequiresRegister());  // For offset.
+  }
+  if (expected_coordinates_count == 1u) {
+    // For instance fields, this is the source object.
+    locations->SetInAt(1, Location::RequiresRegister());
+  } else {
+    // Add a temporary to hold the declaring class.
+    locations->AddTemp(Location::RequiresRegister());
+  }
+  if (IsConstantZeroBitPattern(value)) {
+    locations->SetInAt(value_index, Location::ConstantLocation(value->AsConstant()));
+  } else if (DataType::IsFloatingPointType(value_type)) {
+    locations->SetInAt(value_index, Location::RequiresFpuRegister());
+  } else {
+    locations->SetInAt(value_index, Location::RequiresRegister());
+  }
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
+  // Implemented only for fields.
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  DCHECK_LE(expected_coordinates_count, 1u);
+  uint32_t value_index = invoke->GetNumberOfArguments() - 1;
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, value_index);
+
+  MacroAssembler* masm = GetVIXLAssembler();
+  CPURegister value = InputCPURegisterOrZeroRegAt(invoke, value_index);
+
+  SlowPathCodeARM64* slow_path =
+      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen_->AddSlowPath(slow_path);
+
+  GenerateVarHandleFieldCheck(invoke, codegen_, slow_path);
+  {
+    UseScratchRegisterScope temps(masm);
+    Register var_type_no_rb = temps.AcquireW();
+    GenerateVarHandleAccessModeAndVarTypeChecks(
+        invoke, codegen_, slow_path, value_type, var_type_no_rb);
+    if (value_type == DataType::Type::kReference && !value.IsZero()) {
+      // If the value type is a reference, check it against the varType.
+      // False negatives due to varType being an interface or array type
+      // or due to the missing read barrier are handled by the slow path.
+      GenerateSubTypeObjectCheckNoReadBarrier(codegen_, slow_path, value.W(), var_type_no_rb);
+    }
+  }
+
+  // The temporary allocated for loading `offset`.
+  Register offset = WRegisterFrom(invoke->GetLocations()->GetTemp(0u));
+  // The object reference from which to load the field.
+  Register object = (expected_coordinates_count == 0u)
+      ? WRegisterFrom(invoke->GetLocations()->GetTemp(1u))
+      : InputRegisterAt(invoke, 1).W();
+
+  GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
+
+  // Store the value to the field.
+  {
+    CPURegister source = value;
+    UseScratchRegisterScope temps(masm);
+    if (kPoisonHeapReferences && value_type == DataType::Type::kReference) {
+      DCHECK(value.IsW());
+      Register temp = temps.AcquireW();
+      __ Mov(temp, value.W());
+      codegen_->GetAssembler()->PoisonHeapReference(temp);
+      source = temp;
+    }
+    codegen_->Store(value_type, source, MemOperand(object.X(), offset.X()));
+  }
+
+  if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(value_index))) {
+    codegen_->MarkGCCard(object, Register(value), /*value_can_be_null=*/ true);
+  }
 
   __ Bind(slow_path->GetExitLabel());
 }
@@ -3481,7 +3755,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetOpaque)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetVolatile)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSet)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetOpaque)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetVolatile)
