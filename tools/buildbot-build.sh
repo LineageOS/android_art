@@ -16,6 +16,8 @@
 
 set -e
 
+shopt -s failglob
+
 if [ ! -d art ]; then
   echo "Script needs to be run at the root of the android tree"
   exit 1
@@ -179,13 +181,6 @@ if [[ $mode == "target" ]]; then
   link_command="mkdir -p $(dirname "$link_name") && ln -sf com.android.art.testing \"$link_name\""
   echo "Executing $link_command"
   eval "$link_command"
-  # Also provide access to symbols of binaries from the Runtime (Bionic) APEX,
-  # e.g. to support debugging in GDB.
-  find "$target_out_unstripped/apex/com.android.runtime/bin" -type f | while read target; do
-    cmd="ln -sf $target $target_out_unstripped/system/bin/$(basename $target)"
-    echo "Executing $cmd"
-    eval "$cmd"
-  done
 
   # Temporary fix for libjavacrypto.so dependencies in libcore and jvmti tests (b/147124225).
   conscrypt_dir="$ANDROID_PRODUCT_OUT/system/apex/com.android.conscrypt"
@@ -228,14 +223,18 @@ if [[ $mode == "target" ]]; then
     echo "Symlinking /apex/com.android.runtime/bin/$b to /system/bin"
     ln -sf /apex/com.android.runtime/bin/$b $ANDROID_PRODUCT_OUT/system/bin/$b
   done
-  for p in $ANDROID_PRODUCT_OUT/system/apex/com.android.runtime/lib{,64}/bionic/*; do
-    lib_dir=$(expr $p : '.*/\(lib[0-9]*\)/.*')
-    lib_file=$(basename $p)
-    src=/apex/com.android.runtime/${lib_dir}/bionic/${lib_file}
-    dst=$ANDROID_PRODUCT_OUT/system/${lib_dir}/${lib_file}
-    echo "Symlinking $src into /system/${lib_dir}"
-    mkdir -p $(dirname $dst)
-    ln -sf $src $dst
+  for d in $ANDROID_PRODUCT_OUT/system/apex/com.android.runtime/lib{,64}/bionic; do
+    if [ -d $d ]; then
+      for p in $d/*; do
+        lib_dir=$(expr $p : '.*/\(lib[0-9]*\)/.*')
+        lib_file=$(basename $p)
+        src=/apex/com.android.runtime/${lib_dir}/bionic/${lib_file}
+        dst=$ANDROID_PRODUCT_OUT/system/${lib_dir}/${lib_file}
+        echo "Symlinking $src into /system/${lib_dir}"
+        mkdir -p $(dirname $dst)
+        ln -sf $src $dst
+      done
+    fi
   done
 
   # Create linker config files. We run linkerconfig on host to avoid problems
@@ -264,6 +263,24 @@ if [[ $mode == "target" ]]; then
     rm -rf $dst
     cp -r $src $dst
   done
+
+  # Linkerconfig also looks at /apex/apex-info-list.xml to check for system APEXes.
+  apex_xml_file=$linkerconfig_root/apex/apex-info-list.xml
+  echo "Creating $apex_xml_file"
+  cat <<EOF > $apex_xml_file
+<?xml version="1.0" encoding="utf-8"?>
+<apex-info-list>
+EOF
+  for apex in ${apexes[@]}; do
+    [[ $apex == com.android.art.* ]] && apex=com.android.art
+    cat <<EOF >> $apex_xml_file
+    <apex-info moduleName="${apex}" modulePath="/system/apex/${apex}.apex" preinstalledModulePath="/system/apex/${apex}.apex" versionCode="1" versionName="" isFactory="true" isActive="true">
+    </apex-info>
+EOF
+  done
+  cat <<EOF >> $apex_xml_file
+</apex-info-list>
+EOF
 
   # To avoid warnings from linkerconfig when it checks following two partitions
   mkdir -p $linkerconfig_root/product

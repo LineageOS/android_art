@@ -20,4 +20,18 @@ public class InaccessibleClassProxy {
   public static boolean test(Object o) {
     return o instanceof InaccessibleClass;
   }
+
+  public static void testGetReferrersClass() {
+    Class<?> klass = InaccessibleClass.$noinline$getReferrersClass();
+    if (klass == null) {
+      throw new Error("Expected non-null klass");
+    }
+  }
+
+  public static void testGetReferrersClassViaAnotherClass() {
+    Class<?> klass = InaccessibleClass.$noinline$getReferrersClassViaAnotherClass();
+    if (klass != null) {
+      throw new Error("Expected non-null klass");
+    }
+  }
 }

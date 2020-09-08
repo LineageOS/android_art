@@ -2872,8 +2872,10 @@ class ImageSpace::BootImageLoader {
       image_header.VisitPackedArtMethods([&](ArtMethod& method)
           REQUIRES_SHARED(Locks::mutator_lock_) {
         main_patch_object_visitor.PatchGcRoot(&method.DeclaringClassRoot());
-        void** data_address = PointerAddress(&method, ArtMethod::DataOffset(kPointerSize));
-        main_patch_object_visitor.PatchNativePointer(data_address);
+        if (!method.HasCodeItem()) {
+          void** data_address = PointerAddress(&method, ArtMethod::DataOffset(kPointerSize));
+          main_patch_object_visitor.PatchNativePointer(data_address);
+        }
         void** entrypoint_address =
             PointerAddress(&method, ArtMethod::EntryPointFromQuickCompiledCodeOffset(kPointerSize));
         main_patch_object_visitor.PatchNativePointer(entrypoint_address);

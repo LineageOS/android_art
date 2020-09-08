@@ -784,6 +784,9 @@ END_FUNCTION \name
 // - rPC: the new PC pointer to execute
 // - edi: number of arguments
 // - ecx: first dex register
+//
+// This helper expects:
+// - rax to contain the code item
 .macro SETUP_STACK_FOR_INVOKE
    // We do the same stack overflow check as the compiler. See CanMethodUseNterp
    // in how we limit the maximum nterp frame size.
@@ -969,13 +972,7 @@ END_FUNCTION \name
    cmpq %rax, ART_METHOD_QUICK_CODE_OFFSET_64(%rdi)
    jne  VAR(call_compiled_code)
 
-   // TODO: Get code item in a better way and remove below
-   push %rdi
-   push %rsi
-   call SYMBOL(NterpGetCodeItem)
-   pop %rsi
-   pop %rdi
-   // TODO: Get code item in a better way and remove above
+   movq ART_METHOD_DATA_OFFSET_64(%rdi), %rax
 .endm
 
 // Uses r9 and r10 as temporary
@@ -1389,9 +1386,6 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     call SYMBOL(NterpGetShorty)
     // Save shorty in callee-save rbp.
     movq %rax, %rbp
-    movq %rbx, %rdi
-    call SYMBOL(NterpGetCodeItem)
-    movq %rax, rPC
 
     // Restore xmm registers + alignment.
     movq 0(%rsp), %xmm0
@@ -1412,6 +1406,8 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     POP rsi
     POP rdi
     // TODO: Get shorty in a better way and remove above
+
+    movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
 
     // Setup the stack for executing the method.
     SETUP_STACK_FRAME rPC, rREFS, rFP, CFI_REFS
