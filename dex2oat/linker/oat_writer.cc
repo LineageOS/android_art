@@ -938,6 +938,7 @@ class OatWriter::InitBssLayoutMethodVisitor : public DexMethodVisitor {
     // We currently support inlining of throwing instructions only when they originate in the
     // same dex file as the outer method. All .bss references are used by throwing instructions.
     DCHECK_EQ(dex_file_, ref.dex_file);
+    DCHECK_LT(ref.index, number_of_indexes);
 
     auto refs_it = references->find(ref.dex_file);
     if (refs_it == references->end()) {

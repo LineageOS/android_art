@@ -573,7 +573,8 @@ const char* CodeGenerator::GetCriticalNativeShorty(HInvokeStaticOrDirect* invoke
 
 void CodeGenerator::GenerateInvokeStaticOrDirectRuntimeCall(
     HInvokeStaticOrDirect* invoke, Location temp, SlowPathCode* slow_path) {
-  MoveConstant(temp, invoke->GetDexMethodIndex());
+  MethodReference method_reference(invoke->GetMethodReference());
+  MoveConstant(temp, method_reference.index);
 
   // The access check is unnecessary but we do not want to introduce
   // extra entrypoints for the codegens that do not support some
@@ -602,7 +603,8 @@ void CodeGenerator::GenerateInvokeStaticOrDirectRuntimeCall(
   InvokeRuntime(entrypoint, invoke, invoke->GetDexPc(), slow_path);
 }
 void CodeGenerator::GenerateInvokeUnresolvedRuntimeCall(HInvokeUnresolved* invoke) {
-  MoveConstant(invoke->GetLocations()->GetTemp(0), invoke->GetDexMethodIndex());
+  MethodReference method_reference(invoke->GetMethodReference());
+  MoveConstant(invoke->GetLocations()->GetTemp(0), method_reference.index);
 
   // Initialize to anything to silent compiler warnings.
   QuickEntrypointEnum entrypoint = kQuickInvokeStaticTrampolineWithAccessCheck;
