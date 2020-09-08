@@ -4350,7 +4350,7 @@ void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invok
   MacroAssembler* masm = GetVIXLAssembler();
   UseScratchRegisterScope scratch_scope(masm);
   scratch_scope.Exclude(ip1);
-  __ Mov(ip1, invoke->GetDexMethodIndex());
+  __ Mov(ip1, invoke->GetMethodReference().index);
 
   __ Ldr(temp,
       MemOperand(temp, mirror::Class::ImtPtrOffset(kArm64PointerSize).Uint32Value()));
@@ -4436,11 +4436,12 @@ void CodeGeneratorARM64::GenerateStaticOrDirectCall(
     case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative: {
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       // Add ADRP with its PC-relative method patch.
-      vixl::aarch64::Label* adrp_label = NewBootImageMethodPatch(invoke->GetTargetMethod());
+      vixl::aarch64::Label* adrp_label =
+          NewBootImageMethodPatch(invoke->GetResolvedMethodReference());
       EmitAdrpPlaceholder(adrp_label, XRegisterFrom(temp));
       // Add ADD with its PC-relative method patch.
       vixl::aarch64::Label* add_label =
-          NewBootImageMethodPatch(invoke->GetTargetMethod(), adrp_label);
+          NewBootImageMethodPatch(invoke->GetResolvedMethodReference(), adrp_label);
       EmitAddPlaceholder(add_label, XRegisterFrom(temp), XRegisterFrom(temp));
       break;
     }
@@ -4457,12 +4458,11 @@ void CodeGeneratorARM64::GenerateStaticOrDirectCall(
     }
     case HInvokeStaticOrDirect::MethodLoadKind::kBssEntry: {
       // Add ADRP with its PC-relative .bss entry patch.
-      MethodReference target_method(&GetGraph()->GetDexFile(), invoke->GetDexMethodIndex());
-      vixl::aarch64::Label* adrp_label = NewMethodBssEntryPatch(target_method);
+      vixl::aarch64::Label* adrp_label = NewMethodBssEntryPatch(invoke->GetMethodReference());
       EmitAdrpPlaceholder(adrp_label, XRegisterFrom(temp));
       // Add LDR with its PC-relative .bss entry patch.
       vixl::aarch64::Label* ldr_label =
-          NewMethodBssEntryPatch(target_method, adrp_label);
+          NewMethodBssEntryPatch(invoke->GetMethodReference(), adrp_label);
       // All aligned loads are implicitly atomic consume operations on ARM64.
       EmitLdrOffsetPlaceholder(ldr_label, XRegisterFrom(temp), XRegisterFrom(temp));
       break;
@@ -4811,7 +4811,7 @@ void CodeGeneratorARM64::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* inv
   if (GetCompilerOptions().IsBootImage()) {
     DCHECK_EQ(boot_image_offset, IntrinsicVisitor::IntegerValueOfInfo::kInvalidReference);
     // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
-    MethodReference target_method = invoke->GetTargetMethod();
+    MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     // Add ADRP with its PC-relative type patch.
     vixl::aarch64::Label* adrp_label = NewBootImageTypePatch(*target_method.dex_file, type_idx);
