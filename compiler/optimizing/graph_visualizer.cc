@@ -456,7 +456,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
   }
 
   void VisitInvoke(HInvoke* invoke) override {
-    StartAttributeStream("dex_file_index") << invoke->GetDexMethodIndex();
+    StartAttributeStream("dex_file_index") << invoke->GetMethodReference().index;
     ArtMethod* method = invoke->GetResolvedMethod();
     // We don't print signatures, which conflict with c1visualizer format.
     static constexpr bool kWithSignature = false;
@@ -464,7 +464,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     // other invokes might be coming from inlined methods.
     ScopedObjectAccess soa(Thread::Current());
     std::string method_name = (method == nullptr)
-        ? GetGraph()->GetDexFile().PrettyMethod(invoke->GetDexMethodIndex(), kWithSignature)
+        ? invoke->GetMethodReference().PrettyMethod(kWithSignature)
         : method->PrettyMethod(kWithSignature);
     StartAttributeStream("method_name") << method_name;
     StartAttributeStream("always_throws") << std::boolalpha

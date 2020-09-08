@@ -2580,7 +2580,7 @@ void InstructionCodeGeneratorX86::VisitInvokeInterface(HInvokeInterface* invoke)
   // Set the hidden argument. This is safe to do this here, as XMM7
   // won't be modified thereafter, before the `call` instruction.
   DCHECK_EQ(XMM7, hidden_reg);
-  __ movl(temp, Immediate(invoke->GetDexMethodIndex()));
+  __ movl(temp, Immediate(invoke->GetMethodReference().index));
   __ movd(hidden_reg, temp);
 
   if (receiver.IsStackSlot()) {
@@ -5312,16 +5312,21 @@ void CodeGeneratorX86::RecordBootImageMethodPatch(HInvokeStaticOrDirect* invoke)
   HX86ComputeBaseMethodAddress* method_address =
       invoke->InputAt(invoke->GetSpecialInputIndex())->AsX86ComputeBaseMethodAddress();
   boot_image_method_patches_.emplace_back(
-      method_address, invoke->GetTargetMethod().dex_file, invoke->GetTargetMethod().index);
+      method_address,
+      invoke->GetResolvedMethodReference().dex_file,
+      invoke->GetResolvedMethodReference().index);
   __ Bind(&boot_image_method_patches_.back().label);
 }
 
 void CodeGeneratorX86::RecordMethodBssEntryPatch(HInvokeStaticOrDirect* invoke) {
+  DCHECK(IsSameDexFile(GetGraph()->GetDexFile(), *invoke->GetMethodReference().dex_file));
   HX86ComputeBaseMethodAddress* method_address =
       invoke->InputAt(invoke->GetSpecialInputIndex())->AsX86ComputeBaseMethodAddress();
   // Add the patch entry and bind its label at the end of the instruction.
   method_bss_entry_patches_.emplace_back(
-      method_address, &GetGraph()->GetDexFile(), invoke->GetDexMethodIndex());
+      method_address,
+      invoke->GetMethodReference().dex_file,
+      invoke->GetMethodReference().index);
   __ Bind(&method_bss_entry_patches_.back().label);
 }
 
@@ -5399,7 +5404,7 @@ void CodeGeneratorX86::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invok
     Register method_address_reg =
         invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex()).AsRegister<Register>();
     __ leal(argument, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
-    MethodReference target_method = invoke->GetTargetMethod();
+    MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     boot_image_type_patches_.emplace_back(method_address, target_method.dex_file, type_idx.index_);
     __ Bind(&boot_image_type_patches_.back().label);
