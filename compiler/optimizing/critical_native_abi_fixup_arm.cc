@@ -69,7 +69,7 @@ static void FixUpArguments(HInvokeStaticOrDirect* invoke) {
           /*number_of_arguments=*/ 1u,
           converted_type,
           invoke->GetDexPc(),
-          /*method_index=*/ dex::kDexNoIndex,
+          /*method_reference=*/ MethodReference(nullptr, dex::kDexNoIndex),
           resolved_method,
           dispatch_info,
           kStatic,
