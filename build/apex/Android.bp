@@ -216,6 +216,9 @@ apex_defaults {
     required: [
         "com.android.i18n",
     ],
+    prebuilts: [
+        "art-linker-config",
+    ],
     // ART APEXes depend on bouncycastle which is disabled for PDK builds.
     // Since the dependency is disabled, ART APEXes can't be built either.
     // Disable the APEXes too. See b/157267166.
@@ -453,4 +456,10 @@ cc_prebuilt_binary {
     name: "art-check-testing-apex-gen-fakebin",
     defaults: ["art-check-apex-gen-fakebin-defaults"],
     srcs: [":art-check-testing-apex-gen"],
+}
+
+prebuilt_etc {
+    name: "art-linker-config",
+    src: "linker.config.txt",
+    filename: "linker.config.txt",
 }
