@@ -1143,13 +1143,15 @@ void CodeGeneratorX86_64::RecordBootImageRelRoPatch(uint32_t boot_image_offset) 
 }
 
 void CodeGeneratorX86_64::RecordBootImageMethodPatch(HInvokeStaticOrDirect* invoke) {
-  boot_image_method_patches_.emplace_back(
-      invoke->GetTargetMethod().dex_file, invoke->GetTargetMethod().index);
+  boot_image_method_patches_.emplace_back(invoke->GetResolvedMethodReference().dex_file,
+                                          invoke->GetResolvedMethodReference().index);
   __ Bind(&boot_image_method_patches_.back().label);
 }
 
 void CodeGeneratorX86_64::RecordMethodBssEntryPatch(HInvokeStaticOrDirect* invoke) {
-  method_bss_entry_patches_.emplace_back(&GetGraph()->GetDexFile(), invoke->GetDexMethodIndex());
+  DCHECK(IsSameDexFile(GetGraph()->GetDexFile(), *invoke->GetMethodReference().dex_file));
+  method_bss_entry_patches_.emplace_back(invoke->GetMethodReference().dex_file,
+                                         invoke->GetMethodReference().index);
   __ Bind(&method_bss_entry_patches_.back().label);
 }
 
@@ -1205,7 +1207,7 @@ void CodeGeneratorX86_64::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* in
     // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
     __ leal(argument,
             Address::Absolute(CodeGeneratorX86_64::kPlaceholder32BitOffset, /* no_rip= */ false));
-    MethodReference target_method = invoke->GetTargetMethod();
+    MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     boot_image_type_patches_.emplace_back(target_method.dex_file, type_idx.index_);
     __ Bind(&boot_image_type_patches_.back().label);
@@ -2743,7 +2745,7 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
   // won't be modified thereafter, before the `call` instruction.
   // We also di it after MaybeGenerateInlineCache that may use RAX.
   DCHECK_EQ(RAX, hidden_reg.AsRegister());
-  codegen_->Load64BitValue(hidden_reg, invoke->GetDexMethodIndex());
+  codegen_->Load64BitValue(hidden_reg, invoke->GetMethodReference().index);
 
   // temp = temp->GetAddressOfIMT()
   __ movq(temp,
