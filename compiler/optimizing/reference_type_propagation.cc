@@ -526,8 +526,8 @@ void ReferenceTypePropagation::RTPVisitor::SetClassAsTypeInfo(HInstruction* inst
       ClassLinker* cl = Runtime::Current()->GetClassLinker();
       Thread* self = Thread::Current();
       StackHandleScope<2> hs(self);
-      const DexFile& dex_file = *invoke->GetTargetMethod().dex_file;
-      uint32_t dex_method_index = invoke->GetTargetMethod().index;
+      const DexFile& dex_file = *invoke->GetResolvedMethodReference().dex_file;
+      uint32_t dex_method_index = invoke->GetResolvedMethodReference().index;
       Handle<mirror::DexCache> dex_cache(
           hs.NewHandle(FindDexCacheWithHint(self, dex_file, hint_dex_cache_)));
       // Use a null loader, the target method is in a boot classpath dex file.
