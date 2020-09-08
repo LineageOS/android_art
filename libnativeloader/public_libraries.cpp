@@ -59,8 +59,6 @@ constexpr const char* kLlndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/llnd
 constexpr const char* kVndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/vndksp.libraries.{}.txt";
 
 
-constexpr const char* kStatsdApexPublicLibrary = "libstats_jni.so";
-
 // TODO(b/130388701): do we need this?
 std::string root_dir() {
   static const char* android_root_env = getenv("ANDROID_ROOT");
@@ -276,10 +274,6 @@ static std::string InitVndkspLibrariesProduct() {
   return android::base::Join(*sonames, ':');
 }
 
-static std::string InitStatsdPublicLibraries() {
-  return kStatsdApexPublicLibrary;
-}
-
 static std::map<std::string, std::string> InitApexLibraries(const std::string& tag) {
   std::string file_content;
   if (!base::ReadFileToString(kApexLibrariesConfigFile, &file_content)) {
@@ -339,11 +333,6 @@ const std::string& vendor_public_libraries() {
 
 const std::string& extended_public_libraries() {
   static std::string list = InitExtendedPublicLibraries();
-  return list;
-}
-
-const std::string& statsd_public_libraries() {
-  static std::string list = InitStatsdPublicLibraries();
   return list;
 }
 
