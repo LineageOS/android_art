@@ -32,7 +32,6 @@ using android::base::Result;
 // e.g., if it is a vendor app or not, different set of libraries are made available.
 const std::string& preloadable_public_libraries();
 const std::string& default_public_libraries();
-const std::string& statsd_public_libraries();
 const std::string& vendor_public_libraries();
 const std::string& extended_public_libraries();
 const std::string& llndk_libraries_product();
