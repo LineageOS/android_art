@@ -832,12 +832,12 @@ bool HInliner::TryInlineMonomorphicCall(HInvoke* invoke_instruction,
   ArtMethod* resolved_method = ResolveMethodFromInlineCache(
       monomorphic_type, invoke_instruction, pointer_size);
 
-  LOG_NOTE() << "Try inline monomorphic call to " << resolved_method->PrettyMethod();
   if (resolved_method == nullptr) {
     // Bogus AOT profile, bail.
     DCHECK(Runtime::Current()->IsAotCompiler());
     return false;
   }
+  LOG_NOTE() << "Try inline monomorphic call to " << resolved_method->PrettyMethod();
 
   HInstruction* receiver = invoke_instruction->InputAt(0);
   HInstruction* cursor = invoke_instruction->GetPrevious();
