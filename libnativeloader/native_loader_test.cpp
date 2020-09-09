@@ -99,7 +99,6 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
 #define NAMESPACE_ENTRY(ns) {ns, TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE(ns))}
   NAMESPACE_ENTRY("com_android_i18n"),
   NAMESPACE_ENTRY("com_android_neuralnetworks"),
-  NAMESPACE_ENTRY("com_android_os_statsd"),
   NAMESPACE_ENTRY("com_android_art"),
   NAMESPACE_ENTRY("default"),
   NAMESPACE_ENTRY("sphal"),
@@ -367,7 +366,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_vndk_product_ns = false;
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
-  bool expected_link_with_statsd_ns = true;
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
   std::string expected_shared_libs_to_art_ns = apex_public_libraries().at("com_android_art");
   std::string expected_shared_libs_to_i18n_ns = apex_public_libraries().at("com_android_i18n");
@@ -376,7 +374,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   std::string expected_shared_libs_to_vndk_product_ns = vndksp_libraries_product();
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
   std::string expected_shared_libs_to_neuralnetworks_ns = apex_public_libraries().at("com_android_neuralnetworks");
-  std::string expected_shared_libs_to_statsd_ns = statsd_public_libraries();
 
   void SetExpectations() {
     NativeLoaderTest::SetExpectations();
@@ -429,11 +426,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_neuralnetworks_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
-          .WillOnce(Return(true));
-    }
-    if (expected_link_with_statsd_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_os_statsd"),
-                                              StrEq(expected_shared_libs_to_statsd_ns)))
           .WillOnce(Return(true));
     }
   }
