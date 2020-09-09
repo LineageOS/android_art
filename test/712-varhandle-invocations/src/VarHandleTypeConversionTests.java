@@ -1217,6 +1217,11 @@ public class VarHandleTypeConversionTests {
                 failUnreachable();
             } catch (UnsupportedOperationException e) {
             }
+            try {
+                boolean result = vh.compareAndSet(this, new Object(), Widget.ONE);
+                failUnreachable();
+            } catch (ClassCastException e) {
+            }
         }
     }
 
