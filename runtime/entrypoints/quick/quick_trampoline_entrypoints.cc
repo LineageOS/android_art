@@ -1322,9 +1322,11 @@ extern "C" const void* artQuickResolutionTrampoline(
     if (called != nullptr) {
       if (invoke_type == kSuper) {
         if (called->GetDexFile() == called_method.dex_file) {
-          // When the target is in a different dex file, the compiler makes sure
-          // the index is relative to the caller's dex file.
           called_method.index = called->GetDexMethodIndex();
+        } else {
+          called_method.index = called->FindDexMethodIndexInOtherDexFile(
+              *called_method.dex_file, called_method.index);
+          DCHECK_NE(called_method.index, dex::kDexNoIndex);
         }
       }
       MaybeUpdateBssMethodEntry(called, called_method);

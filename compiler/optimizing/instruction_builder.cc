@@ -957,18 +957,6 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
       actual_method = compiling_class->GetSuperClass()->GetVTableEntry(
           vtable_index, class_linker->GetImagePointerSize());
     }
-    if (actual_method != resolved_method &&
-        !IsSameDexFile(*actual_method->GetDexFile(), *dex_compilation_unit.GetDexFile())) {
-      // The back-end code generator relies on this check in order to ensure that it will not
-      // attempt to read the dex_cache with a dex_method_index that is not from the correct
-      // dex_file. If we didn't do this check then the dex_method_index will not be updated in the
-      // builder, which means that the code-generator (and sharpening and inliner, maybe)
-      // might invoke an incorrect method.
-      // TODO: The actual method could still be referenced in the current dex file, so we
-      //       could try locating it.
-      // TODO: Remove the dex_file restriction.
-      return nullptr;
-    }
     if (!actual_method->IsInvokable()) {
       // Fail if the actual method cannot be invoked. Otherwise, the runtime resolution stub
       // could resolve the callee to the wrong method.
@@ -1092,15 +1080,31 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
 
   HInvoke* invoke = nullptr;
   if (invoke_type == kDirect || invoke_type == kStatic || invoke_type == kSuper) {
+    // For sharpening, we create another MethodReference, to account for the
+    // kSuper case below where we cannot find a dex method index.
+    bool has_method_id = true;
     if (invoke_type == kSuper) {
+      uint32_t dex_method_index = method_reference.index;
       if (IsSameDexFile(*method_info.dex_file, *dex_compilation_unit_->GetDexFile())) {
         // Update the method index to the one resolved. Note that this may be a no-op if
         // we resolved to the method referenced by the instruction.
-        method_reference.index = method_info.index;
+        dex_method_index = method_info.index;
+      } else {
+        // Try to find a dex method index in this caller's dex file.
+        ScopedObjectAccess soa(Thread::Current());
+        dex_method_index = resolved_method->FindDexMethodIndexInOtherDexFile(
+            *dex_compilation_unit_->GetDexFile(), method_idx);
+      }
+      if (dex_method_index == dex::kDexNoIndex) {
+        has_method_id = false;
+      } else {
+        method_reference.index = dex_method_index;
       }
     }
     HInvokeStaticOrDirect::DispatchInfo dispatch_info =
-        HSharpening::SharpenInvokeStaticOrDirect(resolved_method, code_generator_);
+        HSharpening::SharpenInvokeStaticOrDirect(resolved_method,
+                                                 has_method_id,
+                                                 code_generator_);
     if (dispatch_info.code_ptr_location ==
             HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
       graph_->SetHasDirectCriticalNativeCall(true);
