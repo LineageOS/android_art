@@ -222,12 +222,11 @@ class InstructionHandler {
       // TODO It would be good to add the old exception to the
       // suppressed exceptions of the new one if possible.
       return false;  // Pending exception.
-    } else {
-      if (UNLIKELY(!thr.IsNull())) {
-        self->SetException(thr.Get());
-      }
-      return true;
     }
+    if (UNLIKELY(!thr.IsNull())) {
+      self->SetException(thr.Get());
+    }
+    return true;
   }
 
   HANDLER_ATTRIBUTES bool HandleReturn(JValue result) {
@@ -325,9 +324,8 @@ class InstructionHandler {
     ObjPtr<ArrayType> array = ObjPtr<ArrayType>::DownCast(a);
     if (UNLIKELY(!array->CheckIsValidIndex(index))) {
       return false;  // Pending exception.
-    } else {
-      (this->*setVReg)(A(), array->GetWithoutChecks(index));
     }
+    (this->*setVReg)(A(), array->GetWithoutChecks(index));
     return true;
   }
 
@@ -342,12 +340,11 @@ class InstructionHandler {
     ObjPtr<ArrayType> array = ObjPtr<ArrayType>::DownCast(a);
     if (UNLIKELY(!array->CheckIsValidIndex(index))) {
       return false;  // Pending exception.
-    } else {
-      if (transaction_active && !CheckWriteConstraint(self_, array)) {
-        return false;
-      }
-      array->template SetWithoutChecks<transaction_active>(index, value);
     }
+    if (transaction_active && !CheckWriteConstraint(self_, array)) {
+      return false;
+    }
+    array->template SetWithoutChecks<transaction_active>(index, value);
     return true;
   }
 
@@ -533,42 +530,22 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool CONST_4() {
-    uint4_t dst = inst_->VRegA_11n(inst_data_);
-    int4_t val = inst_->VRegB_11n(inst_data_);
-    SetVReg(dst, val);
-    if (val == 0) {
-      SetVRegReference(dst, nullptr);
-    }
+    SetVReg(A(), B());
     return true;
   }
 
   HANDLER_ATTRIBUTES bool CONST_16() {
-    uint8_t dst = A();
-    int16_t val = B();
-    SetVReg(dst, val);
-    if (val == 0) {
-      SetVRegReference(dst, nullptr);
-    }
+    SetVReg(A(), B());
     return true;
   }
 
   HANDLER_ATTRIBUTES bool CONST() {
-    uint8_t dst = A();
-    int32_t val = B();
-    SetVReg(dst, val);
-    if (val == 0) {
-      SetVRegReference(dst, nullptr);
-    }
+    SetVReg(A(), B());
     return true;
   }
 
   HANDLER_ATTRIBUTES bool CONST_HIGH16() {
-    uint8_t dst = A();
-    int32_t val = static_cast<int32_t>(B() << 16);
-    SetVReg(dst, val);
-    if (val == 0) {
-      SetVRegReference(dst, nullptr);
-    }
+    SetVReg(A(), static_cast<int32_t>(B() << 16));
     return true;
   }
 
@@ -596,9 +573,8 @@ class InstructionHandler {
     ObjPtr<mirror::String> s = ResolveString(self_, shadow_frame_, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), s);
     }
+    SetVRegReference(A(), s);
     return true;
   }
 
@@ -606,9 +582,8 @@ class InstructionHandler {
     ObjPtr<mirror::String> s = ResolveString(self_, shadow_frame_, dex::StringIndex(B()));
     if (UNLIKELY(s == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), s);
     }
+    SetVRegReference(A(), s);
     return true;
   }
 
@@ -620,9 +595,8 @@ class InstructionHandler {
                                                      do_access_check);
     if (UNLIKELY(c == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), c);
     }
+    SetVRegReference(A(), c);
     return true;
   }
 
@@ -633,9 +607,8 @@ class InstructionHandler {
                                                               shadow_frame_.GetMethod());
     if (UNLIKELY(mh == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), mh);
     }
+    SetVRegReference(A(), mh);
     return true;
   }
 
@@ -646,9 +619,8 @@ class InstructionHandler {
                                                           shadow_frame_.GetMethod());
     if (UNLIKELY(mt == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), mt);
     }
+    SetVRegReference(A(), mt);
     return true;
   }
 
@@ -660,10 +632,9 @@ class InstructionHandler {
     if (UNLIKELY(obj == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       return false;  // Pending exception.
-    } else {
-      DoMonitorEnter<do_assignability_check>(self_, &shadow_frame_, obj);
-      return !self_->IsExceptionPending();
     }
+    DoMonitorEnter<do_assignability_check>(self_, &shadow_frame_, obj);
+    return !self_->IsExceptionPending();
   }
 
   HANDLER_ATTRIBUTES bool MONITOR_EXIT() {
@@ -674,10 +645,9 @@ class InstructionHandler {
     if (UNLIKELY(obj == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       return false;  // Pending exception.
-    } else {
-      DoMonitorExit<do_assignability_check>(self_, &shadow_frame_, obj);
-      return !self_->IsExceptionPending();
     }
+    DoMonitorExit<do_assignability_check>(self_, &shadow_frame_, obj);
+    return !self_->IsExceptionPending();
   }
 
   HANDLER_ATTRIBUTES bool CHECK_CAST() {
@@ -688,12 +658,11 @@ class InstructionHandler {
                                                      do_access_check);
     if (UNLIKELY(c == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      ObjPtr<mirror::Object> obj = GetVRegReference(A());
-      if (UNLIKELY(obj != nullptr && !obj->InstanceOf(c))) {
-        ThrowClassCastException(c, obj->GetClass());
-        return false;  // Pending exception.
-      }
+    }
+    ObjPtr<mirror::Object> obj = GetVRegReference(A());
+    if (UNLIKELY(obj != nullptr && !obj->InstanceOf(c))) {
+      ThrowClassCastException(c, obj->GetClass());
+      return false;  // Pending exception.
     }
     return true;
   }
@@ -706,10 +675,9 @@ class InstructionHandler {
                                                      do_access_check);
     if (UNLIKELY(c == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      ObjPtr<mirror::Object> obj = GetVRegReference(B());
-      SetVReg(A(), (obj != nullptr && obj->InstanceOf(c)) ? 1 : 0);
     }
+    ObjPtr<mirror::Object> obj = GetVRegReference(B());
+    SetVReg(A(), (obj != nullptr && obj->InstanceOf(c)) ? 1 : 0);
     return true;
   }
 
@@ -718,9 +686,8 @@ class InstructionHandler {
     if (UNLIKELY(array == nullptr)) {
       ThrowNullPointerExceptionFromInterpreter();
       return false;  // Pending exception.
-    } else {
-      SetVReg(A(), array->AsArray()->GetLength());
     }
+    SetVReg(A(), array->AsArray()->GetLength());
     return true;
   }
 
@@ -749,10 +716,9 @@ class InstructionHandler {
     }
     if (UNLIKELY(obj == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      obj->GetClass()->AssertInitializedOrInitializingInThread(self_);
-      SetVRegReference(A(), obj);
     }
+    obj->GetClass()->AssertInitializedOrInitializingInThread(self_);
+    SetVRegReference(A(), obj);
     return true;
   }
 
@@ -766,9 +732,8 @@ class InstructionHandler {
         Runtime::Current()->GetHeap()->GetCurrentAllocator());
     if (UNLIKELY(obj == nullptr)) {
       return false;  // Pending exception.
-    } else {
-      SetVRegReference(A(), obj);
     }
+    SetVRegReference(A(), obj);
     return true;
   }
 
@@ -1293,16 +1258,12 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool FLOAT_TO_INT() {
-    float val = GetVRegFloat(B());
-    int32_t result = art_float_to_integral<int32_t, float>(val);
-    SetVReg(A(), result);
+    SetVReg(A(), art_float_to_integral<int32_t, float>(GetVRegFloat(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool FLOAT_TO_LONG() {
-    float val = GetVRegFloat(B());
-    int64_t result = art_float_to_integral<int64_t, float>(val);
-    SetVRegLong(A(), result);
+    SetVRegLong(A(), art_float_to_integral<int64_t, float>(GetVRegFloat(B())));
     return true;
   }
 
@@ -1312,16 +1273,12 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool DOUBLE_TO_INT() {
-    double val = GetVRegDouble(B());
-    int32_t result = art_float_to_integral<int32_t, double>(val);
-    SetVReg(A(), result);
+    SetVReg(A(), art_float_to_integral<int32_t, double>(GetVRegDouble(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool DOUBLE_TO_LONG() {
-    double val = GetVRegDouble(B());
-    int64_t result = art_float_to_integral<int64_t, double>(val);
-    SetVRegLong(A(), result);
+    SetVRegLong(A(), art_float_to_integral<int64_t, double>(GetVRegDouble(B())));
     return true;
   }
 
@@ -1502,190 +1459,158 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool ADD_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, SafeAdd(GetVReg(vregA), GetVReg(B())));
+    SetVReg(A(), SafeAdd(GetVReg(A()), GetVReg(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SUB_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, SafeSub(GetVReg(vregA), GetVReg(B())));
+    SetVReg(A(), SafeSub(GetVReg(A()), GetVReg(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool MUL_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, SafeMul(GetVReg(vregA), GetVReg(B())));
+    SetVReg(A(), SafeMul(GetVReg(A()), GetVReg(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool DIV_INT_2ADDR() {
-    uint4_t vregA = A();
-    return DoIntDivide(shadow_frame_, vregA, GetVReg(vregA), GetVReg(B()));
+    return DoIntDivide(shadow_frame_, A(), GetVReg(A()), GetVReg(B()));
   }
 
   HANDLER_ATTRIBUTES bool REM_INT_2ADDR() {
-    uint4_t vregA = A();
-    return DoIntRemainder(shadow_frame_, vregA, GetVReg(vregA), GetVReg(B()));
+    return DoIntRemainder(shadow_frame_, A(), GetVReg(A()), GetVReg(B()));
   }
 
   HANDLER_ATTRIBUTES bool SHL_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, GetVReg(vregA) << (GetVReg(B()) & 0x1f));
+    SetVReg(A(), GetVReg(A()) << (GetVReg(B()) & 0x1f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SHR_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, GetVReg(vregA) >> (GetVReg(B()) & 0x1f));
+    SetVReg(A(), GetVReg(A()) >> (GetVReg(B()) & 0x1f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool USHR_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, static_cast<uint32_t>(GetVReg(vregA)) >> (GetVReg(B()) & 0x1f));
+    SetVReg(A(), static_cast<uint32_t>(GetVReg(A())) >> (GetVReg(B()) & 0x1f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool AND_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, GetVReg(vregA) & GetVReg(B()));
+    SetVReg(A(), GetVReg(A()) & GetVReg(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool OR_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, GetVReg(vregA) | GetVReg(B()));
+    SetVReg(A(), GetVReg(A()) | GetVReg(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool XOR_INT_2ADDR() {
-    uint4_t vregA = A();
-    SetVReg(vregA, GetVReg(vregA) ^ GetVReg(B()));
+    SetVReg(A(), GetVReg(A()) ^ GetVReg(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool ADD_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, SafeAdd(GetVRegLong(vregA), GetVRegLong(B())));
+    SetVRegLong(A(), SafeAdd(GetVRegLong(A()), GetVRegLong(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SUB_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, SafeSub(GetVRegLong(vregA), GetVRegLong(B())));
+    SetVRegLong(A(), SafeSub(GetVRegLong(A()), GetVRegLong(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool MUL_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, SafeMul(GetVRegLong(vregA), GetVRegLong(B())));
+    SetVRegLong(A(), SafeMul(GetVRegLong(A()), GetVRegLong(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool DIV_LONG_2ADDR() {
-    uint4_t vregA = A();
-    return DoLongDivide(shadow_frame_, vregA, GetVRegLong(vregA), GetVRegLong(B()));
+    return DoLongDivide(shadow_frame_, A(), GetVRegLong(A()), GetVRegLong(B()));
   }
 
   HANDLER_ATTRIBUTES bool REM_LONG_2ADDR() {
-    uint4_t vregA = A();
-    return DoLongRemainder(shadow_frame_, vregA, GetVRegLong(vregA), GetVRegLong(B()));
+    return DoLongRemainder(shadow_frame_, A(), GetVRegLong(A()), GetVRegLong(B()));
   }
 
   HANDLER_ATTRIBUTES bool AND_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, GetVRegLong(vregA) & GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(A()) & GetVRegLong(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool OR_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, GetVRegLong(vregA) | GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(A()) | GetVRegLong(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool XOR_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, GetVRegLong(vregA) ^ GetVRegLong(B()));
+    SetVRegLong(A(), GetVRegLong(A()) ^ GetVRegLong(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SHL_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, GetVRegLong(vregA) << (GetVReg(B()) & 0x3f));
+    SetVRegLong(A(), GetVRegLong(A()) << (GetVReg(B()) & 0x3f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SHR_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, GetVRegLong(vregA) >> (GetVReg(B()) & 0x3f));
+    SetVRegLong(A(), GetVRegLong(A()) >> (GetVReg(B()) & 0x3f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool USHR_LONG_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegLong(vregA, static_cast<uint64_t>(GetVRegLong(vregA)) >> (GetVReg(B()) & 0x3f));
+    SetVRegLong(A(), static_cast<uint64_t>(GetVRegLong(A())) >> (GetVReg(B()) & 0x3f));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool ADD_FLOAT_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegFloat(vregA, GetVRegFloat(vregA) + GetVRegFloat(B()));
+    SetVRegFloat(A(), GetVRegFloat(A()) + GetVRegFloat(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SUB_FLOAT_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegFloat(vregA, GetVRegFloat(vregA) - GetVRegFloat(B()));
+    SetVRegFloat(A(), GetVRegFloat(A()) - GetVRegFloat(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool MUL_FLOAT_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegFloat(vregA, GetVRegFloat(vregA) * GetVRegFloat(B()));
+    SetVRegFloat(A(), GetVRegFloat(A()) * GetVRegFloat(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool DIV_FLOAT_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegFloat(vregA, GetVRegFloat(vregA) / GetVRegFloat(B()));
+    SetVRegFloat(A(), GetVRegFloat(A()) / GetVRegFloat(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool REM_FLOAT_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegFloat(vregA, fmodf(GetVRegFloat(vregA), GetVRegFloat(B())));
+    SetVRegFloat(A(), fmodf(GetVRegFloat(A()), GetVRegFloat(B())));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool ADD_DOUBLE_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegDouble(vregA, GetVRegDouble(vregA) + GetVRegDouble(B()));
+    SetVRegDouble(A(), GetVRegDouble(A()) + GetVRegDouble(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool SUB_DOUBLE_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegDouble(vregA, GetVRegDouble(vregA) - GetVRegDouble(B()));
+    SetVRegDouble(A(), GetVRegDouble(A()) - GetVRegDouble(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool MUL_DOUBLE_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegDouble(vregA, GetVRegDouble(vregA) * GetVRegDouble(B()));
+    SetVRegDouble(A(), GetVRegDouble(A()) * GetVRegDouble(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool DIV_DOUBLE_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegDouble(vregA, GetVRegDouble(vregA) / GetVRegDouble(B()));
+    SetVRegDouble(A(), GetVRegDouble(A()) / GetVRegDouble(B()));
     return true;
   }
 
   HANDLER_ATTRIBUTES bool REM_DOUBLE_2ADDR() {
-    uint4_t vregA = A();
-    SetVRegDouble(vregA, fmod(GetVRegDouble(vregA), GetVRegDouble(B())));
+    SetVRegDouble(A(), fmod(GetVRegDouble(A()), GetVRegDouble(B())));
     return true;
   }
 
