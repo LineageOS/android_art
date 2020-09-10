@@ -3076,11 +3076,64 @@ static uint32_t GetExpectedVarHandleCoordinatesCount(HInvoke *invoke) {
 }
 
 static DataType::Type GetDataTypeFromShorty(HInvoke* invoke, uint32_t index) {
+  DCHECK(invoke->IsInvokePolymorphic());
   const DexFile& dex_file = invoke->GetBlock()->GetGraph()->GetDexFile();
   const char* shorty = dex_file.GetShorty(invoke->AsInvokePolymorphic()->GetProtoIndex());
   DCHECK_LT(index, strlen(shorty));
 
   return DataType::FromShorty(shorty[index]);
+}
+
+static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
+  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  if (expected_coordinates_count > 1u) {
+    // Only static and instance fields VarHandle are supported now.
+    return false;
+  }
+
+  if (expected_coordinates_count == 1u &&
+      invoke->InputAt(1)->GetType() != DataType::Type::kReference) {
+    // For instance fields, the source object must be a reference
+    return false;
+  }
+
+  DataType::Type type = invoke->GetType();
+  mirror::VarHandle::AccessModeTemplate access_mode_template =
+      mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
+  switch (access_mode_template) {
+    case mirror::VarHandle::AccessModeTemplate::kSet:
+      if (type != DataType::Type::kVoid) {
+        return false;
+      }
+      break;
+    case mirror::VarHandle::AccessModeTemplate::kCompareAndSet: {
+      if (type != DataType::Type::kBool) {
+        return false;
+      }
+      uint32_t number_of_arguments = invoke->GetNumberOfArguments();
+      uint32_t expected_value_index = number_of_arguments - 2;
+      uint32_t new_value_index = number_of_arguments - 1;
+      DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
+      DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
+
+      if (expected_value_type != new_value_type) {
+        return false;
+      }
+      break;
+    }
+    case mirror::VarHandle::AccessModeTemplate::kGet:
+      // The return type should be the same as varType, so it shouldn't be void
+      if (type == DataType::Type::kVoid) {
+        return false;
+      }
+      break;
+    case mirror::VarHandle::AccessModeTemplate::kGetAndUpdate:
+    case mirror::VarHandle::AccessModeTemplate::kCompareAndExchange:
+      // Unimplemented intrinsics
+      UNREACHABLE();
+  }
+
+  return true;
 }
 
 static void GenerateVarHandleAccessModeCheck(Register varhandle_object,
@@ -3258,22 +3311,7 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleGet(HInvoke* invoke) {
     return;
   }
 
-  DataType::Type type = invoke->GetType();
-
-  if (type == DataType::Type::kVoid) {
-    // Return type should not be void for get.
-    return;
-  }
-
-  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
-  if (expected_coordinates_count > 1u) {
-    // Only field VarHandle is supported now. TODO: support arrays, etc.
-    return;
-  }
-
-  if (expected_coordinates_count == 1u &&
-      invoke->InputAt(1u)->GetType() != DataType::Type::kReference) {
-    // For an instance field, the source object must be a reference.
+  if (!IsValidFieldVarHandleExpected(invoke)) {
     return;
   }
 
@@ -3281,12 +3319,14 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleGet(HInvoke* invoke) {
   LocationSummary* locations = new (allocator) LocationSummary(
       invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
   locations->SetInAt(0, Location::RequiresRegister());
+  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   if (expected_coordinates_count == 1u) {
     // For instance fields, this is the source object.
     locations->SetInAt(1, Location::RequiresRegister());
   }
   locations->AddTemp(Location::RequiresRegister());
 
+  DataType::Type type = invoke->GetType();
   switch (DataType::Kind(type)) {
     case DataType::Type::kInt64:
       locations->AddTemp(Location::RequiresRegister());
@@ -3353,29 +3393,13 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGet(HInvoke* invoke) {
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleSet(HInvoke* invoke) {
-  DCHECK(invoke->IsInvokePolymorphic());
-
   // The only read barrier implementation supporting the
   // VarHandleGet intrinsic is the Baker-style read barriers.
   if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
     return;
   }
 
-  DataType::Type type = invoke->GetType();
-  if (type != DataType::Type::kVoid) {
-    // Return type should be void for set.
-    return;
-  }
-
-  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
-  if (expected_coordinates_count > 1u) {
-    // Only static and instance fields VarHandle is supported now.
-    return;
-  }
-
-  if (expected_coordinates_count == 1u &&
-      invoke->InputAt(1)->GetType() != DataType::Type::kReference) {
-    // For instance fields, the source object must be a reference
+  if (!IsValidFieldVarHandleExpected(invoke)) {
     return;
   }
 
@@ -3398,6 +3422,7 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleSet(HInvoke* invoke) {
   // This temporary register is also used for card for MarkGCCard. Make sure it's a byte register
   locations->AddTemp(Location::RegisterLocation(EAX));
   locations->SetInAt(0, Location::RequiresRegister());
+  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   if (expected_coordinates_count == 1u) {
     // For instance fields, this is the source object
     locations->SetInAt(1, Location::RequiresRegister());
@@ -3511,6 +3536,199 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleSet(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
+  // The only read barrier implementation supporting the
+  // VarHandleGet intrinsic is the Baker-style read barriers.
+  if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
+    return;
+  }
+
+  if (!IsValidFieldVarHandleExpected(invoke)) {
+    return;
+  }
+
+  uint32_t number_of_arguments = invoke->GetNumberOfArguments();
+  uint32_t expected_value_index = number_of_arguments - 2;
+  uint32_t new_value_index = number_of_arguments - 1;
+  DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
+  DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
+  DCHECK_EQ(expected_value_type, new_value_type);
+
+  if (DataType::Is64BitType(new_value_type)) {
+    // We avoid the case of an Int64/Float64 value because we would need to place it in a register
+    // pair. If the slow path is taken, the ParallelMove might fail to move the pair according to
+    // the X86DexCallingConvention in case of an overlap (e.g., move the 64 bit value from
+    // <EAX, EBX> to <EBX, ECX>).
+    return;
+  }
+
+  LocationSummary* locations = new (allocator_) LocationSummary(
+      invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+  // We use eax for the expected value of cmpxchg and for the card (we need a byte register)
+  locations->AddTemp(Location::RegisterLocation(EAX));
+  locations->AddTemp(Location::RequiresRegister());
+  locations->SetInAt(0, Location::RequiresRegister());
+  if (GetExpectedVarHandleCoordinatesCount(invoke) == 1u) {
+    // For instance fields, this is the source object
+    locations->SetInAt(1, Location::RequiresRegister());
+  } else if (new_value_type == DataType::Type::kReference) {
+    // For static reference fields, we need another temporary for MarkGCCard because one will
+    // be busy with the declaring class.
+    locations->AddTemp(Location::RequiresRegister());
+  }
+  locations->SetInAt(expected_value_index, Location::Any());
+  if (DataType::IsFloatingPointType(expected_value_type)) {
+    locations->AddTemp(Location::RequiresRegister());
+    locations->SetInAt(new_value_index, Location::RequiresFpuRegister());
+  } else if (DataType::Is8BitType(expected_value_type)) {
+    // Ensure it's in a byte register
+    locations->SetInAt(new_value_index, Location::RegisterLocation(EBX));
+  } else {
+    locations->SetInAt(new_value_index, Location::RequiresRegister());
+  }
+
+  // We need a byte register because return type is bool.
+  locations->SetOut(Location::RegisterLocation(ECX));
+}
+
+void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
+  // The only read barrier implementation supporting the
+  // VarHandleGet intrinsic is the Baker-style read barriers.
+  DCHECK(!kEmitCompilerReadBarrier || kUseBakerReadBarrier);
+
+  X86Assembler* assembler = codegen_->GetAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+  uint32_t number_of_arguments = invoke->GetNumberOfArguments();
+  uint32_t expected_value_index = number_of_arguments - 2;
+  uint32_t new_value_index = number_of_arguments - 1;
+  DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
+  DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
+  DCHECK_EQ(expected_value_type, new_value_type);
+  Location expected_value_loc = locations->InAt(expected_value_index);
+  Location new_value_loc = locations->InAt(new_value_index);
+  Register vh_object = locations->InAt(0).AsRegister<Register>();
+  // cmpxchg takes the expected value from EAX
+  Register eax = locations->GetTemp(0).AsRegister<Register>();
+  DCHECK_EQ(eax, EAX);
+  Register temp = locations->GetTemp(1).AsRegister<Register>();
+  CodeGeneratorX86* codegen_x86 = down_cast<CodeGeneratorX86*>(codegen_);
+  SlowPathCode* slow_path = new (codegen_->GetScopedAllocator()) IntrinsicSlowPathX86(invoke);
+  codegen_->AddSlowPath(slow_path);
+
+  GenerateVarHandleCommonChecks(invoke, temp, slow_path, assembler);
+  // Check the varType.primitiveType against the type of the expected value. There is no need to
+  // check for a reference if the types match because we will check if it's the same object.
+  GenerateVarTypePrimitiveTypeCheck(vh_object, temp, expected_value_type, slow_path, assembler);
+  // Ensure expected value is in eax for cmpxchg
+  codegen_x86->Move32(Location::RegisterLocation(eax), expected_value_loc);
+  if (new_value_type == DataType::Type::kReference) {
+    const uint32_t var_type_offset = mirror::VarHandle::VarTypeOffset().Uint32Value();
+
+    // If the value type is a reference, check it against the varType.
+    GenerateSubTypeObjectCheck(new_value_loc.AsRegister<Register>(),
+                               temp,
+                               Address(vh_object, var_type_offset),
+                               slow_path,
+                               assembler);
+    // Check the expected value type
+    GenerateSubTypeObjectCheck(eax,
+                               temp,
+                               Address(vh_object, var_type_offset),
+                               slow_path,
+                               assembler);
+  }
+
+  // We can use `out` for the offset, since we know it's a core register
+  Register offset = locations->Out().AsRegister<Register>();
+  // Get the field referred by the VarHandle. The returned register contains the object reference
+  // or the declaring class. The field offset will be placed in 'offset'. For static fields, the
+  // declaring class will be placed in 'temp' register.
+  Register reference = GenerateVarHandleFieldReference(invoke, codegen_, temp, offset);
+
+  Register out = locations->Out().AsRegister<Register>();
+  Address field_address = Address(reference, offset, TIMES_1, 0);
+  switch (new_value_type) {
+    case DataType::Type::kBool:
+    case DataType::Type::kInt8:
+    case DataType::Type::kUint8:
+      __ LockCmpxchgb(field_address, new_value_loc.AsRegister<ByteRegister>());
+      __ setb(kZero, out);
+      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
+      break;
+    case DataType::Type::kInt16:
+    case DataType::Type::kUint16:
+      __ LockCmpxchgw(field_address, new_value_loc.AsRegister<Register>());
+      __ setb(kZero, out);
+      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
+      break;
+    case DataType::Type::kInt32:
+      __ LockCmpxchgl(field_address, new_value_loc.AsRegister<Register>());
+      __ setb(kZero, out);
+      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
+      break;
+    case DataType::Type::kFloat32: {
+      Register new_value = locations->GetTemp(2).AsRegister<Register>();
+      __ movd(new_value, new_value_loc.AsFpuRegister<XmmRegister>());
+      __ LockCmpxchgl(field_address, new_value);
+      __ setb(kZero, out);
+      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
+      break;
+    }
+    case DataType::Type::kReference: {
+      Register new_value = new_value_loc.AsRegister<Register>();
+      bool needs_write_barrier =
+          CodeGenerator::StoreNeedsWriteBarrier(new_value_type, invoke->InputAt(new_value_index));
+      uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+      temp = expected_coordinates_count == 1u ? temp :
+             locations->GetTemp(2).AsRegister<Register>();
+      if (kCompilerReadBarrierOption == kWithReadBarrier) {
+        // Need to make sure the reference stored in the field is a to-space
+        // one before attempting the cmpxchg or it could fail incorrectly.
+        codegen_x86->GenerateReferenceLoadWithBakerReadBarrier(invoke,
+                                                               Location::RegisterLocation(temp),
+                                                               reference,
+                                                               field_address,
+                                                               /* needs_null_check= */ false,
+                                                               /* always_update_field= */ true,
+                                                               &eax);
+        // We use eax, so we need to ensure the expected value is there
+        codegen_x86->Move32(Location::RegisterLocation(eax), expected_value_loc);
+      }
+      if (kPoisonHeapReferences) {
+        // EAX is the expected value
+        __ PoisonHeapReference(eax);
+      }
+      if (kPoisonHeapReferences && needs_write_barrier) {
+        __ movl(temp, new_value);
+        __ PoisonHeapReference(temp);
+        __ LockCmpxchgl(field_address, temp);
+      } else {
+        __ LockCmpxchgl(field_address, new_value);
+      }
+      __ setb(kZero, out);
+      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
+      if (needs_write_barrier) {
+        NearLabel skip_mark_gc_card;
+        // If the set was not done because of the field not containing the expected value,
+        // we don't need to mark gc card.
+        __ j(kNotEqual, &skip_mark_gc_card);
+        // Use eax for the card, to ensure it is a byte register
+        codegen_->MarkGCCard(temp, eax, reference, new_value, false);
+        __ Bind(&skip_mark_gc_card);
+      }
+      break;
+    }
+    case DataType::Type::kUint32:
+    case DataType::Type::kUint64:
+    case DataType::Type::kInt64:
+    case DataType::Type::kFloat64:
+    case DataType::Type::kVoid:
+      UNREACHABLE();
+  }
+
+  codegen_->GenerateMemoryBarrier(MemBarrierKind::kAnyAny);
+  __ Bind(slow_path->GetExitLabel());
+}
 
 UNIMPLEMENTED_INTRINSIC(X86, MathRoundDouble)
 UNIMPLEMENTED_INTRINSIC(X86, ReferenceGetReferent)
@@ -3566,7 +3784,6 @@ UNIMPLEMENTED_INTRINSIC(X86, MethodHandleInvoke)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchange)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchangeAcquire)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchangeRelease)
-UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndSet)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleGetAcquire)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleGetAndAdd)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleGetAndAddAcquire)
