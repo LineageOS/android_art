@@ -34,6 +34,12 @@ TEST(AssemblerX86, CreateBuffer) {
   ASSERT_EQ(static_cast<size_t>(5), buffer.Size());
 }
 
+struct X86RegisterCompare {
+    bool operator()(const x86::Register& a, const x86::Register& b) const {
+        return static_cast<int32_t>(a) < static_cast<int32_t>(b);
+    }
+};
+
 //
 // Test fixture.
 //
@@ -81,6 +87,7 @@ class AssemblerX86Test : public AssemblerTest<x86::X86Assembler,
       addresses_.push_back(x86::Address(x86::ESP, 1));
       addresses_.push_back(x86::Address(x86::ESP, 987654321));
     }
+
     if (registers_.size() == 0) {
       registers_.insert(end(registers_),
                         {
@@ -93,6 +100,20 @@ class AssemblerX86Test : public AssemblerTest<x86::X86Assembler,
                           new x86::Register(x86::ESI),
                           new x86::Register(x86::EDI)
                         });
+
+      secondary_register_names_.emplace(x86::Register(x86::EAX), "ax");
+      secondary_register_names_.emplace(x86::Register(x86::EBX), "bx");
+      secondary_register_names_.emplace(x86::Register(x86::ECX), "cx");
+      secondary_register_names_.emplace(x86::Register(x86::EDX), "dx");
+      secondary_register_names_.emplace(x86::Register(x86::EBP), "bp");
+      secondary_register_names_.emplace(x86::Register(x86::ESP), "sp");
+      secondary_register_names_.emplace(x86::Register(x86::ESI), "si");
+      secondary_register_names_.emplace(x86::Register(x86::EDI), "di");
+
+      tertiary_register_names_.emplace(x86::Register(x86::EAX), "al");
+      tertiary_register_names_.emplace(x86::Register(x86::EBX), "bl");
+      tertiary_register_names_.emplace(x86::Register(x86::ECX), "cl");
+      tertiary_register_names_.emplace(x86::Register(x86::EDX), "dl");
     }
 
     if (fp_registers_.size() == 0) {
@@ -132,11 +153,23 @@ class AssemblerX86Test : public AssemblerTest<x86::X86Assembler,
     return x86::Immediate(imm_value);
   }
 
+  std::string GetSecondaryRegisterName(const x86::Register& reg) override {
+    CHECK(secondary_register_names_.find(reg) != secondary_register_names_.end());
+    return secondary_register_names_[reg];
+  }
+
+  std::string GetTertiaryRegisterName(const x86::Register& reg) override {
+    CHECK(tertiary_register_names_.find(reg) != tertiary_register_names_.end());
+    return tertiary_register_names_[reg];
+  }
+
   std::vector<x86::Address> addresses_singleton_;
 
  private:
   std::vector<x86::Address> addresses_;
   std::vector<x86::Register*> registers_;
+  std::map<x86::Register, std::string, X86RegisterCompare> secondary_register_names_;
+  std::map<x86::Register, std::string, X86RegisterCompare> tertiary_register_names_;
   std::vector<x86::XmmRegister*> fp_registers_;
 };
 
@@ -265,6 +298,10 @@ TEST_F(AssemblerX86Test, MovlLoad) {
 
 TEST_F(AssemblerX86Test, Addw) {
   DriverStr(RepeatAI(&x86::X86Assembler::addw, /*imm_bytes*/ 2U, "addw ${imm}, {mem}"), "addw");
+}
+
+TEST_F(AssemblerX86Test, MovwStore) {
+  DriverStr(RepeatAr(&x86::X86Assembler::movw, "movw %{reg}, {mem}"), "movw-store");
 }
 
 TEST_F(AssemblerX86Test, MovlStore) {
