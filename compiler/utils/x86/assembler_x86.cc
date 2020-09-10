@@ -3636,6 +3636,23 @@ X86Assembler* X86Assembler::lock() {
 }
 
 
+void X86Assembler::cmpxchgb(const Address& address, ByteRegister reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitUint8(0x0F);
+  EmitUint8(0xB0);
+  EmitOperand(reg, address);
+}
+
+
+void X86Assembler::cmpxchgw(const Address& address, Register reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitOperandSizeOverride();
+  EmitUint8(0x0F);
+  EmitUint8(0xB1);
+  EmitOperand(reg, address);
+}
+
+
 void X86Assembler::cmpxchgl(const Address& address, Register reg) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitUint8(0x0F);
