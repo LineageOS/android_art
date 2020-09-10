@@ -568,11 +568,12 @@ class ReadBarrierMarkAndUpdateFieldSlowPathX86 : public SlowPathCode {
     DCHECK(locations->CanCall());
     DCHECK(!locations->GetLiveRegisters()->ContainsCoreRegister(ref_reg)) << ref_reg;
     // This slow path is only used by the UnsafeCASObject intrinsic.
-    DCHECK((instruction_->IsInvokeVirtual() && instruction_->GetLocations()->Intrinsified()))
+    DCHECK((instruction_->IsInvoke() && instruction_->GetLocations()->Intrinsified()))
         << "Unexpected instruction in read barrier marking and field updating slow path: "
         << instruction_->DebugName();
     DCHECK(instruction_->GetLocations()->Intrinsified());
-    DCHECK_EQ(instruction_->AsInvoke()->GetIntrinsic(), Intrinsics::kUnsafeCASObject);
+    DCHECK(instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeCASObject ||
+           instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kVarHandleCompareAndSet);
 
     __ Bind(GetEntryLabel());
     if (unpoison_ref_before_marking_) {
@@ -1336,6 +1337,9 @@ void CodeGeneratorX86::Move32(Location destination, Location source) {
       __ movl(destination.AsRegister<Register>(), source.AsRegister<Register>());
     } else if (source.IsFpuRegister()) {
       __ movd(destination.AsRegister<Register>(), source.AsFpuRegister<XmmRegister>());
+    } else if (source.IsConstant()) {
+      int32_t value = GetInt32ValueOf(source.GetConstant());
+      __ movl(destination.AsRegister<Register>(), Immediate(value));
     } else {
       DCHECK(source.IsStackSlot());
       __ movl(destination.AsRegister<Register>(), Address(ESP, source.GetStackIndex()));
