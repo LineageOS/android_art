@@ -20,17 +20,21 @@
 
 namespace art {
 
-#define CHECK_REGS_CONTAIN_REFS(dex_pc, abort_if_not_found, ...) do {                 \
-  int t[] = {__VA_ARGS__};                                                            \
-  int t_size = sizeof(t) / sizeof(*t);                                                \
-  const OatQuickMethodHeader* method_header = GetCurrentOatQuickMethodHeader();       \
-  uintptr_t native_quick_pc = method_header->ToNativeQuickPc(GetMethod(),             \
-                                                 dex_pc,                              \
-                                                 /* is_catch_handler */ false,        \
-                                                 abort_if_not_found);                 \
-  if (native_quick_pc != UINTPTR_MAX) {                                               \
-    CheckReferences(t, t_size, method_header->NativeQuickPcOffset(native_quick_pc));  \
-  }                                                                                   \
+#define CHECK_REGS_CONTAIN_REFS(dex_pc, abort_if_not_found, ...) do {                         \
+  int t[] = {__VA_ARGS__};                                                                    \
+  int t_size = sizeof(t) / sizeof(*t);                                                        \
+  const OatQuickMethodHeader* method_header = GetCurrentOatQuickMethodHeader();               \
+  uintptr_t native_quick_pc = method_header->ToNativeQuickPc(GetMethod(),                     \
+                                                 dex_pc,                                      \
+                                                 /* is_catch_handler */ false,                \
+                                                 abort_if_not_found);                         \
+  if (native_quick_pc != UINTPTR_MAX) {                                                       \
+    CheckReferences(t,                                                                        \
+                    t_size,                                                                   \
+                    dex_pc,                                                                   \
+                    method_header->NativeQuickPcOffset(native_quick_pc),                      \
+                    /* search_for_valid_stack_map= */ true);                                  \
+  }                                                                                           \
 } while (false);
 
 struct ReferenceMap2Visitor : public CheckReferenceMapVisitor {

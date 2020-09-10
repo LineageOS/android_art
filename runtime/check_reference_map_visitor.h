@@ -59,18 +59,35 @@ class CheckReferenceMapVisitor : public StackVisitor {
     return false;
   }
 
-  void CheckReferences(int* registers, int number_of_references, uint32_t native_pc_offset)
+  void CheckReferences(int* registers,
+                       int number_of_references,
+                       uint32_t dex_pc,
+                       uint32_t native_pc_offset,
+                       bool search_for_valid_stack_map)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     CHECK(GetCurrentOatQuickMethodHeader()->IsOptimized());
-    CheckOptimizedMethod(registers, number_of_references, native_pc_offset);
+    CheckOptimizedMethod(
+        registers, number_of_references, dex_pc, native_pc_offset, search_for_valid_stack_map);
   }
 
  private:
-  void CheckOptimizedMethod(int* registers, int number_of_references, uint32_t native_pc_offset)
+  void CheckOptimizedMethod(int* registers,
+                            int number_of_references,
+                            uint32_t dex_pc,
+                            uint32_t native_pc_offset,
+                            bool search_for_valid_stack_map)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     ArtMethod* m = GetMethod();
     CodeInfo code_info(GetCurrentOatQuickMethodHeader());
     StackMap stack_map = code_info.GetStackMapForNativePcOffset(native_pc_offset);
+    if (search_for_valid_stack_map && !code_info.GetStackMaskOf(stack_map).IsValid()) {
+      for (StackMap map : code_info.GetStackMaps()) {
+        if (map.GetDexPc() == dex_pc && code_info.GetStackMaskOf(map).IsValid()) {
+          stack_map = map;
+          break;
+        }
+      }
+    }
     CodeItemDataAccessor accessor(m->DexInstructionData());
     uint16_t number_of_dex_registers = accessor.RegistersSize();
 
@@ -93,6 +110,7 @@ class CheckReferenceMapVisitor : public StackVisitor {
           CHECK(false);
           break;
         case DexRegisterLocation::Kind::kInStack:
+          CHECK(stack_mask.IsValid());
           DCHECK_EQ(location.GetValue() % kFrameSlotSize, 0);
           CHECK(stack_mask.LoadBit(location.GetValue() / kFrameSlotSize));
           break;
