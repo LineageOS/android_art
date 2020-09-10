@@ -41,7 +41,7 @@ using ::testing::StrEq;
 using ::testing::_;
 using internal::ConfigEntry;
 using internal::ParseConfig;
-using internal::ParseJniConfig;
+using internal::ParseApexLibrariesConfig;
 
 #if defined(__LP64__)
 #define LIB_DIR "lib64"
@@ -99,7 +99,6 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
 #define NAMESPACE_ENTRY(ns) {ns, TO_MOCK_NAMESPACE(TO_ANDROID_NAMESPACE(ns))}
   NAMESPACE_ENTRY("com_android_i18n"),
   NAMESPACE_ENTRY("com_android_neuralnetworks"),
-  NAMESPACE_ENTRY("com_android_os_statsd"),
   NAMESPACE_ENTRY("com_android_art"),
   NAMESPACE_ENTRY("default"),
   NAMESPACE_ENTRY("sphal"),
@@ -367,16 +366,14 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
   bool expected_link_with_vndk_product_ns = false;
   bool expected_link_with_default_ns = false;
   bool expected_link_with_neuralnetworks_ns = true;
-  bool expected_link_with_statsd_ns = true;
   std::string expected_shared_libs_to_platform_ns = default_public_libraries();
-  std::string expected_shared_libs_to_art_ns = art_public_libraries();
-  std::string expected_shared_libs_to_i18n_ns = i18n_public_libraries();
+  std::string expected_shared_libs_to_art_ns = apex_public_libraries().at("com_android_art");
+  std::string expected_shared_libs_to_i18n_ns = apex_public_libraries().at("com_android_i18n");
   std::string expected_shared_libs_to_sphal_ns = vendor_public_libraries();
   std::string expected_shared_libs_to_vndk_ns = vndksp_libraries_vendor();
   std::string expected_shared_libs_to_vndk_product_ns = vndksp_libraries_product();
   std::string expected_shared_libs_to_default_ns = default_public_libraries();
-  std::string expected_shared_libs_to_neuralnetworks_ns = neuralnetworks_public_libraries();
-  std::string expected_shared_libs_to_statsd_ns = statsd_public_libraries();
+  std::string expected_shared_libs_to_neuralnetworks_ns = apex_public_libraries().at("com_android_neuralnetworks");
 
   void SetExpectations() {
     NativeLoaderTest::SetExpectations();
@@ -429,11 +426,6 @@ class NativeLoaderTest_Create : public NativeLoaderTest {
     if (expected_link_with_neuralnetworks_ns) {
       EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_neuralnetworks"),
                                               StrEq(expected_shared_libs_to_neuralnetworks_ns)))
-          .WillOnce(Return(true));
-    }
-    if (expected_link_with_statsd_ns) {
-      EXPECT_CALL(*mock, mock_link_namespaces(Eq(IsBridged()), _, NsEq("com_android_os_statsd"),
-                                              StrEq(expected_shared_libs_to_statsd_ns)))
           .WillOnce(Return(true));
     }
   }
@@ -690,28 +682,76 @@ TEST(NativeLoaderConfigParser, RejectMalformed) {
   ASSERT_FALSE(ParseConfig("libA.so nopreload # comment", always_true).ok());
 }
 
-TEST(NativeLoaderJniConfigParser, BasicLoading) {
+TEST(NativeLoaderApexLibrariesConfigParser, BasicLoading) {
   const char file_content[] = R"(
 # comment
-com_android_foo libfoo.so
+jni com_android_foo libfoo.so
 # Empty line is ignored
 
-com_android_bar libbar.so:libbar2.so
+jni com_android_bar libbar.so:libbar2.so
+
+  public com_android_bar libpublic.so
 )";
 
-  std::map<std::string, std::string> expected_result{
+  auto jni_libs = ParseApexLibrariesConfig(file_content, "jni");
+  ASSERT_RESULT_OK(jni_libs);
+  std::map<std::string, std::string> expected_jni_libs {
     {"com_android_foo", "libfoo.so"},
     {"com_android_bar", "libbar.so:libbar2.so"},
   };
+  ASSERT_EQ(expected_jni_libs, *jni_libs);
 
-  Result<std::map<std::string, std::string>> result = ParseJniConfig(file_content);
-  ASSERT_RESULT_OK(result);
-  ASSERT_EQ(expected_result, *result);
+  auto public_libs = ParseApexLibrariesConfig(file_content, "public");
+  ASSERT_RESULT_OK(public_libs);
+  std::map<std::string, std::string> expected_public_libs {
+    {"com_android_bar", "libpublic.so"},
+  };
+  ASSERT_EQ(expected_public_libs, *public_libs);
 }
 
-TEST(NativeLoaderJniConfigParser, RejectMalformed) {
-  ASSERT_FALSE(ParseJniConfig("com_android_foo").ok());
+TEST(NativeLoaderApexLibrariesConfigParser, RejectMalformedLine) {
+  const char file_content[] = R"(
+jni com_android_foo libfoo
+# missing <library list>
+jni com_android_bar
+)";
+  auto result = ParseApexLibrariesConfig(file_content, "jni");
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ("Malformed line \"jni com_android_bar\"", result.error().message());
 }
+
+TEST(NativeLoaderApexLibrariesConfigParser, RejectInvalidTag) {
+  const char file_content[] = R"(
+jni apex1 lib
+public apex2 lib
+# unknown tag
+unknown com_android_foo libfoo
+)";
+  auto result = ParseApexLibrariesConfig(file_content, "jni");
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ("Invalid tag \"unknown com_android_foo libfoo\"", result.error().message());
+}
+
+TEST(NativeLoaderApexLibrariesConfigParser, RejectInvalidApexNamespace) {
+  const char file_content[] = R"(
+# apex linker namespace should be mangled ('.' -> '_')
+jni com.android.foo lib
+)";
+  auto result = ParseApexLibrariesConfig(file_content, "jni");
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ("Invalid apex_namespace \"jni com.android.foo lib\"", result.error().message());
+}
+
+TEST(NativeLoaderApexLibrariesConfigParser, RejectInvalidLibraryList) {
+  const char file_content[] = R"(
+# library list is ":" separated list of filenames
+jni com_android_foo lib64/libfoo.so
+)";
+  auto result = ParseApexLibrariesConfig(file_content, "jni");
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ("Invalid library_list \"jni com_android_foo lib64/libfoo.so\"", result.error().message());
+}
+
 
 }  // namespace nativeloader
 }  // namespace android

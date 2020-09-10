@@ -50,10 +50,6 @@ constexpr const char* kApexPath = "/apex/";
 constexpr const char* kVendorNamespaceName = "sphal";
 constexpr const char* kVndkNamespaceName = "vndk";
 constexpr const char* kVndkProductNamespaceName = "vndk_product";
-constexpr const char* kArtNamespaceName = "com_android_art";
-constexpr const char* kI18nNamespaceName = "com_android_i18n";
-constexpr const char* kNeuralNetworksNamespaceName = "com_android_neuralnetworks";
-constexpr const char* kStatsdNamespaceName = "com_android_os_statsd";
 
 // classloader-namespace is a linker namespace that is created for the loaded
 // app. To be specific, it is created for the app classloader. When
@@ -314,31 +310,14 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     return linked.error();
   }
 
-  auto art_ns = NativeLoaderNamespace::GetExportedNamespace(kArtNamespaceName, is_bridged);
-  // ART APEX does not exist on host, and under certain build conditions.
-  if (art_ns.ok()) {
-    linked = app_ns->Link(*art_ns, art_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
-    }
-  }
-
-  auto i18n_ns = NativeLoaderNamespace::GetExportedNamespace(kI18nNamespaceName, is_bridged);
-  // i18n APEX does not exist on host, and under certain build conditions.
-  if (i18n_ns.ok()) {
-    linked = app_ns->Link(*i18n_ns, i18n_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
-    }
-  }
-
-  // Give access to NNAPI libraries (apex-updated LLNDK library).
-  auto nnapi_ns =
-      NativeLoaderNamespace::GetExportedNamespace(kNeuralNetworksNamespaceName, is_bridged);
-  if (nnapi_ns.ok()) {
-    linked = app_ns->Link(*nnapi_ns, neuralnetworks_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
+  for (const auto&[apex_ns_name, public_libs] : apex_public_libraries()) {
+    auto ns = NativeLoaderNamespace::GetExportedNamespace(apex_ns_name, is_bridged);
+    // Even if APEX namespace is visible, it may not be available to bridged.
+    if (ns.ok()) {
+      linked = app_ns->Link(*ns, public_libs);
+      if (!linked.ok()) {
+        return linked.error();
+      }
     }
   }
 
@@ -370,21 +349,11 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     if (jni_libs != "") {
       auto apex_ns = NativeLoaderNamespace::GetExportedNamespace(*apex_ns_name, is_bridged);
       if (apex_ns.ok()) {
-        auto link = app_ns->Link(*apex_ns, jni_libs);
-        if (!link.ok()) {
+        linked = app_ns->Link(*apex_ns, jni_libs);
+        if (!linked.ok()) {
           return linked.error();
         }
       }
-    }
-  }
-
-  // Give access to StatsdAPI libraries
-  auto statsd_ns =
-      NativeLoaderNamespace::GetExportedNamespace(kStatsdNamespaceName, is_bridged);
-  if (statsd_ns.ok()) {
-    linked = app_ns->Link(*statsd_ns, statsd_public_libraries());
-    if (!linked.ok()) {
-      return linked.error();
     }
   }
 
