@@ -212,7 +212,6 @@ java_defaults {
         javacflags: ["-XepDisableAllChecks"],
     },
 
-    data: ["expected.txt"],
     test_config_template: ":art-run-test-template",
     test_suites: ["general-tests"],
 }

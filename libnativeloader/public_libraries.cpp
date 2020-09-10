@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <regex>
+#include <string>
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
@@ -43,7 +45,7 @@ using android::base::ErrnoError;
 using android::base::Result;
 using internal::ConfigEntry;
 using internal::ParseConfig;
-using internal::ParseJniConfig;
+using internal::ParseApexLibrariesConfig;
 using std::literals::string_literals::operator""s;
 
 namespace {
@@ -51,25 +53,11 @@ namespace {
 constexpr const char* kDefaultPublicLibrariesFile = "/etc/public.libraries.txt";
 constexpr const char* kExtendedPublicLibrariesFilePrefix = "public.libraries-";
 constexpr const char* kExtendedPublicLibrariesFileSuffix = ".txt";
-constexpr const char* kJniConfigFile = "/linkerconfig/jni.config.txt";
+constexpr const char* kApexLibrariesConfigFile = "/linkerconfig/apex.libraries.config.txt";
 constexpr const char* kVendorPublicLibrariesFile = "/vendor/etc/public.libraries.txt";
 constexpr const char* kLlndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/llndk.libraries.{}.txt";
 constexpr const char* kVndkLibrariesFile = "/apex/com.android.vndk.v{}/etc/vndksp.libraries.{}.txt";
 
-const std::vector<const std::string> kArtApexPublicLibraries = {
-    "libnativehelper.so",
-};
-
-const std::vector<const std::string> ki18nApexPublicLibraries = {
-    "libicuuc.so",
-    "libicui18n.so",
-};
-
-constexpr const char* kI18nApexLibPath = "/apex/com.android.i18n/" LIB;
-
-constexpr const char* kNeuralNetworksApexPublicLibrary = "libneuralnetworks.so";
-
-constexpr const char* kStatsdApexPublicLibrary = "libstats_jni.so";
 
 // TODO(b/130388701): do we need this?
 std::string root_dir() {
@@ -198,52 +186,20 @@ static std::string InitDefaultPublicLibraries(bool for_preload) {
     return android::base::Join(*sonames, ':');
   }
 
-  // Remove the public libs in the i18n namespace.
-  // These libs are listed in public.android.txt, but we don't want the rest of android
-  // in default namespace to dlopen the libs.
-  // For example, libicuuc.so is exposed to classloader namespace from art namespace.
-  // Unfortunately, it does not have stable C symbols, and default namespace should only use
-  // stable symbols in libandroidicu.so. http://b/120786417
-  for (const std::string& lib_name : ki18nApexPublicLibraries) {
-    std::string path(kI18nApexLibPath);
-    path.append("/").append(lib_name);
-
-    struct stat s;
-    // Do nothing if the path in /apex does not exist.
-    // Runtime APEX must be mounted since libnativeloader is in the same APEX
-    if (stat(path.c_str(), &s) != 0) {
+  // Remove the public libs provided by apexes because these libs are available
+  // from apex namespaces.
+  for (const auto& p : apex_public_libraries()) {
+    // TODO(b/167578583) remove this `if` block after fixing the bug
+    // Skip ART APEX to keep behaviors
+    if (p.first == "com_android_art") {
       continue;
     }
-
-    auto it = std::find(sonames->begin(), sonames->end(), lib_name);
-    if (it != sonames->end()) {
-      sonames->erase(it);
-    }
-  }
-
-  // Remove the public libs in the nnapi namespace.
-  auto it = std::find(sonames->begin(), sonames->end(), kNeuralNetworksApexPublicLibrary);
-  if (it != sonames->end()) {
-    sonames->erase(it);
+    auto public_libs = base::Split(p.second, ":");
+    sonames->erase(std::remove_if(sonames->begin(), sonames->end(), [&public_libs](const std::string& v) {
+      return std::find(public_libs.begin(), public_libs.end(), v) != public_libs.end();
+    }), sonames->end());
   }
   return android::base::Join(*sonames, ':');
-}
-
-static std::string InitArtPublicLibraries() {
-  CHECK_GT((int)kArtApexPublicLibraries.size(), 0);
-  std::string list = android::base::Join(kArtApexPublicLibraries, ":");
-
-  std::string additional_libs = additional_public_libraries();
-  if (!additional_libs.empty()) {
-    list = list + ':' + additional_libs;
-  }
-  return list;
-}
-
-static std::string InitI18nPublicLibraries() {
-  static_assert(sizeof(ki18nApexPublicLibraries) > 0, "ki18nApexPublicLibraries is empty");
-  std::string list = android::base::Join(ki18nApexPublicLibraries, ":");
-  return list;
 }
 
 static std::string InitVendorPublicLibraries() {
@@ -318,27 +274,44 @@ static std::string InitVndkspLibrariesProduct() {
   return android::base::Join(*sonames, ':');
 }
 
-static std::string InitNeuralNetworksPublicLibraries() {
-  return kNeuralNetworksApexPublicLibrary;
-}
-
-static std::string InitStatsdPublicLibraries() {
-  return kStatsdApexPublicLibrary;
-}
-
-static std::map<std::string, std::string> InitApexJniLibraries() {
+static std::map<std::string, std::string> InitApexLibraries(const std::string& tag) {
   std::string file_content;
-  if (!base::ReadFileToString(kJniConfigFile, &file_content)) {
-    // jni config is optional
+  if (!base::ReadFileToString(kApexLibrariesConfigFile, &file_content)) {
+    // config is optional
     return {};
   }
-  auto config = ParseJniConfig(file_content);
+  auto config = ParseApexLibrariesConfig(file_content, tag);
   if (!config.ok()) {
-    LOG_ALWAYS_FATAL("%s: %s", kJniConfigFile, config.error().message().c_str());
-    // not reach here
+    LOG_ALWAYS_FATAL("%s: %s", kApexLibrariesConfigFile, config.error().message().c_str());
     return {};
   }
   return *config;
+}
+
+struct ApexLibrariesConfigLine {
+  std::string tag;
+  std::string apex_namespace;
+  std::string library_list;
+};
+
+const std::regex kApexNamespaceRegex("[0-9a-zA-Z_]+");
+const std::regex kLibraryListRegex("[0-9a-zA-Z.:@+_-]+");
+
+Result<ApexLibrariesConfigLine> ParseApexLibrariesConfigLine(const std::string& line) {
+  std::vector<std::string> tokens = base::Split(line, " ");
+  if (tokens.size() != 3) {
+    return Errorf("Malformed line \"{}\"", line);
+  }
+  if (tokens[0] != "jni" && tokens[0] != "public") {
+    return Errorf("Invalid tag \"{}\"", line);
+  }
+  if (!std::regex_match(tokens[1], kApexNamespaceRegex)) {
+    return Errorf("Invalid apex_namespace \"{}\"", line);
+  }
+  if (!std::regex_match(tokens[2], kLibraryListRegex)) {
+    return Errorf("Invalid library_list \"{}\"", line);
+  }
+  return ApexLibrariesConfigLine{std::move(tokens[0]), std::move(tokens[1]), std::move(tokens[2])};
 }
 
 }  // namespace
@@ -353,16 +326,6 @@ const std::string& default_public_libraries() {
   return list;
 }
 
-const std::string& art_public_libraries() {
-  static std::string list = InitArtPublicLibraries();
-  return list;
-}
-
-const std::string& i18n_public_libraries() {
-  static std::string list = InitI18nPublicLibraries();
-  return list;
-}
-
 const std::string& vendor_public_libraries() {
   static std::string list = InitVendorPublicLibraries();
   return list;
@@ -370,16 +333,6 @@ const std::string& vendor_public_libraries() {
 
 const std::string& extended_public_libraries() {
   static std::string list = InitExtendedPublicLibraries();
-  return list;
-}
-
-const std::string& neuralnetworks_public_libraries() {
-  static std::string list = InitNeuralNetworksPublicLibraries();
-  return list;
-}
-
-const std::string& statsd_public_libraries() {
-  static std::string list = InitStatsdPublicLibraries();
   return list;
 }
 
@@ -404,8 +357,13 @@ const std::string& vndksp_libraries_vendor() {
 }
 
 const std::string& apex_jni_libraries(const std::string& apex_ns_name) {
-  static std::map<std::string, std::string> jni_libraries = InitApexJniLibraries();
+  static std::map<std::string, std::string> jni_libraries = InitApexLibraries("jni");
   return jni_libraries[apex_ns_name];
+}
+
+const std::map<std::string, std::string>& apex_public_libraries() {
+  static std::map<std::string, std::string> public_libraries = InitApexLibraries("public");
+  return public_libraries;
 }
 
 bool is_product_vndk_version_defined() {
@@ -485,7 +443,19 @@ Result<std::vector<std::string>> ParseConfig(
   return sonames;
 }
 
-Result<std::map<std::string, std::string>> ParseJniConfig(const std::string& file_content) {
+// Parses apex.libraries.config.txt file generated by linkerconfig which looks like
+//   system/linkerconfig/testdata/golden_output/stages/apex.libraries.config.txt
+// and returns mapping of <apex namespace> to <library list> which matches <tag>.
+//
+// The file is line-based and each line consists of "<tag> <apex namespace> <library list>".
+//
+// <tag> explains what <library list> is. (e.g "jni", "public")
+// <library list> is colon-separated list of library names. (e.g "libfoo.so:libbar.so")
+//
+// If <tag> is "jni", <library list> is the list of JNI libraries exposed by <apex namespace>.
+// If <tag> is "public", <library list> is the list of public libraries exposed by <apex namespace>.
+// Public libraries are the libs listed in /system/etc/public.libraries.txt.
+Result<std::map<std::string, std::string>> ParseApexLibrariesConfig(const std::string& file_content, const std::string& tag) {
   std::map<std::string, std::string> entries;
   std::vector<std::string> lines = base::Split(file_content, "\n");
   for (auto& line : lines) {
@@ -493,12 +463,22 @@ Result<std::map<std::string, std::string>> ParseJniConfig(const std::string& fil
     if (trimmed_line[0] == '#' || trimmed_line.empty()) {
       continue;
     }
-
-    std::vector<std::string> tokens = base::Split(trimmed_line, " ");
-    if (tokens.size() < 2) {
-      return Errorf( "Malformed line \"{}\"", line);
+    auto config_line = ParseApexLibrariesConfigLine(trimmed_line);
+    if (!config_line.ok()) {
+      return config_line.error();
     }
-    entries[tokens[0]] = tokens[1];
+    if (config_line->tag != tag) {
+      continue;
+    }
+    entries[config_line->apex_namespace] = config_line->library_list;
+  }
+
+  // TODO(b/167578583) remove this `if` block after fixing the bug
+  if (tag == "public") {
+    std::string additional_libs = additional_public_libraries();
+    if (!additional_libs.empty()) {
+      entries["com_android_art"] += ':' + additional_libs;
+    }
   }
   return entries;
 }
