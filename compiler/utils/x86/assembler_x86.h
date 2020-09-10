@@ -795,6 +795,8 @@ class X86Assembler final : public Assembler {
   void rep_movsw();
 
   X86Assembler* lock();
+  void cmpxchgb(const Address& address, ByteRegister reg);
+  void cmpxchgw(const Address& address, Register reg);
   void cmpxchgl(const Address& address, Register reg);
   void cmpxchg8b(const Address& address);
 
@@ -811,6 +813,14 @@ class X86Assembler final : public Assembler {
 
   void LoadLongConstant(XmmRegister dst, int64_t value);
   void LoadDoubleConstant(XmmRegister dst, double value);
+
+  void LockCmpxchgb(const Address& address, ByteRegister reg) {
+    lock()->cmpxchgb(address, reg);
+  }
+
+  void LockCmpxchgw(const Address& address, Register reg) {
+    lock()->cmpxchgw(address, reg);
+  }
 
   void LockCmpxchgl(const Address& address, Register reg) {
     lock()->cmpxchgl(address, reg);
