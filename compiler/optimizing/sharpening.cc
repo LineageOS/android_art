@@ -58,7 +58,7 @@ static bool BootImageAOTCanEmbedMethod(ArtMethod* method, const CompilerOptions&
 }
 
 HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
-    ArtMethod* callee, CodeGenerator* codegen) {
+    ArtMethod* callee, bool has_method_id, CodeGenerator* codegen) {
   if (kIsDebugBuild) {
     ScopedObjectAccess soa(Thread::Current());  // Required for GetDeclaringClass below.
     DCHECK(callee != nullptr);
@@ -96,6 +96,8 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
     } else if (BootImageAOTCanEmbedMethod(callee, compiler_options)) {
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative;
+    } else if (!has_method_id) {
+      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
     } else {
       // Use PC-relative access to the .bss methods array.
       method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBssEntry;
@@ -117,6 +119,9 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
   } else if (IsInBootImage(callee)) {
     // Use PC-relative access to the .data.bimg.rel.ro methods array.
     method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
+    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+  } else if (!has_method_id) {
+    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
     code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
   } else {
     // Use PC-relative access to the .bss methods array.
