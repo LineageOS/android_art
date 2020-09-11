@@ -462,4 +462,5 @@ prebuilt_etc {
     name: "art-linker-config",
     src: "linker.config.txt",
     filename: "linker.config.txt",
+    installable: false,
 }
