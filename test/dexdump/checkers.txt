@@ -52,6 +52,7 @@ Class #0            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 62
       code          -
       registers     : 1
       ins           : 1
@@ -68,6 +69,7 @@ Class #0            -
       name          : 'a'
       type          : '(Z)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 63
       code          -
       registers     : 4
       ins           : 2
@@ -98,6 +100,7 @@ Class #0            -
       name          : 'onConfigurationChanged'
       type          : '(Landroid/content/res/Configuration;)V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 66
       code          -
       registers     : 2
       ins           : 2
@@ -114,6 +117,7 @@ Class #0            -
       name          : 'onCreate'
       type          : '(Landroid/os/Bundle;)V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 67
       code          -
       registers     : 8
       ins           : 2
@@ -158,6 +162,7 @@ Class #0            -
       name          : 'onCreateOptionsMenu'
       type          : '(Landroid/view/Menu;)Z'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 68
       code          -
       registers     : 11
       ins           : 2
@@ -277,6 +282,7 @@ Class #0            -
       name          : 'onKeyDown'
       type          : '(ILandroid/view/KeyEvent;)Z'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 69
       code          -
       registers     : 8
       ins           : 3
@@ -315,6 +321,7 @@ Class #0            -
       name          : 'onOptionsItemSelected'
       type          : '(Landroid/view/MenuItem;)Z'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 70
       code          -
       registers     : 7
       ins           : 2
@@ -407,6 +414,7 @@ Class #0            -
       name          : 'onPause'
       type          : '()V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 71
       code          -
       registers     : 3
       ins           : 1
@@ -431,6 +439,7 @@ Class #0            -
       name          : 'onStop'
       type          : '()V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 72
       code          -
       registers     : 2
       ins           : 1
@@ -449,6 +458,7 @@ Class #0            -
       name          : 'onTrackballEvent'
       type          : '(Landroid/view/MotionEvent;)Z'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 73
       code          -
       registers     : 6
       ins           : 2
@@ -677,6 +687,7 @@ Class #1            -
       name          : '<init>'
       type          : '(Landroid/content/Context;Landroid/content/SharedPreferences;)V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 77
       code          -
       registers     : 12
       ins           : 3
@@ -1004,6 +1015,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Landroid/content/SharedPreferences$Editor;Ljava/lang/String;[I)V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 82
       code          -
       registers     : 6
       ins           : 3
@@ -1034,6 +1046,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Landroid/content/SharedPreferences;Ljava/lang/String;[I)V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 83
       code          -
       registers     : 7
       ins           : 3
@@ -1066,6 +1079,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Landroid/graphics/Canvas;IIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 84
       code          -
       registers     : 13
       ins           : 6
@@ -1123,6 +1137,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Landroid/graphics/Canvas;IIIILandroid/graphics/Paint;Landroid/graphics/Paint;Z)V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 85
       code          -
       registers     : 13
       ins           : 8
@@ -1187,6 +1202,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Lcom/google/android/checkers/CheckersView;I)V'
       access        : 0x1008 (STATIC SYNTHETIC)
+      method_idx    : 86
       code          -
       registers     : 2
       ins           : 2
@@ -1203,6 +1219,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Landroid/content/SharedPreferences;)Z'
       access        : 0x20012 (PRIVATE FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 88
       code          -
       registers     : 12
       ins           : 2
@@ -1393,6 +1410,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(Lcom/google/android/checkers/CheckersView;)Z'
       access        : 0x1008 (STATIC SYNTHETIC)
+      method_idx    : 89
       code          -
       registers     : 7
       ins           : 1
@@ -1416,6 +1434,7 @@ The application complies with the official American checkers rules, where black 
       name          : 'a'
       type          : '(ZIIII)Z'
       access        : 0x20012 (PRIVATE FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 91
       code          -
       registers     : 15
       ins           : 6
@@ -1802,6 +1821,7 @@ goto options to rotate board" // string@00c2
       name          : 'b'
       type          : '(FF)I'
       access        : 0x20012 (PRIVATE FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 92
       code          -
       registers     : 13
       ins           : 3
@@ -1887,6 +1907,7 @@ goto options to rotate board" // string@00c2
       name          : 'b'
       type          : '(I)V'
       access        : 0x20012 (PRIVATE FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 94
       code          -
       registers     : 3
       ins           : 2
@@ -1914,6 +1935,7 @@ goto options to rotate board" // string@00c2
       name          : 'b'
       type          : '(Landroid/graphics/Canvas;IIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 95
       code          -
       registers     : 16
       ins           : 6
@@ -1994,6 +2016,7 @@ goto options to rotate board" // string@00c2
       name          : 'c'
       type          : '(I)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 98
       code          -
       registers     : 10
       ins           : 2
@@ -2146,6 +2169,7 @@ goto options to rotate board" // string@00c2
       name          : 'd'
       type          : '()V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 100
       code          -
       registers     : 6
       ins           : 1
@@ -2197,6 +2221,7 @@ goto options to rotate board" // string@00c2
       name          : 'e'
       type          : '()Z'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 103
       code          -
       registers     : 3
       ins           : 1
@@ -2219,6 +2244,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '()V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 78
       code          -
       registers     : 4
       ins           : 1
@@ -2268,6 +2294,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '(FF)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 79
       code          -
       registers     : 10
       ins           : 3
@@ -2357,6 +2384,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '(IIII)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 80
       code          -
       registers     : 11
       ins           : 5
@@ -2382,6 +2410,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '(Landroid/content/SharedPreferences$Editor;)V'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 81
       code          -
       registers     : 4
       ins           : 2
@@ -2474,6 +2503,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '(I)Z'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 87
       code          -
       registers     : 8
       ins           : 2
@@ -2500,6 +2530,7 @@ goto options to rotate board" // string@00c2
       name          : 'a'
       type          : '(Z)Z'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 90
       code          -
       registers     : 3
       ins           : 2
@@ -2531,6 +2562,7 @@ goto options to rotate board" // string@00c2
       name          : 'b'
       type          : '()V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 93
       code          -
       registers     : 7
       ins           : 1
@@ -2567,6 +2599,7 @@ goto options to rotate board" // string@00c2
       name          : 'b'
       type          : '(Z)Z'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 96
       code          -
       registers     : 7
       ins           : 2
@@ -2627,6 +2660,7 @@ goto options to rotate board" // string@00c2
       name          : 'c'
       type          : '()I'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 97
       code          -
       registers     : 2
       ins           : 1
@@ -2650,6 +2684,7 @@ goto options to rotate board" // string@00c2
       name          : 'c'
       type          : '(Z)Z'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 99
       code          -
       registers     : 5
       ins           : 2
@@ -2687,6 +2722,7 @@ goto options to rotate board" // string@00c2
       name          : 'd'
       type          : '(Z)Z'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 101
       code          -
       registers     : 3
       ins           : 2
@@ -2717,6 +2753,7 @@ goto options to rotate board" // string@00c2
       name          : 'draw'
       type          : '(Landroid/graphics/Canvas;)V'
       access        : 0x20001 (PUBLIC DECLARED_SYNCHRONIZED)
+      method_idx    : 102
       code          -
       registers     : 30
       ins           : 2
@@ -3424,6 +3461,7 @@ goto options to rotate board" // string@00c2
       name          : 'e'
       type          : '(Z)Z'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 104
       code          -
       registers     : 3
       ins           : 2
@@ -3454,6 +3492,7 @@ goto options to rotate board" // string@00c2
       name          : 'onSizeChanged'
       type          : '(IIII)V'
       access        : 0x20004 (PROTECTED DECLARED_SYNCHRONIZED)
+      method_idx    : 107
       code          -
       registers     : 8
       ins           : 5
@@ -3501,6 +3540,7 @@ goto options to rotate board" // string@00c2
       name          : 'onTouchEvent'
       type          : '(Landroid/view/MotionEvent;)Z'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 108
       code          -
       registers     : 8
       ins           : 2
@@ -3539,6 +3579,7 @@ goto options to rotate board" // string@00c2
       name          : 'setLevel'
       type          : '(I)V'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 112
       code          -
       registers     : 4
       ins           : 2
@@ -3764,6 +3805,7 @@ Class #2            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 113
       code          -
       registers     : 8
       ins           : 0
@@ -4363,6 +4405,7 @@ Class #2            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 114
       code          -
       registers     : 7
       ins           : 2
@@ -4427,6 +4470,7 @@ Class #2            -
       name          : 'a'
       type          : '(II)I'
       access        : 0x001a (PRIVATE STATIC FINAL)
+      method_idx    : 115
       code          -
       registers     : 3
       ins           : 2
@@ -4451,6 +4495,7 @@ Class #2            -
       name          : 'a'
       type          : '(IIIIIZ)I'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 116
       code          -
       registers     : 31
       ins           : 7
@@ -5152,6 +5197,7 @@ Class #2            -
       name          : 'a'
       type          : '(IZ)I'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 117
       code          -
       registers     : 7
       ins           : 3
@@ -5199,6 +5245,7 @@ Class #2            -
       name          : 'a'
       type          : '(Z)I'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 118
       code          -
       registers     : 7
       ins           : 2
@@ -5271,6 +5318,7 @@ Class #2            -
       name          : 'a'
       type          : '(ZII)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 119
       code          -
       registers     : 7
       ins           : 3
@@ -5317,6 +5365,7 @@ Class #2            -
       name          : 'a'
       type          : '(ZIIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 120
       code          -
       registers     : 9
       ins           : 5
@@ -5356,6 +5405,7 @@ Class #2            -
       name          : 'a'
       type          : '(ZIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 121
       code          -
       registers     : 7
       ins           : 4
@@ -5389,6 +5439,7 @@ Class #2            -
       name          : 'a'
       type          : '(IIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 125
       code          -
       registers     : 9
       ins           : 5
@@ -5440,6 +5491,7 @@ Class #2            -
       name          : 'a'
       type          : '(IIIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 126
       code          -
       registers     : 10
       ins           : 6
@@ -5475,6 +5527,7 @@ Class #2            -
       name          : 'a'
       type          : '(IIIIIIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 127
       code          -
       registers     : 18
       ins           : 9
@@ -5547,6 +5600,7 @@ Class #2            -
       name          : 'a'
       type          : '(IZI)Z'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 129
       code          -
       registers     : 21
       ins           : 4
@@ -6017,6 +6071,7 @@ Class #2            -
       name          : 'b'
       type          : '(ZIIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 130
       code          -
       registers     : 9
       ins           : 5
@@ -6057,6 +6112,7 @@ Class #2            -
       name          : 'b'
       type          : '(ZIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 131
       code          -
       registers     : 8
       ins           : 4
@@ -6103,6 +6159,7 @@ Class #2            -
       name          : 'b'
       type          : '()V'
       access        : 0x20012 (PRIVATE FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 132
       code          -
       registers     : 2
       ins           : 1
@@ -6136,6 +6193,7 @@ Class #2            -
       name          : 'b'
       type          : '(I)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 133
       code          -
       registers     : 10
       ins           : 2
@@ -6345,6 +6403,7 @@ Class #2            -
       name          : 'b'
       type          : '(IIIIIIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 134
       code          -
       registers     : 18
       ins           : 9
@@ -6417,6 +6476,7 @@ Class #2            -
       name          : 'b'
       type          : '(IZI)Z'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 136
       code          -
       registers     : 15
       ins           : 4
@@ -6695,6 +6755,7 @@ Class #2            -
       name          : 'c'
       type          : '(ZIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 137
       code          -
       registers     : 8
       ins           : 4
@@ -6740,6 +6801,7 @@ Class #2            -
       name          : 'c'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 138
       code          -
       registers     : 2
       ins           : 0
@@ -6761,6 +6823,7 @@ Class #2            -
       name          : 'c'
       type          : '(IIIIIIII)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 139
       code          -
       registers     : 18
       ins           : 9
@@ -6889,6 +6952,7 @@ Class #2            -
       name          : 'd'
       type          : '(ZIIZ)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 140
       code          -
       registers     : 8
       ins           : 4
@@ -6936,6 +7000,7 @@ Class #2            -
       name          : 'a'
       type          : '(ZZ)I'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 122
       code          -
       registers     : 4
       ins           : 3
@@ -6955,6 +7020,7 @@ Class #2            -
       name          : 'a'
       type          : '()V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 123
       code          -
       registers     : 4
       ins           : 1
@@ -6993,6 +7059,7 @@ Class #2            -
       name          : 'a'
       type          : '(I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 124
       code          -
       registers     : 2
       ins           : 2
@@ -7009,6 +7076,7 @@ Class #2            -
       name          : 'a'
       type          : '(IIIIZ)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 128
       code          -
       registers     : 8
       ins           : 6
@@ -7043,6 +7111,7 @@ Class #2            -
       name          : 'b'
       type          : '(ZZ)V'
       access        : 0x20011 (PUBLIC FINAL DECLARED_SYNCHRONIZED)
+      method_idx    : 135
       code          -
       registers     : 4
       ins           : 3
@@ -7070,6 +7139,7 @@ Class #2            -
       name          : 'run'
       type          : '()V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 141
       code          -
       registers     : 24
       ins           : 1
@@ -7401,6 +7471,7 @@ Class #3            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 143
       code          -
       registers     : 2
       ins           : 2
@@ -7419,6 +7490,7 @@ Class #3            -
       name          : 'onClick'
       type          : '(Landroid/content/DialogInterface;I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 144
       code          -
       registers     : 4
       ins           : 3
@@ -7468,6 +7540,7 @@ Class #4            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 145
       code          -
       registers     : 2
       ins           : 2
@@ -7486,6 +7559,7 @@ Class #4            -
       name          : 'onClick'
       type          : '(Landroid/content/DialogInterface;I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 146
       code          -
       registers     : 3
       ins           : 3
@@ -7529,6 +7603,7 @@ Class #5            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 147
       code          -
       registers     : 2
       ins           : 2
@@ -7547,6 +7622,7 @@ Class #5            -
       name          : 'onClick'
       type          : '(Landroid/content/DialogInterface;I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 148
       code          -
       registers     : 3
       ins           : 3
@@ -7590,6 +7666,7 @@ Class #6            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 149
       code          -
       registers     : 2
       ins           : 2
@@ -7608,6 +7685,7 @@ Class #6            -
       name          : 'onClick'
       type          : '(Landroid/content/DialogInterface;I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 150
       code          -
       registers     : 5
       ins           : 3
@@ -7654,6 +7732,7 @@ Class #7            -
       name          : '<init>'
       type          : '(Lcom/google/android/checkers/CheckersView;)V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 151
       code          -
       registers     : 2
       ins           : 2
@@ -7672,6 +7751,7 @@ Class #7            -
       name          : 'onClick'
       type          : '(Landroid/content/DialogInterface;I)V'
       access        : 0x0011 (PUBLIC FINAL)
+      method_idx    : 152
       code          -
       registers     : 4
       ins           : 3
@@ -7788,6 +7868,7 @@ Class #8            -
       name          : 'a'
       type          : '([B)Z'
       access        : 0x0008 (STATIC)
+      method_idx    : 153
       code          -
       registers     : 5
       ins           : 1
