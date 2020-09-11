@@ -1,0 +1,2 @@
+Test that even if a supercall cannot directly reference the resolved method
+within the dex file, we still generate a HInvokeStaticOrDirect.
