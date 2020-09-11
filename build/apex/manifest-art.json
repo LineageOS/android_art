@@ -3,6 +3,7 @@
   "version": 1,
   "requireNativeLibs": [
     "libandroidicu.so",
+    "libicu.so",
     "libicuuc.so",
     "libicui18n.so",
     "libicu_jni.so",
