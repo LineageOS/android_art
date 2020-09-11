@@ -53,6 +53,7 @@ Class #0            -
       name          : '<init>'
       type          : '(Ljava/lang/invoke/MethodHandle;)V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 8
       code          -
       registers     : 2
       ins           : 2
@@ -97,6 +98,7 @@ Class #1            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 50
       code          -
       registers     : 1
       ins           : 1
@@ -115,6 +117,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(BB)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 51
       code          -
       registers     : 5
       ins           : 2
@@ -149,6 +152,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(CC)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 52
       code          -
       registers     : 5
       ins           : 2
@@ -183,6 +187,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(DD)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 53
       code          -
       registers     : 7
       ins           : 4
@@ -218,6 +223,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(FF)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 54
       code          -
       registers     : 5
       ins           : 2
@@ -253,6 +259,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(II)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 55
       code          -
       registers     : 5
       ins           : 2
@@ -287,6 +294,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(JJ)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 56
       code          -
       registers     : 7
       ins           : 4
@@ -322,6 +330,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(Ljava/lang/Object;Ljava/lang/Object;)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 57
       code          -
       registers     : 5
       ins           : 2
@@ -358,6 +367,7 @@ Class #1            -
       name          : 'assertEquals'
       type          : '(SS)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 58
       code          -
       registers     : 5
       ins           : 2
@@ -392,6 +402,7 @@ Class #1            -
       name          : 'assertNotEquals'
       type          : '(Ljava/lang/Object;Ljava/lang/Object;)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 59
       code          -
       registers     : 5
       ins           : 2
@@ -428,6 +439,7 @@ Class #1            -
       name          : 'assertNotReached'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 60
       code          -
       registers     : 2
       ins           : 0
@@ -447,6 +459,7 @@ Class #1            -
       name          : 'assertTrue'
       type          : '(Z)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 61
       code          -
       registers     : 4
       ins           : 1
@@ -477,6 +490,7 @@ Class #1            -
       name          : 'fail'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 62
       code          -
       registers     : 2
       ins           : 0
@@ -532,6 +546,7 @@ Class #2            -
       name          : '<init>'
       type          : '(I)V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 72
       code          -
       registers     : 2
       ins           : 2
@@ -581,6 +596,7 @@ Class #3            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 96
       code          -
       registers     : 1
       ins           : 1
@@ -600,6 +616,7 @@ Class #3            -
       name          : 'initialValue'
       type          : '()Ljava/lang/Integer;'
       access        : 0x0004 (PROTECTED)
+      method_idx    : 97
       code          -
       registers     : 2
       ins           : 1
@@ -623,6 +640,7 @@ Class #3            -
       name          : 'initialValue'
       type          : '()Ljava/lang/Object;'
       access        : 0x1044 (PROTECTED BRIDGE SYNTHETIC)
+      method_idx    : 98
       code          -
       registers     : 2
       ins           : 1
@@ -670,6 +688,7 @@ Class #4            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 169
       code          -
       registers     : 1
       ins           : 1
@@ -688,6 +707,7 @@ Class #4            -
       name          : 'bsm'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 170
       code          -
       registers     : 6
       ins           : 4
@@ -749,6 +769,7 @@ Class #5            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 0
       code          -
       registers     : 1
       ins           : 1
@@ -767,6 +788,7 @@ Class #5            -
       name          : 'TestLinkerMethodMinimalArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 1
       code          -
       registers     : 4
       ins           : 0
@@ -839,6 +861,7 @@ Class #5            -
       name          : 'TestLinkerMethodMultipleArgumentTypes'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 2
       code          -
       registers     : 2
       ins           : 0
@@ -867,6 +890,7 @@ Class #5            -
       name          : 'TestUninitializedCallSite'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 3
       code          -
       registers     : 7
       ins           : 0
@@ -939,6 +963,7 @@ Class #5            -
       name          : 'main'
       type          : '([Ljava/lang/String;)V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 7
       code          -
       registers     : 1
       ins           : 1
@@ -1042,6 +1067,7 @@ Class #6            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 9
       code          -
       registers     : 1
       ins           : 1
@@ -1060,6 +1086,7 @@ Class #6            -
       name          : 'boxingArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 12
       code          -
       registers     : 2
       ins           : 0
@@ -1080,6 +1107,7 @@ Class #6            -
       name          : 'bsm'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;ILjava/lang/String;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 14
       code          -
       registers     : 7
       ins           : 5
@@ -1150,6 +1178,7 @@ Class #6            -
       name          : 'bsmDJ'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;DJ)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 15
       code          -
       registers     : 9
       ins           : 7
@@ -1197,6 +1226,7 @@ Class #6            -
       name          : 'bsmDoubleLong'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Double;Ljava/lang/Long;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 16
       code          -
       registers     : 7
       ins           : 5
@@ -1244,6 +1274,7 @@ Class #6            -
       name          : 'bsmReturningInteger'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/Integer;'
       access        : 0x0008 (STATIC)
+      method_idx    : 17
       code          -
       registers     : 5
       ins           : 3
@@ -1270,6 +1301,7 @@ Class #6            -
       name          : 'bsmReturningObject'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/Object;'
       access        : 0x0008 (STATIC)
+      method_idx    : 18
       code          -
       registers     : 5
       ins           : 3
@@ -1295,6 +1327,7 @@ Class #6            -
       name          : 'bsmReturningTestersConstantCallsite'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)LTestBadBootstrapArguments$TestersConstantCallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 19
       code          -
       registers     : 5
       ins           : 3
@@ -1320,6 +1353,7 @@ Class #6            -
       name          : 'bsmReturningVoid'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)V'
       access        : 0x0008 (STATIC)
+      method_idx    : 20
       code          -
       registers     : 5
       ins           : 3
@@ -1343,6 +1377,7 @@ Class #6            -
       name          : 'bsmZBCS'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;ZBCS)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 21
       code          -
       registers     : 8
       ins           : 7
@@ -1369,6 +1404,7 @@ Class #6            -
       name          : 'extraArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 22
       code          -
       registers     : 2
       ins           : 0
@@ -1389,6 +1425,7 @@ Class #6            -
       name          : 'happy'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 23
       code          -
       registers     : 2
       ins           : 0
@@ -1409,6 +1446,7 @@ Class #6            -
       name          : 'integerReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 24
       code          -
       registers     : 0
       ins           : 0
@@ -1427,6 +1465,7 @@ Class #6            -
       name          : 'invokeBoxingArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 25
       code          -
       registers     : 0
       ins           : 0
@@ -1445,6 +1484,7 @@ Class #6            -
       name          : 'invokeExtraArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 26
       code          -
       registers     : 0
       ins           : 0
@@ -1463,6 +1503,7 @@ Class #6            -
       name          : 'invokeHappy'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 27
       code          -
       registers     : 0
       ins           : 0
@@ -1481,6 +1522,7 @@ Class #6            -
       name          : 'invokeIntegerReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 28
       code          -
       registers     : 0
       ins           : 0
@@ -1499,6 +1541,7 @@ Class #6            -
       name          : 'invokeMissingParameterTypes'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 29
       code          -
       registers     : 0
       ins           : 0
@@ -1517,6 +1560,7 @@ Class #6            -
       name          : 'invokeNarrowArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 30
       code          -
       registers     : 0
       ins           : 0
@@ -1535,6 +1579,7 @@ Class #6            -
       name          : 'invokeObjectReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 31
       code          -
       registers     : 0
       ins           : 0
@@ -1553,6 +1598,7 @@ Class #6            -
       name          : 'invokeViaCustomCallSiteClass'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 32
       code          -
       registers     : 0
       ins           : 0
@@ -1571,6 +1617,7 @@ Class #6            -
       name          : 'invokeVoidReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 33
       code          -
       registers     : 0
       ins           : 0
@@ -1589,6 +1636,7 @@ Class #6            -
       name          : 'invokeWideningArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 34
       code          -
       registers     : 0
       ins           : 0
@@ -1607,6 +1655,7 @@ Class #6            -
       name          : 'invokeWideningBoxingArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 35
       code          -
       registers     : 0
       ins           : 0
@@ -1625,6 +1674,7 @@ Class #6            -
       name          : 'invokeWrongArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 36
       code          -
       registers     : 0
       ins           : 0
@@ -1643,6 +1693,7 @@ Class #6            -
       name          : 'invokeWrongArgumentsAgain'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 37
       code          -
       registers     : 0
       ins           : 0
@@ -1661,6 +1712,7 @@ Class #6            -
       name          : 'invokeWrongParameterTypes'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 38
       code          -
       registers     : 0
       ins           : 0
@@ -1679,6 +1731,7 @@ Class #6            -
       name          : 'missingParameterTypes'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 39
       code          -
       registers     : 2
       ins           : 0
@@ -1699,6 +1752,7 @@ Class #6            -
       name          : 'narrowArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 40
       code          -
       registers     : 0
       ins           : 0
@@ -1717,6 +1771,7 @@ Class #6            -
       name          : 'objectReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 41
       code          -
       registers     : 0
       ins           : 0
@@ -1735,6 +1790,7 @@ Class #6            -
       name          : 'sayHello'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 42
       code          -
       registers     : 2
       ins           : 0
@@ -1755,6 +1811,7 @@ Class #6            -
       name          : 'test'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 43
       code          -
       registers     : 3
       ins           : 0
@@ -2137,6 +2194,7 @@ Class #6            -
       name          : 'voidReturnType'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 44
       code          -
       registers     : 0
       ins           : 0
@@ -2155,6 +2213,7 @@ Class #6            -
       name          : 'wideningArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 45
       code          -
       registers     : 2
       ins           : 0
@@ -2175,6 +2234,7 @@ Class #6            -
       name          : 'wideningBoxingArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 46
       code          -
       registers     : 2
       ins           : 0
@@ -2195,6 +2255,7 @@ Class #6            -
       name          : 'wrongArguments'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 47
       code          -
       registers     : 2
       ins           : 0
@@ -2215,6 +2276,7 @@ Class #6            -
       name          : 'wrongArgumentsAgain'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 48
       code          -
       registers     : 2
       ins           : 0
@@ -2235,6 +2297,7 @@ Class #6            -
       name          : 'wrongParameterTypes'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 49
       code          -
       registers     : 2
       ins           : 0
@@ -2289,6 +2352,7 @@ Class #7            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 63
       code          -
       registers     : 1
       ins           : 0
@@ -2307,6 +2371,7 @@ Class #7            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 64
       code          -
       registers     : 1
       ins           : 1
@@ -2325,6 +2390,7 @@ Class #7            -
       name          : 'bsm'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;J)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 67
       code          -
       registers     : 11
       ins           : 6
@@ -2372,6 +2438,7 @@ Class #7            -
       name          : 'targetA100000000'
       type          : '(ILjava/lang/String;Ljava/lang/Double;)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 68
       code          -
       registers     : 5
       ins           : 3
@@ -2408,6 +2475,7 @@ Class #7            -
       name          : 'test'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 69
       code          -
       registers     : 2
       ins           : 0
@@ -2439,6 +2507,7 @@ Class #7            -
       name          : 'testCallSites'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 70
       code          -
       registers     : 3
       ins           : 0
@@ -2482,6 +2551,7 @@ Class #7            -
       name          : 'testDynamic'
       type          : '(ILjava/lang/String;Ljava/lang/Double;)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 71
       code          -
       registers     : 4
       ins           : 3
@@ -2564,6 +2634,7 @@ Class #8            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 73
       code          -
       registers     : 1
       ins           : 1
@@ -2582,6 +2653,7 @@ Class #8            -
       name          : 'getInstanceField'
       type          : '(LTestInvocationKinds;)D'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 78
       code          -
       registers     : 3
       ins           : 1
@@ -2602,6 +2674,7 @@ Class #8            -
       name          : 'getStaticField'
       type          : '()I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 80
       code          -
       registers     : 1
       ins           : 0
@@ -2621,6 +2694,7 @@ Class #8            -
       name          : 'lookupConstructor'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 81
       code          -
       registers     : 7
       ins           : 3
@@ -2655,6 +2729,7 @@ Class #8            -
       name          : 'lookupInstanceFieldGetter'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 82
       code          -
       registers     : 5
       ins           : 3
@@ -2687,6 +2762,7 @@ Class #8            -
       name          : 'lookupInstanceFieldSetter'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 83
       code          -
       registers     : 5
       ins           : 3
@@ -2720,6 +2796,7 @@ Class #8            -
       name          : 'lookupStaticFieldGetter'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 84
       code          -
       registers     : 5
       ins           : 3
@@ -2749,6 +2826,7 @@ Class #8            -
       name          : 'lookupStaticFieldSetter'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x0008 (STATIC)
+      method_idx    : 85
       code          -
       registers     : 5
       ins           : 3
@@ -2780,6 +2858,7 @@ Class #8            -
       name          : 'lookupVirtual'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 86
       code          -
       registers     : 6
       ins           : 3
@@ -2812,6 +2891,7 @@ Class #8            -
       name          : 'makeWidget'
       type          : '(I)LTestInvocationKinds$Widget;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 87
       code          -
       registers     : 2
       ins           : 1
@@ -2832,6 +2912,7 @@ Class #8            -
       name          : 'maxIntegerValue'
       type          : '(LTestInvocationKinds;II)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 88
       code          -
       registers     : 4
       ins           : 3
@@ -2854,6 +2935,7 @@ Class #8            -
       name          : 'setInstanceField'
       type          : '(LTestInvocationKinds;D)V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 89
       code          -
       registers     : 5
       ins           : 3
@@ -2877,6 +2959,7 @@ Class #8            -
       name          : 'setStaticField'
       type          : '(I)V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 90
       code          -
       registers     : 1
       ins           : 1
@@ -2896,6 +2979,7 @@ Class #8            -
       name          : 'test'
       type          : '()V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 91
       code          -
       registers     : 2
       ins           : 0
@@ -2926,6 +3010,7 @@ Class #8            -
       name          : 'testConstructor'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 92
       code          -
       registers     : 3
       ins           : 0
@@ -2961,6 +3046,7 @@ Class #8            -
       name          : 'testInstanceFieldAccessors'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 93
       code          -
       registers     : 5
       ins           : 0
@@ -3001,6 +3087,7 @@ Class #8            -
       name          : 'testInvokeVirtual'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 94
       code          -
       registers     : 3
       ins           : 0
@@ -3034,6 +3121,7 @@ Class #8            -
       name          : 'testStaticFieldAccessors'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 95
       code          -
       registers     : 2
       ins           : 0
@@ -3079,6 +3167,7 @@ Class #8            -
       name          : 'getMaxIntegerValue'
       type          : '(II)I'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 79
       code          -
       registers     : 4
       ins           : 3
@@ -3165,6 +3254,7 @@ Class #9            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 99
       code          -
       registers     : 2
       ins           : 0
@@ -3203,6 +3293,7 @@ Class #9            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10002 (PRIVATE CONSTRUCTOR)
+      method_idx    : 100
       code          -
       registers     : 1
       ins           : 1
@@ -3221,6 +3312,7 @@ Class #9            -
       name          : 'access$000'
       type          : '()Ljava/util/concurrent/atomic/AtomicInteger;'
       access        : 0x1008 (STATIC SYNTHETIC)
+      method_idx    : 101
       code          -
       registers     : 1
       ins           : 0
@@ -3238,6 +3330,7 @@ Class #9            -
       name          : 'getThreadIndex'
       type          : '()I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 105
       code          -
       registers     : 1
       ins           : 0
@@ -3260,6 +3353,7 @@ Class #9            -
       name          : 'linkerMethod'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 106
       code          -
       registers     : 8
       ins           : 3
@@ -3336,6 +3430,7 @@ Class #9            -
       name          : 'notUsed'
       type          : '(I)I'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 107
       code          -
       registers     : 1
       ins           : 1
@@ -3353,6 +3448,7 @@ Class #9            -
       name          : 'setCalled'
       type          : '(I)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 109
       code          -
       registers     : 3
       ins           : 1
@@ -3381,6 +3477,7 @@ Class #9            -
       name          : 'test'
       type          : '()V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 110
       code          -
       registers     : 12
       ins           : 0
@@ -3563,6 +3660,7 @@ Class #9            -
       name          : 'run'
       type          : '()V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 108
       code          -
       registers     : 2
       ins           : 1
@@ -3642,6 +3740,7 @@ Class #10            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 111
       code          -
       registers     : 1
       ins           : 0
@@ -3660,6 +3759,7 @@ Class #10            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 112
       code          -
       registers     : 1
       ins           : 1
@@ -3678,6 +3778,7 @@ Class #10            -
       name          : '_add'
       type          : '(II)I'
       access        : 0x0008 (STATIC)
+      method_idx    : 113
       code          -
       registers     : 4
       ins           : 2
@@ -3710,6 +3811,7 @@ Class #10            -
       name          : 'add'
       type          : '(II)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 114
       code          -
       registers     : 3
       ins           : 2
@@ -3731,6 +3833,7 @@ Class #10            -
       name          : 'linkerMethod'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 118
       code          -
       registers     : 7
       ins           : 3
@@ -3798,6 +3901,7 @@ Class #10            -
       name          : 'test'
       type          : '(III)V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 119
       code          -
       registers     : 6
       ins           : 3
@@ -3891,6 +3995,7 @@ Class #11            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 120
       code          -
       registers     : 1
       ins           : 0
@@ -3909,6 +4014,7 @@ Class #11            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 121
       code          -
       registers     : 1
       ins           : 1
@@ -3927,6 +4033,7 @@ Class #11            -
       name          : '_add'
       type          : '(II)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 123
       code          -
       registers     : 3
       ins           : 2
@@ -3946,6 +4053,7 @@ Class #11            -
       name          : 'add'
       type          : '(II)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 124
       code          -
       registers     : 3
       ins           : 2
@@ -3967,6 +4075,7 @@ Class #11            -
       name          : 'linkerMethod'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;IIIIIFDLjava/lang/String;Ljava/lang/Class;J)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 131
       code          -
       registers     : 31
       ins           : 15
@@ -4060,6 +4169,7 @@ Class #11            -
       name          : 'test'
       type          : '(II)V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 132
       code          -
       registers     : 4
       ins           : 2
@@ -4088,6 +4198,7 @@ Class #11            -
       name          : 'GetBootstrapRunCount'
       type          : '()I'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 122
       code          -
       registers     : 2
       ins           : 1
@@ -4135,6 +4246,7 @@ Class #12            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10000 (CONSTRUCTOR)
+      method_idx    : 133
       code          -
       registers     : 1
       ins           : 1
@@ -4153,6 +4265,7 @@ Class #12            -
       name          : '_addf'
       type          : '(FF)F'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 134
       code          -
       registers     : 3
       ins           : 2
@@ -4172,6 +4285,7 @@ Class #12            -
       name          : '_subf'
       type          : '(FF)F'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 135
       code          -
       registers     : 3
       ins           : 2
@@ -4191,6 +4305,7 @@ Class #12            -
       name          : 'addf'
       type          : '(FF)F'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 136
       code          -
       registers     : 3
       ins           : 2
@@ -4212,6 +4327,7 @@ Class #12            -
       name          : 'subf'
       type          : '(FF)F'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 139
       code          -
       registers     : 3
       ins           : 2
@@ -4233,6 +4349,7 @@ Class #12            -
       name          : 'test'
       type          : '()V'
       access        : 0x0009 (PUBLIC STATIC)
+      method_idx    : 140
       code          -
       registers     : 4
       ins           : 0
@@ -4342,6 +4459,7 @@ Class #13            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 141
       code          -
       registers     : 1
       ins           : 1
@@ -4360,6 +4478,7 @@ Class #13            -
       name          : 'bsmWithBoxedArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Integer;)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 143
       code          -
       registers     : 7
       ins           : 4
@@ -4401,6 +4520,7 @@ Class #13            -
       name          : 'bsmWithClassAndFloatArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;[F)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 144
       code          -
       registers     : 8
       ins           : 5
@@ -4446,6 +4566,7 @@ Class #13            -
       name          : 'bsmWithClassArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Class;)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 145
       code          -
       registers     : 7
       ins           : 4
@@ -4487,6 +4608,7 @@ Class #13            -
       name          : 'bsmWithDoubleArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[D)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 146
       code          -
       registers     : 7
       ins           : 4
@@ -4528,6 +4650,7 @@ Class #13            -
       name          : 'bsmWithFloatAndLongArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;F[J)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 147
       code          -
       registers     : 9
       ins           : 5
@@ -4576,6 +4699,7 @@ Class #13            -
       name          : 'bsmWithIntAndStringArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 148
       code          -
       registers     : 9
       ins           : 5
@@ -4624,6 +4748,7 @@ Class #13            -
       name          : 'bsmWithLongAndIntArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;J[I)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 149
       code          -
       registers     : 10
       ins           : 6
@@ -4670,6 +4795,7 @@ Class #13            -
       name          : 'bsmWithStringArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/String;)Ljava/lang/invoke/CallSite;'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 150
       code          -
       registers     : 7
       ins           : 4
@@ -4711,6 +4837,7 @@ Class #13            -
       name          : 'bsmWithWiderArray'
       type          : '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[J)Ljava/lang/invoke/CallSite;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 151
       code          -
       registers     : 7
       ins           : 4
@@ -4752,6 +4879,7 @@ Class #13            -
       name          : 'methodA'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 152
       code          -
       registers     : 2
       ins           : 0
@@ -4772,6 +4900,7 @@ Class #13            -
       name          : 'methodB'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 153
       code          -
       registers     : 2
       ins           : 0
@@ -4792,6 +4921,7 @@ Class #13            -
       name          : 'methodC'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 154
       code          -
       registers     : 2
       ins           : 0
@@ -4812,6 +4942,7 @@ Class #13            -
       name          : 'methodD'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 155
       code          -
       registers     : 2
       ins           : 0
@@ -4832,6 +4963,7 @@ Class #13            -
       name          : 'methodE'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 156
       code          -
       registers     : 2
       ins           : 0
@@ -4852,6 +4984,7 @@ Class #13            -
       name          : 'methodF'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 157
       code          -
       registers     : 2
       ins           : 0
@@ -4872,6 +5005,7 @@ Class #13            -
       name          : 'methodG'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 158
       code          -
       registers     : 2
       ins           : 0
@@ -4892,6 +5026,7 @@ Class #13            -
       name          : 'methodH'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 159
       code          -
       registers     : 2
       ins           : 0
@@ -4912,6 +5047,7 @@ Class #13            -
       name          : 'methodI'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 160
       code          -
       registers     : 2
       ins           : 0
@@ -4932,6 +5068,7 @@ Class #13            -
       name          : 'methodJ'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 161
       code          -
       registers     : 2
       ins           : 0
@@ -4952,6 +5089,7 @@ Class #13            -
       name          : 'methodK'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 162
       code          -
       registers     : 2
       ins           : 0
@@ -4972,6 +5110,7 @@ Class #13            -
       name          : 'methodO'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 163
       code          -
       registers     : 0
       ins           : 0
@@ -4990,6 +5129,7 @@ Class #13            -
       name          : 'methodP'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 164
       code          -
       registers     : 0
       ins           : 0
@@ -5008,6 +5148,7 @@ Class #13            -
       name          : 'methodQ'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 165
       code          -
       registers     : 0
       ins           : 0
@@ -5026,6 +5167,7 @@ Class #13            -
       name          : 'methodR'
       type          : '()V'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 166
       code          -
       registers     : 0
       ins           : 0
@@ -5044,6 +5186,7 @@ Class #13            -
       name          : 'printBsmArgs'
       type          : '(Ljava/lang/String;[Ljava/lang/Object;)V'
       access        : 0x008a (PRIVATE STATIC VARARGS)
+      method_idx    : 167
       code          -
       registers     : 6
       ins           : 2
@@ -5164,6 +5307,7 @@ Class #13            -
       name          : 'test'
       type          : '()V'
       access        : 0x0008 (STATIC)
+      method_idx    : 168
       code          -
       registers     : 3
       ins           : 0

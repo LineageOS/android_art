@@ -526,7 +526,7 @@
  static="true"
  final="true"
  visibility="public"
- value="&lt;&amp;&quot;JOHO&quot;&amp;&gt;&#xA;"
+ value="&lt;&amp;&quot;JOHO&quot;&amp;&gt;\u000a"
 >
 </field>
 <field name="mZ0"
