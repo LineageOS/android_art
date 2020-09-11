@@ -20,7 +20,10 @@
 #include "base/casts.h"
 #include "base/macros.h"
 #include "code_generator.h"
+#include "data_type-inl.h"
+#include "dex/dex_file-inl.h"
 #include "locations.h"
+#include "mirror/var_handle.h"
 #include "nodes.h"
 #include "utils/assembler.h"
 #include "utils/label.h"
@@ -92,6 +95,24 @@ class IntrinsicSlowPath : public TSlowPathCode {
 
   DISALLOW_COPY_AND_ASSIGN(IntrinsicSlowPath);
 };
+
+static inline size_t GetExpectedVarHandleCoordinatesCount(HInvoke *invoke) {
+  mirror::VarHandle::AccessModeTemplate access_mode_template =
+      mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
+  size_t var_type_count = mirror::VarHandle::GetNumberOfVarTypeParameters(access_mode_template);
+  size_t accessor_argument_count = invoke->GetNumberOfArguments() - 1;
+
+  return accessor_argument_count - var_type_count;
+}
+
+static inline DataType::Type GetDataTypeFromShorty(HInvoke* invoke, uint32_t index) {
+  DCHECK(invoke->IsInvokePolymorphic());
+  const DexFile& dex_file = invoke->GetBlock()->GetGraph()->GetDexFile();
+  const char* shorty = dex_file.GetShorty(invoke->AsInvokePolymorphic()->GetProtoIndex());
+  DCHECK_LT(index, strlen(shorty));
+
+  return DataType::FromShorty(shorty[index]);
+}
 
 }  // namespace art
 
