@@ -3392,7 +3392,7 @@ static void GenerateSubTypeObjectCheckNoReadBarrier(CodeGeneratorARM64* codegen,
   codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp);
   vixl::aarch64::Label loop;
   __ Bind(&loop);
-  __ Cmp(type, temp);  // For heap poisoning, compare poisoned references.
+  __ Cmp(type, temp);
   __ B(&success, eq);
   __ Ldr(temp, HeapOperand(temp, super_class_offset.Int32Value()));
   codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp);
@@ -3440,6 +3440,8 @@ static void GenerateVarHandleInstanceFieldCheck(HInvoke* invoke,
   // type compatibility check with the source object's type, which will fail for null.
   DCHECK_EQ(coordinate_type0_offset.Int32Value() + 4, coordinate_type1_offset.Int32Value());
   __ Ldp(temp, temp2, HeapOperand(varhandle, coordinate_type0_offset.Int32Value()));
+  codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp);
+  // No need for read barrier or unpoisoning of coordinateType1 for comparison with null.
   __ Cbnz(temp2, slow_path->GetEntryLabel());
 
   // Check that the object has the correct type.
@@ -3562,7 +3564,7 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
   // The object reference from which to load the field.
   Register object = (expected_coordinates_count == 0u)
       ? WRegisterFrom(locations->GetTemp(0u))
-      : InputRegisterAt(invoke, 1).W();
+      : InputRegisterAt(invoke, 1);
 
   GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
 
@@ -3673,7 +3675,7 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
   // The object reference from which to load the field.
   Register object = (expected_coordinates_count == 0u)
       ? WRegisterFrom(invoke->GetLocations()->GetTemp(1u))
-      : InputRegisterAt(invoke, 1).W();
+      : InputRegisterAt(invoke, 1);
 
   GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
 
