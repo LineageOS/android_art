@@ -55,6 +55,7 @@ Class #0            -
       name          : 'value'
       type          : '()[Ljava/lang/String;'
       access        : 0x0401 (PUBLIC ABSTRACT)
+      method_idx    : 0
       code          : (none)
 
   source_file_idx   : 46 (SuppressLint.java)
@@ -91,6 +92,7 @@ Class #1            -
       name          : 'value'
       type          : '()I'
       access        : 0x0401 (PUBLIC ABSTRACT)
+      method_idx    : 1
       code          : (none)
 
   source_file_idx   : 48 (TargetApi.java)
@@ -124,6 +126,7 @@ Class #2            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 4
       code          -
       registers     : 1
       ins           : 1
@@ -171,6 +174,7 @@ Class #3            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 5
       code          -
       registers     : 1
       ins           : 1
@@ -223,6 +227,7 @@ Class #4            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 6
       code          -
       registers     : 1
       ins           : 1
@@ -269,6 +274,7 @@ Class #5            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 7
       code          -
       registers     : 1
       ins           : 1
@@ -436,6 +442,7 @@ Class #6            -
       name          : '<clinit>'
       type          : '()V'
       access        : 0x10008 (STATIC CONSTRUCTOR)
+      method_idx    : 8
       code          -
       registers     : 2
       ins           : 0
@@ -485,6 +492,7 @@ Class #6            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 9
       code          -
       registers     : 9
       ins           : 1
@@ -636,6 +644,7 @@ Class #6            -
       name          : 'add'
       type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
       access        : 0x20002 (PRIVATE DECLARED_SYNCHRONIZED)
+      method_idx    : 10
       code          -
       registers     : 13
       ins           : 2
@@ -803,6 +812,7 @@ Class #6            -
       name          : 'adds'
       type          : '(Ljava/lang/Object;)Ljava/lang/Object;'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 11
       code          -
       registers     : 9
       ins           : 1
@@ -896,6 +906,7 @@ Class #6            -
       name          : 'copies'
       type          : '()V'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 12
       code          -
       registers     : 19
       ins           : 1
@@ -1020,6 +1031,7 @@ Class #6            -
       name          : 'doit'
       type          : '(I)V'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 13
       code          -
       registers     : 3
       ins           : 2
@@ -1084,6 +1096,7 @@ Class #6            -
       name          : 'geta'
       type          : '()Z'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 14
       code          -
       registers     : 8
       ins           : 1
@@ -1149,6 +1162,7 @@ Class #6            -
       name          : 'p'
       type          : '(I)V'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 16
       code          -
       registers     : 6
       ins           : 2
@@ -1184,6 +1198,7 @@ Class #6            -
       name          : 'params'
       type          : '(BCSIJFDLjava/lang/Object;[I)J'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 17
       code          -
       registers     : 38
       ins           : 12
@@ -1406,6 +1421,7 @@ Class #6            -
       name          : 'q'
       type          : '(II)V'
       access        : 0x0012 (PRIVATE FINAL)
+      method_idx    : 18
       code          -
       registers     : 10
       ins           : 3
@@ -1483,6 +1499,7 @@ Class #6            -
       name          : 'r'
       type          : '(II)I'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 19
       code          -
       registers     : 15
       ins           : 2
@@ -1597,6 +1614,7 @@ Class #6            -
       name          : 's'
       type          : '(JJ)J'
       access        : 0x000a (PRIVATE STATIC)
+      method_idx    : 21
       code          -
       registers     : 32
       ins           : 4
@@ -1753,6 +1771,7 @@ Class #6            -
       name          : 'seta'
       type          : '()V'
       access        : 0x0002 (PRIVATE)
+      method_idx    : 22
       code          -
       registers     : 6
       ins           : 1
@@ -1805,6 +1824,7 @@ Class #6            -
       name          : 'onStart'
       type          : '()V'
       access        : 0x0004 (PROTECTED)
+      method_idx    : 15
       code          -
       registers     : 2
       ins           : 1
@@ -1827,6 +1847,7 @@ Class #6            -
       name          : 'run'
       type          : '()V'
       access        : 0x0001 (PUBLIC)
+      method_idx    : 20
       code          -
       registers     : 3
       ins           : 1
