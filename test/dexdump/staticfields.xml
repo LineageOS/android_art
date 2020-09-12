@@ -86,7 +86,7 @@
  static="true"
  final="true"
  visibility="public"
- value="abc \&gt;&lt;&quot;'&amp;&#x9;&#xD;&#xA;"
+ value="abc \\&gt;&lt;&quot;'&amp;\u0009\u000d\u000a"
 >
 </field>
 <field name="test08_public_static_final_object_null"
