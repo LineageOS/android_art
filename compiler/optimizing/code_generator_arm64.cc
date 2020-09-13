@@ -642,7 +642,7 @@ class ReadBarrierForHeapReferenceSlowPathARM64 : public SlowPathCodeARM64 {
            instruction_->IsArrayGet() ||
            instruction_->IsInstanceOf() ||
            instruction_->IsCheckCast() ||
-           (instruction_->IsInvokeVirtual() && instruction_->GetLocations()->Intrinsified()))
+           (instruction_->IsInvoke() && instruction_->GetLocations()->Intrinsified()))
         << "Unexpected instruction in read barrier for heap reference slow path: "
         << instruction_->DebugName();
     // The read barrier instrumentation of object ArrayGet
@@ -708,14 +708,15 @@ class ReadBarrierForHeapReferenceSlowPathARM64 : public SlowPathCodeARM64 {
             "art::mirror::HeapReference<art::mirror::Object> and int32_t have different sizes.");
         __ Add(index_reg, index_reg, Operand(offset_));
       } else {
-        // In the case of the UnsafeGetObject/UnsafeGetObjectVolatile
+        // In the case of the UnsafeGetObject/UnsafeGetObjectVolatile/VarHandleGet
         // intrinsics, `index_` is not shifted by a scale factor of 2
         // (as in the case of ArrayGet), as it is actually an offset
         // to an object field within an object.
         DCHECK(instruction_->IsInvoke()) << instruction_->DebugName();
         DCHECK(instruction_->GetLocations()->Intrinsified());
         DCHECK((instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeGetObject) ||
-               (instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeGetObjectVolatile))
+               (instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeGetObjectVolatile ||
+               (instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kVarHandleGet)))
             << instruction_->AsInvoke()->GetIntrinsic();
         DCHECK_EQ(offset_, 0u);
         DCHECK(index_.IsRegister());
@@ -802,7 +803,9 @@ class ReadBarrierForRootSlowPathARM64 : public SlowPathCodeARM64 {
     DataType::Type type = DataType::Type::kReference;
     DCHECK(locations->CanCall());
     DCHECK(!locations->GetLiveRegisters()->ContainsCoreRegister(out_.reg()));
-    DCHECK(instruction_->IsLoadClass() || instruction_->IsLoadString())
+    DCHECK(instruction_->IsLoadClass() ||
+           instruction_->IsLoadString() ||
+           (instruction_->IsInvoke() && instruction_->GetLocations()->Intrinsified()))
         << "Unexpected instruction in read barrier for GC root slow path: "
         << instruction_->DebugName();
 

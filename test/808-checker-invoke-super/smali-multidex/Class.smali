@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.class LOtherClass;
+.class LClass;
 .super LSuperClass;
 
-## CHECK-START: void OtherClass.$noinline$foo() register (after)
-## CHECK-DAG:     InvokeStaticOrDirect dex_file_index:<<Index1:\d+>> method_name:SuperSuperClass.$noinline$foo
-## CHECK-DAG:     InvokeStaticOrDirect dex_file_index:<<Index2:\d+>> method_name:SuperSuperClass.$noinline$foo
-## CHECK-DAG:     InvokeStaticOrDirect dex_file_index:<<Index3:\d+>> method_name:SuperSuperClass.$noinline$foo
-## CHECK-EVAL:    <<Index1>> == <<Index2>>
-## CHECK-EVAL:    <<Index1>> == <<Index3>>
+## CHECK-START: void Class.$noinline$foo() register (after)
+## CHECK-DAG:     InvokeStaticOrDirect method_name:SuperClass.$noinline$foo
 .method public $noinline$foo()V
 .registers 1
-    invoke-super {p0}, LOtherClass;->$noinline$foo()V
-    invoke-super {p0}, LSuperClass;->$noinline$foo()V
-    invoke-super {p0}, LSuperSuperClass;->$noinline$foo()V
+    invoke-super {p0}, LClass;->$noinline$foo()V
     return-void
 .end method

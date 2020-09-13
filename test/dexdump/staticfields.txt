@@ -107,6 +107,7 @@ Class #0            -
       name          : '<init>'
       type          : '()V'
       access        : 0x10001 (PUBLIC CONSTRUCTOR)
+      method_idx    : 0
       code          -
       registers     : 1
       ins           : 1
