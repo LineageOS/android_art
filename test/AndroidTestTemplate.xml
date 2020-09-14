@@ -15,8 +15,6 @@
 -->
 <!-- Note: This test config for {MODULE} is generated from a template. -->
 <configuration description="Test module config for {MODULE}">
-    <!-- Root access is needed to push the test JAR file to the device. -->
-    <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <!-- TODO: Use option `push-file` instead of deprecated option
