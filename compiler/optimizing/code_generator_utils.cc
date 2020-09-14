@@ -100,10 +100,149 @@ bool IsBooleanValueOrMaterializedCondition(HInstruction* cond_input) {
   return !cond_input->IsCondition() || !cond_input->IsEmittedAtUseSite();
 }
 
+// A helper class to group functions analyzing if values are non-negative
+// at the point of use. The class keeps some context used by the functions.
+// The class is not supposed to be used directly or its instances to be kept.
+// The main function using it is HasNonNegativeInputAt.
+// If you want to use the class methods you need to become a friend of the class.
+class UnsignedUseAnalyzer {
+ private:
+  explicit UnsignedUseAnalyzer(ArenaAllocator* allocator)
+      : seen_values_(allocator->Adapter(kArenaAllocCodeGenerator)) {
+  }
+
+  bool IsNonNegativeUse(HInstruction* target_user, HInstruction* value);
+  bool IsComparedValueNonNegativeInBlock(HInstruction* value,
+                                         HCondition* cond,
+                                         HBasicBlock* target_block);
+
+  ArenaSet<HInstruction*> seen_values_;
+
+  friend bool HasNonNegativeInputAt(HInstruction* instr, size_t i);
+};
+
+// Check that the value compared with a non-negavite value is
+// non-negative in the specified basic block.
+bool UnsignedUseAnalyzer::IsComparedValueNonNegativeInBlock(HInstruction* value,
+                                                            HCondition* cond,
+                                                            HBasicBlock* target_block) {
+  DCHECK(cond->HasInput(value));
+
+  // To simplify analysis, we require:
+  // 1. The condition basic block and target_block to be different.
+  // 2. The condition basic block to end with HIf.
+  // 3. HIf to use the condition.
+  if (cond->GetBlock() == target_block ||
+      !cond->GetBlock()->EndsWithIf() ||
+      cond->GetBlock()->GetLastInstruction()->InputAt(0) != cond) {
+    return false;
+  }
+
+  // We need to find a successor basic block of HIf for the case when instr is non-negative.
+  // If the successor dominates target_block, instructions in target_block see a non-negative value.
+  HIf* if_instr = cond->GetBlock()->GetLastInstruction()->AsIf();
+  HBasicBlock* successor = nullptr;
+  switch (cond->GetCondition()) {
+    case kCondGT:
+    case kCondGE: {
+      if (cond->GetLeft() == value) {
+        // The expression is v > A or v >= A.
+        // If A is non-negative, we need the true successor.
+        if (IsNonNegativeUse(cond, cond->GetRight())) {
+          successor = if_instr->IfTrueSuccessor();
+        } else {
+          return false;
+        }
+      } else {
+        DCHECK_EQ(cond->GetRight(), value);
+        // The expression is A > v or A >= v.
+        // If A is non-negative, we need the false successor.
+        if (IsNonNegativeUse(cond, cond->GetLeft())) {
+          successor = if_instr->IfFalseSuccessor();
+        } else {
+          return false;
+        }
+      }
+      break;
+    }
+
+    case kCondLT:
+    case kCondLE: {
+      if (cond->GetLeft() == value) {
+        // The expression is v < A or v <= A.
+        // If A is non-negative, we need the false successor.
+        if (IsNonNegativeUse(cond, cond->GetRight())) {
+          successor = if_instr->IfFalseSuccessor();
+        } else {
+          return false;
+        }
+      } else {
+        DCHECK_EQ(cond->GetRight(), value);
+        // The expression is A < v or A <= v.
+        // If A is non-negative, we need the true successor.
+        if (IsNonNegativeUse(cond, cond->GetLeft())) {
+          successor = if_instr->IfTrueSuccessor();
+        } else {
+          return false;
+        }
+      }
+      break;
+    }
+
+    default:
+      return false;
+  }
+  DCHECK_NE(successor, nullptr);
+
+  return successor->Dominates(target_block);
+}
+
+// Check the value used by target_user is non-negative.
+bool UnsignedUseAnalyzer::IsNonNegativeUse(HInstruction* target_user, HInstruction* value) {
+  DCHECK(target_user->HasInput(value));
+
+  // Prevent infinitive recursion which can happen when the value is an induction variable.
+  if (!seen_values_.insert(value).second) {
+    return false;
+  }
+
+  // Check if the value is always non-negative.
+  if (IsGEZero(value)) {
+    return true;
+  }
+
+  for (const HUseListNode<HInstruction*>& use : value->GetUses()) {
+    HInstruction* user = use.GetUser();
+    if (user == target_user) {
+      continue;
+    }
+
+    // If the value is compared with some non-negative value, this can guarantee the value to be
+    // non-negative at its use.
+    // JFYI: We're not using HTypeConversion to bind the new information because it would
+    // increase the complexity of optimizations: HTypeConversion can create a dependency
+    // which does not exist in the input program, for example:
+    // between two uses, 1st - cmp, 2nd - target_user.
+    if (user->IsCondition()) {
+      // The condition must dominate target_user to guarantee that the value is always checked
+      // before it is used by target_user.
+      if (user->GetBlock()->Dominates(target_user->GetBlock()) &&
+          IsComparedValueNonNegativeInBlock(value, user->AsCondition(), target_user->GetBlock())) {
+        return true;
+      }
+    }
+
+    // TODO The value is non-negative if it is used as an array index before.
+    // TODO The value is non-negative if it is initialized by a positive number and all of its
+    //      modifications keep the value non-negative, for example the division operation.
+  }
+
+  return false;
+}
 
 bool HasNonNegativeInputAt(HInstruction* instr, size_t i) {
-  HInstruction* input = instr->InputAt(i);
-  return IsGEZero(input);
+  UnsignedUseAnalyzer analyzer(instr->GetBlock()->GetGraph()->GetAllocator());
+  return analyzer.IsNonNegativeUse(instr, instr->InputAt(i));
 }
 
 bool HasNonNegativeOrMinIntInputAt(HInstruction* instr, size_t i) {
