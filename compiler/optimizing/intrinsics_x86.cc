@@ -1962,122 +1962,173 @@ void IntrinsicLocationsBuilderX86::VisitUnsafeCASObject(HInvoke* invoke) {
   CreateIntIntIntIntIntToInt(allocator_, DataType::Type::kReference, invoke);
 }
 
-static void GenCAS(DataType::Type type, HInvoke* invoke, CodeGeneratorX86* codegen) {
+static void GenPrimitiveCAS(DataType::Type type,
+                            CodeGeneratorX86* codegen,
+                            Location expected_value,
+                            Location new_value,
+                            Register base,
+                            Register offset,
+                            Location out,
+                            // Only necessary for floating point
+                            Register temp = Register::kNoRegister) {
   X86Assembler* assembler = down_cast<X86Assembler*>(codegen->GetAssembler());
+
+  DCHECK_EQ(out.AsRegister<Register>(), EAX);
+  if (DataType::Kind(type) == DataType::Type::kInt32) {
+    DCHECK_EQ(expected_value.AsRegister<Register>(), EAX);
+  }
+
+  // The address of the field within the holding object.
+  Address field_addr(base, offset, TIMES_1, 0);
+
+  switch (type) {
+    case DataType::Type::kBool:
+    case DataType::Type::kInt8:
+      __ LockCmpxchgb(field_addr, new_value.AsRegister<ByteRegister>());
+      break;
+    case DataType::Type::kInt16:
+    case DataType::Type::kUint16:
+      __ LockCmpxchgw(field_addr, new_value.AsRegister<Register>());
+      break;
+    case DataType::Type::kInt32:
+      __ LockCmpxchgl(field_addr, new_value.AsRegister<Register>());
+      break;
+    case DataType::Type::kFloat32: {
+      // cmpxchg requires the expected value to be in EAX so the new value must be elsewhere.
+      DCHECK_NE(temp, EAX);
+      // EAX is both an input and an output for cmpxchg
+      codegen->Move32(Location::RegisterLocation(EAX), expected_value);
+      codegen->Move32(Location::RegisterLocation(temp), new_value);
+      __ LockCmpxchgl(field_addr, temp);
+      break;
+    }
+    case DataType::Type::kInt64:
+      // Ensure the expected value is in EAX:EDX and that the new
+      // value is in EBX:ECX (required by the CMPXCHG8B instruction).
+      DCHECK_EQ(expected_value.AsRegisterPairLow<Register>(), EAX);
+      DCHECK_EQ(expected_value.AsRegisterPairHigh<Register>(), EDX);
+      DCHECK_EQ(new_value.AsRegisterPairLow<Register>(), EBX);
+      DCHECK_EQ(new_value.AsRegisterPairHigh<Register>(), ECX);
+      __ LockCmpxchg8b(field_addr);
+      break;
+    default:
+      LOG(FATAL) << "Unexpected CAS type " << type;
+  }
+  // LOCK CMPXCHG/LOCK CMPXCHG8B have full barrier semantics, and we
+  // don't need scheduling barriers at this time.
+
+  // Convert ZF into the Boolean result.
+  __ setb(kZero, out.AsRegister<Register>());
+  __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+}
+
+static void GenReferenceCAS(HInvoke* invoke,
+                            CodeGeneratorX86* codegen,
+                            Location expected_value,
+                            Location new_value,
+                            Register base,
+                            Register offset,
+                            Register temp,
+                            Register temp2) {
+  X86Assembler* assembler = down_cast<X86Assembler*>(codegen->GetAssembler());
+  LocationSummary* locations = invoke->GetLocations();
+  Location out = locations->Out();
+
+  // The address of the field within the holding object.
+  Address field_addr(base, offset, TIMES_1, 0);
+
+  Register expected = expected_value.AsRegister<Register>();
+  DCHECK_EQ(expected, EAX);
+  DCHECK_NE(temp, temp2);
+
+  // Mark card for object assuming new value is stored.
+  bool value_can_be_null = true;  // TODO: Worth finding out this information?
+  Register value = new_value.AsRegister<Register>();
+  codegen->MarkGCCard(temp, temp2, base, value, value_can_be_null);
+
+  if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
+    // Need to make sure the reference stored in the field is a to-space
+    // one before attempting the CAS or the CAS could fail incorrectly.
+    codegen->GenerateReferenceLoadWithBakerReadBarrier(
+        invoke,
+        // Unused, used only as a "temporary" within the read barrier.
+        Location::RegisterLocation(temp),
+        base,
+        field_addr,
+        /* needs_null_check= */ false,
+        /* always_update_field= */ true,
+        &temp2);
+  }
+  bool base_equals_value = (base == value);
+  if (kPoisonHeapReferences) {
+    if (base_equals_value) {
+      // If `base` and `value` are the same register location, move
+      // `value` to a temporary register.  This way, poisoning
+      // `value` won't invalidate `base`.
+      value = temp;
+      __ movl(value, base);
+    }
+
+    // Check that the register allocator did not assign the location
+    // of `expected` (EAX) to `value` nor to `base`, so that heap
+    // poisoning (when enabled) works as intended below.
+    // - If `value` were equal to `expected`, both references would
+    //   be poisoned twice, meaning they would not be poisoned at
+    //   all, as heap poisoning uses address negation.
+    // - If `base` were equal to `expected`, poisoning `expected`
+    //   would invalidate `base`.
+    DCHECK_NE(value, expected);
+    DCHECK_NE(base, expected);
+    __ PoisonHeapReference(expected);
+    __ PoisonHeapReference(value);
+  }
+  __ LockCmpxchgl(field_addr, value);
+
+  // LOCK CMPXCHG has full barrier semantics, and we don't need
+  // scheduling barriers at this time.
+
+  // Convert ZF into the Boolean result.
+  __ setb(kZero, out.AsRegister<Register>());
+  __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+
+  // If heap poisoning is enabled, we need to unpoison the values
+  // that were poisoned earlier.
+  if (kPoisonHeapReferences) {
+    if (base_equals_value) {
+      // `value` has been moved to a temporary register, no need to
+      // unpoison it.
+    } else {
+      // Ensure `value` is different from `out`, so that unpoisoning
+      // the former does not invalidate the latter.
+      DCHECK_NE(value, out.AsRegister<Register>());
+      __ UnpoisonHeapReference(value);
+    }
+  }
+  // Do not unpoison the reference contained in register
+  // `expected`, as it is the same as register `out` (EAX).
+}
+
+static void GenCAS(DataType::Type type, HInvoke* invoke, CodeGeneratorX86* codegen) {
   LocationSummary* locations = invoke->GetLocations();
 
   Register base = locations->InAt(1).AsRegister<Register>();
   Register offset = locations->InAt(2).AsRegisterPairLow<Register>();
+  Location expected_value = locations->InAt(3);
+  Location new_value = locations->InAt(4);
   Location out = locations->Out();
   DCHECK_EQ(out.AsRegister<Register>(), EAX);
 
-  // The address of the field within the holding object.
-  Address field_addr(base, offset, ScaleFactor::TIMES_1, 0);
+  // The only read barrier implementation supporting the
+  // UnsafeCASObject intrinsic is the Baker-style read barriers.
+  DCHECK(!kEmitCompilerReadBarrier || kUseBakerReadBarrier);
 
   if (type == DataType::Type::kReference) {
-    // The only read barrier implementation supporting the
-    // UnsafeCASObject intrinsic is the Baker-style read barriers.
-    DCHECK(!kEmitCompilerReadBarrier || kUseBakerReadBarrier);
-
-    Location temp1_loc = locations->GetTemp(0);
-    Register temp1 = temp1_loc.AsRegister<Register>();
+    Register temp = locations->GetTemp(0).AsRegister<Register>();
     Register temp2 = locations->GetTemp(1).AsRegister<Register>();
-
-    Register expected = locations->InAt(3).AsRegister<Register>();
-    // Ensure `expected` is in EAX (required by the CMPXCHG instruction).
-    DCHECK_EQ(expected, EAX);
-    Register value = locations->InAt(4).AsRegister<Register>();
-
-    // Mark card for object assuming new value is stored.
-    bool value_can_be_null = true;  // TODO: Worth finding out this information?
-    codegen->MarkGCCard(temp1, temp2, base, value, value_can_be_null);
-
-    if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
-      // Need to make sure the reference stored in the field is a to-space
-      // one before attempting the CAS or the CAS could fail incorrectly.
-      codegen->GenerateReferenceLoadWithBakerReadBarrier(
-          invoke,
-          temp1_loc,  // Unused, used only as a "temporary" within the read barrier.
-          base,
-          field_addr,
-          /* needs_null_check= */ false,
-          /* always_update_field= */ true,
-          &temp2);
-    }
-
-    bool base_equals_value = (base == value);
-    if (kPoisonHeapReferences) {
-      if (base_equals_value) {
-        // If `base` and `value` are the same register location, move
-        // `value` to a temporary register.  This way, poisoning
-        // `value` won't invalidate `base`.
-        value = temp1;
-        __ movl(value, base);
-      }
-
-      // Check that the register allocator did not assign the location
-      // of `expected` (EAX) to `value` nor to `base`, so that heap
-      // poisoning (when enabled) works as intended below.
-      // - If `value` were equal to `expected`, both references would
-      //   be poisoned twice, meaning they would not be poisoned at
-      //   all, as heap poisoning uses address negation.
-      // - If `base` were equal to `expected`, poisoning `expected`
-      //   would invalidate `base`.
-      DCHECK_NE(value, expected);
-      DCHECK_NE(base, expected);
-
-      __ PoisonHeapReference(expected);
-      __ PoisonHeapReference(value);
-    }
-
-    __ LockCmpxchgl(field_addr, value);
-
-    // LOCK CMPXCHG has full barrier semantics, and we don't need
-    // scheduling barriers at this time.
-
-    // Convert ZF into the Boolean result.
-    __ setb(kZero, out.AsRegister<Register>());
-    __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
-
-    // If heap poisoning is enabled, we need to unpoison the values
-    // that were poisoned earlier.
-    if (kPoisonHeapReferences) {
-      if (base_equals_value) {
-        // `value` has been moved to a temporary register, no need to
-        // unpoison it.
-      } else {
-        // Ensure `value` is different from `out`, so that unpoisoning
-        // the former does not invalidate the latter.
-        DCHECK_NE(value, out.AsRegister<Register>());
-        __ UnpoisonHeapReference(value);
-      }
-      // Do not unpoison the reference contained in register
-      // `expected`, as it is the same as register `out` (EAX).
-    }
+    GenReferenceCAS(invoke, codegen, expected_value, new_value, base, offset, temp, temp2);
   } else {
-    if (type == DataType::Type::kInt32) {
-      // Ensure the expected value is in EAX (required by the CMPXCHG
-      // instruction).
-      DCHECK_EQ(locations->InAt(3).AsRegister<Register>(), EAX);
-      __ LockCmpxchgl(field_addr, locations->InAt(4).AsRegister<Register>());
-    } else if (type == DataType::Type::kInt64) {
-      // Ensure the expected value is in EAX:EDX and that the new
-      // value is in EBX:ECX (required by the CMPXCHG8B instruction).
-      DCHECK_EQ(locations->InAt(3).AsRegisterPairLow<Register>(), EAX);
-      DCHECK_EQ(locations->InAt(3).AsRegisterPairHigh<Register>(), EDX);
-      DCHECK_EQ(locations->InAt(4).AsRegisterPairLow<Register>(), EBX);
-      DCHECK_EQ(locations->InAt(4).AsRegisterPairHigh<Register>(), ECX);
-      __ LockCmpxchg8b(field_addr);
-    } else {
-      LOG(FATAL) << "Unexpected CAS type " << type;
-    }
-
-    // LOCK CMPXCHG/LOCK CMPXCHG8B have full barrier semantics, and we
-    // don't need scheduling barriers at this time.
-
-    // Convert ZF into the Boolean result.
-    __ setb(kZero, out.AsRegister<Register>());
-    __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+    DCHECK(!DataType::IsFloatingPointType(type));
+    GenPrimitiveCAS(type, codegen, expected_value, new_value, base, offset, out);
   }
 }
 
@@ -3546,31 +3597,32 @@ void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndSet(HInvoke* invoke) 
 
   LocationSummary* locations = new (allocator_) LocationSummary(
       invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
-  // We use eax for the expected value of cmpxchg and for the card (we need a byte register)
-  locations->AddTemp(Location::RegisterLocation(EAX));
   locations->AddTemp(Location::RequiresRegister());
+  locations->AddTemp(Location::RequiresRegister());
+  // We use this temporary for the card, so we need a byte register
+  locations->AddTemp(Location::RegisterLocation(EBX));
   locations->SetInAt(0, Location::RequiresRegister());
   if (GetExpectedVarHandleCoordinatesCount(invoke) == 1u) {
     // For instance fields, this is the source object
     locations->SetInAt(1, Location::RequiresRegister());
-  } else if (new_value_type == DataType::Type::kReference) {
-    // For static reference fields, we need another temporary for MarkGCCard because one will
-    // be busy with the declaring class.
+  } else {
+    // For static fields, we need another temp because one will be busy with the declaring class.
     locations->AddTemp(Location::RequiresRegister());
   }
-  locations->SetInAt(expected_value_index, Location::Any());
   if (DataType::IsFloatingPointType(expected_value_type)) {
-    locations->AddTemp(Location::RequiresRegister());
-    locations->SetInAt(new_value_index, Location::RequiresFpuRegister());
-  } else if (DataType::Is8BitType(expected_value_type)) {
-    // Ensure it's in a byte register
-    locations->SetInAt(new_value_index, Location::RegisterLocation(EBX));
+    // We need EAX for placing the expected value
+    locations->AddTemp(Location::RegisterLocation(EAX));
+    locations->SetInAt(new_value_index,
+                       Location::FpuRegisterOrConstant(invoke->InputAt(new_value_index)));
+    locations->SetInAt(expected_value_index,
+                       Location::FpuRegisterOrConstant(invoke->InputAt(expected_value_index)));
   } else {
-    locations->SetInAt(new_value_index, Location::RequiresRegister());
+    // Ensure it's in a byte register
+    locations->SetInAt(new_value_index, Location::RegisterLocation(ECX));
+    locations->SetInAt(expected_value_index, Location::RegisterLocation(EAX));
   }
 
-  // We need a byte register because return type is bool.
-  locations->SetOut(Location::RegisterLocation(ECX));
+  locations->SetOut(Location::RegisterLocation(EAX));
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
@@ -3583,129 +3635,54 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
   uint32_t number_of_arguments = invoke->GetNumberOfArguments();
   uint32_t expected_value_index = number_of_arguments - 2;
   uint32_t new_value_index = number_of_arguments - 1;
-  DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
-  DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
-  DCHECK_EQ(expected_value_type, new_value_type);
-  Location expected_value_loc = locations->InAt(expected_value_index);
-  Location new_value_loc = locations->InAt(new_value_index);
+  DataType::Type type = GetDataTypeFromShorty(invoke, expected_value_index);
+  DCHECK_EQ(type, GetDataTypeFromShorty(invoke, new_value_index));
+  Location expected_value = locations->InAt(expected_value_index);
+  Location new_value = locations->InAt(new_value_index);
   Register vh_object = locations->InAt(0).AsRegister<Register>();
-  // cmpxchg takes the expected value from EAX
-  Register eax = locations->GetTemp(0).AsRegister<Register>();
-  DCHECK_EQ(eax, EAX);
+  Register offset = locations->GetTemp(0).AsRegister<Register>();
   Register temp = locations->GetTemp(1).AsRegister<Register>();
-  CodeGeneratorX86* codegen_x86 = down_cast<CodeGeneratorX86*>(codegen_);
+  Register temp2 = locations->GetTemp(2).AsRegister<Register>();
   SlowPathCode* slow_path = new (codegen_->GetScopedAllocator()) IntrinsicSlowPathX86(invoke);
   codegen_->AddSlowPath(slow_path);
 
   GenerateVarHandleCommonChecks(invoke, temp, slow_path, assembler);
-  // Check the varType.primitiveType against the type of the expected value. There is no need to
-  // check for a reference if the types match because we will check if it's the same object.
-  GenerateVarTypePrimitiveTypeCheck(vh_object, temp, expected_value_type, slow_path, assembler);
-  // Ensure expected value is in eax for cmpxchg
-  codegen_x86->Move32(Location::RegisterLocation(eax), expected_value_loc);
-  if (new_value_type == DataType::Type::kReference) {
+  // Check the varType.primitiveType against the type of the expected value.
+  GenerateVarTypePrimitiveTypeCheck(vh_object, temp, type, slow_path, assembler);
+  if (type == DataType::Type::kReference) {
     const uint32_t var_type_offset = mirror::VarHandle::VarTypeOffset().Uint32Value();
 
     // If the value type is a reference, check it against the varType.
-    GenerateSubTypeObjectCheck(new_value_loc.AsRegister<Register>(),
+    GenerateSubTypeObjectCheck(new_value.AsRegister<Register>(),
                                temp,
                                Address(vh_object, var_type_offset),
                                slow_path,
                                assembler);
     // Check the expected value type
-    GenerateSubTypeObjectCheck(eax,
+    GenerateSubTypeObjectCheck(expected_value.AsRegister<Register>(),
                                temp,
                                Address(vh_object, var_type_offset),
                                slow_path,
                                assembler);
   }
 
-  // We can use `out` for the offset, since we know it's a core register
-  Register offset = locations->Out().AsRegister<Register>();
   // Get the field referred by the VarHandle. The returned register contains the object reference
   // or the declaring class. The field offset will be placed in 'offset'. For static fields, the
   // declaring class will be placed in 'temp' register.
   Register reference = GenerateVarHandleFieldReference(invoke, codegen_, temp, offset);
 
-  Register out = locations->Out().AsRegister<Register>();
-  Address field_address = Address(reference, offset, TIMES_1, 0);
-  switch (new_value_type) {
-    case DataType::Type::kBool:
-    case DataType::Type::kInt8:
-    case DataType::Type::kUint8:
-      __ LockCmpxchgb(field_address, new_value_loc.AsRegister<ByteRegister>());
-      __ setb(kZero, out);
-      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
-      break;
-    case DataType::Type::kInt16:
-    case DataType::Type::kUint16:
-      __ LockCmpxchgw(field_address, new_value_loc.AsRegister<Register>());
-      __ setb(kZero, out);
-      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
-      break;
-    case DataType::Type::kInt32:
-      __ LockCmpxchgl(field_address, new_value_loc.AsRegister<Register>());
-      __ setb(kZero, out);
-      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
-      break;
-    case DataType::Type::kFloat32: {
-      Register new_value = locations->GetTemp(2).AsRegister<Register>();
-      __ movd(new_value, new_value_loc.AsFpuRegister<XmmRegister>());
-      __ LockCmpxchgl(field_address, new_value);
-      __ setb(kZero, out);
-      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
-      break;
-    }
-    case DataType::Type::kReference: {
-      Register new_value = new_value_loc.AsRegister<Register>();
-      bool needs_write_barrier =
-          CodeGenerator::StoreNeedsWriteBarrier(new_value_type, invoke->InputAt(new_value_index));
-      size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
-      temp = expected_coordinates_count == 1u ? temp :
-             locations->GetTemp(2).AsRegister<Register>();
-      if (kCompilerReadBarrierOption == kWithReadBarrier) {
-        // Need to make sure the reference stored in the field is a to-space
-        // one before attempting the cmpxchg or it could fail incorrectly.
-        codegen_x86->GenerateReferenceLoadWithBakerReadBarrier(invoke,
-                                                               Location::RegisterLocation(temp),
-                                                               reference,
-                                                               field_address,
-                                                               /* needs_null_check= */ false,
-                                                               /* always_update_field= */ true,
-                                                               &eax);
-        // We use eax, so we need to ensure the expected value is there
-        codegen_x86->Move32(Location::RegisterLocation(eax), expected_value_loc);
-      }
-      if (kPoisonHeapReferences) {
-        // EAX is the expected value
-        __ PoisonHeapReference(eax);
-      }
-      if (kPoisonHeapReferences && needs_write_barrier) {
-        __ movl(temp, new_value);
-        __ PoisonHeapReference(temp);
-        __ LockCmpxchgl(field_address, temp);
-      } else {
-        __ LockCmpxchgl(field_address, new_value);
-      }
-      __ setb(kZero, out);
-      __ movzxb(out, locations->Out().AsRegister<ByteRegister>());
-      if (needs_write_barrier) {
-        NearLabel skip_mark_gc_card;
-        // If the set was not done because of the field not containing the expected value,
-        // we don't need to mark gc card.
-        __ j(kNotEqual, &skip_mark_gc_card);
-        // Use eax for the card, to ensure it is a byte register
-        codegen_->MarkGCCard(temp, eax, reference, new_value, false);
-        __ Bind(&skip_mark_gc_card);
-      }
-      break;
-    }
-    case DataType::Type::kUint32:
-    case DataType::Type::kUint64:
-    case DataType::Type::kInt64:
-    case DataType::Type::kFloat64:
-    case DataType::Type::kVoid:
-      UNREACHABLE();
+  uint32_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  // For generating the compare and exchange, we need 2 temporaries. In case of a static field, the
+  // first temporary contains the declaring class so we need another temporary. In case of an
+  // instance field, the object comes in a separate register so it's safe to use the first temp.
+  temp = (expected_coordinates_count == 1u) ? temp : locations->GetTemp(3).AsRegister<Register>();
+  DCHECK_NE(temp, reference);
+
+  if (type == DataType::Type::kReference) {
+    GenReferenceCAS(invoke, codegen_, expected_value, new_value, reference, offset, temp, temp2);
+  } else {
+    Location out = locations->Out();
+    GenPrimitiveCAS(type, codegen_, expected_value, new_value, reference, offset, out, temp);
   }
 
   codegen_->GenerateMemoryBarrier(MemBarrierKind::kAnyAny);
