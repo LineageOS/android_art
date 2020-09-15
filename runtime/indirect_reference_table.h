@@ -381,7 +381,8 @@ class IndirectReferenceTable {
     return reinterpret_cast<IndirectRef>(EncodeIndirectRef(table_index, serial));
   }
 
-  // Resize the backing table. Currently must be larger than the current size.
+  // Resize the backing table to be at least new_size elements long. Currently
+  // must be larger than the current size. After return max_entries_ >= new_size.
   bool Resize(size_t new_size, std::string* error_msg);
 
   void RecoverHoles(IRTSegmentState from);
