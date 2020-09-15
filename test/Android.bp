@@ -213,7 +213,10 @@ java_defaults {
     },
 
     test_config_template: ":art-run-test-template",
-    test_suites: ["general-tests"],
+    test_suites: [
+        "general-tests",
+        "mts",
+    ],
 }
 
 art_cc_test_library {
