@@ -115,13 +115,6 @@ class InstructionHandler {
     return true;
   }
 
-  HANDLER_ATTRIBUTES bool HandleMonitorChecks() {
-    if (!DoMonitorCheckOnExit<do_assignability_check>(self_, &shadow_frame_)) {
-      return false;  // Pending exception.
-    }
-    return true;
-  }
-
   // Code to run before each dex instruction.
   HANDLER_ATTRIBUTES bool Preamble() {
     /* We need to put this before & after the instrumentation to avoid having to put in a */
@@ -149,48 +142,6 @@ class InstructionHandler {
       }
     }
     return true;
-  }
-
-  HANDLER_ATTRIBUTES bool BranchInstrumentation(int32_t offset) {
-    if (UNLIKELY(instrumentation_->HasBranchListeners())) {
-      instrumentation_->Branch(self_, shadow_frame_.GetMethod(), dex_pc_, offset);
-    }
-    JValue result;
-    if (jit::Jit::MaybeDoOnStackReplacement(self_,
-                                            shadow_frame_.GetMethod(),
-                                            dex_pc_,
-                                            offset,
-                                            &result)) {
-      ctx_->result = result;
-      exit_interpreter_loop_ = true;
-      return false;
-    }
-    return true;
-  }
-
-  ALWAYS_INLINE void HotnessUpdate()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    jit::Jit* jit = Runtime::Current()->GetJit();
-    if (jit != nullptr) {
-      jit->AddSamples(self_, shadow_frame_.GetMethod(), 1, /*with_backedges=*/ true);
-    }
-  }
-
-  HANDLER_ATTRIBUTES bool HandleAsyncException() {
-    if (UNLIKELY(self_->ObserveAsyncException())) {
-      return false;  // Pending exception.
-    }
-    return true;
-  }
-
-  ALWAYS_INLINE void HandleBackwardBranch(int32_t offset)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (IsBackwardBranch(offset)) {
-      HotnessUpdate();
-      /* Record new dex pc early to have consistent suspend point at loop header. */
-      shadow_frame_.SetDexPC(next_->GetDexPc(Insns()));
-      self_->AllowThreadSuspension();
-    }
   }
 
   // Unlike most other events the DexPcMovedEvent can be sent when there is a pending exception (if
@@ -231,7 +182,7 @@ class InstructionHandler {
 
   HANDLER_ATTRIBUTES bool HandleReturn(JValue result) {
     self_->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
+    if (!DoMonitorCheckOnExit<do_assignability_check>(self_, &shadow_frame_)) {
       return false;
     }
     if (UNLIKELY(NeedsMethodExitEvent(instrumentation_) &&
@@ -252,16 +203,40 @@ class InstructionHandler {
     return false;
   }
 
-  HANDLER_ATTRIBUTES bool HandleGoto(int32_t offset) {
-    if (!HandleAsyncException()) {
-      return false;
+  HANDLER_ATTRIBUTES bool HandleBranch(int32_t offset) {
+    if (UNLIKELY(self_->ObserveAsyncException())) {
+      return false;  // Pending exception.
     }
-    if (!BranchInstrumentation(offset)) {
+    if (UNLIKELY(instrumentation_->HasBranchListeners())) {
+      instrumentation_->Branch(self_, shadow_frame_.GetMethod(), dex_pc_, offset);
+    }
+    // TODO: Do OSR only on back-edges and check if OSR code is ready here.
+    JValue result;
+    if (jit::Jit::MaybeDoOnStackReplacement(self_,
+                                            shadow_frame_.GetMethod(),
+                                            dex_pc_,
+                                            offset,
+                                            &result)) {
+      ctx_->result = result;
+      exit_interpreter_loop_ = true;
       return false;
     }
     SetNextInstruction(inst_->RelativeAt(offset));
-    HandleBackwardBranch(offset);
+    if (offset <= 0) {  // Back-edge.
+      // Hotness update.
+      jit::Jit* jit = Runtime::Current()->GetJit();
+      if (jit != nullptr) {
+        jit->AddSamples(self_, shadow_frame_.GetMethod(), 1, /*with_backedges=*/ true);
+      }
+      // Record new dex pc early to have consistent suspend point at loop header.
+      shadow_frame_.SetDexPC(next_->GetDexPc(Insns()));
+      self_->AllowThreadSuspension();
+    }
     return true;
+  }
+
+  HANDLER_ATTRIBUTES bool HandleIf(bool cond, int32_t offset) {
+    return HandleBranch(cond ? offset : Instruction::SizeInCodeUnits(kFormat));
   }
 
 #pragma clang diagnostic push
@@ -298,18 +273,12 @@ class InstructionHandler {
 
 #pragma clang diagnostic pop
 
-  HANDLER_ATTRIBUTES bool HandleIf(bool cond, int32_t offset) {
-    if (cond) {
-      if (!BranchInstrumentation(offset)) {
-        return false;
-      }
-      SetNextInstruction(inst_->RelativeAt(offset));
-      HandleBackwardBranch(offset);
-    } else {
-      if (!BranchInstrumentation(2)) {
-        return false;
-      }
+  HANDLER_ATTRIBUTES bool HandleConstString() {
+    ObjPtr<mirror::String> s = ResolveString(self_, shadow_frame_, dex::StringIndex(B()));
+    if (UNLIKELY(s == nullptr)) {
+      return false;  // Pending exception.
     }
+    SetVRegReference(A(), s);
     return true;
   }
 
@@ -482,7 +451,7 @@ class InstructionHandler {
   HANDLER_ATTRIBUTES bool RETURN_OBJECT() {
     JValue result;
     self_->AllowThreadSuspension();
-    if (!HandleMonitorChecks()) {
+    if (!DoMonitorCheckOnExit<do_assignability_check>(self_, &shadow_frame_)) {
       return false;
     }
     const size_t ref_idx = A();
@@ -570,21 +539,11 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool CONST_STRING() {
-    ObjPtr<mirror::String> s = ResolveString(self_, shadow_frame_, dex::StringIndex(B()));
-    if (UNLIKELY(s == nullptr)) {
-      return false;  // Pending exception.
-    }
-    SetVRegReference(A(), s);
-    return true;
+    return HandleConstString();
   }
 
   HANDLER_ATTRIBUTES bool CONST_STRING_JUMBO() {
-    ObjPtr<mirror::String> s = ResolveString(self_, shadow_frame_, dex::StringIndex(B()));
-    if (UNLIKELY(s == nullptr)) {
-      return false;  // Pending exception.
-    }
-    SetVRegReference(A(), s);
-    return true;
+    return HandleConstString();
   }
 
   HANDLER_ATTRIBUTES bool CONST_CLASS() {
@@ -625,8 +584,8 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool MONITOR_ENTER() {
-    if (!HandleAsyncException()) {
-      return false;
+    if (UNLIKELY(self_->ObserveAsyncException())) {
+      return false;  // Pending exception.
     }
     ObjPtr<mirror::Object> obj = GetVRegReference(A());
     if (UNLIKELY(obj == nullptr)) {
@@ -638,8 +597,8 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool MONITOR_EXIT() {
-    if (!HandleAsyncException()) {
-      return false;
+    if (UNLIKELY(self_->ObserveAsyncException())) {
+      return false;  // Pending exception.
     }
     ObjPtr<mirror::Object> obj = GetVRegReference(A());
     if (UNLIKELY(obj == nullptr)) {
@@ -762,8 +721,8 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool THROW() {
-    if (!HandleAsyncException()) {
-      return false;
+    if (UNLIKELY(self_->ObserveAsyncException())) {
+      return false;  // Pending exception.
     }
     ObjPtr<mirror::Object> exception = GetVRegReference(A());
     if (UNLIKELY(exception == nullptr)) {
@@ -781,35 +740,23 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool GOTO() {
-    return HandleGoto(A());
+    return HandleBranch(A());
   }
 
   HANDLER_ATTRIBUTES bool GOTO_16() {
-    return HandleGoto(A());
+    return HandleBranch(A());
   }
 
   HANDLER_ATTRIBUTES bool GOTO_32() {
-    return HandleGoto(A());
+    return HandleBranch(A());
   }
 
   HANDLER_ATTRIBUTES bool PACKED_SWITCH() {
-    int32_t offset = DoPackedSwitch(inst_, shadow_frame_, inst_data_);
-    if (!BranchInstrumentation(offset)) {
-      return false;
-    }
-    SetNextInstruction(inst_->RelativeAt(offset));
-    HandleBackwardBranch(offset);
-    return true;
+    return HandleBranch(DoPackedSwitch(inst_, shadow_frame_, inst_data_));
   }
 
   HANDLER_ATTRIBUTES bool SPARSE_SWITCH() {
-    int32_t offset = DoSparseSwitch(inst_, shadow_frame_, inst_data_);
-    if (!BranchInstrumentation(offset)) {
-      return false;
-    }
-    SetNextInstruction(inst_->RelativeAt(offset));
-    HandleBackwardBranch(offset);
-    return true;
+    return HandleBranch(DoSparseSwitch(inst_, shadow_frame_, inst_data_));
   }
 
   HANDLER_ATTRIBUTES bool CMPL_FLOAT() {
@@ -1896,21 +1843,15 @@ void ExecuteSwitchImplCpp(SwitchImplContext* ctx) {
           if (success && LIKELY(!interpret_one_instruction)) {                                    \
             continue;                                                                             \
           }                                                                                       \
-          if (exit) {                                                                             \
-            shadow_frame.SetDexPC(dex::kDexNoIndex);                                              \
-            return;                                                                               \
-          }                                                                                       \
           break;                                                                                  \
         }
   DEX_INSTRUCTION_LIST(OPCODE_CASE)
 #undef OPCODE_CASE
       }
-    } else {
-      // Preamble returned false due to debugger event.
-      if (exit) {
-        shadow_frame.SetDexPC(dex::kDexNoIndex);
-        return;  // Return statement or debugger forced exit.
-      }
+    }
+    if (exit) {
+      shadow_frame.SetDexPC(dex::kDexNoIndex);
+      return;  // Return statement or debugger forced exit.
     }
     if (self->IsExceptionPending()) {
       if (!InstructionHandler<do_access_check, transaction_active, Instruction::kInvalidFormat>(
