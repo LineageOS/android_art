@@ -62,7 +62,7 @@ public class ApiResolver {
     public void resolvePublicAlternatives(String publicAlternativesString, String signature,
                                           Integer maxSdkVersion)
             throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-                    RequiredAlternativeNotSpecifiedError {
+                    RequiredAlternativeNotSpecifiedError, MultipleAlternativesFoundWarning {
         if (Strings.isNullOrEmpty(publicAlternativesString) && maxSdkVersion != null
                 && maxSdkVersion >= MIN_SDK_REQUIRING_PUBLIC_ALTERNATIVES) {
             throw new RequiredAlternativeNotSpecifiedError();
@@ -96,7 +96,7 @@ public class ApiResolver {
                     if (almostMatches.size() == 0) {
                         throw new MemberAlternativeNotFoundError(alternative);
                     } else if (almostMatches.size() > 1) {
-                        throw new MultipleAlternativesFoundError(alternative, almostMatches);
+                        throw new MultipleAlternativesFoundWarning(alternative, almostMatches);
                     }
                 }
             }

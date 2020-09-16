@@ -46,14 +46,22 @@ public class AnnotatedMemberContext extends AnnotationContext {
             getClassDescriptor(), member.getName(), member.getSignature());
     }
 
-    @Override
-    public void reportError(String message, Object... args) {
+    private String buildReportString(String message, Object... args) {
         Formatter error = new Formatter();
         error
-            .format("%s: %s.%s: ", definingClass.getSourceFileName(),
-                definingClass.getClassName(), member.getName())
-            .format(Locale.US, message, args);
+                .format("%s: %s.%s: ", definingClass.getSourceFileName(),
+                        definingClass.getClassName(), member.getName())
+                .format(Locale.US, message, args);
+        return error.toString();
+    }
 
-        status.error(error.toString());
+    @Override
+    public void reportError(String message, Object... args) {
+        status.error(buildReportString(message, args));
+    }
+
+    @Override
+    public void reportWarning(String message, Object... args) {
+        status.warning(buildReportString(message, args));
     }
 }
