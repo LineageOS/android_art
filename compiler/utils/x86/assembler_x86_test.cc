@@ -305,6 +305,10 @@ TEST_F(AssemblerX86Test, Addw) {
   DriverStr(RepeatAI(&x86::X86Assembler::addw, /*imm_bytes*/ 2U, "addw ${imm}, {mem}"), "addw");
 }
 
+TEST_F(AssemblerX86Test, Andw) {
+  DriverStr(RepeatAI(&x86::X86Assembler::andw, /*imm_bytes*/ 2U, "andw ${imm}, {mem}"), "andw");
+}
+
 TEST_F(AssemblerX86Test, MovwStore) {
   DriverStr(RepeatAr(&x86::X86Assembler::movw, "movw %{reg}, {mem}"), "movw-store");
 }
