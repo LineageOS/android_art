@@ -414,6 +414,9 @@ libart_cc_defaults {
         "jni_platform_headers",
         "libnativehelper_header_only",
     ],
+    whole_static_libs: [
+        "libcpu_features",
+    ],
     shared_libs: [
         "libartpalette",
         "libbacktrace",
