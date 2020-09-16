@@ -814,12 +814,24 @@ class X86Assembler final : public Assembler {
   void LoadLongConstant(XmmRegister dst, int64_t value);
   void LoadDoubleConstant(XmmRegister dst, double value);
 
+  void LockCmpxchgb(const Address& address, Register reg) {
+    // For testing purpose
+    lock()->cmpxchgb(address, static_cast<ByteRegister>(reg));
+  }
+
   void LockCmpxchgb(const Address& address, ByteRegister reg) {
     lock()->cmpxchgb(address, reg);
   }
 
   void LockCmpxchgw(const Address& address, Register reg) {
-    lock()->cmpxchgw(address, reg);
+    AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+    // We make sure that the operand size override bytecode is emited before the lock bytecode.
+    // We test against clang which enforces this bytecode order.
+    EmitOperandSizeOverride();
+    EmitUint8(0xF0);
+    EmitUint8(0x0F);
+    EmitUint8(0xB1);
+    EmitOperand(reg, address);
   }
 
   void LockCmpxchgl(const Address& address, Register reg) {

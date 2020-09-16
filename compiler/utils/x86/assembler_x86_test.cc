@@ -114,6 +114,11 @@ class AssemblerX86Test : public AssemblerTest<x86::X86Assembler,
       tertiary_register_names_.emplace(x86::Register(x86::EBX), "bl");
       tertiary_register_names_.emplace(x86::Register(x86::ECX), "cl");
       tertiary_register_names_.emplace(x86::Register(x86::EDX), "dl");
+      // FIXME: Refactor RepeatAw() to only use the tertiary for EAX, EBX, ECX, EDX
+      tertiary_register_names_.emplace(x86::Register(x86::EBP), "ch");
+      tertiary_register_names_.emplace(x86::Register(x86::ESP), "ah");
+      tertiary_register_names_.emplace(x86::Register(x86::ESI), "dh");
+      tertiary_register_names_.emplace(x86::Register(x86::EDI), "bh");
     }
 
     if (fp_registers_.size() == 0) {
@@ -320,6 +325,16 @@ TEST_F(AssemblerX86Test, LoadLongConstant) {
       "movsd 0(%esp), %xmm0\n"
       "add $8, %esp\n";
   DriverStr(expected, "LoadLongConstant");
+}
+
+TEST_F(AssemblerX86Test, LockCmpxchgb) {
+  DriverStr(RepeatAw(&x86::X86Assembler::LockCmpxchgb,
+                     "lock cmpxchgb %{reg}, {mem}"), "lock_cmpxchgb");
+}
+
+TEST_F(AssemblerX86Test, LockCmpxchgw) {
+  DriverStr(RepeatAr(&x86::X86Assembler::LockCmpxchgw,
+                     "lock cmpxchgw %{reg}, {mem}"), "lock_cmpxchgw");
 }
 
 TEST_F(AssemblerX86Test, LockCmpxchgl) {

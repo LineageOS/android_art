@@ -3578,7 +3578,7 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
                                                     object,
                                                     MemOperand(offset.X()),
                                                     /*needs_null_check=*/ false,
-                                                    /*is_volatile=*/ false);
+                                                    /*use_load_acquire=*/ false);
   } else {
     codegen_->Load(type, out, MemOperand(object.X(), offset.X()));
     if (type == DataType::Type::kReference) {
