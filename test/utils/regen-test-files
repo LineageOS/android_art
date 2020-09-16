@@ -352,6 +352,9 @@ cat >TEST_MAPPING <<EOF
   "presubmit": [
     {
       "name": "CtsJdwpTestCases"
+    },
+    {
+      "name": "BootImageProfileTest"
     }
   ],
   "postsubmit": [
