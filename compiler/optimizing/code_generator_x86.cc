@@ -5813,6 +5813,7 @@ void InstructionCodeGeneratorX86::HandleFieldSet(HInstruction* instruction,
 
     case DataType::Type::kFloat64: {
       if (value.IsConstant()) {
+        DCHECK(!is_volatile);
         int64_t v = CodeGenerator::GetInt64ValueOf(value.GetConstant());
         __ movl(Address(base, offset), Immediate(Low32Bits(v)));
         codegen_->MaybeRecordImplicitNullCheck(instruction);
