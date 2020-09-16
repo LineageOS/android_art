@@ -8552,8 +8552,14 @@ bool ClassLinker::LinkFields(Thread* self,
   ShuffleForward<4>(&current_field, &field_offset, &grouped_and_sorted_fields, &gaps);
   ShuffleForward<2>(&current_field, &field_offset, &grouped_and_sorted_fields, &gaps);
   ShuffleForward<1>(&current_field, &field_offset, &grouped_and_sorted_fields, &gaps);
-  CHECK(grouped_and_sorted_fields.empty()) << "Missed " << grouped_and_sorted_fields.size() <<
-      " fields.";
+  if (!grouped_and_sorted_fields.empty()) {
+    std::ostringstream oss;
+    oss << "Missed " << grouped_and_sorted_fields.size() << " fields ";
+    for (ArtField* field : grouped_and_sorted_fields) {
+      oss << field->PrettyField() << " ";
+    }
+    LOG(FATAL) << oss.str();
+  }
   self->EndAssertNoThreadSuspension(old_no_suspend_cause);
 
   // We lie to the GC about the java.lang.ref.Reference.referent field, so it doesn't scan it.
