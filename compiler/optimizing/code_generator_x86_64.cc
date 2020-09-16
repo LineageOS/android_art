@@ -1001,22 +1001,8 @@ HInvokeStaticOrDirect::DispatchInfo CodeGeneratorX86_64::GetSupportedInvokeStati
   return desired_dispatch_info;
 }
 
-void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
-    HInvokeStaticOrDirect* invoke, Location temp, SlowPathCode* slow_path) {
-  // All registers are assumed to be correctly set up.
-
-  Location callee_method = temp;  // For all kinds except kRecursive, callee will be in temp.
-  switch (invoke->GetMethodLoadKind()) {
-    case MethodLoadKind::kStringInit: {
-      // temp = thread->string_init_entrypoint
-      uint32_t offset =
-          GetThreadOffset<kX86_64PointerSize>(invoke->GetStringInitEntryPoint()).Int32Value();
-      __ gs()->movq(temp.AsRegister<CpuRegister>(), Address::Absolute(offset, /* no_rip= */ true));
-      break;
-    }
-    case MethodLoadKind::kRecursive:
-      callee_method = invoke->GetLocations()->InAt(invoke->GetCurrentMethodIndex());
-      break;
+void CodeGeneratorX86_64::LoadMethod(MethodLoadKind load_kind, Location temp, HInvoke* invoke) {
+  switch (load_kind) {
     case MethodLoadKind::kBootImageLinkTimePcRelative:
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       __ leal(temp.AsRegister<CpuRegister>(),
@@ -1037,12 +1023,46 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
       // No need for memory fence, thanks to the x86-64 memory model.
       break;
     }
-    case MethodLoadKind::kJitDirectAddress:
-      Load64BitValue(temp.AsRegister<CpuRegister>(), invoke->GetMethodAddress());
+    case MethodLoadKind::kJitDirectAddress: {
+      Load64BitValue(temp.AsRegister<CpuRegister>(),
+                     reinterpret_cast<int64_t>(invoke->GetResolvedMethod()));
       break;
+    }
+    case MethodLoadKind::kRuntimeCall: {
+      // Test situation, don't do anything.
+      break;
+    }
+    default: {
+      LOG(FATAL) << "Load kind should have already been handled " << load_kind;
+      UNREACHABLE();
+    }
+  }
+}
+
+void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
+    HInvokeStaticOrDirect* invoke, Location temp, SlowPathCode* slow_path) {
+  // All registers are assumed to be correctly set up.
+
+  Location callee_method = temp;  // For all kinds except kRecursive, callee will be in temp.
+  switch (invoke->GetMethodLoadKind()) {
+    case MethodLoadKind::kStringInit: {
+      // temp = thread->string_init_entrypoint
+      uint32_t offset =
+          GetThreadOffset<kX86_64PointerSize>(invoke->GetStringInitEntryPoint()).Int32Value();
+      __ gs()->movq(temp.AsRegister<CpuRegister>(), Address::Absolute(offset, /* no_rip= */ true));
+      break;
+    }
+    case MethodLoadKind::kRecursive: {
+      callee_method = invoke->GetLocations()->InAt(invoke->GetCurrentMethodIndex());
+      break;
+    }
     case MethodLoadKind::kRuntimeCall: {
       GenerateInvokeStaticOrDirectRuntimeCall(invoke, temp, slow_path);
       return;  // No code pointer retrieval; the runtime performs the call directly.
+    }
+    default: {
+      LoadMethod(invoke->GetMethodLoadKind(), temp, invoke);
+      break;
     }
   }
 
@@ -1147,13 +1167,13 @@ void CodeGeneratorX86_64::RecordBootImageRelRoPatch(uint32_t boot_image_offset) 
   __ Bind(&boot_image_other_patches_.back().label);
 }
 
-void CodeGeneratorX86_64::RecordBootImageMethodPatch(HInvokeStaticOrDirect* invoke) {
+void CodeGeneratorX86_64::RecordBootImageMethodPatch(HInvoke* invoke) {
   boot_image_method_patches_.emplace_back(invoke->GetResolvedMethodReference().dex_file,
                                           invoke->GetResolvedMethodReference().index);
   __ Bind(&boot_image_method_patches_.back().label);
 }
 
-void CodeGeneratorX86_64::RecordMethodBssEntryPatch(HInvokeStaticOrDirect* invoke) {
+void CodeGeneratorX86_64::RecordMethodBssEntryPatch(HInvoke* invoke) {
   DCHECK(IsSameDexFile(GetGraph()->GetDexFile(), *invoke->GetMethodReference().dex_file));
   method_bss_entry_patches_.emplace_back(invoke->GetMethodReference().dex_file,
                                          invoke->GetMethodReference().index);
@@ -2711,6 +2731,10 @@ void InstructionCodeGeneratorX86_64::VisitInvokeVirtual(HInvokeVirtual* invoke) 
 void LocationsBuilderX86_64::VisitInvokeInterface(HInvokeInterface* invoke) {
   HandleInvoke(invoke);
   // Add the hidden argument.
+  if (invoke->GetHiddenArgumentLoadKind() == MethodLoadKind::kRecursive) {
+    invoke->GetLocations()->SetInAt(invoke->GetNumberOfArguments() - 1,
+                                    Location::RegisterLocation(RAX));
+  }
   invoke->GetLocations()->AddTemp(Location::RegisterLocation(RAX));
 }
 
@@ -2744,7 +2768,6 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
   // TODO: b/18116999, our IMTs can miss an IncompatibleClassChangeError.
   LocationSummary* locations = invoke->GetLocations();
   CpuRegister temp = locations->GetTemp(0).AsRegister<CpuRegister>();
-  CpuRegister hidden_reg = locations->GetTemp(1).AsRegister<CpuRegister>();
   Location receiver = locations->InAt(0);
   size_t class_offset = mirror::Object::ClassOffset().SizeValue();
 
@@ -2768,11 +2791,14 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
 
   codegen_->MaybeGenerateInlineCacheCheck(invoke, temp);
 
-  // Set the hidden argument. This is safe to do this here, as RAX
-  // won't be modified thereafter, before the `call` instruction.
-  // We also di it after MaybeGenerateInlineCache that may use RAX.
-  DCHECK_EQ(RAX, hidden_reg.AsRegister());
-  codegen_->Load64BitValue(hidden_reg, invoke->GetMethodReference().index);
+  if (invoke->GetHiddenArgumentLoadKind() != MethodLoadKind::kRecursive) {
+    Location hidden_reg = locations->GetTemp(1);
+    // Set the hidden argument. This is safe to do this here, as RAX
+    // won't be modified thereafter, before the `call` instruction.
+    // We also di it after MaybeGenerateInlineCache that may use RAX.
+    DCHECK_EQ(RAX, hidden_reg.AsRegister<Register>());
+    codegen_->LoadMethod(invoke->GetHiddenArgumentLoadKind(), hidden_reg, invoke);
+  }
 
   // temp = temp->GetAddressOfIMT()
   __ movq(temp,

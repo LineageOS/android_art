@@ -286,6 +286,8 @@ extern "C" size_t NterpGetMethod(Thread* self, ArtMethod* caller, uint16_t* dex_
     } else {
       DCHECK(resolved_method->GetDeclaringClass()->IsInterface());
       UpdateCache(self, dex_pc_ptr, resolved_method->GetImtIndex());
+      // TODO: We should pass the resolved method, and have nterp fetch the IMT
+      // index. Unfortunately, this doesn't work for default methods.
       return resolved_method->GetImtIndex();
     }
   } else if (resolved_method->GetDeclaringClass()->IsStringClass()

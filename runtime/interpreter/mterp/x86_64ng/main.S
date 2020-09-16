@@ -1130,7 +1130,10 @@ END_FUNCTION \name
    call SYMBOL(art_quick_invoke_custom)
    .else
       .if \is_interface
-      movzwl 2(rPC), %eax
+      // Setup hidden argument. As we don't have access to the interface method,
+      // just pass the method from the IMT. If the method is the conflict trampoline,
+      // this will make the stub go to runtime, otherwise the hidden argument is unused.
+      movq %rdi, %rax
       .endif
       call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
    .endif
@@ -1229,7 +1232,10 @@ END_FUNCTION \name
    call SYMBOL(art_quick_invoke_custom)
    .else
      .if \is_interface
-     movzwl 2(rPC), %eax
+     // Setup hidden argument. As we don't have access to the interface method,
+     // just pass the method from the IMT. If the method is the conflict trampoline,
+     // this will make the stub go to runtime, otherwise the hidden argument is unused.
+     movq %rdi, %rax
      .endif
      call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
    .endif
