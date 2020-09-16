@@ -2037,14 +2037,10 @@ static void GenReferenceCAS(HInvoke* invoke,
   // The address of the field within the holding object.
   Address field_addr(base, offset, TIMES_1, 0);
 
+  Register value = new_value.AsRegister<Register>();
   Register expected = expected_value.AsRegister<Register>();
   DCHECK_EQ(expected, EAX);
   DCHECK_NE(temp, temp2);
-
-  // Mark card for object assuming new value is stored.
-  bool value_can_be_null = true;  // TODO: Worth finding out this information?
-  Register value = new_value.AsRegister<Register>();
-  codegen->MarkGCCard(temp, temp2, base, value, value_can_be_null);
 
   if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
     // Need to make sure the reference stored in the field is a to-space
@@ -2090,6 +2086,13 @@ static void GenReferenceCAS(HInvoke* invoke,
   // Convert ZF into the Boolean result.
   __ setb(kZero, out.AsRegister<Register>());
   __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+
+  // Mark card for object if the new value is stored.
+  bool value_can_be_null = true;  // TODO: Worth finding out this information?
+  NearLabel skip_mark_gc_card;
+  __ j(kNotZero, &skip_mark_gc_card);
+  codegen->MarkGCCard(temp, temp2, base, value, value_can_be_null);
+  __ Bind(&skip_mark_gc_card);
 
   // If heap poisoning is enabled, we need to unpoison the values
   // that were poisoned earlier.
