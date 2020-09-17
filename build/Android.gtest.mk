@@ -66,6 +66,25 @@ my_files :=
 include $(CLEAR_VARS)
 ###################################################################################################
 
+# Create a phony module that contains data needed for ART chroot-based testing.
+include $(CLEAR_VARS)
+LOCAL_MODULE := art_chroot
+LOCAL_MODULE_TAGS := tests
+LOCAL_MODULE_CLASS := NATIVE_TESTS
+LOCAL_MODULE_SUFFIX := .txt
+LOCAL_COMPATIBILITY_SUITE := general-tests
+LOCAL_COMPATIBILITY_SUPPORT_FILES := \
+	$(foreach apex,$(TESTING_ART_APEX) $(RUNTIME_APEX) $(CONSCRYPT_APEX) $(I18N_APEX),\
+		$(PRODUCT_OUT)/system/apex/$(apex).apex:system/apex/$(apex).apex)
+include $(BUILD_SYSTEM)/base_rules.mk
+
+$(LOCAL_BUILT_MODULE):
+	@mkdir -p $(dir $@)
+	echo "This directory contains common data and tools needed for ART target tests" > $@
+
+include $(CLEAR_VARS)
+###################################################################################################
+
 # The path for which all the dex files are relative, not actually the current directory.
 LOCAL_PATH := art/test
 
