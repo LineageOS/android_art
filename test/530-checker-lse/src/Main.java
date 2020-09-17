@@ -3627,7 +3627,47 @@ public class Main {
     return obj.next.i;
   }
 
+
+  /// CHECK-START: long Main.testOverlapLoop(int) load_store_elimination (before)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 If
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 Goto
+
+  /// CHECK-START: long Main.testOverlapLoop(int) load_store_elimination (after)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 If
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 Goto
+  /// CHECK-NOT:                 ArrayGet
+
+  // Test that we don't incorrectly remove writes needed by later loop iterations
+  // NB This is fibonacci numbers
+  private static long testOverlapLoop(int cnt) {
+    long[] w = new long[cnt];
+    w[1] = 1;
+    long t = 1;
+    for (int i = 2; i < cnt; ++i) {
+      w[i] = w[i - 1] + w[i - 2];
+      t = w[i];
+    }
+    return t;
+  }
+
   private static void $noinline$clobberObservables() {}
+
+  static void assertLongEquals(long result, long expected) {
+    if (expected != result) {
+      throw new Error("Expected: " + expected + ", found: " + result);
+    }
+  }
 
   static void assertIntEquals(int result, int expected) {
     if (expected != result) {
@@ -4012,5 +4052,7 @@ public class Main {
     assertIntEquals(testNestedLoop8(new TestClass(), 1), 0);
     assertIntEquals(testNestedLoop8(new TestClass(), 2), 0);
     assertIntEquals(testNestedLoop8(new TestClass(), 3), 0);
+    assertLongEquals(testOverlapLoop(10), 34l);
+    assertLongEquals(testOverlapLoop(50), 7778742049l);
   }
 }
