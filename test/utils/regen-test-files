@@ -359,9 +359,7 @@ cat >TEST_MAPPING <<EOF
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    }
-  ],
-  "postsubmit": [
+    },
     // ART run-tests.
 EOF
 # Only include tests expected to succeed for now.
