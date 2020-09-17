@@ -20,11 +20,11 @@ import com.google.common.base.Joiner;
 
 import java.util.List;
 
-public class MultipleAlternativesFoundError extends AlternativeNotFoundError {
+public class MultipleAlternativesFoundWarning extends Exception {
     public final ApiComponents alternative;
     public final List<ApiComponents> almostMatches;
 
-    public MultipleAlternativesFoundError(ApiComponents alternative,
+    public MultipleAlternativesFoundWarning(ApiComponents alternative,
             List<ApiComponents> almostMatches) {
         this.alternative = alternative;
         this.almostMatches = almostMatches;
@@ -32,7 +32,8 @@ public class MultipleAlternativesFoundError extends AlternativeNotFoundError {
 
     @Override
     public String toString() {
-        return "Alternative " + alternative + " returned multiple matches: "
+        return "Alternative " + alternative + " returned multiple matches. Consider adding method" +
+                " parameters to make the match unique. Matches: "
                 + Joiner.on(", ").join(almostMatches);
     }
 }
