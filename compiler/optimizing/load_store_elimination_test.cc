@@ -900,4 +900,546 @@ TEST_F(LoadStoreEliminationTest, VLoadDefaultValueAndVLoad) {
   ASSERT_FALSE(IsRemoved(vstore2));
 }
 
+// void DO_CAL() {
+//   int i = 1;
+//   int[] w = new int[80];
+//   int t = 0;
+//   while (i < 80) {
+//     w[i] = PLEASE_INTERLEAVE(w[i - 1], 1)
+//     t = PLEASE_SELECT(w[i], t);
+//     i++;
+//   }
+//   return t;
+// }
+TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap) {
+  CreateGraph();
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "loop_pre_header" },
+                              { "loop_pre_header", "loop_entry" },
+                              { "loop_entry", "loop_body" },
+                              { "loop_entry", "loop_post" },
+                              { "loop_body", "loop_entry" },
+                              { "loop_post", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(loop_pre_header);
+  GET_BLOCK(loop_entry);
+  GET_BLOCK(loop_body);
+  GET_BLOCK(loop_post);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* zero_const = graph_->GetConstant(DataType::Type::kInt32, 0);
+  HInstruction* one_const = graph_->GetConstant(DataType::Type::kInt32, 1);
+  HInstruction* eighty_const = graph_->GetConstant(DataType::Type::kInt32, 80);
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(entry_goto);
+
+  HInstruction* alloc_w = new (GetAllocator()) HNewArray(zero_const, eighty_const, 0, 0);
+  HInstruction* pre_header_goto = new (GetAllocator()) HGoto();
+  loop_pre_header->AddInstruction(alloc_w);
+  loop_pre_header->AddInstruction(pre_header_goto);
+  // environment
+  ArenaVector<HInstruction*> alloc_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(alloc_w, &alloc_locals);
+
+  // loop-start
+  HPhi* i_phi = new (GetAllocator()) HPhi(GetAllocator(), 0, 0, DataType::Type::kInt32);
+  HPhi* t_phi = new (GetAllocator()) HPhi(GetAllocator(), 1, 0, DataType::Type::kInt32);
+  HInstruction* suspend = new (GetAllocator()) HSuspendCheck();
+  HInstruction* i_cmp_top = new (GetAllocator()) HGreaterThanOrEqual(i_phi, eighty_const);
+  HInstruction* loop_start_branch = new (GetAllocator()) HIf(i_cmp_top);
+  loop_entry->AddPhi(i_phi);
+  loop_entry->AddPhi(t_phi);
+  loop_entry->AddInstruction(suspend);
+  loop_entry->AddInstruction(i_cmp_top);
+  loop_entry->AddInstruction(loop_start_branch);
+  CHECK_EQ(loop_entry->GetSuccessors().size(), 2u);
+  if (loop_entry->GetNormalSuccessors()[1] != loop_body) {
+    loop_entry->SwapSuccessors();
+  }
+  CHECK_EQ(loop_entry->GetPredecessors().size(), 2u);
+  if (loop_entry->GetPredecessors()[0] != loop_pre_header) {
+    loop_entry->SwapPredecessors();
+  }
+  i_phi->AddInput(one_const);
+  t_phi->AddInput(zero_const);
+
+  // environment
+  ArenaVector<HInstruction*> suspend_locals({ alloc_w, i_phi, t_phi },
+                                            GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(suspend, &suspend_locals);
+
+  // BODY
+  HInstruction* last_i = new (GetAllocator()) HSub(DataType::Type::kInt32, i_phi, one_const);
+  HInstruction* last_get =
+      new (GetAllocator()) HArrayGet(alloc_w, last_i, DataType::Type::kInt32, 0);
+  HInvoke* body_value = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            2,
+                            DataType::Type::kInt32,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  body_value->SetRawInputAt(0, last_get);
+  body_value->SetRawInputAt(1, one_const);
+  HInstruction* body_set =
+      new (GetAllocator()) HArraySet(alloc_w, i_phi, body_value, DataType::Type::kInt32, 0);
+  HInstruction* body_get =
+      new (GetAllocator()) HArrayGet(alloc_w, i_phi, DataType::Type::kInt32, 0);
+  HInvoke* t_next = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            2,
+                            DataType::Type::kInt32,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  t_next->SetRawInputAt(0, body_get);
+  t_next->SetRawInputAt(1, t_phi);
+  HInstruction* i_next = new (GetAllocator()) HAdd(DataType::Type::kInt32, i_phi, one_const);
+  HInstruction* body_goto = new (GetAllocator()) HGoto();
+  loop_body->AddInstruction(last_i);
+  loop_body->AddInstruction(last_get);
+  loop_body->AddInstruction(body_value);
+  loop_body->AddInstruction(body_set);
+  loop_body->AddInstruction(body_get);
+  loop_body->AddInstruction(t_next);
+  loop_body->AddInstruction(i_next);
+  loop_body->AddInstruction(body_goto);
+  body_value->CopyEnvironmentFrom(suspend->GetEnvironment());
+
+  i_phi->AddInput(i_next);
+  t_phi->AddInput(t_next);
+  t_next->CopyEnvironmentFrom(suspend->GetEnvironment());
+
+  // loop-post
+  HInstruction* return_inst = new (GetAllocator()) HReturn(t_phi);
+  loop_post->AddInstruction(return_inst);
+
+  // exit
+  HInstruction* exit_inst = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_inst);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  // TODO Technically this is optimizable. LSE just needs to add phis to keep
+  // track of the last `N` values set where `N` is how many locations we can go
+  // back into the array.
+  if (IsRemoved(last_get)) {
+    // If we were able to remove the previous read the entire array should be removable.
+    EXPECT_TRUE(IsRemoved(body_set));
+    EXPECT_TRUE(IsRemoved(alloc_w));
+  } else {
+    // This is the branch we actually take for now. If we rely on being able to
+    // read the array we'd better remember to write to it as well.
+    EXPECT_FALSE(IsRemoved(body_set));
+  }
+  // The last 'get' should always be removable.
+  EXPECT_TRUE(IsRemoved(body_get));
+}
+
+
+// void DO_CAL2() {
+//   int i = 1;
+//   int[] w = new int[80];
+//   int t = 0;
+//   while (i < 80) {
+//     w[i] = PLEASE_INTERLEAVE(w[i - 1], 1) // <-- removed
+//     t = PLEASE_SELECT(w[i], t);
+//     w[i] = PLEASE_INTERLEAVE(w[i - 1], 1) // <-- removed
+//     t = PLEASE_SELECT(w[i], t);
+//     w[i] = PLEASE_INTERLEAVE(w[i - 1], 1) // <-- kept
+//     t = PLEASE_SELECT(w[i], t);
+//     i++;
+//   }
+//   return t;
+// }
+TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap2) {
+  CreateGraph();
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "loop_pre_header" },
+                              { "loop_pre_header", "loop_entry" },
+                              { "loop_entry", "loop_body" },
+                              { "loop_entry", "loop_post" },
+                              { "loop_body", "loop_entry" },
+                              { "loop_post", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(loop_pre_header);
+  GET_BLOCK(loop_entry);
+  GET_BLOCK(loop_body);
+  GET_BLOCK(loop_post);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* zero_const = graph_->GetConstant(DataType::Type::kInt32, 0);
+  HInstruction* one_const = graph_->GetConstant(DataType::Type::kInt32, 1);
+  HInstruction* eighty_const = graph_->GetConstant(DataType::Type::kInt32, 80);
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(entry_goto);
+
+  HInstruction* alloc_w = new (GetAllocator()) HNewArray(zero_const, eighty_const, 0, 0);
+  HInstruction* pre_header_goto = new (GetAllocator()) HGoto();
+  loop_pre_header->AddInstruction(alloc_w);
+  loop_pre_header->AddInstruction(pre_header_goto);
+  // environment
+  ArenaVector<HInstruction*> alloc_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(alloc_w, &alloc_locals);
+
+  // loop-start
+  HPhi* i_phi = new (GetAllocator()) HPhi(GetAllocator(), 0, 0, DataType::Type::kInt32);
+  HPhi* t_phi = new (GetAllocator()) HPhi(GetAllocator(), 1, 0, DataType::Type::kInt32);
+  HInstruction* suspend = new (GetAllocator()) HSuspendCheck();
+  HInstruction* i_cmp_top = new (GetAllocator()) HGreaterThanOrEqual(i_phi, eighty_const);
+  HInstruction* loop_start_branch = new (GetAllocator()) HIf(i_cmp_top);
+  loop_entry->AddPhi(i_phi);
+  loop_entry->AddPhi(t_phi);
+  loop_entry->AddInstruction(suspend);
+  loop_entry->AddInstruction(i_cmp_top);
+  loop_entry->AddInstruction(loop_start_branch);
+  CHECK_EQ(loop_entry->GetSuccessors().size(), 2u);
+  if (loop_entry->GetNormalSuccessors()[1] != loop_body) {
+    loop_entry->SwapSuccessors();
+  }
+  CHECK_EQ(loop_entry->GetPredecessors().size(), 2u);
+  if (loop_entry->GetPredecessors()[0] != loop_pre_header) {
+    loop_entry->SwapPredecessors();
+  }
+  i_phi->AddInput(one_const);
+  t_phi->AddInput(zero_const);
+
+  // environment
+  ArenaVector<HInstruction*> suspend_locals({ alloc_w, i_phi, t_phi },
+                                            GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(suspend, &suspend_locals);
+
+  // BODY
+  HInstruction* last_i = new (GetAllocator()) HSub(DataType::Type::kInt32, i_phi, one_const);
+  HInstruction* last_get_1, *last_get_2, *last_get_3;
+  HInstruction* body_value_1, *body_value_2, *body_value_3;
+  HInstruction* body_set_1, *body_set_2, *body_set_3;
+  HInstruction* body_get_1, *body_get_2, *body_get_3;
+  HInstruction* t_next_1, *t_next_2, *t_next_3;
+  auto make_instructions = [&](HInstruction* last_t_value) {
+    HInstruction* last_get =
+        new (GetAllocator()) HArrayGet(alloc_w, last_i, DataType::Type::kInt32, 0);
+    HInvoke* body_value = new (GetAllocator())
+        HInvokeStaticOrDirect(GetAllocator(),
+                              2,
+                              DataType::Type::kInt32,
+                              0,
+                              { nullptr, 0 },
+                              nullptr,
+                              {},
+                              InvokeType::kStatic,
+                              { nullptr, 0 },
+                              HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+    body_value->SetRawInputAt(0, last_get);
+    body_value->SetRawInputAt(1, one_const);
+    HInstruction* body_set =
+        new (GetAllocator()) HArraySet(alloc_w, i_phi, body_value, DataType::Type::kInt32, 0);
+    HInstruction* body_get =
+        new (GetAllocator()) HArrayGet(alloc_w, i_phi, DataType::Type::kInt32, 0);
+    HInvoke* t_next = new (GetAllocator())
+        HInvokeStaticOrDirect(GetAllocator(),
+                              2,
+                              DataType::Type::kInt32,
+                              0,
+                              { nullptr, 0 },
+                              nullptr,
+                              {},
+                              InvokeType::kStatic,
+                              { nullptr, 0 },
+                              HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+    t_next->SetRawInputAt(0, body_get);
+    t_next->SetRawInputAt(1, last_t_value);
+    loop_body->AddInstruction(last_get);
+    loop_body->AddInstruction(body_value);
+    loop_body->AddInstruction(body_set);
+    loop_body->AddInstruction(body_get);
+    loop_body->AddInstruction(t_next);
+    return std::make_tuple(last_get, body_value, body_set, body_get, t_next);
+  };
+  std::tie(last_get_1, body_value_1, body_set_1, body_get_1, t_next_1) = make_instructions(t_phi);
+  std::tie(last_get_2, body_value_2, body_set_2, body_get_2, t_next_2) =
+      make_instructions(t_next_1);
+  std::tie(last_get_3, body_value_3, body_set_3, body_get_3, t_next_3) =
+      make_instructions(t_next_2);
+  HInstruction* i_next = new (GetAllocator()) HAdd(DataType::Type::kInt32, i_phi, one_const);
+  HInstruction* body_goto = new (GetAllocator()) HGoto();
+  loop_body->InsertInstructionBefore(last_i, last_get_1);
+  loop_body->AddInstruction(i_next);
+  loop_body->AddInstruction(body_goto);
+  body_value_1->CopyEnvironmentFrom(suspend->GetEnvironment());
+  body_value_2->CopyEnvironmentFrom(suspend->GetEnvironment());
+  body_value_3->CopyEnvironmentFrom(suspend->GetEnvironment());
+
+  i_phi->AddInput(i_next);
+  t_phi->AddInput(t_next_3);
+  t_next_1->CopyEnvironmentFrom(suspend->GetEnvironment());
+  t_next_2->CopyEnvironmentFrom(suspend->GetEnvironment());
+  t_next_3->CopyEnvironmentFrom(suspend->GetEnvironment());
+
+  // loop-post
+  HInstruction* return_inst = new (GetAllocator()) HReturn(t_phi);
+  loop_post->AddInstruction(return_inst);
+
+  // exit
+  HInstruction* exit_inst = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_inst);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  // TODO Technically this is optimizable. LSE just needs to add phis to keep
+  // track of the last `N` values set where `N` is how many locations we can go
+  // back into the array.
+  if (IsRemoved(last_get_1)) {
+    // If we were able to remove the previous read the entire array should be removable.
+    EXPECT_TRUE(IsRemoved(body_set_1));
+    EXPECT_TRUE(IsRemoved(body_set_2));
+    EXPECT_TRUE(IsRemoved(body_set_3));
+    EXPECT_TRUE(IsRemoved(last_get_1));
+    EXPECT_TRUE(IsRemoved(last_get_2));
+    EXPECT_TRUE(IsRemoved(alloc_w));
+  } else {
+    // This is the branch we actually take for now. If we rely on being able to
+    // read the array we'd better remember to write to it as well.
+    EXPECT_FALSE(IsRemoved(body_set_3));
+  }
+  // The last 'get' should always be removable.
+  EXPECT_TRUE(IsRemoved(body_get_1));
+  EXPECT_TRUE(IsRemoved(body_get_2));
+  EXPECT_TRUE(IsRemoved(body_get_3));
+  // shadowed writes should always be removed
+  EXPECT_TRUE(IsRemoved(body_set_1));
+  EXPECT_TRUE(IsRemoved(body_set_2));
+}
+
+TEST_F(LoadStoreEliminationTest, ArrayNonLoopPhi) {
+  CreateGraph();
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "start" },
+                              { "start", "left" },
+                              { "start", "right" },
+                              { "left", "ret" },
+                              { "right", "ret" },
+                              { "ret", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(start);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+  GET_BLOCK(ret);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* zero_const = graph_->GetConstant(DataType::Type::kInt32, 0);
+  HInstruction* one_const = graph_->GetConstant(DataType::Type::kInt32, 1);
+  HInstruction* two_const = graph_->GetConstant(DataType::Type::kInt32, 2);
+  HInstruction* param = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 0, DataType::Type::kBool);
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(param);
+  entry->AddInstruction(entry_goto);
+
+  HInstruction* alloc_w = new (GetAllocator()) HNewArray(zero_const, two_const, 0, 0);
+  HInstruction* branch = new (GetAllocator()) HIf(param);
+  start->AddInstruction(alloc_w);
+  start->AddInstruction(branch);
+  // environment
+  ArenaVector<HInstruction*> alloc_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(alloc_w, &alloc_locals);
+
+  // left
+  HInvoke* left_value = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kInt32,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  left_value->SetRawInputAt(0, zero_const);
+  HInstruction* left_set_1 =
+      new (GetAllocator()) HArraySet(alloc_w, zero_const, left_value, DataType::Type::kInt32, 0);
+  HInstruction* left_set_2 =
+      new (GetAllocator()) HArraySet(alloc_w, one_const, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* left_goto = new (GetAllocator()) HGoto();
+  left->AddInstruction(left_value);
+  left->AddInstruction(left_set_1);
+  left->AddInstruction(left_set_2);
+  left->AddInstruction(left_goto);
+  ArenaVector<HInstruction*> left_locals({ alloc_w },
+                                         GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(left_value, &alloc_locals);
+
+  // right
+  HInvoke* right_value = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kInt32,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  right_value->SetRawInputAt(0, one_const);
+  HInstruction* right_set_1 =
+      new (GetAllocator()) HArraySet(alloc_w, zero_const, right_value, DataType::Type::kInt32, 0);
+  HInstruction* right_set_2 =
+      new (GetAllocator()) HArraySet(alloc_w, one_const, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* right_goto = new (GetAllocator()) HGoto();
+  right->AddInstruction(right_value);
+  right->AddInstruction(right_set_1);
+  right->AddInstruction(right_set_2);
+  right->AddInstruction(right_goto);
+  ArenaVector<HInstruction*> right_locals({ alloc_w },
+                                          GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(right_value, &alloc_locals);
+
+  // ret
+  HInstruction* read_1 =
+      new (GetAllocator()) HArrayGet(alloc_w, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* read_2 =
+      new (GetAllocator()) HArrayGet(alloc_w, one_const, DataType::Type::kInt32, 0);
+  HInstruction* add = new (GetAllocator()) HAdd(DataType::Type::kInt32, read_1, read_2);
+  HInstruction* return_inst = new (GetAllocator()) HReturn(add);
+  ret->AddInstruction(read_1);
+  ret->AddInstruction(read_2);
+  ret->AddInstruction(add);
+  ret->AddInstruction(return_inst);
+
+  // exit
+  HInstruction* exit_inst = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_inst);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_1));
+  EXPECT_TRUE(IsRemoved(read_2));
+  EXPECT_TRUE(IsRemoved(left_set_1));
+  EXPECT_TRUE(IsRemoved(left_set_2));
+  EXPECT_TRUE(IsRemoved(right_set_1));
+  EXPECT_TRUE(IsRemoved(right_set_2));
+  EXPECT_TRUE(IsRemoved(alloc_w));
+
+  EXPECT_FALSE(IsRemoved(left_value));
+  EXPECT_FALSE(IsRemoved(right_value));
+}
+
+TEST_F(LoadStoreEliminationTest, ArrayMergeDefault) {
+  CreateGraph();
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "start" },
+                              { "start", "left" },
+                              { "start", "right" },
+                              { "left", "ret" },
+                              { "right", "ret" },
+                              { "ret", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(start);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+  GET_BLOCK(ret);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* zero_const = graph_->GetConstant(DataType::Type::kInt32, 0);
+  HInstruction* one_const = graph_->GetConstant(DataType::Type::kInt32, 1);
+  HInstruction* two_const = graph_->GetConstant(DataType::Type::kInt32, 2);
+  HInstruction* param = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 0, DataType::Type::kBool);
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(param);
+  entry->AddInstruction(entry_goto);
+
+  HInstruction* alloc_w = new (GetAllocator()) HNewArray(zero_const, two_const, 0, 0);
+  HInstruction* branch = new (GetAllocator()) HIf(param);
+  start->AddInstruction(alloc_w);
+  start->AddInstruction(branch);
+  // environment
+  ArenaVector<HInstruction*> alloc_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(alloc_w, &alloc_locals);
+
+  // left
+  HInstruction* left_set_1 =
+      new (GetAllocator()) HArraySet(alloc_w, zero_const, one_const, DataType::Type::kInt32, 0);
+  HInstruction* left_set_2 =
+      new (GetAllocator()) HArraySet(alloc_w, zero_const, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* left_goto = new (GetAllocator()) HGoto();
+  left->AddInstruction(left_set_1);
+  left->AddInstruction(left_set_2);
+  left->AddInstruction(left_goto);
+
+  // right
+  HInstruction* right_set_1 =
+      new (GetAllocator()) HArraySet(alloc_w, one_const, one_const, DataType::Type::kInt32, 0);
+  HInstruction* right_set_2 =
+      new (GetAllocator()) HArraySet(alloc_w, one_const, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* right_goto = new (GetAllocator()) HGoto();
+  right->AddInstruction(right_set_1);
+  right->AddInstruction(right_set_2);
+  right->AddInstruction(right_goto);
+
+  // ret
+  HInstruction* read_1 =
+      new (GetAllocator()) HArrayGet(alloc_w, zero_const, DataType::Type::kInt32, 0);
+  HInstruction* read_2 =
+      new (GetAllocator()) HArrayGet(alloc_w, one_const, DataType::Type::kInt32, 0);
+  HInstruction* add = new (GetAllocator()) HAdd(DataType::Type::kInt32, read_1, read_2);
+  HInstruction* return_inst = new (GetAllocator()) HReturn(add);
+  ret->AddInstruction(read_1);
+  ret->AddInstruction(read_2);
+  ret->AddInstruction(add);
+  ret->AddInstruction(return_inst);
+
+  // exit
+  HInstruction* exit_inst = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_inst);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_1));
+  EXPECT_TRUE(IsRemoved(read_2));
+  EXPECT_TRUE(IsRemoved(left_set_1));
+  EXPECT_TRUE(IsRemoved(left_set_2));
+  EXPECT_TRUE(IsRemoved(right_set_1));
+  EXPECT_TRUE(IsRemoved(right_set_2));
+  EXPECT_TRUE(IsRemoved(alloc_w));
+}
+
 }  // namespace art
