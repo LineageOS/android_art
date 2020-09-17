@@ -23,6 +23,9 @@ public class Status {
     // Highlight "Error:" in red.
     private static final String ERROR = "\u001B[31mError: \u001B[0m";
 
+    // Highlight "Warning:" in yellow.
+    private static final String WARNING = "\u001B[33mWarning: \u001B[0m";
+
     private final boolean mDebug;
     private boolean mHasErrors;
 
@@ -46,6 +49,11 @@ public class Status {
         System.err.print(ERROR);
         System.err.println(String.format(Locale.US, message, args));
         mHasErrors = true;
+    }
+
+    public void warning(String message, Object... args) {
+        System.err.print(WARNING);
+        System.err.println(String.format(Locale.US, message, args));
     }
 
     public boolean ok() {

@@ -20,7 +20,7 @@ import org.apache.bcel.classfile.JavaClass;
 
 /**
  */
-public abstract class AnnotationContext implements ErrorReporter {
+public abstract class AnnotationContext implements StatusReporter {
 
   public final Status status;
   public final JavaClass definingClass;
