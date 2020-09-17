@@ -163,6 +163,8 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
         try {
             mApiResolver.resolvePublicAlternatives(publicAlternativesString, signature,
                     maxTargetSdk);
+        } catch (MultipleAlternativesFoundWarning e) {
+            context.reportWarning(e.toString());
         } catch (JavadocLinkSyntaxError | AlternativeNotFoundError e) {
             context.reportError(e.toString());
         } catch (RequiredAlternativeNotSpecifiedError e) {
