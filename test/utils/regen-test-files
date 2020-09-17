@@ -352,13 +352,16 @@ cat >TEST_MAPPING <<EOF
   "presubmit": [
     {
       "name": "CtsJdwpTestCases"
-    }
-  ],
-  "postsubmit": [
+    },
+    {
+      "name": "BootImageProfileTest"
+    },
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    },
+    }
+  ],
+  "postsubmit": [
     // ART run-tests.
 EOF
 # Only include tests expected to succeed for now.
