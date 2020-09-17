@@ -243,6 +243,14 @@ class InstructionCodeGeneratorX86 : public InstructionCodeGenerator {
                                Label* fixup_label,
                                ReadBarrierOption read_barrier_option);
 
+  void HandleFieldSet(HInstruction* instruction,
+                      uint32_t value_index,
+                      DataType::Type type,
+                      Address field_addr,
+                      Register base,
+                      bool is_volatile,
+                      bool value_can_be_null);
+
  private:
   // Generate code for the given suspend check. If not null, `successor`
   // is the block to branch to if the suspend check is not needed, and after
