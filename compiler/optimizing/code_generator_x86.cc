@@ -26,6 +26,7 @@
 #include "gc/accounting/card_table.h"
 #include "gc/space/image_space.h"
 #include "heap_poisoning.h"
+#include "interpreter/mterp/nterp.h"
 #include "intrinsics.h"
 #include "intrinsics_x86.h"
 #include "jit/profiling_info.h"
@@ -1116,7 +1117,9 @@ void CodeGeneratorX86::MaybeIncrementHotness(bool is_frame_entry) {
         __ movl(EAX, Immediate(address));
         __ addw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
                 Immediate(1));
-        __ j(kCarryClear, &done);
+        __ andw(Address(EAX, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()),
+                Immediate(interpreter::kTieredHotnessMask));
+        __ j(kNotZero, &done);
         GenerateInvokeRuntime(
             GetThreadOffset<kX86PointerSize>(kQuickCompileOptimized).Int32Value());
         __ Bind(&done);
