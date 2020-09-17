@@ -30,9 +30,7 @@ import java.util.Set;
 
 public class ApiResolverTest extends AnnotationHandlerTestBase {
     @Test
-    public void testFindPublicAlternativeExactly()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testFindPublicAlternativeExactly() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->foo(I)V", "La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -40,9 +38,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testFindPublicAlternativeDeducedPackageName()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testFindPublicAlternativeDeducedPackageName() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->foo(I)V", "La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -50,9 +46,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testFindPublicAlternativeDeducedPackageAndClassName()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testFindPublicAlternativeDeducedPackageAndClassName() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->foo(I)V", "La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -60,9 +54,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testFindPublicAlternativeDeducedParameterTypes()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testFindPublicAlternativeDeducedParameterTypes() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->foo(I)V", "La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -70,12 +62,12 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testFindPublicAlternativeFailDueToMultipleParameterTypes()
+    public void testFindPublicAlternativeWarnsOnMultipleParameterTypes()
             throws SignatureSyntaxError {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->foo(I)V", "La/b/C;->bar(I)I", "La/b/C;->foo(II)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
-        MultipleAlternativesFoundError e = expectThrows(MultipleAlternativesFoundError.class,
+        MultipleAlternativesFoundWarning e = expectThrows(MultipleAlternativesFoundWarning.class,
                 () -> resolver.resolvePublicAlternatives("{@link #foo}", "La/b/C;->bar()V", 1));
         assertThat(e.almostMatches).containsExactly(
                 ApiComponents.fromDexSignature("La/b/C;->foo(I)V"),
@@ -111,9 +103,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testPublicAlternativesJustPackageAndClassName()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testPublicAlternativesJustPackageAndClassName() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -121,9 +111,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testPublicAlternativesJustClassName()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testPublicAlternativesJustClassName() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>(
                 Arrays.asList("La/b/C;->bar(I)V")));
         ApiResolver resolver = new ApiResolver(publicApis);
@@ -131,9 +119,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testNoPublicAlternativesButHasExplanation()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testNoPublicAlternativesButHasExplanation() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>());
         ApiResolver resolver = new ApiResolver(publicApis);
         resolver.resolvePublicAlternatives("Foo {@code bar}", "La/b/C;->bar()V", 1);
@@ -148,9 +134,7 @@ public class ApiResolverTest extends AnnotationHandlerTestBase {
     }
 
     @Test
-    public void testNoPublicAlternativesSpecifiedWithMaxLessThanQ()
-            throws JavadocLinkSyntaxError, AlternativeNotFoundError,
-            RequiredAlternativeNotSpecifiedError {
+    public void testNoPublicAlternativesSpecifiedWithMaxLessThanQ() throws Exception {
         Set<String> publicApis = Collections.unmodifiableSet(new HashSet<>());
         ApiResolver resolver = new ApiResolver(publicApis);
         resolver.resolvePublicAlternatives(null, "La/b/C;->bar()V", 28);
