@@ -30,6 +30,7 @@
 #include "gc/accounting/card_table.h"
 #include "gc/space/image_space.h"
 #include "heap_poisoning.h"
+#include "interpreter/mterp/nterp.h"
 #include "intrinsics.h"
 #include "intrinsics_arm_vixl.h"
 #include "linker/linker_patch.h"
@@ -2119,6 +2120,7 @@ void CodeGeneratorARMVIXL::MaybeIncrementHotness(bool is_frame_entry) {
       __ Mov(r4, address);
       __ Ldrh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
       __ Add(ip, ip, 1);
+      instruction_visitor_.GenerateAndConst(ip, ip, interpreter::kTieredHotnessMask);
       __ Strh(ip, MemOperand(r4, ProfilingInfo::BaselineHotnessCountOffset().Int32Value()));
       if (!is_frame_entry) {
         __ Pop(r4);
