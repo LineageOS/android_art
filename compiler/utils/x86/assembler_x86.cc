@@ -3677,6 +3677,29 @@ void X86Assembler::cmpxchg8b(const Address& address) {
 }
 
 
+void X86Assembler::xaddb(const Address& address, ByteRegister reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitUint8(0x0F);
+  EmitUint8(0xC0);
+  EmitOperand(reg, address);
+}
+
+void X86Assembler::xaddw(const Address& address, Register reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitOperandSizeOverride();
+  EmitUint8(0x0F);
+  EmitUint8(0xC1);
+  EmitOperand(reg, address);
+}
+
+void X86Assembler::xaddl(const Address& address, Register reg) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitUint8(0x0F);
+  EmitUint8(0xC1);
+  EmitOperand(reg, address);
+}
+
+
 void X86Assembler::mfence() {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitUint8(0x0F);
