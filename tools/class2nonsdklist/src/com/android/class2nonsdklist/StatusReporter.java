@@ -16,10 +16,16 @@
 
 package com.android.class2nonsdklist;
 
-public interface ErrorReporter {
+public interface StatusReporter {
     /**
      * Report an error in this context. The final error message will include
      * the class and member names, and the source file name.
      */
     void reportError(String message, Object... args);
+
+    /**
+     * Report a warning in this context. The final message will include the
+     * class and member names, and the source file name.
+     */
+    void reportWarning(String message, Object... args);
 }

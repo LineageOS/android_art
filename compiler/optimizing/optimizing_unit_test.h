@@ -292,6 +292,60 @@ inline bool IsRemoved(HInstruction* instruction) {
   return instruction->GetBlock() == nullptr;
 }
 
+class AdjacencyListGraph {
+ public:
+  using Edge = std::pair<const std::string_view, const std::string_view>;
+  AdjacencyListGraph(
+      HGraph* graph,
+      ArenaAllocator* alloc,
+      const std::string_view entry_name,
+      const std::string_view exit_name,
+      const std::vector<Edge>& adj) : graph_(graph) {
+    auto create_block = [&]() {
+      HBasicBlock* blk = new (alloc) HBasicBlock(graph_);
+      graph_->AddBlock(blk);
+      return blk;
+    };
+    HBasicBlock* entry = create_block();
+    HBasicBlock* exit = create_block();
+    graph_->SetEntryBlock(entry);
+    graph_->SetExitBlock(exit);
+    name_to_block_.Put(entry_name, entry);
+    name_to_block_.Put(exit_name, exit);
+    for (const auto& [src, dest] : adj) {
+      HBasicBlock* src_blk = name_to_block_.GetOrCreate(src, create_block);
+      HBasicBlock* dest_blk = name_to_block_.GetOrCreate(dest, create_block);
+      src_blk->AddSuccessor(dest_blk);
+    }
+    graph_->ComputeDominanceInformation();
+    for (auto [name, blk] : name_to_block_) {
+      block_to_name_.Put(blk, name);
+    }
+  }
+
+  bool HasBlock(const HBasicBlock* blk) {
+    return block_to_name_.find(blk) != block_to_name_.end();
+  }
+
+  std::string_view GetName(const HBasicBlock* blk) {
+    return block_to_name_.Get(blk);
+  }
+
+  HBasicBlock* Get(const std::string_view& sv) {
+    return name_to_block_.Get(sv);
+  }
+
+  AdjacencyListGraph(AdjacencyListGraph&&) = default;
+  AdjacencyListGraph(const AdjacencyListGraph&) = default;
+  AdjacencyListGraph& operator=(AdjacencyListGraph&&) = default;
+  AdjacencyListGraph& operator=(const AdjacencyListGraph&) = default;
+
+ private:
+  HGraph* graph_;
+  SafeMap<const std::string_view, HBasicBlock*> name_to_block_;
+  SafeMap<const HBasicBlock*, const std::string_view> block_to_name_;
+};
+
 }  // namespace art
 
 #endif  // ART_COMPILER_OPTIMIZING_OPTIMIZING_UNIT_TEST_H_

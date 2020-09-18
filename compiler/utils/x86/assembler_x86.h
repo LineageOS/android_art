@@ -73,6 +73,10 @@ class Operand : public ValueObject {
     return static_cast<Register>(encoding_at(1) & 7);
   }
 
+  int32_t disp() const {
+    return disp_;
+  }
+
   int8_t disp8() const {
     CHECK_GE(length_, 2);
     return static_cast<int8_t>(encoding_[length_ - 1]);
@@ -92,7 +96,7 @@ class Operand : public ValueObject {
 
  protected:
   // Operand can be sub classed (e.g: Address).
-  Operand() : length_(0), fixup_(nullptr) { }
+  Operand() : length_(0), disp_(0), fixup_(nullptr) { }
 
   void SetModRM(int mod_in, Register rm_in) {
     CHECK_EQ(mod_in & ~3, 0);
@@ -110,6 +114,7 @@ class Operand : public ValueObject {
   void SetDisp8(int8_t disp) {
     CHECK(length_ == 1 || length_ == 2);
     encoding_[length_++] = static_cast<uint8_t>(disp);
+    disp_ = disp;
   }
 
   void SetDisp32(int32_t disp) {
@@ -117,6 +122,7 @@ class Operand : public ValueObject {
     int disp_size = sizeof(disp);
     memmove(&encoding_[length_], &disp, disp_size);
     length_ += disp_size;
+    disp_ = disp;
   }
 
   AssemblerFixup* GetFixup() const {
@@ -130,12 +136,13 @@ class Operand : public ValueObject {
  private:
   uint8_t length_;
   uint8_t encoding_[6];
+  int32_t disp_;
 
   // A fixup can be associated with the operand, in order to be applied after the
   // code has been generated. This is used for constant area fixups.
   AssemblerFixup* fixup_;
 
-  explicit Operand(Register reg) : fixup_(nullptr) { SetModRM(3, reg); }
+  explicit Operand(Register reg) : disp_(0), fixup_(nullptr) { SetModRM(3, reg); }
 
   // Get the operand encoding byte at the given index.
   uint8_t encoding_at(int index_in) const {
@@ -189,6 +196,15 @@ class Address : public Operand {
           int32_t disp, AssemblerFixup *fixup) {
     Init(base_in, index_in, scale_in, disp);
     SetFixup(fixup);
+  }
+
+  Address displaceBy(int offset) {
+    if (rm() == ESP) {
+      // SIB addressing mode
+      return Address(base(), index(), scale(), disp() + offset, GetFixup());
+    } else {
+      return Address(rm(), disp() + offset, GetFixup());
+    }
   }
 
   static Address Absolute(uintptr_t addr) {
@@ -694,6 +710,7 @@ class X86Assembler final : public Assembler {
   void andl(Register dst, const Immediate& imm);
   void andl(Register dst, Register src);
   void andl(Register dst, const Address& address);
+  void andw(const Address& address, const Immediate& imm);
 
   void orl(Register dst, const Immediate& imm);
   void orl(Register dst, Register src);
