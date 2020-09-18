@@ -3151,6 +3151,59 @@ void InstructionCodeGeneratorARM64::GenerateResultRemWithAnyConstant(
   __ Msub(out, quotient, temp_imm, dividend);
 }
 
+// Helper to generate code for HDiv/HRem instructions when a dividend is non-negative and
+// a divisor is a positive constant, not power of 2.
+void InstructionCodeGeneratorARM64::GenerateInt64UnsignedDivRemWithAnyPositiveConstant(
+    HBinaryOperation* instruction) {
+  DCHECK(instruction->IsDiv() || instruction->IsRem());
+  DCHECK(instruction->GetResultType() == DataType::Type::kInt64);
+
+  LocationSummary* locations = instruction->GetLocations();
+  Location second = locations->InAt(1);
+  DCHECK(second.IsConstant());
+
+  Register out = OutputRegister(instruction);
+  Register dividend = InputRegisterAt(instruction, 0);
+  int64_t imm = Int64FromConstant(second.GetConstant());
+  DCHECK_GT(imm, 0);
+
+  int64_t magic;
+  int shift;
+  CalculateMagicAndShiftForDivRem(imm, /* is_long= */ true, &magic, &shift);
+
+  UseScratchRegisterScope temps(GetVIXLAssembler());
+  Register temp = temps.AcquireSameSizeAs(out);
+
+  auto generate_unsigned_div_code = [this, magic, shift](Register out,
+                                                         Register dividend,
+                                                         Register temp) {
+    // temp = get_high(dividend * magic)
+    __ Mov(temp, magic);
+    if (magic > 0 && shift == 0) {
+      __ Smulh(out, dividend, temp);
+    } else {
+      __ Smulh(temp, dividend, temp);
+      if (magic < 0) {
+        // The negative magic means that the multiplier m is greater than INT64_MAX.
+        // In such a case shift is never 0. See the proof in
+        // InstructionCodeGeneratorARMVIXL::GenerateDivRemWithAnyConstant.
+        __ Add(temp, temp, dividend);
+      }
+      DCHECK_NE(shift, 0);
+      __ Lsr(out, temp, shift);
+    }
+  };
+
+  if (instruction->IsDiv()) {
+    generate_unsigned_div_code(out, dividend, temp);
+  } else {
+    generate_unsigned_div_code(temp, dividend, temp);
+    GenerateResultRemWithAnyConstant(out, dividend, temp, imm, &temps);
+  }
+}
+
+// Helper to generate code for HDiv/HRem instructions for any dividend and a constant divisor
+// (not power of 2).
 void InstructionCodeGeneratorARM64::GenerateInt64DivRemWithAnyConstant(
     HBinaryOperation* instruction) {
   DCHECK(instruction->IsDiv() || instruction->IsRem());
@@ -3270,10 +3323,15 @@ void InstructionCodeGeneratorARM64::GenerateInt32DivRemWithAnyConstant(
   }
 }
 
-void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperation* instruction) {
+void InstructionCodeGeneratorARM64::GenerateDivRemWithAnyConstant(HBinaryOperation* instruction,
+                                                                  int64_t divisor) {
   DCHECK(instruction->IsDiv() || instruction->IsRem());
   if (instruction->GetResultType() == DataType::Type::kInt64) {
-    GenerateInt64DivRemWithAnyConstant(instruction);
+    if (divisor > 0 && HasNonNegativeInputAt(instruction, 0)) {
+      GenerateInt64UnsignedDivRemWithAnyPositiveConstant(instruction);
+    } else {
+      GenerateInt64DivRemWithAnyConstant(instruction);
+    }
   } else {
     GenerateInt32DivRemWithAnyConstant(instruction);
   }
@@ -3292,7 +3350,7 @@ void InstructionCodeGeneratorARM64::GenerateIntDivForConstDenom(HDiv *instructio
   } else {
     // Cases imm == -1 or imm == 1 are handled by InstructionSimplifier.
     DCHECK(imm < -2 || imm > 2) << imm;
-    GenerateDivRemWithAnyConstant(instruction);
+    GenerateDivRemWithAnyConstant(instruction, imm);
   }
 }
 
@@ -5684,7 +5742,7 @@ void InstructionCodeGeneratorARM64::GenerateIntRemForConstDenom(HRem *instructio
     GenerateIntRemForPower2Denom(instruction);
   } else {
     DCHECK(imm < -2 || imm > 2) << imm;
-    GenerateDivRemWithAnyConstant(instruction);
+    GenerateDivRemWithAnyConstant(instruction, imm);
   }
 }
 
