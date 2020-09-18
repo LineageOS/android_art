@@ -351,6 +351,21 @@ TEST_F(AssemblerX86Test, LockCmpxchg8b) {
                     "lock cmpxchg8b {mem}"), "lock_cmpxchg8b");
 }
 
+TEST_F(AssemblerX86Test, LockXaddb) {
+  DriverStr(RepeatAw(&x86::X86Assembler::LockXaddb,
+                     "lock xaddb %{reg}, {mem}"), "lock_xaddb");
+}
+
+TEST_F(AssemblerX86Test, LockXaddw) {
+  DriverStr(RepeatAr(&x86::X86Assembler::LockXaddw,
+                     "lock xaddw %{reg}, {mem}"), "lock_xaddw");
+}
+
+TEST_F(AssemblerX86Test, LockXaddl) {
+  DriverStr(RepeatAR(&x86::X86Assembler::LockXaddl,
+                     "lock xaddl %{reg}, {mem}"), "lock_xaddl");
+}
+
 TEST_F(AssemblerX86Test, FPUIntegerLoadS) {
   DriverStr(RepeatA(&x86::X86Assembler::filds, "fildl {mem}"), "fildd");
 }

@@ -817,6 +817,10 @@ class X86Assembler final : public Assembler {
   void cmpxchgl(const Address& address, Register reg);
   void cmpxchg8b(const Address& address);
 
+  void xaddb(const Address& address, ByteRegister reg);
+  void xaddw(const Address& address, Register reg);
+  void xaddl(const Address& address, Register reg);
+
   void mfence();
 
   X86Assembler* fs();
@@ -857,6 +861,30 @@ class X86Assembler final : public Assembler {
 
   void LockCmpxchg8b(const Address& address) {
     lock()->cmpxchg8b(address);
+  }
+
+  void LockXaddb(const Address& address, Register reg) {
+    // For testing purpose
+    lock()->xaddb(address, static_cast<ByteRegister>(reg));
+  }
+
+  void LockXaddb(const Address& address, ByteRegister reg) {
+    lock()->xaddb(address, reg);
+  }
+
+  void LockXaddw(const Address& address, Register reg) {
+    AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+    // We make sure that the operand size override bytecode is emited before the lock bytecode.
+    // We test against clang which enforces this bytecode order.
+    EmitOperandSizeOverride();
+    EmitUint8(0xF0);
+    EmitUint8(0x0F);
+    EmitUint8(0xC1);
+    EmitOperand(reg, address);
+  }
+
+  void LockXaddl(const Address& address, Register reg) {
+    lock()->xaddl(address, reg);
   }
 
   //
