@@ -3913,7 +3913,7 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGetAndAdd(HInvoke* invoke) {
               value_loc.AsFpuRegister<XmmRegister>());
       GenPrimitiveLockedCmpxchg(type,
                                 codegen,
-                                /* expected= */ eax,
+                                /* expected_value= */ eax,
                                 /* new_value= */ temp_float,
                                 reference,
                                 offset,
