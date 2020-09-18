@@ -977,15 +977,26 @@ java_library {
 }
 
 art_cc_test {
-    name: "ArtGtestsTarget",
+    name: "ArtGtestsTargetInstallApex",
     data: [
         // We need the ART testing apex, which contains all gtest binaries.
-        // Note that due to linker constraints the gtests must be in the apex.
+        // Note that due to build system and linker constraints the gtests must be in the apex.
         ":com.android.art.testing",
-        ":art-gtest-jars",
     ],
+    // It seems that only device-tests build can create a valid apex.
     test_suites: ["device-tests"],
-    test_config: "gtests-target.xml",
+    test_config: "art-gtests-target-install-apex.xml",
+}
+
+art_cc_test {
+    name: "ArtGtestsTargetChroot",
+    data: [
+        // We need the ART testing apex, which contains all gtest binaries.
+        // Note that due to build system and linker constraints the gtests must be in the apex.
+        ":com.android.art.testing",
+    ],
+    test_suites: ["general-tests"],
+    test_config: "art-gtests-target-chroot.xml",
 }
 
 filegroup {

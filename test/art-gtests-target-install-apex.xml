@@ -13,13 +13,14 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<configuration description="ART gtests">
+<configuration description="ART gtests for target (using apex installation)">
     <option name="test-suite-tag" value="art" />
+    <option name="test-suite-tag" value="art-target-gtest-install-apex" />
     <target_preparer class="com.android.tradefed.targetprep.InstallApexModuleTargetPreparer" >
         <option name="test-file-name" value="com.android.art.testing.apex" />
     </target_preparer>
     <test class="com.android.tradefed.testtype.GTest" >
-        <!-- TODO: These tests do not work since they need to write to /system -->
+        <!-- TODO(b/147821328): These tests do not work since they need to write to /system -->
         <option name="exclude-filter" value="HiddenApiTest.DexDomain_System*:OatFileAssistantTest.SystemFrameworkDir" />
         <option name="native-test-timeout" value="600000" /> <!-- 10 min -->
         <option name="native-test-device-path" value="/apex/com.android.art/bin/art" />
