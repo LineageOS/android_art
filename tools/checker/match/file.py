@@ -352,6 +352,4 @@ def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
       else:
         msg = "Statement could not be matched starting from line {}"
       msg = msg.format(lineNo)
-      with file(c1File.fileName) as cfgFile:
-        Logger.log(''.join(cfgFile), Logger.Level.Error)
       Logger.testFailed(msg, e.statement, e.variables)
