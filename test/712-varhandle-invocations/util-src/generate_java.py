@@ -77,7 +77,7 @@ class ValueType(JavaType):
 BOOLEAN_TYPE = ValueType("boolean", "Boolean", [ "true", "false" ], ordinal = 0, width = 1, supports_numeric=False)
 BYTE_TYPE=ValueType("byte", "Byte", [ "(byte) -128", "(byte) -61", "(byte) 7", "(byte) 127", "(byte) 33" ], ordinal=1, width=1)
 SHORT_TYPE=ValueType("short", "Short", [ "(short) -32768", "(short) -384", "(short) 32767", "(short) 0xaa55" ], ordinal=2, width=2)
-CHAR_TYPE=ValueType("char", "Character", [ r"'A'", r"'#'", r"'$'", r"'Z'", r"'t'", r"'c'" ], ordinal=3, width=2)
+CHAR_TYPE=ValueType("char", "Character", [ r"'A'", r"'#'", r"'$'", r"'Z'", r"'t'", r"'c'",  r"Character.MAX_VALUE", r"Character.MIN_LOW_SURROGATE"], ordinal=3, width=2)
 INT_TYPE=ValueType("int", "Integer", [ "-0x01234567", "0x7f6e5d4c", "0x12345678", "0x10215220", "42" ], ordinal=4, width=4)
 LONG_TYPE=ValueType("long", "Long", [ "-0x0123456789abcdefl", "0x789abcdef0123456l", "0xfedcba9876543210l" ], ordinal=5, width=8)
 FLOAT_TYPE=ValueType("float", "Float", [ "-7.77e23f", "1.234e-17f", "3.40e36f", "-8.888e3f", "4.442e11f" ], ordinal=6, width=4, supports_bitwise=False)
