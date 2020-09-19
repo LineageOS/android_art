@@ -383,6 +383,21 @@ public class DivTest {
     return r;
   }
 
+  /// CHECK-START-ARM:   java.lang.Integer DivTest.unsignedDiv01(int) disassembly (after)
+  /// CHECK:                 Div
+  /// CHECK-NEXT:            asr{{s?}} r{{\d+}}, #1
+  //
+  /// CHECK-START-ARM64: java.lang.Integer DivTest.unsignedDiv01(int) disassembly (after)
+  /// CHECK:                 Div
+  /// CHECK-NEXT:            asr w{{\d+}}, w{{\d+}}, #1
+  private static Integer unsignedDiv01(int v) {
+    int l = 0;
+    for (int m = v - 1; m >= 0; m = m / 2 - 1) {
+      ++l;
+    }
+    return l;
+  }
+
   private static void divLong() {
     expectEquals(0L, $noinline$LongDivBy2(0L));
     expectEquals(0L, $noinline$LongDivBy2(1L));

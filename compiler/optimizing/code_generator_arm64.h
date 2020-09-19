@@ -375,9 +375,10 @@ class InstructionCodeGeneratorARM64 : public InstructionCodeGenerator {
                                         int64_t divisor,
                                         // This function may acquire a scratch register.
                                         vixl::aarch64::UseScratchRegisterScope* temps_scope);
+  void GenerateInt64UnsignedDivRemWithAnyPositiveConstant(HBinaryOperation* instruction);
   void GenerateInt64DivRemWithAnyConstant(HBinaryOperation* instruction);
   void GenerateInt32DivRemWithAnyConstant(HBinaryOperation* instruction);
-  void GenerateDivRemWithAnyConstant(HBinaryOperation* instruction);
+  void GenerateDivRemWithAnyConstant(HBinaryOperation* instruction, int64_t divisor);
   void GenerateIntDiv(HDiv* instruction);
   void GenerateIntDivForConstDenom(HDiv *instruction);
   void GenerateIntDivForPower2Denom(HDiv *instruction);
