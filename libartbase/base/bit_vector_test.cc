@@ -66,6 +66,32 @@ TEST(BitVector, Test) {
   EXPECT_TRUE(iterator == bv.Indexes().end());
 }
 
+struct MessyAllocator : public Allocator {
+ public:
+  MessyAllocator() : malloc_(Allocator::GetMallocAllocator()) {}
+  ~MessyAllocator() {}
+
+  void* Alloc(size_t s) override {
+    void* res = malloc_->Alloc(s);
+    memset(res, 0xfe, s);
+    return res;
+  }
+
+  void Free(void* v) override {
+    malloc_->Free(v);
+  }
+
+ private:
+  Allocator* malloc_;
+};
+
+TEST(BitVector, MessyAllocator) {
+  MessyAllocator alloc;
+  BitVector bv(32, false, &alloc);
+  EXPECT_EQ(bv.NumSetBits(), 0u);
+  EXPECT_EQ(bv.GetHighestBitSet(), -1);
+}
+
 TEST(BitVector, NoopAllocator) {
   const uint32_t kWords = 2;
 
