@@ -47,7 +47,7 @@ class BitVector {
    *   }
    */
   class IndexIterator :
-      std::iterator<std::forward_iterator_tag, uint32_t, ptrdiff_t, void, uint32_t> {
+      public std::iterator<std::forward_iterator_tag, uint32_t, ptrdiff_t, void, uint32_t> {
    public:
     bool operator==(const IndexIterator& other) const;
 
