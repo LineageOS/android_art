@@ -61,7 +61,10 @@ BitVector::BitVector(const BitVector& src,
 }
 
 BitVector::~BitVector() {
-  allocator_->Free(storage_);
+  if (storage_ != nullptr) {
+    // Only free if we haven't been moved out of.
+    allocator_->Free(storage_);
+  }
 }
 
 bool BitVector::SameBitsSet(const BitVector *src) const {
