@@ -308,4 +308,59 @@ TEST(BitVector, TransformIterator) {
   }
 }
 
+class SingleAllocator : public Allocator {
+ public:
+  SingleAllocator() : alloc_count_(0), free_count_(0) {}
+  ~SingleAllocator() {
+    EXPECT_EQ(alloc_count_, 1u);
+    EXPECT_EQ(free_count_, 1u);
+  }
+
+  void* Alloc(size_t s) override {
+    EXPECT_LT(s, 1024ull);
+    EXPECT_EQ(alloc_count_, free_count_);
+    ++alloc_count_;
+    return bytes_.begin();
+  }
+
+  void Free(void*) override {
+    ++free_count_;
+  }
+
+  uint32_t AllocCount() const {
+    return alloc_count_;
+  }
+  uint32_t FreeCount() const {
+    return free_count_;
+  }
+
+ private:
+  std::array<uint8_t, 1024> bytes_;
+  uint32_t alloc_count_;
+  uint32_t free_count_;
+};
+
+TEST(BitVector, MovementFree) {
+  SingleAllocator alloc;
+  {
+    BitVector bv(16, false, &alloc);
+    bv.SetBit(13);
+    EXPECT_EQ(alloc.FreeCount(), 0u);
+    EXPECT_EQ(alloc.AllocCount(), 1u);
+    ASSERT_TRUE(bv.GetRawStorage() != nullptr);
+    EXPECT_TRUE(bv.IsBitSet(13));
+    {
+      BitVector bv2(std::move(bv));
+      ASSERT_TRUE(bv.GetRawStorage() == nullptr);
+      EXPECT_TRUE(bv2.IsBitSet(13));
+      EXPECT_EQ(alloc.FreeCount(), 0u);
+      EXPECT_EQ(alloc.AllocCount(), 1u);
+    }
+    EXPECT_EQ(alloc.FreeCount(), 1u);
+    EXPECT_EQ(alloc.AllocCount(), 1u);
+  }
+  EXPECT_EQ(alloc.FreeCount(), 1u);
+  EXPECT_EQ(alloc.AllocCount(), 1u);
+}
+
 }  // namespace art
