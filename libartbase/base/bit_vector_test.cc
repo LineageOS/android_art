@@ -18,6 +18,7 @@
 
 #include "allocator.h"
 #include "bit_vector-inl.h"
+#include "transform_iterator.h"
 #include "gtest/gtest.h"
 
 namespace art {
@@ -266,6 +267,18 @@ TEST(BitVector, CopyTo) {
     bv.CopyTo(buf, sizeof(buf));
     EXPECT_EQ(0x80040000U, buf[0]);
     EXPECT_EQ(0x00000000U, buf[1]);
+  }
+}
+
+TEST(BitVector, TransformIterator) {
+  BitVector bv(16, false, Allocator::GetMallocAllocator());
+  bv.SetBit(4);
+  bv.SetBit(8);
+
+  auto indexs = bv.Indexes();
+  for (int32_t negative :
+       MakeTransformRange(indexs, [](uint32_t idx) { return -1 * static_cast<int32_t>(idx); })) {
+    EXPECT_TRUE(negative == -4 || negative == -8);
   }
 }
 
