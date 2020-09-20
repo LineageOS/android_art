@@ -93,6 +93,7 @@
 #include "oat.h"
 #include "oat_file.h"
 #include "oat_file_assistant.h"
+#include "palette/palette.h"
 #include "profile/profile_compilation_info.h"
 #include "runtime.h"
 #include "runtime_options.h"
@@ -1699,6 +1700,16 @@ class Dex2Oat final {
       callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
     }
 
+    // Now that the FDs have been setup, report that we're starting the
+    // compilation.
+    PaletteHooks* hooks = nullptr;
+    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+      hooks->NotifyStartDex2oatCompilation(zip_fd_,
+                                           IsAppImage() ? app_image_fd_ : image_fd_,
+                                           oat_fd_,
+                                           output_vdex_fd_);
+    }
+
     return dex2oat::ReturnCode::kNoFailure;
   }
 
@@ -2120,6 +2131,16 @@ class Dex2Oat final {
         oat_writer.reset();
         // We may still need the ELF writer later for stripping.
       }
+    }
+
+    // Now that the files have been written to, report that we're starting the
+    // compilation.
+    PaletteHooks* hooks = nullptr;
+    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+      hooks->NotifyEndDex2oatCompilation(zip_fd_,
+                                         IsAppImage() ? app_image_fd_ : image_fd_,
+                                         oat_fd_,
+                                         output_vdex_fd_);
     }
 
     return true;

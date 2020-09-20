@@ -95,6 +95,20 @@ public class RemTest {
     expectEquals(0, $noinline$IntRemByMinus6(-6));
     expectEquals(1, $noinline$IntRemByMinus6(19));
     expectEquals(-1, $noinline$IntRemByMinus6(-19));
+
+    expectEquals(1, $noinline$UnsignedIntRem01(13));
+    expectEquals(1, $noinline$UnsignedIntRem02(13));
+    expectEquals(1, $noinline$UnsignedIntRem03(13));
+    expectEquals(1, $noinline$UnsignedIntRem04(13));
+    expectEquals(1, $noinline$UnsignedIntRem05(101));
+    expectEquals(11, $noinline$UnsignedIntRem06(101));
+
+    expectEquals(-1, $noinline$SignedIntRem01(-13));
+    expectEquals(-1, $noinline$SignedIntRem02(-13));
+    expectEquals(1, $noinline$SignedIntRem03(-13));
+    expectEquals(1, $noinline$SignedIntRem04(-13, true));
+    expectEquals(0, $noinline$SignedIntRem05(-12, 0,-13));
+    expectEquals(-1, $noinline$SignedIntRem06(-13));
   }
 
   // A test case to check that 'lsr' and 'asr' are combined into one 'asr'.
@@ -251,6 +265,287 @@ public class RemTest {
     return r;
   }
 
+  private static int $noinline$Negate(int v) {
+    return -v;
+  }
+
+  private static int $noinline$Decrement(int v) {
+    return v - 1;
+  }
+
+  private static int $noinline$Increment(int v) {
+    return v + 1;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem01(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem01(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem01(int v) {
+    int c = 0;
+    if (v > 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem02(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem02(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem02(int v) {
+    int c = 0;
+    if (0 < v) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem03(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem03(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem03(int v) {
+    int c = 0;
+    if (v >= 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem04(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem04(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            mov w{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem04(int v) {
+    int c = 0;
+    if (0 <= v) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem05(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, #2
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #10
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem05(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NEXT:            mov w{{\d+}}, #0xa
+  /// CHECK-NEXT:            msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem05(int v) {
+    int c = 0;
+    for(; v > 100; ++c) {
+      v %= 10;
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$UnsignedIntRem06(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            lsr{{s?}} r{{\d+}}, r{{\d+}}, #2
+  /// CHECK:                 mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$UnsignedIntRem06(int) disassembly (after)
+  /// CHECK:                 smull x{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK-NEXT:            lsr x{{\d+}}, x{{\d+}}, #34
+  /// CHECK:                 msub w{{\d+}}, w{{\d+}}, w{{\d+}}, w{{\d+}}
+  private static int $noinline$UnsignedIntRem06(int v) {
+    if (v < 10) {
+      v = $noinline$Negate(v); // This is to prevent from using Select.
+    } else {
+      v = (v % 10) + (v / 10);
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem01(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem01(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem01(int v) {
+    int c = 0;
+    if (v < 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem02(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem02(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem02(int v) {
+    int c = 0;
+    if (v <= 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem03(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem03(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem03(int v) {
+    boolean positive = (v > 0);
+    int c = v % 6;
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem04(int, boolean) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem04(int, boolean) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem04(int v, boolean apply_rem) {
+    int c = 0;
+    boolean positive = (v > 0);
+    if (apply_rem) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem05(int, int, int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem05(int, int, int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem05(int v, int a, int b) {
+    int c = 0;
+
+    if (v < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (b < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (v > b) {
+      c = v % 6;
+    } else {
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int RemTest.$noinline$SignedIntRem06(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, asr #31
+  /// CHECK-NEXT:            mov{{s?}} r{{\d+}}, #6
+  /// CHECK-NEXT:            mls       r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  //
+  /// CHECK-START-ARM64: int RemTest.$noinline$SignedIntRem06(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntRem06(int v) {
+    int c = v % 6;
+
+    if (v > 0) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
   private static void remLong() {
     expectEquals(0L, $noinline$LongRemBy18(0L));
     expectEquals(1L, $noinline$LongRemBy18(1L));
@@ -315,6 +610,20 @@ public class RemTest {
     expectEquals(0L, $noinline$LongRemByMinus100(-100L));
     expectEquals(1L, $noinline$LongRemByMinus100(101L));
     expectEquals(-1L, $noinline$LongRemByMinus100(-101L));
+
+    expectEquals(1L, $noinline$UnsignedLongRem01(13L));
+    expectEquals(1L, $noinline$UnsignedLongRem02(13L));
+    expectEquals(1L, $noinline$UnsignedLongRem03(13L));
+    expectEquals(1L, $noinline$UnsignedLongRem04(13L));
+    expectEquals(1L, $noinline$UnsignedLongRem05(101L));
+    expectEquals(11L, $noinline$UnsignedLongRem06(101L));
+
+    expectEquals(-1L, $noinline$SignedLongRem01(-13L));
+    expectEquals(-1L, $noinline$SignedLongRem02(-13L));
+    expectEquals(1L, $noinline$SignedLongRem03(-13L));
+    expectEquals(1L, $noinline$SignedLongRem04(-13L, true));
+    expectEquals(0L, $noinline$SignedLongRem05(-12L, 0L,-13L));
+    expectEquals(-1L, $noinline$SignedLongRem06(-13L));
   }
 
   // Test cases for Int64 HDiv/HRem to check that optimizations implemented for Int32 are not
@@ -408,5 +717,232 @@ public class RemTest {
   private static long $noinline$LongRemByMinus100(long v) {
     long r = v % -100L;
     return r;
+  }
+
+  private static long $noinline$Negate(long v) {
+    return -v;
+  }
+
+  private static long $noinline$Decrement(long v) {
+    return v - 1;
+  }
+
+  private static long $noinline$Increment(long v) {
+    return v + 1;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem01(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem01(long v) {
+    long c = 0;
+    if (v > 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem02(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem02(long v) {
+    long c = 0;
+    if (0 < v) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem03(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem03(long v) {
+    long c = 0;
+    if (v >= 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem04(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem04(long v) {
+    long c = 0;
+    if (0 <= v) {
+      c = v % 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem05(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            lsr x{{\d+}}, x{{\d+}}, #2
+  /// CHECK-NEXT:            mov x{{\d+}}, #0xa
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem05(long v) {
+    long c = 0;
+    for(; v > 100; ++c) {
+      v %= 10;
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$UnsignedLongRem06(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            lsr x{{\d+}}, x{{\d+}}, #2
+  /// CHECK:                 msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$UnsignedLongRem06(long v) {
+    if (v < 10) {
+      v = $noinline$Negate(v); // This is to prevent from using Select.
+    } else {
+      v = (v % 10) + (v / 10);
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem01(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem01(long v) {
+    long c = 0;
+    if (v < 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem02(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem02(long v) {
+    long c = 0;
+    if (v <= 0) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem03(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem03(long v) {
+    boolean positive = (v > 0);
+    long c = v % 6;
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem04(long, boolean) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem04(long v, boolean apply_rem) {
+    long c = 0;
+    boolean positive = (v > 0);
+    if (apply_rem) {
+      c = v % 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem05(long, long, long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem05(long v, long a, long b) {
+    long c = 0;
+
+    if (v < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (b < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (v > b) {
+      c = v % 6;
+    } else {
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long RemTest.$noinline$SignedLongRem06(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  /// CHECK-NEXT:            mov x{{\d+}}, #0x6
+  /// CHECK-NEXT:            msub x{{\d+}}, x{{\d+}}, x{{\d+}}, x{{\d+}}
+  private static long $noinline$SignedLongRem06(long v) {
+    long c = v % 6;
+
+    if (v > 0) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+
+    return c;
   }
 }

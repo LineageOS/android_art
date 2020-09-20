@@ -45,8 +45,9 @@ BitVector::BitVector(uint32_t start_bits,
               allocator,
               BitsToWords(start_bits),
               static_cast<uint32_t*>(allocator->Alloc(BitsToWords(start_bits) * kWordBytes))) {
+  // We don't know if the allocator cleared things.
+  ClearAllBits();
 }
-
 
 BitVector::BitVector(const BitVector& src,
                      bool expandable,
@@ -60,7 +61,10 @@ BitVector::BitVector(const BitVector& src,
 }
 
 BitVector::~BitVector() {
-  allocator_->Free(storage_);
+  if (storage_ != nullptr) {
+    // Only free if we haven't been moved out of.
+    allocator_->Free(storage_);
+  }
 }
 
 bool BitVector::SameBitsSet(const BitVector *src) const {

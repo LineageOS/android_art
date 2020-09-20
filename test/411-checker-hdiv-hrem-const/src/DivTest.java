@@ -27,6 +27,12 @@ public class DivTest {
     }
   }
 
+  private static void expectEquals(String expected, String result) {
+    if (!expected.equals(result)) {
+      throw new Error("Expected: " + expected + ", found: " + result);
+    }
+  }
+
   public static void main() {
     divInt();
     divLong();
@@ -95,6 +101,25 @@ public class DivTest {
     expectEquals(1, $noinline$IntDivByMinus6(-6));
     expectEquals(-3, $noinline$IntDivByMinus6(19));
     expectEquals(3, $noinline$IntDivByMinus6(-19));
+
+    expectEquals(2, $noinline$UnsignedIntDiv01(12));
+    expectEquals(2, $noinline$UnsignedIntDiv02(12));
+    expectEquals(2, $noinline$UnsignedIntDiv03(12));
+    expectEquals(2, $noinline$UnsignedIntDiv04(12));
+    expectEquals("01", $noinline$UnsignedIntDiv05(10));
+    expectEquals("321", $noinline$UnsignedIntDiv05(123));
+    expectEquals(1, $noinline$UnsignedIntDiv06(101));
+    expectEquals(1, $noinline$UnsignedIntDiv07(10));
+    expectEquals(1, $noinline$UnsignedIntDiv07(100));
+    expectEquals(10, $noinline$UnsignedIntDiv08(100));
+    expectEquals(11, $noinline$UnsignedIntDiv08(101));
+
+    expectEquals(-2, $noinline$SignedIntDiv01(-12));
+    expectEquals(-2, $noinline$SignedIntDiv02(-12));
+    expectEquals(2, $noinline$SignedIntDiv03(-12));
+    expectEquals(2, $noinline$SignedIntDiv04(-12, true));
+    expectEquals(-2, $noinline$SignedIntDiv05(-12, 0,-13));
+    expectEquals(-2, $noinline$SignedIntDiv06(-12));
   }
 
   // A test case to check that 'lsr' and 'asr' are combined into one 'asr'.
@@ -234,6 +259,303 @@ public class DivTest {
     return r;
   }
 
+  private static int $noinline$Negate(int v) {
+    return -v;
+  }
+
+  private static int $noinline$Decrement(int v) {
+    return v - 1;
+  }
+
+  private static int $noinline$Increment(int v) {
+    return v + 1;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv01(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv01(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv01(int v) {
+    int c = 0;
+    if (v > 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv02(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv02(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv02(int v) {
+    int c = 0;
+    if (0 < v) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv03(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv03(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv03(int v) {
+    int c = 0;
+    if (v >= 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv04(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv04(int) disassembly (after)
+  /// CHECK:                 lsr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NOT:             add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv04(int v) {
+    int c = 0;
+    if (0 <= v) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   java.lang.String DivTest.$noinline$UnsignedIntDiv05(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: java.lang.String DivTest.$noinline$UnsignedIntDiv05(int) disassembly (after)
+  /// CHECK:                 smull x{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK:                 lsr   x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             add   w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static String $noinline$UnsignedIntDiv05(int v) {
+    String r = "";
+    while (v > 0) {
+      int d = v % 10;
+      r += (char)(d + '0');
+      v /= 10;
+    }
+    return r;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv06(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv06(int) disassembly (after)
+  /// CHECK:                 smull x{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK:                 lsr   x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             add   w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv06(int v) {
+    int c = 0;
+    for(; v > 100; ++c) {
+      v /= 10;
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv07(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv07(int) disassembly (after)
+  /// CHECK:                 smull x{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK:                 lsr   x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             add   w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv07(int v) {
+    while (v > 0 && (v % 10) == 0) {
+      v /= 10;
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$UnsignedIntDiv08(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NOT:             sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$UnsignedIntDiv08(int) disassembly (after)
+  /// CHECK:                 smull x{{\d+}}, w{{\d+}}, w{{\d+}}
+  /// CHECK:                 lsr   x{{\d+}}, x{{\d+}}, #34
+  /// CHECK-NOT:             add   w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$UnsignedIntDiv08(int v) {
+    if (v < 10) {
+      v = $noinline$Negate(v); // This is to prevent from using Select.
+    } else {
+      v = (v % 10) + (v / 10);
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv01(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv01(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv01(int v) {
+    int c = 0;
+    if (v < 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv02(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv02(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv02(int v) {
+    int c = 0;
+    if (v <= 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv03(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv03(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv03(int v) {
+    boolean positive = (v > 0);
+    int c = v / 6;
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv04(int, boolean) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv04(int, boolean) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv04(int v, boolean apply_div) {
+    int c = 0;
+    boolean positive = (v > 0);
+    if (apply_div) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv05(int, int, int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv05(int, int, int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv05(int v, int a, int b) {
+    int c = 0;
+
+    if (v < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (b < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (v > b) {
+      c = v / 6;
+    } else {
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM:   int DivTest.$noinline$SignedIntDiv06(int) disassembly (after)
+  /// CHECK:                 smull     r{{\d+}}, r{{\d+}}, r{{\d+}}, r{{\d+}}
+  /// CHECK-NEXT:            sub       r{{\d+}}, r{{\d+}}, r{{\d+}}, asr #31
+  //
+  /// CHECK-START-ARM64: int DivTest.$noinline$SignedIntDiv06(int) disassembly (after)
+  /// CHECK:                 asr x{{\d+}}, x{{\d+}}, #32
+  /// CHECK-NEXT:            add w{{\d+}}, w{{\d+}}, w{{\d+}}, lsr #31
+  private static int $noinline$SignedIntDiv06(int v) {
+    int c = v / 6;
+
+    if (v > 0) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
   private static void divLong() {
     expectEquals(0L, $noinline$LongDivBy18(0L));
     expectEquals(0L, $noinline$LongDivBy18(1L));
@@ -298,6 +620,25 @@ public class DivTest {
     expectEquals(1L, $noinline$LongDivByMinus100(-100L));
     expectEquals(-3L, $noinline$LongDivByMinus100(301L));
     expectEquals(3L, $noinline$LongDivByMinus100(-301L));
+
+    expectEquals(2L, $noinline$UnsignedLongDiv01(12L));
+    expectEquals(2L, $noinline$UnsignedLongDiv02(12L));
+    expectEquals(2L, $noinline$UnsignedLongDiv03(12L));
+    expectEquals(2L, $noinline$UnsignedLongDiv04(12L));
+    expectEquals("01", $noinline$UnsignedLongDiv05(10L));
+    expectEquals("321", $noinline$UnsignedLongDiv05(123L));
+    expectEquals(1L, $noinline$UnsignedLongDiv06(101L));
+    expectEquals(1L, $noinline$UnsignedLongDiv07(10L));
+    expectEquals(1L, $noinline$UnsignedLongDiv07(100L));
+    expectEquals(10L, $noinline$UnsignedLongDiv08(100L));
+    expectEquals(11L, $noinline$UnsignedLongDiv08(101L));
+
+    expectEquals(-2L, $noinline$SignedLongDiv01(-12L));
+    expectEquals(-2L, $noinline$SignedLongDiv02(-12L));
+    expectEquals(2L, $noinline$SignedLongDiv03(-12L));
+    expectEquals(2L, $noinline$SignedLongDiv04(-12L, true));
+    expectEquals(-2L, $noinline$SignedLongDiv05(-12L, 0L,-13L));
+    expectEquals(-2L, $noinline$SignedLongDiv06(-12L));
   }
 
   // Test cases for Int64 HDiv/HRem to check that optimizations implemented for Int32 are not
@@ -375,5 +716,257 @@ public class DivTest {
   private static long $noinline$LongDivByMinus100(long v) {
     long r = v / -100L;
     return r;
+  }
+
+  private static long $noinline$Negate(long v) {
+    return -v;
+  }
+
+  private static long $noinline$Decrement(long v) {
+    return v - 1;
+  }
+
+  private static long $noinline$Increment(long v) {
+    return v + 1;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv01(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv01(long v) {
+    long c = 0;
+    if (v > 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv02(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv02(long v) {
+    long c = 0;
+    if (0 < v) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv03(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv03(long v) {
+    long c = 0;
+    if (v >= 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv04(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv04(long v) {
+    long c = 0;
+    if (0 <= v) {
+      c = v / 6;
+    } else {
+      c = $noinline$Negate(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: java.lang.String DivTest.$noinline$UnsignedLongDiv05(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            lsr   x{{\d+}}, x{{\d+}}, #2
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static String $noinline$UnsignedLongDiv05(long v) {
+    String r = "";
+    while (v > 0) {
+      long d = v % 10;
+      r += (char)(d + '0');
+      v /= 10;
+    }
+    return r;
+  }
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: void DivTest.$noinline$UnsignedLongDiv05(java.lang.StringBuilder, long, long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            lsr   x{{\d+}}, x{{\d+}}, #2
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static void $noinline$UnsignedLongDiv05(java.lang.StringBuilder sb, long w, long d) {
+    while (w > 0) {
+      sb.append((char)(d/w + '0'));
+      d = d % w;
+      w /= 10;
+    }
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv06(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv06(long v) {
+    long c = 0;
+    for(; v > 100; ++c) {
+      v /= 10;
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv07(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv07(long v) {
+    while (v > 0 && (v % 10) == 0) {
+      v /= 10;
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is not generated for a non-negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$UnsignedLongDiv08(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NOT:             add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$UnsignedLongDiv08(long v) {
+    if (v < 10) {
+      v = $noinline$Negate(v); // This is to prevent from using Select.
+    } else {
+      v = (v % 10) + (v / 10);
+    }
+    return v;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv01(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv01(long v) {
+    long c = 0;
+    if (v < 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for a negative
+  // dividend and a positive divisor.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv02(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv02(long v) {
+    long c = 0;
+    if (v <= 0) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv03(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv03(long v) {
+    boolean positive = (v > 0);
+    long c = v / 6;
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv04(long, boolean) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv04(long v, boolean apply_div) {
+    long c = 0;
+    boolean positive = (v > 0);
+    if (apply_div) {
+      c = v / 6;
+    } else {
+      c = $noinline$Decrement(v); // This is to prevent from using Select.
+    }
+    if (!positive) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv05(long, long, long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv05(long v, long a, long b) {
+    long c = 0;
+
+    if (v < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (b < a)
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+
+    if (v > b) {
+      c = v / 6;
+    } else {
+      c = $noinline$Increment(c); // This is to prevent from using Select.
+    }
+
+    return c;
+  }
+
+  // A test case to check that a correcting 'add' is generated for signed division.
+  //
+  /// CHECK-START-ARM64: long DivTest.$noinline$SignedLongDiv06(long) disassembly (after)
+  /// CHECK:                 smulh x{{\d+}}, x{{\d+}}, x{{\d+}}
+  /// CHECK-NEXT:            add x{{\d+}}, x{{\d+}}, x{{\d+}}, lsr #63
+  private static long $noinline$SignedLongDiv06(long v) {
+    long c = v / 6;
+
+    if (v > 0) {
+      c = $noinline$Negate(c); // This is to prevent from using Select.
+    }
+
+    return c;
   }
 }

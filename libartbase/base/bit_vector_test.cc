@@ -18,6 +18,7 @@
 
 #include "allocator.h"
 #include "bit_vector-inl.h"
+#include "transform_iterator.h"
 #include "gtest/gtest.h"
 
 namespace art {
@@ -63,6 +64,32 @@ TEST(BitVector, Test) {
   EXPECT_EQ(kBits - 1u, *iterator);
   ++iterator;
   EXPECT_TRUE(iterator == bv.Indexes().end());
+}
+
+struct MessyAllocator : public Allocator {
+ public:
+  MessyAllocator() : malloc_(Allocator::GetMallocAllocator()) {}
+  ~MessyAllocator() {}
+
+  void* Alloc(size_t s) override {
+    void* res = malloc_->Alloc(s);
+    memset(res, 0xfe, s);
+    return res;
+  }
+
+  void Free(void* v) override {
+    malloc_->Free(v);
+  }
+
+ private:
+  Allocator* malloc_;
+};
+
+TEST(BitVector, MessyAllocator) {
+  MessyAllocator alloc;
+  BitVector bv(32, false, &alloc);
+  EXPECT_EQ(bv.NumSetBits(), 0u);
+  EXPECT_EQ(bv.GetHighestBitSet(), -1);
 }
 
 TEST(BitVector, NoopAllocator) {
@@ -267,6 +294,73 @@ TEST(BitVector, CopyTo) {
     EXPECT_EQ(0x80040000U, buf[0]);
     EXPECT_EQ(0x00000000U, buf[1]);
   }
+}
+
+TEST(BitVector, TransformIterator) {
+  BitVector bv(16, false, Allocator::GetMallocAllocator());
+  bv.SetBit(4);
+  bv.SetBit(8);
+
+  auto indexs = bv.Indexes();
+  for (int32_t negative :
+       MakeTransformRange(indexs, [](uint32_t idx) { return -1 * static_cast<int32_t>(idx); })) {
+    EXPECT_TRUE(negative == -4 || negative == -8);
+  }
+}
+
+class SingleAllocator : public Allocator {
+ public:
+  SingleAllocator() : alloc_count_(0), free_count_(0) {}
+  ~SingleAllocator() {
+    EXPECT_EQ(alloc_count_, 1u);
+    EXPECT_EQ(free_count_, 1u);
+  }
+
+  void* Alloc(size_t s) override {
+    EXPECT_LT(s, 1024ull);
+    EXPECT_EQ(alloc_count_, free_count_);
+    ++alloc_count_;
+    return bytes_.begin();
+  }
+
+  void Free(void*) override {
+    ++free_count_;
+  }
+
+  uint32_t AllocCount() const {
+    return alloc_count_;
+  }
+  uint32_t FreeCount() const {
+    return free_count_;
+  }
+
+ private:
+  std::array<uint8_t, 1024> bytes_;
+  uint32_t alloc_count_;
+  uint32_t free_count_;
+};
+
+TEST(BitVector, MovementFree) {
+  SingleAllocator alloc;
+  {
+    BitVector bv(16, false, &alloc);
+    bv.SetBit(13);
+    EXPECT_EQ(alloc.FreeCount(), 0u);
+    EXPECT_EQ(alloc.AllocCount(), 1u);
+    ASSERT_TRUE(bv.GetRawStorage() != nullptr);
+    EXPECT_TRUE(bv.IsBitSet(13));
+    {
+      BitVector bv2(std::move(bv));
+      ASSERT_TRUE(bv.GetRawStorage() == nullptr);
+      EXPECT_TRUE(bv2.IsBitSet(13));
+      EXPECT_EQ(alloc.FreeCount(), 0u);
+      EXPECT_EQ(alloc.AllocCount(), 1u);
+    }
+    EXPECT_EQ(alloc.FreeCount(), 1u);
+    EXPECT_EQ(alloc.AllocCount(), 1u);
+  }
+  EXPECT_EQ(alloc.FreeCount(), 1u);
+  EXPECT_EQ(alloc.AllocCount(), 1u);
 }
 
 }  // namespace art
