@@ -3468,8 +3468,8 @@ static void CreateVarHandleSetLocations(HInvoke* invoke) {
   uint32_t value_index = invoke->GetNumberOfArguments() - 1;
   HInstruction* value = invoke->InputAt(value_index);
   DataType::Type value_type = GetDataTypeFromShorty(invoke, value_index);
-  bool is_volatile = invoke->GetIntrinsic() == Intrinsics::kVarHandleSetVolatile;
-  if (value_type == DataType::Type::kInt64 && (!value->IsConstant() || is_volatile)) {
+  bool needs_atomicity = invoke->GetIntrinsic() != Intrinsics::kVarHandleSet;
+  if (value_type == DataType::Type::kInt64 && (!value->IsConstant() || needs_atomicity)) {
     // We avoid the case of a non-constant (or volatile) Int64 value because we would need to
     // place it in a register pair. If the slow path is taken, the ParallelMove might fail to move
     // the pair according to the X86DexCallingConvention in case of an overlap (e.g., move the
@@ -3500,7 +3500,7 @@ static void CreateVarHandleSetLocations(HInvoke* invoke) {
       locations->SetInAt(value_index, Location::RegisterOrConstant(value));
       break;
     case DataType::Type::kInt64:
-      // We only handle constant non-volatile int64 values.
+      // We only handle constant non-atomic int64 values.
       DCHECK(value->IsConstant());
       locations->SetInAt(value_index, Location::ConstantLocation(value->AsConstant()));
       break;
@@ -3509,7 +3509,7 @@ static void CreateVarHandleSetLocations(HInvoke* invoke) {
       break;
     default:
       DCHECK(DataType::IsFloatingPointType(value_type));
-      if (is_volatile && value_type == DataType::Type::kFloat64) {
+      if (needs_atomicity && value_type == DataType::Type::kFloat64) {
         locations->SetInAt(value_index, Location::RequiresFpuRegister());
       } else {
         locations->SetInAt(value_index, Location::FpuRegisterOrConstant(value));
@@ -3581,11 +3581,12 @@ static void GenerateVarHandleSet(HInvoke* invoke, CodeGeneratorX86* codegen) {
       // pair. If the slow path is taken, the Parallel move might fail to move the register pair
       // in case of an overlap (e.g., move from <EAX, EBX> to <EBX, ECX>). (Bug: b/168687887)
       break;
+    case Intrinsics::kVarHandleSetRelease:
+      // setRelease needs to ensure atomicity too. See the above comment.
+      codegen->GenerateMemoryBarrier(MemBarrierKind::kAnyStore);
+      break;
     case Intrinsics::kVarHandleSetVolatile:
       is_volatile = true;
-      break;
-    case Intrinsics::kVarHandleSetRelease:
-      codegen->GenerateMemoryBarrier(MemBarrierKind::kAnyStore);
       break;
     default:
       LOG(FATAL) << "GenerateVarHandleSet received non-set intrinsic " << invoke->GetIntrinsic();
