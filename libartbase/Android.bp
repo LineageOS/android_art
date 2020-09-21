@@ -72,10 +72,6 @@ cc_defaults {
                 "libbase",
             ],
             export_shared_lib_headers: ["libbase"],
-            // Exclude the version script from Darwin host since it's not
-            // supported by the linker there. That means ASan checks on Darwin
-            // might trigger ODR violations.
-            version_script: "libartbase.map",
         },
         not_windows: {
             srcs: [
@@ -93,11 +89,7 @@ cc_defaults {
             ],
             export_shared_lib_headers: ["libbase"],
         },
-        linux_glibc: {
-            version_script: "libartbase.map",
-        },
         windows: {
-            version_script: "libartbase.map",
             srcs: [
                 "base/mem_map_windows.cc",
             ],
@@ -119,14 +111,6 @@ cc_defaults {
     },
     generated_sources: ["art_libartbase_operator_srcs"],
     cflags: ["-DBUILDING_LIBART=1"],
-
-    // Utilities used by various ART libs and tools are linked in statically
-    // here to avoid shared lib dependencies outside the ART APEX. No target
-    // there should depend on these separately.
-    whole_static_libs: [
-        "liblz4",
-        "liblzma",
-    ],
 
     export_include_dirs: ["."],
     // ART's macros.h depends on libbase's macros.h.
