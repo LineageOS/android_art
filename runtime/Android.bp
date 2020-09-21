@@ -416,14 +416,15 @@ libart_cc_defaults {
     ],
     shared_libs: [
         "libartpalette",
+        "libbacktrace",
+        "libbase", // For common macros.
+        "liblog",
+        "liblz4",
+        "liblzma", // libelffile(d) dependency; must be repeated here since it's a static lib.
         "libnativebridge",
         "libnativeloader",
-        "libbacktrace",
-        "liblog",
-        // For common macros.
-        "libbase",
-        "libunwindstack",
         "libsigchain",
+        "libunwindstack",
     ],
     export_include_dirs: ["."],
     // ART's macros.h depends on libbase's macros.h.
@@ -469,6 +470,8 @@ libart_static_cc_defaults {
         "libbacktrace",
         "libbase",
         "liblog",
+        "liblz4",
+        "liblzma", // libelffile dependency; must be repeated here since it's a static lib.
         "libnativebridge",
         "libnativeloader",
         "libsigchain_fake",
