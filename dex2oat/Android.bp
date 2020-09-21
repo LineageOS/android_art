@@ -58,10 +58,8 @@ art_cc_defaults {
     generated_sources: ["art_dex2oat_operator_srcs"],
     shared_libs: [
         "libbase",
-
-        // For SHA-1 checksumming of build ID
-        "libcrypto",
-
+        "libcrypto", // For SHA-1 checksumming of build ID
+        "liblz4",
         "libz",
     ],
     export_include_dirs: ["."],
@@ -72,6 +70,7 @@ cc_defaults {
     static_libs: [
         "libbase",
         "libcrypto",
+        "liblz4",
         "libz",
     ],
 }
@@ -212,15 +211,16 @@ art_cc_binary {
     // either dex2oat or dex2oatd in ART source builds.
     visibility: ["//visibility:public"],
     shared_libs: [
-        "libprofile",
+        "libart",
         "libart-compiler",
         "libart-dexlayout",
-        "libart",
-        "libcrypto",
-        "libdexfile",
         "libartbase",
         "libartpalette",
         "libbase",
+        "libcrypto",
+        "libdexfile",
+        "liblz4", // libart-dex2oat dependency; must be repeated here since it's a static lib.
+        "libprofile",
         "libsigchain",
         "libz",
     ],
@@ -279,15 +279,16 @@ art_cc_binary {
     // either dex2oat or dex2oatd in ART source builds.
     visibility: ["//visibility:public"],
     shared_libs: [
-        "libprofiled",
+        "libartbased",
+        "libartd",
         "libartd-compiler",
         "libartd-dexlayout",
-        "libartd",
-        "libcrypto",
-        "libdexfiled",
-        "libartbased",
         "libartpalette",
         "libbase",
+        "libcrypto",
+        "libdexfiled",
+        "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
+        "libprofiled",
         "libsigchain",
         "libz",
     ],
@@ -389,11 +390,12 @@ art_cc_library_static {
         "common_compiler_driver_test.cc",
     ],
     shared_libs: [
-        "libartd-compiler",
-        "libartd-disassembler",
         "libart-compiler-gtest",
         "libart-runtime-gtest",
+        "libartd-compiler",
+        "libartd-disassembler",
         "libbase",
+        "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
     ],
     static_libs: [
         "libartd-dex2oat",
@@ -479,6 +481,7 @@ art_cc_test {
         "libartpalette",
         "libbase",
         "libcrypto",
+        "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
         "libprofiled",
         "libsigchain",
         "libziparchive",

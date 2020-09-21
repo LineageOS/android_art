@@ -160,6 +160,7 @@ art_cc_defaults {
     generated_sources: ["art_compiler_operator_srcs"],
     shared_libs: [
         "libbase",
+        "liblzma", // libelffile(d) dependency; must be repeated here since it's a static lib.
     ],
     header_libs: [
         "art_cmdlineparser_headers", // For compiler_options.
