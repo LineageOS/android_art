@@ -27,6 +27,7 @@ art_cc_defaults {
     ],
     shared_libs: [
         "libbase",
+        "liblzma",
     ],
 }
 
