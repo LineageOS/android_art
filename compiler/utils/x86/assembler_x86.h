@@ -207,6 +207,14 @@ class Address : public Operand {
     }
   }
 
+  Register GetBaseRegister() {
+    if (rm() == ESP) {
+      return base();
+    } else {
+      return rm();
+    }
+  }
+
   static Address Absolute(uintptr_t addr) {
     Address result;
     result.SetModRM(0, EBP);
