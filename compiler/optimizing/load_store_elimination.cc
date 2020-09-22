@@ -123,7 +123,7 @@
  * but if we use TryReplacingLoopPhiPlaceholderWithDefault() for default value
  * replacement search, there are additional dependencies to consider, see below.
  *
- * In the successful case (no unknown inputs found) we use the Floyd-Warshal
+ * In the successful case (no unknown inputs found) we use the Floyd-Warshall
  * algorithm to determine transitive closures for each found Phi placeholder,
  * and then match or materialize Phis from the smallest transitive closure,
  * so that we can determine if such subset has a single other input. This has
@@ -162,7 +162,7 @@
  *    O(phi_placeholder_dependencies * phi_placeholders)
  * term from unknown input cases is actually
  *    O(heap_locations^3 * blocks^3) ,
- * exactly as the estimate for the Floyd-Warshal parts of successful cases.
+ * exactly as the estimate for the Floyd-Warshall parts of successful cases.
  * Adding the other term from the unknown input cases (to account for the case
  * with significantly more instructions than blocks and heap locations), the
  * phase 2 time complexity is
@@ -2052,12 +2052,10 @@ void LSEVisitor::SearchPhiPlaceholdersForKeptStores() {
     work_queue.pop_back();
     size_t idx = phi_placeholder->GetHeapLocation();
     HBasicBlock* block = blocks[phi_placeholder->GetBlockId()];
-    HeapLocation* heap_loc = heap_location_collector_.GetHeapLocation(idx);
-    bool unknown_array_stores = false;
     for (HBasicBlock* predecessor : block->GetPredecessors()) {
       ScopedArenaVector<ValueRecord>& heap_values = heap_values_for_[predecessor->GetBlockId()];
-      // For loop back-edges we must also preserve all stores to locations that may alias
-      // with the location `idx`.
+      // For loop back-edges we must also preserve all stores to locations that
+      // may alias with the location `idx`.
       // TODO: Review whether we need to keep stores to aliased locations from pre-header.
       // TODO: Add tests cases around this.
       bool is_back_edge =
@@ -2066,7 +2064,31 @@ void LSEVisitor::SearchPhiPlaceholdersForKeptStores() {
       size_t end = is_back_edge ? heap_values.size() : idx + 1u;
       for (size_t i = start; i != end; ++i) {
         Value stored_by = heap_values[i].stored_by;
-        if (!stored_by.IsUnknown() && (i == idx || heap_location_collector_.MayAlias(i, idx))) {
+        auto may_alias = [this, block, idx](size_t i) {
+            DCHECK_NE(i, idx);
+            DCHECK(block->IsLoopHeader());
+            if (heap_location_collector_.MayAlias(i, idx)) {
+              return true;
+            }
+            // For array locations with index defined inside the loop, include
+            // all other locations in the array, even those that LSA declares
+            // non-aliasing, such as `a[i]` and `a[i + 1]`, as they may actually
+            // refer to the same locations for different iterations. (LSA's
+            // `ComputeMayAlias()` does not consider different loop iterations.)
+            HeapLocation* heap_loc = heap_location_collector_.GetHeapLocation(idx);
+            HeapLocation* other_loc = heap_location_collector_.GetHeapLocation(i);
+            if (heap_loc->IsArray() &&
+                other_loc->IsArray() &&
+                heap_loc->GetReferenceInfo() == other_loc->GetReferenceInfo() &&
+                block->GetLoopInformation()->Contains(*heap_loc->GetIndex()->GetBlock())) {
+              // If one location has index defined inside and the other index defined outside
+              // of the loop, LSA considers them aliasing and we take an early return above.
+              DCHECK(block->GetLoopInformation()->Contains(*other_loc->GetIndex()->GetBlock()));
+              return true;
+            }
+            return false;
+        };
+        if (!stored_by.IsUnknown() && (i == idx || may_alias(i))) {
           if (stored_by.NeedsPhi()) {
             size_t phi_placeholder_index = PhiPlaceholderIndex(stored_by);
             if (!phi_placeholders_to_search_for_kept_stores_.IsBitSet(phi_placeholder_index)) {
@@ -2076,51 +2098,6 @@ void LSEVisitor::SearchPhiPlaceholdersForKeptStores() {
           } else {
             DCHECK(IsStore(stored_by.GetInstruction()));
             kept_stores_.SetBit(stored_by.GetInstruction()->GetId());
-          }
-        } else if (stored_by.IsUnknown() && heap_loc->IsArray()) {
-          // See comment below. We are an array load where we don't know how the
-          // value got there. Need to ensure that writes aren't omitted (in
-          // ways that are observable) since this looks like a read from an
-          // arbitrary point in the array.
-          unknown_array_stores = true;
-        }
-      }
-    }
-    if (unknown_array_stores) {
-      // Since we are an array, actually ended up here, and don't have a known
-      // set this must be from a previous iteration (otherwise we'd either not
-      // reach this because stores were kept from escapes or just known from
-      // earlier). We need to keep all stores that could affect this read.
-      //
-      // This is sufficient since
-      // (1) If we are not an array then all loads and stores are at known,
-      //     exact offsets (fields and such).
-      // (2) If we didn't end up here then we either had no chance to turn
-      //     this load into a phi or we know what the actual value is (above
-      //     branch).
-      //
-      // Since none of these are true we are reading from some location in
-      // the array and we have no idea where/if it was written. This means
-      // we need to be super conservative and preserve all writes that could
-      // possibly occur before this read, in case one of them is the write
-      // that supplies the value. This means keeping the last store for
-      // every heap location touching this array in every block.
-      //
-      // TODO We can do better and do partial LSE around this but we don't
-      // have the data for that at the moment.
-      // TODO Can we be more selective w/o partial LSE data?
-      // TODO Do some analysis to see how much we are leaving on the table
-      // with this.
-      for (uint32_t j = 0; j < heap_location_collector_.GetNumberOfHeapLocations(); ++j) {
-        auto candidate_heap_location = heap_location_collector_.GetHeapLocation(j);
-        // If the heap-location is part of this same array.
-        if (candidate_heap_location->GetReferenceInfo() == heap_loc->GetReferenceInfo()) {
-          for (const auto& hv : heap_values_for_) {
-            if (hv.size() > j && hv[j].stored_by.IsInstruction()) {
-              // This is the last store in this block. We can't tell if it's
-              // to the right location or not so we'll need to keep it.
-              kept_stores_.SetBit(hv[j].stored_by.GetInstruction()->GetId());
-            }
           }
         }
       }
