@@ -59,9 +59,9 @@ class ArmVIXLAssemblerTest : public AssemblerTestBase {
     disassembly = std::regex_replace(disassembly, annotation_re, "");
 
     std::string expected2 = "\n" +
-        obj_file + ": file format ELF32-arm-little\n\n\n"
+        obj_file + ": file format elf32-littlearm\n\n\n"
         "Disassembly of section .text:\n\n"
-        "00000000 .text:\n" +
+        "00000000 <.text>:\n" +
         expected;
     EXPECT_EQ(expected2, disassembly);
     if (expected2 != disassembly) {
