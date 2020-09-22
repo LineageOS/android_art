@@ -43,6 +43,7 @@ TEST_F(DwarfTest, DebugFrame) {
   DebugFrameOpCodeWriter<> opcodes;
   DW_CHECK(".debug_frame contents:");
   DW_CHECK("FDE");
+  DW_CHECK_NEXT("DWARF32");
   DW_CHECK_NEXT("DW_CFA_nop:");  // TODO: Why is a nop here.
   int pc = 0;
   for (int i : {0, 1, 0x3F, 0x40, 0xFF, 0x100, 0xFFFF, 0x10000}) {
@@ -157,6 +158,7 @@ TEST_F(DwarfTest, x86_64_RegisterMapping) {
     opcodes.RelOffset(Reg::X86_64Core(i), 0);
   }
   DW_CHECK("FDE");
+  DW_CHECK_NEXT("DWARF32");
   DW_CHECK_NEXT("DW_CFA_nop:");  // TODO: Why is a nop here.
   DW_CHECK_NEXT("DW_CFA_offset: reg0 0");
   DW_CHECK_NEXT("DW_CFA_offset: reg2 0");
@@ -215,11 +217,6 @@ TEST_F(DwarfTest, DebugLine) {
   DW_CHECK_NEXT("file_names[  3]:");
   DW_CHECK_NEXT("           name: \"file2.c\"");
   DW_CHECK_NEXT("      dir_index: 1");
-  DW_CHECK_NEXT("       mod_time: 0x000003e8");
-  DW_CHECK_NEXT("         length: 0x000007d0");
-  DW_CHECK_NEXT("file_names[  4]:");
-  DW_CHECK_NEXT("           name: \"file.c\"");
-  DW_CHECK_NEXT("      dir_index: 0");
   DW_CHECK_NEXT("       mod_time: 0x000003e8");
   DW_CHECK_NEXT("         length: 0x000007d0");
 
@@ -303,7 +300,7 @@ TEST_F(DwarfTest, DebugInfo) {
   DebugInfoEntryWriter<> info(is64bit, &debug_abbrev);
   DW_CHECK(".debug_info contents:");
   info.StartTag(dwarf::DW_TAG_compile_unit);
-  DW_CHECK_NEXT("Compile Unit: length = 0x00000030 version = 0x0004 abbr_offset = 0x0000 addr_size = 0x04");
+  DW_CHECK_NEXT("Compile Unit: length = 0x00000030, format = DWARF32, version = 0x0004, abbr_offset = 0x0000, addr_size = 0x04");
   DW_CHECK_NEXT("DW_TAG_compile_unit");
   info.WriteStrp(dwarf::DW_AT_producer, "Compiler name", &debug_str_data_);
   DW_CHECK_NEXT("  DW_AT_producer (\"Compiler name\")");
