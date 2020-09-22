@@ -29,6 +29,8 @@
 #include "driver/dex_compilation_unit.h"
 #include "driver/compiler_options.h"
 #include "imtable-inl.h"
+#include "intrinsics.h"
+#include "intrinsics_utils.h"
 #include "jit/jit.h"
 #include "mirror/dex_cache.h"
 #include "oat_file.h"
@@ -1148,6 +1150,21 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
   return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
 }
 
+static bool VarHandleAccessorNeedsReturnTypeCheck(HInvoke* invoke, DataType::Type return_type) {
+  mirror::VarHandle::AccessModeTemplate access_mode_template =
+      mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
+
+  switch (access_mode_template) {
+    case mirror::VarHandle::AccessModeTemplate::kGet:
+    case mirror::VarHandle::AccessModeTemplate::kGetAndUpdate:
+    case mirror::VarHandle::AccessModeTemplate::kCompareAndExchange:
+      return return_type == DataType::Type::kReference;
+    case mirror::VarHandle::AccessModeTemplate::kSet:
+    case mirror::VarHandle::AccessModeTemplate::kCompareAndSet:
+      return false;
+  }
+}
+
 bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
                                                  uint32_t method_idx,
                                                  dex::ProtoIndex proto_idx,
@@ -1180,19 +1197,16 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
     return false;
   }
 
-  bool needs_ret_type_check =
-      resolved_method->GetIntrinsic() == static_cast<uint32_t>(Intrinsics::kVarHandleGet) &&
-      return_type == DataType::Type::kReference &&
-      // VarHandle.get() is only implemented for fields now.
-      number_of_arguments < 3u;
-  if (needs_ret_type_check) {
+  if (invoke->GetIntrinsic() != Intrinsics::kMethodHandleInvoke &&
+      invoke->GetIntrinsic() != Intrinsics::kMethodHandleInvokeExact &&
+      VarHandleAccessorNeedsReturnTypeCheck(invoke, return_type)) {
+    // Type check is needed because VarHandle intrinsics do not type check the retrieved reference.
     ScopedObjectAccess soa(Thread::Current());
     ArtMethod* referrer = graph_->GetArtMethod();
-    dex::TypeIndex ret_type_index = referrer->GetDexFile()->GetProtoId(proto_idx).return_type_idx_;
+    dex::TypeIndex return_type_index =
+        referrer->GetDexFile()->GetProtoId(proto_idx).return_type_idx_;
 
-    // Type check is needed because intrinsic implementations do not type check the retrieved
-    // reference.
-    BuildTypeCheck(/* is_instance_of= */ false, invoke, ret_type_index, dex_pc);
+    BuildTypeCheck(/* is_instance_of= */ false, invoke, return_type_index, dex_pc);
     latest_result_ = current_block_->GetLastInstruction();
   }
 
