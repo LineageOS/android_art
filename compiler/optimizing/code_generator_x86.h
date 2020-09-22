@@ -442,13 +442,12 @@ class CodeGeneratorX86 : public CodeGenerator {
   void Move32(Location destination, Location source);
   // Helper method to move a 64bits value between two locations.
   void Move64(Location destination, Location source);
-  // Helper method to move a primitive value from an address to a register.
-  void MoveFromMemory(DataType::Type dst_type,
-                      Location dst,
-                      Register src_base,
-                      Register src_index = Register::kNoRegister,
-                      ScaleFactor src_scale = TIMES_1,
-                      int32_t src_disp = 0);
+  // Helper method to load a value from an address to a register.
+  void LoadFromMemoryNoBarrier(DataType::Type dst_type,
+                               Location dst,
+                               Address src,
+                               XmmRegister temp = kNoXmmRegister,
+                               bool is_atomic_load = false);
   // Helper method to move a primitive value from a location to an address.
   void MoveToMemory(DataType::Type src_type,
                     Location src,
