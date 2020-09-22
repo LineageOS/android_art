@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-import resolved.SubclassOfUnresolvedClass;
-import resolved.SubclassOfUnresolvedClass2;
-import unresolved.UnresolvedClass;
+import resolved.PublicSubclassOfUnresolvedClass;
+import resolved.PublicSubclassOfUnresolvedClass2;
+import unresolved.UnresolvedPublicClass;
 
 public class Test {
   public static void $noinline$main() {
-    UnresolvedClass.$noinline$main();
-    SubclassOfUnresolvedClass.$noinline$main();
-    SubclassOfUnresolvedClass2.$noinline$main();
+    UnresolvedPublicClass.$noinline$main();
+    PublicSubclassOfUnresolvedClass.$noinline$main();
+    PublicSubclassOfUnresolvedClass2.$noinline$main();
   }
 }
