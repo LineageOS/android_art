@@ -1915,6 +1915,17 @@ class JNI {
     ScopedObjectAccess soa(env);
     ObjPtr<mirror::String> s = soa.Decode<mirror::String>(java_string);
     gc::Heap* heap = Runtime::Current()->GetHeap();
+    if (heap->IsMovableObject(s)) {
+      StackHandleScope<1> hs(soa.Self());
+      HandleWrapperObjPtr<mirror::String> h(hs.NewHandleWrapper(&s));
+      if (!kUseReadBarrier) {
+        heap->IncrementDisableMovingGC(soa.Self());
+      } else {
+        // For the CC collector, we only need to wait for the thread flip rather than the whole GC
+        // to occur thanks to the to-space invariant.
+        heap->IncrementDisableThreadFlip(soa.Self());
+      }
+    }
     if (s->IsCompressed()) {
       if (is_copy != nullptr) {
         *is_copy = JNI_TRUE;
@@ -1926,17 +1937,6 @@ class JNI {
       }
       return chars;
     } else {
-      if (heap->IsMovableObject(s)) {
-        StackHandleScope<1> hs(soa.Self());
-        HandleWrapperObjPtr<mirror::String> h(hs.NewHandleWrapper(&s));
-        if (!kUseReadBarrier) {
-          heap->IncrementDisableMovingGC(soa.Self());
-        } else {
-          // For the CC collector, we only need to wait for the thread flip rather
-          // than the whole GC to occur thanks to the to-space invariant.
-          heap->IncrementDisableThreadFlip(soa.Self());
-        }
-      }
       if (is_copy != nullptr) {
         *is_copy = JNI_FALSE;
       }
@@ -1951,16 +1951,14 @@ class JNI {
     ScopedObjectAccess soa(env);
     gc::Heap* heap = Runtime::Current()->GetHeap();
     ObjPtr<mirror::String> s = soa.Decode<mirror::String>(java_string);
-    if (!s->IsCompressed() && heap->IsMovableObject(s)) {
+    if (heap->IsMovableObject(s)) {
       if (!kUseReadBarrier) {
         heap->DecrementDisableMovingGC(soa.Self());
       } else {
         heap->DecrementDisableThreadFlip(soa.Self());
       }
     }
-    // TODO: For uncompressed strings GetStringCritical() always returns `s->GetValue()`.
-    // Should we report an error if the user passes a different `chars`?
-    if (s->IsCompressed() || (!s->IsCompressed() && s->GetValue() != chars)) {
+    if (s->IsCompressed() || (s->IsCompressed() == false && s->GetValue() != chars)) {
       delete[] chars;
     }
   }
