@@ -525,18 +525,19 @@ class Hierarchy final {
         continue;
       }
 
-      HierarchyClass* superclass = FindClass(dex_klass.GetSuperclassDescriptor());
-      CHECK(superclass != nullptr)
-          << "Superclass " << dex_klass.GetSuperclassDescriptor()
+      auto add_extends = [&](const std::string_view& extends_desc) {
+        HierarchyClass* extends = FindClass(extends_desc);
+        CHECK(extends != nullptr)
+          << "Superclass/interface " << extends_desc
           << " of class " << dex_klass.GetDescriptor() << " from dex file \""
           << dex_klass.GetDexFile().GetLocation() << "\" was not found. "
-          << "Either the superclass is missing or it appears later in the classpath spec.";
-      klass.AddExtends(*superclass);
+          << "Either it is missing or it appears later in the classpath spec.";
+        klass.AddExtends(*extends);
+      };
 
+      add_extends(dex_klass.GetSuperclassDescriptor());
       for (const std::string_view& iface_desc : dex_klass.GetInterfaceDescriptors()) {
-        HierarchyClass* iface = FindClass(iface_desc);
-        CHECK(iface != nullptr);
-        klass.AddExtends(*iface);
+        add_extends(iface_desc);
       }
     }
   }
