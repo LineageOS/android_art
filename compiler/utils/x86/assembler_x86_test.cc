@@ -331,6 +331,21 @@ TEST_F(AssemblerX86Test, LoadLongConstant) {
   DriverStr(expected, "LoadLongConstant");
 }
 
+TEST_F(AssemblerX86Test, Xchgb) {
+  DriverStr(RepeatwA(&x86::X86Assembler::xchgb,
+                     "xchgb {mem}, %{reg}"), "xchgb");
+}
+
+TEST_F(AssemblerX86Test, Xchgw) {
+  DriverStr(RepeatrA(&x86::X86Assembler::xchgw,
+                     "xchgw {mem}, %{reg}"), "xchgw");
+}
+
+TEST_F(AssemblerX86Test, Xchgl) {
+  DriverStr(RepeatRA(&x86::X86Assembler::xchgl,
+                     "xchgl {mem}, %{reg}"), "xchgl");
+}
+
 TEST_F(AssemblerX86Test, LockCmpxchgb) {
   DriverStr(RepeatAw(&x86::X86Assembler::LockCmpxchgb,
                      "lock cmpxchgb %{reg}, {mem}"), "lock_cmpxchgb");

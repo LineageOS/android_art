@@ -2887,6 +2887,27 @@ void X86Assembler::fprem() {
 }
 
 
+void X86Assembler::xchgb(Register reg, const Address& address) {
+  // For testing purpose
+  xchgb(static_cast<ByteRegister>(reg), address);
+}
+
+
+void X86Assembler::xchgb(ByteRegister reg, const Address& address) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitUint8(0x86);
+  EmitOperand(reg, address);
+}
+
+
+void X86Assembler::xchgw(Register reg, const Address& address) {
+  AssemblerBuffer::EnsureCapacity ensured(&buffer_);
+  EmitOperandSizeOverride();
+  EmitUint8(0x87);
+  EmitOperand(reg, address);
+}
+
+
 void X86Assembler::xchgl(Register dst, Register src) {
   AssemblerBuffer::EnsureCapacity ensured(&buffer_);
   EmitUint8(0x87);
