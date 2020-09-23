@@ -89,24 +89,41 @@ class CompactDexFile : public DexFile {
     // Max preheader size in uint16_ts.
     static constexpr size_t kMaxPreHeaderSize = 6;
 
-   private:
-    CodeItem() = default;
+    static constexpr size_t FieldsOffset() {
+      return OFFSETOF_MEMBER(CodeItem, fields_);
+    }
+
+    static constexpr size_t InsnsCountAndFlagsOffset() {
+      return OFFSETOF_MEMBER(CodeItem, insns_count_and_flags_);
+    }
+
+    static constexpr size_t InsnsOffset() {
+      return OFFSETOF_MEMBER(CodeItem, insns_);
+    }
 
     static constexpr size_t kRegistersSizeShift = 12;
     static constexpr size_t kInsSizeShift = 8;
     static constexpr size_t kOutsSizeShift = 4;
     static constexpr size_t kTriesSizeSizeShift = 0;
-    static constexpr uint16_t kFlagPreHeaderRegisterSize = 0x1 << 0;
-    static constexpr uint16_t kFlagPreHeaderInsSize = 0x1 << 1;
-    static constexpr uint16_t kFlagPreHeaderOutsSize = 0x1 << 2;
-    static constexpr uint16_t kFlagPreHeaderTriesSize = 0x1 << 3;
-    static constexpr uint16_t kFlagPreHeaderInsnsSize = 0x1 << 4;
+    static constexpr uint16_t kBitPreHeaderRegistersSize = 0;
+    static constexpr uint16_t kBitPreHeaderInsSize = 1;
+    static constexpr uint16_t kBitPreHeaderOutsSize = 2;
+    static constexpr uint16_t kBitPreHeaderTriesSize = 3;
+    static constexpr uint16_t kBitPreHeaderInsnsSize = 4;
+    static constexpr uint16_t kFlagPreHeaderRegistersSize = 0x1 << kBitPreHeaderRegistersSize;
+    static constexpr uint16_t kFlagPreHeaderInsSize = 0x1 << kBitPreHeaderInsSize;
+    static constexpr uint16_t kFlagPreHeaderOutsSize = 0x1 << kBitPreHeaderOutsSize;
+    static constexpr uint16_t kFlagPreHeaderTriesSize = 0x1 << kBitPreHeaderTriesSize;
+    static constexpr uint16_t kFlagPreHeaderInsnsSize = 0x1 << kBitPreHeaderInsnsSize;
     static constexpr size_t kInsnsSizeShift = 5;
     static constexpr size_t kInsnsSizeBits = sizeof(uint16_t) * kBitsPerByte -  kInsnsSizeShift;
 
+   private:
+    CodeItem() = default;
+
     // Combined preheader flags for fast testing if we need to go slow path.
     static constexpr uint16_t kFlagPreHeaderCombined =
-        kFlagPreHeaderRegisterSize |
+        kFlagPreHeaderRegistersSize |
         kFlagPreHeaderInsSize |
         kFlagPreHeaderOutsSize |
         kFlagPreHeaderTriesSize |
@@ -154,7 +171,7 @@ class CompactDexFile : public DexFile {
           *out_preheader = size;
         }
       };
-      preheader_encode(registers_size, kFlagPreHeaderRegisterSize);
+      preheader_encode(registers_size, kFlagPreHeaderRegistersSize);
       preheader_encode(ins_size, kFlagPreHeaderInsSize);
       preheader_encode(outs_size, kFlagPreHeaderOutsSize);
       preheader_encode(tries_size, kFlagPreHeaderTriesSize);
@@ -203,7 +220,7 @@ class CompactDexFile : public DexFile {
           *insns_count += static_cast<uint32_t>(*preheader) << 16;
         }
         if (!kDecodeOnlyInstructionCount) {
-          if (HasPreHeader(kFlagPreHeaderRegisterSize)) {
+          if (HasPreHeader(kFlagPreHeaderRegistersSize)) {
             --preheader;
             *registers_size += preheader[0];
           }
