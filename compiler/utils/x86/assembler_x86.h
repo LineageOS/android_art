@@ -695,6 +695,10 @@ class X86Assembler final : public Assembler {
   void fptan();
   void fprem();
 
+  void xchgb(ByteRegister reg, const Address& address);
+  void xchgb(Register reg, const Address& address);
+  void xchgw(Register reg, const Address& address);
+
   void xchgl(Register dst, Register src);
   void xchgl(Register reg, const Address& address);
 
