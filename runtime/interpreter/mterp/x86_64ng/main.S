@@ -73,11 +73,13 @@
 #define rINSTbl  %bl
 #define rIBASE   %r14
 #define rREFS    %r15
+#define rREFS32  %r15d
 #define CFI_REFS 15 // DWARF register number of the reference array (r15).
 
 // Temporary registers while setting up a frame.
 #define rNEW_FP   %r8
 #define rNEW_REFS %r9
+#define rNEW_REFS32 %r9d
 #define CFI_NEW_REFS 9
 
 /*
@@ -266,6 +268,80 @@ END_FUNCTION \name
     jmp 2b
 .endm
 
+// Expects:
+// - r10, and r11 to be available.
+// Outputs:
+// - \registers contains the dex registers size
+// - \outs contains the outs size
+// - if load_ins is 1, \ins contains the ins
+// - \code_item is replace with a pointer to the instructions
+.macro FETCH_CODE_ITEM_INFO code_item, registers, outs, ins, load_ins
+    testq MACRO_LITERAL(1), \code_item
+    je 5f
+    andq $$-2, \code_item  // Remove the extra bit that marks it's a compact dex file.
+    movzwl COMPACT_CODE_ITEM_FIELDS_OFFSET(\code_item), %r10d
+    movl %r10d, \registers
+    sarl $$COMPACT_CODE_ITEM_REGISTERS_SIZE_SHIFT, \registers
+    andl $$0xf, \registers
+    movl %r10d, \outs
+    sarl $$COMPACT_CODE_ITEM_OUTS_SIZE_SHIFT, \outs
+    andl $$0xf, \outs
+    .if \load_ins
+    movl %r10d, \ins
+    sarl $$COMPACT_CODE_ITEM_INS_SIZE_SHIFT, \ins
+    andl $$0xf, \ins
+    .else
+    movl %r10d, %r11d
+    sarl $$COMPACT_CODE_ITEM_INS_SIZE_SHIFT, %r11d
+    andl $$0xf, %r11d
+    addl %r11d, \registers
+    .endif
+    testw $$COMPACT_CODE_ITEM_REGISTERS_INS_OUTS_FLAGS, COMPACT_CODE_ITEM_FLAGS_OFFSET(\code_item)
+    je 4f
+    movq \code_item, %r11
+    testw $$COMPACT_CODE_ITEM_INSNS_FLAG, COMPACT_CODE_ITEM_FLAGS_OFFSET(\code_item)
+    je 1f
+    subq $$4, %r11
+1:
+    testw $$COMPACT_CODE_ITEM_REGISTERS_FLAG, COMPACT_CODE_ITEM_FLAGS_OFFSET(\code_item)
+    je 2f
+    subq $$2, %r11
+    movzwl (%r11), %r10d
+    addl %r10d, \registers
+2:
+    testw $$COMPACT_CODE_ITEM_INS_FLAG, COMPACT_CODE_ITEM_FLAGS_OFFSET(\code_item)
+    je 3f
+    subq $$2, %r11
+    movzwl (%r11), %r10d
+    .if \load_ins
+    addl %r10d, \ins
+    .else
+    addl %r10d, \registers
+    .endif
+3:
+    testw $$COMPACT_CODE_ITEM_OUTS_FLAG, COMPACT_CODE_ITEM_FLAGS_OFFSET(\code_item)
+    je 4f
+    subq $$2, %r11
+    movzwl (%r11), %r10d
+    addl %r10d, \outs
+4:
+    .if \load_ins
+    addl \ins, \registers
+    .endif
+    addq $$COMPACT_CODE_ITEM_INSNS_OFFSET, \code_item
+    jmp 6f
+5:
+    // Fetch dex register size.
+    movzwl CODE_ITEM_REGISTERS_SIZE_OFFSET(\code_item), \registers
+    // Fetch outs size.
+    movzwl CODE_ITEM_OUTS_SIZE_OFFSET(\code_item), \outs
+    .if \load_ins
+    movzwl CODE_ITEM_INS_SIZE_OFFSET(\code_item), \ins
+    .endif
+    addq $$CODE_ITEM_INSNS_OFFSET, \code_item
+6:
+.endm
+
 // Setup the stack to start executing the method. Expects:
 // - rdi to contain the ArtMethod
 // - rbx, r10, r11 to be available.
@@ -273,11 +349,10 @@ END_FUNCTION \name
 // Outputs
 // - rbx contains the dex registers size
 // - r11 contains the old stack pointer.
-.macro SETUP_STACK_FRAME code_item, refs, fp, cfi_refs
-    // Fetch dex register size.
-    movzwl CODE_ITEM_REGISTERS_SIZE_OFFSET(\code_item), %ebx
-    // Fetch outs size.
-    movzwq CODE_ITEM_OUTS_SIZE_OFFSET(\code_item), \refs
+// - \code_item is replace with a pointer to the instructions
+// - if load_ins is 1, r14 contains the ins
+.macro SETUP_STACK_FRAME code_item, refs, refs32, fp, cfi_refs, load_ins
+    FETCH_CODE_ITEM_INFO \code_item, %ebx, \refs32, %r14d, \load_ins
 
     // Compute required frame size for dex registers: ((2 * ebx) + refs)
     leaq (\refs, %rbx, 2), %r11
@@ -797,7 +872,7 @@ END_FUNCTION \name
    SPILL_ALL_CALLEE_SAVES
 
    // Setup the frame.
-   SETUP_STACK_FRAME %rax, rNEW_REFS, rNEW_FP, CFI_NEW_REFS
+   SETUP_STACK_FRAME %rax, rNEW_REFS, rNEW_REFS32, rNEW_FP, CFI_NEW_REFS, load_ins=0
    // Make r11 point to the top of the dex register array.
    leaq (rNEW_FP, %rbx, 4), %r11
 
@@ -806,7 +881,7 @@ END_FUNCTION \name
    movzwl 4(rPC), %ecx
 
    // Set the dex pc pointer.
-   leaq CODE_ITEM_INSNS_OFFSET(%rax), rPC
+   movq %rax, rPC
    CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
 .endm
 
@@ -1410,10 +1485,9 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
 
     // Setup the stack for executing the method.
-    SETUP_STACK_FRAME rPC, rREFS, rFP, CFI_REFS
+    SETUP_STACK_FRAME rPC, rREFS, rREFS32, rFP, CFI_REFS, load_ins=1
 
     // Setup the parameters
-    movzwl CODE_ITEM_INS_SIZE_OFFSET(rPC), %r14d
     testl %r14d, %r14d
     je .Lxmm_setup_finished
 
@@ -1457,8 +1531,6 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     LOOP_OVER_SHORTY_STORING_XMMS xmm7, r10, r14, rdi, .Lxmm_setup_finished
     LOOP_OVER_FPs r10, r14, rdi, r11, .Lxmm_setup_finished
 .Lxmm_setup_finished:
-    // Set the dex pc pointer.
-    addq $$CODE_ITEM_INSNS_OFFSET, rPC
     CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
 
     // Set rIBASE

@@ -230,7 +230,8 @@ inline const dex::CodeItem* ArtMethod::GetCodeItem() {
   PointerSize pointer_size = runtime->GetClassLinker()->GetImagePointerSize();
   return runtime->IsAotCompiler()
       ? GetDexFile()->GetCodeItem(reinterpret_cast32<uint32_t>(GetDataPtrSize(pointer_size)))
-      : reinterpret_cast<const dex::CodeItem*>(GetDataPtrSize(pointer_size));
+      : reinterpret_cast<const dex::CodeItem*>(
+          reinterpret_cast<uintptr_t>(GetDataPtrSize(pointer_size)) & ~1);
 }
 
 inline bool ArtMethod::IsResolvedTypeIdx(dex::TypeIndex type_idx) {
