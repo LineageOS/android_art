@@ -57,6 +57,7 @@ cc_defaults {
     target: {
         android: {
             srcs: [
+                "base/globals_unix.cc",
                 "base/mem_map_unix.cc",
             ],
             static_libs: [
