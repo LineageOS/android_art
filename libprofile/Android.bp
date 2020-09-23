@@ -39,7 +39,7 @@ cc_defaults {
                 // ZipArchive support, the order matters here to get all symbols.
                 "libziparchive",
             ],
-            export_shared_lib_headers: ["libbase"],
+            export_shared_lib_headers: ["libbase"], // ART's macros.h depends on libbase's macros.h.
         },
         not_windows: {
             shared_libs: [
@@ -48,7 +48,7 @@ cc_defaults {
                 "libz",
                 "libbase",
             ],
-            export_shared_lib_headers: ["libbase"],
+            export_shared_lib_headers: ["libbase"], // ART's macros.h depends on libbase's macros.h.
         },
         windows: {
             cflags: ["-Wno-thread-safety"],
@@ -58,7 +58,7 @@ cc_defaults {
                 "libz",
                 "libbase",
             ],
-            export_static_lib_headers: ["libbase"],
+            export_static_lib_headers: ["libbase"], // ART's macros.h depends on libbase's macros.h.
         },
         darwin: {
             enabled: true,
@@ -67,9 +67,6 @@ cc_defaults {
     //generated_sources: ["art_libartbase_operator_srcs"],
     cflags: ["-DBUILDING_LIBART=1"],
     export_include_dirs: ["."],
-    // ART's macros.h depends on libbase's macros.h.
-    // Note: runtime_options.h depends on cmdline. But we don't really want to export this
-    //       generically. dex2oat takes care of it itself.
 }
 
 cc_defaults {
