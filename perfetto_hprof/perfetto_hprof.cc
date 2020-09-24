@@ -181,6 +181,10 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
     }
 
     dump_smaps_ = cfg->dump_smaps();
+    for (auto it = cfg->ignored_types(); it; ++it) {
+      std::string name = (*it).ToStdString();
+      ignored_types_.emplace_back(std::move(name));
+    }
 
     uint64_t self_pid = static_cast<uint64_t>(getpid());
     for (auto pid_it = cfg->pid(); pid_it; ++pid_it) {
@@ -255,9 +259,12 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
     return nullptr;
   }
 
+  std::vector<std::string> ignored_types() { return ignored_types_; }
+
  private:
   bool enabled_ = false;
   bool dump_smaps_ = false;
+  std::vector<std::string> ignored_types_;
   static art::Thread* self_;
 };
 
@@ -506,6 +513,16 @@ void ForInstanceReferenceField(art::mirror::Class* klass, F fn) NO_THREAD_SAFETY
   }
 }
 
+bool IsIgnored(const std::vector<std::string>& ignored_types,
+               art::mirror::Object* obj) NO_THREAD_SAFETY_ANALYSIS {
+  if (obj->IsClass()) {
+    return false;
+  }
+  art::mirror::Class* klass = obj->GetClass();
+  return std::find(ignored_types.begin(), ignored_types.end(), PrettyType(klass)) !=
+         ignored_types.end();
+}
+
 void DumpPerfetto(art::Thread* self) {
   pid_t parent_pid = getpid();
   LOG(INFO) << "preparing to dump heap for " << parent_pid;
@@ -564,6 +581,7 @@ void DumpPerfetto(art::Thread* self) {
       [parent_pid, timestamp](JavaHprofDataSource::TraceContext ctx)
           NO_THREAD_SAFETY_ANALYSIS {
             bool dump_smaps;
+            std::vector<std::string> ignored_types;
             {
               auto ds = ctx.GetDataSourceLocked();
               if (!ds || !ds->enabled()) {
@@ -571,6 +589,7 @@ void DumpPerfetto(art::Thread* self) {
                 return;
               }
               dump_smaps = ds->dump_smaps();
+              ignored_types = ds->ignored_types();
             }
             LOG(INFO) << "dumping heap for " << parent_pid;
             if (dump_smaps) {
@@ -613,8 +632,8 @@ void DumpPerfetto(art::Thread* self) {
                 new protozero::PackedVarInt);
 
             art::Runtime::Current()->GetHeap()->VisitObjectsPaused(
-                [&writer, &interned_fields, &interned_locations,
-                &reference_field_ids, &reference_object_ids, &interned_classes](
+                [&writer, &interned_fields, &interned_locations, &reference_field_ids,
+                 &reference_object_ids, &interned_classes, &ignored_types](
                     art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                   if (obj->IsClass()) {
                     art::mirror::Class* klass = obj->AsClass().Ptr();
@@ -663,6 +682,10 @@ void DumpPerfetto(art::Thread* self) {
                           obj->AsClass()->GetLocation()));
                   }
 
+                  if (IsIgnored(ignored_types, obj)) {
+                    return;
+                  }
+
                   auto class_id = FindOrAppend(&interned_classes, class_ptr);
 
                   perfetto::protos::pbzero::HeapGraphObject* object_proto =
@@ -693,11 +716,16 @@ void DumpPerfetto(art::Thread* self) {
                           });
                     }
                   }
-                  for (const auto& p : referred_objects) {
-                    if (emit_field_ids) {
-                      reference_field_ids->Append(FindOrAppend(&interned_fields, p.first));
+                  for (auto& p : referred_objects) {
+                    const std::string& field_name = p.first;
+                    art::mirror::Object* referred_obj = p.second;
+                    if (referred_obj && IsIgnored(ignored_types, referred_obj)) {
+                      referred_obj = nullptr;
                     }
-                    reference_object_ids->Append(GetObjectId(p.second));
+                    if (emit_field_ids) {
+                      reference_field_ids->Append(FindOrAppend(&interned_fields, field_name));
+                    }
+                    reference_object_ids->Append(GetObjectId(referred_obj));
                   }
                   if (emit_field_ids) {
                     object_proto->set_reference_field_id(*reference_field_ids);
