@@ -964,7 +964,9 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
       // could resolve the callee to the wrong method.
       return nullptr;
     }
-    resolved_method = actual_method;
+    // Call GetCanonicalMethod in case the resolved method is a copy: for super calls, the encoding
+    // of ArtMethod in BSS relies on not having copies there.
+    resolved_method = actual_method->GetCanonicalMethod(class_linker->GetImagePointerSize());
   }
 
   if (*invoke_type == kInterface) {
