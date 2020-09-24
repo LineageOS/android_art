@@ -32,7 +32,7 @@ public class PackagePrivateSubclassOfUnresolvedClass2 extends UnresolvedPublicCl
   }
 
   /// CHECK-START: void resolved.PackagePrivateSubclassOfUnresolvedClass2.$noinline$testReferrersClass() builder (after)
-  // CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass2 needs_access_check:false
+  /// CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass2 needs_access_check:false
   static void $noinline$testReferrersClass() {
     Class<?> c = PackagePrivateSubclassOfUnresolvedClass2.class;
   }
