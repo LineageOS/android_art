@@ -3338,6 +3338,73 @@ public class Main {
     return obj.j;
   }
 
+  /// CHECK-START: int Main.testLoop34(int) load_store_elimination (before)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+
+  /// CHECK-START: int Main.testLoop34(int) load_store_elimination (after)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+
+  // Test that ArraySet with non-default value prevents matching ArrayGet for
+  // the same array to default value even when the ArraySet is using an index
+  // offset by one, making LSA declare that the two heap locations do not alias.
+  // Also test that the ArraySet is not eliminated.
+  private static int testLoop34(int n) {
+    int[] a = new int[n + 1];
+    int sum = 0;
+    for (int i = 0; i < n; ) {
+      int value = a[i] + 1;
+      sum += value;
+      ++i;
+      a[i] = value;
+    }
+    return sum;
+  }
+
+  /// CHECK-START: int Main.testLoop35(int) load_store_elimination (before)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+  /// CHECK-DAG:                 ArraySet
+
+  /// CHECK-START: int Main.testLoop35(int) load_store_elimination (after)
+  /// CHECK-DAG:                 NewArray
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 Phi
+  /// CHECK-DAG:                 ArrayGet
+  /// CHECK-DAG:                 ArraySet
+
+  /// CHECK-START: int Main.testLoop35(int) load_store_elimination (after)
+  /// CHECK:                     ArraySet
+  /// CHECK-NOT:                 ArraySet
+
+  // Test that ArraySet with non-default value prevents matching ArrayGet for
+  // the same array to default value even when the ArraySet is using an index
+  // offset by one, making LSA declare that the two heap locations do not alias.
+  // Also test that the ArraySet is not eliminated and that a store after the
+  // loop is eliminated.
+  private static int testLoop35(int n) {
+    int[] a = new int[n + 1];
+    int sum = 0;
+    for (int i = 0; i < n; ) {
+      int value = a[i] + 1;
+      sum += value;
+      ++i;
+      a[i] = value;
+    }
+    a[0] = 1;
+    return sum;
+  }
+
   /// CHECK-START: int Main.testNestedLoop1(TestClass, int) load_store_elimination (before)
   /// CHECK-DAG:                 InstanceFieldSet
   /// CHECK-DAG:                 InstanceFieldGet
@@ -4019,6 +4086,14 @@ public class Main {
     assertIntEquals(testLoop33(new TestClass(), 1), 0);
     assertIntEquals(testLoop33(new TestClass(), 2), 0);
     assertIntEquals(testLoop33(new TestClass(), 3), 0);
+    assertIntEquals(testLoop34(0), 0);
+    assertIntEquals(testLoop34(1), 1);
+    assertIntEquals(testLoop34(2), 3);
+    assertIntEquals(testLoop34(3), 6);
+    assertIntEquals(testLoop35(0), 0);
+    assertIntEquals(testLoop35(1), 1);
+    assertIntEquals(testLoop35(2), 3);
+    assertIntEquals(testLoop35(3), 6);
 
     assertIntEquals(testNestedLoop1(new TestClass(), 0), 1);
     assertIntEquals(testNestedLoop1(new TestClass(), 1), 1);
