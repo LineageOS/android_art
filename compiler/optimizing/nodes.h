@@ -4372,6 +4372,51 @@ enum IntrinsicExceptions {
   kCanThrow  // Intrinsic may throw exceptions.
 };
 
+// Determines how to load an ArtMethod*.
+enum class MethodLoadKind {
+  // Use a String init ArtMethod* loaded from Thread entrypoints.
+  kStringInit,
+
+  // Use the method's own ArtMethod* loaded by the register allocator.
+  kRecursive,
+
+  // Use PC-relative boot image ArtMethod* address that will be known at link time.
+  // Used for boot image methods referenced by boot image code.
+  kBootImageLinkTimePcRelative,
+
+  // Load from an entry in the .data.bimg.rel.ro using a PC-relative load.
+  // Used for app->boot calls with relocatable image.
+  kBootImageRelRo,
+
+  // Load from an entry in the .bss section using a PC-relative load.
+  // Used for methods outside boot image referenced by AOT-compiled app and boot image code.
+  kBssEntry,
+
+  // Use ArtMethod* at a known address, embed the direct address in the code.
+  // Used for for JIT-compiled calls.
+  kJitDirectAddress,
+
+  // Make a runtime call to resolve and call the method. This is the last-resort-kind
+  // used when other kinds are unimplemented on a particular architecture.
+  kRuntimeCall,
+};
+
+// Determines the location of the code pointer of an invoke.
+enum class CodePtrLocation {
+  // Recursive call, use local PC-relative call instruction.
+  kCallSelf,
+
+  // Use native pointer from the Artmethod*.
+  // Used for @CriticalNative to avoid going through the compiled stub. This call goes through
+  // a special resolution stub if the class is not initialized or no native code is registered.
+  kCallCriticalNative,
+
+  // Use code pointer from the ArtMethod*.
+  // Used when we don't know the target code. This is also the last-resort-kind used when
+  // other kinds are unimplemented or impractical (i.e. slow) on a particular architecture.
+  kCallArtMethod,
+};
+
 class HInvoke : public HVariableInputSizeInstruction {
  public:
   bool NeedsEnvironment() const override;
@@ -4585,51 +4630,6 @@ class HInvokeStaticOrDirect final : public HInvoke {
     kExplicit,  // Static call having explicit clinit check as last input.
     kImplicit,  // Static call implicitly requiring a clinit check.
     kLast = kImplicit
-  };
-
-  // Determines how to load the target ArtMethod*.
-  enum class MethodLoadKind {
-    // Use a String init ArtMethod* loaded from Thread entrypoints.
-    kStringInit,
-
-    // Use the method's own ArtMethod* loaded by the register allocator.
-    kRecursive,
-
-    // Use PC-relative boot image ArtMethod* address that will be known at link time.
-    // Used for boot image methods referenced by boot image code.
-    kBootImageLinkTimePcRelative,
-
-    // Load from an entry in the .data.bimg.rel.ro using a PC-relative load.
-    // Used for app->boot calls with relocatable image.
-    kBootImageRelRo,
-
-    // Load from an entry in the .bss section using a PC-relative load.
-    // Used for methods outside boot image referenced by AOT-compiled app and boot image code.
-    kBssEntry,
-
-    // Use ArtMethod* at a known address, embed the direct address in the code.
-    // Used for for JIT-compiled calls.
-    kJitDirectAddress,
-
-    // Make a runtime call to resolve and call the method. This is the last-resort-kind
-    // used when other kinds are unimplemented on a particular architecture.
-    kRuntimeCall,
-  };
-
-  // Determines the location of the code pointer.
-  enum class CodePtrLocation {
-    // Recursive call, use local PC-relative call instruction.
-    kCallSelf,
-
-    // Use native pointer from the Artmethod*.
-    // Used for @CriticalNative to avoid going through the compiled stub. This call goes through
-    // a special resolution stub if the class is not initialized or no native code is registered.
-    kCallCriticalNative,
-
-    // Use code pointer from the ArtMethod*.
-    // Used when we don't know the target code. This is also the last-resort-kind used when
-    // other kinds are unimplemented or impractical (i.e. slow) on a particular architecture.
-    kCallArtMethod,
   };
 
   struct DispatchInfo {
@@ -4858,8 +4858,8 @@ class HInvokeStaticOrDirect final : public HInvoke {
   const MethodReference resolved_method_reference_;
   DispatchInfo dispatch_info_;
 };
-std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::MethodLoadKind rhs);
-std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::CodePtrLocation rhs);
+std::ostream& operator<<(std::ostream& os, MethodLoadKind rhs);
+std::ostream& operator<<(std::ostream& os, CodePtrLocation rhs);
 std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::ClinitCheckRequirement rhs);
 
 class HInvokeVirtual final : public HInvoke {
