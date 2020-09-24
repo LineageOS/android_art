@@ -1,5 +1,6 @@
 ResolvedPackagePrivateClass.$noinline$publicStaticMethod()
 UnresolvedPublicClass passed
+UnresolvedPackagePrivateClass passed
 ResolvedPackagePrivateClass.$noinline$publicStaticMethod()
 ResolvedPackagePrivateClass.$noinline$publicStaticMethod()
 ResolvedPackagePrivateClass.$noinline$staticMethod()
@@ -7,3 +8,5 @@ ResolvedPackagePrivateClass.$noinline$staticMethod()
 PublicSubclassOfUnresolvedClass passed
 ResolvedPackagePrivateClass.$noinline$publicStaticMethod()
 PublicSubclassOfUnresolvedClass2 passed
+PackagePrivateSubclassOfUnresolvedClass passed
+PackagePrivateSubclassOfUnresolvedClass2 passed
