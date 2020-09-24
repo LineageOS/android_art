@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-import resolved.PackagePrivateSubclassOfUnresolvedClassProxy;
-import resolved.PackagePrivateSubclassOfUnresolvedClass2Proxy;
-import resolved.PublicSubclassOfUnresolvedClass;
-import resolved.PublicSubclassOfUnresolvedClass2;
-import unresolved.UnresolvedPackagePrivateClassProxy;
+package resolved;
+
+import getters.GetPackagePrivateSubclassOfUnresolvedClass2;
 import unresolved.UnresolvedPublicClass;
 
-public class Test {
+// This class is used for compiling code that accesses it but it is
+// replaced by a package-private class from src-ex2/ with reduced access
+// to run tests, including access check tests.
+public class PackagePrivateSubclassOfUnresolvedClass2 extends UnresolvedPublicClass {
   public static void $noinline$main() {
-    UnresolvedPublicClass.$noinline$main();
-    UnresolvedPackagePrivateClassProxy.$noinline$main();
-    PublicSubclassOfUnresolvedClass.$noinline$main();
-    PublicSubclassOfUnresolvedClass2.$noinline$main();
-    PackagePrivateSubclassOfUnresolvedClassProxy.$noinline$main();
-    PackagePrivateSubclassOfUnresolvedClass2Proxy.$noinline$main();
+    throw new Error("Unreachable");
   }
 }

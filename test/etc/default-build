@@ -92,6 +92,12 @@ else
   HAS_SRC_EX=false
 fi
 
+if [ -d src-ex2 ]; then
+  HAS_SRC_EX2=true
+else
+  HAS_SRC_EX2=false
+fi
+
 if [ -d src-dex2oat-unresolved ]; then
   HAS_SRC_DEX2OAT_UNRESOLVED=true
 else
@@ -152,6 +158,9 @@ while true; do
     shift
   elif [ "x$1" = "x--no-src-ex" ]; then
     HAS_SRC_EX=false
+    shift
+  elif [ "x$1" = "x--no-src-ex2" ]; then
+    HAS_SRC_EX2=false
     shift
   elif [ "x$1" = "x--no-smali" ]; then
     HAS_SMALI=false
@@ -411,7 +420,7 @@ if [[ "${HAS_JASMIN}" == true ]]; then
   else
     # Move jasmin classes into classes directory so that they are picked up with -cp classes.
     mkdir -p classes
-    mv jasmin_classes/* classes
+    cp -r jasmin_classes/* classes/
   fi
 fi
 
@@ -447,21 +456,35 @@ if [ "${HAS_SMALI_MULTIDEX}" = "true" -a ${NEED_DEX} = "true" ]; then
   make_dexmerge classes2.dex smali_classes2.dex
 fi
 
-if [ ${HAS_SRC_EX} = "true" ]; then
+if [ ${HAS_SRC_EX} = "true" -o ${HAS_SRC_EX2} = "true" ]; then
   # Build src-ex into classes-ex.
-  # Includes 'src', 'src-art' source when compiling classes-ex, but exclude their .class files.
-  if [[ "${HAS_SRC}" == "true" ]]; then
+  # Includes 'src', 'src-art' and 'jasmin' source when compiling classes-ex,
+  # but exclude their .class files.
+  if [ "${HAS_SRC}" = "true" -o "${HAS_SRC_ART}" = "true" -o "${HAS_JASMIN}" = "true" ]; then
     mkdir -p classes-tmp-for-ex
-    javac_with_bootclasspath -d classes-tmp-for-ex `find src -name '*.java'`
     src_tmp_for_ex="-cp classes-tmp-for-ex"
+  fi
+  if [[ "${HAS_SRC}" == "true" ]]; then
+    javac_with_bootclasspath -d classes-tmp-for-ex `find src -name '*.java'`
   fi
   if [[ "${HAS_SRC_ART}" == "true" ]]; then
-    mkdir -p classes-tmp-for-ex
     javac_with_bootclasspath -d classes-tmp-for-ex `find src-art -name '*.java'`
-    src_tmp_for_ex="-cp classes-tmp-for-ex"
+  fi
+  if [[ "${HAS_JASMIN}" == "true" ]]; then
+    make_jasmin classes-tmp-for-ex $(find 'jasmin' -name '*.j')
   fi
   mkdir -p classes-ex
-  javac_with_bootclasspath -d classes-ex $src_tmp_for_ex `find src-ex -name '*.java'`
+  if [ ${HAS_SRC_EX} = "true" ]; then
+    javac_with_bootclasspath -d classes-ex $src_tmp_for_ex `find src-ex -name '*.java'`
+    if [[ "x$src_tmp_for_ex" = "x" ]]; then
+      src_tmp_for_ex="-cp classes-ex"
+    else
+      src_tmp_for_ex="$src_tmp_for_ex:classes-ex"
+    fi
+  fi
+  if [ ${HAS_SRC_EX2} = "true" ]; then
+    javac_with_bootclasspath -d classes-ex $src_tmp_for_ex `find src-ex2 -name '*.java'`
+  fi
 fi
 
 if [[ -d classes-ex ]] && [ ${NEED_DEX} = "true" ]; then
