@@ -1388,6 +1388,7 @@ public class Main {
     Assert.assertEquals(Integer.divideUnsigned(100000, -1), 0);
     Assert.assertEquals(Integer.divideUnsigned(Integer.MAX_VALUE, -1), 0);
     Assert.assertEquals(Integer.divideUnsigned(-2, -1), 0);
+    Assert.assertEquals(Integer.divideUnsigned(-1, -2), 1);
     Assert.assertEquals(Integer.divideUnsigned(-173448, 13), 330368757);
     Assert.assertEquals(Integer.divideUnsigned(Integer.MIN_VALUE, 2), (1 << 30));
     Assert.assertEquals(Integer.divideUnsigned(-1, Integer.MIN_VALUE), 1);
