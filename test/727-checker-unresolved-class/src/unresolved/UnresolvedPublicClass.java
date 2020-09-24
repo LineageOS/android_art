@@ -16,11 +16,15 @@
 
 package unresolved;
 
+import getters.GetUnresolvedPublicClass;
 import resolved.ResolvedPackagePrivateClass;
 import resolved.ResolvedPublicSubclassOfPackagePrivateClass;
 
 public class UnresolvedPublicClass {
   public static void $noinline$main() {
+    $noinline$testReferrersClass();
+    $noinline$testInlinedReferrersClass();
+
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
 
@@ -39,6 +43,19 @@ public class UnresolvedPublicClass {
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
     System.out.println("UnresolvedPublicClass passed");
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testReferrersClass() builder (after)
+  // CHECK: LoadClass class_name:unresolved.UnresolvedPublicClass needs_access_check:false
+  static void $noinline$testReferrersClass() {
+    Class<?> c = UnresolvedPublicClass.class;
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testInlinedReferrersClass() inliner (after)
+  // CHECK: LoadClass class_name:unresolved.UnresolvedPublicClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClass() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetUnresolvedPublicClass.get();
   }
 
   /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testResolvedPublicClass() builder (after)

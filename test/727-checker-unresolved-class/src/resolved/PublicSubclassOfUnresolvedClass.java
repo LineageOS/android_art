@@ -16,10 +16,15 @@
 
 package resolved;
 
+import getters.GetPublicSubclassOfUnresolvedClass;
 import unresolved.UnresolvedPublicClass;
 
 public class PublicSubclassOfUnresolvedClass extends UnresolvedPublicClass {
   public static void $noinline$main() {
+    $noinline$testReferrersClass();
+    $noinline$testInlinedReferrersClass();
+    $noinline$testInlinedReferrersClassFromSamePackage();
+
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
 
@@ -38,6 +43,26 @@ public class PublicSubclassOfUnresolvedClass extends UnresolvedPublicClass {
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
     System.out.println("PublicSubclassOfUnresolvedClass passed");
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testReferrersClass() builder (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testReferrersClass() {
+    Class<?> c = PublicSubclassOfUnresolvedClass.class;
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testInlinedReferrersClass() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClass() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetPublicSubclassOfUnresolvedClass.get();
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testInlinedReferrersClassFromSamePackage() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClassFromSamePackage() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetPublicSubclassOfUnresolvedClassFromSamePackage.get();
   }
 
   /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testResolvedPublicClass() builder (after)
