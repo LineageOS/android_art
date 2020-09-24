@@ -325,19 +325,71 @@ END \name
     b 1b
 .endm
 
+// Uses x12, x13, and x14 as temporaries.
+.macro FETCH_CODE_ITEM_INFO code_item, registers, outs, ins, load_ins
+    tbz \code_item, #0, 4f
+    and \code_item, \code_item, #-2 // Remove the extra bit that marks it's a compact dex file
+    ldrh w13, [\code_item, #COMPACT_CODE_ITEM_FIELDS_OFFSET]
+    ubfx \registers, w13, #COMPACT_CODE_ITEM_REGISTERS_SIZE_SHIFT, #4
+    ubfx \outs, w13, #COMPACT_CODE_ITEM_OUTS_SIZE_SHIFT, #4
+    .if \load_ins
+    ubfx \ins, w13, #COMPACT_CODE_ITEM_INS_SIZE_SHIFT, #4
+    .else
+    ubfx w14, w13, #COMPACT_CODE_ITEM_INS_SIZE_SHIFT, #4
+    add \registers, \registers, w14
+    .endif
+    ldrh w13, [\code_item, #COMPACT_CODE_ITEM_FLAGS_OFFSET]
+    tst w13, #COMPACT_CODE_ITEM_REGISTERS_INS_OUTS_FLAGS
+    b.eq 3f
+    sub x14, \code_item, #4
+    tst w13, #COMPACT_CODE_ITEM_INSNS_FLAG
+    csel x14, x14, \code_item, ne
+
+    tbz w13, #COMPACT_CODE_ITEM_REGISTERS_BIT, 1f
+    ldrh w12, [x14, #-2]!
+    add \registers, \registers, w12
+1:
+    tbz w13, #COMPACT_CODE_ITEM_INS_BIT, 2f
+    ldrh w12, [x14, #-2]!
+    .if \load_ins
+    add \ins, \ins, w12
+    .else
+    add \registers, \registers, w12
+    .endif
+2:
+    tbz w13, #COMPACT_CODE_ITEM_OUTS_BIT, 3f
+    ldrh w12, [x14, #-2]!
+    add \outs, \outs, w12
+3:
+    .if \load_ins
+    add \registers, \registers, \ins
+    .endif
+    add \code_item, \code_item, #COMPACT_CODE_ITEM_INSNS_OFFSET
+    b 5f
+4:
+    // Fetch dex register size.
+    ldrh \registers, [\code_item, #CODE_ITEM_REGISTERS_SIZE_OFFSET]
+    // Fetch outs size.
+    ldrh \outs, [\code_item, #CODE_ITEM_OUTS_SIZE_OFFSET]
+    .if \load_ins
+    ldrh \ins, [\code_item, #CODE_ITEM_INS_SIZE_OFFSET]
+    .endif
+    add \code_item, \code_item, #CODE_ITEM_INSNS_OFFSET
+5:
+.endm
+
 // Setup the stack to start executing the method. Expects:
 // - x0 to contain the ArtMethod
 //
 // Outputs
 // - ip contains the dex registers size
 // - x13 contains the old stack pointer.
+// - \code_item is replaced with a pointer to the instructions
+// - if load_ins is 1, w15 contains the ins
 //
-// Uses ip, ip2, x13, x14 as temporaries.
-.macro SETUP_STACK_FRAME code_item, refs, fp, cfi_refs
-    // Fetch dex register size.
-    ldrh wip, [\code_item, #CODE_ITEM_REGISTERS_SIZE_OFFSET]
-    // Fetch outs size.
-    ldrh wip2, [\code_item, #CODE_ITEM_OUTS_SIZE_OFFSET]
+// Uses ip, ip2, x12, x13, x14 as temporaries.
+.macro SETUP_STACK_FRAME code_item, refs, fp, cfi_refs, load_ins
+    FETCH_CODE_ITEM_INFO \code_item, wip, wip2, w15, \load_ins
 
     // Compute required frame size: ((2 * ip) + ip1) * 4 + 24
     // 24 is for saving the previous frame, pc, and method being executed.
@@ -482,7 +534,7 @@ END \name
    SPILL_ALL_CALLEE_SAVES
 
    // Setup the frame.
-   SETUP_STACK_FRAME x8, xNEW_REFS, xNEW_FP, CFI_NEW_REFS
+   SETUP_STACK_FRAME x8, xNEW_REFS, xNEW_FP, CFI_NEW_REFS, load_ins=0
    // Make x4 point to the top of the dex register array.
    add x4, xNEW_FP, ip, uxtx #2
 
@@ -493,7 +545,7 @@ END \name
    FETCH w3, 2
 
    // Set the dex pc pointer.
-   add xPC, x8, #CODE_ITEM_INSNS_OFFSET
+   mov xPC, x8
    CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
 .endm
 
@@ -1500,13 +1552,12 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     ldr xPC, [xINST, #ART_METHOD_DATA_OFFSET_64]
 
     // Setup the stack for executing the method.
-    SETUP_STACK_FRAME xPC, xREFS, xFP, CFI_REFS
+    SETUP_STACK_FRAME xPC, xREFS, xFP, CFI_REFS, load_ins=1
 
     // Setup the parameters
-    ldrh wip2, [xPC, #CODE_ITEM_INS_SIZE_OFFSET]
-    cbz wip2, .Lxmm_setup_finished
+    cbz w15, .Lxmm_setup_finished
 
-    sub ip2, ip, ip2
+    sub ip2, ip, x15
     lsl x8, ip2, #2 // x8 is now the offset for inputs into the registers array.
 
     // Setup shorty, pointer to inputs in FP and pointer to inputs in REFS
@@ -1547,8 +1598,6 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     LOOP_OVER_SHORTY_STORING_FPS d7, s7, x9, x12, x10, .Lxmm_setup_finished
     LOOP_OVER_FPs x9, x12, x10, x13, .Lxmm_setup_finished
 .Lxmm_setup_finished:
-    // Set the dex pc pointer.
-    add xPC, xPC, #CODE_ITEM_INSNS_OFFSET
     CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
 
     // Set rIBASE

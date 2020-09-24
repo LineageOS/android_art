@@ -51,7 +51,6 @@ bool CanMethodUseNterp(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) 
       method->SkipAccessChecks() &&
       method->IsInvokable() &&
       !method->MustCountLocks() &&
-      method->GetDexFile()->IsStandardDexFile() &&
       // Proxy methods do not go through the JIT like other methods, so we don't
       // run them with nterp.
       !method->IsProxyMethod() &&
