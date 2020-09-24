@@ -63,10 +63,9 @@ class IntrinsicSlowPath : public TSlowPathCode {
 
     if (invoke_->IsInvokeStaticOrDirect()) {
       HInvokeStaticOrDirect* invoke_static_or_direct = invoke_->AsInvokeStaticOrDirect();
-      DCHECK_NE(invoke_static_or_direct->GetMethodLoadKind(),
-                HInvokeStaticOrDirect::MethodLoadKind::kRecursive);
+      DCHECK_NE(invoke_static_or_direct->GetMethodLoadKind(), MethodLoadKind::kRecursive);
       DCHECK_NE(invoke_static_or_direct->GetCodePtrLocation(),
-                HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative);
+                CodePtrLocation::kCallCriticalNative);
       codegen->GenerateStaticOrDirectCall(invoke_static_or_direct, method_loc, this);
     } else if (invoke_->IsInvokeVirtual()) {
       codegen->GenerateVirtualCall(invoke_->AsInvokeVirtual(), method_loc, this);
