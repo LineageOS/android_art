@@ -10,7 +10,9 @@
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    },
+    }
+  ],
+  "postsubmit": [
     // ART run-tests.
     {
       "name": "art-run-test-001-HelloWorld"
