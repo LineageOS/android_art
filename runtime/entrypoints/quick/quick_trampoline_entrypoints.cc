@@ -1320,6 +1320,10 @@ extern "C" const void* artQuickResolutionTrampoline(
 
     // If successful, update .bss entry in oat file if any.
     if (called != nullptr) {
+      // We only put non copied methods in the BSS. Putting a copy can lead to an
+      // odd situation where the ArtMethod being executed is unrelated to the
+      // receiver of the method.
+      called = called->GetCanonicalMethod();
       if (invoke_type == kSuper) {
         if (called->GetDexFile() == called_method.dex_file) {
           called_method.index = called->GetDexMethodIndex();
