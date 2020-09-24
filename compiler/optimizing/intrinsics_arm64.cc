@@ -239,6 +239,15 @@ static void CreateIntIntToIntLocations(ArenaAllocator* allocator, HInvoke* invok
   locations->SetOut(Location::RequiresRegister(), Location::kNoOutputOverlap);
 }
 
+static void CreateIntIntToIntSlowPathCallLocations(ArenaAllocator* allocator, HInvoke* invoke) {
+  LocationSummary* locations =
+      new (allocator) LocationSummary(invoke, LocationSummary::kCallOnSlowPath, kIntrinsified);
+  locations->SetInAt(0, Location::RequiresRegister());
+  locations->SetInAt(1, Location::RequiresRegister());
+  // Force kOutputOverlap; see comments in IntrinsicSlowPath::EmitNativeCode.
+  locations->SetOut(Location::RequiresRegister(), Location::kOutputOverlap);
+}
+
 static void GenReverseBytes(LocationSummary* locations,
                             DataType::Type type,
                             MacroAssembler* masm) {
@@ -3700,8 +3709,29 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderARM64::VisitIntegerDivideUnsigned(HInvoke* invoke) {
+  CreateIntIntToIntSlowPathCallLocations(allocator_, invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitIntegerDivideUnsigned(HInvoke* invoke) {
+  LocationSummary* locations = invoke->GetLocations();
+  MacroAssembler* masm = GetVIXLAssembler();
+  Register dividend = WRegisterFrom(locations->InAt(0));
+  Register divisor = WRegisterFrom(locations->InAt(1));
+  Register out = WRegisterFrom(locations->Out());
+
+  // Check if divisor is zero, bail to managed implementation to handle.
+  SlowPathCodeARM64* slow_path =
+      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen_->AddSlowPath(slow_path);
+  __ Cbz(divisor, slow_path->GetEntryLabel());
+
+  __ Udiv(out, dividend, divisor);
+
+  __ Bind(slow_path->GetExitLabel());
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
-UNIMPLEMENTED_INTRINSIC(ARM64, IntegerDivideUnsigned)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOfAfter);
