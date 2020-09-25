@@ -1290,6 +1290,7 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
           invoke_instruction->GetDexPc(),
           invoke_instruction->GetMethodReference(),  // Use interface method's reference.
           method,
+          MethodReference(method->GetDexFile(), method->GetDexMethodIndex()),
           method->GetMethodIndex());
       DCHECK_NE(new_invoke->GetIntrinsic(), Intrinsics::kNone);
       HInputsRef inputs = invoke_instruction->GetInputs();
@@ -1340,6 +1341,7 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
           invoke_instruction->GetDexPc(),
           MethodReference(invoke_instruction->GetMethodReference().dex_file, dex_method_index),
           method,
+          MethodReference(method->GetDexFile(), method->GetDexMethodIndex()),
           method->GetMethodIndex());
       HInputsRef inputs = invoke_instruction->GetInputs();
       for (size_t index = 0; index != inputs.size(); ++index) {
