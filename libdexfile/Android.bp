@@ -399,8 +399,6 @@ art_cc_library {
     ],
 }
 
-// The same source file is used in two tests here.
-// Its test target is test-art-{host,target}-gtest-art_libdexfile_support_tests.
 art_cc_test {
     name: "art_libdexfile_support_tests",
     defaults: [
@@ -419,66 +417,107 @@ art_cc_test {
     ],
 }
 
-cc_defaults {
-    name: "libdexfile_support_static_defaults",
+cc_library_static {
+    name: "libdexfile_support_static",
     host_supported: true,
     srcs: [
         "external/dex_file_supp.cc",
     ],
     cflags: ["-DSTATIC_LIB"],
-    // Using whole_static_libs here only as an "approximate transitivity" kludge.
-    whole_static_libs: [
-        "libbase",
-        "liblog",
-        "libz",
-        "libziparchive",
-    ],
     header_libs: ["libdexfile_external_headers"],
     export_header_lib_headers: ["libdexfile_external_headers"],
 }
 
-cc_library_static {
-    name: "libdexfile_support_static",
-    visibility: [
-        "//art:__subpackages__",
-        // Required for the simpleperf binary in the NDK. No other modules than
-        // //system/extras/simpleperf:simpleperf_ndk are allowed to use it.
-        "//system/extras/simpleperf",
-        "//cts/tests/tests/simpleperf",
-    ],
+cc_defaults {
+    name: "libdexfile_support_static_defaults",
     defaults: [
         "libdexfile_static_defaults",
-        "libdexfile_support_static_defaults",
     ],
-    whole_static_libs: [
-        "libdexfile",
+    static_libs: [
         "libdexfile_external",
+        "libdexfile_support_static",
     ],
 }
 
-cc_library_static {
-    name: "libdexfiled_support_static",
+cc_defaults {
+    name: "libdexfiled_support_static_defaults",
     defaults: [
-        "libdexfile_support_static_defaults",
         "libdexfiled_static_defaults",
     ],
-    whole_static_libs: [
-        "libdexfiled",
+    static_libs: [
+        "libdexfile_support_static",
         "libdexfiled_external",
     ],
 }
 
-// The same source file is used in two tests here.
-// Its test target is test-art-{host,target}-gtest-art_libdexfile_support_static_tests.
 art_cc_test {
     name: "art_libdexfile_support_static_tests",
     host_supported: true,
     test_suites: ["general-tests"],
+    defaults: ["libdexfile_support_static_defaults"],
     srcs: [
         "external/dex_file_supp_test.cc",
     ],
-    static_libs: [
-        "libbase",
+}
+
+// External packages allowed to link in static libdexfile_support. This is not
+// allowed in any module that may end up in an APEX or platform image, so
+// visibility is restrictive.
+libdexfile_external_static_visibility = [
+    // Required for simpleperf, libsimpleperf_record, and libsimpleperf_report
+    // in the NDK.
+    "//system/extras/simpleperf",
+    "//cts/tests/tests/simpleperf",
+]
+
+cc_library_static {
+    name: "libdexfile_external_static",
+    host_supported: true,
+    visibility: libdexfile_external_static_visibility,
+    // Include internal library dependencies that should have no external
+    // visibility. We cannot use libdexfile_support_static_defaults because that
+    // one also includes external dependencies, and libs using this one may then
+    // get duplicate copies of them.
+    whole_static_libs: [
+        "libartbase",
+        "libartpalette",
+        "libdexfile",
+        "libdexfile_external",
         "libdexfile_support_static",
     ],
+}
+
+cc_defaults {
+    name: "libdexfile_external_static_defaults",
+    defaults_visibility: libdexfile_external_static_visibility,
+    target: {
+        linux: {
+            // This cc_defaults somewhat arbitrarily limits the libs to linux,
+            // because that's what the users in simpleperf need.
+            static_libs: [
+                "libdexfile_external_static",
+                // External dependencies:
+                "libbase",
+                "liblog",
+                "libz",
+                "libziparchive",
+            ],
+        },
+    },
+}
+
+art_cc_test {
+    name: "art_libdexfile_external_static_tests",
+    host_supported: true,
+    test_suites: ["general-tests"],
+    defaults: ["libdexfile_external_static_defaults"],
+    srcs: [
+        "external/dex_file_supp_test.cc",
+    ],
+    enabled: false,
+    target: {
+        linux: {
+            enabled: true,
+        },
+    },
 }
