@@ -711,8 +711,8 @@ void StackVisitor::ValidateFrame() const {
     LinearAlloc* const linear_alloc = runtime->GetLinearAlloc();
     if (!linear_alloc->Contains(method)) {
       // Check class linker linear allocs.
-      // We get the canonical method as copied methods may have their declaring
-      // class from another class loader.
+      // We get the canonical method as copied methods may have been allocated
+      // by a different class loader.
       const PointerSize ptrSize = runtime->GetClassLinker()->GetImagePointerSize();
       ArtMethod* canonical = method->GetCanonicalMethod(ptrSize);
       ObjPtr<mirror::Class> klass = canonical->GetDeclaringClass();

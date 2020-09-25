@@ -29,8 +29,7 @@ namespace arm {
 // Fix up FP arguments passed in core registers for call to @CriticalNative by inserting fake calls
 // to Float.floatToRawIntBits() or Double.doubleToRawLongBits() to satisfy type consistency checks.
 static void FixUpArguments(HInvokeStaticOrDirect* invoke) {
-  DCHECK_EQ(invoke->GetCodePtrLocation(),
-            HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative);
+  DCHECK_EQ(invoke->GetCodePtrLocation(), CodePtrLocation::kCallCriticalNative);
   size_t reg = 0u;
   for (size_t i = 0, num_args = invoke->GetNumberOfArguments(); i != num_args; ++i) {
     HInstruction* input = invoke->InputAt(i);
@@ -58,8 +57,8 @@ static void FixUpArguments(HInvokeStaticOrDirect* invoke) {
       }
       // Use arbitrary dispatch info that does not require the method argument.
       HInvokeStaticOrDirect::DispatchInfo dispatch_info = {
-          HInvokeStaticOrDirect::MethodLoadKind::kBssEntry,
-          HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod,
+          MethodLoadKind::kBssEntry,
+          CodePtrLocation::kCallArtMethod,
           /*method_load_data=*/ 0u
       };
       HBasicBlock* block = invoke->GetBlock();
@@ -98,7 +97,7 @@ bool CriticalNativeAbiFixupArm::Run() {
       HInstruction* instruction = it.Current();
       if (instruction->IsInvokeStaticOrDirect() &&
           instruction->AsInvokeStaticOrDirect()->GetCodePtrLocation() ==
-              HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+              CodePtrLocation::kCallCriticalNative) {
         FixUpArguments(instruction->AsInvokeStaticOrDirect());
       }
     }

@@ -65,8 +65,8 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
     DCHECK(!(callee->IsConstructor() && callee->GetDeclaringClass()->IsStringClass()));
   }
 
-  HInvokeStaticOrDirect::MethodLoadKind method_load_kind;
-  HInvokeStaticOrDirect::CodePtrLocation code_ptr_location;
+  MethodLoadKind method_load_kind;
+  CodePtrLocation code_ptr_location;
   uint64_t method_load_data = 0u;
 
   // Note: we never call an ArtMethod through a known code pointer, as
@@ -85,61 +85,62 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
   const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
   if (callee == codegen->GetGraph()->GetArtMethod() && !codegen->GetGraph()->IsDebuggable()) {
     // Recursive call.
-    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRecursive;
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallSelf;
+    method_load_kind = MethodLoadKind::kRecursive;
+    code_ptr_location = CodePtrLocation::kCallSelf;
   } else if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
     if (!compiler_options.GetCompilePic()) {
       // Test configuration, do not sharpen.
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
+      method_load_kind = MethodLoadKind::kRuntimeCall;
     } else if (IsInBootImage(callee)) {
       DCHECK(compiler_options.IsBootImageExtension());
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
+      method_load_kind = MethodLoadKind::kBootImageRelRo;
     } else if (BootImageAOTCanEmbedMethod(callee, compiler_options)) {
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative;
+      method_load_kind = MethodLoadKind::kBootImageLinkTimePcRelative;
     } else if (!has_method_id) {
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
+      method_load_kind = MethodLoadKind::kRuntimeCall;
     } else {
+      DCHECK(!callee->IsCopied());
       // Use PC-relative access to the .bss methods array.
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBssEntry;
+      method_load_kind = MethodLoadKind::kBssEntry;
     }
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+    code_ptr_location = CodePtrLocation::kCallArtMethod;
   } else if (compiler_options.IsJitCompiler()) {
     ScopedObjectAccess soa(Thread::Current());
     if (Runtime::Current()->GetJit()->CanEncodeMethod(
             callee,
             compiler_options.IsJitCompilerForSharedCode())) {
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress;
+      method_load_kind = MethodLoadKind::kJitDirectAddress;
       method_load_data = reinterpret_cast<uintptr_t>(callee);
-      code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+      code_ptr_location = CodePtrLocation::kCallArtMethod;
     } else {
       // Do not sharpen.
-      method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
-      code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+      method_load_kind = MethodLoadKind::kRuntimeCall;
+      code_ptr_location = CodePtrLocation::kCallArtMethod;
     }
   } else if (IsInBootImage(callee)) {
     // Use PC-relative access to the .data.bimg.rel.ro methods array.
-    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo;
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+    method_load_kind = MethodLoadKind::kBootImageRelRo;
+    code_ptr_location = CodePtrLocation::kCallArtMethod;
   } else if (!has_method_id) {
-    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall;
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+    method_load_kind = MethodLoadKind::kRuntimeCall;
+    code_ptr_location = CodePtrLocation::kCallArtMethod;
   } else {
+    DCHECK(!callee->IsCopied());
     // Use PC-relative access to the .bss methods array.
-    method_load_kind = HInvokeStaticOrDirect::MethodLoadKind::kBssEntry;
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+    method_load_kind = MethodLoadKind::kBssEntry;
+    code_ptr_location = CodePtrLocation::kCallArtMethod;
   }
 
-  if (method_load_kind != HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall &&
-      callee->IsCriticalNative()) {
-    DCHECK_NE(method_load_kind, HInvokeStaticOrDirect::MethodLoadKind::kRecursive);
+  if (method_load_kind != MethodLoadKind::kRuntimeCall && callee->IsCriticalNative()) {
+    DCHECK_NE(method_load_kind, MethodLoadKind::kRecursive);
     DCHECK(callee->IsStatic());
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative;
+    code_ptr_location = CodePtrLocation::kCallCriticalNative;
   }
 
   if (codegen->GetGraph()->IsDebuggable()) {
     // For debuggable apps always use the code pointer from ArtMethod
     // so that we don't circumvent instrumentation stubs if installed.
-    code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+    code_ptr_location = CodePtrLocation::kCallArtMethod;
   }
 
   HInvokeStaticOrDirect::DispatchInfo desired_dispatch_info = {

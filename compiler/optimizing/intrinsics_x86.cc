@@ -2024,15 +2024,43 @@ static void GenPrimitiveCAS(DataType::Type type,
                             Register offset,
                             Location out,
                             // Only necessary for floating point
-                            Register temp = Register::kNoRegister) {
+                            Register temp = Register::kNoRegister,
+                            bool is_cmpxchg = false) {
   X86Assembler* assembler = down_cast<X86Assembler*>(codegen->GetAssembler());
-  DCHECK_EQ(out.AsRegister<Register>(), EAX);
+
+  if (!is_cmpxchg || DataType::Kind(type) == DataType::Type::kInt32) {
+    DCHECK_EQ(out.AsRegister<Register>(), EAX);
+  }
 
   GenPrimitiveLockedCmpxchg(type, codegen, expected_value, new_value, base, offset, temp);
 
-  // Convert ZF into the Boolean result.
-  __ setb(kZero, out.AsRegister<Register>());
-  __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+  if (is_cmpxchg) {
+    // Sign-extend, zero-extend or move the result if necessary
+    switch (type) {
+      case DataType::Type::kBool:
+        __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+        break;
+      case DataType::Type::kInt8:
+        __ movsxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+        break;
+      case DataType::Type::kInt16:
+        __ movsxw(out.AsRegister<Register>(), out.AsRegister<Register>());
+        break;
+      case DataType::Type::kUint16:
+        __ movzxw(out.AsRegister<Register>(), out.AsRegister<Register>());
+        break;
+      case DataType::Type::kFloat32:
+        __ movd(out.AsFpuRegister<XmmRegister>(), EAX);
+        break;
+      default:
+        // Nothing to do
+        break;
+    }
+  } else {
+    // Convert ZF into the Boolean result.
+    __ setb(kZero, out.AsRegister<Register>());
+    __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+  }
 }
 
 static void GenReferenceCAS(HInvoke* invoke,
@@ -2042,7 +2070,8 @@ static void GenReferenceCAS(HInvoke* invoke,
                             Register base,
                             Register offset,
                             Register temp,
-                            Register temp2) {
+                            Register temp2,
+                            bool is_cmpxchg = false) {
   X86Assembler* assembler = down_cast<X86Assembler*>(codegen->GetAssembler());
   LocationSummary* locations = invoke->GetLocations();
   Location out = locations->Out();
@@ -2096,9 +2125,14 @@ static void GenReferenceCAS(HInvoke* invoke,
   // LOCK CMPXCHG has full barrier semantics, and we don't need
   // scheduling barriers at this time.
 
-  // Convert ZF into the Boolean result.
-  __ setb(kZero, out.AsRegister<Register>());
-  __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+  if (is_cmpxchg) {
+    DCHECK_EQ(out.AsRegister<Register>(), EAX);
+    __ MaybeUnpoisonHeapReference(out.AsRegister<Register>());
+  } else {
+    // Convert ZF into the Boolean result.
+    __ setb(kZero, out.AsRegister<Register>());
+    __ movzxb(out.AsRegister<Register>(), out.AsRegister<ByteRegister>());
+  }
 
   // Mark card for object if the new value is stored.
   bool value_can_be_null = true;  // TODO: Worth finding out this information?
@@ -3179,6 +3213,12 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
   mirror::VarHandle::AccessModeTemplate access_mode_template =
       mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
   switch (access_mode_template) {
+    case mirror::VarHandle::AccessModeTemplate::kGet:
+      // The return type should be the same as varType, so it shouldn't be void
+      if (type == DataType::Type::kVoid) {
+        return false;
+      }
+      break;
     case mirror::VarHandle::AccessModeTemplate::kSet:
       if (type != DataType::Type::kVoid) {
         return false;
@@ -3213,15 +3253,17 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
       }
       break;
     }
-    case mirror::VarHandle::AccessModeTemplate::kGet:
-      // The return type should be the same as varType, so it shouldn't be void
-      if (type == DataType::Type::kVoid) {
+    case mirror::VarHandle::AccessModeTemplate::kCompareAndExchange: {
+      uint32_t expected_value_index = number_of_arguments - 2;
+      uint32_t new_value_index = number_of_arguments - 1;
+      DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
+      DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
+
+      if (expected_value_type != new_value_type || type != expected_value_type) {
         return false;
       }
       break;
-    case mirror::VarHandle::AccessModeTemplate::kCompareAndExchange:
-      // Unimplemented intrinsics
-      UNREACHABLE();
+    }
   }
 
   return true;
@@ -3917,7 +3959,7 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGetAndSetRelease(HInvoke* invoke) 
   GenerateVarHandleGetAndSet(invoke, codegen_);
 }
 
-static void CreateVarHandleCompareAndSetLocations(HInvoke* invoke) {
+static void CreateVarHandleCompareAndSetOrExchangeLocations(HInvoke* invoke) {
   // The only read barrier implementation supporting the
   // VarHandleGet intrinsic is the Baker-style read barriers.
   if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
@@ -3931,11 +3973,10 @@ static void CreateVarHandleCompareAndSetLocations(HInvoke* invoke) {
   uint32_t number_of_arguments = invoke->GetNumberOfArguments();
   uint32_t expected_value_index = number_of_arguments - 2;
   uint32_t new_value_index = number_of_arguments - 1;
-  DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
-  DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
-  DCHECK_EQ(expected_value_type, new_value_type);
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, expected_value_index);
+  DCHECK_EQ(value_type, GetDataTypeFromShorty(invoke, new_value_index));
 
-  if (DataType::Is64BitType(new_value_type)) {
+  if (DataType::Is64BitType(value_type)) {
     // We avoid the case of an Int64/Float64 value because we would need to place it in a register
     // pair. If the slow path is taken, the ParallelMove might fail to move the pair according to
     // the X86DexCallingConvention in case of an overlap (e.g., move the 64 bit value from
@@ -3958,7 +3999,7 @@ static void CreateVarHandleCompareAndSetLocations(HInvoke* invoke) {
     // For static fields, we need another temp because one will be busy with the declaring class.
     locations->AddTemp(Location::RequiresRegister());
   }
-  if (DataType::IsFloatingPointType(expected_value_type)) {
+  if (DataType::IsFloatingPointType(value_type)) {
     // We need EAX for placing the expected value
     locations->AddTemp(Location::RegisterLocation(EAX));
     locations->SetInAt(new_value_index,
@@ -3971,10 +4012,18 @@ static void CreateVarHandleCompareAndSetLocations(HInvoke* invoke) {
     locations->SetInAt(expected_value_index, Location::RegisterLocation(EAX));
   }
 
-  locations->SetOut(Location::RegisterLocation(EAX));
+  mirror::VarHandle::AccessModeTemplate access_mode_template =
+      mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
+
+  if (access_mode_template == mirror::VarHandle::AccessModeTemplate::kCompareAndExchange &&
+      value_type == DataType::Type::kFloat32) {
+    locations->SetOut(Location::RequiresFpuRegister());
+  } else {
+    locations->SetOut(Location::RegisterLocation(EAX));
+  }
 }
 
-static void GenerateVarHandleCompareAndSet(HInvoke* invoke, CodeGeneratorX86* codegen) {
+static void GenerateVarHandleCompareAndSetOrExchange(HInvoke* invoke, CodeGeneratorX86* codegen) {
   // The only read barrier implementation supporting the
   // VarHandleGet intrinsic is the Baker-style read barriers.
   DCHECK(!kEmitCompilerReadBarrier || kUseBakerReadBarrier);
@@ -4012,54 +4061,85 @@ static void GenerateVarHandleCompareAndSet(HInvoke* invoke, CodeGeneratorX86* co
   // failure semantics. `lock cmpxchg` has full barrier semantics, and we don't need scheduling
   // barriers at this time.
 
+  mirror::VarHandle::AccessModeTemplate access_mode_template =
+      mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
+  bool is_cmpxchg =
+      access_mode_template == mirror::VarHandle::AccessModeTemplate::kCompareAndExchange;
+
   if (type == DataType::Type::kReference) {
-    GenReferenceCAS(invoke, codegen, expected_value, new_value, reference, offset, temp, temp2);
+    GenReferenceCAS(
+        invoke, codegen, expected_value, new_value, reference, offset, temp, temp2, is_cmpxchg);
   } else {
     Location out = locations->Out();
-    GenPrimitiveCAS(type, codegen, expected_value, new_value, reference, offset, out, temp);
+    GenPrimitiveCAS(
+        type, codegen, expected_value, new_value, reference, offset, out, temp, is_cmpxchg);
   }
 
   __ Bind(slow_path->GetExitLabel());
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
-  CreateVarHandleCompareAndSetLocations(invoke);
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndSet(HInvoke* invoke) {
-  GenerateVarHandleCompareAndSet(invoke, codegen_);
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleWeakCompareAndSet(HInvoke* invoke) {
-  CreateVarHandleCompareAndSetLocations(invoke);
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleWeakCompareAndSet(HInvoke* invoke) {
-  GenerateVarHandleCompareAndSet(invoke, codegen_);
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleWeakCompareAndSetPlain(HInvoke* invoke) {
-  CreateVarHandleCompareAndSetLocations(invoke);
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleWeakCompareAndSetPlain(HInvoke* invoke) {
-  GenerateVarHandleCompareAndSet(invoke, codegen_);
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleWeakCompareAndSetAcquire(HInvoke* invoke) {
-  CreateVarHandleCompareAndSetLocations(invoke);
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleWeakCompareAndSetAcquire(HInvoke* invoke) {
-  GenerateVarHandleCompareAndSet(invoke, codegen_);
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
 }
 
 void IntrinsicLocationsBuilderX86::VisitVarHandleWeakCompareAndSetRelease(HInvoke* invoke) {
-  CreateVarHandleCompareAndSetLocations(invoke);
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitVarHandleWeakCompareAndSetRelease(HInvoke* invoke) {
-  GenerateVarHandleCompareAndSet(invoke, codegen_);
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
+}
+
+void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndExchange(HInvoke* invoke) {
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndExchange(HInvoke* invoke) {
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
+}
+
+void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndExchangeAcquire(HInvoke* invoke) {
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndExchangeAcquire(HInvoke* invoke) {
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
+}
+
+void IntrinsicLocationsBuilderX86::VisitVarHandleCompareAndExchangeRelease(HInvoke* invoke) {
+  CreateVarHandleCompareAndSetOrExchangeLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorX86::VisitVarHandleCompareAndExchangeRelease(HInvoke* invoke) {
+  GenerateVarHandleCompareAndSetOrExchange(invoke, codegen_);
 }
 
 static void CreateVarHandleGetAndAddLocations(HInvoke* invoke) {
@@ -4466,9 +4546,6 @@ UNIMPLEMENTED_INTRINSIC(X86, VarHandleLoadLoadFence)
 UNIMPLEMENTED_INTRINSIC(X86, VarHandleStoreStoreFence)
 UNIMPLEMENTED_INTRINSIC(X86, MethodHandleInvokeExact)
 UNIMPLEMENTED_INTRINSIC(X86, MethodHandleInvoke)
-UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchange)
-UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchangeAcquire)
-UNIMPLEMENTED_INTRINSIC(X86, VarHandleCompareAndExchangeRelease)
 
 UNREACHABLE_INTRINSICS(X86)
 

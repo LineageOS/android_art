@@ -296,6 +296,7 @@ while read run_test; do
   [[ -d "$tests_dir/$run_test/jasmin-multidex" ]] && continue
   [[ -d "$tests_dir/$run_test/smali-ex" ]] && continue
   [[ -d "$tests_dir/$run_test/src-ex" ]] && continue
+  [[ -d "$tests_dir/$run_test/src-ex2" ]] && continue
   [[ -d "$tests_dir/$run_test/src-dex2oat-unresolved" ]] && continue
   # Ignore test with a copy of `sun.misc.Unsafe`.
   [[ -f "$tests_dir/$run_test/src/sun/misc/Unsafe.java" ]] && continue
@@ -359,7 +360,9 @@ cat >TEST_MAPPING <<EOF
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    },
+    }
+  ],
+  "postsubmit": [
     // ART run-tests.
 EOF
 # Only include tests expected to succeed for now.
