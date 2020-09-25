@@ -876,7 +876,8 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
                                 ArtMethod* referrer,
                                 const DexCompilationUnit& dex_compilation_unit,
                                 /*inout*/InvokeType* invoke_type,
-                                /*out*/MethodReference* method_info,
+                                /*out*/MethodReference* resolved_method_info,
+                                /*out*/uint16_t* imt_or_vtable_index,
                                 /*out*/bool* is_string_constructor) {
   ScopedObjectAccess soa(Thread::Current());
 
@@ -979,20 +980,14 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
     }
   }
 
-  if (*invoke_type == kDirect || *invoke_type == kStatic || *invoke_type == kSuper) {
-    // Record the target method needed for HInvokeStaticOrDirect.
-    *method_info =
+  *resolved_method_info =
         MethodReference(resolved_method->GetDexFile(), resolved_method->GetDexMethodIndex());
-  } else if (*invoke_type == kVirtual) {
+  if (*invoke_type == kVirtual) {
     // For HInvokeVirtual we need the vtable index.
-    *method_info = MethodReference(/*file=*/ nullptr, resolved_method->GetVtableIndex());
+    *imt_or_vtable_index = resolved_method->GetVtableIndex();
   } else if (*invoke_type == kInterface) {
     // For HInvokeInterface we need the IMT index.
-    *method_info = MethodReference(/*file=*/ nullptr, ImTable::GetImtIndex(resolved_method));
-  } else {
-    // For HInvokePolymorphic we don't need the target method yet
-    DCHECK_EQ(*invoke_type, kPolymorphic);
-    DCHECK(method_info == nullptr);
+    *imt_or_vtable_index = ImTable::GetImtIndex(resolved_method);
   }
 
   *is_string_constructor =
@@ -1016,13 +1011,15 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
     number_of_arguments++;
   }
 
-  MethodReference method_info(nullptr, 0u);
+  MethodReference resolved_method_reference(nullptr, 0u);
   bool is_string_constructor = false;
+  uint16_t imt_or_vtable_index = DexFile::kDexNoIndex16;
   ArtMethod* resolved_method = ResolveMethod(method_idx,
                                              graph_->GetArtMethod(),
                                              *dex_compilation_unit_,
                                              &invoke_type,
-                                             &method_info,
+                                             &resolved_method_reference,
+                                             &imt_or_vtable_index,
                                              &is_string_constructor);
 
   MethodReference method_reference(&graph_->GetDexFile(), method_idx);
@@ -1058,7 +1055,7 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
         /* resolved_method= */ nullptr,
         dispatch_info,
         invoke_type,
-        method_info,
+        resolved_method_reference,
         HInvokeStaticOrDirect::ClinitCheckRequirement::kImplicit);
     return HandleStringInit(invoke, operands, shorty);
   }
@@ -1089,10 +1086,11 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
     bool has_method_id = true;
     if (invoke_type == kSuper) {
       uint32_t dex_method_index = method_reference.index;
-      if (IsSameDexFile(*method_info.dex_file, *dex_compilation_unit_->GetDexFile())) {
+      if (IsSameDexFile(*resolved_method_reference.dex_file,
+                        *dex_compilation_unit_->GetDexFile())) {
         // Update the method index to the one resolved. Note that this may be a no-op if
         // we resolved to the method referenced by the instruction.
-        dex_method_index = method_info.index;
+        dex_method_index = resolved_method_reference.index;
       } else {
         // Try to find a dex method index in this caller's dex file.
         ScopedObjectAccess soa(Thread::Current());
@@ -1120,7 +1118,7 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                                     resolved_method,
                                                     dispatch_info,
                                                     invoke_type,
-                                                    method_info,
+                                                    resolved_method_reference,
                                                     clinit_check_requirement);
     if (clinit_check != nullptr) {
       // Add the class initialization check as last input of `invoke`.
@@ -1130,14 +1128,14 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
       invoke->SetArgumentAt(clinit_check_index, clinit_check);
     }
   } else if (invoke_type == kVirtual) {
-    DCHECK(method_info.dex_file == nullptr);
     invoke = new (allocator_) HInvokeVirtual(allocator_,
                                              number_of_arguments,
                                              return_type,
                                              dex_pc,
                                              method_reference,
                                              resolved_method,
-                                             /*vtable_index=*/ method_info.index);
+                                             resolved_method_reference,
+                                             /*vtable_index=*/ imt_or_vtable_index);
   } else {
     DCHECK_EQ(invoke_type, kInterface);
     invoke = new (allocator_) HInvokeInterface(allocator_,
@@ -1146,7 +1144,8 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                                dex_pc,
                                                method_reference,
                                                resolved_method,
-                                               /*imt_index=*/ method_info.index);
+                                               resolved_method_reference,
+                                               /*imt_index=*/ imt_or_vtable_index);
   }
   return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
 }
@@ -1179,11 +1178,14 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
   // even if we don't need it afterwards.
   InvokeType invoke_type = InvokeType::kPolymorphic;
   bool is_string_constructor = false;
+  uint16_t imt_or_vtable_index = DexFile::kDexNoIndex16;
+  MethodReference resolved_method_reference(nullptr, 0u);
   ArtMethod* resolved_method = ResolveMethod(method_idx,
                                             graph_->GetArtMethod(),
                                             *dex_compilation_unit_,
                                             &invoke_type,
-                                            /* method_info= */ nullptr,
+                                            &resolved_method_reference,
+                                            &imt_or_vtable_index,
                                             &is_string_constructor);
 
   MethodReference method_reference(&graph_->GetDexFile(), method_idx);
@@ -1193,6 +1195,7 @@ bool HInstructionBuilder::BuildInvokePolymorphic(uint32_t dex_pc,
                                                         dex_pc,
                                                         method_reference,
                                                         resolved_method,
+                                                        resolved_method_reference,
                                                         proto_idx);
   if (!HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false)) {
     return false;
