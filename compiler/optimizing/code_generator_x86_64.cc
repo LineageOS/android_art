@@ -1002,51 +1002,51 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
 
   Location callee_method = temp;  // For all kinds except kRecursive, callee will be in temp.
   switch (invoke->GetMethodLoadKind()) {
-    case HInvokeStaticOrDirect::MethodLoadKind::kStringInit: {
+    case MethodLoadKind::kStringInit: {
       // temp = thread->string_init_entrypoint
       uint32_t offset =
           GetThreadOffset<kX86_64PointerSize>(invoke->GetStringInitEntryPoint()).Int32Value();
       __ gs()->movq(temp.AsRegister<CpuRegister>(), Address::Absolute(offset, /* no_rip= */ true));
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kRecursive:
+    case MethodLoadKind::kRecursive:
       callee_method = invoke->GetLocations()->InAt(invoke->GetCurrentMethodIndex());
       break;
-    case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative:
+    case MethodLoadKind::kBootImageLinkTimePcRelative:
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       __ leal(temp.AsRegister<CpuRegister>(),
               Address::Absolute(kPlaceholder32BitOffset, /* no_rip= */ false));
       RecordBootImageMethodPatch(invoke);
       break;
-    case HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo: {
+    case MethodLoadKind::kBootImageRelRo: {
       // Note: Boot image is in the low 4GiB and the entry is 32-bit, so emit a 32-bit load.
       __ movl(temp.AsRegister<CpuRegister>(),
               Address::Absolute(kPlaceholder32BitOffset, /* no_rip= */ false));
       RecordBootImageRelRoPatch(GetBootImageOffset(invoke));
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kBssEntry: {
+    case MethodLoadKind::kBssEntry: {
       __ movq(temp.AsRegister<CpuRegister>(),
               Address::Absolute(kPlaceholder32BitOffset, /* no_rip= */ false));
       RecordMethodBssEntryPatch(invoke);
       // No need for memory fence, thanks to the x86-64 memory model.
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress:
+    case MethodLoadKind::kJitDirectAddress:
       Load64BitValue(temp.AsRegister<CpuRegister>(), invoke->GetMethodAddress());
       break;
-    case HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall: {
+    case MethodLoadKind::kRuntimeCall: {
       GenerateInvokeStaticOrDirectRuntimeCall(invoke, temp, slow_path);
       return;  // No code pointer retrieval; the runtime performs the call directly.
     }
   }
 
   switch (invoke->GetCodePtrLocation()) {
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallSelf:
+    case CodePtrLocation::kCallSelf:
       __ call(&frame_entry_label_);
       RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       break;
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
+    case CodePtrLocation::kCallCriticalNative: {
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorX86_64,
                                     kNativeStackAlignment,
@@ -1084,7 +1084,7 @@ void CodeGeneratorX86_64::GenerateStaticOrDirectCall(
       }
       break;
     }
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod:
+    case CodePtrLocation::kCallArtMethod:
       // (callee_method + offset_of_quick_compiled_code)()
       __ call(Address(callee_method.AsRegister<CpuRegister>(),
                       ArtMethod::EntryPointFromQuickCompiledCodeOffset(
@@ -2625,7 +2625,7 @@ void LocationsBuilderX86_64::VisitInvokeStaticOrDirect(HInvokeStaticOrDirect* in
     return;
   }
 
-  if (invoke->GetCodePtrLocation() == HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+  if (invoke->GetCodePtrLocation() == CodePtrLocation::kCallCriticalNative) {
     CriticalNativeCallingConventionVisitorX86_64 calling_convention_visitor(
         /*for_register_allocation=*/ true);
     CodeGenerator::CreateCommonInvokeLocationSummary(invoke, &calling_convention_visitor);
