@@ -16,10 +16,15 @@
 
 package resolved;
 
-import unresolved.UnresolvedClass;
+import getters.GetPublicSubclassOfUnresolvedClass;
+import unresolved.UnresolvedPublicClass;
 
-public class SubclassOfUnresolvedClass extends UnresolvedClass {
+public class PublicSubclassOfUnresolvedClass extends UnresolvedPublicClass {
   public static void $noinline$main() {
+    $noinline$testReferrersClass();
+    $noinline$testInlinedReferrersClass();
+    $noinline$testInlinedReferrersClassFromSamePackage();
+
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
 
@@ -37,43 +42,63 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     $noinline$testPackagePrivateMethodInResolvedPackagePrivateClass();
     $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass();
 
-    System.out.println("SubclassOfUnresolvedClass passed");
+    System.out.println("PublicSubclassOfUnresolvedClass passed");
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testResolvedPublicClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testReferrersClass() builder (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testReferrersClass() {
+    Class<?> c = PublicSubclassOfUnresolvedClass.class;
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testInlinedReferrersClass() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClass() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetPublicSubclassOfUnresolvedClass.get();
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testInlinedReferrersClassFromSamePackage() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClassFromSamePackage() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetPublicSubclassOfUnresolvedClassFromSamePackage.get();
+  }
+
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testResolvedPublicClass() builder (after)
   /// CHECK: LoadClass class_name:resolved.ResolvedPublicSubclassOfPackagePrivateClass needs_access_check:false
   static void $noinline$testResolvedPublicClass() {
     Class<?> c = ResolvedPublicSubclassOfPackagePrivateClass.class;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testResolvedPackagePrivateClass() builder (after)
   /// CHECK: LoadClass class_name:resolved.ResolvedPackagePrivateClass needs_access_check:false
   static void $noinline$testResolvedPackagePrivateClass() {
     Class<?> c = ResolvedPackagePrivateClass.class;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK: StaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInResolvedPackagePrivateClass() {
     ResolvedPackagePrivateClass.publicIntField = 42;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: StaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass() {
     ResolvedPublicSubclassOfPackagePrivateClass.publicIntField = 42;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK: UnresolvedStaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: StaticFieldSet
   static void $noinline$testPrivateFieldInResolvedPackagePrivateClass() {
     try {
@@ -82,10 +107,10 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     } catch (IllegalAccessError expected) {}
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: UnresolvedStaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: StaticFieldSet
   static void $noinline$testPrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() {
     try {
@@ -94,46 +119,46 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     } catch (IllegalAccessError expected) {}
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK: StaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPackagePrivateFieldInResolvedPackagePrivateClass() {
     ResolvedPackagePrivateClass.intField = 42;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: StaticFieldSet
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: UnresolvedStaticFieldSet
   static void $noinline$testPackagePrivateFieldInPackagePrivateClassViaResolvedPublicSubclass() {
     ResolvedPublicSubclassOfPackagePrivateClass.intField = 42;
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$publicStaticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: InvokeUnresolved method_name:{{[^$]*}}$noinline$publicStaticMethod
   static void $noinline$testPublicMethodInResolvedPackagePrivateClass() {
     ResolvedPackagePrivateClass.$noinline$publicStaticMethod();
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$publicStaticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPublicMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPublicMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: InvokeUnresolved method_name:{{[^$]*}}$noinline$publicStaticMethod
   static void $noinline$testPublicMethodInPackagePrivateClassViaResolvedPublicSubclass() {
     ResolvedPublicSubclassOfPackagePrivateClass.$noinline$publicStaticMethod();
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK: InvokeUnresolved method_name:{{[^$]*}}$noinline$privateStaticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$privateStaticMethod
   static void $noinline$testPrivateMethodInResolvedPackagePrivateClass() {
     try {
@@ -142,10 +167,10 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     } catch (IllegalAccessError expected) {}
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: InvokeUnresolved method_name:{{[^$]*}}$noinline$privateStaticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$privateStaticMethod
   static void $noinline$testPrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() {
     try {
@@ -154,19 +179,19 @@ public class SubclassOfUnresolvedClass extends UnresolvedClass {
     } catch (IllegalAccessError expected) {}
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$staticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInResolvedPackagePrivateClass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInResolvedPackagePrivateClass() builder (after)
   /// CHECK-NOT: InvokeUnresolved method_name:{{[^$]*}}$noinline$staticMethod
   static void $noinline$testPackagePrivateMethodInResolvedPackagePrivateClass() {
     ResolvedPackagePrivateClass.$noinline$staticMethod();
   }
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK: InvokeStaticOrDirect method_name:{{[^$]*}}$noinline$staticMethod
 
-  /// CHECK-START: void resolved.SubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
+  /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() builder (after)
   /// CHECK-NOT: InvokeUnresolved method_name:{{[^$]*}}$noinline$staticMethod
   static void $noinline$testPackagePrivateMethodInPackagePrivateClassViaResolvedPublicSubclass() {
     ResolvedPublicSubclassOfPackagePrivateClass.$noinline$staticMethod();

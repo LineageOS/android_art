@@ -3361,7 +3361,7 @@ void LocationsBuilderARMVIXL::VisitInvokeStaticOrDirect(HInvokeStaticOrDirect* i
     return;
   }
 
-  if (invoke->GetCodePtrLocation() == HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+  if (invoke->GetCodePtrLocation() == CodePtrLocation::kCallCriticalNative) {
     CriticalNativeCallingConventionVisitorARMVIXL calling_convention_visitor(
         /*for_register_allocation=*/ true);
     CodeGenerator::CreateCommonInvokeLocationSummary(invoke, &calling_convention_visitor);
@@ -9034,8 +9034,7 @@ HInvokeStaticOrDirect::DispatchInfo CodeGeneratorARMVIXL::GetSupportedInvokeStat
     const HInvokeStaticOrDirect::DispatchInfo& desired_dispatch_info,
     ArtMethod* method) {
   if (method->IsIntrinsic() &&
-      desired_dispatch_info.code_ptr_location ==
-          HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative) {
+      desired_dispatch_info.code_ptr_location == CodePtrLocation::kCallCriticalNative) {
     // As a work-around for soft-float native ABI interfering with type checks, we are
     // inserting fake calls to Float.floatToRawIntBits() or Double.doubleToRawLongBits()
     // when a float or double argument is passed in core registers but we cannot do that
@@ -9048,7 +9047,7 @@ HInvokeStaticOrDirect::DispatchInfo CodeGeneratorARMVIXL::GetSupportedInvokeStat
     for (uint32_t i = 1; i != shorty_len; ++i) {
       if (shorty[i] == 'D' || shorty[i] == 'F') {
         HInvokeStaticOrDirect::DispatchInfo dispatch_info = desired_dispatch_info;
-        dispatch_info.code_ptr_location = HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod;
+        dispatch_info.code_ptr_location = CodePtrLocation::kCallArtMethod;
         return dispatch_info;
       }
     }
@@ -9060,24 +9059,24 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
     HInvokeStaticOrDirect* invoke, Location temp, SlowPathCode* slow_path) {
   Location callee_method = temp;  // For all kinds except kRecursive, callee will be in temp.
   switch (invoke->GetMethodLoadKind()) {
-    case HInvokeStaticOrDirect::MethodLoadKind::kStringInit: {
+    case MethodLoadKind::kStringInit: {
       uint32_t offset =
           GetThreadOffset<kArmPointerSize>(invoke->GetStringInitEntryPoint()).Int32Value();
       // temp = thread->string_init_entrypoint
       GetAssembler()->LoadFromOffset(kLoadWord, RegisterFrom(temp), tr, offset);
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kRecursive:
+    case MethodLoadKind::kRecursive:
       callee_method = invoke->GetLocations()->InAt(invoke->GetCurrentMethodIndex());
       break;
-    case HInvokeStaticOrDirect::MethodLoadKind::kBootImageLinkTimePcRelative: {
+    case MethodLoadKind::kBootImageLinkTimePcRelative: {
       DCHECK(GetCompilerOptions().IsBootImage() || GetCompilerOptions().IsBootImageExtension());
       PcRelativePatchInfo* labels = NewBootImageMethodPatch(invoke->GetResolvedMethodReference());
       vixl32::Register temp_reg = RegisterFrom(temp);
       EmitMovwMovtPlaceholder(labels, temp_reg);
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kBootImageRelRo: {
+    case MethodLoadKind::kBootImageRelRo: {
       uint32_t boot_image_offset = GetBootImageOffset(invoke);
       PcRelativePatchInfo* labels = NewBootImageRelRoPatch(boot_image_offset);
       vixl32::Register temp_reg = RegisterFrom(temp);
@@ -9085,7 +9084,7 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
       GetAssembler()->LoadFromOffset(kLoadWord, temp_reg, temp_reg, /* offset*/ 0);
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kBssEntry: {
+    case MethodLoadKind::kBssEntry: {
       PcRelativePatchInfo* labels = NewMethodBssEntryPatch(invoke->GetMethodReference());
       vixl32::Register temp_reg = RegisterFrom(temp);
       EmitMovwMovtPlaceholder(labels, temp_reg);
@@ -9093,10 +9092,10 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
       GetAssembler()->LoadFromOffset(kLoadWord, temp_reg, temp_reg, /* offset*/ 0);
       break;
     }
-    case HInvokeStaticOrDirect::MethodLoadKind::kJitDirectAddress:
+    case MethodLoadKind::kJitDirectAddress:
       __ Mov(RegisterFrom(temp), Operand::From(invoke->GetMethodAddress()));
       break;
-    case HInvokeStaticOrDirect::MethodLoadKind::kRuntimeCall: {
+    case MethodLoadKind::kRuntimeCall: {
       GenerateInvokeStaticOrDirectRuntimeCall(invoke, temp, slow_path);
       return;  // No code pointer retrieval; the runtime performs the call directly.
     }
@@ -9117,7 +9116,7 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
     }
   };
   switch (invoke->GetCodePtrLocation()) {
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallSelf:
+    case CodePtrLocation::kCallSelf:
       {
         // Use a scope to help guarantee that `RecordPcInfo()` records the correct pc.
         ExactAssemblyScope aas(GetVIXLAssembler(),
@@ -9127,7 +9126,7 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
         RecordPcInfo(invoke, invoke->GetDexPc(), slow_path);
       }
       break;
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative: {
+    case CodePtrLocation::kCallCriticalNative: {
       size_t out_frame_size =
           PrepareCriticalNativeCall<CriticalNativeCallingConventionVisitorARMVIXL,
                                     kAapcsStackAlignment,
@@ -9158,7 +9157,7 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
       }
       break;
     }
-    case HInvokeStaticOrDirect::CodePtrLocation::kCallArtMethod:
+    case CodePtrLocation::kCallArtMethod:
       call_code_pointer_member(ArtMethod::EntryPointFromQuickCompiledCodeOffset(kArmPointerSize));
       break;
   }

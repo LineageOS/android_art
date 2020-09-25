@@ -23,6 +23,7 @@
 
 #include "android-base/stringprintf.h"
 #include "art_method.h"
+#include "art_method-inl.h"
 #include "base/intrusive_forward_list.h"
 #include "bounds_check_elimination.h"
 #include "builder.h"
@@ -470,6 +471,9 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     StartAttributeStream("always_throws") << std::boolalpha
                                           << invoke->AlwaysThrows()
                                           << std::noboolalpha;
+    if (method != nullptr) {
+      StartAttributeStream("method_index") << method->GetMethodIndex();
+    }
   }
 
   void VisitInvokeUnresolved(HInvokeUnresolved* invoke) override {

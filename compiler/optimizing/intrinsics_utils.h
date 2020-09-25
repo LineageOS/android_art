@@ -63,10 +63,9 @@ class IntrinsicSlowPath : public TSlowPathCode {
 
     if (invoke_->IsInvokeStaticOrDirect()) {
       HInvokeStaticOrDirect* invoke_static_or_direct = invoke_->AsInvokeStaticOrDirect();
-      DCHECK_NE(invoke_static_or_direct->GetMethodLoadKind(),
-                HInvokeStaticOrDirect::MethodLoadKind::kRecursive);
+      DCHECK_NE(invoke_static_or_direct->GetMethodLoadKind(), MethodLoadKind::kRecursive);
       DCHECK_NE(invoke_static_or_direct->GetCodePtrLocation(),
-                HInvokeStaticOrDirect::CodePtrLocation::kCallCriticalNative);
+                CodePtrLocation::kCallCriticalNative);
       codegen->GenerateStaticOrDirectCall(invoke_static_or_direct, method_loc, this);
     } else if (invoke_->IsInvokeVirtual()) {
       codegen->GenerateVirtualCall(invoke_->AsInvokeVirtual(), method_loc, this);
@@ -79,6 +78,11 @@ class IntrinsicSlowPath : public TSlowPathCode {
     Location out = invoke_->GetLocations()->Out();
     if (out.IsValid()) {
       DCHECK(out.IsRegisterKind());  // TODO: Replace this when we support output in memory.
+      // We want to double-check that we don't overwrite a live register with the return
+      // value.
+      // Note: For the possible kNoOutputOverlap case we can't simply remove the OUT register
+      // from the GetLiveRegisters() - theoretically it might be needed after the return from
+      // the slow path.
       DCHECK(!invoke_->GetLocations()->GetLiveRegisters()->OverlapsRegisters(out));
       codegen->MoveFromReturnRegister(out, invoke_->GetType());
     }
