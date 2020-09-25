@@ -26,7 +26,7 @@ my_files := $(ART_TESTCASES_CONTENT)
 # Manually add system libraries that we need to run the host ART tools.
 my_files += \
   $(foreach lib, libbacktrace libbase libc++ libicu_jni liblog libsigchain libunwindstack \
-    libziparchive libjavacore libandroidio libopenjdkd, \
+    libziparchive libjavacore libandroidio libopenjdkd liblz4, \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib).so) \
   $(foreach lib, libcrypto libz libicuuc libicui18n libandroidicu libexpat, \
