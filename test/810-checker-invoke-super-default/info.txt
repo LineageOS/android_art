@@ -1,0 +1,1 @@
+Test that we don't store copied methods in BSS.

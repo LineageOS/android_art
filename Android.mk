@@ -697,6 +697,7 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
                         $(ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES) \
                         $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
+                        $(TARGET_OUT_SHARED_LIBRARIES)/liblz4.so \
                         libartpalette-system \
                         tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
                         tz_version-art-test-tzdata icu_overlay-art-test-tzdata \
