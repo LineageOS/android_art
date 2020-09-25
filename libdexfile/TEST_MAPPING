@@ -5,6 +5,10 @@
       "host": true
     },
     {
+      "name": "art_libdexfile_external_static_tests",
+      "host": true
+    },
+    {
       "name": "art_libdexfile_support_tests",
       "host": true
     },
