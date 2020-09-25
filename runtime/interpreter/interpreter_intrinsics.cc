@@ -440,6 +440,7 @@ bool MterpHandleIntrinsic(ShadowFrame* shadow_frame,
     UNIMPLEMENTED_CASE(FloatIsNaN /* (F)Z */)
     UNIMPLEMENTED_CASE(FloatIntBitsToFloat /* (I)F */)
     UNIMPLEMENTED_CASE(IntegerDivideUnsigned /* (II)I */)
+    UNIMPLEMENTED_CASE(LongDivideUnsigned /* (JJ)J */)
     INTRINSIC_CASE(IntegerReverse)
     INTRINSIC_CASE(IntegerReverseBytes)
     INTRINSIC_CASE(IntegerBitCount)
