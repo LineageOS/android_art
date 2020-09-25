@@ -26,6 +26,59 @@ class HInstruction;
  * allocation is visible outside ('escapes') its immediate method context.
  */
 
+// A visitor for seeing all instructions escape analysis considers escaping.
+// Called with each user of the reference passed to 'VisitEscapes'. Return true
+// to continue iteration and false to stop.
+class EscapeVisitor {
+ public:
+  virtual ~EscapeVisitor() {}
+  virtual bool Visit(HInstruction* escape) = 0;
+  bool operator()(HInstruction* user) {
+    return Visit(user);
+  }
+};
+
+// An explicit EscapeVisitor for lambdas
+template <typename F>
+class LambdaEscapeVisitor final : public EscapeVisitor {
+ public:
+  explicit LambdaEscapeVisitor(F f) : func_(f) {}
+  bool Visit(HInstruction* escape) override {
+    return func_(escape);
+  }
+
+ private:
+  F func_;
+};
+
+// This functor is used with the escape-checking functions. If the NoEscape
+// function returns true escape analysis will consider 'user' to not have
+// escaped 'reference'. This allows clients with additional information to
+// supplement the escape-analysis. If the NoEscape function returns false then
+// the normal escape-checking code will be used to determine whether or not
+// 'reference' escapes.
+class NoEscapeCheck {
+ public:
+  virtual ~NoEscapeCheck() {}
+  virtual bool NoEscape(HInstruction* reference, HInstruction* user) = 0;
+  bool operator()(HInstruction* ref, HInstruction* user) {
+    return NoEscape(ref, user);
+  }
+};
+
+// An explicit NoEscapeCheck for use with c++ lambdas.
+template <typename F>
+class LambdaNoEscapeCheck final : public NoEscapeCheck {
+ public:
+  explicit LambdaNoEscapeCheck(F f) : func_(f) {}
+  bool NoEscape(HInstruction* ref, HInstruction* user) override {
+    return func_(ref, user);
+  }
+
+ private:
+  F func_;
+};
+
 /*
  * Performs escape analysis on the given instruction, typically a reference to an
  * allocation. The method assigns true to parameter 'is_singleton' if the reference
@@ -52,16 +105,44 @@ class HInstruction;
  * analysis is applied to the user instead.
  */
 void CalculateEscape(HInstruction* reference,
-                     bool (*no_escape)(HInstruction*, HInstruction*),
+                     NoEscapeCheck& no_escape,
                      /*out*/ bool* is_singleton,
                      /*out*/ bool* is_singleton_and_not_returned,
                      /*out*/ bool* is_singleton_and_not_deopt_visible);
+
+inline void CalculateEscape(HInstruction* reference,
+                            bool (*no_escape_fn)(HInstruction*, HInstruction*),
+                            /*out*/ bool* is_singleton,
+                            /*out*/ bool* is_singleton_and_not_returned,
+                            /*out*/ bool* is_singleton_and_not_deopt_visible) {
+  LambdaNoEscapeCheck esc(no_escape_fn);
+  LambdaNoEscapeCheck noop_esc([](HInstruction*, HInstruction*) { return false; });
+  CalculateEscape(reference,
+                  no_escape_fn == nullptr ? static_cast<NoEscapeCheck&>(noop_esc) : esc,
+                  is_singleton,
+                  is_singleton_and_not_returned,
+                  is_singleton_and_not_deopt_visible);
+}
+
+/*
+ * Performs escape analysis and visits each escape of the reference. Does not try to calculate any
+ * overall information about the method. Escapes are calculated in the same way as CalculateEscape.
+ *
+ * The escape_visitor should return true to continue visiting, false otherwise.
+ */
+void VisitEscapes(HInstruction* reference, EscapeVisitor& escape_visitor);
 
 /*
  * Convenience method for testing the singleton and not returned properties at once.
  * Callers should be aware that this method invokes the full analysis at each call.
  */
-bool DoesNotEscape(HInstruction* reference, bool (*no_escape)(HInstruction*, HInstruction*));
+bool DoesNotEscape(HInstruction* reference, NoEscapeCheck& no_escape);
+
+inline bool DoesNotEscape(HInstruction* reference,
+                          bool (*no_escape_fn)(HInstruction*, HInstruction*)) {
+  LambdaNoEscapeCheck<typeof(no_escape_fn)> esc(no_escape_fn);
+  return DoesNotEscape(reference, esc);
+}
 
 }  // namespace art
 
