@@ -21,10 +21,12 @@ cc_defaults {
 
 cc_defaults {
     name: "signal_dumper_libunwindstack_static_deps",
-    defaults: ["signal_dumper_libbase_static_deps"],
+    defaults: [
+        "libdexfile_support_static_defaults",
+        "signal_dumper_libbase_static_deps",
+    ],
     static_libs: [
         "libbase",
-        "libdexfile_support_static",
         "liblog",
         "liblzma",
     ],
