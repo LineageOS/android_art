@@ -46,7 +46,7 @@ public class PublicSubclassOfUnresolvedClass extends UnresolvedPublicClass {
   }
 
   /// CHECK-START: void resolved.PublicSubclassOfUnresolvedClass.$noinline$testReferrersClass() builder (after)
-  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
+  /// CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:false
   static void $noinline$testReferrersClass() {
     Class<?> c = PublicSubclassOfUnresolvedClass.class;
   }
