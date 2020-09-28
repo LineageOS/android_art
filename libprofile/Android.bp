@@ -71,7 +71,7 @@ cc_defaults {
 
 cc_defaults {
     name: "libprofile_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libbase",
         "libz",
         "libziparchive",
@@ -85,7 +85,7 @@ cc_defaults {
         "libartbase_static_defaults",
         "libdexfile_static_defaults",
     ],
-    static_libs: ["libprofile"],
+    whole_static_libs: ["libprofile"],
 }
 
 cc_defaults {
@@ -95,7 +95,7 @@ cc_defaults {
         "libartbased_static_defaults",
         "libdexfiled_static_defaults",
     ],
-    static_libs: ["libprofiled"],
+    whole_static_libs: ["libprofiled"],
 }
 
 art_cc_library {
