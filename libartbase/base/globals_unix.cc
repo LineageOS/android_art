@@ -22,6 +22,8 @@
 
 namespace art {
 
+#ifndef ART_STATIC_LIBARTBASE
+
 #ifdef __APPLE__
 // dlopen(3) on Linux with just an SO name will search the already
 // opened libraries. On Darwin, we need dlopen(3) needs the SO name
@@ -71,5 +73,7 @@ static struct CheckLoadedBuild {
     }
   }
 } g_check_loaded_build;
+
+#endif  // !ART_STATIC_LIBARTBASE
 
 }  // namespace art
