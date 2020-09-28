@@ -379,19 +379,31 @@ if [ ${HAS_SRC_DEX2OAT_UNRESOLVED} = "true" ]; then
     make_dex classes
   fi
 else
+  if [ "${HAS_SRC}" = "true" -a "${HAS_SRC_MULTIDEX}" = "true" ]; then
+    # To allow circular references, compile src/ and src-multidex/ together
+    # and pass the output as class path argument. Replacement sources
+    # in src-art/ can replace symbols used by src-multidex but everything
+    # needed to compile src-multidex should be present in src/.
+    mkdir classes-tmp-all
+    javac_with_bootclasspath -implicit:none -d classes-tmp-all \
+        `find src -name '*.java'` \
+        `find src-multidex -name '*.java'`
+    src_tmp_all="-cp classes-tmp-all"
+  fi
+
   if [ "${HAS_SRC}" = "true" ]; then
     mkdir -p classes
-    javac_with_bootclasspath -implicit:none -classpath src-multidex -d classes `find src -name '*.java'`
+    javac_with_bootclasspath -implicit:none $src_tmp_all -d classes `find src -name '*.java'`
   fi
 
   if [ "${HAS_SRC_ART}" = "true" ]; then
     mkdir -p classes
-    javac_with_bootclasspath -implicit:none -classpath src-multidex -d classes `find src-art -name '*.java'`
+    javac_with_bootclasspath -implicit:none $src_tmp_all -d classes `find src-art -name '*.java'`
   fi
 
   if [ "${HAS_SRC_MULTIDEX}" = "true" ]; then
     mkdir classes2
-    javac_with_bootclasspath -implicit:none -classpath src -d classes2 `find src-multidex -name '*.java'`
+    javac_with_bootclasspath -implicit:none $src_tmp_all -d classes2 `find src-multidex -name '*.java'`
     if [ ${NEED_DEX} = "true" ]; then
       make_dex classes2
     fi
@@ -464,8 +476,14 @@ if [ ${HAS_SRC_EX} = "true" -o ${HAS_SRC_EX2} = "true" ]; then
     mkdir -p classes-tmp-for-ex
     src_tmp_for_ex="-cp classes-tmp-for-ex"
   fi
-  if [[ "${HAS_SRC}" == "true" ]]; then
+  if [ "${HAS_SRC}" = "true" -a "${HAS_SRC_MULTIDEX}" = "true" ]; then
+    javac_with_bootclasspath -d classes-tmp-for-ex \
+        `find src -name '*.java'` \
+        `find src-multidex -name '*.java'`
+  elif [[ "${HAS_SRC}" == "true" ]]; then
     javac_with_bootclasspath -d classes-tmp-for-ex `find src -name '*.java'`
+  elif [[ "${HAS_SRC_MULTIDEX}" == "true" ]]; then
+    javac_with_bootclasspath -d classes-tmp-for-ex `find src-multidex -name '*.java'`
   fi
   if [[ "${HAS_SRC_ART}" == "true" ]]; then
     javac_with_bootclasspath -d classes-tmp-for-ex `find src-art -name '*.java'`

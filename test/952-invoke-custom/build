@@ -27,14 +27,13 @@ function javac_wrapper {
   set -e # Stop on error - the caller script may not have this set.
 
   # Update arguments to add transformer and ASM to the compiler classpath.
-  local args=()
   local classpath="./transformer.jar:$ASM_JAR"
+  local args=(-cp $classpath)
   while [ $# -ne 0 ] ; do
     case $1 in
       -cp|-classpath|--class-path)
         shift
         shift
-        args+=(-cp $classpath)
         ;;
       *)
         args+=("$1")
