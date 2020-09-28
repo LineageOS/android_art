@@ -29,14 +29,19 @@ cc_defaults {
         },
     },
 
-    shared_libs: [
+    stl: "c++_static",
+    static_libs: [
         "libbase",
     ],
 }
 
 art_cc_binary {
     name: "hiddenapi",
-    defaults: ["hiddenapi-defaults"],
+    defaults: [
+        "hiddenapi-defaults",
+        "libartbase_static_defaults",
+        "libdexfile_static_defaults",
+    ],
     target: {
         host: {
             // Override the prefer32 added by art_cc_binary when
@@ -46,10 +51,6 @@ art_cc_binary {
             compile_multilib: "64",
         },
     },
-    shared_libs: [
-        "libdexfile",
-        "libartbase",
-    ],
 }
 
 art_cc_binary {
@@ -57,10 +58,8 @@ art_cc_binary {
     defaults: [
         "art_debug_defaults",
         "hiddenapi-defaults",
-    ],
-    shared_libs: [
-        "libdexfiled",
-        "libartbased",
+        "libartbased_static_defaults",
+        "libdexfiled_static_defaults",
     ],
 }
 
