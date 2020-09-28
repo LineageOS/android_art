@@ -326,7 +326,7 @@ size_t ThreadList::RunCheckpoint(Closure* checkpoint_function, Closure* callback
   std::vector<Thread*> suspended_count_modified_threads;
   size_t count = 0;
   {
-    // Call a checkpoint function for each thread, threads which are suspend get their checkpoint
+    // Call a checkpoint function for each thread, threads which are suspended get their checkpoint
     // manually called.
     MutexLock mu(self, *Locks::thread_list_lock_);
     MutexLock mu2(self, *Locks::thread_suspend_count_lock_);
