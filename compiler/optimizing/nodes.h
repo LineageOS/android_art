@@ -6391,6 +6391,21 @@ class HLoadClass final : public HInstruction {
     // Used for classes outside boot image referenced by AOT-compiled app and boot image code.
     kBssEntry,
 
+    // Load from an entry for public class in the .bss section using a PC-relative load.
+    // Used for classes that were unresolved during AOT-compilation outside the literal
+    // package of the compiling class. Such classes are accessible only if they are public
+    // and the .bss entry shall therefore be filled only if the resolved class is public.
+    kBssEntryPublic,
+
+    // Load from an entry for package class in the .bss section using a PC-relative load.
+    // Used for classes that were unresolved during AOT-compilation but within the literal
+    // package of the compiling class. Such classes are accessible if they are public or
+    // in the same package which, given the literal package match, requires only matching
+    // defining class loader and the .bss entry shall therefore be filled only if at least
+    // one of those conditions holds. Note that all code in an oat file belongs to classes
+    // with the same defining class loader.
+    kBssEntryPackage,
+
     // Use a known boot image Class* address, embedded in the code by the codegen.
     // Used for boot image classes referenced by apps in JIT-compiled code.
     kJitBootImageAddress,
@@ -6443,7 +6458,9 @@ class HLoadClass final : public HInstruction {
   bool HasPcRelativeLoadKind() const {
     return GetLoadKind() == LoadKind::kBootImageLinkTimePcRelative ||
            GetLoadKind() == LoadKind::kBootImageRelRo ||
-           GetLoadKind() == LoadKind::kBssEntry;
+           GetLoadKind() == LoadKind::kBssEntry ||
+           GetLoadKind() == LoadKind::kBssEntryPublic ||
+           GetLoadKind() == LoadKind::kBssEntryPackage;
   }
 
   bool CanBeMoved() const override { return true; }
@@ -6459,9 +6476,6 @@ class HLoadClass final : public HInstruction {
   }
 
   void SetMustGenerateClinitCheck(bool generate_clinit_check) {
-    // The entrypoint the code generator is going to call does not do
-    // clinit of the class.
-    DCHECK(!NeedsAccessCheck());
     SetPackedFlag<kFlagGenerateClInitCheck>(generate_clinit_check);
   }
 
@@ -6514,9 +6528,14 @@ class HLoadClass final : public HInstruction {
 
   bool MustResolveTypeOnSlowPath() const {
     // Check that this instruction has a slow path.
-    DCHECK(GetLoadKind() != LoadKind::kRuntimeCall);  // kRuntimeCall calls on main path.
-    DCHECK(GetLoadKind() == LoadKind::kBssEntry || MustGenerateClinitCheck());
-    return GetLoadKind() == LoadKind::kBssEntry;
+    LoadKind load_kind = GetLoadKind();
+    DCHECK(load_kind != LoadKind::kRuntimeCall);  // kRuntimeCall calls on main path.
+    bool must_resolve_type_on_slow_path =
+       load_kind == LoadKind::kBssEntry ||
+       load_kind == LoadKind::kBssEntryPublic ||
+       load_kind == LoadKind::kBssEntryPackage;
+    DCHECK(must_resolve_type_on_slow_path || MustGenerateClinitCheck());
+    return must_resolve_type_on_slow_path;
   }
 
   void MarkInBootImage() {
@@ -6558,6 +6577,8 @@ class HLoadClass final : public HInstruction {
     return load_kind == LoadKind::kReferrersClass ||
         load_kind == LoadKind::kBootImageLinkTimePcRelative ||
         load_kind == LoadKind::kBssEntry ||
+        load_kind == LoadKind::kBssEntryPublic ||
+        load_kind == LoadKind::kBssEntryPackage ||
         load_kind == LoadKind::kRuntimeCall;
   }
 
@@ -6565,14 +6586,14 @@ class HLoadClass final : public HInstruction {
 
   // The special input is the HCurrentMethod for kRuntimeCall or kReferrersClass.
   // For other load kinds it's empty or possibly some architecture-specific instruction
-  // for PC-relative loads, i.e. kBssEntry or kBootImageLinkTimePcRelative.
+  // for PC-relative loads, i.e. kBssEntry* or kBootImageLinkTimePcRelative.
   HUserRecord<HInstruction*> special_input_;
 
   // A type index and dex file where the class can be accessed. The dex file can be:
   // - The compiling method's dex file if the class is defined there too.
   // - The compiling method's dex file if the class is referenced there.
   // - The dex file where the class is defined. When the load kind can only be
-  //   kBssEntry or kRuntimeCall, we cannot emit code for this `HLoadClass`.
+  //   kBssEntry* or kRuntimeCall, we cannot emit code for this `HLoadClass`.
   const dex::TypeIndex type_index_;
   const DexFile& dex_file_;
 
@@ -6601,6 +6622,8 @@ inline void HLoadClass::AddSpecialInput(HInstruction* special_input) {
   DCHECK(GetLoadKind() == LoadKind::kBootImageLinkTimePcRelative ||
          GetLoadKind() == LoadKind::kBootImageRelRo ||
          GetLoadKind() == LoadKind::kBssEntry ||
+         GetLoadKind() == LoadKind::kBssEntryPublic ||
+         GetLoadKind() == LoadKind::kBssEntryPackage ||
          GetLoadKind() == LoadKind::kJitBootImageAddress) << GetLoadKind();
   DCHECK(special_input_.GetInstruction() == nullptr);
   special_input_ = HUserRecord<HInstruction*>(special_input);

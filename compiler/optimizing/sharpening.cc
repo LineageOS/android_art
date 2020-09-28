@@ -158,24 +158,55 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
          load_class->GetLoadKind() == HLoadClass::LoadKind::kReferrersClass)
       << load_class->GetLoadKind();
   DCHECK(!load_class->IsInBootImage()) << "HLoadClass should not be optimized before sharpening.";
+  const DexFile& dex_file = load_class->GetDexFile();
+  dex::TypeIndex type_index = load_class->GetTypeIndex();
+  const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
 
-  HLoadClass::LoadKind load_kind = load_class->GetLoadKind();
+  bool is_in_boot_image = false;
+  HLoadClass::LoadKind desired_load_kind = HLoadClass::LoadKind::kInvalid;
 
-  if (load_class->NeedsAccessCheck()) {
-    // We need to call the runtime anyway, so we simply get the class as that call's return value.
-  } else if (load_kind == HLoadClass::LoadKind::kReferrersClass) {
+  if (load_class->GetLoadKind() == HLoadClass::LoadKind::kReferrersClass) {
+    DCHECK(!load_class->NeedsAccessCheck());
     // Loading from the ArtMethod* is the most efficient retrieval in code size.
     // TODO: This may not actually be true for all architectures and
     // locations of target classes. The additional register pressure
     // for using the ArtMethod* should be considered.
+    desired_load_kind = HLoadClass::LoadKind::kReferrersClass;
+  } else if (load_class->NeedsAccessCheck()) {
+    DCHECK_EQ(load_class->GetLoadKind(), HLoadClass::LoadKind::kRuntimeCall);
+    if (klass != nullptr) {
+      // Resolved class that needs access check must be really inaccessible
+      // and the access check is bound to fail. Just emit the runtime call.
+      desired_load_kind = HLoadClass::LoadKind::kRuntimeCall;
+    } else if (compiler_options.IsJitCompiler()) {
+      // Unresolved class while JITting means that either we never hit this
+      // instruction or it failed. Either way, just emit the runtime call.
+      // (Though we could consider emitting Deoptimize instead and
+      // recompile if the instruction succeeds in interpreter.)
+      desired_load_kind = HLoadClass::LoadKind::kRuntimeCall;
+    } else {
+      // For AOT, check if the class is in the same literal package as the
+      // compiling class and pick an appropriate .bss entry.
+      auto package_length = [](const char* descriptor) {
+        const char* slash_pos = strrchr(descriptor, '/');
+        return (slash_pos != nullptr) ? static_cast<size_t>(slash_pos - descriptor) : 0u;
+      };
+      const char* klass_descriptor = dex_file.StringByTypeIdx(type_index);
+      const uint32_t klass_package_length = package_length(klass_descriptor);
+      const DexFile* referrer_dex_file = dex_compilation_unit.GetDexFile();
+      const dex::TypeIndex referrer_type_index =
+          referrer_dex_file->GetClassDef(dex_compilation_unit.GetClassDefIndex()).class_idx_;
+      const char* referrer_descriptor = referrer_dex_file->StringByTypeIdx(referrer_type_index);
+      const uint32_t referrer_package_length = package_length(referrer_descriptor);
+      bool same_package =
+          (referrer_package_length == klass_package_length) &&
+          memcmp(referrer_descriptor, klass_descriptor, referrer_package_length) == 0;
+      desired_load_kind = same_package
+          ? HLoadClass::LoadKind::kBssEntryPackage
+          : HLoadClass::LoadKind::kBssEntryPublic;
+    }
   } else {
-    const DexFile& dex_file = load_class->GetDexFile();
-    dex::TypeIndex type_index = load_class->GetTypeIndex();
-
-    bool is_in_boot_image = false;
-    HLoadClass::LoadKind desired_load_kind = HLoadClass::LoadKind::kInvalid;
     Runtime* runtime = Runtime::Current();
-    const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
     if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {
       // Compiling boot image or boot image extension. Check if the class is a boot image class.
       DCHECK(!compiler_options.IsJitCompiler());
@@ -227,17 +258,19 @@ HLoadClass::LoadKind HSharpening::ComputeLoadClassKind(
         desired_load_kind = HLoadClass::LoadKind::kBssEntry;
       }
     }
-    DCHECK_NE(desired_load_kind, HLoadClass::LoadKind::kInvalid);
-
-    if (is_in_boot_image) {
-      load_class->MarkInBootImage();
-    }
-    load_kind = codegen->GetSupportedLoadClassKind(desired_load_kind);
   }
+  DCHECK_NE(desired_load_kind, HLoadClass::LoadKind::kInvalid);
+
+  if (is_in_boot_image) {
+    load_class->MarkInBootImage();
+  }
+  HLoadClass::LoadKind load_kind = codegen->GetSupportedLoadClassKind(desired_load_kind);
 
   if (!IsSameDexFile(load_class->GetDexFile(), *dex_compilation_unit.GetDexFile())) {
-    if ((load_kind == HLoadClass::LoadKind::kRuntimeCall) ||
-        (load_kind == HLoadClass::LoadKind::kBssEntry)) {
+    if (load_kind == HLoadClass::LoadKind::kRuntimeCall ||
+        load_kind == HLoadClass::LoadKind::kBssEntry ||
+        load_kind == HLoadClass::LoadKind::kBssEntryPublic ||
+        load_kind == HLoadClass::LoadKind::kBssEntryPackage) {
       // We actually cannot reference this class, we're forced to bail.
       // We cannot reference this class with Bss, as the entrypoint will lookup the class
       // in the caller's dex file, but that dex file does not reference the class.
