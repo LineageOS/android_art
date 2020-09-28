@@ -17,6 +17,7 @@
 package unresolved;
 
 import getters.GetUnresolvedPublicClass;
+import getters.GetUnresolvedPublicClassFromDifferentDexFile;
 import resolved.ResolvedPackagePrivateClass;
 import resolved.ResolvedPublicSubclassOfPackagePrivateClass;
 
@@ -24,6 +25,9 @@ public class UnresolvedPublicClass {
   public static void $noinline$main() {
     $noinline$testReferrersClass();
     $noinline$testInlinedReferrersClass();
+    $noinline$testInlinedReferrersClassFromDifferentDexFile();
+    $noinline$testInlinedClassDescriptorCompare1();
+    $noinline$testInlinedClassDescriptorCompare2();
 
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
@@ -46,7 +50,7 @@ public class UnresolvedPublicClass {
   }
 
   /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testReferrersClass() builder (after)
-  // CHECK: LoadClass class_name:unresolved.UnresolvedPublicClass needs_access_check:false
+  /// CHECK: LoadClass class_name:unresolved.UnresolvedPublicClass needs_access_check:false
   static void $noinline$testReferrersClass() {
     Class<?> c = UnresolvedPublicClass.class;
   }
@@ -56,6 +60,33 @@ public class UnresolvedPublicClass {
   static void $noinline$testInlinedReferrersClass() {
     // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
     Class<?> c = GetUnresolvedPublicClass.get();
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testInlinedReferrersClassFromDifferentDexFile() inliner (after)
+  // CHECK: LoadClass class_name:unresolved.UnresolvedPublicClass needs_access_check:false
+  static void $noinline$testInlinedReferrersClassFromDifferentDexFile() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c = GetUnresolvedPublicClassFromDifferentDexFile.get();
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testInlinedClassDescriptorCompare1() inliner (after)
+  // CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:true
+  static void $noinline$testInlinedClassDescriptorCompare1() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c =
+        GetUnresolvedPublicClassFromDifferentDexFile.getOtherClass();
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testInlinedClassDescriptorCompare2() inliner (after)
+  // CHECK: LoadClass class_name:unresolved.UnresolvedPublicClazz needs_access_check:true
+  static void $noinline$testInlinedClassDescriptorCompare2() {
+    // This is useful for code coverage of descriptor comparison
+    // implemented by first comparing the utf16 lengths and then
+    // checking strcmp(). Using these classes we cover the path
+    // where utf16 lengths match but string contents differ.
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
+    Class<?> c =
+        GetUnresolvedPublicClassFromDifferentDexFile.getOtherClassWithSameDescriptorLength();
   }
 
   /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testResolvedPublicClass() builder (after)
