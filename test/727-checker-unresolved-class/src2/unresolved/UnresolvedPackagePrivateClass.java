@@ -27,7 +27,7 @@ class UnresolvedPackagePrivateClass {
   }
 
   /// CHECK-START: void unresolved.UnresolvedPackagePrivateClass.$noinline$testReferrersClass() builder (after)
-  // CHECK: LoadClass class_name:unresolved.UnresolvedPackagePrivateClass needs_access_check:false
+  /// CHECK: LoadClass class_name:unresolved.UnresolvedPackagePrivateClass needs_access_check:false
   static void $noinline$testReferrersClass() {
     Class<?> c = UnresolvedPackagePrivateClass.class;
   }
