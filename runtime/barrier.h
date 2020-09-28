@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// CAUTION: THIS IS NOT A FULLY GENERAL BARRIER API.
+// CAUTION: THIS IS NOT A FULLY GENERAL BARRIER API. Some names are unconventional.
 
 // It may either be used as a "latch" or single-use barrier, or it may be reused under
 // very limited conditions, e.g. if only Pass(), but not Wait() is called.  Unlike a standard
@@ -22,7 +22,7 @@
 // Pass() or Wait(), and only then set the count using the Increment() method.  Threads at
 // a Wait() are only awoken if the count reaches zero AFTER the decrement is applied.
 // This works because, also unlike most latch APIs, there is no way to Wait() without
-// decrementing the count, and thus nobody can spuriosly wake up on the initial zero.
+// decrementing the count, and thus nobody can spuriously wake up on the initial zero.
 
 #ifndef ART_RUNTIME_BARRIER_H_
 #define ART_RUNTIME_BARRIER_H_
@@ -52,7 +52,7 @@ class Barrier {
   // Pass through the barrier, decrement the count but do not block.
   void Pass(Thread* self) REQUIRES(!GetLock());
 
-  // Wait on the barrier, decrement the count.
+  // Decrement the count, then wait until the count is zero.
   void Wait(Thread* self) REQUIRES(!GetLock());
 
   // The following three calls are only safe if we somehow know that no other thread both
@@ -61,13 +61,13 @@ class Barrier {
   // If these calls are made in that situation, the offending thread is likely to go back
   // to sleep, resulting in a deadlock.
 
-  // Increment the count by delta, wait on condition if count is non zero.  If LockHandling is
+  // Increment the count by delta, wait on condition while count is non zero.  If LockHandling is
   // kAllowHoldingLocks we will not check that all locks are released when waiting.
   template <Barrier::LockHandling locks = kDisallowHoldingLocks>
   void Increment(Thread* self, int delta) REQUIRES(!GetLock());
 
-  // Increment the count by delta, wait on condition if count is non zero, with a timeout. Returns
-  // true if time out occurred.
+  // Increment the count by delta, wait on condition while count is non zero, with a timeout.
+  // Returns true if time out occurred.
   bool Increment(Thread* self, int delta, uint32_t timeout_ms) REQUIRES(!GetLock());
 
   // Set the count to a new value.  This should only be used if there is no possibility that
