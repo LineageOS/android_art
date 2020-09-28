@@ -123,6 +123,7 @@ art_cc_library_static {
     device_supported: false,
     host_supported: true,
     defaults: [
+        "art_defaults",
         "libart-compiler_static_defaults",
         "libart-dex2oat_static_defaults",
         "libart-dexlayout_static_defaults",
@@ -170,6 +171,8 @@ art_cc_library_static {
     device_supported: false,
     host_supported: true,
     defaults: [
+        "art_debug_defaults",
+        "art_defaults",
         "libartbased_static_defaults",
         "libartd-compiler_static_defaults",
         "libartd-dex2oat_static_defaults",
