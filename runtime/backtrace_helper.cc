@@ -52,8 +52,9 @@ struct UnwindHelper : public TLSData {
         dex_(memory_),
         unwinder_(max_depth, &maps_, memory_) {
     CHECK(maps_.Parse());
-    unwinder_.SetJitDebug(&jit_, unwindstack::Regs::CurrentArch());
-    unwinder_.SetDexFiles(&dex_, unwindstack::Regs::CurrentArch());
+    unwinder_.SetArch(unwindstack::Regs::CurrentArch());
+    unwinder_.SetJitDebug(&jit_);
+    unwinder_.SetDexFiles(&dex_);
     unwinder_.SetResolveNames(false);
     unwindstack::Elf::SetCachingEnabled(true);
   }
