@@ -102,7 +102,7 @@ cc_defaults {
 
 cc_defaults {
     name: "libdexfile_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libbase",
         "liblog",
         "libz",
@@ -119,7 +119,7 @@ cc_defaults {
     defaults_visibility: [
         "//art:__subpackages__",
     ],
-    static_libs: ["libdexfile"],
+    whole_static_libs: ["libdexfile"],
 }
 
 cc_defaults {
@@ -128,7 +128,7 @@ cc_defaults {
         "libartbased_static_defaults",
         "libdexfile_static_base_defaults",
     ],
-    static_libs: ["libdexfiled"],
+    whole_static_libs: ["libdexfiled"],
 }
 
 gensrcs {
@@ -433,7 +433,7 @@ cc_defaults {
     defaults: [
         "libdexfile_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libdexfile_external",
         "libdexfile_support_static",
     ],
@@ -444,7 +444,7 @@ cc_defaults {
     defaults: [
         "libdexfiled_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libdexfile_support_static",
         "libdexfiled_external",
     ],

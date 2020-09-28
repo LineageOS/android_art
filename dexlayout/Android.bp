@@ -58,7 +58,7 @@ art_cc_defaults {
 
 cc_defaults {
     name: "libart-dexlayout_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libbase",
         "libz",
     ],
@@ -114,7 +114,7 @@ cc_defaults {
         "libdexfile_static_defaults",
         "libprofile_static_defaults",
     ],
-    static_libs: ["libart-dexlayout"],
+    whole_static_libs: ["libart-dexlayout"],
 }
 
 art_cc_library {
@@ -159,7 +159,7 @@ cc_defaults {
         "libdexfiled_static_defaults",
         "libprofiled_static_defaults",
     ],
-    static_libs: ["libartd-dexlayout"],
+    whole_static_libs: ["libartd-dexlayout"],
 }
 
 cc_defaults {
