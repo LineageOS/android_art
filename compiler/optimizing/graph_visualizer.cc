@@ -110,13 +110,17 @@ std::ostream& operator<<(std::ostream& os, const StringList& list) {
   }
 }
 
+#ifndef ART_STATIC_LIBART_COMPILER
 using create_disasm_prototype = Disassembler*(InstructionSet, DisassemblerOptions*);
+#endif
+
 class HGraphVisualizerDisassembler {
  public:
   HGraphVisualizerDisassembler(InstructionSet instruction_set,
                                const uint8_t* base_address,
                                const uint8_t* end_address)
       : instruction_set_(instruction_set), disassembler_(nullptr) {
+#ifndef ART_STATIC_LIBART_COMPILER
     constexpr const char* libart_disassembler_so_name =
         kIsDebugBuild ? "libartd-disassembler.so" : "libart-disassembler.so";
     libart_disassembler_handle_ = dlopen(libart_disassembler_so_name, RTLD_NOW);
@@ -132,10 +136,11 @@ class HGraphVisualizerDisassembler {
                  << libart_disassembler_so_name << ": " << dlerror();
       return;
     }
+#endif
     // Reading the disassembly from 0x0 is easier, so we print relative
     // addresses. We will only disassemble the code once everything has
     // been generated, so we can read data in literal pools.
-    disassembler_ = std::unique_ptr<Disassembler>((*create_disassembler)(
+    disassembler_ = std::unique_ptr<Disassembler>(create_disassembler(
             instruction_set,
             new DisassemblerOptions(/* absolute_addresses= */ false,
                                     base_address,
@@ -149,9 +154,11 @@ class HGraphVisualizerDisassembler {
   ~HGraphVisualizerDisassembler() {
     // We need to call ~Disassembler() before we close the library.
     disassembler_.reset();
+#ifndef ART_STATIC_LIBART_COMPILER
     if (libart_disassembler_handle_ != nullptr) {
       dlclose(libart_disassembler_handle_);
     }
+#endif
   }
 
   void Disassemble(std::ostream& output, size_t start, size_t end) const {
@@ -172,7 +179,9 @@ class HGraphVisualizerDisassembler {
   InstructionSet instruction_set_;
   std::unique_ptr<Disassembler> disassembler_;
 
+#ifndef ART_STATIC_LIBART_COMPILER
   void* libart_disassembler_handle_;
+#endif
 };
 
 
