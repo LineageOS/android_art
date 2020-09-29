@@ -47,6 +47,9 @@ class Arm64InstructionSetFeatures final : public InstructionSetFeatures {
   // InstructionSetFeatures. This works around kernel bugs in AT_HWCAP and /proc/cpuinfo.
   static Arm64FeaturesUniquePtr FromAssembly();
 
+  // Use external cpu_features library.
+  static Arm64FeaturesUniquePtr FromCpuFeatures();
+
   bool Equals(const InstructionSetFeatures* other) const override;
 
   // Note that newer CPUs do not have a53 erratum 835769 and 843419,

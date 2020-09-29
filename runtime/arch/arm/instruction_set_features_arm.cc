@@ -29,6 +29,15 @@
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 
+#include <cpu_features_macros.h>
+
+#ifdef CPU_FEATURES_ARCH_ARM
+// This header can only be included on ARM targets,
+// as determined by cpu_features own define.
+#include <cpuinfo_arm.h>
+#endif
+
+
 #if defined(__arm__)
 extern "C" bool artCheckForArmSdivInstruction();
 extern "C" bool artCheckForArmv8AInstructions();
@@ -265,6 +274,19 @@ ArmFeaturesUniquePtr ArmInstructionSetFeatures::FromAssembly() {
   return ArmFeaturesUniquePtr(new ArmInstructionSetFeatures(has_div,
                                                             has_atomic_ldrd_strd,
                                                             has_armv8a));
+}
+
+ArmFeaturesUniquePtr ArmInstructionSetFeatures::FromCpuFeatures() {
+#ifdef CPU_FEATURES_ARCH_ARM
+  auto info = cpu_features::GetArmInfo();
+  auto features = info.features;
+  return ArmFeaturesUniquePtr(new ArmInstructionSetFeatures(features.idiva,
+                                                            features.lpae,
+                                                            info.architecture == 8));
+#else
+  UNIMPLEMENTED(WARNING);
+  return FromCppDefines();
+#endif
 }
 
 bool ArmInstructionSetFeatures::Equals(const InstructionSetFeatures* other) const {

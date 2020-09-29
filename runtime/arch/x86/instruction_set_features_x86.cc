@@ -25,6 +25,14 @@
 
 #include "arch/x86_64/instruction_set_features_x86_64.h"
 
+#include <cpu_features_macros.h>
+
+#ifdef CPU_FEATURES_ARCH_X86
+// This header can only be included on x86 targets,
+// as determined by cpu_features own define.
+#include <cpuinfo_x86.h>
+#endif
+
 namespace art {
 
 using android::base::StringPrintf;
@@ -237,6 +245,24 @@ X86FeaturesUniquePtr X86InstructionSetFeatures::FromAssembly(bool x86_64) {
   UNIMPLEMENTED(WARNING);
   return FromCppDefines(x86_64);
 }
+
+
+X86FeaturesUniquePtr X86InstructionSetFeatures::FromCpuFeatures(bool x86_64) {
+#ifdef CPU_FEATURES_ARCH_X86
+  cpu_features::X86Features features = cpu_features::GetX86Info().features;
+  return Create(x86_64,
+    features.ssse3,
+    features.sse4_1,
+    features.sse4_2,
+    features.avx,
+    features.avx2,
+    features.popcnt);
+#else
+  UNIMPLEMENTED(WARNING);
+  return FromCppDefines(x86_64);
+#endif
+}
+
 
 bool X86InstructionSetFeatures::Equals(const InstructionSetFeatures* other) const {
   if (GetInstructionSet() != other->GetInstructionSet()) {
