@@ -42,6 +42,7 @@
 #include "base/os.h"
 #include "base/runtime_debug.h"
 #include "base/stl_util.h"
+#include "base/string_view_cpp20.h"
 #include "base/unix_file/fd_file.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/dex_file-inl.h"
@@ -159,7 +160,9 @@ std::string CommonArtTestImpl::GetAndroidBuildTop() {
         break;
       }
       // We are running tests from testcases (extracted from zip) on tradefed.
-      if (path.filename() == std::filesystem::path("testcases")) {
+      // The first path is for remote runs and the second path for local runs.
+      if (path.filename() == std::filesystem::path("testcases") ||
+          StartsWith(path.filename().string(), "host_testcases")) {
         android_build_top = path.append("art_common");
         break;
       }
