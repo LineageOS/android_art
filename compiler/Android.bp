@@ -157,6 +157,9 @@ art_cc_defaults {
             ],
         },
     },
+    static: {
+        cflags: ["-DART_STATIC_LIBART_COMPILER"],
+    },
     generated_sources: ["art_compiler_operator_srcs"],
     shared_libs: [
         "libbase",
@@ -266,6 +269,7 @@ cc_defaults {
     name: "libart-compiler_static_defaults",
     defaults: [
         "libart-compiler_static_base_defaults",
+        "libart-disassembler_static_defaults",
         "libart_static_defaults",
         "libartbase_static_defaults",
         "libdexfile_static_defaults",
@@ -339,8 +343,9 @@ cc_defaults {
     name: "libartd-compiler_static_defaults",
     defaults: [
         "libart-compiler_static_base_defaults",
-        "libartd_static_defaults",
         "libartbased_static_defaults",
+        "libartd-disassembler_static_defaults",
+        "libartd_static_defaults",
         "libdexfiled_static_defaults",
         "libprofiled_static_defaults",
     ],
