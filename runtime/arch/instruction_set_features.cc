@@ -166,6 +166,25 @@ std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromAssemb
   UNREACHABLE();
 }
 
+std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::FromCpuFeatures() {
+  switch (kRuntimeISA) {
+    case InstructionSet::kArm:
+    case InstructionSet::kThumb2:
+      return ArmInstructionSetFeatures::FromCpuFeatures();
+    case InstructionSet::kArm64:
+      return Arm64InstructionSetFeatures::FromCpuFeatures();
+    case InstructionSet::kX86:
+      return X86InstructionSetFeatures::FromCpuFeatures();
+    case InstructionSet::kX86_64:
+      return X86_64InstructionSetFeatures::FromCpuFeatures();
+
+    default:
+      break;
+  }
+  UNIMPLEMENTED(FATAL) << kRuntimeISA;
+  UNREACHABLE();
+}
+
 std::unique_ptr<const InstructionSetFeatures> InstructionSetFeatures::AddFeaturesFromString(
     const std::string& feature_list, /* out */ std::string* error_msg) const {
   std::vector<std::string> features;
