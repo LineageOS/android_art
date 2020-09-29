@@ -1,0 +1,2 @@
+Regression test when a super call resolves to a method from a different class
+loader.
