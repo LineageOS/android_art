@@ -30,6 +30,14 @@
 
 #include "base/stl_util.h"
 
+#include <cpu_features_macros.h>
+
+#ifdef CPU_FEATURES_ARCH_AARCH64
+// This header can only be included on aarch64 targets,
+// as determined by cpu_features own define.
+#include <cpuinfo_aarch64.h>
+#endif
+
 namespace art {
 
 using android::base::StringPrintf;
@@ -243,6 +251,22 @@ Arm64FeaturesUniquePtr Arm64InstructionSetFeatures::FromHwcap() {
 Arm64FeaturesUniquePtr Arm64InstructionSetFeatures::FromAssembly() {
   UNIMPLEMENTED(WARNING);
   return FromCppDefines();
+}
+
+Arm64FeaturesUniquePtr Arm64InstructionSetFeatures::FromCpuFeatures() {
+#ifdef CPU_FEATURES_ARCH_AARCH64
+  auto features = cpu_features::GetAarch64Info().features;
+  return Arm64FeaturesUniquePtr(new Arm64InstructionSetFeatures(false,
+                                                                false,
+                                                                features.crc32,
+                                                                features.atomics,
+                                                                features.fphp,
+                                                                features.asimddp,
+                                                                features.sve));
+#else
+  UNIMPLEMENTED(WARNING);
+  return FromCppDefines();
+#endif
 }
 
 bool Arm64InstructionSetFeatures::Equals(const InstructionSetFeatures* other) const {

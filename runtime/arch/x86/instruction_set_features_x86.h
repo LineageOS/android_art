@@ -69,6 +69,9 @@ class X86InstructionSetFeatures : public InstructionSetFeatures {
   // InstructionSetFeatures. This works around kernel bugs in AT_HWCAP and /proc/cpuinfo.
   static X86FeaturesUniquePtr FromAssembly(bool x86_64 = false);
 
+  // Use external cpu_features library.
+  static X86FeaturesUniquePtr FromCpuFeatures(bool x86_64 = false);
+
   bool Equals(const InstructionSetFeatures* other) const override;
 
   bool HasAtLeast(const InstructionSetFeatures* other) const override;
