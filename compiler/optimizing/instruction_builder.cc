@@ -1253,7 +1253,10 @@ HNewInstance* HInstructionBuilder::BuildNewInstance(dex::TypeIndex type_index, u
   // need access checks, then we haven't resolved the method and the class may
   // again be finalizable.
   QuickEntrypointEnum entrypoint = kQuickAllocObjectInitialized;
-  if (load_class->NeedsAccessCheck() || klass->IsFinalizable() || !klass->IsInstantiable()) {
+  if (load_class->NeedsAccessCheck() ||
+      klass == nullptr ||  // Finalizable/instantiable is unknown.
+      klass->IsFinalizable() ||
+      !klass->IsInstantiable()) {
     entrypoint = kQuickAllocObjectWithChecks;
   }
   // We will always be able to resolve the string class since it is in the BCP.
@@ -2375,7 +2378,7 @@ HLoadClass* HInstructionBuilder::BuildLoadClass(dex::TypeIndex type_index, uint3
   ScopedObjectAccess soa(Thread::Current());
   const DexFile& dex_file = *dex_compilation_unit_->GetDexFile();
   Handle<mirror::Class> klass = ResolveClass(soa, type_index);
-  bool needs_access_check = LoadClassNeedsAccessCheck(klass.Get());
+  bool needs_access_check = LoadClassNeedsAccessCheck(type_index, klass.Get());
   return BuildLoadClass(type_index, dex_file, klass, dex_pc, needs_access_check);
 }
 
@@ -2395,9 +2398,15 @@ HLoadClass* HInstructionBuilder::BuildLoadClass(dex::TypeIndex type_index,
     }
   }
 
-  // Note: `klass` must be from `graph_->GetHandleCache()`.
+  // We cannot use the referrer's class load kind if we need to do an access check.
+  // If the `klass` is unresolved, we need access check with the exception of the referrer's
+  // class, see LoadClassNeedsAccessCheck(), so the `!needs_access_check` check is enough.
+  // Otherwise, also check if the `klass` is the same as the compiling class, which also
+  // conveniently rejects the case of unresolved compiling class.
   bool is_referrers_class =
-      (klass != nullptr) && (outer_compilation_unit_->GetCompilingClass().Get() == klass.Get());
+    !needs_access_check &&
+    (klass == nullptr || outer_compilation_unit_->GetCompilingClass().Get() == klass.Get());
+  // Note: `klass` must be from `graph_->GetHandleCache()`.
   HLoadClass* load_class = new (allocator_) HLoadClass(
       graph_->GetCurrentMethod(),
       type_index,
@@ -2438,9 +2447,56 @@ Handle<mirror::Class> HInstructionBuilder::ResolveClass(ScopedObjectAccess& soa,
   return h_klass;
 }
 
-bool HInstructionBuilder::LoadClassNeedsAccessCheck(ObjPtr<mirror::Class> klass) {
+bool HInstructionBuilder::LoadClassNeedsAccessCheck(dex::TypeIndex type_index,
+                                                    ObjPtr<mirror::Class> klass) {
   if (klass == nullptr) {
-    return true;
+    // If the class is unresolved, we can avoid access checks only for references to
+    // the compiling class as determined by checking the descriptor and ClassLoader.
+    if (outer_compilation_unit_->GetCompilingClass() != nullptr) {
+      // Compiling class is resolved, so different from the unresolved class.
+      return true;
+    }
+    if (dex_compilation_unit_->GetClassLoader().Get() !=
+            outer_compilation_unit_->GetClassLoader().Get()) {
+      // Resolving the same descriptor in a different ClassLoader than the
+      // defining loader of the compiling class shall either fail to find
+      // the class definition, or find a different one.
+      // (Assuming no custom ClassLoader hierarchy with circular delegation.)
+      return true;
+    }
+    // Check if the class is the outer method's class.
+    // For the same dex file compare type indexes, otherwise descriptors.
+    const DexFile* outer_dex_file = outer_compilation_unit_->GetDexFile();
+    const DexFile* inner_dex_file = dex_compilation_unit_->GetDexFile();
+    const dex::ClassDef& outer_class_def =
+        outer_dex_file->GetClassDef(outer_compilation_unit_->GetClassDefIndex());
+    if (IsSameDexFile(*inner_dex_file, *outer_dex_file)) {
+      if (type_index != outer_class_def.class_idx_) {
+        return true;
+      }
+    } else {
+      uint32_t outer_utf16_length;
+      const char* outer_descriptor =
+          outer_dex_file->StringByTypeIdx(outer_class_def.class_idx_, &outer_utf16_length);
+      uint32_t target_utf16_length;
+      const char* target_descriptor =
+          inner_dex_file->StringByTypeIdx(type_index, &target_utf16_length);
+      if (outer_utf16_length != target_utf16_length ||
+          strcmp(outer_descriptor, target_descriptor) != 0) {
+        return true;
+      }
+    }
+    // For inlined methods we also need to check if the compiling class
+    // is public or in the same package as the inlined method's class.
+    if (dex_compilation_unit_ != outer_compilation_unit_ &&
+        (outer_class_def.access_flags_ & kAccPublic) == 0) {
+      DCHECK(dex_compilation_unit_->GetCompilingClass() != nullptr);
+      SamePackageCompare same_package(*outer_compilation_unit_);
+      if (!same_package(dex_compilation_unit_->GetCompilingClass().Get())) {
+        return true;
+      }
+    }
+    return false;
   } else if (klass->IsPublic()) {
     return false;
   } else if (dex_compilation_unit_->GetCompilingClass() != nullptr) {
@@ -2472,7 +2528,7 @@ void HInstructionBuilder::BuildTypeCheck(bool is_instance_of,
   ScopedObjectAccess soa(Thread::Current());
   const DexFile& dex_file = *dex_compilation_unit_->GetDexFile();
   Handle<mirror::Class> klass = ResolveClass(soa, type_index);
-  bool needs_access_check = LoadClassNeedsAccessCheck(klass.Get());
+  bool needs_access_check = LoadClassNeedsAccessCheck(type_index, klass.Get());
   TypeCheckKind check_kind = HSharpening::ComputeTypeCheckKind(
       klass.Get(), code_generator_, needs_access_check);
 

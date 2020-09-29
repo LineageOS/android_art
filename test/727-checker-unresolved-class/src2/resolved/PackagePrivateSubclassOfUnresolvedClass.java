@@ -29,7 +29,7 @@ class PackagePrivateSubclassOfUnresolvedClass extends UnresolvedPublicClass {
   }
 
   /// CHECK-START: void resolved.PackagePrivateSubclassOfUnresolvedClass.$noinline$testReferrersClass() builder (after)
-  // CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass needs_access_check:false
+  /// CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass needs_access_check:false
   static void $noinline$testReferrersClass() {
     Class<?> c = PackagePrivateSubclassOfUnresolvedClass.class;
   }
@@ -47,6 +47,7 @@ class PackagePrivateSubclassOfUnresolvedClass extends UnresolvedPublicClass {
   /// CHECK-START: void resolved.PackagePrivateSubclassOfUnresolvedClass.$noinline$testInlinedReferrersClassFromSamePackage() inliner (after)
   // CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass needs_access_check:false
   static void $noinline$testInlinedReferrersClassFromSamePackage() {
+    // TODO: Make $inline$ and enable CHECK above when we relax the verifier. b/28313047
     Class<?> c = GetPackagePrivateSubclassOfUnresolvedClassFromSamePackage.get();
   }
 }

@@ -79,6 +79,9 @@ cc_defaults {
                 "base/globals_unix.cc",
                 "base/mem_map_unix.cc",
             ],
+            static: {
+                cflags: ["-DART_STATIC_LIBARTBASE"],
+            },
             shared_libs: [
                 "libziparchive",
                 "libz",
@@ -119,7 +122,7 @@ cc_defaults {
 
 cc_defaults {
     name: "libartbase_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libbase",
         "libartpalette",
         "liblog",
@@ -131,13 +134,13 @@ cc_defaults {
 cc_defaults {
     name: "libartbase_static_defaults",
     defaults: ["libartbase_static_base_defaults"],
-    static_libs: ["libartbase"],
+    whole_static_libs: ["libartbase"],
 }
 
 cc_defaults {
     name: "libartbased_static_defaults",
     defaults: ["libartbase_static_base_defaults"],
-    static_libs: ["libartbased"],
+    whole_static_libs: ["libartbased"],
 }
 
 gensrcs {

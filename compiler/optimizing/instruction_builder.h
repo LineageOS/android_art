@@ -232,7 +232,7 @@ class HInstructionBuilder : public ValueObject {
   Handle<mirror::Class> ResolveClass(ScopedObjectAccess& soa, dex::TypeIndex type_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool LoadClassNeedsAccessCheck(ObjPtr<mirror::Class> klass)
+  bool LoadClassNeedsAccessCheck(dex::TypeIndex type_index, ObjPtr<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Builds a `HLoadMethodHandle` loading the given `method_handle_index`.

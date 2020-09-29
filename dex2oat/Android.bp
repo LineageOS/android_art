@@ -67,7 +67,7 @@ art_cc_defaults {
 
 cc_defaults {
     name: "libart-dex2oat_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libbase",
         "libcrypto",
         "liblz4",
@@ -109,10 +109,28 @@ cc_defaults {
         "libart_static_defaults",
         "libprofile_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libart-compiler",
         "libart-dexlayout",
         "libart-dex2oat",
+    ],
+}
+
+// Collect all the static defaults and build a host-only static library, which
+// is then used for the (mostly) static host dex2oat binary.
+art_cc_library_static {
+    name: "libdex2oat_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "art_defaults",
+        "libart-compiler_static_defaults",
+        "libart-dex2oat_static_defaults",
+        "libart-dexlayout_static_defaults",
+        "libart_static_defaults",
+        "libartbase_static_defaults",
+        "libdexfile_static_defaults",
+        "libprofile_static_defaults",
     ],
 }
 
@@ -141,10 +159,27 @@ cc_defaults {
         "libartd_static_defaults",
         "libprofiled_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libartd-compiler",
         "libartd-dexlayout",
         "libartd-dex2oat",
+    ],
+}
+
+art_cc_library_static {
+    name: "libdex2oatd_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "art_debug_defaults",
+        "art_defaults",
+        "libartbased_static_defaults",
+        "libartd-compiler_static_defaults",
+        "libartd-dex2oat_static_defaults",
+        "libartd-dexlayout_static_defaults",
+        "libartd_static_defaults",
+        "libdexfiled_static_defaults",
+        "libprofiled_static_defaults",
     ],
 }
 
@@ -152,19 +187,28 @@ cc_defaults {
     name: "dex2oat-defaults",
     host_supported: true,
     defaults: ["art_defaults"],
+
     srcs: [
         "dex2oat_options.cc",
         "dex2oat.cc",
+    ],
+    header_libs: [
+        "art_cmdlineparser_headers",
     ],
 
     target: {
         android: {
             compile_multilib: "both",
+            shared_libs: [
+                "libartpalette",
+                "libbase",
+                "libcrypto",
+                "liblz4", // libart(d)-dex2oat dependency; must be repeated here since it's a static lib.
+                "libsigchain",
+                "libz",
+            ],
         },
     },
-    header_libs: [
-        "art_cmdlineparser_headers",
-    ],
 }
 
 cc_defaults {
@@ -210,23 +254,6 @@ art_cc_binary {
     // Modules that do dexpreopting, e.g. android_app, depend implicitly on
     // either dex2oat or dex2oatd in ART source builds.
     visibility: ["//visibility:public"],
-    shared_libs: [
-        "libart",
-        "libart-compiler",
-        "libart-dexlayout",
-        "libartbase",
-        "libartpalette",
-        "libbase",
-        "libcrypto",
-        "libdexfile",
-        "liblz4", // libart-dex2oat dependency; must be repeated here since it's a static lib.
-        "libprofile",
-        "libsigchain",
-        "libz",
-    ],
-    static_libs: [
-        "libart-dex2oat",
-    ],
 
     multilib: {
         lib32: {
@@ -247,11 +274,26 @@ art_cc_binary {
     },
     target: {
         android: {
+            shared_libs: [
+                "libart",
+                "libart-compiler",
+                "libart-dexlayout",
+                "libartbase",
+                "libdexfile",
+                "libprofile",
+            ],
+            static_libs: [
+                "libart-dex2oat",
+            ],
             lto: {
                 thin: true,
             },
         },
         host: {
+            // Make the host binary static, except for system libraries. This
+            // avoids having to bundle host dynamic libs in prebuilts.
+            static_libs: ["libdex2oat_static"],
+            stl: "c++_static",
             // Override the prefer32 added by art_cc_binary when
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
@@ -278,25 +320,25 @@ art_cc_binary {
     // Modules that do dexpreopting, e.g. android_app, depend implicitly on
     // either dex2oat or dex2oatd in ART source builds.
     visibility: ["//visibility:public"],
-    shared_libs: [
-        "libartbased",
-        "libartd",
-        "libartd-compiler",
-        "libartd-dexlayout",
-        "libartpalette",
-        "libbase",
-        "libcrypto",
-        "libdexfiled",
-        "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
-        "libprofiled",
-        "libsigchain",
-        "libz",
-    ],
-    static_libs: [
-        "libartd-dex2oat",
-    ],
     target: {
+        android: {
+            shared_libs: [
+                "libartbased",
+                "libartd",
+                "libartd-compiler",
+                "libartd-dexlayout",
+                "libdexfiled",
+                "libprofiled",
+            ],
+            static_libs: [
+                "libartd-dex2oat",
+            ],
+        },
         host: {
+            // Make the host binary static, except for system libraries. This
+            // avoids having to bundle host dynamic libs in prebuilts.
+            static_libs: ["libdex2oatd_static"],
+            stl: "c++_static",
             // Override the prefer32 added by art_cc_binary when
             // HOST_PREFER_32_BIT is in use. Necessary because the logic in
             // Soong for setting ctx.Config().BuildOSTarget (used in
@@ -342,25 +384,12 @@ cc_defaults {
         // Try to get rid of it.
         "-z muldefs",
     ],
-    static_libs: [
-        "libbase",
-        "libsigchain_fake",
-        "libz",
-    ],
 }
 
 art_cc_binary {
     name: "dex2oats",
-    defaults: [
-        "dex2oats-defaults",
-        "libart_static_defaults",
-        "libart-compiler_static_defaults",
-        "libart-dexlayout_static_defaults",
-        "libartbase_static_defaults",
-        "libdexfile_static_defaults",
-        "libprofile_static_defaults",
-        "libart-dex2oat_static_defaults",
-    ],
+    defaults: ["dex2oats-defaults"],
+    static_libs: ["libdex2oat_static"],
 }
 
 art_cc_binary {
@@ -368,14 +397,8 @@ art_cc_binary {
     defaults: [
         "art_debug_defaults",
         "dex2oats-defaults",
-        "libartd_static_defaults",
-        "libartd-compiler_static_defaults",
-        "libartd-dexlayout_static_defaults",
-        "libartbased_static_defaults",
-        "libdexfiled_static_defaults",
-        "libprofiled_static_defaults",
-        "libartd-dex2oat_static_defaults",
     ],
+    static_libs: ["libdex2oatd_static"],
     target: {
         linux_glibc_x86_64: {
             use_clang_lld: true,
