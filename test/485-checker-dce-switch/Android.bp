@@ -8,6 +8,9 @@ java_test {
     defaults: ["art-run-test-defaults"],
     srcs: ["src/**/*.java"],
     data: [":art-run-test-485-checker-dce-switch-expected"],
+    // Include the Java source files in the test's artifacts, to make Checker assertions
+    // available to the TradeFed test runner.
+    include_srcs: true,
 }
 
 // Test's expected output.
