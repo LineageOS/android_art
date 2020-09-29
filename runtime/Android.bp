@@ -465,7 +465,7 @@ cc_defaults {
 
 libart_static_cc_defaults {
     name: "libart_static_base_defaults",
-    static_libs: [
+    whole_static_libs: [
         "libartpalette",
         "libbacktrace",
         "libbase",
@@ -489,7 +489,7 @@ cc_defaults {
         "libdexfile_support_static_defaults",
         "libprofile_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libart",
         "libelffile",
     ],
@@ -504,7 +504,7 @@ cc_defaults {
         "libdexfiled_support_static_defaults",
         "libprofiled_static_defaults",
     ],
-    static_libs: [
+    whole_static_libs: [
         "libartd",
         "libelffiled",
     ],
