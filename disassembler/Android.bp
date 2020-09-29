@@ -58,6 +58,14 @@ art_cc_library {
     ],
 }
 
+cc_defaults {
+    name: "libart-disassembler_static_defaults",
+    whole_static_libs: [
+        "libart-disassembler",
+        "libvixl",
+    ],
+}
+
 art_cc_library {
     name: "libartd-disassembler",
     defaults: [
@@ -72,6 +80,14 @@ art_cc_library {
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
+    ],
+}
+
+cc_defaults {
+    name: "libartd-disassembler_static_defaults",
+    whole_static_libs: [
+        "libartd-disassembler",
+        "libvixld",
     ],
 }
 
