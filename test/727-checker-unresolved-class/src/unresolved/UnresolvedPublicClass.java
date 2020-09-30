@@ -18,6 +18,8 @@ package unresolved;
 
 import getters.GetUnresolvedPublicClass;
 import getters.GetUnresolvedPublicClassFromDifferentDexFile;
+import resolved.PackagePrivateSubclassOfUnresolvedClass;
+import resolved.PublicSubclassOfUnresolvedClass;
 import resolved.ResolvedPackagePrivateClass;
 import resolved.ResolvedPublicSubclassOfPackagePrivateClass;
 
@@ -31,6 +33,10 @@ public class UnresolvedPublicClass {
 
     $noinline$testResolvedPublicClass();
     $noinline$testResolvedPackagePrivateClass();
+    $noinline$testUnresolvedPublicClass();
+    $noinline$testUnresolvedPackagePrivateClass();
+    $noinline$testUnresolvedPublicClassInSamePackage();
+    $noinline$testUnresolvedPackagePrivateClassInSamePackage();
 
     $noinline$testPublicFieldInResolvedPackagePrivateClass();
     $noinline$testPublicFieldInPackagePrivateClassViaResolvedPublicSubclass();
@@ -102,6 +108,45 @@ public class UnresolvedPublicClass {
       Class<?> c = ResolvedPackagePrivateClass.class;
       throw new Error("Unreachable");
     } catch (IllegalAccessError expected) {}
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPublicClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.PublicSubclassOfUnresolvedClass needs_access_check:true
+
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPublicClass() builder (after)
+  /// CHECK: LoadClass load_kind:BssEntryPublic class_name:resolved.PublicSubclassOfUnresolvedClass
+  static void $noinline$testUnresolvedPublicClass() {
+    Class<?> c = PublicSubclassOfUnresolvedClass.class;
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPackagePrivateClass() builder (after)
+  /// CHECK: LoadClass class_name:resolved.PackagePrivateSubclassOfUnresolvedClass needs_access_check:true
+
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPackagePrivateClass() builder (after)
+  /// CHECK: LoadClass load_kind:BssEntryPublic class_name:resolved.PackagePrivateSubclassOfUnresolvedClass
+  static void $noinline$testUnresolvedPackagePrivateClass() {
+    try {
+      Class<?> c = PackagePrivateSubclassOfUnresolvedClass.class;
+      throw new Error("Unreachable");
+    } catch (IllegalAccessError expected) {}
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPublicClassInSamePackage() builder (after)
+  /// CHECK: LoadClass class_name:unresolved.UnresolvedPublicClazz needs_access_check:true
+
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPublicClassInSamePackage() builder (after)
+  /// CHECK: LoadClass load_kind:BssEntryPackage class_name:unresolved.UnresolvedPublicClazz
+  static void $noinline$testUnresolvedPublicClassInSamePackage() {
+    Class<?> c = UnresolvedPublicClazz.class;
+  }
+
+  /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPackagePrivateClassInSamePackage() builder (after)
+  /// CHECK: LoadClass class_name:unresolved.UnresolvedPackagePrivateClass needs_access_check:true
+
+  /// CHECK-START-{ARM,ARM64,X86,X86_64}: void unresolved.UnresolvedPublicClass.$noinline$testUnresolvedPackagePrivateClassInSamePackage() builder (after)
+  /// CHECK: LoadClass load_kind:BssEntryPackage class_name:unresolved.UnresolvedPackagePrivateClass
+  static void $noinline$testUnresolvedPackagePrivateClassInSamePackage() {
+    Class<?> c = UnresolvedPackagePrivateClass.class;
   }
 
   /// CHECK-START: void unresolved.UnresolvedPublicClass.$noinline$testPublicFieldInResolvedPackagePrivateClass() builder (after)
