@@ -9279,7 +9279,7 @@ CodeGeneratorARMVIXL::PcRelativePatchInfo* CodeGeneratorARMVIXL::NewTypeBssEntry
       LOG(FATAL) << "Unexpected load kind: " << load_class->GetLoadKind();
       UNREACHABLE();
   }
-  return NewPcRelativePatch(&dex_file, type_index.index_, &type_bss_entry_patches_);
+  return NewPcRelativePatch(&dex_file, type_index.index_, patches);
 }
 
 CodeGeneratorARMVIXL::PcRelativePatchInfo* CodeGeneratorARMVIXL::NewBootImageStringPatch(
