@@ -71,6 +71,9 @@ class InstructionSetFeatures {
   // InstructionSetFeatures. This works around kernel bugs in AT_HWCAP and /proc/cpuinfo.
   static std::unique_ptr<const InstructionSetFeatures> FromAssembly();
 
+  // Use external cpu_features library.
+  static std::unique_ptr<const InstructionSetFeatures> FromCpuFeatures();
+
   // Parse a string of the form "div,-atomic_ldrd_strd" adding and removing these features to
   // create a new InstructionSetFeatures.
   std::unique_ptr<const InstructionSetFeatures> AddFeaturesFromString(

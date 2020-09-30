@@ -47,6 +47,9 @@ class ArmInstructionSetFeatures final : public InstructionSetFeatures {
   // InstructionSetFeatures. This works around kernel bugs in AT_HWCAP and /proc/cpuinfo.
   static ArmFeaturesUniquePtr FromAssembly();
 
+  // Use external cpu_features library.
+  static ArmFeaturesUniquePtr FromCpuFeatures();
+
   bool Equals(const InstructionSetFeatures* other) const override;
 
   bool HasAtLeast(const InstructionSetFeatures* other) const override;
