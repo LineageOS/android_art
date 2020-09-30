@@ -327,8 +327,13 @@ class LoadClassSlowPathARM64 : public SlowPathCodeARM64 {
       DCHECK(IsSameDexFile(cls_->GetDexFile(), arm64_codegen->GetGraph()->GetDexFile()));
       dex::TypeIndex type_index = cls_->GetTypeIndex();
       __ Mov(calling_convention.GetRegisterAt(0).W(), type_index.index_);
-      arm64_codegen->InvokeRuntime(kQuickResolveType, instruction_, dex_pc, this);
-      CheckEntrypointTypes<kQuickResolveType, void*, uint32_t>();
+      if (cls_->NeedsAccessCheck()) {
+        CheckEntrypointTypes<kQuickResolveTypeAndVerifyAccess, void*, uint32_t>();
+        arm64_codegen->InvokeRuntime(kQuickResolveTypeAndVerifyAccess, instruction_, dex_pc, this);
+      } else {
+        CheckEntrypointTypes<kQuickResolveType, void*, uint32_t>();
+        arm64_codegen->InvokeRuntime(kQuickResolveType, instruction_, dex_pc, this);
+      }
       // If we also must_do_clinit, the resolved type is now in the correct register.
     } else {
       DCHECK(must_do_clinit);
@@ -942,6 +947,8 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
       method_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_type_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       type_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      public_type_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
+      package_type_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_string_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       string_bss_entry_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
       boot_image_other_patches_(graph->GetAllocator()->Adapter(kArenaAllocCodeGenerator)),
@@ -4733,10 +4740,26 @@ vixl::aarch64::Label* CodeGeneratorARM64::NewBootImageTypePatch(
 }
 
 vixl::aarch64::Label* CodeGeneratorARM64::NewBssEntryTypePatch(
-    const DexFile& dex_file,
-    dex::TypeIndex type_index,
+    HLoadClass* load_class,
     vixl::aarch64::Label* adrp_label) {
-  return NewPcRelativePatch(&dex_file, type_index.index_, adrp_label, &type_bss_entry_patches_);
+  const DexFile& dex_file = load_class->GetDexFile();
+  dex::TypeIndex type_index = load_class->GetTypeIndex();
+  ArenaDeque<PcRelativePatchInfo>* patches = nullptr;
+  switch (load_class->GetLoadKind()) {
+    case HLoadClass::LoadKind::kBssEntry:
+      patches = &type_bss_entry_patches_;
+      break;
+    case HLoadClass::LoadKind::kBssEntryPublic:
+      patches = &public_type_bss_entry_patches_;
+      break;
+    case HLoadClass::LoadKind::kBssEntryPackage:
+      patches = &package_type_bss_entry_patches_;
+      break;
+    default:
+      LOG(FATAL) << "Unexpected load kind: " << load_class->GetLoadKind();
+      UNREACHABLE();
+  }
+  return NewPcRelativePatch(&dex_file, type_index.index_, adrp_label, patches);
 }
 
 vixl::aarch64::Label* CodeGeneratorARM64::NewBootImageStringPatch(
@@ -4916,6 +4939,8 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
       method_bss_entry_patches_.size() +
       boot_image_type_patches_.size() +
       type_bss_entry_patches_.size() +
+      public_type_bss_entry_patches_.size() +
+      package_type_bss_entry_patches_.size() +
       boot_image_string_patches_.size() +
       string_bss_entry_patches_.size() +
       boot_image_other_patches_.size() +
@@ -4945,6 +4970,10 @@ void CodeGeneratorARM64::EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* lin
       method_bss_entry_patches_, linker_patches);
   EmitPcRelativeLinkerPatches<linker::LinkerPatch::TypeBssEntryPatch>(
       type_bss_entry_patches_, linker_patches);
+  EmitPcRelativeLinkerPatches<linker::LinkerPatch::PublicTypeBssEntryPatch>(
+      public_type_bss_entry_patches_, linker_patches);
+  EmitPcRelativeLinkerPatches<linker::LinkerPatch::PackageTypeBssEntryPatch>(
+      package_type_bss_entry_patches_, linker_patches);
   EmitPcRelativeLinkerPatches<linker::LinkerPatch::StringBssEntryPatch>(
       string_bss_entry_patches_, linker_patches);
   for (const PatchInfo<vixl::aarch64::Label>& info : call_entrypoint_patches_) {
@@ -5063,6 +5092,8 @@ HLoadClass::LoadKind CodeGeneratorARM64::GetSupportedLoadClassKind(
     case HLoadClass::LoadKind::kBootImageLinkTimePcRelative:
     case HLoadClass::LoadKind::kBootImageRelRo:
     case HLoadClass::LoadKind::kBssEntry:
+    case HLoadClass::LoadKind::kBssEntryPublic:
+    case HLoadClass::LoadKind::kBssEntryPackage:
       DCHECK(!GetCompilerOptions().IsJitCompiler());
       break;
     case HLoadClass::LoadKind::kJitBootImageAddress:
@@ -5086,7 +5117,9 @@ void LocationsBuilderARM64::VisitLoadClass(HLoadClass* cls) {
     DCHECK(calling_convention.GetRegisterAt(0).Is(vixl::aarch64::x0));
     return;
   }
-  DCHECK(!cls->NeedsAccessCheck());
+  DCHECK_EQ(cls->NeedsAccessCheck(),
+            load_kind == HLoadClass::LoadKind::kBssEntryPublic ||
+                load_kind == HLoadClass::LoadKind::kBssEntryPackage);
 
   const bool requires_read_barrier = kEmitCompilerReadBarrier && !cls->IsInBootImage();
   LocationSummary::CallKind call_kind = (cls->NeedsEnvironment() || requires_read_barrier)
@@ -5120,7 +5153,9 @@ void InstructionCodeGeneratorARM64::VisitLoadClass(HLoadClass* cls) NO_THREAD_SA
     codegen_->MaybeGenerateMarkingRegisterCheck(/* code= */ __LINE__);
     return;
   }
-  DCHECK(!cls->NeedsAccessCheck());
+  DCHECK_EQ(cls->NeedsAccessCheck(),
+            load_kind == HLoadClass::LoadKind::kBssEntryPublic ||
+                load_kind == HLoadClass::LoadKind::kBssEntryPackage);
 
   Location out_loc = cls->GetLocations()->Out();
   Register out = OutputRegister(cls);
@@ -5170,16 +5205,15 @@ void InstructionCodeGeneratorARM64::VisitLoadClass(HLoadClass* cls) NO_THREAD_SA
       codegen_->EmitLdrOffsetPlaceholder(ldr_label, out.W(), out.X());
       break;
     }
-    case HLoadClass::LoadKind::kBssEntry: {
+    case HLoadClass::LoadKind::kBssEntry:
+    case HLoadClass::LoadKind::kBssEntryPublic:
+    case HLoadClass::LoadKind::kBssEntryPackage: {
       // Add ADRP with its PC-relative Class .bss entry patch.
-      const DexFile& dex_file = cls->GetDexFile();
-      dex::TypeIndex type_index = cls->GetTypeIndex();
       vixl::aarch64::Register temp = XRegisterFrom(out_loc);
-      vixl::aarch64::Label* adrp_label = codegen_->NewBssEntryTypePatch(dex_file, type_index);
+      vixl::aarch64::Label* adrp_label = codegen_->NewBssEntryTypePatch(cls);
       codegen_->EmitAdrpPlaceholder(adrp_label, temp);
       // Add LDR with its PC-relative Class .bss entry patch.
-      vixl::aarch64::Label* ldr_label =
-          codegen_->NewBssEntryTypePatch(dex_file, type_index, adrp_label);
+      vixl::aarch64::Label* ldr_label = codegen_->NewBssEntryTypePatch(cls, adrp_label);
       // /* GcRoot<mirror::Class> */ out = *(base_address + offset)  /* PC-relative */
       // All aligned loads are implicitly atomic consume operations on ARM64.
       codegen_->GenerateGcRootFieldLoad(cls,
