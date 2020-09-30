@@ -59,6 +59,11 @@ class X86_64InstructionSetFeatures final : public X86InstructionSetFeatures {
     return Convert(X86InstructionSetFeatures::FromAssembly(true));
   }
 
+  // Use external cpu_features library.
+  static X86_64FeaturesUniquePtr FromCpuFeatures() {
+    return Convert(X86InstructionSetFeatures::FromCpuFeatures(true));
+  }
+
   InstructionSet GetInstructionSet() const override {
     return InstructionSet::kX86_64;
   }
