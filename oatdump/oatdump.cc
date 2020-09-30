@@ -542,6 +542,20 @@ class OatDumper {
             [=](uint32_t index) { return dex_file->PrettyType(dex::TypeIndex(index)); });
         DumpBssEntries(
             os,
+            "Public Class",
+            oat_dex_file->GetPublicTypeBssMapping(),
+            dex_file->NumTypeIds(),
+            sizeof(GcRoot<mirror::Class>),
+            [=](uint32_t index) { return dex_file->PrettyType(dex::TypeIndex(index)); });
+        DumpBssEntries(
+            os,
+            "Package Class",
+            oat_dex_file->GetPackageTypeBssMapping(),
+            dex_file->NumTypeIds(),
+            sizeof(GcRoot<mirror::Class>),
+            [=](uint32_t index) { return dex_file->PrettyType(dex::TypeIndex(index)); });
+        DumpBssEntries(
+            os,
             "String",
             oat_dex_file->GetStringBssMapping(),
             dex_file->NumStringIds(),
