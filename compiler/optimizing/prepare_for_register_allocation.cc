@@ -166,7 +166,6 @@ void PrepareForRegisterAllocation::VisitClinitCheck(HClinitCheck* check) {
     }
   } else if (can_merge_with_load_class &&
              load_class->GetLoadKind() != HLoadClass::LoadKind::kRuntimeCall) {
-    DCHECK(!load_class->NeedsAccessCheck());
     // Pass the initialization duty to the `HLoadClass` instruction,
     // and remove the instruction from the graph.
     DCHECK(load_class->HasEnvironment());

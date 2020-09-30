@@ -736,8 +736,7 @@ class CodeGeneratorARM64 : public CodeGenerator {
   // to be bound before the instruction. The instruction will be either the
   // ADRP (pass `adrp_label = null`) or the ADD (pass `adrp_label` pointing
   // to the associated ADRP patch label).
-  vixl::aarch64::Label* NewBssEntryTypePatch(const DexFile& dex_file,
-                                             dex::TypeIndex type_index,
+  vixl::aarch64::Label* NewBssEntryTypePatch(HLoadClass* load_class,
                                              vixl::aarch64::Label* adrp_label = nullptr);
 
   // Add a new boot image string patch for an instruction and return the label
@@ -1048,6 +1047,10 @@ class CodeGeneratorARM64 : public CodeGenerator {
   ArenaDeque<PcRelativePatchInfo> boot_image_type_patches_;
   // PC-relative type patch info for kBssEntry.
   ArenaDeque<PcRelativePatchInfo> type_bss_entry_patches_;
+  // PC-relative public type patch info for kBssEntryPublic.
+  ArenaDeque<PcRelativePatchInfo> public_type_bss_entry_patches_;
+  // PC-relative package type patch info for kBssEntryPackage.
+  ArenaDeque<PcRelativePatchInfo> package_type_bss_entry_patches_;
   // PC-relative String patch info for kBootImageLinkTimePcRelative.
   ArenaDeque<PcRelativePatchInfo> boot_image_string_patches_;
   // PC-relative String patch info for kBssEntry.
