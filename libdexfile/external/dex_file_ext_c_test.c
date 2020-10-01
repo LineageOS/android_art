@@ -25,7 +25,22 @@
 static const char gtest_output_arg[] = "--gtest_output=xml:";
 static const char gtest_output_xml[] = "\
 <?xml version=\"1.0\"?>\n\
-<testsuites tests=\"0\" failures=\"0\" disabled=\"0\" errors=\"0\" name=\"AllTests\">";
+<testsuites tests=\"1\" failures=\"0\" disabled=\"0\" errors=\"0\" name=\"AllTests\">\n\
+  <testsuite tests=\"1\" failures=\"0\" disabled=\"0\" errors=\"0\" name=\"NopTest\">\n\
+    <testcase name=\"nop\" status=\"run\" />\n\
+  </testsuite>\n\
+</testsuites>";
+
+static const char canned_stdout[] = "\
+[==========] Running 1 test from 1 test suite.\n\
+[----------] 1 test from NopTest\n\
+[ RUN      ] NopTest.nop\n\
+[       OK ] NopTest.nop (0 ms)\n\
+[----------] 1 test from NopTest (0 ms total)\n\
+\n\
+[==========] 1 test from 1 test suite ran. (0 ms total)\n\
+[  PASSED  ] 1 test.\n\
+";
 
 /* Writes a fake gtest xml report to the given path. */
 static int write_gtest_output_xml(char* gtest_output_path) {
@@ -47,9 +62,18 @@ static int write_gtest_output_xml(char* gtest_output_path) {
 }
 
 int main(int argc, char** argv) {
-  if (argc >= 2 && strncmp(argv[1], gtest_output_arg, sizeof(gtest_output_arg) - 1) == 0) {
-    /* The ART gtest framework expects all tests to understand --gtest_output. */
-    return write_gtest_output_xml(argv[1] + sizeof(gtest_output_arg) - 1);
+  int i;
+  for (i = 1; i < argc; ++i) {
+    if (strncmp(argv[i], gtest_output_arg, sizeof(gtest_output_arg) - 1) == 0) {
+      /* The ART gtest framework expects all tests to understand --gtest_output. */
+      if (write_gtest_output_xml(argv[i] + sizeof(gtest_output_arg) - 1)) {
+        return 1;
+      }
+    }
+  }
+  /* Tradefed parses the output, so send something passable there. */
+  if (fputs(canned_stdout, stdout) < 0) {
+    return 1;
   }
   return 0;
 }
