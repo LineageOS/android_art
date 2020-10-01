@@ -395,23 +395,6 @@ class Heap {
       REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Implements VMDebug.getInstancesOfClasses and JDWP RT_Instances.
-  void GetInstances(VariableSizedHandleScope& scope,
-                    Handle<mirror::Class> c,
-                    bool use_is_assignable_from,
-                    int32_t max_count,
-                    std::vector<Handle<mirror::Object>>& instances)
-      REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Implements JDWP OR_ReferringObjects.
-  void GetReferringObjects(VariableSizedHandleScope& scope,
-                           Handle<mirror::Object> o,
-                           int32_t max_count,
-                           std::vector<Handle<mirror::Object>>& referring_objects)
-      REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Removes the growth limit on the alloc space so it may grow to its maximum capacity. Used to
   // implement dalvik.system.VMRuntime.clearGrowthLimit.
   void ClearGrowthLimit();
