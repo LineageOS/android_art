@@ -883,11 +883,17 @@ bool OatFileBase::Setup(int zip_fd,
 
     const IndexBssMapping* method_bss_mapping;
     const IndexBssMapping* type_bss_mapping;
+    const IndexBssMapping* public_type_bss_mapping;
+    const IndexBssMapping* package_type_bss_mapping;
     const IndexBssMapping* string_bss_mapping;
     if (!ReadIndexBssMapping(
             this, &oat, i, dex_file_location, "method", &method_bss_mapping, error_msg) ||
         !ReadIndexBssMapping(
             this, &oat, i, dex_file_location, "type", &type_bss_mapping, error_msg) ||
+        !ReadIndexBssMapping(
+            this, &oat, i, dex_file_location, "type", &public_type_bss_mapping, error_msg) ||
+        !ReadIndexBssMapping(
+            this, &oat, i, dex_file_location, "type", &package_type_bss_mapping, error_msg) ||
         !ReadIndexBssMapping(
             this, &oat, i, dex_file_location, "string", &string_bss_mapping, error_msg)) {
       return false;
@@ -903,6 +909,8 @@ bool OatFileBase::Setup(int zip_fd,
         lookup_table_data,
         method_bss_mapping,
         type_bss_mapping,
+        public_type_bss_mapping,
+        package_type_bss_mapping,
         string_bss_mapping,
         class_offsets_pointer,
         dex_layout_sections);
@@ -1869,6 +1877,8 @@ OatDexFile::OatDexFile(const OatFile* oat_file,
                        const uint8_t* lookup_table_data,
                        const IndexBssMapping* method_bss_mapping_data,
                        const IndexBssMapping* type_bss_mapping_data,
+                       const IndexBssMapping* public_type_bss_mapping_data,
+                       const IndexBssMapping* package_type_bss_mapping_data,
                        const IndexBssMapping* string_bss_mapping_data,
                        const uint32_t* oat_class_offsets_pointer,
                        const DexLayoutSections* dex_layout_sections)
@@ -1880,6 +1890,8 @@ OatDexFile::OatDexFile(const OatFile* oat_file,
       lookup_table_data_(lookup_table_data),
       method_bss_mapping_(method_bss_mapping_data),
       type_bss_mapping_(type_bss_mapping_data),
+      public_type_bss_mapping_(public_type_bss_mapping_data),
+      package_type_bss_mapping_(package_type_bss_mapping_data),
       string_bss_mapping_(string_bss_mapping_data),
       oat_class_offsets_pointer_(oat_class_offsets_pointer),
       lookup_table_(),
