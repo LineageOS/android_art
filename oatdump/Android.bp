@@ -24,22 +24,75 @@ cc_defaults {
     ],
 }
 
+// Collect all the static defaults and build a host-only static library, which
+// is then used for the (mostly) static host oatdump binary.
+art_cc_library_static {
+    name: "liboatdump_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "libart-compiler_static_defaults",
+        "libart-dexlayout_static_defaults",
+        "libart-disassembler_static_defaults",
+        "libart_static_defaults",
+        "libartbase_static_defaults",
+        "libdexfile_static_defaults",
+        "libprofile_static_defaults",
+        "oatdump-defaults",
+    ],
+    whole_static_libs: [
+        "libbase",
+    ],
+}
+
 art_cc_binary {
     name: "oatdump",
     defaults: ["oatdump-defaults"],
-    shared_libs: [
-        "libart",
-        "libart-compiler",
-        "libart-dexlayout",
-        "libart-disassembler",
-        "libdexfile",
-        "libartbase",
-        "libprofile",
-        "libbase",
-    ],
+
+    target: {
+        android: {
+            shared_libs: [
+                "libart",
+                "libart-compiler",
+                "libart-dexlayout",
+                "libart-disassembler",
+                "libartbase",
+                "libbase",
+                "libdexfile",
+                "libprofile",
+            ],
+        },
+        host: {
+            // Make the host binary static, except for system libraries.
+            static_libs: ["liboatdump_static"],
+            stl: "c++_static",
+        },
+    },
+
     apex_available: [
         "com.android.art.release",
         "com.android.art.debug",
+    ],
+}
+
+// Collect all the static defaults and build a host-only static library, which
+// is then used for the (mostly) static host oatdump binary.
+art_cc_library_static {
+    name: "liboatdumpd_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "libartd-compiler_static_defaults",
+        "libartd-dexlayout_static_defaults",
+        "libartd-disassembler_static_defaults",
+        "libartd_static_defaults",
+        "libartbased_static_defaults",
+        "libdexfiled_static_defaults",
+        "libprofiled_static_defaults",
+        "oatdump-defaults",
+    ],
+    whole_static_libs: [
+        "libbase",
     ],
 }
 
@@ -49,16 +102,27 @@ art_cc_binary {
         "art_debug_defaults",
         "oatdump-defaults",
     ],
-    shared_libs: [
-        "libartd",
-        "libartd-compiler",
-        "libartd-dexlayout",
-        "libartd-disassembler",
-        "libdexfiled",
-        "libartbased",
-        "libprofiled",
-        "libbase",
-    ],
+
+    target: {
+        android: {
+            shared_libs: [
+                "libartbased",
+                "libartd",
+                "libartd-compiler",
+                "libartd-dexlayout",
+                "libartd-disassembler",
+                "libbase",
+                "libdexfiled",
+                "libprofiled",
+            ],
+        },
+        host: {
+            // Make the host binary static, except for system libraries.
+            static_libs: ["liboatdumpd_static"],
+            stl: "c++_static",
+        },
+    },
+
     apex_available: [
         "com.android.art.debug",
     ],
