@@ -67,6 +67,8 @@ inline bool IsAdrpPatch(const LinkerPatch& patch) {
     case LinkerPatch::Type::kMethodBssEntry:
     case LinkerPatch::Type::kTypeRelative:
     case LinkerPatch::Type::kTypeBssEntry:
+    case LinkerPatch::Type::kPublicTypeBssEntry:
+    case LinkerPatch::Type::kPackageTypeBssEntry:
     case LinkerPatch::Type::kStringRelative:
     case LinkerPatch::Type::kStringBssEntry:
       return patch.LiteralOffset() == patch.PcInsnOffset();
@@ -261,6 +263,8 @@ void Arm64RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
                patch.GetType() == LinkerPatch::Type::kTypeRelative ||
                patch.GetType() == LinkerPatch::Type::kStringRelative ||
                patch.GetType() == LinkerPatch::Type::kTypeBssEntry ||
+               patch.GetType() == LinkerPatch::Type::kPublicTypeBssEntry ||
+               patch.GetType() == LinkerPatch::Type::kPackageTypeBssEntry ||
                patch.GetType() == LinkerPatch::Type::kStringBssEntry) << patch.GetType();
       }
       shift = 0u;  // No shift for ADD.
@@ -269,6 +273,8 @@ void Arm64RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
       DCHECK(patch.GetType() == LinkerPatch::Type::kDataBimgRelRo ||
              patch.GetType() == LinkerPatch::Type::kMethodBssEntry ||
              patch.GetType() == LinkerPatch::Type::kTypeBssEntry ||
+             patch.GetType() == LinkerPatch::Type::kPublicTypeBssEntry ||
+             patch.GetType() == LinkerPatch::Type::kPackageTypeBssEntry ||
              patch.GetType() == LinkerPatch::Type::kStringBssEntry) << patch.GetType();
       DCHECK_EQ(insn & 0xbfbffc00, 0xb9000000) << std::hex << insn;
     }

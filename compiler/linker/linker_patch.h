@@ -50,6 +50,8 @@ class LinkerPatch {
     kCallRelative,
     kTypeRelative,
     kTypeBssEntry,
+    kPublicTypeBssEntry,
+    kPackageTypeBssEntry,
     kStringRelative,
     kStringBssEntry,
     kCallEntrypoint,
@@ -117,6 +119,26 @@ class LinkerPatch {
                                        uint32_t pc_insn_offset,
                                        uint32_t target_type_idx) {
     LinkerPatch patch(literal_offset, Type::kTypeBssEntry, target_dex_file);
+    patch.type_idx_ = target_type_idx;
+    patch.pc_insn_offset_ = pc_insn_offset;
+    return patch;
+  }
+
+  static LinkerPatch PublicTypeBssEntryPatch(size_t literal_offset,
+                                             const DexFile* target_dex_file,
+                                             uint32_t pc_insn_offset,
+                                             uint32_t target_type_idx) {
+    LinkerPatch patch(literal_offset, Type::kPublicTypeBssEntry, target_dex_file);
+    patch.type_idx_ = target_type_idx;
+    patch.pc_insn_offset_ = pc_insn_offset;
+    return patch;
+  }
+
+  static LinkerPatch PackageTypeBssEntryPatch(size_t literal_offset,
+                                              const DexFile* target_dex_file,
+                                              uint32_t pc_insn_offset,
+                                              uint32_t target_type_idx) {
+    LinkerPatch patch(literal_offset, Type::kPackageTypeBssEntry, target_dex_file);
     patch.type_idx_ = target_type_idx;
     patch.pc_insn_offset_ = pc_insn_offset;
     return patch;
@@ -192,13 +214,17 @@ class LinkerPatch {
 
   const DexFile* TargetTypeDexFile() const {
     DCHECK(patch_type_ == Type::kTypeRelative ||
-           patch_type_ == Type::kTypeBssEntry);
+           patch_type_ == Type::kTypeBssEntry ||
+           patch_type_ == Type::kPublicTypeBssEntry ||
+           patch_type_ == Type::kPackageTypeBssEntry);
     return target_dex_file_;
   }
 
   dex::TypeIndex TargetTypeIndex() const {
     DCHECK(patch_type_ == Type::kTypeRelative ||
-           patch_type_ == Type::kTypeBssEntry);
+           patch_type_ == Type::kTypeBssEntry ||
+           patch_type_ == Type::kPublicTypeBssEntry ||
+           patch_type_ == Type::kPackageTypeBssEntry);
     return dex::TypeIndex(type_idx_);
   }
 
@@ -221,6 +247,8 @@ class LinkerPatch {
            patch_type_ == Type::kMethodBssEntry ||
            patch_type_ == Type::kTypeRelative ||
            patch_type_ == Type::kTypeBssEntry ||
+           patch_type_ == Type::kPublicTypeBssEntry ||
+           patch_type_ == Type::kPackageTypeBssEntry ||
            patch_type_ == Type::kStringRelative ||
            patch_type_ == Type::kStringBssEntry);
     return pc_insn_offset_;
