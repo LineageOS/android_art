@@ -9140,6 +9140,12 @@ void CodeGeneratorARMVIXL::GenerateStaticOrDirectCall(
       GenerateInvokeStaticOrDirectRuntimeCall(invoke, temp, slow_path);
       return;  // No code pointer retrieval; the runtime performs the call directly.
     }
+    case MethodLoadKind::kBootImageLinkTimePcRelative:
+      // Note: Unlike arm64, x86 and x86-64, we do not avoid the materialization of method
+      // pointer for kCallCriticalNative because it would not save us an instruction from
+      // the current sequence MOVW+MOVT+ADD(pc)+LDR+BL. The ADD(pc) separates the patched
+      // offset instructions MOVW+MOVT from the entrypoint load, so they cannot be fused.
+      FALLTHROUGH_INTENDED;
     default: {
       LoadMethod(invoke->GetMethodLoadKind(), temp, invoke);
       break;
