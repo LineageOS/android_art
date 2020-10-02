@@ -643,7 +643,7 @@ class ReleaseHostChecker:
     self._checker.check_symlinked_first_executable('dex2oat')
 
     # Check exported native libraries for Managed Core Library.
-    self._checker.check_native_library('libandroidicu-host')
+    self._checker.check_native_library('libicu')
     self._checker.check_native_library('libandroidio')
 
     # Check internal libraries for Managed Core Library.
