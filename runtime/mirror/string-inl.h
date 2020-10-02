@@ -84,6 +84,14 @@ inline int32_t String::GetHashCode() {
   return result;
 }
 
+inline int32_t String::GetUtfLength() {
+  if (IsCompressed()) {
+    return GetLength();
+  } else {
+    return CountUtf8Bytes(GetValue(), GetLength());
+  }
+}
+
 template<typename MemoryType>
 inline bool String::AllASCII(const MemoryType* chars, const int length) {
   static_assert(std::is_unsigned<MemoryType>::value, "Expecting unsigned MemoryType");
