@@ -1,0 +1,1 @@
+Test that thread's names are correctly inherited.
