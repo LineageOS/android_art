@@ -368,11 +368,9 @@ libart_cc_defaults {
                 "runtime_android.cc",
                 "thread_android.cc",
             ],
-            header_libs: [
-                "libandroidicu_headers",
-            ],
             shared_libs: [
                 "libdl_android",
+                "libicu",
                 "libz", // For adler32.
             ],
         },
