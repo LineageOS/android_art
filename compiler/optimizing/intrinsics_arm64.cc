@@ -3540,7 +3540,7 @@ static void GenerateVarHandleFieldReference(HInvoke* invoke,
   }
 }
 
-void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
+static void CreateVarHandleGetLocations(HInvoke* invoke) {
   DataType::Type type = invoke->GetType();
   if (type == DataType::Type::kVoid) {
     // Return type should not be void for get.
@@ -3584,7 +3584,9 @@ void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
   }
 }
 
-void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
+static void GenerateVarHandleGet(HInvoke* invoke,
+                                 CodeGeneratorARM64* codegen,
+                                 bool use_load_acquire) {
   // Implemented only for fields.
   size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   DCHECK_LE(expected_coordinates_count, 1u);
@@ -3592,15 +3594,15 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
   DCHECK_NE(type, DataType::Type::kVoid);
 
   LocationSummary* locations = invoke->GetLocations();
-  MacroAssembler* masm = GetVIXLAssembler();
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
   CPURegister out = helpers::OutputCPURegister(invoke);
 
   SlowPathCodeARM64* slow_path =
-      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
-  codegen_->AddSlowPath(slow_path);
+      new (codegen->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen->AddSlowPath(slow_path);
 
-  GenerateVarHandleFieldCheck(invoke, codegen_, slow_path);
-  GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen_, slow_path, type);
+  GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
+  GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, type);
 
   // Use `out` for offset if it is a core register, except for non-Baker read barrier.
   Register offset =
@@ -3612,34 +3614,72 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
       ? WRegisterFrom(locations->GetTemp(0u))
       : InputRegisterAt(invoke, 1);
 
-  GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
+  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
 
   // Load the value from the field.
   if (type == DataType::Type::kReference && kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
     // Piggy-back on the field load path using introspection for the Baker read barrier.
     // The `offset` is either the `out` or a temporary, use it for field address.
     __ Add(offset.X(), object.X(), offset.X());
-    codegen_->GenerateFieldLoadWithBakerReadBarrier(invoke,
-                                                    locations->Out(),
-                                                    object,
-                                                    MemOperand(offset.X()),
-                                                    /*needs_null_check=*/ false,
-                                                    /*use_load_acquire=*/ false);
+    codegen->GenerateFieldLoadWithBakerReadBarrier(invoke,
+                                                   locations->Out(),
+                                                   object,
+                                                   MemOperand(offset.X()),
+                                                   /*needs_null_check=*/ false,
+                                                   use_load_acquire);
   } else {
-    codegen_->Load(type, out, MemOperand(object.X(), offset.X()));
+    MemOperand address(object.X(), offset.X());
+    if (use_load_acquire) {
+      codegen->LoadAcquire(invoke, out, address, /*needs_null_check=*/ false);
+    } else {
+      codegen->Load(type, out, address);
+    }
     if (type == DataType::Type::kReference) {
       DCHECK(out.IsW());
       Location out_loc = locations->Out();
       Location object_loc = LocationFrom(object);
       Location offset_loc = LocationFrom(offset);
-      codegen_->MaybeGenerateReadBarrierSlow(invoke, out_loc, out_loc, object_loc, 0u, offset_loc);
+      codegen->MaybeGenerateReadBarrierSlow(invoke, out_loc, out_loc, object_loc, 0u, offset_loc);
     }
   }
 
   __ Bind(slow_path->GetExitLabel());
 }
 
-void IntrinsicLocationsBuilderARM64::VisitVarHandleSet(HInvoke* invoke) {
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGet(HInvoke* invoke) {
+  CreateVarHandleGetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGet(HInvoke* invoke) {
+  GenerateVarHandleGet(invoke, codegen_, /*use_load_acquire=*/ false);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetOpaque(HInvoke* invoke) {
+  CreateVarHandleGetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetOpaque(HInvoke* invoke) {
+  GenerateVarHandleGet(invoke, codegen_, /*use_load_acquire=*/ false);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAcquire(HInvoke* invoke) {
+  CreateVarHandleGetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAcquire(HInvoke* invoke) {
+  GenerateVarHandleGet(invoke, codegen_, /*use_load_acquire=*/ true);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetVolatile(HInvoke* invoke) {
+  CreateVarHandleGetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetVolatile(HInvoke* invoke) {
+  // ARM64 load-acquire instructions are implicitly sequentially consistent.
+  GenerateVarHandleGet(invoke, codegen_, /*use_load_acquire=*/ true);
+}
+
+static void CreateVarHandleSetLocations(HInvoke* invoke) {
   if (invoke->GetType() != DataType::Type::kVoid) {
     // Return type should be void for set.
     return;
@@ -3688,31 +3728,33 @@ void IntrinsicLocationsBuilderARM64::VisitVarHandleSet(HInvoke* invoke) {
   }
 }
 
-void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
+static void GenerateVarHandleSet(HInvoke* invoke,
+                                 CodeGeneratorARM64* codegen,
+                                 bool use_store_release) {
   // Implemented only for fields.
   size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   DCHECK_LE(expected_coordinates_count, 1u);
   uint32_t value_index = invoke->GetNumberOfArguments() - 1;
   DataType::Type value_type = GetDataTypeFromShorty(invoke, value_index);
 
-  MacroAssembler* masm = GetVIXLAssembler();
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
   CPURegister value = InputCPURegisterOrZeroRegAt(invoke, value_index);
 
   SlowPathCodeARM64* slow_path =
-      new (codegen_->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
-  codegen_->AddSlowPath(slow_path);
+      new (codegen->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen->AddSlowPath(slow_path);
 
-  GenerateVarHandleFieldCheck(invoke, codegen_, slow_path);
+  GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
   {
     UseScratchRegisterScope temps(masm);
     Register var_type_no_rb = temps.AcquireW();
     GenerateVarHandleAccessModeAndVarTypeChecks(
-        invoke, codegen_, slow_path, value_type, var_type_no_rb);
+        invoke, codegen, slow_path, value_type, var_type_no_rb);
     if (value_type == DataType::Type::kReference && !value.IsZero()) {
       // If the value type is a reference, check it against the varType.
       // False negatives due to varType being an interface or array type
       // or due to the missing read barrier are handled by the slow path.
-      GenerateSubTypeObjectCheckNoReadBarrier(codegen_, slow_path, value.W(), var_type_no_rb);
+      GenerateSubTypeObjectCheckNoReadBarrier(codegen, slow_path, value.W(), var_type_no_rb);
     }
   }
 
@@ -3723,7 +3765,7 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
       ? WRegisterFrom(invoke->GetLocations()->GetTemp(1u))
       : InputRegisterAt(invoke, 1);
 
-  GenerateVarHandleFieldReference(invoke, codegen_, object, offset);
+  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
 
   // Store the value to the field.
   {
@@ -3733,17 +3775,55 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
       DCHECK(value.IsW());
       Register temp = temps.AcquireW();
       __ Mov(temp, value.W());
-      codegen_->GetAssembler()->PoisonHeapReference(temp);
+      codegen->GetAssembler()->PoisonHeapReference(temp);
       source = temp;
     }
-    codegen_->Store(value_type, source, MemOperand(object.X(), offset.X()));
+    MemOperand address(object.X(), offset.X());
+    if (use_store_release) {
+      codegen->StoreRelease(invoke, value_type, source, address, /*needs_null_check=*/ false);
+    } else {
+      codegen->Store(value_type, source, address);
+    }
   }
 
   if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(value_index))) {
-    codegen_->MarkGCCard(object, Register(value), /*value_can_be_null=*/ true);
+    codegen->MarkGCCard(object, Register(value), /*value_can_be_null=*/ true);
   }
 
   __ Bind(slow_path->GetExitLabel());
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleSet(HInvoke* invoke) {
+  CreateVarHandleSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleSet(HInvoke* invoke) {
+  GenerateVarHandleSet(invoke, codegen_, /*use_store_release=*/ false);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleSetOpaque(HInvoke* invoke) {
+  CreateVarHandleSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleSetOpaque(HInvoke* invoke) {
+  GenerateVarHandleSet(invoke, codegen_, /*use_store_release=*/ false);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleSetRelease(HInvoke* invoke) {
+  CreateVarHandleSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleSetRelease(HInvoke* invoke) {
+  GenerateVarHandleSet(invoke, codegen_, /*use_store_release=*/ true);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleSetVolatile(HInvoke* invoke) {
+  CreateVarHandleSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleSetVolatile(HInvoke* invoke) {
+  // ARM64 store-release instructions are implicitly sequentially consistent.
+  GenerateVarHandleSet(invoke, codegen_, /*use_store_release=*/ true);
 }
 
 UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
@@ -3784,7 +3864,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchange)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchangeAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndExchangeRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleCompareAndSet)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAdd)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAddAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAddRelease)
@@ -3800,11 +3879,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXorRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSet)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetRelease)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetOpaque)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetVolatile)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetOpaque)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetRelease)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleSetVolatile)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleWeakCompareAndSet)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleWeakCompareAndSetAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleWeakCompareAndSetPlain)
