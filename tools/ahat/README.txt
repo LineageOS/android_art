@@ -52,6 +52,9 @@ Reported Issues:
  * Request to be able to sort tables by size.
 
 Release History:
+ 1.7.1 September 30, 2020
+   Fix issue parsing proguard maps with comments.
+
  1.7 August 8, 2019
    Annotate binder services, tokens, and proxies.
    Add option for viewing subclass instances of a class.
