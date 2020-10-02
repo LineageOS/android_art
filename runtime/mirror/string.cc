@@ -59,14 +59,6 @@ int String::ComputeHashCode() {
   return hash_code;
 }
 
-int32_t String::GetUtfLength() {
-  if (IsCompressed()) {
-    return GetLength();
-  } else {
-    return CountUtf8Bytes(GetValue(), GetLength());
-  }
-}
-
 inline bool String::AllASCIIExcept(const uint16_t* chars, int32_t length, uint16_t non_ascii) {
   DCHECK(!IsASCII(non_ascii));
   for (int32_t i = 0; i < length; ++i) {
