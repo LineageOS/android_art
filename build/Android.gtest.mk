@@ -29,7 +29,7 @@ my_files += \
     libziparchive libjavacore libandroidio libopenjdkd liblz4 liblzma, \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib).so \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib).so) \
-  $(foreach lib, libcrypto libz libicuuc libicui18n libandroidicu libexpat, \
+  $(foreach lib, libcrypto libz libicu libicuuc libicui18n libexpat, \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST)/$(lib).so:lib64/$(lib)-host.so \
     $(call intermediates-dir-for,SHARED_LIBRARIES,$(lib),HOST,,2ND)/$(lib).so:lib/$(lib)-host.so)
 
