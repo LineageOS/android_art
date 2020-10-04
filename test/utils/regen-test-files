@@ -354,6 +354,11 @@ declare -a expected_succeeding_tests
 for run_test in "${handled_tests[@]}"; do
   for fail in "${known_failing_tests[@]}"; do
     [[ "$run_test" == "$fail" ]] && continue 2
+    # Also temporarily exclude Checker tests from test mapping, as they
+    # currently break some test runs (see b/169852871).
+    # TODO(b/162408889): Complete Checker integration and re-include Checker
+    # tests in test mapping.
+    [[ "$run_test" =~ ^art-run-test-[0-9]+-checker- ]] && continue 2
   done
   expected_succeeding_tests+=("$run_test")
 done

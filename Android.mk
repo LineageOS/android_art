@@ -579,11 +579,11 @@ PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS := \
   lib64/libssl.so \
 
 PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
-  lib/libandroidicu.so \
+  lib/libicu.so \
   lib/libicui18n.so \
   lib/libicu_jni.so \
   lib/libicuuc.so \
-  lib64/libandroidicu.so \
+  lib64/libicu.so \
   lib64/libicui18n.so \
   lib64/libicu_jni.so \
   lib64/libicuuc.so \
