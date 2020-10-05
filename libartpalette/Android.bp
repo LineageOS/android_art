@@ -17,12 +17,6 @@
 cc_defaults {
     name: "libartpalette_defaults",
     defaults: ["art_defaults"],
-    visibility: [
-        // Visibility for prebuilt binaries from the prebuilt of this module.
-        // TODO(b/155921753): Restrict this when prebuilts are in their proper
-        // locations.
-        "//prebuilts:__subpackages__",
-    ],
     host_supported: true,
     export_include_dirs: ["include"],
 }
