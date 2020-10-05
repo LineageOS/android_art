@@ -1838,8 +1838,9 @@ class JNI {
     } else {
       CHECK_NON_NULL_MEMCPY_ARGUMENT(length, buf);
       if (s->IsCompressed()) {
+        const uint8_t* src = s->GetValueCompressed() + start;
         for (int i = 0; i < length; ++i) {
-          buf[i] = static_cast<jchar>(s->CharAt(start+i));
+          buf[i] = static_cast<jchar>(src[i]);
         }
       } else {
         const jchar* chars = static_cast<jchar*>(s->GetValue());
@@ -1862,8 +1863,9 @@ class JNI {
         return;
       }
       if (s->IsCompressed()) {
+        const uint8_t* src = s->GetValueCompressed() + start;
         for (int i = 0; i < length; ++i) {
-          buf[i] = s->CharAt(start+i);
+          buf[i] = static_cast<jchar>(src[i]);
         }
         buf[length] = '\0';
       } else {
@@ -1884,8 +1886,9 @@ class JNI {
       jchar* chars = new jchar[s->GetLength()];
       if (s->IsCompressed()) {
         int32_t length = s->GetLength();
+        const uint8_t* src = s->GetValueCompressed();
         for (int i = 0; i < length; ++i) {
-          chars[i] = s->CharAt(i);
+          chars[i] = static_cast<jchar>(src[i]);
         }
       } else {
         memcpy(chars, s->GetValue(), sizeof(jchar) * s->GetLength());
@@ -1920,9 +1923,10 @@ class JNI {
         *is_copy = JNI_TRUE;
       }
       int32_t length = s->GetLength();
+      const uint8_t* src = s->GetValueCompressed();
       jchar* chars = new jchar[length];
       for (int i = 0; i < length; ++i) {
-        chars[i] = s->CharAt(i);
+        chars[i] = static_cast<jchar>(src[i]);
       }
       return chars;
     } else {
@@ -1978,8 +1982,9 @@ class JNI {
     char* bytes = new char[byte_count + 1];
     CHECK(bytes != nullptr);  // bionic aborts anyway.
     if (s->IsCompressed()) {
+      const uint8_t* src = s->GetValueCompressed();
       for (size_t i = 0; i < byte_count; ++i) {
-        bytes[i] = s->CharAt(i);
+        bytes[i] = src[i];
       }
     } else {
       const uint16_t* chars = s->GetValue();
