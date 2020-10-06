@@ -639,6 +639,21 @@ public class Main {
     }
   }
 
+  /// CHECK-START:       int Main.$noinline$noRemNonConst(int, int) BCE (after)
+  /// CHECK:                 BoundsCheck
+  private static int $noinline$noRemNonConst(int v, int s) {
+    // Regression test for compiler crash, b/169669115.
+    int[] values = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    if (v > 0) {
+      int q = v / s;  // Non-constant divisor.
+      int a = q * 10;  // Constant unrelated to the divisor above.
+      int b = s - a;
+      return values[b];
+    } else {
+      return -1;
+    }
+  }
+
   public static void main(String args[]) {
     remInt();
   }
