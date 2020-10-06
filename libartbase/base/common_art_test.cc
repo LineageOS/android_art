@@ -214,7 +214,11 @@ std::string CommonArtTestImpl::GetAndroidHostOut() {
   std::filesystem::path expected(android_host_out);
   if (android_host_out_from_env != nullptr) {
     std::filesystem::path from_env(std::filesystem::weakly_canonical(android_host_out_from_env));
-    CHECK_EQ(std::filesystem::weakly_canonical(expected).string(), from_env.string());
+    if (std::filesystem::weakly_canonical(expected).string() != from_env.string()) {
+      LOG(WARNING) << "Execution path (" << expected << ") not below ANDROID_HOST_OUT ("
+                   << from_env << ")! Using env-var.";
+      expected = from_env;
+    }
   } else {
     setenv("ANDROID_HOST_OUT", android_host_out.c_str(), /*overwrite=*/0);
   }
