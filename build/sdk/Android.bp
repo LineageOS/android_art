@@ -12,10 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Additional visibility to add to the prebuilt modules that are part of
+// the snapshots of the ART sdk/module_exports to ensure that they are
+// visible to each other.
+prebuilt_visibility = [
+    // TODO(b/155921753): Restrict this when prebuilts are in their proper
+    // locations.
+    "//prebuilts:__subpackages__",
+]
+
 // The SDK for the art module apex.
 sdk {
     name: "art-module-sdk",
     host_supported: true,
+
+    prebuilt_visibility: prebuilt_visibility,
+
     native_header_libs: [
         "jni_headers",
         "libnativehelper_header_only",
@@ -73,6 +85,9 @@ module_exports {
     name: "art-module-host-exports",
     host_supported: true,
     device_supported: false,
+
+    prebuilt_visibility: prebuilt_visibility,
+
     target: {
         host: {
             // Set in target.host because the top level compile_multilib
@@ -107,6 +122,9 @@ module_exports {
 module_exports {
     name: "art-module-test-exports",
     host_supported: true,
+
+    prebuilt_visibility: prebuilt_visibility,
+
     java_libs: [
         // The following bouncycastle modules are required by:
         // * conscrypt-benchmarks (all)

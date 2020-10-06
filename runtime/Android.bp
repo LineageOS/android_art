@@ -60,12 +60,6 @@ libart_cc_defaults {
 libart_cc_defaults {
     name: "libart_defaults",
     defaults: ["art_defaults"],
-    visibility: [
-        // Visibility for prebuilt binaries from the prebuilt of this module.
-        // TODO(b/155921753): Restrict this when prebuilts are in their proper
-        // locations.
-        "//prebuilts:__subpackages__",
-    ],
     host_supported: true,
     srcs: [
         "aot_class_linker.cc",
