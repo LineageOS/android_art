@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-class EqualityMixin:
-  """ Object equality via equality of dictionaries. """
+def ToUnicode(string):
+  """ Converts a string into Unicode.
 
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.__dict__ == other.__dict__
-
-class PrintableMixin:
-  """ Prints object as name-dictionary pair. """
-
-  def __repr__(self):
-    return "<%s: %s>" % (type(self).__name__, str(self.__dict__))
+  This is a delegate function for the built-in `unicode`. It checks if the input
+  is not `None`, because `unicode` turns it into an actual "None" string.
+  """
+  assert string is not None
+  return unicode(string)
