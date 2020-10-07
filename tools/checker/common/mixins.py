@@ -23,4 +23,4 @@ class PrintableMixin:
   """ Prints object as name-dictionary pair. """
 
   def __repr__(self):
-    return "<%s: %s>" % (type(self).__name__, str(self.__dict__))
+    return '<{}: {}>'.format(type(self).__name__, str(self.__dict__))
