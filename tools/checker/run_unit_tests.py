@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 #
 # Copyright (C) 2014 The Android Open Source Project
 #
@@ -27,5 +27,5 @@ from match.test                    import MatchLines_Test, \
 import unittest
 
 if __name__ == '__main__':
-  Logger.Verbosity = Logger.Level.NO_OUTPUT
+  Logger.Verbosity = Logger.Level.NoOutput
   unittest.main(verbosity=2)

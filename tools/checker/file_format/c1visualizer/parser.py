@@ -37,7 +37,7 @@ def __parseC1Line(c1File, line, lineNo, state, fileName):
   if state.currentState == C1ParserState.StartingCfgBlock:
     # Previous line started a new 'cfg' block which means that this one must
     # contain the name of the pass (this is enforced by C1visualizer).
-    if re.match(r"name\s+\"[^\"]+\"", line):
+    if re.match("name\s+\"[^\"]+\"", line):
       # Extract the pass name, prepend it with the name of the method and
       # return as the beginning of a new group.
       state.currentState = C1ParserState.InsideCfgBlock
@@ -54,12 +54,12 @@ def __parseC1Line(c1File, line, lineNo, state, fileName):
 
   elif state.currentState == C1ParserState.InsideCompilationBlock:
     # Search for the method's name. Format: method "<name>"
-    if re.match(r"method\s+\"[^\"]*\"", line):
+    if re.match("method\s+\"[^\"]*\"", line):
       methodName = line.split("\"")[1].strip()
       if not methodName:
         Logger.fail("Empty method name in output", fileName, lineNo)
 
-      m = re.search(r"isa_features:([\w,-]+)", methodName)
+      m = re.search("isa_features:([\w,-]+)", methodName)
       if (m):
         rawFeatures = m.group(1).split(",")
         # Create a map of features in the form {featureName: isEnabled}.

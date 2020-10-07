@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 #
 # Copyright (C) 2014 The Android Open Source Project
 #
@@ -99,7 +99,7 @@ if __name__ == "__main__":
   args = ParseArguments()
 
   if args.quiet:
-    Logger.Verbosity = Logger.Level.ERROR
+    Logger.Verbosity = Logger.Level.Error
 
   if args.list_passes:
     ListPasses(args.tested_file)
