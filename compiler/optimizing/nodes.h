@@ -4417,6 +4417,12 @@ enum class CodePtrLocation {
   kCallArtMethod,
 };
 
+static inline bool IsPcRelativeMethodLoadKind(MethodLoadKind load_kind) {
+  return load_kind == MethodLoadKind::kBootImageLinkTimePcRelative ||
+         load_kind == MethodLoadKind::kBootImageRelRo ||
+         load_kind == MethodLoadKind::kBssEntry;
+}
+
 class HInvoke : public HVariableInputSizeInstruction {
  public:
   bool NeedsEnvironment() const override;
@@ -4738,9 +4744,7 @@ class HInvokeStaticOrDirect final : public HInvoke {
   bool IsStringInit() const { return GetMethodLoadKind() == MethodLoadKind::kStringInit; }
   bool HasMethodAddress() const { return GetMethodLoadKind() == MethodLoadKind::kJitDirectAddress; }
   bool HasPcRelativeMethodLoadKind() const {
-    return GetMethodLoadKind() == MethodLoadKind::kBootImageLinkTimePcRelative ||
-           GetMethodLoadKind() == MethodLoadKind::kBootImageRelRo ||
-           GetMethodLoadKind() == MethodLoadKind::kBssEntry;
+    return IsPcRelativeMethodLoadKind(GetMethodLoadKind());
   }
 
   QuickEntrypointEnum GetStringInitEntryPoint() const {
@@ -4941,10 +4945,11 @@ class HInvokeInterface final : public HInvoke {
                    MethodReference method_reference,
                    ArtMethod* resolved_method,
                    MethodReference resolved_method_reference,
-                   uint32_t imt_index)
+                   uint32_t imt_index,
+                   MethodLoadKind load_kind)
       : HInvoke(kInvokeInterface,
                 allocator,
-                number_of_arguments,
+                number_of_arguments + (NeedsCurrentMethod(load_kind) ? 1 : 0),
                 0u,
                 return_type,
                 dex_pc,
@@ -4952,7 +4957,12 @@ class HInvokeInterface final : public HInvoke {
                 resolved_method,
                 resolved_method_reference,
                 kInterface),
-        imt_index_(imt_index) {
+        imt_index_(imt_index),
+        hidden_argument_load_kind_(load_kind) {
+  }
+
+  static bool NeedsCurrentMethod(MethodLoadKind load_kind) {
+    return load_kind == MethodLoadKind::kRecursive;
   }
 
   bool IsClonable() const override { return true; }
@@ -4967,7 +4977,16 @@ class HInvokeInterface final : public HInvoke {
     return true;
   }
 
+  size_t GetSpecialInputIndex() const {
+    return GetNumberOfArguments();
+  }
+
+  void AddSpecialInput(HInstruction* input) {
+    InsertInputAt(GetSpecialInputIndex(), input);
+  }
+
   uint32_t GetImtIndex() const { return imt_index_; }
+  MethodLoadKind GetHiddenArgumentLoadKind() const { return hidden_argument_load_kind_; }
 
   DECLARE_INSTRUCTION(InvokeInterface);
 
@@ -4977,6 +4996,9 @@ class HInvokeInterface final : public HInvoke {
  private:
   // Cached value of the resolved method, to avoid needing the mutator lock.
   const uint32_t imt_index_;
+
+  // How the hidden argument (the interface method) is being loaded.
+  const MethodLoadKind hidden_argument_load_kind_;
 };
 
 class HNeg final : public HUnaryOperation {
