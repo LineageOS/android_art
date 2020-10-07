@@ -1446,113 +1446,32 @@ END art_quick_proxy_invoke_handler
     /*
      * Called to resolve an imt conflict.
      * r0 is the conflict ArtMethod.
-     * r12 is a hidden argument that holds the target interface method's dex method index.
+     * r12 is a hidden argument that holds the target interface method.
      *
      * Note that this stub writes to r0, r4, and r12.
      */
     .extern artLookupResolvedMethod
 ENTRY art_quick_imt_conflict_trampoline
-    push    {r1-r2}
-    .cfi_adjust_cfa_offset (2 * 4)
-    .cfi_rel_offset r1, 0
-    .cfi_rel_offset r2, 4
-    ldr     r4, [sp, #(2 * 4)]  // Load referrer.
-    ldr     r2, [r0, #ART_METHOD_JNI_OFFSET_32]  // Load ImtConflictTable
-    // Load the declaring class (without read barrier) and access flags (for obsolete method check).
-    // The obsolete flag is set with suspended threads, so we do not need an acquire operation here.
-#if ART_METHOD_ACCESS_FLAGS_OFFSET != ART_METHOD_DECLARING_CLASS_OFFSET + 4
-#error "Expecting declaring class and access flags to be consecutive for LDRD."
-#endif
-    ldrd    r0, r1, [r4, #ART_METHOD_DECLARING_CLASS_OFFSET]
-    // If the method is obsolete, just go through the dex cache miss slow path.
-    lsrs    r1, #(ACC_OBSOLETE_METHOD_SHIFT + 1)
-    bcs     .Limt_conflict_trampoline_dex_cache_miss
-    ldr     r4, [r0, #MIRROR_CLASS_DEX_CACHE_OFFSET]  // Load the DexCache (without read barrier).
-    UNPOISON_HEAP_REF r4
-    ubfx    r1, r12, #0, #METHOD_DEX_CACHE_HASH_BITS  // Calculate DexCache method slot index.
-    ldr     r4, [r4, #MIRROR_DEX_CACHE_RESOLVED_METHODS_OFFSET]  // Load the resolved methods.
-    add     r4, r4, r1, lsl #(POINTER_SIZE_SHIFT + 1)  // Load DexCache method slot address.
-
-// FIXME: Configure the build to use the faster code when appropriate.
-//        Currently we fall back to the slower version.
-#if HAS_ATOMIC_LDRD
-    ldrd    r0, r1, [r4]
-#else
-    push    {r3}
-    .cfi_adjust_cfa_offset 4
-    .cfi_rel_offset r3, 0
-.Limt_conflict_trampoline_retry_load:
-    ldrexd  r0, r1, [r4]
-    strexd  r3, r0, r1, [r4]
-    cmp     r3, #0
-    bne     .Limt_conflict_trampoline_retry_load
-    pop     {r3}
-    .cfi_adjust_cfa_offset -4
-    .cfi_restore r3
-#endif
-
-    ldr     r4, [r2]  // Load first entry in ImtConflictTable.
-    cmp     r1, r12   // Compare method index to see if we had a DexCache method hit.
-    bne     .Limt_conflict_trampoline_dex_cache_miss
+    ldr     r0, [r0, #ART_METHOD_JNI_OFFSET_32]  // Load ImtConflictTable
+    ldr     r4, [r0]  // Load first entry in ImtConflictTable.
 .Limt_table_iterate:
-    cmp     r4, r0
+    cmp     r4, r12
     // Branch if found. Benchmarks have shown doing a branch here is better.
     beq     .Limt_table_found
     // If the entry is null, the interface method is not in the ImtConflictTable.
     cbz     r4, .Lconflict_trampoline
     // Iterate over the entries of the ImtConflictTable.
-    ldr     r4, [r2, #(2 * __SIZEOF_POINTER__)]!
+    ldr     r4, [r0, #(2 * __SIZEOF_POINTER__)]!
     b .Limt_table_iterate
 .Limt_table_found:
     // We successfully hit an entry in the table. Load the target method
     // and jump to it.
-    ldr     r0, [r2, #__SIZEOF_POINTER__]
-    .cfi_remember_state
-    pop     {r1-r2}
-    .cfi_adjust_cfa_offset -(2 * 4)
-    .cfi_restore r1
-    .cfi_restore r2
+    ldr     r0, [r0, #__SIZEOF_POINTER__]
     ldr     pc, [r0, #ART_METHOD_QUICK_CODE_OFFSET_32]
-    .cfi_restore_state
 .Lconflict_trampoline:
-    // Call the runtime stub to populate the ImtConflictTable and jump to the
-    // resolved method.
-    .cfi_remember_state
-    pop     {r1-r2}
-    .cfi_adjust_cfa_offset -(2 * 4)
-    .cfi_restore r1
-    .cfi_restore r2
+    // Pass interface method to the trampoline.
+    mov r0, r12
     INVOKE_TRAMPOLINE_BODY artInvokeInterfaceTrampoline
-    .cfi_restore_state
-.Limt_conflict_trampoline_dex_cache_miss:
-    // We're not creating a proper runtime method frame here,
-    // artLookupResolvedMethod() is not allowed to walk the stack.
-
-    // Save ImtConflictTable (r2), remaining arg (r3), first entry (r4), return address (lr).
-    push    {r2-r4, lr}
-    .cfi_adjust_cfa_offset (4 * 4)
-    .cfi_rel_offset r3, 4
-    .cfi_rel_offset lr, 12
-    // Save FPR args.
-    vpush   {d0-d7}
-    .cfi_adjust_cfa_offset (8 * 8)
-
-    mov     r0, ip                      // Pass method index.
-    ldr     r1, [sp, #(8 * 8 + 6 * 4)]  // Pass referrer.
-    bl      artLookupResolvedMethod     // (uint32_t method_index, ArtMethod* referrer)
-
-    // Restore FPR args.
-    vpop    {d0-d7}
-    .cfi_adjust_cfa_offset -(8 * 8)
-    // Restore ImtConflictTable (r2), remaining arg (r3), first entry (r4), return address (lr).
-    pop     {r2-r4, lr}
-    .cfi_adjust_cfa_offset -(4 * 4)
-    .cfi_restore r3
-    .cfi_restore lr
-
-    cmp     r0, #0                  // If the method wasn't resolved,
-    beq     .Lconflict_trampoline   //   skip the lookup and go to artInvokeInterfaceTrampoline().
-    b       .Limt_table_iterate
 END art_quick_imt_conflict_trampoline
 
     .extern artQuickResolutionTrampoline

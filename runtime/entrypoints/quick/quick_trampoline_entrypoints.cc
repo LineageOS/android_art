@@ -2402,7 +2402,7 @@ extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_metho
   ArtMethod* method = nullptr;
   ImTable* imt = cls->GetImt(kRuntimePointerSize);
 
-  if (UNLIKELY(interface_method == nullptr)) {
+  if (UNLIKELY(interface_method == nullptr) || interface_method->IsRuntimeMethod()) {
     // The interface method is unresolved, so resolve it in the dex file of the caller.
     // Fetch the dex_method_idx of the target interface method from the caller.
     uint32_t dex_method_idx;
@@ -2438,6 +2438,7 @@ extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_metho
       CHECK(self->IsExceptionPending());
       return GetTwoWordFailureValue();  // Failure.
     }
+    MaybeUpdateBssMethodEntry(interface_method, MethodReference(&dex_file, dex_method_idx));
   }
 
   // The compiler and interpreter make sure the conflict trampoline is never
