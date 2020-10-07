@@ -1072,7 +1072,7 @@ class BCEVisitor : public HGraphVisitor {
       const_divisor = (1LL << n) - 1;
     }
 
-    if (div == nullptr || !IsInt64Value(div->GetRight()->AsConstant(), const_divisor) ||
+    if (div == nullptr || !IsInt64Value(div->GetRight(), const_divisor) ||
         div->GetLeft() != instruction->GetLeft()) {
       return false;
     }
