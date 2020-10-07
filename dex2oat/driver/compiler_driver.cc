@@ -355,8 +355,11 @@ static optimizer::DexToDexCompiler::CompilationLevel GetDexToDexCompilationLevel
   if (dex_file.GetContainer() != nullptr && dex_file.GetContainer()->IsReadOnly()) {
     return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
   }
+  if (!driver.GetCompilerOptions().IsQuickeningCompilationEnabled()) {
+    // b/170086509 Quickening compilation is being deprecated.
+    return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
+  }
   auto* const runtime = Runtime::Current();
-  DCHECK(driver.GetCompilerOptions().IsQuickeningCompilationEnabled());
   const char* descriptor = dex_file.GetClassDescriptor(class_def);
   ClassLinker* class_linker = runtime->GetClassLinker();
   ObjPtr<mirror::Class> klass = class_linker->FindClass(self, descriptor, class_loader);
