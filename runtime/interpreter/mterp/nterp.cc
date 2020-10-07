@@ -48,8 +48,9 @@ bool CanRuntimeUseNterp() REQUIRES_SHARED(Locks::mutator_lock_) {
 
 bool CanMethodUseNterp(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_) {
   return !method->IsNative() &&
-      method->SkipAccessChecks() &&
       method->IsInvokable() &&
+      // Nterp supports the same methods the compiler supports.
+      method->IsCompilable() &&
       !method->MustCountLocks() &&
       // Proxy methods do not go through the JIT like other methods, so we don't
       // run them with nterp.
