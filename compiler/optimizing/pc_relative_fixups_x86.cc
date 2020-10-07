@@ -207,6 +207,15 @@ class PCRelativeHandlerVisitor : public HGraphVisitor {
       base_added = true;
     }
 
+    HInvokeInterface* invoke_interface = invoke->AsInvokeInterface();
+    if (invoke_interface != nullptr &&
+        IsPcRelativeMethodLoadKind(invoke_interface->GetHiddenArgumentLoadKind())) {
+      HX86ComputeBaseMethodAddress* method_address = GetPCRelativeBasePointer(invoke);
+      // Add the extra parameter.
+      invoke_interface->AddSpecialInput(method_address);
+      base_added = true;
+    }
+
     // Ensure that we can load FP arguments from the constant area.
     HInputsRef inputs = invoke->GetInputs();
     for (size_t i = 0; i < inputs.size(); i++) {
