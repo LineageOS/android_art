@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 #
 # Copyright (C) 2014 The Android Open Source Project
 #
@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from common.archs               import archs_list
+from common.testing             import ToUnicode
 from file_format.checker.parser import ParseCheckerStream
 from file_format.checker.struct import CheckerFile, TestCase, TestStatement, TestExpression
 
@@ -26,7 +27,7 @@ CheckerException = SystemExit
 class CheckerParser_PrefixTest(unittest.TestCase):
 
   def tryParse(self, string):
-    checkerText = "/// CHECK-START: pass\n" + string
+    checkerText = u"/// CHECK-START: pass\n" + ToUnicode(string)
     return ParseCheckerStream("<test-file>", "CHECK", io.StringIO(checkerText))
 
   def assertParses(self, string):
@@ -75,8 +76,8 @@ class CheckerParser_PrefixTest(unittest.TestCase):
 class CheckerParser_TestExpressionTest(unittest.TestCase):
 
   def parseStatement(self, string, variant=""):
-    checkerText = ("/// CHECK-START: pass\n" +
-                   "/// CHECK" + variant + ": " + string)
+    checkerText = (u"/// CHECK-START: pass\n" +
+                   u"/// CHECK" + ToUnicode(variant) + u": " + ToUnicode(string))
     checkerFile = ParseCheckerStream("<test-file>", "CHECK", io.StringIO(checkerText))
     self.assertEqual(len(checkerFile.testCases), 1)
     testCase = checkerFile.testCases[0]
@@ -213,7 +214,7 @@ class CheckerParser_FileLayoutTest(unittest.TestCase):
     return self.assertEqual(expectedFile, actualFile)
 
   def parse(self, checkerText):
-    return ParseCheckerStream("<test_file>", "CHECK", io.StringIO(checkerText))
+    return ParseCheckerStream("<test_file>", "CHECK", io.StringIO(ToUnicode(checkerText)))
 
   def test_EmptyFile(self):
     self.assertParsesTo("", [])
@@ -316,7 +317,7 @@ class CheckerParser_SuffixTests(unittest.TestCase):
                 """
 
   def parse(self, checkerText):
-    return ParseCheckerStream("<test_file>", "CHECK", io.StringIO(checkerText))
+    return ParseCheckerStream("<test_file>", "CHECK", io.StringIO(ToUnicode(checkerText)))
 
   def test_NonArchTests(self):
     for arch in [None] + archs_list:
@@ -375,7 +376,7 @@ class CheckerParser_SuffixTests(unittest.TestCase):
 
 class CheckerParser_EvalTests(unittest.TestCase):
   def parseTestCase(self, string):
-    checkerText = "/// CHECK-START: pass\n" + string
+    checkerText = u"/// CHECK-START: pass\n" + ToUnicode(string)
     checkerFile = ParseCheckerStream("<test-file>", "CHECK", io.StringIO(checkerText))
     self.assertEqual(len(checkerFile.testCases), 1)
     return checkerFile.testCases[0]

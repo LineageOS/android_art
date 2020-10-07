@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 #
 # Copyright (C) 2014 The Android Open Source Project
 #
@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from common.immutables               import ImmutableDict
+from common.testing                  import ToUnicode
 from file_format.c1visualizer.parser import ParseC1visualizerStream
 from file_format.c1visualizer.struct import C1visualizerFile, C1visualizerPass
 
@@ -40,7 +41,7 @@ class C1visualizerParser_Test(unittest.TestCase):
 
   def assertParsesTo(self, c1Text, expectedData):
     expectedFile = self.createFile(expectedData)
-    actualFile = ParseC1visualizerStream("<c1_file>", io.StringIO(c1Text))
+    actualFile = ParseC1visualizerStream("<c1_file>", io.StringIO(ToUnicode(c1Text)))
     return self.assertEqual(expectedFile, actualFile)
 
   def test_EmptyFile(self):
