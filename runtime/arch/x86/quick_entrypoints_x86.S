@@ -1712,104 +1712,39 @@ END_FUNCTION art_quick_proxy_invoke_handler
     /*
      * Called to resolve an imt conflict.
      * eax is the conflict ArtMethod.
-     * xmm7 is a hidden argument that holds the target interface method's dex method index.
+     * xmm7 is a hidden argument that holds the target interface method.
      *
      * Note that this stub writes to eax.
-     * Because of lack of free registers, it also saves and restores edi.
+     * Because of lack of free registers, it also saves and restores esi.
      */
 DEFINE_FUNCTION art_quick_imt_conflict_trampoline
-    PUSH EDI
     PUSH ESI
-    PUSH EDX
-    movl 16(%esp), %edi         // Load referrer.
     movd %xmm7, %esi            // Get target method index stored in xmm7, remember it in ESI.
-    // If the method is obsolete, just go through the dex cache miss slow path.
-    // The obsolete flag is set with suspended threads, so we do not need an acquire operation here.
-    testl LITERAL(ACC_OBSOLETE_METHOD), ART_METHOD_ACCESS_FLAGS_OFFSET(%edi)
-    jnz .Limt_conflict_trampoline_dex_cache_miss
-    movl ART_METHOD_DECLARING_CLASS_OFFSET(%edi), %edi // Load declaring class (no read barrier).
-    movl MIRROR_CLASS_DEX_CACHE_OFFSET(%edi), %edi     // Load the DexCache (without read barrier).
-    UNPOISON_HEAP_REF edi
-    movl MIRROR_DEX_CACHE_RESOLVED_METHODS_OFFSET(%edi), %edi  // Load the resolved methods.
-    pushl ART_METHOD_JNI_OFFSET_32(%eax)  // Push ImtConflictTable.
-    CFI_ADJUST_CFA_OFFSET(4)
-    movl %esi, %eax             // Copy the method index from ESI.
-    andl LITERAL(METHOD_DEX_CACHE_SIZE_MINUS_ONE), %eax  // Calculate DexCache method slot index.
-    leal 0(%edi, %eax, 2 * __SIZEOF_POINTER__), %edi  // Load DexCache method slot address.
-    mov %ecx, %edx              // Make EDX:EAX == ECX:EBX so that LOCK CMPXCHG8B makes no changes.
-    mov %ebx, %eax              // (The actual value does not matter.)
-    lock cmpxchg8b (%edi)       // Relaxed atomic load EDX:EAX from the dex cache slot.
-    popl %edi                   // Pop ImtConflictTable.
-    CFI_ADJUST_CFA_OFFSET(-4)
-    cmp %edx, %esi              // Compare method index to see if we had a DexCache method hit.
-    jne .Limt_conflict_trampoline_dex_cache_miss
+    movl ART_METHOD_JNI_OFFSET_32(%eax), %eax  // Load ImtConflictTable.
 .Limt_table_iterate:
-    cmpl %eax, 0(%edi)
+    cmpl %esi, 0(%eax)
     jne .Limt_table_next_entry
     // We successfully hit an entry in the table. Load the target method
     // and jump to it.
-    movl __SIZEOF_POINTER__(%edi), %eax
+    movl __SIZEOF_POINTER__(%eax), %eax
     CFI_REMEMBER_STATE
-    POP EDX
     POP ESI
-    POP EDI
     jmp *ART_METHOD_QUICK_CODE_OFFSET_32(%eax)
-    CFI_RESTORE_STATE_AND_DEF_CFA(esp, 16)
+    CFI_RESTORE_STATE_AND_DEF_CFA(esp, 8)
 .Limt_table_next_entry:
     // If the entry is null, the interface method is not in the ImtConflictTable.
-    cmpl LITERAL(0), 0(%edi)
+    cmpl LITERAL(0), 0(%eax)
     jz .Lconflict_trampoline
     // Iterate over the entries of the ImtConflictTable.
-    addl LITERAL(2 * __SIZEOF_POINTER__), %edi
+    addl LITERAL(2 * __SIZEOF_POINTER__), %eax
     jmp .Limt_table_iterate
 .Lconflict_trampoline:
     // Call the runtime stub to populate the ImtConflictTable and jump to the
     // resolved method.
-    CFI_REMEMBER_STATE
-    POP EDX
+    // Pass the interface method in first argument.
+    movl %esi, %eax
     POP ESI
-    POP EDI
     INVOKE_TRAMPOLINE_BODY artInvokeInterfaceTrampoline
-    CFI_RESTORE_STATE_AND_DEF_CFA(esp, 16)
-.Limt_conflict_trampoline_dex_cache_miss:
-    // We're not creating a proper runtime method frame here,
-    // artLookupResolvedMethod() is not allowed to walk the stack.
-
-    // Save core register args; EDX is already saved.
-    PUSH ebx
-    PUSH ecx
-
-    // Save FPR args.
-    subl MACRO_LITERAL(32), %esp
-    CFI_ADJUST_CFA_OFFSET(32)
-    movsd %xmm0, 0(%esp)
-    movsd %xmm1, 8(%esp)
-    movsd %xmm2, 16(%esp)
-    movsd %xmm3, 24(%esp)
-
-    pushl 32+8+16(%esp)         // Pass referrer.
-    CFI_ADJUST_CFA_OFFSET(4)
-    pushl %esi                  // Pass method index.
-    CFI_ADJUST_CFA_OFFSET(4)
-    call SYMBOL(artLookupResolvedMethod)  // (uint32_t method_index, ArtMethod* referrer)
-    addl LITERAL(8), %esp       // Pop arguments.
-    CFI_ADJUST_CFA_OFFSET(-8)
-
-    // Restore FPR args.
-    movsd 0(%esp), %xmm0
-    movsd 8(%esp), %xmm1
-    movsd 16(%esp), %xmm2
-    movsd 24(%esp), %xmm3
-    addl MACRO_LITERAL(32), %esp
-    CFI_ADJUST_CFA_OFFSET(-32)
-
-    // Restore core register args.
-    POP ecx
-    POP ebx
-
-    cmp LITERAL(0), %eax        // If the method wasn't resolved,
-    je .Lconflict_trampoline    //   skip the lookup and go to artInvokeInterfaceTrampoline().
-    jmp .Limt_table_iterate
 END_FUNCTION art_quick_imt_conflict_trampoline
 
 DEFINE_FUNCTION art_quick_resolution_trampoline
