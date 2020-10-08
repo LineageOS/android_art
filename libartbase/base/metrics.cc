@@ -32,25 +32,42 @@ std::string DatumName(DatumId datum) {
     return #name;
     ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTER
+
+#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
+  case DatumId::k##name:                                        \
+    return #name;
+    ART_HISTOGRAMS(ART_HISTOGRAM)
+#undef ART_HISTOGRAM
+
     default:
       LOG(FATAL) << "Unknown datum id: " << static_cast<unsigned>(datum);
       UNREACHABLE();
   }
 }
 
-ArtMetrics::ArtMetrics()
-    :
-#define ART_COUNTER(name) name{},
-      ART_COUNTERS(ART_COUNTER)
+ArtMetrics::ArtMetrics() : unused_ {}
+#define ART_COUNTER(name) \
+  , name##_ {}
+ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTER
-          unused_{} {
+#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
+  , name##_ {}
+ART_HISTOGRAMS(ART_HISTOGRAM)
+#undef ART_HISTOGRAM
+{
 }
 
 void ArtMetrics::ReportAllMetrics(MetricsBackend* backend) const {
 // Dump counters
-#define ART_COUNTER(name) backend->ReportCounter(DatumId::k##name, name.Value());
+#define ART_COUNTER(name) backend->ReportCounter(DatumId::k##name, name()->Value());
   ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTERS
+
+// Dump histograms
+#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
+  backend->ReportHistogram(DatumId::k##name, low_value, high_value, name()->GetBuckets());
+  ART_HISTOGRAMS(ART_HISTOGRAM)
+#undef ART_HISTOGRAM
 }
 
 }  // namespace metrics
