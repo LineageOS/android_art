@@ -1104,9 +1104,9 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
       }
     }
     HInvokeStaticOrDirect::DispatchInfo dispatch_info =
-        HSharpening::SharpenInvokeStaticOrDirect(resolved_method,
-                                                 has_method_id,
-                                                 code_generator_);
+        HSharpening::SharpenLoadMethod(resolved_method,
+                                       has_method_id,
+                                       code_generator_);
     if (dispatch_info.code_ptr_location == CodePtrLocation::kCallCriticalNative) {
       graph_->SetHasDirectCriticalNativeCall(true);
     }
@@ -1138,6 +1138,13 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                              /*vtable_index=*/ imt_or_vtable_index);
   } else {
     DCHECK_EQ(invoke_type, kInterface);
+    if (kIsDebugBuild) {
+      ScopedObjectAccess soa(Thread::Current());
+      DCHECK(resolved_method->GetDeclaringClass()->IsInterface());
+    }
+    MethodLoadKind load_kind =
+        HSharpening::SharpenLoadMethod(resolved_method, /* has_method_id= */ true, code_generator_)
+            .method_load_kind;
     invoke = new (allocator_) HInvokeInterface(allocator_,
                                                number_of_arguments,
                                                return_type,
@@ -1145,7 +1152,8 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
                                                method_reference,
                                                resolved_method,
                                                resolved_method_reference,
-                                               /*imt_index=*/ imt_or_vtable_index);
+                                               /*imt_index=*/ imt_or_vtable_index,
+                                               load_kind);
   }
   return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ false);
 }
@@ -1667,6 +1675,12 @@ bool HInstructionBuilder::SetupInvokeArguments(HInstruction* invoke,
     DCHECK_EQ(argument_index, invoke->AsInvokeStaticOrDirect()->GetCurrentMethodIndex());
     DCHECK(invoke->InputAt(argument_index) == nullptr);
     invoke->SetRawInputAt(argument_index, graph_->GetCurrentMethod());
+  }
+
+  if (invoke->IsInvokeInterface() &&
+      (invoke->AsInvokeInterface()->GetHiddenArgumentLoadKind() == MethodLoadKind::kRecursive)) {
+    invoke->SetRawInputAt(invoke->AsInvokeInterface()->GetNumberOfArguments() - 1,
+                          graph_->GetCurrentMethod());
   }
 
   return true;
