@@ -57,7 +57,7 @@ static bool BootImageAOTCanEmbedMethod(ArtMethod* method, const CompilerOptions&
   return compiler_options.IsImageClass(dex_file.StringByTypeIdx(klass->GetDexTypeIndex()));
 }
 
-HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenInvokeStaticOrDirect(
+HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenLoadMethod(
     ArtMethod* callee, bool has_method_id, CodeGenerator* codegen) {
   if (kIsDebugBuild) {
     ScopedObjectAccess soa(Thread::Current());  // Required for GetDeclaringClass below.

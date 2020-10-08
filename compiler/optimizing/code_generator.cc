@@ -923,8 +923,7 @@ uint32_t CodeGenerator::GetBootImageOffset(HLoadString* load_string) NO_THREAD_S
   return GetBootImageOffsetImpl(string.Ptr(), ImageHeader::kSectionObjects);
 }
 
-uint32_t CodeGenerator::GetBootImageOffset(HInvokeStaticOrDirect* invoke) {
-  DCHECK_EQ(invoke->GetMethodLoadKind(), MethodLoadKind::kBootImageRelRo);
+uint32_t CodeGenerator::GetBootImageOffset(HInvoke* invoke) {
   ArtMethod* method = invoke->GetResolvedMethod();
   DCHECK(method != nullptr);
   return GetBootImageOffsetImpl(method, ImageHeader::kSectionArtMethods);

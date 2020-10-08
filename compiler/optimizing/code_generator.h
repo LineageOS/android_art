@@ -632,7 +632,7 @@ class CodeGenerator : public DeletableArenaObject<kArenaAllocCodeGenerator> {
 
   uint32_t GetBootImageOffset(HLoadClass* load_class);
   uint32_t GetBootImageOffset(HLoadString* load_string);
-  uint32_t GetBootImageOffset(HInvokeStaticOrDirect* invoke);
+  uint32_t GetBootImageOffset(HInvoke* invoke);
 
   static void CreateSystemArrayCopyLocationSummary(HInvoke* invoke);
 

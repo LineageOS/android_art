@@ -2311,7 +2311,7 @@ void InstructionSimplifierVisitor::SimplifySystemArrayCopy(HInvoke* instruction)
       // is unlikely that it exists. The most usual situation for such typed
       // arraycopy methods is a direct pointer to the boot image.
       invoke->SetDispatchInfo(
-          HSharpening::SharpenInvokeStaticOrDirect(method, /* has_method_id= */ true, codegen_));
+          HSharpening::SharpenLoadMethod(method, /* has_method_id= */ true, codegen_));
     }
   }
 }
