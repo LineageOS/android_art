@@ -1329,6 +1329,7 @@ bool Jit::CompileMethodFromProfile(Thread* self,
   const void* entry_point = method->GetEntryPointFromQuickCompiledCode();
   if (class_linker->IsQuickToInterpreterBridge(entry_point) ||
       class_linker->IsQuickGenericJniStub(entry_point) ||
+      (entry_point == interpreter::GetNterpEntryPoint()) ||
       // We explicitly check for the stub. The trampoline is for methods backed by
       // a .oat file that has a compiled version of the method.
       (entry_point == GetQuickResolutionStub())) {
