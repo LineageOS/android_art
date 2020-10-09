@@ -161,7 +161,7 @@ art_cc_library {
         "//packages/modules/NetworkStack/tests:__subpackages__",
     ],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
 
@@ -279,7 +279,7 @@ cc_library_headers {
     export_shared_lib_headers: ["libbase"],
 
     apex_available: [
+        "com.android.art",
         "com.android.art.debug",
-        "com.android.art.release",
     ],
 }

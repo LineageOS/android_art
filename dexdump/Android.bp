@@ -53,7 +53,7 @@ art_cc_binary {
         },
     },
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
         "//apex_available:platform", // for SDK
     ],

@@ -53,7 +53,7 @@ art_cc_library {
         "libvixl",
     ],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
 }
@@ -78,7 +78,7 @@ art_cc_library {
     ],
 
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
 }
@@ -100,6 +100,6 @@ cc_library_headers {
 
     apex_available: [
         "com.android.art.debug",
-        "com.android.art.release",
+        "com.android.art",
     ],
 }
