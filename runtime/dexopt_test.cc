@@ -156,7 +156,6 @@ void DexoptTest::GenerateOatForTest(const std::string& dex_location,
         ArrayRef<const std::string>(Runtime::Current()->GetBootClassPathLocations()),
         ArrayRef<const std::string>(Runtime::Current()->GetBootClassPath()),
         kRuntimeISA,
-        gc::space::ImageSpaceLoadingOrder::kSystemFirst,
         &error_msg);
     ASSERT_EQ(!with_alternate_image, match) << error_msg;
   }
