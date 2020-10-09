@@ -1984,67 +1984,6 @@ void Heap::CountInstances(const std::vector<Handle<mirror::Class>>& classes,
   VisitObjects(instance_counter);
 }
 
-void Heap::GetInstances(VariableSizedHandleScope& scope,
-                        Handle<mirror::Class> h_class,
-                        bool use_is_assignable_from,
-                        int32_t max_count,
-                        std::vector<Handle<mirror::Object>>& instances) {
-  DCHECK_GE(max_count, 0);
-  auto instance_collector = [&](mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (MatchesClass(obj, h_class, use_is_assignable_from)) {
-      if (max_count == 0 || instances.size() < static_cast<size_t>(max_count)) {
-        instances.push_back(scope.NewHandle(obj));
-      }
-    }
-  };
-  VisitObjects(instance_collector);
-}
-
-void Heap::GetReferringObjects(VariableSizedHandleScope& scope,
-                               Handle<mirror::Object> o,
-                               int32_t max_count,
-                               std::vector<Handle<mirror::Object>>& referring_objects) {
-  class ReferringObjectsFinder {
-   public:
-    ReferringObjectsFinder(VariableSizedHandleScope& scope_in,
-                           Handle<mirror::Object> object_in,
-                           int32_t max_count_in,
-                           std::vector<Handle<mirror::Object>>& referring_objects_in)
-        REQUIRES_SHARED(Locks::mutator_lock_)
-        : scope_(scope_in),
-          object_(object_in),
-          max_count_(max_count_in),
-          referring_objects_(referring_objects_in) {}
-
-    // For Object::VisitReferences.
-    void operator()(ObjPtr<mirror::Object> obj,
-                    MemberOffset offset,
-                    bool is_static ATTRIBUTE_UNUSED) const
-        REQUIRES_SHARED(Locks::mutator_lock_) {
-      mirror::Object* ref = obj->GetFieldObject<mirror::Object>(offset);
-      if (ref == object_.Get() && (max_count_ == 0 || referring_objects_.size() < max_count_)) {
-        referring_objects_.push_back(scope_.NewHandle(obj));
-      }
-    }
-
-    void VisitRootIfNonNull(mirror::CompressedReference<mirror::Object>* root ATTRIBUTE_UNUSED)
-        const {}
-    void VisitRoot(mirror::CompressedReference<mirror::Object>* root ATTRIBUTE_UNUSED) const {}
-
-   private:
-    VariableSizedHandleScope& scope_;
-    Handle<mirror::Object> const object_;
-    const uint32_t max_count_;
-    std::vector<Handle<mirror::Object>>& referring_objects_;
-    DISALLOW_COPY_AND_ASSIGN(ReferringObjectsFinder);
-  };
-  ReferringObjectsFinder finder(scope, o, max_count, referring_objects);
-  auto referring_objects_finder = [&](mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
-    obj->VisitReferences(finder, VoidFunctor());
-  };
-  VisitObjects(referring_objects_finder);
-}
-
 void Heap::CollectGarbage(bool clear_soft_references, GcCause cause) {
   // Even if we waited for a GC we still need to do another GC since weaks allocated during the
   // last GC will not have necessarily been cleared.
