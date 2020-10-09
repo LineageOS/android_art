@@ -104,7 +104,7 @@ TEST_F(DexoptAnalyzerTest, DexNoOat) {
 
   Verify(dex_location, CompilerFilter::kSpeed);
   Verify(dex_location, CompilerFilter::kExtract);
-  Verify(dex_location, CompilerFilter::kQuicken);
+  Verify(dex_location, CompilerFilter::kVerify);
   Verify(dex_location, CompilerFilter::kSpeedProfile);
   Verify(dex_location, CompilerFilter::kSpeed, false, false, nullptr);
 }
@@ -116,7 +116,7 @@ TEST_F(DexoptAnalyzerTest, OatUpToDate) {
   GenerateOatForTest(dex_location.c_str(), CompilerFilter::kSpeed);
 
   Verify(dex_location, CompilerFilter::kSpeed);
-  Verify(dex_location, CompilerFilter::kQuicken);
+  Verify(dex_location, CompilerFilter::kVerify);
   Verify(dex_location, CompilerFilter::kExtract);
   Verify(dex_location, CompilerFilter::kEverything);
   Verify(dex_location, CompilerFilter::kSpeed, false, false, nullptr);
@@ -129,19 +129,19 @@ TEST_F(DexoptAnalyzerTest, ProfileOatUpToDate) {
   GenerateOatForTest(dex_location.c_str(), CompilerFilter::kSpeedProfile);
 
   Verify(dex_location, CompilerFilter::kSpeedProfile, false);
-  Verify(dex_location, CompilerFilter::kQuicken, false);
+  Verify(dex_location, CompilerFilter::kVerify, false);
   Verify(dex_location, CompilerFilter::kSpeedProfile, true);
-  Verify(dex_location, CompilerFilter::kQuicken, true);
+  Verify(dex_location, CompilerFilter::kVerify, true);
 }
 
 TEST_F(DexoptAnalyzerTest, Downgrade) {
   std::string dex_location = GetScratchDir() + "/Downgrade.jar";
   Copy(GetDexSrc1(), dex_location);
-  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kQuicken);
+  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kVerify);
 
   Verify(dex_location, CompilerFilter::kSpeedProfile, false, true);
-  Verify(dex_location, CompilerFilter::kQuicken, false, true);
   Verify(dex_location, CompilerFilter::kVerify, false, true);
+  Verify(dex_location, CompilerFilter::kExtract, false, true);
 }
 
 // Case: We have a MultiDEX file and up-to-date OAT file for it.
@@ -195,7 +195,7 @@ TEST_F(DexoptAnalyzerTest, OatImageOutOfDate) {
                      /*with_alternate_image=*/true);
 
   Verify(dex_location, CompilerFilter::kExtract);
-  Verify(dex_location, CompilerFilter::kQuicken);
+  Verify(dex_location, CompilerFilter::kVerify);
   Verify(dex_location, CompilerFilter::kSpeed);
 }
 
@@ -212,7 +212,7 @@ TEST_F(DexoptAnalyzerTest, OatVerifyAtRuntimeImageOutOfDate) {
                      /*with_alternate_image=*/true);
 
   Verify(dex_location, CompilerFilter::kExtract);
-  Verify(dex_location, CompilerFilter::kQuicken);
+  Verify(dex_location, CompilerFilter::kVerify);
 }
 
 // Case: We have a DEX file and an ODEX file, but no OAT file.
@@ -272,7 +272,7 @@ TEST_F(DexoptAnalyzerTest, ResourceOnlyDex) {
 
   Verify(dex_location, CompilerFilter::kSpeed);
   Verify(dex_location, CompilerFilter::kExtract);
-  Verify(dex_location, CompilerFilter::kQuicken);
+  Verify(dex_location, CompilerFilter::kVerify);
 }
 
 // Case: We have a DEX file, an ODEX file and an OAT file.

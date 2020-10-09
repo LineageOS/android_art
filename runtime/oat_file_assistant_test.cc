@@ -233,7 +233,7 @@ TEST_F(OatFileAssistantTest, DexNoOat) {
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeedProfile));
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
@@ -278,7 +278,7 @@ TEST_F(OatFileAssistantTest, OdexUpToDate) {
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
-            GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+            GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(-OatFileAssistant::kDex2OatForFilter,
@@ -310,7 +310,7 @@ TEST_F(OatFileAssistantTest, OdexUpToDatePartialBootImage) {
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
-            GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+            GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(-OatFileAssistant::kDex2OatForFilter,
@@ -345,7 +345,7 @@ TEST_F(OatFileAssistantTest, OdexUpToDateSymLink) {
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(-OatFileAssistant::kDex2OatForFilter,
@@ -379,7 +379,7 @@ TEST_F(OatFileAssistantTest, OatUpToDate) {
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
@@ -420,7 +420,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithFd) {
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(-OatFileAssistant::kDex2OatForFilter,
@@ -617,11 +617,11 @@ TEST_F(OatFileAssistantTest, ProfileOatUpToDate) {
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeedProfile, false));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken, false));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify, false));
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeedProfile, true));
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken, true));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify, true));
 
   EXPECT_FALSE(oat_file_assistant.IsInBootClassPath());
   EXPECT_EQ(OatFileAssistant::kOatCannotOpen, oat_file_assistant.OdexFileStatus());
@@ -776,7 +776,7 @@ TEST_F(OatFileAssistantTest, OatImageOutOfDate) {
   EXPECT_EQ(OatFileAssistant::kDex2OatForBootImage,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatForBootImage,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
   EXPECT_EQ(OatFileAssistant::kDex2OatForBootImage,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
 
@@ -811,7 +811,7 @@ TEST_F(OatFileAssistantTest, OatVerifyAtRuntimeImageOutOfDate) {
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
 
   EXPECT_FALSE(oat_file_assistant.IsInBootClassPath());
   EXPECT_EQ(OatFileAssistant::kOatCannotOpen, oat_file_assistant.OdexFileStatus());
@@ -861,7 +861,7 @@ TEST_F(OatFileAssistantTest, ResourceOnlyDex) {
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
-      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kQuicken));
+      GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
 
   EXPECT_FALSE(oat_file_assistant.IsInBootClassPath());
   EXPECT_EQ(OatFileAssistant::kOatCannotOpen, oat_file_assistant.OdexFileStatus());
@@ -972,7 +972,7 @@ TEST_F(OatFileAssistantTest, LoadExecInterpretOnlyOatUpToDate) {
   std::string dex_location = GetScratchDir() + "/LoadExecInterpretOnlyOatUpToDate.jar";
 
   Copy(GetDexSrc1(), dex_location);
-  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kQuicken);
+  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kVerify);
 
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
