@@ -178,27 +178,6 @@ static jlong VMDebug_lastDebuggerActivity(JNIEnv*, jclass) {
   return -1;
 }
 
-static void ThrowUnsupportedOperationException(JNIEnv* env) {
-  ScopedObjectAccess soa(env);
-  soa.Self()->ThrowNewException("Ljava/lang/UnsupportedOperationException;", nullptr);
-}
-
-static void VMDebug_startInstructionCounting(JNIEnv* env, jclass) {
-  ThrowUnsupportedOperationException(env);
-}
-
-static void VMDebug_stopInstructionCounting(JNIEnv* env, jclass) {
-  ThrowUnsupportedOperationException(env);
-}
-
-static void VMDebug_getInstructionCount(JNIEnv* env, jclass, jintArray /*javaCounts*/) {
-  ThrowUnsupportedOperationException(env);
-}
-
-static void VMDebug_resetInstructionCount(JNIEnv* env, jclass) {
-  ThrowUnsupportedOperationException(env);
-}
-
 static void VMDebug_printLoadedClasses(JNIEnv* env, jclass, jint flags) {
   class DumpClassVisitor : public ClassVisitor {
    public:
@@ -275,14 +254,6 @@ static void VMDebug_dumpReferenceTables(JNIEnv* env, jclass) {
   LOG(INFO) << "---";
 }
 
-static void VMDebug_crash(JNIEnv*, jclass) {
-  LOG(FATAL) << "Crashing runtime on request";
-}
-
-static void VMDebug_infopoint(JNIEnv*, jclass, jint id) {
-  LOG(INFO) << "VMDebug infopoint " << id << " hit";
-}
-
 static jlong VMDebug_countInstancesOfClass(JNIEnv* env,
                                            jclass,
                                            jclass javaClass,
@@ -330,123 +301,6 @@ static jlongArray VMDebug_countInstancesOfClasses(JNIEnv* env,
     long_counts->Set(i, counts[i]);
   }
   return soa.AddLocalReference<jlongArray>(long_counts);
-}
-
-static jobjectArray VMDebug_getInstancesOfClasses(JNIEnv* env,
-                                                  jclass,
-                                                  jobjectArray javaClasses,
-                                                  jboolean includeAssignable) {
-  ScopedObjectAccess soa(env);
-  StackHandleScope<2> hs(soa.Self());
-  Handle<mirror::ObjectArray<mirror::Class>> classes = hs.NewHandle(
-      soa.Decode<mirror::ObjectArray<mirror::Class>>(javaClasses));
-  if (classes == nullptr) {
-    return nullptr;
-  }
-
-  jclass object_array_class = env->FindClass("[Ljava/lang/Object;");
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    return nullptr;
-  }
-  CHECK(object_array_class != nullptr);
-
-  size_t num_classes = classes->GetLength();
-  jobjectArray result = env->NewObjectArray(num_classes, object_array_class, nullptr);
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    return nullptr;
-  }
-
-  gc::Heap* const heap = Runtime::Current()->GetHeap();
-  MutableHandle<mirror::Class> h_class(hs.NewHandle<mirror::Class>(nullptr));
-  for (size_t i = 0; i < num_classes; ++i) {
-    h_class.Assign(classes->Get(i));
-
-    VariableSizedHandleScope hs2(soa.Self());
-    std::vector<Handle<mirror::Object>> raw_instances;
-    heap->GetInstances(hs2, h_class, includeAssignable, /* max_count= */ 0, raw_instances);
-    jobjectArray array = env->NewObjectArray(raw_instances.size(),
-                                             WellKnownClasses::java_lang_Object,
-                                             nullptr);
-    if (env->ExceptionCheck() == JNI_TRUE) {
-      return nullptr;
-    }
-
-    for (size_t j = 0; j < raw_instances.size(); ++j) {
-      env->SetObjectArrayElement(array, j, raw_instances[j].ToJObject());
-    }
-    env->SetObjectArrayElement(result, i, array);
-  }
-  return result;
-}
-
-// We export the VM internal per-heap-space size/alloc/free metrics
-// for the zygote space, alloc space (application heap), and the large
-// object space for dumpsys meminfo. The other memory region data such
-// as PSS, private/shared dirty/shared data are available via
-// /proc/<pid>/smaps.
-static void VMDebug_getHeapSpaceStats(JNIEnv* env, jclass, jlongArray data) {
-  jlong* arr = reinterpret_cast<jlong*>(env->GetPrimitiveArrayCritical(data, nullptr));
-  if (arr == nullptr || env->GetArrayLength(data) < 9) {
-    return;
-  }
-
-  size_t allocSize = 0;
-  size_t allocUsed = 0;
-  size_t zygoteSize = 0;
-  size_t zygoteUsed = 0;
-  size_t largeObjectsSize = 0;
-  size_t largeObjectsUsed = 0;
-  gc::Heap* heap = Runtime::Current()->GetHeap();
-  {
-    ScopedObjectAccess soa(env);
-    for (gc::space::ContinuousSpace* space : heap->GetContinuousSpaces()) {
-      if (space->IsImageSpace()) {
-        // Currently don't include the image space.
-      } else if (space->IsZygoteSpace()) {
-        gc::space::ZygoteSpace* zygote_space = space->AsZygoteSpace();
-        zygoteSize += zygote_space->Size();
-        zygoteUsed += zygote_space->GetBytesAllocated();
-      } else if (space->IsMallocSpace()) {
-        // This is a malloc space.
-        gc::space::MallocSpace* malloc_space = space->AsMallocSpace();
-        allocSize += malloc_space->GetFootprint();
-        allocUsed += malloc_space->GetBytesAllocated();
-      } else if (space->IsBumpPointerSpace()) {
-        gc::space::BumpPointerSpace* bump_pointer_space = space->AsBumpPointerSpace();
-        allocSize += bump_pointer_space->Size();
-        allocUsed += bump_pointer_space->GetBytesAllocated();
-      } else if (space->IsRegionSpace()) {
-        gc::space::RegionSpace* region_space = space->AsRegionSpace();
-        // When using the concurrent copying garbage collector, the corresponding allocation space
-        // uses a region space. The memory actually requested for the region space is to allow for
-        // a from-space and a to-space, and their sum is twice the actual available space. So here
-        // we need to divide by 2 to get the actual space size that can be used.
-        allocSize += region_space->Size() / 2;
-        allocUsed += region_space->GetBytesAllocated();
-      }
-    }
-    for (gc::space::DiscontinuousSpace* space : heap->GetDiscontinuousSpaces()) {
-      if (space->IsLargeObjectSpace()) {
-        largeObjectsSize += space->AsLargeObjectSpace()->GetBytesAllocated();
-        largeObjectsUsed += largeObjectsSize;
-      }
-    }
-  }
-  size_t allocFree = allocSize - allocUsed;
-  size_t zygoteFree = zygoteSize - zygoteUsed;
-  size_t largeObjectsFree = largeObjectsSize - largeObjectsUsed;
-
-  int j = 0;
-  arr[j++] = allocSize;
-  arr[j++] = allocUsed;
-  arr[j++] = allocFree;
-  arr[j++] = zygoteSize;
-  arr[j++] = zygoteUsed;
-  arr[j++] = zygoteFree;
-  arr[j++] = largeObjectsSize;
-  arr[j++] = largeObjectsUsed;
-  arr[j++] = largeObjectsFree;
-  env->ReleasePrimitiveArrayCritical(data, arr, 0);
 }
 
 // The runtime stat names for VMDebug.getRuntimeStat().
@@ -628,31 +482,23 @@ static void VMDebug_setAllocTrackerStackDepth(JNIEnv* env, jclass, jint stack_de
 static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(VMDebug, countInstancesOfClass, "(Ljava/lang/Class;Z)J"),
   NATIVE_METHOD(VMDebug, countInstancesOfClasses, "([Ljava/lang/Class;Z)[J"),
-  NATIVE_METHOD(VMDebug, crash, "()V"),
   NATIVE_METHOD(VMDebug, dumpHprofData, "(Ljava/lang/String;I)V"),
   NATIVE_METHOD(VMDebug, dumpHprofDataDdms, "()V"),
   NATIVE_METHOD(VMDebug, dumpReferenceTables, "()V"),
   NATIVE_METHOD(VMDebug, getAllocCount, "(I)I"),
-  NATIVE_METHOD(VMDebug, getHeapSpaceStats, "([J)V"),
-  NATIVE_METHOD(VMDebug, getInstancesOfClasses, "([Ljava/lang/Class;Z)[[Ljava/lang/Object;"),
-  NATIVE_METHOD(VMDebug, getInstructionCount, "([I)V"),
   FAST_NATIVE_METHOD(VMDebug, getLoadedClassCount, "()I"),
   NATIVE_METHOD(VMDebug, getVmFeatureList, "()[Ljava/lang/String;"),
-  NATIVE_METHOD(VMDebug, infopoint, "(I)V"),
   FAST_NATIVE_METHOD(VMDebug, isDebuggerConnected, "()Z"),
   FAST_NATIVE_METHOD(VMDebug, isDebuggingEnabled, "()Z"),
   NATIVE_METHOD(VMDebug, getMethodTracingMode, "()I"),
   FAST_NATIVE_METHOD(VMDebug, lastDebuggerActivity, "()J"),
   FAST_NATIVE_METHOD(VMDebug, printLoadedClasses, "(I)V"),
   NATIVE_METHOD(VMDebug, resetAllocCount, "(I)V"),
-  NATIVE_METHOD(VMDebug, resetInstructionCount, "()V"),
   NATIVE_METHOD(VMDebug, startAllocCounting, "()V"),
-  NATIVE_METHOD(VMDebug, startInstructionCounting, "()V"),
   NATIVE_METHOD(VMDebug, startMethodTracingDdmsImpl, "(IIZI)V"),
   NATIVE_METHOD(VMDebug, startMethodTracingFd, "(Ljava/lang/String;IIIZIZ)V"),
   NATIVE_METHOD(VMDebug, startMethodTracingFilename, "(Ljava/lang/String;IIZI)V"),
   NATIVE_METHOD(VMDebug, stopAllocCounting, "()V"),
-  NATIVE_METHOD(VMDebug, stopInstructionCounting, "()V"),
   NATIVE_METHOD(VMDebug, stopMethodTracing, "()V"),
   FAST_NATIVE_METHOD(VMDebug, threadCpuTimeNanos, "()J"),
   NATIVE_METHOD(VMDebug, getRuntimeStatInternal, "(I)Ljava/lang/String;"),
