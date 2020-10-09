@@ -272,5 +272,16 @@
   modes: [device],
   bug: 161420453,
   names: ["libcore.java.text.DecimalFormatTest#testCurrencySymbolSpacing"]
+},
+{
+  description: "Test failures due to mismatch of conscrypt and boringssl versions on host",
+  result: EXEC_FAILED,
+  modes: [host],
+  names: ["libcore.javax.net.ssl.DefaultHostnameVerifierTest#testAltIpOnlyCert",
+          "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectAltOnlyCert",
+          "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectWithAltNamesCert",
+          "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectWithWildAltNamesCert",
+          "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testWildAltNameOnlyCert"],
+  bug: 166619732
 }
 ]
