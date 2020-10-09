@@ -21,15 +21,16 @@
 #include <stdio.h>
 
 #include <iosfwd>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
-#include <memory>
 #include <vector>
 
 #include "base/locks.h"
 #include "base/macros.h"
 #include "base/mem_map.h"
+#include "base/metrics.h"
 #include "base/string_view_cpp20.h"
 #include "deoptimization_kind.h"
 #include "dex/dex_file_types.h"
@@ -979,6 +980,8 @@ class Runtime {
   // Return true if we should load oat files as executable or not.
   bool GetOatFilesExecutable() const;
 
+  metrics::ArtMetrics* GetMetrics() { return &metrics_; }
+
  private:
   static void InitPlatformSignalHandlers();
 
@@ -1334,6 +1337,8 @@ class Runtime {
   bool verifier_missing_kthrow_fatal_;
   bool perfetto_hprof_enabled_;
 
+  metrics::ArtMetrics metrics_;
+
   // Note: See comments on GetFaultMessage.
   friend std::string GetFaultMessageForAbortLogging();
   friend class Dex2oatImageTest;
@@ -1343,6 +1348,8 @@ class Runtime {
 
   DISALLOW_COPY_AND_ASSIGN(Runtime);
 };
+
+inline metrics::ArtMetrics* GetMetrics() { return Runtime::Current()->GetMetrics(); }
 
 }  // namespace art
 
