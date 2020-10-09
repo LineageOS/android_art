@@ -25,6 +25,7 @@
 #include <string_view>
 #include <vector>
 
+#include "android-base/logging.h"
 #include "base/time_utils.h"
 
 #pragma clang diagnostic push
@@ -131,19 +132,21 @@ class MetricsBackend {
 
 class MetricsCounter {
  public:
+  using value_t = uint64_t;
+
   explicit constexpr MetricsCounter(uint64_t value = 0) : value_{value} {
     // Ensure we do not have any unnecessary data in this class.
     static_assert(sizeof(*this) == sizeof(uint64_t));
   }
 
   void AddOne() { Add(1u); }
-  void Add(uint64_t value) { value_.fetch_add(value, std::memory_order::memory_order_relaxed); }
+  void Add(value_t value) { value_.fetch_add(value, std::memory_order::memory_order_relaxed); }
 
-  uint64_t Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
+  value_t Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
 
  private:
-  std::atomic<uint64_t> value_;
-  static_assert(std::atomic<uint64_t>::is_always_lock_free);
+  std::atomic<value_t> value_;
+  static_assert(std::atomic<value_t>::is_always_lock_free);
 };
 
 template <size_t num_buckets_, int64_t minimum_value_, int64_t maximum_value_>
@@ -152,6 +155,8 @@ class MetricsHistogram {
   static_assert(minimum_value_ < maximum_value_);
 
  public:
+  using value_t = int64_t;
+
   constexpr MetricsHistogram() : buckets_{} {
     // Ensure we do not have any unnecessary data in this class.
     static_assert(sizeof(*this) == sizeof(uint32_t) * num_buckets_);
@@ -189,6 +194,73 @@ class MetricsHistogram {
 
   friend class ArtMetrics;
   static_assert(std::atomic<uint32_t>::is_always_lock_free);
+};
+
+/**
+ * AutoTimer simplifies time-based metrics collection.
+ *
+ * Several modes are supported. In the default case, the timer starts immediately and stops when it
+ * goes out of scope. Example:
+ *
+ *     {
+ *       AutoTimer timer{metric};
+ *       DoStuff();
+ *       // timer stops and updates metric automatically here.
+ *     }
+ *
+ * You can also stop the timer early:
+ *
+ *     timer.Stop();
+ *
+ * Finally, you can choose to not automatically start the timer at the beginning by passing false as
+ * the second argument to the constructor:
+ *
+ *     AutoTimer timer{metric, false};
+ *     DoNotTimeThis();
+ *     timer.Start();
+ *     TimeThis();
+ *
+ * Manually started timers will still automatically stop in the destructor, but they can be manually
+ * stopped as well.
+ *
+ * Note that AutoTimer makes calls to MicroTime(), so this may not be suitable on critical paths, or
+ * in cases where the counter needs to be started and stopped on different threads.
+ */
+template <typename Metric>
+class AutoTimer {
+ public:
+  explicit AutoTimer(Metric* metric, bool autostart = true)
+      : running_{false}, start_time_microseconds_{}, metric_{metric} {
+    if (autostart) {
+      Start();
+    }
+  }
+
+  ~AutoTimer() {
+    if (running_) {
+      Stop();
+    }
+  }
+
+  void Start() {
+    DCHECK(!running_);
+    running_ = true;
+    start_time_microseconds_ = MicroTime();
+  }
+
+  void Stop() {
+    DCHECK(running_);
+    uint64_t stop_time_microseconds = MicroTime();
+    running_ = false;
+
+    metric_->Add(
+        static_cast<typename Metric::value_t>(stop_time_microseconds - start_time_microseconds_));
+  }
+
+ private:
+  bool running_;
+  uint64_t start_time_microseconds_;
+  Metric* metric_;
 };
 
 /**
