@@ -33,7 +33,6 @@
 
 // COUNTER(counter_name)
 #define ART_COUNTERS(COUNTER) COUNTER(ClassVerificationTotalTime)
-// TODO: ClassVerificationTime serves as a mock for now. Implementation will come later.
 
 // HISTOGRAM(counter_name, num_buckets, minimum_value, maximum_value)
 //
@@ -248,13 +247,15 @@ class AutoTimer {
     start_time_microseconds_ = MicroTime();
   }
 
-  void Stop() {
+  // Stops a running timer. Returns the time elapsed since starting the timer in microseconds.
+  uint64_t Stop() {
     DCHECK(running_);
     uint64_t stop_time_microseconds = MicroTime();
     running_ = false;
 
-    metric_->Add(
-        static_cast<typename Metric::value_t>(stop_time_microseconds - start_time_microseconds_));
+    uint64_t elapsed_time = stop_time_microseconds - start_time_microseconds_;
+    metric_->Add(static_cast<typename Metric::value_t>(elapsed_time));
+    return elapsed_time;
   }
 
  private:
