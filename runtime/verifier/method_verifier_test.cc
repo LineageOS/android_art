@@ -71,5 +71,14 @@ TEST_F(MethodVerifierTest, LibCore) {
   VerifyDexFile(*java_lang_dex_file_);
 }
 
+// Make sure verification time metrics are collected.
+TEST_F(MethodVerifierTest, VerificationTimeMetrics) {
+  ScopedObjectAccess soa(Thread::Current());
+  ASSERT_TRUE(java_lang_dex_file_ != nullptr);
+  const uint64_t original_time = GetMetrics()->ClassVerificationTotalTime()->Value();
+  VerifyDexFile(*java_lang_dex_file_);
+  ASSERT_GT(GetMetrics()->ClassVerificationTotalTime()->Value(), original_time);
+}
+
 }  // namespace verifier
 }  // namespace art
