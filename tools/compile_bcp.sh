@@ -162,7 +162,7 @@ for jar in ${SYSTEMSERVERCLASSPATH//:/ }; do
            --boot-image=/apex/com.android.art/javalib/boot.art:${output}/boot-framework.art \
            --dex-file=${jar} \
            --oat-file=${arch_output}/${stem}.odex \
-           --app-image-file=${oat_file_dir}/${stem}.art \
+           --app-image-file=${arch_output}/${stem}.art \
            --android-root=out/empty \
            --instruction-set=${systemserver_arch} \
            --abort-on-hard-verifier-error \
