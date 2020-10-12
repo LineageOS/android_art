@@ -377,8 +377,9 @@ class Writer {
 class ReferredObjectsFinder {
  public:
   explicit ReferredObjectsFinder(
-      std::vector<std::pair<std::string, art::mirror::Object*>>* referred_objects)
-      : referred_objects_(referred_objects) {}
+      std::vector<std::pair<std::string, art::mirror::Object*>>* referred_objects,
+      art::mirror::Object** min_nonnull_ptr)
+      : referred_objects_(referred_objects), min_nonnull_ptr_(min_nonnull_ptr) {}
 
   // For art::mirror::Object::VisitReferences.
   void operator()(art::ObjPtr<art::mirror::Object> obj, art::MemberOffset offset,
@@ -400,6 +401,9 @@ class ReferredObjectsFinder {
       field_name = field->PrettyField(/*with_type=*/true);
     }
     referred_objects_->emplace_back(std::move(field_name), ref);
+    if (!*min_nonnull_ptr_ || (ref && *min_nonnull_ptr_ > ref)) {
+      *min_nonnull_ptr_ = ref;
+    }
   }
 
   void VisitRootIfNonNull(art::mirror::CompressedReference<art::mirror::Object>* root
@@ -411,6 +415,7 @@ class ReferredObjectsFinder {
   // We can use a raw Object* pointer here, because there are no concurrent GC threads after the
   // fork.
   std::vector<std::pair<std::string, art::mirror::Object*>>* referred_objects_;
+  art::mirror::Object** min_nonnull_ptr_;
 };
 
 class RootFinder : public art::SingleRootVisitor {
@@ -549,6 +554,11 @@ bool IsIgnored(const std::vector<std::string>& ignored_types,
   art::mirror::Class* klass = obj->GetClass();
   return std::find(ignored_types.begin(), ignored_types.end(), PrettyType(klass)) !=
          ignored_types.end();
+}
+
+size_t EncodedSize(uint64_t n) {
+  if (n == 0) return 1;
+  return 1 + static_cast<size_t>(art::MostSignificantBit(n)) / 7;
 }
 
 void DumpPerfetto(art::Thread* self) {
@@ -728,7 +738,8 @@ void DumpPerfetto(art::Thread* self) {
 
                   std::vector<std::pair<std::string, art::mirror::Object*>>
                       referred_objects;
-                  ReferredObjectsFinder objf(&referred_objects);
+                  art::mirror::Object* min_nonnull_ptr = nullptr;
+                  ReferredObjectsFinder objf(&referred_objects, &min_nonnull_ptr);
 
                   const bool emit_field_ids =
                       klass->GetClassFlags() != art::mirror::kClassFlagObjectArray &&
@@ -745,20 +756,51 @@ void DumpPerfetto(art::Thread* self) {
                           });
                     }
                   }
+
+                  uint64_t bytes_saved = 0;
+                  uint64_t base_obj_id = GetObjectId(min_nonnull_ptr);
+                  if (base_obj_id) {
+                    // We need to decrement the base for object ids so that we can tell apart
+                    // null references.
+                    base_obj_id--;
+                  }
+                  if (base_obj_id) {
+                    for (auto& p : referred_objects) {
+                      art::mirror::Object*& referred_obj = p.second;
+                      if (!referred_obj || IsIgnored(ignored_types, referred_obj)) {
+                        referred_obj = nullptr;
+                        continue;
+                      }
+                      uint64_t referred_obj_id = GetObjectId(referred_obj);
+                      bytes_saved +=
+                          EncodedSize(referred_obj_id) - EncodedSize(referred_obj_id - base_obj_id);
+                    }
+                  }
+
+                  // +1 for storing the field id.
+                  if (bytes_saved <= EncodedSize(base_obj_id) + 1) {
+                    // Subtracting the base ptr gains fewer bytes than it takes to store it.
+                    base_obj_id = 0;
+                  }
+
                   for (auto& p : referred_objects) {
                     const std::string& field_name = p.first;
                     art::mirror::Object* referred_obj = p.second;
-                    if (referred_obj && IsIgnored(ignored_types, referred_obj)) {
-                      referred_obj = nullptr;
-                    }
                     if (emit_field_ids) {
                       reference_field_ids->Append(FindOrAppend(&interned_fields, field_name));
                     }
-                    reference_object_ids->Append(GetObjectId(referred_obj));
+                    uint64_t referred_obj_id = GetObjectId(referred_obj);
+                    if (referred_obj_id) {
+                      referred_obj_id -= base_obj_id;
+                    }
+                    reference_object_ids->Append(referred_obj_id);
                   }
                   if (emit_field_ids) {
                     object_proto->set_reference_field_id(*reference_field_ids);
                     reference_field_ids->Reset();
+                  }
+                  if (base_obj_id) {
+                    object_proto->set_reference_field_id_base(base_obj_id);
                   }
                   object_proto->set_reference_object_id(*reference_object_ids);
                   reference_object_ids->Reset();
