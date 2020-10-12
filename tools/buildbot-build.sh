@@ -141,7 +141,7 @@ if [[ $mode == "target" ]]; then
   # testing, we need to install an implementation of the libraries (and cannot
   # rely on the one already installed on the device, if the device is post R and
   # has it).
-  implementation_libs="libartpalette-system.so"
+  implementation_libs="libartpalette-system.so liblog.so"
   if [ -d prebuilts/runtime/mainline/platform/impl ]; then
     if [[ $TARGET_ARCH = arm* ]]; then
       arch32=arm
