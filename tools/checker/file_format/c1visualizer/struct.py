@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from common.immutables import ImmutableDict
 from common.logger     import Logger
 from common.mixins     import PrintableMixin
@@ -19,7 +21,8 @@ from common.mixins     import PrintableMixin
 class C1visualizerFile(PrintableMixin):
 
   def __init__(self, fileName):
-    self.fileName = fileName
+    self.baseFileName = os.path.basename(fileName)
+    self.fullFileName = fileName
     self.passes = []
     self.instructionSetFeatures = ImmutableDict()
 
@@ -58,7 +61,7 @@ class C1visualizerPass(PrintableMixin):
 
   @property
   def fileName(self):
-    return self.parent.fileName
+    return self.parent.baseFileName
 
   def __eq__(self, other):
     return isinstance(other, self.__class__) \
