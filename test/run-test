@@ -928,6 +928,7 @@ if [[ "$TEST_NAME" =~ ^[0-9]+-checker- ]]; then
       fi
 
       run_args+=(-Xcompiler-option "--dump-cfg=$cfg_output_dir/$cfg_output" -Xcompiler-option -j1)
+      checker_args="$checker_args --print-cfg"
     fi
   fi
 fi
