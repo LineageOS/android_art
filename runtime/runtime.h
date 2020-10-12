@@ -35,7 +35,6 @@
 #include "deoptimization_kind.h"
 #include "dex/dex_file_types.h"
 #include "experimental_flags.h"
-#include "gc/space/image_space_loading_order.h"
 #include "gc_root.h"
 #include "instrumentation.h"
 #include "jdwp_provider.h"
@@ -965,10 +964,6 @@ class Runtime {
   // Return true if startup is already completed.
   bool GetStartupCompleted() const;
 
-  gc::space::ImageSpaceLoadingOrder GetImageSpaceLoadingOrder() const {
-    return image_space_loading_order_;
-  }
-
   bool IsVerifierMissingKThrowFatal() const {
     return verifier_missing_kthrow_fatal_;
   }
@@ -1330,9 +1325,6 @@ class Runtime {
 
   // If startup has completed, must happen at most once.
   std::atomic<bool> startup_completed_ = false;
-
-  gc::space::ImageSpaceLoadingOrder image_space_loading_order_ =
-      gc::space::ImageSpaceLoadingOrder::kSystemFirst;
 
   bool verifier_missing_kthrow_fatal_;
   bool perfetto_hprof_enabled_;
