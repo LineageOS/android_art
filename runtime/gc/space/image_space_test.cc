@@ -138,7 +138,6 @@ TEST_F(ImageSpaceTest, StringDeduplication) {
                                      bcp_locations,
                                      full_image_locations,
                                      kRuntimeISA,
-                                     ImageSpaceLoadingOrder::kSystemFirst,
                                      /*relocate=*/ false,
                                      /*executable=*/ true,
                                      /*is_zygote=*/ false,
@@ -340,7 +339,6 @@ TEST_F(DexoptTest, Checksums) {
         ArrayRef<const std::string>(bcp_locations),
         ArrayRef<const std::string>(bcp),
         kRuntimeISA,
-        gc::space::ImageSpaceLoadingOrder::kSystemFirst,
         &error_msg);
   };
 
