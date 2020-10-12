@@ -26,7 +26,8 @@ bool CompilerFilter::IsAotCompilationEnabled(Filter filter) {
   switch (filter) {
     case CompilerFilter::kAssumeVerified:
     case CompilerFilter::kExtract:
-    case CompilerFilter::kVerify: return false;
+    case CompilerFilter::kVerify:
+    case CompilerFilter::kQuicken: return false;
 
     case CompilerFilter::kSpaceProfile:
     case CompilerFilter::kSpace:
@@ -44,6 +45,7 @@ bool CompilerFilter::IsJniCompilationEnabled(Filter filter) {
     case CompilerFilter::kExtract:
     case CompilerFilter::kVerify: return false;
 
+    case CompilerFilter::kQuicken:
     case CompilerFilter::kSpaceProfile:
     case CompilerFilter::kSpace:
     case CompilerFilter::kSpeedProfile:
@@ -54,8 +56,21 @@ bool CompilerFilter::IsJniCompilationEnabled(Filter filter) {
   UNREACHABLE();
 }
 
-bool CompilerFilter::IsQuickeningCompilationEnabled(Filter filter ATTRIBUTE_UNUSED) {
-  return false;
+bool CompilerFilter::IsQuickeningCompilationEnabled(Filter filter) {
+  switch (filter) {
+    case CompilerFilter::kAssumeVerified:
+    case CompilerFilter::kExtract:
+    case CompilerFilter::kVerify: return false;
+
+    case CompilerFilter::kQuicken:
+    case CompilerFilter::kSpaceProfile:
+    case CompilerFilter::kSpace:
+    case CompilerFilter::kSpeedProfile:
+    case CompilerFilter::kSpeed:
+    case CompilerFilter::kEverythingProfile:
+    case CompilerFilter::kEverything: return true;
+  }
+  UNREACHABLE();
 }
 
 bool CompilerFilter::IsAnyCompilationEnabled(Filter filter) {
@@ -70,6 +85,7 @@ bool CompilerFilter::IsVerificationEnabled(Filter filter) {
     case CompilerFilter::kExtract: return false;
 
     case CompilerFilter::kVerify:
+    case CompilerFilter::kQuicken:
     case CompilerFilter::kSpaceProfile:
     case CompilerFilter::kSpace:
     case CompilerFilter::kSpeedProfile:
@@ -91,6 +107,7 @@ bool CompilerFilter::DependsOnProfile(Filter filter) {
     case CompilerFilter::kAssumeVerified:
     case CompilerFilter::kExtract:
     case CompilerFilter::kVerify:
+    case CompilerFilter::kQuicken:
     case CompilerFilter::kSpace:
     case CompilerFilter::kSpeed:
     case CompilerFilter::kEverything: return false;
@@ -107,6 +124,7 @@ CompilerFilter::Filter CompilerFilter::GetNonProfileDependentFilterFrom(Filter f
     case CompilerFilter::kAssumeVerified:
     case CompilerFilter::kExtract:
     case CompilerFilter::kVerify:
+    case CompilerFilter::kQuicken:
     case CompilerFilter::kSpace:
     case CompilerFilter::kSpeed:
     case CompilerFilter::kEverything:
@@ -131,6 +149,7 @@ CompilerFilter::Filter CompilerFilter::GetSafeModeFilterFrom(Filter filter) {
     case CompilerFilter::kAssumeVerified:
     case CompilerFilter::kExtract:
     case CompilerFilter::kVerify:
+    case CompilerFilter::kQuicken:
       return filter;
 
     case CompilerFilter::kSpace:
@@ -139,7 +158,7 @@ CompilerFilter::Filter CompilerFilter::GetSafeModeFilterFrom(Filter filter) {
     case CompilerFilter::kSpaceProfile:
     case CompilerFilter::kSpeedProfile:
     case CompilerFilter::kEverythingProfile:
-      return CompilerFilter::kVerify;
+      return CompilerFilter::kQuicken;
   }
   UNREACHABLE();
 }
@@ -157,6 +176,7 @@ std::string CompilerFilter::NameOfFilter(Filter filter) {
     case CompilerFilter::kAssumeVerified: return "assume-verified";
     case CompilerFilter::kExtract: return "extract";
     case CompilerFilter::kVerify: return "verify";
+    case CompilerFilter::kQuicken: return "quicken";
     case CompilerFilter::kSpaceProfile: return "space-profile";
     case CompilerFilter::kSpace: return "space";
     case CompilerFilter::kSpeedProfile: return "speed-profile";
@@ -177,7 +197,7 @@ bool CompilerFilter::ParseCompilerFilter(const char* option, Filter* filter) {
   } else if (strcmp(option, "interpret-only") == 0) {
     LOG(WARNING) << "'interpret-only' is an obsolete compiler filter name that will be "
                  << "removed in future releases, please use 'quicken' instead.";
-    *filter = kVerify;
+    *filter = kQuicken;
   } else if (strcmp(option, "verify-profile") == 0) {
     LOG(WARNING) << "'verify-profile' is an obsolete compiler filter name that will be "
                  << "removed in future releases, please use 'verify' instead.";
@@ -201,8 +221,7 @@ bool CompilerFilter::ParseCompilerFilter(const char* option, Filter* filter) {
   } else if (strcmp(option, "verify") == 0) {
     *filter = kVerify;
   } else if (strcmp(option, "quicken") == 0) {
-    // b/170086509 'quicken' becomes an alias to 'verify.
-    *filter = kVerify;
+    *filter = kQuicken;
   } else if (strcmp(option, "space") == 0) {
     *filter = kSpace;
   } else if (strcmp(option, "space-profile") == 0) {
