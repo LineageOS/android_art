@@ -2425,18 +2425,15 @@ class ImageSpace::BootImageLoader {
     return cache_filename_;
   }
 
-  bool LoadFromSystem(bool validate_oat_file,
-                      size_t extra_reservation_size,
+  bool LoadFromSystem(size_t extra_reservation_size,
                       /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
                       /*out*/MemMap* extra_reservation,
                       /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool LoadFromDalvikCache(
-      bool validate_oat_file,
-      size_t extra_reservation_size,
-      /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
-      /*out*/MemMap* extra_reservation,
-      /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
+  bool LoadFromDalvikCache(size_t extra_reservation_size,
+                           /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
+                           /*out*/MemMap* extra_reservation,
+                           /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   bool LoadImage(
@@ -3305,7 +3302,6 @@ class ImageSpace::BootImageLoader {
 };
 
 bool ImageSpace::BootImageLoader::LoadFromSystem(
-    bool validate_oat_file,
     size_t extra_reservation_size,
     /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
     /*out*/MemMap* extra_reservation,
@@ -3318,7 +3314,7 @@ bool ImageSpace::BootImageLoader::LoadFromSystem(
   }
 
   if (!LoadImage(layout,
-                 validate_oat_file,
+                 /*validate_oat_file=*/ false,
                  extra_reservation_size,
                  &logger,
                  boot_image_spaces,
@@ -3336,7 +3332,6 @@ bool ImageSpace::BootImageLoader::LoadFromSystem(
 }
 
 bool ImageSpace::BootImageLoader::LoadFromDalvikCache(
-    bool validate_oat_file,
     size_t extra_reservation_size,
     /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
     /*out*/MemMap* extra_reservation,
@@ -3349,7 +3344,7 @@ bool ImageSpace::BootImageLoader::LoadFromDalvikCache(
     return false;
   }
   if (!LoadImage(layout,
-                 validate_oat_file,
+                 /*validate_oat_file=*/ true,
                  extra_reservation_size,
                  &logger,
                  boot_image_spaces,
@@ -3372,7 +3367,6 @@ bool ImageSpace::IsBootClassPathOnDisk(InstructionSet image_isa) {
                          ArrayRef<const std::string>(runtime->GetBootClassPath()),
                          ArrayRef<const std::string>(runtime->GetBootClassPathLocations()));
   const std::string image_location = layout.GetPrimaryImageLocation();
-  ImageSpaceLoadingOrder order = runtime->GetImageSpaceLoadingOrder();
   std::unique_ptr<ImageHeader> image_header;
   std::string error_msg;
 
@@ -3391,9 +3385,7 @@ bool ImageSpace::IsBootClassPathOnDisk(InstructionSet image_isa) {
                         &has_cache,
                         &is_global_cache)) {
     DCHECK(has_system || has_cache);
-    const std::string& filename = (order == ImageSpaceLoadingOrder::kSystemFirst)
-        ? (has_system ? system_filename : cache_filename)
-        : (has_cache ? cache_filename : system_filename);
+    const std::string& filename = (has_system ? system_filename : cache_filename);
     image_header = ReadSpecificImageHeader(filename.c_str(), &error_msg);
   }
 
@@ -3405,7 +3397,6 @@ bool ImageSpace::LoadBootImage(
     const std::vector<std::string>& boot_class_path_locations,
     const std::string& image_location,
     const InstructionSet image_isa,
-    ImageSpaceLoadingOrder order,
     bool relocate,
     bool executable,
     bool is_zygote,
@@ -3436,48 +3427,25 @@ bool ImageSpace::LoadBootImage(
   // Collect all the errors.
   std::vector<std::string> error_msgs;
 
-  auto try_load_from = [&](auto has_fn, auto load_fn, bool validate_oat_file) {
-    if ((loader.*has_fn)()) {
-      std::string local_error_msg;
-      if ((loader.*load_fn)(validate_oat_file,
-                            extra_reservation_size,
-                            boot_image_spaces,
-                            extra_reservation,
-                            &local_error_msg)) {
-        return true;
-      }
-      error_msgs.push_back(local_error_msg);
-    }
-    return false;
-  };
-
-  auto try_load_from_system = [&]() {
-    // Validate the oat files if the loading order checks data first. Otherwise assume system
-    // integrity.
-    return try_load_from(&BootImageLoader::HasSystem,
-                         &BootImageLoader::LoadFromSystem,
-                         /*validate_oat_file=*/ order != ImageSpaceLoadingOrder::kSystemFirst);
-  };
-  auto try_load_from_cache = [&]() {
-    // Always validate oat files from the dalvik cache.
-    return try_load_from(&BootImageLoader::HasCache,
-                         &BootImageLoader::LoadFromDalvikCache,
-                         /*validate_oat_file=*/ true);
-  };
-
-  auto invoke_sequentially = [](auto first, auto second) {
-    return first() || second();
-  };
-
-  // Step 1+2: Check system and cache images in the asked-for order.
-  if (order == ImageSpaceLoadingOrder::kSystemFirst) {
-    if (invoke_sequentially(try_load_from_system, try_load_from_cache)) {
+  std::string error_msg;
+  if (loader.HasSystem()) {
+    if (loader.LoadFromSystem(extra_reservation_size,
+                              boot_image_spaces,
+                              extra_reservation,
+                              &error_msg)) {
       return true;
     }
-  } else {
-    if (invoke_sequentially(try_load_from_cache, try_load_from_system)) {
+    error_msgs.push_back(error_msg);
+  }
+
+  if (loader.HasCache()) {
+    if (loader.LoadFromDalvikCache(extra_reservation_size,
+                                   boot_image_spaces,
+                                   extra_reservation,
+                                   &error_msg)) {
       return true;
     }
+    error_msgs.push_back(error_msg);
   }
 
   std::ostringstream oss;
@@ -3693,7 +3661,6 @@ bool ImageSpace::VerifyBootClassPathChecksums(std::string_view oat_checksums,
                                               ArrayRef<const std::string> boot_class_path_locations,
                                               ArrayRef<const std::string> boot_class_path,
                                               InstructionSet image_isa,
-                                              ImageSpaceLoadingOrder order,
                                               /*out*/std::string* error_msg) {
   if (oat_checksums.empty() || oat_boot_class_path.empty()) {
     *error_msg = oat_checksums.empty() ? "Empty checksums." : "Empty boot class path.";
@@ -3736,8 +3703,7 @@ bool ImageSpace::VerifyBootClassPathChecksums(std::string_view oat_checksums,
     }
 
     DCHECK(has_system || has_cache);
-    bool use_system = (order == ImageSpaceLoadingOrder::kSystemFirst) ? has_system : !has_cache;
-    bool image_checksums_ok = use_system
+    bool image_checksums_ok = has_system
         ? layout.ValidateFromSystem(image_isa, &oat_checksums, error_msg)
         : layout.ValidateFromDalvikCache(cache_filename, &oat_checksums, error_msg);
     if (!image_checksums_ok) {

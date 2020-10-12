@@ -173,11 +173,6 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       .Define("-Xbootclasspath-locations:_")
           .WithType<ParseStringList<':'>>()  // std::vector<std::string>, split by :
           .IntoKey(M::BootClassPathLocations)
-      .Define("-Ximage-load-order:_")
-          .WithType<gc::space::ImageSpaceLoadingOrder>()
-          .WithValueMap({{"system", gc::space::ImageSpaceLoadingOrder::kSystemFirst},
-                         {"data", gc::space::ImageSpaceLoadingOrder::kDataFirst}})
-          .IntoKey(M::ImageSpaceLoadingOrder)
       .Define("-Xjniopts:forcecopy")
           .IntoKey(M::JniOptsForceCopy)
       .Define("-XjdwpProvider:_")
