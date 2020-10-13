@@ -229,7 +229,9 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasJitCompiledCode(JNIEnv* env,
   return jit->GetCodeCache()->ContainsMethod(method);
 }
 
-static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::mutator_lock_) {
+static void ForceJitCompiled(Thread* self,
+                             ArtMethod* method,
+                             CompilationKind kind) REQUIRES(!Locks::mutator_lock_) {
   {
     ScopedObjectAccess soa(self);
     if (!Runtime::Current()->GetRuntimeCallbacks()->IsMethodSafeToJit(method)) {
@@ -271,10 +273,9 @@ static void ForceJitCompiled(Thread* self, ArtMethod* method) REQUIRES(!Locks::m
     usleep(1000);
     ScopedObjectAccess soa(self);
     // Will either ensure it's compiled or do the compilation itself. We do
-    // this before checking if we will execute JIT code to make sure the
-    // method is compiled 'optimized' and not baseline (tests expect optimized
-    // compilation).
-    jit->CompileMethod(method, self, CompilationKind::kOptimized, /*prejit=*/ false);
+    // this before checking if we will execute JIT code in case the request
+    // is for an 'optimized' compilation.
+    jit->CompileMethod(method, self, kind, /*prejit=*/ false);
   } while (!code_cache->ContainsPc(method->GetEntryPointFromQuickCompiledCode()));
 }
 
@@ -290,7 +291,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureMethodJitCompiled(JNIEnv*, jcl
     ScopedObjectAccess soa(self);
     method = ArtMethod::FromReflectedMethod(soa, meth);
   }
-  ForceJitCompiled(self, method);
+  ForceJitCompiled(self, method, CompilationKind::kOptimized);
 }
 
 extern "C" JNIEXPORT void JNICALL Java_Main_ensureJitCompiled(JNIEnv* env,
@@ -310,7 +311,27 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureJitCompiled(JNIEnv* env,
     ScopedUtfChars chars(env, method_name);
     method = GetMethod(soa, cls, chars);
   }
-  ForceJitCompiled(self, method);
+  ForceJitCompiled(self, method, CompilationKind::kOptimized);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_Main_ensureJitBaselineCompiled(JNIEnv* env,
+                                                                      jclass,
+                                                                      jclass cls,
+                                                                      jstring method_name) {
+  jit::Jit* jit = GetJitIfEnabled();
+  if (jit == nullptr) {
+    return;
+  }
+
+  Thread* self = Thread::Current();
+  ArtMethod* method = nullptr;
+  {
+    ScopedObjectAccess soa(self);
+
+    ScopedUtfChars chars(env, method_name);
+    method = GetMethod(soa, cls, chars);
+  }
+  ForceJitCompiled(self, method, CompilationKind::kBaseline);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasSingleImplementation(JNIEnv* env,
