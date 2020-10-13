@@ -63,6 +63,9 @@ public class Main {
   }
 
   public static void test() {
+    ensureJitBaselineCompiled(Main.class, "$noinline$stringEquals");
+    ensureJitBaselineCompiled(Main.class, "$noinline$inlineMonomorphic");
+    ensureJitBaselineCompiled(Main.class, "$noinline$knownReceiverType");
     // Warm up inline cache.
     for (int i = 0; i < 600000; i++) {
       $noinline$inlineMonomorphic(str);
@@ -91,5 +94,6 @@ public class Main {
 
   static String str = "xyz";
 
+  private static native void ensureJitBaselineCompiled(Class<?> itf, String method_name);
   private static native void ensureJitCompiled(Class<?> itf, String method_name);
 }
