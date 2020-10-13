@@ -18,7 +18,6 @@
 #define ART_RUNTIME_ENTRYPOINTS_QUICK_QUICK_ENTRYPOINTS_ENUM_H_
 
 #include "quick_entrypoints.h"
-#include "quick_entrypoints_enum.h"
 #include "thread.h"
 
 namespace art {
