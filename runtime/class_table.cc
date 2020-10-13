@@ -56,7 +56,7 @@ ObjPtr<mirror::Class> ClassTable::UpdateClass(const char* descriptor,
   // Should only be updating latest table.
   DescriptorHashPair pair(descriptor, hash);
   auto existing_it = classes_.back().FindWithHash(pair, hash);
-  if (kIsDebugBuild && existing_it == classes_.back().end()) {
+  if (existing_it == classes_.back().end()) {
     for (const ClassSet& class_set : classes_) {
       if (class_set.FindWithHash(pair, hash) != class_set.end()) {
         LOG(FATAL) << "Updating class found in frozen table " << descriptor;
