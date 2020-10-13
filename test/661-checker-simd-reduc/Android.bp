@@ -6,6 +6,7 @@
 java_test {
     name: "art-run-test-661-checker-simd-reduc",
     defaults: ["art-run-test-defaults"],
+    test_config_template: ":art-run-test-target-no-test-suite-tag-template",
     srcs: ["src/**/*.java"],
     data: [":art-run-test-661-checker-simd-reduc-expected"],
     // Include the Java source files in the test's artifacts, to make Checker assertions
