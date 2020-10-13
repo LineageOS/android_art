@@ -35,7 +35,6 @@
 #include "gc/collector/iteration.h"
 #include "gc/collector_type.h"
 #include "gc/gc_cause.h"
-#include "gc/space/image_space_loading_order.h"
 #include "gc/space/large_object_space.h"
 #include "handle.h"
 #include "obj_ptr.h"
@@ -225,8 +224,7 @@ class Heap {
        bool use_generational_cc,
        uint64_t min_interval_homogeneous_space_compaction_by_oom,
        bool dump_region_info_before_gc,
-       bool dump_region_info_after_gc,
-       space::ImageSpaceLoadingOrder image_space_loading_order);
+       bool dump_region_info_after_gc);
 
   ~Heap();
 
@@ -392,23 +390,6 @@ class Heap {
   void CountInstances(const std::vector<Handle<mirror::Class>>& classes,
                       bool use_is_assignable_from,
                       uint64_t* counts)
-      REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Implements VMDebug.getInstancesOfClasses and JDWP RT_Instances.
-  void GetInstances(VariableSizedHandleScope& scope,
-                    Handle<mirror::Class> c,
-                    bool use_is_assignable_from,
-                    int32_t max_count,
-                    std::vector<Handle<mirror::Object>>& instances)
-      REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Implements JDWP OR_ReferringObjects.
-  void GetReferringObjects(VariableSizedHandleScope& scope,
-                           Handle<mirror::Object> o,
-                           int32_t max_count,
-                           std::vector<Handle<mirror::Object>>& referring_objects)
       REQUIRES(!Locks::heap_bitmap_lock_, !*gc_complete_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 

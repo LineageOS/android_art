@@ -188,14 +188,12 @@ bool JitCompiler::CompileMethod(
                                           : "Compiling baseline",
                                   &logger);
     JitCodeCache* const code_cache = runtime->GetJit()->GetCodeCache();
-    uint64_t start_ns = NanoTime();
+    metrics::AutoTimer timer{runtime->GetMetrics()->JitMethodCompileTime()};
     success = compiler_->JitCompile(
         self, code_cache, region, method, compilation_kind, jit_logger_.get());
-    uint64_t duration_ns = NanoTime() - start_ns;
-    VLOG(jit) << "Compilation of "
-              << method->PrettyMethod()
-              << " took "
-              << PrettyDuration(duration_ns);
+    uint64_t duration_us = timer.Stop();
+    VLOG(jit) << "Compilation of " << method->PrettyMethod() << " took "
+              << PrettyDuration(UsToNs(duration_us));
   }
 
   // Trim maps to reduce memory usage.

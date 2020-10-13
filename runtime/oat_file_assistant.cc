@@ -621,7 +621,6 @@ bool OatFileAssistant::ValidateBootClassPathChecksums(const OatFile& oat_file) {
       ArrayRef<const std::string>(runtime->GetBootClassPathLocations()),
       ArrayRef<const std::string>(runtime->GetBootClassPath()),
       isa_,
-      runtime->GetImageSpaceLoadingOrder(),
       &error_msg);
   if (!result) {
     VLOG(oat) << "Failed to verify checksums of oat file " << oat_file.GetLocation()
