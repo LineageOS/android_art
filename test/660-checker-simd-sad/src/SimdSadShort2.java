@@ -158,8 +158,8 @@ public class SimdSadShort2 {
   /// CHECK-DAG: <<Cons1:i\d+>>  IntConstant 1                  loop:none
   /// CHECK-DAG: <<Phi2:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<BC1:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<BC2:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<BC1:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>      outer_loop:none
+  /// CHECK-DAG: <<BC2:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>>   ArrayGet [{{l\d+}},<<BC1>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:c\d+>>   ArrayGet [{{l\d+}},<<BC2>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Cnv1:s\d+>>   TypeConversion [<<Get1>>]      loop:<<Loop>>      outer_loop:none
@@ -211,8 +211,8 @@ public class SimdSadShort2 {
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 0                 loop:none
   /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Phi2:j\d+>>   Phi [<<ConsL>>,{{j\d+}}]       loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<BC1:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
-  /// CHECK-DAG: <<BC2:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
+  /// CHECK-DAG: <<BC1:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
+  /// CHECK-DAG: <<BC2:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>>   ArrayGet [{{l\d+}},<<BC1>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:c\d+>>   ArrayGet [{{l\d+}},<<BC2>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Cnv1:s\d+>>   TypeConversion [<<Get1>>]      loop:<<Loop>>      outer_loop:none
@@ -267,8 +267,8 @@ public class SimdSadShort2 {
   /// CHECK-DAG: <<ConsL:j\d+>>  LongConstant 1                 loop:none
   /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Phi2:j\d+>>   Phi [<<ConsL>>,{{j\d+}}]       loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<BC1:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
-  /// CHECK-DAG: <<BC2:\i\d+>>   BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
+  /// CHECK-DAG: <<BC1:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
+  /// CHECK-DAG: <<BC2:i\d+>>    BoundsCheck [<<Phi1>>,{{i\d+}}] loop:<<Loop>>     outer_loop:none
   /// CHECK-DAG: <<Get1:c\d+>>   ArrayGet [{{l\d+}},<<BC1>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Get2:c\d+>>   ArrayGet [{{l\d+}},<<BC2>>]    loop:<<Loop>>      outer_loop:none
   /// CHECK-DAG: <<Cnv1:s\d+>>   TypeConversion [<<Get1>>]      loop:<<Loop>>      outer_loop:none
