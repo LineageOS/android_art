@@ -244,6 +244,30 @@ static constexpr InterpreterImplKind kInterpreterImplKind = kSwitchImplKind;
 static constexpr InterpreterImplKind kInterpreterImplKind = kMterpImplKind;
 #endif
 
+static JValue ExecuteSwitch(Thread* self,
+                            const CodeItemDataAccessor& accessor,
+                            ShadowFrame& shadow_frame,
+                            JValue result_register,
+                            bool interpret_one_instruction) REQUIRES_SHARED(Locks::mutator_lock_) {
+  if (Runtime::Current()->IsActiveTransaction()) {
+    if (shadow_frame.GetMethod()->SkipAccessChecks()) {
+      return ExecuteSwitchImpl<false, true>(
+          self, accessor, shadow_frame, result_register, interpret_one_instruction);
+    } else {
+      return ExecuteSwitchImpl<true, true>(
+          self, accessor, shadow_frame, result_register, interpret_one_instruction);
+    }
+  } else {
+    if (shadow_frame.GetMethod()->SkipAccessChecks()) {
+      return ExecuteSwitchImpl<false, false>(
+          self, accessor, shadow_frame, result_register, interpret_one_instruction);
+    } else {
+      return ExecuteSwitchImpl<true, false>(
+          self, accessor, shadow_frame, result_register, interpret_one_instruction);
+    }
+  }
+}
+
 static inline JValue Execute(
     Thread* self,
     const CodeItemDataAccessor& accessor,
@@ -341,72 +365,39 @@ static inline JValue Execute(
   // reduction of template parameters, we gate it behind access-checks mode.
   DCHECK(!method->SkipAccessChecks() || !method->MustCountLocks());
 
-  bool transaction_active = Runtime::Current()->IsActiveTransaction();
   VLOG(interpreter) << "Interpreting " << method->PrettyMethod();
-  if (LIKELY(method->SkipAccessChecks())) {
-    // Enter the "without access check" interpreter.
-    if (kInterpreterImplKind == kMterpImplKind) {
-      if (transaction_active) {
-        // No Mterp variant - just use the switch interpreter.
-        return ExecuteSwitchImpl<false, true>(self, accessor, shadow_frame, result_register,
-                                              false);
-      } else if (UNLIKELY(!Runtime::Current()->IsStarted())) {
-        return ExecuteSwitchImpl<false, false>(self, accessor, shadow_frame, result_register,
-                                               false);
-      } else {
-        while (true) {
-          // Mterp does not support all instrumentation/debugging.
-          if (!self->UseMterp()) {
-            return ExecuteSwitchImpl<false, false>(self, accessor, shadow_frame, result_register,
-                                                   false);
-          }
-          bool returned = ExecuteMterpImpl(self,
-                                           accessor.Insns(),
-                                           &shadow_frame,
-                                           &result_register);
-          if (returned) {
-            return result_register;
-          } else {
-            // Mterp didn't like that instruction.  Single-step it with the reference interpreter.
-            result_register = ExecuteSwitchImpl<false, false>(self, accessor, shadow_frame,
-                                                              result_register, true);
-            if (shadow_frame.GetDexPC() == dex::kDexNoIndex) {
-              // Single-stepped a return or an exception not handled locally.  Return to caller.
-              return result_register;
-            }
-          }
-        }
-      }
-    } else {
-      DCHECK_EQ(kInterpreterImplKind, kSwitchImplKind);
-      if (transaction_active) {
-        return ExecuteSwitchImpl<false, true>(self, accessor, shadow_frame, result_register,
-                                              false);
-      } else {
-        return ExecuteSwitchImpl<false, false>(self, accessor, shadow_frame, result_register,
-                                               false);
-      }
-    }
-  } else {
-    // Enter the "with access check" interpreter.
 
-    if (kInterpreterImplKind == kMterpImplKind) {
-      // No access check variants for Mterp.  Just use the switch version.
-      if (transaction_active) {
-        return ExecuteSwitchImpl<true, true>(self, accessor, shadow_frame, result_register,
-                                             false);
-      } else {
-        return ExecuteSwitchImpl<true, false>(self, accessor, shadow_frame, result_register,
-                                              false);
-      }
+  // Note that mterp doesn't support non-compilable methods, nor methods on
+  // which we must count locks.
+  if (kInterpreterImplKind == kSwitchImplKind ||
+      UNLIKELY(!Runtime::Current()->IsStarted()) ||
+      !method->IsCompilable() ||
+      method->MustCountLocks() ||
+      Runtime::Current()->IsActiveTransaction()) {
+    return ExecuteSwitch(
+        self, accessor, shadow_frame, result_register, /*interpret_one_instruction=*/ false);
+  }
+
+  CHECK_EQ(kInterpreterImplKind, kMterpImplKind);
+  while (true) {
+    // Mterp does not support all instrumentation/debugging.
+    if (!self->UseMterp()) {
+      return ExecuteSwitch(
+          self, accessor, shadow_frame, result_register, /*interpret_one_instruction=*/ false);
+    }
+    bool returned = ExecuteMterpImpl(self,
+                                     accessor.Insns(),
+                                     &shadow_frame,
+                                     &result_register);
+    if (returned) {
+      return result_register;
     } else {
-      DCHECK_EQ(kInterpreterImplKind, kSwitchImplKind);
-      if (transaction_active) {
-        return ExecuteSwitchImpl<true, true>(self, accessor, shadow_frame, result_register,
-                                             false);
-      } else {
-        return ExecuteSwitchImpl<true, false>(self, accessor, shadow_frame, result_register,
-                                              false);
+      // Mterp didn't like that instruction.  Single-step it with the reference interpreter.
+      result_register = ExecuteSwitch(
+          self, accessor, shadow_frame, result_register, /*interpret_one_instruction=*/ true);
+      if (shadow_frame.GetDexPC() == dex::kDexNoIndex) {
+        // Single-stepped a return or an exception not handled locally.  Return to caller.
+        return result_register;
       }
     }
   }

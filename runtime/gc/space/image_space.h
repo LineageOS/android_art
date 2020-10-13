@@ -19,7 +19,6 @@
 
 #include "gc/accounting/space_bitmap.h"
 #include "image.h"
-#include "image_space_loading_order.h"
 #include "space.h"
 
 namespace art {
@@ -83,8 +82,7 @@ class ImageSpace : public MemMapSpace {
   //     <search-path>/*
   //     *
   // where the second form means that the path of a particular BCP component
-  // should be used to search for that component's boot image extension. These
-  // paths will be searched in the specifed order.
+  // should be used to search for that component's boot image extension.
   //
   // The actual filename shall be derived from the specified locations using
   // `GetSystemImageFilename()` or `GetDalvikCacheFilename()`.
@@ -128,7 +126,6 @@ class ImageSpace : public MemMapSpace {
       const std::vector<std::string>& boot_class_path_locations,
       const std::string& image_location,
       const InstructionSet image_isa,
-      ImageSpaceLoadingOrder order,
       bool relocate,
       bool executable,
       bool is_zygote,
@@ -237,7 +234,6 @@ class ImageSpace : public MemMapSpace {
                                            ArrayRef<const std::string> boot_class_path_locations,
                                            ArrayRef<const std::string> boot_class_path,
                                            InstructionSet image_isa,
-                                           ImageSpaceLoadingOrder order,
                                            /*out*/std::string* error_msg);
 
   // Returns whether the oat checksums and boot class path description are valid

@@ -39,19 +39,23 @@ def ParseArguments():
                       help="Run tests for the specified target architecture.")
   parser.add_argument("--debuggable", action="store_true",
                       help="Run tests for debuggable code.")
+  parser.add_argument("--print-cfg", action="store_true", default="True", dest="print_cfg",
+                      help="Print the whole cfg file in case of test failure (default)")
+  parser.add_argument("--no-print-cfg", action="store_false", default="True", dest="print_cfg",
+                      help="Don't print the whole cfg file in case of test failure")
   parser.add_argument("-q", "--quiet", action="store_true",
                       help="print only errors")
   return parser.parse_args()
 
 
 def ListPasses(outputFilename):
-  c1File = ParseC1visualizerStream(os.path.basename(outputFilename), open(outputFilename, "r"))
+  c1File = ParseC1visualizerStream(outputFilename, open(outputFilename, "r"))
   for compiler_pass in c1File.passes:
     Logger.log(compiler_pass.name)
 
 
 def DumpPass(outputFilename, passName):
-  c1File = ParseC1visualizerStream(os.path.basename(outputFilename), open(outputFilename, "r"))
+  c1File = ParseC1visualizerStream(outputFilename, open(outputFilename, "r"))
   compiler_pass = c1File.findPass(passName)
   if compiler_pass:
     maxLineNo = compiler_pass.startLineNo + len(compiler_pass.body)
@@ -85,14 +89,14 @@ def FindCheckerFiles(path):
     Logger.fail("Source path \"" + path + "\" not found")
 
 
-def RunTests(checkPrefix, checkPath, outputFilename, targetArch, debuggableMode):
-  c1File = ParseC1visualizerStream(os.path.basename(outputFilename), open(outputFilename, "r"))
+def RunTests(checkPrefix, checkPath, outputFilename, targetArch, debuggableMode, printCfg):
+  c1File = ParseC1visualizerStream(outputFilename, open(outputFilename, "r"))
   for checkFilename in FindCheckerFiles(checkPath):
     checkerFile = ParseCheckerStream(os.path.basename(checkFilename),
                                      checkPrefix,
                                      open(checkFilename, "r"),
                                      targetArch)
-    MatchFiles(checkerFile, c1File, targetArch, debuggableMode)
+    MatchFiles(checkerFile, c1File, targetArch, debuggableMode, printCfg)
 
 
 if __name__ == "__main__":
@@ -106,4 +110,5 @@ if __name__ == "__main__":
   elif args.dump_pass:
     DumpPass(args.tested_file, args.dump_pass)
   else:
-    RunTests(args.check_prefix, args.source_path, args.tested_file, args.arch, args.debuggable)
+    RunTests(args.check_prefix, args.source_path, args.tested_file, args.arch, args.debuggable,
+             args.print_cfg)

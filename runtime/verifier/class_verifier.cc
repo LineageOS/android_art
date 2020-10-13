@@ -305,7 +305,7 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
     failure_data.Merge(result);
   }
   uint64_t elapsed_time_microseconds = timer.Stop();
-  VLOG(verifier) << "VerifyClass took " << PrettyDuration(elapsed_time_microseconds * 1000)
+  VLOG(verifier) << "VerifyClass took " << PrettyDuration(UsToNs(elapsed_time_microseconds))
                  << ", class: " << PrettyDescriptor(dex_file->GetClassDescriptor(class_def));
 
   if (failure_data.kind == FailureKind::kNoFailure) {

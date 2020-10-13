@@ -96,12 +96,16 @@ def __parseC1Line(c1File, line, lineNo, state, fileName):
     else:
       Logger.fail("C1visualizer line not inside a group", fileName, lineNo)
 
+
 def ParseC1visualizerStream(fileName, stream):
   c1File = C1visualizerFile(fileName)
   state = C1ParserState()
-  fnProcessLine = lambda line, lineNo: __parseC1Line(c1File, line, lineNo, state, fileName)
-  fnLineOutsideChunk = lambda line, lineNo: \
-      Logger.fail("C1visualizer line not inside a group", fileName, lineNo)
+
+  def fnProcessLine(line, lineNo):
+    return __parseC1Line(c1File, line, lineNo, state, c1File.baseFileName)
+
+  def fnLineOutsideChunk(line, lineNo):
+    Logger.fail("C1visualizer line not inside a group", c1File.baseFileName, lineNo)
   for passName, passLines, startLineNo, testArch in \
       SplitStream(stream, fnProcessLine, fnLineOutsideChunk):
     C1visualizerPass(c1File, passName, passLines, startLineNo + 1)

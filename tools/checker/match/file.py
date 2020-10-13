@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections                      import namedtuple
-from common.immutables                import ImmutableDict
-from common.logger                    import Logger
-from file_format.c1visualizer.struct  import C1visualizerFile, C1visualizerPass
-from file_format.checker.struct       import CheckerFile, TestCase, TestStatement
-from match.line                       import MatchLines, EvaluateLine
+from collections import namedtuple
+
+from common.immutables import ImmutableDict
+from common.logger import Logger
+from file_format.checker.struct import TestStatement
+from match.line import MatchLines, EvaluateLine
 
 MatchScope = namedtuple("MatchScope", ["start", "end"])
 MatchInfo = namedtuple("MatchInfo", ["scope", "variables"])
@@ -324,7 +324,7 @@ def MatchTestCase(testCase, c1Pass, instructionSetFeatures):
   for statement in testStatements:
     state.handle(statement)
 
-def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
+def MatchFiles(checkerFile, c1File, targetArch, debuggableMode, printCfg):
   for testCase in checkerFile.testCases:
     if testCase.testArch not in [None, targetArch]:
       continue
@@ -336,10 +336,10 @@ def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
     # match a check group against the first output group of the same name.
     c1Pass = c1File.findPass(testCase.name)
     if c1Pass is None:
-      with file(c1File.fileName) as cfgFile:
+      with file(c1File.fullFileName) as cfgFile:
         Logger.log(''.join(cfgFile), Logger.Level.Error)
       Logger.fail("Test case not found in the CFG file",
-                  testCase.fileName, testCase.startLineNo, testCase.name)
+                  testCase.fullFileName, testCase.startLineNo, testCase.name)
 
     Logger.startTest(testCase.name)
     try:
@@ -352,4 +352,7 @@ def MatchFiles(checkerFile, c1File, targetArch, debuggableMode):
       else:
         msg = "Statement could not be matched starting from line {}"
       msg = msg.format(lineNo)
+      if printCfg:
+        with file(c1File.fullFileName) as cfgFile:
+          Logger.log(''.join(cfgFile), Logger.Level.Error)
       Logger.testFailed(msg, e.statement, e.variables)

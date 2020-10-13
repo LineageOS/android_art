@@ -159,61 +159,45 @@ bool CanUseMterp()
       (runtime->GetJit() == nullptr || !runtime->GetJit()->JitAtFirstUse());
 }
 
-
-extern "C" size_t MterpInvokeVirtual(Thread* self,
-                                     ShadowFrame* shadow_frame,
-                                     uint16_t* dex_pc_ptr,
-                                     uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kVirtual, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
+#define MTERP_INVOKE(Name)                                                                         \
+extern "C" size_t MterpInvoke##Name(Thread* self,                                                  \
+                                    ShadowFrame* shadow_frame,                                     \
+                                    uint16_t* dex_pc_ptr,                                          \
+                                    uint16_t inst_data)                                            \
+    REQUIRES_SHARED(Locks::mutator_lock_) {                                                        \
+  JValue* result_register = shadow_frame->GetResultRegister();                                     \
+  const Instruction* inst = Instruction::At(dex_pc_ptr);                                           \
+  if (shadow_frame->GetMethod()->SkipAccessChecks()) {                                             \
+    return DoInvoke<k##Name, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>( \
+        self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;                          \
+  } else {                                                                                         \
+    return DoInvoke<k##Name, /*is_range=*/ false, /*do_access_check=*/ true, /*is_mterp=*/ true>(  \
+        self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;                          \
+  }                                                                                                \
+}                                                                                                  \
+extern "C" size_t MterpInvoke##Name##Range(Thread* self,                                           \
+                                           ShadowFrame* shadow_frame,                              \
+                                           uint16_t* dex_pc_ptr,                                   \
+                                           uint16_t inst_data)                                     \
+    REQUIRES_SHARED(Locks::mutator_lock_) {                                                        \
+  JValue* result_register = shadow_frame->GetResultRegister();                                     \
+  const Instruction* inst = Instruction::At(dex_pc_ptr);                                           \
+  if (shadow_frame->GetMethod()->SkipAccessChecks()) {                                             \
+    return DoInvoke<k##Name, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(  \
+        self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;                          \
+  } else {                                                                                         \
+    return DoInvoke<k##Name, /*is_range=*/ true, /*do_access_check=*/ true, /*is_mterp=*/ true>(   \
+        self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;                          \
+  }                                                                                                \
 }
 
-extern "C" size_t MterpInvokeSuper(Thread* self,
-                                   ShadowFrame* shadow_frame,
-                                   uint16_t* dex_pc_ptr,
-                                   uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kSuper, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
+MTERP_INVOKE(Virtual)
+MTERP_INVOKE(Super)
+MTERP_INVOKE(Interface)
+MTERP_INVOKE(Direct)
+MTERP_INVOKE(Static)
 
-extern "C" size_t MterpInvokeInterface(Thread* self,
-                                       ShadowFrame* shadow_frame,
-                                       uint16_t* dex_pc_ptr,
-                                       uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kInterface, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeDirect(Thread* self,
-                                    ShadowFrame* shadow_frame,
-                                    uint16_t* dex_pc_ptr,
-                                    uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kDirect, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeStatic(Thread* self,
-                                    ShadowFrame* shadow_frame,
-                                    uint16_t* dex_pc_ptr,
-                                    uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kStatic, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
+#undef MTERP_INVOKE
 
 extern "C" size_t MterpInvokeCustom(Thread* self,
                                     ShadowFrame* shadow_frame,
@@ -234,61 +218,6 @@ extern "C" size_t MterpInvokePolymorphic(Thread* self,
   JValue* result_register = shadow_frame->GetResultRegister();
   const Instruction* inst = Instruction::At(dex_pc_ptr);
   return DoInvokePolymorphic</* is_range= */ false>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeVirtualRange(Thread* self,
-                                          ShadowFrame* shadow_frame,
-                                          uint16_t* dex_pc_ptr,
-                                          uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kVirtual, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeSuperRange(Thread* self,
-                                        ShadowFrame* shadow_frame,
-                                        uint16_t* dex_pc_ptr,
-                                        uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kSuper, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeInterfaceRange(Thread* self,
-                                            ShadowFrame* shadow_frame,
-                                            uint16_t* dex_pc_ptr,
-                                            uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kInterface, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeDirectRange(Thread* self,
-                                         ShadowFrame* shadow_frame,
-                                         uint16_t* dex_pc_ptr,
-                                         uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kDirect, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(
-      self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeStaticRange(Thread* self,
-                                         ShadowFrame* shadow_frame,
-                                         uint16_t* dex_pc_ptr,
-                                         uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kStatic, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true>(
       self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
 }
 
@@ -358,11 +287,12 @@ extern "C" size_t MterpConstClass(uint32_t index,
                                   ShadowFrame* shadow_frame,
                                   Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(index),
-                                                   shadow_frame->GetMethod(),
-                                                   self,
-                                                   /* can_run_clinit= */ false,
-                                                   /* verify_access= */ false);
+  ObjPtr<mirror::Class> c =
+      ResolveVerifyAndClinit(dex::TypeIndex(index),
+                             shadow_frame->GetMethod(),
+                             self,
+                             /* can_run_clinit= */ false,
+                             !shadow_frame->GetMethod()->SkipAccessChecks());
   if (UNLIKELY(c == nullptr)) {
     return 1u;
   }
@@ -402,11 +332,12 @@ extern "C" size_t MterpCheckCast(uint32_t index,
                                  art::ArtMethod* method,
                                  Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(index),
-                                                   method,
-                                                   self,
-                                                   false,
-                                                   false);
+  ObjPtr<mirror::Class> c =
+      ResolveVerifyAndClinit(dex::TypeIndex(index),
+                             method,
+                             self,
+                             /* can_run_clinit= */ false,
+                             !method->SkipAccessChecks());
   if (UNLIKELY(c == nullptr)) {
     return 1u;
   }
@@ -427,8 +358,8 @@ extern "C" size_t MterpInstanceOf(uint32_t index,
   ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(index),
                                                    method,
                                                    self,
-                                                   false,
-                                                   false);
+                                                   /* can_run_clinit= */ false,
+                                                   !method->SkipAccessChecks());
   if (UNLIKELY(c == nullptr)) {
     return 0u;  // Caller will check for pending exception.  Return value unimportant.
   }
@@ -447,11 +378,12 @@ extern "C" size_t MterpNewInstance(ShadowFrame* shadow_frame, Thread* self, uint
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Instruction* inst = Instruction::At(shadow_frame->GetDexPCPtr());
   ObjPtr<mirror::Object> obj = nullptr;
-  ObjPtr<mirror::Class> c = ResolveVerifyAndClinit(dex::TypeIndex(inst->VRegB_21c()),
-                                                   shadow_frame->GetMethod(),
-                                                   self,
-                                                   /* can_run_clinit= */ false,
-                                                   /* verify_access= */ false);
+  ObjPtr<mirror::Class> c =
+      ResolveVerifyAndClinit(dex::TypeIndex(inst->VRegB_21c()),
+                             shadow_frame->GetMethod(),
+                             self,
+                             /* can_run_clinit= */ false,
+                             !shadow_frame->GetMethod()->SkipAccessChecks());
   if (LIKELY(c != nullptr)) {
     if (UNLIKELY(c->IsStringClass())) {
       gc::AllocatorType allocator_type = Runtime::Current()->GetHeap()->GetCurrentAllocator();
@@ -710,7 +642,7 @@ ALWAYS_INLINE void MterpFieldAccess(Instruction* inst,
   }
 }
 
-template<typename PrimType, FindFieldType kAccessType>
+template<typename PrimType, FindFieldType kAccessType, bool do_access_checks>
 NO_INLINE bool MterpFieldAccessSlow(Instruction* inst,
                                     uint16_t inst_data,
                                     ShadowFrame* shadow_frame,
@@ -723,7 +655,7 @@ NO_INLINE bool MterpFieldAccessSlow(Instruction* inst,
   shadow_frame->SetDexPCPtr(reinterpret_cast<uint16_t*>(inst));
   ArtMethod* referrer = shadow_frame->GetMethod();
   uint32_t field_idx = kIsStatic ? inst->VRegB_21c() : inst->VRegC_22c();
-  ArtField* field = FindFieldFromCode<kAccessType, /* access_checks= */ false>(
+  ArtField* field = FindFieldFromCode<kAccessType, do_access_checks>(
       field_idx, referrer, self, sizeof(PrimType));
   if (UNLIKELY(field == nullptr)) {
     DCHECK(self->IsExceptionPending());
@@ -742,10 +674,7 @@ NO_INLINE bool MterpFieldAccessSlow(Instruction* inst,
 }
 
 // This methods is called from assembly to handle field access instructions.
-//
-// This method is fairly hot.  It is long, but it has been carefully optimized.
-// It contains only fully inlined methods -> no spills -> no prologue/epilogue.
-template<typename PrimType, FindFieldType kAccessType>
+template<typename PrimType, FindFieldType kAccessType, bool do_access_checks>
 ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
                                         uint16_t inst_data,
                                         ShadowFrame* shadow_frame,
@@ -764,7 +693,7 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
         : tls_value;
     if (kIsDebugBuild) {
       uint32_t field_idx = kIsStatic ? inst->VRegB_21c() : inst->VRegC_22c();
-      ArtField* field = FindFieldFromCode<kAccessType, /* access_checks= */ false>(
+      ArtField* field = FindFieldFromCode<kAccessType, do_access_checks>(
           field_idx, shadow_frame->GetMethod(), self, sizeof(PrimType));
       DCHECK_EQ(offset, field->GetOffset().SizeValue());
     }
@@ -780,7 +709,7 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
 
   // This effectively inlines the fast path from ArtMethod::GetDexCache.
   ArtMethod* referrer = shadow_frame->GetMethod();
-  if (LIKELY(!referrer->IsObsolete())) {
+  if (LIKELY(!referrer->IsObsolete() && !do_access_checks)) {
     // Avoid read barriers, since we need only the pointer to the native (non-movable)
     // DexCache field array which we can get even through from-space objects.
     ObjPtr<mirror::Class> klass = referrer->GetDeclaringClass<kWithoutReadBarrier>();
@@ -793,12 +722,14 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
     if (LIKELY(field != nullptr)) {
       bool visibly_initialized = !kIsStatic || field->GetDeclaringClass()->IsVisiblyInitialized();
       if (LIKELY(visibly_initialized)) {
-        DCHECK_EQ(field, (FindFieldFromCode<kAccessType, /* access_checks= */ false>(
+        DCHECK_EQ(field, (FindFieldFromCode<kAccessType, do_access_checks>(
             field_idx, referrer, self, sizeof(PrimType))));
         ObjPtr<mirror::Object> obj = kIsStatic
             ? field->GetDeclaringClass().Ptr()
             : shadow_frame->GetVRegReference(inst->VRegB_22c(inst_data));
-        if (LIKELY(kIsStatic || obj != nullptr)) {
+        // We check if nterp is supported as nterp and mterp use the cache in an
+        // incompatible way.
+        if (!IsNterpSupported() && LIKELY(kIsStatic || obj != nullptr)) {
           // Only non-volatile fields are allowed in the thread-local cache.
           if (LIKELY(!field->IsVolatile())) {
             if (kIsStatic) {
@@ -816,13 +747,18 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
   }
 
   // Slow path. Last and with identical arguments so that it becomes single instruction tail call.
-  return MterpFieldAccessSlow<PrimType, kAccessType>(inst, inst_data, shadow_frame, self);
+  return MterpFieldAccessSlow<PrimType, kAccessType, do_access_checks>(
+      inst, inst_data, shadow_frame, self);
 }
 
 #define MTERP_FIELD_ACCESSOR(Name, PrimType, AccessType)                                          \
 extern "C" bool Name(Instruction* inst, uint16_t inst_data, ShadowFrame* sf, Thread* self)        \
     REQUIRES_SHARED(Locks::mutator_lock_) {                                                       \
-  return MterpFieldAccessFast<PrimType, AccessType>(inst, inst_data, sf, self);                   \
+  if (sf->GetMethod()->SkipAccessChecks()) {                                                      \
+    return MterpFieldAccessFast<PrimType, AccessType, false>(inst, inst_data, sf, self);          \
+  } else {                                                                                        \
+    return MterpFieldAccessFast<PrimType, AccessType, true>(inst, inst_data, sf, self);           \
+  }                                                                                               \
 }
 
 #define MTERP_FIELD_ACCESSORS_FOR_TYPE(Sufix, PrimType, Kind)                                     \
