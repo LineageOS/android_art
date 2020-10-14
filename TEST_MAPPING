@@ -10,16 +10,17 @@
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
-    }
-  ],
-  "postsubmit": [
+    },
     // ART run-tests.
     {
       "name": "art-run-test-001-HelloWorld"
     },
     {
       "name": "art-run-test-001-Main"
-    },
+    }
+  ],
+  "postsubmit": [
+    // ART run-tests.
     {
       "name": "art-run-test-002-sleep"
     },
@@ -382,6 +383,9 @@
     },
     {
       "name": "art-run-test-2030-long-running-child"
+    },
+    {
+      "name": "art-run-test-2037-thread-name-inherit"
     },
     {
       "name": "art-run-test-300-package-override"
