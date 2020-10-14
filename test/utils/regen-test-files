@@ -28,6 +28,18 @@ fi
 
 me=$(basename "$0")
 
+# array_contains ELEMENT ARRAY
+# ----------------------------
+# Test whether ARRAY contains (at least one instance of) ELEMENT; return 0 if
+# true, and 1 otherwise.
+array_contains () {
+  for e in "${@:2}"
+  do
+    [[ "$e" == "$1" ]] && return 0
+  done
+  return 1
+}
+
 # Known failing tests.
 # TODO(rpl): Investigate and address the causes of failures.
 known_failing_tests=(
@@ -156,6 +168,7 @@ known_failing_tests=(
   art-run-test-2031-zygote-compiled-frame-deopt
   art-run-test-2033-shutdown-mechanics
   art-run-test-2036-jni-filechannel
+  art-run-test-2037-thread-name-inherit
   art-run-test-305-other-fault-handler
   art-run-test-449-checker-bce
   art-run-test-454-get-vreg
@@ -277,6 +290,12 @@ num_tests=0
 # List of tests for which a Blueprint file is generated.
 declare -a handled_tests
 
+# Test expected to succeed (complement of `known_failing_tests` in
+# `handled_tests`), and thus added to ART's `TEST_MAPPING` file, and also tagged
+# as part of TradeFed's `art-target-run-test` test suite via the
+# `test-suite-tag` option in their configuration file.
+declare -a expected_succeeding_tests
+
 # Regenerate Blueprint files.
 # ---------------------------
 
@@ -312,6 +331,28 @@ while read run_test; do
 
   run_test_name="art-run-test-$run_test"
 
+  # Record test name in `handled_tests`.
+  handled_tests+=("$run_test_name")
+
+  # Check whether the test is expected to fail and:
+  # 1. select the test configuration template (tagging the test as part of the
+  #    `art-target-run-test` test suite or not) based on its expected outcome;
+  # 2. if the test is not expected to fail, add it to
+  #    `expected_succeeding_tests`, so that it is included in ART's
+  #    `TEST_MAPPING` file (see below).
+  #
+  # Also temporarily consider Checker tests as known failing tests, as they
+  # currently break some test runs (see b/169852871).
+  # TODO(b/162408889): Complete Checker integration and re-include Checker
+  # tests in test mapping.
+  if array_contains "$run_test_name" "${known_failing_tests[@]}" \
+       || [[ "$run_test_name" =~ ^art-run-test-[0-9]+-checker- ]]; then
+    test_config_template="art-run-test-target-no-test-suite-tag-template"
+  else
+    test_config_template="art-run-test-target-template"
+    expected_succeeding_tests+=("$run_test_name")
+  fi
+
   if [[ "$run_test" =~ ^[0-9]+-checker- ]]; then
     include_src="    // Include the Java source files in the test's artifacts, to make Checker assertions
     // available to the TradeFed test runner.
@@ -330,6 +371,7 @@ while read run_test; do
 java_test {
     name: "$run_test_name",
     defaults: ["art-run-test-defaults"],
+    test_config_template: ":$test_config_template",
     srcs: ["src/**/*.java"],
     data: [":$run_test_name-expected"],
 $include_src}
@@ -342,9 +384,6 @@ genrule {
     cmd: "cp -f \$(in) \$(out)",
 }
 EOF
-
-  # Record test name.
-  handled_tests+=("$run_test_name")
 done <<< $(ls -1 $tests_dir | grep -E '^[0-9]{3,}-')
 
 handled_tests_percentage=$((${#handled_tests[@]} * 100 / num_tests))
@@ -356,20 +395,6 @@ echo "Generated Blueprint files for ${#handled_tests[@]} ART run-tests ouf of $n
 # -------------------------------
 
 # Note: We only include ART run-tests expected to succeed for now.
-
-# Complement of `known_failing_tests` in `handled_tests`.
-declare -a expected_succeeding_tests
-for run_test in "${handled_tests[@]}"; do
-  for fail in "${known_failing_tests[@]}"; do
-    [[ "$run_test" == "$fail" ]] && continue 2
-    # Also temporarily exclude Checker tests from test mapping, as they
-    # currently break some test runs (see b/169852871).
-    # TODO(b/162408889): Complete Checker integration and re-include Checker
-    # tests in test mapping.
-    [[ "$run_test" =~ ^art-run-test-[0-9]+-checker- ]] && continue 2
-  done
-  expected_succeeding_tests+=("$run_test")
-done
 
 # Prologue.
 cat >TEST_MAPPING <<EOF
