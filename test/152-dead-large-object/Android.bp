@@ -6,6 +6,7 @@
 java_test {
     name: "art-run-test-152-dead-large-object",
     defaults: ["art-run-test-defaults"],
+    test_config_template: ":art-run-test-target-template",
     srcs: ["src/**/*.java"],
     data: [":art-run-test-152-dead-large-object-expected"],
 }
