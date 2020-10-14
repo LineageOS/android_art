@@ -37,16 +37,33 @@ public class Main {
   /// CHECK-DAG: <<D9:d\d+>>   DoubleConstant 20
   /// CHECK-DAG: <<D10:d\d+>>  DoubleConstant 0
   //
-  /// CHECK-DAG:               VecReplicateScalar [<<C1>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<C2>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<C3>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<C4>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<C5>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<L6>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<F7>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<F8>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<D9>>]
-  /// CHECK-DAG:               VecReplicateScalar [<<D10>>]
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG:               VecReplicateScalar [<<C1>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C2>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C3>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C4>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C5>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<L6>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<F7>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<F8>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<D9>>,{{j\d+}}]
+  ///     CHECK-DAG:               VecReplicateScalar [<<D10>>,{{j\d+}}]
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:               VecReplicateScalar [<<C1>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C2>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C3>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C4>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<C5>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<L6>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<F7>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<F8>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<D9>>]
+  ///     CHECK-DAG:               VecReplicateScalar [<<D10>>]
+  //
+  /// CHECK-FI:
   private static void encodableConstants(byte[] b, short[] s, char[] c, int[] a, long[] l, float[] f, double[] d) {
     for (int i = 0; i < ARRAY_SIZE; i++) {
       b[i] += 1;
