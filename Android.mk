@@ -282,7 +282,7 @@ endif
 LOCAL_PATH := $(art_path)
 
 #######################
-# ART APEX.
+# ART APEX autoselect
 
 include $(CLEAR_VARS)
 
@@ -295,11 +295,11 @@ include $(CLEAR_VARS)
 #   both "release" and "debug" artifacts, as well as additional tools
 #   and ART gtests).
 #
-# The ART APEX module (`com.android.art`) is an "alias" for either the
-# release or the debug module. By default, "user" build variants contain
-# the release module, while "userdebug" and "eng" build variants contain
-# the debug module. However, if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD`
-# is defined, it overrides the previous logic:
+# `com.android.art-autoselect` is an "alias" for either the release or the debug
+# module. By default, "user" build variants contain the release module, while
+# "userdebug" and "eng" build variants contain the debug module. However, if
+# `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is defined, it overrides the previous
+# logic:
 # - if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is set to `false`, the
 #   build will include the release module (whatever the build
 #   variant);
@@ -323,7 +323,7 @@ else
   APEX_TEST_MODULE := art-check-release-apex-gen-fakebin
 endif
 
-LOCAL_MODULE := com.android.art
+LOCAL_MODULE := com.android.art-autoselect
 LOCAL_REQUIRED_MODULES := $(TARGET_ART_APEX)
 
 # Clear locally used variable.
@@ -332,7 +332,7 @@ art_target_include_debug_build :=
 include $(BUILD_PHONY_PACKAGE)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := com.android.art
+LOCAL_MODULE := com.android.art-autoselect
 LOCAL_IS_HOST_MODULE := true
 ifneq ($(HOST_OS),darwin)
   LOCAL_REQUIRED_MODULES += $(APEX_TEST_MODULE)
