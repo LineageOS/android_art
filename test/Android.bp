@@ -186,10 +186,25 @@ art_cc_library {
 
 // ART run-tests.
 
+// Test configuration template for ART run-tests on target expected to run
+// successfully, and as such tagged as part of TradeFed's `art-target-run-test`
+// test suite via the `test-suite-tag`.
 filegroup {
-    name: "art-run-test-template",
+    name: "art-run-test-target-template",
     srcs: [
-        "AndroidTestTemplate.xml",
+        "art-run-test-target-template.xml",
+    ],
+}
+
+// Test configuration template for ART run-tests on target expected to run
+// successfully, and as such *not* tagged as part of TradeFed's
+// `art-target-run-test` test suite via the `test-suite-tag`. This is as
+// temporary measure, while we add proper support for all ART (target) run-tests
+// to TradeFed (b/147818031).
+filegroup {
+    name: "art-run-test-target-no-test-suite-tag-template",
+    srcs: [
+        "art-run-test-target-no-test-suite-tag-template.xml",
     ],
 }
 
@@ -212,7 +227,6 @@ java_defaults {
         javacflags: ["-XepDisableAllChecks"],
     },
 
-    test_config_template: ":art-run-test-template",
     test_suites: [
         "general-tests",
         "mts",
