@@ -385,9 +385,6 @@
       "name": "art-run-test-2030-long-running-child"
     },
     {
-      "name": "art-run-test-2037-thread-name-inherit"
-    },
-    {
       "name": "art-run-test-300-package-override"
     },
     {
@@ -770,6 +767,9 @@
     },
     {
       "name": "art-run-test-806-TooWideClassInstanceOf"
+    },
+    {
+      "name": "art-run-test-812-recursive-default"
     },
     {
       "name": "art-run-test-963-default-range-smali"
