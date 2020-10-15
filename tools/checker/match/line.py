@@ -12,106 +12,117 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from common.logger              import Logger
+from common.logger import Logger
 from file_format.checker.struct import TestExpression, TestStatement
 
+# Required for eval.
 import os
 import re
 
-def headAndTail(list):
+
+def head_and_tail(list):
   return list[0], list[1:]
 
-def splitAtSeparators(expressions):
-  """ Splits a list of TestExpressions at separators. """
-  splitExpressions = []
-  wordStart = 0
-  for index, expression in enumerate(expressions):
-    if expression.variant == TestExpression.Variant.Separator:
-      splitExpressions.append(expressions[wordStart:index])
-      wordStart = index + 1
-  splitExpressions.append(expressions[wordStart:])
-  return splitExpressions
 
-def getVariable(name, variables, pos):
+def split_at_separators(expressions):
+  """ Splits a list of TestExpressions at separators. """
+  split_expressions = []
+  word_start = 0
+  for index, expression in enumerate(expressions):
+    if expression.variant == TestExpression.Variant.SEPARATOR:
+      split_expressions.append(expressions[word_start:index])
+      word_start = index + 1
+  split_expressions.append(expressions[word_start:])
+  return split_expressions
+
+
+def get_variable(name, variables, pos):
   if name in variables:
     return variables[name]
   else:
-    Logger.testFailed("Missing definition of variable \"{}\"".format(name), pos, variables)
+    Logger.test_failed('Missing definition of variable "{}"'.format(name), pos, variables)
 
-def setVariable(name, value, variables, pos):
+
+def set_variable(name, value, variables, pos):
   if name not in variables:
-    return variables.copyWith(name, value)
+    return variables.copy_with(name, value)
   else:
-    Logger.testFailed("Multiple definitions of variable \"{}\"".format(name), pos, variables)
+    Logger.test_failed('Multiple definitions of variable "{}"'.format(name), pos, variables)
 
-def matchWords(checkerWord, stringWord, variables, pos):
+
+def match_words(checker_word, string_word, variables, pos):
   """ Attempts to match a list of TestExpressions against a string.
       Returns updated variable dictionary if successful and None otherwise.
   """
-  for expression in checkerWord:
+  for expression in checker_word:
     # If `expression` is a variable reference, replace it with the value.
-    if expression.variant == TestExpression.Variant.VarRef:
-      pattern = re.escape(getVariable(expression.name, variables, pos))
+    if expression.variant == TestExpression.Variant.VAR_REF:
+      pattern = re.escape(get_variable(expression.name, variables, pos))
     else:
       pattern = expression.text
 
     # Match the expression's regex pattern against the remainder of the word.
     # Note: re.match will succeed only if matched from the beginning.
-    match = re.match(pattern, stringWord)
+    match = re.match(pattern, string_word)
     if not match:
       return None
 
     # If `expression` was a variable definition, set the variable's value.
-    if expression.variant == TestExpression.Variant.VarDef:
-      variables = setVariable(expression.name, stringWord[:match.end()], variables, pos)
+    if expression.variant == TestExpression.Variant.VAR_DEF:
+      variables = set_variable(expression.name, string_word[:match.end()], variables, pos)
 
     # Move cursor by deleting the matched characters.
-    stringWord = stringWord[match.end():]
+    string_word = string_word[match.end():]
 
   # Make sure the entire word matched, i.e. `stringWord` is empty.
-  if stringWord:
+  if string_word:
     return None
 
   return variables
 
-def MatchLines(checkerLine, stringLine, variables):
+
+def match_lines(checker_line, string_line, variables):
   """ Attempts to match a CHECK line against a string. Returns variable state
       after the match if successful and None otherwise.
   """
-  assert checkerLine.variant != TestStatement.Variant.Eval
+  assert checker_line.variant != TestStatement.Variant.EVAL
 
-  checkerWords = splitAtSeparators(checkerLine.expressions)
-  stringWords = stringLine.split()
+  checker_words = split_at_separators(checker_line.expressions)
+  string_words = string_line.split()
 
-  while checkerWords:
+  while checker_words:
     # Get the next run of TestExpressions which must match one string word.
-    checkerWord, checkerWords = headAndTail(checkerWords)
+    checker_word, checker_words = head_and_tail(checker_words)
 
     # Keep reading words until a match is found.
-    wordMatched = False
-    while stringWords:
-      stringWord, stringWords = headAndTail(stringWords)
-      newVariables = matchWords(checkerWord, stringWord, variables, checkerLine)
-      if newVariables is not None:
-        wordMatched = True
-        variables = newVariables
+    word_matched = False
+    while string_words:
+      string_word, string_words = head_and_tail(string_words)
+      new_variables = match_words(checker_word, string_word, variables, checker_line)
+      if new_variables is not None:
+        word_matched = True
+        variables = new_variables
         break
-    if not wordMatched:
+    if not word_matched:
       return None
 
   # All TestExpressions matched. Return new variable state.
   return variables
 
-def getEvalText(expression, variables, pos):
-  if expression.variant == TestExpression.Variant.PlainText:
+
+def get_eval_text(expression, variables, pos):
+  if expression.variant == TestExpression.Variant.PLAIN_TEXT:
     return expression.text
   else:
-    assert expression.variant == TestExpression.Variant.VarRef
-    return getVariable(expression.name, variables, pos)
+    assert expression.variant == TestExpression.Variant.VAR_REF
+    return get_variable(expression.name, variables, pos)
 
-def EvaluateLine(checkerLine, variables):
-  assert checkerLine.isEvalContentStatement()
+
+def evaluate_line(checker_line, variables):
+  assert checker_line.is_eval_content_statement()
+  # Required for eval.
   hasIsaFeature = lambda feature: variables["ISA_FEATURES"].get(feature, False)
-  eval_string = "".join(map(lambda expr: getEvalText(expr, variables, checkerLine),
-                            checkerLine.expressions))
+  eval_string = "".join(get_eval_text(expr,
+                                      variables,
+                                      checker_line) for expr in checker_line.expressions)
   return eval(eval_string)
