@@ -6,6 +6,7 @@
 java_test {
     name: "art-run-test-107-int-math2",
     defaults: ["art-run-test-defaults"],
+    test_config_template: ":art-run-test-target-template",
     srcs: ["src/**/*.java"],
     data: [":art-run-test-107-int-math2-expected"],
 }
