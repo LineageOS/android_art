@@ -84,30 +84,6 @@ class VerifierDeps {
   static void MaybeRecordClassRedefinition(const DexFile& dex_file, const dex::ClassDef& class_def)
       REQUIRES(!Locks::verifier_deps_lock_);
 
-  // Record the outcome `klass` of resolving type `type_idx` from `dex_file`.
-  // If `klass` is null, the class is assumed unresolved.
-  static void MaybeRecordClassResolution(const DexFile& dex_file,
-                                         dex::TypeIndex type_idx,
-                                         ObjPtr<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  // Record the outcome `field` of resolving field `field_idx` from `dex_file`.
-  // If `field` is null, the field is assumed unresolved.
-  static void MaybeRecordFieldResolution(const DexFile& dex_file,
-                                         uint32_t field_idx,
-                                         ArtField* field)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  // Record the outcome `method` of resolving method `method_idx` from `dex_file`.
-  // If `method` is null, the method is assumed unresolved.
-  static void MaybeRecordMethodResolution(const DexFile& dex_file,
-                                          uint32_t method_idx,
-                                          ArtMethod* method)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
   // Record the outcome `is_assignable` of type assignability test from `source`
   // to `destination` as defined by RegType::AssignableFrom. `dex_file` is the
   // owner of the method for which MethodVerifier performed the assignability test.
@@ -154,48 +130,6 @@ class VerifierDeps {
       /*out*/std::vector<std::vector<bool>>* verified_classes_per_dex);
 
  private:
-  static constexpr uint16_t kUnresolvedMarker = static_cast<uint16_t>(-1);
-
-  using ClassResolutionBase = std::tuple<dex::TypeIndex, uint16_t>;
-  struct ClassResolution : public ClassResolutionBase {
-    ClassResolution() = default;
-    ClassResolution(const ClassResolution&) = default;
-    ClassResolution(dex::TypeIndex type_idx, uint16_t access_flags)
-        : ClassResolutionBase(type_idx, access_flags) {}
-
-    bool IsResolved() const { return GetAccessFlags() != kUnresolvedMarker; }
-    dex::TypeIndex GetDexTypeIndex() const { return std::get<0>(*this); }
-    uint16_t GetAccessFlags() const { return std::get<1>(*this); }
-  };
-
-  using FieldResolutionBase = std::tuple<uint32_t, uint16_t, dex::StringIndex>;
-  struct FieldResolution : public FieldResolutionBase {
-    FieldResolution() = default;
-    FieldResolution(const FieldResolution&) = default;
-    FieldResolution(uint32_t field_idx, uint16_t access_flags, dex::StringIndex declaring_class_idx)
-        : FieldResolutionBase(field_idx, access_flags, declaring_class_idx) {}
-
-    bool IsResolved() const { return GetAccessFlags() != kUnresolvedMarker; }
-    uint32_t GetDexFieldIndex() const { return std::get<0>(*this); }
-    uint16_t GetAccessFlags() const { return std::get<1>(*this); }
-    dex::StringIndex GetDeclaringClassIndex() const { return std::get<2>(*this); }
-  };
-
-  using MethodResolutionBase = std::tuple<uint32_t, uint16_t, dex::StringIndex>;
-  struct MethodResolution : public MethodResolutionBase {
-    MethodResolution() = default;
-    MethodResolution(const MethodResolution&) = default;
-    MethodResolution(uint32_t method_idx,
-                     uint16_t access_flags,
-                     dex::StringIndex declaring_class_idx)
-        : MethodResolutionBase(method_idx, access_flags, declaring_class_idx) {}
-
-    bool IsResolved() const { return GetAccessFlags() != kUnresolvedMarker; }
-    uint32_t GetDexMethodIndex() const { return std::get<0>(*this); }
-    uint16_t GetAccessFlags() const { return std::get<1>(*this); }
-    dex::StringIndex GetDeclaringClassIndex() const { return std::get<2>(*this); }
-  };
-
   using TypeAssignabilityBase = std::tuple<dex::StringIndex, dex::StringIndex>;
   struct TypeAssignability : public TypeAssignabilityBase {
     TypeAssignability() = default;
@@ -222,11 +156,6 @@ class VerifierDeps {
     // of the two types to the other.
     std::set<TypeAssignability> assignable_types_;
     std::set<TypeAssignability> unassignable_types_;
-
-    // Sets of recorded class/field/method resolutions.
-    std::set<ClassResolution> classes_;
-    std::set<FieldResolution> fields_;
-    std::set<MethodResolution> methods_;
 
     // Bit vector indexed by class def indices indicating whether the corresponding
     // class was successfully verified.
@@ -277,43 +206,8 @@ class VerifierDeps {
   // Returns the string represented by `id`.
   std::string GetStringFromId(const DexFile& dex_file, dex::StringIndex string_id) const;
 
-  // Returns the bytecode access flags of `element` (bottom 16 bits), or
-  // `kUnresolvedMarker` if `element` is null.
-  template <typename Ptr>
-  static uint16_t GetAccessFlags(Ptr element)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Returns a string ID of the descriptor of the declaring class of `element`,
-  // or `kUnresolvedMarker` if `element` is null.
-  dex::StringIndex GetMethodDeclaringClassStringId(const DexFile& dex_file,
-                                                   uint32_t dex_method_idx,
-                                                   ArtMethod* method)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  dex::StringIndex GetFieldDeclaringClassStringId(const DexFile& dex_file,
-                                                  uint32_t dex_field_idx,
-                                                  ArtField* field)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Returns a string ID of the descriptor of the class.
   dex::StringIndex GetClassDescriptorStringId(const DexFile& dex_file, ObjPtr<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  void AddClassResolution(const DexFile& dex_file,
-                          dex::TypeIndex type_idx,
-                          ObjPtr<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  void AddFieldResolution(const DexFile& dex_file,
-                          uint32_t field_idx,
-                          ArtField* field)
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  void AddMethodResolution(const DexFile& dex_file,
-                           uint32_t method_idx,
-                           ArtMethod* method)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::verifier_deps_lock_);
 
@@ -364,36 +258,6 @@ class VerifierDeps {
                            bool expected_assignability,
                            Thread* self,
                            /* out */ std::string* error_msg) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Verify that the set of resolved classes at the point of creation
-  // of this `VerifierDeps` is still the same.
-  bool VerifyClasses(Handle<mirror::ClassLoader> class_loader,
-                     const DexFile& dex_file,
-                     const std::set<ClassResolution>& classes,
-                     Thread* self,
-                     /* out */ std::string* error_msg) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Verify that the set of resolved fields at the point of creation
-  // of this `VerifierDeps` is still the same, and each field resolves to the
-  // same field holder and access flags.
-  bool VerifyFields(Handle<mirror::ClassLoader> class_loader,
-                    const DexFile& dex_file,
-                    const std::set<FieldResolution>& classes,
-                    Thread* self,
-                    /* out */ std::string* error_msg) const
-      REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::verifier_deps_lock_);
-
-  // Verify that the set of resolved methods at the point of creation
-  // of this `VerifierDeps` is still the same, and each method resolves to the
-  // same method holder, access flags, and invocation kind.
-  bool VerifyMethods(Handle<mirror::ClassLoader> class_loader,
-                     const DexFile& dex_file,
-                     const std::set<MethodResolution>& methods,
-                     Thread* self,
-                     /* out */ std::string* error_msg) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Map from DexFiles into dependencies collected from verification of their methods.
