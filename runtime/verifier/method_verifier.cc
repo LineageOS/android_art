@@ -3756,9 +3756,6 @@ const RegType& MethodVerifier<kVerifierDebug>::ResolveClass(dex::TypeIndex class
     return *result;
   }
 
-  // Record result of class resolution attempt.
-  VerifierDeps::MaybeRecordClassResolution(*dex_file_, class_idx, klass);
-
   // If requested, check if access is allowed. Unresolved types are included in this check, as the
   // interpreter only tests whether access is allowed when a class is not pre-verified and runs in
   // the access-checks interpreter. If result is primitive, skip the access check.
@@ -3893,11 +3890,6 @@ ArtMethod* MethodVerifier<kVerifierDebug>::ResolveMethodAndCheckAccess(
     res_method = class_linker->FindResolvedMethod(
         klass, dex_cache_.Get(), class_loader_.Get(), dex_method_idx);
   }
-
-  // Record result of method resolution attempt. The klass resolution has recorded whether
-  // the class is an interface or not and therefore the type of the lookup performed above.
-  // TODO: Maybe we should not record dependency if the invoke type does not match the lookup type.
-  VerifierDeps::MaybeRecordMethodResolution(*dex_file_, dex_method_idx, res_method);
 
   bool must_fail = false;
   // This is traditional and helps with screwy bytecode. It will tell you that, yes, a method
@@ -4674,9 +4666,6 @@ ArtField* MethodVerifier<kVerifierDebug>::GetStaticField(int field_idx) {
   ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
 
-  // Record result of the field resolution attempt.
-  VerifierDeps::MaybeRecordFieldResolution(*dex_file_, field_idx, field);
-
   if (field == nullptr) {
     VLOG(verifier) << "Unable to resolve static field " << field_idx << " ("
               << dex_file_->GetFieldName(field_id) << ") in "
@@ -4723,9 +4712,6 @@ ArtField* MethodVerifier<kVerifierDebug>::GetInstanceField(const RegType& obj_ty
   }
   ClassLinker* class_linker = GetClassLinker();
   ArtField* field = class_linker->ResolveFieldJLS(field_idx, dex_cache_, class_loader_);
-
-  // Record result of the field resolution attempt.
-  VerifierDeps::MaybeRecordFieldResolution(*dex_file_, field_idx, field);
 
   if (field == nullptr) {
     VLOG(verifier) << "Unable to resolve instance field " << field_idx << " ("

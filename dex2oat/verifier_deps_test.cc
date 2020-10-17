@@ -239,7 +239,7 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
         } else if (&cls->GetDexFile() != dex_file) {
           // Ignore classes from different dex files.
         } else if (verified_classes[i]) {
-          ASSERT_EQ(cls->GetStatus(), ClassStatus::kVerified);
+          ASSERT_EQ(cls->GetStatus(), ClassStatus::kVerifiedNeedsAccessChecks);
         } else {
           ASSERT_LT(cls->GetStatus(), ClassStatus::kVerified);
         }
@@ -291,141 +291,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     return false;
   }
 
-  // Iterates over all class resolution records, finds an entry which matches
-  // the given class descriptor and tests its properties.
-  bool HasClass(const std::string& expected_klass,
-                bool expected_resolved,
-                const std::string& expected_access_flags = "") {
-    for (auto& dex_dep : verifier_deps_->dex_deps_) {
-      for (auto& entry : dex_dep.second->classes_) {
-        if (expected_resolved != entry.IsResolved()) {
-          continue;
-        }
-
-        std::string actual_klass = dex_dep.first->StringByTypeIdx(entry.GetDexTypeIndex());
-        if (expected_klass != actual_klass) {
-          continue;
-        }
-
-        if (expected_resolved) {
-          // Test access flags. Note that PrettyJavaAccessFlags always appends
-          // a space after the modifiers. Add it to the expected access flags.
-          std::string actual_access_flags = PrettyJavaAccessFlags(entry.GetAccessFlags());
-          if (expected_access_flags + " " != actual_access_flags) {
-            continue;
-          }
-        }
-
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Iterates over all field resolution records, finds an entry which matches
-  // the given field class+name+type and tests its properties.
-  bool HasField(const std::string& expected_klass,
-                const std::string& expected_name,
-                const std::string& expected_type,
-                bool expected_resolved,
-                const std::string& expected_access_flags = "",
-                const std::string& expected_decl_klass = "") {
-    for (auto& dex_dep : verifier_deps_->dex_deps_) {
-      for (auto& entry : dex_dep.second->fields_) {
-        if (expected_resolved != entry.IsResolved()) {
-          continue;
-        }
-
-        const dex::FieldId& field_id = dex_dep.first->GetFieldId(entry.GetDexFieldIndex());
-
-        std::string actual_klass = dex_dep.first->StringByTypeIdx(field_id.class_idx_);
-        if (expected_klass != actual_klass) {
-          continue;
-        }
-
-        std::string actual_name = dex_dep.first->StringDataByIdx(field_id.name_idx_);
-        if (expected_name != actual_name) {
-          continue;
-        }
-
-        std::string actual_type = dex_dep.first->StringByTypeIdx(field_id.type_idx_);
-        if (expected_type != actual_type) {
-          continue;
-        }
-
-        if (expected_resolved) {
-          // Test access flags. Note that PrettyJavaAccessFlags always appends
-          // a space after the modifiers. Add it to the expected access flags.
-          std::string actual_access_flags = PrettyJavaAccessFlags(entry.GetAccessFlags());
-          if (expected_access_flags + " " != actual_access_flags) {
-            continue;
-          }
-
-          std::string actual_decl_klass = verifier_deps_->GetStringFromId(
-              *dex_dep.first, entry.GetDeclaringClassIndex());
-          if (expected_decl_klass != actual_decl_klass) {
-            continue;
-          }
-        }
-
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Iterates over all method resolution records, finds an entry which matches
-  // the given field kind+class+name+signature and tests its properties.
-  bool HasMethod(const std::string& expected_klass,
-                 const std::string& expected_name,
-                 const std::string& expected_signature,
-                 bool expect_resolved,
-                 const std::string& expected_access_flags = "",
-                 const std::string& expected_decl_klass = "") {
-    for (auto& dex_dep : verifier_deps_->dex_deps_) {
-      for (const VerifierDeps::MethodResolution& entry : dex_dep.second->methods_) {
-        if (expect_resolved != entry.IsResolved()) {
-          continue;
-        }
-
-        const dex::MethodId& method_id = dex_dep.first->GetMethodId(entry.GetDexMethodIndex());
-
-        std::string actual_klass = dex_dep.first->StringByTypeIdx(method_id.class_idx_);
-        if (expected_klass != actual_klass) {
-          continue;
-        }
-
-        std::string actual_name = dex_dep.first->StringDataByIdx(method_id.name_idx_);
-        if (expected_name != actual_name) {
-          continue;
-        }
-
-        std::string actual_signature = dex_dep.first->GetMethodSignature(method_id).ToString();
-        if (expected_signature != actual_signature) {
-          continue;
-        }
-
-        if (expect_resolved) {
-          // Test access flags. Note that PrettyJavaAccessFlags always appends
-          // a space after the modifiers. Add it to the expected access flags.
-          std::string actual_access_flags = PrettyJavaAccessFlags(entry.GetAccessFlags());
-          if (expected_access_flags + " " != actual_access_flags) {
-            continue;
-          }
-
-          std::string actual_decl_klass = verifier_deps_->GetStringFromId(
-              *dex_dep.first, entry.GetDeclaringClassIndex());
-          if (expected_decl_klass != actual_decl_klass) {
-            continue;
-          }
-        }
-
-        return true;
-      }
-    }
-    return false;
-  }
-
   size_t NumberOfCompiledDexFiles() {
     return verifier_deps_->dex_deps_.size();
   }
@@ -437,9 +302,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
   bool HasEachKindOfRecord() {
     bool has_strings = false;
     bool has_assignability = false;
-    bool has_classes = false;
-    bool has_fields = false;
-    bool has_methods = false;
     bool has_verified_classes = false;
     bool has_unverified_classes = false;
     bool has_redefined_classes = false;
@@ -449,9 +311,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
       has_strings |= !entry.second->strings_.empty();
       has_assignability |= !entry.second->assignable_types_.empty();
       has_assignability |= !entry.second->unassignable_types_.empty();
-      has_classes |= !entry.second->classes_.empty();
-      has_fields |= !entry.second->fields_.empty();
-      has_methods |= !entry.second->methods_.empty();
       has_verified_classes |= HasBoolValue(entry.second->verified_classes_, true);
       has_unverified_classes |= HasBoolValue(entry.second->verified_classes_, false);
       has_redefined_classes |= HasBoolValue(entry.second->redefined_classes_, true);
@@ -460,9 +319,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
 
     return has_strings &&
            has_assignability &&
-           has_classes &&
-           has_fields &&
-           has_methods &&
            has_verified_classes &&
            has_unverified_classes &&
            has_redefined_classes &&
@@ -605,21 +461,6 @@ TEST_F(VerifierDepsTest, NotAssignable_BothArrays) {
   ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/util/SimpleTimeZone;", false));
 }
 
-TEST_F(VerifierDepsTest, ArgumentType_ResolvedClass) {
-  ASSERT_TRUE(VerifyMethod("ArgumentType_ResolvedClass"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Thread;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, ArgumentType_UnresolvedClass) {
-  ASSERT_TRUE(VerifyMethod("ArgumentType_UnresolvedClass"));
-  ASSERT_TRUE(HasClass("LUnresolvedClass;", false));
-}
-
-TEST_F(VerifierDepsTest, ArgumentType_UnresolvedSuper) {
-  ASSERT_TRUE(VerifyMethod("ArgumentType_UnresolvedSuper"));
-  ASSERT_TRUE(HasClass("LMySetWithUnresolvedSuper;", false));
-}
-
 TEST_F(VerifierDepsTest, ReturnType_Reference) {
   ASSERT_TRUE(VerifyMethod("ReturnType_Reference"));
   ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;", true));
@@ -632,14 +473,6 @@ TEST_F(VerifierDepsTest, ReturnType_Array) {
 
 TEST_F(VerifierDepsTest, InvokeArgumentType) {
   ASSERT_TRUE(VerifyMethod("InvokeArgumentType"));
-  ASSERT_TRUE(HasClass("Ljava/text/SimpleDateFormat;", true, "public"));
-  ASSERT_TRUE(HasClass("Ljava/util/SimpleTimeZone;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/text/SimpleDateFormat;",
-                        "setTimeZone",
-                        "(Ljava/util/TimeZone;)V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/text/DateFormat;"));
   ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;", true));
 }
 
@@ -665,51 +498,6 @@ TEST_F(VerifierDepsTest, MergeTypes_Unresolved) {
       "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;", true));
 }
 
-TEST_F(VerifierDepsTest, ConstClass_Resolved) {
-  ASSERT_TRUE(VerifyMethod("ConstClass_Resolved"));
-  ASSERT_TRUE(HasClass("Ljava/lang/IllegalStateException;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, ConstClass_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("ConstClass_Unresolved"));
-  ASSERT_TRUE(HasClass("LUnresolvedClass;", false));
-}
-
-TEST_F(VerifierDepsTest, CheckCast_Resolved) {
-  ASSERT_TRUE(VerifyMethod("CheckCast_Resolved"));
-  ASSERT_TRUE(HasClass("Ljava/lang/IllegalStateException;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, CheckCast_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("CheckCast_Unresolved"));
-  ASSERT_TRUE(HasClass("LUnresolvedClass;", false));
-}
-
-TEST_F(VerifierDepsTest, InstanceOf_Resolved) {
-  ASSERT_TRUE(VerifyMethod("InstanceOf_Resolved"));
-  ASSERT_TRUE(HasClass("Ljava/lang/IllegalStateException;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, InstanceOf_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("InstanceOf_Unresolved"));
-  ASSERT_TRUE(HasClass("LUnresolvedClass;", false));
-}
-
-TEST_F(VerifierDepsTest, NewInstance_Resolved) {
-  ASSERT_TRUE(VerifyMethod("NewInstance_Resolved"));
-  ASSERT_TRUE(HasClass("Ljava/lang/IllegalStateException;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, NewInstance_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("NewInstance_Unresolved"));
-  ASSERT_TRUE(HasClass("LUnresolvedClass;", false));
-}
-
-TEST_F(VerifierDepsTest, NewArray_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("NewArray_Unresolved"));
-  ASSERT_TRUE(HasClass("[LUnresolvedClass;", false));
-}
-
 TEST_F(VerifierDepsTest, Throw) {
   ASSERT_TRUE(VerifyMethod("Throw"));
   ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;", true));
@@ -717,9 +505,6 @@ TEST_F(VerifierDepsTest, Throw) {
 
 TEST_F(VerifierDepsTest, MoveException_Resolved) {
   ASSERT_TRUE(VerifyMethod("MoveException_Resolved"));
-  ASSERT_TRUE(HasClass("Ljava/io/InterruptedIOException;", true, "public"));
-  ASSERT_TRUE(HasClass("Ljava/net/SocketTimeoutException;", true, "public"));
-  ASSERT_TRUE(HasClass("Ljava/util/zip/ZipException;", true, "public"));
 
   // Testing that all exception types are assignable to Throwable.
   ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/io/InterruptedIOException;", true));
@@ -736,404 +521,44 @@ TEST_F(VerifierDepsTest, MoveException_Resolved) {
       "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
 }
 
-TEST_F(VerifierDepsTest, MoveException_Unresolved) {
-  ASSERT_FALSE(VerifyMethod("MoveException_Unresolved"));
-  ASSERT_TRUE(HasClass("LUnresolvedException;", false));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInReferenced) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/lang/System;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/lang/System;",
-                       "out",
-                       "Ljava/io/PrintStream;",
-                       true,
-                       "public static",
-                       "Ljava/lang/System;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInSuperclass1) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInSuperclass1"));
-  ASSERT_TRUE(HasClass("Ljava/util/SimpleTimeZone;", true, "public"));
-  ASSERT_TRUE(HasField(
-      "Ljava/util/SimpleTimeZone;", "LONG", "I", true, "public static", "Ljava/util/TimeZone;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInSuperclass2) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInSuperclass2"));
-  ASSERT_TRUE(HasField(
-      "LMySimpleTimeZone;", "SHORT", "I", true, "public static", "Ljava/util/TimeZone;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInInterface1) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInInterface1"));
-  ASSERT_TRUE(HasClass("Ljavax/xml/transform/dom/DOMResult;", true, "public"));
-  ASSERT_TRUE(HasField("Ljavax/xml/transform/dom/DOMResult;",
-                       "PI_ENABLE_OUTPUT_ESCAPING",
-                       "Ljava/lang/String;",
-                       true,
-                       "public static",
-                       "Ljavax/xml/transform/Result;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInInterface2) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInInterface2"));
-  ASSERT_TRUE(HasField("LMyDOMResult;",
-                       "PI_ENABLE_OUTPUT_ESCAPING",
-                       "Ljava/lang/String;",
-                       true,
-                       "public static",
-                       "Ljavax/xml/transform/Result;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInInterface3) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInInterface3"));
-  ASSERT_TRUE(HasField("LMyResult;",
-                       "PI_ENABLE_OUTPUT_ESCAPING",
-                       "Ljava/lang/String;",
-                       true,
-                       "public static",
-                       "Ljavax/xml/transform/Result;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Resolved_DeclaredInInterface4) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Resolved_DeclaredInInterface4"));
-  ASSERT_TRUE(HasField("LMyDocument;",
-                       "ELEMENT_NODE",
-                       "S",
-                       true,
-                       "public static",
-                       "Lorg/w3c/dom/Node;"));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Unresolved_ReferrerInBoot) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Unresolved_ReferrerInBoot"));
-  ASSERT_TRUE(HasClass("Ljava/util/TimeZone;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/util/TimeZone;", "x", "I", false));
-}
-
-TEST_F(VerifierDepsTest, StaticField_Unresolved_ReferrerInDex) {
-  ASSERT_TRUE(VerifyMethod("StaticField_Unresolved_ReferrerInDex"));
-  ASSERT_TRUE(HasField("LMyThreadSet;", "x", "I", false));
-}
-
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInReferenced) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/io/InterruptedIOException;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/io/InterruptedIOException;",
-                       "bytesTransferred",
-                       "I",
-                       true,
-                       "public",
-                       "Ljava/io/InterruptedIOException;"));
   ASSERT_TRUE(HasAssignable(
       "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
 }
 
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInSuperclass1) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInSuperclass1"));
-  ASSERT_TRUE(HasClass("Ljava/net/SocketTimeoutException;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/net/SocketTimeoutException;",
-                       "bytesTransferred",
-                       "I",
-                       true,
-                       "public",
-                       "Ljava/io/InterruptedIOException;"));
   ASSERT_TRUE(HasAssignable(
       "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
 }
 
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInSuperclass2) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInSuperclass2"));
-  ASSERT_TRUE(HasField("LMySocketTimeoutException;",
-                       "bytesTransferred",
-                       "I",
-                       true,
-                       "public",
-                       "Ljava/io/InterruptedIOException;"));
   ASSERT_TRUE(HasAssignable(
       "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
 }
 
-TEST_F(VerifierDepsTest, InstanceField_Unresolved_ReferrerInBoot) {
-  ASSERT_TRUE(VerifyMethod("InstanceField_Unresolved_ReferrerInBoot"));
-  ASSERT_TRUE(HasClass("Ljava/io/InterruptedIOException;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/io/InterruptedIOException;", "x", "I", false));
-}
-
-TEST_F(VerifierDepsTest, InstanceField_Unresolved_ReferrerInDex) {
-  ASSERT_TRUE(VerifyMethod("InstanceField_Unresolved_ReferrerInDex"));
-  ASSERT_TRUE(HasField("LMyThreadSet;", "x", "I", false));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_Resolved_DeclaredInReferenced) {
-  ASSERT_TRUE(VerifyMethod("InvokeStatic_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/net/Socket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/net/Socket;",
-                        "setSocketImplFactory",
-                        "(Ljava/net/SocketImplFactory;)V",
-                        /* expect_resolved= */ true,
-                        "public static",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_Resolved_DeclaredInSuperclass1) {
-  ASSERT_TRUE(VerifyMethod("InvokeStatic_Resolved_DeclaredInSuperclass1"));
-  ASSERT_TRUE(HasClass("Ljavax/net/ssl/SSLSocket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljavax/net/ssl/SSLSocket;",
-                        "setSocketImplFactory",
-                        "(Ljava/net/SocketImplFactory;)V",
-                        /* expect_resolved= */ true,
-                        "public static",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_Resolved_DeclaredInSuperclass2) {
-  ASSERT_TRUE(VerifyMethod("InvokeStatic_Resolved_DeclaredInSuperclass2"));
-  ASSERT_TRUE(HasMethod("LMySSLSocket;",
-                        "setSocketImplFactory",
-                        "(Ljava/net/SocketImplFactory;)V",
-                        /* expect_resolved= */ true,
-                        "public static",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_DeclaredInInterface1) {
-  ASSERT_TRUE(VerifyMethod("InvokeStatic_DeclaredInInterface1"));
-  ASSERT_TRUE(HasClass("Ljava/util/Map$Entry;", true, "public interface"));
-  ASSERT_TRUE(HasMethod("Ljava/util/Map$Entry;",
-                        "comparingByKey",
-                        "()Ljava/util/Comparator;",
-                        /* expect_resolved= */ true,
-                        "public static",
-                        "Ljava/util/Map$Entry;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_DeclaredInInterface2) {
-  ASSERT_FALSE(VerifyMethod("InvokeStatic_DeclaredInInterface2"));
-  ASSERT_TRUE(HasClass("Ljava/util/AbstractMap$SimpleEntry;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/util/AbstractMap$SimpleEntry;",
-                        "comparingByKey",
-                        "()Ljava/util/Comparator;",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_Unresolved1) {
-  ASSERT_FALSE(VerifyMethod("InvokeStatic_Unresolved1"));
-  ASSERT_TRUE(HasClass("Ljavax/net/ssl/SSLSocket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljavax/net/ssl/SSLSocket;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeStatic_Unresolved2) {
-  ASSERT_FALSE(VerifyMethod("InvokeStatic_Unresolved2"));
-  ASSERT_TRUE(HasMethod("LMySSLSocket;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeDirect_Resolved_DeclaredInReferenced) {
-  ASSERT_TRUE(VerifyMethod("InvokeDirect_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/net/Socket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/net/Socket;",
-                        "<init>",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeDirect_Resolved_DeclaredInSuperclass1) {
-  ASSERT_FALSE(VerifyMethod("InvokeDirect_Resolved_DeclaredInSuperclass1"));
-  ASSERT_TRUE(HasClass("Ljavax/net/ssl/SSLSocket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljavax/net/ssl/SSLSocket;",
-                        "checkOldImpl",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "private",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeDirect_Resolved_DeclaredInSuperclass2) {
-  ASSERT_FALSE(VerifyMethod("InvokeDirect_Resolved_DeclaredInSuperclass2"));
-  ASSERT_TRUE(HasMethod("LMySSLSocket;",
-                        "checkOldImpl",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "private",
-                        "Ljava/net/Socket;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeDirect_Unresolved1) {
-  ASSERT_FALSE(VerifyMethod("InvokeDirect_Unresolved1"));
-  ASSERT_TRUE(HasClass("Ljavax/net/ssl/SSLSocket;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljavax/net/ssl/SSLSocket;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeDirect_Unresolved2) {
-  ASSERT_FALSE(VerifyMethod("InvokeDirect_Unresolved2"));
-  ASSERT_TRUE(HasMethod("LMySSLSocket;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
 TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInReferenced) {
   ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Throwable;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/lang/Throwable;",
-                        "getMessage",
-                        "()Ljava/lang/String;",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Throwable;"));
   // Type dependency on `this` argument.
   ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;", true));
 }
 
 TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInSuperclass1) {
   ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInSuperclass1"));
-  ASSERT_TRUE(HasClass("Ljava/io/InterruptedIOException;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/io/InterruptedIOException;",
-                        "getMessage",
-                        "()Ljava/lang/String;",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Throwable;"));
   // Type dependency on `this` argument.
   ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;", true));
 }
 
-TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInSuperclass2) {
-  ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInSuperclass2"));
-  ASSERT_TRUE(HasMethod("LMySocketTimeoutException;",
-                        "getMessage",
-                        "()Ljava/lang/String;",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Throwable;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInSuperinterface) {
-  ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInSuperinterface"));
-  ASSERT_TRUE(HasMethod("LMyThreadSet;",
-                        "size",
-                        "()I",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/util/Set;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeVirtual_Unresolved1) {
-  ASSERT_FALSE(VerifyMethod("InvokeVirtual_Unresolved1"));
-  ASSERT_TRUE(HasClass("Ljava/io/InterruptedIOException;", true, "public"));
-  ASSERT_TRUE(HasMethod("Ljava/io/InterruptedIOException;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeVirtual_Unresolved2) {
-  ASSERT_FALSE(VerifyMethod("InvokeVirtual_Unresolved2"));
-  ASSERT_TRUE(HasMethod("LMySocketTimeoutException;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Resolved_DeclaredInReferenced) {
-  ASSERT_TRUE(VerifyMethod("InvokeInterface_Resolved_DeclaredInReferenced"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Runnable;", true, "public interface"));
-  ASSERT_TRUE(HasMethod("Ljava/lang/Runnable;",
-                        "run",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Runnable;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Resolved_DeclaredInSuperclass) {
-  ASSERT_FALSE(VerifyMethod("InvokeInterface_Resolved_DeclaredInSuperclass"));
-  // TODO: Maybe we should not record dependency if the invoke type does not match the lookup type.
-  ASSERT_TRUE(HasMethod("LMyThread;",
-                        "join",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Thread;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Resolved_DeclaredInSuperinterface1) {
-  ASSERT_FALSE(VerifyMethod("InvokeInterface_Resolved_DeclaredInSuperinterface1"));
-  // TODO: Maybe we should not record dependency if the invoke type does not match the lookup type.
-  ASSERT_TRUE(HasMethod("LMyThreadSet;",
-                        "run",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Thread;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Resolved_DeclaredInSuperinterface2) {
-  ASSERT_FALSE(VerifyMethod("InvokeInterface_Resolved_DeclaredInSuperinterface2"));
-  ASSERT_TRUE(HasMethod("LMyThreadSet;",
-                        "isEmpty",
-                        "()Z",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/util/Set;"));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Unresolved1) {
-  ASSERT_FALSE(VerifyMethod("InvokeInterface_Unresolved1"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Runnable;", true, "public interface"));
-  ASSERT_TRUE(HasMethod("Ljava/lang/Runnable;",
-                        "x",
-                        "()V",
-                        /* expect_resolved= */ false));
-}
-
-TEST_F(VerifierDepsTest, InvokeInterface_Unresolved2) {
-  ASSERT_FALSE(VerifyMethod("InvokeInterface_Unresolved2"));
-  ASSERT_TRUE(HasMethod("LMyThreadSet;", "x", "()V", /* expect_resolved= */ false));
-}
-
 TEST_F(VerifierDepsTest, InvokeSuper_ThisAssignable) {
   ASSERT_TRUE(VerifyMethod("InvokeSuper_ThisAssignable"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Runnable;", true, "public interface"));
   ASSERT_TRUE(HasAssignable("Ljava/lang/Runnable;", "Ljava/lang/Thread;", true));
-  ASSERT_TRUE(HasMethod("Ljava/lang/Runnable;",
-                        "run",
-                        "()V",
-                        /* expect_resolved= */ true,
-                        "public",
-                        "Ljava/lang/Runnable;"));
 }
 
 TEST_F(VerifierDepsTest, InvokeSuper_ThisNotAssignable) {
   ASSERT_FALSE(VerifyMethod("InvokeSuper_ThisNotAssignable"));
-  ASSERT_TRUE(HasClass("Ljava/lang/Integer;", true, "public"));
   ASSERT_TRUE(HasAssignable("Ljava/lang/Integer;", "Ljava/lang/Thread;", false));
-  ASSERT_TRUE(HasMethod("Ljava/lang/Integer;",
-                        "intValue", "()I",
-                        /* expect_resolved= */ true,
-                        "public", "Ljava/lang/Integer;"));
-}
-
-TEST_F(VerifierDepsTest, ArgumentType_ResolvedReferenceArray) {
-  ASSERT_TRUE(VerifyMethod("ArgumentType_ResolvedReferenceArray"));
-  ASSERT_TRUE(HasClass("[Ljava/lang/Thread;", true, "public"));
-}
-
-TEST_F(VerifierDepsTest, NewArray_Resolved) {
-  ASSERT_TRUE(VerifyMethod("NewArray_Resolved"));
-  ASSERT_TRUE(HasClass("[Ljava/lang/IllegalStateException;", true, "public"));
 }
 
 TEST_F(VerifierDepsTest, EncodeDecode) {
@@ -1199,14 +624,6 @@ TEST_F(VerifierDepsTest, RedefinedClass) {
   VerifyDexFile();
   // Test that a class which redefines a boot classpath class has dependencies recorded.
   ASSERT_TRUE(HasRedefinedClass("Ljava/net/SocketTimeoutException;"));
-  // These come from test case InstanceField_Resolved_DeclaredInSuperclass1.
-  ASSERT_TRUE(HasClass("Ljava/net/SocketTimeoutException;", true, "public"));
-  ASSERT_TRUE(HasField("Ljava/net/SocketTimeoutException;",
-                       "bytesTransferred",
-                       "I",
-                       true,
-                       "public",
-                       "Ljava/io/InterruptedIOException;"));
 }
 
 TEST_F(VerifierDepsTest, UnverifiedOrder) {
@@ -1270,149 +687,6 @@ TEST_F(VerifierDepsTest, VerifyDeps) {
   ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
         deps.unassignable_types_.insert(*deps.assignable_types_.begin());
       }, buffer, &error_msg));
-
-  // Mess with classes.
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.classes_) {
-          if (entry.IsResolved()) {
-            deps.classes_.insert(VerifierDeps::ClassResolution(
-                entry.GetDexTypeIndex(), VerifierDeps::kUnresolvedMarker));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved classes";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.classes_) {
-          if (!entry.IsResolved()) {
-            deps.classes_.insert(VerifierDeps::ClassResolution(
-                entry.GetDexTypeIndex(), VerifierDeps::kUnresolvedMarker - 1));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any unresolved classes";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.classes_) {
-          if (entry.IsResolved()) {
-            deps.classes_.insert(VerifierDeps::ClassResolution(
-                entry.GetDexTypeIndex(), entry.GetAccessFlags() - 1));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved classes";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-
-  // Mess with fields.
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.fields_) {
-          if (entry.IsResolved()) {
-            deps.fields_.insert(VerifierDeps::FieldResolution(entry.GetDexFieldIndex(),
-                                                              VerifierDeps::kUnresolvedMarker,
-                                                              entry.GetDeclaringClassIndex()));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved fields";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.fields_) {
-          if (!entry.IsResolved()) {
-            constexpr dex::StringIndex kStringIndexZero(0);  // We know there is a class there.
-            deps.fields_.insert(VerifierDeps::FieldResolution(0 /* we know there is a field there */,
-                                                              VerifierDeps::kUnresolvedMarker - 1,
-                                                              kStringIndexZero));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any unresolved fields";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.fields_) {
-          if (entry.IsResolved()) {
-            deps.fields_.insert(VerifierDeps::FieldResolution(entry.GetDexFieldIndex(),
-                                                              entry.GetAccessFlags() - 1,
-                                                              entry.GetDeclaringClassIndex()));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved fields";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        for (const auto& entry : deps.fields_) {
-          constexpr dex::StringIndex kNewTypeIndex(0);
-          if (entry.GetDeclaringClassIndex() != kNewTypeIndex) {
-            deps.fields_.insert(VerifierDeps::FieldResolution(entry.GetDexFieldIndex(),
-                                                              entry.GetAccessFlags(),
-                                                              kNewTypeIndex));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any suitable fields";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-
-  // Mess with methods.
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        std::set<VerifierDeps::MethodResolution>* methods = &deps.methods_;
-        for (const auto& entry : *methods) {
-          if (entry.IsResolved()) {
-            methods->insert(VerifierDeps::MethodResolution(entry.GetDexMethodIndex(),
-                                                          VerifierDeps::kUnresolvedMarker,
-                                                          entry.GetDeclaringClassIndex()));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved methods";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        std::set<VerifierDeps::MethodResolution>* methods = &deps.methods_;
-        for (const auto& entry : *methods) {
-          if (!entry.IsResolved()) {
-            constexpr dex::StringIndex kStringIndexZero(0);  // We know there is a class there.
-            methods->insert(VerifierDeps::MethodResolution(0 /* we know there is a method there */,
-                                                          VerifierDeps::kUnresolvedMarker - 1,
-                                                          kStringIndexZero));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any unresolved methods";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        std::set<VerifierDeps::MethodResolution>* methods = &deps.methods_;
-        for (const auto& entry : *methods) {
-          if (entry.IsResolved()) {
-            methods->insert(VerifierDeps::MethodResolution(entry.GetDexMethodIndex(),
-                                                          entry.GetAccessFlags() - 1,
-                                                          entry.GetDeclaringClassIndex()));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any resolved methods";
-        UNREACHABLE();
-      }, buffer, &error_msg));
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        std::set<VerifierDeps::MethodResolution>* methods = &deps.methods_;
-        for (const auto& entry : *methods) {
-          constexpr dex::StringIndex kNewTypeIndex(0);
-          if (entry.IsResolved() && entry.GetDeclaringClassIndex() != kNewTypeIndex) {
-            methods->insert(VerifierDeps::MethodResolution(entry.GetDexMethodIndex(),
-                                                          entry.GetAccessFlags(),
-                                                          kNewTypeIndex));
-            return;
-          }
-        }
-        LOG(FATAL) << "Could not find any suitable methods";
-        UNREACHABLE();
-      }, buffer, &error_msg));
 }
 
 TEST_F(VerifierDepsTest, CompilerDriver) {
@@ -1439,20 +713,6 @@ TEST_F(VerifierDepsTest, CompilerDriver) {
       VerifierDeps decoded_deps(dex_files_, /*output_only=*/ false);
       bool parsed = decoded_deps.ParseStoredData(dex_files_, ArrayRef<const uint8_t>(buffer));
       ASSERT_TRUE(parsed);
-      if (verify_failure) {
-        // Just taint the decoded VerifierDeps with one invalid entry.
-        VerifierDeps::DexFileDeps* deps = decoded_deps.GetDexFileDeps(*primary_dex_file_);
-        bool found = false;
-        for (const auto& entry : deps->classes_) {
-          if (entry.IsResolved()) {
-            deps->classes_.insert(VerifierDeps::ClassResolution(
-                entry.GetDexTypeIndex(), VerifierDeps::kUnresolvedMarker));
-            found = true;
-            break;
-          }
-        }
-        ASSERT_TRUE(found);
-      }
       VerifyWithCompilerDriver(&decoded_deps);
 
       if (verify_failure) {
