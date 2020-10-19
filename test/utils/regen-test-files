@@ -280,7 +280,7 @@ known_failing_tests=(
 # the `presubmit` test group in `TEST_MAPPING` file -- the rest will be included
 # in `postsubmit` test group.
 # Currently, this value has to be a number between 1 and 99.
-presubmit_tests_percentage=1
+presubmit_tests_percentage=5
 
 cd "$ANDROID_BUILD_TOP/art"
 
