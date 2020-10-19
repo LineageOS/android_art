@@ -47,6 +47,7 @@ class LinkerPatch {
     kDataBimgRelRo,
     kMethodRelative,
     kMethodBssEntry,
+    kJniEntrypointRelative,
     kCallRelative,
     kTypeRelative,
     kTypeBssEntry,
@@ -91,6 +92,16 @@ class LinkerPatch {
                                          uint32_t pc_insn_offset,
                                          uint32_t target_method_idx) {
     LinkerPatch patch(literal_offset, Type::kMethodBssEntry, target_dex_file);
+    patch.method_idx_ = target_method_idx;
+    patch.pc_insn_offset_ = pc_insn_offset;
+    return patch;
+  }
+
+  static LinkerPatch RelativeJniEntrypointPatch(size_t literal_offset,
+                                                const DexFile* target_dex_file,
+                                                uint32_t pc_insn_offset,
+                                                uint32_t target_method_idx) {
+    LinkerPatch patch(literal_offset, Type::kJniEntrypointRelative, target_dex_file);
     patch.method_idx_ = target_method_idx;
     patch.pc_insn_offset_ = pc_insn_offset;
     return patch;
@@ -208,6 +219,7 @@ class LinkerPatch {
   MethodReference TargetMethod() const {
     DCHECK(patch_type_ == Type::kMethodRelative ||
            patch_type_ == Type::kMethodBssEntry ||
+           patch_type_ == Type::kJniEntrypointRelative ||
            patch_type_ == Type::kCallRelative);
     return MethodReference(target_dex_file_, method_idx_);
   }
@@ -245,6 +257,7 @@ class LinkerPatch {
            patch_type_ == Type::kDataBimgRelRo ||
            patch_type_ == Type::kMethodRelative ||
            patch_type_ == Type::kMethodBssEntry ||
+           patch_type_ == Type::kJniEntrypointRelative ||
            patch_type_ == Type::kTypeRelative ||
            patch_type_ == Type::kTypeBssEntry ||
            patch_type_ == Type::kPublicTypeBssEntry ||
