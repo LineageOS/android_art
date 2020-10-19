@@ -17,6 +17,7 @@
 #include "metrics.h"
 
 #include "gtest/gtest.h"
+#include "metrics_test.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic error "-Wconversion"
@@ -24,76 +25,51 @@
 namespace art {
 namespace metrics {
 
+using test::CounterValue;
+using test::GetBuckets;
+using test::TestBackendBase;
+
 class MetricsTest : public testing::Test {};
 
-namespace {
-
-// MetricsHistogram::GetBuckets is protected because we only want limited places to be able to read
-// the buckets. Tests are one of those places, but because making a gTest a friend is difficult,
-// instead we subclass MetricsHistogram and expose GetBuckets as GetBucksForTest.
-template <size_t num_buckets, int64_t low_value, int64_t high_value>
-class TestMetricsHistogram : public MetricsHistogram<num_buckets, low_value, high_value> {
- public:
-  std::vector<uint32_t> GetBucketsForTest() const { return this->GetBuckets(); }
-};
-
-// A trivial MetricsBackend that does nothing for all of the members. This can be overridden by
-// test cases to test specific behaviors.
-class TestBackendBase : public MetricsBackend {
- public:
-  void BeginSession([[maybe_unused]] const SessionData& session_data) override {}
-  void EndSession() override {}
-
-  void ReportCounter([[maybe_unused]] DatumId counter_type,
-                     [[maybe_unused]] uint64_t value) override {}
-
-  void ReportHistogram([[maybe_unused]] DatumId histogram_type,
-                       [[maybe_unused]] int64_t low_value_,
-                       [[maybe_unused]] int64_t high_value,
-                       [[maybe_unused]] const std::vector<uint32_t>& buckets) override {}
-};
-
-}  // namespace
-
 TEST_F(MetricsTest, SimpleCounter) {
-  MetricsCounter test_counter;
+  MetricsCounter<DatumId::kClassVerificationTotalTime> test_counter;
 
-  EXPECT_EQ(0u, test_counter.Value());
+  EXPECT_EQ(0u, CounterValue(test_counter));
 
   test_counter.AddOne();
-  EXPECT_EQ(1u, test_counter.Value());
+  EXPECT_EQ(1u, CounterValue(test_counter));
 
   test_counter.Add(5);
-  EXPECT_EQ(6u, test_counter.Value());
+  EXPECT_EQ(6u, CounterValue(test_counter));
 }
 
 TEST_F(MetricsTest, CounterTimer) {
-  MetricsCounter test_counter;
+  MetricsCounter<DatumId::kClassVerificationTotalTime> test_counter;
   {
     AutoTimer timer{&test_counter};
     // Sleep for 2µs so the counter will be greater than 0.
     NanoSleep(2'000);
   }
-  EXPECT_GT(test_counter.Value(), 0u);
+  EXPECT_GT(CounterValue(test_counter), 0u);
 }
 
 TEST_F(MetricsTest, CounterTimerExplicitStop) {
-  MetricsCounter test_counter;
+  MetricsCounter<DatumId::kClassVerificationTotalTime> test_counter;
   AutoTimer timer{&test_counter};
   // Sleep for 2µs so the counter will be greater than 0.
   NanoSleep(2'000);
   timer.Stop();
-  EXPECT_GT(test_counter.Value(), 0u);
+  EXPECT_GT(CounterValue(test_counter), 0u);
 }
 
 TEST_F(MetricsTest, CounterTimerExplicitStart) {
-  MetricsCounter test_counter;
+  MetricsCounter<DatumId::kClassVerificationTotalTime> test_counter;
   {
     AutoTimer timer{&test_counter, /*autostart=*/false};
     // Sleep for 2µs so the counter will be greater than 0.
     NanoSleep(2'000);
   }
-  EXPECT_EQ(test_counter.Value(), 0u);
+  EXPECT_EQ(CounterValue(test_counter), 0u);
 
   {
     AutoTimer timer{&test_counter, /*autostart=*/false};
@@ -101,17 +77,17 @@ TEST_F(MetricsTest, CounterTimerExplicitStart) {
     // Sleep for 2µs so the counter will be greater than 0.
     NanoSleep(2'000);
   }
-  EXPECT_GT(test_counter.Value(), 0u);
+  EXPECT_GT(CounterValue(test_counter), 0u);
 }
 
 TEST_F(MetricsTest, CounterTimerExplicitStartStop) {
-  MetricsCounter test_counter;
+  MetricsCounter<DatumId::kClassVerificationTotalTime> test_counter;
   AutoTimer timer{&test_counter, /*autostart=*/false};
   // Sleep for 2µs so the counter will be greater than 0.
   timer.Start();
   NanoSleep(2'000);
   timer.Stop();
-  EXPECT_GT(test_counter.Value(), 0u);
+  EXPECT_GT(CounterValue(test_counter), 0u);
 }
 
 TEST_F(MetricsTest, DatumName) {
@@ -119,7 +95,7 @@ TEST_F(MetricsTest, DatumName) {
 }
 
 TEST_F(MetricsTest, SimpleHistogramTest) {
-  TestMetricsHistogram<5, 0, 100> histogram;
+  MetricsHistogram<DatumId::kJitMethodCompileTime, 5, 0, 100> histogram;
 
   // bucket 0: 0-19
   histogram.Add(10);
@@ -142,7 +118,7 @@ TEST_F(MetricsTest, SimpleHistogramTest) {
   // bucket 4: 80-99
   // leave this bucket empty
 
-  std::vector<uint32_t> buckets{histogram.GetBucketsForTest()};
+  std::vector<uint32_t> buckets{GetBuckets(histogram)};
   EXPECT_EQ(1u, buckets[0u]);
   EXPECT_EQ(2u, buckets[1u]);
   EXPECT_EQ(4u, buckets[2u]);
@@ -152,7 +128,7 @@ TEST_F(MetricsTest, SimpleHistogramTest) {
 
 // Make sure values added outside the range of the histogram go into the first or last bucket.
 TEST_F(MetricsTest, HistogramOutOfRangeTest) {
-  TestMetricsHistogram<2, 0, 100> histogram;
+  MetricsHistogram<DatumId::kJitMethodCompileTime, 2, 0, 100> histogram;
 
   // bucket 0: 0-49
   histogram.Add(-500);
@@ -161,7 +137,7 @@ TEST_F(MetricsTest, HistogramOutOfRangeTest) {
   histogram.Add(250);
   histogram.Add(1000);
 
-  std::vector<uint32_t> buckets{histogram.GetBucketsForTest()};
+  std::vector<uint32_t> buckets{GetBuckets(histogram)};
   EXPECT_EQ(1u, buckets[0u]);
   EXPECT_EQ(2u, buckets[1u]);
 }
@@ -219,14 +195,14 @@ TEST_F(MetricsTest, ArtMetricsReport) {
 }
 
 TEST_F(MetricsTest, HistogramTimer) {
-  TestMetricsHistogram<1, 0, 100> test_histogram;
+  MetricsHistogram<DatumId::kJitMethodCompileTime, 1, 0, 100> test_histogram;
   {
     AutoTimer timer{&test_histogram};
     // Sleep for 2µs so the counter will be greater than 0.
     NanoSleep(2'000);
   }
 
-  EXPECT_GT(test_histogram.GetBucketsForTest()[0], 0u);
+  EXPECT_GT(GetBuckets(test_histogram)[0], 0u);
 }
 
 }  // namespace metrics
