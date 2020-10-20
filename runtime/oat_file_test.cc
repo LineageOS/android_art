@@ -57,7 +57,7 @@ TEST_F(OatFileTest, ChangingMultiDexUncompressed) {
   std::string dex_location = GetScratchDir() + "/MultiDexUncompressedAligned.jar";
 
   Copy(GetTestDexFileName("MultiDexUncompressedAligned"), dex_location);
-  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kQuicken);
+  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kVerify);
 
   std::string oat_location;
   std::string error_msg;

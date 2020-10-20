@@ -40,7 +40,7 @@ class DexToDexDecompilerTest : public CommonCompilerDriverTest {
   void CompileAll(jobject class_loader) REQUIRES(!Locks::mutator_lock_) {
     TimingLogger timings("DexToDexDecompilerTest::CompileAll", false, false);
     compiler_options_->image_type_ = CompilerOptions::ImageType::kNone;
-    compiler_options_->SetCompilerFilter(CompilerFilter::kQuicken);
+    compiler_options_->SetCompilerFilter(CompilerFilter::kVerify);
     // Create the main VerifierDeps, here instead of in the compiler since we want to aggregate
     // the results for all the dex files, not just the results for the current dex file.
     down_cast<QuickCompilerCallbacks*>(Runtime::Current()->GetCompilerCallbacks())->SetVerifierDeps(
@@ -77,9 +77,6 @@ class DexToDexDecompilerTest : public CommonCompilerDriverTest {
 
     updated_dex_file->EnableWrite();
     CompileAll(class_loader);
-    // The dex files should be different after quickening.
-    cmp = memcmp(original_dex_file->Begin(), updated_dex_file->Begin(), updated_dex_file->Size());
-    ASSERT_NE(0, cmp);
 
     // Unquicken the dex file.
     for (ClassAccessor accessor : updated_dex_file->GetClasses()) {
