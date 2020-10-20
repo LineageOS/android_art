@@ -461,9 +461,8 @@ cc_prebuilt_binary {
     srcs: [":art-check-testing-apex-gen"],
 }
 
-prebuilt_etc {
+linker_config {
     name: "art-linker-config",
-    src: "linker.config.txt",
-    filename: "linker.config.txt",
+    src: "linker.config.json",
     installable: false,
 }
