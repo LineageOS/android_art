@@ -17,10 +17,7 @@
     },
     {
       "name": "art-run-test-001-Main"
-    }
-  ],
-  "postsubmit": [
-    // ART run-tests.
+    },
     {
       "name": "art-run-test-002-sleep"
     },
@@ -50,7 +47,10 @@
     },
     {
       "name": "art-run-test-014-math3"
-    },
+    }
+  ],
+  "postsubmit": [
+    // ART run-tests.
     {
       "name": "art-run-test-015-switch"
     },

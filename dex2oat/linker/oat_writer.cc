@@ -1887,6 +1887,17 @@ class OatWriter::WriteCodeMethodVisitor : public OrderedMethodVisitor {
                                                                    target_offset);
               break;
             }
+            case LinkerPatch::Type::kJniEntrypointRelative: {
+              DCHECK(GetTargetMethod(patch)->IsNative());
+              uint32_t target_offset =
+                  GetTargetMethodOffset(GetTargetMethod(patch)) +
+                  ArtMethod::EntryPointFromJniOffset(pointer_size_).Uint32Value();
+              writer_->relative_patcher_->PatchPcRelativeReference(&patched_code_,
+                                                                   patch,
+                                                                   offset_ + literal_offset,
+                                                                   target_offset);
+              break;
+            }
             case LinkerPatch::Type::kCallEntrypoint: {
               writer_->relative_patcher_->PatchEntrypointCall(&patched_code_,
                                                               patch,
