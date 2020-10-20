@@ -65,6 +65,7 @@ inline bool IsAdrpPatch(const LinkerPatch& patch) {
     case LinkerPatch::Type::kDataBimgRelRo:
     case LinkerPatch::Type::kMethodRelative:
     case LinkerPatch::Type::kMethodBssEntry:
+    case LinkerPatch::Type::kJniEntrypointRelative:
     case LinkerPatch::Type::kTypeRelative:
     case LinkerPatch::Type::kTypeBssEntry:
     case LinkerPatch::Type::kPublicTypeBssEntry:
@@ -272,6 +273,7 @@ void Arm64RelativePatcher::PatchPcRelativeReference(std::vector<uint8_t>* code,
       // LDR/STR 32-bit or 64-bit with imm12 == 0 (unset).
       DCHECK(patch.GetType() == LinkerPatch::Type::kDataBimgRelRo ||
              patch.GetType() == LinkerPatch::Type::kMethodBssEntry ||
+             patch.GetType() == LinkerPatch::Type::kJniEntrypointRelative ||
              patch.GetType() == LinkerPatch::Type::kTypeBssEntry ||
              patch.GetType() == LinkerPatch::Type::kPublicTypeBssEntry ||
              patch.GetType() == LinkerPatch::Type::kPackageTypeBssEntry ||
