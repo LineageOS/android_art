@@ -191,7 +191,6 @@ class MethodVerifier {
   ALWAYS_INLINE const InstructionFlags& GetInstructionFlags(size_t index) const;
 
   MethodReference GetMethodReference() const;
-  bool HasCheckCasts() const;
   bool HasFailures() const;
   bool HasInstructionThatWillThrow() const {
     return flags_.have_any_pending_runtime_throw_failure_;
@@ -377,11 +376,6 @@ class MethodVerifier {
   // Converts soft failures to hard failures when false. Only false when the compiler isn't
   // running and the verifier is called from the class linker.
   const bool allow_soft_failures_;
-
-  // Indicates the method being verified contains at least one check-cast or aput-object
-  // instruction. Aput-object operations implicitly check for array-store exceptions, similar to
-  // check-cast.
-  bool has_check_casts_;
 
   // Classlinker to use when resolving.
   ClassLinker* class_linker_;
