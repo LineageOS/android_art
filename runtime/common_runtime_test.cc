@@ -505,16 +505,6 @@ bool CommonRuntimeTestImpl::RunDex2Oat(const std::vector<std::string>& args,
   return res.StandardSuccess();
 }
 
-std::string CommonRuntimeTestImpl::GetImageDirectory() {
-  std::string prefix;
-  if (IsHost()) {
-    const char* host_dir = getenv("ANDROID_HOST_OUT");
-    CHECK(host_dir != nullptr);
-    prefix = host_dir;
-  }
-  return prefix + kAndroidArtApexDefaultPath + "/javalib";
-}
-
 std::string CommonRuntimeTestImpl::GetImageLocation() {
   return GetImageDirectory() + "/boot.art";
 }
