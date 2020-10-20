@@ -547,10 +547,21 @@ std::unique_ptr<const DexFile> CommonArtTestImpl::OpenTestDexFile(const char* na
   return OpenDexFile(GetTestDexFileName(name).c_str());
 }
 
+std::string CommonArtTestImpl::GetImageDirectory() {
+  std::string path;
+  if (IsHost()) {
+    const char* host_dir = getenv("ANDROID_HOST_OUT");
+    CHECK(host_dir != nullptr);
+    path = std::string(host_dir) + "/apex/art_boot_images";
+  } else {
+    path = std::string(kAndroidArtApexDefaultPath);
+  }
+  return path + "/javalib";
+}
+
 std::string CommonArtTestImpl::GetCoreFileLocation(const char* suffix) {
   CHECK(suffix != nullptr);
-  std::string prefix(IsHost() ? GetAndroidRoot() : "");
-  return StringPrintf("%s%s/javalib/boot.%s", prefix.c_str(), kAndroidArtApexDefaultPath, suffix);
+  return GetImageDirectory() + "/boot." + suffix;
 }
 
 std::string CommonArtTestImpl::CreateClassPath(

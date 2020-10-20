@@ -676,7 +676,7 @@ if [ "$runtime" = "dalvik" ]; then
 elif [ "$runtime" = "art" ]; then
     if [ "$target_mode" = "no" ]; then
         guess_host_arch_name
-        run_args+=(--boot "${ANDROID_HOST_OUT}/apex/com.android.art/javalib/boot.art")
+        run_args+=(--boot "${ANDROID_HOST_OUT}/apex/art_boot_images/javalib/boot.art")
         run_args+=(--runtime-option "-Djava.library.path=${host_lib_root}/lib${suffix64}:${host_lib_root}/nativetest${suffix64}")
     else
         guess_target_arch_name
