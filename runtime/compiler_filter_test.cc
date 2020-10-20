@@ -43,7 +43,6 @@ TEST(CompilerFilterTest, ParseCompilerFilter) {
   TestCompilerFilterName(CompilerFilter::kAssumeVerified, "assume-verified");
   TestCompilerFilterName(CompilerFilter::kExtract, "extract");
   TestCompilerFilterName(CompilerFilter::kVerify, "verify");
-  TestCompilerFilterName(CompilerFilter::kQuicken, "quicken");
   TestCompilerFilterName(CompilerFilter::kSpaceProfile, "space-profile");
   TestCompilerFilterName(CompilerFilter::kSpace, "space");
   TestCompilerFilterName(CompilerFilter::kSpeedProfile, "speed-profile");
@@ -58,13 +57,12 @@ TEST(CompilerFilterTest, SafeModeFilter) {
   TestSafeModeFilter(CompilerFilter::kAssumeVerified, "assume-verified");
   TestSafeModeFilter(CompilerFilter::kExtract, "extract");
   TestSafeModeFilter(CompilerFilter::kVerify, "verify");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "quicken");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "space-profile");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "space");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "speed-profile");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "speed");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "everything-profile");
-  TestSafeModeFilter(CompilerFilter::kQuicken, "everything");
+  TestSafeModeFilter(CompilerFilter::kVerify, "space-profile");
+  TestSafeModeFilter(CompilerFilter::kVerify, "space");
+  TestSafeModeFilter(CompilerFilter::kVerify, "speed-profile");
+  TestSafeModeFilter(CompilerFilter::kVerify, "speed");
+  TestSafeModeFilter(CompilerFilter::kVerify, "everything-profile");
+  TestSafeModeFilter(CompilerFilter::kVerify, "everything");
 }
 
 }  // namespace art
