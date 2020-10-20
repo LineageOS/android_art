@@ -298,6 +298,7 @@ class CommonArtTestImpl {
   std::string CreateClassPathWithChecksums(
       const std::vector<std::unique_ptr<const DexFile>>& dex_files);
 
+  static std::string GetImageDirectory();
   static std::string GetCoreFileLocation(const char* suffix);
 
   std::vector<std::unique_ptr<const DexFile>> loaded_dex_files_;
