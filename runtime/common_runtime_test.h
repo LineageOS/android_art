@@ -205,7 +205,6 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   virtual void FinalizeSetup();
 
   // Returns the directory where the pre-compiled boot.art can be found.
-  static std::string GetImageDirectory();
   static std::string GetImageLocation();
   static std::string GetSystemImageFile();
 
