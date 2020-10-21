@@ -68,7 +68,6 @@ void VerifierDeps::MergeWith(std::unique_ptr<VerifierDeps> other,
     // which should be the one passed as `this` in this method.
     DCHECK(other_deps.strings_.empty());
     my_deps->assignable_types_.merge(other_deps.assignable_types_);
-    my_deps->unassignable_types_.merge(other_deps.unassignable_types_);
     BitVectorOr(my_deps->verified_classes_, other_deps.verified_classes_);
     BitVectorOr(my_deps->redefined_classes_, other_deps.redefined_classes_);
   }
@@ -272,9 +271,7 @@ ObjPtr<mirror::Class> VerifierDeps::FindOneClassPathBoundaryForInterface(
 
 void VerifierDeps::AddAssignability(const DexFile& dex_file,
                                     ObjPtr<mirror::Class> destination,
-                                    ObjPtr<mirror::Class> source,
-                                    bool is_strict,
-                                    bool is_assignable) {
+                                    ObjPtr<mirror::Class> source) {
   // Test that the method is only called on reference types.
   // Note that concurrent verification of `destination` and `source` may have
   // set their status to erroneous. However, the tests performed below rely
@@ -291,17 +288,8 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
     return;
   }
 
-  if (source->IsObjectClass() && !is_assignable) {
-    // j.l.Object is trivially non-assignable to other types, don't
-    // record it.
-    return;
-  }
-
-  if (destination == source ||
-      destination->IsObjectClass() ||
-      (!is_strict && destination->IsInterface())) {
+  if (destination == source || destination->IsObjectClass()) {
     // Cases when `destination` is trivially assignable from `source`.
-    DCHECK(is_assignable);
     return;
   }
 
@@ -317,15 +305,9 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
     if (destination_component->IsResolved() && source_component->IsResolved()) {
       AddAssignability(dex_file,
                        destination_component,
-                       source_component,
-                       /* is_strict= */ true,
-                       is_assignable);
+                       source_component);
       return;
     }
-  } else {
-    // We only do this check for non-array types, as arrays might have erroneous
-    // component types which makes the IsAssignableFrom check unreliable.
-    DCHECK_EQ(is_assignable, destination->IsAssignableFrom(source));
   }
 
   DexFileDeps* dex_deps = GetDexFileDeps(dex_file);
@@ -352,7 +334,7 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
       if (source == destination) {
         return;
       }
-    } else if (is_assignable) {
+    } else {
       source = FindOneClassPathBoundaryForInterface(destination, source);
       if (source == nullptr) {
         // There was no classpath boundary, no need to record.
@@ -367,11 +349,7 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
   dex::StringIndex destination_id = GetClassDescriptorStringId(dex_file, destination);
   dex::StringIndex source_id = GetClassDescriptorStringId(dex_file, source);
 
-  if (is_assignable) {
-    dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
-  } else {
-    dex_deps->unassignable_types_.emplace(TypeAssignability(destination_id, source_id));
-  }
+  dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
 }
 
 void VerifierDeps::MaybeRecordClassRedefinition(const DexFile& dex_file,
@@ -405,12 +383,10 @@ void VerifierDeps::RecordClassVerified(const DexFile& dex_file, const dex::Class
 
 void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
                                             ObjPtr<mirror::Class> destination,
-                                            ObjPtr<mirror::Class> source,
-                                            bool is_strict,
-                                            bool is_assignable) {
+                                            ObjPtr<mirror::Class> source) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
   if (thread_deps != nullptr) {
-    thread_deps->AddAssignability(dex_file, destination, source, is_strict, is_assignable);
+    thread_deps->AddAssignability(dex_file, destination, source);
   }
 }
 
@@ -579,7 +555,6 @@ void VerifierDeps::Encode(const std::vector<const DexFile*>& dex_files,
     const DexFileDeps& deps = *GetDexFileDeps(*dex_file);
     EncodeStringVector(buffer, deps.strings_);
     EncodeSet(buffer, deps.assignable_types_);
-    EncodeSet(buffer, deps.unassignable_types_);
     EncodeUint16SparseBitVector(buffer, deps.verified_classes_, /* sparse_value= */ false);
     EncodeUint16SparseBitVector(buffer, deps.redefined_classes_, /* sparse_value= */ true);
   }
@@ -595,8 +570,6 @@ bool VerifierDeps::DecodeDexFileDeps(DexFileDeps& deps,
           data_start, data_end, &deps.strings_) &&
       DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(
           data_start, data_end, &deps.assignable_types_) &&
-      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(
-          data_start, data_end, &deps.unassignable_types_) &&
       DecodeUint16SparseBitVector</*kFillVector=*/ true>(
           data_start, data_end, num_class_defs, /*sparse_value=*/ false, &deps.verified_classes_) &&
       DecodeUint16SparseBitVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
@@ -686,7 +659,6 @@ bool VerifierDeps::Equals(const VerifierDeps& rhs) const {
 bool VerifierDeps::DexFileDeps::Equals(const VerifierDeps::DexFileDeps& rhs) const {
   return (strings_ == rhs.strings_) &&
          (assignable_types_ == rhs.assignable_types_) &&
-         (unassignable_types_ == rhs.unassignable_types_) &&
          (verified_classes_ == rhs.verified_classes_);
 }
 
@@ -721,14 +693,6 @@ void VerifierDeps::Dump(VariableIndentationOutputStream* vios) const {
       vios->Stream()
         << GetStringFromId(dex_file, entry.GetSource())
         << " must be assignable to "
-        << GetStringFromId(dex_file, entry.GetDestination())
-        << "\n";
-    }
-
-    for (const TypeAssignability& entry : dep.second->unassignable_types_) {
-      vios->Stream()
-        << GetStringFromId(dex_file, entry.GetSource())
-        << " must not be assignable to "
         << GetStringFromId(dex_file, entry.GetDestination())
         << "\n";
     }
@@ -877,12 +841,6 @@ bool VerifierDeps::VerifyDexFile(Handle<mirror::ClassLoader> class_loader,
                              dex_file,
                              deps.assignable_types_,
                              /* expected_assignability= */ true,
-                             self,
-                             error_msg) &&
-         VerifyAssignability(class_loader,
-                             dex_file,
-                             deps.unassignable_types_,
-                             /* expected_assignability= */ false,
                              self,
                              error_msg);
 }

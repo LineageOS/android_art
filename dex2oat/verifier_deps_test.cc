@@ -199,10 +199,7 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     VerifyWithCompilerDriver(/* verifier_deps= */ nullptr);
   }
 
-  bool TestAssignabilityRecording(const std::string& dst,
-                                  const std::string& src,
-                                  bool is_strict,
-                                  bool is_assignable) {
+  bool TestAssignabilityRecording(const std::string& dst, const std::string& src) {
     ScopedObjectAccess soa(Thread::Current());
     LoadDexFile(soa);
     StackHandleScope<1> hs(soa.Self());
@@ -212,9 +209,7 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     DCHECK(klass_src != nullptr) << src;
     verifier_deps_->AddAssignability(*primary_dex_file_,
                                      klass_dst.Get(),
-                                     klass_src,
-                                     is_strict,
-                                     is_assignable);
+                                     klass_src);
     return true;
   }
 
@@ -273,12 +268,10 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
   // Iterates over all assignability records and tries to find an entry which
   // matches the expected destination/source pair.
   bool HasAssignable(const std::string& expected_destination,
-                     const std::string& expected_source,
-                     bool expected_is_assignable) {
+                     const std::string& expected_source) {
     for (auto& dex_dep : verifier_deps_->dex_deps_) {
       const DexFile& dex_file = *dex_dep.first;
-      auto& storage = expected_is_assignable ? dex_dep.second->assignable_types_
-                                             : dex_dep.second->unassignable_types_;
+      auto& storage = dex_dep.second->assignable_types_;
       for (auto& entry : storage) {
         std::string actual_destination =
             verifier_deps_->GetStringFromId(dex_file, entry.GetDestination());
@@ -310,7 +303,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     for (auto& entry : verifier_deps_->dex_deps_) {
       has_strings |= !entry.second->strings_.empty();
       has_assignability |= !entry.second->assignable_types_.empty();
-      has_assignability |= !entry.second->unassignable_types_.empty();
       has_verified_classes |= HasBoolValue(entry.second->verified_classes_, true);
       has_unverified_classes |= HasBoolValue(entry.second->verified_classes_, false);
       has_redefined_classes |= HasBoolValue(entry.second->redefined_classes_, true);
@@ -387,178 +379,125 @@ TEST_F(VerifierDepsTest, StringToId) {
 
 TEST_F(VerifierDepsTest, Assignable_BothInBoot) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/util/TimeZone;",
-                                         /* src= */ "Ljava/util/SimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ true));
-  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;", true));
+                                         /* src= */ "Ljava/util/SimpleTimeZone;"));
+  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;"));
 }
 
 TEST_F(VerifierDepsTest, Assignable_DestinationInBoot1) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/net/Socket;",
-                                         /* src= */ "LMySSLSocket;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ true));
-  ASSERT_TRUE(HasAssignable("Ljava/net/Socket;", "Ljavax/net/ssl/SSLSocket;", true));
+                                         /* src= */ "LMySSLSocket;"));
+  ASSERT_TRUE(HasAssignable("Ljava/net/Socket;", "Ljavax/net/ssl/SSLSocket;"));
 }
 
 TEST_F(VerifierDepsTest, Assignable_DestinationInBoot2) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/util/TimeZone;",
-                                         /* src= */ "LMySimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ true));
-  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;", true));
+                                         /* src= */ "LMySimpleTimeZone;"));
+  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;"));
 }
 
 TEST_F(VerifierDepsTest, Assignable_DestinationInBoot3) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/util/Collection;",
-                                         /* src= */ "LMyThreadSet;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ true));
-  ASSERT_TRUE(HasAssignable("Ljava/util/Collection;", "Ljava/util/Set;", true));
+                                         /* src= */ "LMyThreadSet;"));
+  ASSERT_TRUE(HasAssignable("Ljava/util/Collection;", "Ljava/util/Set;"));
 }
 
 TEST_F(VerifierDepsTest, Assignable_BothArrays_Resolved) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "[[Ljava/util/TimeZone;",
-                                         /* src= */ "[[Ljava/util/SimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ true));
+                                         /* src= */ "[[Ljava/util/SimpleTimeZone;"));
   // If the component types of both arrays are resolved, we optimize the list of
   // dependencies by recording a dependency on the component types.
-  ASSERT_FALSE(HasAssignable("[[Ljava/util/TimeZone;", "[[Ljava/util/SimpleTimeZone;", true));
-  ASSERT_FALSE(HasAssignable("[Ljava/util/TimeZone;", "[Ljava/util/SimpleTimeZone;", true));
-  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;", true));
-}
-
-TEST_F(VerifierDepsTest, NotAssignable_BothInBoot) {
-  ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/lang/Exception;",
-                                         /* src= */ "Ljava/util/SimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ false));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/util/SimpleTimeZone;", false));
-}
-
-TEST_F(VerifierDepsTest, NotAssignable_DestinationInBoot1) {
-  ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/lang/Exception;",
-                                         /* src= */ "LMySSLSocket;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ false));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljavax/net/ssl/SSLSocket;", false));
-}
-
-TEST_F(VerifierDepsTest, NotAssignable_DestinationInBoot2) {
-  ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/lang/Exception;",
-                                         /* src= */ "LMySimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ false));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/util/SimpleTimeZone;", false));
-}
-
-TEST_F(VerifierDepsTest, NotAssignable_BothArrays) {
-  ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "[Ljava/lang/Exception;",
-                                         /* src= */ "[Ljava/util/SimpleTimeZone;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ false));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/util/SimpleTimeZone;", false));
+  ASSERT_FALSE(HasAssignable("[[Ljava/util/TimeZone;", "[[Ljava/util/SimpleTimeZone;"));
+  ASSERT_FALSE(HasAssignable("[Ljava/util/TimeZone;", "[Ljava/util/SimpleTimeZone;"));
+  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;"));
 }
 
 TEST_F(VerifierDepsTest, ReturnType_Reference) {
   ASSERT_TRUE(VerifyMethod("ReturnType_Reference"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;", true));
-}
-
-TEST_F(VerifierDepsTest, ReturnType_Array) {
-  ASSERT_FALSE(VerifyMethod("ReturnType_Array"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Integer;", "Ljava/lang/IllegalStateException;", false));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;"));
 }
 
 TEST_F(VerifierDepsTest, InvokeArgumentType) {
   ASSERT_TRUE(VerifyMethod("InvokeArgumentType"));
-  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/util/TimeZone;", "Ljava/util/SimpleTimeZone;"));
 }
 
 TEST_F(VerifierDepsTest, MergeTypes_RegisterLines) {
   ASSERT_TRUE(VerifyMethod("MergeTypes_RegisterLines"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;", true));
+      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, MergeTypes_IfInstanceOf) {
   ASSERT_TRUE(VerifyMethod("MergeTypes_IfInstanceOf"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;", true));
-  ASSERT_TRUE(HasAssignable("Ljava/net/SocketTimeoutException;", "Ljava/lang/Exception;", false));
+      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, MergeTypes_Unresolved) {
   ASSERT_TRUE(VerifyMethod("MergeTypes_Unresolved"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "Ljava/net/SocketTimeoutException;"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;", true));
+      "Ljava/lang/Exception;", "Ljava/util/concurrent/TimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, Throw) {
   ASSERT_TRUE(VerifyMethod("Throw"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/lang/IllegalStateException;"));
 }
 
 TEST_F(VerifierDepsTest, MoveException_Resolved) {
   ASSERT_TRUE(VerifyMethod("MoveException_Resolved"));
 
   // Testing that all exception types are assignable to Throwable.
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/io/InterruptedIOException;", true));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;", true));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/util/zip/ZipException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/io/InterruptedIOException;"));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;"));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/util/zip/ZipException;"));
 
   // Testing that the merge type is assignable to Throwable.
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/io/IOException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/io/IOException;"));
 
   // Merging of exception types.
-  ASSERT_TRUE(HasAssignable("Ljava/io/IOException;", "Ljava/io/InterruptedIOException;", true));
-  ASSERT_TRUE(HasAssignable("Ljava/io/IOException;", "Ljava/util/zip/ZipException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/io/IOException;", "Ljava/io/InterruptedIOException;"));
+  ASSERT_TRUE(HasAssignable("Ljava/io/IOException;", "Ljava/util/zip/ZipException;"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
+      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInReferenced) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInReferenced"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
+      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInSuperclass1) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInSuperclass1"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
+      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InstanceField_Resolved_DeclaredInSuperclass2) {
   ASSERT_TRUE(VerifyMethod("InstanceField_Resolved_DeclaredInSuperclass2"));
   ASSERT_TRUE(HasAssignable(
-      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;", true));
+      "Ljava/io/InterruptedIOException;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInReferenced) {
   ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInReferenced"));
   // Type dependency on `this` argument.
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InvokeVirtual_Resolved_DeclaredInSuperclass1) {
   ASSERT_TRUE(VerifyMethod("InvokeVirtual_Resolved_DeclaredInSuperclass1"));
   // Type dependency on `this` argument.
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;", true));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Throwable;", "Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, InvokeSuper_ThisAssignable) {
   ASSERT_TRUE(VerifyMethod("InvokeSuper_ThisAssignable"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Runnable;", "Ljava/lang/Thread;", true));
-}
-
-TEST_F(VerifierDepsTest, InvokeSuper_ThisNotAssignable) {
-  ASSERT_FALSE(VerifyMethod("InvokeSuper_ThisNotAssignable"));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Integer;", "Ljava/lang/Thread;", false));
+  ASSERT_TRUE(HasAssignable("Ljava/lang/Runnable;", "Ljava/lang/Thread;"));
 }
 
 TEST_F(VerifierDepsTest, EncodeDecode) {
@@ -677,16 +616,6 @@ TEST_F(VerifierDepsTest, VerifyDeps) {
   // Check that dependencies are satisfied after decoding `buffer`.
   ASSERT_TRUE(RunValidation([](VerifierDeps::DexFileDeps&) {}, buffer, &error_msg))
       << error_msg;
-
-  // Mess with the dependencies to make sure we catch any change and fail to verify.
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        deps.assignable_types_.insert(*deps.unassignable_types_.begin());
-      }, buffer, &error_msg));
-
-  // Mess with the unassignable_types.
-  ASSERT_FALSE(RunValidation([](VerifierDeps::DexFileDeps& deps) {
-        deps.unassignable_types_.insert(*deps.assignable_types_.begin());
-      }, buffer, &error_msg));
 }
 
 TEST_F(VerifierDepsTest, CompilerDriver) {
@@ -738,23 +667,11 @@ TEST_F(VerifierDepsTest, MultiDexVerification) {
   ASSERT_FALSE(buffer.empty());
 }
 
-TEST_F(VerifierDepsTest, NotAssignable_InterfaceWithClassInBoot) {
-  ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "Ljava/lang/Exception;",
-                                         /* src= */ "LIface;",
-                                         /* is_strict= */ true,
-                                         /* is_assignable= */ false));
-  ASSERT_TRUE(HasAssignable("Ljava/lang/Exception;", "LIface;", false));
-}
-
 TEST_F(VerifierDepsTest, Assignable_Arrays) {
   ASSERT_TRUE(TestAssignabilityRecording(/* dst= */ "[LIface;",
-                                         /* src= */ "[LMyClassExtendingInterface;",
-                                         /* is_strict= */ false,
-                                         /* is_assignable= */ true));
+                                         /* src= */ "[LMyClassExtendingInterface;"));
   ASSERT_FALSE(HasAssignable(
-      "LIface;", "LMyClassExtendingInterface;", /* expected_is_assignable= */ true));
-  ASSERT_FALSE(HasAssignable(
-      "LIface;", "LMyClassExtendingInterface;", /* expected_is_assignable= */ false));
+      "LIface;", "LMyClassExtendingInterface;"));
 }
 
 }  // namespace verifier

@@ -89,9 +89,7 @@ class VerifierDeps {
   // owner of the method for which MethodVerifier performed the assignability test.
   static void MaybeRecordAssignability(const DexFile& dex_file,
                                        ObjPtr<mirror::Class> destination,
-                                       ObjPtr<mirror::Class> source,
-                                       bool is_strict,
-                                       bool is_assignable)
+                                       ObjPtr<mirror::Class> source)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::verifier_deps_lock_);
 
@@ -155,7 +153,6 @@ class VerifierDeps {
     // Set of class pairs recording the outcome of assignability test from one
     // of the two types to the other.
     std::set<TypeAssignability> assignable_types_;
-    std::set<TypeAssignability> unassignable_types_;
 
     // Bit vector indexed by class def indices indicating whether the corresponding
     // class was successfully verified.
@@ -213,9 +210,7 @@ class VerifierDeps {
 
   void AddAssignability(const DexFile& dex_file,
                         ObjPtr<mirror::Class> destination,
-                        ObjPtr<mirror::Class> source,
-                        bool is_strict,
-                        bool is_assignable)
+                        ObjPtr<mirror::Class> source)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool Equals(const VerifierDeps& rhs) const;
