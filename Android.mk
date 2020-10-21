@@ -349,6 +349,11 @@ include $(BUILD_PHONY_PACKAGE)
 # of the symlink is triggered by the apex_manifest.pb file which is the file
 # that is guaranteed to be created regardless of the value of
 # TARGET_FLATTEN_APEX.
+# TODO(b/171419613): the symlink is disabled because the
+# $OUT/symbols/apex/com.android.art name is taken by the com.android.art apex
+# even when com.android.art.debug is selected by TARGET_ART_APEX.
+# Disabling the symlink means that symbols for the com.android.art.debug apex
+# will not be found.
 ifeq ($(TARGET_FLATTEN_APEX),true)
 art_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_ART_APEX)/apex_manifest.pb
 else
@@ -359,13 +364,13 @@ art_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)
 $(art_apex_manifest_file): $(art_apex_symlink_timestamp)
 $(art_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art
 $(art_apex_symlink_timestamp):
-ifeq ($(TARGET_ART_APEX),com.android.art)
-	$(hide) if [ -L $(PRIVATE_LINK_NAME) ]; then rm -f $(PRIVATE_LINK_NAME); fi
-else
-	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
-	$(hide) rm -rf $(PRIVATE_LINK_NAME)
-	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
-endif
+#ifeq ($(TARGET_ART_APEX),com.android.art)
+#	$(hide) if [ -L $(PRIVATE_LINK_NAME) ]; then rm -f $(PRIVATE_LINK_NAME); fi
+#else
+#	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
+#	$(hide) rm -rf $(PRIVATE_LINK_NAME)
+#	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
+#endif
 	$(hide) touch $@
 $(art_apex_symlink_timestamp): .KATI_SYMLINK_OUTPUTS := $(PRIVATE_LINK_NAME)
 
