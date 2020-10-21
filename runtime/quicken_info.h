@@ -57,7 +57,7 @@ class QuickenInfoTable {
 
   // Returns true if the dex instruction has an index in the table. (maybe dequickenable).
   static bool NeedsIndexForInstruction(const Instruction* inst) {
-    return inst->IsQuickened() || inst->Opcode() == Instruction::NOP;
+    return inst->IsQuickened();
   }
 
   static size_t NumberOfIndices(size_t bytes) {

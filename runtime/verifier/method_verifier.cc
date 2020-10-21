@@ -1079,15 +1079,6 @@ bool MethodVerifier<kVerifierDebug>::ComputeWidthsAndCountOps() {
     if (next.IsErrorState()) {
       break;
     }
-    Instruction::Code opcode = it->Opcode();
-    switch (opcode) {
-      case Instruction::APUT_OBJECT:
-      case Instruction::CHECK_CAST:
-        has_check_casts_ = true;
-        break;
-      default:
-        break;
-    }
     GetModifiableInstructionFlags(it.DexPc()).SetIsOpcode();
   }
 
@@ -5071,7 +5062,6 @@ MethodVerifier::MethodVerifier(Thread* self,
       encountered_failure_types_(0),
       can_load_classes_(can_load_classes),
       allow_soft_failures_(allow_soft_failures),
-      has_check_casts_(false),
       class_linker_(class_linker),
       link_(nullptr) {
   self->PushVerifier(this);
