@@ -19,7 +19,7 @@ art_cc_library {
         "//frameworks/base/native/webview/loader",
     ],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
     host_supported: true,
@@ -87,8 +87,8 @@ cc_library_headers {
     name: "libnativeloader-headers",
     apex_available: [
         "//apex_available:platform",
+        "com.android.art",
         "com.android.art.debug",
-        "com.android.art.release",
     ],
     visibility: [
         "//art:__subpackages__",
