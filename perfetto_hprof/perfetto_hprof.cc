@@ -685,6 +685,7 @@ void DumpPerfetto(art::Thread* self) {
                           klass->GetLocation()));
                     type_proto->set_object_size(klass->GetObjectSize());
                     type_proto->set_kind(ProtoClassKind(klass->GetClassFlags()));
+                    type_proto->set_classloader_id(GetObjectId(klass->GetClassLoader().Ptr()));
                     if (klass->GetSuperClass().Ptr()) {
                       type_proto->set_superclass_id(
                         FindOrAppend(&interned_classes,
