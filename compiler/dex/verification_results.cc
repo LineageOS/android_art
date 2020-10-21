@@ -82,14 +82,6 @@ void VerificationResults::ProcessVerifiedMethod(verifier::MethodVerifier* method
   } else {
     // TODO: Investigate why are we doing the work again for this method and try to avoid it.
     LOG(WARNING) << "Method processed more than once: " << ref.PrettyMethod();
-    if (!Runtime::Current()->UseJitCompilation()) {
-      if (kIsDebugBuild) {
-        auto ex_set = existing->GetSafeCastSet();
-        auto ve_set = verified_method->GetSafeCastSet();
-        CHECK_EQ(ex_set == nullptr, ve_set == nullptr);
-        CHECK((ex_set == nullptr) || (ex_set->size() == ve_set->size()));
-      }
-    }
     // Let the unique_ptr delete the new verified method since there was already an existing one
     // registered. It is unsafe to replace the existing one since the JIT may be using it to
     // generate a native GC map.
