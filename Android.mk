@@ -367,6 +367,7 @@ else
 	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
 endif
 	$(hide) touch $@
+$(art_apex_symlink_timestamp): .KATI_SYMLINK_OUTPUTS := $(PRIVATE_LINK_NAME)
 
 art_apex_manifest_file :=
 
