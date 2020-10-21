@@ -362,6 +362,7 @@ $(art_apex_symlink_timestamp):
 	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
 	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
 	$(hide) touch $@
+$(art_apex_symlink_timestamp): .KATI_SYMLINK_OUTPUTS := $(PRIVATE_LINK_NAME)
 
 art_apex_manifest_file :=
 
