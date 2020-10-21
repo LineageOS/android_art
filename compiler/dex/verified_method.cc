@@ -92,9 +92,7 @@ void VerifiedMethod::GenerateSafeCastSet(verifier::MethodVerifier* method_verifi
           DCHECK(cast_type.HasClass());
           verifier::VerifierDeps::MaybeRecordAssignability(method_verifier->GetDexFile(),
                                                            cast_type.GetClass(),
-                                                           reg_type.GetClass(),
-                                                           /* is_strict= */ true,
-                                                           /* is_assignable= */ true);
+                                                           reg_type.GetClass());
         }
         if (safe_cast_set_ == nullptr) {
           safe_cast_set_.reset(new SafeCastSet());
