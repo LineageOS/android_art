@@ -37,9 +37,11 @@
           "jsr166.StampedLockTest#testReadLockInterruptibly_Interruptible",
           "jsr166.StampedLockTest#testReadLockInterruptibly",
           "jsr166.StampedLockTest#testWriteLockInterruptibly",
+          "jsr166.TimeUnitTest#testConvert",
           "libcore.java.lang.StringTest#testFastPathString_wellFormedUtf8Sequence",
           "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
           "libcore.java.math.BigIntegerTest#test_probablePrime",
+          "org.apache.harmony.luni.tests.internal.net.www.protocol.http.HttpURLConnectionTest#testUsingProxy",
           "org.apache.harmony.tests.java.lang.ProcessManagerTest#testSleep",
           "org.apache.harmony.tests.java.math.BigIntegerConstructorsTest#testConstructorPrime"
   ]
