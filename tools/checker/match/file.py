@@ -17,21 +17,24 @@ from collections import namedtuple
 from common.immutables import ImmutableDict
 from common.logger import Logger
 from file_format.checker.struct import TestStatement
-from match.line import MatchLines, EvaluateLine
+from match.line import match_lines, evaluate_line
 
 MatchScope = namedtuple("MatchScope", ["start", "end"])
 MatchInfo = namedtuple("MatchInfo", ["scope", "variables"])
 
+
 class MatchFailedException(Exception):
-  def __init__(self, statement, lineNo, variables):
+  def __init__(self, statement, line_no, variables):
     self.statement = statement
-    self.lineNo = lineNo
+    self.line_no = line_no
     self.variables = variables
 
+
 class BadStructureException(Exception):
-  def __init__(self, msg, lineNo):
+  def __init__(self, msg, line_no):
     self.msg = msg
-    self.lineNo = lineNo
+    self.line_no = line_no
+
 
 class IfStack:
   """
@@ -41,11 +44,11 @@ class IfStack:
   statements, and consequently update the stack with new information.
 
   The following elements can appear on the stack:
-  - BranchTaken: a branch is taken if its condition evaluates to true and
+  - BRANCH_TAKEN: a branch is taken if its condition evaluates to true and
     its parent branch was also previously taken.
-  - BranchNotTakenYet: the branch's parent was taken, but this branch wasn't as its
+  - BRANCH_NOT_TAKEN_YET: the branch's parent was taken, but this branch wasn't as its
     condition did not evaluate to true.
-  - BranchNotTaken: a branch is not taken when its parent was either NotTaken or NotTakenYet.
+  - BRANCH_NOT_TAKEN: a branch is not taken when its parent was either NotTaken or NotTakenYet.
     It doesn't matter if the condition would evaluate to true, that's not even checked.
 
   CHECK-IF is the only instruction that pushes a new element on the stack. CHECK-ELIF
@@ -54,110 +57,111 @@ class IfStack:
   processed just by looking at the top of the stack.
   CHECK-FI will pop the last element.
 
-  `BranchTaken`, `BranchNotTaken`, `BranchNotTakenYet` are implemented as positive integers.
-  Negated values of `BranchTaken` and `BranchNotTaken` may be appear; `-BranchTaken` and
-  `-BranchNotTaken` have the same meaning as `BranchTaken` and `BranchNotTaken`
+  `BRANCH_TAKEN`, `BRANCH_NOT_TAKEN`, `BRANCH_NOT_TAKEN_YET` are implemented as positive integers.
+  Negated values of `BRANCH_TAKEN` and `BRANCH_NOT_TAKEN` may be appear; `-BRANCH_TAKEN` and
+  `-BRANCH_NOT_TAKEN` have the same meaning as `BRANCH_TAKEN` and `BRANCH_NOT_TAKEN`
   (respectively), but they indicate that we went past the ELSE branch. Knowing that, we can
   output a precise error message if the user creates a malformed branching structure.
   """
 
-  BranchTaken, BranchNotTaken, BranchNotTakenYet = range(1, 4)
+  BRANCH_TAKEN, BRANCH_NOT_TAKEN, BRANCH_NOT_TAKEN_YET = range(1, 4)
 
   def __init__(self):
     self.stack = []
 
-  def CanExecute(self):
+  def can_execute(self):
     """
     Returns true if we're not in any branch, or the branch we're
     currently in was taken.
     """
-    if self.__isEmpty():
+    if self._is_empty():
       return True
-    return abs(self.__peek()) == IfStack.BranchTaken
+    return abs(self._peek()) == IfStack.BRANCH_TAKEN
 
-  def Handle(self, statement, variables):
+  def handle(self, statement, variables):
     """
     This function is invoked if the cursor is pointing to a
     CHECK-[IF, ELIF, ELSE, FI] line.
     """
     variant = statement.variant
-    if variant is TestStatement.Variant.If:
-      self.__if(statement, variables)
-    elif variant is TestStatement.Variant.Elif:
-      self.__elif(statement, variables)
-    elif variant is TestStatement.Variant.Else:
-      self.__else(statement)
+    if variant is TestStatement.Variant.IF:
+      self._if(statement, variables)
+    elif variant is TestStatement.Variant.ELIF:
+      self._elif(statement, variables)
+    elif variant is TestStatement.Variant.ELSE:
+      self._else(statement)
     else:
-      assert variant is TestStatement.Variant.Fi
-      self.__fi(statement)
+      assert variant is TestStatement.Variant.FI
+      self._fi(statement)
 
-  def Eof(self):
+  def eof(self):
     """
     The last line the cursor points to is always EOF.
     """
-    if not self.__isEmpty():
+    if not self._is_empty():
       raise BadStructureException("Missing CHECK-FI", -1)
 
-  def __isEmpty(self):
-    return len(self.stack) == 0
+  def _is_empty(self):
+    return not self.stack
 
-  def __if(self, statement, variables):
-    if not self.__isEmpty() and abs(self.__peek()) in [ IfStack.BranchNotTaken,
-                                                        IfStack.BranchNotTakenYet ]:
-      self.__push(IfStack.BranchNotTaken)
-    elif EvaluateLine(statement, variables):
-      self.__push(IfStack.BranchTaken)
+  def _if(self, statement, variables):
+    if not self._is_empty() and abs(self._peek()) in [IfStack.BRANCH_NOT_TAKEN,
+                                                      IfStack.BRANCH_NOT_TAKEN_YET]:
+      self._push(IfStack.BRANCH_NOT_TAKEN)
+    elif evaluate_line(statement, variables):
+      self._push(IfStack.BRANCH_TAKEN)
     else:
-      self.__push(IfStack.BranchNotTakenYet)
+      self._push(IfStack.BRANCH_NOT_TAKEN_YET)
 
-  def __elif(self, statement, variables):
-    if self.__isEmpty():
+  def _elif(self, statement, variables):
+    if self._is_empty():
       raise BadStructureException("CHECK-ELIF must be after CHECK-IF or CHECK-ELIF",
-                                  statement.lineNo)
-    if self.__peek() < 0:
-      raise BadStructureException("CHECK-ELIF cannot be after CHECK-ELSE", statement.lineNo)
-    if self.__peek() == IfStack.BranchTaken:
-      self.__setLast(IfStack.BranchNotTaken)
-    elif self.__peek() == IfStack.BranchNotTakenYet:
-      if EvaluateLine(statement, variables):
-        self.__setLast(IfStack.BranchTaken)
+                                  statement.line_no)
+    if self._peek() < 0:
+      raise BadStructureException("CHECK-ELIF cannot be after CHECK-ELSE", statement.line_no)
+    if self._peek() == IfStack.BRANCH_TAKEN:
+      self._set_last(IfStack.BRANCH_NOT_TAKEN)
+    elif self._peek() == IfStack.BRANCH_NOT_TAKEN_YET:
+      if evaluate_line(statement, variables):
+        self._set_last(IfStack.BRANCH_TAKEN)
       # else, the CHECK-ELIF condition is False, so do nothing: the last element on the stack is
-      # already set to BranchNotTakenYet.
+      # already set to BRANCH_NOT_TAKEN_YET.
     else:
-      assert self.__peek() == IfStack.BranchNotTaken
+      assert self._peek() == IfStack.BRANCH_NOT_TAKEN
 
-  def __else(self, statement):
-    if self.__isEmpty():
+  def _else(self, statement):
+    if self._is_empty():
       raise BadStructureException("CHECK-ELSE must be after CHECK-IF or CHECK-ELIF",
-                                  statement.lineNo)
-    if self.__peek() < 0:
-      raise BadStructureException("Consecutive CHECK-ELSE statements", statement.lineNo)
-    if self.__peek() in [ IfStack.BranchTaken, IfStack.BranchNotTaken ]:
-      # Notice that we're setting -BranchNotTaken rather that BranchNotTaken as we went past the
+                                  statement.line_no)
+    if self._peek() < 0:
+      raise BadStructureException("Consecutive CHECK-ELSE statements", statement.line_no)
+    if self._peek() in [IfStack.BRANCH_TAKEN, IfStack.BRANCH_NOT_TAKEN]:
+      # Notice that we're setting -BRANCH_NOT_TAKEN rather that BRANCH_NOT_TAKEN as we went past the
       # ELSE branch.
-      self.__setLast(-IfStack.BranchNotTaken)
+      self._set_last(-IfStack.BRANCH_NOT_TAKEN)
     else:
-      assert self.__peek() == IfStack.BranchNotTakenYet
-      # Setting -BranchTaken rather BranchTaken for the same reason.
-      self.__setLast(-IfStack.BranchTaken)
+      assert self._peek() == IfStack.BRANCH_NOT_TAKEN_YET
+      # Setting -BRANCH_TAKEN rather BRANCH_TAKEN for the same reason.
+      self._set_last(-IfStack.BRANCH_TAKEN)
 
-  def __fi(self, statement):
-    if self.__isEmpty():
-      raise BadStructureException("CHECK-FI does not have a matching CHECK-IF", statement.lineNo)
+  def _fi(self, statement):
+    if self._is_empty():
+      raise BadStructureException("CHECK-FI does not have a matching CHECK-IF", statement.line_no)
     self.stack.pop()
 
-  def __peek(self):
-    assert not self.__isEmpty()
+  def _peek(self):
+    assert not self._is_empty()
     return self.stack[-1]
 
-  def __push(self, element):
+  def _push(self, element):
     self.stack.append(element)
 
-  def __setLast(self, element):
+  def _set_last(self, element):
     self.stack[-1] = element
 
-def findMatchingLine(statement, c1Pass, scope, variables, excludeLines=[]):
-  """ Finds the first line in `c1Pass` which matches `statement`.
+
+def find_matching_line(statement, c1_pass, scope, variables, exclude_lines=[]):
+  """ Finds the first line in `c1_pass` which matches `statement`.
 
   Scan only lines numbered between `scope.start` and `scope.end` and not on the
   `excludeLines` list.
@@ -168,33 +172,35 @@ def findMatchingLine(statement, c1Pass, scope, variables, excludeLines=[]):
   Raises MatchFailedException if no such `c1Pass` line can be found.
   """
   for i in range(scope.start, scope.end):
-    if i in excludeLines: continue
-    newVariables = MatchLines(statement, c1Pass.body[i], variables)
-    if newVariables is not None:
-      return MatchInfo(MatchScope(i, i), newVariables)
+    if i in exclude_lines:
+      continue
+    new_variables = match_lines(statement, c1_pass.body[i], variables)
+    if new_variables is not None:
+      return MatchInfo(MatchScope(i, i), new_variables)
   raise MatchFailedException(statement, scope.start, variables)
 
-class ExecutionState(object):
-  def __init__(self, c1Pass, variables={}):
-    self.cursor = 0
-    self.c1Pass = c1Pass
-    self.c1Length = len(c1Pass.body)
-    self.variables = ImmutableDict(variables)
-    self.dagQueue = []
-    self.notQueue = []
-    self.ifStack = IfStack()
-    self.lastVariant = None
 
-  def moveCursor(self, match):
+class ExecutionState(object):
+  def __init__(self, c1_pass, variables={}):
+    self.cursor = 0
+    self.c1_pass = c1_pass
+    self.c1_length = len(c1_pass.body)
+    self.variables = ImmutableDict(variables)
+    self.dag_queue = []
+    self.not_queue = []
+    self.if_stack = IfStack()
+    self.last_variant = None
+
+  def move_cursor(self, match):
     assert self.cursor <= match.scope.end
 
     # Handle any pending NOT statements before moving the cursor
-    self.handleNotQueue(MatchScope(self.cursor, match.scope.start))
+    self.handle_not_queue(MatchScope(self.cursor, match.scope.start))
 
     self.cursor = match.scope.end + 1
     self.variables = match.variables
 
-  def handleDagQueue(self, scope):
+  def handle_dag_queue(self, scope):
     """ Attempts to find matching `c1Pass` lines for a group of DAG statements.
 
     Statements are matched in the list order and variable values propagated. Only
@@ -205,154 +211,156 @@ class ExecutionState(object):
 
     Raises MatchFailedException when a statement cannot be satisfied.
     """
-    if not self.dagQueue:
+    if not self.dag_queue:
       return
 
-    matchedLines = []
+    matched_lines = []
     variables = self.variables
 
-    for statement in self.dagQueue:
+    for statement in self.dag_queue:
       assert statement.variant == TestStatement.Variant.DAG
-      match = findMatchingLine(statement, self.c1Pass, scope, variables, matchedLines)
+      match = find_matching_line(statement, self.c1_pass, scope, variables, matched_lines)
       variables = match.variables
       assert match.scope.start == match.scope.end
-      assert match.scope.start not in matchedLines
-      matchedLines.append(match.scope.start)
+      assert match.scope.start not in matched_lines
+      matched_lines.append(match.scope.start)
 
-    match = MatchInfo(MatchScope(min(matchedLines), max(matchedLines)), variables)
-    self.dagQueue = []
-    self.moveCursor(match)
+    match = MatchInfo(MatchScope(min(matched_lines), max(matched_lines)), variables)
+    self.dag_queue = []
+    self.move_cursor(match)
 
-  def handleNotQueue(self, scope):
+  def handle_not_queue(self, scope):
     """ Verifies that none of the given NOT statements matches a line inside
         the given `scope` of `c1Pass` lines.
 
     Raises MatchFailedException if a statement matches a line in the scope.
     """
-    for statement in self.notQueue:
-      assert statement.variant == TestStatement.Variant.Not
+    for statement in self.not_queue:
+      assert statement.variant == TestStatement.Variant.NOT
       for i in range(scope.start, scope.end):
-        if MatchLines(statement, self.c1Pass.body[i], self.variables) is not None:
+        if match_lines(statement, self.c1_pass.body[i], self.variables) is not None:
           raise MatchFailedException(statement, i, self.variables)
-    self.notQueue = []
+    self.not_queue = []
 
-  def handleEOF(self):
+  def handle_eof(self):
     """ EOF marker always moves the cursor to the end of the file."""
-    match = MatchInfo(MatchScope(self.c1Length, self.c1Length), None)
-    self.moveCursor(match)
+    match = MatchInfo(MatchScope(self.c1_length, self.c1_length), None)
+    self.move_cursor(match)
 
-  def handleInOrder(self, statement):
+  def handle_in_order(self, statement):
     """ Single in-order statement. Find the first line that matches and move
         the cursor to the subsequent line.
 
     Raises MatchFailedException if no such line can be found.
     """
-    scope = MatchScope(self.cursor, self.c1Length)
-    match = findMatchingLine(statement, self.c1Pass, scope, self.variables)
-    self.moveCursor(match)
+    scope = MatchScope(self.cursor, self.c1_length)
+    match = find_matching_line(statement, self.c1_pass, scope, self.variables)
+    self.move_cursor(match)
 
-  def handleNextLine(self, statement):
+  def handle_next_line(self, statement):
     """ Single next-line statement. Test if the current line matches and move
         the cursor to the next line if it does.
 
     Raises MatchFailedException if the current line does not match.
     """
-    if self.lastVariant not in [ TestStatement.Variant.InOrder, TestStatement.Variant.NextLine ]:
+    if self.last_variant not in [TestStatement.Variant.IN_ORDER, TestStatement.Variant.NEXT_LINE]:
       raise BadStructureException("A next-line statement can only be placed "
-                  "after an in-order statement or another next-line statement.",
-                  statement.lineNo)
+                                  "after an in-order statement or another next-line statement.",
+                                  statement.line_no)
 
     scope = MatchScope(self.cursor, self.cursor + 1)
-    match = findMatchingLine(statement, self.c1Pass, scope, self.variables)
-    self.moveCursor(match)
+    match = find_matching_line(statement, self.c1_pass, scope, self.variables)
+    self.move_cursor(match)
 
-  def handleEval(self, statement):
+  def handle_eval(self, statement):
     """ Evaluates the statement in the current context.
 
     Raises MatchFailedException if the expression evaluates to False.
     """
-    if not EvaluateLine(statement, self.variables):
+    if not evaluate_line(statement, self.variables):
       raise MatchFailedException(statement, self.cursor, self.variables)
 
   def handle(self, statement):
     variant = None if statement is None else statement.variant
 
-    if variant in [ TestStatement.Variant.If,
-                    TestStatement.Variant.Elif,
-                    TestStatement.Variant.Else,
-                    TestStatement.Variant.Fi ]:
-      self.ifStack.Handle(statement, self.variables)
+    if variant in [TestStatement.Variant.IF,
+                   TestStatement.Variant.ELIF,
+                   TestStatement.Variant.ELSE,
+                   TestStatement.Variant.FI]:
+      self.if_stack.handle(statement, self.variables)
       return
 
     if variant is None:
-      self.ifStack.Eof()
+      self.if_stack.eof()
 
-    if not self.ifStack.CanExecute():
+    if not self.if_stack.can_execute():
       return
 
     # First non-DAG statement always triggers execution of any preceding
     # DAG statements.
     if variant is not TestStatement.Variant.DAG:
-      self.handleDagQueue(MatchScope(self.cursor, self.c1Length))
+      self.handle_dag_queue(MatchScope(self.cursor, self.c1_length))
 
     if variant is None:
-      self.handleEOF()
-    elif variant is TestStatement.Variant.InOrder:
-      self.handleInOrder(statement)
-    elif variant is TestStatement.Variant.NextLine:
-      self.handleNextLine(statement)
+      self.handle_eof()
+    elif variant is TestStatement.Variant.IN_ORDER:
+      self.handle_in_order(statement)
+    elif variant is TestStatement.Variant.NEXT_LINE:
+      self.handle_next_line(statement)
     elif variant is TestStatement.Variant.DAG:
-      self.dagQueue.append(statement)
-    elif variant is TestStatement.Variant.Not:
-      self.notQueue.append(statement)
+      self.dag_queue.append(statement)
+    elif variant is TestStatement.Variant.NOT:
+      self.not_queue.append(statement)
     else:
-      assert variant is TestStatement.Variant.Eval
-      self.handleEval(statement)
+      assert variant is TestStatement.Variant.EVAL
+      self.handle_eval(statement)
 
-    self.lastVariant = variant
+    self.last_variant = variant
 
-def MatchTestCase(testCase, c1Pass, instructionSetFeatures):
+
+def match_test_case(test_case, c1_pass, instruction_set_features):
   """ Runs a test case against a C1visualizer graph dump.
 
   Raises MatchFailedException when a statement cannot be satisfied.
   """
-  assert testCase.name == c1Pass.name
+  assert test_case.name == c1_pass.name
 
-  initialVariables = {"ISA_FEATURES": instructionSetFeatures}
-  state = ExecutionState(c1Pass, initialVariables)
-  testStatements = testCase.statements + [ None ]
-  for statement in testStatements:
+  initial_variables = {"ISA_FEATURES": instruction_set_features}
+  state = ExecutionState(c1_pass, initial_variables)
+  test_statements = test_case.statements + [None]
+  for statement in test_statements:
     state.handle(statement)
 
-def MatchFiles(checkerFile, c1File, targetArch, debuggableMode, printCfg):
-  for testCase in checkerFile.testCases:
-    if testCase.testArch not in [None, targetArch]:
+
+def match_files(checker_file, c1_file, target_arch, debuggable_mode, print_cfg):
+  for test_case in checker_file.test_cases:
+    if test_case.test_arch not in [None, target_arch]:
       continue
-    if testCase.forDebuggable != debuggableMode:
+    if test_case.for_debuggable != debuggable_mode:
       continue
 
     # TODO: Currently does not handle multiple occurrences of the same group
     # name, e.g. when a pass is run multiple times. It will always try to
     # match a check group against the first output group of the same name.
-    c1Pass = c1File.findPass(testCase.name)
-    if c1Pass is None:
-      with open(c1File.fullFileName) as cfgFile:
-        Logger.log(''.join(cfgFile), Logger.Level.ERROR)
+    c1_pass = c1_file.find_pass(test_case.name)
+    if c1_pass is None:
+      with open(c1_file.full_file_name) as cfg_file:
+        Logger.log("".join(cfg_file), Logger.Level.ERROR)
       Logger.fail("Test case not found in the CFG file",
-                  testCase.fullFileName, testCase.startLineNo, testCase.name)
+                  test_case.full_file_name, test_case.start_line_no, test_case.name)
 
-    Logger.startTest(testCase.name)
+    Logger.start_test(test_case.name)
     try:
-      MatchTestCase(testCase, c1Pass, c1File.instructionSetFeatures)
-      Logger.testPassed()
+      match_test_case(test_case, c1_pass, c1_file.instruction_set_features)
+      Logger.test_passed()
     except MatchFailedException as e:
-      lineNo = c1Pass.startLineNo + e.lineNo
-      if e.statement.variant == TestStatement.Variant.Not:
+      line_no = c1_pass.start_line_no + e.line_no
+      if e.statement.variant == TestStatement.Variant.NOT:
         msg = "NOT statement matched line {}"
       else:
         msg = "Statement could not be matched starting from line {}"
-      msg = msg.format(lineNo)
-      if printCfg:
-        with open(c1File.fullFileName) as cfgFile:
-          Logger.log(''.join(cfgFile), Logger.Level.Error)
-      Logger.testFailed(msg, e.statement, e.variables)
+      msg = msg.format(line_no)
+      if print_cfg:
+        with open(c1_file.full_file_name) as cfg_file:
+          Logger.log("".join(cfg_file), Logger.Level.ERROR)
+      Logger.test_failed(msg, e.statement, e.variables)
