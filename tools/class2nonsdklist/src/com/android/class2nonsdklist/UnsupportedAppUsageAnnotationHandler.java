@@ -33,6 +33,10 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
     private static final String MAX_TARGET_SDK_PROPERTY = "maxTargetSdk";
     private static final String IMPLICIT_MEMBER_PROPERTY = "implicitMember";
     private static final String PUBLIC_ALTERNATIVES_PROPERTY = "publicAlternatives";
+    private static final String TRACKING_BUG_PROPERTY = "trackingBug";
+    // we are temporarilly treating this bug id as if it is specified with maxTargetSdk=0
+    private static final Long RESTRICT_UNUSED_APIS_BUG = 170729553L;
+    private static final Integer SDK_VERSION_R = 30;
 
     private final Status mStatus;
     private final Predicate<ClassMember> mClassMemberFilter;
@@ -100,6 +104,7 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
         Integer maxTargetSdk = null;
         String implicitMemberSignature = null;
         String publicAlternativesString = null;
+        Long trackingBug = null;
 
         for (ElementValuePair property : annotation.getElementValuePairs()) {
             switch (property.getNameString()) {
@@ -140,7 +145,22 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
                 case PUBLIC_ALTERNATIVES_PROPERTY:
                     publicAlternativesString = property.getValue().stringifyValue();
                     break;
+                case TRACKING_BUG_PROPERTY:
+                    if (property.getValue().getElementValueType() != ElementValue.PRIMITIVE_LONG) {
+                        context.reportError("Expected property %s to be of type long; got %d",
+                                property.getNameString(),
+                                property.getValue().getElementValueType());
+                        return;
+                    }
+                    trackingBug = ((SimpleElementValue) property.getValue()).getValueLong();
+                    break;
             }
+        }
+
+        boolean isSpecialTrackingBug = RESTRICT_UNUSED_APIS_BUG.equals(trackingBug) &&
+                SDK_VERSION_R.equals(maxTargetSdk);
+        if (isSpecialTrackingBug) {
+            maxTargetSdk = 0;
         }
 
         if (context instanceof AnnotatedClassContext && implicitMemberSignature == null) {
@@ -176,7 +196,11 @@ public class UnsupportedAppUsageAnnotationHandler extends AnnotationHandler {
 
         // Consume this annotation if it matches the predicate.
         if (mClassMemberFilter.test(new ClassMember(signature, isBridgeMethod))) {
-            mAnnotationConsumer.consume(signature, stringifyAnnotationProperties(annotation),
+            Map<String, String> annotationProperties = stringifyAnnotationProperties(annotation);
+            if (isSpecialTrackingBug) {
+                annotationProperties.put(MAX_TARGET_SDK_PROPERTY, "0");
+            }
+            mAnnotationConsumer.consume(signature, annotationProperties,
                     ImmutableSet.of(mSdkVersionToFlagMap.get(maxTargetSdk)));
         }
     }
