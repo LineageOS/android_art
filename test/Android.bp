@@ -54,7 +54,7 @@ art_cc_defaults {
         "art_defaults",
     ],
 
-    test_suites: ["general-tests"],
+    test_suites: ["art-host-tests"],
     test_options: {
         test_suite_tag: ["art-host-gtest"],
     },
