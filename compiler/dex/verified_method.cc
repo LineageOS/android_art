@@ -43,69 +43,7 @@ const VerifiedMethod* VerifiedMethod::Create(verifier::MethodVerifier* method_ve
       new VerifiedMethod(method_verifier->GetEncounteredFailureTypes(),
                          method_verifier->HasInstructionThatWillThrow()));
 
-  if (method_verifier->HasCheckCasts()) {
-    verified_method->GenerateSafeCastSet(method_verifier);
-  }
-
   return verified_method.release();
-}
-
-bool VerifiedMethod::IsSafeCast(uint32_t pc) const {
-  if (safe_cast_set_ == nullptr) {
-    return false;
-  }
-  return std::binary_search(safe_cast_set_->begin(), safe_cast_set_->end(), pc);
-}
-
-void VerifiedMethod::GenerateSafeCastSet(verifier::MethodVerifier* method_verifier) {
-  /*
-   * Walks over the method code and adds any cast instructions in which
-   * the type cast is implicit to a set, which is used in the code generation
-   * to elide these casts.
-   */
-  if (method_verifier->HasFailures()) {
-    return;
-  }
-  for (const DexInstructionPcPair& pair : method_verifier->CodeItem()) {
-    const Instruction& inst = pair.Inst();
-    const Instruction::Code code = inst.Opcode();
-    if (code == Instruction::CHECK_CAST) {
-      const uint32_t dex_pc = pair.DexPc();
-      if (!method_verifier->GetInstructionFlags(dex_pc).IsVisited()) {
-        // Do not attempt to quicken this instruction, it's unreachable anyway.
-        continue;
-      }
-      const verifier::RegisterLine* line = method_verifier->GetRegLine(dex_pc);
-      DCHECK(line != nullptr) << "Did not have line for dex pc 0x" << std::hex << dex_pc;
-      const verifier::RegType& reg_type(line->GetRegisterType(method_verifier,
-                                                              inst.VRegA_21c()));
-      const verifier::RegType& cast_type =
-          method_verifier->ResolveCheckedClass(dex::TypeIndex(inst.VRegB_21c()));
-      // Pass null for the method verifier to not record the VerifierDeps dependency
-      // if the types are not assignable.
-      if (cast_type.IsStrictlyAssignableFrom(reg_type, /* verifier= */ nullptr)) {
-        // The types are assignable, we record that dependency in the VerifierDeps so
-        // that if this changes after OTA, we will re-verify again.
-        // We check if reg_type has a class, as the verifier may have inferred it's
-        // 'null'.
-        if (reg_type.HasClass()) {
-          DCHECK(cast_type.HasClass());
-          verifier::VerifierDeps::MaybeRecordAssignability(method_verifier->GetDexFile(),
-                                                           cast_type.GetClass(),
-                                                           reg_type.GetClass(),
-                                                           /* is_strict= */ true,
-                                                           /* is_assignable= */ true);
-        }
-        if (safe_cast_set_ == nullptr) {
-          safe_cast_set_.reset(new SafeCastSet());
-        }
-        // Verify ordering for push_back() to the sorted vector.
-        DCHECK(safe_cast_set_->empty() || safe_cast_set_->back() < dex_pc);
-        safe_cast_set_->push_back(dex_pc);
-      }
-    }
-  }
-  DCHECK(safe_cast_set_ == nullptr || !safe_cast_set_->empty());
 }
 
 }  // namespace art

@@ -183,8 +183,6 @@ class CompilerDriver {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
 
-  bool IsSafeCast(const DexCompilationUnit* mUnit, uint32_t dex_pc);
-
   size_t GetThreadCount() const {
     return parallel_thread_count_;
   }
