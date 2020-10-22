@@ -14,34 +14,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from common.immutables               import ImmutableDict
-from file_format.c1visualizer.parser import ParseC1visualizerStream
+from common.immutables import ImmutableDict
+from file_format.c1visualizer.parser import parse_c1_visualizer_stream
 from file_format.c1visualizer.struct import C1visualizerFile, C1visualizerPass
 
 import io
 import unittest
 
+
 class C1visualizerParser_Test(unittest.TestCase):
 
-  def createFile(self, data):
+  def create_file(self, data):
     """ Creates an instance of CheckerFile from provided info.
 
     Data format: ( [ <isa-feature>, ... ],
                    [ ( <case-name>, [ ( <text>, <assert-variant> ), ... ] ), ... ]
                  )
     """
-    c1File = C1visualizerFile("<c1_file>")
-    c1File.instructionSetFeatures = data[0]
-    for passEntry in data[1]:
-      passName = passEntry[0]
-      passBody = passEntry[1]
-      c1Pass = C1visualizerPass(c1File, passName, passBody, 0)
-    return c1File
+    c1_file = C1visualizerFile("<c1_file>")
+    c1_file.instruction_set_features = data[0]
+    for pass_entry in data[1]:
+      pass_name = pass_entry[0]
+      pass_body = pass_entry[1]
+      c1_pass = C1visualizerPass(c1_file, pass_name, pass_body, 0)
+    return c1_file
 
-  def assertParsesTo(self, c1Text, expectedData):
-    expectedFile = self.createFile(expectedData)
-    actualFile = ParseC1visualizerStream("<c1_file>", io.StringIO(c1Text))
-    return self.assertEqual(expectedFile, actualFile)
+  def assertParsesTo(self, c1_text, expected_data):
+    expected_file = self.create_file(expected_data)
+    actual_file = parse_c1_visualizer_stream("<c1_file>", io.StringIO(c1_text))
+    return self.assertEqual(expected_file, actual_file)
 
   def test_EmptyFile(self):
     self.assertParsesTo("", (ImmutableDict(), []))
@@ -58,8 +59,8 @@ class C1visualizerParser_Test(unittest.TestCase):
           bar
         end_cfg
       """,
-      ( ImmutableDict(), [
-        ( "MyMethod pass1", [ "foo", "bar" ] )
+      (ImmutableDict(), [
+        ("MyMethod pass1", ["foo", "bar"])
       ]))
 
   def test_MultipleGroups(self):
@@ -81,9 +82,9 @@ class C1visualizerParser_Test(unittest.TestCase):
           def
         end_cfg
       """,
-      ( ImmutableDict(), [
-        ( "MyMethod1 pass1", [ "foo", "bar" ] ),
-        ( "MyMethod1 pass2", [ "abc", "def" ] )
+      (ImmutableDict(), [
+        ("MyMethod1 pass1", ["foo", "bar"]),
+        ("MyMethod1 pass2", ["abc", "def"])
       ]))
     self.assertParsesTo(
       """
@@ -108,9 +109,9 @@ class C1visualizerParser_Test(unittest.TestCase):
           def
         end_cfg
       """,
-      ( ImmutableDict(), [
-        ( "MyMethod1 pass1", [ "foo", "bar" ] ),
-        ( "MyMethod2 pass2", [ "abc", "def" ] )
+      (ImmutableDict(), [
+        ("MyMethod1 pass1", ["foo", "bar"]),
+        ("MyMethod2 pass2", ["abc", "def"])
       ]))
 
   def test_InstructionSetFeatures(self):
@@ -122,7 +123,7 @@ class C1visualizerParser_Test(unittest.TestCase):
           date 1234
         end_compilation
       """,
-      ( ImmutableDict({"feature1": True, "feature2": False}), []))
+      (ImmutableDict({"feature1": True, "feature2": False}), []))
     self.assertParsesTo(
       """
         begin_compilation
@@ -141,8 +142,8 @@ class C1visualizerParser_Test(unittest.TestCase):
           bar
         end_cfg
       """,
-      ( ImmutableDict({"feature1": True, "feature2": False}), [
-        ( "MyMethod1 pass1", [ "foo", "bar" ] )
+      (ImmutableDict({"feature1": True, "feature2": False}), [
+        ("MyMethod1 pass1", ["foo", "bar"])
       ]))
     self.assertParsesTo(
       """
@@ -152,7 +153,7 @@ class C1visualizerParser_Test(unittest.TestCase):
           date 1234
         end_compilation
       """,
-      ( ImmutableDict({"feature1": True, "feature2": False}), []))
+      (ImmutableDict({"feature1": True, "feature2": False}), []))
     self.assertParsesTo(
       """
         begin_compilation
@@ -171,6 +172,6 @@ class C1visualizerParser_Test(unittest.TestCase):
           bar
         end_cfg
       """,
-      ( ImmutableDict({"feature1": True, "feature2": False}), [
-        ( "MyMethod1 pass1", [ "foo", "bar" ] )
+      (ImmutableDict({"feature1": True, "feature2": False}), [
+        ("MyMethod1 pass1", ["foo", "bar"])
       ]))
