@@ -15,55 +15,54 @@
 import os
 
 from common.immutables import ImmutableDict
-from common.logger     import Logger
-from common.mixins     import PrintableMixin
+from common.logger import Logger
+from common.mixins import PrintableMixin
+
 
 class C1visualizerFile(PrintableMixin):
-
-  def __init__(self, fileName):
-    self.baseFileName = os.path.basename(fileName)
-    self.fullFileName = fileName
+  def __init__(self, filename):
+    self.base_file_name = os.path.basename(filename)
+    self.full_file_name = filename
     self.passes = []
-    self.instructionSetFeatures = ImmutableDict()
+    self.instruction_set_features = ImmutableDict()
 
-  def setISAFeatures(self, features):
-    self.instructionSetFeatures = ImmutableDict(features)
+  def set_isa_features(self, features):
+    self.instruction_set_features = ImmutableDict(features)
 
-  def addPass(self, new_pass):
+  def add_pass(self, new_pass):
     self.passes.append(new_pass)
 
-  def findPass(self, name):
+  def find_pass(self, name):
     for entry in self.passes:
       if entry.name == name:
         return entry
     return None
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.passes == other.passes \
-       and self.instructionSetFeatures == other.instructionSetFeatures
+    return (isinstance(other, self.__class__)
+            and self.passes == other.passes
+            and self.instruction_set_features == other.instruction_set_features)
 
 
 class C1visualizerPass(PrintableMixin):
-
-  def __init__(self, parent, name, body, startLineNo):
+  def __init__(self, parent, name, body, start_line_no):
     self.parent = parent
     self.name = name
     self.body = body
-    self.startLineNo = startLineNo
+    self.start_line_no = start_line_no
 
     if not self.name:
-      Logger.fail("C1visualizer pass does not have a name", self.fileName, self.startLineNo)
+      Logger.fail("C1visualizer pass does not have a name", self.filename, self.start_line_no)
     if not self.body:
-      Logger.fail("C1visualizer pass does not have a body", self.fileName, self.startLineNo)
+      Logger.fail("C1visualizer pass does not have a body", self.filename, self.start_line_no)
 
-    self.parent.addPass(self)
+    self.parent.add_pass(self)
 
   @property
-  def fileName(self):
-    return self.parent.baseFileName
+  def filename(self):
+    return self.parent.base_file_name
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.name == other.name \
-       and self.body == other.body
+    return (isinstance(other, self.__class__)
+            and self.name == other.name
+            and self.body == other.body)
