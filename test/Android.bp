@@ -832,6 +832,7 @@ java_library {
         "2006-virtual-structural-finalizing/src-art/art/Test2006.java",
         "2007-virtual-structural-finalizable/src-art/art/Test2007.java",
     ],
+    sdk_version: "core_platform",
 }
 
 // CTS test runner in cts/hostsidetests/jvmti looks for an expected test
