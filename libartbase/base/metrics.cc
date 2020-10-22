@@ -59,13 +59,12 @@ ART_HISTOGRAMS(ART_HISTOGRAM)
 
 void ArtMetrics::ReportAllMetrics(MetricsBackend* backend) const {
 // Dump counters
-#define ART_COUNTER(name) backend->ReportCounter(DatumId::k##name, name()->Value());
+#define ART_COUNTER(name) name()->Report(backend);
   ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTERS
 
 // Dump histograms
-#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
-  backend->ReportHistogram(DatumId::k##name, low_value, high_value, name()->GetBuckets());
+#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) name()->Report(backend);
   ART_HISTOGRAMS(ART_HISTOGRAM)
 #undef ART_HISTOGRAM
 }
