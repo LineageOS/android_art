@@ -1349,5 +1349,10 @@
         "variant": "jvm",
         "bug": "b/154802847",
         "description": ["Failing on RI. Needs further investigating."]
+    },
+    {
+        "tests": ["2232-write-metrics-to-log"],
+        "variant": "jvm",
+        "description": ["RI does not support ART metrics."]
     }
 ]
