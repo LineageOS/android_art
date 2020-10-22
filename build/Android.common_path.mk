@@ -113,7 +113,7 @@ ART_HOST_EXECUTABLES += $(foreach name,$(ART_CORE_DEBUGGABLE_EXECUTABLES),$(name
 endif
 
 # Release ART APEX, included by default in "user" builds.
-RELEASE_ART_APEX := com.android.art.release
+RELEASE_ART_APEX := com.android.art
 # Debug ART APEX, included by default in "userdebug" and "eng"
 # builds and used in ART device benchmarking.
 DEBUG_ART_APEX := com.android.art.debug

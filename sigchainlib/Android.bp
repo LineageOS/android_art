@@ -44,7 +44,7 @@ cc_library {
 
     export_include_dirs: ["."],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
         // TODO(b/142944043) Clean this up. This is due to the dependency from
         // app_process
