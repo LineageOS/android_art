@@ -89,7 +89,7 @@ art_cc_library {
         },
     },
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
         // TODO(b/142944931): remove this
         "com.android.runtime", // due to the transitive dependency from linker

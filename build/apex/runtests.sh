@@ -133,7 +133,7 @@ function fail_check {
 # Test all modules, if possible.
 
 apex_modules=(
-  "com.android.art.release"
+  "com.android.art"
   "com.android.art.debug"
   "com.android.art.testing"
 )
@@ -181,9 +181,9 @@ for apex_module in ${apex_modules[@]}; do
       art_apex_test_args="$art_apex_test_args --debugfs $ANDROID_HOST_OUT/bin/debugfs"
     fi
     case $apex_module in
-      (*.release) test_only_args="--flavor release";;
       (*.debug)   test_only_args="--flavor debug";;
       (*.testing) test_only_args="--flavor testing";;
+      (*)         test_only_args="--flavor release";;
     esac
   fi
   say "APEX package path: $apex_path"

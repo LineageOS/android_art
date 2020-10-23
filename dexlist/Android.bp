@@ -23,7 +23,7 @@ art_cc_binary {
         "libbase",
     ],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
 }

@@ -55,7 +55,7 @@ art_cc_library {
         "libartbase",
     ],
     apex_available: [
-        "com.android.art.release",
+        "com.android.art",
         "com.android.art.debug",
     ],
 }
