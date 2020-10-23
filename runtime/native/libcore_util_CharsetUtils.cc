@@ -30,6 +30,87 @@
 
 namespace art {
 
+/**
+ * Approximates java.lang.UnsafeByteSequence so we don't have to pay the cost of calling back into
+ * Java when converting a char[] to a UTF-8 byte[]. This lets us have UTF-8 conversions slightly
+ * faster than ICU for large char[]s without paying for the NIO overhead with small char[]s.
+ *
+ * We could avoid this by keeping the UTF-8 bytes on the native heap until we're done and only
+ * creating a byte[] on the Java heap when we know how big it needs to be, but one shouldn't lie
+ * to the garbage collector (nor hide potentially large allocations from it).
+ *
+ * Because a call to append might require an allocation, it might fail. Callers should always
+ * check the return value of append.
+ */
+class NativeUnsafeByteSequence {
+ public:
+  explicit NativeUnsafeByteSequence(JNIEnv* env)
+    : mEnv(env), mJavaArray(nullptr), mRawArray(nullptr), mSize(-1), mOffset(0) {
+  }
+
+  ~NativeUnsafeByteSequence() {
+    // Release our pointer to the raw array, copying changes back to the Java heap.
+    if (mRawArray != nullptr) {
+      mEnv->ReleaseByteArrayElements(mJavaArray, mRawArray, 0);
+    }
+  }
+
+  bool append(jbyte b) {
+    if (mOffset == mSize && !resize(mSize * 2)) {
+      return false;
+    }
+    mRawArray[mOffset++] = b;
+    return true;
+  }
+
+  bool resize(int newSize) {
+    if (newSize == mSize) {
+      return true;
+    }
+
+    // Allocate a new array.
+    jbyteArray newJavaArray = mEnv->NewByteArray(newSize);
+    if (newJavaArray == nullptr) {
+      return false;
+    }
+    jbyte* newRawArray = mEnv->GetByteArrayElements(newJavaArray, nullptr);
+    if (newRawArray == nullptr) {
+      return false;
+    }
+
+    // Copy data out of the old array and then let go of it.
+    // Note that we may be trimming the array.
+    if (mRawArray != nullptr) {
+      memcpy(newRawArray, mRawArray, mOffset);
+      mEnv->ReleaseByteArrayElements(mJavaArray, mRawArray, JNI_ABORT);
+      mEnv->DeleteLocalRef(mJavaArray);
+    }
+
+    // Point ourselves at the new array.
+    mJavaArray = newJavaArray;
+    mRawArray = newRawArray;
+    mSize = newSize;
+    return true;
+  }
+
+  jbyteArray toByteArray() {
+    // Trim any unused space, if necessary.
+    bool okay = resize(mOffset);
+    return okay ? mJavaArray : nullptr;
+  }
+
+ private:
+  JNIEnv* mEnv;
+  jbyteArray mJavaArray;
+  jbyte* mRawArray;
+  jint mSize;
+  jint mOffset;
+
+  // Disallow copy and assignment.
+  NativeUnsafeByteSequence(const NativeUnsafeByteSequence&);
+  void operator=(const NativeUnsafeByteSequence&);
+};
+
 static void CharsetUtils_asciiBytesToChars(JNIEnv* env, jclass, jbyteArray javaBytes, jint offset,
                                            jint length, jcharArray javaChars) {
   ScopedByteArrayRO bytes(env, javaBytes);
@@ -75,30 +156,29 @@ static void CharsetUtils_isoLatin1BytesToChars(JNIEnv* env, jclass, jbyteArray j
  */
 static jbyteArray charsToBytes(JNIEnv* env, jstring java_string, jint offset, jint length,
                                jchar maxValidChar) {
-  ScopedFastNativeObjectAccess soa(env);
+  ScopedObjectAccess soa(env);
   StackHandleScope<1> hs(soa.Self());
   Handle<mirror::String> string(hs.NewHandle(soa.Decode<mirror::String>(java_string)));
   if (string == nullptr) {
     return nullptr;
   }
 
-  ObjPtr<mirror::ByteArray> result = mirror::ByteArray::Alloc(soa.Self(), length);
-  if (result == nullptr) {
+  jbyteArray javaBytes = env->NewByteArray(length);
+  ScopedByteArrayRW bytes(env, javaBytes);
+  if (bytes.get() == nullptr) {
     return nullptr;
   }
 
-  if (string->IsCompressed()) {
-    // All characters in a compressed string are ASCII and therefore do not need a replacement.
-    DCHECK_GE(maxValidChar, 0x7f);
-    memcpy(result->GetData(), string->GetValueCompressed() + offset, length);
-  } else {
-    const uint16_t* src = string->GetValue() + offset;
-    auto clamp = [maxValidChar](uint16_t c) {
-      return static_cast<jbyte>(dchecked_integral_cast<uint8_t>((c > maxValidChar) ? '?' : c));
-    };
-    std::transform(src, src + length, result->GetData(), clamp);
+  jbyte* dst = &bytes[0];
+  for (int i = 0; i < length; ++i) {
+    jchar ch = string->CharAt(offset + i);
+    if (ch > maxValidChar) {
+      ch = '?';
+    }
+    *dst++ = static_cast<jbyte>(ch);
   }
-  return soa.AddLocalReference<jbyteArray>(result);
+
+  return javaBytes;
 }
 
 static jbyteArray CharsetUtils_toAsciiBytes(JNIEnv* env, jclass, jstring java_string, jint offset,
@@ -113,74 +193,63 @@ static jbyteArray CharsetUtils_toIsoLatin1Bytes(JNIEnv* env, jclass, jstring jav
 
 static jbyteArray CharsetUtils_toUtf8Bytes(JNIEnv* env, jclass, jstring java_string, jint offset,
                                            jint length) {
-  ScopedFastNativeObjectAccess soa(env);
+  ScopedObjectAccess soa(env);
   StackHandleScope<1> hs(soa.Self());
   Handle<mirror::String> string(hs.NewHandle(soa.Decode<mirror::String>(java_string)));
   if (string == nullptr) {
     return nullptr;
   }
 
-  DCHECK_GE(offset, 0);
-  DCHECK_LE(offset, string->GetLength());
-  DCHECK_GE(length, 0);
-  DCHECK_LE(length, string->GetLength() - offset);
-
-  auto visit_chars16 = [string, offset, length](auto append) REQUIRES_SHARED(Locks::mutator_lock_) {
-    const uint16_t* chars16 = string->GetValue() + offset;
-    for (int i = 0; i < length; ++i) {
-      jint ch = chars16[i];
-      if (ch < 0x80) {
-        // One byte.
-        append(ch);
-      } else if (ch < 0x800) {
-        // Two bytes.
-        append((ch >> 6) | 0xc0);
-        append((ch & 0x3f) | 0x80);
-      } else if (U16_IS_SURROGATE(ch)) {
-        // A supplementary character.
-        jchar high = static_cast<jchar>(ch);
-        jchar low = (i + 1 != length) ? chars16[i + 1] : 0;
-        if (!U16_IS_SURROGATE_LEAD(high) || !U16_IS_SURROGATE_TRAIL(low)) {
-          append('?');
-          continue;
-        }
-        // Now we know we have a *valid* surrogate pair, we can consume the low surrogate.
-        ++i;
-        ch = U16_GET_SUPPLEMENTARY(high, low);
-        // Four bytes.
-        append((ch >> 18) | 0xf0);
-        append(((ch >> 12) & 0x3f) | 0x80);
-        append(((ch >> 6) & 0x3f) | 0x80);
-        append((ch & 0x3f) | 0x80);
-      } else {
-        // Three bytes.
-        append((ch >> 12) | 0xe0);
-        append(((ch >> 6) & 0x3f) | 0x80);
-        append((ch & 0x3f) | 0x80);
-      }
-    }
-  };
-
-  bool compressed = string->IsCompressed();
-  size_t utf8_length = 0;
-  if (compressed) {
-    utf8_length = length;
-  } else {
-    visit_chars16([&utf8_length](jbyte c ATTRIBUTE_UNUSED) { ++utf8_length; });
-  }
-  ObjPtr<mirror::ByteArray> result =
-      mirror::ByteArray::Alloc(soa.Self(), dchecked_integral_cast<int32_t>(utf8_length));
-  if (result == nullptr) {
+  NativeUnsafeByteSequence out(env);
+  if (!out.resize(length)) {
     return nullptr;
   }
 
-  if (compressed) {
-    memcpy(result->GetData(), string->GetValueCompressed() + offset, length);
-  } else {
-    int8_t* data = result->GetData();
-    visit_chars16([&data](jbyte c) { *data++ = c; });
+  const int end = offset + length;
+  for (int i = offset; i < end; ++i) {
+    jint ch = string->CharAt(i);
+    if (ch < 0x80) {
+      // One byte.
+      if (!out.append(ch)) {
+        return nullptr;
+      }
+    } else if (ch < 0x800) {
+      // Two bytes.
+      if (!out.append((ch >> 6) | 0xc0) || !out.append((ch & 0x3f) | 0x80)) {
+        return nullptr;
+      }
+    } else if (U16_IS_SURROGATE(ch)) {
+      // A supplementary character.
+      jchar high = static_cast<jchar>(ch);
+      jchar low = (i + 1 != end) ? string->CharAt(i + 1) : 0;
+      if (!U16_IS_SURROGATE_LEAD(high) || !U16_IS_SURROGATE_TRAIL(low)) {
+        if (!out.append('?')) {
+          return nullptr;
+        }
+        continue;
+      }
+      // Now we know we have a *valid* surrogate pair, we can consume the low surrogate.
+      ++i;
+      ch = U16_GET_SUPPLEMENTARY(high, low);
+      // Four bytes.
+      jbyte b1 = (ch >> 18) | 0xf0;
+      jbyte b2 = ((ch >> 12) & 0x3f) | 0x80;
+      jbyte b3 = ((ch >> 6) & 0x3f) | 0x80;
+      jbyte b4 = (ch & 0x3f) | 0x80;
+      if (!out.append(b1) || !out.append(b2) || !out.append(b3) || !out.append(b4)) {
+        return nullptr;
+      }
+    } else {
+      // Three bytes.
+      jbyte b1 = (ch >> 12) | 0xe0;
+      jbyte b2 = ((ch >> 6) & 0x3f) | 0x80;
+      jbyte b3 = (ch & 0x3f) | 0x80;
+      if (!out.append(b1) || !out.append(b2) || !out.append(b3)) {
+        return nullptr;
+      }
+    }
   }
-  return soa.AddLocalReference<jbyteArray>(result);
+  return out.toByteArray();
 }
 
 static JNINativeMethod gMethods[] = {
