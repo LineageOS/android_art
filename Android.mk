@@ -287,8 +287,8 @@ LOCAL_PATH := $(art_path)
 include $(CLEAR_VARS)
 
 # The ART APEX comes in three flavors:
-# - the release module (`com.android.art.release`), containing
-#   only "release" artifacts;
+# - the release module (`com.android.art`), containing only "release"
+#   artifacts;
 # - the debug module (`com.android.art.debug`), containing both
 #   "release" and "debug" artifacts, as well as additional tools;
 # - the testing module (`com.android.art.testing`), containing
@@ -339,16 +339,16 @@ ifneq ($(HOST_OS),darwin)
 endif
 include $(BUILD_PHONY_PACKAGE)
 
-# Create canonical name -> file name symlink in the symbol directory
-# The symbol files for the debug or release variant are installed to
-# $(TARGET_OUT_UNSTRIPPED)/$(TARGET_ART_APEX) directory. However,
-# since they are available via /apex/com.android.art at runtime
-# regardless of which variant is installed, create a symlink so that
+# Create canonical name -> file name symlink in the symbol directory for the
+# debug APEX. The symbol files for it are installed to
+# $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art.debug. However, since it's
+# available via /apex/com.android.art at runtime, create a symlink so that
 # $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art is linked to
-# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_ART_APEX).
-# Note that installation of the symlink is triggered by the apex_manifest.pb
-# file which is the file that is guaranteed to be created regardless of the
-# value of TARGET_FLATTEN_APEX.
+# $(TARGET_OUT_UNSTRIPPED)/apex/$(TARGET_ART_APEX). We skip this for the release
+# APEX which has com.android.art as $(TARGET_ART_APEX). Note that installation
+# of the symlink is triggered by the apex_manifest.pb file which is the file
+# that is guaranteed to be created regardless of the value of
+# TARGET_FLATTEN_APEX.
 ifeq ($(TARGET_FLATTEN_APEX),true)
 art_apex_manifest_file := $(PRODUCT_OUT)/system/apex/$(TARGET_ART_APEX)/apex_manifest.pb
 else
@@ -359,8 +359,13 @@ art_apex_symlink_timestamp := $(call intermediates-dir-for,FAKE,com.android.art)
 $(art_apex_manifest_file): $(art_apex_symlink_timestamp)
 $(art_apex_manifest_file): PRIVATE_LINK_NAME := $(TARGET_OUT_UNSTRIPPED)/apex/com.android.art
 $(art_apex_symlink_timestamp):
+ifeq ($(TARGET_ART_APEX),com.android.art)
+	$(hide) if [ -L $(PRIVATE_LINK_NAME) ]; then rm -f $(PRIVATE_LINK_NAME); fi
+else
 	$(hide) mkdir -p $(dir $(PRIVATE_LINK_NAME))
+	$(hide) rm -rf $(PRIVATE_LINK_NAME)
 	$(hide) ln -sf $(TARGET_ART_APEX) $(PRIVATE_LINK_NAME)
+endif
 	$(hide) touch $@
 $(art_apex_symlink_timestamp): .KATI_SYMLINK_OUTPUTS := $(PRIVATE_LINK_NAME)
 
@@ -377,16 +382,16 @@ LOCAL_MODULE := art-runtime
 
 # Base requirements.
 LOCAL_REQUIRED_MODULES := \
-    dalvikvm.com.android.art.release \
-    dex2oat.com.android.art.release \
-    dexoptanalyzer.com.android.art.release \
-    libart.com.android.art.release \
-    libart-compiler.com.android.art.release \
-    libopenjdkjvm.com.android.art.release \
-    libopenjdkjvmti.com.android.art.release \
-    profman.com.android.art.release \
-    libadbconnection.com.android.art.release \
-    libperfetto_hprof.com.android.art.release \
+    dalvikvm.com.android.art \
+    dex2oat.com.android.art \
+    dexoptanalyzer.com.android.art \
+    libart.com.android.art \
+    libart-compiler.com.android.art \
+    libopenjdkjvm.com.android.art \
+    libopenjdkjvmti.com.android.art \
+    profman.com.android.art \
+    libadbconnection.com.android.art \
+    libperfetto_hprof.com.android.art \
 
 # Potentially add in debug variants:
 #
@@ -709,8 +714,6 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
 	sed -i '/libdexfiled.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	sed -i '/libprofiled.so/d' $(TARGET_OUT)/etc/public.libraries.txt
 	sed -i '/libartbased.so/d' $(TARGET_OUT)/etc/public.libraries.txt
-	# The 'art' script will look for a 'com.android.art' directory.
-	ln -sf com.android.art.release $(TARGET_OUT)/apex/com.android.art
 
 ########################################################################
 # Phony target for building what go/lem requires on host.

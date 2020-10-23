@@ -41,8 +41,8 @@ cc_object {
     cflags: ["-S"],
     srcs: ["asm_defines.cc"],
     apex_available: [
+        "com.android.art",
         "com.android.art.debug",
-        "com.android.art.release",
     ],
 }
 
@@ -62,8 +62,8 @@ cc_genrule {
     },
 
     apex_available: [
+        "com.android.art",
         "com.android.art.debug",
-        "com.android.art.release",
     ],
 }
 
@@ -73,8 +73,8 @@ cc_library_headers {
     export_include_dirs: ["."],
 
     apex_available: [
+        "com.android.art",
         "com.android.art.debug",
-        "com.android.art.release",
     ],
 }
 

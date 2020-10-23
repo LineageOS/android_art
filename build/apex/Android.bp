@@ -256,7 +256,7 @@ apex_defaults {
 // variants nor tools), included in user builds. Also used for
 // storage-constrained devices in userdebug and eng builds.
 art_apex {
-    name: "com.android.art.release",
+    name: "com.android.art",
     defaults: ["com.android.art-defaults"],
     certificate: ":com.android.art.certificate",
 }
@@ -410,7 +410,7 @@ cc_defaults {
 genrule {
     name: "art-check-release-apex-gen",
     defaults: ["art-check-apex-gen-defaults"],
-    srcs: [":com.android.art.release"],
+    srcs: [":com.android.art"],
     cmd: art_check_apex_gen_stem +
         " --flavor release" +
         " $(in)" +
