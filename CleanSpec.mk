@@ -108,6 +108,9 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/apex/com.android.art)
 # Remove 'libart[d]?-simulator-container.so' which was briefly in the ART AREX.
 $(call add-clean-step, find $(OUT_DIR)/soong/.intermediates/art -name 'libart*-simulator-container.so' -type f | xargs rm -f)
 
+# Remove symbols/apex/com.android.art symlink (b/171406631)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/symbols/apex/com.android.art)
+
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
 # ************************************************
