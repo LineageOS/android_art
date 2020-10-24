@@ -12,136 +12,137 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import enum
+
 from common.logger import Logger
 from common.mixins import EqualityMixin, PrintableMixin
 
 import re
 
+
 class CheckerFile(PrintableMixin):
 
-  def __init__(self, fileName):
-    self.fileName = fileName
-    self.testCases = []
+  def __init__(self, filename):
+    self.file_name = filename
+    self.test_cases = []
 
-  def addTestCase(self, new_test_case):
-    self.testCases.append(new_test_case)
+  def add_test_case(self, new_test_case):
+    self.test_cases.append(new_test_case)
 
-  def testCasesForArch(self, targetArch):
-    return [t for t in self.testCases if t.testArch == targetArch]
+  def test_cases_for_arch(self, target_arch):
+    return [t for t in self.test_cases if t.test_arch == target_arch]
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.testCases == other.testCases
+    return isinstance(other, self.__class__) and self.test_cases == other.test_cases
 
 
 class TestCase(PrintableMixin):
 
-  def __init__(self, parent, name, startLineNo, testArch = None, forDebuggable = False):
+  def __init__(self, parent, name, start_line_no, test_arch=None, for_debuggable=False):
     assert isinstance(parent, CheckerFile)
 
     self.parent = parent
     self.name = name
     self.statements = []
-    self.startLineNo = startLineNo
-    self.testArch = testArch
-    self.forDebuggable = forDebuggable
+    self.start_line_no = start_line_no
+    self.test_arch = test_arch
+    self.for_debuggable = for_debuggable
 
     if not self.name:
-      Logger.fail("Test case does not have a name", self.fileName, self.startLineNo)
+      Logger.fail("Test case does not have a name", self.filename, self.start_line_no)
 
-    self.parent.addTestCase(self)
+    self.parent.add_test_case(self)
 
   @property
-  def fileName(self):
-    return self.parent.fileName
+  def filename(self):
+    return self.parent.file_name
 
-  def addStatement(self, new_statement):
+  def add_statement(self, new_statement):
     self.statements.append(new_statement)
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.name == other.name \
-       and self.statements == other.statements
+    return (isinstance(other, self.__class__)
+            and self.name == other.name
+            and self.statements == other.statements)
 
 
 class TestStatement(PrintableMixin):
-
-  class Variant(object):
+  class Variant(enum.IntEnum):
     """Supported types of statements."""
-    InOrder, NextLine, DAG, Not, Eval, If, Elif, Else, Fi = range(9)
+    IN_ORDER, NEXT_LINE, DAG, NOT, EVAL, IF, ELIF, ELSE, FI = range(9)
 
-  def __init__(self, parent, variant, originalText, lineNo):
+  def __init__(self, parent, variant, original_text, line_no):
     assert isinstance(parent, TestCase)
 
     self.parent = parent
     self.variant = variant
     self.expressions = []
-    self.lineNo = lineNo
-    self.originalText = originalText
+    self.line_no = line_no
+    self.original_text = original_text
 
-    self.parent.addStatement(self)
+    self.parent.add_statement(self)
 
   @property
-  def fileName(self):
-    return self.parent.fileName
+  def filename(self):
+    return self.parent.filename
 
-  def isPatternMatchContentStatement(self):
-    return self.variant in [ TestStatement.Variant.InOrder,
-                             TestStatement.Variant.NextLine,
-                             TestStatement.Variant.DAG,
-                             TestStatement.Variant.Not ]
+  def is_pattern_match_content_statement(self):
+    return self.variant in [TestStatement.Variant.IN_ORDER,
+                            TestStatement.Variant.NEXT_LINE,
+                            TestStatement.Variant.DAG,
+                            TestStatement.Variant.NOT]
 
-  def isEvalContentStatement(self):
-    return self.variant in [ TestStatement.Variant.Eval,
-                             TestStatement.Variant.If,
-                             TestStatement.Variant.Elif ]
+  def is_eval_content_statement(self):
+    return self.variant in [TestStatement.Variant.EVAL,
+                            TestStatement.Variant.IF,
+                            TestStatement.Variant.ELIF]
 
-  def isNoContentStatement(self):
-    return self.variant in [ TestStatement.Variant.Else,
-                             TestStatement.Variant.Fi ]
+  def is_no_content_statement(self):
+    return self.variant in [TestStatement.Variant.ELSE,
+                            TestStatement.Variant.FI]
 
-  def addExpression(self, new_expression):
+  def add_expression(self, new_expression):
     assert isinstance(new_expression, TestExpression)
-    if self.variant == TestStatement.Variant.Not:
-      if new_expression.variant == TestExpression.Variant.VarDef:
-        Logger.fail("CHECK-NOT lines cannot define variables", self.fileName, self.lineNo)
+    if self.variant == TestStatement.Variant.NOT:
+      if new_expression.variant == TestExpression.Variant.VAR_DEF:
+        Logger.fail("CHECK-NOT lines cannot define variables", self.filename, self.line_no)
     self.expressions.append(new_expression)
 
-  def toRegex(self):
+  def to_regex(self):
     """ Returns a regex pattern for this entire statement. Only used in tests. """
     regex = ""
     for expression in self.expressions:
-      if expression.variant == TestExpression.Variant.Separator:
+      if expression.variant == TestExpression.Variant.SEPARATOR:
         regex = regex + ", "
       else:
         regex = regex + "(" + expression.text + ")"
     return regex
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.variant == other.variant \
-       and self.expressions == other.expressions
+    return (isinstance(other, self.__class__)
+            and self.variant == other.variant
+            and self.expressions == other.expressions)
 
 
 class TestExpression(EqualityMixin, PrintableMixin):
-
-  class Variant(object):
+  class Variant:
     """Supported language constructs."""
-    PlainText, Pattern, VarRef, VarDef, Separator = range(5)
+    PLAIN_TEXT, PATTERN, VAR_REF, VAR_DEF, SEPARATOR = range(5)
 
-  class Regex(object):
-    rName = r"([a-zA-Z][a-zA-Z0-9]*)"
-    rRegex = r"(.+?)"
-    rPatternStartSym = r"(\{\{)"
-    rPatternEndSym = r"(\}\})"
-    rVariableStartSym = r"(<<)"
-    rVariableEndSym = r"(>>)"
-    rVariableSeparator = r"(:)"
-    rVariableDefinitionBody = rName + rVariableSeparator + rRegex
+  class Regex:
+    R_NAME = r"([a-zA-Z][a-zA-Z0-9]*)"
+    R_REGEX = r"(.+?)"
+    R_PATTERN_START_SYM = r"(\{\{)"
+    R_PATTERN_END_SYM = r"(\}\})"
+    R_VARIABLE_START_SYM = r"(<<)"
+    R_VARIABLE_END_SYM = r"(>>)"
+    R_VARIABLE_SEPARATOR = r"(:)"
+    R_VARIABLE_DEFINITION_BODY = R_NAME + R_VARIABLE_SEPARATOR + R_REGEX
 
-    regexPattern = rPatternStartSym + rRegex + rPatternEndSym
-    regexVariableReference = rVariableStartSym + rName + rVariableEndSym
-    regexVariableDefinition = rVariableStartSym + rVariableDefinitionBody + rVariableEndSym
+    REGEX_PATTERN = R_PATTERN_START_SYM + R_REGEX + R_PATTERN_END_SYM
+    REGEX_VARIABLE_REFERENCE = R_VARIABLE_START_SYM + R_NAME + R_VARIABLE_END_SYM
+    REGEX_VARIABLE_DEFINITION = (R_VARIABLE_START_SYM + R_VARIABLE_DEFINITION_BODY
+                                 + R_VARIABLE_END_SYM)
 
   def __init__(self, variant, name, text):
     self.variant = variant
@@ -149,33 +150,33 @@ class TestExpression(EqualityMixin, PrintableMixin):
     self.text = text
 
   def __eq__(self, other):
-    return isinstance(other, self.__class__) \
-       and self.variant == other.variant \
-       and self.name == other.name \
-       and self.text == other.text
+    return (isinstance(other, self.__class__)
+            and self.variant == other.variant
+            and self.name == other.name
+            and self.text == other.text)
 
   @staticmethod
-  def createSeparator():
-    return TestExpression(TestExpression.Variant.Separator, None, None)
+  def create_separator():
+    return TestExpression(TestExpression.Variant.SEPARATOR, None, None)
 
   @staticmethod
-  def createPlainText(text):
-    return TestExpression(TestExpression.Variant.PlainText, None, text)
+  def create_plain_text(text):
+    return TestExpression(TestExpression.Variant.PLAIN_TEXT, None, text)
 
   @staticmethod
-  def createPatternFromPlainText(text):
-    return TestExpression(TestExpression.Variant.Pattern, None, re.escape(text))
+  def create_pattern_from_plain_text(text):
+    return TestExpression(TestExpression.Variant.PATTERN, None, re.escape(text))
 
   @staticmethod
-  def createPattern(pattern):
-    return TestExpression(TestExpression.Variant.Pattern, None, pattern)
+  def create_pattern(pattern):
+    return TestExpression(TestExpression.Variant.PATTERN, None, pattern)
 
   @staticmethod
-  def createVariableReference(name):
-    assert re.match(TestExpression.Regex.rName, name)
-    return TestExpression(TestExpression.Variant.VarRef, name, None)
+  def create_variable_reference(name):
+    assert re.match(TestExpression.Regex.R_NAME, name)
+    return TestExpression(TestExpression.Variant.VAR_REF, name, None)
 
   @staticmethod
-  def createVariableDefinition(name, pattern):
-    assert re.match(TestExpression.Regex.rName, name)
-    return TestExpression(TestExpression.Variant.VarDef, name, pattern)
+  def create_variable_definition(name, pattern):
+    assert re.match(TestExpression.Regex.R_NAME, name)
+    return TestExpression(TestExpression.Variant.VAR_DEF, name, pattern)
