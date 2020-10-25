@@ -14,18 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from common.logger                 import Logger
+from common.logger import Logger
 from file_format.c1visualizer.test import C1visualizerParser_Test
-from file_format.checker.test      import CheckerParser_PrefixTest, \
-                                          CheckerParser_TestExpressionTest, \
-                                          CheckerParser_FileLayoutTest, \
-                                          CheckerParser_SuffixTests, \
-                                          CheckerParser_EvalTests
-from match.test                    import MatchLines_Test, \
-                                          MatchFiles_Test
+from file_format.checker.test import CheckerParser_PrefixTest, \
+  CheckerParser_TestExpressionTest, \
+  CheckerParser_FileLayoutTest, \
+  CheckerParser_SuffixTests, \
+  CheckerParser_EvalTests
+from match.test import MatchLines_Test, \
+  MatchFiles_Test
 
 import unittest
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   Logger.Verbosity = Logger.Level.NO_OUTPUT
   unittest.main(verbosity=2)

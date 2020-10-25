@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def SplitStream(stream, fnProcessLine, fnLineOutsideChunk):
+
+def split_stream(stream, fn_process_line, fn_line_outside_chunk):
   """ Reads the given input stream and splits it into chunks based on
       information extracted from individual lines.
 
@@ -24,12 +25,12 @@ def SplitStream(stream, fnProcessLine, fnLineOutsideChunk):
    - fnLineOutsideChunk: Called on attempt to attach data prior to creating
      a chunk.
   """
-  lineNo = 0
-  allChunks = []
-  currentChunk = None
+  line_no = 0
+  all_chunks = []
+  current_chunk = None
 
   for line in stream:
-    lineNo += 1
+    line_no += 1
     line = line.strip()
     if not line:
       continue
@@ -37,15 +38,15 @@ def SplitStream(stream, fnProcessLine, fnLineOutsideChunk):
     # Let the child class process the line and return information about it.
     # The _processLine method can modify the content of the line (or delete it
     # entirely) and specify whether it starts a new group.
-    processedLine, newChunkName, testArch = fnProcessLine(line, lineNo)
+    processed_line, new_chunk_name, test_arch = fn_process_line(line, line_no)
     # Currently, only a full chunk can be specified as architecture-specific.
-    assert testArch is None or newChunkName is not None
-    if newChunkName is not None:
-      currentChunk = (newChunkName, [], lineNo, testArch)
-      allChunks.append(currentChunk)
-    if processedLine is not None:
-      if currentChunk is not None:
-        currentChunk[1].append(processedLine)
+    assert test_arch is None or new_chunk_name is not None
+    if new_chunk_name is not None:
+      current_chunk = (new_chunk_name, [], line_no, test_arch)
+      all_chunks.append(current_chunk)
+    if processed_line is not None:
+      if current_chunk is not None:
+        current_chunk[1].append(processed_line)
       else:
-        fnLineOutsideChunk(line, lineNo)
-  return allChunks
+        fn_line_outside_chunk(line, line_no)
+  return all_chunks

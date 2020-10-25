@@ -123,11 +123,13 @@ class MetricsBackend {
                                int64_t maximum_value,
                                const std::vector<uint32_t>& buckets) = 0;
 
-  friend class ArtMetrics;
-  template <size_t num_buckets, int64_t low_value, int64_t high_value>
+  template <DatumId counter_type>
+  friend class MetricsCounter;
+  template <DatumId histogram_type, size_t num_buckets, int64_t low_value, int64_t high_value>
   friend class MetricsHistogram;
 };
 
+template <DatumId counter_type>
 class MetricsCounter {
  public:
   using value_t = uint64_t;
@@ -140,20 +142,25 @@ class MetricsCounter {
   void AddOne() { Add(1u); }
   void Add(value_t value) { value_.fetch_add(value, std::memory_order::memory_order_relaxed); }
 
-  value_t Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
+  void Report(MetricsBackend* backend) const { backend->ReportCounter(counter_type, Value()); }
 
  private:
+  value_t Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
+
   std::atomic<value_t> value_;
   static_assert(std::atomic<value_t>::is_always_lock_free);
 };
 
-template <size_t num_buckets_, int64_t minimum_value_, int64_t maximum_value_>
+template <DatumId histogram_type_,
+          size_t num_buckets_,
+          int64_t minimum_value_,
+          int64_t maximum_value_>
 class MetricsHistogram {
   static_assert(num_buckets_ >= 1);
   static_assert(minimum_value_ < maximum_value_);
 
  public:
-  using value_t = int64_t;
+  using value_t = uint32_t;
 
   constexpr MetricsHistogram() : buckets_{} {
     // Ensure we do not have any unnecessary data in this class.
@@ -165,12 +172,8 @@ class MetricsHistogram {
     buckets_[i].fetch_add(1u, std::memory_order::memory_order_relaxed);
   }
 
- protected:
-  std::vector<uint32_t> GetBuckets() const {
-    // The loads from buckets_ will all be memory_order_seq_cst, which means they will be acquire
-    // loads. This is a stricter memory order than is needed, but this should not be a
-    // performance-critical section of code.
-    return std::vector<uint32_t>{buckets_.begin(), buckets_.end()};
+  void Report(MetricsBackend* backend) const {
+    backend->ReportHistogram(histogram_type_, minimum_value_, maximum_value_, GetBuckets());
   }
 
  private:
@@ -188,10 +191,15 @@ class MetricsHistogram {
     return static_cast<size_t>(value - minimum_value_) * num_buckets_ / bucket_width;
   }
 
-  std::array<std::atomic<uint32_t>, num_buckets_> buckets_;
+  std::vector<value_t> GetBuckets() const {
+    // The loads from buckets_ will all be memory_order_seq_cst, which means they will be acquire
+    // loads. This is a stricter memory order than is needed, but this should not be a
+    // performance-critical section of code.
+    return std::vector<value_t>{buckets_.begin(), buckets_.end()};
+  }
 
-  friend class ArtMetrics;
-  static_assert(std::atomic<uint32_t>::is_always_lock_free);
+  std::array<std::atomic<value_t>, num_buckets_> buckets_;
+  static_assert(std::atomic<value_t>::is_always_lock_free);
 };
 
 /**
@@ -272,15 +280,19 @@ class ArtMetrics {
 
   void ReportAllMetrics(MetricsBackend* backend) const;
 
-#define ART_COUNTER(name)                      \
-  MetricsCounter* name() { return &name##_; }  \
-  const MetricsCounter* name() const { return &name##_; }
+#define ART_COUNTER(name)                                       \
+  MetricsCounter<DatumId::k##name>* name() { return &name##_; } \
+  const MetricsCounter<DatumId::k##name>* name() const { return &name##_; }
   ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTER
 
-#define ART_HISTOGRAM(name, num_buckets, low_value, high_value)                      \
-  MetricsHistogram<num_buckets, low_value, high_value>* name() { return &name##_; }  \
-  const MetricsHistogram<num_buckets, low_value, high_value>* name() const { return &name##_; }
+#define ART_HISTOGRAM(name, num_buckets, low_value, high_value)                                \
+  MetricsHistogram<DatumId::k##name, num_buckets, low_value, high_value>* name() {             \
+    return &name##_;                                                                           \
+  }                                                                                            \
+  const MetricsHistogram<DatumId::k##name, num_buckets, low_value, high_value>* name() const { \
+    return &name##_;                                                                           \
+  }
   ART_HISTOGRAMS(ART_HISTOGRAM)
 #undef ART_HISTOGRAM
 
@@ -294,12 +306,12 @@ class ArtMetrics {
   int unused_[0];
 #pragma clang diagnostic pop  // -Wunused-private-field
 
-#define ART_COUNTER(name) MetricsCounter name##_;
+#define ART_COUNTER(name) MetricsCounter<DatumId::k##name> name##_;
   ART_COUNTERS(ART_COUNTER)
 #undef ART_COUNTER
 
 #define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
-  MetricsHistogram<num_buckets, low_value, high_value> name##_;
+  MetricsHistogram<DatumId::k##name, num_buckets, low_value, high_value> name##_;
   ART_HISTOGRAMS(ART_HISTOGRAM)
 #undef ART_HISTOGRAM
 };
