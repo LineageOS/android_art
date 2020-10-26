@@ -578,4 +578,37 @@ public class UnsupportedAppUsageAnnotationHandlerTest extends AnnotationHandlerT
                 "trackingBug", "123456789");
     }
 
+
+    @Test
+    public void testSpecialCaseBug170729553AnnotationPropertiesIntoMap() throws IOException {
+        mJavac.addSource("annotation.Anno2", Joiner.on('\n').join(
+                "package annotation;",
+                "import static java.lang.annotation.RetentionPolicy.CLASS;",
+                "import java.lang.annotation.Retention;",
+                "@Retention(CLASS)",
+                "public @interface Anno2 {",
+                "  String expectedSignature() default \"\";",
+                "  int maxTargetSdk() default Integer.MAX_VALUE;",
+                "  long trackingBug() default 0;",
+                "}"));
+        mJavac.addSource("a.b.Class", Joiner.on('\n').join(
+                "package a.b;",
+                "import annotation.Anno2;",
+                "public class Class {",
+                "  @Anno2(maxTargetSdk=30, trackingBug=170729553)",
+                "  public int field;",
+                "}"));
+        mJavac.compile();
+        new AnnotationVisitor(mJavac.getCompiledClass("a.b.Class"), mStatus,
+                ImmutableMap.of("Lannotation/Anno2;", createGreylistHandler(x -> true,
+                        ImmutableMap.of(0, "flag0")))
+        ).visit();
+
+        assertNoErrors();
+        ArgumentCaptor<Map<String, String>> properties = ArgumentCaptor.forClass(Map.class);
+        verify(mConsumer, times(1)).consume(any(), properties.capture(), any());
+        assertThat(properties.getValue()).containsExactly(
+                "maxTargetSdk", "0",
+                "trackingBug", "170729553");
+    }
 }
