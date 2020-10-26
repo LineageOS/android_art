@@ -2020,6 +2020,7 @@ void Runtime::DumpForSigQuit(std::ostream& os) {
   }
   DumpDeoptimizations(os);
   TrackedAllocators::Dump(os);
+  GetMetrics()->DumpForSigQuit(os);
   os << "\n";
 
   thread_list_->DumpForSigQuit(os);

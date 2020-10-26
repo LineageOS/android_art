@@ -202,6 +202,25 @@ class MetricsHistogram {
   static_assert(std::atomic<value_t>::is_always_lock_free);
 };
 
+// A backend that writes metrics in a human-readable format to an std::ostream.
+class StreamBackend : public MetricsBackend {
+ public:
+  explicit StreamBackend(std::ostream& os);
+
+  void BeginSession(const SessionData& session_data) override;
+  void EndSession() override;
+
+  void ReportCounter(DatumId counter_type, uint64_t value) override;
+
+  void ReportHistogram(DatumId histogram_type,
+                       int64_t low_value,
+                       int64_t high_value,
+                       const std::vector<uint32_t>& buckets) override;
+
+ private:
+  std::ostream& os_;
+};
+
 /**
  * AutoTimer simplifies time-based metrics collection.
  *
@@ -279,6 +298,7 @@ class ArtMetrics {
   ArtMetrics();
 
   void ReportAllMetrics(MetricsBackend* backend) const;
+  void DumpForSigQuit(std::ostream& os) const;
 
 #define ART_COUNTER(name)                                       \
   MetricsCounter<DatumId::k##name>* name() { return &name##_; } \
