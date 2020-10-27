@@ -475,7 +475,7 @@ class CodeGeneratorX86_64 : public CodeGenerator {
                               Handle<mirror::Class> handle);
 
   void LoadBootImageAddress(CpuRegister reg, uint32_t boot_image_reference);
-  void AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invoke, uint32_t boot_image_offset);
+  void LoadIntrinsicDeclaringClass(CpuRegister reg, HInvoke* invoke);
 
   void EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* linker_patches) override;
 
