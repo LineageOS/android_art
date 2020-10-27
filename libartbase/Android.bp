@@ -155,6 +155,7 @@ art_cc_library {
     defaults: [
         "libartbase_defaults",
         "libart_nativeunwind_defaults",
+        "art_pgo_defaults",
     ],
     visibility: [
         // TODO(b/133140750): Clean this up.
