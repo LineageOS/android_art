@@ -223,6 +223,36 @@ art_global_defaults {
     ],
 }
 
+cc_defaults {
+    name: "art_pgo_defaults",
+    visibility: ["//art:__subpackages__"],
+    pgo: {
+        sampling: true,
+    },
+    target: {
+        android_arm64: {
+            pgo: {
+                profile_file: "art/art_arm_arm64.profdata",
+            },
+        },
+        android_arm: {
+            pgo: {
+                profile_file: "art/art_arm_arm64.profdata",
+            },
+        },
+        android_x86_64: {
+            pgo: {
+                profile_file: "art/art_x86_x86_64.profdata",
+            },
+        },
+        android_x86: {
+            pgo: {
+                profile_file: "art/art_x86_x86_64.profdata",
+            },
+        },
+    },
+}
+
 art_debug_defaults {
     name: "art_debug_defaults",
     visibility: ["//art:__subpackages__"],
