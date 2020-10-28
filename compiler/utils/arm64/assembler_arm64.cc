@@ -54,6 +54,9 @@ static void SetVIXLCPUFeaturesFromART(vixl::aarch64::MacroAssembler* vixl_masm_,
   if (art_features->HasLSE()) {
     features->Combine(vixl::CPUFeatures::kAtomics);
   }
+  if (art_features->HasSVE()) {
+    features->Combine(vixl::CPUFeatures::kSVE);
+  }
 }
 
 Arm64Assembler::Arm64Assembler(ArenaAllocator* allocator,
