@@ -60,8 +60,7 @@ static jstring String_concat(JNIEnv* env, jobject java_this, jstring java_string
   int32_t length_this = string_this->GetLength();
   int32_t length_arg = string_arg->GetLength();
   if (length_arg > 0 && length_this > 0) {
-    ObjPtr<mirror::String> result =
-        mirror::String::AllocFromStrings(soa.Self(), string_this, string_arg);
+    ObjPtr<mirror::String> result = mirror::String::DoConcat(soa.Self(), string_this, string_arg);
     return soa.AddLocalReference<jstring>(result);
   }
   jobject string_original = (length_this == 0) ? java_string_arg : java_this;
