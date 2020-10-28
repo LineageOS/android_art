@@ -144,7 +144,7 @@ class Arm64Assembler final : public Assembler {
     } else if (code == XZR) {
       return vixl::aarch64::xzr;
     }
-    return vixl::aarch64::XRegister(code);
+    return vixl::aarch64::Register::GetXRegFromCode(code);
   }
 
   static vixl::aarch64::Register reg_w(int code) {
@@ -154,15 +154,15 @@ class Arm64Assembler final : public Assembler {
     } else if (code == WZR) {
       return vixl::aarch64::wzr;
     }
-    return vixl::aarch64::WRegister(code);
+    return vixl::aarch64::Register::GetWRegFromCode(code);
   }
 
   static vixl::aarch64::VRegister reg_d(int code) {
-    return vixl::aarch64::DRegister(code);
+    return vixl::aarch64::VRegister::GetDRegFromCode(code);
   }
 
   static vixl::aarch64::VRegister reg_s(int code) {
-    return vixl::aarch64::SRegister(code);
+    return vixl::aarch64::VRegister::GetSRegFromCode(code);
   }
 
  private:
