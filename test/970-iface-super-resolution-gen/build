@@ -23,11 +23,11 @@ if [[ $@ == *"--jvm"* ]]; then
   # Build the Java files
   mkdir -p src
   mkdir -p src2
-  ./util-src/generate_java.py ./src2 ./src ./expected.txt
+  ./util-src/generate_java.py ./src2 ./src ./expected-stdout.txt
 else
-  # Generate the smali files and expected.txt or fail
+  # Generate the smali files and expected-stdout.txt or fail
   mkdir -p smali
-  ./util-src/generate_smali.py ./smali ./expected.txt
+  ./util-src/generate_smali.py ./smali ./expected-stdout.txt
 fi
 
 ./default-build "$@" --experimental default-methods
