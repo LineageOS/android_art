@@ -2768,16 +2768,16 @@ void IntrinsicCodeGeneratorARM64::VisitSystemArrayCopy(HInvoke* invoke) {
 static void GenIsInfinite(LocationSummary* locations,
                           bool is64bit,
                           MacroAssembler* masm) {
-  Operand infinity(0);
-  Operand tst_mask(0);
+  Operand infinity;
+  Operand tst_mask;
   Register out;
 
   if (is64bit) {
-    infinity = Operand(kPositiveInfinityDouble);
+    infinity = kPositiveInfinityDouble;
     tst_mask = MaskLeastSignificant<uint64_t>(63);
     out = XRegisterFrom(locations->Out());
   } else {
-    infinity = Operand(kPositiveInfinityFloat);
+    infinity = kPositiveInfinityFloat;
     tst_mask = MaskLeastSignificant<uint32_t>(31);
     out = WRegisterFrom(locations->Out());
   }
