@@ -118,6 +118,7 @@ public class Main {
 
         testEqualsConstString();
         testConstStringEquals();
+        testStringConcat();
 
         // Regression tests for String.setCharAt() breaking string compression invariants.
         Locale en_US = new Locale("en", "US");
@@ -750,6 +751,13 @@ public class Main {
         // string should be compressed. Only the low 8 bits are relevant but the whole
         // `hibyte` was erroneously tested. Bug: 63661357
         Assert.assertTrue("A".equals(new String(new byte[] { (byte)'A' }, /* hibyte */ 0x100)));
+    }
+
+    public static void testStringConcat() {
+        Assert.assertEquals("abcxyzw", "abc".concat("xyzw"));
+        Assert.assertEquals("abc\u0440", "abc".concat("\u0440"));
+        Assert.assertEquals("\u0440xyzw", "\u0440".concat("xyzw"));
+        Assert.assertEquals("abc\u0440xyzw\u0440", "abc\u0440".concat("xyzw\u0440"));
     }
 
     public static boolean $noinline$equalsConstString0(String s) {
