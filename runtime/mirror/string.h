@@ -148,9 +148,7 @@ class MANAGED String final : public Object {
                                                        gc::AllocatorType allocator_type)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
-  static ObjPtr<String> AllocFromStrings(Thread* self,
-                                         Handle<String> string,
-                                         Handle<String> string2)
+  static ObjPtr<String> DoConcat(Thread* self, Handle<String> h_this, Handle<String> h_arg)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
   static ObjPtr<String> AllocFromUtf16(Thread* self,

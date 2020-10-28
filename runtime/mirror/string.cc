@@ -112,15 +112,13 @@ ObjPtr<String> String::DoReplace(Thread* self, Handle<String> src, uint16_t old_
   return Alloc(self, length_with_flag, allocator_type, visitor);
 }
 
-ObjPtr<String> String::AllocFromStrings(Thread* self,
-                                        Handle<String> string,
-                                        Handle<String> string2) {
-  int32_t length = string->GetLength();
-  int32_t length2 = string2->GetLength();
+ObjPtr<String> String::DoConcat(Thread* self, Handle<String> h_this, Handle<String> h_arg) {
+  int32_t length_this = h_this->GetLength();
+  int32_t length_arg = h_arg->GetLength();
   gc::AllocatorType allocator_type = Runtime::Current()->GetHeap()->GetCurrentAllocator();
-  const bool compressible = kUseStringCompression &&
-      (string->IsCompressed() && string2->IsCompressed());
-  const int32_t length_with_flag = String::GetFlaggedCount(length + length2, compressible);
+  const bool compressible =
+      kUseStringCompression && (h_this->IsCompressed() && h_arg->IsCompressed());
+  const int32_t length_with_flag = String::GetFlaggedCount(length_this + length_arg, compressible);
 
   auto visitor = [=](ObjPtr<Object> obj, size_t usable_size) REQUIRES_SHARED(Locks::mutator_lock_) {
     SetStringCountVisitor set_string_count_visitor(length_with_flag);
@@ -128,25 +126,25 @@ ObjPtr<String> String::AllocFromStrings(Thread* self,
     ObjPtr<String> new_string = obj->AsString();
     if (compressible) {
       uint8_t* new_value = new_string->GetValueCompressed();
-      memcpy(new_value, string->GetValueCompressed(), length * sizeof(uint8_t));
-      memcpy(new_value + length, string2->GetValueCompressed(), length2 * sizeof(uint8_t));
+      memcpy(new_value, h_this->GetValueCompressed(), length_this * sizeof(uint8_t));
+      memcpy(new_value + length_this, h_arg->GetValueCompressed(), length_arg * sizeof(uint8_t));
     } else {
       uint16_t* new_value = new_string->GetValue();
-      if (string->IsCompressed()) {
-        const uint8_t* value = string->GetValueCompressed();
-        for (int i = 0; i < length; ++i) {
-          new_value[i] = value[i];
+      if (h_this->IsCompressed()) {
+        const uint8_t* value_this = h_this->GetValueCompressed();
+        for (int i = 0; i < length_this; ++i) {
+          new_value[i] = value_this[i];
         }
       } else {
-        memcpy(new_value, string->GetValue(), length * sizeof(uint16_t));
+        memcpy(new_value, h_this->GetValue(), length_this * sizeof(uint16_t));
       }
-      if (string2->IsCompressed()) {
-        const uint8_t* value2 = string2->GetValueCompressed();
-        for (int i = 0; i < length2; ++i) {
-          new_value[i+length] = value2[i];
+      if (h_arg->IsCompressed()) {
+        const uint8_t* value_arg = h_arg->GetValueCompressed();
+        for (int i = 0; i < length_arg; ++i) {
+          new_value[i + length_this] = value_arg[i];
         }
       } else {
-        memcpy(new_value + length, string2->GetValue(), length2 * sizeof(uint16_t));
+        memcpy(new_value + length_this, h_arg->GetValue(), length_arg * sizeof(uint16_t));
       }
     }
   };
