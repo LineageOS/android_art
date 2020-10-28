@@ -6901,11 +6901,11 @@ void CodeGeneratorARM64::CompileBakerReadBarrierThunk(Arm64Assembler& assembler,
   switch (kind) {
     case BakerReadBarrierKind::kField:
     case BakerReadBarrierKind::kAcquire: {
-      auto base_reg =
-          Register::GetXRegFromCode(BakerReadBarrierFirstRegField::Decode(encoded_data));
+      Register base_reg =
+          vixl::aarch64::XRegister(BakerReadBarrierFirstRegField::Decode(encoded_data));
       CheckValidReg(base_reg.GetCode());
-      auto holder_reg =
-          Register::GetXRegFromCode(BakerReadBarrierSecondRegField::Decode(encoded_data));
+      Register holder_reg =
+          vixl::aarch64::XRegister(BakerReadBarrierSecondRegField::Decode(encoded_data));
       CheckValidReg(holder_reg.GetCode());
       UseScratchRegisterScope temps(assembler.GetVIXLAssembler());
       temps.Exclude(ip0, ip1);
@@ -6951,8 +6951,8 @@ void CodeGeneratorARM64::CompileBakerReadBarrierThunk(Arm64Assembler& assembler,
       break;
     }
     case BakerReadBarrierKind::kArray: {
-      auto base_reg =
-          Register::GetXRegFromCode(BakerReadBarrierFirstRegField::Decode(encoded_data));
+      Register base_reg =
+          vixl::aarch64::XRegister(BakerReadBarrierFirstRegField::Decode(encoded_data));
       CheckValidReg(base_reg.GetCode());
       DCHECK_EQ(kBakerReadBarrierInvalidEncodedReg,
                 BakerReadBarrierSecondRegField::Decode(encoded_data));
@@ -6980,8 +6980,8 @@ void CodeGeneratorARM64::CompileBakerReadBarrierThunk(Arm64Assembler& assembler,
       // and it does not have a forwarding address), call the correct introspection entrypoint;
       // otherwise return the reference (or the extracted forwarding address).
       // There is no gray bit check for GC roots.
-      auto root_reg =
-          Register::GetWRegFromCode(BakerReadBarrierFirstRegField::Decode(encoded_data));
+      Register root_reg =
+          vixl::aarch64::WRegister(BakerReadBarrierFirstRegField::Decode(encoded_data));
       CheckValidReg(root_reg.GetCode());
       DCHECK_EQ(kBakerReadBarrierInvalidEncodedReg,
                 BakerReadBarrierSecondRegField::Decode(encoded_data));
