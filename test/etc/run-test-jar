@@ -1403,7 +1403,10 @@ else
           # This temporary host only path is for ICU lazy initialization output (b/171770326).
           # We are attempting to remove the ICU log entries that now happens lazily and go to
           # stderr on host.
-          $cmdline "$@" 2>&1 | sed -e 's/No timezone override.*icudt6[6-7]l.dat//'
+          $cmdline "$@" 2>&1 | sed -e '/^No timezone override.*icu_tzdata.dat$/d' \
+                                   -e '/^Time zone APEX ICU file found:.*icu_tzdata.dat$/d' \
+                                   -e '/^I18n APEX ICU file found: .*icudt6[6-7]l.dat$/d' \
+                                   -e 's/No timezone override.*icudt6[6-7]l.dat//'
           exit_value=${PIPESTATUS[0]}
         else
           $cmdline "$@" 2>&1 & pid=$!
