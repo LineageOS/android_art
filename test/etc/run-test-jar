@@ -695,7 +695,7 @@ if [ "$USE_JVM" = "y" ]; then
   if [ "$CREATE_RUNNER" = "y" ]; then
     echo "#!/bin/bash" > runit.sh
     echo "export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\""
-    echo $cmdline "2>&1" >> runit.sh
+    echo $cmdline >> runit.sh
     chmod u+x runit.sh
     echo "Runnable test script written to $PWD/runit.sh"
   else
@@ -1365,12 +1365,17 @@ else
         echo export $var="${!var}" >> ${DEX_LOCATION}/runit.sh
       done
       if [ "$DEV_MODE" = "y" ]; then
-        echo $cmdline "2>&1" >> ${DEX_LOCATION}/runit.sh
+        echo $cmdline >> ${DEX_LOCATION}/runit.sh
       else
         echo 'STDERR=$(mktemp)' >> ${DEX_LOCATION}/runit.sh
         echo 'STDOUT=$(mktemp)' >> ${DEX_LOCATION}/runit.sh
-        echo $cmdline '2>${STDERR} >${STDOUT}' >> ${DEX_LOCATION}/runit.sh
-        echo 'if diff ${STDOUT} $ANDROID_DATA/expected-stdout.txt; then' >> ${DEX_LOCATION}/runit.sh
+        echo $cmdline '>${STDOUT} 2>${STDERR}' >> ${DEX_LOCATION}/runit.sh
+        echo 'if diff ${STDOUT} $ANDROID_DATA/expected-stdout.txt; then' \
+          >> ${DEX_LOCATION}/runit.sh
+        echo '  rm -f ${STDOUT} ${STDERR}' >> ${DEX_LOCATION}/runit.sh
+        echo '  exit 0' >> ${DEX_LOCATION}/runit.sh
+        echo 'elif diff ${STDERR} $ANDROID_DATA/expected-stderr.txt; then' \
+          >> ${DEX_LOCATION}/runit.sh
         echo '  rm -f ${STDOUT} ${STDERR}' >> ${DEX_LOCATION}/runit.sh
         echo '  exit 0' >> ${DEX_LOCATION}/runit.sh
         echo 'else' >> ${DEX_LOCATION}/runit.sh
@@ -1399,7 +1404,7 @@ else
     else
       if [ "$TIME_OUT" != "gdb" ]; then
         trap 'kill -INT -$pid' INT
-        $cmdline "$@" 2>&1 & pid=$!
+        $cmdline "$@" & pid=$!
         wait $pid
         exit_value=$?
         # Add extra detail if time out is enabled.
@@ -1410,7 +1415,7 @@ else
       else
         # With a thread dump that uses gdb if a timeout.
         trap 'kill -INT -$pid' INT
-        $cmdline "$@" 2>&1 & pid=$!
+        $cmdline "$@" & pid=$!
         # Spawn a watcher process.
         ( sleep $TIME_OUT_VALUE && \
           echo "##### Thread dump using gdb on test timeout" && \
