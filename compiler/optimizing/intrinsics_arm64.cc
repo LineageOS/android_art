@@ -2873,6 +2873,66 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
   }
 }
 
+void IntrinsicLocationsBuilderARM64::VisitReferenceGetReferent(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceGetReferentLocations(invoke, codegen_);
+
+  if (kEmitCompilerReadBarrier && kUseBakerReadBarrier && invoke->GetLocations() != nullptr) {
+    invoke->GetLocations()->AddTemp(Location::RequiresRegister());
+  }
+}
+
+void IntrinsicCodeGeneratorARM64::VisitReferenceGetReferent(HInvoke* invoke) {
+  MacroAssembler* masm = GetVIXLAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+
+  Location obj = locations->InAt(0);
+  Location out = locations->Out();
+
+  SlowPathCodeARM64* slow_path = new (GetAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen_->AddSlowPath(slow_path);
+
+  if (kEmitCompilerReadBarrier) {
+    // Check self->GetWeakRefAccessEnabled().
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireW();
+    __ Ldr(temp,
+           MemOperand(tr, Thread::WeakRefAccessEnabledOffset<kArm64PointerSize>().Uint32Value()));
+    __ Cbz(temp, slow_path->GetEntryLabel());
+  }
+
+  {
+    // Load the java.lang.ref.Reference class.
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireW();
+    codegen_->LoadIntrinsicDeclaringClass(temp, invoke);
+
+    // Check static fields java.lang.ref.Reference.{disableIntrinsic,slowPathEnabled} together.
+    MemberOffset disable_intrinsic_offset = IntrinsicVisitor::GetReferenceDisableIntrinsicOffset();
+    DCHECK_ALIGNED(disable_intrinsic_offset.Uint32Value(), 2u);
+    DCHECK_EQ(disable_intrinsic_offset.Uint32Value() + 1u,
+              IntrinsicVisitor::GetReferenceSlowPathEnabledOffset().Uint32Value());
+    __ Ldrh(temp, HeapOperand(temp, disable_intrinsic_offset.Uint32Value()));
+    __ Cbnz(temp, slow_path->GetEntryLabel());
+  }
+
+  // Load the value from the field.
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
+    codegen_->GenerateFieldLoadWithBakerReadBarrier(invoke,
+                                                    out,
+                                                    WRegisterFrom(obj),
+                                                    referent_offset,
+                                                    /*maybe_temp=*/ locations->GetTemp(0),
+                                                    /*needs_null_check=*/ true,
+                                                    /*use_load_acquire=*/ true);
+  } else {
+    MemOperand field = HeapOperand(WRegisterFrom(obj), referent_offset);
+    codegen_->LoadAcquire(invoke, WRegisterFrom(out), field, /*needs_null_check=*/ true);
+    codegen_->MaybeGenerateReadBarrierSlow(invoke, out, out, obj, referent_offset);
+  }
+  __ Bind(slow_path->GetExitLabel());
+}
+
 void IntrinsicLocationsBuilderARM64::VisitThreadInterrupted(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke, LocationSummary::kNoCall, kIntrinsified);
@@ -3827,8 +3887,6 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleSetVolatile(HInvoke* invoke) {
   // ARM64 store-release instructions are implicitly sequentially consistent.
   GenerateVarHandleSet(invoke, codegen_, /*use_store_release=*/ true);
 }
-
-UNIMPLEMENTED_INTRINSIC(ARM64, ReferenceGetReferent)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOfAfter);

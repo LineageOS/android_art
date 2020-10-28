@@ -3014,6 +3014,21 @@ void IntrinsicCodeGeneratorX86::VisitSystemArrayCopy(HInvoke* invoke) {
   __ Bind(intrinsic_slow_path->GetExitLabel());
 }
 
+static void RequestBaseMethodAddressInRegister(HInvoke* invoke) {
+  LocationSummary* locations = invoke->GetLocations();
+  if (locations != nullptr) {
+    HInvokeStaticOrDirect* invoke_static_or_direct = invoke->AsInvokeStaticOrDirect();
+    // Note: The base method address is not present yet when this is called from the
+    // PCRelativeHandlerVisitor via IsCallFreeIntrinsic() to determine whether to insert it.
+    if (invoke_static_or_direct->HasSpecialInput()) {
+      DCHECK(invoke_static_or_direct->InputAt(invoke_static_or_direct->GetSpecialInputIndex())
+                 ->IsX86ComputeBaseMethodAddress());
+      locations->SetInAt(invoke_static_or_direct->GetSpecialInputIndex(),
+                         Location::RequiresRegister());
+    }
+  }
+}
+
 void IntrinsicLocationsBuilderX86::VisitIntegerValueOf(HInvoke* invoke) {
   DCHECK(invoke->IsInvokeStaticOrDirect());
   InvokeRuntimeCallingConvention calling_convention;
@@ -3022,17 +3037,7 @@ void IntrinsicLocationsBuilderX86::VisitIntegerValueOf(HInvoke* invoke) {
       codegen_,
       Location::RegisterLocation(EAX),
       Location::RegisterLocation(calling_convention.GetRegisterAt(0)));
-
-  LocationSummary* locations = invoke->GetLocations();
-  if (locations != nullptr) {
-    HInvokeStaticOrDirect* invoke_static_or_direct = invoke->AsInvokeStaticOrDirect();
-    if (invoke_static_or_direct->HasSpecialInput() &&
-        invoke->InputAt(invoke_static_or_direct->GetSpecialInputIndex())
-            ->IsX86ComputeBaseMethodAddress()) {
-      locations->SetInAt(invoke_static_or_direct->GetSpecialInputIndex(),
-                         Location::RequiresRegister());
-    }
-  }
+  RequestBaseMethodAddressInRegister(invoke);
 }
 
 void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
@@ -3105,6 +3110,61 @@ void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
     __ movl(Address(out, info.value_offset), in);
     __ Bind(&done);
   }
+}
+
+void IntrinsicLocationsBuilderX86::VisitReferenceGetReferent(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceGetReferentLocations(invoke, codegen_);
+  RequestBaseMethodAddressInRegister(invoke);
+}
+
+void IntrinsicCodeGeneratorX86::VisitReferenceGetReferent(HInvoke* invoke) {
+  X86Assembler* assembler = GetAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+
+  Location obj = locations->InAt(0);
+  Location out = locations->Out();
+
+  SlowPathCode* slow_path = new (GetAllocator()) IntrinsicSlowPathX86(invoke);
+  codegen_->AddSlowPath(slow_path);
+
+  if (kEmitCompilerReadBarrier) {
+    // Check self->GetWeakRefAccessEnabled().
+    ThreadOffset32 offset = Thread::WeakRefAccessEnabledOffset<kX86PointerSize>();
+    __ fs()->cmpl(Address::Absolute(offset), Immediate(0));
+    __ j(kEqual, slow_path->GetEntryLabel());
+  }
+
+  // Load the java.lang.ref.Reference class, use the output register as a temporary.
+  codegen_->LoadIntrinsicDeclaringClass(out.AsRegister<Register>(),
+                                        invoke->AsInvokeStaticOrDirect());
+
+  // Check static fields java.lang.ref.Reference.{disableIntrinsic,slowPathEnabled} together.
+  MemberOffset disable_intrinsic_offset = IntrinsicVisitor::GetReferenceDisableIntrinsicOffset();
+  DCHECK_ALIGNED(disable_intrinsic_offset.Uint32Value(), 2u);
+  DCHECK_EQ(disable_intrinsic_offset.Uint32Value() + 1u,
+            IntrinsicVisitor::GetReferenceSlowPathEnabledOffset().Uint32Value());
+  __ cmpw(Address(out.AsRegister<Register>(), disable_intrinsic_offset.Uint32Value()),
+          Immediate(0));
+  __ j(kNotEqual, slow_path->GetEntryLabel());
+
+  // Load the value from the field.
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
+    codegen_->GenerateFieldLoadWithBakerReadBarrier(invoke,
+                                                    out,
+                                                    obj.AsRegister<Register>(),
+                                                    referent_offset,
+                                                    /*needs_null_check=*/ true);
+    // Note that the fence is a no-op, thanks to the x86 memory model.
+    codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
+  } else {
+    __ movl(out.AsRegister<Register>(), Address(obj.AsRegister<Register>(), referent_offset));
+    codegen_->MaybeRecordImplicitNullCheck(invoke);
+    // Note that the fence is a no-op, thanks to the x86 memory model.
+    codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
+    codegen_->MaybeGenerateReadBarrierSlow(invoke, out, out, obj, referent_offset);
+  }
+  __ Bind(slow_path->GetExitLabel());
 }
 
 void IntrinsicLocationsBuilderX86::VisitThreadInterrupted(HInvoke* invoke) {
@@ -4499,7 +4559,6 @@ void IntrinsicCodeGeneratorX86::VisitVarHandleGetAndBitwiseAndRelease(HInvoke* i
 }
 
 UNIMPLEMENTED_INTRINSIC(X86, MathRoundDouble)
-UNIMPLEMENTED_INTRINSIC(X86, ReferenceGetReferent)
 UNIMPLEMENTED_INTRINSIC(X86, FloatIsInfinite)
 UNIMPLEMENTED_INTRINSIC(X86, DoubleIsInfinite)
 UNIMPLEMENTED_INTRINSIC(X86, IntegerHighestOneBit)
