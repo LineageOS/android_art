@@ -21,6 +21,7 @@
 #include "base/utils.h"
 #include "class_linker.h"
 #include "class_root-inl.h"
+#include "code_generator.h"
 #include "dex/invoke_type.h"
 #include "driver/compiler_options.h"
 #include "gc/space/image_space.h"
@@ -152,13 +153,14 @@ void IntrinsicVisitor::ComputeIntegerValueOfLocations(HInvoke* invoke,
   // The intrinsic will call if it needs to allocate a j.l.Integer.
   LocationSummary::CallKind call_kind = LocationSummary::kCallOnMainOnly;
   const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
+  // Piggyback on the method load kind to determine whether we can use PC-relative addressing
+  // for AOT. This should cover both the testing config (non-PIC boot image) and codegens that
+  // reject PC-relative load kinds and fall back to the runtime call.
+  if (compiler_options.IsAotCompiler() &&
+      !invoke->AsInvokeStaticOrDirect()->HasPcRelativeMethodLoadKind()) {
+    return;
+  }
   if (compiler_options.IsBootImage()) {
-    // Piggyback on the method load kind to determine whether we can use PC-relative addressing.
-    // This should cover both the testing config (non-PIC boot image) and codegens that reject
-    // PC-relative load kinds and fall back to the runtime call.
-    if (!invoke->AsInvokeStaticOrDirect()->HasPcRelativeMethodLoadKind()) {
-      return;
-    }
     if (!compiler_options.IsImageClass(kIntegerCacheDescriptor) ||
         !compiler_options.IsImageClass(kIntegerDescriptor)) {
       return;
@@ -261,18 +263,10 @@ static int32_t GetIntegerCacheLowFromIntegerCache(Thread* self, ClassLinker* cla
   return GetIntegerCacheField(cache_class, kLowFieldName);
 }
 
-static uint32_t CalculateBootImageOffset(ObjPtr<mirror::Object> object)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  gc::Heap* heap = Runtime::Current()->GetHeap();
-  DCHECK(heap->ObjectIsInBootImageSpace(object));
-  return reinterpret_cast<const uint8_t*>(object.Ptr()) - heap->GetBootImageSpaces()[0]->Begin();
-}
-
 inline IntrinsicVisitor::IntegerValueOfInfo::IntegerValueOfInfo()
     : value_offset(0),
       low(0),
       length(0u),
-      integer_boot_image_offset(kInvalidReference),
       value_boot_image_reference(kInvalidReference) {}
 
 IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo(
@@ -293,8 +287,8 @@ IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo
 
   IntegerValueOfInfo info;
   if (compiler_options.IsBootImage()) {
-    ObjPtr<mirror::Class> integer_class =
-        LookupInitializedClass(self, class_linker, kIntegerDescriptor);
+    ObjPtr<mirror::Class> integer_class = invoke->GetResolvedMethod()->GetDeclaringClass();
+    DCHECK(integer_class->DescriptorEquals(kIntegerDescriptor));
     ArtField* value_field = integer_class->FindDeclaredInstanceField(kValueFieldName, "I");
     DCHECK(value_field != nullptr);
     info.value_offset = value_field->GetOffset().Uint32Value();
@@ -304,7 +298,6 @@ IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo
     int32_t high = GetIntegerCacheField(cache_class, kHighFieldName);
     info.length = dchecked_integral_cast<uint32_t>(high - info.low + 1);
 
-    info.integer_boot_image_offset = IntegerValueOfInfo::kInvalidReference;
     if (invoke->InputAt(0)->IsIntConstant()) {
       int32_t input_value = invoke->InputAt(0)->AsIntConstant()->GetValue();
       uint32_t index = static_cast<uint32_t>(input_value) - static_cast<uint32_t>(info.low);
@@ -340,21 +333,20 @@ IntrinsicVisitor::IntegerValueOfInfo IntrinsicVisitor::ComputeIntegerValueOfInfo
     info.length = dchecked_integral_cast<uint32_t>(
         IntrinsicObjects::GetIntegerValueOfCache(boot_image_live_objects)->GetLength());
 
-    info.integer_boot_image_offset = CalculateBootImageOffset(integer_class);
     if (invoke->InputAt(0)->IsIntConstant()) {
       int32_t input_value = invoke->InputAt(0)->AsIntConstant()->GetValue();
       uint32_t index = static_cast<uint32_t>(input_value) - static_cast<uint32_t>(info.low);
       if (index < static_cast<uint32_t>(info.length)) {
         ObjPtr<mirror::Object> integer =
             IntrinsicObjects::GetIntegerValueOfObject(boot_image_live_objects, index);
-        info.value_boot_image_reference = CalculateBootImageOffset(integer);
+        info.value_boot_image_reference = CodeGenerator::GetBootImageOffset(integer);
       } else {
         // Not in the cache.
         info.value_boot_image_reference = IntegerValueOfInfo::kInvalidReference;
       }
     } else {
       info.array_data_boot_image_reference =
-          CalculateBootImageOffset(boot_image_live_objects) +
+          CodeGenerator::GetBootImageOffset(boot_image_live_objects) +
           IntrinsicObjects::GetIntegerValueOfArrayDataOffset(boot_image_live_objects).Uint32Value();
     }
   }
