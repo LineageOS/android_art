@@ -2825,6 +2825,12 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
   Register out = RegisterFrom(locations->Out(), DataType::Type::kReference);
   UseScratchRegisterScope temps(masm);
   Register temp = temps.AcquireW();
+  auto allocate_instance = [&]() {
+    DCHECK(out.X().Is(InvokeRuntimeCallingConvention().GetRegisterAt(0)));
+    codegen_->LoadIntrinsicDeclaringClass(out, invoke);
+    codegen_->InvokeRuntime(kQuickAllocObjectInitialized, invoke, invoke->GetDexPc());
+    CheckEntrypointTypes<kQuickAllocObjectWithChecks, void*, mirror::Class*>();
+  };
   if (invoke->InputAt(0)->IsConstant()) {
     int32_t value = invoke->InputAt(0)->AsIntConstant()->GetValue();
     if (static_cast<uint32_t>(value - info.low) < info.length) {
@@ -2836,12 +2842,10 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
       // Allocate and initialize a new j.l.Integer.
       // TODO: If we JIT, we could allocate the j.l.Integer now, and store it in the
       // JIT object table.
-      codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                             info.integer_boot_image_offset);
+      allocate_instance();
       __ Mov(temp.W(), value);
       __ Str(temp.W(), HeapOperand(out.W(), info.value_offset));
-      // `value` is a final field :-( Ideally, we'd merge this memory barrier with the allocation
-      // one.
+      // `value` is a final field, emit the barrier after we have stored it.
       codegen_->GenerateMemoryBarrier(MemBarrierKind::kStoreStore);
     }
   } else {
@@ -2861,11 +2865,9 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
     __ B(&done);
     __ Bind(&allocate);
     // Otherwise allocate and initialize a new j.l.Integer.
-    codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                           info.integer_boot_image_offset);
+    allocate_instance();
     __ Str(in.W(), HeapOperand(out.W(), info.value_offset));
-    // `value` is a final field :-( Ideally, we'd merge this memory barrier with the allocation
-    // one.
+    // `value` is a final field, emit the barrier after we have stored it.
     codegen_->GenerateMemoryBarrier(MemBarrierKind::kStoreStore);
     __ Bind(&done);
   }

@@ -495,7 +495,7 @@ class CodeGeneratorX86 : public CodeGenerator {
   void LoadBootImageAddress(Register reg,
                             uint32_t boot_image_reference,
                             HInvokeStaticOrDirect* invoke);
-  void AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invoke, uint32_t boot_image_offset);
+  void LoadIntrinsicDeclaringClass(Register reg, HInvokeStaticOrDirect* invoke);
 
   Label* NewJitRootStringPatch(const DexFile& dex_file,
                                dex::StringIndex string_index,

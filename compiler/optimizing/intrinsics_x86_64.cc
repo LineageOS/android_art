@@ -2616,6 +2616,11 @@ void IntrinsicCodeGeneratorX86_64::VisitIntegerValueOf(HInvoke* invoke) {
   CpuRegister out = locations->Out().AsRegister<CpuRegister>();
   InvokeRuntimeCallingConvention calling_convention;
   CpuRegister argument = CpuRegister(calling_convention.GetRegisterAt(0));
+  auto allocate_instance = [&]() {
+    codegen_->LoadIntrinsicDeclaringClass(argument, invoke);
+    codegen_->InvokeRuntime(kQuickAllocObjectInitialized, invoke, invoke->GetDexPc());
+    CheckEntrypointTypes<kQuickAllocObjectWithChecks, void*, mirror::Class*>();
+  };
   if (invoke->InputAt(0)->IsIntConstant()) {
     int32_t value = invoke->InputAt(0)->AsIntConstant()->GetValue();
     if (static_cast<uint32_t>(value - info.low) < info.length) {
@@ -2627,8 +2632,7 @@ void IntrinsicCodeGeneratorX86_64::VisitIntegerValueOf(HInvoke* invoke) {
       // Allocate and initialize a new j.l.Integer.
       // TODO: If we JIT, we could allocate the j.l.Integer now, and store it in the
       // JIT object table.
-      codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                             info.integer_boot_image_offset);
+      allocate_instance();
       __ movl(Address(out, info.value_offset), Immediate(value));
     }
   } else {
@@ -2649,8 +2653,7 @@ void IntrinsicCodeGeneratorX86_64::VisitIntegerValueOf(HInvoke* invoke) {
     __ jmp(&done);
     __ Bind(&allocate);
     // Otherwise allocate and initialize a new j.l.Integer.
-    codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                           info.integer_boot_image_offset);
+    allocate_instance();
     __ movl(Address(out, info.value_offset), in);
     __ Bind(&done);
   }

@@ -5506,29 +5506,24 @@ void CodeGeneratorX86::LoadBootImageAddress(Register reg,
   }
 }
 
-void CodeGeneratorX86::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invoke,
-                                                    uint32_t boot_image_offset) {
-  DCHECK(invoke->IsStatic());
-  InvokeRuntimeCallingConvention calling_convention;
-  Register argument = calling_convention.GetRegisterAt(0);
+void CodeGeneratorX86::LoadIntrinsicDeclaringClass(Register reg, HInvokeStaticOrDirect* invoke) {
+  DCHECK_NE(invoke->GetIntrinsic(), Intrinsics::kNone);
   if (GetCompilerOptions().IsBootImage()) {
-    DCHECK_EQ(boot_image_offset, IntrinsicVisitor::IntegerValueOfInfo::kInvalidReference);
     // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
     HX86ComputeBaseMethodAddress* method_address =
         invoke->InputAt(invoke->GetSpecialInputIndex())->AsX86ComputeBaseMethodAddress();
     DCHECK(method_address != nullptr);
     Register method_address_reg =
         invoke->GetLocations()->InAt(invoke->GetSpecialInputIndex()).AsRegister<Register>();
-    __ leal(argument, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
+    __ leal(reg, Address(method_address_reg, CodeGeneratorX86::kPlaceholder32BitOffset));
     MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     boot_image_type_patches_.emplace_back(method_address, target_method.dex_file, type_idx.index_);
     __ Bind(&boot_image_type_patches_.back().label);
   } else {
-    LoadBootImageAddress(argument, boot_image_offset, invoke);
+    uint32_t boot_image_offset = GetBootImageOffsetOfIntrinsicDeclaringClass(invoke);
+    LoadBootImageAddress(reg, boot_image_offset, invoke);
   }
-  InvokeRuntime(kQuickAllocObjectInitialized, invoke, invoke->GetDexPc());
-  CheckEntrypointTypes<kQuickAllocObjectWithChecks, void*, mirror::Class*>();
 }
 
 // The label points to the end of the "movl" or another instruction but the literal offset
@@ -7147,7 +7142,7 @@ void InstructionCodeGeneratorX86::VisitLoadClass(HLoadClass* cls) NO_THREAD_SAFE
       Register method_address = locations->InAt(0).AsRegister<Register>();
       __ movl(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageRelRoPatch(cls->InputAt(0)->AsX86ComputeBaseMethodAddress(),
-                                          codegen_->GetBootImageOffset(cls));
+                                          CodeGenerator::GetBootImageOffset(cls));
       break;
     }
     case HLoadClass::LoadKind::kBssEntry:
@@ -7346,7 +7341,7 @@ void InstructionCodeGeneratorX86::VisitLoadString(HLoadString* load) NO_THREAD_S
       Register method_address = locations->InAt(0).AsRegister<Register>();
       __ movl(out, Address(method_address, CodeGeneratorX86::kPlaceholder32BitOffset));
       codegen_->RecordBootImageRelRoPatch(load->InputAt(0)->AsX86ComputeBaseMethodAddress(),
-                                          codegen_->GetBootImageOffset(load));
+                                          CodeGenerator::GetBootImageOffset(load));
       return;
     }
     case HLoadString::LoadKind::kBssEntry: {
