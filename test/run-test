@@ -352,6 +352,9 @@ while true; do
     elif [ "x$1" = "x--no-precise" ]; then
         run_args+=(--no-precise)
         shift
+    elif [ "x$1" = "x--external-log-tags" ]; then
+        run_args+=(--external-log-tags)
+        shift
     elif [ "x$1" = "x--invoke-with" ]; then
         shift
         what="$1"
@@ -851,6 +854,8 @@ if [ "$usage" = "yes" ]; then
         echo "    --instruction-set-features [string]"
         echo "                          Set instruction-set-features for compilation."
         echo "    --quiet               Don't print anything except failure messages"
+        echo "    --external-log-tags   Use ANDROID_LOG_TAGS to set a custom logging level for"
+        echo "                          a test run."
         echo "    --bisection-search    Perform bisection bug search."
         echo "    --vdex                Test using vdex as in input to dex2oat. Only works with --prebuild."
         echo "    --suspend-timeout     Change thread suspend timeout ms (default 500000)."
