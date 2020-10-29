@@ -3043,7 +3043,12 @@ void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
   X86Assembler* assembler = GetAssembler();
 
   Register out = locations->Out().AsRegister<Register>();
-  InvokeRuntimeCallingConvention calling_convention;
+  auto allocate_instance = [&]() {
+    DCHECK_EQ(out, InvokeRuntimeCallingConvention().GetRegisterAt(0));
+    codegen_->LoadIntrinsicDeclaringClass(out, invoke->AsInvokeStaticOrDirect());
+    codegen_->InvokeRuntime(kQuickAllocObjectInitialized, invoke, invoke->GetDexPc());
+    CheckEntrypointTypes<kQuickAllocObjectWithChecks, void*, mirror::Class*>();
+  };
   if (invoke->InputAt(0)->IsConstant()) {
     int32_t value = invoke->InputAt(0)->AsIntConstant()->GetValue();
     if (static_cast<uint32_t>(value - info.low) < info.length) {
@@ -3056,8 +3061,7 @@ void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
       // Allocate and initialize a new j.l.Integer.
       // TODO: If we JIT, we could allocate the j.l.Integer now, and store it in the
       // JIT object table.
-      codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                             info.integer_boot_image_offset);
+      allocate_instance();
       __ movl(Address(out, info.value_offset), Immediate(value));
     }
   } else {
@@ -3097,8 +3101,7 @@ void IntrinsicCodeGeneratorX86::VisitIntegerValueOf(HInvoke* invoke) {
     __ jmp(&done);
     __ Bind(&allocate);
     // Otherwise allocate and initialize a new j.l.Integer.
-    codegen_->AllocateInstanceForIntrinsic(invoke->AsInvokeStaticOrDirect(),
-                                           info.integer_boot_image_offset);
+    allocate_instance();
     __ movl(Address(out, info.value_offset), in);
     __ Bind(&done);
   }
