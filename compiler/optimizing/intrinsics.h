@@ -117,9 +117,6 @@ class IntrinsicVisitor : public ValueObject {
     // The length of the cache array.
     uint32_t length;
 
-    // Boot image offset of java.lang.Integer for allocating an instance.
-    uint32_t integer_boot_image_offset;  // Set to kInvalidReference when compiling the boot image.
-
     // This union contains references to the boot image. For app AOT or JIT compilation,
     // these are the boot image offsets of the target. For boot image compilation, the
     // location shall be known only at link time, so we encode a symbolic reference using

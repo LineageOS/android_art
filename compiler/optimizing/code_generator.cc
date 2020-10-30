@@ -891,7 +891,6 @@ void CodeGenerator::GenerateLoadMethodTypeRuntimeCall(HLoadMethodType* method_ty
 
 static uint32_t GetBootImageOffsetImpl(const void* object, ImageHeader::ImageSections section) {
   Runtime* runtime = Runtime::Current();
-  DCHECK(runtime->IsAotCompiler());
   const std::vector<gc::space::ImageSpace*>& boot_image_spaces =
       runtime->GetHeap()->GetBootImageSpaces();
   // Check that the `object` is in the expected section of one of the boot image files.
@@ -905,6 +904,10 @@ static uint32_t GetBootImageOffsetImpl(const void* object, ImageHeader::ImageSec
   uintptr_t begin = reinterpret_cast<uintptr_t>(boot_image_spaces.front()->Begin());
   uintptr_t offset = reinterpret_cast<uintptr_t>(object) - begin;
   return dchecked_integral_cast<uint32_t>(offset);
+}
+
+uint32_t CodeGenerator::GetBootImageOffset(ObjPtr<mirror::Object> object) {
+  return GetBootImageOffsetImpl(object.Ptr(), ImageHeader::kSectionObjects);
 }
 
 // NO_THREAD_SAFETY_ANALYSIS: Avoid taking the mutator lock, boot image classes are non-moveable.
@@ -927,6 +930,16 @@ uint32_t CodeGenerator::GetBootImageOffset(HInvoke* invoke) {
   ArtMethod* method = invoke->GetResolvedMethod();
   DCHECK(method != nullptr);
   return GetBootImageOffsetImpl(method, ImageHeader::kSectionArtMethods);
+}
+
+// NO_THREAD_SAFETY_ANALYSIS: Avoid taking the mutator lock, boot image classes are non-moveable.
+uint32_t CodeGenerator::GetBootImageOffsetOfIntrinsicDeclaringClass(HInvoke* invoke)
+    NO_THREAD_SAFETY_ANALYSIS {
+  DCHECK_NE(invoke->GetIntrinsic(), Intrinsics::kNone);
+  ArtMethod* method = invoke->GetResolvedMethod();
+  DCHECK(method != nullptr);
+  ObjPtr<mirror::Class> declaring_class = method->GetDeclaringClass<kWithoutReadBarrier>();
+  return GetBootImageOffsetImpl(declaring_class.Ptr(), ImageHeader::kSectionObjects);
 }
 
 void CodeGenerator::BlockIfInRegister(Location location, bool is_out) const {
