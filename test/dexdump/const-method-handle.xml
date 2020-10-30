@@ -80,12 +80,5 @@
 >
 </method>
 </class>
-<method_handle index="0"
- type="invoke-instance"
- target_class="Ljava/lang/Object;"
- target_member="getClass"
- target_member_type="(Ljava/lang/Object;)Ljava/lang/Class;"
->
-</method_handle>
 </package>
 </api>
