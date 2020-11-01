@@ -4956,28 +4956,23 @@ void CodeGeneratorARM64::LoadBootImageAddress(vixl::aarch64::Register reg,
   }
 }
 
-void CodeGeneratorARM64::AllocateInstanceForIntrinsic(HInvokeStaticOrDirect* invoke,
-                                                      uint32_t boot_image_offset) {
-  DCHECK(invoke->IsStatic());
-  InvokeRuntimeCallingConvention calling_convention;
-  Register argument = calling_convention.GetRegisterAt(0);
+void CodeGeneratorARM64::LoadIntrinsicDeclaringClass(vixl::aarch64::Register reg, HInvoke* invoke) {
+  DCHECK_NE(invoke->GetIntrinsic(), Intrinsics::kNone);
   if (GetCompilerOptions().IsBootImage()) {
-    DCHECK_EQ(boot_image_offset, IntrinsicVisitor::IntegerValueOfInfo::kInvalidReference);
     // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
     MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
     // Add ADRP with its PC-relative type patch.
     vixl::aarch64::Label* adrp_label = NewBootImageTypePatch(*target_method.dex_file, type_idx);
-    EmitAdrpPlaceholder(adrp_label, argument.X());
+    EmitAdrpPlaceholder(adrp_label, reg.X());
     // Add ADD with its PC-relative type patch.
     vixl::aarch64::Label* add_label =
         NewBootImageTypePatch(*target_method.dex_file, type_idx, adrp_label);
-    EmitAddPlaceholder(add_label, argument.X(), argument.X());
+    EmitAddPlaceholder(add_label, reg.X(), reg.X());
   } else {
-    LoadBootImageAddress(argument, boot_image_offset);
+    uint32_t boot_image_offset = GetBootImageOffsetOfIntrinsicDeclaringClass(invoke);
+    LoadBootImageAddress(reg, boot_image_offset);
   }
-  InvokeRuntime(kQuickAllocObjectInitialized, invoke, invoke->GetDexPc());
-  CheckEntrypointTypes<kQuickAllocObjectWithChecks, void*, mirror::Class*>();
 }
 
 template <linker::LinkerPatch (*Factory)(size_t, const DexFile*, uint32_t, uint32_t)>
@@ -5267,7 +5262,7 @@ void InstructionCodeGeneratorARM64::VisitLoadClass(HLoadClass* cls) NO_THREAD_SA
     }
     case HLoadClass::LoadKind::kBootImageRelRo: {
       DCHECK(!codegen_->GetCompilerOptions().IsBootImage());
-      uint32_t boot_image_offset = codegen_->GetBootImageOffset(cls);
+      uint32_t boot_image_offset = CodeGenerator::GetBootImageOffset(cls);
       // Add ADRP with its PC-relative .data.bimg.rel.ro patch.
       vixl::aarch64::Label* adrp_label = codegen_->NewBootImageRelRoPatch(boot_image_offset);
       codegen_->EmitAdrpPlaceholder(adrp_label, out.X());
@@ -5443,7 +5438,7 @@ void InstructionCodeGeneratorARM64::VisitLoadString(HLoadString* load) NO_THREAD
     case HLoadString::LoadKind::kBootImageRelRo: {
       DCHECK(!codegen_->GetCompilerOptions().IsBootImage());
       // Add ADRP with its PC-relative .data.bimg.rel.ro patch.
-      uint32_t boot_image_offset = codegen_->GetBootImageOffset(load);
+      uint32_t boot_image_offset = CodeGenerator::GetBootImageOffset(load);
       vixl::aarch64::Label* adrp_label = codegen_->NewBootImageRelRoPatch(boot_image_offset);
       codegen_->EmitAdrpPlaceholder(adrp_label, out.X());
       // Add LDR with its PC-relative .data.bimg.rel.ro patch.
