@@ -16,6 +16,8 @@
 
 #include "code_generator_arm64.h"
 
+#include "aarch64/assembler-aarch64.h"
+#include "aarch64/registers-aarch64.h"
 #include "arch/arm64/asm_support_arm64.h"
 #include "arch/arm64/instruction_set_features_arm64.h"
 #include "arch/arm64/jni_frame_arm64.h"
@@ -40,6 +42,7 @@
 #include "mirror/class-inl.h"
 #include "mirror/var_handle.h"
 #include "offsets.h"
+#include "optimizing/common_arm64.h"
 #include "thread.h"
 #include "utils/arm64/assembler_arm64.h"
 #include "utils/assembler.h"
@@ -645,6 +648,7 @@ class ReadBarrierForHeapReferenceSlowPathARM64 : public SlowPathCodeARM64 {
     DCHECK(locations->CanCall());
     DCHECK(!locations->GetLiveRegisters()->ContainsCoreRegister(out_.reg()));
     DCHECK(instruction_->IsInstanceFieldGet() ||
+           instruction_->IsPredicatedInstanceFieldGet() ||
            instruction_->IsStaticFieldGet() ||
            instruction_->IsArrayGet() ||
            instruction_->IsInstanceOf() ||
@@ -2002,7 +2006,11 @@ void LocationsBuilderARM64::HandleBinaryOp(HBinaryOperation* instr) {
 
 void LocationsBuilderARM64::HandleFieldGet(HInstruction* instruction,
                                            const FieldInfo& field_info) {
-  DCHECK(instruction->IsInstanceFieldGet() || instruction->IsStaticFieldGet());
+  DCHECK(instruction->IsInstanceFieldGet() ||
+         instruction->IsStaticFieldGet() ||
+         instruction->IsPredicatedInstanceFieldGet());
+
+  bool is_predicated = instruction->IsPredicatedInstanceFieldGet();
 
   bool object_field_get_with_read_barrier =
       kEmitCompilerReadBarrier && (instruction->GetType() == DataType::Type::kReference);
@@ -2021,29 +2029,45 @@ void LocationsBuilderARM64::HandleFieldGet(HInstruction* instruction,
       locations->AddTemp(FixedTempLocation());
     }
   }
-  locations->SetInAt(0, Location::RequiresRegister());
+  // Input for object receiver.
+  locations->SetInAt(is_predicated ? 1 : 0, Location::RequiresRegister());
   if (DataType::IsFloatingPointType(instruction->GetType())) {
-    locations->SetOut(Location::RequiresFpuRegister());
+    if (is_predicated) {
+      locations->SetInAt(0, Location::RequiresFpuRegister());
+      locations->SetOut(Location::SameAsFirstInput());
+    } else {
+      locations->SetOut(Location::RequiresFpuRegister());
+    }
   } else {
-    // The output overlaps for an object field get when read barriers
-    // are enabled: we do not want the load to overwrite the object's
-    // location, as we need it to emit the read barrier.
-    locations->SetOut(
-        Location::RequiresRegister(),
-        object_field_get_with_read_barrier ? Location::kOutputOverlap : Location::kNoOutputOverlap);
+    if (is_predicated) {
+      locations->SetInAt(0, Location::RequiresRegister());
+      locations->SetOut(Location::SameAsFirstInput());
+    } else {
+      // The output overlaps for an object field get when read barriers
+      // are enabled: we do not want the load to overwrite the object's
+      // location, as we need it to emit the read barrier.
+      locations->SetOut(Location::RequiresRegister(),
+                        object_field_get_with_read_barrier ? Location::kOutputOverlap
+                                                           : Location::kNoOutputOverlap);
+    }
   }
 }
 
 void InstructionCodeGeneratorARM64::HandleFieldGet(HInstruction* instruction,
                                                    const FieldInfo& field_info) {
-  DCHECK(instruction->IsInstanceFieldGet() || instruction->IsStaticFieldGet());
+  DCHECK(instruction->IsInstanceFieldGet() ||
+         instruction->IsStaticFieldGet() ||
+         instruction->IsPredicatedInstanceFieldGet());
+  bool is_predicated = instruction->IsPredicatedInstanceFieldGet();
   LocationSummary* locations = instruction->GetLocations();
-  Location base_loc = locations->InAt(0);
+  uint32_t receiver_input = is_predicated ? 1 : 0;
+  Location base_loc = locations->InAt(receiver_input);
   Location out = locations->Out();
   uint32_t offset = field_info.GetFieldOffset().Uint32Value();
   DCHECK_EQ(DataType::Size(field_info.GetFieldType()), DataType::Size(instruction->GetType()));
   DataType::Type load_type = instruction->GetType();
-  MemOperand field = HeapOperand(InputRegisterAt(instruction, 0), field_info.GetFieldOffset());
+  MemOperand field =
+      HeapOperand(InputRegisterAt(instruction, receiver_input), field_info.GetFieldOffset());
 
   if (kEmitCompilerReadBarrier && kUseBakerReadBarrier &&
       load_type == DataType::Type::kReference) {
@@ -2105,12 +2129,19 @@ void InstructionCodeGeneratorARM64::HandleFieldSet(HInstruction* instruction,
                                                    const FieldInfo& field_info,
                                                    bool value_can_be_null) {
   DCHECK(instruction->IsInstanceFieldSet() || instruction->IsStaticFieldSet());
+  bool is_predicated =
+      instruction->IsInstanceFieldSet() && instruction->AsInstanceFieldSet()->GetIsPredicatedSet();
 
   Register obj = InputRegisterAt(instruction, 0);
   CPURegister value = InputCPURegisterOrZeroRegAt(instruction, 1);
   CPURegister source = value;
   Offset offset = field_info.GetFieldOffset();
   DataType::Type field_type = field_info.GetFieldType();
+  std::optional<vixl::aarch64::Label> pred_is_null;
+  if (is_predicated) {
+    pred_is_null.emplace();
+    __ Cbz(obj, &*pred_is_null);
+  }
 
   {
     // We use a block to end the scratch scope before the write barrier, thus
@@ -2138,6 +2169,10 @@ void InstructionCodeGeneratorARM64::HandleFieldSet(HInstruction* instruction,
 
   if (CodeGenerator::StoreNeedsWriteBarrier(field_type, instruction->InputAt(1))) {
     codegen_->MarkGCCard(obj, Register(value), value_can_be_null);
+  }
+
+  if (is_predicated) {
+    __ Bind(&*pred_is_null);
   }
 }
 
@@ -3794,8 +3829,21 @@ void CodeGeneratorARM64::GenerateNop() {
   __ Nop();
 }
 
+void LocationsBuilderARM64::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* instruction) {
+  HandleFieldGet(instruction, instruction->GetFieldInfo());
+}
+
 void LocationsBuilderARM64::VisitInstanceFieldGet(HInstanceFieldGet* instruction) {
   HandleFieldGet(instruction, instruction->GetFieldInfo());
+}
+
+void InstructionCodeGeneratorARM64::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* instruction) {
+  vixl::aarch64::Label finish;
+  __ Cbz(InputRegisterAt(instruction, 1), &finish);
+  HandleFieldGet(instruction, instruction->GetFieldInfo());
+  __ Bind(&finish);
 }
 
 void InstructionCodeGeneratorARM64::VisitInstanceFieldGet(HInstanceFieldGet* instruction) {
