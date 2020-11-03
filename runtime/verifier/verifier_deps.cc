@@ -31,6 +31,8 @@
 #include "mirror/class_loader.h"
 #include "oat_file.h"
 #include "obj_ptr-inl.h"
+#include "reg_type.h"
+#include "reg_type_cache-inl.h"
 #include "runtime.h"
 
 namespace art {
@@ -352,6 +354,36 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
   dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
 }
 
+void VerifierDeps::AddAssignability(const DexFile& dex_file,
+                                    const RegType& destination,
+                                    const RegType& source) {
+  DexFileDeps* dex_deps = GetDexFileDeps(dex_file);
+  if (dex_deps == nullptr) {
+    // This invocation is from verification of a DEX file which is not being compiled.
+    return;
+  }
+
+  CHECK(destination.IsUnresolvedReference() || destination.HasClass());
+  CHECK(!destination.IsUnresolvedMergedReference());
+
+  if (source.IsUnresolvedReference() || source.HasClass()) {
+    // Get string IDs for both descriptors and store in the appropriate set.
+    dex::StringIndex destination_id =
+        GetIdFromString(dex_file, std::string(destination.GetDescriptor()));
+    dex::StringIndex source_id = GetIdFromString(dex_file, std::string(source.GetDescriptor()));
+    dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
+  } else if (source.IsZeroOrNull()) {
+    // Nothing to record, null is always assignable.
+  } else {
+    CHECK(source.IsUnresolvedMergedReference()) << source.Dump();
+    const UnresolvedMergedType& merge = *down_cast<const UnresolvedMergedType*>(&source);
+    AddAssignability(dex_file, destination, merge.GetResolvedPart());
+    for (uint32_t idx : merge.GetUnresolvedTypes().Indexes()) {
+      AddAssignability(dex_file, destination, merge.GetRegTypeCache()->GetFromId(idx));
+    }
+  }
+}
+
 void VerifierDeps::MaybeRecordClassRedefinition(const DexFile& dex_file,
                                                 const dex::ClassDef& class_def) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
@@ -384,6 +416,15 @@ void VerifierDeps::RecordClassVerified(const DexFile& dex_file, const dex::Class
 void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
                                             ObjPtr<mirror::Class> destination,
                                             ObjPtr<mirror::Class> source) {
+  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
+  if (thread_deps != nullptr) {
+    thread_deps->AddAssignability(dex_file, destination, source);
+  }
+}
+
+void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
+                                            const RegType& destination,
+                                            const RegType& source) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
   if (thread_deps != nullptr) {
     thread_deps->AddAssignability(dex_file, destination, source);
@@ -753,14 +794,11 @@ bool VerifierDeps::VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
     source.Assign(
         FindClassAndClearException(class_linker, self, source_desc.c_str(), class_loader));
 
-    if (destination == nullptr) {
-      *error_msg = "Could not resolve class " + destination_desc;
-      return false;
-    }
-
-    if (source == nullptr) {
-      *error_msg = "Could not resolve class " + source_desc;
-      return false;
+    if (destination == nullptr || source == nullptr) {
+      // We currently don't use assignability information for unresolved
+      // types, as the status of the class using unresolved types will be soft
+      // fail in the vdex.
+      continue;
     }
 
     DCHECK(destination->IsResolved() && source->IsResolved());
