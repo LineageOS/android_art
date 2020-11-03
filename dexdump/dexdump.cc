@@ -1699,14 +1699,6 @@ static void dumpMethodHandle(const DexFile* pDexFile, u4 idx) {
     fprintf(gOutFile, "  type        : %s\n", type);
     fprintf(gOutFile, "  target      : %s %s\n", declaring_class, member);
     fprintf(gOutFile, "  target_type : %s\n", member_type.c_str());
-  } else {
-    fprintf(gOutFile, "<method_handle index=\"%u\"\n", idx);
-    fprintf(gOutFile, " type=\"%s\"\n", type);
-    fprintf(gOutFile, " target_class=\"%s\"\n", declaring_class);
-    fprintf(gOutFile, " target_member=\"%s\"\n", member);
-    fprintf(gOutFile, " target_member_type=");
-    dumpEscapedString(member_type);
-    fprintf(gOutFile, "\n>\n</method_handle>\n");
   }
 }
 
@@ -1733,17 +1725,6 @@ static void dumpCallSite(const DexFile* pDexFile, u4 idx) {
     fprintf(gOutFile, "  link_argument[0] : %u (MethodHandle)\n", method_handle_idx);
     fprintf(gOutFile, "  link_argument[1] : %s (String)\n", method_name);
     fprintf(gOutFile, "  link_argument[2] : %s (MethodType)\n", method_type.c_str());
-  } else {
-    fprintf(gOutFile, "<call_site index=\"%u\" offset=\"%u\">\n", idx, call_site_id.data_off_);
-    fprintf(gOutFile,
-            "<link_argument index=\"0\" type=\"MethodHandle\" value=\"%u\"/>\n",
-            method_handle_idx);
-    fprintf(gOutFile,
-            "<link_argument index=\"1\" type=\"String\" values=\"%s\"/>\n",
-            method_name);
-    fprintf(gOutFile,
-            "<link_argument index=\"2\" type=\"MethodType\" value=\"%s\"/>\n",
-            method_type.c_str());
   }
 
   size_t argument = 3;
@@ -1823,18 +1804,10 @@ static void dumpCallSite(const DexFile* pDexFile, u4 idx) {
 
     if (gOptions.outputFormat == OUTPUT_PLAIN) {
       fprintf(gOutFile, "  link_argument[%zu] : %s (%s)\n", argument, value.c_str(), type);
-    } else {
-      fprintf(gOutFile, "<link_argument index=\"%zu\" type=\"%s\" value=", argument, type);
-      dumpEscapedString(value);
-      fprintf(gOutFile, "/>\n");
     }
 
     it.Next();
     argument++;
-  }
-
-  if (gOptions.outputFormat == OUTPUT_XML) {
-    fprintf(gOutFile, "</call_site>\n");
   }
 }
 
