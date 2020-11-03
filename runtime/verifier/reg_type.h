@@ -1142,6 +1142,8 @@ class UnresolvedMergedType final : public UnresolvedType {
 
   std::string Dump() const override REQUIRES_SHARED(Locks::mutator_lock_);
 
+  const RegTypeCache* GetRegTypeCache() const { return reg_type_cache_; }
+
  private:
   void CheckInvariants() const REQUIRES_SHARED(Locks::mutator_lock_) override;
 
