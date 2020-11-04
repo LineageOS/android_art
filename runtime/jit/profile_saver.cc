@@ -327,8 +327,6 @@ static void SampleClassesAndExecutedMethods(pthread_t profiler_pthread,
                                             TypeReferenceCollection* resolved_classes,
                                             MethodReferenceCollection* hot_methods,
                                             MethodReferenceCollection* sampled_methods) {
-  ScopedTrace trace("SampleClassesAndExecutedMethods profile_boot_class_path=" +
-      std::to_string(profile_boot_class_path));
   Thread* const self = Thread::Current();
   ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
   // Restore profile saver thread priority during the GC critical section. This helps prevent
