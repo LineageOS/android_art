@@ -79,6 +79,8 @@ cc_library {
     ],
     apex_available: [
         "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
     ],
     host_supported: false,
     srcs: ["native_loader_lazy.cpp"],
@@ -92,6 +94,7 @@ cc_library_headers {
         "//apex_available:platform",
         "com.android.art",
         "com.android.art.debug",
+        "com.android.media",
     ],
     visibility: [
         "//art:__subpackages__",
