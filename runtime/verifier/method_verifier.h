@@ -143,6 +143,10 @@ class MethodVerifier {
     return *dex_file_;
   }
 
+  const dex::ClassDef& GetClassDef() const {
+    return class_def_;
+  }
+
   RegTypeCache* GetRegTypeCache() {
     return &reg_types_;
   }
@@ -216,6 +220,7 @@ class MethodVerifier {
                  ClassLinker* class_linker,
                  ArenaPool* arena_pool,
                  const DexFile* dex_file,
+                 const dex::ClassDef& class_def,
                  const dex::CodeItem* code_item,
                  uint32_t dex_method_idx,
                  bool can_load_classes,
@@ -331,8 +336,9 @@ class MethodVerifier {
   // Storage for the register status we're saving for later.
   RegisterLineArenaUniquePtr saved_line_;
 
-  const uint32_t dex_method_idx_;  // The method we're working on.
-  const DexFile* const dex_file_;  // The dex file containing the method.
+  const uint32_t dex_method_idx_;   // The method we're working on.
+  const DexFile* const dex_file_;   // The dex file containing the method.
+  const dex::ClassDef& class_def_;  // The class being verified.
   const CodeItemDataAccessor code_item_accessor_;
 
   // Instruction widths and flags, one entry per code unit.

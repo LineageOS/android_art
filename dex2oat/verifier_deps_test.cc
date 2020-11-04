@@ -208,6 +208,7 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     ObjPtr<mirror::Class> klass_src = FindClassByName(soa, src);
     DCHECK(klass_src != nullptr) << src;
     verifier_deps_->AddAssignability(*primary_dex_file_,
+                                     primary_dex_file_->GetClassDef(0),
                                      klass_dst.Get(),
                                      klass_src);
     return true;
@@ -268,16 +269,18 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
   // Iterates over all assignability records and tries to find an entry which
   // matches the expected destination/source pair.
   bool HasAssignable(const std::string& expected_destination,
-                     const std::string& expected_source) {
+                     const std::string& expected_source) const {
     for (auto& dex_dep : verifier_deps_->dex_deps_) {
       const DexFile& dex_file = *dex_dep.first;
       auto& storage = dex_dep.second->assignable_types_;
-      for (auto& entry : storage) {
-        std::string actual_destination =
-            verifier_deps_->GetStringFromId(dex_file, entry.GetDestination());
-        std::string actual_source = verifier_deps_->GetStringFromId(dex_file, entry.GetSource());
-        if ((expected_destination == actual_destination) && (expected_source == actual_source)) {
-          return true;
+      for (auto& set : storage) {
+        for (auto& entry : set) {
+          std::string actual_destination =
+              verifier_deps_->GetStringFromId(dex_file, entry.GetDestination());
+          std::string actual_source = verifier_deps_->GetStringFromId(dex_file, entry.GetSource());
+          if ((expected_destination == actual_destination) && (expected_source == actual_source)) {
+            return true;
+          }
         }
       }
     }

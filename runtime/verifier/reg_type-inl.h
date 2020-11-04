@@ -117,14 +117,15 @@ inline bool RegType::AssignableFrom(const RegType& lhs,
           // VerifiedMethod::GenerateSafeCastSet.
           if (verifier != nullptr && result) {
             VerifierDeps::MaybeRecordAssignability(
-                verifier->GetDexFile(), lhs.GetClass(), rhs.GetClass());
+                verifier->GetDexFile(), verifier->GetClassDef(), lhs.GetClass(), rhs.GetClass());
           }
           return result;
         } else {
           // For unresolved types, we don't know if they are assignable, and the
           // verifier will continue assuming they are. We need to record that.
           if (verifier != nullptr) {
-            VerifierDeps::MaybeRecordAssignability(verifier->GetDexFile(), lhs, rhs);
+            VerifierDeps::MaybeRecordAssignability(
+                verifier->GetDexFile(), verifier->GetClassDef(), lhs, rhs);
           }
           // Unresolved types are only assignable for null and equality.
           // Null cannot be the left-hand side.
