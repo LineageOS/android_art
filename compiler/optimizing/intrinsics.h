@@ -136,6 +136,10 @@ class IntrinsicVisitor : public ValueObject {
   static IntegerValueOfInfo ComputeIntegerValueOfInfo(
       HInvoke* invoke, const CompilerOptions& compiler_options);
 
+  static MemberOffset GetReferenceDisableIntrinsicOffset();
+  static MemberOffset GetReferenceSlowPathEnabledOffset();
+  static void CreateReferenceGetReferentLocations(HInvoke* invoke, CodeGenerator* codegen);
+
  protected:
   IntrinsicVisitor() {}
 
