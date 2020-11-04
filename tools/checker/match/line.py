@@ -61,6 +61,13 @@ def match_words(checker_word, string_word, variables, pos):
     else:
       pattern = expression.text
 
+    try:
+      pattern = re.compile(pattern)
+    except re.error as e:
+      message = ('Invalid regex "{}" at {}:{},'
+                 ' compiling fails with error: {}'.format(pattern, pos.filename, pos.line_no, e))
+      raise RuntimeError(message)
+
     # Match the expression's regex pattern against the remainder of the word.
     # Note: re.match will succeed only if matched from the beginning.
     match = re.match(pattern, string_word)
