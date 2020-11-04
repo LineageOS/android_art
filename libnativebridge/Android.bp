@@ -76,10 +76,13 @@ cc_library {
         "//frameworks/native/opengl/libs",
         "//frameworks/native/vulkan/libvulkan",
     ],
+    apex_available: [
+        "//apex_available:platform",
+    ],
 
     host_supported: false,
     srcs: ["native_bridge_lazy.cc"],
-    required: ["libnativebridge"],
+    runtime_libs: ["libnativebridge"],
     shared_libs: ["liblog"],
 }
 
