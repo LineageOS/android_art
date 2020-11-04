@@ -288,6 +288,10 @@ if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
     if $debug; then
       expectations="$expectations --expectations art/tools/libcore_gcstress_debug_failures.txt"
     fi
+
+    # Bump pause threshold as long pauses cause explicit gc logging to occur irrespective
+    # of -XX:AlwayLogExplicitGcs:false.
+    vogar_args="$vogar_args --vm-arg -XX:LongPauseLogThreshold=15" # 15 ms (default: 5ms)
   else
     # We only run this package when user has not specified packages
     # to run and not under gcstress as it can cause timeouts. See
