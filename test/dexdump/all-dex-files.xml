@@ -1,0 +1,1863 @@
+<api>
+<package name=""
+>
+<class name="A"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="A"
+ type="A"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="arrays"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="binary_ops"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="binary_ops_2addr"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="binary_ops_lit16"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="binary_ops_lit8"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="compares"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="conditionals"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="constants"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="misc"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="moves"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="packed_switch"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="return32"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="return64"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="return_object"
+ return="java.lang.Object"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="sparse_switch"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="static_fields"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="unary_ops"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="instance_fields"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="invokes"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+</class>
+</package>
+<package name="com.google.android.checkers"
+>
+<class name="Checkers"
+ extends="android.app.Activity"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="Checkers"
+ type="com.google.android.checkers.Checkers"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="onConfigurationChanged"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.content.res.Configuration">
+</parameter>
+</method>
+<method name="onCreate"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.os.Bundle">
+</parameter>
+</method>
+<method name="onCreateOptionsMenu"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.view.Menu">
+</parameter>
+</method>
+<method name="onKeyDown"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="android.view.KeyEvent">
+</parameter>
+</method>
+<method name="onOptionsItemSelected"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.view.MenuItem">
+</parameter>
+</method>
+<method name="onPause"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="onStop"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="onTrackballEvent"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.view.MotionEvent">
+</parameter>
+</method>
+</class>
+<class name="CheckersView"
+ extends="android.view.View"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="CheckersView"
+ type="com.google.android.checkers.CheckersView"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.content.Context">
+</parameter>
+<parameter name="arg1" type="android.content.SharedPreferences">
+</parameter>
+</constructor>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="float">
+</parameter>
+<parameter name="arg1" type="float">
+</parameter>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="int">
+</parameter>
+<parameter name="arg2" type="int">
+</parameter>
+<parameter name="arg3" type="int">
+</parameter>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="android.content.SharedPreferences$Editor">
+</parameter>
+</method>
+<method name="a"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+</method>
+<method name="a"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+</method>
+<method name="b"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+</method>
+<method name="b"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+</method>
+<method name="c"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+</method>
+<method name="c"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+</method>
+<method name="d"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+</method>
+<method name="draw"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.graphics.Canvas">
+</parameter>
+</method>
+<method name="e"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+</method>
+<method name="onSizeChanged"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="false"
+ visibility="protected"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="int">
+</parameter>
+<parameter name="arg2" type="int">
+</parameter>
+<parameter name="arg3" type="int">
+</parameter>
+</method>
+<method name="onTouchEvent"
+ return="boolean"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="android.view.MotionEvent">
+</parameter>
+</method>
+<method name="setLevel"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+</method>
+</class>
+<class name="a"
+ extends="java.lang.Thread"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<field name="a"
+ type="int[]"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="b"
+ type="int[]"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="c"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="d"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="e"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="f"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="g"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="h"
+ type="int"
+ transient="false"
+ volatile="true"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</field>
+<constructor name="a"
+ type="com.google.android.checkers.a"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="com.google.android.checkers.CheckersView">
+</parameter>
+</constructor>
+<method name="a"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+<parameter name="arg1" type="boolean">
+</parameter>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+</method>
+<method name="a"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="int">
+</parameter>
+<parameter name="arg2" type="int">
+</parameter>
+<parameter name="arg3" type="int">
+</parameter>
+<parameter name="arg4" type="boolean">
+</parameter>
+</method>
+<method name="b"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="true"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<parameter name="arg0" type="boolean">
+</parameter>
+<parameter name="arg1" type="boolean">
+</parameter>
+</method>
+<method name="run"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+</method>
+</class>
+<class name="g"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="true"
+ visibility="public"
+>
+<field name="a"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="b"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="c"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="d"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="e"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="f"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="g"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="h"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="i"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="j"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="k"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="l"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="m"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="n"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="o"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="p"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="q"
+ type="byte[]"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+<field name="r"
+ type="boolean"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</field>
+</class>
+</package>
+<package name=""
+>
+<class name="Main"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="Main"
+ type="Main"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="main"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="java.lang.String[]">
+</parameter>
+</method>
+</class>
+</package>
+<package name="constmethodhandle"
+>
+<class name="ConstTest"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="ConstTest"
+ type="constmethodhandle.ConstTest"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="main"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="java.lang.String[]">
+</parameter>
+</method>
+<method name="test1"
+ return="java.lang.invoke.MethodHandle"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="test2"
+ return="java.lang.invoke.MethodType"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+</class>
+</package>
+<package name=""
+>
+<class name="Main"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="Main"
+ type="Main"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="main"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="java.lang.String[]">
+</parameter>
+</method>
+</class>
+<class name="TestBadBootstrapArguments"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="TestBadBootstrapArguments"
+ type="TestBadBootstrapArguments"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+</class>
+<class name="TestInvokeCustomWithConcurrentThreads"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<implements name="java.lang.Runnable">
+</implements>
+<method name="notUsed"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+</method>
+<method name="test"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+</method>
+<method name="run"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+</class>
+<class name="TestLinkerMethodMinimalArguments"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="TestLinkerMethodMinimalArguments"
+ type="TestLinkerMethodMinimalArguments"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="test"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="int">
+</parameter>
+<parameter name="arg2" type="int">
+</parameter>
+</method>
+</class>
+<class name="TestLinkerMethodMultipleArgumentTypes"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="TestLinkerMethodMultipleArgumentTypes"
+ type="TestLinkerMethodMultipleArgumentTypes"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="test"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="int">
+</parameter>
+<parameter name="arg1" type="int">
+</parameter>
+</method>
+<method name="GetBootstrapRunCount"
+ return="int"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</method>
+</class>
+<class name="TestVariableArityLinkerMethod"
+ extends="TestBase"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="TestVariableArityLinkerMethod"
+ type="TestVariableArityLinkerMethod"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+</class>
+</package>
+<package name=""
+>
+<class name="Main"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<constructor name="Main"
+ type="Main"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+<method name="main"
+ return="void"
+ abstract="false"
+ native="false"
+ synchronized="false"
+ static="true"
+ final="false"
+ visibility="public"
+>
+<parameter name="arg0" type="java.lang.String[]">
+</parameter>
+</method>
+</class>
+</package>
+<package name=""
+>
+<class name="StaticFields"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<field name="test00_public_static_final_byte_42"
+ type="byte"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="42"
+>
+</field>
+<field name="test01_public_static_final_short_43"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="43"
+>
+</field>
+<field name="test02_public_static_final_char_X"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="88"
+>
+</field>
+<field name="test03_public_static_final_int_44"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="44"
+>
+</field>
+<field name="test04_public_static_final_long_45"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="45"
+>
+</field>
+<field name="test05_public_static_final_float_46_47"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="46.47"
+>
+</field>
+<field name="test06_public_static_final_double_48_49"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="48.49"
+>
+</field>
+<field name="test07_public_static_final_string"
+ type="java.lang.String"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="abc \\&gt;&lt;&quot;'&amp;\u0009\u000d\u000a"
+>
+</field>
+<field name="test08_public_static_final_object_null"
+ type="java.lang.Object"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="null"
+>
+</field>
+<field name="test09_public_static_final_boolean_true"
+ type="boolean"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="true"
+>
+</field>
+<field name="test99_empty_value"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+>
+</field>
+<constructor name="StaticFields"
+ type="StaticFields"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+</class>
+</package>
+<package name=""
+>
+<class name="Test"
+ extends="java.lang.Object"
+ interface="false"
+ abstract="false"
+ static="false"
+ final="false"
+ visibility="public"
+>
+<field name="mB0"
+ type="byte"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mB1"
+ type="byte"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="127"
+>
+</field>
+<field name="mB2"
+ type="byte"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-128"
+>
+</field>
+<field name="mB3"
+ type="byte"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1"
+>
+</field>
+<field name="mC0"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mC1"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="32767"
+>
+</field>
+<field name="mC2"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="32768"
+>
+</field>
+<field name="mC3"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="255"
+>
+</field>
+<field name="mC4"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="65520"
+>
+</field>
+<field name="mC5"
+ type="char"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="65535"
+>
+</field>
+<field name="mD0"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-inf"
+>
+</field>
+<field name="mD1"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="4.94066e-324"
+>
+</field>
+<field name="mD2"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-0"
+>
+</field>
+<field name="mD3"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mD4"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="1.79769e+308"
+>
+</field>
+<field name="mD5"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="inf"
+>
+</field>
+<field name="mD6"
+ type="double"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="nan"
+>
+</field>
+<field name="mF0"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-inf"
+>
+</field>
+<field name="mF1"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="1.4013e-45"
+>
+</field>
+<field name="mF2"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-0"
+>
+</field>
+<field name="mF3"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mF4"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="3.40282e+38"
+>
+</field>
+<field name="mF5"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="inf"
+>
+</field>
+<field name="mF6"
+ type="float"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="nan"
+>
+</field>
+<field name="mI0"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mI1"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="2147483647"
+>
+</field>
+<field name="mI2"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-2147483648"
+>
+</field>
+<field name="mI3"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="255"
+>
+</field>
+<field name="mI4"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-16"
+>
+</field>
+<field name="mI5"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-4096"
+>
+</field>
+<field name="mI6"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1048576"
+>
+</field>
+<field name="mI7"
+ type="int"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1"
+>
+</field>
+<field name="mJ0"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mJ1"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="9223372036854775807"
+>
+</field>
+<field name="mJ2"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-9223372036854775808"
+>
+</field>
+<field name="mJ3"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="255"
+>
+</field>
+<field name="mJ4"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-16"
+>
+</field>
+<field name="mJ5"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-4096"
+>
+</field>
+<field name="mJ6"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1048576"
+>
+</field>
+<field name="mJ7"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-268435456"
+>
+</field>
+<field name="mJ8"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-68719476736"
+>
+</field>
+<field name="mJ9"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-17592186044416"
+>
+</field>
+<field name="mJa"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-4503599627370496"
+>
+</field>
+<field name="mJb"
+ type="long"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1"
+>
+</field>
+<field name="mObject"
+ type="java.lang.Object"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="null"
+>
+</field>
+<field name="mS0"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="0"
+>
+</field>
+<field name="mS1"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="32767"
+>
+</field>
+<field name="mS2"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-32768"
+>
+</field>
+<field name="mS3"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="255"
+>
+</field>
+<field name="mS4"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-16"
+>
+</field>
+<field name="mS5"
+ type="short"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="-1"
+>
+</field>
+<field name="mString"
+ type="java.lang.String"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="&lt;&amp;&quot;JOHO&quot;&amp;&gt;\u000a"
+>
+</field>
+<field name="mZ0"
+ type="boolean"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="false"
+>
+</field>
+<field name="mZ1"
+ type="boolean"
+ transient="false"
+ volatile="false"
+ static="true"
+ final="true"
+ visibility="public"
+ value="true"
+>
+</field>
+<constructor name="Test"
+ type="Test"
+ static="false"
+ final="false"
+ visibility="public"
+>
+</constructor>
+</class>
+</package>
+</api>
