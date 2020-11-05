@@ -689,6 +689,13 @@ class Thread {
   }
 
   template<PointerSize pointer_size>
+  static constexpr ThreadOffset<pointer_size> WeakRefAccessEnabledOffset() {
+    return ThreadOffset<pointer_size>(
+        OFFSETOF_MEMBER(Thread, tls32_) +
+        OFFSETOF_MEMBER(tls_32bit_sized_values, weak_ref_access_enabled));
+  }
+
+  template<PointerSize pointer_size>
   static constexpr ThreadOffset<pointer_size> ThreadFlagsOffset() {
     return ThreadOffset<pointer_size>(
         OFFSETOF_MEMBER(Thread, tls32_) +
