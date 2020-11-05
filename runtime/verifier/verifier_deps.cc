@@ -69,7 +69,12 @@ void VerifierDeps::MergeWith(std::unique_ptr<VerifierDeps> other,
     // We currently collect extra strings only on the main `VerifierDeps`,
     // which should be the one passed as `this` in this method.
     DCHECK(other_deps.strings_.empty());
-    my_deps->assignable_types_.merge(other_deps.assignable_types_);
+    // Size is the number of class definitions in the dex file, and must be the
+    // same between the two `VerifierDeps`.
+    DCHECK_EQ(my_deps->assignable_types_.size(), other_deps.assignable_types_.size());
+    for (uint32_t i = 0; i < my_deps->assignable_types_.size(); ++i) {
+      my_deps->assignable_types_[i].merge(other_deps.assignable_types_[i]);
+    }
     BitVectorOr(my_deps->verified_classes_, other_deps.verified_classes_);
     BitVectorOr(my_deps->redefined_classes_, other_deps.redefined_classes_);
   }
@@ -272,6 +277,7 @@ ObjPtr<mirror::Class> VerifierDeps::FindOneClassPathBoundaryForInterface(
 }
 
 void VerifierDeps::AddAssignability(const DexFile& dex_file,
+                                    const dex::ClassDef& class_def,
                                     ObjPtr<mirror::Class> destination,
                                     ObjPtr<mirror::Class> source) {
   // Test that the method is only called on reference types.
@@ -306,6 +312,7 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
     // that they linked successfully, as required at the top of this method.
     if (destination_component->IsResolved() && source_component->IsResolved()) {
       AddAssignability(dex_file,
+                       class_def,
                        destination_component,
                        source_component);
       return;
@@ -351,10 +358,12 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
   dex::StringIndex destination_id = GetClassDescriptorStringId(dex_file, destination);
   dex::StringIndex source_id = GetClassDescriptorStringId(dex_file, source);
 
-  dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
+  uint16_t index = dex_file.GetIndexForClassDef(class_def);
+  dex_deps->assignable_types_[index].emplace(TypeAssignability(destination_id, source_id));
 }
 
 void VerifierDeps::AddAssignability(const DexFile& dex_file,
+                                    const dex::ClassDef& class_def,
                                     const RegType& destination,
                                     const RegType& source) {
   DexFileDeps* dex_deps = GetDexFileDeps(dex_file);
@@ -371,15 +380,16 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
     dex::StringIndex destination_id =
         GetIdFromString(dex_file, std::string(destination.GetDescriptor()));
     dex::StringIndex source_id = GetIdFromString(dex_file, std::string(source.GetDescriptor()));
-    dex_deps->assignable_types_.emplace(TypeAssignability(destination_id, source_id));
+    uint16_t index = dex_file.GetIndexForClassDef(class_def);
+    dex_deps->assignable_types_[index].emplace(TypeAssignability(destination_id, source_id));
   } else if (source.IsZeroOrNull()) {
     // Nothing to record, null is always assignable.
   } else {
     CHECK(source.IsUnresolvedMergedReference()) << source.Dump();
     const UnresolvedMergedType& merge = *down_cast<const UnresolvedMergedType*>(&source);
-    AddAssignability(dex_file, destination, merge.GetResolvedPart());
+    AddAssignability(dex_file, class_def, destination, merge.GetResolvedPart());
     for (uint32_t idx : merge.GetUnresolvedTypes().Indexes()) {
-      AddAssignability(dex_file, destination, merge.GetRegTypeCache()->GetFromId(idx));
+      AddAssignability(dex_file, class_def, destination, merge.GetRegTypeCache()->GetFromId(idx));
     }
   }
 }
@@ -414,20 +424,22 @@ void VerifierDeps::RecordClassVerified(const DexFile& dex_file, const dex::Class
 }
 
 void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
+                                            const dex::ClassDef& class_def,
                                             ObjPtr<mirror::Class> destination,
                                             ObjPtr<mirror::Class> source) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
   if (thread_deps != nullptr) {
-    thread_deps->AddAssignability(dex_file, destination, source);
+    thread_deps->AddAssignability(dex_file, class_def, destination, source);
   }
 }
 
 void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
+                                            const dex::ClassDef& class_def,
                                             const RegType& destination,
                                             const RegType& source) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
   if (thread_deps != nullptr) {
-    thread_deps->AddAssignability(dex_file, destination, source);
+    thread_deps->AddAssignability(dex_file, class_def, destination, source);
   }
 }
 
@@ -485,27 +497,42 @@ static inline bool DecodeTuple(const uint8_t** in, const uint8_t* end, std::tupl
 }
 
 template<typename T>
-static inline void EncodeSet(std::vector<uint8_t>* out, const std::set<T>& set) {
-  EncodeUnsignedLeb128(out, set.size());
-  for (const T& entry : set) {
-    EncodeTuple(out, entry);
+static inline void EncodeSetVector(std::vector<uint8_t>* out,
+                                   const std::vector<std::set<T>>& vector) {
+  EncodeUnsignedLeb128(out, vector.size());
+  for (const std::set<T>& set : vector) {
+    EncodeUnsignedLeb128(out, set.size());
+    for (const T& entry : set) {
+      EncodeTuple(out, entry);
+    }
   }
 }
 
 template<bool kFillSet, typename T>
-static inline bool DecodeSet(const uint8_t** in, const uint8_t* end, std::set<T>* set) {
-  DCHECK(set->empty());
+static inline bool DecodeSetVector(const uint8_t** in,
+                                   const uint8_t* end,
+                                   std::vector<std::set<T>>* vector) {
   uint32_t num_entries;
   if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_entries))) {
     return false;
   }
+  if (kIsDebugBuild && kFillSet) {
+    DCHECK_EQ(vector->size(), num_entries);
+  }
   for (uint32_t i = 0; i < num_entries; ++i) {
-    T tuple;
-    if (UNLIKELY(!DecodeTuple(in, end, &tuple))) {
+    uint32_t set_entries;
+    if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &set_entries))) {
       return false;
     }
-    if (kFillSet) {
-      set->emplace(tuple);
+    std::set<T>& set = (*vector)[i];
+    for (uint32_t j = 0; j < set_entries; ++j) {
+      T tuple;
+      if (UNLIKELY(!DecodeTuple(in, end, &tuple))) {
+        return false;
+      }
+      if (kFillSet) {
+        set.emplace(tuple);
+      }
     }
   }
   return true;
@@ -595,7 +622,7 @@ void VerifierDeps::Encode(const std::vector<const DexFile*>& dex_files,
   for (const DexFile* dex_file : dex_files) {
     const DexFileDeps& deps = *GetDexFileDeps(*dex_file);
     EncodeStringVector(buffer, deps.strings_);
-    EncodeSet(buffer, deps.assignable_types_);
+    EncodeSetVector(buffer, deps.assignable_types_);
     EncodeUint16SparseBitVector(buffer, deps.verified_classes_, /* sparse_value= */ false);
     EncodeUint16SparseBitVector(buffer, deps.redefined_classes_, /* sparse_value= */ true);
   }
@@ -609,7 +636,7 @@ bool VerifierDeps::DecodeDexFileDeps(DexFileDeps& deps,
   return
       DecodeStringVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
           data_start, data_end, &deps.strings_) &&
-      DecodeSet</*kFillSet=*/ !kOnlyVerifiedClasses>(
+      DecodeSetVector</*kFillSet=*/ !kOnlyVerifiedClasses>(
           data_start, data_end, &deps.assignable_types_) &&
       DecodeUint16SparseBitVector</*kFillVector=*/ true>(
           data_start, data_end, num_class_defs, /*sparse_value=*/ false, &deps.verified_classes_) &&
@@ -730,12 +757,18 @@ void VerifierDeps::Dump(VariableIndentationOutputStream* vios) const {
       vios->Stream() << "Extra string: " << str << "\n";
     }
 
-    for (const TypeAssignability& entry : dep.second->assignable_types_) {
+    for (size_t idx = 0; idx < dep.second->assignable_types_.size(); idx++) {
       vios->Stream()
-        << GetStringFromId(dex_file, entry.GetSource())
-        << " must be assignable to "
-        << GetStringFromId(dex_file, entry.GetDestination())
-        << "\n";
+          << "Dependencies of "
+          << dex_file.GetClassDescriptor(dex_file.GetClassDef(idx))
+          << ":\n";
+      for (const TypeAssignability& entry : dep.second->assignable_types_[idx]) {
+        vios->Stream()
+          << GetStringFromId(dex_file, entry.GetSource())
+          << " must be assignable to "
+          << GetStringFromId(dex_file, entry.GetDestination())
+          << "\n";
+      }
     }
 
     for (size_t idx = 0; idx < dep.second->verified_classes_.size(); idx++) {
@@ -777,7 +810,7 @@ static ObjPtr<mirror::Class> FindClassAndClearException(ClassLinker* class_linke
 
 bool VerifierDeps::VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
                                        const DexFile& dex_file,
-                                       const std::set<TypeAssignability>& assignables,
+                                       const std::vector<std::set<TypeAssignability>>& assignables,
                                        bool expected_assignability,
                                        Thread* self,
                                        /* out */ std::string* error_msg) const {
@@ -786,26 +819,28 @@ bool VerifierDeps::VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
   MutableHandle<mirror::Class> source(hs.NewHandle<mirror::Class>(nullptr));
   MutableHandle<mirror::Class> destination(hs.NewHandle<mirror::Class>(nullptr));
 
-  for (const auto& entry : assignables) {
-    const std::string& destination_desc = GetStringFromId(dex_file, entry.GetDestination());
-    destination.Assign(
-        FindClassAndClearException(class_linker, self, destination_desc.c_str(), class_loader));
-    const std::string& source_desc = GetStringFromId(dex_file, entry.GetSource());
-    source.Assign(
-        FindClassAndClearException(class_linker, self, source_desc.c_str(), class_loader));
+  for (const auto& vec : assignables) {
+    for (const auto& entry : vec) {
+      const std::string& destination_desc = GetStringFromId(dex_file, entry.GetDestination());
+      destination.Assign(
+          FindClassAndClearException(class_linker, self, destination_desc.c_str(), class_loader));
+      const std::string& source_desc = GetStringFromId(dex_file, entry.GetSource());
+      source.Assign(
+          FindClassAndClearException(class_linker, self, source_desc.c_str(), class_loader));
 
-    if (destination == nullptr || source == nullptr) {
-      // We currently don't use assignability information for unresolved
-      // types, as the status of the class using unresolved types will be soft
-      // fail in the vdex.
-      continue;
-    }
+      if (destination == nullptr || source == nullptr) {
+        // We currently don't use assignability information for unresolved
+        // types, as the status of the class using unresolved types will be soft
+        // fail in the vdex.
+        continue;
+      }
 
-    DCHECK(destination->IsResolved() && source->IsResolved());
-    if (destination->IsAssignableFrom(source.Get()) != expected_assignability) {
-      *error_msg = "Class " + destination_desc + (expected_assignability ? " not " : " ") +
-          "assignable from " + source_desc;
-      return false;
+      DCHECK(destination->IsResolved() && source->IsResolved());
+      if (destination->IsAssignableFrom(source.Get()) != expected_assignability) {
+        *error_msg = "Class " + destination_desc + (expected_assignability ? " not " : " ") +
+            "assignable from " + source_desc;
+        return false;
+      }
     }
   }
   return true;
