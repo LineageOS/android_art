@@ -25,7 +25,7 @@ if [[ "$@" == *"--interpreter"* ]]; then
   # On interpreter we are fully capable of providing the full jvmti api so we
   # have a slightly different expected output.
   # TODO We should really be changing this in the 'check' script.
-  patch -s expected.txt <interpreter-expected.patch
+  patch -s expected-stdout.txt <interpreter-expected.patch
 fi
 
 # Provide additional runtime options when running on device.

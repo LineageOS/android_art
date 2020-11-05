@@ -20,4 +20,4 @@ to the <init> function.
 
 It is also possible it could fail due to the pattern of allocations caused by
 doing string concatenation or printing changing. In this case you should simply
-update the expected.txt file.
+update the expected-stdout.txt file.

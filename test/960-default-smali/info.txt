@@ -17,4 +17,4 @@ To update the test files do the following steps:
     <Add new classes/interfaces>
     <Add these classes/interfaces to ./smali/classes.xml>
     JAVA_HOME="/path/to/java-8-jdk" ../run-test --use-java-home --update --jvm --host 956-default-smali
-    git add ./smali/classes.xml ./expected.txt
+    git add ./smali/classes.xml ./expected-stdout.txt

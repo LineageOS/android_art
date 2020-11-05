@@ -8,13 +8,13 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":art-run-test-target-template",
     srcs: ["src/**/*.java"],
-    data: [":art-run-test-2023-InvariantLoops_typecast-expected"],
+    data: [":art-run-test-2023-InvariantLoops_typecast-expected-stdout"],
 }
 
 // Test's expected output.
 genrule {
-    name: "art-run-test-2023-InvariantLoops_typecast-expected",
-    out: ["art-run-test-2023-InvariantLoops_typecast-expected.txt"],
-    srcs: ["expected.txt"],
+    name: "art-run-test-2023-InvariantLoops_typecast-expected-stdout",
+    out: ["art-run-test-2023-InvariantLoops_typecast-expected-stdout.txt"],
+    srcs: ["expected-stdout.txt"],
     cmd: "cp -f $(in) $(out)",
 }

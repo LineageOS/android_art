@@ -23,14 +23,14 @@ if [[ $@ == *"--jvm"* ]]; then
   mkdir -p src
   echo "${JAVAC} \$@" >> ./javac_exec.sh
   # This will use java_exec.sh to execute the javac compiler. It will place the
-  # compiled class files in ./classes and the expected values in expected.txt
+  # compiled class files in ./classes and the expected values in expected-stdout.txt
   #
   # After this the src directory will contain the final versions of all files.
-  ./util-src/generate_java.py ./javac_exec.sh ./src ./classes ./expected.txt ./build_log
+  ./util-src/generate_java.py ./javac_exec.sh ./src ./classes ./expected-stdout.txt ./build_log
 else
   mkdir -p ./smali
-  # Generate the smali files and expected.txt or fail
-  ./util-src/generate_smali.py ./smali ./expected.txt
+  # Generate the smali files and expected-stdout.txt or fail
+  ./util-src/generate_smali.py ./smali ./expected-stdout.txt
   # Use the default build script
   ./default-build "$@" "$EXTRA_ARGS" --experimental default-methods
 fi
