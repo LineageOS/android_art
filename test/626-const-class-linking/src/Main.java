@@ -28,7 +28,7 @@ public class Main {
             System.loadLibrary(args[0]);
         } catch (ClassNotFoundException e) {
             usingRI = true;
-            // Add expected JNI_OnLoad log line to match expected.txt.
+            // Add expected JNI_OnLoad log line to match expected-stdout.txt.
             System.out.println("JNI_OnLoad called");
         }
 
@@ -107,7 +107,7 @@ public class Main {
         } catch (InvocationTargetException ite) {
             String message = ite.getCause().getMessage();
             if (usingRI && "Test".equals(message)) {
-              // Replace RI message with dalvik message to match expected.txt.
+              // Replace RI message with dalvik message to match expected-stdout.txt.
               message = "Initiating class loader of type " +
                   misbehaving_loader.getClass().getName() +
                   " returned class Helper2 instead of Test.";

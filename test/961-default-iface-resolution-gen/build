@@ -19,7 +19,7 @@ set -e
 
 mkdir -p ./src
 
-# Generate the smali files and expected.txt or fail
-./util-src/generate_java.py ./src ./expected.txt
+# Generate the smali files and expected-stdout.txt or fail
+./util-src/generate_java.py ./src ./expected-stdout.txt
 
 ./default-build "$@" --experimental default-methods

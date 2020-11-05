@@ -16,7 +16,7 @@
 
 # Art sends events for park/unpark, and the RI doesn't. Remove it from the expected output.
 if [[ "$TEST_RUNTIME" == "jvm" ]]; then
-  patch -p0 expected.txt < jvm-expected.patch >/dev/null
+  patch -p0 expected-stdout.txt < jvm-expected.patch >/dev/null
 fi
 
 ./default-check "$@"
