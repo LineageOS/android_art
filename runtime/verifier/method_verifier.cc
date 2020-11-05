@@ -173,6 +173,7 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
                                      class_linker,
                                      arena_pool,
                                      dex_file,
+                                     class_def,
                                      code_item,
                                      method_idx,
                                      can_load_classes,
@@ -184,7 +185,6 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
        return_type_(nullptr),
        dex_cache_(dex_cache),
        class_loader_(class_loader),
-       class_def_(class_def),
        declaring_class_(nullptr),
        interesting_dex_pc_(-1),
        monitor_enter_dex_pcs_(nullptr),
@@ -793,7 +793,6 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   Handle<mirror::DexCache> dex_cache_ GUARDED_BY(Locks::mutator_lock_);
   // The class loader for the declaring class of the method.
   Handle<mirror::ClassLoader> class_loader_ GUARDED_BY(Locks::mutator_lock_);
-  const dex::ClassDef& class_def_;  // The class def of the declaring class of the method.
   const RegType* declaring_class_;  // Lazily computed reg type of the method's declaring class.
 
   // The dex PC of a FindLocksAtDexPc request, -1 otherwise.
@@ -5042,6 +5041,7 @@ MethodVerifier::MethodVerifier(Thread* self,
                                ClassLinker* class_linker,
                                ArenaPool* arena_pool,
                                const DexFile* dex_file,
+                               const dex::ClassDef& class_def,
                                const dex::CodeItem* code_item,
                                uint32_t dex_method_idx,
                                bool can_load_classes,
@@ -5056,6 +5056,7 @@ MethodVerifier::MethodVerifier(Thread* self,
       work_insn_idx_(dex::kDexNoIndex),
       dex_method_idx_(dex_method_idx),
       dex_file_(dex_file),
+      class_def_(class_def),
       code_item_accessor_(*dex_file, code_item),
       // TODO: make it designated initialization when we compile as C++20.
       flags_({false, false, false, false, aot_mode}),
