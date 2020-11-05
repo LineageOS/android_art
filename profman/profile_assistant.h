@@ -43,17 +43,35 @@ class ProfileAssistant {
    public:
     static constexpr bool kForceMergeDefault = false;
     static constexpr bool kBootImageMergeDefault = false;
+    static constexpr uint32_t kMinNewMethodsPercentChangeForCompilation = 2;
+    static constexpr uint32_t kMinNewClassesPercentChangeForCompilation = 2;
 
     Options()
         : force_merge_(kForceMergeDefault),
-          boot_image_merge_(kBootImageMergeDefault) {
+          boot_image_merge_(kBootImageMergeDefault),
+          min_new_methods_percent_change_for_compilation_(
+              kMinNewMethodsPercentChangeForCompilation),
+          min_new_classes_percent_change_for_compilation_(
+              kMinNewClassesPercentChangeForCompilation) {
     }
 
     bool IsForceMerge() const { return force_merge_; }
     bool IsBootImageMerge() const { return boot_image_merge_; }
+    uint32_t GetMinNewMethodsPercentChangeForCompilation() const {
+        return min_new_methods_percent_change_for_compilation_;
+    }
+    uint32_t GetMinNewClassesPercentChangeForCompilation() const {
+        return min_new_classes_percent_change_for_compilation_;
+    }
 
     void SetForceMerge(bool value) { force_merge_ = value; }
     void SetBootImageMerge(bool value) { boot_image_merge_ = value; }
+    void SetMinNewMethodsPercentChangeForCompilation(uint32_t value) {
+      min_new_methods_percent_change_for_compilation_ = value;
+    }
+    void SetMinNewClassesPercentChangeForCompilation(uint32_t value) {
+      min_new_classes_percent_change_for_compilation_ = value;
+    }
 
    private:
     // If true, performs a forced merge, without analyzing if there is a
@@ -63,6 +81,8 @@ class ProfileAssistant {
     // Signals that the merge is for boot image profiles. It will ignore differences
     // in profile versions (instead of aborting).
     bool boot_image_merge_;
+    uint32_t min_new_methods_percent_change_for_compilation_;
+    uint32_t min_new_classes_percent_change_for_compilation_;
   };
 
   // Process the profile information present in the given files. Returns one of
