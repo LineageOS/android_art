@@ -355,21 +355,6 @@ ifeq ($(ART_BUILD_HOST),true)
   $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host-both,$$(notdir $$(basename $$(file))))))
 endif
 
-# Used outside the art project to get a list of the current tests
-RUNTIME_TARGET_GTEST_MAKE_TARGETS :=
-art_target_gtest_files := $(foreach m,$(ART_TEST_MODULES),$(ART_TEST_LIST_device_$(TARGET_ARCH)_$(m)))
-# If testdir == testfile, assume this is not a test_per_src module
-$(foreach file,$(art_target_gtest_files),\
-  $(eval testdir := $$(notdir $$(patsubst %/,%,$$(dir $$(file)))))\
-  $(eval testfile := $$(notdir $$(basename $$(file))))\
-  $(if $(call streq,$(testdir),$(testfile)),,\
-    $(eval testfile := $(testdir)_$(testfile)))\
-  $(eval RUNTIME_TARGET_GTEST_MAKE_TARGETS += $(testfile))\
-)
-testdir :=
-testfile :=
-art_target_gtest_files :=
-
 # Define all the combinations of host/target and suffix such as:
 # test-art-host-gtest or test-art-host-gtest64
 # $(1): host or target
