@@ -16,7 +16,7 @@
 
 # The RI sends an extra event that art doesn't. Add it to the expected output.
 if [[ "$TEST_RUNTIME" == "jvm" ]]; then
-  patch -p0 expected.txt < jvm-expected.patch >/dev/null
+  patch -p0 expected-stdout.txt < jvm-expected.patch >/dev/null
 fi
 
 ./default-check "$@"
