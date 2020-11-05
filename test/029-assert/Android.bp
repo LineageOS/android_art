@@ -8,13 +8,13 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":art-run-test-target-template",
     srcs: ["src/**/*.java"],
-    data: [":art-run-test-029-assert-expected"],
+    data: [":art-run-test-029-assert-expected-stdout"],
 }
 
 // Test's expected output.
 genrule {
-    name: "art-run-test-029-assert-expected",
-    out: ["art-run-test-029-assert-expected.txt"],
-    srcs: ["expected.txt"],
+    name: "art-run-test-029-assert-expected-stdout",
+    out: ["art-run-test-029-assert-expected-stdout.txt"],
+    srcs: ["expected-stdout.txt"],
     cmd: "cp -f $(in) $(out)",
 }

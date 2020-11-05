@@ -13,5 +13,5 @@ Care should be taken when updating the generate_smali.py script. It should alway
 return equivalent output when run multiple times and the expected output should
 be valid.
 
-Do not modify the expected.txt file. It is generated on each run by
+Do not modify the expected-stdout.txt file. It is generated on each run by
 util-src/generate_smali.py.
