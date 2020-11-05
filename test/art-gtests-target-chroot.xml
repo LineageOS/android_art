@@ -21,8 +21,6 @@
     <test class="com.android.tradefed.testtype.ArtGTest" >
         <!-- TODO(b/147821328): These tests do not work since they need to write to /system -->
         <option name="exclude-filter" value="HiddenApiTest.DexDomain_System*:OatFileAssistantTest.SystemFrameworkDir" />
-        <!-- TODO(b/167660924): These tests fail during remote execution (but pass locally) -->
-        <option name="exclude-filter" value="DexAnalyzeTest*:DexDiagTest*:DexDumpTest*:DexLayoutTest*:DexListTest*:OatDumpTest*" />
         <option name="native-test-timeout" value="600000" />
         <option name="native-test-device-path" value="/data/local/tmp/art-test-chroot/apex/com.android.art/bin/art" />
     </test>
