@@ -122,7 +122,7 @@ chroot=
 info="info.txt"
 build="build"
 run="run"
-expected="expected.txt"
+expected="expected-stdout.txt"
 check_cmd="check"
 output="output.txt"
 build_output="build-output.txt"
@@ -764,7 +764,7 @@ if [ "$usage" = "yes" ]; then
         echo "              The script will only run the test portion, and " \
              "share oat and dex files."
         echo "  $prog --update [options] [test-name]  Update mode" \
-             "(replaces expected.txt)."
+             "(replaces expected-stdout.txt)."
         echo '  Omitting the test name or specifying "-" will use the' \
              "current directory."
         echo "  Runtime Options:"
@@ -1129,7 +1129,7 @@ if [ "$bisection_search" = "yes" -a "$good" != "yes" ]; then
         $maybe_device_mode \
         --raw-cmd="$raw_cmd" \
         --check-script="$cwd/check" \
-        --expected-output="$cwd/expected.txt" \
+        --expected-output="$cwd/expected-stdout.txt" \
         --logfile="$cwd/bisection_log.txt" \
         --timeout=${timeout:-300}
     fi
