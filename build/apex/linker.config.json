@@ -1,7 +1,14 @@
 {
-    "permittedPaths": [
-        "/data",
-        "/system/framework",
-        "/apex/com.android.art/javalib"
-    ]
+  "permittedPaths": [
+    // App odex files need to be dlopen'ed by the ART runtime, and JVMTI
+    // libraries used in ART testing are located under /data.
+    // TODO(b/171732668): Narrow this down.
+    "/data",
+
+    // odex files are also in /system/framework and
+    // /apex/com.android.art/javalib, and the ART APEX primary boot image is in
+    // the latter location.
+    "/system/framework",
+    "/apex/com.android.art/javalib"
+  ]
 }
