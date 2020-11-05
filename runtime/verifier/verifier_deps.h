@@ -90,6 +90,7 @@ class VerifierDeps {
   // to `destination` as defined by RegType::AssignableFrom. `dex_file` is the
   // owner of the method for which MethodVerifier performed the assignability test.
   static void MaybeRecordAssignability(const DexFile& dex_file,
+                                       const dex::ClassDef& class_def,
                                        ObjPtr<mirror::Class> destination,
                                        ObjPtr<mirror::Class> source)
       REQUIRES_SHARED(Locks::mutator_lock_)
@@ -98,6 +99,7 @@ class VerifierDeps {
   // Record that `source` is assignable to `destination`. `dex_file` is the
   // owner of the method for which MethodVerifier performed the assignability test.
   static void MaybeRecordAssignability(const DexFile& dex_file,
+                                       const dex::ClassDef& class_def,
                                        const RegType& destination,
                                        const RegType& source)
       REQUIRES_SHARED(Locks::mutator_lock_)
@@ -153,16 +155,17 @@ class VerifierDeps {
   // methods inside one DexFile.
   struct DexFileDeps {
     explicit DexFileDeps(size_t num_class_defs)
-        : verified_classes_(num_class_defs),
+        : assignable_types_(num_class_defs),
+          verified_classes_(num_class_defs),
           redefined_classes_(num_class_defs) {}
 
     // Vector of strings which are not present in the corresponding DEX file.
     // These are referred to with ids starting with `NumStringIds()` of that DexFile.
     std::vector<std::string> strings_;
 
-    // Set of class pairs recording the outcome of assignability test from one
-    // of the two types to the other.
-    std::set<TypeAssignability> assignable_types_;
+    // Vector that contains for each class def defined in a dex file, a set of class pairs recording
+    // the outcome of assignability test from one of the two types to the other.
+    std::vector<std::set<TypeAssignability>> assignable_types_;
 
     // Bit vector indexed by class def indices indicating whether the corresponding
     // class was successfully verified.
@@ -219,11 +222,13 @@ class VerifierDeps {
       REQUIRES(!Locks::verifier_deps_lock_);
 
   void AddAssignability(const DexFile& dex_file,
+                        const dex::ClassDef& class_def,
                         ObjPtr<mirror::Class> destination,
                         ObjPtr<mirror::Class> source)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   void AddAssignability(const DexFile& dex_file,
+                        const dex::ClassDef& class_def,
                         const RegType& destination,
                         const RegType& source)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -264,7 +269,7 @@ class VerifierDeps {
 
   bool VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
                            const DexFile& dex_file,
-                           const std::set<TypeAssignability>& assignables,
+                           const std::vector<std::set<TypeAssignability>>& assignables,
                            bool expected_assignability,
                            Thread* self,
                            /* out */ std::string* error_msg) const
