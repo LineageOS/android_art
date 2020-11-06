@@ -163,9 +163,8 @@ class IntrinsicOptimizations : public ValueObject {
   explicit IntrinsicOptimizations(const HInvoke& invoke)
       : value_(invoke.GetIntrinsicOptimizations()) {}
 
-  static constexpr int kNumberOfGenericOptimizations = 2;
-  GENERIC_OPTIMIZATION(DoesNotNeedDexCache, 0);
-  GENERIC_OPTIMIZATION(DoesNotNeedEnvironment, 1);
+  static constexpr int kNumberOfGenericOptimizations = 1;
+  GENERIC_OPTIMIZATION(DoesNotNeedEnvironment, 0);
 
  protected:
   bool IsBitSet(uint32_t bit) const {
