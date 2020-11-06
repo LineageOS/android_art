@@ -197,85 +197,6 @@ std::string VerifierDeps::GetStringFromId(const DexFile& dex_file, dex::StringIn
   }
 }
 
-bool VerifierDeps::IsInClassPath(ObjPtr<mirror::Class> klass) const {
-  DCHECK(klass != nullptr);
-
-  // For array types, we return whether the non-array component type
-  // is in the classpath.
-  while (klass->IsArrayClass()) {
-    klass = klass->GetComponentType();
-  }
-
-  if (klass->IsPrimitive()) {
-    return true;
-  }
-
-  ObjPtr<mirror::DexCache> dex_cache = klass->GetDexCache();
-  DCHECK(dex_cache != nullptr);
-  const DexFile* dex_file = dex_cache->GetDexFile();
-  DCHECK(dex_file != nullptr);
-
-  // Test if the `dex_deps_` contains an entry for `dex_file`. If not, the dex
-  // file was not registered as being compiled and we assume `klass` is in the
-  // classpath.
-  return (GetDexFileDeps(*dex_file) == nullptr);
-}
-
-ObjPtr<mirror::Class> VerifierDeps::FindOneClassPathBoundaryForInterface(
-    ObjPtr<mirror::Class> destination,
-    ObjPtr<mirror::Class> source) const {
-  DCHECK(destination->IsInterface());
-  DCHECK(IsInClassPath(destination));
-  Thread* thread = Thread::Current();
-  ObjPtr<mirror::Class> current = source;
-  // Record the classes that are at the boundary between the compiled DEX files and
-  // the classpath. We will check those classes later to find one class that inherits
-  // `destination`.
-  std::vector<ObjPtr<mirror::Class>> boundaries;
-  // If the destination is a direct interface of a class defined in the DEX files being
-  // compiled, no need to record it.
-  while (!IsInClassPath(current)) {
-    for (size_t i = 0; i < current->NumDirectInterfaces(); ++i) {
-      ObjPtr<mirror::Class> direct = mirror::Class::GetDirectInterface(thread, current, i);
-      if (direct == destination) {
-        return nullptr;
-      } else if (IsInClassPath(direct)) {
-        boundaries.push_back(direct);
-      }
-    }
-    current = current->GetSuperClass();
-  }
-  DCHECK(current != nullptr);
-  boundaries.push_back(current);
-
-  // Check if we have an interface defined in the DEX files being compiled, direclty
-  // inheriting `destination`.
-  int32_t iftable_count = source->GetIfTableCount();
-  ObjPtr<mirror::IfTable> iftable = source->GetIfTable();
-  for (int32_t i = 0; i < iftable_count; ++i) {
-    ObjPtr<mirror::Class> itf = iftable->GetInterface(i);
-    if (!IsInClassPath(itf)) {
-      for (size_t j = 0; j < itf->NumDirectInterfaces(); ++j) {
-        ObjPtr<mirror::Class> direct = mirror::Class::GetDirectInterface(thread, itf, j);
-        if (direct == destination) {
-          return nullptr;
-        } else if (IsInClassPath(direct)) {
-          boundaries.push_back(direct);
-        }
-      }
-    }
-  }
-
-  // Find a boundary making `source` inherit from `destination`. We must find one.
-  for (const ObjPtr<mirror::Class>& boundary : boundaries) {
-    if (destination->IsAssignableFrom(boundary)) {
-      return boundary;
-    }
-  }
-  LOG(FATAL) << "Should have found a classpath boundary";
-  UNREACHABLE();
-}
-
 void VerifierDeps::AddAssignability(const DexFile& dex_file,
                                     const dex::ClassDef& class_def,
                                     ObjPtr<mirror::Class> destination,
@@ -324,35 +245,6 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
     // This invocation is from verification of a DEX file which is not being compiled.
     return;
   }
-
-  if (!IsInClassPath(destination) && !IsInClassPath(source)) {
-    // Both `destination` and `source` are defined in the compiled DEX files.
-    // No need to record a dependency.
-    return;
-  }
-
-  if (!IsInClassPath(source)) {
-    if (!destination->IsInterface() && !source->IsInterface()) {
-      // Find the super class at the classpath boundary. Only that class
-      // can change the assignability.
-      do {
-        source = source->GetSuperClass();
-      } while (!IsInClassPath(source));
-
-      // If that class is the actual destination, no need to record it.
-      if (source == destination) {
-        return;
-      }
-    } else {
-      source = FindOneClassPathBoundaryForInterface(destination, source);
-      if (source == nullptr) {
-        // There was no classpath boundary, no need to record.
-        return;
-      }
-      DCHECK(IsInClassPath(source));
-    }
-  }
-
 
   // Get string IDs for both descriptors and store in the appropriate set.
   dex::StringIndex destination_id = GetClassDescriptorStringId(dex_file, destination);
