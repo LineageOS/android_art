@@ -23,29 +23,43 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.Predicate;
 
 public class Test988 {
 
     // Methods with non-deterministic output that should not be printed.
-    static Set<Method> NON_DETERMINISTIC_OUTPUT_METHODS = new HashSet<>();
-    static Set<Method> NON_DETERMINISTIC_OUTPUT_TYPE_METHODS = new HashSet<>();
+    static List<Predicate<Executable>> NON_DETERMINISTIC_OUTPUT_METHODS = new ArrayList<>();
+    static List<Predicate<Executable>> NON_DETERMINISTIC_OUTPUT_TYPE_METHODS = new ArrayList<>();
     static List<Class<?>> NON_DETERMINISTIC_TYPE_NAMES = new ArrayList<>();
 
+    static Predicate<Executable> IS_NON_DETERMINISTIC_OUTPUT =
+        (x) -> NON_DETERMINISTIC_OUTPUT_METHODS.stream().anyMatch((pred) -> pred.test(x));
+    static Predicate<Executable> IS_NON_DETERMINISTIC_OUTPUT_TYPE =
+        (x) -> NON_DETERMINISTIC_OUTPUT_TYPE_METHODS.stream().anyMatch((pred) -> pred.test(x));
+
+    public static final Predicate<Executable> EqPred(Executable m) {
+      return (Executable n) -> n.equals(m);
+    }
+
     static {
+      // Throwable.nativeFillInStackTrace is only on android and hiddenapi so we
+      // should avoid trying to find it at all.
+      NON_DETERMINISTIC_OUTPUT_METHODS.add(
+        (Executable ex) -> {
+          return ex.getDeclaringClass().equals(Throwable.class)
+              && ex.getName().equals("nativeFillInStackTrace");
+        });
       try {
         NON_DETERMINISTIC_OUTPUT_METHODS.add(
-            Throwable.class.getDeclaredMethod("nativeFillInStackTrace"));
-      } catch (Exception e) {}
-      try {
-        NON_DETERMINISTIC_OUTPUT_METHODS.add(Thread.class.getDeclaredMethod("currentThread"));
-        NON_DETERMINISTIC_OUTPUT_TYPE_METHODS.add(Thread.class.getDeclaredMethod("currentThread"));
+            EqPred(Thread.class.getDeclaredMethod("currentThread")));
+        NON_DETERMINISTIC_OUTPUT_TYPE_METHODS.add(
+            EqPred(Thread.class.getDeclaredMethod("currentThread")));
       } catch (Exception e) {}
       try {
         NON_DETERMINISTIC_TYPE_NAMES.add(
@@ -160,7 +174,7 @@ public class Test988 {
         @Override
         public void Print() {
             String print;
-            if (NON_DETERMINISTIC_OUTPUT_METHODS.contains(m)) {
+            if (IS_NON_DETERMINISTIC_OUTPUT.test(m)) {
                 print = "<non-deterministic>";
             } else {
                 print = genericToString(val);
@@ -175,7 +189,7 @@ public class Test988 {
             } else if (NON_DETERMINISTIC_TYPE_NAMES.contains(klass)) {
               klass_print = "<non-deterministic-class " +
                   NON_DETERMINISTIC_TYPE_NAMES.indexOf(klass) + ">";
-            } else if (NON_DETERMINISTIC_OUTPUT_TYPE_METHODS.contains(m)) {
+            } else if (IS_NON_DETERMINISTIC_OUTPUT_TYPE.test(m)) {
               klass_print = "<non-deterministic>";
             } else {
               klass_print = klass.toString();
