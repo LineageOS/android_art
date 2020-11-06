@@ -1823,8 +1823,6 @@ bool HInliner::CanInlineBody(const HGraph* callee_graph,
   const DexFile& callee_dex_file = callee_graph->GetDexFile();
   ArtMethod* const resolved_method = callee_graph->GetArtMethod();
   const uint32_t method_index = resolved_method->GetMethodIndex();
-  const bool same_dex_file =
-      IsSameDexFile(*outer_compilation_unit_.GetDexFile(), *resolved_method->GetDexFile());
 
   HBasicBlock* exit_block = callee_graph->GetExitBlock();
   if (exit_block == nullptr) {
@@ -1922,14 +1920,6 @@ bool HInliner::CanInlineBody(const HGraph* callee_graph,
             << " could not be inlined because " << current->DebugName()
             << " needs an environment, is in a different dex file"
             << ", and cannot be encoded in the stack maps.";
-        return false;
-      }
-
-      if (!same_dex_file && current->NeedsDexCacheOfDeclaringClass()) {
-        LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedDexCache)
-            << "Method " << callee_dex_file.PrettyMethod(method_index)
-            << " could not be inlined because " << current->DebugName()
-            << " it is in a different dex file and requires access to the dex cache";
         return false;
       }
 
