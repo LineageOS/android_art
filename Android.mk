@@ -853,3 +853,58 @@ art-job-images: \
   $(HOST_OUT_EXECUTABLES)/dex2oats \
   $(HOST_OUT_EXECUTABLES)/dex2oatds \
   $(HOST_OUT_EXECUTABLES)/profman
+
+########################################################################
+
+# Build a target that contains dex public SDK stubs for SDK version in the list.
+# Zip files structure:
+#   public-sdk-28-stub.zip
+#     classes.dex
+#   public-sdk-29-stub.zip
+#     classes.dex
+#   public-sdk-30-stub.zip
+#     classes.dex
+MIN_SDK_VERSION := 28
+SDK_VERSIONS := $(call numbers_greater_or_equal_to,$(MIN_SDK_VERSION),$(TARGET_AVAIALBLE_SDK_VERSIONS))
+
+# Create dex public SDK stubs.
+define get_public_sdk_stub_dex
+$(TARGET_OUT_COMMON_INTERMEDIATES)/PACKAGING/public_sdk_$(1)_stub_intermediates/classes.dex
+endef
+
+# The input is the SDK version.
+define create_public_sdk_dex
+public_sdk_$(1)_stub := $$(call get_public_sdk_stub_dex,$(1))
+$$(public_sdk_$(1)_stub): PRIVATE_MIN_SDK_VERSION := $(1)
+$$(public_sdk_$(1)_stub): $$(call resolve-prebuilt-sdk-jar-path,$(1)) $$(DX) $$(ZIP2ZIP)
+	$$(transform-classes.jar-to-dex)
+endef
+
+$(foreach version,$(SDK_VERSIONS),$(eval $(call create_public_sdk_dex,$(version))))
+
+# Create dex public SDK stubs zip.
+define get_public_sdk_stub_zip
+$(call intermediates-dir-for,PACKAGING,public_sdk_stub,HOST)/public-sdk-$(1)-stub.zip
+endef
+
+define create_public_sdk_zip
+PUBLIC_SDK_$(1)_STUB_ZIP_PATH := $$(call get_public_sdk_stub_zip,$(1))
+$$(PUBLIC_SDK_$(1)_STUB_ZIP_PATH): PRIVATE_SDK_STUBS_DEX_DIR := $$(dir $$(public_sdk_$(1)_stub))
+$$(PUBLIC_SDK_$(1)_STUB_ZIP_PATH): $$(SOONG_ZIP) $$(public_sdk_$(1)_stub)
+	rm -f $$@
+	$$(SOONG_ZIP) -o $$@ -C $$(PRIVATE_SDK_STUBS_DEX_DIR) -D $$(PRIVATE_SDK_STUBS_DEX_DIR)
+endef
+
+$(foreach version,$(SDK_VERSIONS),$(eval $(call create_public_sdk_zip,$(version))))
+
+# Make the zip files available for prebuilts.
+$(foreach version,$(SDK_VERSIONS),$(call dist-for-goals,sdk,$(call get_public_sdk_stub_zip,$(version))))
+
+STUB_ZIP_FILES = $(foreach version,$(SDK_VERSIONS),$(call get_public_sdk_stub_zip,$(version)))
+
+.PHONY: public_sdk_stubs
+public_sdk_stubs: $(STUB_ZIP_FILES)
+
+MIN_SDK_VERSION :=
+SDK_VERSIONS :=
+
