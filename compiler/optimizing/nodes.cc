@@ -2881,7 +2881,7 @@ bool HInstruction::HasAnyEnvironmentUseBefore(HInstruction* other) {
 }
 
 void HInvoke::SetIntrinsic(Intrinsics intrinsic,
-                           IntrinsicNeedsEnvironmentOrCache needs_env_or_cache,
+                           IntrinsicNeedsEnvironment needs_env,
                            IntrinsicSideEffects side_effects,
                            IntrinsicExceptions exceptions) {
   intrinsic_ = intrinsic;
@@ -2895,8 +2895,7 @@ void HInvoke::SetIntrinsic(Intrinsics intrinsic,
     case kAllSideEffects: SetSideEffects(SideEffects::AllExceptGCDependency()); break;
   }
 
-  if (needs_env_or_cache == kNoEnvironmentOrCache) {
-    opt.SetDoesNotNeedDexCache();
+  if (needs_env == kNoEnvironment) {
     opt.SetDoesNotNeedEnvironment();
   } else {
     // If we need an environment, that means there will be a call, which can trigger GC.
@@ -2924,17 +2923,6 @@ const DexFile& HInvokeStaticOrDirect::GetDexFileForPcRelativeDexCache() const {
   // `caller` is null for a top-level graph representing a method whose declaring
   // class was not resolved.
   return caller == nullptr ? GetBlock()->GetGraph()->GetDexFile() : *caller->GetDexFile();
-}
-
-bool HInvokeStaticOrDirect::NeedsDexCacheOfDeclaringClass() const {
-  if (GetMethodLoadKind() != MethodLoadKind::kRuntimeCall) {
-    return false;
-  }
-  if (!IsIntrinsic()) {
-    return true;
-  }
-  IntrinsicOptimizations opt(*this);
-  return !opt.GetDoesNotNeedDexCache();
 }
 
 std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::ClinitCheckRequirement rhs) {
@@ -3114,19 +3102,19 @@ std::ostream& operator<<(std::ostream& os, TypeCheckKind rhs) {
 #undef CHECK_INTRINSICS_ENUM_VALUES
 
 // Function that returns whether an intrinsic needs an environment or not.
-static inline IntrinsicNeedsEnvironmentOrCache NeedsEnvironmentOrCacheIntrinsic(Intrinsics i) {
+static inline IntrinsicNeedsEnvironment NeedsEnvironmentIntrinsic(Intrinsics i) {
   switch (i) {
     case Intrinsics::kNone:
-      return kNeedsEnvironmentOrCache;  // Non-sensical for intrinsic.
-#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnvOrCache, SideEffects, Exceptions, ...) \
+      return kNeedsEnvironment;  // Non-sensical for intrinsic.
+#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnv, SideEffects, Exceptions, ...) \
     case Intrinsics::k ## Name: \
-      return NeedsEnvOrCache;
+      return NeedsEnv;
 #include "intrinsics_list.h"
       INTRINSICS_LIST(OPTIMIZING_INTRINSICS)
 #undef INTRINSICS_LIST
 #undef OPTIMIZING_INTRINSICS
   }
-  return kNeedsEnvironmentOrCache;
+  return kNeedsEnvironment;
 }
 
 // Function that returns whether an intrinsic has side effects.
@@ -3134,7 +3122,7 @@ static inline IntrinsicSideEffects GetSideEffectsIntrinsic(Intrinsics i) {
   switch (i) {
     case Intrinsics::kNone:
       return kAllSideEffects;
-#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnvOrCache, SideEffects, Exceptions, ...) \
+#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnv, SideEffects, Exceptions, ...) \
     case Intrinsics::k ## Name: \
       return SideEffects;
 #include "intrinsics_list.h"
@@ -3150,7 +3138,7 @@ static inline IntrinsicExceptions GetExceptionsIntrinsic(Intrinsics i) {
   switch (i) {
     case Intrinsics::kNone:
       return kCanThrow;
-#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnvOrCache, SideEffects, Exceptions, ...) \
+#define OPTIMIZING_INTRINSICS(Name, InvokeType, NeedsEnv, SideEffects, Exceptions, ...) \
     case Intrinsics::k ## Name: \
       return Exceptions;
 #include "intrinsics_list.h"
@@ -3165,7 +3153,7 @@ void HInvoke::SetResolvedMethod(ArtMethod* method) {
   if (method != nullptr && method->IsIntrinsic()) {
     Intrinsics intrinsic = static_cast<Intrinsics>(method->GetIntrinsic());
     SetIntrinsic(intrinsic,
-                 NeedsEnvironmentOrCacheIntrinsic(intrinsic),
+                 NeedsEnvironmentIntrinsic(intrinsic),
                  GetSideEffectsIntrinsic(intrinsic),
                  GetExceptionsIntrinsic(intrinsic));
   }
