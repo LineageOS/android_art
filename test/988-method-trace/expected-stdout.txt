@@ -166,10 +166,10 @@ fibonacci(5)=5
 ......=> private static java.lang.Object java.lang.Throwable.nativeFillInStackTrace()
 ......<= private static java.lang.Object java.lang.Throwable.nativeFillInStackTrace() -> <class [Ljava.lang.Object;: <non-deterministic>>
 .....<= public synchronized java.lang.Throwable java.lang.Throwable.fillInStackTrace() -> <class java.lang.Error: java.lang.Error: Bad argument: -19 < 0
-	art.Test988.iter_fibonacci(Test988.java:255)
-	art.Test988$IterOp.applyAsInt(Test988.java:250)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:344)
+	art.Test988.iter_fibonacci(Test988.java:269)
+	art.Test988$IterOp.applyAsInt(Test988.java:264)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:358)
 	<additional hidden frames>
 >
 ....<= public java.lang.Throwable(java.lang.String) -> <null: null>
@@ -186,10 +186,10 @@ fibonacci(5)=5
 ...<= private void java.util.ArrayList.ensureExplicitCapacity(int) -> <null: null>
 ..<= private void java.util.ArrayList.ensureCapacityInternal(int) -> <null: null>
 fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
-	art.Test988.iter_fibonacci(Test988.java:255)
-	art.Test988$IterOp.applyAsInt(Test988.java:250)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:344)
+	art.Test988.iter_fibonacci(Test988.java:269)
+	art.Test988$IterOp.applyAsInt(Test988.java:264)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:358)
 	<additional hidden frames>
 
 .<= public boolean java.util.ArrayList.add(java.lang.Object) -> <class java.lang.Boolean: true>
@@ -269,10 +269,10 @@ fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
 ......=> private static java.lang.Object java.lang.Throwable.nativeFillInStackTrace()
 ......<= private static java.lang.Object java.lang.Throwable.nativeFillInStackTrace() -> <class [Ljava.lang.Object;: <non-deterministic>>
 .....<= public synchronized java.lang.Throwable java.lang.Throwable.fillInStackTrace() -> <class java.lang.Error: java.lang.Error: Bad argument: -19 < 0
-	art.Test988.fibonacci(Test988.java:277)
-	art.Test988$RecurOp.applyAsInt(Test988.java:272)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:345)
+	art.Test988.fibonacci(Test988.java:291)
+	art.Test988$RecurOp.applyAsInt(Test988.java:286)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:359)
 	<additional hidden frames>
 >
 ....<= public java.lang.Throwable(java.lang.String) -> <null: null>
@@ -289,10 +289,10 @@ fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
 ...<= private void java.util.ArrayList.ensureExplicitCapacity(int) -> <null: null>
 ..<= private void java.util.ArrayList.ensureCapacityInternal(int) -> <null: null>
 fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
-	art.Test988.fibonacci(Test988.java:277)
-	art.Test988$RecurOp.applyAsInt(Test988.java:272)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:345)
+	art.Test988.fibonacci(Test988.java:291)
+	art.Test988$RecurOp.applyAsInt(Test988.java:286)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:359)
 	<additional hidden frames>
 
 .<= public boolean java.util.ArrayList.add(java.lang.Object) -> <class java.lang.Boolean: true>
@@ -315,9 +315,9 @@ fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
 ......<= private static java.lang.Object java.lang.Throwable.nativeFillInStackTrace() -> <class [Ljava.lang.Object;: <non-deterministic>>
 .....<= public synchronized java.lang.Throwable java.lang.Throwable.fillInStackTrace() -> <class java.lang.Error: java.lang.Error: bad argument
 	art.Test988.nativeFibonacci(Native Method)
-	art.Test988$NativeOp.applyAsInt(Test988.java:287)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:346)
+	art.Test988$NativeOp.applyAsInt(Test988.java:301)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:360)
 	<additional hidden frames>
 >
 ....<= public java.lang.Throwable(java.lang.String) -> <null: null>
@@ -335,9 +335,9 @@ fibonacci(-19) -> java.lang.Error: Bad argument: -19 < 0
 ..<= private void java.util.ArrayList.ensureCapacityInternal(int) -> <null: null>
 fibonacci(-19) -> java.lang.Error: bad argument
 	art.Test988.nativeFibonacci(Native Method)
-	art.Test988$NativeOp.applyAsInt(Test988.java:287)
-	art.Test988.doFibTest(Test988.java:388)
-	art.Test988.run(Test988.java:346)
+	art.Test988$NativeOp.applyAsInt(Test988.java:301)
+	art.Test988.doFibTest(Test988.java:402)
+	art.Test988.run(Test988.java:360)
 	<additional hidden frames>
 
 .<= public boolean java.util.ArrayList.add(java.lang.Object) -> <class java.lang.Boolean: true>
