@@ -280,7 +280,7 @@ known_failing_tests=(
 # the `presubmit` test group in `TEST_MAPPING` file -- the rest will be included
 # in `postsubmit` test group.
 # Currently, this value has to be a number between 1 and 99.
-presubmit_tests_percentage=10
+presubmit_tests_percentage=25
 
 cd "$ANDROID_BUILD_TOP/art"
 
@@ -373,14 +373,14 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":$test_config_template",
     srcs: ["src/**/*.java"],
-    data: [":$run_test_name-expected"],
+    data: [":$run_test_name-expected-stdout"],
 $include_src}
 
 // Test's expected output.
 genrule {
-    name: "$run_test_name-expected",
-    out: ["$run_test_name-expected.txt"],
-    srcs: ["expected.txt"],
+    name: "$run_test_name-expected-stdout",
+    out: ["$run_test_name-expected-stdout.txt"],
+    srcs: ["expected-stdout.txt"],
     cmd: "cp -f \$(in) \$(out)",
 }
 EOF

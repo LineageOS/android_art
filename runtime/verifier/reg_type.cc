@@ -902,9 +902,11 @@ const RegType& RegType::Merge(const RegType& incoming_type,
       // are assignable to `join_class`. The `verifier` is null during unit tests.
       if (verifier != nullptr) {
         VerifierDeps::MaybeRecordAssignability(verifier->GetDexFile(),
+                                               verifier->GetClassDef(),
                                                join_class,
                                                GetClass());
         VerifierDeps::MaybeRecordAssignability(verifier->GetDexFile(),
+                                               verifier->GetClassDef(),
                                                join_class,
                                                incoming_type.GetClass());
       }
