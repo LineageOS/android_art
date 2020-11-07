@@ -2468,10 +2468,6 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
     return NeedsEnvironment() || IsCurrentMethod();
   }
 
-  // Returns whether the code generation of the instruction will require to have access
-  // to the dex cache of the current method's declaring class via the current method.
-  virtual bool NeedsDexCacheOfDeclaringClass() const { return false; }
-
   // Does this instruction have any use in an environment before
   // control flow hits 'other'?
   bool HasAnyEnvironmentUseBefore(HInstruction* other);
@@ -4355,9 +4351,9 @@ class HNewInstance final : public HExpression<1> {
   QuickEntrypointEnum entrypoint_;
 };
 
-enum IntrinsicNeedsEnvironmentOrCache {
-  kNoEnvironmentOrCache,        // Intrinsic does not require an environment or dex cache.
-  kNeedsEnvironmentOrCache      // Intrinsic requires an environment or requires a dex cache.
+enum IntrinsicNeedsEnvironment {
+  kNoEnvironment,        // Intrinsic does not require an environment.
+  kNeedsEnvironment      // Intrinsic requires an environment.
 };
 
 enum IntrinsicSideEffects {
@@ -4446,7 +4442,7 @@ class HInvoke : public HVariableInputSizeInstruction {
   }
 
   void SetIntrinsic(Intrinsics intrinsic,
-                    IntrinsicNeedsEnvironmentOrCache needs_env_or_cache,
+                    IntrinsicNeedsEnvironment needs_env,
                     IntrinsicSideEffects side_effects,
                     IntrinsicExceptions exceptions);
 
@@ -4740,7 +4736,6 @@ class HInvokeStaticOrDirect final : public HInvoke {
   MethodLoadKind GetMethodLoadKind() const { return dispatch_info_.method_load_kind; }
   CodePtrLocation GetCodePtrLocation() const { return dispatch_info_.code_ptr_location; }
   bool IsRecursive() const { return GetMethodLoadKind() == MethodLoadKind::kRecursive; }
-  bool NeedsDexCacheOfDeclaringClass() const override;
   bool IsStringInit() const { return GetMethodLoadKind() == MethodLoadKind::kStringInit; }
   bool HasMethodAddress() const { return GetMethodLoadKind() == MethodLoadKind::kJitDirectAddress; }
   bool HasPcRelativeMethodLoadKind() const {
@@ -4970,11 +4965,6 @@ class HInvokeInterface final : public HInvoke {
   bool CanDoImplicitNullCheckOn(HInstruction* obj) const override {
     // TODO: Add implicit null checks in intrinsics.
     return (obj == InputAt(0)) && !IsIntrinsic();
-  }
-
-  bool NeedsDexCacheOfDeclaringClass() const override {
-    // The assembly stub currently needs it.
-    return true;
   }
 
   size_t GetSpecialInputIndex() const {
@@ -6535,10 +6525,6 @@ class HLoadClass final : public HInstruction {
   dex::TypeIndex GetTypeIndex() const { return type_index_; }
   const DexFile& GetDexFile() const { return dex_file_; }
 
-  bool NeedsDexCacheOfDeclaringClass() const override {
-    return GetLoadKind() == LoadKind::kRuntimeCall;
-  }
-
   static SideEffects SideEffectsForArchRuntimeCalls() {
     return SideEffects::CanTriggerGC();
   }
@@ -6743,10 +6729,6 @@ class HLoadString final : public HInstruction {
       return false;
     }
     return true;
-  }
-
-  bool NeedsDexCacheOfDeclaringClass() const override {
-    return GetLoadKind() == LoadKind::kRuntimeCall;
   }
 
   bool CanBeNull() const override { return false; }

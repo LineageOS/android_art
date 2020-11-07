@@ -16,6 +16,6 @@
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    art.Test993.run();
+    art.Test993.run(true);
   }
 }
