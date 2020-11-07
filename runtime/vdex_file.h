@@ -39,6 +39,8 @@ class VerifierDeps;
 // VDEX files contain extracted DEX files. The VdexFile class maps the file to
 // memory and provides tools for accessing its individual sections.
 //
+// In the description below, D is the number of dex files.
+//
 // File format:
 //   VdexFile::VerifierDepsHeader    fixed-length header
 //      Dex file checksums
@@ -51,10 +53,22 @@ class VerifierDeps;
 //      quicken_table_off[1]
 //      DEX[1]
 //      ...
-//      DEX[D]
+//      DEX[D-1]
 //
 //   VerifierDeps
-//      uint8[D][]                 verification dependencies
+//      4-byte alignment
+//      uint32[D]                  DexFileDeps offsets for each dex file
+//      DexFileDeps[D][]           verification dependencies
+//        4-byte alignment
+//        uint32[class_def_size]     TypeAssignability offsets (kNotVerifiedMarker for a class
+//                                        that isn't verified)
+//        uint32                     Offset of end of AssignabilityType sets
+//        uint8[]                    AssignabilityType sets
+//        4-byte alignment
+//        uint32                     Number of strings
+//        uint32[]                   String data offsets for each string
+//        uint8[]                    String data
+//
 //
 //   Optionally:
 //      QuickeningInfo
@@ -114,8 +128,8 @@ class VdexFile {
     static constexpr uint8_t kVdexMagic[] = { 'v', 'd', 'e', 'x' };
 
     // The format version of the verifier deps header and the verifier deps.
-    // Last update: Include all assignable checks.
-    static constexpr uint8_t kVerifierDepsVersion[] = { '0', '2', '5', '\0' };
+    // Last update: Fast per-class access.
+    static constexpr uint8_t kVerifierDepsVersion[] = { '0', '2', '6', '\0' };
 
     // The format version of the dex section header and the dex section, containing
     // both the dex code and the quickening data.
