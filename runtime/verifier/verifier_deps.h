@@ -194,18 +194,6 @@ class VerifierDeps {
 
   const DexFileDeps* GetDexFileDeps(const DexFile& dex_file) const;
 
-  // Returns true if `klass` is null or not defined in any of dex files which
-  // were reported as being compiled.
-  bool IsInClassPath(ObjPtr<mirror::Class> klass) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Finds the class in the classpath that makes `source` inherit` from `destination`.
-  // Returns null if a class defined in the compiled DEX files, and assignable to
-  // `source`, direclty inherits from `destination`.
-  ObjPtr<mirror::Class> FindOneClassPathBoundaryForInterface(ObjPtr<mirror::Class> destination,
-                                                             ObjPtr<mirror::Class> source) const
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Returns the index of `str`. If it is defined in `dex_file_`, this is the dex
   // string ID. If not, an ID is assigned to the string and cached in `strings_`
   // of the corresponding DexFileDeps structure (either provided or inferred from
