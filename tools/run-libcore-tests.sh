@@ -239,7 +239,7 @@ if [ -z "$execution_mode" ]; then
 fi
 
 # Default timeout, gets overridden on device under gcstress.
-timeout_secs=480
+default_timeout_secs=480
 
 if [ $execution_mode = "device" ]; then
   # Honor environment variable ART_TEST_CHROOT.
@@ -259,16 +259,18 @@ if [ $execution_mode = "device" ]; then
   # the default timeout.
   if $gcstress; then
     if $debug; then
-      timeout_secs=1440
+      default_timeout_secs=1440
     else
-      timeout_secs=900
+      default_timeout_secs=900
     fi
   fi
 fi  # $execution_mode = "device"
 
 if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
-  # Add timeout to vogar command-line.
-  vogar_args="$vogar_args --timeout $timeout_secs"
+  # Add timeout to vogar command-line (if not explicitly present in the command-line arguments) .
+  if [[ "$vogar_args" != *" --timeout "* ]]; then
+    vogar_args="$vogar_args --timeout $default_timeout_secs"
+  fi
 
   # Suppress explicit gc logs that are triggered an absurd number of times by these tests.
   vogar_args="$vogar_args --vm-arg -XX:AlwaysLogExplicitGcs:false"
