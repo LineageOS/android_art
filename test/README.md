@@ -39,9 +39,10 @@ is actually implemented in the "JAR runner" (`test/etc/run-test-jar`), invoked
 by `test/etc/default-run`.
 
 After the execution of a run-test, the check step's default behavior
-(implemented in `test/etc/default-check`) is to compare its standard output with
-the contents of the `expected-stdout.txt` file contained in the test's directory;
-any mismatch triggers a test failure.
+(implemented in `test/etc/default-check`) is to respectively compare its
+standard output and standard error with the contents of the
+`expected-stdout.txt` and `expected-stderr.txt` files contained in the test's
+directory; any mismatch triggers a test failure.
 
 The `test/run-test` script handles the execution of a single run-test in a given
 configuration. The Python script `test/testrunner/testrunner.py` is a convenient
