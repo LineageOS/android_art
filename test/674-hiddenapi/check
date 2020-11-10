@@ -14,10 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # Remove pid and date from the log messages.
-grep -vE '^dalvikvm(32|64) E [^]]+]' "$2" \
-    | grep -v JNI_OnLoad \
+grep -v JNI_OnLoad "$2" \
     | grep -v JNI_OnUnload \
     > "$2.tmp"
+grep -vE '^dalvikvm(32|64) E [^]]+]' "$4" \
+    > "$4.tmp"
 
-./default-check "$1" "$2.tmp"
+./default-check "$1" "$2.tmp" "$3" "$4.tmp"

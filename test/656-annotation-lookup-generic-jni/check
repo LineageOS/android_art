@@ -14,8 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # On gcstress configurations, an extra "JNI_OnUnload called" line may
 # be emitted. If so, remove it.
 sed -e '${/^JNI_OnUnload called$/d;}' "$2" > "$2.tmp"
 
-./default-check "$1" "$2.tmp"
+./default-check "$1" "$2.tmp" "$3" "$4"

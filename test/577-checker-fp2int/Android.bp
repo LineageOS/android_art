@@ -8,16 +8,27 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":art-run-test-target-no-test-suite-tag-template",
     srcs: ["src/**/*.java"],
-    data: [":art-run-test-577-checker-fp2int-expected-stdout"],
+    data: [
+        ":art-run-test-577-checker-fp2int-expected-stdout",
+        ":art-run-test-577-checker-fp2int-expected-stderr",
+    ],
     // Include the Java source files in the test's artifacts, to make Checker assertions
     // available to the TradeFed test runner.
     include_srcs: true,
 }
 
-// Test's expected output.
+// Test's expected standard output.
 genrule {
     name: "art-run-test-577-checker-fp2int-expected-stdout",
     out: ["art-run-test-577-checker-fp2int-expected-stdout.txt"],
     srcs: ["expected-stdout.txt"],
+    cmd: "cp -f $(in) $(out)",
+}
+
+// Test's expected standard error.
+genrule {
+    name: "art-run-test-577-checker-fp2int-expected-stderr",
+    out: ["art-run-test-577-checker-fp2int-expected-stderr.txt"],
+    srcs: ["expected-stderr.txt"],
     cmd: "cp -f $(in) $(out)",
 }

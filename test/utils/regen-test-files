@@ -373,14 +373,25 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":$test_config_template",
     srcs: ["src/**/*.java"],
-    data: [":$run_test_name-expected-stdout"],
+    data: [
+        ":$run_test_name-expected-stdout",
+        ":$run_test_name-expected-stderr",
+    ],
 $include_src}
 
-// Test's expected output.
+// Test's expected standard output.
 genrule {
     name: "$run_test_name-expected-stdout",
     out: ["$run_test_name-expected-stdout.txt"],
     srcs: ["expected-stdout.txt"],
+    cmd: "cp -f \$(in) \$(out)",
+}
+
+// Test's expected standard error.
+genrule {
+    name: "$run_test_name-expected-stderr",
+    out: ["$run_test_name-expected-stderr.txt"],
+    srcs: ["expected-stderr.txt"],
     cmd: "cp -f \$(in) \$(out)",
 }
 EOF

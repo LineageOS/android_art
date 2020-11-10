@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # DeadReferenceSafe result differs for interpreted mode. A real failure
 # will produce an extra line anyway.
 
-diff --ignore-matching-lines="DeadReferenceSafe count:" -q $1 $2
+diff --ignore-matching-lines="DeadReferenceSafe count:" -q $1 $2 \
+  && diff --strip-trailing-cr -q "$3" "$4" >/dev/null

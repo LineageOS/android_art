@@ -14,5 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # Filter out error messages for missing native methods.
-grep -v 'No implementation found for ' "$2" | diff -q "$1" - >/dev/null
+diff --strip-trailing-cr -q "$1" "$2" >/dev/null \
+  && grep -v 'No implementation found for ' "$4" | diff -q "$3" - >/dev/null

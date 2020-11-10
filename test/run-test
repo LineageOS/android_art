@@ -122,10 +122,13 @@ chroot=
 info="info.txt"
 build="build"
 run="run"
-expected="expected-stdout.txt"
+expected_stdout="expected-stdout.txt"
+expected_stderr="expected-stderr.txt"
 check_cmd="check"
-output="output.txt"
-build_output="build-output.txt"
+test_stdout="test-stdout.txt"
+test_stderr="test-stderr.txt"
+build_stdout="build-stdout.txt"
+build_stderr="build-stderr.txt"
 cfg_output="graph.cfg"
 strace_output="strace-output.txt"
 lib="libartd.so"
@@ -764,7 +767,7 @@ if [ "$usage" = "yes" ]; then
         echo "              The script will only run the test portion, and " \
              "share oat and dex files."
         echo "  $prog --update [options] [test-name]  Update mode" \
-             "(replaces expected-stdout.txt)."
+             "(replaces expected-stdout.txt and expected-stderr.txt)."
         echo '  Omitting the test name or specifying "-" will use the' \
              "current directory."
         echo "  Runtime Options:"
@@ -868,17 +871,15 @@ cd "$test_dir"
 test_dir=`pwd`
 
 td_info="${test_dir}/${info}"
-td_expected="${test_dir}/${expected}"
+td_expected_stdout="${test_dir}/${expected_stdout}"
+td_expected_stderr="${test_dir}/${expected_stderr}"
 
-if [ ! -r $td_info ]; then
-    err_echo "${test_dir}: missing file $td_info"
-    exit 1
-fi
-
-if [ ! -r $td_expected ]; then
-    err_echo "${test_dir}: missing file $td_expected"
-    exit 1
-fi
+for td_file in "$td_info" "$td_expected_stdout" "$td_expected_stderr"; do
+    if [ ! -r "$td_file" ]; then
+        err_echo "${test_dir}: missing file $td_file"
+        exit 1
+    fi
+done
 
 # copy the test to a temp dir and run it
 
@@ -965,12 +966,12 @@ good_build="yes"
 good_run="yes"
 export TEST_RUNTIME="${runtime}"
 if [ "$dev_mode" = "yes" ]; then
-    "./${build}" $build_args 2>&1
+    "./${build}" $build_args
     build_exit="$?"
     echo "build exit status: $build_exit" 1>&2
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" "${run_args[@]}" "$@" 2>&1
+        "./${run}" "${run_args[@]}" "$@"
         run_exit="$?"
 
         if [ "$run_exit" = "0" ]; then
@@ -991,45 +992,61 @@ if [ "$dev_mode" = "yes" ]; then
         echo "run exit status: $run_exit" 1>&2
     fi
 elif [ "$update_mode" = "yes" ]; then
-    "./${build}" $build_args >"$build_output" 2>&1
+    "./${build}" $build_args >"$build_stdout" 2>"$build_stderr"
     build_exit="$?"
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" "${run_args[@]}" "$@" >"$output" 2>&1
+        "./${run}" "${run_args[@]}" "$@" >"$test_stdout" 2>"$test_stderr"
         if [ "$run_checker" = "yes" ]; then
           if [ "$target_mode" = "yes" ]; then
             adb pull "$chroot/$cfg_output_dir/$cfg_output" &> /dev/null
           fi
-          "$checker" -q $checker_args "$cfg_output" "$tmp_dir" >> "$output" 2>&1
+          "$checker" -q $checker_args "$cfg_output" "$tmp_dir" >>"$test_stdout" 2>>"$test_stderr"
         fi
-        sed -e 's/[[:cntrl:]]$//g' < "$output" >"${td_expected}"
+        sed -e 's/[[:cntrl:]]$//g' <"$test_stdout" >"${td_expected_stdout}"
+        sed -e 's/[[:cntrl:]]$//g' <"$test_stderr" >"${td_expected_stderr}"
         good="yes"
     else
-        cat "$build_output" 1>&${real_stderr} 1>&2
+        err_echo "#################### build standard output"
+        cat "$build_stdout" 1>&${real_stderr}
+        err_echo "####################"
+        err_echo "#################### build standard error"
+        cat "$build_stderr" 1>&${real_stderr}
+        err_echo "####################"
         err_echo "build exit status: $build_exit"
     fi
 elif [ "$build_only" = "yes" ]; then
     good="yes"
-    "./${build}" $build_args >"$build_output" 2>&1
+    "./${build}" $build_args >"$build_stdout" 2>"$build_stderr"
     build_exit="$?"
     if [ "$build_exit" '!=' '0' ]; then
-        cp "$build_output" "$output"
-        echo "build exit status: $build_exit" >>"$output"
-        diff --strip-trailing-cr -q "$expected" "$output" >/dev/null
+        cp "$build_stdout" "$test_stdout"
+        diff --strip-trailing-cr -q "$expected_stdout" "$test_stdout" >/dev/null
         if [ "$?" '!=' "0" ]; then
             good="no"
-            err_echo "BUILD FAILED For ${TEST_NAME}"
+            err_echo "BUILD FAILED For ${TEST_NAME}" \
+              "(the build's standard output does not match the expected standard output)"
         fi
+        cp "$build_stderr" "$test_stderr"
+        diff --strip-trailing-cr -q "$expected_stderr" "$test_stderr" >/dev/null
+        if [ "$?" '!=' "0" ]; then
+            good="no"
+            err_echo "BUILD FAILED For ${TEST_NAME}" \
+              "(the build's standard error does not match the expected standard error)"
+        fi
+        echo "build exit status: $build_exit" >>"$test_stderr"
     fi
     # Clean up extraneous files that are not used by tests.
-    find $tmp_dir -mindepth 1  ! -regex ".*/\(.*jar\|$output\|$expected\)" | xargs rm -rf
+    find $tmp_dir -mindepth 1  \
+        ! -regex ".*/\(.*jar\|$test_stdout\|$expected_stdout|$test_stderr\|$expected_stderr\)" \
+      | xargs rm -rf
     exit 0
 else
-    "./${build}" $build_args >"$build_output" 2>&1
+    "./${build}" $build_args >"$build_stdout" 2>"$build_stderr"
     build_exit="$?"
     if [ "$build_exit" = '0' ]; then
         echo "${test_dir}: running..." 1>&2
-        "./${run}" "${run_args[@]}" "$@" >"$output" 2>&1
+        "./${run}" "${run_args[@]}" "$@" >"$test_stdout" 2>"$test_stderr"
         run_exit="$?"
         if [ "$run_exit" != "0" ]; then
             err_echo "run exit status: $run_exit"
@@ -1038,7 +1055,7 @@ else
             if [ "$target_mode" = "yes" ]; then
               adb pull "$chroot/$cfg_output_dir/$cfg_output" &> /dev/null
             fi
-            "$checker" -q $checker_args "$cfg_output" "$tmp_dir" >> "$output" 2>&1
+            "$checker" -q $checker_args "$cfg_output" "$tmp_dir" >>"$test_stdout" 2>>"$test_stderr"
             checker_exit="$?"
             if [ "$checker_exit" != "0" ]; then
                 err_echo "checker exit status: $checker_exit"
@@ -1051,20 +1068,22 @@ else
         fi
     else
         good_build="no"
-        cp "$build_output" "$output"
-        echo "Failed to build in tmpdir=${tmp_dir} from oldwd=${oldwd} and cwd=`pwd`" >> "$output"
-        echo "Non-canonical tmpdir was ${noncanonical_tmp_dir}" >> "$output"
-        echo "Args: ${args}" >> "$output"
-        echo "build exit status: $build_exit" >> "$output"
+        cp "$build_stdout" "$test_stdout"
+        cp "$build_stderr" "$test_stderr"
+        echo "Failed to build in tmpdir=${tmp_dir} from oldwd=${oldwd} and cwd=`pwd`" \
+          >> "$test_stderr"
+        echo "Non-canonical tmpdir was ${noncanonical_tmp_dir}" >> "$test_stderr"
+        echo "Args: ${args}" >> "$test_stderr"
+        echo "build exit status: $build_exit" >> "$test_stderr"
         max_name_length=$(getconf NAME_MAX ${tmp_dir})
-        echo "Max filename (NAME_MAX): ${max_name_length}" >> "$output"
+        echo "Max filename (NAME_MAX): ${max_name_length}" >> "$test_stderr"
         max_path_length=$(getconf PATH_MAX ${tmp_dir})
-        echo "Max pathlength (PATH_MAX): ${max_path_length}" >> "$output"
+        echo "Max pathlength (PATH_MAX): ${max_path_length}" >> "$test_stderr"
     fi
-    ./$check_cmd "$expected" "$output"
+    ./$check_cmd "$expected_stdout" "$test_stdout" "$expected_stderr" "$test_stderr"
     if [ "$?" = "0" ]; then
         if [ "$good_build" = "no" -o "$good_run" = "yes" ]; then
-          # output == expected
+          # test_stdout == expected_stdout && test_stderr == expected_stderr
           good="yes"
           echo "${test_dir}: succeeded!" 1>&2
         fi
@@ -1077,13 +1096,16 @@ fi
         echo ' '
         echo '#################### info'
         cat "${td_info}" | sed 's/^/# /g'
-        echo '#################### diffs'
+        echo '#################### stdout diffs'
         if [ "$run_checker" == "yes" ]; then
           # Checker failures dump the whole CFG, so we output the whole diff.
-          diff --strip-trailing-cr -u "$expected" "$output"
+          diff --strip-trailing-cr -u "$expected_stdout" "$test_stdout"
         else
-          diff --strip-trailing-cr -u "$expected" "$output" | tail -n 10000
+          diff --strip-trailing-cr -u "$expected_stdout" "$test_stdout" | tail -n 10000
         fi
+        echo '####################'
+        echo '#################### stderr diffs'
+        diff --strip-trailing-cr -u "$expected_stderr" "$test_stderr" | tail -n 10000
         echo '####################'
         if [ "$strace" = "yes" ]; then
             echo '#################### strace output'
@@ -1093,7 +1115,8 @@ fi
         if [ "x$target_mode" = "xno" -a "x$SANITIZE_HOST" = "xaddress" ]; then
             # Run the stack script to symbolize any ASAN aborts on the host for SANITIZE_HOST. The
             # tools used by the given ABI work for both x86 and x86-64.
-            echo "ABI: 'x86_64'" | cat - "$output" | $ANDROID_BUILD_TOP/development/scripts/stack | tail -n 3000
+            echo "ABI: 'x86_64'" | cat - "$test_stdout" "$test_stderr" \
+              | $ANDROID_BUILD_TOP/development/scripts/stack | tail -n 3000
         fi
         echo ' '
     fi
