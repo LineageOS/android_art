@@ -14,8 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # When profile verification fails, dex2oat logs an error. The following
 # command strips out the error message.
 grep -v -f $1 $2 > $1
+grep -v -f $3 $4 > $3
 
 ./default-check "$@"

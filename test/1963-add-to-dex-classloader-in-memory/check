@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # Some of our test devices are so old that they don't have memfd_create and are setup in such a way
 # that tmpfile() doesn't work. In these cases this test cannot complete successfully.
 

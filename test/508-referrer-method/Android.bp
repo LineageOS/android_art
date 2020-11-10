@@ -8,13 +8,24 @@ java_test {
     defaults: ["art-run-test-defaults"],
     test_config_template: ":art-run-test-target-template",
     srcs: ["src/**/*.java"],
-    data: [":art-run-test-508-referrer-method-expected-stdout"],
+    data: [
+        ":art-run-test-508-referrer-method-expected-stdout",
+        ":art-run-test-508-referrer-method-expected-stderr",
+    ],
 }
 
-// Test's expected output.
+// Test's expected standard output.
 genrule {
     name: "art-run-test-508-referrer-method-expected-stdout",
     out: ["art-run-test-508-referrer-method-expected-stdout.txt"],
     srcs: ["expected-stdout.txt"],
+    cmd: "cp -f $(in) $(out)",
+}
+
+// Test's expected standard error.
+genrule {
+    name: "art-run-test-508-referrer-method-expected-stderr",
+    out: ["art-run-test-508-referrer-method-expected-stderr.txt"],
+    srcs: ["expected-stderr.txt"],
     cmd: "cp -f $(in) $(out)",
 }

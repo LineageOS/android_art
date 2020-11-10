@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # ASAN prints a warning here.
 
-sed -e '/WARNING: ASan is ignoring requested __asan_handle_no_return/,+2d' "$2" | \
-    diff --strip-trailing-cr -q "$1" - >/dev/null
+diff --strip-trailing-cr -q "$1" "$2" >/dev/null \
+  && sed -e '/WARNING: ASan is ignoring requested __asan_handle_no_return/,+2d' "$4" \
+       | diff --strip-trailing-cr -q "$3" - >/dev/null
