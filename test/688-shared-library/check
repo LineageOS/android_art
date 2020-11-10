@@ -14,9 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # Finalizers of DexFile will complain not being able to close
 # the main dex file, as it's still open. That's OK to ignore.
 # Oat file manager will also complain about duplicate dex files. Ignore.
-sed -e '/^E\/System/d' "$2" | sed -e '/.*oat_file_manager.*/d' > "$2.tmp"
+sed -e '/^E\/System/d' "$4" | sed -e '/.*oat_file_manager.*/d' > "$4.tmp"
 
-diff --strip-trailing-cr -q "$1" "$2.tmp" >/dev/null
+diff --strip-trailing-cr -q "$1" "$2" >/dev/null \
+  && diff --strip-trailing-cr -q "$3" "$4.tmp" >/dev/null

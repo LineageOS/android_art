@@ -14,10 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
+
 # Only keep the lines we're interested in.
-sed -s '/^.*: oat file has dex code, but APK has uncompressed dex code\|Hello World/!d' "$2" > "$2.tmp"
+sed -s '/Hello World/!d' "$2" > "$2.tmp"
+sed -s '/^.*: oat file has dex code, but APK has uncompressed dex code/!d' "$4" > "$4.tmp"
 
 # Remove part of message containing filename.
-sed -s 's/^.*: //' "$2.tmp" > "$2.tmp2"
+sed -s 's/^.*: //' "$4.tmp" > "$4.tmp2"
 
-diff --strip-trailing-cr -q "$1" "$2.tmp2" >/dev/null
+diff --strip-trailing-cr -q "$1" "$2.tmp" >/dev/null \
+  && diff --strip-trailing-cr -q "$3" "$4.tmp2" >/dev/null
