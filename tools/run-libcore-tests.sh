@@ -71,7 +71,7 @@ function usage {
     --dry-run              Print vogar command-line, but do not run.
     --no-getrandom         Ignore failures from getrandom() (for kernel < 3.17).
     --no-jit               Disable JIT (device|host only).
-    --Xgc:gcstress         Enable GC stress configuration (device|host only).
+    --gcstress             Enable GC stress configuration (device|host only).
 
   The script passes unrecognized options to the command-line created for vogar.
 
@@ -210,8 +210,14 @@ while [ -n "$1" ]; do
       vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
       debug=true
       ;;
+    --gcstress)
+      vogar_args="$vogar_args --vm-arg -Xgc:gcstress"
+      gcstress=true
+      ;;
     -Xgc:gcstress)
-      vogar_args="$vogar_args $1"
+      # Deprecated option for selecting gcstress (b/172923084).
+      echo "Warning: -Xgc:gcstress is deprecated, use --gcstress instead." 1>&2
+      vogar_args="$vogar_args $1" # note: requires --vm-arg before -Xgc:gcstress
       gcstress=true
       ;;
     --dry-run)
