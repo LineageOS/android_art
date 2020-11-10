@@ -14,9 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Search for the redefinition line and remove unnecessary tags.
-sed -e 's/^dex2oat[d]\?\(\|32\|64\)\ W.*\] \(Fast verification failed: Class L[^;]*; redefines a class in the classpath\).*/\2/g' "$2" > "$2.tmp1"
-# Remove all other dex2oat/dalvikvm log lines.
-grep -v dex2oat "$2.tmp1" | grep -v dalvikvm >> "$2.tmp2"
+# Inputs:
+# $1: Test's expected standard output
+# $2: Test's actual standard output
+# $3: Test's expected standard error
+# $4: Test's actual standard error
 
-./default-check "$1" "$2.tmp2"
+# Search for the redefinition line and remove unnecessary tags.
+sed -e 's/^dex2oat[d]\?\(\|32\|64\)\ W.*\] \(Fast verification failed: Class L[^;]*; redefines a class in the classpath\).*/\2/g' "$4" > "$4.tmp1"
+# Remove all other dex2oat/dalvikvm log lines.
+grep -v dex2oat "$4.tmp1" | grep -v dalvikvm >> "$4.tmp2"
+
+./default-check "$1" "$2" "$3" "$4.tmp2"
