@@ -3277,7 +3277,7 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
       mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
   switch (access_mode_template) {
     case mirror::VarHandle::AccessModeTemplate::kGet:
-      // The return type should be the same as varType, so it shouldn't be void
+      // The return type should be the same as varType, so it shouldn't be void.
       if (type == DataType::Type::kVoid) {
         return false;
       }
