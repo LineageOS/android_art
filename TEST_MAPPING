@@ -319,9 +319,6 @@
       "name": "art-run-test-159-app-image-fields"
     },
     {
-      "name": "art-run-test-160-read-barrier-stress"
-    },
-    {
       "name": "art-run-test-163-app-image-methods"
     },
     {

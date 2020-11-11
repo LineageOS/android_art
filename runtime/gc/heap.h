@@ -781,7 +781,10 @@ class Heap {
   collector::ConcurrentCopying* ConcurrentCopyingCollector() {
     if (use_generational_cc_) {
       DCHECK((active_concurrent_copying_collector_ == concurrent_copying_collector_) ||
-             (active_concurrent_copying_collector_ == young_concurrent_copying_collector_));
+             (active_concurrent_copying_collector_ == young_concurrent_copying_collector_))
+              << "active_concurrent_copying_collector: " << active_concurrent_copying_collector_
+              << " young_concurrent_copying_collector: " << young_concurrent_copying_collector_
+              << " concurrent_copying_collector: " << concurrent_copying_collector_;
     } else {
       DCHECK_EQ(active_concurrent_copying_collector_, concurrent_copying_collector_);
     }
