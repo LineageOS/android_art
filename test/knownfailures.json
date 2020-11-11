@@ -442,6 +442,7 @@
             ".*method-handle.*",
             ".*varhandle.*",
             ".*var-handle.*",
+            "160-read-barrier-stress",
             "716-jli-jit-samples",
             "1975-hello-structural-transformation",
             "1976-hello-structural-static-methods",
