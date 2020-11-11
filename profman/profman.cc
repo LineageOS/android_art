@@ -179,9 +179,9 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("      In this case, the reference profile must have a boot profile version.");
   UsageError("  --force-merge: performs a forced merge, without analyzing if there is a");
   UsageError("      significant difference between the current profile and the reference profile.");
-  UsageError("  --min-new-methods-percent-change=percentage between 0 and 100");
+  UsageError("  --min-new-methods-percent-change=percentage between 0 and 100 (default 20)");
   UsageError("      the min percent of new methods to trigger a compilation.");
-  UsageError("  --min-new-classes-percent-change=percentage between 0 and 100");
+  UsageError("  --min-new-classes-percent-change=percentage between 0 and 100 (default 20)");
   UsageError("      the min percent of new classes to trigger a compilation.");
   UsageError("");
 
