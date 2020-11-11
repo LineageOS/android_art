@@ -165,9 +165,10 @@ done
 # Use JIT compiling by default.
 use_jit=true
 
-gcstress=false
 debug=false
 dry_run=false
+gcstress=false
+heap_poisoning=${ART_HEAP_POISONING:-false}
 
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
@@ -263,6 +264,10 @@ if [ $execution_mode = "device" ]; then
     else
       default_timeout_secs=900
     fi
+  elif $heap_poisoning && $debug; then
+    # Increase the timeout for heap poisoning and debug combo
+    # following ICU rewrites (b/161420453).
+    default_timeout_secs=600
   fi
 fi  # $execution_mode = "device"
 
