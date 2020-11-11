@@ -199,7 +199,7 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
       // is never executable.
       std::string name = exec_cache_name + "-rw";
       non_exec_pages = MemMap::MapFile(exec_capacity,
-                                       kProtR,
+                                       kIsDebugBuild ? kProtR : kProtRW,
                                        base_flags,
                                        mem_fd,
                                        /* start= */ data_capacity,
@@ -285,13 +285,12 @@ bool JitMemoryRegion::Initialize(size_t initial_capacity,
   if (code_heap != nullptr) {
     // Make all pages reserved for the code heap writable. The mspace allocator, that manages the
     // heap, will take and initialize pages in create_mspace_with_base().
-    CheckedCall(mprotect, "create code heap", code_heap->Begin(), code_heap->Size(), kProtRW);
-    exec_mspace_ = create_mspace_with_base(code_heap->Begin(), exec_end_, false /*locked*/);
+    {
+      ScopedCodeCacheWrite scc(*this);
+      exec_mspace_ = create_mspace_with_base(code_heap->Begin(), exec_end_, false /*locked*/);
+    }
     CHECK(exec_mspace_ != nullptr) << "create_mspace_with_base (exec) failed";
     SetFootprintLimit(current_capacity_);
-    // Protect pages containing heap metadata. Updates to the code heap toggle write permission to
-    // perform the update and there are no other times write access is required.
-    CheckedCall(mprotect, "protect code heap", code_heap->Begin(), code_heap->Size(), kProtR);
   } else {
     exec_mspace_ = nullptr;
     SetFootprintLimit(current_capacity_);
