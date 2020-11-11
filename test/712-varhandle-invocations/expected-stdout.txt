@@ -3307,6 +3307,8 @@ ByteBufferViewUnalignedAccessesIndexTest...OK
 ByteBufferViewBadIndexTypeTest...OK
 ByteBufferViewMissingIndexTest...OK
 ByteBufferViewBadByteBufferTest...OK
+FieldFloatTest...OK
+FieldDoubleTest...OK
 VoidReturnTypeTest...OK
 BoxedNullBooleanThrowsNPETest...OK
 BoxedNullByteThrowsNPETest...OK
@@ -3336,4 +3338,4 @@ SubtypeTest...OK
 SupertypeTest...OK
 InterfaceTest...OK
 ImplicitBoxingIntegerTest...OK
-3338 successes, 0 skips, 0 failures.
+3340 successes, 0 skips, 0 failures.
