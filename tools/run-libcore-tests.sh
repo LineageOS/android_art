@@ -269,7 +269,13 @@ if [ $execution_mode = "device" ]; then
     # following ICU rewrites (b/161420453).
     default_timeout_secs=600
   fi
-fi  # $execution_mode = "device"
+elif [ $execution_mode = "host" ]; then
+  # Increase timeout for gcstress and debug combo following ICU
+  # rewrites (b/161420453).
+  if $gcstress && $debug; then
+    default_timeout_secs=600
+  fi
+fi
 
 if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
   # Add timeout to vogar command-line (if not explicitly present in the command-line arguments) .
