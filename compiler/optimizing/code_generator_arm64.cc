@@ -723,6 +723,7 @@ class ReadBarrierForHeapReferenceSlowPathARM64 : public SlowPathCodeARM64 {
         Intrinsics intrinsic = instruction_->AsInvoke()->GetIntrinsic();
         DCHECK(intrinsic == Intrinsics::kUnsafeGetObject ||
                intrinsic == Intrinsics::kUnsafeGetObjectVolatile ||
+               intrinsic == Intrinsics::kUnsafeCASObject ||
                mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
                    mirror::VarHandle::AccessModeTemplate::kGet ||
                mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
