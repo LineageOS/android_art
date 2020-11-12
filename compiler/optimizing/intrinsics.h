@@ -285,7 +285,12 @@ UNREACHABLE_INTRINSIC(Arch, StringIsEmpty)                      \
 UNREACHABLE_INTRINSIC(Arch, StringLength)                       \
 UNREACHABLE_INTRINSIC(Arch, UnsafeLoadFence)                    \
 UNREACHABLE_INTRINSIC(Arch, UnsafeStoreFence)                   \
-UNREACHABLE_INTRINSIC(Arch, UnsafeFullFence)
+UNREACHABLE_INTRINSIC(Arch, UnsafeFullFence)                    \
+UNREACHABLE_INTRINSIC(Arch, VarHandleFullFence)                 \
+UNREACHABLE_INTRINSIC(Arch, VarHandleAcquireFence)              \
+UNREACHABLE_INTRINSIC(Arch, VarHandleReleaseFence)              \
+UNREACHABLE_INTRINSIC(Arch, VarHandleLoadLoadFence)             \
+UNREACHABLE_INTRINSIC(Arch, VarHandleStoreStoreFence)
 
 template <typename IntrinsicLocationsBuilder, typename Codegenerator>
 bool IsCallFreeIntrinsic(HInvoke* invoke, Codegenerator* codegen) {
