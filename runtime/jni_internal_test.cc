@@ -23,6 +23,7 @@
 #include "indirect_reference_table.h"
 #include "java_vm_ext.h"
 #include "jni_env_ext.h"
+#include "mem_map.h"
 #include "mirror/string-inl.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "scoped_thread_state_change-inl.h"
@@ -1549,6 +1550,119 @@ TEST_F(JniInternalTest, NewStringUTF) {
   EXPECT_NE(s, nullptr);
   EXPECT_EQ(8, env_->GetStringLength(s));
   EXPECT_EQ(13, env_->GetStringUTFLength(s));
+}
+
+TEST_F(JniInternalTest, NewStringUTF_Validation) {
+  // For the following tests, allocate two pages, one R/W and the next inaccessible.
+  std::string error_msg;
+  std::unique_ptr<MemMap> head_map(MemMap::MapAnonymous("head",
+                                                        /*addr=*/ nullptr,
+                                                        2 * kPageSize,
+                                                        PROT_READ | PROT_WRITE,
+                                                        /*low_4gb=*/ false,
+                                                        /*reuse=*/ false,
+                                                        &error_msg));
+  ASSERT_TRUE(head_map != nullptr) << error_msg;
+  std::unique_ptr<MemMap> tail_map(
+      head_map->RemapAtEnd(head_map->Begin() + kPageSize, "tail", PROT_NONE, &error_msg));
+  ASSERT_TRUE(tail_map != nullptr) << error_msg;
+  char* utf_src = reinterpret_cast<char*>(head_map->Begin());
+
+  // Prepare for checking the `count` field.
+  jclass c = env_->FindClass("java/lang/String");
+  ASSERT_NE(c, nullptr);
+  jfieldID count_fid = env_->GetFieldID(c, "count", "I");
+  ASSERT_TRUE(count_fid != nullptr);
+
+  // Prepare for testing with the unchecked interface.
+  const JNINativeInterface* base_env = down_cast<JNIEnvExt*>(env_)->GetUncheckedFunctions();
+
+  // Start with a simple ASCII string consisting of 4095 characters 'x'.
+  memset(utf_src, 'x', kPageSize - 1u);
+  utf_src[kPageSize - 1u] = 0u;
+  jstring s = base_env->NewStringUTF(env_, utf_src);
+  ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 1u, /* compressible= */ true),
+            env_->GetIntField(s, count_fid));
+  const char* chars = env_->GetStringUTFChars(s, nullptr);
+  for (size_t pos = 0; pos != kPageSize - 1u; ++pos) {
+    ASSERT_EQ('x', chars[pos]) << pos;
+  }
+  env_->ReleaseStringUTFChars(s, chars);
+
+  // Replace the last character with invalid character that requires continuation.
+  for (char invalid : { '\xc0', '\xe0', '\xf0' }) {
+    utf_src[kPageSize - 2u] = invalid;
+    s = base_env->NewStringUTF(env_, utf_src);
+    ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 1u, /* compressible= */ true),
+              env_->GetIntField(s, count_fid));
+    chars = env_->GetStringUTFChars(s, nullptr);
+    for (size_t pos = 0; pos != kPageSize - 2u; ++pos) {
+      ASSERT_EQ('x', chars[pos]) << pos;
+    }
+    EXPECT_EQ('?', chars[kPageSize - 2u]);
+    env_->ReleaseStringUTFChars(s, chars);
+  }
+
+  // Replace the first two characters with a valid two-byte sequence yielding one character.
+  utf_src[0] = '\xc2';
+  utf_src[1] = '\x80';
+  s = base_env->NewStringUTF(env_, utf_src);
+  ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 2u, /* compressible= */ false),
+            env_->GetIntField(s, count_fid));
+  const jchar* jchars = env_->GetStringChars(s, nullptr);
+  EXPECT_EQ(jchars[0], 0x80u);
+  for (size_t pos = 1; pos != kPageSize - 3u; ++pos) {
+    ASSERT_EQ('x', jchars[pos]) << pos;
+  }
+  EXPECT_EQ('?', jchars[kPageSize - 3u]);
+  env_->ReleaseStringChars(s, jchars);
+
+  // Replace the leading two-byte sequence with a two-byte sequence that decodes as ASCII (0x40).
+  // The sequence shall be replaced if string compression is used.
+  utf_src[0] = '\xc1';
+  utf_src[1] = '\x80';
+  s = base_env->NewStringUTF(env_, utf_src);
+  // Note: All invalid characters are replaced by ASCII replacement character.
+  ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 2u, /* compressible= */ true),
+            env_->GetIntField(s, count_fid));
+  jchars = env_->GetStringChars(s, nullptr);
+  EXPECT_EQ(mirror::kUseStringCompression ? '?' : '\x40', jchars[0]);
+  for (size_t pos = 1; pos != kPageSize - 3u; ++pos) {
+    ASSERT_EQ('x', jchars[pos]) << pos;
+  }
+  EXPECT_EQ('?', jchars[kPageSize - 3u]);
+  env_->ReleaseStringChars(s, jchars);
+
+  // Replace the leading three bytes with a three-byte sequence that decodes as ASCII (0x40).
+  // The sequence shall be replaced if string compression is used.
+  utf_src[0] = '\xe0';
+  utf_src[1] = '\x81';
+  utf_src[2] = '\x80';
+  s = base_env->NewStringUTF(env_, utf_src);
+  // Note: All invalid characters are replaced by ASCII replacement character.
+  ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 3u, /* compressible= */ true),
+            env_->GetIntField(s, count_fid));
+  jchars = env_->GetStringChars(s, nullptr);
+  EXPECT_EQ(mirror::kUseStringCompression ? '?' : '\x40', jchars[0]);
+  for (size_t pos = 1; pos != kPageSize - 4u; ++pos) {
+    ASSERT_EQ('x', jchars[pos]) << pos;
+  }
+  EXPECT_EQ('?', jchars[kPageSize - 4u]);
+  env_->ReleaseStringChars(s, jchars);
+
+  // Replace the last two characters with a valid two-byte sequence that decodes as 0.
+  utf_src[kPageSize - 3u] = '\xc0';
+  utf_src[kPageSize - 2u] = '\x80';
+  s = base_env->NewStringUTF(env_, utf_src);
+  ASSERT_EQ(mirror::String::GetFlaggedCount(kPageSize - 4u, /* compressible= */ false),
+            env_->GetIntField(s, count_fid));
+  jchars = env_->GetStringChars(s, nullptr);
+  EXPECT_EQ(mirror::kUseStringCompression ? '?' : '\x40', jchars[0]);
+  for (size_t pos = 1; pos != kPageSize - 5u; ++pos) {
+    ASSERT_EQ('x', jchars[pos]) << pos;
+  }
+  EXPECT_EQ('\0', jchars[kPageSize - 5u]);
+  env_->ReleaseStringChars(s, jchars);
 }
 
 TEST_F(JniInternalTest, NewString) {
