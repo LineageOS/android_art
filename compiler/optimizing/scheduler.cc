@@ -560,7 +560,7 @@ void HScheduler::Schedule(HGraph* graph) {
   // should run the analysis or not.
   const HeapLocationCollector* heap_location_collector = nullptr;
   ScopedArenaAllocator allocator(graph->GetArenaStack());
-  LoadStoreAnalysis lsa(graph, /*stats=*/nullptr, &allocator, /*for_elimination=*/false);
+  LoadStoreAnalysis lsa(graph, &allocator);
   if (!only_optimize_loop_blocks_ || graph->HasLoops()) {
     lsa.Run();
     heap_location_collector = &lsa.GetHeapLocationCollector();
