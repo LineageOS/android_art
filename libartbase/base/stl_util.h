@@ -229,6 +229,64 @@ static inline IterationRange<ZipLeftIter<IterLeft, IterRight>> ZipLeft(
                         ZipLeftIter(iter_left.end(), iter_right.end()));
 }
 
+static inline IterationRange<CountIter> Range(size_t start, size_t end) {
+  return IterationRange(CountIter(start), CountIter(end));
+}
+
+static inline IterationRange<CountIter> Range(size_t end) {
+  return Range(0, end);
+}
+
+template <typename RealIter, typename Filter>
+struct FilterIterator
+    : public std::iterator<std::forward_iterator_tag, typename RealIter::value_type> {
+ public:
+  FilterIterator(RealIter rl,
+                 Filter cond,
+                 std::optional<RealIter> end = std::nullopt)
+      : real_iter_(rl), cond_(cond), end_(end) {
+    DCHECK(std::make_optional(rl) == end_ || cond_(*real_iter_));
+  }
+
+  FilterIterator<RealIter, Filter>& operator++() {
+    DCHECK(std::make_optional(real_iter_) != end_);
+    do {
+      if (std::make_optional(++real_iter_) == end_) {
+        break;
+      }
+    } while (!cond_(*real_iter_));
+    return *this;
+  }
+  FilterIterator<RealIter, Filter> operator++(int) {
+    FilterIterator<RealIter, Filter> ret(real_iter_, cond_, end_);
+    ++(*this);
+    return ret;
+  }
+  bool operator==(const FilterIterator<RealIter, Filter>& other) const {
+    return real_iter_ == other.real_iter_;
+  }
+  bool operator!=(const FilterIterator<RealIter, Filter>& other) const {
+    return !(*this == other);
+  }
+  typename RealIter::value_type operator*() const {
+    return *real_iter_;
+  }
+
+ private:
+  RealIter real_iter_;
+  Filter cond_;
+  std::optional<RealIter> end_;
+};
+
+template <typename Iter, typename Filter>
+static inline IterationRange<FilterIterator<Iter, Filter>> Filter(
+    IterationRange<Iter> it, Filter cond) {
+  auto end = it.end();
+  auto start = std::find_if(it.begin(), end, cond);
+  return MakeIterationRange(FilterIterator(start, cond, std::make_optional(end)),
+                            FilterIterator(end, cond, std::make_optional(end)));
+}
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_STL_UTIL_H_
