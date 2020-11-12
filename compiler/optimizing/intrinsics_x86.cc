@@ -3272,23 +3272,23 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
   }
 
   uint32_t number_of_arguments = invoke->GetNumberOfArguments();
-  DataType::Type type = invoke->GetType();
+  DataType::Type return_type = invoke->GetType();
   mirror::VarHandle::AccessModeTemplate access_mode_template =
       mirror::VarHandle::GetAccessModeTemplateByIntrinsic(invoke->GetIntrinsic());
   switch (access_mode_template) {
     case mirror::VarHandle::AccessModeTemplate::kGet:
       // The return type should be the same as varType, so it shouldn't be void.
-      if (type == DataType::Type::kVoid) {
+      if (return_type == DataType::Type::kVoid) {
         return false;
       }
       break;
     case mirror::VarHandle::AccessModeTemplate::kSet:
-      if (type != DataType::Type::kVoid) {
+      if (return_type != DataType::Type::kVoid) {
         return false;
       }
       break;
     case mirror::VarHandle::AccessModeTemplate::kCompareAndSet: {
-      if (type != DataType::Type::kBool) {
+      if (return_type != DataType::Type::kBool) {
         return false;
       }
       uint32_t expected_value_index = number_of_arguments - 2;
@@ -3305,13 +3305,17 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
       DataType::Type value_type = GetDataTypeFromShorty(invoke, number_of_arguments - 1);
       if (IsVarHandleGetAndAdd(invoke) &&
           (value_type == DataType::Type::kReference || value_type == DataType::Type::kBool)) {
-        // We should only add numerical types
+        // We should only add numerical types.
         return false;
       } else if (IsVarHandleGetAndBitwiseOp(invoke) && !DataType::IsIntegralType(value_type)) {
         // We can only apply operators to bitwise integral types.
+        // Note that bitwise VarHandle operations accept a non-integral boolean type and
+        // perform the appropriate logical operation. However, the result is the same as
+        // using the bitwise operation on our boolean representation and this fits well
+        // with DataType::IsIntegralType() treating the compiler type kBool as integral.
         return false;
       }
-      if (value_type != type) {
+      if (value_type != return_type) {
         return false;
       }
       break;
@@ -3322,7 +3326,7 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
       DataType::Type expected_value_type = GetDataTypeFromShorty(invoke, expected_value_index);
       DataType::Type new_value_type = GetDataTypeFromShorty(invoke, new_value_index);
 
-      if (expected_value_type != new_value_type || type != expected_value_type) {
+      if (expected_value_type != new_value_type || return_type != expected_value_type) {
         return false;
       }
       break;
