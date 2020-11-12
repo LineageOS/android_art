@@ -71,7 +71,7 @@ function usage {
     --dry-run              Print vogar command-line, but do not run.
     --no-getrandom         Ignore failures from getrandom() (for kernel < 3.17).
     --no-jit               Disable JIT (device|host only).
-    --Xgc:gcstress         Enable GC stress configuration (device|host only).
+    --gcstress             Enable GC stress configuration (device|host only).
 
   The script passes unrecognized options to the command-line created for vogar.
 
@@ -165,9 +165,10 @@ done
 # Use JIT compiling by default.
 use_jit=true
 
-gcstress=false
 debug=false
 dry_run=false
+gcstress=false
+heap_poisoning=${ART_HEAP_POISONING:-false}
 
 # Run tests that use the getrandom() syscall? (Requires Linux 3.17+).
 getrandom=true
@@ -209,8 +210,14 @@ while [ -n "$1" ]; do
       vogar_args="$vogar_args --vm-arg -XXlib:libartd.so --vm-arg -XX:SlowDebug=true"
       debug=true
       ;;
+    --gcstress)
+      vogar_args="$vogar_args --vm-arg -Xgc:gcstress"
+      gcstress=true
+      ;;
     -Xgc:gcstress)
-      vogar_args="$vogar_args $1"
+      # Deprecated option for selecting gcstress (b/172923084).
+      echo "Warning: -Xgc:gcstress is deprecated, use --gcstress instead." 1>&2
+      vogar_args="$vogar_args $1" # note: requires --vm-arg before -Xgc:gcstress
       gcstress=true
       ;;
     --dry-run)
@@ -239,7 +246,7 @@ if [ -z "$execution_mode" ]; then
 fi
 
 # Default timeout, gets overridden on device under gcstress.
-timeout_secs=480
+default_timeout_secs=480
 
 if [ $execution_mode = "device" ]; then
   # Honor environment variable ART_TEST_CHROOT.
@@ -259,16 +266,28 @@ if [ $execution_mode = "device" ]; then
   # the default timeout.
   if $gcstress; then
     if $debug; then
-      timeout_secs=1440
+      default_timeout_secs=1440
     else
-      timeout_secs=900
+      default_timeout_secs=900
     fi
+  elif $heap_poisoning && $debug; then
+    # Increase the timeout for heap poisoning and debug combo
+    # following ICU rewrites (b/161420453).
+    default_timeout_secs=600
   fi
-fi  # $execution_mode = "device"
+elif [ $execution_mode = "host" ]; then
+  # Increase timeout for gcstress and debug combo following ICU
+  # rewrites (b/161420453).
+  if $gcstress && $debug; then
+    default_timeout_secs=600
+  fi
+fi
 
 if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
-  # Add timeout to vogar command-line.
-  vogar_args="$vogar_args --timeout $timeout_secs"
+  # Add timeout to vogar command-line (if not explicitly present in the command-line arguments) .
+  if [[ "$vogar_args" != *" --timeout "* ]]; then
+    vogar_args="$vogar_args --timeout $default_timeout_secs"
+  fi
 
   # Suppress explicit gc logs that are triggered an absurd number of times by these tests.
   vogar_args="$vogar_args --vm-arg -XX:AlwaysLogExplicitGcs:false"

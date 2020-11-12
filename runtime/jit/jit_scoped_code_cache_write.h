@@ -38,20 +38,24 @@ class ScopedCodeCacheWrite : ScopedTrace {
   explicit ScopedCodeCacheWrite(const JitMemoryRegion& region)
       : ScopedTrace("ScopedCodeCacheWrite"),
         region_(region) {
-    ScopedTrace trace("mprotect all");
-    const MemMap* const updatable_pages = region.GetUpdatableCodeMapping();
-    if (updatable_pages != nullptr) {
-      int prot = region.HasDualCodeMapping() ? kProtRW : kProtRWX;
-      CheckedCall(mprotect, "Cache +W", updatable_pages->Begin(), updatable_pages->Size(), prot);
+    if (kIsDebugBuild || !region.HasDualCodeMapping()) {
+      ScopedTrace trace("mprotect all");
+      const MemMap* const updatable_pages = region.GetUpdatableCodeMapping();
+      if (updatable_pages != nullptr) {
+        int prot = region.HasDualCodeMapping() ? kProtRW : kProtRWX;
+        CheckedCall(mprotect, "Cache +W", updatable_pages->Begin(), updatable_pages->Size(), prot);
+      }
     }
   }
 
   ~ScopedCodeCacheWrite() {
-    ScopedTrace trace("mprotect code");
-    const MemMap* const updatable_pages = region_.GetUpdatableCodeMapping();
-    if (updatable_pages != nullptr) {
-      int prot = region_.HasDualCodeMapping() ? kProtR : kProtRX;
-      CheckedCall(mprotect, "Cache -W", updatable_pages->Begin(), updatable_pages->Size(), prot);
+    if (kIsDebugBuild || !region_.HasDualCodeMapping()) {
+      ScopedTrace trace("mprotect code");
+      const MemMap* const updatable_pages = region_.GetUpdatableCodeMapping();
+      if (updatable_pages != nullptr) {
+        int prot = region_.HasDualCodeMapping() ? kProtR : kProtRX;
+        CheckedCall(mprotect, "Cache -W", updatable_pages->Begin(), updatable_pages->Size(), prot);
+      }
     }
   }
 
