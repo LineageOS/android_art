@@ -15,13 +15,11 @@
  */
 
 #include <memory>
-#include <random>
 
 #include "allocator.h"
-#include "base/stl_util.h"
 #include "bit_vector-inl.h"
-#include "gtest/gtest.h"
 #include "transform_iterator.h"
+#include "gtest/gtest.h"
 
 namespace art {
 
@@ -363,60 +361,6 @@ TEST(BitVector, MovementFree) {
   }
   EXPECT_EQ(alloc.FreeCount(), 1u);
   EXPECT_EQ(alloc.AllocCount(), 1u);
-}
-
-TEST(BitVector, ArrayCol) {
-  {
-    BitVectorArray bva(100, 200, true, Allocator::GetMallocAllocator());
-    for (uint32_t i : Range(bva.NumColumns())) {
-      bva.SetBit(bva.NumRows() / 2, i);
-    }
-    EXPECT_EQ(bva.GetRawData().NumSetBits(), bva.NumColumns());
-  }
-  {
-    BitVectorArray bva(100, 200, true, Allocator::GetMallocAllocator());
-    for (uint32_t i : Range(bva.NumRows())) {
-      bva.SetBit(i, bva.NumColumns() / 2);
-    }
-    EXPECT_EQ(bva.GetRawData().NumSetBits(), bva.NumRows());
-  }
-}
-
-TEST(BitVector, ArrayUnion) {
-  {
-    BitVectorArray bva(100, 200, true, Allocator::GetMallocAllocator());
-    bva.SetBit(4, 12);
-    bva.SetBit(40, 120);
-    bva.SetBit(40, 121);
-    bva.SetBit(40, 122);
-
-    bva.UnionRows(4, 40);
-
-    EXPECT_TRUE(bva.IsBitSet(4, 12));
-    EXPECT_TRUE(bva.IsBitSet(4, 120));
-    EXPECT_TRUE(bva.IsBitSet(4, 121));
-    EXPECT_TRUE(bva.IsBitSet(4, 122));
-    EXPECT_FALSE(bva.IsBitSet(40, 12));
-    EXPECT_TRUE(bva.IsBitSet(40, 120));
-    EXPECT_TRUE(bva.IsBitSet(40, 121));
-    EXPECT_TRUE(bva.IsBitSet(40, 122));
-    EXPECT_EQ(bva.GetRawData().NumSetBits(), 7u);
-  }
-  {
-    BitVectorArray bva(100, 100, true, Allocator::GetMallocAllocator());
-    for (uint32_t i : Range(bva.NumRows())) {
-      bva.SetBit(i, i);
-    }
-    for (uint32_t i : Range(1, bva.NumRows())) {
-      bva.UnionRows(0, i);
-    }
-    for (uint32_t col : Range(bva.NumColumns())) {
-      for (uint32_t row : Range(bva.NumRows())) {
-        // We set every bit where row== column and every bit on row 0 up to number of rows.
-        EXPECT_EQ(bva.IsBitSet(row, col), row == col || (row == 0 && col < bva.NumRows()));
-      }
-    }
-  }
 }
 
 }  // namespace art
