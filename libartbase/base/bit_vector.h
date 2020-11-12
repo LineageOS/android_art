@@ -18,7 +18,6 @@
 #define ART_LIBARTBASE_BASE_BIT_VECTOR_H_
 
 #include <stdint.h>
-
 #include <iterator>
 
 #include "bit_utils.h"
@@ -27,7 +26,6 @@
 namespace art {
 
 class Allocator;
-class ArenaBitVector;
 
 /*
  * Expanding bitmap, used for tracking resources.  Bits are numbered starting
@@ -35,9 +33,6 @@ class ArenaBitVector;
  */
 class BitVector {
  public:
-  static constexpr uint32_t kWordBytes = sizeof(uint32_t);
-  static constexpr uint32_t kWordBits = kWordBytes * 8;
-
   class IndexContainer;
 
   /**
@@ -231,21 +226,10 @@ class BitVector {
     return storage_size_ * kWordBytes;
   }
 
-  size_t GetBitSizeOf() const {
-    return storage_size_ * kWordBits;
-  }
-
   /**
    * @return the highest bit set, -1 if none are set
    */
   int GetHighestBitSet() const;
-
-  /**
-   * @return true if there are any bits set, false otherwise.
-   */
-  bool IsAnyBitSet() const {
-    return GetHighestBitSet() != -1;
-  }
 
   // Minimum number of bits required to store this vector, 0 if none are set.
   size_t GetNumberOfBits() const {
@@ -297,148 +281,15 @@ class BitVector {
     return 1 << (idx & 0x1f);
   }
 
+  static constexpr uint32_t kWordBytes = sizeof(uint32_t);
+  static constexpr uint32_t kWordBits = kWordBytes * 8;
+
   uint32_t*  storage_;            // The storage for the bit vector.
   uint32_t   storage_size_;       // Current size, in 32-bit words.
   Allocator* const allocator_;    // Allocator if expandable.
   const bool expandable_;         // Should the bitmap expand if too small?
 };
 
-// Helper for dealing with 2d bit-vector arrays packed into a single bit-vec
-class BaseBitVectorArray {
- public:
-  BaseBitVectorArray(const BaseBitVectorArray& bv) = default;
-  BaseBitVectorArray& operator=(const BaseBitVectorArray& other) = default;
-
-  BaseBitVectorArray() : num_columns_(0), num_rows_(0) {}
-
-  BaseBitVectorArray(size_t num_rows, size_t num_columns)
-      : num_columns_(RoundUp(num_columns, BitVector::kWordBits)), num_rows_(num_rows) {}
-
-  virtual ~BaseBitVectorArray() {}
-
-  bool IsExpandable() const {
-    return GetRawData().IsExpandable();
-  }
-
-  // Let subclasses provide storage for various types.
-  virtual const BitVector& GetRawData() const = 0;
-  virtual BitVector& GetRawData() = 0;
-
-  size_t NumRows() const {
-    return num_rows_;
-  }
-
-  // NB This might be more than the requested size for alignment purposes.
-  size_t NumColumns() const {
-    return num_columns_;
-  }
-
-  void Clear() {
-    GetRawData().ClearAllBits();
-  }
-
-  // Ensure that we can set all bits in the given range. The actual number of
-  // columns might be larger than requested for alignment purposes.
-  void Resize(size_t rows, size_t cols, bool clear = true);
-
-  void SetBit(size_t row, size_t col) {
-    DCHECK_LT(col, num_columns_);
-    DCHECK_LT(row, num_rows_);
-    GetRawData().SetBit(row * num_columns_ + col);
-  }
-
-  void ClearBit(size_t row, size_t col) {
-    DCHECK_LT(col, num_columns_);
-    DCHECK_LT(row, num_rows_);
-    GetRawData().ClearBit(row * num_columns_ + col);
-  }
-
-  bool IsBitSet(size_t row, size_t col) const {
-    DCHECK_LT(col, num_columns_);
-    DCHECK_LT(row, num_rows_);
-    return GetRawData().IsBitSet(row * num_columns_ + col);
-  }
-
-  // Union the vector of 'other' into 'dest_row'.
-  void UnionRows(size_t dest_row, size_t other);
-
-  static size_t RequiredBitVectorSize(size_t rows, size_t cols) {
-    return rows * RoundUp(cols, BitVector::kWordBits);
-  }
-
-  static size_t MaxRowsFor(const BitVector& bv, size_t cols) {
-    return cols != 0 ? bv.GetBitSizeOf() / RoundUp(cols, BitVector::kWordBits) : 0;
-  }
-
- private:
-  size_t num_columns_;
-  size_t num_rows_;
-};
-
-// A BitVectorArray with a standard owned BitVector providing the backing
-// storage. This should be used when the BitVectorArray is the owner of the
-// whole BitVector and should use standard allocators for cleanup/allocation.
-// Contrast this with ArenaBitVectorArray which uses arena allocators.
-class BitVectorArray final : public BaseBitVectorArray {
- public:
-  BitVectorArray(const BitVectorArray& bv) = delete;
-  BitVectorArray& operator=(const BitVectorArray& other) = delete;
-
-  explicit BitVectorArray(BitVector&& bv) : BaseBitVectorArray(), data_(std::move(bv)) {}
-  explicit BitVectorArray(BitVector&& bv, size_t cols)
-      : BaseBitVectorArray(BaseBitVectorArray::MaxRowsFor(bv, cols), cols), data_(std::move(bv)) {}
-  explicit BitVectorArray(BitVector&& bv, size_t rows, size_t cols)
-      : BaseBitVectorArray(rows, cols), data_(std::move(bv)) {}
-
-  BitVectorArray(uint32_t start_rows, uint32_t start_cols, bool expandable, Allocator* allocator)
-      : BaseBitVectorArray(start_rows, start_cols),
-        data_(BaseBitVectorArray::RequiredBitVectorSize(start_rows, start_cols),
-              expandable,
-              allocator) {}
-
-  BitVectorArray(const BaseBitVectorArray& src, bool expandable, Allocator* allocator)
-      : BaseBitVectorArray(src.NumRows(), src.NumColumns()),
-        data_(src.GetRawData(), expandable, allocator) {}
-
-  ~BitVectorArray() override {}
-
-  const BitVector& GetRawData() const override {
-    return data_;
-  }
-
-  BitVector& GetRawData() override {
-    return data_;
-  }
-
- private:
-  BitVector data_;
-};
-
-// A bit vector array that uses an unowned BitVector reference as it's backing
-// data.
-class BitVectorArrayWrapper final : public BaseBitVectorArray {
- public:
-  BitVectorArrayWrapper& operator=(BitVectorArrayWrapper& other) = default;
-  BitVectorArrayWrapper(BitVectorArrayWrapper&) = default;
-  explicit BitVectorArrayWrapper(BitVector* bv) : BaseBitVectorArray(), data_(bv) {}
-  explicit BitVectorArrayWrapper(BitVector* bv, size_t cols)
-      : BaseBitVectorArray(BaseBitVectorArray::MaxRowsFor(*bv, cols), cols), data_(bv) {}
-  explicit BitVectorArrayWrapper(BitVector* bv, size_t rows, size_t cols)
-      : BaseBitVectorArray(rows, cols), data_(bv) {}
-
-  ~BitVectorArrayWrapper() override {}
-
-  const BitVector& GetRawData() const override {
-    return *data_;
-  }
-
-  BitVector& GetRawData() override {
-    return *data_;
-  }
-
- private:
-  BitVector* data_;
-};
 
 }  // namespace art
 
