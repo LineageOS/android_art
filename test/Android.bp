@@ -226,10 +226,12 @@ java_defaults {
     errorprone: {
         javacflags: ["-XepDisableAllChecks"],
     },
-
     test_suites: [
         "general-tests",
         "mts",
+    ],
+    host_required: [
+        "art-run-test-checker",
     ],
 }
 
