@@ -24,6 +24,7 @@ import java.util.Objects;
  * instance from the heap dump.
  */
 public abstract class Value {
+  Value() { }
   /**
    * Constructs a Value for an AhatInstance.
    * Note: returns null for null <code>value</code>.
