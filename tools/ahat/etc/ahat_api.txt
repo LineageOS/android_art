@@ -294,7 +294,6 @@ package com.android.ahat.heapdump {
   }
 
   public abstract class Value {
-    ctor public Value();
     method public com.android.ahat.heapdump.AhatInstance asAhatInstance();
     method public Byte asByte();
     method public Character asChar();
