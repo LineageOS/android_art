@@ -80,3 +80,23 @@ sh_binary {
     host_supported: false,
     src: "compile_bcp.sh",
 }
+
+python_binary_host {
+    name: "art-run-test-checker",
+    srcs: [
+        "checker/**/*.py",
+    ],
+    main: "checker/checker.py",
+    version: {
+        py2: {
+            enabled: false,
+        },
+        py3: {
+            enabled: true,
+        },
+    },
+    test_suites: [
+        "general-tests",
+        "mts",
+    ],
+}
