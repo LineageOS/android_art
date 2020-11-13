@@ -17,6 +17,7 @@
 #ifndef ART_LIBARTBASE_BASE_ARRAY_SLICE_H_
 #define ART_LIBARTBASE_BASE_ARRAY_SLICE_H_
 
+#include <ostream>
 #include "bit_utils.h"
 #include "casts.h"
 #include "iteration_range.h"
@@ -63,6 +64,10 @@ class ArraySlice {
             lpa != nullptr && lpa->size() != 0 ? &lpa->At(0, element_size, alignment) : nullptr,
             lpa != nullptr ? lpa->size() : 0,
             element_size) {}
+  ArraySlice(const ArraySlice<T>&) = default;
+  ArraySlice(ArraySlice<T>&&) = default;
+  ArraySlice<T>& operator=(const ArraySlice<T>&) = default;
+  ArraySlice<T>& operator=(ArraySlice<T>&&) = default;
 
   // Iterators.
   iterator begin() { return iterator(&AtUnchecked(0), element_size_); }
@@ -165,6 +170,19 @@ class ArraySlice {
   size_t size_;
   size_t element_size_;
 };
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const ArraySlice<T>& ts) {
+  bool first = true;
+  os << "[";
+  for (const T& t : ts) {
+    if (!first) { os << ", "; }
+    first = false;
+    os << t;
+  }
+  os << "]";
+  return os;
+}
 
 }  // namespace art
 
