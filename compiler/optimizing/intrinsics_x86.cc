@@ -3230,34 +3230,6 @@ void IntrinsicCodeGeneratorX86::VisitIntegerDivideUnsigned(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
-static bool IsVarHandleGetAndBitwiseOp(HInvoke* invoke) {
-  switch (invoke->GetIntrinsic()) {
-    case Intrinsics::kVarHandleGetAndBitwiseOr:
-    case Intrinsics::kVarHandleGetAndBitwiseOrAcquire:
-    case Intrinsics::kVarHandleGetAndBitwiseOrRelease:
-    case Intrinsics::kVarHandleGetAndBitwiseXor:
-    case Intrinsics::kVarHandleGetAndBitwiseXorAcquire:
-    case Intrinsics::kVarHandleGetAndBitwiseXorRelease:
-    case Intrinsics::kVarHandleGetAndBitwiseAnd:
-    case Intrinsics::kVarHandleGetAndBitwiseAndAcquire:
-    case Intrinsics::kVarHandleGetAndBitwiseAndRelease:
-      return true;
-    default:
-      return false;
-  }
-}
-
-static bool IsVarHandleGetAndAdd(HInvoke* invoke) {
-  switch (invoke->GetIntrinsic()) {
-    case Intrinsics::kVarHandleGetAndAdd:
-    case Intrinsics::kVarHandleGetAndAddAcquire:
-    case Intrinsics::kVarHandleGetAndAddRelease:
-      return true;
-    default:
-      return false;
-  }
-}
-
 static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
   size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   if (expected_coordinates_count > 1u) {

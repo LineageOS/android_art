@@ -1365,6 +1365,29 @@ void IntrinsicCodeGeneratorARM64::VisitUnsafeCASObject(HInvoke* invoke) {
   GenUnsafeCas(invoke, DataType::Type::kReference, codegen_);
 }
 
+static void GenerateGetAndSet(CodeGeneratorARM64* codegen,
+                              DataType::Type type,
+                              std::memory_order order,
+                              Register ptr,
+                              Register new_value,
+                              Register old_value) {
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  UseScratchRegisterScope temps(masm);
+  Register store_result = temps.AcquireW();
+
+  bool use_load_acquire =
+      (order == std::memory_order_acquire) || (order == std::memory_order_seq_cst);
+  bool use_store_release =
+      (order == std::memory_order_release) || (order == std::memory_order_seq_cst);
+  DCHECK(use_load_acquire || use_store_release);
+
+  vixl::aarch64::Label loop_label;
+  __ Bind(&loop_label);
+  EmitLoadExclusive(codegen, type, ptr, old_value, use_load_acquire);
+  EmitStoreExclusive(codegen, type, ptr, store_result, new_value, use_store_release);
+  __ Cbnz(store_result, &loop_label);
+}
+
 void IntrinsicLocationsBuilderARM64::VisitStringCompareTo(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke,
@@ -3921,9 +3944,15 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
       }
       break;
     }
-    case mirror::VarHandle::AccessModeTemplate::kGetAndUpdate:
-      LOG(FATAL) << "Unimplemented!";
-      UNREACHABLE();
+    case mirror::VarHandle::AccessModeTemplate::kGetAndUpdate: {
+      DataType::Type value_type = GetDataTypeFromShorty(invoke, number_of_arguments - 1);
+      DCHECK(!IsVarHandleGetAndAdd(invoke));  // Unimplemented.
+      DCHECK(!IsVarHandleGetAndBitwiseOp(invoke));  // Unimplemented.
+      if (value_type != return_type) {
+        return false;
+      }
+      break;
+    }
   }
 
   return true;
@@ -4483,6 +4512,154 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleWeakCompareAndSetRelease(HInvoke
       invoke, codegen_, std::memory_order_release, /*return_success=*/ true, /*strong=*/ false);
 }
 
+static void CreateVarHandleGetAndSetLocations(HInvoke* invoke) {
+  if (!IsValidFieldVarHandleExpected(invoke)) {
+    return;
+  }
+
+  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
+      invoke->GetType() == DataType::Type::kReference) {
+    // Unsupported for non-Baker read barrier because the artReadBarrierSlow() ignores
+    // the passed reference and reloads it from the field, thus seeing the new value
+    // that we have just stored. (And it also gets the memory visibility wrong.)
+    return;
+  }
+
+  LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
+
+  // Add a temporary for offset.
+  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
+      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {
+    // To preserve the offset value across the non-Baker read barrier slow path
+    // for loading the declaring class, use a fixed callee-save register.
+    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+  } else {
+    locations->AddTemp(Location::RequiresRegister());
+  }
+  if (DataType::IsFloatingPointType(invoke->GetType()) &&
+      !IsConstantZeroBitPattern(invoke->InputAt(invoke->GetNumberOfArguments() - 1u))) {
+    // Add a temporary for `old_value` if floating point `new_value` takes a scratch register.
+    locations->AddTemp(Location::RequiresRegister());
+  }
+}
+
+static void GenerateVarHandleGetAndSet(HInvoke* invoke,
+                                       CodeGeneratorARM64* codegen,
+                                       std::memory_order order) {
+  // Implemented only for fields.
+  size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
+  DCHECK_LE(expected_coordinates_count, 1u);
+  uint32_t new_value_index = invoke->GetNumberOfArguments() - 1;
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, new_value_index);
+
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+  CPURegister new_value = InputCPURegisterOrZeroRegAt(invoke, new_value_index);
+  CPURegister out = helpers::OutputCPURegister(invoke);
+
+  SlowPathCodeARM64* slow_path =
+      new (codegen->GetScopedAllocator()) IntrinsicSlowPathARM64(invoke);
+  codegen->AddSlowPath(slow_path);
+
+  GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
+  GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, value_type);
+
+  // The temporary allocated for loading `offset`.
+  Register offset =
+      WRegisterFrom(locations->GetTemp((expected_coordinates_count == 0u) ? 1u : 0u));
+  // The object reference in which to CAS the field.
+  Register object = (expected_coordinates_count == 0u)
+      ? WRegisterFrom(locations->GetTemp(0u))
+      : InputRegisterAt(invoke, 1);
+
+  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
+
+  // This needs to be before the temp registers, as MarkGCCard also uses VIXL temps.
+  if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(new_value_index))) {
+    // Mark card for object, the new value shall be stored.
+    bool new_value_can_be_null = true;  // TODO: Worth finding out this information?
+    codegen->MarkGCCard(object, new_value.W(), new_value_can_be_null);
+  }
+
+  // Reuse the `offset` temporary for the pointer to the field, except
+  // for references that need the offset for the non-Baker read barrier.
+  UseScratchRegisterScope temps(masm);
+  Register tmp_ptr = offset.X();
+  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
+      value_type == DataType::Type::kReference) {
+    tmp_ptr = temps.AcquireX();
+  }
+  __ Add(tmp_ptr, object.X(), offset.X());
+
+  // Move floating point value to temporary.
+  Register new_value_reg = MoveToTempIfFpRegister(new_value, value_type, masm, &temps);
+  DataType::Type load_store_type = DataType::IsFloatingPointType(value_type)
+      ? ((value_type == DataType::Type::kFloat32) ? DataType::Type::kInt32 : DataType::Type::kInt64)
+      : value_type;
+
+  // Prepare register for old value.
+  Register old_value;
+  if (DataType::IsFloatingPointType(value_type) && !new_value.IsZero()) {
+    // We need a temporary register but we have already used a scratch register for
+    // the new value unless it is zero bit pattern (+0.0f or +0.0) and need anothe one
+    // in GenerateGetAndSet(). We have allocated a normal temporary to handle that.
+    Location temp = locations->GetTemp((expected_coordinates_count == 0u) ? 2u : 1u);
+    old_value =
+        (load_store_type == DataType::Type::kInt64) ? XRegisterFrom(temp) : WRegisterFrom(temp);
+  } else if ((kEmitCompilerReadBarrier && kUseBakerReadBarrier) &&
+             value_type == DataType::Type::kReference) {
+    // Load the old value initially to a scratch register.
+    // We shall move it to `out` later with a read barrier.
+    old_value = temps.AcquireW();
+  } else {
+    // Use the output register for the old value.
+    old_value = (load_store_type == DataType::Type::kInt64) ? out.X() : out.W();
+  }
+
+  GenerateGetAndSet(codegen, load_store_type, order, tmp_ptr, new_value_reg, old_value);
+
+  if (DataType::IsFloatingPointType(value_type)) {
+    __ Fmov((value_type == DataType::Type::kFloat64) ? out.D() : out.S(), old_value);
+  } else if (kEmitCompilerReadBarrier && value_type == DataType::Type::kReference) {
+    if (kUseBakerReadBarrier) {
+      codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(out.W(), old_value);
+    } else {
+      codegen->GenerateReadBarrierSlow(
+          invoke,
+          Location::RegisterLocation(out.W().GetCode()),
+          Location::RegisterLocation(old_value.GetCode()),
+          Location::RegisterLocation(object.GetCode()),
+          /*offset=*/ 0u,
+          /*index=*/ Location::RegisterLocation(offset.GetCode()));
+    }
+  }
+  __ Bind(slow_path->GetExitLabel());
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSet(HInvoke* invoke) {
+  CreateVarHandleGetAndSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSet(HInvoke* invoke) {
+  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_seq_cst);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSetAcquire(HInvoke* invoke) {
+  CreateVarHandleGetAndSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSetAcquire(HInvoke* invoke) {
+  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_acquire);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSetRelease(HInvoke* invoke) {
+  CreateVarHandleGetAndSetLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSetRelease(HInvoke* invoke) {
+  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_release);
+}
+
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOfAfter);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringBufferAppend);
@@ -4522,9 +4699,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseOrRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXor)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXorAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXorRelease)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSet)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetAcquire)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndSetRelease)
 
 UNREACHABLE_INTRINSICS(ARM64)
 
