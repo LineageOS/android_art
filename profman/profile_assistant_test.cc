@@ -561,25 +561,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilation) {
 TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentage) {
   const uint16_t kNumberOfMethodsInRefProfile = 6000;
   const uint16_t kNumberOfMethodsInCurProfile = 6100;  // Threshold is 2%.
-  // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
-            CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
-                                                kNumberOfMethodsInRefProfile));
-}
-
-TEST_F(ProfileAssistantTest, ShouldAdviseCompilationMethodPercentage) {
-  const uint16_t kNumberOfMethodsInRefProfile = 6000;
-  const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 2%.
-  // We should advise compilation.
-  ASSERT_EQ(ProfileAssistant::kCompile,
-            CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
-                                                kNumberOfMethodsInRefProfile));
-}
-
-TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentageWithNewMin) {
-  const uint16_t kNumberOfMethodsInRefProfile = 6000;
-  const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 20%.
-  std::vector<const std::string> extra_args({"--min-new-methods-percent-change=20"});
+  std::vector<const std::string> extra_args({"--min-new-methods-percent-change=2"});
 
   // We should not advise compilation.
   ASSERT_EQ(ProfileAssistant::kSkipCompilation,
@@ -588,34 +570,60 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentageWithNewMin) {
                                                 extra_args));
 }
 
+TEST_F(ProfileAssistantTest, ShouldAdviseCompilationMethodPercentage) {
+  const uint16_t kNumberOfMethodsInRefProfile = 6000;
+  const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 2%.
+  std::vector<const std::string> extra_args({"--min-new-methods-percent-change=2"});
+
+  // We should advise compilation.
+  ASSERT_EQ(ProfileAssistant::kCompile,
+            CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
+                                                kNumberOfMethodsInRefProfile,
+                                                extra_args));
+}
+
+TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentageWithNewMin) {
+  const uint16_t kNumberOfMethodsInRefProfile = 6000;
+  const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 20%.
+
+  // We should not advise compilation.
+  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+            CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
+                                                kNumberOfMethodsInRefProfile));
+}
+
 TEST_F(ProfileAssistantTest, DoNotdviseCompilationClassPercentage) {
   const uint16_t kNumberOfClassesInRefProfile = 6000;
   const uint16_t kNumberOfClassesInCurProfile = 6110;  // Threshold is 2%.
-  // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
-            CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
-                                               kNumberOfClassesInRefProfile));
-}
-
-TEST_F(ProfileAssistantTest, ShouldAdviseCompilationClassPercentage) {
-  const uint16_t kNumberOfClassesInRefProfile = 6000;
-  const uint16_t kNumberOfClassesInCurProfile = 6120;  // Threshold is 2%.
-  // We should advise compilation.
-  ASSERT_EQ(ProfileAssistant::kCompile,
-            CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
-                                               kNumberOfClassesInRefProfile));
-}
-
-TEST_F(ProfileAssistantTest, DoNotAdviseCompilationClassPercentageWithNewMin) {
-  const uint16_t kNumberOfClassesInRefProfile = 6000;
-  const uint16_t kNumberOfClassesInCurProfile = 6200;  // Threshold is 20%.
-  std::vector<const std::string> extra_args({"--min-new-classes-percent-change=20"});
+  std::vector<const std::string> extra_args({"--min-new-classes-percent-change=2"});
 
   // We should not advise compilation.
   ASSERT_EQ(ProfileAssistant::kSkipCompilation,
             CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
                                                kNumberOfClassesInRefProfile,
                                                extra_args));
+}
+
+TEST_F(ProfileAssistantTest, ShouldAdviseCompilationClassPercentage) {
+  const uint16_t kNumberOfClassesInRefProfile = 6000;
+  const uint16_t kNumberOfClassesInCurProfile = 6120;  // Threshold is 2%.
+  std::vector<const std::string> extra_args({"--min-new-classes-percent-change=2"});
+
+  // We should advise compilation.
+  ASSERT_EQ(ProfileAssistant::kCompile,
+            CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
+                                               kNumberOfClassesInRefProfile,
+                                               extra_args));
+}
+
+TEST_F(ProfileAssistantTest, DoNotAdviseCompilationClassPercentageWithNewMin) {
+  const uint16_t kNumberOfClassesInRefProfile = 6000;
+  const uint16_t kNumberOfClassesInCurProfile = 6200;  // Threshold is 20%.
+
+  // We should not advise compilation.
+  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+            CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
+                                               kNumberOfClassesInRefProfile));
 }
 
 TEST_F(ProfileAssistantTest, FailProcessingBecauseOfProfiles) {
