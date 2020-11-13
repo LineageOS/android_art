@@ -228,7 +228,7 @@
     FETCH_ADVANCE_INST 1                // advance rPC, load wINST
     GET_INST_OPCODE ip                  // extract opcode from wINST
     .if $is_object
-    SET_VREG_OBJECT w0, w2, w1          // fp[AA]<- r0
+    SET_VREG_OBJECT w0, w2              // fp[AA]<- r0
     .else
     SET_VREG w0, w2                     // fp[AA]<- r0
     .endif
