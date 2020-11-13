@@ -360,7 +360,9 @@ class ProfileAssistantTest : public CommonRuntimeTest {
   }
 
   int CheckCompilationMethodPercentChange(uint16_t methods_in_cur_profile,
-                                          uint16_t methods_in_ref_profile) {
+                                          uint16_t methods_in_ref_profile,
+                                          const std::vector<const std::string>& extra_args =
+                                              std::vector<const std::string>()) {
     ScratchFile profile;
     ScratchFile reference_profile;
     std::vector<int> profile_fds({ GetFd(profile)});
@@ -380,11 +382,13 @@ class ProfileAssistantTest : public CommonRuntimeTest {
     ProfileCompilationInfo info2;
     SetupBasicProfile(dex1, hot_methods_ref, empty_vector, empty_vector,
         reference_profile,  &info2);
-    return ProcessProfiles(profile_fds, reference_profile_fd);
+    return ProcessProfiles(profile_fds, reference_profile_fd, extra_args);
   }
 
   int CheckCompilationClassPercentChange(uint16_t classes_in_cur_profile,
-                                         uint16_t classes_in_ref_profile) {
+                                         uint16_t classes_in_ref_profile,
+                                         const std::vector<const std::string>& extra_args =
+                                             std::vector<const std::string>()) {
     ScratchFile profile;
     ScratchFile reference_profile;
 
@@ -395,7 +399,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
     SetupProfile(dex1, dex2, 0, classes_in_cur_profile, profile,  &info1);
     ProfileCompilationInfo info2;
     SetupProfile(dex1, dex2, 0, classes_in_ref_profile, reference_profile, &info2);
-    return ProcessProfiles(profile_fds, reference_profile_fd);
+    return ProcessProfiles(profile_fds, reference_profile_fd, extra_args);
   }
 
   std::unique_ptr<ArenaAllocator> allocator_;
@@ -572,6 +576,18 @@ TEST_F(ProfileAssistantTest, ShouldAdviseCompilationMethodPercentage) {
                                                 kNumberOfMethodsInRefProfile));
 }
 
+TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentageWithNewMin) {
+  const uint16_t kNumberOfMethodsInRefProfile = 6000;
+  const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 20%.
+  std::vector<const std::string> extra_args({"--min-new-methods-percent-change=20"});
+
+  // We should not advise compilation.
+  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+            CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
+                                                kNumberOfMethodsInRefProfile,
+                                                extra_args));
+}
+
 TEST_F(ProfileAssistantTest, DoNotdviseCompilationClassPercentage) {
   const uint16_t kNumberOfClassesInRefProfile = 6000;
   const uint16_t kNumberOfClassesInCurProfile = 6110;  // Threshold is 2%.
@@ -588,6 +604,18 @@ TEST_F(ProfileAssistantTest, ShouldAdviseCompilationClassPercentage) {
   ASSERT_EQ(ProfileAssistant::kCompile,
             CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
                                                kNumberOfClassesInRefProfile));
+}
+
+TEST_F(ProfileAssistantTest, DoNotAdviseCompilationClassPercentageWithNewMin) {
+  const uint16_t kNumberOfClassesInRefProfile = 6000;
+  const uint16_t kNumberOfClassesInCurProfile = 6200;  // Threshold is 20%.
+  std::vector<const std::string> extra_args({"--min-new-classes-percent-change=20"});
+
+  // We should not advise compilation.
+  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+            CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
+                                               kNumberOfClassesInRefProfile,
+                                               extra_args));
 }
 
 TEST_F(ProfileAssistantTest, FailProcessingBecauseOfProfiles) {
