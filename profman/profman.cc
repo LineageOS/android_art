@@ -179,6 +179,10 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("      In this case, the reference profile must have a boot profile version.");
   UsageError("  --force-merge: performs a forced merge, without analyzing if there is a");
   UsageError("      significant difference between the current profile and the reference profile.");
+  UsageError("  --min-new-methods-percent-change=percentage between 0 and 100");
+  UsageError("      the min percent of new methods to trigger a compilation.");
+  UsageError("  --min-new-classes-percent-change=percentage between 0 and 100");
+  UsageError("      the min percent of new classes to trigger a compilation.");
   UsageError("");
 
   exit(EXIT_FAILURE);
@@ -406,6 +410,24 @@ class ProfMan final {
                         &test_profile_class_percentage_);
       } else if (StartsWith(option, "--generate-test-profile-seed=")) {
         ParseUintOption(raw_option, "--generate-test-profile-seed=", &test_profile_seed_);
+      } else if (StartsWith(option, "--min-new-methods-percent-change=")) {
+        uint32_t min_new_methods_percent_change;
+        ParseUintOption(raw_option,
+                        "--min-new-methods-percent-change=",
+                        &min_new_methods_percent_change,
+                        0u,
+                        100u);
+        profile_assistant_options_.SetMinNewMethodsPercentChangeForCompilation(
+            min_new_methods_percent_change);
+      } else if (StartsWith(option, "--min-new-classes-percent-change=")) {
+        uint32_t min_new_classes_percent_change;
+        ParseUintOption(raw_option,
+                        "--min-new-classes-percent-change=",
+                        &min_new_classes_percent_change,
+                        0u,
+                        100u);
+        profile_assistant_options_.SetMinNewClassesPercentChangeForCompilation(
+            min_new_classes_percent_change);
       } else if (option == "--copy-and-update-profile-key") {
         copy_and_update_profile_key_ = true;
       } else if (option == "--boot-image-merge") {
