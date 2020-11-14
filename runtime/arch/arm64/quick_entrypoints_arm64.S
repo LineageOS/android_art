@@ -1503,6 +1503,8 @@ ART_QUICK_ALLOC_OBJECT_ROSALLOC art_quick_alloc_object_initialized_rosalloc, art
 .endm
 
 // The common code for art_quick_alloc_object_*region_tlab
+// Currently the implementation ignores isInitialized. TODO(b/172087402): clean this up.
+// Caller must execute a constructor fence after this.
 .macro GENERATE_ALLOC_OBJECT_RESOLVED_TLAB name, entrypoint, isInitialized
 ENTRY \name
     // Fast path region tlab allocation.
@@ -1570,6 +1572,7 @@ GENERATE_ALLOC_OBJECT_RESOLVED_TLAB art_quick_alloc_object_initialized_tlab, art
     ret
 .endm
 
+// Caller must execute a constructor fence after this.
 .macro GENERATE_ALLOC_ARRAY_TLAB name, entrypoint, size_setup
 ENTRY \name
     // Fast path array allocation for region tlab allocation.
