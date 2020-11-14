@@ -30,6 +30,7 @@ public class Main {
         testUnsafeCasRegression();
         testVarHandleCompareAndSet();
         testVarHandleCompareAndExchange();
+        testVarHandleGetAndSet();
     }
 
     public static void testFieldReads() {
@@ -358,6 +359,46 @@ public class Main {
             assertSameObject(f4444, f4444vh.compareAndExchange(mf, f1024, f4444));  // Unchanged.
             assertSameObject(f4998, f4998vh.compareAndExchange(mf, f1024, f4444));  // Unchanged.
             assertSameObject(f4999, f4999vh.compareAndExchange(mf, f1024, f4444));  // Unchanged.
+        }
+    }
+
+    public static void testVarHandleGetAndSet() throws Exception {
+        // Initialize local variables for comparison.
+        Object f0000 = manyFields.testField0000;
+        Object f0001 = manyFields.testField0001;
+        Object f1024 = manyFields.testField1024;
+        Object f4444 = manyFields.testField4444;
+        Object f4998 = manyFields.testField4998;
+        Object f4999 = manyFields.testField4999;
+        // Initialize VarHandle objects.
+        VarHandle f0000vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField0000", Object.class);
+        VarHandle f0001vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField0001", Object.class);
+        VarHandle f1024vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField1024", Object.class);
+        VarHandle f4444vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField4444", Object.class);
+        VarHandle f4998vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField4998", Object.class);
+        VarHandle f4999vh =
+            MethodHandles.lookup().findVarHandle(ManyFields.class, "testField4999", Object.class);
+
+        // Continually check VarHandle.getAndSet() while allocating
+        // over 64MiB memory (with heap size limited to 16MiB), ensuring we run GC and
+        // stress the read barrier implementation if concurrent collector is enabled.
+        for (int i = 0; i != 64 * 1024; ++i) {
+            allocateAtLeast1KiB();
+            ManyFields mf = manyFields;  // Load the volatile `manyFields` once on each iteration.
+            // Test VarHandle.getAndSet(). Use reference comparison, not equals().
+            assertSameObject(f0000, f0000vh.getAndSet(mf, f0000));  // Unchanged.
+            assertSameObject(f0001, f0001vh.getAndSet(mf, f0001));  // Unchanged.
+            assertSameObject(f1024, f1024vh.getAndSet(mf, f4444));  // Replaced.
+            assertSameObject(f4444, f1024vh.getAndSet(mf, f1024));  // Replaced.
+            assertSameObject(f1024, f1024vh.getAndSet(mf, f1024));  // Unchanged.
+            assertSameObject(f4444, f4444vh.getAndSet(mf, f4444));  // Unchanged.
+            assertSameObject(f4998, f4998vh.getAndSet(mf, f4998));  // Unchanged.
+            assertSameObject(f4999, f4999vh.getAndSet(mf, f4999));  // Unchanged.
         }
     }
 

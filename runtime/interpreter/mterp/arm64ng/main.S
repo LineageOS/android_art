@@ -202,7 +202,7 @@
     str     \reg, [xFP, \vreg, uxtw #2]
     str     wzr, [xREFS, \vreg, uxtw #2]
 .endm
-.macro SET_VREG_OBJECT reg, vreg, tmpreg
+.macro SET_VREG_OBJECT reg, vreg
     str     \reg, [xFP, \vreg, uxtw #2]
     str     \reg, [xREFS, \vreg, uxtw #2]
 .endm
@@ -1546,14 +1546,12 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     // TODO: Get shorty in a better way and remove below
     SPILL_ALL_ARGUMENTS
 
-    // Save method in callee-save xINST
-    mov xINST, x0
     bl NterpGetShorty
     // Save shorty in callee-save xIBASE.
     mov xIBASE, x0
 
     RESTORE_ALL_ARGUMENTS
-    ldr xPC, [xINST, #ART_METHOD_DATA_OFFSET_64]
+    ldr xPC, [x0, #ART_METHOD_DATA_OFFSET_64]
 
     // Setup the stack for executing the method.
     SETUP_STACK_FRAME xPC, xREFS, xFP, CFI_REFS, load_ins=1
@@ -1632,7 +1630,7 @@ common_errDivideByZero:
     EXPORT_PC
     bl art_quick_throw_div_zero
 
-// Expect array in w0, index in w1, length in w2
+// Expect index in w1, length in w3.
 common_errArrayIndex:
     EXPORT_PC
     mov x0, x1
@@ -1844,7 +1842,7 @@ NterpPutObjectStaticField:
    ldr w0, [x0, #ART_FIELD_DECLARING_CLASS_OFFSET]
    cbnz wMR, 7f
 6:
-   lsr w2, wINST, #8                    // w1 <- A
+   lsr w2, wINST, #8                    // w2 <- A
    GET_VREG w2, w2
    add ip, x0, x1
    stlr w2, [ip]
@@ -2005,7 +2003,7 @@ NterpCheckCast:
    cbnz wMR, 4f
 1:
    lsr     w2, wINST, #8               // w2<- A
-   GET_VREG w0, w2                     // w2<- vA (object)
+   GET_VREG w0, w2                     // w0<- vA (object)
    cbz w0, 2f
    bl art_quick_check_instance_of
 2:
