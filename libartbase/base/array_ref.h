@@ -203,19 +203,6 @@ bool operator!=(const ArrayRef<T>& lhs, const ArrayRef<T>& rhs) {
   return !(lhs == rhs);
 }
 
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const ArrayRef<T>& ts) {
-  bool first = true;
-  os << "[";
-  for (const T& t : ts) {
-    if (!first) { os << ", "; }
-    first = false;
-    os << t;
-  }
-  os << "]";
-  return os;
-}
-
 }  // namespace art
 
 
