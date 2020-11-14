@@ -53,7 +53,6 @@ enum ArenaAllocKind {
   kArenaAllocBlockList,
   kArenaAllocReversePostOrder,
   kArenaAllocLinearOrder,
-  kArenaAllocReachabilityGraph,
   kArenaAllocConstantsMap,
   kArenaAllocPredecessors,
   kArenaAllocSuccessors,
