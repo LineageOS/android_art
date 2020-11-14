@@ -3119,7 +3119,7 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
       allocate_instance();
       __ Mov(temp.W(), value);
       __ Str(temp.W(), HeapOperand(out.W(), info.value_offset));
-      // `value` is a final field, emit the barrier after we have stored it.
+      // Class pointer and `value` final field stores require a barrier before publication.
       codegen_->GenerateMemoryBarrier(MemBarrierKind::kStoreStore);
     }
   } else {
@@ -3141,7 +3141,7 @@ void IntrinsicCodeGeneratorARM64::VisitIntegerValueOf(HInvoke* invoke) {
     // Otherwise allocate and initialize a new j.l.Integer.
     allocate_instance();
     __ Str(in.W(), HeapOperand(out.W(), info.value_offset));
-    // `value` is a final field, emit the barrier after we have stored it.
+    // Class pointer and `value` final field stores require a barrier before publication.
     codegen_->GenerateMemoryBarrier(MemBarrierKind::kStoreStore);
     __ Bind(&done);
   }
