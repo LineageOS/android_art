@@ -317,23 +317,21 @@ class AdjacencyListGraph {
       HBasicBlock* dest_blk = name_to_block_.GetOrCreate(dest, create_block);
       src_blk->AddSuccessor(dest_blk);
     }
-    graph_->ClearReachabilityInformation();
     graph_->ComputeDominanceInformation();
-    graph_->ComputeReachabilityInformation();
     for (auto [name, blk] : name_to_block_) {
       block_to_name_.Put(blk, name);
     }
   }
 
-  bool HasBlock(const HBasicBlock* blk) const {
+  bool HasBlock(const HBasicBlock* blk) {
     return block_to_name_.find(blk) != block_to_name_.end();
   }
 
-  std::string_view GetName(const HBasicBlock* blk) const {
+  std::string_view GetName(const HBasicBlock* blk) {
     return block_to_name_.Get(blk);
   }
 
-  HBasicBlock* Get(const std::string_view& sv) const {
+  HBasicBlock* Get(const std::string_view& sv) {
     return name_to_block_.Get(sv);
   }
 
