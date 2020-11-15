@@ -44,7 +44,6 @@ const char* const ArenaAllocatorStatsImpl<kCount>::kAllocNames[] = {
   "BlockList    ",
   "RevPostOrder ",
   "LinearOrder  ",
-  "Reachability ",
   "ConstantsMap ",
   "Predecessors ",
   "Successors   ",
