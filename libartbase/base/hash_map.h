@@ -81,13 +81,6 @@ class HashMap : public HashSet<std::pair<Key, Value>,
   HashMap() : Base() { }
   explicit HashMap(const Alloc& alloc)
       : Base(alloc) { }
-
-  // Used to insert a new mapping.
-  typename Base::iterator Overwrite(const Key& k, const Value& v) {
-    auto res = Base::insert({ k, v }).first;
-    *res = { k, v };
-    return res;
-  }
 };
 
 }  // namespace art

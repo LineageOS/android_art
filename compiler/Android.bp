@@ -48,7 +48,6 @@ art_cc_defaults {
         "optimizing/data_type.cc",
         "optimizing/dead_code_elimination.cc",
         "optimizing/escape.cc",
-        "optimizing/execution_subgraph.cc",
         "optimizing/graph_checker.cc",
         "optimizing/graph_visualizer.cc",
         "optimizing/gvn.cc",
@@ -415,7 +414,6 @@ art_cc_test {
 
         "jni/jni_cfi_test.cc",
         "optimizing/codegen_test.cc",
-        "optimizing/execution_subgraph_test.cc",
         "optimizing/load_store_analysis_test.cc",
         "optimizing/load_store_elimination_test.cc",
         "optimizing/optimizing_cfi_test.cc",
