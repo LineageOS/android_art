@@ -1211,10 +1211,10 @@ END_FUNCTION \name
    .if \is_string_init
    addq $$1, %r10       // arg start index
    movq $$1, %rbp       // index in stack
-   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS rsi, esi, r11, r10, rbp, .Lgpr_setup_finished_\suffix
+   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS rsi, esi, r11, r10, rbp, .Lgpr_setup_finished_range_\suffix
    .elseif \is_static
    movq $$0, %rbp // index in stack
-   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS rsi, esi, r11, r10, rbp, .Lgpr_setup_finished_\suffix
+   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS rsi, esi, r11, r10, rbp, .Lgpr_setup_finished_range_\suffix
    .else
    addq $$1, %r10       // arg start index
    movq $$1, %rbp // index in stack
