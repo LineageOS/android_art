@@ -1365,15 +1365,40 @@ void IntrinsicCodeGeneratorARM64::VisitUnsafeCASObject(HInvoke* invoke) {
   GenUnsafeCas(invoke, DataType::Type::kReference, codegen_);
 }
 
-static void GenerateGetAndSet(CodeGeneratorARM64* codegen,
-                              DataType::Type type,
-                              std::memory_order order,
-                              Register ptr,
-                              Register new_value,
-                              Register old_value) {
+enum class GetAndUpdateOp {
+  kSet,
+  kAdd
+};
+
+static void GenerateGetAndUpdate(CodeGeneratorARM64* codegen,
+                                 GetAndUpdateOp get_and_update_op,
+                                 DataType::Type load_store_type,
+                                 std::memory_order order,
+                                 Register ptr,
+                                 CPURegister arg,
+                                 CPURegister old_value) {
   MacroAssembler* masm = codegen->GetVIXLAssembler();
   UseScratchRegisterScope temps(masm);
   Register store_result = temps.AcquireW();
+
+  DCHECK_EQ(old_value.GetSizeInBits(), arg.GetSizeInBits());
+  Register old_value_reg;
+  Register new_value;
+  switch (get_and_update_op) {
+    case GetAndUpdateOp::kSet:
+      old_value_reg = old_value.IsX() ? old_value.X() : old_value.W();
+      new_value = arg.IsX() ? arg.X() : arg.W();
+      break;
+    case GetAndUpdateOp::kAdd:
+      if (arg.IsVRegister()) {
+        old_value_reg = arg.IsD() ? temps.AcquireX() : temps.AcquireW();
+        new_value = old_value_reg;  // Use the same temporary.
+      } else {
+        old_value_reg = old_value.IsX() ? old_value.X() : old_value.W();
+        new_value = old_value.IsX() ? temps.AcquireX() : temps.AcquireW();
+      }
+      break;
+  }
 
   bool use_load_acquire =
       (order == std::memory_order_acquire) || (order == std::memory_order_seq_cst);
@@ -1383,8 +1408,23 @@ static void GenerateGetAndSet(CodeGeneratorARM64* codegen,
 
   vixl::aarch64::Label loop_label;
   __ Bind(&loop_label);
-  EmitLoadExclusive(codegen, type, ptr, old_value, use_load_acquire);
-  EmitStoreExclusive(codegen, type, ptr, store_result, new_value, use_store_release);
+  EmitLoadExclusive(codegen, load_store_type, ptr, old_value_reg, use_load_acquire);
+  switch (get_and_update_op) {
+    case GetAndUpdateOp::kSet:
+      break;
+    case GetAndUpdateOp::kAdd:
+      if (arg.IsVRegister()) {
+        VRegister old_value_vreg = old_value.IsD() ? old_value.D() : old_value.S();
+        VRegister sum = temps.AcquireSameSizeAs(old_value_vreg);
+        __ Fmov(old_value_vreg, old_value_reg);
+        __ Fadd(sum, old_value_vreg, arg.IsD() ? arg.D() : arg.S());
+        __ Fmov(new_value, sum);
+      } else {
+        __ Add(new_value, old_value_reg, arg.IsX() ? arg.X() : arg.W());
+      }
+      break;
+  }
+  EmitStoreExclusive(codegen, load_store_type, ptr, store_result, new_value, use_store_release);
   __ Cbnz(store_result, &loop_label);
 }
 
@@ -3964,7 +4004,11 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
     }
     case mirror::VarHandle::AccessModeTemplate::kGetAndUpdate: {
       DataType::Type value_type = GetDataTypeFromShorty(invoke, number_of_arguments - 1);
-      DCHECK(!IsVarHandleGetAndAdd(invoke));  // Unimplemented.
+      if (IsVarHandleGetAndAdd(invoke) &&
+          (value_type == DataType::Type::kReference || value_type == DataType::Type::kBool)) {
+        // We should only add numerical types.
+        return false;
+      }
       DCHECK(!IsVarHandleGetAndBitwiseOp(invoke));  // Unimplemented.
       if (value_type != return_type) {
         return false;
@@ -4489,7 +4533,8 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleWeakCompareAndSetRelease(HInvoke
       invoke, codegen_, std::memory_order_release, /*return_success=*/ true, /*strong=*/ false);
 }
 
-static void CreateVarHandleGetAndSetLocations(HInvoke* invoke) {
+static void CreateVarHandleGetAndUpdateLocations(HInvoke* invoke,
+                                                 GetAndUpdateOp get_and_update_op) {
   if (!IsValidFieldVarHandleExpected(invoke)) {
     return;
   }
@@ -4504,25 +4549,33 @@ static void CreateVarHandleGetAndSetLocations(HInvoke* invoke) {
 
   LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
 
-  if (DataType::IsFloatingPointType(invoke->GetType()) &&
-      !IsConstantZeroBitPattern(invoke->InputAt(invoke->GetNumberOfArguments() - 1u))) {
-    // Add a temporary for `old_value` if floating point `new_value` takes a scratch register.
-    locations->AddTemp(Location::RequiresRegister());
+  if (DataType::IsFloatingPointType(invoke->GetType())) {
+    if (get_and_update_op == GetAndUpdateOp::kAdd) {
+      // For ADD, do not use ZR for zero bit pattern (+0.0f or +0.0).
+      locations->SetInAt(invoke->GetNumberOfArguments() - 1u, Location::RequiresFpuRegister());
+    } else {
+      DCHECK(get_and_update_op == GetAndUpdateOp::kSet);
+      if (!IsConstantZeroBitPattern(invoke->InputAt(invoke->GetNumberOfArguments() - 1u))) {
+        // Add a temporary for `old_value` if floating point `new_value` takes a scratch register.
+        locations->AddTemp(Location::RequiresRegister());
+      }
+    }
   }
 }
 
-static void GenerateVarHandleGetAndSet(HInvoke* invoke,
-                                       CodeGeneratorARM64* codegen,
-                                       std::memory_order order) {
+static void GenerateVarHandleGetAndUpdate(HInvoke* invoke,
+                                          CodeGeneratorARM64* codegen,
+                                          GetAndUpdateOp get_and_update_op,
+                                          std::memory_order order) {
   // Implemented only for fields.
   size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   DCHECK_LE(expected_coordinates_count, 1u);
-  uint32_t new_value_index = invoke->GetNumberOfArguments() - 1;
-  DataType::Type value_type = GetDataTypeFromShorty(invoke, new_value_index);
+  uint32_t arg_index = invoke->GetNumberOfArguments() - 1;
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, arg_index);
 
   MacroAssembler* masm = codegen->GetVIXLAssembler();
   LocationSummary* locations = invoke->GetLocations();
-  CPURegister new_value = InputCPURegisterOrZeroRegAt(invoke, new_value_index);
+  CPURegister arg = InputCPURegisterOrZeroRegAt(invoke, arg_index);
   CPURegister out = helpers::OutputCPURegister(invoke);
 
   SlowPathCodeARM64* slow_path =
@@ -4535,10 +4588,11 @@ static void GenerateVarHandleGetAndSet(HInvoke* invoke,
   VarHandleTarget target = GenerateVarHandleTarget(invoke, codegen);
 
   // This needs to be before the temp registers, as MarkGCCard also uses VIXL temps.
-  if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(new_value_index))) {
+  if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(arg_index))) {
+    DCHECK(get_and_update_op == GetAndUpdateOp::kSet);
     // Mark card for object, the new value shall be stored.
     bool new_value_can_be_null = true;  // TODO: Worth finding out this information?
-    codegen->MarkGCCard(target.object, new_value.W(), new_value_can_be_null);
+    codegen->MarkGCCard(target.object, arg.W(), new_value_can_be_null);
   }
 
   // Reuse the `target.offset` temporary for the pointer to the field, except
@@ -4551,42 +4605,47 @@ static void GenerateVarHandleGetAndSet(HInvoke* invoke,
   }
   __ Add(tmp_ptr, target.object.X(), target.offset.X());
 
-  // Move floating point value to temporary.
-  Register new_value_reg = MoveToTempIfFpRegister(new_value, value_type, masm, &temps);
+  // The load/store type is never floating point.
   DataType::Type load_store_type = DataType::IsFloatingPointType(value_type)
       ? ((value_type == DataType::Type::kFloat32) ? DataType::Type::kInt32 : DataType::Type::kInt64)
       : value_type;
 
   // Prepare register for old value.
-  Register old_value;
-  if (DataType::IsFloatingPointType(value_type) && !new_value.IsZero()) {
-    // We need a temporary register but we have already used a scratch register for
-    // the new value unless it is zero bit pattern (+0.0f or +0.0) and need anothe one
-    // in GenerateGetAndSet(). We have allocated a normal temporary to handle that.
-    Location temp = locations->GetTemp((expected_coordinates_count == 0u) ? 2u : 1u);
-    old_value =
-        (load_store_type == DataType::Type::kInt64) ? XRegisterFrom(temp) : WRegisterFrom(temp);
-  } else if ((kEmitCompilerReadBarrier && kUseBakerReadBarrier) &&
-             value_type == DataType::Type::kReference) {
-    // Load the old value initially to a scratch register.
-    // We shall move it to `out` later with a read barrier.
-    old_value = temps.AcquireW();
-  } else {
-    // Use the output register for the old value.
-    old_value = (load_store_type == DataType::Type::kInt64) ? out.X() : out.W();
+  CPURegister old_value = out;
+  if (get_and_update_op == GetAndUpdateOp::kSet) {
+    // For floating point GetAndSet, do the GenerateGetAndUpdate() with core registers,
+    // rather than moving between core and FP registers in the loop.
+    arg = MoveToTempIfFpRegister(arg, value_type, masm, &temps);
+    if (DataType::IsFloatingPointType(value_type) && !arg.IsZero()) {
+      // We need a temporary register but we have already used a scratch register for
+      // the new value unless it is zero bit pattern (+0.0f or +0.0) and need anothe one
+      // in GenerateGetAndUpdate(). We have allocated a normal temporary to handle that.
+      Location temp = locations->GetTemp((expected_coordinates_count == 0u) ? 2u : 1u);
+      old_value =
+          (load_store_type == DataType::Type::kInt64) ? XRegisterFrom(temp) : WRegisterFrom(temp);
+    } else if ((kEmitCompilerReadBarrier && kUseBakerReadBarrier) &&
+               value_type == DataType::Type::kReference) {
+      // Load the old value initially to a scratch register.
+      // We shall move it to `out` later with a read barrier.
+      old_value = temps.AcquireW();
+    }
   }
 
-  GenerateGetAndSet(codegen, load_store_type, order, tmp_ptr, new_value_reg, old_value);
+  GenerateGetAndUpdate(codegen, get_and_update_op, load_store_type, order, tmp_ptr, arg, old_value);
 
-  if (DataType::IsFloatingPointType(value_type)) {
-    __ Fmov((value_type == DataType::Type::kFloat64) ? out.D() : out.S(), old_value);
+  if (get_and_update_op == GetAndUpdateOp::kSet && DataType::IsFloatingPointType(value_type)) {
+    if (value_type == DataType::Type::kFloat64) {
+      __ Fmov(out.D(), old_value.X());
+    } else {
+      __ Fmov(out.S(), old_value.W());
+    }
   } else if (kEmitCompilerReadBarrier && value_type == DataType::Type::kReference) {
     if (kUseBakerReadBarrier) {
-      codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(out.W(), old_value);
+      codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(out.W(), old_value.W());
     } else {
       codegen->GenerateReadBarrierSlow(
           invoke,
-          Location::RegisterLocation(out.W().GetCode()),
+          Location::RegisterLocation(out.GetCode()),
           Location::RegisterLocation(old_value.GetCode()),
           Location::RegisterLocation(target.object.GetCode()),
           /*offset=*/ 0u,
@@ -4597,28 +4656,53 @@ static void GenerateVarHandleGetAndSet(HInvoke* invoke,
 }
 
 void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSet(HInvoke* invoke) {
-  CreateVarHandleGetAndSetLocations(invoke);
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kSet);
 }
 
 void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSet(HInvoke* invoke) {
-  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_seq_cst);
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kSet, std::memory_order_seq_cst);
 }
 
 void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSetAcquire(HInvoke* invoke) {
-  CreateVarHandleGetAndSetLocations(invoke);
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kSet);
 }
 
 void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSetAcquire(HInvoke* invoke) {
-  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_acquire);
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kSet, std::memory_order_acquire);
 }
 
 void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndSetRelease(HInvoke* invoke) {
-  CreateVarHandleGetAndSetLocations(invoke);
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kSet);
 }
 
 void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndSetRelease(HInvoke* invoke) {
-  GenerateVarHandleGetAndSet(invoke, codegen_, std::memory_order_release);
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kSet, std::memory_order_release);
 }
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndAdd(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAdd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndAdd(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAdd, std::memory_order_seq_cst);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndAddAcquire(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAdd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndAddAcquire(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAdd, std::memory_order_acquire);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndAddRelease(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAdd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndAddRelease(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAdd, std::memory_order_release);
+}
+
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOfAfter);
@@ -4647,9 +4731,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, UnsafeGetAndSetObject)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, MethodHandleInvokeExact)
 UNIMPLEMENTED_INTRINSIC(ARM64, MethodHandleInvoke)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAdd)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAddAcquire)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndAddRelease)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAnd)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAndAcquire)
 UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAndRelease)
