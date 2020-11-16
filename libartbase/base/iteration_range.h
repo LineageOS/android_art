@@ -18,6 +18,7 @@
 #define ART_LIBARTBASE_BASE_ITERATION_RANGE_H_
 
 #include <iterator>
+#include <type_traits>
 
 namespace art {
 
@@ -49,9 +50,11 @@ inline IterationRange<Iter> MakeIterationRange(const Iter& begin_it, const Iter&
   return IterationRange<Iter>(begin_it, end_it);
 }
 
-template<typename List>
-inline IterationRange<typename List::iterator> MakeIterationRange(List& list) {
-  return IterationRange<typename List::iterator>(list.begin(), list.end());
+template <typename List>
+inline auto MakeIterationRange(List& list) -> IterationRange<decltype(list.begin())> {
+  static_assert(std::is_same_v<decltype(list.begin()), decltype(list.end())>,
+                "Different iterator types");
+  return MakeIterationRange(list.begin(), list.end());
 }
 
 template <typename Iter>

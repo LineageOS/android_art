@@ -15,12 +15,19 @@
  */
 #include "nodes.h"
 
+#include <algorithm>
 #include <cfloat>
 
 #include "art_method-inl.h"
+#include "base/arena_allocator.h"
+#include "base/arena_bit_vector.h"
 #include "base/bit_utils.h"
 #include "base/bit_vector-inl.h"
+#include "base/bit_vector.h"
+#include "base/iteration_range.h"
 #include "base/logging.h"
+#include "base/scoped_arena_allocator.h"
+#include "base/scoped_arena_containers.h"
 #include "base/stl_util.h"
 #include "class_linker-inl.h"
 #include "class_root-inl.h"
@@ -261,6 +268,171 @@ static bool UpdateDominatorOfSuccessor(HBasicBlock* block, HBasicBlock* successo
     successor->SetDominator(new_dominator);
     return true;
   }
+}
+
+// TODO Consider moving this entirely into LoadStoreAnalysis/Elimination.
+bool HGraph::PathBetween(uint32_t source_idx, uint32_t dest_idx) const {
+  DCHECK_LT(source_idx, blocks_.size()) << "source not present in graph!";
+  DCHECK_LT(dest_idx, blocks_.size()) << "dest not present in graph!";
+  DCHECK(blocks_[source_idx] != nullptr);
+  DCHECK(blocks_[dest_idx] != nullptr);
+  return reachability_graph_.IsBitSet(source_idx, dest_idx);
+}
+
+bool HGraph::PathBetween(const HBasicBlock* source, const HBasicBlock* dest) const {
+  if (source == nullptr || dest == nullptr) {
+    return false;
+  }
+  size_t source_idx = source->GetBlockId();
+  size_t dest_idx = dest->GetBlockId();
+  return PathBetween(source_idx, dest_idx);
+}
+
+// This function/struct calculates the reachability of every node from every
+// other node by iteratively using DFS to find reachability of each individual
+// block.
+//
+// This is in practice faster then the simpler Floyd-Warshall since while that
+// is O(N**3) this is O(N*(E + N)) where N is the number of blocks and E is the
+// number of edges. Since in practice each block only has a few outgoing edges
+// we can confidently say that E ~ B*N where B is a small number (~3). We also
+// memoize the results as we go allowing us to (potentially) avoid walking the
+// entire graph for every node. To make best use of this memoization we
+// calculate the reachability of blocks in PostOrder. This means that
+// (generally) blocks that are dominated by many other blocks and dominate few
+// blocks themselves will be examined first. This makes it more likely we can
+// use our memoized results.
+class ReachabilityAnalysisHelper {
+ public:
+  ReachabilityAnalysisHelper(const HGraph* graph,
+                             ArenaBitVectorArray* reachability_graph,
+                             ArenaStack* arena_stack)
+      : graph_(graph),
+        reachability_graph_(reachability_graph),
+        arena_stack_(arena_stack),
+        temporaries_(arena_stack_),
+        block_size_(RoundUp(graph_->GetBlocks().size(), BitVector::kWordBits)),
+        all_visited_nodes_(
+            &temporaries_, graph_->GetBlocks().size(), false, kArenaAllocReachabilityGraph),
+        not_post_order_visited_(
+            &temporaries_, graph_->GetBlocks().size(), false, kArenaAllocReachabilityGraph) {
+    // We can't adjust the size of reachability graph any more without breaking
+    // our allocator invariants so it had better be large enough.
+    CHECK_GE(reachability_graph_->NumRows(), graph_->GetBlocks().size());
+    CHECK_GE(reachability_graph_->NumColumns(), graph_->GetBlocks().size());
+    not_post_order_visited_.SetInitialBits(graph_->GetBlocks().size());
+  }
+
+  void CalculateReachability() {
+    // Calculate what blocks connect using repeated DFS
+    //
+    // Going in PostOrder should generally give memoization a good shot of
+    // hitting.
+    for (const HBasicBlock* blk : graph_->GetPostOrder()) {
+      if (blk == nullptr) {
+        continue;
+      }
+      not_post_order_visited_.ClearBit(blk->GetBlockId());
+      CalculateConnectednessOn(blk);
+      all_visited_nodes_.SetBit(blk->GetBlockId());
+    }
+    // Get all other bits
+    for (auto idx : not_post_order_visited_.Indexes()) {
+      const HBasicBlock* blk = graph_->GetBlocks()[idx];
+      if (blk == nullptr) {
+        continue;
+      }
+      CalculateConnectednessOn(blk);
+      all_visited_nodes_.SetBit(blk->GetBlockId());
+    }
+  }
+
+ private:
+  void AddEdge(uint32_t source, const HBasicBlock* dest) {
+    reachability_graph_->SetBit(source, dest->GetBlockId());
+  }
+
+  // Union the reachability of 'idx' into 'update_block_idx'. This is done to
+  // implement memoization. In order to improve performance we do this in 4-byte
+  // blocks. Clang should be able to optimize this to larger blocks if possible.
+  void UnionBlock(size_t update_block_idx, size_t idx) {
+    reachability_graph_->UnionRows(update_block_idx, idx);
+  }
+
+  // Single DFS to get connectedness of a single block
+  void CalculateConnectednessOn(const HBasicBlock* const target_block) {
+    const uint32_t target_idx = target_block->GetBlockId();
+    ScopedArenaAllocator connectedness_temps(arena_stack_);
+    // What nodes we have already discovered and either have processed or are
+    // already on the queue.
+    ArenaBitVector discovered(
+        &connectedness_temps, graph_->GetBlocks().size(), false, kArenaAllocReachabilityGraph);
+    // The work stack. What blocks we still need to process.
+    ScopedArenaVector<const HBasicBlock*> work_stack(
+        connectedness_temps.Adapter(kArenaAllocReachabilityGraph));
+    // Known max size since otherwise we'd have blocks multiple times. Avoids
+    // re-allocation
+    work_stack.reserve(graph_->GetBlocks().size());
+    discovered.SetBit(target_idx);
+    work_stack.push_back(target_block);
+    // Main DFS Loop.
+    while (!work_stack.empty()) {
+      const HBasicBlock* cur = work_stack.back();
+      work_stack.pop_back();
+      // Memoization of previous runs.
+      if (all_visited_nodes_.IsBitSet(cur->GetBlockId())) {
+        DCHECK_NE(target_block, cur);
+        // Already explored from here. Just use that data.
+        UnionBlock(target_idx, cur->GetBlockId());
+        continue;
+      }
+      for (const HBasicBlock* succ : cur->GetSuccessors()) {
+        AddEdge(target_idx, succ);
+        if (!discovered.IsBitSet(succ->GetBlockId())) {
+          work_stack.push_back(succ);
+          discovered.SetBit(succ->GetBlockId());
+        }
+      }
+    }
+  }
+
+  const HGraph* graph_;
+  // The graph's reachability_graph_ on the main allocator.
+  ArenaBitVectorArray* reachability_graph_;
+  ArenaStack* arena_stack_;
+  // An allocator for temporary bit-vectors used by this algorithm. The
+  // 'SetBit,ClearBit' on reachability_graph_ prior to the construction of this
+  // object should be the only allocation on the main allocator so it's safe to
+  // make a sub-allocator here.
+  ScopedArenaAllocator temporaries_;
+  // number of columns
+  const size_t block_size_;
+  // Where we've already completely calculated connectedness.
+  ArenaBitVector all_visited_nodes_;
+  // What we never visited and need to do later
+  ArenaBitVector not_post_order_visited_;
+
+  DISALLOW_COPY_AND_ASSIGN(ReachabilityAnalysisHelper);
+};
+
+void HGraph::ComputeReachabilityInformation() {
+  DCHECK_EQ(reachability_graph_.GetRawData().NumSetBits(), 0u);
+  DCHECK(reachability_graph_.IsExpandable());
+  // Reserve all the bits we'll need. This is the only allocation on the
+  // standard allocator we do here, enabling us to create a new ScopedArena for
+  // use with temporaries.
+  //
+  // reachability_graph_ acts as |N| x |N| graph for PathBetween. Array is
+  // padded so each row starts on an BitVector::kWordBits-bit alignment for
+  // simplicity and performance, allowing us to union blocks together without
+  // going bit-by-bit.
+  reachability_graph_.Resize(blocks_.size(), blocks_.size(), /*clear=*/false);
+  ReachabilityAnalysisHelper helper(this, &reachability_graph_, GetArenaStack());
+  helper.CalculateReachability();
+}
+
+void HGraph::ClearReachabilityInformation() {
+  reachability_graph_.Clear();
 }
 
 void HGraph::ComputeDominanceInformation() {
