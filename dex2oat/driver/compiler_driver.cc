@@ -1892,9 +1892,6 @@ bool CompilerDriver::FastVerify(jobject jclass_loader,
   if (!verifier_deps->ValidateDependencies(
       soa.Self(),
       class_loader,
-      // This returns classpath dex files in no particular order but VerifierDeps
-      // does not care about the order.
-      classpath_classes_.GetDexFiles(),
       &error_msg)) {
     LOG(WARNING) << "Fast verification failed: " << error_msg;
     return false;
@@ -2066,16 +2063,6 @@ class VerifyClassVisitor : public CompilationVisitor {
       }
     } else if (&klass->GetDexFile() != &dex_file) {
       // Skip a duplicate class (as the resolved class is from another, earlier dex file).
-      // Record the information that we skipped this class in the vdex.
-      // If the class resolved to a dex file not covered by the vdex, e.g. boot class path,
-      // it is considered external, dependencies on it will be recorded and the vdex will
-      // remain usable regardless of whether the class remains redefined or not (in the
-      // latter case, this class will be verify-at-runtime).
-      // On the other hand, if the class resolved to a dex file covered by the vdex, i.e.
-      // a different dex file within the same APK, this class will always be eclipsed by it.
-      // Recording that it was redefined is not necessary but will save class resolution
-      // time during fast-verify.
-      verifier::VerifierDeps::MaybeRecordClassRedefinition(dex_file, class_def);
       return;  // Do not update state.
     } else if (!SkipClass(jclass_loader, dex_file, klass.Get())) {
       CHECK(klass->IsResolved()) << klass->PrettyClass();
