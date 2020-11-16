@@ -1130,10 +1130,10 @@ END \name
    .if \is_string_init
    add x10, x10, #1  // arg start index
    mov x11, #1       // index in stack
-   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS x1, w1, x9, w10, w11, .Lgpr_setup_finished_\suffix
+   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS x1, w1, x9, w10, w11, .Lgpr_setup_finished_range_\suffix
    .elseif \is_static
    mov x11, xzr      // index in stack
-   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS x1, w1, x9, w10, w11 .Lgpr_setup_finished_\suffix
+   LOOP_RANGE_OVER_SHORTY_LOADING_GPRS x1, w1, x9, w10, w11 .Lgpr_setup_finished_range_\suffix
    .else
    add x10, x10, #1  // arg start index
    mov x11, #1       // index in stack
