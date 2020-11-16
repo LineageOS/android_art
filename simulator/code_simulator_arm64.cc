@@ -40,7 +40,13 @@ CodeSimulatorArm64::CodeSimulatorArm64()
     : CodeSimulator(), decoder_(nullptr), simulator_(nullptr) {
   DCHECK(kCanSimulate);
   decoder_ = new Decoder();
-  simulator_ = new Simulator(decoder_);
+
+  SimStack stack_builder;
+  stack_builder.SetLimitGuardSize(0x4000);
+  stack_builder.SetUsableSize(0x4000);
+  SimStack::Allocated stack = stack_builder.Allocate();
+
+  simulator_ = new Simulator(decoder_, stdout, std::move(stack));
 }
 
 CodeSimulatorArm64::~CodeSimulatorArm64() {

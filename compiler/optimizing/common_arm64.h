@@ -65,12 +65,12 @@ inline int ARTRegCodeFromVIXL(int code) {
 
 inline vixl::aarch64::Register XRegisterFrom(Location location) {
   DCHECK(location.IsRegister()) << location;
-  return vixl::aarch64::Register::GetXRegFromCode(VIXLRegCodeFromART(location.reg()));
+  return vixl::aarch64::XRegister(VIXLRegCodeFromART(location.reg()));
 }
 
 inline vixl::aarch64::Register WRegisterFrom(Location location) {
   DCHECK(location.IsRegister()) << location;
-  return vixl::aarch64::Register::GetWRegFromCode(VIXLRegCodeFromART(location.reg()));
+  return vixl::aarch64::WRegister(VIXLRegCodeFromART(location.reg()));
 }
 
 inline vixl::aarch64::Register RegisterFrom(Location location, DataType::Type type) {
@@ -89,27 +89,27 @@ inline vixl::aarch64::Register InputRegisterAt(HInstruction* instr, int input_in
 
 inline vixl::aarch64::VRegister DRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::VRegister::GetDRegFromCode(location.reg());
+  return vixl::aarch64::DRegister(location.reg());
 }
 
 inline vixl::aarch64::VRegister QRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::VRegister::GetQRegFromCode(location.reg());
+  return vixl::aarch64::QRegister(location.reg());
 }
 
 inline vixl::aarch64::VRegister VRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::VRegister::GetVRegFromCode(location.reg());
+  return vixl::aarch64::VRegister(location.reg());
 }
 
 inline vixl::aarch64::VRegister SRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::VRegister::GetSRegFromCode(location.reg());
+  return vixl::aarch64::SRegister(location.reg());
 }
 
 inline vixl::aarch64::VRegister HRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
-  return vixl::aarch64::VRegister::GetHRegFromCode(location.reg());
+  return vixl::aarch64::HRegister(location.reg());
 }
 
 inline vixl::aarch64::VRegister FPRegisterFrom(Location location, DataType::Type type) {
