@@ -96,7 +96,7 @@ module_exports {
             compile_multilib: "64",
 
             java_libs: [
-                "timezone-host",
+                "art.module.api.annotations",
             ],
             native_binaries: [
                 "hiddenapi",
