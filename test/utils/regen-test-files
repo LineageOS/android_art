@@ -49,7 +49,7 @@ ART_RUN_TEST_MODULE_NAME_PREFIX = "art-run-test-"
 
 # Known failing ART run-tests.
 # TODO(rpl): Investigate and address the causes of failures.
-known_failing_tests = frozenset([
+known_failing_tests = [
   "004-SignalTest",
   "004-UnsafeTest",
   "030-bad-finalizer",
@@ -283,7 +283,102 @@ known_failing_tests = frozenset([
   "995-breakpoints-throw",
   "996-breakpoint-obsolete",
   "997-single-step",
+]
+
+# More known failing tests, related to Checker.
+# TODO(rpl): Investigate and address the causes of failures.
+known_failing_tests.extend([
+  # Fails (on flame-userdebug) with:
+  #
+  #   java.lang.RuntimeException: Error running Checker
+  #   error: Statement could not be matched starting from line 564575
+  #   RemTest.java:289: lsr x{{\d+}}, x{{\d+}}, #32
+  #   ISA_FEATURES = {'a53': True, 'crc': True, 'lse': False, 'fp16': False, 'dotprod': False, 'sve': False}
+  #
+  "411-checker-hdiv-hrem-const",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 317325
+  #   Main.java:296: InvokeStaticOrDirect
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #   NewInstance  = l6
+  #
+  "476-checker-ctor-fence-redun-elim",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 264874
+  #   Main.java:77: InvokeStaticOrDirect [{{([ij]\d+,)?}}<<ClinitCheck>>]
+  #   ClinitCheck  = l4
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #   LoadClass    = l3
+  #
+  "478-checker-clinit-check-pruning",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 124181
+  #   Main.java:178: <<Arg:z\d+>>  StaticFieldGet  liveness:<<ArgLiv:\d+>> ranges:{[<<ArgLiv>>,<<ArgUse:\d+>>)} uses:[<<ArgUse>>]
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "482-checker-loop-back-edge-use",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 7333
+  #   Main.java:66: <<t1:i\d+>>      Add [<<Arg>>,<<Const1>>] {{.*->e(bp|si|di)}}
+  #   Arg          = i0
+  #   Const1       = i3
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "526-checker-caller-callee-regs",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: NOT statement matched line 379347
+  #   Main.java:538: NewInstance
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "530-checker-lse",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: NOT statement matched line 238857
+  #   Main.java:650: Shl
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "551-checker-shifter-operand",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 158575
+  #   Main.java:97: X86ComputeBaseMethodAddress
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "552-checker-sharpening",
+  # Fails (on flame-userdebug) with:
+  #
+  #   java.lang.RuntimeException: Error running Checker
+  #   error: Statement could not be matched starting from line 11964
+  #   Main.java:59: <<ConstM42:i\d+>>      IntConstant -42
+  #   ISA_FEATURES = {'a53': True, 'crc': True, 'lse': False, 'fp16': False, 'dotprod': False, 'sve': False}
+  #
+  #
+  "562-checker-no-intermediate",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
+  #   error: Statement could not be matched starting from line 149082
+  #   Main.java:312: <<LoadClass:l\d+>>   LoadClass class_name:Main
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #   Int42        = i8
+  #   Int43        = i10
+  #
+  "639-checker-code-sinking",
 ])
+
+known_failing_tests = frozenset(known_failing_tests)
 
 # Percentage of ART run-tests (among the ones expected to succeed) to include in
 # the `presubmit` test group in `TEST_MAPPING` file -- the rest will be included
@@ -303,13 +398,8 @@ def is_checker_test(run_test):
   return re.match("^[0-9]+-checker-", run_test)
 
 # Is `run_test` expected to succeed?
-#
-# Also temporarily consider Checker tests as known failing tests, as they
-# currently break some test runs (see b/169852871).
-# TODO(b/162408889): Complete Checker integration and re-include Checker
-# tests in test mapping.
 def is_expected_succeeding(run_test):
-  return run_test not in known_failing_tests and not is_checker_test(run_test)
+  return run_test not in known_failing_tests
 
 
 class Generator:
