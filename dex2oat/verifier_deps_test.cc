@@ -261,11 +261,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     return !verifier_deps_->GetVerifiedClasses(dex_file)[class_def_idx];
   }
 
-  bool HasRedefinedClass(const std::string& cls) {
-    uint16_t class_def_idx = GetClassDefIndex(cls, *primary_dex_file_);
-    return verifier_deps_->GetRedefinedClasses(*primary_dex_file_)[class_def_idx];
-  }
-
   // Iterates over all assignability records and tries to find an entry which
   // matches the expected destination/source pair.
   bool HasAssignable(const std::string& expected_destination,
@@ -300,24 +295,18 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     bool has_assignability = false;
     bool has_verified_classes = false;
     bool has_unverified_classes = false;
-    bool has_redefined_classes = false;
-    bool has_not_redefined_classes = false;
 
     for (auto& entry : verifier_deps_->dex_deps_) {
       has_strings |= !entry.second->strings_.empty();
       has_assignability |= !entry.second->assignable_types_.empty();
       has_verified_classes |= HasBoolValue(entry.second->verified_classes_, true);
       has_unverified_classes |= HasBoolValue(entry.second->verified_classes_, false);
-      has_redefined_classes |= HasBoolValue(entry.second->redefined_classes_, true);
-      has_not_redefined_classes |= HasBoolValue(entry.second->redefined_classes_, false);
     }
 
     return has_strings &&
            has_assignability &&
            has_verified_classes &&
-           has_unverified_classes &&
-           has_redefined_classes &&
-           has_not_redefined_classes;
+           has_unverified_classes;
   }
 
   // Load the dex file again with a new class loader, decode the VerifierDeps
@@ -344,7 +333,6 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
 
     return decoded_deps.ValidateDependencies(soa.Self(),
                                              new_class_loader,
-                                             std::vector<const DexFile*>(),
                                              error_msg);
   }
 
@@ -542,12 +530,6 @@ TEST_F(VerifierDepsTest, UnverifiedClasses) {
   ASSERT_TRUE(HasUnverifiedClass("LMyClassWithNoSuper;"));
   // Test that a class with unresolved super and hard failure is recorded.
   ASSERT_TRUE(HasUnverifiedClass("LMyClassWithNoSuperButFailures;"));
-}
-
-TEST_F(VerifierDepsTest, RedefinedClass) {
-  VerifyDexFile();
-  // Test that a class which redefines a boot classpath class has dependencies recorded.
-  ASSERT_TRUE(HasRedefinedClass("Ljava/net/SocketTimeoutException;"));
 }
 
 TEST_F(VerifierDepsTest, UnverifiedOrder) {
