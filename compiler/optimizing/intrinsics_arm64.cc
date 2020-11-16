@@ -1327,7 +1327,7 @@ void IntrinsicLocationsBuilderARM64::VisitUnsafeCASLong(HInvoke* invoke) {
 }
 void IntrinsicLocationsBuilderARM64::VisitUnsafeCASObject(HInvoke* invoke) {
   // The only read barrier implementation supporting the
-  // UnsafeCASObject intrinsic is the Baker-style read barriers.
+  // UnsafeCASObject intrinsic is the Baker-style read barriers. b/173104084
   if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
     return;
   }
@@ -3777,8 +3777,13 @@ static void GenerateVarHandleAccessModeAndVarTypeChecks(HInvoke* invoke,
   codegen->GetAssembler()->MaybeUnpoisonHeapReference(var_type_no_rb);
   __ Tbz(temp2, static_cast<uint32_t>(access_mode), slow_path->GetEntryLabel());
   __ Ldrh(temp2, HeapOperand(var_type_no_rb, primitive_type_offset.Int32Value()));
-  __ Cmp(temp2, static_cast<uint16_t>(primitive_type));
-  __ B(slow_path->GetEntryLabel(), ne);
+  if (primitive_type == Primitive::kPrimNot) {
+    static_assert(Primitive::kPrimNot == 0);
+    __ Cbnz(temp2, slow_path->GetEntryLabel());
+  } else {
+    __ Cmp(temp2, static_cast<uint16_t>(primitive_type));
+    __ B(slow_path->GetEntryLabel(), ne);
+  }
 
   temps.Release(temp2);
 
@@ -3862,35 +3867,48 @@ static void GenerateVarHandleFieldCheck(HInvoke* invoke,
   }
 }
 
-static void GenerateVarHandleFieldReference(HInvoke* invoke,
-                                            CodeGeneratorARM64* codegen,
-                                            Register object,
-                                            Register offset) {
+struct VarHandleTarget {
+  Register object;  // The object holding the value to operate on.
+  Register offset;  // The offset of the value to operate on.
+};
+
+static VarHandleTarget GenerateVarHandleTarget(HInvoke* invoke, CodeGeneratorARM64* codegen) {
   MacroAssembler* masm = codegen->GetVIXLAssembler();
   Register varhandle = InputRegisterAt(invoke, 0);
   size_t expected_coordinates_count = GetExpectedVarHandleCoordinatesCount(invoke);
   DCHECK_LE(expected_coordinates_count, 1u);
+  LocationSummary* locations = invoke->GetLocations();
 
-  // For static fields, we need to fill the `object` with the declaring class, so
-  // we can use `object` as temporary for the `ArtMethod*`. For instance fields,
+  VarHandleTarget target;
+  // The temporary allocated for loading the offset.
+  target.offset = WRegisterFrom(locations->GetTemp((expected_coordinates_count == 0u) ? 1u : 0u));
+  // The reference to the object that holds the field to operate on.
+  target.object = (expected_coordinates_count == 0u)
+      ? WRegisterFrom(locations->GetTemp(0u))
+      : InputRegisterAt(invoke, 1);
+
+  // For static fields, we need to fill the `target.object` with the declaring class,
+  // so we can use `target.object` as temporary for the `ArtMethod*`. For instance fields,
   // we do not need the declaring class, so we can forget the `ArtMethod*` when
-  // we load the `offset`, so use the `offset` to hold the `ArtMethod*`.
-  Register method = (expected_coordinates_count == 0) ? object : offset;
+  // we load the `target.offset`, so use the `target.offset` to hold the `ArtMethod*`.
+  Register method = (expected_coordinates_count == 0) ? target.object : target.offset;
 
   const MemberOffset art_field_offset = mirror::FieldVarHandle::ArtFieldOffset();
   const MemberOffset offset_offset = ArtField::OffsetOffset();
 
   // Load the ArtField, the offset and, if needed, declaring class.
   __ Ldr(method.X(), HeapOperand(varhandle, art_field_offset.Int32Value()));
-  __ Ldr(offset, MemOperand(method.X(), offset_offset.Int32Value()));
+  __ Ldr(target.offset, MemOperand(method.X(), offset_offset.Int32Value()));
   if (expected_coordinates_count == 0u) {
     codegen->GenerateGcRootFieldLoad(invoke,
-                                     LocationFrom(object),
+                                     LocationFrom(target.object),
                                      method.X(),
                                      ArtField::DeclaringClassOffset().Int32Value(),
                                      /*fixup_label=*/ nullptr,
                                      kCompilerReadBarrierOption);
   }
+
+  return target;
 }
 
 static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
@@ -3992,6 +4010,17 @@ static LocationSummary* CreateVarHandleFieldLocations(HInvoke* invoke) {
       locations->SetInAt(arg_index, Location::RequiresRegister());
     }
   }
+
+  // Add a temporary for offset.
+  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
+      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {  // For static fields.
+    // To preserve the offset value across the non-Baker read barrier slow path
+    // for loading the declaring class, use a fixed callee-save register.
+    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+  } else {
+    locations->AddTemp(Location::RequiresRegister());
+  }
+
   return locations;
 }
 
@@ -4006,22 +4035,11 @@ static void CreateVarHandleGetLocations(HInvoke* invoke) {
       invoke->GetIntrinsic() != Intrinsics::kVarHandleGetOpaque) {
     // Unsupported for non-Baker read barrier because the artReadBarrierSlow() ignores
     // the passed reference and reloads it from the field. This gets the memory visibility
-    // wrong for Acquire/Volatile operations.
+    // wrong for Acquire/Volatile operations. b/173104084
     return;
   }
 
-  LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
-
-  // Add a temporary for offset if we cannot use the output register.
-  if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
-    // To preserve the offset value across the non-Baker read barrier slow path
-    // for loading the declaring class, use a fixed callee-save register.
-    // For simplicity, use this also for instance fields, even though we could use
-    // the output register for primitives and an arbitrary temporary for references.
-    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
-  } else if (DataType::IsFloatingPointType(invoke->GetType())) {
-    locations->AddTemp(Location::RequiresRegister());
-  }
+  CreateVarHandleFieldLocations(invoke);
 }
 
 static void GenerateVarHandleGet(HInvoke* invoke,
@@ -4044,31 +4062,22 @@ static void GenerateVarHandleGet(HInvoke* invoke,
   GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
   GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, type);
 
-  // Use `out` for offset if it is a core register, except for non-Baker read barrier.
-  Register offset =
-      ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) || DataType::IsFloatingPointType(type))
-          ? WRegisterFrom(locations->GetTemp(expected_coordinates_count == 0u ? 1u : 0u))
-          : out.W();
-  // The object reference from which to load the field.
-  Register object = (expected_coordinates_count == 0u)
-      ? WRegisterFrom(locations->GetTemp(0u))
-      : InputRegisterAt(invoke, 1);
-
-  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
+  VarHandleTarget target = GenerateVarHandleTarget(invoke, codegen);
 
   // Load the value from the field.
   if (type == DataType::Type::kReference && kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
     // Piggy-back on the field load path using introspection for the Baker read barrier.
-    // The `offset` is either the `out` or a temporary, use it for field address.
-    __ Add(offset.X(), object.X(), offset.X());
+    // The `target.offset` is a temporary, use it for field address.
+    Register tmp_ptr = target.offset.X();
+    __ Add(tmp_ptr, target.object.X(), target.offset.X());
     codegen->GenerateFieldLoadWithBakerReadBarrier(invoke,
                                                    locations->Out(),
-                                                   object,
-                                                   MemOperand(offset.X()),
+                                                   target.object,
+                                                   MemOperand(tmp_ptr),
                                                    /*needs_null_check=*/ false,
                                                    use_load_acquire);
   } else {
-    MemOperand address(object.X(), offset.X());
+    MemOperand address(target.object.X(), target.offset.X());
     if (use_load_acquire) {
       codegen->LoadAcquire(invoke, out, address, /*needs_null_check=*/ false);
     } else {
@@ -4077,8 +4086,8 @@ static void GenerateVarHandleGet(HInvoke* invoke,
     if (type == DataType::Type::kReference) {
       DCHECK(out.IsW());
       Location out_loc = locations->Out();
-      Location object_loc = LocationFrom(object);
-      Location offset_loc = LocationFrom(offset);
+      Location object_loc = LocationFrom(target.object);
+      Location offset_loc = LocationFrom(target.offset);
       codegen->MaybeGenerateReadBarrierSlow(invoke, out_loc, out_loc, object_loc, 0u, offset_loc);
     }
   }
@@ -4124,17 +4133,7 @@ static void CreateVarHandleSetLocations(HInvoke* invoke) {
     return;
   }
 
-  LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
-
-  // Add a temporary for offset.
-  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
-      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {
-    // To preserve the offset value across the non-Baker read barrier slow path
-    // for loading the declaring class, use a fixed callee-save register.
-    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
-  } else {
-    locations->AddTemp(Location::RequiresRegister());
-  }
+  CreateVarHandleFieldLocations(invoke);
 }
 
 static void GenerateVarHandleSet(HInvoke* invoke,
@@ -4156,15 +4155,7 @@ static void GenerateVarHandleSet(HInvoke* invoke,
   GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
   GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, value_type);
 
-  // The temporary allocated for loading `offset`.
-  Register offset =
-      WRegisterFrom(invoke->GetLocations()->GetTemp((expected_coordinates_count == 0u) ? 1u : 0u));
-  // The object reference to which to store the field.
-  Register object = (expected_coordinates_count == 0u)
-      ? WRegisterFrom(invoke->GetLocations()->GetTemp(0u))
-      : InputRegisterAt(invoke, 1);
-
-  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
+  VarHandleTarget target = GenerateVarHandleTarget(invoke, codegen);
 
   // Store the value to the field.
   {
@@ -4177,7 +4168,7 @@ static void GenerateVarHandleSet(HInvoke* invoke,
       codegen->GetAssembler()->PoisonHeapReference(temp);
       source = temp;
     }
-    MemOperand address(object.X(), offset.X());
+    MemOperand address(target.object.X(), target.offset.X());
     if (use_store_release) {
       codegen->StoreRelease(invoke, value_type, source, address, /*needs_null_check=*/ false);
     } else {
@@ -4186,7 +4177,7 @@ static void GenerateVarHandleSet(HInvoke* invoke,
   }
 
   if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(value_index))) {
-    codegen->MarkGCCard(object, Register(value), /*value_can_be_null=*/ true);
+    codegen->MarkGCCard(target.object, Register(value), /*value_can_be_null=*/ true);
   }
 
   __ Bind(slow_path->GetExitLabel());
@@ -4240,24 +4231,18 @@ static void CreateVarHandleCompareAndSetOrExchangeLocations(HInvoke* invoke, boo
     // reference to the same object as `old_value`, breaking slow path assumptions. And
     // for CompareAndExchange, marking the old value after comparison failure may actually
     // return the reference to `expected`, erroneously indicating success even though we
-    // did not set the new value. (And it also gets the memory visibility wrong.)
+    // did not set the new value. (And it also gets the memory visibility wrong.) b/173104084
     return;
   }
 
   LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
 
-  // Add a temporary for offset.
   if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
-      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {
-    // To preserve the offset value across the non-Baker read barrier slow path
-    // for loading the declaring class, use a fixed callee-save register.
-    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {  // For static fields.
     // Not implemented for references, see above.
-    // Note that we would also need a callee-save register instead of the temporary
+    // Note that we would need a callee-save register instead of the temporary
     // reserved in CreateVarHandleFieldLocations() for the class object.
     DCHECK_NE(value_type, DataType::Type::kReference);
-  } else {
-    locations->AddTemp(Location::RequiresRegister());
   }
   if (!return_success && DataType::IsFloatingPointType(value_type)) {
     // Add a temporary for old value and exclusive store result if floating point
@@ -4321,31 +4306,23 @@ static void GenerateVarHandleCompareAndSetOrExchange(HInvoke* invoke,
   GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
   GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, value_type);
 
-  // The temporary allocated for loading `offset`.
-  Register offset =
-      WRegisterFrom(locations->GetTemp((expected_coordinates_count == 0u) ? 1u : 0u));
-  // The object reference in which to CAS the field.
-  Register object = (expected_coordinates_count == 0u)
-      ? WRegisterFrom(locations->GetTemp(0u))
-      : InputRegisterAt(invoke, 1);
-
-  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
+  VarHandleTarget target = GenerateVarHandleTarget(invoke, codegen);
 
   // This needs to be before the temp registers, as MarkGCCard also uses VIXL temps.
   if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(new_value_index))) {
     // Mark card for object assuming new value is stored.
     bool new_value_can_be_null = true;  // TODO: Worth finding out this information?
-    codegen->MarkGCCard(object, new_value.W(), new_value_can_be_null);
+    codegen->MarkGCCard(target.object, new_value.W(), new_value_can_be_null);
   }
 
   // Reuse the `offset` temporary for the pointer to the field, except
   // for references that need the offset for the read barrier.
   UseScratchRegisterScope temps(masm);
-  Register tmp_ptr = offset.X();
+  Register tmp_ptr = target.offset.X();
   if (kEmitCompilerReadBarrier && value_type == DataType::Type::kReference) {
     tmp_ptr = temps.AcquireX();
   }
-  __ Add(tmp_ptr, object.X(), offset.X());
+  __ Add(tmp_ptr, target.object.X(), target.offset.X());
 
   // Move floating point values to temporaries.
   // Note that float/double CAS uses bitwise comparison, rather than the operator==.
@@ -4399,8 +4376,8 @@ static void GenerateVarHandleCompareAndSetOrExchange(HInvoke* invoke,
             invoke,
             order,
             strong,
-            object,
-            offset.X(),
+            target.object,
+            target.offset.X(),
             expected_reg,
             new_value_reg,
             old_value,
@@ -4521,21 +4498,12 @@ static void CreateVarHandleGetAndSetLocations(HInvoke* invoke) {
       invoke->GetType() == DataType::Type::kReference) {
     // Unsupported for non-Baker read barrier because the artReadBarrierSlow() ignores
     // the passed reference and reloads it from the field, thus seeing the new value
-    // that we have just stored. (And it also gets the memory visibility wrong.)
+    // that we have just stored. (And it also gets the memory visibility wrong.) b/173104084
     return;
   }
 
   LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
 
-  // Add a temporary for offset.
-  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
-      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {
-    // To preserve the offset value across the non-Baker read barrier slow path
-    // for loading the declaring class, use a fixed callee-save register.
-    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
-  } else {
-    locations->AddTemp(Location::RequiresRegister());
-  }
   if (DataType::IsFloatingPointType(invoke->GetType()) &&
       !IsConstantZeroBitPattern(invoke->InputAt(invoke->GetNumberOfArguments() - 1u))) {
     // Add a temporary for `old_value` if floating point `new_value` takes a scratch register.
@@ -4564,32 +4532,24 @@ static void GenerateVarHandleGetAndSet(HInvoke* invoke,
   GenerateVarHandleFieldCheck(invoke, codegen, slow_path);
   GenerateVarHandleAccessModeAndVarTypeChecks(invoke, codegen, slow_path, value_type);
 
-  // The temporary allocated for loading `offset`.
-  Register offset =
-      WRegisterFrom(locations->GetTemp((expected_coordinates_count == 0u) ? 1u : 0u));
-  // The object reference in which to CAS the field.
-  Register object = (expected_coordinates_count == 0u)
-      ? WRegisterFrom(locations->GetTemp(0u))
-      : InputRegisterAt(invoke, 1);
-
-  GenerateVarHandleFieldReference(invoke, codegen, object, offset);
+  VarHandleTarget target = GenerateVarHandleTarget(invoke, codegen);
 
   // This needs to be before the temp registers, as MarkGCCard also uses VIXL temps.
   if (CodeGenerator::StoreNeedsWriteBarrier(value_type, invoke->InputAt(new_value_index))) {
     // Mark card for object, the new value shall be stored.
     bool new_value_can_be_null = true;  // TODO: Worth finding out this information?
-    codegen->MarkGCCard(object, new_value.W(), new_value_can_be_null);
+    codegen->MarkGCCard(target.object, new_value.W(), new_value_can_be_null);
   }
 
-  // Reuse the `offset` temporary for the pointer to the field, except
+  // Reuse the `target.offset` temporary for the pointer to the field, except
   // for references that need the offset for the non-Baker read barrier.
   UseScratchRegisterScope temps(masm);
-  Register tmp_ptr = offset.X();
+  Register tmp_ptr = target.offset.X();
   if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
       value_type == DataType::Type::kReference) {
     tmp_ptr = temps.AcquireX();
   }
-  __ Add(tmp_ptr, object.X(), offset.X());
+  __ Add(tmp_ptr, target.object.X(), target.offset.X());
 
   // Move floating point value to temporary.
   Register new_value_reg = MoveToTempIfFpRegister(new_value, value_type, masm, &temps);
@@ -4628,9 +4588,9 @@ static void GenerateVarHandleGetAndSet(HInvoke* invoke,
           invoke,
           Location::RegisterLocation(out.W().GetCode()),
           Location::RegisterLocation(old_value.GetCode()),
-          Location::RegisterLocation(object.GetCode()),
+          Location::RegisterLocation(target.object.GetCode()),
           /*offset=*/ 0u,
-          /*index=*/ Location::RegisterLocation(offset.GetCode()));
+          /*index=*/ Location::RegisterLocation(target.offset.GetCode()));
     }
   }
   __ Bind(slow_path->GetExitLabel());
