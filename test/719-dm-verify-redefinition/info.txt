@@ -1,2 +1,0 @@
-Verifies that the vdex file from a DexMetadata archive is discarded
-if the app redefines boot classes.

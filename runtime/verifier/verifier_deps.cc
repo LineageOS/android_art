@@ -76,7 +76,6 @@ void VerifierDeps::MergeWith(std::unique_ptr<VerifierDeps> other,
       my_deps->assignable_types_[i].merge(other_deps.assignable_types_[i]);
     }
     BitVectorOr(my_deps->verified_classes_, other_deps.verified_classes_);
-    BitVectorOr(my_deps->redefined_classes_, other_deps.redefined_classes_);
   }
 }
 
@@ -286,25 +285,17 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
   }
 }
 
-void VerifierDeps::MaybeRecordClassRedefinition(const DexFile& dex_file,
-                                                const dex::ClassDef& class_def) {
-  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
-  if (thread_deps != nullptr) {
-    DexFileDeps* dex_deps = thread_deps->GetDexFileDeps(dex_file);
-    DCHECK_EQ(dex_deps->redefined_classes_.size(), dex_file.NumClassDefs());
-    dex_deps->redefined_classes_[dex_file.GetIndexForClassDef(class_def)] = true;
-  }
-}
-
 void VerifierDeps::MaybeRecordVerificationStatus(const DexFile& dex_file,
                                                  const dex::ClassDef& class_def,
                                                  FailureKind failure_kind) {
-  // The `verified_classes_` bit vector is initialized to `false`.
-  // Only continue if we are about to write `true`.
-  if (failure_kind == FailureKind::kNoFailure) {
-    VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
-    if (thread_deps != nullptr) {
+  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
+  if (thread_deps != nullptr) {
+    if (failure_kind == FailureKind::kNoFailure) {
       thread_deps->RecordClassVerified(dex_file, class_def);
+    } else {
+      DexFileDeps* dex_deps = thread_deps->GetDexFileDeps(dex_file);
+      uint16_t index = dex_file.GetIndexForClassDef(class_def);
+      dex_deps->assignable_types_[index].clear();
     }
   }
 }
@@ -339,9 +330,6 @@ namespace {
 
 template<typename T> inline uint32_t Encode(T in);
 
-template<> inline uint32_t Encode<uint16_t>(uint16_t in) {
-  return in;
-}
 template<> inline uint32_t Encode<dex::StringIndex>(dex::StringIndex in) {
   return in.index_;
 }
@@ -388,38 +376,75 @@ static inline bool DecodeTuple(const uint8_t** in, const uint8_t* end, std::tupl
   return true;
 }
 
+// Marker to know whether a class is verified. A non-verified class will have
+// this marker as its offset entry in the encoded data.
+static uint32_t constexpr kNotVerifiedMarker = std::numeric_limits<uint32_t>::max();
+
+static void SetUint32InUint8Array(std::vector<uint8_t>* out,
+                                  uint32_t uint8_offset,
+                                  uint32_t uint32_offset,
+                                  uint32_t value) {
+  DCHECK(IsAligned<sizeof(uint32_t)>(out->data() + uint8_offset));
+  (reinterpret_cast<uint32_t*>(out->data() + uint8_offset))[uint32_offset] = value;
+}
+
 template<typename T>
-static inline void EncodeSetVector(std::vector<uint8_t>* out,
-                                   const std::vector<std::set<T>>& vector) {
-  EncodeUnsignedLeb128(out, vector.size());
+static void EncodeSetVector(std::vector<uint8_t>* out,
+                            const std::vector<std::set<T>>& vector,
+                            const std::vector<bool>& verified_classes) {
+  uint32_t offsets_index = out->size();
+  // Make room for offsets for each class, +1 for marking the end of the
+  // assignability types data.
+  out->resize(out->size() + (vector.size() + 1) * sizeof(uint32_t));
+  uint32_t class_def_index = 0;
   for (const std::set<T>& set : vector) {
-    EncodeUnsignedLeb128(out, set.size());
-    for (const T& entry : set) {
-      EncodeTuple(out, entry);
+    if (verified_classes[class_def_index]) {
+      // Store the offset of the set for this class.
+      SetUint32InUint8Array(out, offsets_index, class_def_index, out->size());
+      for (const T& entry : set) {
+        EncodeTuple(out, entry);
+      }
+    } else {
+      SetUint32InUint8Array(out, offsets_index, class_def_index, kNotVerifiedMarker);
     }
+    class_def_index++;
   }
+  SetUint32InUint8Array(out, offsets_index, class_def_index, out->size());
 }
 
 template<bool kFillSet, typename T>
-static inline bool DecodeSetVector(const uint8_t** in,
-                                   const uint8_t* end,
-                                   std::vector<std::set<T>>* vector) {
-  uint32_t num_entries;
-  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_entries))) {
-    return false;
-  }
-  if (kIsDebugBuild && kFillSet) {
-    DCHECK_EQ(vector->size(), num_entries);
-  }
-  for (uint32_t i = 0; i < num_entries; ++i) {
-    uint32_t set_entries;
-    if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &set_entries))) {
-      return false;
+static bool DecodeSetVector(const uint8_t** cursor,
+                            const uint8_t* start,
+                            const uint8_t* end,
+                            std::vector<std::set<T>>* vector,
+                            std::vector<bool>* verified_classes,
+                            size_t num_class_defs) {
+  const uint32_t* offsets = reinterpret_cast<const uint32_t*>(*cursor);
+  uint32_t next_valid_offset_index = 1;
+  // Put the cursor after the offsets of each class, +1 for the offset of the
+  // end of the assignable types data.
+  *cursor += (num_class_defs + 1) * sizeof(uint32_t);
+  for (uint32_t i = 0; i < num_class_defs; ++i) {
+    uint32_t offset = offsets[i];
+    if (offset == kNotVerifiedMarker) {
+      (*verified_classes)[i] = false;
+      continue;
     }
+    (*verified_classes)[i] = true;
+    *cursor = start + offset;
+    // Fetch the assignability checks.
     std::set<T>& set = (*vector)[i];
-    for (uint32_t j = 0; j < set_entries; ++j) {
+    // Find the offset of the next entry. This will tell us where to stop when
+    // reading the checks. Note that the last entry in the `offsets` array points
+    // to the end of the assignability types data, so the loop will terminate correctly.
+    while (next_valid_offset_index <= i || offsets[next_valid_offset_index] == kNotVerifiedMarker) {
+      next_valid_offset_index++;
+    }
+    const uint8_t* set_end = start + offsets[next_valid_offset_index];
+    // Decode each check.
+    while (*cursor < set_end) {
       T tuple;
-      if (UNLIKELY(!DecodeTuple(in, end, &tuple))) {
+      if (UNLIKELY(!DecodeTuple(cursor, end, &tuple))) {
         return false;
       }
       if (kFillSet) {
@@ -427,52 +452,24 @@ static inline bool DecodeSetVector(const uint8_t** in,
       }
     }
   }
-  return true;
-}
-
-static inline void EncodeUint16SparseBitVector(std::vector<uint8_t>* out,
-                                               const std::vector<bool>& vector,
-                                               bool sparse_value) {
-  DCHECK(IsUint<16>(vector.size()));
-  EncodeUnsignedLeb128(out, std::count(vector.begin(), vector.end(), sparse_value));
-  for (uint16_t idx = 0; idx < vector.size(); ++idx) {
-    if (vector[idx] == sparse_value) {
-      EncodeUnsignedLeb128(out, Encode(idx));
-    }
-  }
-}
-
-template<bool kFillVector>
-static inline bool DecodeUint16SparseBitVector(const uint8_t** in,
-                                               const uint8_t* end,
-                                               size_t num_class_defs,
-                                               bool sparse_value,
-                                               /*out*/std::vector<bool>* vector) {
-  if (kFillVector) {
-    DCHECK_EQ(vector->size(), num_class_defs);
-    DCHECK(IsUint<16>(vector->size()));
-    std::fill(vector->begin(), vector->end(), !sparse_value);
-  }
-  uint32_t num_entries;
-  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_entries))) {
-    return false;
-  }
-  for (uint32_t i = 0; i < num_entries; ++i) {
-    uint32_t idx;
-    if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &idx)) || idx >= vector->size()) {
-      return false;
-    }
-    if (kFillVector) {
-      (*vector)[idx] = sparse_value;
-    }
-  }
+  // Align the cursor to start decoding the strings.
+  cursor = AlignUp(cursor, sizeof(uint32_t));
   return true;
 }
 
 static inline void EncodeStringVector(std::vector<uint8_t>* out,
                                       const std::vector<std::string>& strings) {
-  EncodeUnsignedLeb128(out, strings.size());
+  uint32_t offsets_index = out->size();
+  // Make room for offsets for each string, +1 for putting the number of
+  // strings.
+  out->resize(out->size() + (strings.size() + 1 ) * sizeof(uint32_t));
+  (reinterpret_cast<uint32_t*>(out->data() + offsets_index))[0] = strings.size();
+  uint32_t string_index = 1;
   for (const std::string& str : strings) {
+    // Store the offset of the string.
+    (reinterpret_cast<uint32_t*>(out->data() + offsets_index))[string_index++] = out->size();
+
+    // Store the string data.
     const uint8_t* data = reinterpret_cast<const uint8_t*>(str.c_str());
     size_t length = str.length() + 1;
     out->insert(out->end(), data, data + length);
@@ -481,20 +478,22 @@ static inline void EncodeStringVector(std::vector<uint8_t>* out,
 }
 
 template<bool kFillVector>
-static inline bool DecodeStringVector(const uint8_t** in,
+static inline bool DecodeStringVector(const uint8_t** cursor,
+                                      const uint8_t* start,
                                       const uint8_t* end,
                                       std::vector<std::string>* strings) {
   DCHECK(strings->empty());
-  uint32_t num_strings;
-  if (UNLIKELY(!DecodeUnsignedLeb128Checked(in, end, &num_strings))) {
-    return false;
-  }
+  uint32_t num_strings = reinterpret_cast<const uint32_t*>(*cursor)[0];
   if (kFillVector) {
     strings->reserve(num_strings);
   }
+  const uint8_t* offsets = *cursor;
+  *cursor += sizeof(uint32_t) + num_strings * sizeof(uint32_t);
   for (uint32_t i = 0; i < num_strings; ++i) {
-    const char* string_start = reinterpret_cast<const char*>(*in);
-    const char* string_end = reinterpret_cast<const char*>(memchr(string_start, 0, end - *in));
+    uint32_t string_offset = reinterpret_cast<const uint32_t*>(offsets)[i + 1];
+    const char* string_start = reinterpret_cast<const char*>(start + string_offset);
+    const char* string_end = reinterpret_cast<const char*>(
+        memchr(string_start, 0, end - start - string_offset));
     if (UNLIKELY(string_end == nullptr)) {
       return false;
     }
@@ -502,7 +501,7 @@ static inline bool DecodeStringVector(const uint8_t** in,
     if (kFillVector) {
       strings->emplace_back(string_start, string_length);
     }
-    *in += string_length + 1;
+    *cursor = reinterpret_cast<const uint8_t*>(string_end + 1);
   }
   return true;
 }
@@ -511,29 +510,37 @@ static inline bool DecodeStringVector(const uint8_t** in,
 
 void VerifierDeps::Encode(const std::vector<const DexFile*>& dex_files,
                           std::vector<uint8_t>* buffer) const {
+  uint32_t offset = buffer->size();
+  buffer->resize(buffer->size() + dex_files.size() * sizeof(uint32_t));
+  uint32_t dex_file_index = 0;
   for (const DexFile* dex_file : dex_files) {
+    // Four byte alignment before encoding the data.
+    buffer->resize(RoundUp(buffer->size(), sizeof(uint32_t)));
+    (reinterpret_cast<uint32_t*>(buffer->data() + offset))[dex_file_index++] = buffer->size();
     const DexFileDeps& deps = *GetDexFileDeps(*dex_file);
+    EncodeSetVector(buffer, deps.assignable_types_, deps.verified_classes_);
+    // Four byte alignment before encoding strings.
+    buffer->resize(RoundUp(buffer->size(), sizeof(uint32_t)));
     EncodeStringVector(buffer, deps.strings_);
-    EncodeSetVector(buffer, deps.assignable_types_);
-    EncodeUint16SparseBitVector(buffer, deps.verified_classes_, /* sparse_value= */ false);
-    EncodeUint16SparseBitVector(buffer, deps.redefined_classes_, /* sparse_value= */ true);
   }
 }
 
 template <bool kOnlyVerifiedClasses>
 bool VerifierDeps::DecodeDexFileDeps(DexFileDeps& deps,
-                                     const uint8_t** data_start,
+                                     const uint8_t** cursor,
+                                     const uint8_t* data_start,
                                      const uint8_t* data_end,
                                      size_t num_class_defs) {
   return
-      DecodeStringVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
-          data_start, data_end, &deps.strings_) &&
       DecodeSetVector</*kFillSet=*/ !kOnlyVerifiedClasses>(
-          data_start, data_end, &deps.assignable_types_) &&
-      DecodeUint16SparseBitVector</*kFillVector=*/ true>(
-          data_start, data_end, num_class_defs, /*sparse_value=*/ false, &deps.verified_classes_) &&
-      DecodeUint16SparseBitVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
-          data_start, data_end, num_class_defs, /*sparse_value=*/ true, &deps.redefined_classes_);
+          cursor,
+          data_start,
+          data_end,
+          &deps.assignable_types_,
+          &deps.verified_classes_,
+          num_class_defs) &&
+      DecodeStringVector</*kFillVector=*/ !kOnlyVerifiedClasses>(
+          cursor, data_start, data_end, &deps.strings_);
 }
 
 bool VerifierDeps::ParseStoredData(const std::vector<const DexFile*>& dex_files,
@@ -546,11 +553,16 @@ bool VerifierDeps::ParseStoredData(const std::vector<const DexFile*>& dex_files,
   }
   const uint8_t* data_start = data.data();
   const uint8_t* data_end = data_start + data.size();
+  const uint8_t* cursor = data_start;
+  uint32_t dex_file_index = 0;
   for (const DexFile* dex_file : dex_files) {
     DexFileDeps* deps = GetDexFileDeps(*dex_file);
+    // Fetch the offset of this dex file's verifier data.
+    cursor = data_start + reinterpret_cast<const uint32_t*>(data_start)[dex_file_index++];
     size_t num_class_defs = dex_file->NumClassDefs();
     if (UNLIKELY(!DecodeDexFileDeps</*kOnlyVerifiedClasses=*/ false>(*deps,
-                                                                     &data_start,
+                                                                     &cursor,
+                                                                     data_start,
                                                                      data_end,
                                                                      num_class_defs))) {
       LOG(ERROR) << "Failed to parse dex file dependencies for " << dex_file->GetLocation();
@@ -573,12 +585,17 @@ bool VerifierDeps::ParseVerifiedClasses(
 
   const uint8_t* data_start = data.data();
   const uint8_t* data_end = data_start + data.size();
+  const uint8_t* cursor = data_start;
+  uint32_t dex_file_index = 0;
   for (const DexFile* dex_file : dex_files) {
-    DexFileDeps deps(/*num_class_defs=*/ 0u);  // Do not initialize sparse bool vectors.
+    DexFileDeps deps(/*num_class_defs=*/ 0u);  // Do not initialize vectors.
+    // Fetch the offset of this dex file's verifier data.
+    cursor = data_start + reinterpret_cast<const uint32_t*>(data_start)[dex_file_index++];
     size_t num_class_defs = dex_file->NumClassDefs();
     deps.verified_classes_.resize(num_class_defs);
     if (UNLIKELY(!DecodeDexFileDeps</*kOnlyVerifiedClasses=*/ true>(deps,
-                                                                    &data_start,
+                                                                    &cursor,
+                                                                    data_start,
                                                                     data_end,
                                                                     num_class_defs))) {
       LOG(ERROR) << "Failed to parse dex file dependencies for " << dex_file->GetLocation();
@@ -675,10 +692,9 @@ void VerifierDeps::Dump(VariableIndentationOutputStream* vios) const {
 
 bool VerifierDeps::ValidateDependencies(Thread* self,
                                         Handle<mirror::ClassLoader> class_loader,
-                                        const std::vector<const DexFile*>& classpath,
                                         /* out */ std::string* error_msg) const {
   for (const auto& entry : dex_deps_) {
-    if (!VerifyDexFile(class_loader, *entry.first, *entry.second, classpath, self, error_msg)) {
+    if (!VerifyDexFile(class_loader, *entry.first, *entry.second, self, error_msg)) {
       return false;
     }
   }
@@ -703,7 +719,6 @@ static ObjPtr<mirror::Class> FindClassAndClearException(ClassLinker* class_linke
 bool VerifierDeps::VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
                                        const DexFile& dex_file,
                                        const std::vector<std::set<TypeAssignability>>& assignables,
-                                       bool expected_assignability,
                                        Thread* self,
                                        /* out */ std::string* error_msg) const {
   StackHandleScope<2> hs(self);
@@ -728,84 +743,23 @@ bool VerifierDeps::VerifyAssignability(Handle<mirror::ClassLoader> class_loader,
       }
 
       DCHECK(destination->IsResolved() && source->IsResolved());
-      if (destination->IsAssignableFrom(source.Get()) != expected_assignability) {
-        *error_msg = "Class " + destination_desc + (expected_assignability ? " not " : " ") +
-            "assignable from " + source_desc;
+      if (!destination->IsAssignableFrom(source.Get())) {
+        *error_msg = "Class " + destination_desc + " not assignable from " + source_desc;
         return false;
       }
     }
   }
-  return true;
-}
-
-bool VerifierDeps::IsInDexFiles(const char* descriptor,
-                                size_t hash,
-                                const std::vector<const DexFile*>& dex_files,
-                                /* out */ const DexFile** out_dex_file) const {
-  for (const DexFile* dex_file : dex_files) {
-    if (OatDexFile::FindClassDef(*dex_file, descriptor, hash) != nullptr) {
-      *out_dex_file = dex_file;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool VerifierDeps::VerifyInternalClasses(const DexFile& dex_file,
-                                         const std::vector<const DexFile*>& classpath,
-                                         const std::vector<bool>& verified_classes,
-                                         const std::vector<bool>& redefined_classes,
-                                         /* out */ std::string* error_msg) const {
-  const std::vector<const DexFile*>& boot_classpath =
-      Runtime::Current()->GetClassLinker()->GetBootClassPath();
-
-  for (ClassAccessor accessor : dex_file.GetClasses()) {
-    const char* descriptor = accessor.GetDescriptor();
-
-    const uint16_t class_def_index = accessor.GetClassDefIndex();
-    if (redefined_classes[class_def_index]) {
-      if (verified_classes[class_def_index]) {
-        *error_msg = std::string("Class ") + descriptor + " marked both verified and redefined";
-        return false;
-      }
-
-      // Class was not verified under these dependencies. No need to check it further.
-      continue;
-    }
-
-    // Check that the class resolved into the same dex file. Otherwise there is
-    // a different class with the same descriptor somewhere in one of the parent
-    // class loaders.
-    const size_t hash = ComputeModifiedUtf8Hash(descriptor);
-    const DexFile* cp_dex_file = nullptr;
-    if (IsInDexFiles(descriptor, hash, boot_classpath, &cp_dex_file) ||
-        IsInDexFiles(descriptor, hash, classpath, &cp_dex_file)) {
-      *error_msg = std::string("Class ") + descriptor
-          + " redefines a class in the classpath "
-          + "(dexFile expected=" + dex_file.GetLocation()
-          + ", actual=" + cp_dex_file->GetLocation() + ")";
-      return false;
-    }
-  }
-
   return true;
 }
 
 bool VerifierDeps::VerifyDexFile(Handle<mirror::ClassLoader> class_loader,
                                  const DexFile& dex_file,
                                  const DexFileDeps& deps,
-                                 const std::vector<const DexFile*>& classpath,
                                  Thread* self,
                                  /* out */ std::string* error_msg) const {
-  return VerifyInternalClasses(dex_file,
-                               classpath,
-                               deps.verified_classes_,
-                               deps.redefined_classes_,
-                               error_msg) &&
-         VerifyAssignability(class_loader,
+  return VerifyAssignability(class_loader,
                              dex_file,
                              deps.assignable_types_,
-                             /* expected_assignability= */ true,
                              self,
                              error_msg);
 }
