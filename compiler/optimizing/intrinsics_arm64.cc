@@ -1367,7 +1367,10 @@ void IntrinsicCodeGeneratorARM64::VisitUnsafeCASObject(HInvoke* invoke) {
 
 enum class GetAndUpdateOp {
   kSet,
-  kAdd
+  kAdd,
+  kAnd,
+  kOr,
+  kXor
 };
 
 static void GenerateGetAndUpdate(CodeGeneratorARM64* codegen,
@@ -1393,10 +1396,14 @@ static void GenerateGetAndUpdate(CodeGeneratorARM64* codegen,
       if (arg.IsVRegister()) {
         old_value_reg = arg.IsD() ? temps.AcquireX() : temps.AcquireW();
         new_value = old_value_reg;  // Use the same temporary.
-      } else {
-        old_value_reg = old_value.IsX() ? old_value.X() : old_value.W();
-        new_value = old_value.IsX() ? temps.AcquireX() : temps.AcquireW();
+        break;
       }
+      FALLTHROUGH_INTENDED;
+    case GetAndUpdateOp::kAnd:
+    case GetAndUpdateOp::kOr:
+    case GetAndUpdateOp::kXor:
+      old_value_reg = old_value.IsX() ? old_value.X() : old_value.W();
+      new_value = old_value.IsX() ? temps.AcquireX() : temps.AcquireW();
       break;
   }
 
@@ -1422,6 +1429,15 @@ static void GenerateGetAndUpdate(CodeGeneratorARM64* codegen,
       } else {
         __ Add(new_value, old_value_reg, arg.IsX() ? arg.X() : arg.W());
       }
+      break;
+    case GetAndUpdateOp::kAnd:
+      __ And(new_value, old_value_reg, arg.IsX() ? arg.X() : arg.W());
+      break;
+    case GetAndUpdateOp::kOr:
+      __ Orr(new_value, old_value_reg, arg.IsX() ? arg.X() : arg.W());
+      break;
+    case GetAndUpdateOp::kXor:
+      __ Eor(new_value, old_value_reg, arg.IsX() ? arg.X() : arg.W());
       break;
   }
   EmitStoreExclusive(codegen, load_store_type, ptr, store_result, new_value, use_store_release);
@@ -4008,8 +4024,14 @@ static bool IsValidFieldVarHandleExpected(HInvoke* invoke) {
           (value_type == DataType::Type::kReference || value_type == DataType::Type::kBool)) {
         // We should only add numerical types.
         return false;
+      } else if (IsVarHandleGetAndBitwiseOp(invoke) && !DataType::IsIntegralType(value_type)) {
+        // We can only apply operators to bitwise integral types.
+        // Note that bitwise VarHandle operations accept a non-integral boolean type and
+        // perform the appropriate logical operation. However, the result is the same as
+        // using the bitwise operation on our boolean representation and this fits well
+        // with DataType::IsIntegralType() treating the compiler type kBool as integral.
+        return false;
       }
-      DCHECK(!IsVarHandleGetAndBitwiseOp(invoke));  // Unimplemented.
       if (value_type != return_type) {
         return false;
       }
@@ -4703,6 +4725,77 @@ void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndAddRelease(HInvoke* invoke
   GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAdd, std::memory_order_release);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseAnd(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAnd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseAnd(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAnd, std::memory_order_seq_cst);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseAndAcquire(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAnd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseAndAcquire(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAnd, std::memory_order_acquire);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseAndRelease(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kAnd);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseAndRelease(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kAnd, std::memory_order_release);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseOr(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kOr);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseOr(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kOr, std::memory_order_seq_cst);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseOrAcquire(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kOr);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseOrAcquire(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kOr, std::memory_order_acquire);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseOrRelease(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kOr);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseOrRelease(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kOr, std::memory_order_release);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseXor(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kXor);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseXor(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kXor, std::memory_order_seq_cst);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseXorAcquire(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kXor);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseXorAcquire(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kXor, std::memory_order_acquire);
+}
+
+void IntrinsicLocationsBuilderARM64::VisitVarHandleGetAndBitwiseXorRelease(HInvoke* invoke) {
+  CreateVarHandleGetAndUpdateLocations(invoke, GetAndUpdateOp::kXor);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitVarHandleGetAndBitwiseXorRelease(HInvoke* invoke) {
+  GenerateVarHandleGetAndUpdate(invoke, codegen_, GetAndUpdateOp::kXor, std::memory_order_release);
+}
 
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOf);
 UNIMPLEMENTED_INTRINSIC(ARM64, StringStringIndexOfAfter);
@@ -4731,15 +4824,6 @@ UNIMPLEMENTED_INTRINSIC(ARM64, UnsafeGetAndSetObject)
 
 UNIMPLEMENTED_INTRINSIC(ARM64, MethodHandleInvokeExact)
 UNIMPLEMENTED_INTRINSIC(ARM64, MethodHandleInvoke)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAnd)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAndAcquire)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseAndRelease)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseOr)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseOrAcquire)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseOrRelease)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXor)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXorAcquire)
-UNIMPLEMENTED_INTRINSIC(ARM64, VarHandleGetAndBitwiseXorRelease)
 
 UNREACHABLE_INTRINSICS(ARM64)
 
