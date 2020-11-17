@@ -498,3 +498,8 @@ art_cc_test {
         },
     },
 }
+
+filegroup {
+    name: "art_libdexfile_dex_instruction_list_header",
+    srcs: ["dex/dex_instruction_list.h"],
+}
