@@ -36,6 +36,7 @@
 #include "linker/linker_patch.h"
 #include "mirror/array-inl.h"
 #include "mirror/class-inl.h"
+#include "mirror/var_handle.h"
 #include "scoped_thread_state_change-inl.h"
 #include "thread.h"
 #include "utils/arm/assembler_arm_vixl.h"
@@ -834,14 +835,18 @@ class ReadBarrierForHeapReferenceSlowPathARMVIXL : public SlowPathCodeARMVIXL {
         // to an object field within an object.
         DCHECK(instruction_->IsInvoke()) << instruction_->DebugName();
         DCHECK(instruction_->GetLocations()->Intrinsified());
-        DCHECK((instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeGetObject) ||
-               (instruction_->AsInvoke()->GetIntrinsic() == Intrinsics::kUnsafeGetObjectVolatile))
+        Intrinsics intrinsic = instruction_->AsInvoke()->GetIntrinsic();
+        DCHECK(intrinsic == Intrinsics::kUnsafeGetObject ||
+               intrinsic == Intrinsics::kUnsafeGetObjectVolatile ||
+               mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
+                   mirror::VarHandle::AccessModeTemplate::kGet)
             << instruction_->AsInvoke()->GetIntrinsic();
         DCHECK_EQ(offset_, 0U);
-        DCHECK(index_.IsRegisterPair());
-        // UnsafeGet's offset location is a register pair, the low
-        // part contains the correct offset.
-        index = index_.ToLow();
+        // Though UnsafeGet's offset location is a register pair, we only pass the low
+        // part (high part is irrelevant for 32-bit addresses) to the slow path.
+        // For VarHandle intrinsics, the index is always just a register.
+        DCHECK(index_.IsRegister());
+        index = index_;
       }
     }
 
@@ -923,7 +928,9 @@ class ReadBarrierForRootSlowPathARMVIXL : public SlowPathCodeARMVIXL {
     vixl32::Register reg_out = RegisterFrom(out_);
     DCHECK(locations->CanCall());
     DCHECK(!locations->GetLiveRegisters()->ContainsCoreRegister(reg_out.GetCode()));
-    DCHECK(instruction_->IsLoadClass() || instruction_->IsLoadString())
+    DCHECK(instruction_->IsLoadClass() ||
+           instruction_->IsLoadString() ||
+           (instruction_->IsInvoke() && instruction_->GetLocations()->Intrinsified()))
         << "Unexpected instruction in read barrier for GC root slow path: "
         << instruction_->DebugName();
 
@@ -6729,7 +6736,7 @@ void InstructionCodeGeneratorARMVIXL::VisitArraySet(HArraySet* instruction) {
         }
       }
 
-      codegen_->MarkGCCard(temp1, temp2, array, value, /* can_be_null= */ false);
+      codegen_->MarkGCCard(temp1, temp2, array, value, /* value_can_be_null= */ false);
 
       if (can_value_be_null) {
         DCHECK(do_store.IsReferenced());
@@ -6960,10 +6967,10 @@ void CodeGeneratorARMVIXL::MarkGCCard(vixl32::Register temp,
                                       vixl32::Register card,
                                       vixl32::Register object,
                                       vixl32::Register value,
-                                      bool can_be_null) {
+                                      bool value_can_be_null) {
   vixl32::Label is_null;
-  if (can_be_null) {
-    __ CompareAndBranchIfZero(value, &is_null);
+  if (value_can_be_null) {
+    __ CompareAndBranchIfZero(value, &is_null, /* is_far_target=*/ false);
   }
   // Load the address of the card table into `card`.
   GetAssembler()->LoadFromOffset(
@@ -6985,7 +6992,7 @@ void CodeGeneratorARMVIXL::MarkGCCard(vixl32::Register temp,
   // of the card to mark; and 2. to load the `kCardDirty` value) saves a load
   // (no need to explicitly load `kCardDirty` as an immediate value).
   __ Strb(card, MemOperand(card, temp));
-  if (can_be_null) {
+  if (value_can_be_null) {
     __ Bind(&is_null);
   }
 }
@@ -9711,18 +9718,10 @@ void CodeGeneratorARMVIXL::MoveFromReturnRegister(Location trg, DataType::Type t
     return;
   }
 
-  // TODO: Consider pairs in the parallel move resolver, then this could be nicely merged
-  //       with the last branch.
-  if (type == DataType::Type::kInt64) {
-    TODO_VIXL32(FATAL);
-  } else if (type == DataType::Type::kFloat64) {
-    TODO_VIXL32(FATAL);
-  } else {
-    // Let the parallel move resolver take care of all of this.
-    HParallelMove parallel_move(GetGraph()->GetAllocator());
-    parallel_move.AddMove(return_loc, trg, type, nullptr);
-    GetMoveResolver()->EmitNativeCode(&parallel_move);
-  }
+  // Let the parallel move resolver take care of all of this.
+  HParallelMove parallel_move(GetGraph()->GetAllocator());
+  parallel_move.AddMove(return_loc, trg, type, nullptr);
+  GetMoveResolver()->EmitNativeCode(&parallel_move);
 }
 
 void LocationsBuilderARMVIXL::VisitClassTableGet(HClassTableGet* instruction) {
