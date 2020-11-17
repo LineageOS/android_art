@@ -22,6 +22,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__BIONIC__)
+#include <bionic/macros.h>
+#endif
+
 #include <algorithm>
 #include <initializer_list>
 #include <mutex>
@@ -38,6 +42,9 @@
 // Darwin has an #error when ucontext.h is included without _XOPEN_SOURCE defined.
 #define _XOPEN_SOURCE
 #endif
+
+#define SA_UNSUPPORTED 0x00000400
+#define SA_EXPOSE_TAGBITS 0x00000800
 
 #include <ucontext.h>
 
@@ -204,13 +211,50 @@ class SignalChain {
 #endif
 
     handler_action.sa_sigaction = SignalChain::Handler;
-    handler_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK;
+    handler_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK |
+                              SA_UNSUPPORTED | SA_EXPOSE_TAGBITS;
 
 #if defined(__BIONIC__)
     linked_sigaction64(signo, &handler_action, &action_);
+    linked_sigaction64(signo, nullptr, &handler_action);
 #else
     linked_sigaction(signo, &handler_action, &action_);
+    linked_sigaction(signo, nullptr, &handler_action);
 #endif
+
+    // Newer kernels clear unknown flags from sigaction.sa_flags in order to
+    // allow userspace to determine which flag bits are supported. We use this
+    // behavior in turn to implement the same flag bit support detection
+    // protocol regardless of kernel version. Due to the lack of a flag bit
+    // support detection protocol in older kernels we assume support for a base
+    // set of flags that have been supported since at least 2003 [1]. No flags
+    // were introduced since then until the introduction of SA_EXPOSE_TAGBITS
+    // handled below. glibc headers do not define SA_RESTORER so we define it
+    // ourselves.
+    //
+    // TODO(pcc): The new kernel behavior has been implemented in a kernel
+    // patch [2] that has not yet landed. Update the code if necessary once it
+    // lands.
+    //
+    // [1] https://github.com/mpe/linux-fullhistory/commit/c0f806c86fc8b07ad426df023f1a4bb0e53c64f6
+    // [2] https://lore.kernel.org/linux-arm-kernel/cover.1605235762.git.pcc@google.com/
+#if !defined(__BIONIC__)
+#define SA_RESTORER 0x04000000
+#endif
+    kernel_supported_flags_ = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO |
+                              SA_ONSTACK | SA_RESTART | SA_NODEFER |
+                              SA_RESETHAND | SA_RESTORER;
+
+    // Determine whether the kernel supports SA_EXPOSE_TAGBITS. For newer
+    // kernels we use the flag support detection protocol described above. In
+    // order to allow userspace to distinguish old and new kernels,
+    // SA_UNSUPPORTED has been reserved as an unsupported flag. If the kernel
+    // did not clear it then we know that we have an old kernel that would not
+    // support SA_EXPOSE_TAGBITS anyway.
+    if (!(handler_action.sa_flags & SA_UNSUPPORTED) &&
+        (handler_action.sa_flags & SA_EXPOSE_TAGBITS)) {
+      kernel_supported_flags_ |= SA_EXPOSE_TAGBITS;
+    }
   }
 
   template <typename SigactionType>
@@ -244,6 +288,7 @@ class SignalChain {
       memcpy(&action_.sa_mask, &new_action->sa_mask,
              std::min(sizeof(action_.sa_mask), sizeof(new_action->sa_mask)));
     }
+    action_.sa_flags &= kernel_supported_flags_;
   }
 
   void AddSpecialHandler(SigchainAction* sa) {
@@ -278,6 +323,7 @@ class SignalChain {
 
  private:
   bool claimed_;
+  int kernel_supported_flags_;
 #if defined(__BIONIC__)
   struct sigaction64 action_;
 #else
@@ -342,6 +388,17 @@ void SignalChain::Handler(int signo, siginfo_t* siginfo, void* ucontext_raw) {
 #endif
 
   if ((handler_flags & SA_SIGINFO)) {
+    // If the chained handler is not expecting tag bits in the fault address,
+    // mask them out now.
+#if defined(__BIONIC__)
+    if (!(handler_flags & SA_EXPOSE_TAGBITS) &&
+        (signo == SIGILL || signo == SIGFPE || signo == SIGSEGV ||
+         signo == SIGBUS || signo == SIGTRAP) &&
+        siginfo->si_code > SI_USER && siginfo->si_code < SI_KERNEL &&
+        !(signo == SIGTRAP && siginfo->si_code == TRAP_HWBKPT)) {
+      siginfo->si_addr = untag_address(siginfo->si_addr);
+    }
+#endif
     chains[signo].action_.sa_sigaction(signo, siginfo, ucontext_raw);
   } else {
     auto handler = chains[signo].action_.sa_handler;
