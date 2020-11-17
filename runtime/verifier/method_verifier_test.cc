@@ -21,12 +21,12 @@
 #include <memory>
 
 #include "android-base/strings.h"
-#include "base/metrics_test.h"
 #include "base/utils.h"
 #include "class_linker-inl.h"
 #include "class_verifier.h"
 #include "common_runtime_test.h"
 #include "dex/dex_file-inl.h"
+#include "metrics/metrics_test.h"
 #include "scoped_thread_state_change-inl.h"
 #include "verifier_enums.h"
 
