@@ -88,6 +88,94 @@ static bool CanBinaryOpsAlias(const HBinaryOperation* idx1,
   return CanIntegerRangesOverlap(l1, h1, l2, h2);
 }
 
+// Make sure we mark any writes/potential writes to heap-locations within partially
+// escaped values as escaping.
+void ReferenceInfo::PrunePartialEscapeWrites() {
+  if (!subgraph_.IsValid()) {
+    // All paths escape.
+    return;
+  }
+  HGraph* graph = reference_->GetBlock()->GetGraph();
+  ArenaBitVector additional_exclusions(
+      allocator_, graph->GetBlocks().size(), false, kArenaAllocLSA);
+  for (const HUseListNode<HInstruction*>& use : reference_->GetUses()) {
+    const HInstruction* user = use.GetUser();
+    const bool possible_exclusion =
+        !additional_exclusions.IsBitSet(user->GetBlock()->GetBlockId()) &&
+        subgraph_.ContainsBlock(user->GetBlock());
+    const bool is_written_to =
+        (user->IsUnresolvedInstanceFieldSet() || user->IsUnresolvedStaticFieldSet() ||
+         user->IsInstanceFieldSet() || user->IsStaticFieldSet() || user->IsArraySet()) &&
+        (reference_ == user->InputAt(0));
+    if (possible_exclusion && is_written_to &&
+        std::any_of(subgraph_.UnreachableBlocks().begin(),
+                    subgraph_.UnreachableBlocks().end(),
+                    [&](const HBasicBlock* excluded) -> bool {
+                      return reference_->GetBlock()->GetGraph()->PathBetween(excluded,
+                                                                             user->GetBlock());
+                    })) {
+      // This object had memory written to it somewhere, if it escaped along
+      // some paths prior to the current block this write also counts as an
+      // escape.
+      additional_exclusions.SetBit(user->GetBlock()->GetBlockId());
+    }
+  }
+  if (UNLIKELY(additional_exclusions.IsAnyBitSet())) {
+    for (uint32_t exc : additional_exclusions.Indexes()) {
+      subgraph_.RemoveBlock(graph->GetBlocks()[exc]);
+    }
+  }
+}
+
+bool HeapLocationCollector::InstructionEligibleForLSERemoval(HInstruction* inst) const {
+  if (inst->IsNewInstance()) {
+    return !inst->AsNewInstance()->NeedsChecks();
+  } else if (inst->IsNewArray()) {
+    HInstruction* array_length = inst->AsNewArray()->GetLength();
+    bool known_array_length =
+        array_length->IsIntConstant() && array_length->AsIntConstant()->GetValue() >= 0;
+    return known_array_length &&
+           std::all_of(inst->GetUses().cbegin(),
+                       inst->GetUses().cend(),
+                       [&](const HUseListNode<HInstruction*>& user) {
+                         if (user.GetUser()->IsArrayGet() || user.GetUser()->IsArraySet()) {
+                           return user.GetUser()->InputAt(1)->IsIntConstant();
+                         }
+                         return true;
+                       });
+  } else {
+    return false;
+  }
+}
+
+void HeapLocationCollector::DumpReferenceStats(OptimizingCompilerStats* stats) {
+  if (stats == nullptr) {
+    return;
+  }
+  std::vector<bool> seen_instructions(GetGraph()->GetCurrentInstructionId(), false);
+  for (auto hl : heap_locations_) {
+    auto ri = hl->GetReferenceInfo();
+    if (ri == nullptr || seen_instructions[ri->GetReference()->GetId()]) {
+      continue;
+    }
+    auto instruction = ri->GetReference();
+    seen_instructions[instruction->GetId()] = true;
+    if (ri->IsSingletonAndRemovable()) {
+      if (InstructionEligibleForLSERemoval(instruction)) {
+        MaybeRecordStat(stats, MethodCompilationStat::kFullLSEPossible);
+      }
+    }
+    // TODO This is an estimate of the number of allocations we will be able
+    // to (partially) remove. As additional work is done this can be refined.
+    if (ri->IsPartialSingleton() && instruction->IsNewInstance() &&
+        ri->GetNoEscapeSubgraph()->ContainsBlock(instruction->GetBlock()) &&
+        !ri->GetNoEscapeSubgraph()->GetExcludedCohorts().empty() &&
+        InstructionEligibleForLSERemoval(instruction)) {
+      MaybeRecordStat(stats, MethodCompilationStat::kPartialLSEPossible);
+    }
+  }
+}
+
 bool HeapLocationCollector::CanArrayElementsAlias(const HInstruction* idx1,
                                                   const size_t vector_length1,
                                                   const HInstruction* idx2,
@@ -172,6 +260,7 @@ bool LoadStoreAnalysis::Run() {
   }
 
   heap_location_collector_.BuildAliasingMatrix();
+  heap_location_collector_.DumpReferenceStats(stats_);
   return true;
 }
 
