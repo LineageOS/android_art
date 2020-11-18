@@ -152,6 +152,11 @@ class ConcurrentCopying : public GarbageCollector {
   }
   void RevokeThreadLocalMarkStack(Thread* thread) REQUIRES(!mark_stack_lock_);
 
+  // Blindly return the forwarding pointer from the lockword, or null if there is none.
+  static mirror::Object* GetFwdPtrUnchecked(mirror::Object* from_ref)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // If marked, return the to-space object, otherwise null.
   mirror::Object* IsMarked(mirror::Object* from_ref) override
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -161,6 +166,9 @@ class ConcurrentCopying : public GarbageCollector {
   void PushOntoMarkStack(Thread* const self, mirror::Object* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!mark_stack_lock_);
+  // Returns a to-space copy of the from-space object from_ref, and atomically installs a
+  // forwarding pointer. Ensures that the forwarding reference is visible to other threads before
+  // the returned to-space pointer becomes visible to them.
   mirror::Object* Copy(Thread* const self,
                        mirror::Object* from_ref,
                        mirror::Object* holder,
@@ -266,8 +274,8 @@ class ConcurrentCopying : public GarbageCollector {
   void CheckEmptyMarkStack() REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!mark_stack_lock_);
   void IssueEmptyCheckpoint() REQUIRES_SHARED(Locks::mutator_lock_);
   bool IsOnAllocStack(mirror::Object* ref) REQUIRES_SHARED(Locks::mutator_lock_);
-  mirror::Object* GetFwdPtr(mirror::Object* from_ref)
-      REQUIRES_SHARED(Locks::mutator_lock_);
+  // Return the forwarding pointer from the lockword. The argument must be in from space.
+  mirror::Object* GetFwdPtr(mirror::Object* from_ref) REQUIRES_SHARED(Locks::mutator_lock_);
   void FlipThreadRoots() REQUIRES(!Locks::mutator_lock_);
   void SwapStacks() REQUIRES_SHARED(Locks::mutator_lock_);
   void RecordLiveStackFreezeSize(Thread* self);
