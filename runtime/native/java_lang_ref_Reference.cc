@@ -36,6 +36,37 @@ static jobject Reference_getReferent(JNIEnv* env, jobject javaThis) {
   return soa.AddLocalReference<jobject>(referent);
 }
 
+static jboolean Reference_refersTo0(JNIEnv* env, jobject javaThis, jobject o) {
+  if (kUseReadBarrier && !kUseBakerReadBarrier) {
+    // Fall back to naive implementation that may block and needlessly preserve javaThis.
+    return env->IsSameObject(Reference_getReferent(env, javaThis), o);
+  }
+  ScopedFastNativeObjectAccess soa(env);
+  const ObjPtr<mirror::Reference> ref = soa.Decode<mirror::Reference>(javaThis);
+  const ObjPtr<mirror::Object> other = soa.Decode<mirror::Reference>(o);
+  const ObjPtr<mirror::Object> referent = ref->template GetReferent<kWithoutReadBarrier>();
+  if (referent == other) {
+      return JNI_TRUE;
+  }
+  if (!kUseReadBarrier || referent.IsNull() || other.IsNull()) {
+    return JNI_FALSE;
+  }
+  // Explicitly handle the case in which referent is a from-space pointer.  Don't use a
+  // read-barrier, since that could easily mark an object we no longer need and, since it
+  // creates new gray objects, may not be safe without blocking.
+  //
+  // ConcurrentCopying::Copy ensure that whenever a pointer to a to_space object is published,
+  // the forwarding pointer is also visible. We need that guarantee to ensure that if referent
+  // == other and referent is in from-space, then referent has a forwarding pointer. In order to
+  // use that guarantee, we need to ensure that the forwarding pointer is loaded after we
+  // retrieved other. Hence this fence:
+  atomic_thread_fence(std::memory_order_acquire);
+  // Note: On ARM, the above could be replaced by an asm fake-dependency hack to make
+  // referent appear to depend on other. That would be faster and uglier.
+  return gc::collector::ConcurrentCopying::GetFwdPtrUnchecked(referent.Ptr()) == other.Ptr() ?
+      JNI_TRUE : JNI_FALSE;
+}
+
 static void Reference_clearReferent(JNIEnv* env, jobject javaThis) {
   ScopedFastNativeObjectAccess soa(env);
   const ObjPtr<mirror::Reference> ref = soa.Decode<mirror::Reference>(javaThis);
@@ -45,6 +76,7 @@ static void Reference_clearReferent(JNIEnv* env, jobject javaThis) {
 static JNINativeMethod gMethods[] = {
   FAST_NATIVE_METHOD(Reference, getReferent, "()Ljava/lang/Object;"),
   FAST_NATIVE_METHOD(Reference, clearReferent, "()V"),
+  FAST_NATIVE_METHOD(Reference, refersTo0, "(Ljava/lang/Object;)Z"),
 };
 
 void register_java_lang_ref_Reference(JNIEnv* env) {
