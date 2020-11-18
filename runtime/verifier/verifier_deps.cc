@@ -453,7 +453,7 @@ static bool DecodeSetVector(const uint8_t** cursor,
     }
   }
   // Align the cursor to start decoding the strings.
-  cursor = AlignUp(cursor, sizeof(uint32_t));
+  *cursor = AlignUp(*cursor, sizeof(uint32_t));
   return true;
 }
 
