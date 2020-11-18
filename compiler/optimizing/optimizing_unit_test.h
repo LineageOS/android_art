@@ -213,23 +213,23 @@ class OptimizingUnitTestHelper {
   // Run GraphChecker with all checks.
   //
   // Return: the status whether the run is successful.
-  bool CheckGraph(HGraph* graph) {
-    return CheckGraph(graph, /*check_ref_type_info=*/true);
+  bool CheckGraph(HGraph* graph, std::ostream& oss = std::cerr) {
+    return CheckGraph(graph, /*check_ref_type_info=*/true, oss);
   }
 
-  bool CheckGraph() {
-    return CheckGraph(graph_);
+  bool CheckGraph(std::ostream& oss = std::cerr) {
+    return CheckGraph(graph_, oss);
   }
 
   // Run GraphChecker with all checks except reference type information checks.
   //
   // Return: the status whether the run is successful.
-  bool CheckGraphSkipRefTypeInfoChecks(HGraph* graph) {
-    return CheckGraph(graph, /*check_ref_type_info=*/false);
+  bool CheckGraphSkipRefTypeInfoChecks(HGraph* graph, std::ostream& oss = std::cerr) {
+    return CheckGraph(graph, /*check_ref_type_info=*/false, oss);
   }
 
-  bool CheckGraphSkipRefTypeInfoChecks() {
-    return CheckGraphSkipRefTypeInfoChecks(graph_);
+  bool CheckGraphSkipRefTypeInfoChecks(std::ostream& oss = std::cerr) {
+    return CheckGraphSkipRefTypeInfoChecks(graph_, oss);
   }
 
   HEnvironment* ManuallyBuildEnvFor(HInstruction* instruction,
@@ -247,11 +247,11 @@ class OptimizingUnitTestHelper {
   }
 
  protected:
-  bool CheckGraph(HGraph* graph, bool check_ref_type_info) {
+  bool CheckGraph(HGraph* graph, bool check_ref_type_info, std::ostream& oss) {
     GraphChecker checker(graph);
     checker.SetRefTypeInfoCheckEnabled(check_ref_type_info);
     checker.Run();
-    checker.Dump(std::cerr);
+    checker.Dump(oss);
     return checker.IsValid();
   }
 
@@ -317,21 +317,23 @@ class AdjacencyListGraph {
       HBasicBlock* dest_blk = name_to_block_.GetOrCreate(dest, create_block);
       src_blk->AddSuccessor(dest_blk);
     }
+    graph_->ClearReachabilityInformation();
     graph_->ComputeDominanceInformation();
+    graph_->ComputeReachabilityInformation();
     for (auto [name, blk] : name_to_block_) {
       block_to_name_.Put(blk, name);
     }
   }
 
-  bool HasBlock(const HBasicBlock* blk) {
+  bool HasBlock(const HBasicBlock* blk) const {
     return block_to_name_.find(blk) != block_to_name_.end();
   }
 
-  std::string_view GetName(const HBasicBlock* blk) {
+  std::string_view GetName(const HBasicBlock* blk) const {
     return block_to_name_.Get(blk);
   }
 
-  HBasicBlock* Get(const std::string_view& sv) {
+  HBasicBlock* Get(const std::string_view& sv) const {
     return name_to_block_.Get(sv);
   }
 

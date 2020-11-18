@@ -273,7 +273,8 @@ class SchedulerTest : public OptimizingUnitTest {
       entry->AddInstruction(instr);
     }
 
-    HeapLocationCollector heap_location_collector(graph_, GetScopedAllocator());
+    HeapLocationCollector heap_location_collector(
+        graph_, GetScopedAllocator(), /*for_partial_elimination=*/false);
     heap_location_collector.VisitBasicBlock(entry);
     heap_location_collector.BuildAliasingMatrix();
     TestSchedulingGraph scheduling_graph(GetScopedAllocator(), &heap_location_collector);
