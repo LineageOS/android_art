@@ -25,7 +25,10 @@ cc_library_headers {
     name: "libartpalette-headers",
     export_include_dirs: ["include"],
     host_supported: true,
-    visibility: ["//system/libartpalette"],
+    visibility: [
+        "//art:__subpackages__",
+        "//system/libartpalette",
+    ],
 }
 
 // libartpalette is the dynamic loader of the platform abstraction
