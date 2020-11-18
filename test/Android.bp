@@ -674,6 +674,7 @@ cc_defaults {
 java_library {
     name: "art_cts_jvmti_test_library",
     visibility: [
+        "//art:__subpackages__",
         "//cts/hostsidetests/jvmti:__subpackages__",
     ],
     srcs: [
