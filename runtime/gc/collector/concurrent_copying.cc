@@ -3465,17 +3465,14 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
       to_ref->SetReadBarrierState(ReadBarrier::GrayState());
     }
 
-    // Do a fence to prevent the field CAS in ConcurrentCopying::Process from possibly reordering
-    // before the object copy.
-    std::atomic_thread_fence(std::memory_order_release);
-
     LockWord new_lock_word = LockWord::FromForwardingAddress(reinterpret_cast<size_t>(to_ref));
 
-    // Try to atomically write the fwd ptr.
+    // Try to atomically write the fwd ptr. Make sure that the copied object is visible to any
+    // readers of the fwd pointer.
     bool success = from_ref->CasLockWord(old_lock_word,
                                          new_lock_word,
                                          CASMode::kWeak,
-                                         std::memory_order_relaxed);
+                                         std::memory_order_release);
     if (LIKELY(success)) {
       // The CAS succeeded.
       DCHECK(thread_running_gc_ != nullptr);
@@ -3506,6 +3503,9 @@ mirror::Object* ConcurrentCopying::Copy(Thread* const self,
       }
       DCHECK(GetFwdPtr(from_ref) == to_ref);
       CHECK_NE(to_ref->GetLockWord(false).GetState(), LockWord::kForwardingAddress);
+      // Make sure that anyone who sees to_ref also sees both the object contents and the
+      // fwd pointer.
+      QuasiAtomic::ThreadFenceForConstructor();
       PushOntoMarkStack(self, to_ref);
       return to_ref;
     } else {
@@ -3731,8 +3731,7 @@ bool ConcurrentCopying::IsNullOrMarkedHeapReference(mirror::HeapReference<mirror
         }
       } while (!field->CasWeakRelaxed(from_ref, to_ref));
     } else {
-      // TODO: Why is this seq_cst when the above is relaxed? Document memory ordering.
-      field->Assign</* kIsVolatile= */ true>(to_ref);
+      field->Assign(to_ref);
     }
   }
   return true;
