@@ -27,11 +27,19 @@ namespace art {
 
 class LoadStoreEliminationTest : public OptimizingUnitTest {
  public:
+  AdjacencyListGraph SetupFromAdjacencyList(
+      const std::string_view entry_name,
+      const std::string_view exit_name,
+      const std::vector<AdjacencyListGraph::Edge>& adj) {
+    return AdjacencyListGraph(graph_, GetAllocator(), entry_name, exit_name, adj);
+  }
+
   void PerformLSE() {
     graph_->BuildDominatorTree();
     LoadStoreElimination lse(graph_, /*stats=*/ nullptr);
     lse.Run();
-    EXPECT_TRUE(CheckGraphSkipRefTypeInfoChecks());
+    std::ostringstream oss;
+    EXPECT_TRUE(CheckGraphSkipRefTypeInfoChecks(oss)) << oss.str();
   }
 
   // Create instructions shared among tests.
@@ -1440,6 +1448,2063 @@ TEST_F(LoadStoreEliminationTest, ArrayMergeDefault) {
   EXPECT_TRUE(IsRemoved(right_set_1));
   EXPECT_TRUE(IsRemoved(right_set_2));
   EXPECT_TRUE(IsRemoved(alloc_w));
+}
+
+// // ENTRY
+// obj = new Obj();
+// // ALL should be kept
+// switch (parameter_value) {
+//   case 1:
+//     // Case1
+//     obj.field = 1;
+//     call_func(obj);
+//     break;
+//   case 2:
+//     // Case2
+//     obj.field = 2;
+//     call_func(obj);
+//     // We don't know what obj.field is now we aren't able to eliminate the read below!
+//     break;
+//   default:
+//     // Case3
+//     // TODO This only happens because of limitations on our LSE which is unable
+//     //      to materialize co-dependent loop and non-loop phis.
+//     // Ideally we'd want to generate
+//     // P1 = PHI[3, loop_val]
+//     // while (test()) {
+//     //   if (test2()) { goto; } else { goto; }
+//     //   loop_val = [P1, 5]
+//     // }
+//     // Currently we aren't able to unfortunately.
+//     obj.field = 3;
+//     while (test()) {
+//       if (test2()) { } else { obj.field = 5; }
+//     }
+//     break;
+// }
+// EXIT
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
+  CreateGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "bswitch" },
+                                                   { "bswitch", "case1" },
+                                                   { "bswitch", "case2" },
+                                                   { "bswitch", "case3" },
+                                                   { "case1", "breturn" },
+                                                   { "case2", "breturn" },
+                                                   { "case3", "loop_pre_header" },
+                                                   { "loop_pre_header", "loop_header" },
+                                                   { "loop_header", "loop_body" },
+                                                   { "loop_body", "loop_if_left" },
+                                                   { "loop_body", "loop_if_right" },
+                                                   { "loop_if_left", "loop_end" },
+                                                   { "loop_if_right", "loop_end" },
+                                                   { "loop_end", "loop_header" },
+                                                   { "loop_header", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(bswitch);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(case1);
+  GET_BLOCK(case2);
+  GET_BLOCK(case3);
+
+  GET_BLOCK(loop_pre_header);
+  GET_BLOCK(loop_header);
+  GET_BLOCK(loop_body);
+  GET_BLOCK(loop_if_left);
+  GET_BLOCK(loop_if_right);
+  GET_BLOCK(loop_end);
+#undef GET_BLOCK
+  HInstruction* switch_val = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kInt32);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* c5 = graph_->GetIntConstant(5);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(switch_val);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(entry_goto);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, switch_val);
+  bswitch->AddInstruction(switch_inst);
+
+  HInstruction* write_c1 = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                  c1,
+                                                                  nullptr,
+                                                                  DataType::Type::kInt32,
+                                                                  MemberOffset(10),
+                                                                  false,
+                                                                  0,
+                                                                  0,
+                                                                  graph_->GetDexFile(),
+                                                                  0);
+  HInstruction* call_c1 = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_c1 = new (GetAllocator()) HGoto();
+  call_c1->AsInvoke()->SetRawInputAt(0, new_inst);
+  case1->AddInstruction(write_c1);
+  case1->AddInstruction(call_c1);
+  case1->AddInstruction(goto_c1);
+  call_c1->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_c2 = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                  c2,
+                                                                  nullptr,
+                                                                  DataType::Type::kInt32,
+                                                                  MemberOffset(10),
+                                                                  false,
+                                                                  0,
+                                                                  0,
+                                                                  graph_->GetDexFile(),
+                                                                  0);
+  HInstruction* call_c2 = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_c2 = new (GetAllocator()) HGoto();
+  call_c2->AsInvoke()->SetRawInputAt(0, new_inst);
+  case2->AddInstruction(write_c2);
+  case2->AddInstruction(call_c2);
+  case2->AddInstruction(goto_c2);
+  call_c2->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_c3 = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                  c3,
+                                                                  nullptr,
+                                                                  DataType::Type::kInt32,
+                                                                  MemberOffset(10),
+                                                                  false,
+                                                                  0,
+                                                                  0,
+                                                                  graph_->GetDexFile(),
+                                                                  0);
+  HInstruction* goto_c3 = new (GetAllocator()) HGoto();
+  case3->AddInstruction(write_c3);
+  case3->AddInstruction(goto_c3);
+
+  HInstruction* goto_preheader = new (GetAllocator()) HGoto();
+  loop_pre_header->AddInstruction(goto_preheader);
+
+  HInstruction* suspend_check_header = new (GetAllocator()) HSuspendCheck();
+  HInstruction* call_loop_header = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* if_loop_header = new (GetAllocator()) HIf(call_loop_header);
+  loop_header->AddInstruction(suspend_check_header);
+  loop_header->AddInstruction(call_loop_header);
+  loop_header->AddInstruction(if_loop_header);
+  call_loop_header->CopyEnvironmentFrom(cls->GetEnvironment());
+  suspend_check_header->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_loop_body = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* if_loop_body = new (GetAllocator()) HIf(call_loop_body);
+  loop_body->AddInstruction(call_loop_body);
+  loop_body->AddInstruction(if_loop_body);
+  call_loop_body->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
+  loop_if_left->AddInstruction(goto_loop_left);
+
+  HInstruction* write_loop_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                          c5,
+                                                                          nullptr,
+                                                                          DataType::Type::kInt32,
+                                                                          MemberOffset(10),
+                                                                          false,
+                                                                          0,
+                                                                          0,
+                                                                          graph_->GetDexFile(),
+                                                                          0);
+  HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
+  loop_if_right->AddInstruction(write_loop_right);
+  loop_if_right->AddInstruction(goto_loop_right);
+
+  HInstruction* goto_loop_end = new (GetAllocator()) HGoto();
+  loop_end->AddInstruction(goto_loop_end);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_ins = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_ins);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_FALSE(IsRemoved(read_bottom));
+  EXPECT_FALSE(IsRemoved(write_c1));
+  EXPECT_FALSE(IsRemoved(write_c2));
+  EXPECT_FALSE(IsRemoved(write_c3));
+  // EXPECT_FALSE(IsRemoved(write_loop_left));
+  EXPECT_FALSE(IsRemoved(write_loop_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   obj.field = 1;
+//   call_func(obj);
+//   foo_r = obj.field
+// } else {
+//   // TO BE ELIMINATED
+//   obj.field = 2;
+//   // RIGHT
+//   // TO BE ELIMINATED
+//   foo_l = obj.field;
+// }
+// EXIT
+// return PHI(foo_l, foo_r)
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit_REAL",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "exit" },
+                                                   { "right", "exit" },
+                                                   { "exit", "exit_REAL" } }));
+  HBasicBlock* entry = blks.Get("entry");
+  HBasicBlock* left = blks.Get("left");
+  HBasicBlock* right = blks.Get("right");
+  HBasicBlock* exit = blks.Get("exit");
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* read_left = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                   nullptr,
+                                                                   DataType::Type::kInt32,
+                                                                   MemberOffset(16),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(write_left);
+  left->AddInstruction(call_left);
+  left->AddInstruction(read_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(16),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* read_right = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(16),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(read_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* phi_final =
+      new (GetAllocator()) HPhi(GetAllocator(), 12, 2, DataType::Type::kInt32);
+  phi_final->SetRawInputAt(0, read_left);
+  phi_final->SetRawInputAt(1, read_right);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(phi_final);
+  exit->AddPhi(phi_final->AsPhi());
+  exit->AddInstruction(return_exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  ASSERT_TRUE(IsRemoved(read_right));
+  ASSERT_FALSE(IsRemoved(read_left));
+  ASSERT_FALSE(IsRemoved(phi_final));
+  ASSERT_TRUE(phi_final->GetInputs()[1] == c2);
+  ASSERT_TRUE(phi_final->GetInputs()[0] == read_left);
+  ASSERT_TRUE(IsRemoved(write_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   obj.field = 1;
+//   call_func(obj);
+//   // We don't know what obj.field is now we aren't able to eliminate the read below!
+// } else {
+//   // DO NOT ELIMINATE
+//   obj.field = 2;
+//   // RIGHT
+// }
+// EXIT
+// return obj.field
+// TODO We eventually want to be able to eliminate the right write along with the final read but
+// will need either new blocks or new instructions.
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit_REAL",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "exit" },
+                                                   { "right", "exit" },
+                                                   { "exit", "exit_REAL" } }));
+  HBasicBlock* entry = blks.Get("entry");
+  HBasicBlock* left = blks.Get("left");
+  HBasicBlock* right = blks.Get("right");
+  HBasicBlock* exit = blks.Get("exit");
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(write_left);
+  left->AddInstruction(call_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  exit->AddInstruction(read_bottom);
+  exit->AddInstruction(return_exit);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  ASSERT_FALSE(IsRemoved(read_bottom));
+  ASSERT_FALSE(IsRemoved(write_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   obj.field = 1;
+//   call_func(obj);
+//   // We don't know what obj.field is now we aren't able to eliminate the read below!
+// } else {
+//   // DO NOT ELIMINATE
+//   if (param2) {
+//     obj.field = 2;
+//   } else {
+//     obj.field = 3;
+//   }
+//   // RIGHT
+// }
+// EXIT
+// return obj.field
+// TODO We eventually want to be able to eliminate the right write along with the final read but
+// will need either new blocks or new instructions.
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit_REAL",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right_start" },
+                                                   { "left", "exit" },
+                                                   { "right_start", "right_first" },
+                                                   { "right_start", "right_second" },
+                                                   { "right_first", "right_end" },
+                                                   { "right_second", "right_end" },
+                                                   { "right_end", "exit" },
+                                                   { "exit", "exit_REAL" } }));
+  HBasicBlock* entry = blks.Get("entry");
+  HBasicBlock* left = blks.Get("left");
+  HBasicBlock* right_start = blks.Get("right_start");
+  HBasicBlock* right_first = blks.Get("right_first");
+  HBasicBlock* right_second = blks.Get("right_second");
+  HBasicBlock* right_end = blks.Get("right_end");
+  HBasicBlock* exit = blks.Get("exit");
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* bool_value_2 = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 2, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(bool_value_2);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(write_left);
+  left->AddInstruction(call_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* right_if = new (GetAllocator()) HIf(bool_value_2);
+  right_start->AddInstruction(right_if);
+
+  HInstruction* write_right_first = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                           c2,
+                                                                           nullptr,
+                                                                           DataType::Type::kInt32,
+                                                                           MemberOffset(10),
+                                                                           false,
+                                                                           0,
+                                                                           0,
+                                                                           graph_->GetDexFile(),
+                                                                           0);
+  HInstruction* goto_right_first = new (GetAllocator()) HGoto();
+  right_first->AddInstruction(write_right_first);
+  right_first->AddInstruction(goto_right_first);
+
+  HInstruction* write_right_second = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                            c3,
+                                                                            nullptr,
+                                                                            DataType::Type::kInt32,
+                                                                            MemberOffset(10),
+                                                                            false,
+                                                                            0,
+                                                                            0,
+                                                                            graph_->GetDexFile(),
+                                                                            0);
+  HInstruction* goto_right_second = new (GetAllocator()) HGoto();
+  right_second->AddInstruction(write_right_second);
+  right_second->AddInstruction(goto_right_second);
+
+  HInstruction* goto_right_end = new (GetAllocator()) HGoto();
+  right_end->AddInstruction(goto_right_end);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  exit->AddInstruction(read_bottom);
+  exit->AddInstruction(return_exit);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  ASSERT_FALSE(IsRemoved(read_bottom));
+  EXPECT_FALSE(IsRemoved(write_right_first));
+  EXPECT_FALSE(IsRemoved(write_right_second));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   escape(obj);
+//   obj.field = 1;
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   obj.field = 2;
+// }
+// EXIT
+// ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "breturn"},
+                                                   { "right", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(call_left);
+  left->AddInstruction(write_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_bottom));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   obj.field = 1;
+//   escape(obj);
+//   return obj.field;
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   obj.field = 2;
+//   return obj.field;
+// }
+// EXIT
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList(
+      "entry",
+      "exit",
+      { { "entry", "left" }, { "entry", "right" }, { "left", "exit" }, { "right", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* read_left = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                   nullptr,
+                                                                   DataType::Type::kInt32,
+                                                                   MemberOffset(10),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* return_left = new (GetAllocator()) HReturn(read_left);
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(write_left);
+  left->AddInstruction(call_left);
+  left->AddInstruction(read_left);
+  left->AddInstruction(return_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* read_right = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* return_right = new (GetAllocator()) HReturn(read_right);
+  right->AddInstruction(write_right);
+  right->AddInstruction(read_right);
+  right->AddInstruction(return_right);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_right));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+  EXPECT_FALSE(IsRemoved(read_left));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   obj.field = 1;
+//   while (true) {
+//     bool esc = escape(obj);
+//     // DO NOT ELIMINATE
+//     obj.field = 3;
+//     if (esc) break;
+//   }
+//   // ELIMINATE.
+//   return obj.field;
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   obj.field = 2;
+//   return obj.field;
+// }
+// EXIT
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "entry_post" },
+                                                   { "entry_post", "right" },
+                                                   { "right", "exit" },
+                                                   { "entry_post", "left_pre" },
+                                                   { "left_pre", "left_loop" },
+                                                   { "left_loop", "left_loop" },
+                                                   { "left_loop", "left_finish" },
+                                                   { "left_finish", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(entry_post);
+  GET_BLOCK(exit);
+  GET_BLOCK(left_pre);
+  GET_BLOCK(left_loop);
+  GET_BLOCK(left_finish);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  // Left-loops first successor is the break.
+  if (left_loop->GetSuccessors()[0] != left_finish) {
+    left_loop->SwapSuccessors();
+  }
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* goto_entry = new (GetAllocator()) HGoto();
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(goto_entry);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry_post->AddInstruction(if_inst);
+
+  HInstruction* write_left_pre = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                        c1,
+                                                                        nullptr,
+                                                                        DataType::Type::kInt32,
+                                                                        MemberOffset(10),
+                                                                        false,
+                                                                        0,
+                                                                        0,
+                                                                        graph_->GetDexFile(),
+                                                                        0);
+  HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
+  left_pre->AddInstruction(write_left_pre);
+  left_pre->AddInstruction(goto_left_pre);
+
+  HInstruction* suspend_left_loop = new (GetAllocator()) HSuspendCheck();
+  HInstruction* call_left_loop = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left_loop = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                         c3,
+                                                                         nullptr,
+                                                                         DataType::Type::kInt32,
+                                                                         MemberOffset(10),
+                                                                         false,
+                                                                         0,
+                                                                         0,
+                                                                         graph_->GetDexFile(),
+                                                                         0);
+  HInstruction* if_left_loop = new (GetAllocator()) HIf(call_left_loop);
+  call_left_loop->AsInvoke()->SetRawInputAt(0, new_inst);
+  left_loop->AddInstruction(suspend_left_loop);
+  left_loop->AddInstruction(call_left_loop);
+  left_loop->AddInstruction(write_left_loop);
+  left_loop->AddInstruction(if_left_loop);
+  suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+  call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* read_left_end = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                       nullptr,
+                                                                       DataType::Type::kInt32,
+                                                                       MemberOffset(10),
+                                                                       false,
+                                                                       0,
+                                                                       0,
+                                                                       graph_->GetDexFile(),
+                                                                       0);
+  HInstruction* return_left_end = new (GetAllocator()) HReturn(read_left_end);
+  left_finish->AddInstruction(read_left_end);
+  left_finish->AddInstruction(return_left_end);
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* read_right = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* return_right = new (GetAllocator()) HReturn(read_right);
+  right->AddInstruction(write_right);
+  right->AddInstruction(read_right);
+  right->AddInstruction(return_right);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_FALSE(IsRemoved(write_left_pre));
+  EXPECT_TRUE(IsRemoved(read_right));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left_loop));
+  EXPECT_FALSE(IsRemoved(call_left_loop));
+  EXPECT_TRUE(IsRemoved(read_left_end));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   escape(obj);
+//   obj.field = 1;
+// } else {
+//   // RIGHT
+//   // obj hasn't escaped so it's invisible.
+//   // ELIMINATE
+//   obj.field = 2;
+//   noescape();
+// }
+// EXIT
+// ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "breturn" },
+                                                   { "right", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(call_left);
+  left->AddInstruction(write_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* call_right = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(call_right);
+  right->AddInstruction(goto_right);
+  call_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_bottom));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+  EXPECT_FALSE(IsRemoved(call_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// // Eliminate this one. Object hasn't escaped yet so it's safe.
+// obj.field = 3;
+// noescape();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   obj.field = 5;
+//   escape(obj);
+//   obj.field = 1;
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   obj.field = 2;
+// }
+// EXIT
+// ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "breturn" },
+                                                   { "right", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* c5 = graph_->GetIntConstant(5);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* write_entry = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c3,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* call_entry = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(write_entry);
+  entry->AddInstruction(call_entry);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+  call_entry->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left_start = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                          c5,
+                                                                          nullptr,
+                                                                          DataType::Type::kInt32,
+                                                                          MemberOffset(10),
+                                                                          false,
+                                                                          0,
+                                                                          0,
+                                                                          graph_->GetDexFile(),
+                                                                          0);
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(write_left_start);
+  left->AddInstruction(call_left);
+  left->AddInstruction(write_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_bottom));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_TRUE(IsRemoved(write_entry));
+  EXPECT_FALSE(IsRemoved(write_left_start));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+  EXPECT_FALSE(IsRemoved(call_entry));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   obj.field = 1;
+//   while (true) {
+//     bool esc = escape(obj);
+//     if (esc) break;
+//     // DO NOT ELIMINATE
+//     obj.field = 3;
+//   }
+// } else {
+//   // RIGHT
+//   // DO NOT ELIMINATE
+//   obj.field = 2;
+// }
+// // DO NOT ELIMINATE
+// return obj.field;
+// EXIT
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "entry_post" },
+                                                   { "entry_post", "right" },
+                                                   { "right", "return_block" },
+                                                   { "entry_post", "left_pre" },
+                                                   { "left_pre", "left_loop" },
+                                                   { "left_loop", "left_loop_post" },
+                                                   { "left_loop_post", "left_loop" },
+                                                   { "left_loop", "return_block" },
+                                                   { "return_block", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(entry_post);
+  GET_BLOCK(exit);
+  GET_BLOCK(return_block);
+  GET_BLOCK(left_pre);
+  GET_BLOCK(left_loop);
+  GET_BLOCK(left_loop_post);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  // Left-loops first successor is the break.
+  if (left_loop->GetSuccessors()[0] != return_block) {
+    left_loop->SwapSuccessors();
+  }
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* goto_entry = new (GetAllocator()) HGoto();
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(goto_entry);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry_post->AddInstruction(if_inst);
+
+  HInstruction* write_left_pre = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                        c1,
+                                                                        nullptr,
+                                                                        DataType::Type::kInt32,
+                                                                        MemberOffset(10),
+                                                                        false,
+                                                                        0,
+                                                                        0,
+                                                                        graph_->GetDexFile(),
+                                                                        0);
+  HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
+  left_pre->AddInstruction(write_left_pre);
+  left_pre->AddInstruction(goto_left_pre);
+
+  HInstruction* suspend_left_loop = new (GetAllocator()) HSuspendCheck();
+  HInstruction* call_left_loop = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* if_left_loop = new (GetAllocator()) HIf(call_left_loop);
+  call_left_loop->AsInvoke()->SetRawInputAt(0, new_inst);
+  left_loop->AddInstruction(suspend_left_loop);
+  left_loop->AddInstruction(call_left_loop);
+  left_loop->AddInstruction(if_left_loop);
+  suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+  call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left_loop = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                         c3,
+                                                                         nullptr,
+                                                                         DataType::Type::kInt32,
+                                                                         MemberOffset(10),
+                                                                         false,
+                                                                         0,
+                                                                         0,
+                                                                         graph_->GetDexFile(),
+                                                                         0);
+  HInstruction* goto_left_loop = new (GetAllocator()) HGoto();
+  left_loop_post->AddInstruction(write_left_loop);
+  left_loop_post->AddInstruction(goto_left_loop);
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_return = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_final = new (GetAllocator()) HReturn(read_return);
+  return_block->AddInstruction(read_return);
+  return_block->AddInstruction(return_final);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_FALSE(IsRemoved(write_left_pre));
+  EXPECT_FALSE(IsRemoved(read_return));
+  EXPECT_FALSE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left_loop));
+  EXPECT_FALSE(IsRemoved(call_left_loop));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // ELIMINATE (not visible since always overridden by obj.field = 3)
+//   obj.field = 1;
+//   while (true) {
+//     bool stop = should_stop();
+//     // DO NOT ELIMINATE (visible by read at end)
+//     obj.field = 3;
+//     if (stop) break;
+//   }
+// } else {
+//   // RIGHT
+//   // DO NOT ELIMINATE
+//   obj.field = 2;
+//   escape(obj);
+// }
+// // DO NOT ELIMINATE
+// return obj.field;
+// EXIT
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "entry_post" },
+                                                   { "entry_post", "right" },
+                                                   { "right", "return_block" },
+                                                   { "entry_post", "left_pre" },
+                                                   { "left_pre", "left_loop" },
+                                                   { "left_loop", "left_loop" },
+                                                   { "left_loop", "return_block" },
+                                                   { "return_block", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(entry_post);
+  GET_BLOCK(exit);
+  GET_BLOCK(return_block);
+  GET_BLOCK(left_pre);
+  GET_BLOCK(left_loop);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  // Left-loops first successor is the break.
+  if (left_loop->GetSuccessors()[0] != return_block) {
+    left_loop->SwapSuccessors();
+  }
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* goto_entry = new (GetAllocator()) HGoto();
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(goto_entry);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry_post->AddInstruction(if_inst);
+
+  HInstruction* write_left_pre = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                        c1,
+                                                                        nullptr,
+                                                                        DataType::Type::kInt32,
+                                                                        MemberOffset(10),
+                                                                        false,
+                                                                        0,
+                                                                        0,
+                                                                        graph_->GetDexFile(),
+                                                                        0);
+  HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
+  left_pre->AddInstruction(write_left_pre);
+  left_pre->AddInstruction(goto_left_pre);
+
+  HInstruction* suspend_left_loop = new (GetAllocator()) HSuspendCheck();
+  HInstruction* call_left_loop = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left_loop = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                         c3,
+                                                                         nullptr,
+                                                                         DataType::Type::kInt32,
+                                                                         MemberOffset(10),
+                                                                         false,
+                                                                         0,
+                                                                         0,
+                                                                         graph_->GetDexFile(),
+                                                                         0);
+  HInstruction* if_left_loop = new (GetAllocator()) HIf(call_left_loop);
+  left_loop->AddInstruction(suspend_left_loop);
+  left_loop->AddInstruction(call_left_loop);
+  left_loop->AddInstruction(write_left_loop);
+  left_loop->AddInstruction(if_left_loop);
+  suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+  call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* call_right = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kBool,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  call_right->AsInvoke()->SetRawInputAt(0, new_inst);
+  right->AddInstruction(write_right);
+  right->AddInstruction(call_right);
+  right->AddInstruction(goto_right);
+  call_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* read_return = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_final = new (GetAllocator()) HReturn(read_return);
+  return_block->AddInstruction(read_return);
+  return_block->AddInstruction(return_final);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_FALSE(IsRemoved(read_return));
+  EXPECT_FALSE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left_loop));
+  EXPECT_FALSE(IsRemoved(call_left_loop));
+  EXPECT_TRUE(IsRemoved(write_left_pre));
+  EXPECT_FALSE(IsRemoved(call_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   escape(obj);
+//   obj.field = 1;
+//   // obj has already escaped so can't use field = 1 for value
+//   noescape();
+// } else {
+//   // RIGHT
+//   // obj is needed for read since we don't know what the left value is
+//   // DO NOT ELIMINATE
+//   obj.field = 2;
+//   noescape();
+// }
+// EXIT
+// ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "breturn" },
+                                                   { "right", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* call2_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(call_left);
+  left->AddInstruction(write_left);
+  left->AddInstruction(call2_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+  call2_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* call_right = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(call_right);
+  right->AddInstruction(goto_right);
+  call_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_FALSE(IsRemoved(read_bottom));
+  EXPECT_FALSE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+  EXPECT_FALSE(IsRemoved(call_right));
+}
+
+// // ENTRY
+// obj = new Obj();
+// DO NOT ELIMINATE. Kept by escape.
+// obj.field = 3;
+// noescape();
+// if (parameter_value) {
+//   // LEFT
+//   // DO NOT ELIMINATE
+//   escape(obj);
+//   obj.field = 1;
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   obj.field = 2;
+// }
+// EXIT
+// ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
+  InitGraph();
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 { { "entry", "left" },
+                                                   { "entry", "right" },
+                                                   { "left", "breturn" },
+                                                   { "right", "breturn" },
+                                                   { "breturn", "exit" } }));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  HInstruction* bool_value = new (GetAllocator())
+      HParameterValue(graph_->GetDexFile(), dex::TypeIndex(1), 1, DataType::Type::kBool);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* write_entry = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c3,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* call_entry = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            0,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(write_entry);
+  entry->AddInstruction(call_entry);
+  entry->AddInstruction(if_inst);
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(cls, &current_locals);
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+  call_entry->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_left = new (GetAllocator())
+      HInvokeStaticOrDirect(GetAllocator(),
+                            1,
+                            DataType::Type::kVoid,
+                            0,
+                            { nullptr, 0 },
+                            nullptr,
+                            {},
+                            InvokeType::kStatic,
+                            { nullptr, 0 },
+                            HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
+  HInstruction* write_left = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                    c1,
+                                                                    nullptr,
+                                                                    DataType::Type::kInt32,
+                                                                    MemberOffset(10),
+                                                                    false,
+                                                                    0,
+                                                                    0,
+                                                                    graph_->GetDexFile(),
+                                                                    0);
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  call_left->AsInvoke()->SetRawInputAt(0, new_inst);
+  left->AddInstruction(call_left);
+  left->AddInstruction(write_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_right = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                     c2,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(write_right);
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                     nullptr,
+                                                                     DataType::Type::kInt32,
+                                                                     MemberOffset(10),
+                                                                     false,
+                                                                     0,
+                                                                     0,
+                                                                     graph_->GetDexFile(),
+                                                                     0);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  HInstruction* exit_instruction = new (GetAllocator()) HExit();
+  exit->AddInstruction(exit_instruction);
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(read_bottom));
+  EXPECT_TRUE(IsRemoved(write_right));
+  EXPECT_FALSE(IsRemoved(write_entry));
+  EXPECT_FALSE(IsRemoved(write_left));
+  EXPECT_FALSE(IsRemoved(call_left));
+  EXPECT_FALSE(IsRemoved(call_entry));
 }
 
 }  // namespace art

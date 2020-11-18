@@ -84,6 +84,12 @@ interface Filter {
 
 public class Main {
 
+  static Object ESCAPE = null;
+  static void $noinline$Escape(TestClass o) {
+    ESCAPE = o;
+    o.next.i++;
+  }
+
   /// CHECK-START: double Main.calcCircleArea(double) load_store_elimination (before)
   /// CHECK: NewInstance
   /// CHECK: InstanceFieldSet
@@ -3728,6 +3734,65 @@ public class Main {
     return t;
   }
 
+  private static boolean $noinline$getBoolean(boolean val) {
+    return val;
+  }
+
+  /// CHECK-START: int Main.$noinline$testPartialEscape1(TestClass, boolean) load_store_elimination (before)
+  /// CHECK-DAG:     ParameterValue
+  /// CHECK-DAG:     NewInstance
+  /// CHECK-DAG:     InvokeStaticOrDirect
+  /// CHECK-DAG:     InstanceFieldSet
+  /// CHECK-DAG:     InvokeStaticOrDirect
+  /// CHECK-DAG:     InstanceFieldGet
+  /// CHECK-DAG:     InstanceFieldGet
+  /// CHECK-DAG:     InstanceFieldSet
+  /// CHECK-DAG:     InstanceFieldGet
+  /// CHECK-DAG:     InstanceFieldGet
+  /// CHECK-DAG:     Phi
+  //
+  /// CHECK-NOT:     NewInstance
+  /// CHECK-NOT:     InvokeStaticOrDirect
+  /// CHECK-NOT:     InstanceFieldSet
+  /// CHECK-NOT:     InstanceFieldGet
+  //
+  /// CHECK-START: int Main.$noinline$testPartialEscape1(TestClass, boolean) load_store_elimination (after)
+  /// CHECK-DAG:     ParameterValue
+  /// CHECK-DAG:     NewInstance
+  /// CHECK-DAG:     Phi
+  //
+  /// CHECK-START: int Main.$noinline$testPartialEscape1(TestClass, boolean) load_store_elimination (after)
+  /// CHECK:         InvokeStaticOrDirect
+  /// CHECK:         InvokeStaticOrDirect
+  //
+  /// CHECK-NOT:     InvokeStaticOrDirect
+
+  /// CHECK-START: int Main.$noinline$testPartialEscape1(TestClass, boolean) load_store_elimination (after)
+  /// CHECK:         InstanceFieldSet
+  //
+  /// CHECK-NOT:     InstanceFieldSet
+  //
+  /// CHECK-START: int Main.$noinline$testPartialEscape1(TestClass, boolean) load_store_elimination (after)
+  /// CHECK:         InstanceFieldGet
+  /// CHECK:         InstanceFieldGet
+  /// CHECK:         InstanceFieldGet
+  //
+  /// CHECK-NOT:     InstanceFieldGet
+  private static int $noinline$testPartialEscape1(TestClass obj, boolean escape) {
+    TestClass i = new SubTestClass();
+    int res;
+    if ($noinline$getBoolean(escape)) {
+      i.next = obj;
+      $noinline$Escape(i);
+      res = i.next.i;
+    } else {
+      i.next = obj;
+      res = i.next.i;
+    }
+    return res;
+  }
+
+
   private static void $noinline$clobberObservables() {}
 
   static void assertLongEquals(long result, long expected) {
@@ -4129,5 +4194,7 @@ public class Main {
     assertIntEquals(testNestedLoop8(new TestClass(), 3), 0);
     assertLongEquals(testOverlapLoop(10), 34l);
     assertLongEquals(testOverlapLoop(50), 7778742049l);
+    assertIntEquals($noinline$testPartialEscape1(new TestClass(), true), 1);
+    assertIntEquals($noinline$testPartialEscape1(new TestClass(), false), 0);
   }
 }
