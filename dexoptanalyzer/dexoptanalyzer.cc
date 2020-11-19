@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "dexoptanalyzer.h"
+
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -35,25 +37,7 @@
 #include "thread-inl.h"
 
 namespace art {
-
-// See OatFileAssistant docs for the meaning of the valid return codes.
-enum ReturnCodes {
-  kNoDexOptNeeded = 0,
-  kDex2OatFromScratch = 1,
-  kDex2OatForBootImageOat = 2,
-  kDex2OatForFilterOat = 3,
-  kDex2OatForBootImageOdex = 4,
-  kDex2OatForFilterOdex = 5,
-
-  // Success return code when executed with --flatten-class-loader-context.
-  // Success is typically signalled with a zero but we use a non-colliding
-  // code to communicate that the flattening code path was taken.
-  kFlattenClassLoaderContextSuccess = 50,
-
-  kErrorInvalidArguments = 101,
-  kErrorCannotCreateRuntime = 102,
-  kErrorUnknownDexOptNeeded = 103
-};
+namespace dexoptanalyzer {
 
 static int original_argc;
 static char** original_argv;
@@ -150,7 +134,7 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("        kErrorUnknownDexOptNeeded = 103");
   UsageError("");
 
-  exit(kErrorInvalidArguments);
+  exit(static_cast<int>(ReturnCode::kErrorInvalidArguments));
 }
 
 class DexoptAnalyzer final {
@@ -287,9 +271,9 @@ class DexoptAnalyzer final {
     return true;
   }
 
-  int GetDexOptNeeded() const {
+  ReturnCode GetDexOptNeeded() const {
     if (!CreateRuntime()) {
-      return kErrorCannotCreateRuntime;
+      return ReturnCode::kErrorCannotCreateRuntime;
     }
     std::unique_ptr<Runtime> runtime(Runtime::Current());
 
@@ -315,7 +299,7 @@ class DexoptAnalyzer final {
     // Always treat elements of the bootclasspath as up-to-date.
     // TODO(calin): this check should be in OatFileAssistant.
     if (oat_file_assistant->IsInBootClassPath()) {
-      return kNoDexOptNeeded;
+      return ReturnCode::kNoDexOptNeeded;
     }
 
     int dexoptNeeded = oat_file_assistant->GetDexOptNeeded(compiler_filter_,
@@ -326,23 +310,23 @@ class DexoptAnalyzer final {
 
     // Convert OatFileAssitant codes to dexoptanalyzer codes.
     switch (dexoptNeeded) {
-      case OatFileAssistant::kNoDexOptNeeded: return kNoDexOptNeeded;
-      case OatFileAssistant::kDex2OatFromScratch: return kDex2OatFromScratch;
-      case OatFileAssistant::kDex2OatForBootImage: return kDex2OatForBootImageOat;
-      case OatFileAssistant::kDex2OatForFilter: return kDex2OatForFilterOat;
+      case OatFileAssistant::kNoDexOptNeeded: return ReturnCode::kNoDexOptNeeded;
+      case OatFileAssistant::kDex2OatFromScratch: return ReturnCode::kDex2OatFromScratch;
+      case OatFileAssistant::kDex2OatForBootImage: return ReturnCode::kDex2OatForBootImageOat;
+      case OatFileAssistant::kDex2OatForFilter: return ReturnCode::kDex2OatForFilterOat;
 
-      case -OatFileAssistant::kDex2OatForBootImage: return kDex2OatForBootImageOdex;
-      case -OatFileAssistant::kDex2OatForFilter: return kDex2OatForFilterOdex;
+      case -OatFileAssistant::kDex2OatForBootImage: return ReturnCode::kDex2OatForBootImageOdex;
+      case -OatFileAssistant::kDex2OatForFilter: return ReturnCode::kDex2OatForFilterOdex;
       default:
         LOG(ERROR) << "Unknown dexoptNeeded " << dexoptNeeded;
-        return kErrorUnknownDexOptNeeded;
+        return ReturnCode::kErrorUnknownDexOptNeeded;
     }
   }
 
-  int FlattenClassLoaderContext() const {
+  ReturnCode FlattenClassLoaderContext() const {
     DCHECK(only_flatten_context_);
     if (context_str_.empty()) {
-      return kErrorInvalidArguments;
+      return ReturnCode::kErrorInvalidArguments;
     }
 
     std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str_);
@@ -351,10 +335,10 @@ class DexoptAnalyzer final {
     }
 
     std::cout << context->FlattenDexPaths() << std::flush;
-    return kFlattenClassLoaderContextSuccess;
+    return ReturnCode::kFlattenClassLoaderContextSuccess;
   }
 
-  int Run() const {
+  ReturnCode Run() const {
     if (only_flatten_context_) {
       return FlattenClassLoaderContext();
     } else {
@@ -379,7 +363,7 @@ class DexoptAnalyzer final {
   std::vector<int> context_fds_;
 };
 
-static int dexoptAnalyze(int argc, char** argv) {
+static ReturnCode dexoptAnalyze(int argc, char** argv) {
   DexoptAnalyzer analyzer;
 
   // Parse arguments. Argument mistakes will lead to exit(kErrorInvalidArguments) in UsageError.
@@ -387,8 +371,10 @@ static int dexoptAnalyze(int argc, char** argv) {
   return analyzer.Run();
 }
 
+}  // namespace dexoptanalyzer
 }  // namespace art
 
 int main(int argc, char **argv) {
-  return art::dexoptAnalyze(argc, argv);
+  art::dexoptanalyzer::ReturnCode return_code = art::dexoptanalyzer::dexoptAnalyze(argc, argv);
+  return static_cast<int>(return_code);
 }
