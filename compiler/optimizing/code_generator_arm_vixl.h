@@ -540,7 +540,7 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
                   vixl::aarch32::Register card,
                   vixl::aarch32::Register object,
                   vixl::aarch32::Register value,
-                  bool can_be_null);
+                  bool value_can_be_null);
 
   void GenerateMemoryBarrier(MemBarrierKind kind);
 
