@@ -297,7 +297,7 @@ include $(CLEAR_VARS)
 #
 # `com.android.art-autoselect` is an "alias" for either the release or the debug
 # module. By default, "user" build variants contain the release module, while
-# "userdebug" and "eng" build variants contain the debug module. However, if
+# "eng" build variant contain the debug module. However, if
 # `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is defined, it overrides the previous
 # logic:
 # - if `PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD` is set to `false`, the
@@ -308,7 +308,7 @@ include $(CLEAR_VARS)
 
 art_target_include_debug_build := $(PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD)
 ifneq (false,$(art_target_include_debug_build))
-  ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+  ifneq (,$(filter eng,$(TARGET_BUILD_VARIANT)))
     art_target_include_debug_build := true
   endif
 endif
