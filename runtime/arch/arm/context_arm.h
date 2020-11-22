@@ -46,6 +46,10 @@ class ArmContext final : public Context {
     SetGPR(PC, new_pc);
   }
 
+  void SetNterpDexPC(uintptr_t dex_pc_ptr) override {
+    SetGPR(R11, dex_pc_ptr);
+  }
+
   void SetArg0(uintptr_t new_arg0_value) override {
     SetGPR(R0, new_arg0_value);
   }

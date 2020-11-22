@@ -107,14 +107,17 @@ bool NullPointerHandler::Action(int sig ATTRIBUTE_UNUSED, siginfo_t* info, void*
   struct ucontext *uc = reinterpret_cast<struct ucontext*>(context);
   struct sigcontext *sc = reinterpret_cast<struct sigcontext*>(&uc->uc_mcontext);
   uint8_t* ptr = reinterpret_cast<uint8_t*>(sc->arm_pc);
-  uint32_t instr_size = GetInstructionSize(ptr);
-  uintptr_t gc_map_location = (sc->arm_pc + instr_size) | 1;
+  bool in_thumb_mode = sc->arm_cpsr & (1 << 5);
+  uint32_t instr_size = in_thumb_mode ? GetInstructionSize(ptr) : 4;
+  uintptr_t gc_map_location = (sc->arm_pc + instr_size) | (in_thumb_mode ? 1 : 0);
 
   // Push the gc map location to the stack and pass the fault address in LR.
   sc->arm_sp -= sizeof(uintptr_t);
   *reinterpret_cast<uintptr_t*>(sc->arm_sp) = gc_map_location;
   sc->arm_lr = reinterpret_cast<uintptr_t>(info->si_addr);
   sc->arm_pc = reinterpret_cast<uintptr_t>(art_quick_throw_null_pointer_exception_from_signal);
+  // Make sure the thumb bit is set as the handler is in thumb mode.
+  sc->arm_cpsr = sc->arm_cpsr | (1 << 5);
   // Pass the faulting address as the first argument of
   // art_quick_throw_null_pointer_exception_from_signal.
   VLOG(signals) << "Generating null pointer exception";
@@ -230,6 +233,9 @@ bool StackOverflowHandler::Action(int sig ATTRIBUTE_UNUSED, siginfo_t* info ATTR
   // caused this fault.  This will be inserted into a callee save frame by
   // the function to which this handler returns (art_quick_throw_stack_overflow).
   sc->arm_pc = reinterpret_cast<uintptr_t>(art_quick_throw_stack_overflow);
+
+  // Make sure the thumb bit is set as the handler is in thumb mode.
+  sc->arm_cpsr = sc->arm_cpsr | (1 << 5);
 
   // The kernel will now return to the address in sc->arm_pc.
   return true;
