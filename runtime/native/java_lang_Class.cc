@@ -24,6 +24,7 @@
 #include "class_linker-inl.h"
 #include "class_root-inl.h"
 #include "common_throws.h"
+#include "compat_framework.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_annotations.h"
@@ -104,8 +105,9 @@ static hiddenapi::AccessContext GetReflectionCaller(Thread* self)
         // and walking over this frame would cause a null pointer dereference
         // (e.g. in 691-hiddenapi-proxy).
         ObjPtr<mirror::Class> proxy_class = GetClassRoot<mirror::Proxy>();
+        CompatFramework& compat_framework = Runtime::Current()->GetCompatFramework();
         if (declaring_class->IsInSamePackage(proxy_class) && declaring_class != proxy_class) {
-          if (Runtime::Current()->isChangeEnabled(kPreventMetaReflectionBlocklistAccess)) {
+          if (compat_framework.IsChangeEnabled(kPreventMetaReflectionBlocklistAccess)) {
             return true;
           }
         }

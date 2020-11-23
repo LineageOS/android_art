@@ -321,7 +321,8 @@ extern "C" JNIEXPORT jint JNICALL Java_Reflection_getHiddenApiAccessFlags(JNIEnv
 
 extern "C" JNIEXPORT void JNICALL Java_Reflection_setHiddenApiCheckHardening(JNIEnv*, jclass,
     jboolean value) {
-  std::set<uint64_t> disabled_changes = Runtime::Current()->GetDisabledCompatChanges();
+  CompatFramework& compat_framework = Runtime::Current()->GetCompatFramework();
+  std::set<uint64_t> disabled_changes = compat_framework.GetDisabledCompatChanges();
   if (value == JNI_TRUE) {
     // If hidden api check hardening is enabled, remove it from the set of disabled changes.
     disabled_changes.erase(kPreventMetaReflectionBlocklistAccess);
@@ -329,7 +330,7 @@ extern "C" JNIEXPORT void JNICALL Java_Reflection_setHiddenApiCheckHardening(JNI
     // If hidden api check hardening is disabled, add it to the set of disabled changes.
     disabled_changes.insert(kPreventMetaReflectionBlocklistAccess);
   }
-  Runtime::Current()->SetDisabledCompatChanges(disabled_changes);
+  compat_framework.SetDisabledCompatChanges(disabled_changes);
 }
 
 }  // namespace Test674HiddenApi
