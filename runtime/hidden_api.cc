@@ -20,6 +20,7 @@
 
 #include "art_field-inl.h"
 #include "art_method-inl.h"
+#include "compat_framework.h"
 #include "base/dumpable.h"
 #include "base/file_utils.h"
 #include "dex/class_accessor-inl.h"
@@ -476,6 +477,7 @@ template<typename T>
 bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod access_method) {
   DCHECK(member != nullptr);
   Runtime* runtime = Runtime::Current();
+  CompatFramework& compatFramework = runtime->GetCompatFramework();
 
   EnforcementPolicy hiddenApiPolicy = runtime->GetHiddenApiEnforcementPolicy();
   DCHECK(hiddenApiPolicy != EnforcementPolicy::kDisabled)
@@ -501,10 +503,10 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
     } else {
       switch (api_list.GetMaxAllowedSdkVersion()) {
         case SdkVersion::kP:
-          deny_access = runtime->isChangeEnabled(kHideMaxtargetsdkPHiddenApis);
+          deny_access = compatFramework.IsChangeEnabled(kHideMaxtargetsdkPHiddenApis);
           break;
         case SdkVersion::kQ:
-          deny_access = runtime->isChangeEnabled(kHideMaxtargetsdkQHiddenApis);
+          deny_access = compatFramework.IsChangeEnabled(kHideMaxtargetsdkQHiddenApis);
           break;
         default:
           deny_access = IsSdkVersionSetAndMoreThan(runtime->GetTargetSdkVersion(),
