@@ -269,6 +269,7 @@ Runtime::Runtime()
       preinitialization_transactions_(),
       verify_(verifier::VerifyMode::kNone),
       target_sdk_version_(static_cast<uint32_t>(SdkVersion::kUnset)),
+      compat_framework_(),
       implicit_null_checks_(false),
       implicit_so_checks_(false),
       implicit_suspend_checks_(false),
