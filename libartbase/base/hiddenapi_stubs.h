@@ -48,7 +48,7 @@ class ApiStubs {
   static bool IsStubsFlag(const std::string_view& api_flag_name) {
     return api_flag_name == kPublicApiStr || api_flag_name == kSystemApiStr ||
         api_flag_name == kTestApiStr || api_flag_name == kCorePlatformApiStr ||
-        api_flag_name == kRemovedApiStr;
+        api_flag_name == kRemovedApiStr || api_flag_name == kLowPriorityApiStr;
   }
 
  private:
@@ -57,6 +57,7 @@ class ApiStubs {
   static constexpr std::string_view kTestApiStr{"test-api"};
   static constexpr std::string_view kCorePlatformApiStr{"core-platform-api"};
   static constexpr std::string_view kRemovedApiStr{"removed"};
+  static constexpr std::string_view kLowPriorityApiStr{"lo-prio"};
 };
 
 }  // namespace hiddenapi
