@@ -34,11 +34,13 @@
 namespace art {
 namespace hiddenapi {
 
-// Should be the same as dalvik.system.VMRuntime.HIDE_MAXTARGETSDK_P_HIDDEN_APIS and
-// dalvik.system.VMRuntime.HIDE_MAXTARGETSDK_Q_HIDDEN_APIS.
+// Should be the same as dalvik.system.VMRuntime.HIDE_MAXTARGETSDK_P_HIDDEN_APIS,
+// dalvik.system.VMRuntime.HIDE_MAXTARGETSDK_Q_HIDDEN_APIS, and
+// dalvik.system.VMRuntime.EXEMPT_TEST_API_ACCESS_VERIFICATION.
 // Corresponds to bug ids.
 static constexpr uint64_t kHideMaxtargetsdkPHiddenApis = 149997251;
 static constexpr uint64_t kHideMaxtargetsdkQHiddenApis = 149994052;
+static constexpr uint64_t kAllowTestApiAccess = 166236554;
 
 // Set to true if we should always print a warning in logcat for all hidden API accesses, not just
 // conditionally and unconditionally blocked. This can be set to true for developer preview / beta
@@ -498,7 +500,9 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
 
   bool deny_access = false;
   if (hiddenApiPolicy == EnforcementPolicy::kEnabled) {
-    if (testApiPolicy == EnforcementPolicy::kDisabled && api_list.IsTestApi()) {
+    if (api_list.IsTestApi() &&
+      (testApiPolicy == EnforcementPolicy::kDisabled ||
+        compatFramework.IsChangeEnabled(kAllowTestApiAccess))) {
       deny_access = false;
     } else {
       switch (api_list.GetMaxAllowedSdkVersion()) {
