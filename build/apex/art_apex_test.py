@@ -798,6 +798,7 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('compiler_driver_test')
     self._checker.check_art_test_executable('dex2oat_image_test')
     self._checker.check_art_test_executable('dex2oat_test')
+    self._checker.check_art_test_executable('dex2oat_vdex_test')
     self._checker.check_art_test_executable('dex_to_dex_decompiler_test')
     self._checker.check_art_test_executable('elf_writer_test')
     self._checker.check_art_test_executable('image_test')
