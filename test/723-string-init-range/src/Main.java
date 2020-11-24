@@ -33,5 +33,11 @@ public class Main {
     if (!expected.equals(result)) {
       throw new Error("Expected '" + expected + "', got " + result);
     }
+
+    m = c.getMethod("initRangeWithAlias", String.class);
+    result = (String)m.invoke(null, expected);
+    if (!expected.equals(result)) {
+      throw new Error("Expected '" + expected + "', got " + result);
+    }
   }
 }

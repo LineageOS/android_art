@@ -391,7 +391,7 @@ END \name
 .macro SETUP_STACK_FRAME code_item, refs, fp, cfi_refs, load_ins
     FETCH_CODE_ITEM_INFO \code_item, wip, wip2, w15, \load_ins
 
-    // Compute required frame size: ((2 * ip) + ip1) * 4 + 24
+    // Compute required frame size: ((2 * ip) + ip2) * 4 + 24
     // 24 is for saving the previous frame, pc, and method being executed.
     add x14, ip, ip
     add x14, x14, ip2
@@ -1166,7 +1166,7 @@ END \name
    cmp ip, #68       // Test if result type char == 'D'.
    b.eq .Lreturn_double_range_\suffix
    cmp ip, #70
-   b.ne .Ldone_return_\suffix
+   b.ne .Ldone_return_range_\suffix
 .Lreturn_float_range_\suffix:
    fmov w0, s0
    b .Ldone_return_range_\suffix
