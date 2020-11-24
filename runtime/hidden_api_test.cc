@@ -83,13 +83,14 @@ class HiddenApiTest : public CommonRuntimeTest {
   }
 
   void setChangeIdState(uint64_t change, bool enabled) {
-    std::set<uint64_t> disabled_changes = runtime_->GetDisabledCompatChanges();
+    CompatFramework& compat_framework = runtime_->GetCompatFramework();
+    std::set<uint64_t> disabled_changes = compat_framework.GetDisabledCompatChanges();
     if (enabled) {
       disabled_changes.erase(change);
     } else {
       disabled_changes.insert(change);
     }
-    runtime_->SetDisabledCompatChanges(disabled_changes);
+    compat_framework.SetDisabledCompatChanges(disabled_changes);
   }
 
   bool ShouldDenyAccess(hiddenapi::ApiList list) REQUIRES_SHARED(Locks::mutator_lock_) {
