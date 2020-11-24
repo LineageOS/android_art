@@ -39,6 +39,8 @@
 
 namespace art {
 
+static constexpr bool kDebugArgs = false;
+
 // Test class that provides some helpers to set a test up for compilation using dex2oat.
 class Dex2oatEnvironmentTest : public CommonRuntimeTest {
  public:
@@ -201,6 +203,107 @@ class Dex2oatEnvironmentTest : public CommonRuntimeTest {
   // files should be located.
   const std::string& GetOdexDir() const {
     return odex_dir_;
+  }
+
+  int Dex2Oat(
+        const std::vector<std::string>& dex2oat_args,
+        std::string* output,
+        std::string* error_msg) {
+    Runtime* runtime = Runtime::Current();
+
+    const std::vector<gc::space::ImageSpace*>& image_spaces =
+        runtime->GetHeap()->GetBootImageSpaces();
+    if (image_spaces.empty()) {
+      *error_msg = "No image location found for Dex2Oat.";
+      return false;
+    }
+    std::string image_location = image_spaces[0]->GetImageLocation();
+
+    std::vector<std::string> argv;
+    argv.push_back(runtime->GetCompilerExecutable());
+
+    if (runtime->IsJavaDebuggable()) {
+      argv.push_back("--debuggable");
+    }
+    runtime->AddCurrentRuntimeFeaturesAsDex2OatArguments(&argv);
+
+    if (!runtime->IsVerificationEnabled()) {
+      argv.push_back("--compiler-filter=assume-verified");
+    }
+
+    if (runtime->MustRelocateIfPossible()) {
+      argv.push_back("--runtime-arg");
+      argv.push_back("-Xrelocate");
+    } else {
+      argv.push_back("--runtime-arg");
+      argv.push_back("-Xnorelocate");
+    }
+
+    if (!kIsTargetBuild) {
+      argv.push_back("--host");
+    }
+
+    argv.push_back("--boot-image=" + image_location);
+
+    std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
+    argv.insert(argv.end(), compiler_options.begin(), compiler_options.end());
+
+    argv.insert(argv.end(), dex2oat_args.begin(), dex2oat_args.end());
+
+    // We must set --android-root.
+    const char* android_root = getenv("ANDROID_ROOT");
+    CHECK(android_root != nullptr);
+    argv.push_back("--android-root=" + std::string(android_root));
+
+    if (kDebugArgs) {
+      std::string all_args;
+      for (const std::string& arg : argv) {
+        all_args += arg + " ";
+      }
+      LOG(ERROR) << all_args;
+    }
+
+    int link[2];
+
+    if (pipe(link) == -1) {
+      ::testing::AssertionFailure() << "Failed to pipe: " << *error_msg;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+      ::testing::AssertionFailure() << "Failed to fork: " << *error_msg;
+    }
+
+    if (pid == 0) {
+      // We need dex2oat to actually log things.
+      setenv("ANDROID_LOG_TAGS", "*:d", 1);
+      dup2(link[1], STDERR_FILENO);
+      close(link[0]);
+      close(link[1]);
+      std::vector<const char*> c_args;
+      for (const std::string& str : argv) {
+        c_args.push_back(str.c_str());
+      }
+      c_args.push_back(nullptr);
+      execv(c_args[0], const_cast<char* const*>(c_args.data()));
+      exit(1);
+      UNREACHABLE();
+    } else {
+      close(link[1]);
+      char buffer[128];
+      memset(buffer, 0, 128);
+      ssize_t bytes_read = 0;
+
+      while (TEMP_FAILURE_RETRY(bytes_read = read(link[0], buffer, 128)) > 0) {
+        *output += std::string(buffer, bytes_read);
+      }
+      close(link[0]);
+      int status = -1;
+      if (waitpid(pid, &status, 0) != -1) {
+        ::testing::AssertionFailure() << "dex2oat fork/exec failed: " << *error_msg;
+      }
+      return status;
+    }
   }
 
  private:
