@@ -47,7 +47,7 @@
 namespace art {
 
 static constexpr size_t kMaxMethodIds = 65535;
-static constexpr bool kDebugArgs = false;
+
 static const char* kDisableCompactDex = "--compact-dex-level=none";
 
 using android::base::StringPrintf;
@@ -59,7 +59,6 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
 
     output_ = "";
     error_msg_ = "";
-    success_ = false;
   }
 
  protected:
@@ -89,7 +88,7 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
 
     args.insert(args.end(), extra_args.begin(), extra_args.end());
 
-    int status = Dex2Oat(args, error_msg);
+    int status = Dex2Oat(args, &output_, error_msg);
     if (oat_file != nullptr) {
       CHECK_EQ(oat_file->FlushClose(), 0) << "Could not flush and close oat file";
     }
@@ -175,107 +174,8 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
     EXPECT_EQ(expected, actual);
   }
 
-  int Dex2Oat(const std::vector<std::string>& dex2oat_args, std::string* error_msg) {
-    Runtime* runtime = Runtime::Current();
-
-    const std::vector<gc::space::ImageSpace*>& image_spaces =
-        runtime->GetHeap()->GetBootImageSpaces();
-    if (image_spaces.empty()) {
-      *error_msg = "No image location found for Dex2Oat.";
-      return false;
-    }
-    std::string image_location = image_spaces[0]->GetImageLocation();
-
-    std::vector<std::string> argv;
-    argv.push_back(runtime->GetCompilerExecutable());
-
-    if (runtime->IsJavaDebuggable()) {
-      argv.push_back("--debuggable");
-    }
-    runtime->AddCurrentRuntimeFeaturesAsDex2OatArguments(&argv);
-
-    if (!runtime->IsVerificationEnabled()) {
-      argv.push_back("--compiler-filter=assume-verified");
-    }
-
-    if (runtime->MustRelocateIfPossible()) {
-      argv.push_back("--runtime-arg");
-      argv.push_back("-Xrelocate");
-    } else {
-      argv.push_back("--runtime-arg");
-      argv.push_back("-Xnorelocate");
-    }
-
-    if (!kIsTargetBuild) {
-      argv.push_back("--host");
-    }
-
-    argv.push_back("--boot-image=" + image_location);
-
-    std::vector<std::string> compiler_options = runtime->GetCompilerOptions();
-    argv.insert(argv.end(), compiler_options.begin(), compiler_options.end());
-
-    argv.insert(argv.end(), dex2oat_args.begin(), dex2oat_args.end());
-
-    // We must set --android-root.
-    const char* android_root = getenv("ANDROID_ROOT");
-    CHECK(android_root != nullptr);
-    argv.push_back("--android-root=" + std::string(android_root));
-
-    if (kDebugArgs) {
-      std::string all_args;
-      for (const std::string& arg : argv) {
-        all_args += arg + " ";
-      }
-      LOG(ERROR) << all_args;
-    }
-
-    int link[2];
-
-    if (pipe(link) == -1) {
-      return false;
-    }
-
-    pid_t pid = fork();
-    if (pid == -1) {
-      return false;
-    }
-
-    if (pid == 0) {
-      // We need dex2oat to actually log things.
-      setenv("ANDROID_LOG_TAGS", "*:d", 1);
-      dup2(link[1], STDERR_FILENO);
-      close(link[0]);
-      close(link[1]);
-      std::vector<const char*> c_args;
-      for (const std::string& str : argv) {
-        c_args.push_back(str.c_str());
-      }
-      c_args.push_back(nullptr);
-      execv(c_args[0], const_cast<char* const*>(c_args.data()));
-      exit(1);
-      UNREACHABLE();
-    } else {
-      close(link[1]);
-      char buffer[128];
-      memset(buffer, 0, 128);
-      ssize_t bytes_read = 0;
-
-      while (TEMP_FAILURE_RETRY(bytes_read = read(link[0], buffer, 128)) > 0) {
-        output_ += std::string(buffer, bytes_read);
-      }
-      close(link[0]);
-      int status = -1;
-      if (waitpid(pid, &status, 0) != -1) {
-        success_ = (status == 0);
-      }
-      return status;
-    }
-  }
-
   std::string output_ = "";
   std::string error_msg_ = "";
-  bool success_ = false;
 };
 
 class Dex2oatSwapTest : public Dex2oatTest {
@@ -299,7 +199,6 @@ class Dex2oatSwapTest : public Dex2oatTest {
     GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed, copy);
 
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(expect_use);
   }
 
@@ -524,7 +423,6 @@ class Dex2oatVeryLargeTest : public Dex2oatTest {
     GenerateOdexForTest(dex_location, odex_location, filter, new_args);
 
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(dex_location,
                 odex_location,
                 app_image_file,
@@ -748,7 +646,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
                          /* use_fd */ false,
                          /* num_profile_classes */ 0);
       CheckValidity();
-      ASSERT_TRUE(success_);
       // Don't check the result since CheckResult relies on the class being in the profile.
       image_file_empty_profile = GetImageObjectSectionSize(app_image_file);
       EXPECT_GT(image_file_empty_profile, 0u);
@@ -761,7 +658,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
                        /* use_fd */ false,
                        /* num_profile_classes */ 1);
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(dex_location, odex_location, app_image_file);
 
     if (app_image) {
@@ -807,7 +703,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
     }
     ASSERT_EQ(vdex_file1->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     CheckValidity();
-    ASSERT_TRUE(success_);
   }
 
   void CheckResult(const std::string& dex_location,
@@ -929,7 +824,6 @@ class Dex2oatUnquickenTest : public Dex2oatTest {
     }
     ASSERT_EQ(vdex_file1->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     CheckResult(dex_location, odex_location);
-    ASSERT_TRUE(success_);
   }
 
   void RunUnquickenMultiDexCDex() {
@@ -972,7 +866,6 @@ class Dex2oatUnquickenTest : public Dex2oatTest {
     ASSERT_EQ(vdex_file1->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     ASSERT_EQ(vdex_file2->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     CheckResult(dex_location, odex_location2);
-    ASSERT_TRUE(success_);
   }
 
   void CheckResult(const std::string& dex_location, const std::string& odex_location) {
@@ -2003,7 +1896,6 @@ TEST_F(Dex2oatTest, QuickenedInput) {
                         /* use_fd */ true);
   }
   ASSERT_EQ(vdex_unquickened->Flush(), 0) << "Could not flush and close vdex file";
-  ASSERT_TRUE(success_);
   {
     // Check that hte vdex has one dex and compare it to the original one.
     std::unique_ptr<VdexFile> vdex(VdexFile::Open(vdex_location2.c_str(),
