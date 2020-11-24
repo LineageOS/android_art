@@ -1070,7 +1070,7 @@ void CodeGeneratorARM64::Finalize(CodeAllocator* allocator) {
           uint32_t prev_insn = GetInsn(literal_offset - 4u);
           const uint32_t root_reg = BakerReadBarrierFirstRegField::Decode(encoded_data);
           // Usually LDR (immediate) with correct root_reg but
-          // we may have a "MOV marked, old_value" for UnsafeCASObject.
+          // we may have a "MOV marked, old_value" for intrinsic CAS.
           if ((prev_insn & 0xffe0ffff) != (0x2a0003e0 | root_reg)) {    // MOV?
             CHECK_EQ(prev_insn & 0xffc0001fu, 0xb9400000u | root_reg);  // LDR?
           }
@@ -6504,21 +6504,21 @@ void CodeGeneratorARM64::GenerateGcRootFieldLoad(
   MaybeGenerateMarkingRegisterCheck(/* code= */ __LINE__);
 }
 
-void CodeGeneratorARM64::GenerateUnsafeCasOldValueMovWithBakerReadBarrier(
-    vixl::aarch64::Register marked,
+void CodeGeneratorARM64::GenerateIntrinsicCasMoveWithBakerReadBarrier(
+    vixl::aarch64::Register marked_old_value,
     vixl::aarch64::Register old_value) {
   DCHECK(kEmitCompilerReadBarrier);
   DCHECK(kUseBakerReadBarrier);
 
   // Similar to the Baker RB path in GenerateGcRootFieldLoad(), with a MOV instead of LDR.
-  uint32_t custom_data = EncodeBakerReadBarrierGcRootData(marked.GetCode());
+  uint32_t custom_data = EncodeBakerReadBarrierGcRootData(marked_old_value.GetCode());
 
   ExactAssemblyScope guard(GetVIXLAssembler(), 3 * vixl::aarch64::kInstructionSize);
   vixl::aarch64::Label return_address;
   __ adr(lr, &return_address);
   static_assert(BAKER_MARK_INTROSPECTION_GC_ROOT_LDR_OFFSET == -8,
                 "GC root LDR must be 2 instructions (8B) before the return address label.");
-  __ mov(marked, old_value);
+  __ mov(marked_old_value, old_value);
   EmitBakerReadBarrierCbnz(custom_data);
   __ bind(&return_address);
 }
