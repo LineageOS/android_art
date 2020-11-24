@@ -277,7 +277,7 @@ static void VMRuntime_setDisabledCompatChangesNative(JNIEnv* env, jobject,
   for (int i = 0; i < length; i++) {
     disabled_compat_changes_set.insert(static_cast<uint64_t>(elements[i]));
   }
-  Runtime::Current()->SetDisabledCompatChanges(disabled_compat_changes_set);
+  Runtime::Current()->GetCompatFramework().SetDisabledCompatChanges(disabled_compat_changes_set);
 }
 
 static inline size_t clamp_to_size_t(jlong n) {
