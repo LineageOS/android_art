@@ -19,12 +19,14 @@
 
 #include <map>
 #include <unordered_set>
+#include <unordered_map>
 
 #include "base/utils.h"
 #include "debug/debug_info.h"
 #include "debug/method_debug_info.h"
-#include "dex/dex_file-inl.h"
 #include "dex/code_item_accessors.h"
+#include "dex/descriptors_names.h"
+#include "dex/dex_file-inl.h"
 #include "elf/elf_builder.h"
 
 namespace art {
@@ -43,6 +45,39 @@ constexpr bool kGenerateArmMappingSymbol = true;
 // Magic name for .symtab symbols which enumerate dex files used
 // by this ELF file (currently mmapped inside the .dex section).
 constexpr const char* kDexFileSymbolName = "$dexfile";
+
+// Return common parts of method names; shared by all methods in the given set.
+// (e.g. "[DEDUPED] ?.<init>" or "com.android.icu.charset.CharsetEncoderICU.?")
+static void GetDedupedName(const std::vector<const MethodDebugInfo*>& methods, std::string* out) {
+  DCHECK(!methods.empty());
+  const MethodDebugInfo* first = methods.front();
+  auto is_same_class = [&first](const MethodDebugInfo* mi) {
+    DCHECK(mi->dex_file != nullptr);
+    return mi->dex_file == first->dex_file && mi->class_def_index == first->class_def_index;
+  };
+  auto is_same_method_name = [&first](const MethodDebugInfo* mi) {
+    return strcmp(mi->dex_file->GetMethodName(mi->dex_method_index),
+                  first->dex_file->GetMethodName(first->dex_method_index)) == 0;
+  };
+  bool all_same_class = std::all_of(methods.begin(), methods.end(), is_same_class);
+  bool all_same_method_name = std::all_of(methods.begin(), methods.end(), is_same_method_name);
+  *out = "[DEDUPED]";
+  if (all_same_class || all_same_method_name) {
+    *out += ' ';
+    if (all_same_class) {
+      auto& dex_class_def = first->dex_file->GetClassDef(first->class_def_index);
+      AppendPrettyDescriptor(first->dex_file->GetClassDescriptor(dex_class_def), &*out);
+    } else {
+      *out += '?';
+    }
+    *out += '.';
+    if (all_same_method_name) {
+      *out += first->dex_file->GetMethodName(first->dex_method_index);
+    } else {
+      *out += '?';
+    }
+  }
+}
 
 template <typename ElfTypes>
 static void WriteDebugSymbols(ElfBuilder<ElfTypes>* builder,
@@ -71,6 +106,15 @@ static void WriteDebugSymbols(ElfBuilder<ElfTypes>* builder,
     }
   }
 
+  // Create list of deduped methods per function address.
+  // We have to do it separately since the first method does not have the deduped flag.
+  std::unordered_map<uint64_t, std::vector<const MethodDebugInfo*>> deduped_methods;
+  for (const MethodDebugInfo& info : debug_info.compiled_methods) {
+    if (deduped_addresses.find(info.code_address) != deduped_addresses.end()) {
+      deduped_methods[info.code_address].push_back(&info);
+    }
+  }
+
   strtab->Start();
   strtab->Write("");  // strtab should start with empty string.
   // Generate ARM mapping symbols. ELF local symbols must be added first.
@@ -89,7 +133,10 @@ static void WriteDebugSymbols(ElfBuilder<ElfTypes>* builder,
       DCHECK(info.dex_file != nullptr);
       std::string name = info.dex_file->PrettyMethod(info.dex_method_index, !mini_debug_info);
       if (deduped_addresses.find(info.code_address) != deduped_addresses.end()) {
-        name = "[DEDUPED] " + name;
+        // Create method name common to all the deduped methods if possible.
+        // Around half of the time, there is either common class or method name.
+        // NB: We used to return one method at random with tag, but developers found it confusing.
+        GetDedupedName(deduped_methods[info.code_address], &name);
       }
       name_offset = strtab->Write(name);
     }
