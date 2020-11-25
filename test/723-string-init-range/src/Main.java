@@ -26,5 +26,18 @@ public class Main {
     if (!expected.equals(result)) {
       throw new Error("Expected '" + expected + "', got " + result);
     }
+
+    m = c.getMethod("initRange", byte[].class, int.class, int.class, int.class);
+    byte[] byteArray = expected.getBytes();
+    result = (String)m.invoke(null, byteArray, 0, 0, 5);
+    if (!expected.equals(result)) {
+      throw new Error("Expected '" + expected + "', got " + result);
+    }
+
+    m = c.getMethod("initRangeWithAlias", String.class);
+    result = (String)m.invoke(null, expected);
+    if (!expected.equals(result)) {
+      throw new Error("Expected '" + expected + "', got " + result);
+    }
   }
 }

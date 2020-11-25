@@ -42,17 +42,22 @@ export OUT_DIR=${OUT_DIR:-out}
 export DIST_DIR=${DIST_DIR:-${OUT_DIR}/dist}
 
 if [ ! -d frameworks/base ]; then
-  # Configure the build system for the reduced manifest branch.
-  build_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
-  build_args="$build_args TARGET_BUILD_UNBUNDLED=true"
+  # Configure the build system for the reduced manifest branch. These need to be
+  # passed through the environment since they have to be visible to the Soong
+  # --dumpvars-mode invocations.
+  export SOONG_ALLOW_MISSING_DEPENDENCIES=true
+  export TARGET_BUILD_UNBUNDLED=true
 fi
 
 for product in ${PRODUCTS[*]}; do
-  echo_and_run build/soong/soong_ui.bash --make-mode $build_args \
-    TARGET_PRODUCT=${product} ${MAINLINE_MODULES[*]}
+  echo_and_run build/soong/soong_ui.bash --make-mode \
+    TARGET_PRODUCT=${product} "$@" ${MAINLINE_MODULES[*]}
 
-  eval $(TARGET_PRODUCT=${product} build/soong/soong_ui.bash --dumpvars-mode \
-         --vars="PRODUCT_OUT TARGET_ARCH")
+  vars="$(TARGET_PRODUCT=${product} build/soong/soong_ui.bash --dumpvars-mode \
+          --vars="PRODUCT_OUT TARGET_ARCH")"
+  # Assign to a variable and eval that, since bash ignores any error status from
+  # the command substitution if it's directly on the eval line.
+  eval $vars
 
   mkdir -p ${DIST_DIR}/${TARGET_ARCH}
   for module in ${MAINLINE_MODULES[*]}; do
@@ -66,7 +71,7 @@ done
 # mode with make.
 export OUT_DIR=${OUT_DIR}/aml
 
-echo_and_run build/soong/scripts/build-aml-prebuilts.sh $build_args \
+echo_and_run build/soong/scripts/build-aml-prebuilts.sh "$@" \
   ${MODULES_SDK_AND_EXPORTS[*]}
 
 rm -rf ${DIST_DIR}/mainline-sdks
