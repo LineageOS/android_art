@@ -283,7 +283,7 @@ EOF
 
   system_linker_config_pb=$linkerconfig_root/system/etc/linker.config.pb
   echo "Encoding linker.config.json to $system_linker_config_pb"
-  $ANDROID_SOONG_HOST_OUT/bin/conv_linker_config proto -s $ANDROID_BUILD_TOP/system/core/rootdir/etc/linker.config.json -o $system_linker_config_pb
+  $ANDROID_HOST_OUT/bin/conv_linker_config proto -s $ANDROID_BUILD_TOP/system/core/rootdir/etc/linker.config.json -o $system_linker_config_pb
 
   # To avoid warnings from linkerconfig when it checks following two partitions
   mkdir -p $linkerconfig_root/product
