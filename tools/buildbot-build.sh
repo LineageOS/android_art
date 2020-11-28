@@ -68,7 +68,6 @@ done
 extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
 
 # Switch the build system to unbundled mode in the reduced manifest branch.
-# TODO(b/159109002): Clean this up.
 if [ ! -d frameworks/base ]; then
   extra_args="$extra_args TARGET_BUILD_UNBUNDLED=true"
 fi
@@ -99,7 +98,7 @@ elif [[ $mode == "target" ]]; then
   # Targets required to generate a linker configuration for device within the
   # chroot environment. The *.libraries.txt targets are required by
   # the source linkerconfig but not included in the prebuilt one.
-  make_command+=" linkerconfig sanitizer.libraries.txt vndkcorevariant.libraries.txt"
+  make_command+=" linkerconfig conv_linker_config sanitizer.libraries.txt vndkcorevariant.libraries.txt"
   # Additional targets needed for the chroot environment.
   make_command+=" event-log-tags"
   # Needed to extract prebuilt APEXes.
@@ -281,6 +280,10 @@ EOF
   cat <<EOF >> $apex_xml_file
 </apex-info-list>
 EOF
+
+  system_linker_config_pb=$linkerconfig_root/system/etc/linker.config.pb
+  echo "Encoding linker.config.json to $system_linker_config_pb"
+  $ANDROID_HOST_OUT/bin/conv_linker_config proto -s $ANDROID_BUILD_TOP/system/core/rootdir/etc/linker.config.json -o $system_linker_config_pb
 
   # To avoid warnings from linkerconfig when it checks following two partitions
   mkdir -p $linkerconfig_root/product
