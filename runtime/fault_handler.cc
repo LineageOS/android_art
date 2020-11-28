@@ -329,6 +329,11 @@ bool FaultManager::IsInGeneratedCode(siginfo_t* siginfo, void* context, bool che
 
   const OatQuickMethodHeader* method_header = method_obj->GetOatQuickMethodHeader(return_pc);
 
+  if (method_header == nullptr) {
+    VLOG(signals) << "no compiled code";
+    return false;
+  }
+
   // We can be certain that this is a method now.  Check if we have a GC map
   // at the return PC address.
   if (true || kIsDebugBuild) {
