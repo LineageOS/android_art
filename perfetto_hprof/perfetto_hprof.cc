@@ -595,7 +595,15 @@ void DumpPerfetto(art::Thread* self) {
   }
 
   // The following code is only executed by the child of the original process.
-  //
+
+  // Uninstall signal handler, so we don't trigger a profile on it.
+  if (sigaction(kJavaHeapprofdSignal, &g_orig_act, nullptr) != 0) {
+    close(g_signal_pipe_fds[0]);
+    close(g_signal_pipe_fds[1]);
+    PLOG(FATAL) << "Failed to sigaction";
+    return;
+  }
+
   // Daemon creates a new process that is the grand-child of the original process, and exits.
   if (daemon(0, 0) == -1) {
     PLOG(FATAL) << "daemon";
