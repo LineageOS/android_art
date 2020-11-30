@@ -31,6 +31,7 @@
 #include <thread>
 #include <time.h>
 
+#include <limits>
 #include <type_traits>
 
 #include "gc/heap-visit-objects-inl.h"
@@ -82,6 +83,7 @@ static art::ConditionVariable& GetStateCV() {
   return state_cv;
 }
 
+static int requested_tracing_session_id = 0;
 static State g_state = State::kUninitialized;
 
 // Pipe to signal from the signal handler into a worker thread that handles the
@@ -169,6 +171,16 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
   constexpr static perfetto::BufferExhaustedPolicy kBufferExhaustedPolicy =
     perfetto::BufferExhaustedPolicy::kStall;
   void OnSetup(const SetupArgs& args) override {
+    uint64_t normalized_cfg_tracing_session_id =
+      args.config->tracing_session_id() % std::numeric_limits<int32_t>::max();
+    if (requested_tracing_session_id < 0) {
+      LOG(ERROR) << "invalid requested tracing session id " << requested_tracing_session_id;
+      return;
+    }
+    if (static_cast<uint64_t>(requested_tracing_session_id) != normalized_cfg_tracing_session_id) {
+      return;
+    }
+
     // This is on the heap as it triggers -Wframe-larger-than.
     std::unique_ptr<perfetto::protos::pbzero::JavaHprofConfig::Decoder> cfg(
         new perfetto::protos::pbzero::JavaHprofConfig::Decoder(
@@ -890,7 +902,8 @@ extern "C" bool ArtPlugin_Initialize() {
 
   struct sigaction act = {};
   act.sa_flags = SA_SIGINFO | SA_RESTART;
-  act.sa_sigaction = [](int, siginfo_t*, void*) {
+  act.sa_sigaction = [](int, siginfo_t* si, void*) {
+    requested_tracing_session_id = si->si_value.sival_int;
     if (write(g_signal_pipe_fds[1], kByte, sizeof(kByte)) == -1) {
       PLOG(ERROR) << "Failed to trigger heap dump";
     }
