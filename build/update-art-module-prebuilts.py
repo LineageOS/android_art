@@ -19,6 +19,7 @@
 import argparse
 import collections
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -82,6 +83,85 @@ install_entries = (
     install_sdk_entries("art-module-host-exports", "host-exports") +
     install_sdk_entries("art-module-test-exports", "test-exports")
 )
+
+
+def rewrite_bp_for_art_module_source_build(bp_path):
+  """Rewrites an Android.bp file to conditionally prefer prebuilts."""
+  print("Rewriting {} for SOONG_CONFIG_art_module_source_build use."
+        .format(bp_path))
+  bp_file = open(bp_path, "r+")
+
+  # TODO(b/174997203): Remove this when we have a proper way to control prefer
+  # flags in Mainline modules.
+
+  header_lines = []
+  for line in bp_file:
+    line = line.rstrip("\n")
+    if not line.startswith("//"):
+      break
+    header_lines.append(line)
+
+  art_module_types = set()
+
+  content_lines = []
+  for line in bp_file:
+    line = line.rstrip("\n")
+    module_header = re.match("([a-z0-9_]+) +{$", line)
+    if not module_header:
+      content_lines.append(line)
+    else:
+      # Iterate over one Soong module.
+      module_start = line
+      soong_config_clause = False
+      module_content = []
+
+      for module_line in bp_file:
+        module_line = module_line.rstrip("\n")
+        if module_line == "}":
+          break
+        if module_line == "    prefer: false,":
+          module_content.extend([
+              ("    // Do not prefer prebuilt if "
+               "SOONG_CONFIG_art_module_source_build is true."),
+              "    prefer: art_module_prefer_prebuilts,",
+              "    soong_config_variables: {",
+              "        source_build: {",
+              "            prefer: false,",
+              "        },",
+              "    },"])
+          soong_config_clause = True
+        else:
+          module_content.append(module_line)
+
+      if soong_config_clause:
+        module_type = "art_prebuilt_" + module_header.group(1)
+        module_start = module_type + " {"
+        art_module_types.add(module_type)
+
+      content_lines.append(module_start)
+      content_lines.extend(module_content)
+      content_lines.append("}")
+
+  header_lines.extend(
+      ["",
+       "// Soong config variable stanza added by {}.".format(SCRIPT_PATH),
+       "soong_config_module_type_import {",
+       "    from: \"prebuilts/module_sdk/art/SoongConfig.bp\",",
+       "    module_types: ["] +
+      ["        \"{}\",".format(art_module)
+       for art_module in sorted(art_module_types)] +
+      ["    ],",
+       "}",
+       "",
+       # TODO(b/172480615): Change this to true to enable prebuilts for
+       # platform.
+       "art_module_prefer_prebuilts = false",
+       ""])
+
+  bp_file.seek(0)
+  bp_file.truncate()
+  bp_file.write("\n".join(header_lines + content_lines))
+  bp_file.close()
 
 
 def check_call(cmd, **kwargs):
@@ -245,6 +325,16 @@ def main():
     remove_files(git_root, subpaths)
   for entry in install_entries:
     install_entry(args.build, args.local_dist, entry)
+
+  # Postprocess the Android.bp files in the SDK snapshot to control prefer flags
+  # on the prebuilts through SOONG_CONFIG_art_module_source_build.
+  # TODO(b/174997203): Replace this with a better way to control prefer flags on
+  # Mainline module prebuilts.
+  for entry in install_entries:
+    if entry.install_unzipped:
+      bp_path = os.path.join(entry.install_path, "Android.bp")
+      if os.path.exists(bp_path):
+        rewrite_bp_for_art_module_source_build(bp_path)
 
   if not args.skip_cls:
     for git_root, subpaths in install_paths_per_root.items():

@@ -11,10 +11,10 @@ MAINLINE_MODULES=(
 # The products to build MAINLINE_MODULES for, same as in
 # build/soong/scripts/build-mainline-modules.sh.
 PRODUCTS=(
-  aosp_arm
-  aosp_arm64
-  aosp_x86
-  aosp_x86_64
+  art_module_arm
+  art_module_arm64
+  art_module_x86
+  art_module_x86_64
 )
 
 MODULES_SDK_AND_EXPORTS=(
@@ -70,6 +70,9 @@ done
 # uses Soong in --skip-make mode which cannot use the same directory as normal
 # mode with make.
 export OUT_DIR=${OUT_DIR}/aml
+
+# Make build-aml-prebuilts.sh set the source_build Soong config variable true.
+export ENABLE_ART_SOURCE_BUILD=true
 
 echo_and_run build/soong/scripts/build-aml-prebuilts.sh "$@" \
   ${MODULES_SDK_AND_EXPORTS[*]}

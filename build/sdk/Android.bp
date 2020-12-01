@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_sdk",
+        "art_module_exports",
+    ],
+}
+
+// TODO(b/172480615): Change this to false to disable sources for platform.
+art_module_enable_sources = true
+
 // Additional visibility to add to the prebuilt modules that are part of
 // the snapshots of the ART sdk/module_exports to ensure that they are
 // visible to each other.
@@ -22,9 +33,17 @@ prebuilt_visibility = [
 ]
 
 // The SDK for the art module apex.
-sdk {
+art_module_sdk {
     name: "art-module-sdk",
     host_supported: true,
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
 
     prebuilt_visibility: prebuilt_visibility,
 
@@ -122,11 +141,19 @@ sdk {
 }
 
 // Exported host tools and libraries.
-module_exports {
+art_module_exports {
     name: "art-module-host-exports",
     host_supported: true,
     // TODO(b/173186484) - remove once art-notices-for-framework-stubs-jar has been removed.
     device_supported: true,
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
 
     prebuilt_visibility: prebuilt_visibility,
 
@@ -164,12 +191,23 @@ module_exports {
         darwin: {
             enabled: false,
         },
+        windows: {
+            enabled: false,
+        },
     },
 }
 
 // Exported tests and supporting libraries
-module_exports {
+art_module_exports {
     name: "art-module-test-exports",
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
 
     prebuilt_visibility: prebuilt_visibility,
 
