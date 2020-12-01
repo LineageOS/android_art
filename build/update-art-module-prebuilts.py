@@ -44,6 +44,8 @@ SDK_VERSION = "current"
 # Paths to git projects to prepare CLs in
 GIT_PROJECT_ROOTS = [PACKAGE_PATH, SDK_PATH]
 
+SCRIPT_PATH = "art/build/update-art-module-prebuilts.py"
+
 
 InstallEntry = collections.namedtuple("InstallEntry", [
     # Artifact path in the build, passed to fetch_target
@@ -102,7 +104,7 @@ def fetch_artifact(branch, target, build, fetch_pattern, local_dir):
 def start_branch(branch_name, git_dirs):
   """Creates a new repo branch in the given projects."""
   check_call(["repo", "start", branch_name] + git_dirs)
-  # In case the branch already exist we reset it to upstream, to get a clean
+  # In case the branch already exists we reset it to upstream, to get a clean
   # update CL.
   for git_dir in git_dirs:
     check_call(["git", "reset", "--hard", "@{upstream}"], cwd=git_dir)
@@ -116,7 +118,7 @@ def upload_branch(git_root, branch_name):
 
 
 def remove_files(git_root, subpaths):
-  """Removes files in the work tree, and stages it in git too."""
+  """Removes files in the work tree, and stages the removals in git."""
   check_call(["git", "rm", "-qrf", "--ignore-unmatch"] + subpaths, cwd=git_root)
   # Need a plain rm afterwards because git won't remove directories if they have
   # non-git files in them.
@@ -134,10 +136,10 @@ def commit(git_root, prebuilt_descr, branch, build, add_paths):
         .format(prebuilt_descr=prebuilt_descr, branch=branch, build=build))
   else:
     message = (
-        "DO-NOT-SUBMIT: Update {prebuilt_descr} prebuilts from local build."
+        "DO NOT SUBMIT: Update {prebuilt_descr} prebuilts from local build."
         .format(prebuilt_descr=prebuilt_descr))
-  message += ("\n\nCL prepared by art/build/update-art-module-prebuilts.py."
-              "\n\nTest: Presubmits")
+  message += ("\n\nCL prepared by {}."
+              "\n\nTest: Presubmits".format(SCRIPT_PATH))
   msg_fd, msg_path = tempfile.mkstemp()
   with os.fdopen(msg_fd, "w") as f:
     f.write(message)
@@ -226,7 +228,7 @@ def main():
   args = get_args()
 
   if any(path for path in GIT_PROJECT_ROOTS if not os.path.exists(path)):
-    sys.exit("This script must be run in the root of the android build tree.")
+    sys.exit("This script must be run in the root of the Android build tree.")
 
   install_paths = [entry.install_path for entry in install_entries]
   install_paths_per_root = install_paths_per_git_root(
