@@ -223,6 +223,13 @@ void CheckConstants() {
   CHECK_EQ(mirror::Array::kFirstElementOffset, mirror::Array::FirstElementOffset());
 }
 
+metrics::ReportingConfig ParseMetricsReportingConfig(const RuntimeArgumentMap& args) {
+  using M = RuntimeArgumentMap;
+  return {
+      .dump_to_logcat = args.Exists(M::WriteMetricsToLog),
+  };
+}
+
 }  // namespace
 
 Runtime::Runtime()
@@ -1708,6 +1715,9 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   // Class-roots are setup, we can now finish initializing the JniIdManager.
   GetJniIdManager()->Init(self);
+
+  metrics_reporter_ =
+      metrics::MetricsReporter::Create(ParseMetricsReportingConfig(runtime_options), &metrics_);
 
   // Runtime initialization is largely done now.
   // We load plugins first since that can modify the runtime state slightly.

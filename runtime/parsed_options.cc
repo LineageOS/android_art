@@ -387,6 +387,8 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
           .IntoKey(M::CorePlatformApiPolicy)
       .Define("-Xuse-stderr-logger")
           .IntoKey(M::UseStderrLogger)
+      .Define("-Xwrite-metrics-to-log")
+          .IntoKey(M::WriteMetricsToLog)
       .Define("-Xonly-use-system-oat-files")
           .IntoKey(M::OnlyUseSystemOatFiles)
       .Define("-Xverifier-logging-threshold=_")
