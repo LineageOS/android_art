@@ -4436,11 +4436,15 @@ void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invok
   if (invoke->GetHiddenArgumentLoadKind() == MethodLoadKind::kRecursive) {
     Location interface_method = locations->InAt(invoke->GetNumberOfArguments() - 1);
     if (interface_method.IsStackSlot()) {
-      __ Ldr(ip1, StackOperandFrom(receiver));
+      __ Ldr(ip1, StackOperandFrom(interface_method));
     } else {
       __ Mov(ip1, XRegisterFrom(interface_method));
     }
-  } else {
+  // If the load kind is through a runtime call, we will pass the method we
+  // fetch the IMT, which will either be a no-op if we don't hit the conflict
+  // stub, or will make us always go through the trampoline when there is a
+  // conflict.
+  } else if (invoke->GetHiddenArgumentLoadKind() != MethodLoadKind::kRuntimeCall) {
     codegen_->LoadMethod(
         invoke->GetHiddenArgumentLoadKind(), Location::RegisterLocation(ip1.GetCode()), invoke);
   }
@@ -4451,6 +4455,11 @@ void InstructionCodeGeneratorARM64::VisitInvokeInterface(HInvokeInterface* invok
       invoke->GetImtIndex(), kArm64PointerSize));
   // temp = temp->GetImtEntryAt(method_offset);
   __ Ldr(temp, MemOperand(temp, method_offset));
+  if (invoke->GetHiddenArgumentLoadKind() == MethodLoadKind::kRuntimeCall) {
+    // We pass the method from the IMT in case of a conflict. This will ensure
+    // we go into the runtime to resolve the actual method.
+    __ Mov(ip1, temp);
+  }
   // lr = temp->GetEntryPoint();
   __ Ldr(lr, MemOperand(temp, entry_point.Int32Value()));
 
