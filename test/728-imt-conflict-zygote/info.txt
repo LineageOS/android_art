@@ -1,0 +1,2 @@
+Regression test for the compiler in the case we need to do a runtime call to
+lookup an ArtMethod for an invokeinterface.

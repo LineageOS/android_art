@@ -2808,11 +2808,12 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
 
   codegen_->MaybeGenerateInlineCacheCheck(invoke, temp);
 
-  if (invoke->GetHiddenArgumentLoadKind() != MethodLoadKind::kRecursive) {
+  if (invoke->GetHiddenArgumentLoadKind() != MethodLoadKind::kRecursive &&
+      invoke->GetHiddenArgumentLoadKind() != MethodLoadKind::kRuntimeCall) {
     Location hidden_reg = locations->GetTemp(1);
     // Set the hidden argument. This is safe to do this here, as RAX
     // won't be modified thereafter, before the `call` instruction.
-    // We also di it after MaybeGenerateInlineCache that may use RAX.
+    // We also do it after MaybeGenerateInlineCache that may use RAX.
     DCHECK_EQ(RAX, hidden_reg.AsRegister<Register>());
     codegen_->LoadMethod(invoke->GetHiddenArgumentLoadKind(), hidden_reg, invoke);
   }
@@ -2825,6 +2826,12 @@ void InstructionCodeGeneratorX86_64::VisitInvokeInterface(HInvokeInterface* invo
       invoke->GetImtIndex(), kX86_64PointerSize));
   // temp = temp->GetImtEntryAt(method_offset);
   __ movq(temp, Address(temp, method_offset));
+  if (invoke->GetHiddenArgumentLoadKind() == MethodLoadKind::kRuntimeCall) {
+    // We pass the method from the IMT in case of a conflict. This will ensure
+    // we go into the runtime to resolve the actual method.
+    Location hidden_reg = locations->GetTemp(1);
+    __ movq(hidden_reg.AsRegister<CpuRegister>(), temp);
+  }
   // call temp->GetEntryPoint();
   __ call(Address(
       temp, ArtMethod::EntryPointFromQuickCompiledCodeOffset(kX86_64PointerSize).SizeValue()));

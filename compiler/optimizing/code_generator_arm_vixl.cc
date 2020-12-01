@@ -3540,6 +3540,11 @@ void InstructionCodeGeneratorARMVIXL::VisitInvokeInterface(HInvokeInterface* inv
       } else {
         __ Mov(RegisterFrom(hidden_reg), RegisterFrom(current_method));
       }
+    } else if (invoke->GetHiddenArgumentLoadKind() == MethodLoadKind::kRuntimeCall) {
+      // We pass the method from the IMT in case of a conflict. This will ensure
+      // we go into the runtime to resolve the actual method.
+      CHECK_NE(temp.GetCode(), lr.GetCode());
+      __ Mov(RegisterFrom(hidden_reg), temp);
     } else {
       codegen_->LoadMethod(invoke->GetHiddenArgumentLoadKind(), hidden_reg, invoke);
     }
