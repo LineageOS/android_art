@@ -282,8 +282,9 @@ libart_cc_defaults {
         arm: {
             srcs: [
                 "interpreter/mterp/mterp.cc",
-                "interpreter/mterp/nterp_stub.cc",
+                "interpreter/mterp/nterp.cc",
                 ":libart_mterp.arm",
+                ":libart_mterp.armng",
                 "arch/arm/context_arm.cc",
                 "arch/arm/entrypoints_init_arm.cc",
                 "arch/arm/instruction_set_features_assembly_tests.S",
@@ -840,6 +841,19 @@ genrule {
         "interpreter/mterp/gen_mterp.py",
         "interpreter/mterp/common/gen_setup.py",
         ":art_libdexfile_dex_instruction_list_header",
+    ],
+    cmd: "$(location interpreter/mterp/gen_mterp.py) $(out) $(in)",
+}
+
+genrule {
+    name: "libart_mterp.armng",
+    out: ["mterp_armng.S"],
+    srcs: [
+        "interpreter/mterp/armng/*.S",
+    ],
+    tool_files: [
+        "interpreter/mterp/gen_mterp.py",
+        "interpreter/mterp/common/gen_setup.py",
     ],
     cmd: "$(location interpreter/mterp/gen_mterp.py) $(out) $(in)",
 }
