@@ -57,6 +57,7 @@ sdk {
                 "libdexfile_external_static",
             ],
         },
+
         android: {
             java_header_libs: [
                 // Needed by any module that builds against any non-numeric
@@ -111,6 +112,9 @@ sdk {
             ],
         },
 
+        linux_bionic: {
+            enabled: false,
+        },
         darwin: {
             enabled: false,
         },
@@ -134,6 +138,7 @@ module_exports {
                 "art-notices-for-framework-stubs-jar",
             ],
         },
+
         host: {
             // Set in target.host because the top level compile_multilib
             // property is fixed to "both" in the sdk/module_exports
@@ -152,6 +157,10 @@ module_exports {
                 "dex2oatd",
             ],
         },
+
+        linux_bionic: {
+            enabled: false,
+        },
         darwin: {
             enabled: false,
         },
@@ -161,55 +170,49 @@ module_exports {
 // Exported tests and supporting libraries
 module_exports {
     name: "art-module-test-exports",
-    host_supported: true,
 
     prebuilt_visibility: prebuilt_visibility,
 
-    target: {
-        android: {
-            java_libs: [
-                "core-compat-test-rules",
-                "core-test-rules",
-                "core-tests-support",
-                "okhttp-tests-nojarjar",
+    java_libs: [
+        "core-compat-test-rules",
+        "core-test-rules",
+        "core-tests-support",
+        "okhttp-tests-nojarjar",
 
-                // Needed for CtsJvmtiDeviceRunTestAppBase.
-                "art_cts_jvmti_test_library",
-                "expected_cts_outputs",
+        // Needed for CtsJvmtiDeviceRunTestAppBase.
+        "art_cts_jvmti_test_library",
+        "expected_cts_outputs",
 
-                // Needed for robolectric.
-                "core-libart",
-                "okhttp",
+        // Needed for robolectric.
+        "core-libart",
+        "okhttp",
 
-                // Needed for CtsLibcore...TestCases
-                "libcore-expectations-knownfailures-jar",
-                "libcore-expectations-virtualdeviceknownfailures-jar",
+        // Needed for CtsLibcore...TestCases
+        "libcore-expectations-knownfailures-jar",
+        "libcore-expectations-virtualdeviceknownfailures-jar",
 
-                // Needed for CtsLibcoreOkHttpTestCases
-                "okhttp-nojarjar",
-            ],
-            java_tests: [
-                // Needed for CtsJdwpTestCases.
-                "apache-harmony-jdwp-tests",
+        // Needed for CtsLibcoreOkHttpTestCases
+        "okhttp-nojarjar",
+    ],
 
-                "libcore-crypto-tests",
+    java_tests: [
+        // Needed for CtsJdwpTestCases.
+        "apache-harmony-jdwp-tests",
 
-                // Needed for CtsLibcoreOjTestCases
-                "core-ojtests-public",
+        "libcore-crypto-tests",
 
-                // Needed for CtsLibcoreJsr166TestCases
-                "jsr166-tests",
+        // Needed for CtsLibcoreOjTestCases
+        "core-ojtests-public",
 
-                // Needed for CtsLibcoreTestCases
-                "apache-harmony-tests",
-                "core-tests",
-            ],
-            native_shared_libs: [
-                "libjavacoretests",
-            ],
-        },
-        darwin: {
-            enabled: false,
-        },
-    },
+        // Needed for CtsLibcoreJsr166TestCases
+        "jsr166-tests",
+
+        // Needed for CtsLibcoreTestCases
+        "apache-harmony-tests",
+        "core-tests",
+    ],
+
+    native_shared_libs: [
+        "libjavacoretests",
+    ],
 }
