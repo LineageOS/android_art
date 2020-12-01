@@ -26,6 +26,118 @@ namespace art {
 class NodeTest : public OptimizingUnitTest {};
 
 /**
+ * Test that we can clear loop and dominator information in either order.
+ * Code is:
+ * while (true) {
+ *   if (foobar) { break; }
+ *   if (baz) { xyz; } else { abc; }
+ * }
+ * dosomething();
+ */
+TEST_F(NodeTest, ClearLoopThenDominanceInformation) {
+  CreateGraph();
+  AdjacencyListGraph alg(graph_,
+                         GetAllocator(),
+                         "entry",
+                         "exit",
+                         {{"entry", "loop_pre_header"},
+
+                          {"loop_pre_header", "loop_header"},
+                          {"loop_header", "critical_break"},
+                          {"loop_header", "loop_body"},
+                          {"loop_body", "loop_if_left"},
+                          {"loop_body", "loop_if_right"},
+                          {"loop_if_left", "loop_merge"},
+                          {"loop_if_right", "loop_merge"},
+                          {"loop_merge", "loop_header"},
+
+                          {"critical_break", "breturn"},
+                          {"breturn", "exit"}});
+  graph_->ClearDominanceInformation();
+  graph_->BuildDominatorTree();
+
+  // Test
+  EXPECT_TRUE(
+      std::all_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b == graph_->GetEntryBlock() || b == nullptr || b->GetDominator() != nullptr;
+      }));
+  EXPECT_TRUE(
+      std::any_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b != nullptr && b->GetLoopInformation() != nullptr;
+      }));
+
+  // Clear
+  graph_->ClearLoopInformation();
+  graph_->ClearDominanceInformation();
+
+  // Test
+  EXPECT_TRUE(
+      std::none_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b != nullptr && b->GetDominator() != nullptr;
+      }));
+  EXPECT_TRUE(
+      std::all_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b == nullptr || b->GetLoopInformation() == nullptr;
+      }));
+}
+
+/**
+ * Test that we can clear loop and dominator information in either order.
+ * Code is:
+ * while (true) {
+ *   if (foobar) { break; }
+ *   if (baz) { xyz; } else { abc; }
+ * }
+ * dosomething();
+ */
+TEST_F(NodeTest, ClearDominanceThenLoopInformation) {
+  CreateGraph();
+  AdjacencyListGraph alg(graph_,
+                         GetAllocator(),
+                         "entry",
+                         "exit",
+                         {{"entry", "loop_pre_header"},
+
+                          {"loop_pre_header", "loop_header"},
+                          {"loop_header", "critical_break"},
+                          {"loop_header", "loop_body"},
+                          {"loop_body", "loop_if_left"},
+                          {"loop_body", "loop_if_right"},
+                          {"loop_if_left", "loop_merge"},
+                          {"loop_if_right", "loop_merge"},
+                          {"loop_merge", "loop_header"},
+
+                          {"critical_break", "breturn"},
+                          {"breturn", "exit"}});
+  graph_->ClearDominanceInformation();
+  graph_->BuildDominatorTree();
+
+  // Test
+  EXPECT_TRUE(
+      std::all_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b == graph_->GetEntryBlock() || b == nullptr || b->GetDominator() != nullptr;
+      }));
+  EXPECT_TRUE(
+      std::any_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b != nullptr && b->GetLoopInformation() != nullptr;
+      }));
+
+  // Clear
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+
+  // Test
+  EXPECT_TRUE(
+      std::none_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b != nullptr && b->GetDominator() != nullptr;
+      }));
+  EXPECT_TRUE(
+      std::all_of(graph_->GetBlocks().begin(), graph_->GetBlocks().end(), [&](HBasicBlock* b) {
+        return b == nullptr || b->GetLoopInformation() == nullptr;
+      }));
+}
+
+/**
  * Test that removing instruction from the graph removes itself from user lists
  * and environment lists.
  */
