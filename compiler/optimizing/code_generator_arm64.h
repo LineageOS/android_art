@@ -808,9 +808,9 @@ class CodeGeneratorARM64 : public CodeGenerator {
                                uint32_t offset,
                                vixl::aarch64::Label* fixup_label,
                                ReadBarrierOption read_barrier_option);
-  // Generate MOV for the `old_value` in UnsafeCASObject and mark it with Baker read barrier.
-  void GenerateUnsafeCasOldValueMovWithBakerReadBarrier(vixl::aarch64::Register marked,
-                                                        vixl::aarch64::Register old_value);
+  // Generate MOV for the `old_value` in intrinsic CAS and mark it with Baker read barrier.
+  void GenerateIntrinsicCasMoveWithBakerReadBarrier(vixl::aarch64::Register marked_old_value,
+                                                    vixl::aarch64::Register old_value);
   // Fast path implementation of ReadBarrier::Barrier for a heap
   // reference field load when Baker's read barriers are used.
   // Overload suitable for Unsafe.getObject/-Volatile() intrinsic.
