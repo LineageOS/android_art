@@ -411,35 +411,6 @@ class ImageSpace::PatchObjectVisitor final {
       const {}
   void VisitRoot(mirror::CompressedReference<mirror::Object>* root ATTRIBUTE_UNUSED) const {}
 
-  void VisitDexCacheArrays(ObjPtr<mirror::DexCache> dex_cache)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    ScopedTrace st("VisitDexCacheArrays");
-    FixupDexCacheArray<mirror::StringDexCacheType>(dex_cache,
-                                                   mirror::DexCache::StringsOffset(),
-                                                   dex_cache->NumStrings<kVerifyNone>());
-    FixupDexCacheArray<mirror::TypeDexCacheType>(dex_cache,
-                                                 mirror::DexCache::ResolvedTypesOffset(),
-                                                 dex_cache->NumResolvedTypes<kVerifyNone>());
-    FixupDexCacheArray<mirror::MethodDexCacheType>(dex_cache,
-                                                   mirror::DexCache::ResolvedMethodsOffset(),
-                                                   dex_cache->NumResolvedMethods<kVerifyNone>());
-    FixupDexCacheArray<mirror::FieldDexCacheType>(dex_cache,
-                                                  mirror::DexCache::ResolvedFieldsOffset(),
-                                                  dex_cache->NumResolvedFields<kVerifyNone>());
-    FixupDexCacheArray<mirror::MethodTypeDexCacheType>(
-        dex_cache,
-        mirror::DexCache::ResolvedMethodTypesOffset(),
-        dex_cache->NumResolvedMethodTypes<kVerifyNone>());
-    FixupDexCacheArray<GcRoot<mirror::CallSite>>(
-        dex_cache,
-        mirror::DexCache::ResolvedCallSitesOffset(),
-        dex_cache->NumResolvedCallSites<kVerifyNone>());
-    FixupDexCacheArray<GcRoot<mirror::String>>(
-        dex_cache,
-        mirror::DexCache::PreResolvedStringsOffset(),
-        dex_cache->NumPreResolvedStrings<kVerifyNone>());
-  }
-
   template <bool kMayBeNull = true, typename T>
   ALWAYS_INLINE void PatchGcRoot(/*inout*/GcRoot<T>* root) const
       REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -483,54 +454,6 @@ class ImageSpace::PatchObjectVisitor final {
       object->SetFieldObjectWithoutWriteBarrier</*kTransactionActive=*/ false,
                                                 /*kCheckTransaction=*/ true,
                                                 kVerifyNone>(offset, new_value);
-    }
-  }
-
-  template <typename T>
-  void FixupDexCacheArrayEntry(std::atomic<mirror::DexCachePair<T>>* array, uint32_t index)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    static_assert(sizeof(std::atomic<mirror::DexCachePair<T>>) == sizeof(mirror::DexCachePair<T>),
-                  "Size check for removing std::atomic<>.");
-    PatchGcRoot(&(reinterpret_cast<mirror::DexCachePair<T>*>(array)[index].object));
-  }
-
-  template <typename T>
-  void FixupDexCacheArrayEntry(std::atomic<mirror::NativeDexCachePair<T>>* array, uint32_t index)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    static_assert(sizeof(std::atomic<mirror::NativeDexCachePair<T>>) ==
-                      sizeof(mirror::NativeDexCachePair<T>),
-                  "Size check for removing std::atomic<>.");
-    mirror::NativeDexCachePair<T> pair =
-        mirror::DexCache::GetNativePairPtrSize(array, index, kPointerSize);
-    if (pair.object != nullptr) {
-      pair.object = native_visitor_(pair.object);
-      mirror::DexCache::SetNativePairPtrSize(array, index, pair, kPointerSize);
-    }
-  }
-
-  void FixupDexCacheArrayEntry(GcRoot<mirror::CallSite>* array, uint32_t index)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    PatchGcRoot(&array[index]);
-  }
-
-  void FixupDexCacheArrayEntry(GcRoot<mirror::String>* array, uint32_t index)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    PatchGcRoot(&array[index]);
-  }
-
-  template <typename EntryType>
-  void FixupDexCacheArray(ObjPtr<mirror::DexCache> dex_cache,
-                          MemberOffset array_offset,
-                          uint32_t size) REQUIRES_SHARED(Locks::mutator_lock_) {
-    EntryType* old_array =
-        reinterpret_cast64<EntryType*>(dex_cache->GetField64<kVerifyNone>(array_offset));
-    DCHECK_EQ(old_array != nullptr, size != 0u);
-    if (old_array != nullptr) {
-      EntryType* new_array = native_visitor_(old_array);
-      dex_cache->SetField64<kVerifyNone>(array_offset, reinterpret_cast64<uint64_t>(new_array));
-      for (uint32_t i = 0; i != size; ++i) {
-        FixupDexCacheArrayEntry(new_array, i);
-      }
     }
   }
 
@@ -1399,15 +1322,6 @@ class ImageSpace::Loader {
       image_header->RelocateImageReferences(app_image_objects.Delta());
       image_header->RelocateBootImageReferences(boot_image.Delta());
       CHECK_EQ(image_header->GetImageBegin(), target_base);
-      // Fix up dex cache DexFile pointers.
-      ObjPtr<mirror::ObjectArray<mirror::DexCache>> dex_caches =
-          image_header->GetImageRoot<kWithoutReadBarrier>(ImageHeader::kDexCaches)
-              ->AsObjectArray<mirror::DexCache, kVerifyNone>();
-      for (int32_t i = 0, count = dex_caches->GetLength(); i < count; ++i) {
-        ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get<kVerifyNone, kWithoutReadBarrier>(i);
-        CHECK(dex_cache != nullptr);
-        patch_object_visitor.VisitDexCacheArrays(dex_cache);
-      }
     }
     {
       // Only touches objects in the app image, no need for mutator lock.
@@ -2835,12 +2749,7 @@ class ImageSpace::BootImageLoader {
           // This is the last pass over objects, so we do not need to Set().
           main_patch_object_visitor.VisitObject(object);
           ObjPtr<mirror::Class> klass = object->GetClass<kVerifyNone, kWithoutReadBarrier>();
-          if (klass->IsDexCacheClass<kVerifyNone>()) {
-            // Patch dex cache array pointers and elements.
-            ObjPtr<mirror::DexCache> dex_cache =
-                object->AsDexCache<kVerifyNone, kWithoutReadBarrier>();
-            main_patch_object_visitor.VisitDexCacheArrays(dex_cache);
-          } else if (klass == method_class || klass == constructor_class) {
+          if (klass == method_class || klass == constructor_class) {
             // Patch the ArtMethod* in the mirror::Executable subobject.
             ObjPtr<mirror::Executable> as_executable =
                 ObjPtr<mirror::Executable>::DownCast(object);
@@ -3919,39 +3828,14 @@ void ImageSpace::DumpSections(std::ostream& os) const {
   }
 }
 
-void ImageSpace::DisablePreResolvedStrings() {
-  // Clear dex cache pointers.
-  ObjPtr<mirror::ObjectArray<mirror::DexCache>> dex_caches =
-      GetImageHeader().GetImageRoot(ImageHeader::kDexCaches)->AsObjectArray<mirror::DexCache>();
-  for (size_t len = dex_caches->GetLength(), i = 0; i < len; ++i) {
-    ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
-    dex_cache->ClearPreResolvedStrings();
-  }
-}
-
 void ImageSpace::ReleaseMetadata() {
   const ImageSection& metadata = GetImageHeader().GetMetadataSection();
   VLOG(image) << "Releasing " << metadata.Size() << " image metadata bytes";
-  // In the case where new app images may have been added around the checkpoint, ensure that we
-  // don't madvise the cache for these.
-  ObjPtr<mirror::ObjectArray<mirror::DexCache>> dex_caches =
-      GetImageHeader().GetImageRoot(ImageHeader::kDexCaches)->AsObjectArray<mirror::DexCache>();
-  bool have_startup_cache = false;
-  for (size_t len = dex_caches->GetLength(), i = 0; i < len; ++i) {
-    ObjPtr<mirror::DexCache> dex_cache = dex_caches->Get(i);
-    if (dex_cache->NumPreResolvedStrings() != 0u) {
-      have_startup_cache = true;
-    }
-  }
-  // Only safe to do for images that have their preresolved strings caches disabled. This is because
-  // uncompressed images madvise to the original unrelocated image contents.
-  if (!have_startup_cache) {
-    // Avoid using ZeroAndReleasePages since the zero fill might not be word atomic.
-    uint8_t* const page_begin = AlignUp(Begin() + metadata.Offset(), kPageSize);
-    uint8_t* const page_end = AlignDown(Begin() + metadata.End(), kPageSize);
-    if (page_begin < page_end) {
-      CHECK_NE(madvise(page_begin, page_end - page_begin, MADV_DONTNEED), -1) << "madvise failed";
-    }
+  // Avoid using ZeroAndReleasePages since the zero fill might not be word atomic.
+  uint8_t* const page_begin = AlignUp(Begin() + metadata.Offset(), kPageSize);
+  uint8_t* const page_end = AlignDown(Begin() + metadata.End(), kPageSize);
+  if (page_begin < page_end) {
+    CHECK_NE(madvise(page_begin, page_end - page_begin, MADV_DONTNEED), -1) << "madvise failed";
   }
 }
 
