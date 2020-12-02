@@ -11,7 +11,7 @@
    movzwl 2(rPC), %edi // call_site index, first argument of runtime call.
    jmp NterpCommonInvokeCustomRange
 
-%def invoke_direct_or_super(helper="", range=""):
+%def invoke_direct_or_super(helper="", range="", is_super=""):
    EXPORT_PC
    // Fast-path which gets the method from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rdi, 2f
@@ -31,6 +31,9 @@
    movq rPC, %rdx
    call nterp_get_method
    movq %rax, %rdi
+   .if $is_super
+   jmp 1b
+   .else
    testl MACRO_LITERAL(1), %eax
    je 1b
    andq $$-2, %rdi  // Remove the extra bit that marks it's a String.<init> method.
@@ -39,12 +42,13 @@
    .else
    jmp NterpHandleStringInit
    .endif
+   .endif
 
 %def op_invoke_direct():
-%  invoke_direct_or_super(helper="NterpCommonInvokeInstance", range="0")
+%  invoke_direct_or_super(helper="NterpCommonInvokeInstance", range="0", is_super="0")
 
 %def op_invoke_direct_range():
-%  invoke_direct_or_super(helper="NterpCommonInvokeInstanceRange", range="1")
+%  invoke_direct_or_super(helper="NterpCommonInvokeInstanceRange", range="1", is_super="0")
 
 %def op_invoke_polymorphic():
    EXPORT_PC
@@ -123,10 +127,10 @@
 %  invoke_static(helper="NterpCommonInvokeStaticRange")
 
 %def op_invoke_super():
-%  invoke_direct_or_super(helper="NterpCommonInvokeInstance", range="0")
+%  invoke_direct_or_super(helper="NterpCommonInvokeInstance", range="0", is_super="1")
 
 %def op_invoke_super_range():
-%  invoke_direct_or_super(helper="NterpCommonInvokeInstanceRange", range="1")
+%  invoke_direct_or_super(helper="NterpCommonInvokeInstanceRange", range="1", is_super="1")
 
 %def invoke_virtual(helper="", range=""):
    EXPORT_PC

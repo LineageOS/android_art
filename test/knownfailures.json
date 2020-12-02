@@ -1318,7 +1318,8 @@
     },
     {
         "tests": ["175-alloc-big-bignums"],
-        "variant": "interpreter | interp-ac | trace | no-image | debuggable",
+        "variant": "interpreter | interp-ac | trace | no-image | debuggable | prebuild",
+        "bug": "b/174470490",
         "description": "Interpreting BigInteger.add() is too slow (timeouts)"
     },
     {
@@ -1348,5 +1349,10 @@
         "variant": "jvm",
         "bug": "b/154802847",
         "description": ["Failing on RI. Needs further investigating."]
+    },
+    {
+        "tests": ["2232-write-metrics-to-log"],
+        "variant": "jvm",
+        "description": ["RI does not support ART metrics."]
     }
 ]

@@ -430,6 +430,13 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
 
   const ArenaVector<HBasicBlock*>& GetBlocks() const { return blocks_; }
 
+  // An iterator to only blocks that are still actually in the graph (when
+  // blocks are removed they are replaced with 'nullptr' in GetBlocks to
+  // simplify block-id assignment and avoid memmoves in the block-list).
+  IterationRange<FilterNull<ArenaVector<HBasicBlock*>::const_iterator>> GetActiveBlocks() const {
+    return FilterOutNull(MakeIterationRange(GetBlocks()));
+  }
+
   bool IsInSsaForm() const { return in_ssa_form_; }
   void SetInSsaForm() { in_ssa_form_ = true; }
 

@@ -111,6 +111,33 @@ void StreamBackend::ReportHistogram(DatumId histogram_type,
   }
 }
 
+std::unique_ptr<MetricsReporter> MetricsReporter::Create(ReportingConfig config,
+                                                         const ArtMetrics* metrics) {
+  std::unique_ptr<MetricsBackend> backend;
+
+  // We can't use std::make_unique here because the MetricsReporter constructor is private.
+  return std::unique_ptr<MetricsReporter>{new MetricsReporter{config, metrics}};
+}
+
+MetricsReporter::MetricsReporter(ReportingConfig config, const ArtMetrics* metrics)
+    : config_{config}, metrics_{metrics} {}
+
+MetricsReporter::~MetricsReporter() {
+  // If we are configured to report metrics, do one final report at the end.
+  if (config_.dump_to_logcat) {
+    LOG_STREAM(INFO) << "\n*** ART internal metrics ***\n\n";
+    // LOG_STREAM(INFO) destroys the stream at the end of the statement, which makes it tricky pass
+    // it to store as a field in StreamBackend. To get around this, we use an immediately-invoked
+    // lambda expression to act as a let-binding, letting us access the stream for long enough to
+    // dump the metrics.
+    [this](std::ostream& os) {
+      StreamBackend backend{os};
+      metrics_->ReportAllMetrics(&backend);
+    }(LOG_STREAM(INFO));
+    LOG_STREAM(INFO) << "\n*** Done dumping ART internal metrics ***\n";
+  }
+}
+
 }  // namespace metrics
 }  // namespace art
 

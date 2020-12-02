@@ -83,3 +83,5 @@ ASM_DEFINE(STACK_OVERFLOW_RESERVED_BYTES,
            GetStackOverflowReservedBytes(art::kRuntimeISA))
 ASM_DEFINE(NTERP_HOTNESS_MASK,
            art::interpreter::kNterpHotnessMask)
+ASM_DEFINE(NTERP_HOTNESS_BITS,
+           art::POPCOUNT(art::interpreter::kNterpHotnessMask))
