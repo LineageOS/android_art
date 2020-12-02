@@ -1354,5 +1354,11 @@
         "tests": ["2232-write-metrics-to-log"],
         "variant": "jvm",
         "description": ["RI does not support ART metrics."]
+    },
+    {
+        "tests": ["2232-write-metrics-to-log"],
+        "variant": "target",
+        "description": ["Fails on target on go/art-buildbot."],
+        "bug": "b/174632603"
     }
 ]
