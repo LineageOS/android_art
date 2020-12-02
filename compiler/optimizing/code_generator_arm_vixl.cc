@@ -843,7 +843,9 @@ class ReadBarrierForHeapReferenceSlowPathARMVIXL : public SlowPathCodeARMVIXL {
                mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
                    mirror::VarHandle::AccessModeTemplate::kCompareAndSet ||
                mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
-                   mirror::VarHandle::AccessModeTemplate::kCompareAndExchange)
+                   mirror::VarHandle::AccessModeTemplate::kCompareAndExchange ||
+               mirror::VarHandle::GetAccessModeTemplateByIntrinsic(intrinsic) ==
+                   mirror::VarHandle::AccessModeTemplate::kGetAndUpdate)
             << instruction_->AsInvoke()->GetIntrinsic();
         DCHECK_EQ(offset_, 0U);
         // Though UnsafeGet's offset location is a register pair, we only pass the low
