@@ -181,4 +181,7 @@ RUNTIME_OPTIONS_KEY (bool,                VerifierMissingKThrowFatal,     true)
 // This is set to true in frameworks/base/core/jni/AndroidRuntime.cpp.
 RUNTIME_OPTIONS_KEY (bool,                PerfettoHprof,                  false)
 
+// Whether to dump ART metrics to logcat
+RUNTIME_OPTIONS_KEY (Unit,                WriteMetricsToLog)
+
 #undef RUNTIME_OPTIONS_KEY

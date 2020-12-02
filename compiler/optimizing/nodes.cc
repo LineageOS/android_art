@@ -228,7 +228,7 @@ GraphAnalysisResult HGraph::BuildDominatorTree() {
 }
 
 void HGraph::ClearDominanceInformation() {
-  for (HBasicBlock* block : GetReversePostOrder()) {
+  for (HBasicBlock* block : GetActiveBlocks()) {
     block->ClearDominanceInformation();
   }
   reverse_post_order_.clear();
@@ -236,7 +236,7 @@ void HGraph::ClearDominanceInformation() {
 
 void HGraph::ClearLoopInformation() {
   SetHasIrreducibleLoops(false);
-  for (HBasicBlock* block : GetReversePostOrder()) {
+  for (HBasicBlock* block : GetActiveBlocks()) {
     block->SetLoopInformation(nullptr);
   }
 }
@@ -1694,11 +1694,8 @@ FOR_EACH_CONCRETE_INSTRUCTION(DEFINE_ACCEPT)
 #undef DEFINE_ACCEPT
 
 void HGraphVisitor::VisitInsertionOrder() {
-  const ArenaVector<HBasicBlock*>& blocks = graph_->GetBlocks();
-  for (HBasicBlock* block : blocks) {
-    if (block != nullptr) {
-      VisitBasicBlock(block);
-    }
+  for (HBasicBlock* block : graph_->GetActiveBlocks()) {
+    VisitBasicBlock(block);
   }
 }
 

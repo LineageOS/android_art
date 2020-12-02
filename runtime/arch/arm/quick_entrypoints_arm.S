@@ -24,54 +24,6 @@
     /* Deliver an exception pending on a thread */
     .extern artDeliverPendingException
 
-    /*
-     * Macro that sets up the callee save frame to conform with
-     * Runtime::CreateCalleeSaveMethod(kSaveRefsOnly).
-     */
-.macro SETUP_SAVE_REFS_ONLY_FRAME rTemp
-    // Note: We could avoid saving R8 in the case of Baker read
-    // barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    push {r5-r8, r10-r11, lr}                     @ 7 words of callee saves
-    .cfi_adjust_cfa_offset 28
-    .cfi_rel_offset r5, 0
-    .cfi_rel_offset r6, 4
-    .cfi_rel_offset r7, 8
-    .cfi_rel_offset r8, 12
-    .cfi_rel_offset r10, 16
-    .cfi_rel_offset r11, 20
-    .cfi_rel_offset lr, 24
-    sub sp, #4                                    @ bottom word will hold Method*
-    .cfi_adjust_cfa_offset 4
-    RUNTIME_CURRENT2 \rTemp                       @ Load Runtime::Current into rTemp.
-    @ Load kSaveRefsOnly Method* into rTemp.
-    ldr \rTemp, [\rTemp, #RUNTIME_SAVE_REFS_ONLY_METHOD_OFFSET]
-    str \rTemp, [sp, #0]                          @ Place Method* at bottom of stack.
-    str sp, [rSELF, #THREAD_TOP_QUICK_FRAME_OFFSET]  @ Place sp in Thread::Current()->top_quick_frame.
-
-    // Ugly compile-time check, but we only have the preprocessor.
-#if (FRAME_SIZE_SAVE_REFS_ONLY != 28 + 4)
-#error "FRAME_SIZE_SAVE_REFS_ONLY(ARM) size not as expected."
-#endif
-.endm
-
-.macro RESTORE_SAVE_REFS_ONLY_FRAME
-    add sp, #4               @ bottom word holds Method*
-    .cfi_adjust_cfa_offset -4
-    // Note: Likewise, we could avoid restoring R8 in the case of Baker
-    // read barriers, as it is overwritten by REFRESH_MARKING_REGISTER
-    // later; but it's not worth handling this special case.
-    pop {r5-r8, r10-r11, lr} @ 7 words of callee saves
-    .cfi_restore r5
-    .cfi_restore r6
-    .cfi_restore r7
-    .cfi_restore r8
-    .cfi_restore r10
-    .cfi_restore r11
-    .cfi_restore lr
-    .cfi_adjust_cfa_offset -28
-.endm
-
 .macro SETUP_SAVE_REFS_AND_ARGS_FRAME rTemp
     SETUP_SAVE_REFS_AND_ARGS_FRAME_REGISTERS_ONLY
     RUNTIME_CURRENT3 \rTemp                       @ Load Runtime::Current into rTemp.
@@ -228,18 +180,6 @@ ENTRY \c_name
     mov r2, rSELF                   @ pass Thread::Current
     bl  \cxx_name                   @ \cxx_name(Thread*)
 END \c_name
-.endm
-
-.macro  RETURN_OR_DELIVER_PENDING_EXCEPTION_REG reg
-    ldr \reg, [rSELF, #THREAD_EXCEPTION_OFFSET]  @ Get exception field.
-    cbnz \reg, 1f
-    bx lr
-1:
-    DELIVER_PENDING_EXCEPTION
-.endm
-
-.macro  RETURN_OR_DELIVER_PENDING_EXCEPTION_R1
-    RETURN_OR_DELIVER_PENDING_EXCEPTION_REG r1
 .endm
 
 .macro RETURN_IF_RESULT_IS_ZERO_OR_DELIVER
@@ -1316,10 +1256,6 @@ END \name
 .endm
 
 .macro COMPUTE_ARRAY_SIZE_UNKNOWN slow_path
-    bkpt                                                    // We should never enter here.
-                                                            // Code below is for reference.
-                                                            // Possibly a large object, go slow.
-                                                            // Also does negative array size check.
     movw r2, #((MIN_LARGE_OBJECT_THRESHOLD - MIRROR_WIDE_ARRAY_DATA_OFFSET) / 8)
     cmp r1, r2
     bhi \slow_path
@@ -1387,8 +1323,6 @@ END \name
     add    r2, r2, #(MIRROR_WIDE_ARRAY_DATA_OFFSET + OBJECT_ALIGNMENT_MASK)
 .endm
 
-// TODO(ngeoffray): art_quick_alloc_array_resolved_region_tlab is not used for arm, remove
-// the entrypoint once all backends have been updated to use the size variants.
 GENERATE_ALLOC_ARRAY_TLAB art_quick_alloc_array_resolved_region_tlab, artAllocArrayFromCodeResolvedRegionTLAB, COMPUTE_ARRAY_SIZE_UNKNOWN
 GENERATE_ALLOC_ARRAY_TLAB art_quick_alloc_array_resolved8_region_tlab, artAllocArrayFromCodeResolvedRegionTLAB, COMPUTE_ARRAY_SIZE_8
 GENERATE_ALLOC_ARRAY_TLAB art_quick_alloc_array_resolved16_region_tlab, artAllocArrayFromCodeResolvedRegionTLAB, COMPUTE_ARRAY_SIZE_16
@@ -2366,11 +2300,15 @@ art_quick_read_barrier_mark_introspection_gc_roots\label_suffix:
      * The thunk also performs all the fast-path checks, so we need just the
      * slow path.
      *
-     * The UnsafeCASObject intrinsic is similar to the GC roots wide approach
-     * but using ADD (register, T3) instead of the LDR (immediate, T3), so the
-     * destination register is in bits 8-11 rather than 12-15. Therefore it has
-     * its own entrypoint, art_quick_read_barrier_mark_introspection_unsafe_cas
-     * at the offset BAKER_MARK_INTROSPECTION_UNSAFE_CAS_ENTRYPOINT_OFFSET.
+     * Intrinsic CAS operations (VarHandle*CompareAnd{Set,Exchange}* and
+     * UnsafeCASObject) use similar code to the GC roots wide load but using
+     * MOV (register, T3) instead of the LDR (immediate, T3), with destination
+     * register in bits 8-11 rather than 12-15. Therefore they have their own
+     * entrypoint, art_quick_read_barrier_mark_introspection_intrinsic_cas
+     * at the offset BAKER_MARK_INTROSPECTION_INTRINSIC_CAS_ENTRYPOINT_OFFSET.
+     * This is used only for high registers, low registers reuse the GC roots
+     * narrow load entrypoint as the low 3 bits of the destination register
+     * for MOV (register) encoding T1 match the LDR (immediate) encoding T1.
      *
      * The code structure is
      *   art_quick_read_barrier_mark_introspection:                   // @0x00
@@ -2407,9 +2345,9 @@ art_quick_read_barrier_mark_introspection_gc_roots\label_suffix:
      *     return switch.
      *   art_quick_read_barrier_mark_introspection_arrays:            // @0x100
      *     Exactly 128 bytes for array load switch cases (16x2 instructions).
-     *   art_quick_read_barrier_mark_introspection_unsafe_cas:        // @0x180
-     *     UnsafeCASObject intrinsic entrypoint for ADD (register) encoding T3
-     *     (6 bytes). Loads the return register and jumps to the runtime call.
+     *   art_quick_read_barrier_mark_introspection_intrinsic_cas:     // @0x180
+     *     Intrinsic CAS entrypoint for MOV (register) encoding T3 (6 bytes).
+     *     Loads the return register and jumps to the runtime call.
      */
 #if defined(USE_READ_BARRIER) && defined(USE_BAKER_READ_BARRIER)
 ENTRY_ALIGNED art_quick_read_barrier_mark_introspection, 512
@@ -2478,15 +2416,14 @@ art_quick_read_barrier_mark_introspection_arrays:
 
     .balign 8
     .thumb_func
-    .type art_quick_read_barrier_mark_introspection_unsafe_cas, #function
-    .hidden art_quick_read_barrier_mark_introspection_unsafe_cas
-    .global art_quick_read_barrier_mark_introspection_unsafe_cas
-art_quick_read_barrier_mark_introspection_unsafe_cas:
-    // Load the byte of the ADD instruction that contains Rd. Adjust for the thumb state in LR.
-    // The ADD (register, T3) is |11101011000|S|Rn|(0)imm3|Rd|imm2|type|Rm| and we're using
-    // no shift (type=0, imm2=0, imm3=0), so the byte we read here, i.e. |(0)imm3|Rd|,
-    // contains only the register number, the top 4 bits are 0.
-    ldrb    rMR, [lr, #(-1 + BAKER_MARK_INTROSPECTION_UNSAFE_CAS_ADD_OFFSET + 3)]
+    .type art_quick_read_barrier_mark_introspection_intrinsic_cas, #function
+    .hidden art_quick_read_barrier_mark_introspection_intrinsic_cas
+    .global art_quick_read_barrier_mark_introspection_intrinsic_cas
+art_quick_read_barrier_mark_introspection_intrinsic_cas:
+    // Load the byte of the MOV instruction that contains Rd. Adjust for the thumb state in LR.
+    // The MOV (register, T3) is |11101010010|S|1111|(0)000|Rd|0000|Rm|, so the byte we read
+    // here, i.e. |(0)000|Rd|, contains only the register number, the top 4 bits are 0.
+    ldrb    rMR, [lr, #(-1 + BAKER_MARK_INTROSPECTION_INTRINSIC_CAS_MOV_OFFSET + 3)]
     b .Lmark_introspection_runtime_call
 END art_quick_read_barrier_mark_introspection
 #else  // defined(USE_READ_BARRIER) && defined(USE_BAKER_READ_BARRIER)
