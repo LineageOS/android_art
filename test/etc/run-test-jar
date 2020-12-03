@@ -1248,7 +1248,10 @@ if [ "$HOST" = "n" ]; then
              $sync_cmdline && \
              $timeout_prefix $dalvikvm_cmdline"
 
-    cmdfile=$(tempfile -p "cmd-" -s "-$TEST_NAME")
+    # Redirect tempfile error output to /dev/null to silence
+    #     WARNING: tempfile is deprecated; consider using mktemp instead.
+    # seen on device.
+    cmdfile=$(tempfile -p "cmd-" -s "-$TEST_NAME" 2>/dev/null)
     echo "$cmdline" > $cmdfile
 
     if [ "$DEV_MODE" = "y" ]; then
