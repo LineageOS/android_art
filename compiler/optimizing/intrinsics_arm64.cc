@@ -930,7 +930,7 @@ static void CreateUnsafeCASLocations(ArenaAllocator* allocator, HInvoke* invoke)
                                           ? LocationSummary::kCallOnSlowPath
                                           : LocationSummary::kNoCall,
                                       kIntrinsified);
-  if (can_call) {
+  if (can_call && kUseBakerReadBarrier) {
     locations->SetCustomSlowPathCallerSaves(RegisterSet::Empty());  // No caller-save registers.
   }
   locations->SetInAt(0, Location::NoLocation());        // Unused receiver.
@@ -1094,7 +1094,7 @@ static void GenerateCompareAndSet(CodeGeneratorARM64* codegen,
   if (expected2.IsValid()) {
     __ Ccmp(old_value, expected2, ZFlag, ne);
   }
-  // If the comparison failed, the Z flag is cleared as we branch to the `failure` label.
+  // If the comparison failed, the Z flag is cleared as we branch to the `cmp_failure` label.
   // If the comparison succeeded, the Z flag is set and remains set after the end of the
   // code emitted here, unless we retry the whole operation.
   __ B(cmp_failure, ne);
@@ -1166,8 +1166,7 @@ class ReadBarrierCasSlowPathARM64 : public SlowPathCodeARM64 {
     // Mark the `old_value_` from the main path and compare with `expected_`.
     if (kUseBakerReadBarrier) {
       DCHECK(mark_old_value_slow_path_ == nullptr);
-      arm64_codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(old_value_temp_,
-                                                                      old_value_);
+      arm64_codegen->GenerateIntrinsicCasMoveWithBakerReadBarrier(old_value_temp_, old_value_);
     } else {
       DCHECK(mark_old_value_slow_path_ != nullptr);
       __ B(mark_old_value_slow_path_->GetEntryLabel());
@@ -1221,8 +1220,7 @@ class ReadBarrierCasSlowPathARM64 : public SlowPathCodeARM64 {
       __ Bind(&mark_old_value);
       if (kUseBakerReadBarrier) {
         DCHECK(update_old_value_slow_path_ == nullptr);
-        arm64_codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(old_value_,
-                                                                        old_value_temp_);
+        arm64_codegen->GenerateIntrinsicCasMoveWithBakerReadBarrier(old_value_, old_value_temp_);
       } else {
         // Note: We could redirect the `failure` above directly to the entry label and bind
         // the exit label in the main path, but the main path would need to access the
@@ -1342,7 +1340,8 @@ void IntrinsicLocationsBuilderARM64::VisitUnsafeCASObject(HInvoke* invoke) {
     } else {
       // To preserve the old value across the non-Baker read barrier
       // slow path, use a fixed callee-save register.
-      locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+      constexpr int first_callee_save = CTZ(kArm64CalleeSaveRefSpills);
+      locations->AddTemp(Location::RegisterLocation(first_callee_save));
       // To reduce the number of moves, request x0 as the second temporary.
       DCHECK(InvokeRuntimeCallingConvention().GetReturnLocation(DataType::Type::kReference).Equals(
                  Location::RegisterLocation(x0.GetCode())));
@@ -1358,10 +1357,6 @@ void IntrinsicCodeGeneratorARM64::VisitUnsafeCASLong(HInvoke* invoke) {
   GenUnsafeCas(invoke, DataType::Type::kInt64, codegen_);
 }
 void IntrinsicCodeGeneratorARM64::VisitUnsafeCASObject(HInvoke* invoke) {
-  // The only read barrier implementation supporting the
-  // UnsafeCASObject intrinsic is the Baker-style read barriers.
-  DCHECK(!kEmitCompilerReadBarrier || kUseBakerReadBarrier);
-
   GenUnsafeCas(invoke, DataType::Type::kReference, codegen_);
 }
 
@@ -4082,7 +4077,8 @@ static LocationSummary* CreateVarHandleFieldLocations(HInvoke* invoke) {
       GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {  // For static fields.
     // To preserve the offset value across the non-Baker read barrier slow path
     // for loading the declaring class, use a fixed callee-save register.
-    locations->AddTemp(Location::RegisterLocation(CTZ(kArm64CalleeSaveRefSpills)));
+    constexpr int first_callee_save = CTZ(kArm64CalleeSaveRefSpills);
+    locations->AddTemp(Location::RegisterLocation(first_callee_save));
   } else {
     locations->AddTemp(Location::RequiresRegister());
   }
@@ -4303,12 +4299,22 @@ static void CreateVarHandleCompareAndSetOrExchangeLocations(HInvoke* invoke, boo
 
   LocationSummary* locations = CreateVarHandleFieldLocations(invoke);
 
-  if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
-      GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {  // For static fields.
-    // Not implemented for references, see above.
-    // Note that we would need a callee-save register instead of the temporary
-    // reserved in CreateVarHandleFieldLocations() for the class object.
-    DCHECK_NE(value_type, DataType::Type::kReference);
+  if (kEmitCompilerReadBarrier && !kUseBakerReadBarrier) {
+    // We need callee-save registers for both the class object and offset instead of
+    // the temporaries reserved in CreateVarHandleFieldLocations().
+    static_assert(POPCOUNT(kArm64CalleeSaveRefSpills) >= 2u);
+    uint32_t first_callee_save = CTZ(kArm64CalleeSaveRefSpills);
+    uint32_t second_callee_save = CTZ(kArm64CalleeSaveRefSpills ^ (1u << first_callee_save));
+    if (GetExpectedVarHandleCoordinatesCount(invoke) == 0u) {  // For static fields.
+      DCHECK_EQ(locations->GetTempCount(), 2u);
+      DCHECK(locations->GetTemp(0u).Equals(Location::RequiresRegister()));
+      DCHECK(locations->GetTemp(1u).Equals(Location::RegisterLocation(first_callee_save)));
+      locations->SetTempAt(0u, Location::RegisterLocation(second_callee_save));
+    } else {
+      DCHECK_EQ(locations->GetTempCount(), 1u);
+      DCHECK(locations->GetTemp(0u).Equals(Location::RequiresRegister()));
+      locations->SetTempAt(0u, Location::RegisterLocation(first_callee_save));
+    }
   }
   if (!return_success && DataType::IsFloatingPointType(value_type)) {
     // Add a temporary for old value and exclusive store result if floating point
@@ -4640,7 +4646,7 @@ static void GenerateVarHandleGetAndUpdate(HInvoke* invoke,
     arg = MoveToTempIfFpRegister(arg, value_type, masm, &temps);
     if (DataType::IsFloatingPointType(value_type) && !arg.IsZero()) {
       // We need a temporary register but we have already used a scratch register for
-      // the new value unless it is zero bit pattern (+0.0f or +0.0) and need anothe one
+      // the new value unless it is zero bit pattern (+0.0f or +0.0) and need another one
       // in GenerateGetAndUpdate(). We have allocated a normal temporary to handle that.
       Location temp = locations->GetTemp((expected_coordinates_count == 0u) ? 2u : 1u);
       old_value =
@@ -4663,7 +4669,7 @@ static void GenerateVarHandleGetAndUpdate(HInvoke* invoke,
     }
   } else if (kEmitCompilerReadBarrier && value_type == DataType::Type::kReference) {
     if (kUseBakerReadBarrier) {
-      codegen->GenerateUnsafeCasOldValueMovWithBakerReadBarrier(out.W(), old_value.W());
+      codegen->GenerateIntrinsicCasMoveWithBakerReadBarrier(out.W(), old_value.W());
     } else {
       codegen->GenerateReadBarrierSlow(
           invoke,

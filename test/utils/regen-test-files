@@ -214,6 +214,8 @@ known_failing_tests=(
   art-run-test-708-jit-cache-churn
   art-run-test-717-integer-value-of
   art-run-test-720-thread-priority
+  art-run-test-728-imt-conflict-zygote  # Custom `run` script + dependency on `libarttest`.
+  art-run-test-813-fp-args              # Dependency on `libarttest`.
   art-run-test-900-hello-plugin
   art-run-test-901-hello-ti-agent
   art-run-test-902-hello-transformation
