@@ -1194,7 +1194,7 @@ END \name
    FETCH lr, 2 // arguments
    .if \is_string_init
    add lr, lr, #1  // arg start index
-   mov r4, #1       // index in stack
+   mov r4, #0      // index in stack
    LOOP_RANGE_OVER_SHORTY_LOADING_GPRS r1, r8, lr, r4, .Lgpr_setup_finished_range_\suffix, .Lif_long_range_\suffix, is_r3=0
    .elseif \is_static
    mov r4, #0      // index in stack
