@@ -1248,8 +1248,8 @@ if [ "$HOST" = "n" ]; then
              $sync_cmdline && \
              $timeout_prefix $dalvikvm_cmdline"
 
-    cmdfile=$(tempfile -p "cmd-" -s "-$TEST_NAME")
-    echo "$cmdline" > $cmdfile
+    cmdfile=$(mktemp cmd-XXXX --suffix "-$TEST_NAME")
+    echo "$cmdline" >> $cmdfile
 
     if [ "$DEV_MODE" = "y" ]; then
       echo $cmdline
