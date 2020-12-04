@@ -273,7 +273,6 @@ class ImageSpace : public MemMapSpace {
   // De-initialize the image-space by undoing the effects in Init().
   virtual ~ImageSpace();
 
-  void DisablePreResolvedStrings() REQUIRES_SHARED(Locks::mutator_lock_);
   void ReleaseMetadata() REQUIRES_SHARED(Locks::mutator_lock_);
 
  protected:

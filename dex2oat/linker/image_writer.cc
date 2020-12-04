@@ -80,7 +80,6 @@
 #include "runtime.h"
 #include "scoped_thread_state_change-inl.h"
 #include "subtype_check.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 #include "well_known_classes.h"
 
 using ::art::mirror::Class;
@@ -237,7 +236,7 @@ static void ClearDexFileCookies() REQUIRES_SHARED(Locks::mutator_lock_) {
   Runtime::Current()->GetHeap()->VisitObjects(visitor);
 }
 
-bool ImageWriter::PrepareImageAddressSpace(bool preload_dex_caches, TimingLogger* timings) {
+bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
   target_ptr_size_ = InstructionSetPointerSize(compiler_options_.GetInstructionSet());
 
   Thread* const self = Thread::Current();
@@ -275,20 +274,6 @@ bool ImageWriter::PrepareImageAddressSpace(bool preload_dex_caches, TimingLogger
     TimingLogger::ScopedTiming t("PromoteInterns", timings);
     ScopedObjectAccess soa(self);
     Runtime::Current()->GetInternTable()->PromoteWeakToStrong();
-  }
-
-  if (preload_dex_caches) {
-    TimingLogger::ScopedTiming t("PreloadDexCaches", timings);
-    // Preload deterministic contents to the dex cache arrays we're going to write.
-    ScopedObjectAccess soa(self);
-    ObjPtr<mirror::ClassLoader> class_loader = GetAppClassLoader();
-    std::vector<ObjPtr<mirror::DexCache>> dex_caches = FindDexCaches(self);
-    for (ObjPtr<mirror::DexCache> dex_cache : dex_caches) {
-      if (!IsImageDexCache(dex_cache)) {
-        continue;  // Boot image DexCache is not written to the app image.
-      }
-      PreloadDexCache(dex_cache, class_loader);
-    }
   }
 
   {
@@ -654,92 +639,6 @@ void ImageWriter::SetImageBinSlot(mirror::Object* object, BinSlot bin_slot) {
   DCHECK(IsImageBinSlotAssigned(object));
 }
 
-void ImageWriter::PrepareDexCacheArraySlots() {
-  // Prepare dex cache array starts based on the ordering specified in the CompilerOptions.
-  // Set the slot size early to avoid DCHECK() failures in IsImageBinSlotAssigned()
-  // when AssignImageBinSlot() assigns their indexes out or order.
-  for (const DexFile* dex_file : compiler_options_.GetDexFilesForOatFile()) {
-    auto it = dex_file_oat_index_map_.find(dex_file);
-    DCHECK(it != dex_file_oat_index_map_.end()) << dex_file->GetLocation();
-    ImageInfo& image_info = GetImageInfo(it->second);
-    image_info.dex_cache_array_starts_.Put(
-        dex_file, image_info.GetBinSlotSize(Bin::kDexCacheArray));
-    DexCacheArraysLayout layout(target_ptr_size_, dex_file);
-    image_info.IncrementBinSlotSize(Bin::kDexCacheArray, layout.Size());
-  }
-
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
-  Thread* const self = Thread::Current();
-  ReaderMutexLock mu(self, *Locks::dex_lock_);
-  for (const ClassLinker::DexCacheData& data : class_linker->GetDexCachesData()) {
-    ObjPtr<mirror::DexCache> dex_cache =
-        ObjPtr<mirror::DexCache>::DownCast(self->DecodeJObject(data.weak_root));
-    if (dex_cache == nullptr || !IsImageDexCache(dex_cache)) {
-      continue;
-    }
-    const DexFile* dex_file = dex_cache->GetDexFile();
-    CHECK(dex_file_oat_index_map_.find(dex_file) != dex_file_oat_index_map_.end())
-        << "Dex cache should have been pruned " << dex_file->GetLocation()
-        << "; possibly in class path";
-    DexCacheArraysLayout layout(target_ptr_size_, dex_file);
-    // Empty dex files will not have a "valid" DexCacheArraysLayout.
-    if (dex_file->NumTypeIds() + dex_file->NumStringIds() + dex_file->NumMethodIds() +
-        dex_file->NumFieldIds() + dex_file->NumProtoIds() + dex_file->NumCallSiteIds() != 0) {
-      DCHECK(layout.Valid());
-    }
-    size_t oat_index = GetOatIndexForDexFile(dex_file);
-    ImageInfo& image_info = GetImageInfo(oat_index);
-    uint32_t start = image_info.dex_cache_array_starts_.Get(dex_file);
-    DCHECK_EQ(dex_file->NumTypeIds() != 0u, dex_cache->GetResolvedTypes() != nullptr);
-    AddDexCacheArrayRelocation(dex_cache->GetResolvedTypes(),
-                               start + layout.TypesOffset(),
-                               oat_index);
-    DCHECK_EQ(dex_file->NumMethodIds() != 0u, dex_cache->GetResolvedMethods() != nullptr);
-    AddDexCacheArrayRelocation(dex_cache->GetResolvedMethods(),
-                               start + layout.MethodsOffset(),
-                               oat_index);
-    DCHECK_EQ(dex_file->NumFieldIds() != 0u, dex_cache->GetResolvedFields() != nullptr);
-    AddDexCacheArrayRelocation(dex_cache->GetResolvedFields(),
-                               start + layout.FieldsOffset(),
-                               oat_index);
-    DCHECK_EQ(dex_file->NumStringIds() != 0u, dex_cache->GetStrings() != nullptr);
-    AddDexCacheArrayRelocation(dex_cache->GetStrings(), start + layout.StringsOffset(), oat_index);
-
-    AddDexCacheArrayRelocation(dex_cache->GetResolvedMethodTypes(),
-                               start + layout.MethodTypesOffset(),
-                               oat_index);
-    AddDexCacheArrayRelocation(dex_cache->GetResolvedCallSites(),
-                                start + layout.CallSitesOffset(),
-                                oat_index);
-
-    // Preresolved strings aren't part of the special layout.
-    GcRoot<mirror::String>* preresolved_strings = dex_cache->GetPreResolvedStrings();
-    if (preresolved_strings != nullptr) {
-      DCHECK(!IsInBootImage(preresolved_strings));
-      // Add the array to the metadata section.
-      const size_t count = dex_cache->NumPreResolvedStrings();
-      auto bin = BinTypeForNativeRelocationType(NativeObjectRelocationType::kGcRootPointer);
-      for (size_t i = 0; i < count; ++i) {
-        native_object_relocations_.emplace(&preresolved_strings[i],
-            NativeObjectRelocation { oat_index,
-                                     image_info.GetBinSlotSize(bin),
-                                     NativeObjectRelocationType::kGcRootPointer });
-        image_info.IncrementBinSlotSize(bin, sizeof(GcRoot<mirror::Object>));
-      }
-    }
-  }
-}
-
-void ImageWriter::AddDexCacheArrayRelocation(void* array,
-                                             size_t offset,
-                                             size_t oat_index) {
-  if (array != nullptr) {
-    DCHECK(!IsInBootImage(array));
-    native_object_relocations_.emplace(array,
-        NativeObjectRelocation { oat_index, offset, NativeObjectRelocationType::kDexCacheArray });
-  }
-}
-
 void ImageWriter::AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr) {
   DCHECK(arr != nullptr);
   if (kIsDebugBuild) {
@@ -780,12 +679,6 @@ ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t 
     // Memory analysis has determined that the following types of objects get dirtied
     // the most:
     //
-    // * Dex cache arrays are stored in a special bin. The arrays for each dex cache have
-    //   a fixed layout which helps improve generated code (using PC-relative addressing),
-    //   so we pre-calculate their offsets separately in PrepareDexCacheArraySlots().
-    //   Since these arrays are huge, most pages do not overlap other objects and it's not
-    //   really important where they are for the clean/dirty separation. Due to their
-    //   special PC-relative addressing, we arbitrarily keep them at the end.
     // * Class'es which are verified [their clinit runs only at runtime]
     //   - classes in general [because their static fields get overwritten]
     //   - initialized classes with all-final statics are unlikely to be ever dirty,
@@ -1282,113 +1175,6 @@ void ImageWriter::ClearDexCache(ObjPtr<mirror::DexCache> dex_cache) {
               GcRoot<mirror::CallSite>(nullptr));
 }
 
-void ImageWriter::PreloadDexCache(ObjPtr<mirror::DexCache> dex_cache,
-                                  ObjPtr<mirror::ClassLoader> class_loader) {
-  // To ensure deterministic contents of the hash-based arrays, each slot shall contain
-  // the candidate with the lowest index. As we're processing entries in increasing index
-  // order, this means trying to look up the entry for the current index if the slot is
-  // empty or if it contains a higher index.
-
-  Runtime* runtime = Runtime::Current();
-  ClassLinker* class_linker = runtime->GetClassLinker();
-  const DexFile& dex_file = *dex_cache->GetDexFile();
-  // Preload the methods array and make the contents deterministic.
-  mirror::MethodDexCacheType* resolved_methods = dex_cache->GetResolvedMethods();
-  dex::TypeIndex last_class_idx;  // Initialized to invalid index.
-  ObjPtr<mirror::Class> last_class = nullptr;
-  for (size_t i = 0, num = dex_cache->GetDexFile()->NumMethodIds(); i != num; ++i) {
-    uint32_t slot_idx = dex_cache->MethodSlotIndex(i);
-    auto pair =
-        mirror::DexCache::GetNativePairPtrSize(resolved_methods, slot_idx, target_ptr_size_);
-    uint32_t stored_index = pair.index;
-    ArtMethod* method = pair.object;
-    if (method != nullptr && i > stored_index) {
-      continue;  // Already checked.
-    }
-    // Check if the referenced class is in the image. Note that we want to check the referenced
-    // class rather than the declaring class to preserve the semantics, i.e. using a MethodId
-    // results in resolving the referenced class and that can for example throw OOME.
-    const dex::MethodId& method_id = dex_file.GetMethodId(i);
-    if (method_id.class_idx_ != last_class_idx) {
-      last_class_idx = method_id.class_idx_;
-      last_class = class_linker->LookupResolvedType(last_class_idx, dex_cache, class_loader);
-    }
-    if (method == nullptr || i < stored_index) {
-      if (last_class != nullptr) {
-        // Try to resolve the method with the class linker, which will insert
-        // it into the dex cache if successful.
-        method = class_linker->FindResolvedMethod(last_class, dex_cache, class_loader, i);
-        DCHECK(method == nullptr || dex_cache->GetResolvedMethod(i, target_ptr_size_) == method);
-      }
-    } else {
-      DCHECK_EQ(i, stored_index);
-      DCHECK(last_class != nullptr);
-    }
-  }
-  // Preload the fields array and make the contents deterministic.
-  mirror::FieldDexCacheType* resolved_fields = dex_cache->GetResolvedFields();
-  last_class_idx = dex::TypeIndex();  // Initialized to invalid index.
-  last_class = nullptr;
-  for (size_t i = 0, end = dex_file.NumFieldIds(); i < end; ++i) {
-    uint32_t slot_idx = dex_cache->FieldSlotIndex(i);
-    auto pair = mirror::DexCache::GetNativePairPtrSize(resolved_fields, slot_idx, target_ptr_size_);
-    uint32_t stored_index = pair.index;
-    ArtField* field = pair.object;
-    if (field != nullptr && i > stored_index) {
-      continue;  // Already checked.
-    }
-    // Check if the referenced class is in the image. Note that we want to check the referenced
-    // class rather than the declaring class to preserve the semantics, i.e. using a FieldId
-    // results in resolving the referenced class and that can for example throw OOME.
-    const dex::FieldId& field_id = dex_file.GetFieldId(i);
-    if (field_id.class_idx_ != last_class_idx) {
-      last_class_idx = field_id.class_idx_;
-      last_class = class_linker->LookupResolvedType(last_class_idx, dex_cache, class_loader);
-      if (last_class != nullptr && !KeepClass(last_class)) {
-        last_class = nullptr;
-      }
-    }
-    if (field == nullptr || i < stored_index) {
-      if (last_class != nullptr) {
-        // Try to resolve the field with the class linker, which will insert
-        // it into the dex cache if successful.
-        field = class_linker->FindResolvedFieldJLS(last_class, dex_cache, class_loader, i);
-        DCHECK(field == nullptr || dex_cache->GetResolvedField(i, target_ptr_size_) == field);
-      }
-    } else {
-      DCHECK_EQ(i, stored_index);
-      DCHECK(last_class != nullptr);
-    }
-  }
-  // Preload the types array and make the contents deterministic.
-  // This is done after fields and methods as their lookup can touch the types array.
-  for (size_t i = 0, end = dex_cache->GetDexFile()->NumTypeIds(); i < end; ++i) {
-    dex::TypeIndex type_idx(i);
-    uint32_t slot_idx = dex_cache->TypeSlotIndex(type_idx);
-    mirror::TypeDexCachePair pair =
-        dex_cache->GetResolvedTypes()[slot_idx].load(std::memory_order_relaxed);
-    uint32_t stored_index = pair.index;
-    ObjPtr<mirror::Class> klass = pair.object.Read();
-    if (klass == nullptr || i < stored_index) {
-      klass = class_linker->LookupResolvedType(type_idx, dex_cache, class_loader);
-      DCHECK(klass == nullptr || dex_cache->GetResolvedType(type_idx) == klass);
-    }
-  }
-  // Preload the strings array and make the contents deterministic.
-  for (size_t i = 0, end = dex_cache->GetDexFile()->NumStringIds(); i < end; ++i) {
-    dex::StringIndex string_idx(i);
-    uint32_t slot_idx = dex_cache->StringSlotIndex(string_idx);
-    mirror::StringDexCachePair pair =
-        dex_cache->GetStrings()[slot_idx].load(std::memory_order_relaxed);
-    uint32_t stored_index = pair.index;
-    ObjPtr<mirror::String> string = pair.object.Read();
-    if (string == nullptr || i < stored_index) {
-      string = class_linker->LookupString(string_idx, dex_cache);
-      DCHECK(string == nullptr || dex_cache->GetResolvedString(string_idx) == string);
-    }
-  }
-}
-
 void ImageWriter::PruneNonImageClasses() {
   Runtime* runtime = Runtime::Current();
   ClassLinker* class_linker = runtime->GetClassLinker();
@@ -1419,7 +1205,7 @@ void ImageWriter::PruneNonImageClasses() {
     VLOG(compiler) << "Pruned " << class_loader_visitor.GetRemovedClassCount() << " classes";
   }
 
-  // Completely clear DexCaches. They shall be re-filled in PreloadDexCaches if requested.
+  // Completely clear DexCaches.
   std::vector<ObjPtr<mirror::DexCache>> dex_caches = FindDexCaches(self);
   for (ObjPtr<mirror::DexCache> dex_cache : dex_caches) {
     ClearDexCache(dex_cache);
@@ -1795,7 +1581,7 @@ class ImageWriter::LayoutHelper {
    * string. To speed up the visiting of references at load time we include
    * a list of offsets to string references in the AppImage.
    */
-  void CollectStringReferenceInfo(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
+  void CollectStringReferenceInfo() REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   class CollectClassesVisitor;
@@ -2200,10 +1986,6 @@ void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {
           bin_offset = RoundUp(bin_offset, ArtMethod::Alignment(image_writer_->target_ptr_size_));
           break;
         }
-        case Bin::kDexCacheArray:
-          bin_offset =
-              RoundUp(bin_offset, DexCacheArraysLayout::Alignment(image_writer_->target_ptr_size_));
-          break;
         case Bin::kImTable:
         case Bin::kIMTConflictTable: {
           bin_offset = RoundUp(bin_offset, static_cast<size_t>(image_writer_->target_ptr_size_));
@@ -2285,8 +2067,7 @@ void ImageWriter::LayoutHelper::FinalizeBinSlotOffsets() {
   VLOG(image) << "Space wasted for region alignment " << image_writer_->region_alignment_wasted_;
 }
 
-void ImageWriter::LayoutHelper::CollectStringReferenceInfo(Thread* self) {
-  size_t managed_string_refs = 0u;
+void ImageWriter::LayoutHelper::CollectStringReferenceInfo() {
   size_t total_string_refs = 0u;
 
   const size_t num_image_infos = image_writer_->image_infos_.size();
@@ -2316,49 +2097,13 @@ void ImageWriter::LayoutHelper::CollectStringReferenceInfo(Thread* self) {
       }
     }
 
-    managed_string_refs += image_info.string_reference_offsets_.size();
-
-    // Collect dex cache string arrays.
-    for (const DexFile* dex_file : image_writer_->compiler_options_.GetDexFilesForOatFile()) {
-      if (image_writer_->GetOatIndexForDexFile(dex_file) == oat_index) {
-        ObjPtr<mirror::DexCache> dex_cache =
-            Runtime::Current()->GetClassLinker()->FindDexCache(self, *dex_file);
-        DCHECK(dex_cache != nullptr);
-        size_t base_offset = image_writer_->GetImageOffset(dex_cache.Ptr(), oat_index);
-
-        // Visit all string cache entries.
-        mirror::StringDexCacheType* strings = dex_cache->GetStrings();
-        const size_t num_strings = dex_cache->NumStrings();
-        for (uint32_t index = 0; index != num_strings; ++index) {
-          ObjPtr<mirror::String> referred_string = strings[index].load().object.Read();
-          if (image_writer_->IsInternedAppImageStringReference(referred_string)) {
-            image_info.string_reference_offsets_.emplace_back(
-                SetDexCacheStringNativeRefTag(base_offset), index);
-          }
-        }
-
-        // Visit all pre-resolved string entries.
-        GcRoot<mirror::String>* preresolved_strings = dex_cache->GetPreResolvedStrings();
-        const size_t num_pre_resolved_strings = dex_cache->NumPreResolvedStrings();
-        for (uint32_t index = 0; index != num_pre_resolved_strings; ++index) {
-          ObjPtr<mirror::String> referred_string = preresolved_strings[index].Read();
-          if (image_writer_->IsInternedAppImageStringReference(referred_string)) {
-            image_info.string_reference_offsets_.emplace_back(
-                SetDexCachePreResolvedStringNativeRefTag(base_offset), index);
-          }
-        }
-      }
-    }
-
     total_string_refs += image_info.string_reference_offsets_.size();
 
     // Check that we collected the same number of string references as we saw in the previous pass.
     CHECK_EQ(image_info.string_reference_offsets_.size(), image_info.num_string_references_);
   }
 
-  VLOG(compiler) << "Dex2Oat:AppImage:stringReferences = " << total_string_refs
-      << " (managed: " << managed_string_refs
-      << ", native: " << (total_string_refs - managed_string_refs) << ")";
+  VLOG(compiler) << "Dex2Oat:AppImage:stringReferences = " << total_string_refs;
 }
 
 void ImageWriter::LayoutHelper::VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index) {
@@ -2463,9 +2208,6 @@ void ImageWriter::CalculateNewObjectOffsets() {
   // Verify that all objects have assigned image bin slots.
   layout_helper.VerifyImageBinSlotsAssigned();
 
-  // Calculate size of the dex cache arrays slot and prepare offsets.
-  PrepareDexCacheArraySlots();
-
   // Calculate the sizes of the intern tables, class tables, and fixup tables.
   for (ImageInfo& image_info : image_infos_) {
     // Calculate how big the intern table will be after being serialized.
@@ -2488,7 +2230,7 @@ void ImageWriter::CalculateNewObjectOffsets() {
 
   // Collect string reference info for app images.
   if (ClassLinker::kAppImageMayContainStrings && compiler_options_.IsAppImage()) {
-    layout_helper.CollectStringReferenceInfo(self);
+    layout_helper.CollectStringReferenceInfo();
   }
 
   // Calculate image offsets.
@@ -2564,19 +2306,11 @@ std::pair<size_t, std::vector<ImageSection>> ImageWriter::ImageInfo::CreateImage
       ImageSection(GetBinSlotOffset(Bin::kRuntimeMethod), GetBinSlotSize(Bin::kRuntimeMethod));
 
   /*
-   * DexCache Arrays section.
-   */
-  const ImageSection& dex_cache_arrays_section =
-      sections[ImageHeader::kSectionDexCacheArrays] =
-          ImageSection(GetBinSlotOffset(Bin::kDexCacheArray),
-                       GetBinSlotSize(Bin::kDexCacheArray));
-
-  /*
    * Interned Strings section
    */
 
   // Round up to the alignment the string table expects. See HashSet::WriteToMemory.
-  size_t cur_pos = RoundUp(dex_cache_arrays_section.End(), sizeof(uint64_t));
+  size_t cur_pos = RoundUp(sections[ImageHeader::kSectionRuntimeMethods].End(), sizeof(uint64_t));
 
   const ImageSection& interned_strings_section =
       sections[ImageHeader::kSectionInternedStrings] =
@@ -2613,8 +2347,7 @@ std::pair<size_t, std::vector<ImageSection>> ImageWriter::ImageInfo::CreateImage
    */
 
   // Round up to the alignment of the offsets we are going to store.
-  cur_pos = RoundUp(string_reference_offsets.End(),
-                    mirror::DexCache::PreResolvedStringsAlignment());
+  cur_pos = RoundUp(string_reference_offsets.End(), sizeof(uint32_t));
 
   const ImageSection& metadata_section =
       sections[ImageHeader::kSectionMetadata] =
@@ -2841,9 +2574,6 @@ void ImageWriter::CopyAndFixupNativeData(size_t oat_index) {
         reinterpret_cast<LengthPrefixedArray<ArtMethod>*>(dest)->ClearPadding(size, alignment);
         break;
       }
-      case NativeObjectRelocationType::kDexCacheArray:
-        // Nothing to copy here, everything is done in FixupDexCache().
-        break;
       case NativeObjectRelocationType::kIMTable: {
         ImTable* orig_imt = reinterpret_cast<ImTable*>(pair.first);
         ImTable* dest_imt = reinterpret_cast<ImTable*>(dest);
@@ -3211,7 +2941,7 @@ void ImageWriter::FixupObject(Object* orig, Object* copy) {
       ArtMethod* src_method = src->GetArtMethod();
       CopyAndFixupPointer(dest, mirror::Executable::ArtMethodOffset(), src_method);
     } else if (klass == GetClassRoot<mirror::DexCache>(class_roots)) {
-      FixupDexCache(down_cast<mirror::DexCache*>(orig), down_cast<mirror::DexCache*>(copy));
+      down_cast<mirror::DexCache*>(copy)->ResetNativeFields();
     } else if (klass->IsClassLoaderClass()) {
       mirror::ClassLoader* copy_loader = down_cast<mirror::ClassLoader*>(copy);
       // If src is a ClassLoader, set the class table to null so that it gets recreated by the
@@ -3225,113 +2955,6 @@ void ImageWriter::FixupObject(Object* orig, Object* copy) {
     FixupVisitor visitor(this, copy);
     orig->VisitReferences(visitor, visitor);
   }
-}
-
-template <typename T>
-void ImageWriter::FixupDexCacheArrayEntry(std::atomic<mirror::DexCachePair<T>>* orig_array,
-                                          std::atomic<mirror::DexCachePair<T>>* new_array,
-                                          uint32_t array_index) {
-  static_assert(sizeof(std::atomic<mirror::DexCachePair<T>>) == sizeof(mirror::DexCachePair<T>),
-                "Size check for removing std::atomic<>.");
-  mirror::DexCachePair<T>* orig_pair =
-      reinterpret_cast<mirror::DexCachePair<T>*>(&orig_array[array_index]);
-  mirror::DexCachePair<T>* new_pair =
-      reinterpret_cast<mirror::DexCachePair<T>*>(&new_array[array_index]);
-  CopyAndFixupReference(
-      new_pair->object.AddressWithoutBarrier(), orig_pair->object.Read());
-  new_pair->index = orig_pair->index;
-}
-
-template <typename T>
-void ImageWriter::FixupDexCacheArrayEntry(std::atomic<mirror::NativeDexCachePair<T>>* orig_array,
-                                          std::atomic<mirror::NativeDexCachePair<T>>* new_array,
-                                          uint32_t array_index) {
-  static_assert(
-      sizeof(std::atomic<mirror::NativeDexCachePair<T>>) == sizeof(mirror::NativeDexCachePair<T>),
-      "Size check for removing std::atomic<>.");
-  if (target_ptr_size_ == PointerSize::k64) {
-    DexCache::ConversionPair64* orig_pair =
-        reinterpret_cast<DexCache::ConversionPair64*>(orig_array) + array_index;
-    DexCache::ConversionPair64* new_pair =
-        reinterpret_cast<DexCache::ConversionPair64*>(new_array) + array_index;
-    *new_pair = *orig_pair;  // Copy original value and index.
-    if (orig_pair->first != 0u) {
-      CopyAndFixupPointer(
-          reinterpret_cast<void**>(&new_pair->first), reinterpret_cast64<void*>(orig_pair->first));
-    }
-  } else {
-    DexCache::ConversionPair32* orig_pair =
-        reinterpret_cast<DexCache::ConversionPair32*>(orig_array) + array_index;
-    DexCache::ConversionPair32* new_pair =
-        reinterpret_cast<DexCache::ConversionPair32*>(new_array) + array_index;
-    *new_pair = *orig_pair;  // Copy original value and index.
-    if (orig_pair->first != 0u) {
-      CopyAndFixupPointer(
-          reinterpret_cast<void**>(&new_pair->first), reinterpret_cast32<void*>(orig_pair->first));
-    }
-  }
-}
-
-void ImageWriter::FixupDexCacheArrayEntry(GcRoot<mirror::CallSite>* orig_array,
-                                          GcRoot<mirror::CallSite>* new_array,
-                                          uint32_t array_index) {
-  CopyAndFixupReference(
-      new_array[array_index].AddressWithoutBarrier(), orig_array[array_index].Read());
-}
-
-template <typename EntryType>
-void ImageWriter::FixupDexCacheArray(DexCache* orig_dex_cache,
-                                     DexCache* copy_dex_cache,
-                                     MemberOffset array_offset,
-                                     uint32_t size) {
-  EntryType* orig_array = orig_dex_cache->GetFieldPtr64<EntryType*>(array_offset);
-  DCHECK_EQ(orig_array != nullptr, size != 0u);
-  if (orig_array != nullptr) {
-    // Though the DexCache array fields are usually treated as native pointers, we clear
-    // the top 32 bits for 32-bit targets.
-    CopyAndFixupPointer(copy_dex_cache, array_offset, orig_array, PointerSize::k64);
-    EntryType* new_array = NativeCopyLocation(orig_array);
-    for (uint32_t i = 0; i != size; ++i) {
-      FixupDexCacheArrayEntry(orig_array, new_array, i);
-    }
-  }
-}
-
-void ImageWriter::FixupDexCache(DexCache* orig_dex_cache, DexCache* copy_dex_cache) {
-  FixupDexCacheArray<mirror::StringDexCacheType>(orig_dex_cache,
-                                                 copy_dex_cache,
-                                                 DexCache::StringsOffset(),
-                                                 orig_dex_cache->NumStrings());
-  FixupDexCacheArray<mirror::TypeDexCacheType>(orig_dex_cache,
-                                               copy_dex_cache,
-                                               DexCache::ResolvedTypesOffset(),
-                                               orig_dex_cache->NumResolvedTypes());
-  FixupDexCacheArray<mirror::MethodDexCacheType>(orig_dex_cache,
-                                                 copy_dex_cache,
-                                                 DexCache::ResolvedMethodsOffset(),
-                                                 orig_dex_cache->NumResolvedMethods());
-  FixupDexCacheArray<mirror::FieldDexCacheType>(orig_dex_cache,
-                                                copy_dex_cache,
-                                                DexCache::ResolvedFieldsOffset(),
-                                                orig_dex_cache->NumResolvedFields());
-  FixupDexCacheArray<mirror::MethodTypeDexCacheType>(orig_dex_cache,
-                                                     copy_dex_cache,
-                                                     DexCache::ResolvedMethodTypesOffset(),
-                                                     orig_dex_cache->NumResolvedMethodTypes());
-  FixupDexCacheArray<GcRoot<mirror::CallSite>>(orig_dex_cache,
-                                               copy_dex_cache,
-                                               DexCache::ResolvedCallSitesOffset(),
-                                               orig_dex_cache->NumResolvedCallSites());
-  if (orig_dex_cache->GetPreResolvedStrings() != nullptr) {
-    CopyAndFixupPointer(copy_dex_cache,
-                        DexCache::PreResolvedStringsOffset(),
-                        orig_dex_cache->GetPreResolvedStrings(),
-                        PointerSize::k64);
-  }
-
-  // Remove the DexFile pointers. They will be fixed up when the runtime loads the oat file. Leaving
-  // compiler pointers in here will make the output non-deterministic.
-  copy_dex_cache->SetDexFile(nullptr);
 }
 
 const uint8_t* ImageWriter::GetOatAddress(StubType type) const {
@@ -3526,8 +3149,6 @@ ImageWriter::Bin ImageWriter::BinTypeForNativeRelocationType(NativeObjectRelocat
     case NativeObjectRelocationType::kArtMethodDirty:
     case NativeObjectRelocationType::kArtMethodArrayDirty:
       return Bin::kArtMethodDirty;
-    case NativeObjectRelocationType::kDexCacheArray:
-      return Bin::kDexCacheArray;
     case NativeObjectRelocationType::kRuntimeMethod:
       return Bin::kRuntimeMethod;
     case NativeObjectRelocationType::kIMTable:

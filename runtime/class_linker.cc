@@ -143,7 +143,6 @@
 #include "thread_list.h"
 #include "trace.h"
 #include "transaction.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 #include "verifier/class_verifier.h"
 #include "well_known_classes.h"
 
@@ -1518,7 +1517,6 @@ size_t CountInternedStringReferences(gc::space::ImageSpace& space,
 template <typename Visitor>
 static void VisitInternedStringReferences(
     gc::space::ImageSpace* space,
-    bool use_preresolved_strings,
     const Visitor& visitor) REQUIRES_SHARED(Locks::mutator_lock_) {
   const uint8_t* target_base = space->Begin();
   const ImageSection& sro_section =
@@ -1535,75 +1533,26 @@ static void VisitInternedStringReferences(
   for (size_t offset_index = 0; offset_index < num_string_offsets; ++offset_index) {
     uint32_t base_offset = sro_base[offset_index].first;
 
-    if (HasDexCacheStringNativeRefTag(base_offset)) {
-      base_offset = ClearDexCacheNativeRefTags(base_offset);
-      DCHECK_ALIGNED(base_offset, 2);
+    uint32_t raw_member_offset = sro_base[offset_index].second;
+    DCHECK_ALIGNED(base_offset, 2);
+    DCHECK_ALIGNED(raw_member_offset, 2);
 
-      ObjPtr<mirror::DexCache> dex_cache =
-          reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
-      uint32_t string_slot_index = sro_base[offset_index].second;
-
-      mirror::StringDexCachePair source =
-          dex_cache->GetStrings()[string_slot_index].load(std::memory_order_relaxed);
-      ObjPtr<mirror::String> referred_string = source.object.Read();
-      DCHECK(referred_string != nullptr);
-
-      ObjPtr<mirror::String> visited = visitor(referred_string);
-      if (visited != referred_string) {
-        // Because we are not using a helper function we need to mark the GC card manually.
-        WriteBarrier::ForEveryFieldWrite(dex_cache);
-        dex_cache->GetStrings()[string_slot_index].store(
-            mirror::StringDexCachePair(visited, source.index), std::memory_order_relaxed);
-      }
-    } else if (HasDexCachePreResolvedStringNativeRefTag(base_offset)) {
-      if (use_preresolved_strings) {
-        base_offset = ClearDexCacheNativeRefTags(base_offset);
-        DCHECK_ALIGNED(base_offset, 2);
-
-        ObjPtr<mirror::DexCache> dex_cache =
-            reinterpret_cast<mirror::DexCache*>(space->Begin() + base_offset);
-        uint32_t string_index = sro_base[offset_index].second;
-
-        GcRoot<mirror::String>* preresolved_strings =
-            dex_cache->GetPreResolvedStrings();
-        // Handle calls to ClearPreResolvedStrings that might occur concurrently by the profile
-        // saver that runs shortly after startup. In case the strings are cleared, there is nothing
-        // to fix up.
-        if (preresolved_strings != nullptr) {
-          ObjPtr<mirror::String> referred_string =
-              preresolved_strings[string_index].Read();
-          if (referred_string != nullptr) {
-            ObjPtr<mirror::String> visited = visitor(referred_string);
-            if (visited != referred_string) {
-              // Because we are not using a helper function we need to mark the GC card manually.
-              WriteBarrier::ForEveryFieldWrite(dex_cache);
-              preresolved_strings[string_index] = GcRoot<mirror::String>(visited);
-            }
-          }
-        }
-      }
-    } else {
-      uint32_t raw_member_offset = sro_base[offset_index].second;
-      DCHECK_ALIGNED(base_offset, 2);
-      DCHECK_ALIGNED(raw_member_offset, 2);
-
-      ObjPtr<mirror::Object> obj_ptr =
-          reinterpret_cast<mirror::Object*>(space->Begin() + base_offset);
-      MemberOffset member_offset(raw_member_offset);
-      ObjPtr<mirror::String> referred_string =
-          obj_ptr->GetFieldObject<mirror::String,
-                                  kVerifyNone,
-                                  kWithoutReadBarrier,
-                                  /* kIsVolatile= */ false>(member_offset);
-      DCHECK(referred_string != nullptr);
-
-      ObjPtr<mirror::String> visited = visitor(referred_string);
-      if (visited != referred_string) {
-        obj_ptr->SetFieldObject</* kTransactionActive= */ false,
-                                /* kCheckTransaction= */ false,
+    ObjPtr<mirror::Object> obj_ptr =
+        reinterpret_cast<mirror::Object*>(space->Begin() + base_offset);
+    MemberOffset member_offset(raw_member_offset);
+    ObjPtr<mirror::String> referred_string =
+        obj_ptr->GetFieldObject<mirror::String,
                                 kVerifyNone,
-                                /* kIsVolatile= */ false>(member_offset, visited);
-      }
+                                kWithoutReadBarrier,
+                                /* kIsVolatile= */ false>(member_offset);
+    DCHECK(referred_string != nullptr);
+
+    ObjPtr<mirror::String> visited = visitor(referred_string);
+    if (visited != referred_string) {
+      obj_ptr->SetFieldObject</* kTransactionActive= */ false,
+                              /* kCheckTransaction= */ false,
+                              kVerifyNone,
+                              /* kIsVolatile= */ false>(member_offset, visited);
     }
   }
 }
@@ -1621,7 +1570,6 @@ static void VerifyInternedStringReferences(gc::space::ImageSpace* space)
   size_t num_recorded_refs = 0u;
   VisitInternedStringReferences(
       space,
-      /*use_preresolved_strings=*/ true,
       [&image_interns, &num_recorded_refs](ObjPtr<mirror::String> str)
           REQUIRES_SHARED(Locks::mutator_lock_) {
         auto it = image_interns.find(GcRoot<mirror::String>(str));
@@ -1643,8 +1591,7 @@ class AppImageLoadingHelper {
       ClassLinker* class_linker,
       gc::space::ImageSpace* space,
       Handle<mirror::ClassLoader> class_loader,
-      Handle<mirror::ObjectArray<mirror::DexCache>> dex_caches,
-      ClassTable::ClassSet* new_class_set)
+      Handle<mirror::ObjectArray<mirror::DexCache>> dex_caches)
       REQUIRES(!Locks::dex_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -1656,8 +1603,7 @@ void AppImageLoadingHelper::Update(
     ClassLinker* class_linker,
     gc::space::ImageSpace* space,
     Handle<mirror::ClassLoader> class_loader,
-    Handle<mirror::ObjectArray<mirror::DexCache>> dex_caches,
-    ClassTable::ClassSet* new_class_set)
+    Handle<mirror::ObjectArray<mirror::DexCache>> dex_caches)
     REQUIRES(!Locks::dex_lock_)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   ScopedTrace app_image_timing("AppImage:Updating");
@@ -1672,7 +1618,6 @@ void AppImageLoadingHelper::Update(
   Runtime* const runtime = Runtime::Current();
   gc::Heap* const heap = runtime->GetHeap();
   const ImageHeader& header = space->GetImageHeader();
-  bool load_app_image_startup_cache = runtime->LoadAppImageStartupCache();
   {
     // Register dex caches with the class loader.
     WriterMutexLock mu(self, *Locks::classlinker_classes_lock_);
@@ -1682,56 +1627,6 @@ void AppImageLoadingHelper::Update(
         WriterMutexLock mu2(self, *Locks::dex_lock_);
         CHECK(class_linker->FindDexCacheDataLocked(*dex_file) == nullptr);
         class_linker->RegisterDexFileLocked(*dex_file, dex_cache, class_loader.Get());
-      }
-
-      if (!load_app_image_startup_cache) {
-        dex_cache->ClearPreResolvedStrings();
-      }
-
-      if (kIsDebugBuild) {
-        CHECK(new_class_set != nullptr);
-        mirror::TypeDexCacheType* const types = dex_cache->GetResolvedTypes();
-        const size_t num_types = dex_cache->NumResolvedTypes();
-        for (size_t j = 0; j != num_types; ++j) {
-          // The image space is not yet added to the heap, avoid read barriers.
-          ObjPtr<mirror::Class> klass = types[j].load(std::memory_order_relaxed).object.Read();
-
-          if (space->HasAddress(klass.Ptr())) {
-            DCHECK(!klass->IsErroneous()) << klass->GetStatus();
-            auto it = new_class_set->find(ClassTable::TableSlot(klass));
-            DCHECK(it != new_class_set->end());
-            DCHECK_EQ(it->Read(), klass);
-            ObjPtr<mirror::Class> super_class = klass->GetSuperClass();
-
-            if (super_class != nullptr && !heap->ObjectIsInBootImageSpace(super_class)) {
-              auto it2 = new_class_set->find(ClassTable::TableSlot(super_class));
-              DCHECK(it2 != new_class_set->end());
-              DCHECK_EQ(it2->Read(), super_class);
-            }
-
-            for (ArtMethod& m : klass->GetDirectMethods(kRuntimePointerSize)) {
-              const void* code = m.GetEntryPointFromQuickCompiledCode();
-              const void* oat_code = m.IsInvokable() ? class_linker->GetQuickOatCodeFor(&m) : code;
-              if (!class_linker->IsQuickResolutionStub(code) &&
-                  !class_linker->IsQuickGenericJniStub(code) &&
-                  !class_linker->IsQuickToInterpreterBridge(code) &&
-                  !m.IsNative()) {
-                DCHECK_EQ(code, oat_code) << m.PrettyMethod();
-              }
-            }
-
-            for (ArtMethod& m : klass->GetVirtualMethods(kRuntimePointerSize)) {
-              const void* code = m.GetEntryPointFromQuickCompiledCode();
-              const void* oat_code = m.IsInvokable() ? class_linker->GetQuickOatCodeFor(&m) : code;
-              if (!class_linker->IsQuickResolutionStub(code) &&
-                  !class_linker->IsQuickGenericJniStub(code) &&
-                  !class_linker->IsQuickToInterpreterBridge(code) &&
-                  !m.IsNative()) {
-                DCHECK_EQ(code, oat_code) << m.PrettyMethod();
-              }
-            }
-          }
-        }
       }
     }
   }
@@ -1761,8 +1656,6 @@ void AppImageLoadingHelper::HandleAppImageStrings(gc::space::ImageSpace* space) 
 
   Runtime* const runtime = Runtime::Current();
   InternTable* const intern_table = runtime->GetInternTable();
-
-  const bool load_startup_cache = runtime->LoadAppImageStartupCache();
 
   // Add the intern table, removing any conflicts. For conflicts, store the new address in a map
   // for faster lookup.
@@ -1817,7 +1710,6 @@ void AppImageLoadingHelper::HandleAppImageStrings(gc::space::ImageSpace* space) 
     VLOG(image) << "AppImage:conflictingInternStrings = " << intern_remap.size();
     VisitInternedStringReferences(
         space,
-        load_startup_cache,
         [&intern_remap](ObjPtr<mirror::String> str) REQUIRES_SHARED(Locks::mutator_lock_) {
           auto it = intern_remap.find(str.Ptr());
           if (it != intern_remap.end()) {
@@ -1931,15 +1823,6 @@ class ImageChecker final {
     heap->VisitObjects(visitor);
   }
 
-  static void CheckArtMethodDexCacheArray(gc::Heap* heap,
-                                          ClassLinker* class_linker,
-                                          mirror::MethodDexCacheType* arr,
-                                          size_t size)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    ImageChecker ic(heap, class_linker);
-    ic.CheckArtMethodDexCacheArray(arr, size);
-  }
-
  private:
   ImageChecker(gc::Heap* heap, ClassLinker* class_linker)
      :  spaces_(heap->GetBootImageSpaces()),
@@ -1992,30 +1875,6 @@ class ImageChecker final {
     }
   }
 
-  void CheckArtMethodDexCacheArray(mirror::MethodDexCacheType* arr, size_t size)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-    CHECK_EQ(arr != nullptr, size != 0u);
-    if (arr != nullptr) {
-      bool contains = false;
-      for (auto space : spaces_) {
-        auto offset = reinterpret_cast<uint8_t*>(arr) - space->Begin();
-        if (space->GetImageHeader().GetDexCacheArraysSection().Contains(offset)) {
-          contains = true;
-          break;
-        }
-      }
-      CHECK(contains);
-    }
-    for (size_t j = 0; j < size; ++j) {
-      auto pair = mirror::DexCache::GetNativePairPtrSize(arr, j, pointer_size_);
-      ArtMethod* method = pair.object;
-      // expected_class == null means we are a dex cache.
-      if (method != nullptr) {
-        CheckArtMethod(method, nullptr);
-      }
-    }
-  }
-
   const std::vector<gc::space::ImageSpace*>& spaces_;
   const PointerSize pointer_size_;
 
@@ -2027,8 +1886,8 @@ class ImageChecker final {
 
 static void VerifyAppImage(const ImageHeader& header,
                            const Handle<mirror::ClassLoader>& class_loader,
-                           const Handle<mirror::ObjectArray<mirror::DexCache> >& dex_caches,
-                           ClassTable* class_table, gc::space::ImageSpace* space)
+                           ClassTable* class_table,
+                           gc::space::ImageSpace* space)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
     ObjPtr<mirror::Class> klass = method.GetDeclaringClass();
@@ -2053,17 +1912,6 @@ static void VerifyAppImage(const ImageHeader& header,
       for (uint32_t i = 0, num = klass->NumDirectInterfaces(); i != num; ++i) {
         CHECK(klass->GetDirectInterface(self, klass, i) != nullptr)
             << klass->PrettyDescriptor() << " iface #" << i;
-      }
-    }
-  }
-  // Check that all non-primitive classes in dex caches are also in the class table.
-  for (auto dex_cache : dex_caches.ConstIterate<mirror::DexCache>()) {
-    mirror::TypeDexCacheType* const types = dex_cache->GetResolvedTypes();
-    for (int32_t j = 0, num_types = dex_cache->NumResolvedTypes(); j < num_types; j++) {
-      ObjPtr<mirror::Class> klass = types[j].load(std::memory_order_relaxed).object.Read();
-      if (klass != nullptr && !klass->IsPrimitive()) {
-        CHECK(class_table->Contains(klass))
-            << klass->PrettyDescriptor() << " " << dex_cache->GetDexFile()->GetLocation();
       }
     }
   }
@@ -2138,24 +1986,15 @@ bool ClassLinker::AddImageSpace(
       return false;
     }
 
-    if (app_image) {
-      // The current dex file field is bogus, overwrite it so that we can get the dex file in the
-      // loop below.
-      dex_cache->SetDexFile(dex_file.get());
-      mirror::TypeDexCacheType* const types = dex_cache->GetResolvedTypes();
-      for (int32_t j = 0, num_types = dex_cache->NumResolvedTypes(); j < num_types; j++) {
-        ObjPtr<mirror::Class> klass = types[j].load(std::memory_order_relaxed).object.Read();
-        if (klass != nullptr) {
-          DCHECK(!klass->IsErroneous()) << klass->GetStatus();
-        }
-      }
-    } else {
-      if (kCheckImageObjects) {
-        ImageChecker::CheckArtMethodDexCacheArray(heap,
-                                                  this,
-                                                  dex_cache->GetResolvedMethods(),
-                                                  dex_cache->NumResolvedMethods());
-      }
+    LinearAlloc* linear_alloc = GetOrCreateAllocatorForClassLoader(class_loader.Get());
+    DCHECK(linear_alloc != nullptr);
+    DCHECK_EQ(linear_alloc == Runtime::Current()->GetLinearAlloc(), !app_image);
+    {
+      // Native fields are all null.  Initialize them and allocate native memory.
+      WriterMutexLock mu(self, *Locks::dex_lock_);
+      dex_cache->InitializeNativeFields(dex_file.get(), linear_alloc);
+    }
+    if (!app_image) {
       // Register dex files, keep track of existing ones that are conflicts.
       AppendToBootClassPath(dex_file.get(), dex_cache);
     }
@@ -2172,14 +2011,6 @@ bool ClassLinker::AddImageSpace(
   }
 
   if (kCheckImageObjects) {
-    for (auto dex_cache : dex_caches.Iterate<mirror::DexCache>()) {
-      for (size_t j = 0; j < dex_cache->NumResolvedFields(); ++j) {
-        auto* field = dex_cache->GetResolvedField(j, image_pointer_size_);
-        if (field != nullptr) {
-          CHECK(field->GetDeclaringClass()->GetClass() != nullptr);
-        }
-      }
-    }
     if (!app_image) {
       ImageChecker::CheckObjects(heap, this);
     }
@@ -2244,7 +2075,7 @@ bool ClassLinker::AddImageSpace(
     VLOG(image) << "Adding class table classes took " << PrettyDuration(NanoTime() - start_time2);
   }
   if (app_image) {
-    AppImageLoadingHelper::Update(this, space, class_loader, dex_caches, &temp_set);
+    AppImageLoadingHelper::Update(this, space, class_loader, dex_caches);
 
     {
       ScopedTrace trace("AppImage:UpdateClassLoaders");
@@ -2297,7 +2128,7 @@ bool ClassLinker::AddImageSpace(
     // This verification needs to happen after the classes have been added to the class loader.
     // Since it ensures classes are in the class table.
     ScopedTrace trace("AppImage:Verify");
-    VerifyAppImage(header, class_loader, dex_caches, class_table, space);
+    VerifyAppImage(header, class_loader, class_table, space);
   }
 
   VLOG(class_linker) << "Adding image space took " << PrettyDuration(NanoTime() - start_time);
@@ -2596,11 +2427,8 @@ ObjPtr<mirror::PointerArray> ClassLinker::AllocPointerArray(Thread* self, size_t
           : ObjPtr<mirror::Array>(mirror::IntArray::Alloc(self, length)));
 }
 
-ObjPtr<mirror::DexCache> ClassLinker::AllocDexCache(/*out*/ ObjPtr<mirror::String>* out_location,
-                                                    Thread* self,
-                                                    const DexFile& dex_file) {
+ObjPtr<mirror::DexCache> ClassLinker::AllocDexCache(Thread* self, const DexFile& dex_file) {
   StackHandleScope<1> hs(self);
-  DCHECK(out_location != nullptr);
   auto dex_cache(hs.NewHandle(ObjPtr<mirror::DexCache>::DownCast(
       GetClassRoot<mirror::DexCache>(this)->AllocObject(self))));
   if (dex_cache == nullptr) {
@@ -2614,24 +2442,17 @@ ObjPtr<mirror::DexCache> ClassLinker::AllocDexCache(/*out*/ ObjPtr<mirror::Strin
     self->AssertPendingOOMException();
     return nullptr;
   }
-  *out_location = location;
+  dex_cache->SetLocation(location);
   return dex_cache.Get();
 }
 
 ObjPtr<mirror::DexCache> ClassLinker::AllocAndInitializeDexCache(Thread* self,
                                                                  const DexFile& dex_file,
                                                                  LinearAlloc* linear_alloc) {
-  ObjPtr<mirror::String> location = nullptr;
-  ObjPtr<mirror::DexCache> dex_cache = AllocDexCache(&location, self, dex_file);
+  ObjPtr<mirror::DexCache> dex_cache = AllocDexCache(self, dex_file);
   if (dex_cache != nullptr) {
     WriterMutexLock mu(self, *Locks::dex_lock_);
-    DCHECK(location != nullptr);
-    mirror::DexCache::InitializeDexCache(self,
-                                         dex_cache,
-                                         location,
-                                         &dex_file,
-                                         linear_alloc,
-                                         image_pointer_size_);
+    dex_cache->InitializeNativeFields(&dex_file, linear_alloc);
   }
   return dex_cache;
 }
@@ -4073,6 +3894,7 @@ void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,
   Thread* const self = Thread::Current();
   Locks::dex_lock_->AssertExclusiveHeld(self);
   CHECK(dex_cache != nullptr) << dex_file.GetLocation();
+  CHECK_EQ(dex_cache->GetDexFile(), &dex_file) << dex_file.GetLocation();
   // For app images, the dex cache location may be a suffix of the dex file location since the
   // dex file location is an absolute path.
   const std::string dex_cache_location = dex_cache->GetLocation()->ToModifiedUtf8();
@@ -4119,7 +3941,6 @@ void ClassLinker::RegisterDexFileLocked(const DexFile& dex_file,
   hiddenapi::InitializeDexFileDomain(dex_file, class_loader);
 
   jweak dex_cache_jweak = vm->AddWeakGlobalRef(self, dex_cache);
-  dex_cache->SetDexFile(&dex_file);
   DexCacheData data;
   data.weak_root = dex_cache_jweak;
   data.dex_file = dex_cache->GetDexFile();
@@ -4233,11 +4054,7 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
   // get to a suspend point.
   StackHandleScope<3> hs(self);
   Handle<mirror::ClassLoader> h_class_loader(hs.NewHandle(class_loader));
-  ObjPtr<mirror::String> location;
-  Handle<mirror::DexCache> h_dex_cache(hs.NewHandle(AllocDexCache(/*out*/&location,
-                                                                  self,
-                                                                  dex_file)));
-  Handle<mirror::String> h_location(hs.NewHandle(location));
+  Handle<mirror::DexCache> h_dex_cache(hs.NewHandle(AllocDexCache(self, dex_file)));
   {
     // Avoid a deadlock between a garbage collecting thread running a checkpoint,
     // a thread holding the dex lock and blocking on a condition variable regarding
@@ -4247,15 +4064,10 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
     const DexCacheData* old_data = FindDexCacheDataLocked(dex_file);
     old_dex_cache = DecodeDexCacheLocked(self, old_data);
     if (old_dex_cache == nullptr && h_dex_cache != nullptr) {
-      // Do InitializeDexCache while holding dex lock to make sure two threads don't call it at the
-      // same time with the same dex cache. Since the .bss is shared this can cause failing DCHECK
-      // that the arrays are null.
-      mirror::DexCache::InitializeDexCache(self,
-                                           h_dex_cache.Get(),
-                                           h_location.Get(),
-                                           &dex_file,
-                                           linear_alloc,
-                                           image_pointer_size_);
+      // Do InitializeNativeFields while holding dex lock to make sure two threads don't call it
+      // at the same time with the same dex cache. Since the .bss is shared this can cause failing
+      // DCHECK that the arrays are null.
+      h_dex_cache->InitializeNativeFields(&dex_file, linear_alloc);
       RegisterDexFileLocked(dex_file, h_dex_cache.Get(), h_class_loader.Get());
     }
     if (old_dex_cache != nullptr) {
