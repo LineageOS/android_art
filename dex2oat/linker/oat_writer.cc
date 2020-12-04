@@ -70,7 +70,6 @@
 #include "stream/buffered_output_stream.h"
 #include "stream/file_output_stream.h"
 #include "stream/output_stream.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 #include "vdex_file.h"
 #include "verifier/verifier_deps.h"
 

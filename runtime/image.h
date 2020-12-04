@@ -258,7 +258,6 @@ class PACKED(8) ImageHeader {
     kSectionRuntimeMethods,
     kSectionImTables,
     kSectionIMTConflictTables,
-    kSectionDexCacheArrays,
     kSectionInternedStrings,
     kSectionClassTable,
     kSectionStringReferenceOffsets,
@@ -307,10 +306,6 @@ class PACKED(8) ImageHeader {
 
   const ImageSection& GetIMTConflictTablesSection() const {
     return GetImageSection(kSectionIMTConflictTables);
-  }
-
-  const ImageSection& GetDexCacheArraysSection() const {
-    return GetImageSection(kSectionDexCacheArrays);
   }
 
   const ImageSection& GetInternedStringsSection() const {
@@ -509,75 +504,10 @@ class PACKED(8) ImageHeader {
  * This type holds the information necessary to fix up AppImage string
  * references.
  *
- * The first element of the pair is an offset into the image space.  If the
- * offset is tagged (testable using HasDexCacheNativeRefTag) it indicates the location
- * of a DexCache object that has one or more native references to managed
- * strings that need to be fixed up.  In this case the second element has no
- * meaningful value.
- *
- * If the first element isn't tagged then it indicates the location of a
- * managed object with a field that needs fixing up.  In this case the second
- * element of the pair is an object-relative offset to the field in question.
+ * The first element indicates the location of a managed object with a field that needs fixing up.
+ * The second element of the pair is an object-relative offset to the field in question.
  */
 typedef std::pair<uint32_t, uint32_t> AppImageReferenceOffsetInfo;
-
-/*
- * Tags the last bit.  Used by AppImage logic to differentiate between pointers
- * to managed objects and pointers to native reference arrays.
- */
-template<typename T>
-T SetDexCacheStringNativeRefTag(T val) {
-  static_assert(std::is_integral<T>::value, "Expected integral type.");
-
-  return val | 1u;
-}
-
-/*
- * Tags the second last bit.  Used by AppImage logic to differentiate between pointers
- * to managed objects and pointers to native reference arrays.
- */
-template<typename T>
-T SetDexCachePreResolvedStringNativeRefTag(T val) {
-  static_assert(std::is_integral<T>::value, "Expected integral type.");
-
-  return val | 2u;
-}
-
-/*
- * Retrieves the value of the last bit.  Used by AppImage logic to
- * differentiate between pointers to managed objects and pointers to native
- * reference arrays.
- */
-template<typename T>
-bool HasDexCacheStringNativeRefTag(T val) {
-  static_assert(std::is_integral<T>::value, "Expected integral type.");
-
-  return (val & 1u) != 0u;
-}
-
-/*
- * Retrieves the value of the second last bit.  Used by AppImage logic to
- * differentiate between pointers to managed objects and pointers to native
- * reference arrays.
- */
-template<typename T>
-bool HasDexCachePreResolvedStringNativeRefTag(T val) {
-  static_assert(std::is_integral<T>::value, "Expected integral type.");
-
-  return (val & 2u) != 0u;
-}
-
-/*
- * Sets the last bit of the value to 0.  Used by AppImage logic to
- * differentiate between pointers to managed objects and pointers to native
- * reference arrays.
- */
-template<typename T>
-T ClearDexCacheNativeRefTags(T val) {
-  static_assert(std::is_integral<T>::value, "Expected integral type.");
-
-  return val & ~3u;
-}
 
 std::ostream& operator<<(std::ostream& os, ImageHeader::ImageMethod method);
 std::ostream& operator<<(std::ostream& os, ImageHeader::ImageRoot root);

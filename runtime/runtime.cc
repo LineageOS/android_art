@@ -2975,14 +2975,6 @@ class Runtime::NotifyStartupCompletedTask : public gc::HeapTask {
     {
       ScopedTrace trace("Releasing app image spaces metadata");
       ScopedObjectAccess soa(Thread::Current());
-      for (gc::space::ContinuousSpace* space : runtime->GetHeap()->GetContinuousSpaces()) {
-        if (space->IsImageSpace()) {
-          gc::space::ImageSpace* image_space = space->AsImageSpace();
-          if (image_space->GetImageHeader().IsAppImage()) {
-            image_space->DisablePreResolvedStrings();
-          }
-        }
-      }
       // Request empty checkpoints to make sure no threads are accessing the image space metadata
       // section when we madvise it. Use GC exclusion to prevent deadlocks that may happen if
       // multiple threads are attempting to run empty checkpoints at the same time.

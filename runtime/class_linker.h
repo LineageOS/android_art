@@ -926,9 +926,7 @@ class ClassLinker {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 
-  ObjPtr<mirror::DexCache> AllocDexCache(/*out*/ ObjPtr<mirror::String>* out_location,
-                                         Thread* self,
-                                         const DexFile& dex_file)
+  ObjPtr<mirror::DexCache> AllocDexCache(Thread* self, const DexFile& dex_file)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Roles::uninterruptible_);
 
