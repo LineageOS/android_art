@@ -758,13 +758,10 @@ art::mirror::DexCache* Redefiner::ClassRedefinition::CreateNewDexCache(
     return nullptr;
   }
   art::WriterMutexLock mu(driver_->self_, *art::Locks::dex_lock_);
-  art::mirror::DexCache::InitializeDexCache(driver_->self_,
-                                            cache.Get(),
-                                            location.Get(),
-                                            dex_file_.get(),
-                                            loader.IsNull() ? driver_->runtime_->GetLinearAlloc()
-                                                            : loader->GetAllocator(),
-                                            art::kRuntimePointerSize);
+  cache->SetLocation(location.Get());
+  cache->InitializeNativeFields(dex_file_.get(),
+                                loader.IsNull() ? driver_->runtime_->GetLinearAlloc()
+                                                : loader->GetAllocator());
   return cache.Get();
 }
 

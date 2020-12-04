@@ -30,88 +30,54 @@
 #include "runtime_globals.h"
 #include "string.h"
 #include "thread.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 #include "write_barrier.h"
 
 namespace art {
 namespace mirror {
 
-void DexCache::InitializeDexCache(Thread* self,
-                                  ObjPtr<mirror::DexCache> dex_cache,
-                                  ObjPtr<mirror::String> location,
-                                  const DexFile* dex_file,
-                                  LinearAlloc* linear_alloc,
-                                  PointerSize image_pointer_size) {
-  DCHECK(dex_file != nullptr);
+template<typename T>
+static T* AllocArray(Thread* self, LinearAlloc* alloc, size_t num) {
+  if (num == 0) {
+    return nullptr;
+  }
+  return reinterpret_cast<T*>(alloc->AllocAlign16(self, RoundUp(num * sizeof(T), 16)));
+}
+
+void DexCache::InitializeNativeFields(const DexFile* dex_file, LinearAlloc* linear_alloc) {
+  DCHECK(GetDexFile() == nullptr);
+  DCHECK(GetStrings() == nullptr);
+  DCHECK(GetResolvedTypes() == nullptr);
+  DCHECK(GetResolvedMethods() == nullptr);
+  DCHECK(GetResolvedFields() == nullptr);
+  DCHECK(GetResolvedMethodTypes() == nullptr);
+  DCHECK(GetResolvedCallSites() == nullptr);
+
   ScopedAssertNoThreadSuspension sants(__FUNCTION__);
-  DexCacheArraysLayout layout(image_pointer_size, dex_file);
-  uint8_t* raw_arrays = nullptr;
+  Thread* self = Thread::Current();
+  const PointerSize image_pointer_size = kRuntimePointerSize;
 
-  if (dex_file->NumStringIds() != 0u ||
-      dex_file->NumTypeIds() != 0u ||
-      dex_file->NumMethodIds() != 0u ||
-      dex_file->NumFieldIds() != 0u) {
-    static_assert(ArenaAllocator::kAlignment == 8, "Expecting arena alignment of 8.");
-    DCHECK(layout.Alignment() == 8u || layout.Alignment() == 16u);
-    // Zero-initialized.
-    raw_arrays = (layout.Alignment() == 16u)
-        ? reinterpret_cast<uint8_t*>(linear_alloc->AllocAlign16(self, layout.Size()))
-        : reinterpret_cast<uint8_t*>(linear_alloc->Alloc(self, layout.Size()));
-  }
+  size_t num_strings = std::min<size_t>(kDexCacheStringCacheSize, dex_file->NumStringIds());
+  size_t num_types = std::min<size_t>(kDexCacheTypeCacheSize, dex_file->NumTypeIds());
+  size_t num_fields = std::min<size_t>(kDexCacheFieldCacheSize, dex_file->NumFieldIds());
+  size_t num_methods = std::min<size_t>(kDexCacheMethodCacheSize, dex_file->NumMethodIds());
+  size_t num_method_types = std::min<size_t>(kDexCacheMethodTypeCacheSize, dex_file->NumProtoIds());
+  size_t num_call_sites = dex_file->NumCallSiteIds();  // Full size.
 
-  StringDexCacheType* strings = (dex_file->NumStringIds() == 0u) ? nullptr :
-      reinterpret_cast<StringDexCacheType*>(raw_arrays + layout.StringsOffset());
-  TypeDexCacheType* types = (dex_file->NumTypeIds() == 0u) ? nullptr :
-      reinterpret_cast<TypeDexCacheType*>(raw_arrays + layout.TypesOffset());
-  MethodDexCacheType* methods = (dex_file->NumMethodIds() == 0u) ? nullptr :
-      reinterpret_cast<MethodDexCacheType*>(raw_arrays + layout.MethodsOffset());
-  FieldDexCacheType* fields = (dex_file->NumFieldIds() == 0u) ? nullptr :
-      reinterpret_cast<FieldDexCacheType*>(raw_arrays + layout.FieldsOffset());
+  static_assert(ArenaAllocator::kAlignment == 8, "Expecting arena alignment of 8.");
+  StringDexCacheType* strings =
+      AllocArray<StringDexCacheType>(self, linear_alloc, num_strings);
+  TypeDexCacheType* types =
+      AllocArray<TypeDexCacheType>(self, linear_alloc, num_types);
+  MethodDexCacheType* methods =
+      AllocArray<MethodDexCacheType>(self, linear_alloc, num_methods);
+  FieldDexCacheType* fields =
+      AllocArray<FieldDexCacheType>(self, linear_alloc, num_fields);
+  MethodTypeDexCacheType* method_types =
+      AllocArray<MethodTypeDexCacheType>(self, linear_alloc, num_method_types);
+  GcRoot<mirror::CallSite>* call_sites =
+      AllocArray<GcRoot<CallSite>>(self, linear_alloc, num_call_sites);
 
-  size_t num_strings = kDexCacheStringCacheSize;
-  if (dex_file->NumStringIds() < num_strings) {
-    num_strings = dex_file->NumStringIds();
-  }
-  size_t num_types = kDexCacheTypeCacheSize;
-  if (dex_file->NumTypeIds() < num_types) {
-    num_types = dex_file->NumTypeIds();
-  }
-  size_t num_fields = kDexCacheFieldCacheSize;
-  if (dex_file->NumFieldIds() < num_fields) {
-    num_fields = dex_file->NumFieldIds();
-  }
-  size_t num_methods = kDexCacheMethodCacheSize;
-  if (dex_file->NumMethodIds() < num_methods) {
-    num_methods = dex_file->NumMethodIds();
-  }
-
-  // Note that we allocate the method type dex caches regardless of this flag,
-  // and we make sure here that they're not used by the runtime. This is in the
-  // interest of simplicity and to avoid extensive compiler and layout class changes.
-  //
-  // If this needs to be mitigated in a production system running this code,
-  // DexCache::kDexCacheMethodTypeCacheSize can be set to zero.
-  MethodTypeDexCacheType* method_types = nullptr;
-  size_t num_method_types = 0;
-
-  if (dex_file->NumProtoIds() < kDexCacheMethodTypeCacheSize) {
-    num_method_types = dex_file->NumProtoIds();
-  } else {
-    num_method_types = kDexCacheMethodTypeCacheSize;
-  }
-
-  if (num_method_types > 0) {
-    method_types = reinterpret_cast<MethodTypeDexCacheType*>(
-        raw_arrays + layout.MethodTypesOffset());
-  }
-
-  GcRoot<mirror::CallSite>* call_sites = (dex_file->NumCallSiteIds() == 0)
-      ? nullptr
-      : reinterpret_cast<GcRoot<CallSite>*>(raw_arrays + layout.CallSitesOffset());
-
-  DCHECK_ALIGNED(raw_arrays, alignof(StringDexCacheType)) <<
-                 "Expected raw_arrays to align to StringDexCacheType.";
-  DCHECK_ALIGNED(layout.StringsOffset(), alignof(StringDexCacheType)) <<
+  DCHECK_ALIGNED(types, alignof(StringDexCacheType)) <<
                  "Expected StringsOffset() to align to StringDexCacheType.";
   DCHECK_ALIGNED(strings, alignof(StringDexCacheType)) <<
                  "Expected strings to align to StringDexCacheType.";
@@ -158,9 +124,8 @@ void DexCache::InitializeDexCache(Thread* self,
   if (method_types != nullptr) {
     mirror::MethodTypeDexCachePair::Initialize(method_types);
   }
-  dex_cache->Init(dex_file,
-                  location,
-                  strings,
+  SetDexFile(dex_file);
+  SetNativeArrays(strings,
                   num_strings,
                   types,
                   num_types,
@@ -171,7 +136,12 @@ void DexCache::InitializeDexCache(Thread* self,
                   method_types,
                   num_method_types,
                   call_sites,
-                  dex_file->NumCallSiteIds());
+                  num_call_sites);
+}
+
+void DexCache::ResetNativeFields() {
+  SetDexFile(nullptr);
+  SetNativeArrays(nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0);
 }
 
 void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
@@ -238,31 +208,24 @@ bool DexCache::AddPreResolvedStringsArray() {
   return true;
 }
 
-void DexCache::Init(const DexFile* dex_file,
-                    ObjPtr<String> location,
-                    StringDexCacheType* strings,
-                    uint32_t num_strings,
-                    TypeDexCacheType* resolved_types,
-                    uint32_t num_resolved_types,
-                    MethodDexCacheType* resolved_methods,
-                    uint32_t num_resolved_methods,
-                    FieldDexCacheType* resolved_fields,
-                    uint32_t num_resolved_fields,
-                    MethodTypeDexCacheType* resolved_method_types,
-                    uint32_t num_resolved_method_types,
-                    GcRoot<CallSite>* resolved_call_sites,
-                    uint32_t num_resolved_call_sites) {
-  CHECK(dex_file != nullptr);
-  CHECK(location != nullptr);
+void DexCache::SetNativeArrays(StringDexCacheType* strings,
+                               uint32_t num_strings,
+                               TypeDexCacheType* resolved_types,
+                               uint32_t num_resolved_types,
+                               MethodDexCacheType* resolved_methods,
+                               uint32_t num_resolved_methods,
+                               FieldDexCacheType* resolved_fields,
+                               uint32_t num_resolved_fields,
+                               MethodTypeDexCacheType* resolved_method_types,
+                               uint32_t num_resolved_method_types,
+                               GcRoot<CallSite>* resolved_call_sites,
+                               uint32_t num_resolved_call_sites) {
   CHECK_EQ(num_strings != 0u, strings != nullptr);
   CHECK_EQ(num_resolved_types != 0u, resolved_types != nullptr);
   CHECK_EQ(num_resolved_methods != 0u, resolved_methods != nullptr);
   CHECK_EQ(num_resolved_fields != 0u, resolved_fields != nullptr);
   CHECK_EQ(num_resolved_method_types != 0u, resolved_method_types != nullptr);
   CHECK_EQ(num_resolved_call_sites != 0u, resolved_call_sites != nullptr);
-
-  SetDexFile(dex_file);
-  SetLocation(location);
   SetStrings(strings);
   SetResolvedTypes(resolved_types);
   SetResolvedMethods(resolved_methods);

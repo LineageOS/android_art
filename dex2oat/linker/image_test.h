@@ -276,8 +276,7 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
           ASSERT_TRUE(cur_opened_dex_files.empty());
         }
       }
-      bool image_space_ok =
-          writer->PrepareImageAddressSpace(/*preload_dex_caches=*/ true, &timings);
+      bool image_space_ok = writer->PrepareImageAddressSpace(&timings);
       ASSERT_TRUE(image_space_ok);
 
       DCHECK_EQ(out_helper.vdex_files.size(), out_helper.oat_files.size());
