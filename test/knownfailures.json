@@ -1358,7 +1358,6 @@
     {
         "tests": ["2232-write-metrics-to-log"],
         "variant": "target",
-        "description": ["Fails on target on go/art-buildbot."],
-        "bug": "b/174632603"
+        "description": ["Checks LOG_STREAM output, which cannot be captured on target."]
     }
 ]
