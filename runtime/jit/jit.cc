@@ -1060,8 +1060,26 @@ void Jit::MapBootImageMethods() {
     LOG(WARNING) << "Failed to create child mapping of boot image methods: " << error_str;
     return;
   }
+  //  We are going to mremap the child mapping into the image:
+  //
+  //                            ImageSection       ChildMappingMethods
+  //
+  //         section start -->  -----------
+  //                            |         |
+  //                            |         |
+  //            page_start -->  |         |   <-----   -----------
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //                            |         |            |         |
+  //             page_end  -->  |         |   <-----   -----------
+  //                            |         |
+  //         section end   -->  -----------
+  //
   size_t offset = 0;
-  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
   for (gc::space::ImageSpace* space : Runtime::Current()->GetHeap()->GetBootImageSpaces()) {
     const ImageHeader& header = space->GetImageHeader();
     const ImageSection& section = header.GetMethodsSection();
@@ -1073,10 +1091,13 @@ void Jit::MapBootImageMethods() {
       continue;
     }
     uint64_t capacity = page_end - page_start;
-    // Walk over methods in the boot image, and check for ones whose class is
-    // not initialized in the process, but are in the zygote process. For
-    // such methods, we need their entrypoints to be stubs that do the
-    // initialization check.
+    // Walk over methods in the boot image, and check for:
+    // 1) methods whose class is not initialized in the process, but are in the
+    // zygote process. For such methods, we need their entrypoints to be stubs
+    // that do the initialization check.
+    // 2) native methods whose data pointer is different than the one in the
+    // zygote. Such methods may have had custom native implementation provided
+    // by JNI RegisterNatives.
     header.VisitPackedArtMethods([&](ArtMethod& method) NO_THREAD_SAFETY_ANALYSIS {
       // Methods in the boot image should never have their single
       // implementation flag set (and therefore never have a `data_` pointing
@@ -1085,78 +1106,33 @@ void Jit::MapBootImageMethods() {
       if (method.IsRuntimeMethod()) {
         return;
       }
-      if (method.GetDeclaringClassUnchecked()->IsVisiblyInitialized() ||
-          !method.IsStatic() ||
-          method.IsConstructor()) {
-        // Method does not need any stub.
-        return;
+
+      // Pointer to the method we're currently using.
+      uint8_t* pointer = reinterpret_cast<uint8_t*>(&method);
+      // The data pointer of that method that we want to keep.
+      uint8_t* data_pointer = pointer + ArtMethod::DataOffset(kRuntimePointerSize).Int32Value();
+      if (method.IsNative() && data_pointer >= page_start && data_pointer < page_end) {
+        // The data pointer of the ArtMethod in the shared memory we are going to remap into our
+        // own mapping. This is the data that we will see after the remap.
+        uint8_t* new_data_pointer =
+            child_mapping_methods.Begin() + offset + (data_pointer - page_start);
+        CopyIfDifferent(new_data_pointer, data_pointer, sizeof(void*));
       }
 
-      //  We are going to mremap the child mapping into the image:
-      //
-      //                            ImageSection       ChildMappingMethods
-      //
-      //         section start -->  -----------
-      //                            |         |
-      //                            |         |
-      //            page_start -->  |         |   <-----   -----------
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //                            |         |            |         |
-      //             page_end  -->  |         |   <-----   -----------
-      //                            |         |
-      //         section end   -->  -----------
-
-
-      uint8_t* pointer = reinterpret_cast<uint8_t*>(&method);
-      // Note: We could refactor this to only check if the ArtMethod entrypoint is inside the
-      // page region. This would remove the need for the edge case handling below.
-      if (pointer >= page_start && pointer + sizeof(ArtMethod) < page_end) {
-        // For all the methods in the mapping, put the entrypoint to the
-        // resolution stub.
-        ArtMethod* new_method = reinterpret_cast<ArtMethod*>(
-            child_mapping_methods.Begin() + offset + (pointer - page_start));
-        const void* code = new_method->GetEntryPointFromQuickCompiledCode();
-        if (!class_linker->IsQuickGenericJniStub(code) &&
-            !class_linker->IsQuickToInterpreterBridge(code) &&
-            !class_linker->IsQuickResolutionStub(code)) {
-          LOG(INFO) << "Putting back the resolution stub to an ArtMethod";
-          new_method->SetEntryPointFromQuickCompiledCode(GetQuickResolutionStub());
-        }
-      } else if (pointer < page_start && (pointer + sizeof(ArtMethod)) > page_start) {
-        LOG(INFO) << "Copying parts of the contents of an ArtMethod spanning page_start";
-        // If the method spans `page_start`, copy the contents of the child
-        // into the pages we are going to remap into the image.
-        //
-        //         section start -->  -----------
-        //                            |         |
-        //                            |         |
-        //            page_start -->  |/////////|            -----------
-        //                            |/////////| -> copy -> |/////////|
-        //                            |         |            |         |
-        //
-        CopyIfDifferent(child_mapping_methods.Begin() + offset,
-                        page_start,
-                        pointer + sizeof(ArtMethod) - page_start);
-      } else if (pointer < page_end && (pointer + sizeof(ArtMethod)) > page_end) {
-        LOG(INFO) << "Copying parts of the contents of an ArtMethod spanning page_end";
-        // If the method spans `page_end`, copy the contents of the child
-        // into the pages we are going to remap into the image.
-        //
-        //                            |         |            |         |
-        //                            |/////////| -> copy -> |/////////|
-        //             page_end  -->  |/////////|            -----------
-        //                            |         |
-        //         section end   -->  -----------
-        //
-        size_t bytes_to_copy = (page_end - pointer);
-        CopyIfDifferent(child_mapping_methods.Begin() + offset + capacity - bytes_to_copy,
-                        page_end - bytes_to_copy,
-                        bytes_to_copy);
+      // The entrypoint of the method we're currently using and that we want to
+      // keep.
+      uint8_t* entry_point_pointer = pointer +
+          ArtMethod::EntryPointFromQuickCompiledCodeOffset(kRuntimePointerSize).Int32Value();
+      if (!method.GetDeclaringClassUnchecked()->IsVisiblyInitialized() &&
+          method.IsStatic() &&
+          !method.IsConstructor() &&
+          entry_point_pointer >= page_start &&
+          entry_point_pointer < page_end) {
+        // The entry point of the ArtMethod in the shared memory we are going to remap into our
+        // own mapping. This is the entrypoint that we will see after the remap.
+        uint8_t* new_entry_point_pointer =
+            child_mapping_methods.Begin() + offset + (entry_point_pointer - page_start);
+        CopyIfDifferent(new_entry_point_pointer, entry_point_pointer, sizeof(void*));
       }
     }, space->Begin(), kRuntimePointerSize);
 
