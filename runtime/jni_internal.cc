@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 
 #include <cstdarg>
+#include <log/log.h>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -1882,6 +1883,7 @@ class JNI {
         /*bad=*/ []() { return true; });  // Abort processing and return 0 for bad characters.
     if (UNLIKELY(utf8_length != 0u && utf16_length == 0u)) {
       // VisitModifiedUtf8Chars() aborted for a bad character.
+      android_errorWriteLog(0x534e4554, "172655291");  // Report to SafetyNet.
       // Report the error to logcat but avoid too much spam.
       static const uint64_t kMinDelay = UINT64_C(10000000000);  // 10s
       static std::atomic<uint64_t> prev_bad_input_time(UINT64_C(0));
