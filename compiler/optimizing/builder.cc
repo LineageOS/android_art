@@ -33,7 +33,6 @@
 #include "optimizing_compiler_stats.h"
 #include "ssa_builder.h"
 #include "thread.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 
 namespace art {
 

@@ -2007,11 +2007,7 @@ class Dex2Oat final {
 
       // We need to prepare method offsets in the image address space for resolving linker patches.
       TimingLogger::ScopedTiming t2("dex2oat Prepare image address space", timings_);
-      // Do not preload dex caches for "assume-verified". This filter is used for in-memory
-      // compilation of boot image extension; in that scenario it is undesirable to use a lot
-      // of time to look up things now in hope it will be somewhat useful later.
-      bool preload_dex_caches = !compiler_options_->AssumeDexFilesAreVerified();
-      if (!image_writer_->PrepareImageAddressSpace(preload_dex_caches, timings_)) {
+      if (!image_writer_->PrepareImageAddressSpace(timings_)) {
         LOG(ERROR) << "Failed to prepare image address space.";
         return false;
       }
