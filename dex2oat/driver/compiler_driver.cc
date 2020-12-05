@@ -84,7 +84,6 @@
 #include "trampolines/trampoline_compiler.h"
 #include "transaction.h"
 #include "utils/atomic_dex_ref_map-inl.h"
-#include "utils/dex_cache_arrays_layout-inl.h"
 #include "utils/swap_space.h"
 #include "vdex_file.h"
 #include "verifier/class_verifier.h"
@@ -684,11 +683,6 @@ void CompilerDriver::ResolveConstStrings(const std::vector<const DexFile*>& dex_
 
   for (const DexFile* dex_file : dex_files) {
     dex_cache.Assign(class_linker->FindDexCache(soa.Self(), *dex_file));
-    bool added_preresolved_string_array = false;
-    if (only_startup_strings) {
-      // When resolving startup strings, create the preresolved strings array.
-      added_preresolved_string_array = dex_cache->AddPreResolvedStringsArray();
-    }
     TimingLogger::ScopedTiming t("Resolve const-string Strings", timings);
 
     // TODO: Implement a profile-based filter for the boot image. See b/76145463.
@@ -714,7 +708,7 @@ void CompilerDriver::ResolveConstStrings(const std::vector<const DexFile*>& dex_
         if (profile_compilation_info != nullptr && !is_startup_clinit) {
           ProfileCompilationInfo::MethodHotness hotness =
               profile_compilation_info->GetMethodHotness(method.GetReference());
-          if (added_preresolved_string_array ? !hotness.IsStartup() : !hotness.IsInProfile()) {
+          if (only_startup_strings ? !hotness.IsStartup() : !hotness.IsInProfile()) {
             continue;
           }
         }
@@ -732,10 +726,6 @@ void CompilerDriver::ResolveConstStrings(const std::vector<const DexFile*>& dex_
                   : inst->VRegB_31c());
               ObjPtr<mirror::String> string = class_linker->ResolveString(string_index, dex_cache);
               CHECK(string != nullptr) << "Could not allocate a string when forcing determinism";
-              if (added_preresolved_string_array) {
-                dex_cache->GetPreResolvedStrings()[string_index.index_] =
-                    GcRoot<mirror::String>(string);
-              }
               ++num_instructions;
               break;
             }

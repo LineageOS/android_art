@@ -40,7 +40,6 @@
 #include "driver/compiled_method_storage.h"
 #include "thread_pool.h"
 #include "utils/atomic_dex_ref_map.h"
-#include "utils/dex_cache_arrays_layout.h"
 
 namespace art {
 
