@@ -29,7 +29,7 @@ class CompatFramework {
  public:
   // Compat change reported state
   // This must be kept in sync with AppCompatibilityChangeReported.State in
-  // frameworks/base/cmds/statsd/src/atoms.proto
+  // frameworks/proto_logging/stats/atoms.proto
   enum class ChangeState {
     kUnknown,
     kEnabled,
