@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ART_LIBARTBASE_BASE_METRICS_H_
-#define ART_LIBARTBASE_BASE_METRICS_H_
+#ifndef ART_RUNTIME_METRICS_METRICS_H_
+#define ART_RUNTIME_METRICS_METRICS_H_
 
 #include <stdint.h>
 
@@ -366,4 +366,4 @@ class MetricsReporter {
 
 #pragma clang diagnostic pop  // -Wconversion
 
-#endif  // ART_LIBARTBASE_BASE_METRICS_H_
+#endif  // ART_RUNTIME_METRICS_METRICS_H_
