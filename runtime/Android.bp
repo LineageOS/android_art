@@ -27,8 +27,8 @@ JIT_DEBUG_REGISTER_CODE_LDFLAGS = [
 // in stack traces often.
 libart_cc_defaults {
     name: "libart_nativeunwind_defaults",
-    arch: {
-        arm: {
+    target: {
+        android_arm: {
             // Arm 32 bit does not produce complete exidx unwind information
             // so keep the .debug_frame which is relatively small and does
             // include needed unwind information.
@@ -39,17 +39,17 @@ libart_cc_defaults {
         },
         // For all other architectures, leave the symbols in the shared library
         // so that stack unwinders can produce meaningful name resolution.
-        arm64: {
+        android_arm64: {
             strip: {
                 keep_symbols: true,
             },
         },
-        x86: {
+        android_x86: {
             strip: {
                 keep_symbols: true,
             },
         },
-        x86_64: {
+        android_x86_64: {
             strip: {
                 keep_symbols: true,
             },
