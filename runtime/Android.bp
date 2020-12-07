@@ -651,6 +651,7 @@ art_cc_test {
         "arch/x86/instruction_set_features_x86_test.cc",
         "arch/x86_64/instruction_set_features_x86_64_test.cc",
         "barrier_test.cc",
+        "base/message_queue_test.cc",
         "base/mutex_test.cc",
         "base/timing_logger_test.cc",
         "cha_test.cc",
