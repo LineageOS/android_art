@@ -16,9 +16,11 @@
 
 #include "compat_framework.h"
 
-#include "android-base/logging.h"
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "android-base/logging.h"
+#include "thread-current-inl.h"
 
 namespace art {
 
@@ -27,6 +29,11 @@ static constexpr char kUnknownChangeState[] = "UNKNOWN";
 static constexpr char kEnabledChangeState[] = "ENABLED";
 static constexpr char kDisabledChangeState[] = "DISABLED";
 static constexpr char kLoggedState[] = "LOGGED";
+
+CompatFramework::CompatFramework()
+    : reported_compat_changes_lock_("reported compat changes lock") {}
+
+CompatFramework::~CompatFramework() {}
 
 bool CompatFramework::IsChangeEnabled(uint64_t change_id) {
   const auto enabled = disabled_compat_changes_.count(change_id) == 0;
@@ -39,6 +46,7 @@ void CompatFramework::LogChange(uint64_t change_id) {
 }
 
 void CompatFramework::ReportChange(uint64_t change_id, ChangeState state) {
+  MutexLock mu(Thread::Current(), reported_compat_changes_lock_);
   bool already_reported = reported_compat_changes_.count(change_id) != 0;
   if (already_reported) {
     return;
