@@ -66,6 +66,8 @@ public class Main {
 
         testDoubleLoad(args[0]);
         testUTFRegion("\0\0\0");
+
+        testBadFastCriticalNatives();
     }
 
     static class ABC { public static int XYZ = 12; }
@@ -420,6 +422,24 @@ public class Main {
       throw new RuntimeException(t);
     }
   }
+
+  private static void testBadFastCriticalNatives() {
+    testBadFastCriticalNative("BadFastNative");
+    testBadFastCriticalNative("BadCriticalNative");
+    testBadFastCriticalNative("BadCriticalNative2");
+    testBadFastCriticalNative("BadCriticalNative3");
+  }
+
+  private static void testBadFastCriticalNative(String className) {
+    try {
+      Class.forName(className);
+      throw new Error("Expected verification error");
+    } catch (VerifyError e) {
+      // Expected.
+    } catch (Throwable e) {
+      throw new Error("Expected verification error");
+    }
+  }
 }
 
 @FunctionalInterface
@@ -465,4 +485,24 @@ class JniCallNonvirtualTestSubclass extends JniCallNonvirtualTest {
         System.out.println("Subclass.nonstaticMethod");
         nonstaticMethodSubCalled = true;
     }
+}
+
+class BadFastNative {
+  @FastNative
+  public static native synchronized void test();
+}
+
+class BadCriticalNative {
+  @CriticalNative
+  public static native synchronized void test();
+}
+
+class BadCriticalNative2 {
+  @CriticalNative
+  public native void test();
+}
+
+class BadCriticalNative3 {
+  @CriticalNative
+  public static native void test(Object o);
 }
