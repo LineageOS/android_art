@@ -951,6 +951,39 @@ bool MethodVerifier<kVerifierDebug>::Verify() {
       return false;
     }
 
+    // Test FastNative and CriticalNative annotations. We do this in the
+    // verifier for convenience.
+    if ((method_access_flags_ & kAccNative) != 0) {
+      // Fetch the flags from the annotations: the class linker hasn't processed
+      // them yet.
+      uint32_t native_access_flags = annotations::GetNativeMethodAnnotationAccessFlags(
+          *dex_file_, class_def_, dex_method_idx_);
+      if ((native_access_flags & kAccFastNative) != 0) {
+        if ((method_access_flags_ & kAccSynchronized) != 0) {
+          Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "fast native methods cannot be synchronized";
+          return false;
+        }
+      }
+      if ((native_access_flags & kAccCriticalNative) != 0) {
+        if ((method_access_flags_ & kAccSynchronized) != 0) {
+          Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "critical native methods cannot be synchronized";
+          return false;
+        }
+        if ((method_access_flags_ & kAccStatic) == 0) {
+          Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "critical native methods must be static";
+          return false;
+        }
+        const char* shorty = dex_file_->GetMethodShorty(method_id);
+        for (size_t i = 0, len = strlen(shorty); i < len; ++i) {
+          if (Primitive::GetType(shorty[i]) == Primitive::kPrimNot) {
+            Fail(VERIFY_ERROR_BAD_CLASS_HARD) <<
+                "critical native methods must not have references as arguments or return type";
+            return false;
+          }
+        }
+      }
+    }
+
     // This should have been rejected by the dex file verifier. Only do in debug build.
     // Note: the above will also be rejected in the dex file verifier, starting in dex version 37.
     if (kIsDebugBuild) {
