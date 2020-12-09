@@ -16,6 +16,10 @@
 
 #include <tuple>
 
+#include "compilation_kind.h"
+#include "entrypoints/quick/quick_entrypoints_enum.h"
+#include "gtest/gtest.h"
+#include "handle_scope.h"
 #include "load_store_analysis.h"
 #include "load_store_elimination.h"
 #include "nodes.h"
@@ -906,6 +910,85 @@ TEST_F(LoadStoreEliminationTest, VLoadDefaultValueAndVLoad) {
   ASSERT_TRUE(IsRemoved(vload2));
   ASSERT_FALSE(IsRemoved(vstore1));
   ASSERT_FALSE(IsRemoved(vstore2));
+}
+
+// Object o = new Obj();
+// // Needed because otherwise we short-circuit LSA since GVN would get almost
+// // everything other than this. Also since this isn't expected to be a very
+// // common pattern it's not worth changing the LSA logic.
+// o.foo = 3;
+// return o.shadow$_klass_;
+TEST_F(LoadStoreEliminationTest, DefaultShadowClass) {
+  CreateGraph();
+  AdjacencyListGraph blocks(
+      graph_, GetAllocator(), "entry", "exit", {{"entry", "main"}, {"main", "exit"}});
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(main);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* suspend_check = new (GetAllocator()) HSuspendCheck();
+  entry->AddInstruction(suspend_check);
+  entry->AddInstruction(new (GetAllocator()) HGoto());
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(suspend_check, &current_locals);
+
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* const_fence = new (GetAllocator()) HConstructorFence(new_inst, 0, GetAllocator());
+  HInstruction* set_field = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                   graph_->GetIntConstant(33),
+                                                                   nullptr,
+                                                                   DataType::Type::kReference,
+                                                                   MemberOffset(10),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* get_field = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                   nullptr,
+                                                                   DataType::Type::kReference,
+                                                                   mirror::Object::ClassOffset(),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* return_val = new (GetAllocator()) HReturn(get_field);
+  main->AddInstruction(cls);
+  main->AddInstruction(new_inst);
+  main->AddInstruction(const_fence);
+  main->AddInstruction(set_field);
+  main->AddInstruction(get_field);
+  main->AddInstruction(return_val);
+  cls->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+  new_inst->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+
+  exit->AddInstruction(new (GetAllocator()) HExit());
+
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(new_inst));
+  EXPECT_TRUE(IsRemoved(const_fence));
+  EXPECT_TRUE(IsRemoved(get_field));
+  EXPECT_TRUE(IsRemoved(set_field));
+  EXPECT_FALSE(IsRemoved(cls));
+  EXPECT_EQ(cls, return_val->InputAt(0));
 }
 
 // void DO_CAL() {
