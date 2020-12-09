@@ -30,6 +30,7 @@ namespace art {
 class ArtMethod;
 class ArtField;
 class JavaVMExt;
+class ScopedObjectAccess;
 class ScopedObjectAccessAlreadyRunnable;
 
 namespace mirror {
@@ -212,6 +213,8 @@ class JNIEnvExt : public JNIEnv {
   template<bool kEnableIndexIds> friend class JNI;
   friend class ScopedJniEnvLocalRefState;
   friend class Thread;
+  friend IndirectReferenceTable* GetIndirectReferenceTable(ScopedObjectAccess& soa,
+                                                           IndirectRefKind kind);
   friend void ThreadResetFunctionTable(Thread* thread, void* arg);
   ART_FRIEND_TEST(JniInternalTest, JNIEnvExtOffsets);
 };

@@ -2105,17 +2105,12 @@ TEST_F(JniInternalTest, DeleteLocalRef) {
   ASSERT_NE(s, nullptr);
   env_->DeleteLocalRef(s);
 
-  // Currently, deleting an already-deleted reference is just a CheckJNI warning.
+  // Currently, deleting an already-deleted reference is just a CheckJNI abort.
   {
-    bool old_check_jni = vm_->SetCheckJniEnabled(false);
-    {
-      CheckJniAbortCatcher check_jni_abort_catcher;
-      env_->DeleteLocalRef(s);
-    }
+    bool old_check_jni = vm_->SetCheckJniEnabled(true);
     CheckJniAbortCatcher check_jni_abort_catcher;
-    EXPECT_FALSE(vm_->SetCheckJniEnabled(true));
     env_->DeleteLocalRef(s);
-    std::string expected(StringPrintf("use of deleted local reference %p", s));
+    std::string expected = StringPrintf("jobject is an invalid local reference: %p", s);
     check_jni_abort_catcher.Check(expected.c_str());
     EXPECT_TRUE(vm_->SetCheckJniEnabled(old_check_jni));
   }
@@ -2170,7 +2165,7 @@ TEST_F(JniInternalTest, PushLocalFrame_PopLocalFrame) {
     {
       CheckJniAbortCatcher check_jni_abort_catcher;
       EXPECT_EQ(JNIInvalidRefType, env_->GetObjectRefType(inner1));
-      check_jni_abort_catcher.Check("use of deleted local reference");
+      check_jni_abort_catcher.Check("jobject is an invalid local reference");
     }
 
     // Our local reference for the survivor is invalid because the survivor
@@ -2178,7 +2173,7 @@ TEST_F(JniInternalTest, PushLocalFrame_PopLocalFrame) {
     {
       CheckJniAbortCatcher check_jni_abort_catcher;
       EXPECT_EQ(JNIInvalidRefType, env_->GetObjectRefType(inner2));
-      check_jni_abort_catcher.Check("use of deleted local reference");
+      check_jni_abort_catcher.Check("jobject is an invalid local reference");
     }
 
     EXPECT_EQ(env_->PopLocalFrame(nullptr), nullptr);
@@ -2186,11 +2181,11 @@ TEST_F(JniInternalTest, PushLocalFrame_PopLocalFrame) {
   EXPECT_EQ(JNILocalRefType, env_->GetObjectRefType(original));
   CheckJniAbortCatcher check_jni_abort_catcher;
   EXPECT_EQ(JNIInvalidRefType, env_->GetObjectRefType(outer));
-  check_jni_abort_catcher.Check("use of deleted local reference");
+  check_jni_abort_catcher.Check("jobject is an invalid local reference");
   EXPECT_EQ(JNIInvalidRefType, env_->GetObjectRefType(inner1));
-  check_jni_abort_catcher.Check("use of deleted local reference");
+  check_jni_abort_catcher.Check("jobject is an invalid local reference");
   EXPECT_EQ(JNIInvalidRefType, env_->GetObjectRefType(inner2));
-  check_jni_abort_catcher.Check("use of deleted local reference");
+  check_jni_abort_catcher.Check("jobject is an invalid local reference");
 }
 
 TEST_F(JniInternalTest, PushLocalFrame_LimitAndOverflow) {
@@ -2244,17 +2239,12 @@ TEST_F(JniInternalTest, DeleteGlobalRef) {
   ASSERT_NE(o, nullptr);
   env_->DeleteGlobalRef(o);
 
-  // Currently, deleting an already-deleted reference is just a CheckJNI warning.
+  // Currently, deleting an already-deleted reference is just a CheckJNI abort.
   {
-    bool old_check_jni = vm_->SetCheckJniEnabled(false);
-    {
-      CheckJniAbortCatcher check_jni_abort_catcher;
-      env_->DeleteGlobalRef(o);
-    }
+    bool old_check_jni = vm_->SetCheckJniEnabled(true);
     CheckJniAbortCatcher check_jni_abort_catcher;
-    EXPECT_FALSE(vm_->SetCheckJniEnabled(true));
     env_->DeleteGlobalRef(o);
-    std::string expected(StringPrintf("use of deleted global reference %p", o));
+    std::string expected = StringPrintf("jobject is an invalid global reference: %p", o);
     check_jni_abort_catcher.Check(expected.c_str());
     EXPECT_TRUE(vm_->SetCheckJniEnabled(old_check_jni));
   }
@@ -2297,17 +2287,12 @@ TEST_F(JniInternalTest, DeleteWeakGlobalRef) {
   ASSERT_NE(o, nullptr);
   env_->DeleteWeakGlobalRef(o);
 
-  // Currently, deleting an already-deleted reference is just a CheckJNI warning.
+  // Currently, deleting an already-deleted reference is just a CheckJNI abort.
   {
-    bool old_check_jni = vm_->SetCheckJniEnabled(false);
-    {
-      CheckJniAbortCatcher check_jni_abort_catcher;
-      env_->DeleteWeakGlobalRef(o);
-    }
+    bool old_check_jni = vm_->SetCheckJniEnabled(true);
     CheckJniAbortCatcher check_jni_abort_catcher;
-    EXPECT_FALSE(vm_->SetCheckJniEnabled(true));
     env_->DeleteWeakGlobalRef(o);
-    std::string expected(StringPrintf("use of deleted weak global reference %p", o));
+    std::string expected(StringPrintf("jobject is an invalid weak global reference: %p", o));
     check_jni_abort_catcher.Check(expected.c_str());
     EXPECT_TRUE(vm_->SetCheckJniEnabled(old_check_jni));
   }

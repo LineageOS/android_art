@@ -35,6 +35,7 @@
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
 #include "gc/space/space.h"
+#include "indirect_reference_table-inl.h"
 #include "java_vm_ext.h"
 #include "jni_internal.h"
 #include "mirror/class-inl.h"
@@ -50,6 +51,20 @@
 #include "well_known_classes.h"
 
 namespace art {
+
+// This helper cannot be in the anonymous namespace because it needs to be
+// declared as a friend by JniVmExt and JniEnvExt.
+inline IndirectReferenceTable* GetIndirectReferenceTable(ScopedObjectAccess& soa,
+                                                         IndirectRefKind kind) {
+  DCHECK_NE(kind, kHandleScopeOrInvalid);
+  JNIEnvExt* env = soa.Env();
+  IndirectReferenceTable* irt =
+      (kind == kLocal) ? &env->locals_
+                       : ((kind == kGlobal) ? &env->vm_->globals_ : &env->vm_->weak_globals_);
+  DCHECK_EQ(irt->GetKind(), kind);
+  return irt;
+}
+
 namespace {
 
 using android::base::StringAppendF;
@@ -842,25 +857,58 @@ class ScopedCheck {
       }
     }
 
-    ObjPtr<mirror::Object> obj = soa.Decode<mirror::Object>(java_object);
-    if (obj == nullptr) {
-      // Either java_object is invalid or is a cleared weak.
-      IndirectRef ref = reinterpret_cast<IndirectRef>(java_object);
-      bool okay;
-      if (IndirectReferenceTable::GetIndirectRefKind(ref) != kWeakGlobal) {
+    ObjPtr<mirror::Object> obj = nullptr;
+    IndirectRef ref = reinterpret_cast<IndirectRef>(java_object);
+    IndirectRefKind ref_kind = IndirectReferenceTable::GetIndirectRefKind(ref);
+    bool expect_null = false;
+    bool okay = true;
+    std::string error_msg;
+    if (ref_kind == kHandleScopeOrInvalid) {
+      if (!soa.Self()->HandleScopeContains(java_object)) {
         okay = false;
+        error_msg = "use of invalid jobject";
       } else {
-        obj = soa.Vm()->DecodeWeakGlobal(soa.Self(), ref);
-        okay = Runtime::Current()->IsClearedJniWeakGlobal(obj);
+        obj = soa.Decode<mirror::Object>(java_object);
       }
-      if (!okay) {
-        AbortF("%s is an invalid %s: %p (%p)",
-               what,
-               GetIndirectRefKindString(IndirectReferenceTable::GetIndirectRefKind(java_object)),
-               java_object,
-               obj.Ptr());
-        return false;
+    } else {
+      IndirectReferenceTable* irt = GetIndirectReferenceTable(soa, ref_kind);
+      okay = irt->IsValidReference(java_object, &error_msg);
+      DCHECK_EQ(okay, error_msg.empty());
+      if (okay) {
+        // Note: The `IsValidReference()` checks for null but we do not prevent races,
+        // so the null check below can still fail. Even if it succeeds, another thread
+        // could delete the global or weak global before it's used by JNI.
+        if (ref_kind == kLocal) {
+          // Local references do not need a read barrier.
+          obj = irt->Get<kWithoutReadBarrier>(ref);
+        } else if (ref_kind == kGlobal) {
+          obj = soa.Env()->GetVm()->DecodeGlobal(ref);
+        } else {
+          obj = soa.Env()->GetVm()->DecodeWeakGlobal(soa.Self(), ref);
+          if (Runtime::Current()->IsClearedJniWeakGlobal(obj)) {
+            obj = nullptr;
+            expect_null = true;
+          }
+        }
       }
+    }
+    if (okay) {
+      if (!expect_null && obj == nullptr) {
+        okay = false;
+        error_msg = "deleted reference";
+      }
+      if (expect_null && !null_ok) {
+        okay = false;
+        error_msg = "cleared weak reference";
+      }
+    }
+    if (!okay) {
+      AbortF("JNI ERROR (app bug): %s is an invalid %s: %p (%s)",
+             what,
+             ToStr<IndirectRefKind>(ref_kind).c_str(),
+             java_object,
+             error_msg.c_str());
+      return false;
     }
 
     if (!Runtime::Current()->GetHeap()->IsValidObjectAddress(obj.Ptr())) {
@@ -873,7 +921,6 @@ class ScopedCheck {
       return false;
     }
 
-    bool okay = true;
     switch (kind) {
     case kClass:
       okay = obj->IsClass();
