@@ -398,6 +398,23 @@ inline bool ShouldDenyAccessToMember(T* member,
     REQUIRES_SHARED(Locks::mutator_lock_) {
   DCHECK(member != nullptr);
 
+  // First check if we have an explicit sdk checker installed that should be used to
+  // verify access. If so, make the decision based on it.
+  //
+  // This is used during off-device AOT compilation which may want to generate verification
+  // metadata only for a specific list of public SDKs. Note that the check here is made
+  // based on descriptor equality and it's aim to further restrict a symbol that would
+  // otherwise be resolved.
+  //
+  // The check only applies to boot classpaths dex files.
+  Runtime* runtime = Runtime::Current();
+  if (UNLIKELY(runtime->IsAotCompiler())) {
+    if (member->GetDeclaringClass()->GetClassLoader() == nullptr &&
+        runtime->GetClassLinker()->DenyAccessBasedOnPublicSdk(member)) {
+      return true;
+    }
+  }
+
   // Get the runtime flags encoded in member's access flags.
   // Note: this works for proxy methods because they inherit access flags from their
   // respective interface methods.
@@ -430,7 +447,7 @@ inline bool ShouldDenyAccessToMember(T* member,
       DCHECK(!callee_context.IsApplicationDomain());
 
       // Exit early if access checks are completely disabled.
-      EnforcementPolicy policy = Runtime::Current()->GetHiddenApiEnforcementPolicy();
+      EnforcementPolicy policy = runtime->GetHiddenApiEnforcementPolicy();
       if (policy == EnforcementPolicy::kDisabled) {
         return false;
       }
