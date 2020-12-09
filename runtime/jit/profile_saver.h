@@ -136,7 +136,7 @@ class ProfileSaver {
   // we don't hammer the disk to save them right away.
   // The size of this cache is usually very small and tops
   // to just a few hundreds entries in the ProfileCompilationInfo objects.
-  SafeMap<std::string, ProfileCompilationInfo*> profile_cache_;
+  SafeMap<std::string, ProfileCompilationInfo*> profile_cache_ GUARDED_BY(Locks::profiler_lock_);
 
   // Save period condition support.
   Mutex wait_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;

@@ -584,64 +584,67 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
         force_save = true;
       }
 
-      auto profile_cache_it = profile_cache_.find(filename);
-      if (profile_cache_it != profile_cache_.end()) {
-        if (!info.MergeWith(*(profile_cache_it->second))) {
-          LOG(WARNING) << "Could not merge the profile. Clearing the profile data.";
-          info.ClearData();
-          force_save = true;
-        }
-      } else if (VLOG_IS_ON(profiler)) {
-        LOG(INFO) << "Failed to find cached profile for " << filename;
-        for (auto&& pair : profile_cache_) {
-          LOG(INFO) << "Cached profile " << pair.first;
-        }
-      }
-
-      int64_t delta_number_of_methods =
-          info.GetNumberOfMethods() - last_save_number_of_methods;
-      int64_t delta_number_of_classes =
-          info.GetNumberOfResolvedClasses() - last_save_number_of_classes;
-
-      if (!force_save &&
-          delta_number_of_methods < options_.GetMinMethodsToSave() &&
-          delta_number_of_classes < options_.GetMinClassesToSave()) {
-        VLOG(profiler) << "Not enough information to save to: " << filename
-                       << " Number of methods: " << delta_number_of_methods
-                       << " Number of classes: " << delta_number_of_classes;
-        total_number_of_skipped_writes_++;
-        continue;
-      }
-
-      if (number_of_new_methods != nullptr) {
-        *number_of_new_methods =
-            std::max(static_cast<uint16_t>(delta_number_of_methods),
-                     *number_of_new_methods);
-      }
-      uint64_t bytes_written;
-      // Force the save. In case the profile data is corrupted or the the profile
-      // has the wrong version this will "fix" the file to the correct format.
-      if (info.Save(filename, &bytes_written)) {
-        // We managed to save the profile. Clear the cache stored during startup.
+      {
+        MutexLock mu(Thread::Current(), *Locks::profiler_lock_);
+        auto profile_cache_it = profile_cache_.find(filename);
         if (profile_cache_it != profile_cache_.end()) {
-          ProfileCompilationInfo *cached_info = profile_cache_it->second;
-          profile_cache_.erase(profile_cache_it);
-          delete cached_info;
+          if (!info.MergeWith(*(profile_cache_it->second))) {
+            LOG(WARNING) << "Could not merge the profile. Clearing the profile data.";
+            info.ClearData();
+            force_save = true;
+          }
+        } else if (VLOG_IS_ON(profiler)) {
+          LOG(INFO) << "Failed to find cached profile for " << filename;
+          for (auto&& pair : profile_cache_) {
+            LOG(INFO) << "Cached profile " << pair.first;
+          }
         }
-        if (bytes_written > 0) {
-          total_number_of_writes_++;
-          total_bytes_written_ += bytes_written;
-          profile_file_saved = true;
-        } else {
-          // At this point we could still have avoided the write.
-          // We load and merge the data from the file lazily at its first ever
-          // save attempt. So, whatever we are trying to save could already be
-          // in the file.
+
+        int64_t delta_number_of_methods =
+            info.GetNumberOfMethods() - last_save_number_of_methods;
+        int64_t delta_number_of_classes =
+            info.GetNumberOfResolvedClasses() - last_save_number_of_classes;
+
+        if (!force_save &&
+            delta_number_of_methods < options_.GetMinMethodsToSave() &&
+            delta_number_of_classes < options_.GetMinClassesToSave()) {
+          VLOG(profiler) << "Not enough information to save to: " << filename
+                        << " Number of methods: " << delta_number_of_methods
+                        << " Number of classes: " << delta_number_of_classes;
           total_number_of_skipped_writes_++;
+          continue;
         }
-      } else {
-        LOG(WARNING) << "Could not save profiling info to " << filename;
-        total_number_of_failed_writes_++;
+
+        if (number_of_new_methods != nullptr) {
+          *number_of_new_methods =
+              std::max(static_cast<uint16_t>(delta_number_of_methods),
+                      *number_of_new_methods);
+        }
+        uint64_t bytes_written;
+        // Force the save. In case the profile data is corrupted or the profile
+        // has the wrong version this will "fix" the file to the correct format.
+        if (info.Save(filename, &bytes_written)) {
+          // We managed to save the profile. Clear the cache stored during startup.
+          if (profile_cache_it != profile_cache_.end()) {
+            ProfileCompilationInfo *cached_info = profile_cache_it->second;
+            profile_cache_.erase(profile_cache_it);
+            delete cached_info;
+          }
+          if (bytes_written > 0) {
+            total_number_of_writes_++;
+            total_bytes_written_ += bytes_written;
+            profile_file_saved = true;
+          } else {
+            // At this point we could still have avoided the write.
+            // We load and merge the data from the file lazily at its first ever
+            // save attempt. So, whatever we are trying to save could already be
+            // in the file.
+            total_number_of_skipped_writes_++;
+          }
+        } else {
+          LOG(WARNING) << "Could not save profiling info to " << filename;
+          total_number_of_failed_writes_++;
+        }
       }
     }
   }
