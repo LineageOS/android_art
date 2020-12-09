@@ -434,6 +434,8 @@ art_cc_test {
         ":art-gtest-jars-AbstractMethod",
         ":art-gtest-jars-DefaultMethods",
         ":art-gtest-jars-DexToDexDecompiler",
+        ":art-gtest-jars-Dex2oatVdexPublicSdkDex",
+        ":art-gtest-jars-Dex2oatVdexTestDex",
         ":art-gtest-jars-ImageLayoutA",
         ":art-gtest-jars-ImageLayoutB",
         ":art-gtest-jars-LinkageTest",
@@ -457,6 +459,7 @@ art_cc_test {
     ],
     srcs: [
         "dex2oat_test.cc",
+        "dex2oat_vdex_test.cc",
         "dex2oat_image_test.cc",
         "dex/dex_to_dex_decompiler_test.cc",
         "driver/compiler_driver_test.cc",

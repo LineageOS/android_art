@@ -1064,6 +1064,7 @@ class Dex2Oat final {
     AssignIfExists(args, M::CompilationReason, &compilation_reason_);
     AssignTrueIfExists(args, M::CheckLinkageConditions, &check_linkage_conditions_);
     AssignTrueIfExists(args, M::CrashOnLinkageViolation, &crash_on_linkage_violation_);
+    AssignIfExists(args, M::PublicSdk, &public_sdk_);
 
     AssignIfExists(args, M::Backend, &compiler_kind_);
     parser_options->requested_specific_compiler = args.Exists(M::Backend);
@@ -1883,6 +1884,21 @@ class Dex2Oat final {
     }
     if (!IsBootImage()) {
       callbacks_->SetDexFiles(&dex_files);
+
+      // We need to set this after we create the class loader so that the runtime can access
+      // the hidden fields of the well known class loaders.
+      if (!public_sdk_.empty()) {
+        std::string error_msg;
+        std::unique_ptr<SdkChecker> sdk_checker(SdkChecker::Create(public_sdk_, &error_msg));
+        if (sdk_checker != nullptr) {
+          AotClassLinker* aot_class_linker = down_cast<AotClassLinker*>(class_linker);
+          aot_class_linker->SetSdkChecker(std::move(sdk_checker));
+        } else {
+          LOG(FATAL) << "Failed to create SdkChecker with dex files "
+              << public_sdk_ << " Error: " << error_msg;
+          UNREACHABLE();
+        }
+      }
     }
 
     // Register dex caches and key them to the class loader so that they only unload when the
@@ -2833,6 +2849,9 @@ class Dex2Oat final {
 
   // Whether to force individual compilation.
   bool compile_individually_;
+
+  // The classpath that determines if a given symbol should be resolved at compile time or not.
+  std::string public_sdk_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Dex2Oat);
 };
