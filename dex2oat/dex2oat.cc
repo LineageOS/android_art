@@ -517,6 +517,7 @@ class Dex2Oat final {
       input_vdex_file_(nullptr),
       dm_fd_(-1),
       zip_fd_(-1),
+      zip_dup_fd_(-1),
       image_fd_(-1),
       have_multi_image_arg_(false),
       multi_image_(false),
@@ -1705,7 +1706,11 @@ class Dex2Oat final {
     // compilation.
     PaletteHooks* hooks = nullptr;
     if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
-      hooks->NotifyStartDex2oatCompilation(zip_fd_,
+      // We dup the zip file descriptor, as the oat writer will close it in
+      // OatWriter::CloseSources (we still want to close it there for
+      // consistency with other kinds of inputs).
+      zip_dup_fd_ = DupCloexec(zip_fd_);
+      hooks->NotifyStartDex2oatCompilation(zip_dup_fd_,
                                            IsAppImage() ? app_image_fd_ : image_fd_,
                                            oat_fd_,
                                            output_vdex_fd_);
@@ -2149,10 +2154,11 @@ class Dex2Oat final {
     // compilation.
     PaletteHooks* hooks = nullptr;
     if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
-      hooks->NotifyEndDex2oatCompilation(zip_fd_,
+      hooks->NotifyEndDex2oatCompilation(zip_dup_fd_,
                                          IsAppImage() ? app_image_fd_ : image_fd_,
                                          oat_fd_,
                                          output_vdex_fd_);
+      close(zip_dup_fd_);
     }
 
     return true;
@@ -2779,6 +2785,7 @@ class Dex2Oat final {
   std::vector<std::string> dex_filenames_;
   std::vector<std::string> dex_locations_;
   int zip_fd_;
+  int zip_dup_fd_;  // A dup of the zip fd in case we report it to Palette.
   std::string zip_location_;
   std::string boot_image_filename_;
   std::vector<const char*> runtime_args_;
