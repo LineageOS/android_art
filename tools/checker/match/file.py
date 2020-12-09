@@ -347,7 +347,7 @@ def match_files(checker_file, c1_file, target_arch, debuggable_mode, print_cfg):
       with open(c1_file.full_file_name) as cfg_file:
         Logger.log("".join(cfg_file), Logger.Level.ERROR)
       Logger.fail("Test case not found in the CFG file",
-                  test_case.full_file_name, test_case.start_line_no, test_case.name)
+                  c1_file.full_file_name, test_case.start_line_no, test_case.name)
 
     Logger.start_test(test_case.name)
     try:
