@@ -285,6 +285,10 @@ class IndirectReferenceTable {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::alloc_tracker_lock_);
 
+  IndirectRefKind GetKind() const {
+    return kind_;
+  }
+
   // Return the #of entries in the entire table.  This includes holes, and
   // so may be larger than the actual number of "live" entries.
   size_t Capacity() const {
@@ -330,6 +334,10 @@ class IndirectReferenceTable {
   ALWAYS_INLINE static inline IndirectRefKind GetIndirectRefKind(IndirectRef iref) {
     return DecodeIndirectRefKind(reinterpret_cast<uintptr_t>(iref));
   }
+
+  /* Reference validation for CheckJNI. */
+  bool IsValidReference(IndirectRef, /*out*/std::string* error_msg) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   static constexpr size_t kSerialBits = MinimumBitsToStore(kIRTPrevCount);
@@ -391,7 +399,6 @@ class IndirectReferenceTable {
   static void AbortIfNoCheckJNI(const std::string& msg);
 
   /* extra debugging checks */
-  bool GetChecked(IndirectRef) const REQUIRES_SHARED(Locks::mutator_lock_);
   bool CheckEntry(const char*, IndirectRef, uint32_t) const;
 
   /// semi-public - read/write by jni down calls.
