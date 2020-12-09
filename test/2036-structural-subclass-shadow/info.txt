@@ -1,0 +1,5 @@
+Tests dex-cache invalidation with structural redefinition.
+
+Regression test for b/161846143. Structural redefinition was incorrectly
+failing to invalidate some dex-cache entries causing incorrect field/method
+resolution in limited cases.

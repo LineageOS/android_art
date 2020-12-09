@@ -1222,7 +1222,8 @@
                   "2005-pause-all-redefine-multithreaded",
                   "2006-virtual-structural-finalizing",
                   "2007-virtual-structural-finalizable",
-                  "2035-structural-native-method"],
+                  "2035-structural-native-method",
+                  "2036-structural-subclass-shadow"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
