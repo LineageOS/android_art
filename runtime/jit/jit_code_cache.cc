@@ -478,11 +478,14 @@ void JitCodeCache::FreeAllMethodHeaders(
   RepackNativeDebugInfoForJit();
 
   // Check that the set of compiled methods exactly matches native debug information.
-  if (kIsDebugBuild) {
+  // Does not check zygote methods since they can change concurrently.
+  if (kIsDebugBuild && !Runtime::Current()->IsZygote()) {
     std::map<const void*, ArtMethod*> compiled_methods;
     VisitAllMethods([&](const void* addr, ArtMethod* method) {
-      CHECK(addr != nullptr && method != nullptr);
-      compiled_methods.emplace(addr, method);
+      if (!IsInZygoteExecSpace(addr)) {
+        CHECK(addr != nullptr && method != nullptr);
+        compiled_methods.emplace(addr, method);
+      }
     });
     std::set<const void*> debug_info;
     ForEachNativeDebugSymbol([&](const void* addr, size_t, const char* name) {
@@ -494,6 +497,7 @@ void JitCodeCache::FreeAllMethodHeaders(
       for (auto it : compiled_methods) {
         CHECK_EQ(debug_info.count(it.first), 1u) << "No debug info: " << it.second->PrettyMethod();
       }
+      CHECK_EQ(compiled_methods.size(), debug_info.size());
     }
   }
 }
