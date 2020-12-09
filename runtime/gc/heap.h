@@ -779,16 +779,18 @@ class Heap {
 
   // Returns the active concurrent copying collector.
   collector::ConcurrentCopying* ConcurrentCopyingCollector() {
+    collector::ConcurrentCopying* active_collector =
+            active_concurrent_copying_collector_.load(std::memory_order_relaxed);
     if (use_generational_cc_) {
-      DCHECK((active_concurrent_copying_collector_ == concurrent_copying_collector_) ||
-             (active_concurrent_copying_collector_ == young_concurrent_copying_collector_))
-              << "active_concurrent_copying_collector: " << active_concurrent_copying_collector_
+      DCHECK((active_collector == concurrent_copying_collector_) ||
+             (active_collector == young_concurrent_copying_collector_))
+              << "active_concurrent_copying_collector: " << active_collector
               << " young_concurrent_copying_collector: " << young_concurrent_copying_collector_
               << " concurrent_copying_collector: " << concurrent_copying_collector_;
     } else {
-      DCHECK_EQ(active_concurrent_copying_collector_, concurrent_copying_collector_);
+      DCHECK_EQ(active_collector, concurrent_copying_collector_);
     }
-    return active_concurrent_copying_collector_;
+    return active_collector;
   }
 
   CollectorType CurrentCollectorType() {
@@ -1496,7 +1498,7 @@ class Heap {
 
   std::vector<collector::GarbageCollector*> garbage_collectors_;
   collector::SemiSpace* semi_space_collector_;
-  collector::ConcurrentCopying* active_concurrent_copying_collector_;
+  Atomic<collector::ConcurrentCopying*> active_concurrent_copying_collector_;
   collector::ConcurrentCopying* young_concurrent_copying_collector_;
   collector::ConcurrentCopying* concurrent_copying_collector_;
 

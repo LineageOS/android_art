@@ -708,7 +708,8 @@ Heap::Heap(size_t initial_size,
             "young",
             measure_gc_performance);
       }
-      active_concurrent_copying_collector_ = concurrent_copying_collector_;
+      active_concurrent_copying_collector_.store(concurrent_copying_collector_,
+                                                 std::memory_order_relaxed);
       DCHECK(region_space_ != nullptr);
       concurrent_copying_collector_->SetRegionSpace(region_space_);
       if (use_generational_cc_) {
@@ -2576,19 +2577,24 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
         collector = semi_space_collector_;
         break;
       case kCollectorTypeCC:
+        collector::ConcurrentCopying* active_cc_collector;
         if (use_generational_cc_) {
           // TODO: Other threads must do the flip checkpoint before they start poking at
           // active_concurrent_copying_collector_. So we should not concurrency here.
-          active_concurrent_copying_collector_ = (gc_type == collector::kGcTypeSticky) ?
-              young_concurrent_copying_collector_ : concurrent_copying_collector_;
-          DCHECK(active_concurrent_copying_collector_->RegionSpace() == region_space_);
+          active_cc_collector = (gc_type == collector::kGcTypeSticky) ?
+                  young_concurrent_copying_collector_ : concurrent_copying_collector_;
+          active_concurrent_copying_collector_.store(active_cc_collector,
+                                                     std::memory_order_relaxed);
+          DCHECK(active_cc_collector->RegionSpace() == region_space_);
+          collector = active_cc_collector;
+        } else {
+          collector = active_concurrent_copying_collector_.load(std::memory_order_relaxed);
         }
-        collector = active_concurrent_copying_collector_;
         break;
       default:
         LOG(FATAL) << "Invalid collector type " << static_cast<size_t>(collector_type_);
     }
-    if (collector != active_concurrent_copying_collector_) {
+    if (collector != active_concurrent_copying_collector_.load(std::memory_order_relaxed)) {
       temp_space_->GetMemMap()->Protect(PROT_READ | PROT_WRITE);
       if (kIsDebugBuild) {
         // Try to read each page of the memory map in case mprotect didn't work properly b/19894268.
