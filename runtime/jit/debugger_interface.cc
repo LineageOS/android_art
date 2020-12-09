@@ -651,7 +651,8 @@ Mutex* GetNativeDebugInfoLock() {
 void ForEachNativeDebugSymbol(std::function<void(const void*, size_t, const char*)> cb) {
   MutexLock mu(Thread::Current(), g_jit_debug_lock);
   using ElfRuntimeTypes = std::conditional<sizeof(void*) == 4, ElfTypes32, ElfTypes64>::type;
-  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != nullptr; it = it->next_) {
+  const JITCodeEntry* end = __jit_debug_descriptor.zygote_head_entry_;
+  for (const JITCodeEntry* it = __jit_debug_descriptor.head_; it != end; it = it->next_) {
     ArrayRef<const uint8_t> buffer(it->symfile_addr_, it->symfile_size_);
     if (!buffer.empty()) {
       ElfDebugReader<ElfRuntimeTypes> reader(buffer);
