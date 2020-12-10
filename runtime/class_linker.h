@@ -58,6 +58,7 @@ class OatFile;
 template<class T> class ObjectLock;
 class Runtime;
 class ScopedObjectAccessAlreadyRunnable;
+class SdkChecker;
 template<size_t kNumReferences> class PACKED(4) StackHandleScope;
 class Thread;
 
@@ -824,6 +825,15 @@ class ClassLinker {
   void ForceClassInitialized(Thread* self, Handle<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::dex_lock_, !Roles::uninterruptible_);
+
+  // Verifies if the method is accesible according to the SdkChecker (if installed).
+  virtual bool DenyAccessBasedOnPublicSdk(ArtMethod* art_method ATTRIBUTE_UNUSED) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  // Verifies if the field is accesible according to the SdkChecker (if installed).
+  virtual bool DenyAccessBasedOnPublicSdk(ArtField* art_field ATTRIBUTE_UNUSED) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  // Verifies if the descriptor is accesible according to the SdkChecker (if installed).
+  virtual bool DenyAccessBasedOnPublicSdk(const char* type_descriptor ATTRIBUTE_UNUSED) const;
 
  protected:
   virtual bool InitializeClass(Thread* self,

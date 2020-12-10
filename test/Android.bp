@@ -1351,6 +1351,12 @@ java_library {
     defaults: ["art-gtest-jars-defaults"],
 }
 
+java_library {
+    name: "art-gtest-jars-Dex2oatVdexTestDex",
+    srcs: ["Dex2oatVdexTestDex/**/*.java"],
+    defaults: ["art-gtest-jars-defaults"],
+}
+
 // The following cases are non-trivial.
 
 // Uncompress classes.dex files in the jar file.
@@ -1496,4 +1502,11 @@ genrule {
     defaults: ["art-gtest-jars-smali-defaults"],
     srcs: ["LinkageTest/*.smali"],
     out: ["art-gtest-jars-LinkageTest.dex"],
+}
+
+genrule {
+    name: "art-gtest-jars-Dex2oatVdexPublicSdkDex",
+    defaults: ["art-gtest-jars-smali-defaults"],
+    srcs: ["Dex2oatVdexPublicSdkDex/*.smali"],
+    out: ["art-gtest-jars-Dex2oatVdexPublicSdkDex.dex"],
 }
