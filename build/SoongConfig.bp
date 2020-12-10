@@ -1,0 +1,51 @@
+// Set up Soong config variables.
+// https://android.googlesource.com/platform/build/soong/+/master/README.md#soong-config-variables
+
+// The source_build variable in the art_module namespace is used to enable the
+// apex, sdk, and module_exports modules that make up the ART Module by setting
+// SOONG_CONFIG_art_module_source_build in make.
+// TODO(b/172480617): Clean up when ART source is no longer in the platform
+// manifest.
+soong_config_bool_variable {
+    name: "source_build",
+}
+
+soong_config_module_type {
+    name: "art_module_sdk",
+    module_type: "sdk",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_exports",
+    module_type: "module_exports",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_apex_defaults",
+    module_type: "apex_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_cc_defaults",
+    module_type: "cc_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_genrule_defaults",
+    module_type: "genrule_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
