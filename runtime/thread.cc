@@ -2571,17 +2571,10 @@ ObjPtr<mirror::Object> Thread::DecodeJObject(jobject obj) const {
     // Local references do not need a read barrier.
     result = locals.Get<kWithoutReadBarrier>(ref);
   } else if (kind == kHandleScopeOrInvalid) {
-    // TODO: make stack indirect reference table lookup more efficient.
-    // Check if this is a local reference in the handle scope.
-    if (LIKELY(HandleScopeContains(obj))) {
-      // Read from handle scope.
-      result = reinterpret_cast<StackReference<mirror::Object>*>(obj)->AsMirrorPtr();
-      VerifyObject(result);
-    } else {
-      tlsPtr_.jni_env->vm_->JniAbortF(nullptr, "use of invalid jobject %p", obj);
-      expect_null = true;
-      result = nullptr;
-    }
+    // Read from handle scope.
+    DCHECK(HandleScopeContains(obj));
+    result = reinterpret_cast<StackReference<mirror::Object>*>(obj)->AsMirrorPtr();
+    VerifyObject(result);
   } else if (kind == kGlobal) {
     result = tlsPtr_.jni_env->vm_->DecodeGlobal(ref);
   } else {
@@ -2594,10 +2587,9 @@ ObjPtr<mirror::Object> Thread::DecodeJObject(jobject obj) const {
     }
   }
 
-  if (UNLIKELY(!expect_null && result == nullptr)) {
-    tlsPtr_.jni_env->vm_->JniAbortF(nullptr, "use of deleted %s %p",
-                                   ToStr<IndirectRefKind>(kind).c_str(), obj);
-  }
+  DCHECK(expect_null || result != nullptr)
+      << "use of deleted " << ToStr<IndirectRefKind>(kind).c_str()
+      << " " << static_cast<const void*>(obj);
   return result;
 }
 
