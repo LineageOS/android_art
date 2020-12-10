@@ -3,6 +3,18 @@
 // Contains both the Android Managed Runtime (ART) and the Android Core Library
 // (Libcore).
 
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_apex_defaults",
+        "art_module_cc_defaults",
+        "art_module_genrule_defaults",
+    ],
+}
+
+// TODO(b/172480615): Change this to false to disable sources for platform.
+art_module_enable_sources = true
+
 // Modules listed in LOCAL_REQUIRED_MODULES for module art-runtime in art/Android.mk.
 // - Base requirements (binaries for which both 32- and 64-bit versions are built, if possible).
 art_runtime_base_binaries_both = [
@@ -190,9 +202,31 @@ apex_key {
     private_key: "com.android.art.pem",
 }
 
+art_module_apex_defaults {
+    name: "com.android.art-defaults",
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+
+    target: {
+        windows: {
+            // When the Soong config variable above sets enabled:true, it
+            // overrides the default false for targets, so we need to disable
+            // windows explicitly.
+            enabled: false,
+        },
+    },
+}
+
 // Default values shared by device ART APEXes.
 apex_defaults {
-    name: "com.android.art-defaults",
+    name: "com.android.art-device-defaults",
+    defaults: ["com.android.art-defaults"],
     compile_multilib: "both",
     manifest: "manifest-art.json",
     java_libs: libcore_java_libs,
@@ -231,8 +265,8 @@ apex_defaults {
 
 // Default values shared by (device) Debug and Testing ART APEXes.
 apex_defaults {
-    name: "com.android.art-dev-defaults",
-    defaults: ["com.android.art-defaults"],
+    name: "com.android.art-devel-defaults",
+    defaults: ["com.android.art-device-defaults"],
     native_shared_libs: art_runtime_base_native_device_only_debug_shared_libs +
         art_runtime_run_test_libs +
         art_runtime_debug_native_shared_libs +
@@ -257,7 +291,7 @@ apex_defaults {
 // storage-constrained devices in userdebug and eng builds.
 art_apex {
     name: "com.android.art",
-    defaults: ["com.android.art-defaults"],
+    defaults: ["com.android.art-device-defaults"],
     certificate: ":com.android.art.certificate",
 }
 
@@ -266,7 +300,7 @@ art_apex {
 // eng build.
 art_apex {
     name: "com.android.art.debug",
-    defaults: ["com.android.art-dev-defaults"],
+    defaults: ["com.android.art-devel-defaults"],
     certificate: ":com.android.art.certificate",
 }
 
@@ -299,7 +333,7 @@ art_gtests = [
 // purposes only.
 art_apex_test {
     name: "com.android.art.testing",
-    defaults: ["com.android.art-dev-defaults"],
+    defaults: ["com.android.art-devel-defaults"],
     file_contexts: ":com.android.art.debug-file_contexts",
     certificate: ":com.android.art.certificate",
     tests: art_gtests,
@@ -313,6 +347,7 @@ art_apex_test {
 // See b/120617876 for more information.
 art_apex_test_host {
     name: "com.android.art.host",
+    defaults: ["com.android.art-defaults"],
     compile_multilib: "both",
     payload_type: "zip",
     host_supported: true,
@@ -388,18 +423,36 @@ art_check_apex_gen_stem = "$(location art-apex-tester)" +
 
 // The non-flattened APEXes are always checked, as they are always generated
 // (even when APEX flattening is enabled).
-genrule_defaults {
+art_module_genrule_defaults {
     name: "art-check-apex-gen-defaults",
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+
     tools: [
         "art-apex-tester",
         "debugfs",
     ],
 }
 
-cc_defaults {
+art_module_cc_defaults {
     name: "art-check-apex-gen-fakebin-defaults",
     host_supported: true,
     device_supported: false,
+
+    // Enable if SOONG_CONFIG_art_module_source_build is true.
+    enabled: art_module_enable_sources,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+
     target: {
         darwin: {
             enabled: false, // No python3.
