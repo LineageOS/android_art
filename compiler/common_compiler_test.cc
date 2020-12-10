@@ -44,7 +44,7 @@
 
 namespace art {
 
-std::unique_ptr<CompilerOptions> CommonCompilerTest::CreateCompilerOptions(
+std::unique_ptr<CompilerOptions> CommonCompilerTestImpl::CreateCompilerOptions(
     InstructionSet instruction_set, const std::string& variant) {
   std::unique_ptr<CompilerOptions> compiler_options = std::make_unique<CompilerOptions>();
   compiler_options->instruction_set_ = instruction_set;
@@ -55,10 +55,11 @@ std::unique_ptr<CompilerOptions> CommonCompilerTest::CreateCompilerOptions(
   return compiler_options;
 }
 
-CommonCompilerTest::CommonCompilerTest() {}
-CommonCompilerTest::~CommonCompilerTest() {}
+CommonCompilerTestImpl::CommonCompilerTestImpl() {}
+CommonCompilerTestImpl::~CommonCompilerTestImpl() {}
 
-void CommonCompilerTest::MakeExecutable(ArtMethod* method, const CompiledMethod* compiled_method) {
+void CommonCompilerTestImpl::MakeExecutable(ArtMethod* method,
+                                            const CompiledMethod* compiled_method) {
   CHECK(method != nullptr);
   // If the code size is 0 it means the method was skipped due to profile guided compilation.
   if (compiled_method != nullptr && compiled_method->GetQuickCode().size() != 0u) {
@@ -96,11 +97,11 @@ void CommonCompilerTest::MakeExecutable(ArtMethod* method, const CompiledMethod*
   } else {
     // No code? You must mean to go into the interpreter.
     // Or the generic JNI...
-    class_linker_->SetEntryPointsToInterpreter(method);
+    GetClassLinker()->SetEntryPointsToInterpreter(method);
   }
 }
 
-void CommonCompilerTest::MakeExecutable(const void* code_start, size_t code_length) {
+void CommonCompilerTestImpl::MakeExecutable(const void* code_start, size_t code_length) {
   CHECK(code_start != nullptr);
   CHECK_NE(code_length, 0U);
   uintptr_t data = reinterpret_cast<uintptr_t>(code_start);
@@ -115,22 +116,22 @@ void CommonCompilerTest::MakeExecutable(const void* code_start, size_t code_leng
   CHECK(FlushCpuCaches(reinterpret_cast<void*>(base), reinterpret_cast<void*>(base + len)));
 }
 
-void CommonCompilerTest::SetUp() {
-  CommonRuntimeTest::SetUp();
+void CommonCompilerTestImpl::SetUp() {
   {
     ScopedObjectAccess soa(Thread::Current());
 
-    runtime_->SetInstructionSet(instruction_set_);
+    Runtime* runtime = GetRuntime();
+    runtime->SetInstructionSet(instruction_set_);
     for (uint32_t i = 0; i < static_cast<uint32_t>(CalleeSaveType::kLastCalleeSaveType); ++i) {
       CalleeSaveType type = CalleeSaveType(i);
-      if (!runtime_->HasCalleeSaveMethod(type)) {
-        runtime_->SetCalleeSaveMethod(runtime_->CreateCalleeSaveMethod(), type);
+      if (!runtime->HasCalleeSaveMethod(type)) {
+        runtime->SetCalleeSaveMethod(runtime->CreateCalleeSaveMethod(), type);
       }
     }
   }
 }
 
-void CommonCompilerTest::ApplyInstructionSet() {
+void CommonCompilerTestImpl::ApplyInstructionSet() {
   // Copy local instruction_set_ and instruction_set_features_ to *compiler_options_;
   CHECK(instruction_set_features_ != nullptr);
   if (instruction_set_ == InstructionSet::kThumb2) {
@@ -144,8 +145,8 @@ void CommonCompilerTest::ApplyInstructionSet() {
   CHECK(compiler_options_->instruction_set_features_->Equals(instruction_set_features_.get()));
 }
 
-void CommonCompilerTest::OverrideInstructionSetFeatures(InstructionSet instruction_set,
-                                                        const std::string& variant) {
+void CommonCompilerTestImpl::OverrideInstructionSetFeatures(InstructionSet instruction_set,
+                                                            const std::string& variant) {
   instruction_set_ = instruction_set;
   std::string error_msg;
   instruction_set_features_ =
@@ -157,33 +158,29 @@ void CommonCompilerTest::OverrideInstructionSetFeatures(InstructionSet instructi
   }
 }
 
-void CommonCompilerTest::SetUpRuntimeOptions(RuntimeOptions* options) {
-  CommonRuntimeTest::SetUpRuntimeOptions(options);
-
+void CommonCompilerTestImpl::SetUpRuntimeOptionsImpl() {
   compiler_options_.reset(new CompilerOptions);
   verification_results_.reset(new VerificationResults(compiler_options_.get()));
 
   ApplyInstructionSet();
 }
 
-Compiler::Kind CommonCompilerTest::GetCompilerKind() const {
+Compiler::Kind CommonCompilerTestImpl::GetCompilerKind() const {
   return compiler_kind_;
 }
 
-void CommonCompilerTest::SetCompilerKind(Compiler::Kind compiler_kind) {
+void CommonCompilerTestImpl::SetCompilerKind(Compiler::Kind compiler_kind) {
   compiler_kind_ = compiler_kind;
 }
 
-void CommonCompilerTest::TearDown() {
+void CommonCompilerTestImpl::TearDown() {
   verification_results_.reset();
   compiler_options_.reset();
-
-  CommonRuntimeTest::TearDown();
 }
 
-void CommonCompilerTest::CompileMethod(ArtMethod* method) {
+void CommonCompilerTestImpl::CompileMethod(ArtMethod* method) {
   CHECK(method != nullptr);
-  TimingLogger timings("CommonCompilerTest::CompileMethod", false, false);
+  TimingLogger timings("CommonCompilerTestImpl::CompileMethod", false, false);
   TimingLogger::ScopedTiming t(__FUNCTION__, &timings);
   CompiledMethodStorage storage(/*swap_fd=*/ -1);
   CompiledMethod* compiled_method = nullptr;
@@ -194,7 +191,8 @@ void CommonCompilerTest::CompileMethod(ArtMethod* method) {
     std::unique_ptr<Compiler> compiler(
         Compiler::Create(*compiler_options_, &storage, compiler_kind_));
     const DexFile& dex_file = *method->GetDexFile();
-    Handle<mirror::DexCache> dex_cache = hs.NewHandle(class_linker_->FindDexCache(self, dex_file));
+    Handle<mirror::DexCache> dex_cache =
+        hs.NewHandle(GetClassLinker()->FindDexCache(self, dex_file));
     Handle<mirror::ClassLoader> class_loader = hs.NewHandle(method->GetClassLoader());
     compiler_options_->verification_results_ = verification_results_.get();
     if (method->IsNative()) {
@@ -225,37 +223,41 @@ void CommonCompilerTest::CompileMethod(ArtMethod* method) {
   CompiledMethod::ReleaseSwapAllocatedCompiledMethod(&storage, compiled_method);
 }
 
-void CommonCompilerTest::CompileDirectMethod(Handle<mirror::ClassLoader> class_loader,
-                                             const char* class_name, const char* method_name,
-                                             const char* signature) {
+void CommonCompilerTestImpl::CompileDirectMethod(Handle<mirror::ClassLoader> class_loader,
+                                                 const char* class_name,
+                                                 const char* method_name,
+                                                 const char* signature) {
   std::string class_descriptor(DotToDescriptor(class_name));
   Thread* self = Thread::Current();
+  ClassLinker* class_linker = GetClassLinker();
   ObjPtr<mirror::Class> klass =
-      class_linker_->FindClass(self, class_descriptor.c_str(), class_loader);
+      class_linker->FindClass(self, class_descriptor.c_str(), class_loader);
   CHECK(klass != nullptr) << "Class not found " << class_name;
-  auto pointer_size = class_linker_->GetImagePointerSize();
+  auto pointer_size = class_linker->GetImagePointerSize();
   ArtMethod* method = klass->FindClassMethod(method_name, signature, pointer_size);
   CHECK(method != nullptr && method->IsDirect()) << "Direct method not found: "
       << class_name << "." << method_name << signature;
   CompileMethod(method);
 }
 
-void CommonCompilerTest::CompileVirtualMethod(Handle<mirror::ClassLoader> class_loader,
-                                              const char* class_name, const char* method_name,
-                                              const char* signature) {
+void CommonCompilerTestImpl::CompileVirtualMethod(Handle<mirror::ClassLoader> class_loader,
+                                                  const char* class_name,
+                                                  const char* method_name,
+                                                  const char* signature) {
   std::string class_descriptor(DotToDescriptor(class_name));
   Thread* self = Thread::Current();
+  ClassLinker* class_linker = GetClassLinker();
   ObjPtr<mirror::Class> klass =
-      class_linker_->FindClass(self, class_descriptor.c_str(), class_loader);
+      class_linker->FindClass(self, class_descriptor.c_str(), class_loader);
   CHECK(klass != nullptr) << "Class not found " << class_name;
-  auto pointer_size = class_linker_->GetImagePointerSize();
+  auto pointer_size = class_linker->GetImagePointerSize();
   ArtMethod* method = klass->FindClassMethod(method_name, signature, pointer_size);
   CHECK(method != nullptr && !method->IsDirect()) << "Virtual method not found: "
       << class_name << "." << method_name << signature;
   CompileMethod(method);
 }
 
-void CommonCompilerTest::ClearBootImageOption() {
+void CommonCompilerTestImpl::ClearBootImageOption() {
   compiler_options_->image_type_ = CompilerOptions::ImageType::kNone;
 }
 
