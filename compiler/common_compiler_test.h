@@ -42,13 +42,13 @@ class VerificationResults;
 
 template<class T> class Handle;
 
-class CommonCompilerTest : public CommonRuntimeTest {
+class CommonCompilerTestImpl {
  public:
   static std::unique_ptr<CompilerOptions> CreateCompilerOptions(InstructionSet instruction_set,
                                                                 const std::string& variant);
 
-  CommonCompilerTest();
-  ~CommonCompilerTest();
+  CommonCompilerTestImpl();
+  virtual ~CommonCompilerTestImpl();
 
   void MakeExecutable(ArtMethod* method, const CompiledMethod* compiled_method)
       REQUIRES_SHARED(Locks::mutator_lock_);
@@ -56,9 +56,9 @@ class CommonCompilerTest : public CommonRuntimeTest {
   static void MakeExecutable(const void* code_start, size_t code_length);
 
  protected:
-  void SetUp() override;
+  void SetUp();
 
-  void SetUpRuntimeOptions(RuntimeOptions* options) override;
+  void SetUpRuntimeOptionsImpl();
 
   Compiler::Kind GetCompilerKind() const;
   void SetCompilerKind(Compiler::Kind compiler_kind);
@@ -67,7 +67,7 @@ class CommonCompilerTest : public CommonRuntimeTest {
     return CompilerFilter::kDefaultCompilerFilter;
   }
 
-  void TearDown() override;
+  void TearDown();
 
   void CompileMethod(ArtMethod* method) REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -95,10 +95,45 @@ class CommonCompilerTest : public CommonRuntimeTest {
   std::unique_ptr<CompilerOptions> compiler_options_;
   std::unique_ptr<VerificationResults> verification_results_;
 
+ protected:
+  virtual ClassLinker* GetClassLinker() = 0;
+  virtual Runtime* GetRuntime() = 0;
+
  private:
   // Chunks must not move their storage after being created - use the node-based std::list.
   std::list<std::vector<uint8_t>> header_code_and_maps_chunks_;
 };
+
+template <typename RuntimeBase>
+class CommonCompilerTestBase : public CommonCompilerTestImpl, public RuntimeBase {
+ public:
+  void SetUp() override {
+    RuntimeBase::SetUp();
+    CommonCompilerTestImpl::SetUp();
+  }
+  void SetUpRuntimeOptions(RuntimeOptions* options) override {
+    RuntimeBase::SetUpRuntimeOptions(options);
+    CommonCompilerTestImpl::SetUpRuntimeOptionsImpl();
+  }
+  void TearDown() override {
+    CommonCompilerTestImpl::TearDown();
+    RuntimeBase::TearDown();
+  }
+
+ protected:
+  ClassLinker* GetClassLinker() override {
+    return RuntimeBase::class_linker_;
+  }
+  Runtime* GetRuntime() override {
+    return RuntimeBase::runtime_.get();
+  }
+};
+
+class CommonCompilerTest : public CommonCompilerTestBase<CommonRuntimeTest> {};
+
+template <typename Param>
+class CommonCompilerTestWithParam
+    : public CommonCompilerTestBase<CommonRuntimeTestWithParam<Param>> {};
 
 }  // namespace art
 
