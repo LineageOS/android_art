@@ -83,7 +83,8 @@ class ReferenceTypePropagation : public HOptimization {
   // Whether this reference type propagation is the first run we are doing.
   const bool is_first_run_;
 
-  friend class ReferenceTypePropagationTest;
+  template<typename T>
+  friend class ReferenceTypePropagationTestBase;
 
   DISALLOW_COPY_AND_ASSIGN(ReferenceTypePropagation);
 };

@@ -996,8 +996,26 @@ java_library {
     sdk_version: "core_current",
 }
 
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: ["art_module_cc_defaults"],
+}
+
+art_module_cc_defaults {
+    name: "art_gtests_defaults",
+
+    // TODO(b/172480615): Change this to false to disable sources for platform.
+    enabled: true,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+}
+
 art_cc_test {
     name: "ArtGtestsTargetInstallApex",
+    defaults: ["art_gtests_defaults"],
     data: [
         // We need the ART testing apex, which contains all gtest binaries.
         // Note that due to build system and linker constraints the gtests must be in the apex.
@@ -1026,6 +1044,7 @@ art_cc_test {
 
 art_cc_test {
     name: "ArtGtestsTargetChroot",
+    defaults: ["art_gtests_defaults"],
     data: [
         // We need the ART testing apex, which contains all gtest binaries.
         // Note that due to build system and linker constraints the gtests must be in the apex.
