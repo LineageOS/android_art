@@ -401,7 +401,7 @@ TEST_F(ClassLoaderContextTest, OpenInvalidDexFiles) {
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("PCL[does_not_exist.dex]");
   VerifyContextSize(context.get(), 1);
-  ASSERT_FALSE(context->OpenDexFiles(InstructionSet::kArm, "."));
+  ASSERT_FALSE(context->OpenDexFiles("."));
 }
 
 TEST_F(ClassLoaderContextTest, OpenValidDexFiles) {
@@ -415,7 +415,7 @@ TEST_F(ClassLoaderContextTest, OpenValidDexFiles) {
           "PCL[" + multidex_name + ":" + myclass_dex_name + "];" +
           "DLC[" + dex_name + "]");
 
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, /*classpath_dir=*/ ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   VerifyContextSize(context.get(), 2);
 
@@ -465,7 +465,7 @@ TEST_F(ClassLoaderContextTest, OpenValidDexFilesRelative) {
           "PCL[" + multidex_name + ":" + myclass_dex_name + "];" +
           "DLC[" + dex_name + "]");
 
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, /*classpath_dir=*/ ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> all_dex_files0 = OpenTestDexFiles("MultiDex");
   std::vector<std::unique_ptr<const DexFile>> myclass_dex_files = OpenTestDexFiles("MyClass");
@@ -499,7 +499,7 @@ TEST_F(ClassLoaderContextTest, OpenValidDexFilesClasspathDir) {
           "PCL[" + multidex_name + ":" + myclass_dex_name + "];" +
           "DLC[" + dex_name + "]");
 
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, cwd_buf));
+  ASSERT_TRUE(context->OpenDexFiles(cwd_buf));
 
   VerifyContextSize(context.get(), 2);
   std::vector<std::unique_ptr<const DexFile>> all_dex_files0 = OpenTestDexFiles("MultiDex");
@@ -517,7 +517,7 @@ TEST_F(ClassLoaderContextTest, OpenInvalidDexFilesMix) {
   std::string dex_name = GetTestDexFileName("Main");
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("PCL[does_not_exist.dex];DLC[" + dex_name + "]");
-  ASSERT_FALSE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_FALSE(context->OpenDexFiles());
 }
 
 TEST_F(ClassLoaderContextTest, OpenDexFilesForIMCFails) {
@@ -526,14 +526,14 @@ TEST_F(ClassLoaderContextTest, OpenDexFilesForIMCFails) {
 
   context = ParseContextWithChecksums("IMC[<unknown>*111]");
   VerifyContextSize(context.get(), 1);
-  ASSERT_FALSE(context->OpenDexFiles(InstructionSet::kArm, "."));
+  ASSERT_FALSE(context->OpenDexFiles("."));
 }
 
 TEST_F(ClassLoaderContextTest, CreateClassLoader) {
   std::string dex_name = GetTestDexFileName("Main");
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("PCL[" + dex_name + "]");
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> classpath_dex = OpenTestDexFiles("Main");
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -570,7 +570,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoader) {
 TEST_F(ClassLoaderContextTest, CreateClassLoaderWithEmptyContext) {
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("");
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
 
@@ -597,7 +597,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithEmptyContext) {
 TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSharedLibraryContext) {
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create("&");
 
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
 
@@ -635,7 +635,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithComplexChain) {
       "PCL[" + CreateClassPath(classpath_dex_d) + "]";
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_spec);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   // Setup the compilation sources.
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -705,7 +705,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSharedLibraries) {
       "PCL[" + CreateClassPath(classpath_dex_d) + "]}";
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_spec);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   // Setup the compilation sources.
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -793,7 +793,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSharedLibrariesInParentToo) 
       "PCL[" + CreateClassPath(classpath_dex_d) + "]}";
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_spec);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   // Setup the compilation sources.
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -893,7 +893,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSharedLibrariesDependencies)
       "PCL[" + CreateClassPath(classpath_dex_d) + "]";
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_spec);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   // Setup the compilation sources.
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -1008,7 +1008,7 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSameSharedLibraries) {
       "PCL[" + CreateClassPath(classpath_dex_b) + "]}";
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_spec);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   // Setup the compilation sources.
   std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
@@ -1085,7 +1085,7 @@ TEST_F(ClassLoaderContextTest, EncodeInOatFile) {
   std::string dex2_name = GetTestDexFileName("MyClass");
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("PCL[" + dex1_name + ":" + dex2_name + "]");
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("Main");
   std::vector<std::unique_ptr<const DexFile>> dex2 = OpenTestDexFiles("MyClass");
@@ -1100,7 +1100,7 @@ TEST_F(ClassLoaderContextTest, EncodeInOatFileIMC) {
   jobject class_loader_b = LoadDexInInMemoryDexClassLoader("MyClass", class_loader_a);
 
   std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader_b);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::vector<std::unique_ptr<const DexFile>> dex1 = OpenTestDexFiles("Main");
   std::vector<std::unique_ptr<const DexFile>> dex2 = OpenTestDexFiles("MyClass");
@@ -1117,7 +1117,7 @@ TEST_F(ClassLoaderContextTest, EncodeForDex2oat) {
   std::string dex2_name = GetTestDexFileName("MultiDex");
   std::unique_ptr<ClassLoaderContext> context =
       ClassLoaderContext::Create("PCL[" + dex1_name + ":" + dex2_name + "]");
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::string encoding = context->EncodeContextForDex2oat("");
   std::string expected_encoding = "PCL[" + dex1_name + ":" + dex2_name + "]";
@@ -1129,7 +1129,7 @@ TEST_F(ClassLoaderContextTest, EncodeForDex2oatIMC) {
   jobject class_loader_b = LoadDexInInMemoryDexClassLoader("MyClass", class_loader_a);
 
   std::unique_ptr<ClassLoaderContext> context = CreateContextForClassLoader(class_loader_b);
-  ASSERT_TRUE(context->OpenDexFiles(InstructionSet::kArm, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::string encoding = context->EncodeContextForDex2oat("");
   std::string expected_encoding = "IMC[<unknown>];PCL[" + GetTestDexFileName("Main") + "]";
