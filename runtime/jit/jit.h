@@ -61,6 +61,10 @@ static constexpr int16_t kJitHotnessDisabled = -2;
 // At what priority to schedule jit threads. 9 is the lowest foreground priority on device.
 // See android/os/Process.java.
 static constexpr int kJitPoolThreadPthreadDefaultPriority = 9;
+// At what priority to schedule jit zygote threads compiling profiles in the background.
+// 19 is the lowest background priority on device.
+// See android/os/Process.java.
+static constexpr int kJitZygotePoolThreadPthreadDefaultPriority = 19;
 // We check whether to jit-compile the method every Nth invoke.
 // The tests often use threshold of 1000 (and thus 500 to start profiling).
 static constexpr uint32_t kJitSamplesBatchSize = 512;  // Must be power of 2.
@@ -113,8 +117,16 @@ class JitOptions {
     return thread_pool_pthread_priority_;
   }
 
+  int GetZygoteThreadPoolPthreadPriority() const {
+    return zygote_thread_pool_pthread_priority_;
+  }
+
   bool UseJitCompilation() const {
     return use_jit_compilation_;
+  }
+
+  bool UseProfiledJitCompilation() const {
+    return use_profiled_jit_compilation_;
   }
 
   void SetUseJitCompilation(bool b) {
@@ -148,6 +160,7 @@ class JitOptions {
   static uint32_t RoundUpThreshold(uint32_t threshold);
 
   bool use_jit_compilation_;
+  bool use_profiled_jit_compilation_;
   bool use_baseline_compiler_;
   size_t code_cache_initial_capacity_;
   size_t code_cache_max_capacity_;
@@ -158,10 +171,12 @@ class JitOptions {
   uint16_t invoke_transition_weight_;
   bool dump_info_on_shutdown_;
   int thread_pool_pthread_priority_;
+  int zygote_thread_pool_pthread_priority_;
   ProfileSaverOptions profile_saver_options_;
 
   JitOptions()
       : use_jit_compilation_(false),
+        use_profiled_jit_compilation_(false),
         use_baseline_compiler_(false),
         code_cache_initial_capacity_(0),
         code_cache_max_capacity_(0),
@@ -171,7 +186,8 @@ class JitOptions {
         priority_thread_weight_(0),
         invoke_transition_weight_(0),
         dump_info_on_shutdown_(false),
-        thread_pool_pthread_priority_(kJitPoolThreadPthreadDefaultPriority) {}
+        thread_pool_pthread_priority_(kJitPoolThreadPthreadDefaultPriority),
+        zygote_thread_pool_pthread_priority_(kJitZygotePoolThreadPthreadDefaultPriority) {}
 
   DISALLOW_COPY_AND_ASSIGN(JitOptions);
 };
