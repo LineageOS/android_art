@@ -572,25 +572,10 @@ const std::vector<uint32_t>* OatFileAssistant::GetRequiredDexChecksums() {
       required_dex_checksums_found_ = true;
       has_original_dex_files_ = true;
     } else {
-      // This can happen if the original dex file has been stripped from the
-      // apk.
-      VLOG(oat) << "OatFileAssistant: " << error_msg;
+      // The only valid case here is for APKs without dex files.
+      required_dex_checksums_found_ = false;
       has_original_dex_files_ = false;
-
-      // Get the checksums from the odex if we can.
-      const OatFile* odex_file = odex_.GetFile();
-      if (odex_file != nullptr) {
-        required_dex_checksums_found_ = true;
-        for (size_t i = 0; i < odex_file->GetOatHeader().GetDexFileCount(); i++) {
-          std::string dex = DexFileLoader::GetMultiDexLocation(i, dex_location_.c_str());
-          const OatDexFile* odex_dex_file = odex_file->GetOatDexFile(dex.c_str(), nullptr);
-          if (odex_dex_file == nullptr) {
-            required_dex_checksums_found_ = false;
-            break;
-          }
-          cached_required_dex_checksums_.push_back(odex_dex_file->GetDexFileLocationChecksum());
-        }
-      }
+      VLOG(oat) << "Could not get required checksum: " << error_msg;
     }
   }
   return required_dex_checksums_found_ ? &cached_required_dex_checksums_ : nullptr;
@@ -890,7 +875,7 @@ bool OatFileAssistant::OatFileInfo::ClassLoaderContextIsOkay(ClassLoaderContext*
       ? oat_file_assistant_->dex_location_.substr(0, dir_index)
       : "";
 
-  if (!context->OpenDexFiles(oat_file_assistant_->isa_, classpath_dir, context_fds)) {
+  if (!context->OpenDexFiles(classpath_dir, context_fds)) {
     VLOG(oat) << "ClassLoaderContext check failed: dex files from the context could not be opened";
     return false;
   }

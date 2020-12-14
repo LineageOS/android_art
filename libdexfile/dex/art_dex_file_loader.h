@@ -86,6 +86,16 @@ class ArtDexFileLoader : public DexFileLoader {
             bool verify_checksum,
             std::string* error_msg,
             std::vector<std::unique_ptr<const DexFile>>* dex_files) const;
+  // Opens all .dex files found in the file, guessing the container format based on file magic.
+  // If the fd is -1 then the dex files are opened using the filename; otherwise they are
+  // opened using the fd.
+  bool Open(const char* filename,
+            int fd,
+            const std::string& location,
+            bool verify,
+            bool verify_checksum,
+            std::string* error_msg,
+            std::vector<std::unique_ptr<const DexFile>>* dex_files) const;
 
   // Open a single dex file from an fd. This function closes the fd.
   std::unique_ptr<const DexFile> OpenDex(int fd,
