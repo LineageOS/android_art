@@ -35,7 +35,7 @@ TARGET = "aosp_art_module"
 ARCHES = ["arm", "arm64", "x86", "x86_64"]
 
 # Where to install the APEX packages
-PACKAGE_PATH = "packages/modules/ArtPrebuilt/module"
+PACKAGE_PATH = "packages/modules/ArtPrebuilt"
 
 # Where to install the SDKs and module exports
 SDK_PATH = "prebuilts/module_sdk/art"
