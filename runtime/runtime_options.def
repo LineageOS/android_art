@@ -183,7 +183,5 @@ RUNTIME_OPTIONS_KEY (bool,                PerfettoHprof,                  false)
 
 // Whether to dump ART metrics to logcat
 RUNTIME_OPTIONS_KEY (Unit,                WriteMetricsToLog)
-RUNTIME_OPTIONS_KEY (Unit,                DisableFinalMetricsReport)
-RUNTIME_OPTIONS_KEY (unsigned int,        MetricsReportingPeriod)
 
 #undef RUNTIME_OPTIONS_KEY

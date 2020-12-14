@@ -21,14 +21,11 @@
 
 #include <array>
 #include <atomic>
-#include <optional>
 #include <ostream>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "android-base/logging.h"
-#include "base/message_queue.h"
 #include "base/time_utils.h"
 
 #pragma clang diagnostic push
@@ -61,9 +58,6 @@
 // per metric.
 
 namespace art {
-
-class Runtime;
-
 namespace metrics {
 
 /**
@@ -345,63 +339,25 @@ class ArtMetrics {
 // Returns a human readable name for the given DatumId.
 std::string DatumName(DatumId datum);
 
-// Defines the set of options for how metrics reporting happens.
 struct ReportingConfig {
-  // Causes metrics to be written to the log, which makes them show up in logcat.
-  bool dump_to_logcat{false};
-
-  // Indicates whether to report the final state of metrics on shutdown.
-  //
-  // Note that reporting only happens if some output, such as logcat, is enabled.
-  bool report_metrics_on_shutdown{true};
-
-  // If set, metrics will be reported every time this many seconds elapses.
-  std::optional<unsigned int> periodic_report_seconds;
-
-  // Returns whether any options are set that enables metrics reporting.
-  constexpr bool ReportingEnabled() const { return dump_to_logcat; }
-
-  // Returns whether any options are set that requires a background reporting thread.
-  constexpr bool BackgroundReportingEnabled() const {
-    return ReportingEnabled() && periodic_report_seconds.has_value();
-  }
+  bool dump_to_logcat;
+  // TODO(eholk): this will grow to support other configurations, such as logging to a file, or
+  // statsd. There will also be options for reporting after a period of time, or at certain events.
 };
 
 // MetricsReporter handles periodically reporting ART metrics.
 class MetricsReporter {
  public:
   // Creates a MetricsReporter instance that matches the options selected in ReportingConfig.
-  static std::unique_ptr<MetricsReporter> Create(ReportingConfig config, Runtime* runtime);
+  static std::unique_ptr<MetricsReporter> Create(ReportingConfig config, const ArtMetrics* metrics);
 
   ~MetricsReporter();
 
-  // Creates and runs the background reporting thread.
-  void StartBackgroundThreadIfNeeded();
-
-  // Sends a request to the background thread to shutdown.
-  void StopBackgroundThreadIfRunning();
-
  private:
-  explicit MetricsReporter(ReportingConfig config, Runtime* runtime);
+  explicit MetricsReporter(ReportingConfig config, const ArtMetrics* metrics);
 
-  // The background reporting thread main loop.
-  void BackgroundThreadRun();
-
-  // Calls messages_.SetTimeout if needed.
-  void ResetTimeoutIfNeeded();
-
-  // Outputs the current state of the metrics to the destination set by config_.
-  void ReportMetrics() const;
-
-  const ReportingConfig config_;
-  Runtime* runtime_;
-
-  std::optional<std::thread> thread_;
-
-  // A message indicating that the reporting thread should shut down.
-  struct ShutdownRequestedMessage {};
-
-  MessageQueue<ShutdownRequestedMessage> messages_;
+  ReportingConfig config_;
+  const ArtMetrics* metrics_;
 };
 
 

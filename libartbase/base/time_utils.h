@@ -87,10 +87,6 @@ static constexpr uint64_t UsToNs(uint64_t us) {
   return us * 1000;
 }
 
-static constexpr uint64_t SecondsToMs(uint64_t seconds) {
-  return seconds * 1000;
-}
-
 static constexpr time_t SaturatedTimeT(int64_t secs) {
   if (sizeof(time_t) < sizeof(int64_t)) {
     return static_cast<time_t>(std::min(secs,
