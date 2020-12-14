@@ -227,10 +227,6 @@ metrics::ReportingConfig ParseMetricsReportingConfig(const RuntimeArgumentMap& a
   using M = RuntimeArgumentMap;
   return {
       .dump_to_logcat = args.Exists(M::WriteMetricsToLog),
-      .report_metrics_on_shutdown = !args.Exists(M::DisableFinalMetricsReport),
-      .periodic_report_seconds{args.Exists(M::MetricsReportingPeriod)
-                                   ? std::make_optional(args.GetOrDefault(M::MetricsReportingPeriod))
-                                   : std::nullopt},
   };
 }
 
@@ -450,9 +446,6 @@ Runtime::~Runtime() {
   // Deletion ordering is tricky. Null out everything we've deleted.
   delete signal_catcher_;
   signal_catcher_ = nullptr;
-
-  // Shutdown metrics reporting.
-  metrics_reporter_.reset();
 
   // Make sure all other non-daemon threads have terminated, and all daemon threads are suspended.
   // Also wait for daemon threads to quiesce, so that in addition to being "suspended", they
@@ -1079,10 +1072,6 @@ void Runtime::InitNonZygoteOrPostFork(
   // Reset the gc performance data at zygote fork so that the GCs
   // before fork aren't attributed to an app.
   heap_->ResetGcPerformanceInfo();
-
-  if (metrics_reporter_) {
-    metrics_reporter_->StartBackgroundThreadIfNeeded();
-  }
 
   StartSignalCatcher();
 
@@ -1727,7 +1716,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   // Class-roots are setup, we can now finish initializing the JniIdManager.
   GetJniIdManager()->Init(self);
 
-  InitMetrics(runtime_options);
+  metrics_reporter_ =
+      metrics::MetricsReporter::Create(ParseMetricsReportingConfig(runtime_options), &metrics_);
 
   // Runtime initialization is largely done now.
   // We load plugins first since that can modify the runtime state slightly.
@@ -1825,13 +1815,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   }
 
   return true;
-}
-
-void Runtime::InitMetrics(const RuntimeArgumentMap& runtime_options) {
-  auto metrics_config = ParseMetricsReportingConfig(runtime_options);
-  if (metrics_config.ReportingEnabled()) {
-    metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
-  }
 }
 
 bool Runtime::EnsurePluginLoaded(const char* plugin_name, std::string* error_msg) {

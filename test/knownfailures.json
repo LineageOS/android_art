@@ -1351,8 +1351,7 @@
         "description": ["Failing on RI. Needs further investigating."]
     },
     {
-        "tests": ["2232-write-metrics-to-log",
-                  "2233-metrics-background-thread"],
+        "tests": ["2232-write-metrics-to-log"],
         "variant": "jvm",
         "description": ["RI does not support ART metrics."]
     },
