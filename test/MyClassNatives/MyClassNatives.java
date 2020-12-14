@@ -20,8 +20,7 @@ import dalvik.annotation.optimization.FastNative;
 /*
  * AUTOMATICALLY GENERATED FROM art/tools/mako-source-generator/...../MyClassNatives.java.mako
  *
- * !!! DO NOT EDIT DIRECTLY !!!
- *
+ * The tool is however not available, so the changes now need to be done by hand.
  */
 class MyClassNatives {
 
@@ -176,8 +175,6 @@ class MyClassNatives {
     @FastNative
     native double fooDD_Fast(double x, double y);
     @FastNative
-    synchronized native long fooJJ_synchronized_Fast(long x, long y);
-    @FastNative
     native Object fooIOO_Fast(int x, Object y, Object z);
     @FastNative
     static native Object fooSIOO_Fast(int x, Object y, Object z);
@@ -186,15 +183,13 @@ class MyClassNatives {
     @FastNative
     static native double fooSDD_Fast(double x, double y);
     @FastNative
-    static synchronized native Object fooSSIOO_Fast(int x, Object y, Object z);
-    @FastNative
     static native void arraycopy_Fast(Object src, int src_pos, Object dst, int dst_pos, int length);
     @FastNative
     native boolean compareAndSwapInt_Fast(Object obj, long offset, int expected, int newval);
     @FastNative
     static native int getText_Fast(long val1, Object obj1, long val2, Object obj2);
     @FastNative
-    synchronized native Object[] getSinkPropertiesNative_Fast(String path);
+    native Object[] getSinkPropertiesNative_Fast(String path);
 
     @FastNative
     native Class<?> instanceMethodThatShouldReturnClass_Fast();
