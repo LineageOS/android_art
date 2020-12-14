@@ -228,47 +228,12 @@ TEST_F(DexoptAnalyzerTest, DexOdexNoOat) {
   Verify(dex_location, CompilerFilter::kEverything);
 }
 
-// Case: We have a stripped DEX file and a PIC ODEX file, but no OAT file.
-TEST_F(DexoptAnalyzerTest, StrippedDexOdexNoOat) {
-  std::string dex_location = GetScratchDir() + "/StrippedDexOdexNoOat.jar";
-  std::string odex_location = GetOdexDir() + "/StrippedDexOdexNoOat.odex";
-
-  Copy(GetDexSrc1(), dex_location);
-  GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
-
-  // Strip the dex file
-  Copy(GetStrippedDexSrc1(), dex_location);
-
-  Verify(dex_location, CompilerFilter::kSpeed);
-}
-
-// Case: We have a stripped DEX file, a PIC ODEX file, and an out-of-date OAT file.
-TEST_F(DexoptAnalyzerTest, StrippedDexOdexOat) {
-  std::string dex_location = GetScratchDir() + "/StrippedDexOdexOat.jar";
-  std::string odex_location = GetOdexDir() + "/StrippedDexOdexOat.odex";
-
-  // Create the oat file from a different dex file so it looks out of date.
-  Copy(GetDexSrc2(), dex_location);
-  GenerateOatForTest(dex_location.c_str(), CompilerFilter::kSpeed);
-
-  // Create the odex file
-  Copy(GetDexSrc1(), dex_location);
-  GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
-
-  // Strip the dex file.
-  Copy(GetStrippedDexSrc1(), dex_location);
-
-  Verify(dex_location, CompilerFilter::kExtract);
-  Verify(dex_location, CompilerFilter::kSpeed);
-  Verify(dex_location, CompilerFilter::kEverything);
-}
-
 // Case: We have a stripped (or resource-only) DEX file, no ODEX file and no
 // OAT file. Expect: The status is kNoDexOptNeeded.
 TEST_F(DexoptAnalyzerTest, ResourceOnlyDex) {
   std::string dex_location = GetScratchDir() + "/ResourceOnlyDex.jar";
 
-  Copy(GetStrippedDexSrc1(), dex_location);
+  Copy(GetResourceOnlySrc1(), dex_location);
 
   Verify(dex_location, CompilerFilter::kSpeed);
   Verify(dex_location, CompilerFilter::kExtract);

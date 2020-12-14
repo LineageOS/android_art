@@ -399,10 +399,8 @@ ClassLoaderContext::ClassLoaderInfo* ClassLoaderContext::ParseInternal(
   return first.release();
 }
 
-// Opens requested class path files and appends them to opened_dex_files. If the dex files have
-// been stripped, this opens them from their oat files (which get added to opened_oat_files).
-bool ClassLoaderContext::OpenDexFiles(InstructionSet isa,
-                                      const std::string& classpath_dir,
+// Opens requested class path files and appends them to opened_dex_files.
+bool ClassLoaderContext::OpenDexFiles(const std::string& classpath_dir,
                                       const std::vector<int>& fds) {
   if (dex_files_open_attempted_) {
     // Do not attempt to re-open the files if we already tried.
@@ -460,40 +458,14 @@ bool ClassLoaderContext::OpenDexFiles(InstructionSet isa,
       // contents. So pass true to verify_checksum.
       // We don't need to do structural dex file verification, we only need to
       // check the checksum, so pass false to verify.
-      if (fd < 0) {
-        if (!dex_file_loader.Open(location.c_str(),
-                                  location.c_str(),
-                                  /*verify=*/ false,
-                                  /*verify_checksum=*/ true,
-                                  &error_msg,
-                                  &info->opened_dex_files)) {
-          // If we fail to open the dex file because it's been stripped, try to
-          // open the dex file from its corresponding oat file.
-          // This could happen when we need to recompile a pre-build whose dex
-          // code has been stripped (for example, if the pre-build is only
-          // quicken and we want to re-compile it speed-profile).
-          // TODO(calin): Use the vdex directly instead of going through the oat file.
-          OatFileAssistant oat_file_assistant(location.c_str(), isa, false);
-          std::unique_ptr<OatFile> oat_file(oat_file_assistant.GetBestOatFile());
-          std::vector<std::unique_ptr<const DexFile>> oat_dex_files;
-          if (oat_file != nullptr &&
-              OatFileAssistant::LoadDexFiles(*oat_file, location, &oat_dex_files)) {
-            info->opened_oat_files.push_back(std::move(oat_file));
-            info->opened_dex_files.insert(info->opened_dex_files.end(),
-                                          std::make_move_iterator(oat_dex_files.begin()),
-                                          std::make_move_iterator(oat_dex_files.end()));
-          } else {
-            LOG(WARNING) << "Could not open dex files from location: " << location;
-            dex_files_open_result_ = false;
-          }
-        }
-      } else if (!dex_file_loader.Open(fd,
-                                       location.c_str(),
-                                       /*verify=*/ false,
-                                       /*verify_checksum=*/ true,
-                                       &error_msg,
-                                       &info->opened_dex_files)) {
-        LOG(WARNING) << "Could not open dex files from fd " << fd << " for location: " << location;
+      if (!dex_file_loader.Open(location.c_str(),
+                                fd,
+                                location.c_str(),
+                                /*verify=*/ false,
+                                /*verify_checksum=*/ true,
+                                &error_msg,
+                                &info->opened_dex_files)) {
+        LOG(WARNING) << "Could not open dex files for location " << location << ", fd=" << fd;
         dex_files_open_result_ = false;
       }
     }

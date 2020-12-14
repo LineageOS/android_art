@@ -1619,8 +1619,7 @@ class Dex2Oat final {
       // (because the encoding adds the dex checksum...)
       // TODO(calin): consider redesigning this so we don't have to open the dex files before
       // creating the actual class loader.
-      if (!class_loader_context_->OpenDexFiles(runtime_->GetInstructionSet(),
-                                               classpath_dir_,
+      if (!class_loader_context_->OpenDexFiles(classpath_dir_,
                                                class_loader_context_fds_)) {
         // Do not abort if we couldn't open files from the classpath. They might be
         // apks without dex files and right now are opening flow will fail them.

@@ -553,7 +553,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
     LOG(ERROR) << "Could not create class loader context for " << vdex_path;
     return dex_files;
   }
-  DCHECK(context->OpenDexFiles(kRuntimeISA, ""))
+  DCHECK(context->OpenDexFiles())
       << "Context created from already opened dex files should not attempt to open again";
 
   // Check that we can use the vdex against this boot class path and in this class loader context.
