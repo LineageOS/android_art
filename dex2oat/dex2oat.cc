@@ -1396,6 +1396,19 @@ class Dex2Oat final {
   dex2oat::ReturnCode Setup() {
     TimingLogger::ScopedTiming t("dex2oat Setup", timings_);
 
+    // At this point, file descriptors have been setup. Report that we're starting the compilation.
+    PaletteHooks* hooks = nullptr;
+    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+      // We dup the zip file descriptor, as the oat writer will close it in
+      // OatWriter::CloseSources (we still want to close it there for
+      // consistency with other kinds of inputs).
+      zip_dup_fd_ = DupCloexec(zip_fd_);
+      hooks->NotifyStartDex2oatCompilation(zip_dup_fd_,
+                                           IsAppImage() ? app_image_fd_ : image_fd_,
+                                           oat_fd_,
+                                           output_vdex_fd_);
+    }
+
     if (!PrepareDirtyObjects()) {
       return dex2oat::ReturnCode::kOther;
     }
@@ -1606,8 +1619,7 @@ class Dex2Oat final {
       // (because the encoding adds the dex checksum...)
       // TODO(calin): consider redesigning this so we don't have to open the dex files before
       // creating the actual class loader.
-      if (!class_loader_context_->OpenDexFiles(runtime_->GetInstructionSet(),
-                                               classpath_dir_,
+      if (!class_loader_context_->OpenDexFiles(classpath_dir_,
                                                class_loader_context_fds_)) {
         // Do not abort if we couldn't open files from the classpath. They might be
         // apks without dex files and right now are opening flow will fail them.
@@ -1704,20 +1716,6 @@ class Dex2Oat final {
       // Create the main VerifierDeps, here instead of in the compiler since we want to aggregate
       // the results for all the dex files, not just the results for the current dex file.
       callbacks_->SetVerifierDeps(new verifier::VerifierDeps(dex_files));
-    }
-
-    // Now that the FDs have been setup, report that we're starting the
-    // compilation.
-    PaletteHooks* hooks = nullptr;
-    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
-      // We dup the zip file descriptor, as the oat writer will close it in
-      // OatWriter::CloseSources (we still want to close it there for
-      // consistency with other kinds of inputs).
-      zip_dup_fd_ = DupCloexec(zip_fd_);
-      hooks->NotifyStartDex2oatCompilation(zip_dup_fd_,
-                                           IsAppImage() ? app_image_fd_ : image_fd_,
-                                           oat_fd_,
-                                           output_vdex_fd_);
     }
 
     return dex2oat::ReturnCode::kNoFailure;
@@ -2154,7 +2152,7 @@ class Dex2Oat final {
       }
     }
 
-    // Now that the files have been written to, report that we're starting the
+    // Now that the files have been written to, report that we've ended the
     // compilation.
     PaletteHooks* hooks = nullptr;
     if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {

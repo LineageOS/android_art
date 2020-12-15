@@ -250,6 +250,18 @@ bool ArtDexFileLoader::Open(int fd,
   return OpenWithMagic(magic, fd, location, verify, verify_checksum, error_msg, dex_files);
 }
 
+bool ArtDexFileLoader::Open(const char* filename,
+                            int fd,
+                            const std::string& location,
+                            bool verify,
+                            bool verify_checksum,
+                            std::string* error_msg,
+                            std::vector<std::unique_ptr<const DexFile>>* dex_files) const {
+  return fd == -1
+      ? Open(filename, location, verify, verify_checksum, error_msg, dex_files)
+      : Open(fd, location, verify, verify_checksum, error_msg, dex_files);
+}
+
 bool ArtDexFileLoader::OpenWithMagic(uint32_t magic,
                                      int fd,
                                      const std::string& location,

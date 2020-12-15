@@ -177,7 +177,7 @@ TEST_F(OatFileAssistantTest, MakeUpToDateWithContext) {
   std::string context_str = "PCL[" + context_location + "]";
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(context != nullptr);
-  ASSERT_TRUE(context->OpenDexFiles(kRuntimeISA, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::string error_msg;
   std::vector<std::string> args;
@@ -204,7 +204,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithUpToDateContextRelative) {
   std::string context_str = "PCL[" + context_location + "]";
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(context != nullptr);
-  ASSERT_TRUE(context->OpenDexFiles(kRuntimeISA, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::string error_msg;
   std::vector<std::string> args;
@@ -851,7 +851,7 @@ TEST_F(OatFileAssistantTest, DexOdexNoOat) {
 TEST_F(OatFileAssistantTest, ResourceOnlyDex) {
   std::string dex_location = GetScratchDir() + "/ResourceOnlyDex.jar";
 
-  Copy(GetStrippedDexSrc1(), dex_location);
+  Copy(GetResourceOnlySrc1(), dex_location);
 
   // Verify the status.
   OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
@@ -1293,7 +1293,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithOutOfDateContext) {
 
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(context != nullptr);
-  ASSERT_TRUE(context->OpenDexFiles(kRuntimeISA, ""));
+  ASSERT_TRUE(context->OpenDexFiles());
 
   std::string error_msg;
   std::vector<std::string> args;
