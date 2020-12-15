@@ -156,8 +156,8 @@ Calling public java.lang.String java.lang.Class.getName() with params: []
 public java.lang.String java.lang.Class.getName() on (obsolete)class Main$Transform with [] = Main$Transform
 Calling public java.lang.Package java.lang.Class.getPackage() with params: []
 public java.lang.Package java.lang.Class.getPackage() on (obsolete)class Main$Transform with [] = null
-Calling public java.lang.String java.lang.Class.getPackageName$() with params: []
-public java.lang.String java.lang.Class.getPackageName$() on (obsolete)class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getPackageName() with params: []
+public java.lang.String java.lang.Class.getPackageName() on (obsolete)class Main$Transform with [] = 
 Calling public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() with params: []
 public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() on (obsolete)class Main$Transform with [] = null
 Calling public java.net.URL java.lang.Class.getResource(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
@@ -369,8 +369,8 @@ Calling public java.lang.String java.lang.Class.getName() with params: []
 public java.lang.String java.lang.Class.getName() on class Main$Transform with [] = Main$Transform
 Calling public java.lang.Package java.lang.Class.getPackage() with params: []
 public java.lang.Package java.lang.Class.getPackage() on class Main$Transform with [] = null
-Calling public java.lang.String java.lang.Class.getPackageName$() with params: []
-public java.lang.String java.lang.Class.getPackageName$() on class Main$Transform with [] = null
+Calling public java.lang.String java.lang.Class.getPackageName() with params: []
+public java.lang.String java.lang.Class.getPackageName() on class Main$Transform with [] = 
 Calling public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() with params: []
 public java.security.ProtectionDomain java.lang.Class.getProtectionDomain() on class Main$Transform with [] = null
 Calling public java.net.URL java.lang.Class.getResource(java.lang.String) with params: [[NOT_USED_STRING, foo, SECRET_ARRAY]]
