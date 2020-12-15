@@ -228,7 +228,7 @@ java_defaults {
     },
     test_suites: [
         "general-tests",
-        "mts",
+        "mts-art",
     ],
     host_required: [
         "art-run-test-checker",
@@ -1025,7 +1025,7 @@ art_cc_test {
     // It seems that only device-tests build can create a valid apex.
     test_suites: [
         "device-tests",
-        "mts",
+        "mts-art",
     ],
     test_config: "art-gtests-target-install-apex.xml",
 
