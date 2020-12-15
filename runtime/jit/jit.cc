@@ -90,6 +90,8 @@ JitCompilerInterface* (*Jit::jit_load_)(void) = nullptr;
 JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& options) {
   auto* jit_options = new JitOptions;
   jit_options->use_jit_compilation_ = options.GetOrDefault(RuntimeArgumentMap::UseJitCompilation);
+  jit_options->use_profiled_jit_compilation_ =
+      options.GetOrDefault(RuntimeArgumentMap::UseProfiledJitCompilation);
 
   jit_options->code_cache_initial_capacity_ =
       options.GetOrDefault(RuntimeArgumentMap::JITCodeCacheInitialCapacity);
@@ -101,6 +103,8 @@ JitOptions* JitOptions::CreateFromRuntimeArguments(const RuntimeArgumentMap& opt
       options.GetOrDefault(RuntimeArgumentMap::ProfileSaverOpts);
   jit_options->thread_pool_pthread_priority_ =
       options.GetOrDefault(RuntimeArgumentMap::JITPoolThreadPthreadPriority);
+  jit_options->zygote_thread_pool_pthread_priority_ =
+      options.GetOrDefault(RuntimeArgumentMap::JITZygotePoolThreadPthreadPriority);
 
   // Set default compile threshold to aid with checking defaults.
   jit_options->compile_threshold_ =
@@ -1172,10 +1176,13 @@ void Jit::CreateThreadPool() {
   constexpr bool kJitPoolNeedsPeers = true;
   thread_pool_.reset(new ThreadPool("Jit thread pool", 1, kJitPoolNeedsPeers));
 
-  thread_pool_->SetPthreadPriority(options_->GetThreadPoolPthreadPriority());
+  Runtime* runtime = Runtime::Current();
+  thread_pool_->SetPthreadPriority(
+      runtime->IsZygote()
+          ? options_->GetZygoteThreadPoolPthreadPriority()
+          : options_->GetThreadPoolPthreadPriority());
   Start();
 
-  Runtime* runtime = Runtime::Current();
   if (runtime->IsZygote()) {
     // To speed up class lookups, generate a type lookup table for
     // dex files not backed by oat file.
@@ -1276,7 +1283,9 @@ void Jit::RegisterDexFiles(const std::vector<std::unique_ptr<const DexFile>>& de
   Runtime* runtime = Runtime::Current();
   // If the runtime is debuggable, no need to precompile methods.
   if (runtime->IsSystemServer() &&
-      UseJitCompilation() && HasImageWithProfile() &&
+      UseJitCompilation() &&
+      options_->UseProfiledJitCompilation() &&
+      HasImageWithProfile() &&
       !runtime->IsJavaDebuggable()) {
     thread_pool_->AddTask(Thread::Current(), new JitProfileTask(dex_files, class_loader));
   }
@@ -1700,10 +1709,11 @@ void Jit::PreZygoteFork() {
 }
 
 void Jit::PostZygoteFork() {
+  Runtime* runtime = Runtime::Current();
   if (thread_pool_ == nullptr) {
     // If this is a child zygote, check if we need to remap the boot image
     // methods.
-    if (Runtime::Current()->IsZygote() &&
+    if (runtime->IsZygote() &&
         fd_methods_ != -1 &&
         code_cache_->GetZygoteMap()->IsCompilationNotified()) {
       ScopedSuspendAll ssa(__FUNCTION__);
@@ -1711,8 +1721,7 @@ void Jit::PostZygoteFork() {
     }
     return;
   }
-  if (Runtime::Current()->IsZygote() &&
-      code_cache_->GetZygoteMap()->IsCompilationDoneButNotNotified()) {
+  if (runtime->IsZygote() && code_cache_->GetZygoteMap()->IsCompilationDoneButNotNotified()) {
     // Copy the boot image methods data to the mappings we created to share
     // with the children. We do this here as we are the only thread running and
     // we don't risk other threads concurrently updating the ArtMethod's.
@@ -1721,7 +1730,10 @@ void Jit::PostZygoteFork() {
     CHECK(code_cache_->GetZygoteMap()->IsCompilationNotified());
   }
   thread_pool_->CreateThreads();
-  thread_pool_->SetPthreadPriority(options_->GetThreadPoolPthreadPriority());
+  thread_pool_->SetPthreadPriority(
+      runtime->IsZygote()
+          ? options_->GetZygoteThreadPoolPthreadPriority()
+          : options_->GetThreadPoolPthreadPriority());
 }
 
 void Jit::BootCompleted() {
