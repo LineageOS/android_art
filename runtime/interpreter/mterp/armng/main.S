@@ -1252,270 +1252,45 @@ END \name
    GOTO_OPCODE ip
 .endm
 
+.macro WRITE_BARRIER_IF_OBJECT is_object, value, holder, label, tmp
+   .if \is_object
+   // In T32, we would use `SMART_CBZ \value, \label`
+   cmp     \value, #0
+   beq     \label
+   ldr     ip, [rSELF, #THREAD_CARD_TABLE_OFFSET]
+   lsr     \tmp, \holder, #CARD_TABLE_CARD_SHIFT
+   strb    ip, [ip, \tmp]
+\label:
+   .endif
+.endm
+
+.macro LDREXD_STREXD_LOOP addr, load1, load2, store1, store2, tmp, label
+\label:
+   ldrexd  \load1, \load2, [\addr]
+   strexd  \tmp, \store1, \store2, [\addr]
+   cmp     \tmp, #0
+   bne     \label
+.endm
+
+.macro ATOMIC_LOAD64 addr, load1, load2, tmp, label
+   LDREXD_STREXD_LOOP \addr, \load1, \load2, \load1, \load2, \tmp, \label
+.endm
+
+.macro ATOMIC_STORE64 addr, store1, store2, tmp1, tmp2, label
+   LDREXD_STREXD_LOOP \addr, \tmp1, \tmp2, \store1, \store2, \tmp1, \label
+.endm
+
 // Fetch some information from the thread cache.
 // Uses ip and lr as temporaries.
 .macro FETCH_FROM_THREAD_CACHE dest_reg, slow_path
    add      ip, rSELF, #THREAD_INTERPRETER_CACHE_OFFSET       // cache address
    ubfx     lr, rPC, #2, #THREAD_INTERPRETER_CACHE_SIZE_LOG2  // entry index
    add      ip, ip, lr, lsl #3             // entry address within the cache
+   // In T32, we would use `ldrd ip, \dest_reg, [ip]`
    ldr      \dest_reg, [ip, #4]            // value (offset)
    ldr      ip, [ip]                       // entry key (pc)
    cmp      ip, rPC
    bne \slow_path
-.endm
-
-// Helper for static field get.
-.macro OP_SGET load="ldr", wide="0"
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 4f
-1:
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 3f
-2:
-   lsr r2, rINST, #8              // w2 <- A
-   .if \wide
-   add r0, r0, r1
-   ldrd r0, r1, [r0]
-   CLEAR_SHADOW_PAIR r2, ip, lr
-   VREG_INDEX_TO_ADDR r2, r2
-   SET_VREG_WIDE_BY_ADDR r0, r1, r2      // fp[A] <- value
-   .else
-   \load r0, [r0, r1]
-   SET_VREG r0, r2               // fp[A] <- value
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-4:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_static_field
-   tst r0, #1
-   beq 1b
-   CLEAR_STATIC_VOLATILE_MARKER r0
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 7f
-5:
-   lsr r2, rINST, #8              // w2 <- A
-   .if \wide
-   dmb ish
-   add ip, r0, r1
-6:
-   ldrexd   r0, r1, [ip]
-   strexd   r3, r0, r1, [ip]
-   cmp      r3, #0
-   bne      6b
-   dmb ish
-   CLEAR_SHADOW_PAIR r2, ip, lr
-   VREG_INDEX_TO_ADDR r2, r2
-   SET_VREG_WIDE_BY_ADDR r0, r1, r2      // fp[A] <- value
-   .else
-   dmb ish
-   \load r3, [r0, r1]
-   dmb ish
-   SET_VREG r3, r2               // fp[A] <- value
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-7:
-   bl art_quick_read_barrier_mark_reg00
-   b 5b
-.endm
-
-// Helper for static field put.
-.macro OP_SPUT store="str", wide="0"
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 4f
-1:
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 3f
-2:
-   lsr r2, rINST, #8              // w2 <- A
-   .if \wide
-   VREG_INDEX_TO_ADDR r2, r2
-   GET_VREG_WIDE_BY_ADDR r2, r3, r2      // fp[A] <- value
-   add r0, r0, r1
-   strd r2, r3, [r0]
-   .else
-   GET_VREG r2, r2                // w2 <- v[A]
-   \store    r2, [r0, r1]
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-4:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_static_field
-   tst r0, #1
-   beq 1b
-   CLEAR_STATIC_VOLATILE_MARKER r0
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 6f
-5:
-   lsr r2, rINST, #8              // r2 <- A
-   .if \wide
-   VREG_INDEX_TO_ADDR r2, r2
-   GET_VREG_WIDE_BY_ADDR r2, r3, r2
-   add ip, r0, r1
-   dmb ish
-7:
-   ldrexd r0, r1, [ip]
-   strexd r0, r2, r3, [ip]
-   cmp r0, #0
-   bne 7b
-   dmb ish
-   .else
-   GET_VREG r2, r2                // r2 <- v[A]
-   dmb ish
-   \store r2, [r0, r1]
-   dmb ish
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-6:
-   bl art_quick_read_barrier_mark_reg00
-   b 5b
-.endm
-
-
-// Helper for instance field put.
-.macro OP_IPUT store="str", wide="0":
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 2f
-1:
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r4, rINST, #12              // r2<- B
-   GET_VREG r4, r4                     // vB (object we're operating on)
-   cmp r4, #0
-   beq common_errNullObject
-   .if \wide
-   VREG_INDEX_TO_ADDR r1, r1
-   GET_VREG_WIDE_BY_ADDR r2, r3, r1      // fp[A] <- value
-   add r4, r4, r0
-   strd r2, r3, [r4]
-   .else
-   GET_VREG r1, r1                     // r1 <- v[A]
-   \store r1, [r4, r0]
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-2:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_instance_field_offset
-   cmp r0, #0
-   bge 1b
-   CLEAR_INSTANCE_VOLATILE_MARKER r0
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r4, rINST, #12              // r2<- B
-   GET_VREG r4, r4                     // vB (object we're operating on)
-   cmp r4, #0
-   beq common_errNullObject
-   .if \wide
-   VREG_INDEX_TO_ADDR r1, r1
-   GET_VREG_WIDE_BY_ADDR r2, r3, r1
-   add ip, r4, r0
-   dmb ish
-3:
-   ldrexd r0, r1, [ip]
-   strexd r0, r2, r3, [ip]
-   cmp r0, #0
-   bne 3b
-   dmb ish
-   .else
-   GET_VREG r1, r1                     // r1 <- v[A]
-   dmb ish
-   \store r1, [r4, r0]
-   dmb ish
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-.endm
-
-// Helper for instance field get.
-.macro OP_IGET load="ldr", wide="0"
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 2f
-1:
-   lsr     r2, rINST, #12              // w2<- B
-   GET_VREG r3, r2                     // w3<- object we're operating on
-   ubfx    r2, rINST, #8, #4           // w2<- A
-   cmp     r3, #0
-   beq common_errNullObject    // object was null
-   .if \wide
-   add r3, r3, r0
-   ldrd r0, r1, [r3]
-   CLEAR_SHADOW_PAIR r2, ip, lr
-   VREG_INDEX_TO_ADDR r2, r2
-   SET_VREG_WIDE_BY_ADDR r0, r1, r2      // fp[A] <- value
-   .else
-   \load r0, [r3, r0]
-   SET_VREG r0, r2                     // fp[A] <- value
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-2:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_instance_field_offset
-   cmp r0, #0
-   bge 1b
-   CLEAR_INSTANCE_VOLATILE_MARKER r0
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r3, r2                     // r3<- object we're operating on
-   ubfx    r2, rINST, #8, #4           // r2<- A
-   cmp     r3, #0
-   beq common_errNullObject    // object was null
-   .if \wide
-   dmb ish
-   add ip, r3, r0
-3:
-   ldrexd   r0, r1, [ip]
-   strexd   r3, r0, r1, [ip]
-   cmp      r3, #0
-   bne      3b
-   dmb ish
-   CLEAR_SHADOW_PAIR r2, ip, lr
-   VREG_INDEX_TO_ADDR r2, r2
-   SET_VREG_WIDE_BY_ADDR r0, r1, r2      // fp[A] <- value
-   dmb ish
-   .else
-   dmb ish
-   \load r0, [r3, r0]
-   dmb ish
-   SET_VREG r0, r2                     // fp[A] <- value
-   .endif
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
 .endm
 
 // Puts the next int/long/object parameter passed in physical register
@@ -1749,31 +1524,6 @@ NterpHandleStringInit:
 NterpHandleStringInitRange:
    COMMON_INVOKE_RANGE is_string_init=1, suffix="stringInit"
 
-NterpNewInstance:
-   EXPORT_PC
-   // Fast-path which gets the class from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 2f
-   cmp rMR, #0
-   bne 3f
-4:
-   ldr lr, [rSELF, #THREAD_ALLOC_OBJECT_ENTRYPOINT_OFFSET]
-   blx lr
-1:
-   lsr r1, rINST, #8                    // r1 <- A
-   SET_VREG_OBJECT r0, r1               // fp[A] <- value
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-2:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   bl nterp_get_class_or_allocate_object
-   b 1b
-3:
-   bl art_quick_read_barrier_mark_reg00
-   b 4b
-
 NterpNewArray:
    /* new-array vA, vB, class@CCCC */
    EXPORT_PC
@@ -1799,306 +1549,6 @@ NterpNewArray:
    b 1b
 3:
    bl art_quick_read_barrier_mark_reg00
-   b 1b
-
-NterpPutObjectInstanceField:
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 3f
-1:
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r2, r2                     // vB (object we're operating on)
-   cmp r2, #0
-   beq common_errNullObject            // is object null?
-   GET_VREG r1, r1                     // r1 <- v[A]
-   str r1, [r2, r0]
-4:
-   cmp r1, #0
-   beq 2f
-   ldr r1, [rSELF, #THREAD_CARD_TABLE_OFFSET]
-   lsr r3, r2, #CARD_TABLE_CARD_SHIFT
-   strb r1, [r1, r3]
-2:
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_instance_field_offset
-   cmp r0, #0
-   bge 1b
-   CLEAR_INSTANCE_VOLATILE_MARKER r0
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r2, r2                     // vB (object we're operating on)
-   cmp r2, #0
-   beq common_errNullObject            // is object null?
-   GET_VREG r1, r1                     // r1 <- v[A]
-   dmb ish
-   str r1, [r2, r0]
-   dmb ish
-   b 4b
-
-NterpGetObjectInstanceField:
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 4f
-1:
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r2, r2                     // vB (object we're operating on)
-   cmp r2, #0
-   beq common_errNullObject
-   ldr r0, [r2, r0]
-7:
-   cmp rMR, #0
-   bne 3f
-2:
-   SET_VREG_OBJECT r0, r1              // fp[A] <- value
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-4:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_instance_field_offset
-   cmp r0, #0
-   bge 1b
-   CLEAR_INSTANCE_VOLATILE_MARKER r0
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r2, r2                     // vB (object we're operating on)
-   cmp r2, #0
-   beq common_errNullObject
-   dmb ish
-   ldr r0, [r2, r0]
-   dmb ish
-   b 7b
-
-NterpPutObjectStaticField:
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 5f
-1:
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 4f
-2:
-   lsr r2, rINST, #8                    // w2 <- A
-   GET_VREG r2, r2
-   str r2, [r0, r1]
-8:
-   cmp r2, #0
-   beq 3f
-   ldr r1, [rSELF, #THREAD_CARD_TABLE_OFFSET]
-   lsr r3, r0, #CARD_TABLE_CARD_SHIFT
-   strb r1, [r1, r3]
-3:
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-4:
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-5:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_static_field
-   tst r0, #1
-   beq 1b
-   CLEAR_STATIC_VOLATILE_MARKER r0
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 7f
-6:
-   lsr r2, rINST, #8                    // 21 <- A
-   GET_VREG r2, r2
-   dmb ish
-   str r2, [r0, r1]
-   dmb ish
-   b 8b
-7:
-   bl art_quick_read_barrier_mark_reg00
-   b 6b
-
-NterpGetObjectStaticField:
-   // Fast-path which gets the field from thread-local cache.
-   FETCH_FROM_THREAD_CACHE r0, 4f
-1:
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 3f
-   ldr r0, [r0, r1]
-   // No need to check the marking register, we know it's not set here.
-2:
-   lsr r1, rINST, #8                    // r1 <- A
-   SET_VREG_OBJECT r0, r1               // fp[A] <- value
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   bl art_quick_read_barrier_mark_reg00
-   ldr r0, [r0, r1]
-   // Here, we know the marking register is set.
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-4:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   EXPORT_PC
-   bl nterp_get_static_field
-   tst r0, #1
-   beq 1b
-   CLEAR_STATIC_VOLATILE_MARKER r0
-   ldr r1, [r0, #ART_FIELD_OFFSET_OFFSET]
-   ldr r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cmp rMR, #0
-   bne 7f
-5:
-   dmb ish
-   ldr r0, [r0, r1]
-   dmb ish
-   cmp rMR, #0
-   bne 8f
-   b 2b
-7:
-   bl art_quick_read_barrier_mark_reg00
-   b 5b
-8:
-   bl art_quick_read_barrier_mark_reg00
-   b 2b
-
-NterpGetBooleanStaticField:
-  OP_SGET load="ldrb", wide=0
-
-NterpGetByteStaticField:
-  OP_SGET load="ldrsb", wide=0
-
-NterpGetCharStaticField:
-  OP_SGET load="ldrh", wide=0
-
-NterpGetShortStaticField:
-  OP_SGET load="ldrsh", wide=0
-
-NterpGetWideStaticField:
-  OP_SGET load="ldr", wide=1
-
-NterpGetIntStaticField:
-  OP_SGET load="ldr", wide=0
-
-NterpPutStaticField:
-  OP_SPUT store="str", wide=0
-
-NterpPutBooleanStaticField:
-NterpPutByteStaticField:
-  OP_SPUT store="strb", wide=0
-
-NterpPutCharStaticField:
-NterpPutShortStaticField:
-  OP_SPUT store="strh", wide=0
-
-NterpPutWideStaticField:
-  OP_SPUT store="str", wide=1
-
-NterpPutInstanceField:
-  OP_IPUT store="str", wide=0
-
-NterpPutBooleanInstanceField:
-NterpPutByteInstanceField:
-  OP_IPUT store="strb", wide=0
-
-NterpPutCharInstanceField:
-NterpPutShortInstanceField:
-  OP_IPUT store="strh", wide=0
-
-NterpPutWideInstanceField:
-  OP_IPUT store="str", wide=1
-
-NterpGetBooleanInstanceField:
-  OP_IGET load="ldrb", wide=0
-
-NterpGetByteInstanceField:
-  OP_IGET load="ldrsb", wide=0
-
-NterpGetCharInstanceField:
-  OP_IGET load="ldrh", wide=0
-
-NterpGetShortInstanceField:
-  OP_IGET load="ldrsh", wide=0
-
-NterpGetWideInstanceField:
-  OP_IGET load="ldr", wide=1
-
-NterpGetInstanceField:
-  OP_IGET load="ldr", wide=0
-
-NterpInstanceOf:
-   /* instance-of vA, vB, class@CCCC */
-   // Fast-path which gets the class from thread-local cache.
-   EXPORT_PC
-   FETCH_FROM_THREAD_CACHE r1, 3f
-   cmp rMR, #0
-   bne 4f
-1:
-   lsr     r2, rINST, #12              // r2<- B
-   GET_VREG r0, r2                     // r0<- vB (object)
-   cmp r0, #0
-   beq 2f
-   bl artInstanceOfFromCode
-2:
-   ubfx    r1, rINST, #8, #4           // r1<- A
-   SET_VREG r0, r1
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   bl nterp_get_class_or_allocate_object
-   mov r1, r0
-   b 1b
-4:
-   bl art_quick_read_barrier_mark_reg01
-   b 1b
-
-NterpCheckCast:
-   // Fast-path which gets the class from thread-local cache.
-   EXPORT_PC
-   FETCH_FROM_THREAD_CACHE r1, 3f
-   cmp rMR, #0
-   bne 4f
-1:
-   lsr     r2, rINST, #8               // r2<- A
-   GET_VREG r0, r2                     // r0<- vA (object)
-   cmp r0, #0
-   beq 2f
-   bl art_quick_check_instance_of
-2:
-   FETCH_ADVANCE_INST 2
-   GET_INST_OPCODE ip
-   GOTO_OPCODE ip
-3:
-   mov r0, rSELF
-   ldr r1, [sp]
-   mov r2, rPC
-   bl nterp_get_class_or_allocate_object
-   mov r1, r0
-   b 1b
-4:
-   bl art_quick_read_barrier_mark_reg01
    b 1b
 
 NterpHandleInvokeInterfaceOnObjectMethodRange:
@@ -2322,6 +1772,9 @@ artNterpAsmInstructionEnd:
     .global artNterpAsmInstructionStart
 artNterpAsmInstructionStart = .L_op_nop
     .text
+
+%def default_helper_prefix():
+%  return "nterp_"
 
 %def opcode_start():
     NAME_START nterp_${opcode}
