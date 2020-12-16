@@ -81,8 +81,7 @@ class ClassLoaderContext {
   // TODO(calin): we're forced to complicate the flow in this class with a different
   // OpenDexFiles step because the current dex2oat flow requires the dex files be opened before
   // the class loader is created. Consider reworking the dex2oat part.
-  bool OpenDexFiles(InstructionSet isa,
-                    const std::string& classpath_dir,
+  bool OpenDexFiles(const std::string& classpath_dir = "",
                     const std::vector<int>& context_fds = std::vector<int>());
 
   // Remove the specified compilation sources from all classpaths present in this context.

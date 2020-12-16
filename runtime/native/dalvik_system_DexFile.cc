@@ -333,7 +333,7 @@ static jstring DexFile_getClassLoaderContext(JNIEnv* env,
   constexpr const char* kBaseDir = "";
   std::unique_ptr<ClassLoaderContext> context =
   ClassLoaderContext::CreateContextForClassLoader(class_loader, dex_elements);
-  if (context == nullptr || !context->OpenDexFiles(kRuntimeISA, kBaseDir)) {
+  if (context == nullptr || !context->OpenDexFiles(kBaseDir)) {
     LOG(WARNING) << "Could not establish class loader context";
     return nullptr;
   }
