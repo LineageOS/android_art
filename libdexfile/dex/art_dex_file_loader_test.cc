@@ -64,33 +64,42 @@ TEST_F(ArtDexFileLoaderTest, GetLocationChecksum) {
 
 TEST_F(ArtDexFileLoaderTest, GetChecksum) {
   std::vector<uint32_t> checksums;
+  std::vector<std::string> dex_locations;
   std::string error_msg;
   const ArtDexFileLoader dex_file_loader;
   EXPECT_TRUE(dex_file_loader.GetMultiDexChecksums(GetLibCoreDexFileNames()[0].c_str(),
-                                                    &checksums,
-                                                    &error_msg))
+                                                   &checksums,
+                                                   &dex_locations,
+                                                   &error_msg))
       << error_msg;
   ASSERT_EQ(1U, checksums.size());
+  ASSERT_EQ(1U, dex_locations.size());
   EXPECT_EQ(java_lang_dex_file_->GetLocationChecksum(), checksums[0]);
+  EXPECT_EQ(java_lang_dex_file_->GetLocation(), dex_locations[0]);
 }
 
 TEST_F(ArtDexFileLoaderTest, GetMultiDexChecksums) {
   std::string error_msg;
   std::vector<uint32_t> checksums;
+  std::vector<std::string> dex_locations;
   std::string multidex_file = GetTestDexFileName("MultiDex");
   const ArtDexFileLoader dex_file_loader;
   EXPECT_TRUE(dex_file_loader.GetMultiDexChecksums(multidex_file.c_str(),
-                                                    &checksums,
-                                                    &error_msg)) << error_msg;
+                                                   &checksums,
+                                                   &dex_locations,
+                                                   &error_msg)) << error_msg;
 
   std::vector<std::unique_ptr<const DexFile>> dexes = OpenTestDexFiles("MultiDex");
   ASSERT_EQ(2U, dexes.size());
   ASSERT_EQ(2U, checksums.size());
+  ASSERT_EQ(2U, dex_locations.size());
 
   EXPECT_EQ(dexes[0]->GetLocation(), DexFileLoader::GetMultiDexLocation(0, multidex_file.c_str()));
+  EXPECT_EQ(dexes[0]->GetLocation(), dex_locations[0]);
   EXPECT_EQ(dexes[0]->GetLocationChecksum(), checksums[0]);
 
   EXPECT_EQ(dexes[1]->GetLocation(), DexFileLoader::GetMultiDexLocation(1, multidex_file.c_str()));
+  EXPECT_EQ(dexes[1]->GetLocation(), dex_locations[1]);
   EXPECT_EQ(dexes[1]->GetLocationChecksum(), checksums[1]);
 }
 
