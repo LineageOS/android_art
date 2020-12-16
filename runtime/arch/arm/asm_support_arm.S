@@ -198,6 +198,39 @@
 #endif
 .endm
 
+.macro CONDITIONAL_CBZ reg, reg_if, dest
+.ifc \reg, \reg_if
+    cbz \reg, \dest
+.endif
+.endm
+
+.macro CONDITIONAL_CMPBZ reg, reg_if, dest
+.ifc \reg, \reg_if
+    cmp \reg, #0
+    beq \dest
+.endif
+.endm
+
+// Use CBZ if the register is in {r0, r7} otherwise compare and branch.
+.macro SMART_CBZ reg, dest
+    CONDITIONAL_CBZ \reg, r0, \dest
+    CONDITIONAL_CBZ \reg, r1, \dest
+    CONDITIONAL_CBZ \reg, r2, \dest
+    CONDITIONAL_CBZ \reg, r3, \dest
+    CONDITIONAL_CBZ \reg, r4, \dest
+    CONDITIONAL_CBZ \reg, r5, \dest
+    CONDITIONAL_CBZ \reg, r6, \dest
+    CONDITIONAL_CBZ \reg, r7, \dest
+    CONDITIONAL_CMPBZ \reg, r8, \dest
+    CONDITIONAL_CMPBZ \reg, r9, \dest
+    CONDITIONAL_CMPBZ \reg, r10, \dest
+    CONDITIONAL_CMPBZ \reg, r11, \dest
+    CONDITIONAL_CMPBZ \reg, r12, \dest
+    CONDITIONAL_CMPBZ \reg, r13, \dest
+    CONDITIONAL_CMPBZ \reg, r14, \dest
+    CONDITIONAL_CMPBZ \reg, r15, \dest
+.endm
+
     /*
      * Macro that sets up the callee save frame to conform with
      * Runtime::CreateCalleeSaveMethod(kSaveRefsAndArgs), except for storing the method.
