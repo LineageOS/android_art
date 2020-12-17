@@ -68,8 +68,9 @@ print_file_sizes_p=false
 
 function usage {
   cat <<EOF
-Usage: $0 [OPTION]
-Build (optional) and run tests on ART APEX package (on host).
+Usage: $0 [OPTION] [apexes...]
+Build (optional) and run tests on ART APEX package (on host). Defaults to all
+applicable APEXes if none is given on the command line.
 
   -B, --skip-build    skip the build step
   -l, --list-files    list the contents of the ext4 image (\`find\`-like style)
@@ -81,6 +82,8 @@ EOF
   exit
 }
 
+apex_modules=()
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     (-B|--skip-build)  build_apex_p=false;;
@@ -88,8 +91,9 @@ while [[ $# -gt 0 ]]; do
     (-t|--print-tree)  print_image_tree_p=true;;
     (-s|--print-sizes) print_file_sizes_p=true;;
     (-h|--help) usage;;
-    (*) die "Unknown option: '$1'
+    (-*) die "Unknown option: '$1'
 Try '$0 --help' for more information.";;
+    (*) apex_modules+=($1);;
   esac
   shift
 done
@@ -129,17 +133,18 @@ function fail_check {
   exit_status=1
 }
 
-# Test all modules, if possible.
-
-apex_modules=(
-  "com.android.art"
-  "com.android.art.debug"
-  "com.android.art.testing"
-)
-if [[ "$HOST_PREFER_32_BIT" = true ]]; then
-  say "Skipping com.android.art.host, as \`HOST_PREFER_32_BIT\` equals \`true\`"
-else
-  apex_modules+=("com.android.art.host")
+if [ ${#apex_modules[@]} -eq 0 ]; then
+  # Test as many modules as possible.
+  apex_modules=(
+    "com.android.art"
+    "com.android.art.debug"
+    "com.android.art.testing"
+  )
+  if [[ "$HOST_PREFER_32_BIT" = true ]]; then
+    say "Skipping com.android.art.host, as \`HOST_PREFER_32_BIT\` equals \`true\`"
+  else
+    apex_modules+=("com.android.art.host")
+  fi
 fi
 
 # Build the APEX packages (optional).
