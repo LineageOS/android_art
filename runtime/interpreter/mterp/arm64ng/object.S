@@ -308,14 +308,14 @@
    ldr     w1, [x0, #ART_FIELD_OFFSET_OFFSET]
    lsr     w2, wINST, #8               // w2 <- A
    ldr     w0, [x0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cbnz    wMR, 2f
-1:
+   cbnz    wMR, .L${opcode}_read_barrier
+.L${opcode}_resume_after_read_barrier:
    .if $wide
    ldr     x0, [x0, x1]
    SET_VREG_WIDE x0, w2                // fp[A] <- value
    .elseif $is_object
    $load   w0, [x0, x1]
-   // No need to check the marking register for object load, we know it's not set here.
+   // No need to check the marking register, we know it's not set here.
 .L${opcode}_after_reference_load:
    SET_VREG_OBJECT w0, w2              // fp[A] <- value
    .else
@@ -325,7 +325,7 @@
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
    GOTO_OPCODE ip
-2:
+.L${opcode}_read_barrier:
    bl      art_quick_read_barrier_mark_reg00
    .if $is_object
    $load   w0, [x0, x1]
@@ -334,7 +334,7 @@
    bl      art_quick_read_barrier_mark_reg00
    b       .L${opcode}_after_reference_load
    .else
-   b       1b
+   b       .L${opcode}_resume_after_read_barrier
    .endif
 
 %def op_sget_slow_path(volatile_load, maybe_extend, wide, is_object):
@@ -348,8 +348,8 @@
    ldr     w1, [x0, #ART_FIELD_OFFSET_OFFSET]
    lsr     w2, wINST, #8               // w2 <- A
    ldr     w0, [x0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cbnz    wMR, 2f
-1:
+   cbnz    wMR, .L${opcode}_slow_path_read_barrier
+.L${opcode}_slow_path_resume_after_read_barrier:
    add     x0, x0, x1
    .if $wide
    ldar    x0, [x0]
@@ -366,9 +366,9 @@
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
    GOTO_OPCODE ip
-2:
+.L${opcode}_slow_path_read_barrier:
    bl      art_quick_read_barrier_mark_reg00
-   b       1b
+   b       .L${opcode}_slow_path_resume_after_read_barrier
 
 %def op_sget_wide():
 %  op_sget(load="ldr", volatile_load="ldar", maybe_extend="", wide="1", is_object="0")
@@ -399,8 +399,8 @@
    ldr     w1, [x0, #ART_FIELD_OFFSET_OFFSET]
    lsr     w2, wINST, #8               // w2 <- A
    ldr     w0, [x0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cbnz    wMR, 2f
-1:
+   cbnz    wMR, .L${opcode}_read_barrier
+.L${opcode}_resume_after_read_barrier:
    .if $wide
    GET_VREG_WIDE x2, w2                // x2 <- v[A]
    $store  x2, [x0, x1]
@@ -412,9 +412,9 @@
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
    GOTO_OPCODE ip
-2:
+.L${opcode}_read_barrier:
    bl      art_quick_read_barrier_mark_reg00
-   b       1b
+   b       .L${opcode}_resume_after_read_barrier
 
 %def op_sput_slow_path(volatile_store, wide, is_object):
    mov     x0, xSELF
@@ -427,8 +427,8 @@
    ldr     w1, [x0, #ART_FIELD_OFFSET_OFFSET]
    lsr     w2, wINST, #8               // w2 <- A
    ldr     w0, [x0, #ART_FIELD_DECLARING_CLASS_OFFSET]
-   cbnz    wMR, 2f
-1:
+   cbnz    wMR, .L${opcode}_slow_path_read_barrier
+.L${opcode}_slow_path_resume_after_read_barrier:
    add     x1, x0, x1
    .if $wide
    GET_VREG_WIDE x2, w2                // x2 <- v[A]
@@ -441,9 +441,9 @@
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
    GOTO_OPCODE ip
-2:
+.L${opcode}_slow_path_read_barrier:
    bl      art_quick_read_barrier_mark_reg00
-   b       1b
+   b       .L${opcode}_slow_path_resume_after_read_barrier
 
 %def op_sput_wide():
 %  op_sput(store="str", volatile_store="stlr", wide="1", is_object="0")

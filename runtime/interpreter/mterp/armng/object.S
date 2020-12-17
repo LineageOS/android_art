@@ -1,201 +1,534 @@
 %def op_check_cast():
-   b NterpCheckCast
+   // Fast-path which gets the class from thread-local cache.
+   EXPORT_PC
+   FETCH_FROM_THREAD_CACHE r1, 3f
+   cmp     rMR, #0
+   bne     4f
+1:
+   lsr     r2, rINST, #8               // r2<- A
+   GET_VREG r0, r2                     // r0<- vA (object)
+   cmp     r0, #0
+   beq     2f
+   bl      art_quick_check_instance_of
+2:
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+3:
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   bl      nterp_get_class_or_allocate_object
+   mov     r1, r0
+   b       1b
+4:
+   bl      art_quick_read_barrier_mark_reg01
+   b       1b
 
 %def op_instance_of():
-   b NterpInstanceOf
+   /* instance-of vA, vB, class@CCCC */
+   // Fast-path which gets the class from thread-local cache.
+   EXPORT_PC
+   FETCH_FROM_THREAD_CACHE r1, 3f
+   cmp     rMR, #0
+   bne     4f
+1:
+   lsr     r2, rINST, #12              // r2<- B
+   GET_VREG r0, r2                     // r0<- vB (object)
+   cmp     r0, #0
+   beq     2f
+   bl      artInstanceOfFromCode
+2:
+   ubfx    r1, rINST, #8, #4           // r1<- A
+   SET_VREG r0, r1
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+3:
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   bl      nterp_get_class_or_allocate_object
+   mov     r1, r0
+   b       1b
+4:
+   bl      art_quick_read_barrier_mark_reg01
+   b       1b
 
 %def op_iget_boolean():
-   b NterpGetBooleanInstanceField
+%  op_iget(load="ldrb", wide="0", is_object="0")
+
+%def op_iget_byte():
+%  op_iget(load="ldrsb", wide="0", is_object="0")
+
+%def op_iget_char():
+%  op_iget(load="ldrh", wide="0", is_object="0")
+
+%def op_iget_short():
+%  op_iget(load="ldrsh", wide="0", is_object="0")
+
+%def op_iget(load="ldr", wide="0", is_object="0"):
+%  slow_path = add_helper(lambda: op_iget_slow_path(load, wide, is_object))
+   // Fast-path which gets the field from thread-local cache.
+   FETCH_FROM_THREAD_CACHE r0, ${slow_path}
+.L${opcode}_resume:
+   lsr     r2, rINST, #12              // r2<- B
+   GET_VREG r3, r2                     // r3<- object we're operating on
+   ubfx    r2, rINST, #8, #4           // r2<- A
+   cmp     r3, #0
+   beq     common_errNullObject        // object was null
+   .if $wide
+   add     r3, r3, r0
+   ldrd    r0, r1, [r3]
+   CLEAR_SHADOW_PAIR r2, ip, lr
+   VREG_INDEX_TO_ADDR r2, r2
+   SET_VREG_WIDE_BY_ADDR r0, r1, r2    // fp[A] <- value
+   .elseif $is_object
+   $load   r0, [r3, r0]
+   cmp     rMR, #0
+   bne     .L${opcode}_read_barrier
+.L${opcode}_resume_after_read_barrier:
+   SET_VREG_OBJECT r0, r2              // fp[A] <- value
+   .else
+   $load   r0, [r3, r0]
+   SET_VREG r0, r2                     // fp[A] <- value
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+   .if $is_object
+.L${opcode}_read_barrier:
+   bl      art_quick_read_barrier_mark_reg00
+   b       .L${opcode}_resume_after_read_barrier
+   .endif
+
+%def op_iget_slow_path(load, wide, is_object):
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   EXPORT_PC
+   bl      nterp_get_instance_field_offset
+   cmp     r0, #0
+   bge     .L${opcode}_resume
+   CLEAR_INSTANCE_VOLATILE_MARKER r0
+   lsr     r2, rINST, #12              // r2<- B
+   GET_VREG r3, r2                     // r3<- object we're operating on
+   ubfx    r2, rINST, #8, #4           // r2<- A
+   cmp     r3, #0
+   beq     common_errNullObject            // object was null
+   .if $wide
+   add     ip, r3, r0
+   ATOMIC_LOAD64 ip, r0, r1, r3, .L${opcode}_slow_path_atomic_load
+   dmb     ish
+   CLEAR_SHADOW_PAIR r2, ip, lr
+   VREG_INDEX_TO_ADDR r2, r2
+   SET_VREG_WIDE_BY_ADDR r0, r1, r2    // fp[A] <- value
+   .else
+   $load   r0, [r3, r0]
+   dmb     ish
+   .if $is_object
+   cmp     rMR, #0
+   bne     .L${opcode}_read_barrier
+   SET_VREG_OBJECT r0, r2              // fp[A] <- value
+   .else
+   SET_VREG r0, r2                     // fp[A] <- value
+   .endif
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+
+%def op_iget_wide():
+%  op_iget(load="ldr", wide="1", is_object="0")
+
+%def op_iget_object():
+%  op_iget(load="ldr", wide="0", is_object="1")
 
 %def op_iget_boolean_quick():
 %  op_iget_quick(load="ldrb")
 
-%def op_iget_byte():
-   b NterpGetByteInstanceField
-
 %def op_iget_byte_quick():
 %  op_iget_quick(load="ldrsb")
-
-%def op_iget_char():
-   b NterpGetCharInstanceField
 
 %def op_iget_char_quick():
 %  op_iget_quick(load="ldrh")
 
-%def op_iget_object():
-   b NterpGetObjectInstanceField
-
 %def op_iget_object_quick():
-    /* For: iget-object-quick */
-    /* op vA, vB, offset@CCCC */
-    mov     r2, rINST, lsr #12          @ r2<- B
-    FETCH r1, 1                         @ r1<- field byte offset
-    EXPORT_PC
-    GET_VREG r0, r2                     @ r0<- object we're operating on
-    cmp r0, #0
-    beq common_errNullObject
-    ldr r0, [r0, r1]
-    cmp rMR, #0
-    bne 2f
+   /* For: iget-object-quick */
+   /* op vA, vB, offset@CCCC */
+   mov     r2, rINST, lsr #12          @ r2<- B
+   FETCH r1, 1                         @ r1<- field byte offset
+   EXPORT_PC
+   GET_VREG r0, r2                     @ r0<- object we're operating on
+   cmp     r0, #0
+   beq     common_errNullObject
+   ldr     r0, [r0, r1]
+   cmp     rMR, #0
+   bne     2f
 1:
-    ubfx    r2, rINST, #8, #4           @ r2<- A
-    FETCH_ADVANCE_INST 2
-    SET_VREG_OBJECT r0, r2              @ fp[A]<- r0
-    GET_INST_OPCODE ip                  @ extract opcode from rINST
-    GOTO_OPCODE ip                      @ jump to next instruction
+   ubfx    r2, rINST, #8, #4           @ r2<- A
+   FETCH_ADVANCE_INST 2
+   SET_VREG_OBJECT r0, r2              @ fp[A]<- r0
+   GET_INST_OPCODE ip                  @ extract opcode from rINST
+   GOTO_OPCODE ip                      @ jump to next instruction
 2:
-    bl art_quick_read_barrier_mark_reg00
-    b 1b
-
-%def op_iget():
-   b NterpGetInstanceField
+   bl      art_quick_read_barrier_mark_reg00
+   b       1b
 
 %def op_iget_quick(load="ldr", wide="0"):
-    /* For: iget-quick, iget-boolean-quick, iget-byte-quick, iget-char-quick, iget-short-quick, iget-wide-quick*/
-    /* op vA, vB, offset@CCCC */
-    mov     r2, rINST, lsr #12          @ r2<- B
-    FETCH r1, 1                         @ r1<- field byte offset
-    GET_VREG r3, r2                     @ r3<- object we're operating on
-    ubfx    r2, rINST, #8, #4           @ r2<- A
-    cmp     r3, #0                      @ check object for null
-    beq     common_errNullObject        @ object was null
-    FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
-    .if $wide
-    ldrd    r0, [r3, r1]                @ r0<- obj.field (64 bits, aligned)
-    VREG_INDEX_TO_ADDR r3, r2           @ r3<- &fp[A]
-    CLEAR_SHADOW_PAIR r2, ip, lr        @ Zero out the shadow regs
-    GET_INST_OPCODE ip                  @ extract opcode from rINST
-    SET_VREG_WIDE_BY_ADDR r0, r1, r3    @ fp[A]<- r0/r1
-    .else
-    $load   r0, [r3, r1]                @ r0<- obj.field
-    SET_VREG r0, r2                     @ fp[A]<- r0
-    GET_INST_OPCODE ip                  @ extract opcode from rINST
-    .endif
-    GOTO_OPCODE ip                      @ jump to next instruction
-
-%def op_iget_short():
-   b NterpGetShortInstanceField
+   /* For: iget-quick, iget-boolean-quick, iget-byte-quick, iget-char-quick, iget-short-quick,
+    * iget-wide-quick */
+   /* op vA, vB, offset@CCCC */
+   mov     r2, rINST, lsr #12          @ r2<- B
+   FETCH r1, 1                         @ r1<- field byte offset
+   GET_VREG r3, r2                     @ r3<- object we're operating on
+   ubfx    r2, rINST, #8, #4           @ r2<- A
+   cmp     r3, #0                      @ check object for null
+   beq     common_errNullObject        @ object was null
+   FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
+   .if $wide
+   ldrd    r0, [r3, r1]                @ r0<- obj.field (64 bits, aligned)
+   VREG_INDEX_TO_ADDR r3, r2           @ r3<- &fp[A]
+   CLEAR_SHADOW_PAIR r2, ip, lr        @ Zero out the shadow regs
+   GET_INST_OPCODE ip                  @ extract opcode from rINST
+   SET_VREG_WIDE_BY_ADDR r0, r1, r3    @ fp[A]<- r0/r1
+   .else
+   $load   r0, [r3, r1]                @ r0<- obj.field
+   SET_VREG r0, r2                     @ fp[A]<- r0
+   GET_INST_OPCODE ip                  @ extract opcode from rINST
+   .endif
+   GOTO_OPCODE ip                      @ jump to next instruction
 
 %def op_iget_short_quick():
 %  op_iget_quick(load="ldrsh")
-
-%def op_iget_wide():
-   b NterpGetWideInstanceField
 
 %def op_iget_wide_quick():
 %  op_iget_quick(load="ldr", wide="1")
 
 %def op_iput_boolean():
-   b NterpPutBooleanInstanceField
+%  op_iput(store="strb", wide="0", is_object="0")
+
+%def op_iput_byte():
+%  op_iput(store="strb", wide="0", is_object="0")
+
+%def op_iput_char():
+%  op_iput(store="strh", wide="0", is_object="0")
+
+%def op_iput_short():
+%  op_iput(store="strh", wide="0", is_object="0")
+
+%def op_iput(store="str", wide="0", is_object="0"):
+   // Share slow paths for boolean and byte (strb) and slow paths for char and short (strh).
+   // It does not matter to which `.L${opcode}_resume` the slow path returns.
+%  slow_path = "nterp_op_iput_helper_" + store + wide + is_object
+%  add_helper(lambda: op_iput_slow_path(store, wide, is_object), slow_path)
+   // Fast-path which gets the field from thread-local cache.
+   FETCH_FROM_THREAD_CACHE r0, ${slow_path}
+.L${opcode}_resume:
+   lsr     r4, rINST, #12              // r2<- B
+   ubfx    r1, rINST, #8, #4           // r1<- A
+   GET_VREG r4, r4                     // vB (object we're operating on)
+   cmp     r4, #0
+   beq     common_errNullObject
+   .if $wide
+   VREG_INDEX_TO_ADDR r1, r1
+   GET_VREG_WIDE_BY_ADDR r2, r3, r1      // fp[A] <- value
+   add     r4, r4, r0
+   strd    r2, r3, [r4]
+   .else
+   GET_VREG r1, r1                     // r1 <- v[A]
+   $store  r1, [r4, r0]
+   WRITE_BARRIER_IF_OBJECT $is_object, r1, r4, .L${opcode}_skip_write_barrier, r0
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+
+%def op_iput_slow_path(store, wide, is_object):
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   EXPORT_PC
+   bl      nterp_get_instance_field_offset
+   cmp     r0, #0
+   bge     .L${opcode}_resume
+   CLEAR_INSTANCE_VOLATILE_MARKER r0
+   lsr     r4, rINST, #12              // r2<- B
+   ubfx    r1, rINST, #8, #4           // r1<- A
+   GET_VREG r4, r4                     // vB (object we're operating on)
+   cmp     r4, #0
+   beq     common_errNullObject
+   .if $wide
+   VREG_INDEX_TO_ADDR r1, r1
+   GET_VREG_WIDE_BY_ADDR r2, r3, r1
+   add     ip, r4, r0
+   dmb     ish
+   ATOMIC_STORE64 ip, r2, r3, r0, r1, .L${opcode}_slow_path_atomic_store
+   dmb     ish
+   .else
+   GET_VREG r1, r1                     // r1 <- v[A]
+   dmb     ish
+   $store  r1, [r4, r0]
+   dmb     ish
+   WRITE_BARRIER_IF_OBJECT $is_object, r1, r4, .L${opcode}_slow_path_skip_write_barrier, r0
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+
+%def op_iput_wide():
+%  op_iput(store="str", wide="1", is_object="0")
+
+%def op_iput_object():
+%  op_iput(store="str", wide="0", is_object="1")
 
 %def op_iput_boolean_quick():
 %  op_iput_quick(store="strb")
 
-%def op_iput_byte():
-   b NterpPutByteInstanceField
-
 %def op_iput_byte_quick():
 %  op_iput_quick(store="strb")
-
-%def op_iput_char():
-   b NterpPutCharInstanceField
 
 %def op_iput_char_quick():
 %  op_iput_quick(store="strh")
 
-%def op_iput_object():
-   b NterpPutObjectInstanceField
-
 %def op_iput_object_quick():
 %  op_iput_quick(store="str", wide="0", is_object="1")
 
-%def op_iput():
-   b NterpPutInstanceField
-
 %def op_iput_quick(store="str", wide="0", is_object="0"):
-    /* For: iput-quick, iput-object-quick */
-    /* op vA, vB, offset@CCCC */
-    mov     r2, rINST, lsr #12          @ r2<- B
-    FETCH ip, 1                         @ r1<- field byte offset
-    GET_VREG r3, r2                     @ r3<- fp[B], the object pointer
-    ubfx    r2, rINST, #8, #4           @ r2<- A
-    cmp     r3, #0                      @ check object for null
-    beq     common_errNullObject        @ object was null
-    .if $wide
-    VREG_INDEX_TO_ADDR r0, r2           @ r0<- &fp[A]
-    GET_VREG_WIDE_BY_ADDR r0, r1, r0    @ r0/r1<- fp[A]/fp[A+1]
-    FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
-    strd    r0, [r3, ip]                @ obj.field<- r0/r1
-    .else
-    GET_VREG r0, r2                     @ r0<- fp[A]
-    FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
-    $store     r0, [r3, ip]             @ obj.field<- r0
-    .endif
-    .if $is_object
-    cmp r0, #0
-    beq 1f
-    ldr r1, [rSELF, #THREAD_CARD_TABLE_OFFSET]
-    lsr r0, r3, #CARD_TABLE_CARD_SHIFT
-    strb r1, [r1, r0]
-1:
+   /* For: iput-quick, iput-object-quick */
+   /* op vA, vB, offset@CCCC */
+   mov     r2, rINST, lsr #12          @ r2<- B
+   FETCH ip, 1                         @ r1<- field byte offset
+   GET_VREG r3, r2                     @ r3<- fp[B], the object pointer
+   ubfx    r2, rINST, #8, #4           @ r2<- A
+   cmp     r3, #0                      @ check object for null
+   beq     common_errNullObject        @ object was null
+   .if $wide
+   VREG_INDEX_TO_ADDR r0, r2           @ r0<- &fp[A]
+   GET_VREG_WIDE_BY_ADDR r0, r1, r0    @ r0/r1<- fp[A]/fp[A+1]
+   FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
+   strd    r0, [r3, ip]                @ obj.field<- r0/r1
+   .else
+   GET_VREG r0, r2                     @ r0<- fp[A]
+   FETCH_ADVANCE_INST 2                @ advance rPC, load rINST
+   $store  r0, [r3, ip]                @ obj.field<- r0
    .endif
-    GET_INST_OPCODE ip                  @ extract opcode from rINST
-    GOTO_OPCODE ip                      @ jump to next instruction
-
-%def op_iput_short():
-   b NterpPutShortInstanceField
+   WRITE_BARRIER_IF_OBJECT $is_object, r0, r3, .L${opcode}_skip_write_barrier, r2
+   GET_INST_OPCODE ip                  @ extract opcode from rINST
+   GOTO_OPCODE ip                      @ jump to next instruction
 
 %def op_iput_short_quick():
 %  op_iput_quick(store="strh")
-
-%def op_iput_wide():
-   b NterpPutWideInstanceField
 
 %def op_iput_wide_quick():
 %  op_iput_quick(store="str", wide="1", is_object="0")
 
 %def op_sget_boolean():
-   b NterpGetBooleanStaticField
+%  op_sget(load="ldrb", wide="0", is_object="0")
 
 %def op_sget_byte():
-   b NterpGetByteStaticField
+%  op_sget(load="ldrsb", wide="0", is_object="0")
 
 %def op_sget_char():
-   b NterpGetCharStaticField
-
-%def op_sget_object():
-   b NterpGetObjectStaticField
-
-%def op_sget():
-   b NterpGetIntStaticField
+%  op_sget(load="ldrh", wide="0", is_object="0")
 
 %def op_sget_short():
-   b NterpGetShortStaticField
+%  op_sget(load="ldrsh", wide="0", is_object="0")
+
+%def op_sget(load="ldr", wide="0", is_object="0"):
+%  slow_path = add_helper(lambda: op_sget_slow_path(load, wide, is_object))
+   // Fast-path which gets the field from thread-local cache.
+   FETCH_FROM_THREAD_CACHE r0, ${slow_path}
+.L${opcode}_resume:
+   ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
+   ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
+   cmp     rMR, #0
+   bne     .L${opcode}_read_barrier
+.L${opcode}_resume_after_read_barrier:
+   .if $wide
+   add     r0, r0, r1
+   ldrd    r0, r1, [r0]
+   CLEAR_SHADOW_PAIR r2, ip, lr
+   VREG_INDEX_TO_ADDR r2, r2
+   SET_VREG_WIDE_BY_ADDR r0, r1, r2    // fp[A] <- value
+   .elseif $is_object
+   $load   r0, [r0, r1]
+   // No need to check the marking register, we know it's not set here.
+.L${opcode}_after_reference_load:
+   SET_VREG_OBJECT r0, r2              // fp[A] <- value
+   .else
+   $load   r0, [r0, r1]
+   SET_VREG r0, r2                     // fp[A] <- value
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+.L${opcode}_read_barrier:
+   bl      art_quick_read_barrier_mark_reg00
+   .if $is_object
+   ldr     r0, [r0, r1]
+.L${opcode}_mark_after_load:
+   // Here, we know the marking register is set.
+   bl      art_quick_read_barrier_mark_reg00
+   b       .L${opcode}_after_reference_load
+   .else
+   b       .L${opcode}_resume_after_read_barrier
+   .endif
+
+%def op_sget_slow_path(load="ldr", wide="0", is_object="0"):
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   EXPORT_PC
+   bl      nterp_get_static_field
+   tst     r0, #1
+   beq     .L${opcode}_resume
+   CLEAR_STATIC_VOLATILE_MARKER r0
+   ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
+   ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
+   cmp     rMR, #0
+   bne     .L${opcode}_slow_path_read_barrier
+.L${opcode}_slow_path_resume_after_read_barrier:
+   .if $wide
+   add     ip, r0, r1
+   ATOMIC_LOAD64 ip, r0, r1, r3, .L${opcode}_slow_path_atomic_load
+   dmb     ish
+   CLEAR_SHADOW_PAIR r2, ip, lr
+   VREG_INDEX_TO_ADDR r2, r2
+   SET_VREG_WIDE_BY_ADDR r0, r1, r2    // fp[A] <- value
+   .else
+   $load   r0, [r0, r1]
+   dmb     ish
+   .if $is_object
+   cmp     rMR, #0
+   bne     .L${opcode}_mark_after_load
+   SET_VREG_OBJECT r0, r2              // fp[A] <- value
+   .else
+   SET_VREG r0, r2                     // fp[A] <- value
+   .endif
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+.L${opcode}_slow_path_read_barrier:
+   bl      art_quick_read_barrier_mark_reg00
+   b       .L${opcode}_slow_path_resume_after_read_barrier
 
 %def op_sget_wide():
-   b NterpGetWideStaticField
+%  op_sget(load="ldr", wide="1", is_object="0")
+
+%def op_sget_object():
+%  op_sget(load="ldr", wide="0", is_object="1")
 
 %def op_sput_boolean():
-   b NterpPutBooleanStaticField
+%  op_sput(store="strb", wide="0", is_object="0")
 
 %def op_sput_byte():
-   b NterpPutByteStaticField
+%  op_sput(store="strb", wide="0", is_object="0")
 
 %def op_sput_char():
-   b NterpPutCharStaticField
-
-%def op_sput_object():
-   b NterpPutObjectStaticField
-
-%def op_sput():
-   b NterpPutStaticField
+%  op_sput(store="strh", wide="0", is_object="0")
 
 %def op_sput_short():
-   b NterpPutShortStaticField
+%  op_sput(store="strh", wide="0", is_object="0")
+
+%def op_sput(store="str", wide="0", is_object="0"):
+   // Share slow paths for boolean and byte (strb) and slow paths for char and short (strh).
+   // It does not matter to which `.L${opcode}_resume` the slow path returns.
+%  slow_path = "nterp_op_sput_helper_" + store + wide + is_object
+%  add_helper(lambda: op_sput_slow_path(store, wide, is_object), slow_path)
+   // Fast-path which gets the field from thread-local cache.
+   FETCH_FROM_THREAD_CACHE r0, ${slow_path}
+.L${opcode}_resume:
+   ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
+   ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
+   cmp     rMR, #0
+   bne     .L${opcode}_read_barrier
+.L${opcode}_resume_after_read_barrier:
+   .if $wide
+   VREG_INDEX_TO_ADDR r2, r2
+   GET_VREG_WIDE_BY_ADDR r2, r3, r2    // fp[A] <- value
+   add     r0, r0, r1
+   strd    r2, r3, [r0]
+   .else
+   GET_VREG r2, r2                     // r2 <- v[A]
+   $store  r2, [r0, r1]
+   WRITE_BARRIER_IF_OBJECT $is_object, r2, r0, .L${opcode}_skip_write_barrier, r1
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+.L${opcode}_read_barrier:
+   bl      art_quick_read_barrier_mark_reg00
+   b       .L${opcode}_resume_after_read_barrier
+
+%def op_sput_slow_path(store, wide, is_object):
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   EXPORT_PC
+   bl      nterp_get_static_field
+   tst     r0, #1
+   beq     .L${opcode}_resume
+   CLEAR_STATIC_VOLATILE_MARKER r0
+   ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
+   ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
+   cmp     rMR, #0
+   bne     .L${opcode}_slow_path_read_barrier
+.L${opcode}_slow_path_resume_after_read_barrier:
+   .if $wide
+   VREG_INDEX_TO_ADDR r2, r2
+   GET_VREG_WIDE_BY_ADDR r2, r3, r2
+   add     ip, r0, r1
+   dmb     ish
+   ATOMIC_STORE64 ip, r2, r3, r0, r1, .L${opcode}_slow_path_atomic_store
+   dmb     ish
+   .else
+   GET_VREG r2, r2                // r2 <- v[A]
+   dmb     ish
+   $store  r2, [r0, r1]
+   dmb     ish
+   WRITE_BARRIER_IF_OBJECT $is_object, r2, r0, .L${opcode}_slow_path_skip_write_barrier, r1
+   .endif
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+.L${opcode}_slow_path_read_barrier:
+   bl      art_quick_read_barrier_mark_reg00
+   b       .L${opcode}_slow_path_resume_after_read_barrier
 
 %def op_sput_wide():
-   b NterpPutWideStaticField
+%  op_sput(store="str", wide="1", is_object="0")
+
+%def op_sput_object():
+%  op_sput(store="str", wide="0", is_object="1")
 
 %def op_new_instance():
    // The routine is too big to fit in a handler, so jump to it.
-   b NterpNewInstance
+   EXPORT_PC
+   // Fast-path which gets the class from thread-local cache.
+   FETCH_FROM_THREAD_CACHE r0, 2f
+   cmp     rMR, #0
+   bne     3f
+4:
+   ldr     lr, [rSELF, #THREAD_ALLOC_OBJECT_ENTRYPOINT_OFFSET]
+   blx     lr
+1:
+   lsr     r1, rINST, #8                    // r1 <- A
+   SET_VREG_OBJECT r0, r1               // fp[A] <- value
+   FETCH_ADVANCE_INST 2
+   GET_INST_OPCODE ip
+   GOTO_OPCODE ip
+2:
+   mov     r0, rSELF
+   ldr     r1, [sp]
+   mov     r2, rPC
+   bl      nterp_get_class_or_allocate_object
+   b       1b
+3:
+   bl      art_quick_read_barrier_mark_reg00
+   b       4b
