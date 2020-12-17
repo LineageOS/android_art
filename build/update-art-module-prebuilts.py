@@ -123,7 +123,7 @@ def rewrite_bp_for_art_module_source_build(bp_path):
           module_content.extend([
               ("    // Do not prefer prebuilt if "
                "SOONG_CONFIG_art_module_source_build is true."),
-              "    prefer: art_module_prefer_prebuilts,",
+              "    prefer: true,",
               "    soong_config_variables: {",
               "        source_build: {",
               "            prefer: false,",
@@ -152,10 +152,6 @@ def rewrite_bp_for_art_module_source_build(bp_path):
        for art_module in sorted(art_module_types)] +
       ["    ],",
        "}",
-       "",
-       # TODO(b/172480615): Change this to true to enable prebuilts for
-       # platform.
-       "art_module_prefer_prebuilts = false",
        ""])
 
   bp_file.seek(0)
