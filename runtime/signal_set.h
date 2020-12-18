@@ -21,24 +21,32 @@
 
 #include <android-base/logging.h>
 
+#if defined(__GLIBC__)
+#define sigset64_t sigset_t
+#define sigemptyset64 sigemptyset
+#define sigaddset64 sigaddset
+#define pthread_sigmask64 pthread_sigmask
+#define sigwait64 sigwait
+#endif
+
 namespace art {
 
 class SignalSet {
  public:
   SignalSet() {
-    if (sigemptyset(&set_) == -1) {
+    if (sigemptyset64(&set_) == -1) {
       PLOG(FATAL) << "sigemptyset failed";
     }
   }
 
   void Add(int signal) {
-    if (sigaddset(&set_, signal) == -1) {
+    if (sigaddset64(&set_, signal) == -1) {
       PLOG(FATAL) << "sigaddset " << signal << " failed";
     }
   }
 
   void Block() {
-    if (pthread_sigmask(SIG_BLOCK, &set_, nullptr) != 0) {
+    if (pthread_sigmask64(SIG_BLOCK, &set_, nullptr) != 0) {
       PLOG(FATAL) << "pthread_sigmask failed";
     }
   }
@@ -46,7 +54,7 @@ class SignalSet {
   int Wait() {
     // Sleep in sigwait() until a signal arrives. gdb causes EINTR failures.
     int signal_number;
-    int rc = TEMP_FAILURE_RETRY(sigwait(&set_, &signal_number));
+    int rc = TEMP_FAILURE_RETRY(sigwait64(&set_, &signal_number));
     if (rc != 0) {
       PLOG(FATAL) << "sigwait failed";
     }
@@ -54,7 +62,7 @@ class SignalSet {
   }
 
  private:
-  sigset_t set_;
+  sigset64_t set_;
 };
 
 }  // namespace art
