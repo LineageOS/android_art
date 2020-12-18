@@ -1004,8 +1004,8 @@ soong_config_module_type_import {
 art_module_cc_defaults {
     name: "art_gtests_defaults",
 
-    // TODO(b/172480615): Change this to false to disable sources for platform.
-    enabled: true,
+    // Enable gtests only in source builds, where com.android.art.testing is available.
+    enabled: false,
     soong_config_variables: {
         source_build: {
             enabled: true,
