@@ -12,9 +12,6 @@ soong_config_module_type_import {
     ],
 }
 
-// TODO(b/172480615): Change this to false to disable sources for platform.
-art_module_enable_sources = true
-
 // Modules listed in LOCAL_REQUIRED_MODULES for module art-runtime in art/Android.mk.
 // - Base requirements (binaries for which both 32- and 64-bit versions are built, if possible).
 art_runtime_base_binaries_both = [
@@ -208,7 +205,7 @@ art_module_apex_defaults {
     name: "com.android.art-defaults",
 
     // Enable if SOONG_CONFIG_art_module_source_build is true.
-    enabled: art_module_enable_sources,
+    enabled: false,
     soong_config_variables: {
         source_build: {
             enabled: true,
@@ -429,7 +426,7 @@ art_module_genrule_defaults {
     name: "art-check-apex-gen-defaults",
 
     // Enable if SOONG_CONFIG_art_module_source_build is true.
-    enabled: art_module_enable_sources,
+    enabled: false,
     soong_config_variables: {
         source_build: {
             enabled: true,
@@ -448,7 +445,7 @@ art_module_cc_defaults {
     device_supported: false,
 
     // Enable if SOONG_CONFIG_art_module_source_build is true.
-    enabled: art_module_enable_sources,
+    enabled: false,
     soong_config_variables: {
         source_build: {
             enabled: true,
