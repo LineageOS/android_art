@@ -105,7 +105,7 @@ static jobject Constructor_newInstance0(JNIEnv* env, jobject javaMethod, jobject
 
   // String constructor is replaced by a StringFactory method in InvokeMethod.
   if (UNLIKELY(c->IsStringClass())) {
-    return InvokeMethod(soa, javaMethod, nullptr, javaArgs, 2);
+    return InvokeMethod<kRuntimePointerSize>(soa, javaMethod, nullptr, javaArgs, 2);
   }
 
   ObjPtr<mirror::Object> receiver =

@@ -683,6 +683,7 @@ JValue InvokeVirtualOrInterfaceWithVarArgs(const ScopedObjectAccessAlreadyRunnab
   return InvokeVirtualOrInterfaceWithVarArgs(soa, obj, jni::DecodeArtMethod(mid), args);
 }
 
+template <PointerSize kPointerSize>
 jobject InvokeMethod(const ScopedObjectAccessAlreadyRunnable& soa, jobject javaMethod,
                      jobject javaReceiver, jobject javaArgs, size_t num_frames) {
   // We want to make sure that the stack is not within a small distance from the
@@ -725,14 +726,14 @@ jobject InvokeMethod(const ScopedObjectAccessAlreadyRunnable& soa, jobject javaM
       }
 
       // Find the actual implementation of the virtual method.
-      m = receiver->GetClass()->FindVirtualMethodForVirtualOrInterface(m, kRuntimePointerSize);
+      m = receiver->GetClass()->FindVirtualMethodForVirtualOrInterface(m, kPointerSize);
     }
   }
 
   // Get our arrays of arguments and their types, and check they're the same size.
   ObjPtr<mirror::ObjectArray<mirror::Object>> objects =
       soa.Decode<mirror::ObjectArray<mirror::Object>>(javaArgs);
-  auto* np_method = m->GetInterfaceMethodIfProxy(kRuntimePointerSize);
+  auto* np_method = m->GetInterfaceMethodIfProxy(kPointerSize);
   if (!CheckArgsForInvokeMethod(np_method, objects)) {
     return nullptr;
   }
@@ -763,6 +764,19 @@ jobject InvokeMethod(const ScopedObjectAccessAlreadyRunnable& soa, jobject javaM
   }
   return soa.AddLocalReference<jobject>(BoxPrimitive(Primitive::GetType(shorty[0]), result));
 }
+
+template
+jobject InvokeMethod<PointerSize::k32>(const ScopedObjectAccessAlreadyRunnable& soa,
+                                       jobject javaMethod,
+                                       jobject javaReceiver,
+                                       jobject javaArgs,
+                                       size_t num_frames);
+template
+jobject InvokeMethod<PointerSize::k64>(const ScopedObjectAccessAlreadyRunnable& soa,
+                                       jobject javaMethod,
+                                       jobject javaReceiver,
+                                       jobject javaArgs,
+                                       size_t num_frames);
 
 void InvokeConstructor(const ScopedObjectAccessAlreadyRunnable& soa,
                        ArtMethod* constructor,
