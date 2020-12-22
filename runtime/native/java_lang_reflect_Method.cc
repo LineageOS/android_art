@@ -83,7 +83,7 @@ static jobjectArray Method_getExceptionTypes(JNIEnv* env, jobject javaMethod) {
 static jobject Method_invoke(JNIEnv* env, jobject javaMethod, jobject javaReceiver,
                              jobjectArray javaArgs) {
   ScopedFastNativeObjectAccess soa(env);
-  return InvokeMethod(soa, javaMethod, javaReceiver, javaArgs);
+  return InvokeMethod<kRuntimePointerSize>(soa, javaMethod, javaReceiver, javaArgs);
 }
 
 static JNINativeMethod gMethods[] = {

@@ -687,7 +687,12 @@ void UnstartedRuntime::UnstartedConstructorNewInstance0(
                                        soa.AddLocalReference<jobject>(receiver.Get()));
     ScopedLocalRef<jobject> args_ref(self->GetJniEnv(),
                                      soa.AddLocalReference<jobject>(args.Get()));
-    InvokeMethod(soa, method_ref.get(), object_ref.get(), args_ref.get(), 2);
+    PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
+    if (pointer_size == PointerSize::k64) {
+      InvokeMethod<PointerSize::k64>(soa, method_ref.get(), object_ref.get(), args_ref.get(), 2);
+    } else {
+      InvokeMethod<PointerSize::k32>(soa, method_ref.get(), object_ref.get(), args_ref.get(), 2);
+    }
   }
   if (self->IsExceptionPending()) {
     AbortTransactionOrFail(self, "Failed running constructor");
@@ -1644,8 +1649,17 @@ void UnstartedRuntime::UnstartedMethodInvoke(
   ScopedLocalRef<jobject> java_args(env,
       java_args_obj == nullptr ? nullptr : env->AddLocalReference<jobject>(java_args_obj));
 
+  PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
   ScopedLocalRef<jobject> result_jobj(env,
-      InvokeMethod(soa, java_method.get(), java_receiver.get(), java_args.get()));
+      (pointer_size == PointerSize::k64)
+          ? InvokeMethod<PointerSize::k64>(soa,
+                                           java_method.get(),
+                                           java_receiver.get(),
+                                           java_args.get())
+          : InvokeMethod<PointerSize::k32>(soa,
+                                           java_method.get(),
+                                           java_receiver.get(),
+                                           java_args.get()));
 
   result->SetL(self->DecodeJObject(result_jobj.get()));
 
