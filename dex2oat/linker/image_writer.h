@@ -26,13 +26,12 @@
 #include <set>
 #include <stack>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "art_method.h"
 #include "base/bit_utils.h"
 #include "base/dchecked_vector.h"
 #include "base/enums.h"
+#include "base/hash_map.h"
 #include "base/hash_set.h"
 #include "base/length_prefixed_array.h"
 #include "base/macros.h"
@@ -82,7 +81,7 @@ class ImageWriter final {
               uintptr_t image_begin,
               ImageHeader::StorageMode image_storage_mode,
               const std::vector<std::string>& oat_filenames,
-              const std::unordered_map<const DexFile*, size_t>& dex_file_oat_index_map,
+              const HashMap<const DexFile*, size_t>& dex_file_oat_index_map,
               jobject class_loader,
               const HashSet<std::string>* dirty_image_objects);
 
@@ -215,7 +214,6 @@ class ImageWriter final {
   friend std::ostream& operator<<(std::ostream& stream, Bin bin);
 
   enum class NativeObjectRelocationType {
-    kArtField,
     kArtFieldArray,
     kArtMethodClean,
     kArtMethodArrayClean,
@@ -498,9 +496,7 @@ class ImageWriter final {
       REQUIRES_SHARED(Locks::mutator_lock_);
   void FixupObject(mirror::Object* orig, mirror::Object* copy)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  void FixupPointerArray(mirror::Object* dst,
-                         mirror::PointerArray* arr,
-                         Bin array_type)
+  void FixupMethodPointerArray(mirror::Object* dst, mirror::PointerArray* arr)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get quick code for non-resolution/imt_conflict/abstract method.
@@ -537,7 +533,7 @@ class ImageWriter final {
   // early_exit is true if we had a cyclic dependency anywhere down the chain.
   bool PruneImageClassInternal(ObjPtr<mirror::Class> klass,
                                bool* early_exit,
-                               std::unordered_set<mirror::Object*>* visited)
+                               HashSet<mirror::Object*>* visited)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   bool IsMultiImage() const {
@@ -563,10 +559,6 @@ class ImageWriter final {
   // Location of where the object will be when the image is loaded at runtime.
   template <typename T>
   T* NativeLocationInImage(T* obj) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Location of where the temporary copy of the object currently is.
-  template <typename T>
-  T* NativeCopyLocation(T* obj) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Return true if `dex_cache` belongs to the image we're writing.
   // For a boot image, this is true for all dex caches.
@@ -639,16 +631,16 @@ class ImageWriter final {
   // Offset from image_begin_ to where the first object is in image_.
   size_t image_objects_offset_begin_;
 
-  // Pointer arrays that need to be updated. Since these are only some int and long arrays, we need
-  // to keep track. These include vtable arrays, iftable arrays, and dex caches.
-  std::unordered_map<mirror::PointerArray*, Bin> pointer_arrays_;
+  // Method pointer arrays that need to be updated. Since these are only some int and long arrays,
+  // we need to keep track. These include vtable arrays and iftable arrays.
+  HashSet<mirror::PointerArray*> method_pointer_arrays_;
 
   // Saved hash codes. We use these to restore lockwords which were temporarily used to have
   // forwarding addresses as well as copying over hash codes.
-  std::unordered_map<mirror::Object*, uint32_t> saved_hashcode_map_;
+  HashMap<mirror::Object*, uint32_t> saved_hashcode_map_;
 
   // Oat index map for objects.
-  std::unordered_map<mirror::Object*, uint32_t> oat_index_map_;
+  HashMap<mirror::Object*, uint32_t> oat_index_map_;
 
   // Size of pointers on the target architecture.
   PointerSize target_ptr_size_;
@@ -659,7 +651,7 @@ class ImageWriter final {
   // ArtField, ArtMethod relocating map. These are allocated as array of structs but we want to
   // have one entry per art field for convenience. ArtFields are placed right after the end of the
   // image objects (aka sum of bin_slot_sizes_). ArtMethods are placed right after the ArtFields.
-  std::unordered_map<void*, NativeObjectRelocation> native_object_relocations_;
+  HashMap<void*, NativeObjectRelocation> native_object_relocations_;
 
   // Runtime ArtMethods which aren't reachable from any Class but need to be copied into the image.
   ArtMethod* image_methods_[ImageHeader::kImageMethodsCount];
@@ -669,7 +661,7 @@ class ImageWriter final {
   uint64_t clean_methods_;
 
   // Prune class memoization table to speed up ContainsBootClassLoaderNonImageClass.
-  std::unordered_map<mirror::Class*, bool> prune_class_memo_;
+  HashMap<mirror::Class*, bool> prune_class_memo_;
 
   // The application class loader. Null for boot image.
   jobject app_class_loader_;
@@ -684,7 +676,7 @@ class ImageWriter final {
   const std::vector<std::string>& oat_filenames_;
 
   // Map of dex files to the indexes of oat files that they were compiled into.
-  const std::unordered_map<const DexFile*, size_t>& dex_file_oat_index_map_;
+  const HashMap<const DexFile*, size_t>& dex_file_oat_index_map_;
 
   // Set of objects known to be dirty in the image. Can be nullptr if there are none.
   const HashSet<std::string>* dirty_image_objects_;
