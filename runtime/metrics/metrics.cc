@@ -16,19 +16,11 @@
 
 #include "metrics.h"
 
-#include <sstream>
-
-#include "android-base/file.h"
 #include "android-base/logging.h"
 #include "base/macros.h"
-#include "base/scoped_flock.h"
-#include "runtime.h"
-#include "runtime_options.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic error "-Wconversion"
-
-using android::base::WriteStringToFd;
 
 namespace art {
 namespace metrics {
@@ -124,15 +116,15 @@ std::unique_ptr<MetricsReporter> MetricsReporter::Create(ReportingConfig config,
   std::unique_ptr<MetricsBackend> backend;
 
   // We can't use std::make_unique here because the MetricsReporter constructor is private.
-  return std::unique_ptr<MetricsReporter>{new MetricsReporter{std::move(config), metrics}};
+  return std::unique_ptr<MetricsReporter>{new MetricsReporter{config, metrics}};
 }
 
 MetricsReporter::MetricsReporter(ReportingConfig config, const ArtMetrics* metrics)
-    : config_{std::move(config)}, metrics_{metrics} {}
+    : config_{config}, metrics_{metrics} {}
 
 MetricsReporter::~MetricsReporter() {
   // If we are configured to report metrics, do one final report at the end.
-  if (config_.ReportingEnabled()) {
+  if (config_.dump_to_logcat) {
     LOG_STREAM(INFO) << "\n*** ART internal metrics ***\n\n";
     // LOG_STREAM(INFO) destroys the stream at the end of the statement, which makes it tricky pass
     // it to store as a field in StreamBackend. To get around this, we use an immediately-invoked
@@ -144,31 +136,6 @@ MetricsReporter::~MetricsReporter() {
     }(LOG_STREAM(INFO));
     LOG_STREAM(INFO) << "\n*** Done dumping ART internal metrics ***\n";
   }
-  if (config_.dump_to_file.has_value()) {
-    const auto& filename = config_.dump_to_file.value();
-    std::ostringstream stream;
-    StreamBackend backend{stream};
-    metrics_->ReportAllMetrics(&backend);
-
-    std::string error_message;
-    auto file{
-        LockedFile::Open(filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, true, &error_message)};
-    if (file.get() == nullptr) {
-      LOG(WARNING) << "Could open metrics file '" << filename << "': " << error_message;
-    } else {
-      if (!WriteStringToFd(stream.str(), file.get()->Fd())) {
-        PLOG(WARNING) << "Error writing metrics to file";
-      }
-    }
-  }
-}
-
-ReportingConfig ReportingConfig::FromRuntimeArguments(const RuntimeArgumentMap& args) {
-  using M = RuntimeArgumentMap;
-  return {
-      .dump_to_logcat = args.Exists(M::WriteMetricsToLog),
-      .dump_to_file = args.GetOptional(M::WriteMetricsToFile),
-  };
 }
 
 }  // namespace metrics
