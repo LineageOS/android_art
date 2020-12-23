@@ -3234,7 +3234,7 @@ bool ImageSpace::BootImageLoader::LoadFromSystem(
 
   if (VLOG_IS_ON(image)) {
     LOG(INFO) << "ImageSpace::BootImageLoader::LoadFromSystem exiting "
-        << boot_image_spaces->front();
+        << *boot_image_spaces->front();
     logger.Dump(LOG_STREAM(INFO));
   }
   return true;
@@ -3264,7 +3264,7 @@ bool ImageSpace::BootImageLoader::LoadFromDalvikCache(
 
   if (VLOG_IS_ON(image)) {
     LOG(INFO) << "ImageSpace::BootImageLoader::LoadFromDalvikCache exiting "
-        << boot_image_spaces->front();
+        << *boot_image_spaces->front();
     logger.Dump(LOG_STREAM(INFO));
   }
   return true;
