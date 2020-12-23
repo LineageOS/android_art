@@ -381,4 +381,17 @@ TEST_F(HashSetTest, DoubleInsert) {
   ASSERT_EQ(1u, hash_set.size());
 }
 
+TEST_F(HashSetTest, Preallocated) {
+  static const size_t kBufferSize = 64;
+  uint32_t buffer[kBufferSize];
+  HashSet<uint32_t> hash_set(buffer, kBufferSize);
+  size_t max_without_resize = kBufferSize * hash_set.GetMaxLoadFactor();
+  for (size_t i = 0; i != max_without_resize; ++i) {
+    hash_set.insert(i);
+  }
+  ASSERT_FALSE(hash_set.owns_data_);
+  hash_set.insert(max_without_resize);
+  ASSERT_TRUE(hash_set.owns_data_);
+}
+
 }  // namespace art
