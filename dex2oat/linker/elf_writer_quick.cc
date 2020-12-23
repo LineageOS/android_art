@@ -18,8 +18,6 @@
 
 #include <memory>
 #include <openssl/sha.h>
-#include <unordered_map>
-#include <unordered_set>
 
 #include <android-base/logging.h>
 
