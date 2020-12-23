@@ -980,7 +980,6 @@ class Runtime {
       SHARED_TRYLOCK_FUNCTION(true, Locks::mutator_lock_);
   void InitNativeMethods() REQUIRES(!Locks::mutator_lock_);
   void RegisterRuntimeNativeMethods(JNIEnv* env);
-  void InitMetrics(const RuntimeArgumentMap& runtime_options);
 
   void StartDaemonThreads();
   void StartSignalCatcher();
