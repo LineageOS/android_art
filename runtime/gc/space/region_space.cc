@@ -726,39 +726,44 @@ void RegionSpace::LogFragmentationAllocFailure(std::ostream& os,
                                                size_t /* failed_alloc_bytes */) {
   size_t max_contiguous_allocation = 0;
   MutexLock mu(Thread::Current(), region_lock_);
+
   if (current_region_->End() - current_region_->Top() > 0) {
     max_contiguous_allocation = current_region_->End() - current_region_->Top();
   }
-  if (num_non_free_regions_ * 2 < num_regions_) {
-    // We reserve half of the regions for evaluation only. If we
-    // occupy more than half the regions, do not report the free
-    // regions as available.
-    size_t max_contiguous_free_regions = 0;
-    size_t num_contiguous_free_regions = 0;
-    bool prev_free_region = false;
-    for (size_t i = 0; i < num_regions_; ++i) {
-      Region* r = &regions_[i];
-      if (r->IsFree()) {
-        if (!prev_free_region) {
-          CHECK_EQ(num_contiguous_free_regions, 0U);
-          prev_free_region = true;
-        }
-        ++num_contiguous_free_regions;
-      } else {
-        if (prev_free_region) {
-          CHECK_NE(num_contiguous_free_regions, 0U);
-          max_contiguous_free_regions = std::max(max_contiguous_free_regions,
-                                                 num_contiguous_free_regions);
-          num_contiguous_free_regions = 0U;
-          prev_free_region = false;
-        }
+
+  size_t max_contiguous_free_regions = 0;
+  size_t num_contiguous_free_regions = 0;
+  bool prev_free_region = false;
+  for (size_t i = 0; i < num_regions_; ++i) {
+    Region* r = &regions_[i];
+    if (r->IsFree()) {
+      if (!prev_free_region) {
+        CHECK_EQ(num_contiguous_free_regions, 0U);
+        prev_free_region = true;
       }
+      ++num_contiguous_free_regions;
+    } else if (prev_free_region) {
+      CHECK_NE(num_contiguous_free_regions, 0U);
+      max_contiguous_free_regions = std::max(max_contiguous_free_regions,
+                                             num_contiguous_free_regions);
+      num_contiguous_free_regions = 0U;
+      prev_free_region = false;
     }
-    max_contiguous_allocation = std::max(max_contiguous_allocation,
-                                         max_contiguous_free_regions * kRegionSize);
   }
+  max_contiguous_allocation = std::max(max_contiguous_allocation,
+                                       max_contiguous_free_regions * kRegionSize);
+
+  // Calculate how many regions are available for allocations as we have to ensure
+  // that enough regions are left for evacuation.
+  size_t regions_free_for_alloc = num_regions_ / 2 - num_non_free_regions_;
+
+  max_contiguous_allocation = std::min(max_contiguous_allocation,
+                                       regions_free_for_alloc * kRegionSize);
+
   os << "; failed due to fragmentation (largest possible contiguous allocation "
-     <<  max_contiguous_allocation << " bytes)";
+     <<  max_contiguous_allocation << " bytes). Number of "
+     << PrettySize(kRegionSize)
+     << " sized free regions are: " << regions_free_for_alloc;
   // Caller's job to print failed_alloc_bytes.
 }
 
