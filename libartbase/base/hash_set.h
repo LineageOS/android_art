@@ -439,7 +439,7 @@ class HashSet {
     return const_iterator(this, FindIndex(key, hash));
   }
 
-  // Insert an element with hint, allows duplicates.
+  // Insert an element with hint.
   // Note: The hint is not very useful for a HashSet<> unless there are many hash conflicts
   // and in that case the use of HashSet<> itself should be reconsidered.
   std::pair<iterator, bool> insert(const_iterator hint ATTRIBUTE_UNUSED, const T& element) {
@@ -449,7 +449,7 @@ class HashSet {
     return insert(std::move(element));
   }
 
-  // Insert an element, allows duplicates.
+  // Insert an element.
   std::pair<iterator, bool> insert(const T& element) {
     return InsertWithHash(element, hashfn_(element));
   }

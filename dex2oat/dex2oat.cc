@@ -1458,7 +1458,7 @@ class Dex2Oat final {
             opened_dex_files_maps_.push_back(std::move(map));
           }
           for (std::unique_ptr<const DexFile>& dex_file : opened_dex_files) {
-            dex_file_oat_index_map_.emplace(dex_file.get(), i);
+            dex_file_oat_index_map_.insert(std::make_pair(dex_file.get(), i));
             opened_dex_files_.push_back(std::move(dex_file));
           }
         }
@@ -2831,7 +2831,7 @@ class Dex2Oat final {
   std::unique_ptr<ProfileCompilationInfo> profile_compilation_info_;
   TimingLogger* timings_;
   std::vector<std::vector<const DexFile*>> dex_files_per_oat_file_;
-  std::unordered_map<const DexFile*, size_t> dex_file_oat_index_map_;
+  HashMap<const DexFile*, size_t> dex_file_oat_index_map_;
 
   // Backing storage.
   std::forward_list<std::string> char_backing_storage_;

@@ -204,10 +204,10 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
     vdex_filenames.push_back(vdex_filename);
   }
 
-  std::unordered_map<const DexFile*, size_t> dex_file_to_oat_index_map;
+  HashMap<const DexFile*, size_t> dex_file_to_oat_index_map;
   size_t image_idx = 0;
   for (const DexFile* dex_file : class_path) {
-    dex_file_to_oat_index_map.emplace(dex_file, image_idx);
+    dex_file_to_oat_index_map.insert(std::make_pair(dex_file, image_idx));
     ++image_idx;
   }
   std::unique_ptr<ImageWriter> writer(new ImageWriter(*compiler_options_,
