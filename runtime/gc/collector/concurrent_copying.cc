@@ -1055,20 +1055,29 @@ class ConcurrentCopying::ComputeLiveBytesAndMarkRefFieldsVisitor {
             obj->GetFieldObject<mirror::Object, kVerifyNone, kWithoutReadBarrier>(offset);
     // TODO(lokeshgidra): Remove the following condition once b/173676071 is fixed.
     if (UNLIKELY(ref == nullptr && offset == mirror::Object::ClassOffset())) {
-      // As of this change, we don't know for sure what is causing the crash in
-      // the above bug. The only possibility seems to be some race condition.
-      // Therefore we add a small delay and then read class ref
-      // again to confirm if that is the case.
-      sleep(1);
-      // It must be heap corruption. Remove memory protection and dump data.
-      collector_->region_space_->Unprotect();
-      mirror::Class* klass = obj->GetClass<kVerifyNone, kWithoutReadBarrier>();
-      LOG(FATAL_WITHOUT_ABORT) << "klass pointer for ref: " << obj
-                               << " found to be null. klass read again and found: " << klass;
-      collector_->heap_->GetVerification()->LogHeapCorruption(obj,
-                                                              offset,
-                                                              klass,
-                                                              /* fatal */ true);
+      // It has been verified as a race condition (see b/173676071)! After a small
+      // wait when we reload the class pointer, it turns out to be a valid class
+      // object. So as a workaround, we can continue execution and log an error
+      // that this happened.
+      for (size_t i = 0; i < 1000; i++) {
+        // Wait for 1ms at a time. Don't wait for more than 1 second in total.
+        usleep(1000);
+        ref = obj->GetClass<kVerifyNone, kWithoutReadBarrier>();
+        if (ref != nullptr) {
+          LOG(ERROR) << "klass pointer for obj: "
+                     << obj << " (" << mirror::Object::PrettyTypeOf(obj)
+                     << ") found to be null first. Reloading after a small wait fetched klass: "
+                     << ref << " (" << mirror::Object::PrettyTypeOf(ref) << ")";
+          break;
+        }
+      }
+
+      if (UNLIKELY(ref == nullptr)) {
+        // It must be heap corruption. Remove memory protection and dump data.
+        collector_->region_space_->Unprotect();
+        LOG(FATAL_WITHOUT_ABORT) << "klass pointer for ref: " << obj << " found to be null.";
+        collector_->heap_->GetVerification()->LogHeapCorruption(obj, offset, ref, /* fatal */ true);
+      }
     }
     CheckReference(ref);
   }
