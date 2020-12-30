@@ -717,8 +717,7 @@ class ClassLinker {
   ArtMethod* AddMethodToConflictTable(ObjPtr<mirror::Class> klass,
                                       ArtMethod* conflict_method,
                                       ArtMethod* interface_method,
-                                      ArtMethod* method,
-                                      bool force_new_conflict_method)
+                                      ArtMethod* method)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Create a conflict table with a specified capacity.
