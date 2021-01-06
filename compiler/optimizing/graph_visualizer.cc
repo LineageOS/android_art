@@ -195,7 +195,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
                           const char* pass_name,
                           bool is_after_pass,
                           bool graph_in_bad_state,
-                          const CodeGenerator& codegen,
+                          const CodeGenerator* codegen,
                           const DisassemblyInformation* disasm_info = nullptr)
       : HGraphDelegateVisitor(graph),
         output_(output),
@@ -206,10 +206,10 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
         disasm_info_(disasm_info),
         disassembler_(disasm_info_ != nullptr
                       ? new HGraphVisualizerDisassembler(
-                            codegen_.GetInstructionSet(),
-                            codegen_.GetAssembler().CodeBufferBaseAddress(),
-                            codegen_.GetAssembler().CodeBufferBaseAddress()
-                                + codegen_.GetAssembler().CodeSize())
+                            codegen_->GetInstructionSet(),
+                            codegen_->GetAssembler().CodeBufferBaseAddress(),
+                            codegen_->GetAssembler().CodeBufferBaseAddress()
+                                + codegen_->GetAssembler().CodeSize())
                       : nullptr),
         indent_(0) {}
 
@@ -298,10 +298,11 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
   }
 
   void DumpLocation(std::ostream& stream, const Location& location) {
+    DCHECK(codegen_ != nullptr);
     if (location.IsRegister()) {
-      codegen_.DumpCoreRegister(stream, location.reg());
+      codegen_->DumpCoreRegister(stream, location.reg());
     } else if (location.IsFpuRegister()) {
-      codegen_.DumpFloatingPointRegister(stream, location.reg());
+      codegen_->DumpFloatingPointRegister(stream, location.reg());
     } else if (location.IsConstant()) {
       stream << "#";
       HConstant* constant = location.GetConstant();
@@ -321,13 +322,13 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     } else if (location.IsStackSlot()) {
       stream << location.GetStackIndex() << "(sp)";
     } else if (location.IsFpuRegisterPair()) {
-      codegen_.DumpFloatingPointRegister(stream, location.low());
+      codegen_->DumpFloatingPointRegister(stream, location.low());
       stream << "|";
-      codegen_.DumpFloatingPointRegister(stream, location.high());
+      codegen_->DumpFloatingPointRegister(stream, location.high());
     } else if (location.IsRegisterPair()) {
-      codegen_.DumpCoreRegister(stream, location.low());
+      codegen_->DumpCoreRegister(stream, location.low());
       stream << "|";
-      codegen_.DumpCoreRegister(stream, location.high());
+      codegen_->DumpCoreRegister(stream, location.high());
     } else if (location.IsUnallocated()) {
       stream << "unallocated";
     } else if (location.IsDoubleStackSlot()) {
@@ -837,6 +838,12 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     Flush();
   }
 
+  void Run(HInstruction* instruction) {
+    output_ << DataType::TypeId(instruction->GetType()) << instruction->GetId() << " ";
+    PrintInstruction(instruction);
+    Flush();
+  }
+
   void VisitBasicBlock(HBasicBlock* block) override {
     StartTag("block");
     PrintProperty("name", "B", block->GetBlockId());
@@ -895,7 +902,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
   const char* pass_name_;
   const bool is_after_pass_;
   const bool graph_in_bad_state_;
-  const CodeGenerator& codegen_;
+  const CodeGenerator* codegen_;
   const DisassemblyInformation* disasm_info_;
   std::unique_ptr<HGraphVisualizerDisassembler> disassembler_;
   size_t indent_;
@@ -905,7 +912,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
 
 HGraphVisualizer::HGraphVisualizer(std::ostream* output,
                                    HGraph* graph,
-                                   const CodeGenerator& codegen)
+                                   const CodeGenerator* codegen)
   : output_(output), graph_(graph), codegen_(codegen) {}
 
 void HGraphVisualizer::PrintHeader(const char* method_name) const {
@@ -956,9 +963,21 @@ void HGraphVisualizer::DumpGraphWithDisassembly() const {
                                     /* is_after_pass= */ true,
                                     /* graph_in_bad_state= */ false,
                                     codegen_,
-                                    codegen_.GetDisassemblyInformation());
+                                    codegen_->GetDisassemblyInformation());
     printer.Run();
   }
+}
+
+void HGraphVisualizer::DumpInstruction(std::ostream* output,
+                                       HGraph* graph,
+                                       HInstruction* instruction) {
+  HGraphVisualizerPrinter printer(graph,
+                                  *output,
+                                  /* pass_name= */ "debug",
+                                  /* is_after_pass= */ false,
+                                  /* graph_in_bad_state= */ false,
+                                  /* codegen= */ nullptr);
+  printer.Run(instruction);
 }
 
 }  // namespace art

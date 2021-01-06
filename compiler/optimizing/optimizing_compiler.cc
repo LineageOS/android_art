@@ -117,7 +117,7 @@ class PassObserver : public ValueObject {
         visualizer_oss_(),
         visualizer_output_(visualizer_output),
         visualizer_enabled_(!compiler_options.GetDumpCfgFileName().empty()),
-        visualizer_(&visualizer_oss_, graph, *codegen),
+        visualizer_(&visualizer_oss_, graph, codegen),
         codegen_(codegen),
         visualizer_dump_mutex_(dump_mutex),
         graph_in_bad_state_(false) {
