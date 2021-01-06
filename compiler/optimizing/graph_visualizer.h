@@ -101,7 +101,7 @@ class HGraphVisualizer : public ValueObject {
  public:
   HGraphVisualizer(std::ostream* output,
                    HGraph* graph,
-                   const CodeGenerator& codegen);
+                   const CodeGenerator* codegen);
 
   void PrintHeader(const char* method_name) const;
   void DumpGraph(const char* pass_name, bool is_after_pass, bool graph_in_bad_state) const;
@@ -112,10 +112,12 @@ class HGraphVisualizer : public ValueObject {
   // method attributes is used. Such empty blocks don't break the c1visualizer parser.
   static std::string InsertMetaDataAsCompilationBlock(const std::string& meta_data);
 
+  static void DumpInstruction(std::ostream* output, HGraph* graph, HInstruction* instruction);
+
  private:
   std::ostream* const output_;
   HGraph* const graph_;
-  const CodeGenerator& codegen_;
+  const CodeGenerator* codegen_;
 
   DISALLOW_COPY_AND_ASSIGN(HGraphVisualizer);
 };
