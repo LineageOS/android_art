@@ -211,6 +211,7 @@ std::string DexFileLoader::GetDexCanonicalLocation(const char* dex_location) {
 bool DexFileLoader::GetMultiDexChecksums(
     const char* filename ATTRIBUTE_UNUSED,
     std::vector<uint32_t>* checksums ATTRIBUTE_UNUSED,
+    std::vector<std::string>* dex_locations ATTRIBUTE_UNUSED,
     std::string* error_msg,
     int zip_fd ATTRIBUTE_UNUSED,
     bool* zip_file_only_contains_uncompress_dex ATTRIBUTE_UNUSED) const {

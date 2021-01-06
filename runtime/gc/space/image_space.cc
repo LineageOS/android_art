@@ -3429,7 +3429,9 @@ bool ImageSpace::ValidateOatFile(const OatFile& oat_file, std::string* error_msg
     }
 
     std::vector<uint32_t> checksums;
-    if (!dex_file_loader.GetMultiDexChecksums(dex_file_location.c_str(), &checksums, error_msg)) {
+    std::vector<std::string> dex_locations_ignored;
+    if (!dex_file_loader.GetMultiDexChecksums(
+        dex_file_location.c_str(), &checksums, &dex_locations_ignored, error_msg)) {
       *error_msg = StringPrintf("ValidateOatFile failed to get checksums of dex file '%s' "
                                 "referenced by oat file %s: %s",
                                 dex_file_location.c_str(),
