@@ -957,6 +957,11 @@ static ArtMethod* ResolveMethod(uint16_t method_idx,
           resolved_method, class_linker->GetImagePointerSize());
     } else {
       uint16_t vtable_index = resolved_method->GetMethodIndex();
+      if (vtable_index >= static_cast<uint32_t>(
+              compiling_class->GetSuperClass()->GetVTableLength())) {
+        // No super method. The runtime will throw a NoSuchMethodError.
+        return nullptr;
+      }
       actual_method = compiling_class->GetSuperClass()->GetVTableEntry(
           vtable_index, class_linker->GetImagePointerSize());
     }
