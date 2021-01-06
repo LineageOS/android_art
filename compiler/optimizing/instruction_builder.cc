@@ -2040,10 +2040,9 @@ ArtField* HInstructionBuilder::ResolveField(uint16_t field_idx, bool is_static, 
   ClassLinker* class_linker = dex_compilation_unit_->GetClassLinker();
   Handle<mirror::ClassLoader> class_loader = dex_compilation_unit_->GetClassLoader();
 
-  ArtField* resolved_field = class_linker->ResolveField(field_idx,
-                                                        dex_compilation_unit_->GetDexCache(),
-                                                        class_loader,
-                                                        is_static);
+  ArtField* resolved_field = class_linker->ResolveFieldJLS(field_idx,
+                                                           dex_compilation_unit_->GetDexCache(),
+                                                           class_loader);
   DCHECK_EQ(resolved_field == nullptr, soa.Self()->IsExceptionPending())
       << "field="
       << ((resolved_field == nullptr) ? "null" : resolved_field->PrettyField())
@@ -2055,8 +2054,6 @@ ArtField* HInstructionBuilder::ResolveField(uint16_t field_idx, bool is_static, 
     return nullptr;
   }
 
-  // Check static/instance. The class linker has a fast path for looking into the dex cache
-  // and does not check static/instance if it hits it.
   if (UNLIKELY(resolved_field->IsStatic() != is_static)) {
     return nullptr;
   }
