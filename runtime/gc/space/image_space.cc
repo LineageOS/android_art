@@ -3534,6 +3534,14 @@ std::string ImageSpace::GetBootClassPathChecksums(
   return boot_image_checksum;
 }
 
+size_t ImageSpace::GetNumberOfComponents(ArrayRef<ImageSpace* const> image_spaces) {
+  size_t n = 0;
+  for (auto&& is : image_spaces) {
+    n += is->GetComponentCount();
+  }
+  return n;
+}
+
 static size_t CheckAndCountBCPComponents(std::string_view oat_boot_class_path,
                                          ArrayRef<const std::string> boot_class_path,
                                          /*out*/std::string* error_msg) {
