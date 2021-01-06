@@ -5531,7 +5531,6 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
   if (pending_exc) {
     switch (error) {
       case VERIFY_ERROR_NO_CLASS:
-      case VERIFY_ERROR_NO_FIELD:
       case VERIFY_ERROR_NO_METHOD:
       case VERIFY_ERROR_ACCESS_CLASS:
       case VERIFY_ERROR_ACCESS_FIELD:
