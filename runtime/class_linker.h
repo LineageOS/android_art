@@ -22,12 +22,11 @@
 #include <set>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "base/enums.h"
+#include "base/hash_map.h"
 #include "base/mutex.h"
 #include "base/intrusive_forward_list.h"
 #include "base/locks.h"
@@ -857,6 +856,7 @@ class ClassLinker {
 
  private:
   class LinkInterfaceMethodsHelper;
+  class MethodTranslation;
   class VisiblyInitializedCallback;
 
   struct ClassLoaderData {
@@ -1136,78 +1136,6 @@ class ClassLinker {
       const dex::MethodHandleItem& method_handle,
       ArtMethod* referrer) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // A wrapper class representing the result of a method translation used for linking methods and
-  // updating superclass default methods. For each method in a classes vtable there are 4 states it
-  // could be in:
-  // 1) No translation is necessary. In this case there is no MethodTranslation object for it. This
-  //    is the standard case and is true when the method is not overridable by a default method,
-  //    the class defines a concrete implementation of the method, the default method implementation
-  //    remains the same, or an abstract method stayed abstract.
-  // 2) The method must be translated to a different default method. We note this with
-  //    CreateTranslatedMethod.
-  // 3) The method must be replaced with a conflict method. This happens when a superclass
-  //    implements an interface with a default method and this class implements an unrelated
-  //    interface that also defines that default method. We note this with CreateConflictingMethod.
-  // 4) The method must be replaced with an abstract miranda method. This happens when a superclass
-  //    implements an interface with a default method and this class implements a subinterface of
-  //    the superclass's interface which declares the default method abstract. We note this with
-  //    CreateAbstractMethod.
-  //
-  // When a method translation is unnecessary (case #1), we don't put it into the
-  // default_translation maps. So an instance of MethodTranslation must be in one of #2-#4.
-  class MethodTranslation {
-   public:
-    // This slot must become a default conflict method.
-    static MethodTranslation CreateConflictingMethod() {
-      return MethodTranslation(Type::kConflict, /*translation=*/nullptr);
-    }
-
-    // This slot must become an abstract method.
-    static MethodTranslation CreateAbstractMethod() {
-      return MethodTranslation(Type::kAbstract, /*translation=*/nullptr);
-    }
-
-    // Use the given method as the current value for this vtable slot during translation.
-    static MethodTranslation CreateTranslatedMethod(ArtMethod* new_method) {
-      return MethodTranslation(Type::kTranslation, new_method);
-    }
-
-    // Returns true if this is a method that must become a conflict method.
-    bool IsInConflict() const {
-      return type_ == Type::kConflict;
-    }
-
-    // Returns true if this is a method that must become an abstract method.
-    bool IsAbstract() const {
-      return type_ == Type::kAbstract;
-    }
-
-    // Returns true if this is a method that must become a different method.
-    bool IsTranslation() const {
-      return type_ == Type::kTranslation;
-    }
-
-    // Get the translated version of this method.
-    ArtMethod* GetTranslation() const {
-      DCHECK(IsTranslation());
-      DCHECK(translation_ != nullptr);
-      return translation_;
-    }
-
-   private:
-    enum class Type {
-      kTranslation,
-      kConflict,
-      kAbstract,
-    };
-
-    MethodTranslation(Type type, ArtMethod* translation)
-        : translation_(translation), type_(type) {}
-
-    ArtMethod* const translation_;
-    const Type type_;
-  };
-
   // Links the virtual methods for the given class and records any default methods that will need to
   // be updated later.
   //
@@ -1227,7 +1155,7 @@ class ClassLinker {
   bool LinkVirtualMethods(
         Thread* self,
         Handle<mirror::Class> klass,
-        /*out*/std::unordered_map<size_t, MethodTranslation>* default_translations)
+        /*out*/HashMap<size_t, MethodTranslation>* default_translations)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Sets up the interface lookup table (IFTable) in the correct order to allow searching for
@@ -1274,7 +1202,7 @@ class ClassLinker {
   bool LinkInterfaceMethods(
       Thread* self,
       Handle<mirror::Class> klass,
-      const std::unordered_map<size_t, MethodTranslation>& default_translations,
+      const HashMap<size_t, MethodTranslation>& default_translations,
       bool* out_new_conflict,
       ArtMethod** out_imt)
       REQUIRES_SHARED(Locks::mutator_lock_);
