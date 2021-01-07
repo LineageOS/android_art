@@ -30,6 +30,7 @@ static inline bool CanCompilerHandleVerificationFailure(uint32_t encountered_fai
   constexpr uint32_t unresolved_mask = verifier::VerifyError::VERIFY_ERROR_NO_CLASS
       | verifier::VerifyError::VERIFY_ERROR_CLASS_CHANGE
       | verifier::VerifyError::VERIFY_ERROR_NO_METHOD
+      | verifier::VerifyError::VERIFY_ERROR_INSTANTIATION
       | verifier::VerifyError::VERIFY_ERROR_ACCESS_CLASS
       | verifier::VerifyError::VERIFY_ERROR_ACCESS_FIELD
       | verifier::VerifyError::VERIFY_ERROR_ACCESS_METHOD;
