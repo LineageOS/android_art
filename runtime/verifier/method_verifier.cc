@@ -5174,6 +5174,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
 static inline bool CanRuntimeHandleVerificationFailure(uint32_t encountered_failure_types) {
   constexpr uint32_t unresolved_mask =
       verifier::VerifyError::VERIFY_ERROR_CLASS_CHANGE |
+      verifier::VerifyError::VERIFY_ERROR_INSTANTIATION |
       verifier::VerifyError::VERIFY_ERROR_ACCESS_CLASS |
       verifier::VerifyError::VERIFY_ERROR_ACCESS_FIELD |
       verifier::VerifyError::VERIFY_ERROR_NO_METHOD |
