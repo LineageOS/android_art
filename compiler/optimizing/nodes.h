@@ -2145,6 +2145,7 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
 
   virtual ~HInstruction() {}
 
+  std::ostream& Dump(std::ostream& os, bool dump_args = false);
 
   HInstruction* GetNext() const { return next_; }
   HInstruction* GetPrevious() const { return previous_; }

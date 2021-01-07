@@ -113,9 +113,14 @@ class DexFileLoader {
   // the descriptor and `filename` will be used as alias for error logging. If
   // zip_fd is -1, the method will try to open the `filename` and read the
   // content from it.
+  //
+  // The dex_locations vector will be populated with the corresponding multidex
+  // locations.
+  //
   // Return true if the checksums could be found, false otherwise.
   virtual bool GetMultiDexChecksums(const char* filename,
                                     std::vector<uint32_t>* checksums,
+                                    std::vector<std::string>* dex_locations,
                                     std::string* error_msg,
                                     int zip_fd = -1,
                                     bool* zip_file_only_contains_uncompress_dex = nullptr) const;

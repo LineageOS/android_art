@@ -59,8 +59,8 @@ class Signature : public ValueObject {
 
   friend class DexFile;
 
-  const DexFile* const dex_file_ = nullptr;
-  const dex::ProtoId* const proto_id_ = nullptr;
+  const DexFile* dex_file_ = nullptr;
+  const dex::ProtoId* proto_id_ = nullptr;
 };
 std::ostream& operator<<(std::ostream& os, const Signature& sig);
 
