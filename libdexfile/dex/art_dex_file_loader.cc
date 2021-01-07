@@ -86,6 +86,7 @@ static constexpr OatDexFile* kNoOatDexFile = nullptr;
 
 bool ArtDexFileLoader::GetMultiDexChecksums(const char* filename,
                                             std::vector<uint32_t>* checksums,
+                                            std::vector<std::string>* dex_locations,
                                             std::string* error_msg,
                                             int zip_fd,
                                             bool* zip_file_only_contains_uncompressed_dex) const {
@@ -113,8 +114,8 @@ bool ArtDexFileLoader::GetMultiDexChecksums(const char* filename,
       return false;
     }
 
-    uint32_t i = 0;
-    std::string zip_entry_name = GetMultiDexClassesDexName(i++);
+    uint32_t idx = 0;
+    std::string zip_entry_name = GetMultiDexClassesDexName(idx);
     std::unique_ptr<ZipEntry> zip_entry(zip_archive->Find(zip_entry_name.c_str(), error_msg));
     if (zip_entry.get() == nullptr) {
       *error_msg = StringPrintf("Zip archive '%s' doesn't contain %s (error msg: %s)", filename,
@@ -134,7 +135,8 @@ bool ArtDexFileLoader::GetMultiDexChecksums(const char* filename,
         }
       }
       checksums->push_back(zip_entry->GetCrc32());
-      zip_entry_name = GetMultiDexClassesDexName(i++);
+      dex_locations->push_back(GetMultiDexLocation(idx, filename));
+      zip_entry_name = GetMultiDexClassesDexName(++idx);
       zip_entry.reset(zip_archive->Find(zip_entry_name.c_str(), error_msg));
     } while (zip_entry.get() != nullptr);
     return true;

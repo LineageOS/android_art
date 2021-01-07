@@ -332,11 +332,11 @@ class LSEVisitor final : private HGraphDelegateVisitor {
                             : ForNonLoopPhiPlaceholder(phi_placeholder);
     }
 
-    bool IsValid() const {
+    constexpr bool IsValid() const {
       return !IsInvalid();
     }
 
-    bool IsInvalid() const {
+    constexpr bool IsInvalid() const {
       return std::holds_alternative<ValuelessType>(value_) &&
              GetValuelessType() == ValuelessType::kInvalid;
     }
@@ -423,7 +423,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
                                      MergedUnknownMarker,
                                      NeedsNonLoopPhiMarker,
                                      NeedsLoopPhiMarker>;
-    ValuelessType GetValuelessType() const {
+    constexpr ValuelessType GetValuelessType() const {
       return std::get<ValuelessType>(value_);
     }
 

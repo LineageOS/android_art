@@ -74,6 +74,11 @@ class ClassLoaderContext {
   // (Note that one dex file can contain multidexes. Each multidex will be added to the classpath
   // separately.)
   //
+  // only_read_checksums controls whether or not we only read the dex locations and the checksums
+  // from the apk instead of fully opening the dex files.
+  //
+  // This method is not thread safe.
+  //
   // Note that a "false" return could mean that either an apk/jar contained no dex files or
   // that we hit a I/O or checksum mismatch error.
   // TODO(calin): Currently there's no easy way to tell the difference.
@@ -82,7 +87,8 @@ class ClassLoaderContext {
   // OpenDexFiles step because the current dex2oat flow requires the dex files be opened before
   // the class loader is created. Consider reworking the dex2oat part.
   bool OpenDexFiles(const std::string& classpath_dir = "",
-                    const std::vector<int>& context_fds = std::vector<int>());
+                    const std::vector<int>& context_fds = std::vector<int>(),
+                    bool only_read_checksums = false);
 
   // Remove the specified compilation sources from all classpaths present in this context.
   // Should only be called before the first call to OpenDexFiles().
@@ -159,7 +165,10 @@ class ClassLoaderContext {
   //    - the number and type of the class loaders from the chain matches
   //    - the class loader from the same position have the same classpath
   //      (the order and checksum of the dex files matches)
-  // This should be called after OpenDexFiles().
+  // This should be called after OpenDexFiles() with only_read_checksums=true. There's no
+  // need to fully open the dex files if the only thing that needs to be done is to verify
+  // the context.
+  //
   // Names are only verified if verify_names is true.
   // Checksums are only verified if verify_checksums is true.
   VerificationResult VerifyClassLoaderContextMatch(const std::string& context_spec,
@@ -340,6 +349,19 @@ class ClassLoaderContext {
   // The returned format can be used when parsing a context spec.
   static const char* GetClassLoaderTypeName(ClassLoaderType type);
 
+  // Encodes the state of processing the dex files associated with the context.
+  enum ContextDexFilesState {
+    // The dex files are not opened.
+    kDexFilesNotOpened = 1,
+    // The dex checksums/locations were read from the apk/dex but the dex files were not opened.
+    kDexFilesChecksumsRead = 2,
+    // The dex files are opened (either because we called OpenDexFiles, or we used a class loader
+    // to create the context). This implies kDexFilesChecksumsRead.
+    kDexFilesOpened = 3,
+    // We failed to open the dex files or read the checksums.
+    kDexFilesOpenFailed = 4
+  };
+
   // The class loader chain.
   std::unique_ptr<ClassLoaderInfo> class_loader_chain_;
 
@@ -350,10 +372,8 @@ class ClassLoaderContext {
   // (e.g. packages using prebuild system packages as shared libraries b/36480683)
   bool special_shared_library_;
 
-  // Whether or not OpenDexFiles() was called.
-  bool dex_files_open_attempted_;
-  // The result of the last OpenDexFiles() operation.
-  bool dex_files_open_result_;
+  // The opening state of the dex files.
+  ContextDexFilesState dex_files_state_;
 
   // Whether or not the context owns the opened dex and oat files.
   // If true, the opened dex files will be de-allocated when the context is destructed.
