@@ -258,11 +258,11 @@ class MANAGED ByteArrayViewVarHandle : public VarHandle {
 
   bool GetNativeByteOrder() REQUIRES_SHARED(Locks::mutator_lock_);
 
- private:
   static MemberOffset NativeByteOrderOffset() {
     return MemberOffset(OFFSETOF_MEMBER(ByteArrayViewVarHandle, native_byte_order_));
   }
 
+ private:
   // Flag indicating that accessors should use native byte-ordering.
   uint8_t native_byte_order_;
 
