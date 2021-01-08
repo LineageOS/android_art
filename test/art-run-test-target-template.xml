@@ -16,14 +16,20 @@
 <!-- Note: This test config for {MODULE} is generated from a template. -->
 <configuration description="Test module config for {MODULE}">
     <option name="test-suite-tag" value="art-target-run-test" />
+
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <!-- TODO: Use option `push-file` instead of deprecated option
              `push`. -->
         <option name="push" value="{MODULE}.jar->/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </target_preparer>
+
     <test class="com.android.tradefed.testtype.ArtRunTest">
         <option name="run-test-name" value="{MODULE}" />
         <option name="classpath" value="/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </test>
+
+    <object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
+        <option name="mainline-module-package-name" value="com.google.android.art" />
+    </object>
 </configuration>

@@ -21,8 +21,13 @@
              `push`. -->
         <option name="push" value="{MODULE}.jar->/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </target_preparer>
+
     <test class="com.android.tradefed.testtype.ArtRunTest">
         <option name="run-test-name" value="{MODULE}" />
         <option name="classpath" value="/data/local/tmp/{MODULE}/{MODULE}.jar" />
     </test>
+
+    <object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
+        <option name="mainline-module-package-name" value="com.google.android.art" />
+    </object>
 </configuration>

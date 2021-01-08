@@ -15,13 +15,19 @@
 -->
 <configuration description="ART gtests for target (using chroot)">
     <option name="test-suite-tag" value="art-target-gtest-chroot" />
+
     <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer" />
     <target_preparer class="com.android.tradefed.targetprep.DisableSELinuxTargetPreparer" />
     <target_preparer class="com.android.tradefed.targetprep.ArtChrootPreparer" />
+
     <test class="com.android.tradefed.testtype.ArtGTest" >
         <!-- TODO(b/147821328): These tests do not work since they need to write to /system -->
         <option name="exclude-filter" value="HiddenApiTest.DexDomain_System*:OatFileAssistantTest.SystemFrameworkDir" />
         <option name="native-test-timeout" value="600000" />
         <option name="native-test-device-path" value="/data/local/tmp/art-test-chroot/apex/com.android.art/bin/art" />
     </test>
+
+    <object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
+        <option name="mainline-module-package-name" value="com.google.android.art" />
+    </object>
 </configuration>
