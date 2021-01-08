@@ -1382,6 +1382,11 @@ void ClassLinker::AddExtraBootDexFiles(
     std::vector<std::unique_ptr<const DexFile>>&& additional_dex_files) {
   for (std::unique_ptr<const DexFile>& dex_file : additional_dex_files) {
     AppendToBootClassPath(self, dex_file.get());
+    if (kIsDebugBuild) {
+      for (const auto& boot_dex_file : boot_dex_files_) {
+        DCHECK_NE(boot_dex_file->GetLocation(), dex_file->GetLocation());
+      }
+    }
     boot_dex_files_.push_back(std::move(dex_file));
   }
 }
