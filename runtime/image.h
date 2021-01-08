@@ -437,10 +437,12 @@ class PACKED(8) ImageHeader {
   // their oat files are mmapped independently.
   uint32_t image_reservation_size_ = 0u;
 
-  // The number of components.
+  // The number of components (jar files contributing to the image).
   // For boot image or boot image extension, the primary image stores the total number
-  // of images, secondary images have this set to 0.
-  // App images have 1 component.
+  // of components, secondary images have this set to 0. App images have 1 component.
+  // The component count usually matches the total number of images (one image per component), but
+  // if multiple components are compiled with --single-image there will only be 1 image associated
+  // with those components.
   uint32_t component_count_ = 0u;
 
   // Required base address for mapping the image.
