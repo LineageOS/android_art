@@ -58,11 +58,11 @@ TEST_F(DwarfTest, DebugFrame) {
   DW_CHECK_NEXT("DW_CFA_advance_loc2: 65535");
   DW_CHECK_NEXT("DW_CFA_advance_loc4: 65536");
   opcodes.DefCFA(reg, offset);
-  DW_CHECK_NEXT("DW_CFA_def_cfa: reg6 +40000");
+  DW_CHECK_NEXT("DW_CFA_def_cfa: ESI +40000");
   opcodes.DefCFA(reg, -offset);
-  DW_CHECK_NEXT("DW_CFA_def_cfa_sf: reg6 -40000");
+  DW_CHECK_NEXT("DW_CFA_def_cfa_sf: ESI -40000");
   opcodes.DefCFARegister(reg);
-  DW_CHECK_NEXT("DW_CFA_def_cfa_register: reg6");
+  DW_CHECK_NEXT("DW_CFA_def_cfa_register: ESI");
   opcodes.DefCFAOffset(offset);
   DW_CHECK_NEXT("DW_CFA_def_cfa_offset: +40000");
   opcodes.DefCFAOffset(-offset);
@@ -71,9 +71,9 @@ TEST_F(DwarfTest, DebugFrame) {
   opcodes.DefCFAExpression(expr, arraysize(expr));
   DW_CHECK_NEXT("DW_CFA_def_cfa_expression: DW_OP_nop");
   opcodes.Undefined(reg);
-  DW_CHECK_NEXT("DW_CFA_undefined: reg6");
+  DW_CHECK_NEXT("DW_CFA_undefined: ESI");
   opcodes.SameValue(reg);
-  DW_CHECK_NEXT("DW_CFA_same_value: reg6");
+  DW_CHECK_NEXT("DW_CFA_same_value: ESI");
   opcodes.Offset(Reg(0x3F), -offset);
   DW_CHECK_NEXT("DW_CFA_offset: reg63 -40000");
   opcodes.Offset(Reg(0x40), -offset);
@@ -81,21 +81,21 @@ TEST_F(DwarfTest, DebugFrame) {
   opcodes.Offset(Reg(0x40), offset);
   DW_CHECK_NEXT("DW_CFA_offset_extended_sf: reg64 40000");
   opcodes.ValOffset(reg, -offset);
-  DW_CHECK_NEXT("DW_CFA_val_offset: reg6 -40000");
+  DW_CHECK_NEXT("DW_CFA_val_offset: ESI -40000");
   opcodes.ValOffset(reg, offset);
-  DW_CHECK_NEXT("DW_CFA_val_offset_sf: reg6 40000");
+  DW_CHECK_NEXT("DW_CFA_val_offset_sf: ESI 40000");
   opcodes.Register(reg, Reg(1));
-  DW_CHECK_NEXT("DW_CFA_register: reg6 reg1");
+  DW_CHECK_NEXT("DW_CFA_register: ESI ECX");
   opcodes.Expression(reg, expr, arraysize(expr));
-  DW_CHECK_NEXT("DW_CFA_expression: reg6 DW_OP_nop");
+  DW_CHECK_NEXT("DW_CFA_expression: ESI DW_OP_nop");
   opcodes.ValExpression(reg, expr, arraysize(expr));
-  DW_CHECK_NEXT("DW_CFA_val_expression: reg6 DW_OP_nop");
+  DW_CHECK_NEXT("DW_CFA_val_expression: ESI DW_OP_nop");
   opcodes.Restore(Reg(0x3F));
   DW_CHECK_NEXT("DW_CFA_restore: reg63");
   opcodes.Restore(Reg(0x40));
   DW_CHECK_NEXT("DW_CFA_restore_extended: reg64");
   opcodes.Restore(reg);
-  DW_CHECK_NEXT("DW_CFA_restore: reg6");
+  DW_CHECK_NEXT("DW_CFA_restore: ESI");
   opcodes.RememberState();
   DW_CHECK_NEXT("DW_CFA_remember_state:");
   opcodes.RestoreState();
@@ -105,19 +105,19 @@ TEST_F(DwarfTest, DebugFrame) {
 
   // Also test helpers.
   opcodes.DefCFA(Reg(4), 100);  // ESP
-  DW_CHECK_NEXT("DW_CFA_def_cfa: reg4 +100");
+  DW_CHECK_NEXT("DW_CFA_def_cfa: ESP +100");
   opcodes.AdjustCFAOffset(8);
   DW_CHECK_NEXT("DW_CFA_def_cfa_offset: +108");
   opcodes.RelOffset(Reg(0), 0);  // push R0
-  DW_CHECK_NEXT("DW_CFA_offset: reg0 -108");
+  DW_CHECK_NEXT("DW_CFA_offset: EAX -108");
   opcodes.RelOffset(Reg(1), 4);  // push R1
-  DW_CHECK_NEXT("DW_CFA_offset: reg1 -104");
+  DW_CHECK_NEXT("DW_CFA_offset: ECX -104");
   opcodes.RelOffsetForMany(Reg(2), 8, 1 | (1 << 3), 4);  // push R2 and R5
-  DW_CHECK_NEXT("DW_CFA_offset: reg2 -100");
-  DW_CHECK_NEXT("DW_CFA_offset: reg5 -96");
+  DW_CHECK_NEXT("DW_CFA_offset: EDX -100");
+  DW_CHECK_NEXT("DW_CFA_offset: EBP -96");
   opcodes.RestoreMany(Reg(2), 1 | (1 << 3));  // pop R2 and R5
-  DW_CHECK_NEXT("DW_CFA_restore: reg2");
-  DW_CHECK_NEXT("DW_CFA_restore: reg5");
+  DW_CHECK_NEXT("DW_CFA_restore: EDX");
+  DW_CHECK_NEXT("DW_CFA_restore: EBP");
 
   DebugFrameOpCodeWriter<> initial_opcodes;
   WriteCIE(is64bit, Reg(is64bit ? 16 : 8), initial_opcodes, &debug_frame_data_);
@@ -160,22 +160,22 @@ TEST_F(DwarfTest, x86_64_RegisterMapping) {
   DW_CHECK("FDE");
   DW_CHECK_NEXT("DWARF32");
   DW_CHECK_NEXT("DW_CFA_nop:");  // TODO: Why is a nop here.
-  DW_CHECK_NEXT("DW_CFA_offset: reg0 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg2 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg1 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg3 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg7 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg6 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg4 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg5 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg8 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg9 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg10 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg11 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg12 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg13 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg14 0");
-  DW_CHECK_NEXT("DW_CFA_offset: reg15 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RAX 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RCX 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RDX 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RBX 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RSP 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RBP 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RSI 0");
+  DW_CHECK_NEXT("DW_CFA_offset: RDI 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R8 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R9 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R10 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R11 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R12 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R13 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R14 0");
+  DW_CHECK_NEXT("DW_CFA_offset: R15 0");
 
   DebugFrameOpCodeWriter<> initial_opcodes;
   WriteCIE(is64bit, Reg(16), initial_opcodes, &debug_frame_data_);
@@ -305,26 +305,26 @@ TEST_F(DwarfTest, DebugInfo) {
   info.WriteStrp(dwarf::DW_AT_producer, "Compiler name", &debug_str_data_);
   DW_CHECK_NEXT("  DW_AT_producer (\"Compiler name\")");
   info.WriteAddr(dwarf::DW_AT_low_pc, 0x01000000);
-  DW_CHECK_NEXT("  DW_AT_low_pc (0x0000000001000000)");
+  DW_CHECK_NEXT("  DW_AT_low_pc (0x01000000)");
   info.WriteAddr(dwarf::DW_AT_high_pc, 0x02000000);
-  DW_CHECK_NEXT("  DW_AT_high_pc (0x0000000002000000)");
+  DW_CHECK_NEXT("  DW_AT_high_pc (0x02000000)");
   info.StartTag(dwarf::DW_TAG_subprogram);
   DW_CHECK_NEXT("  DW_TAG_subprogram");
   info.WriteStrp(dwarf::DW_AT_name, "Foo", &debug_str_data_);
   DW_CHECK_NEXT("    DW_AT_name (\"Foo\")");
   info.WriteAddr(dwarf::DW_AT_low_pc, 0x01010000);
-  DW_CHECK_NEXT("    DW_AT_low_pc (0x0000000001010000)");
+  DW_CHECK_NEXT("    DW_AT_low_pc (0x01010000)");
   info.WriteAddr(dwarf::DW_AT_high_pc, 0x01020000);
-  DW_CHECK_NEXT("    DW_AT_high_pc (0x0000000001020000)");
+  DW_CHECK_NEXT("    DW_AT_high_pc (0x01020000)");
   info.EndTag();  // DW_TAG_subprogram
   info.StartTag(dwarf::DW_TAG_subprogram);
   DW_CHECK_NEXT("  DW_TAG_subprogram");
   info.WriteStrp(dwarf::DW_AT_name, "Bar", &debug_str_data_);
   DW_CHECK_NEXT("    DW_AT_name (\"Bar\")");
   info.WriteAddr(dwarf::DW_AT_low_pc, 0x01020000);
-  DW_CHECK_NEXT("    DW_AT_low_pc (0x0000000001020000)");
+  DW_CHECK_NEXT("    DW_AT_low_pc (0x01020000)");
   info.WriteAddr(dwarf::DW_AT_high_pc, 0x01030000);
-  DW_CHECK_NEXT("    DW_AT_high_pc (0x0000000001030000)");
+  DW_CHECK_NEXT("    DW_AT_high_pc (0x01030000)");
   info.EndTag();  // DW_TAG_subprogram
   info.EndTag();  // DW_TAG_compile_unit
   DW_CHECK_NEXT("  NULL");
