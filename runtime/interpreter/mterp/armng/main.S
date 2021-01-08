@@ -505,31 +505,6 @@ END \name
     .endif
 .endm
 
-.macro SPILL_ALL_ARGUMENTS
-    // We spill r4 for stack alignment.
-    push {r0-r4}
-    .cfi_adjust_cfa_offset 20
-    .cfi_rel_offset r0, 0
-    .cfi_rel_offset r1, 4
-    .cfi_rel_offset r2, 8
-    .cfi_rel_offset r3, 12
-    .cfi_rel_offset r4, 16
-    vpush {s0-s15}
-    .cfi_adjust_cfa_offset 64
-.endm
-
-.macro RESTORE_ALL_ARGUMENTS
-    vpop {s0-s15}
-    .cfi_adjust_cfa_offset -64
-    pop {r0-r4}
-    .cfi_restore r0
-    .cfi_restore r1
-    .cfi_restore r2
-    .cfi_restore r3
-    .cfi_restore r4
-    .cfi_adjust_cfa_offset -20
-.endm
-
 // Helper to setup the stack after doing a nterp to nterp call. This will setup:
 // - rNEW_FP: the new pointer to dex registers
 // - rNEW_REFS: the new pointer to references
@@ -1396,15 +1371,6 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     /* Spill callee save regs */
     SPILL_ALL_CALLEE_SAVES
 
-    // TODO: Get shorty in a better way and remove below
-    SPILL_ALL_ARGUMENTS
-
-    bl NterpGetShorty
-    // Save shorty in callee-save rIBASE.
-    mov rIBASE, r0
-
-    RESTORE_ALL_ARGUMENTS
-
     ldr rPC, [r0, #ART_METHOD_DATA_OFFSET_32]
 
     // Setup the stack for executing the method.
@@ -1414,36 +1380,54 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     cmp r4, #0
     beq .Lxmm_setup_finished
 
-    sub r4, rINST, r4
-    lsl r4, r4, #2 // r4 is now the offset for inputs into the registers array.
+    sub rINST, rINST, r4
+    ldr r8, [r0, #ART_METHOD_ACCESS_FLAGS_OFFSET]
+    lsl rINST, rINST, #2 // rINST is now the offset for inputs into the registers array.
+    mov rIBASE, ip // rIBASE contains the old stack pointer
 
-    mov lr, ip // lr contains the old stack pointer
+    // If the method is not static and there is one argument ('this'), we don't need to fetch the
+    // shorty.
+    tst r8, #ART_METHOD_IS_STATIC_FLAG
+    bne .Lsetup_with_shorty
+    str r1, [rFP, rINST]
+    str r1, [rREFS, rINST]
+    cmp r4, #1
+    beq .Lxmm_setup_finished
 
-    ldr ip, [r0, #ART_METHOD_ACCESS_FLAGS_OFFSET]
-    // r0 is now available.
+.Lsetup_with_shorty:
+    // Save arguments that were passed before calling into the runtime.
+    // No need to save r0 (ArtMethod) as we're not using it later in this code.
+    // Save r4 for stack aligment.
+    // TODO: Get shorty in a better way and remove below
+    push {r1-r4}
+    vpush {s0-s15}
+    bl NterpGetShorty
+    vpop {s0-s15}
+    pop {r1-r4}
+
+    mov ip, r8
+    add r8, rREFS, rINST
+    add r7, rFP, rINST
+    mov r4, #0
     // Setup shorty, pointer to inputs in FP and pointer to inputs in REFS
-    add r0, rIBASE, #1  // shorty + 1  ; ie skip return arg character
-    add r7, rFP, r4
-    add r8, rREFS, r4
+    add lr, r0, #1  // shorty + 1  ; ie skip return arg character
     tst ip, #ART_METHOD_IS_STATIC_FLAG
     bne .Lhandle_static_method
-    str r1, [r7], #4
-    str r1, [r8], #4
-    add lr, lr, #4
-    mov r4, #0
+    add r7, r7, #4
+    add r8, r8, #4
+    add rIBASE, rIBASE, #4
     b .Lcontinue_setup_gprs
 .Lhandle_static_method:
-    mov r4, #0
-    LOOP_OVER_SHORTY_STORING_GPRS r1, r0, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=0
+    LOOP_OVER_SHORTY_STORING_GPRS r1, lr, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=0
 .Lcontinue_setup_gprs:
-    LOOP_OVER_SHORTY_STORING_GPRS r2, r0, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=0
-    LOOP_OVER_SHORTY_STORING_GPRS r3, r0, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=1
+    LOOP_OVER_SHORTY_STORING_GPRS r2, lr, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=0
+    LOOP_OVER_SHORTY_STORING_GPRS r3, lr, r4, r7, r8, .Lgpr_setup_finished, .Lif_long, is_r3=1
 .Lif_long:
-    LOOP_OVER_INTs r0, r4, r7, r8, lr, ip, r1, .Lgpr_setup_finished
+    LOOP_OVER_INTs lr, r4, r7, r8, rIBASE, ip, r1, .Lgpr_setup_finished
 .Lgpr_setup_finished:
-    add r0, rIBASE, #1  // shorty + 1  ; ie skip return arg character
+    add r0, r0, #1  // shorty + 1  ; ie skip return arg character
     mov r1, r7
-    add r2, lr, #OFFSET_TO_FIRST_ARGUMENT_IN_STACK
+    add r2, rIBASE, #OFFSET_TO_FIRST_ARGUMENT_IN_STACK
     vpush {s0-s15}
     mov r3, sp
     bl NterpStoreArm32Fprs
