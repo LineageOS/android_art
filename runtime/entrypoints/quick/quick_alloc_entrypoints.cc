@@ -32,7 +32,7 @@ namespace art {
 static constexpr bool kUseTlabFastPath = true;
 
 template <bool kInitialized,
-          bool kFinalize,
+          bool kWithChecks,
           bool kInstrumented,
           gc::AllocatorType allocator_type>
 static ALWAYS_INLINE inline mirror::Object* artAllocObjectFromCode(
@@ -40,7 +40,10 @@ static ALWAYS_INLINE inline mirror::Object* artAllocObjectFromCode(
     Thread* self) REQUIRES_SHARED(Locks::mutator_lock_) {
   ScopedQuickEntrypointChecks sqec(self);
   DCHECK(klass != nullptr);
-  if (kUseTlabFastPath && !kInstrumented && allocator_type == gc::kAllocatorTypeTLAB) {
+  if (kUseTlabFastPath &&
+      !kWithChecks &&
+      !kInstrumented &&
+      allocator_type == gc::kAllocatorTypeTLAB) {
     // The "object size alloc fast path" is set when the class is
     // visibly initialized, objects are fixed size and non-finalizable.
     // Otherwise, the value is too large for the size check to succeed.
@@ -60,7 +63,7 @@ static ALWAYS_INLINE inline mirror::Object* artAllocObjectFromCode(
   }
   if (kInitialized) {
     return AllocObjectFromCodeInitialized<kInstrumented>(klass, self, allocator_type).Ptr();
-  } else if (!kFinalize) {
+  } else if (!kWithChecks) {
     return AllocObjectFromCodeResolved<kInstrumented>(klass, self, allocator_type).Ptr();
   } else {
     return AllocObjectFromCode<kInstrumented>(klass, self, allocator_type).Ptr();
