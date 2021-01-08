@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <functional>
 
 #include "art_method-inl.h"
 #include "base/arena_allocator.h"
@@ -1952,6 +1953,58 @@ std::ostream& operator<<(std::ostream& os, HInstruction::InstructionKind rhs) {
       break;
   }
 #undef DECLARE_CASE
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const HInstruction::NoArgsDump rhs) {
+  // TODO Really this should be const but that would require const-ifying
+  // graph-visualizer and HGraphVisitor which are tangled up everywhere.
+  return const_cast<HInstruction*>(rhs.ins)->Dump(os, /* dump_args= */ false);
+}
+
+std::ostream& operator<<(std::ostream& os, const HInstruction::ArgsDump rhs) {
+  // TODO Really this should be const but that would require const-ifying
+  // graph-visualizer and HGraphVisitor which are tangled up everywhere.
+  return const_cast<HInstruction*>(rhs.ins)->Dump(os, /* dump_args= */ true);
+}
+
+std::ostream& operator<<(std::ostream& os, const HInstruction& rhs) {
+  return os << rhs.DumpWithoutArgs();
+}
+
+std::ostream& operator<<(std::ostream& os, const HUseList<HInstruction*>& lst) {
+  os << "Instructions[";
+  bool first = true;
+  for (const auto& hi : lst) {
+    if (!first) {
+      os << ", ";
+    }
+    first = false;
+    os << hi.GetUser()->DebugName() << "[id: " << hi.GetUser()->GetId()
+       << ", blk: " << hi.GetUser()->GetBlock()->GetBlockId() << "]@" << hi.GetIndex();
+  }
+  os << "]";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const HUseList<HEnvironment*>& lst) {
+  os << "Environments[";
+  bool first = true;
+  for (const auto& hi : lst) {
+    if (!first) {
+      os << ", ";
+    }
+    first = false;
+    os << *hi.GetUser()->GetHolder() << "@" << hi.GetIndex();
+  }
+  os << "]";
+  return os;
+}
+
+std::ostream& HGraph::Dump(std::ostream& os,
+                           std::optional<std::reference_wrapper<const BlockNamer>> namer) {
+  HGraphVisualizer vis(&os, this, nullptr, namer);
+  vis.DumpGraphDebug();
   return os;
 }
 
