@@ -7500,17 +7500,25 @@ void CheckVTableHasNoDuplicates(Thread* self, Handle<mirror::Class> klass)
   // Need to check across dex files.
   struct Entry {
     size_t cached_hash = 0;
+    uint32_t name_len = 0;
     const char* name = nullptr;
     Signature signature = Signature::NoSignature();
-    uint32_t name_len = 0;
 
     Entry() = default;
     Entry(const Entry& other) = default;
     Entry& operator=(const Entry& other) = default;
 
     Entry(const DexFile* dex_file, const dex::MethodId& mid)
-        : name(dex_file->StringDataAndUtf16LengthByIdx(mid.name_idx_, &name_len)),
+        : name_len(0),  // Explicit to enforce ordering with -Werror,-Wreorder-ctor.
+          // This call writes `name_len` and it is therefore necessary that the
+          // initializer for `name_len` comes before it, otherwise the value
+          // from the call would be overwritten by that initializer.
+          name(dex_file->StringDataAndUtf16LengthByIdx(mid.name_idx_, &name_len)),
           signature(dex_file->GetMethodSignature(mid)) {
+      // The `name_len` has been initialized to the UTF16 length. Calculate length in bytes.
+      if (name[name_len] != 0) {
+        name_len += strlen(name + name_len);
+      }
     }
 
     bool operator==(const Entry& other) const {
