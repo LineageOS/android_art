@@ -178,14 +178,14 @@ TEST_F(ConscryptExclusionTest, Test) {
                                                    jar_name,
                                                    &error_msg));
   ASSERT_TRUE(odex_file != nullptr) << error_msg;
-  // Check that no classes have been resolved.
+  // Check that no classes have been initialized.
   for (const OatDexFile* oat_dex_file : odex_file->GetOatDexFiles()) {
     std::unique_ptr<const DexFile> dex_file = oat_dex_file->OpenDexFile(&error_msg);
     ASSERT_TRUE(dex_file != nullptr);
     for (size_t i = 0, num_class_defs = dex_file->NumClassDefs(); i != num_class_defs; ++i) {
       ClassStatus status = oat_dex_file->GetOatClass(i).GetStatus();
       ASSERT_FALSE(mirror::Class::IsErroneous(status));
-      ASSERT_LT(status, ClassStatus::kResolved);
+      ASSERT_LE(status, ClassStatus::kVerified);
     }
   }
 }
