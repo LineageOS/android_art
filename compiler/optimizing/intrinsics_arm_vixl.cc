@@ -3755,7 +3755,7 @@ static DataType::Type GetVarHandleExpectedValueType(HInvoke* invoke,
   if (number_of_arguments == /* VarHandle object */ 1u + expected_coordinates_count) {
     return invoke->GetType();
   } else {
-    return invoke->InputAt(number_of_arguments - 1u)->GetType();
+    return GetDataTypeFromShorty(invoke, number_of_arguments - 1u);
   }
 }
 
@@ -4265,7 +4265,7 @@ static void CreateVarHandleCompareAndSetOrExchangeLocations(HInvoke* invoke, boo
   }
 
   uint32_t number_of_arguments = invoke->GetNumberOfArguments();
-  DataType::Type value_type = invoke->InputAt(number_of_arguments - 1u)->GetType();
+  DataType::Type value_type = GetDataTypeFromShorty(invoke, number_of_arguments - 1u);
   if ((kEmitCompilerReadBarrier && !kUseBakerReadBarrier) &&
       value_type == DataType::Type::kReference) {
     // Unsupported for non-Baker read barrier because the artReadBarrierSlow() ignores
