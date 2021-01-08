@@ -5235,6 +5235,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
     }
 
     bool set_dont_compile = false;
+    bool must_count_locks = false;
     if (verifier.failures_.size() != 0) {
       if (VLOG_IS_ON(verifier)) {
         verifier.DumpFailures(VLOG_STREAM(verifier) << "Soft verification failures in "
@@ -5249,31 +5250,26 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
       } else {
         result.kind = FailureKind::kSoftFailure;
       }
-      if (method != nullptr &&
-          !CanCompilerHandleVerificationFailure(verifier.encountered_failure_types_)) {
+      if (!CanCompilerHandleVerificationFailure(verifier.encountered_failure_types_)) {
         set_dont_compile = true;
       }
-    }
-    if (method != nullptr) {
-      if (verifier.HasInstructionThatWillThrow()) {
-        set_dont_compile = true;
-        if (aot_mode && (callbacks != nullptr) && !callbacks->IsBootImage()) {
-          // When compiling apps, make HasInstructionThatWillThrow a soft error to trigger
-          // re-verification at runtime.
-          // The dead code after the throw is not verified and might be invalid. This may cause
-          // the JIT compiler to crash since it assumes that all the code is valid.
-          //
-          // There's a strong assumption that the entire boot image is verified and all its dex
-          // code is valid (even the dead and unverified one). As such this is done only for apps.
-          // (CompilerDriver DCHECKs in VerifyClassVisitor that methods from boot image are
-          // fully verified).
-          result.kind = FailureKind::kSoftFailure;
-        }
-      }
-      bool must_count_locks = false;
       if ((verifier.encountered_failure_types_ & VerifyError::VERIFY_ERROR_LOCKING) != 0) {
         must_count_locks = true;
       }
+    }
+
+    if (verifier.HasInstructionThatWillThrow()) {
+      // The dead code after the throw is not verified and might be invalid. This may cause
+      // the JIT compiler to crash since it assumes that all the code is valid.
+      set_dont_compile = true;
+      if (aot_mode) {
+        // Make HasInstructionThatWillThrow a soft error to trigger
+        // re-verification at runtime.
+        result.kind = FailureKind::kSoftFailure;
+      }
+    }
+
+    if (method != nullptr) {
       verifier_callback->SetDontCompile(method, set_dont_compile);
       verifier_callback->SetMustCountLocks(method, must_count_locks);
     }
