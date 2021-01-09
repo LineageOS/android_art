@@ -252,13 +252,21 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
     return dex_file.GetIndexForClassDef(*class_def);
   }
 
+  bool HasVerifiedClass(const std::string& cls) {
+    return HasVerifiedClass(cls, *primary_dex_file_);
+  }
+
   bool HasUnverifiedClass(const std::string& cls) {
-    return HasUnverifiedClass(cls, *primary_dex_file_);
+    return !HasVerifiedClass(cls, *primary_dex_file_);
   }
 
   bool HasUnverifiedClass(const std::string& cls, const DexFile& dex_file) {
+    return !HasVerifiedClass(cls, dex_file);
+  }
+
+  bool HasVerifiedClass(const std::string& cls, const DexFile& dex_file) {
     uint16_t class_def_idx = GetClassDefIndex(cls, dex_file);
-    return !verifier_deps_->GetVerifiedClasses(dex_file)[class_def_idx];
+    return verifier_deps_->GetVerifiedClasses(dex_file)[class_def_idx];
   }
 
   // Iterates over all assignability records and tries to find an entry which
@@ -526,10 +534,10 @@ TEST_F(VerifierDepsTest, UnverifiedClasses) {
   ASSERT_TRUE(HasUnverifiedClass("LMain;"));
   // Test that a class with hard failure is recorded.
   ASSERT_TRUE(HasUnverifiedClass("LMyVerificationFailure;"));
-  // Test that a class with unresolved super is recorded.
-  ASSERT_TRUE(HasUnverifiedClass("LMyClassWithNoSuper;"));
   // Test that a class with unresolved super and hard failure is recorded.
   ASSERT_TRUE(HasUnverifiedClass("LMyClassWithNoSuperButFailures;"));
+  // Test that a class with unresolved super can be verified.
+  ASSERT_TRUE(HasVerifiedClass("LMyClassWithNoSuper;"));
 }
 
 TEST_F(VerifierDepsTest, UnverifiedOrder) {

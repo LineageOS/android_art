@@ -1594,10 +1594,13 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
         GetInternTable()->AddImageStringsToTable(image_space, VoidFunctor());
       }
     }
-    if (heap_->GetBootImageSpaces().size() != GetBootClassPath().size()) {
+
+    const size_t total_components = gc::space::ImageSpace::GetNumberOfComponents(
+        ArrayRef<gc::space::ImageSpace* const>(heap_->GetBootImageSpaces()));
+    if (total_components != GetBootClassPath().size()) {
       // The boot image did not contain all boot class path components. Load the rest.
-      DCHECK_LT(heap_->GetBootImageSpaces().size(), GetBootClassPath().size());
-      size_t start = heap_->GetBootImageSpaces().size();
+      CHECK_LT(total_components, GetBootClassPath().size());
+      size_t start = total_components;
       DCHECK_LT(start, GetBootClassPath().size());
       std::vector<std::unique_ptr<const DexFile>> extra_boot_class_path;
       if (runtime_options.Exists(Opt::BootClassPathDexList)) {

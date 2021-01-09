@@ -290,12 +290,20 @@ void VerifierDeps::MaybeRecordVerificationStatus(const DexFile& dex_file,
                                                  FailureKind failure_kind) {
   VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
   if (thread_deps != nullptr) {
-    if (failure_kind == FailureKind::kNoFailure) {
-      thread_deps->RecordClassVerified(dex_file, class_def);
-    } else {
-      DexFileDeps* dex_deps = thread_deps->GetDexFileDeps(dex_file);
-      uint16_t index = dex_file.GetIndexForClassDef(class_def);
-      dex_deps->assignable_types_[index].clear();
+    switch (failure_kind) {
+      case verifier::FailureKind::kHardFailure:
+      case verifier::FailureKind::kSoftFailure: {
+        // Class will be verified at runtime.
+        DexFileDeps* dex_deps = thread_deps->GetDexFileDeps(dex_file);
+        uint16_t index = dex_file.GetIndexForClassDef(class_def);
+        dex_deps->assignable_types_[index].clear();
+        break;
+      }
+      case verifier::FailureKind::kAccessChecksFailure:
+      case verifier::FailureKind::kNoFailure: {
+        thread_deps->RecordClassVerified(dex_file, class_def);
+        break;
+      }
     }
   }
 }

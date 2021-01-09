@@ -1269,6 +1269,7 @@ HNewInstance* HInstructionBuilder::BuildNewInstance(dex::TypeIndex type_index, u
   if (load_class->NeedsAccessCheck() ||
       klass == nullptr ||  // Finalizable/instantiable is unknown.
       klass->IsFinalizable() ||
+      klass.Get() == klass->GetClass() ||  // Classes cannot be allocated in code
       !klass->IsInstantiable()) {
     entrypoint = kQuickAllocObjectWithChecks;
   }
