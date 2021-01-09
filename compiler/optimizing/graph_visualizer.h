@@ -17,11 +17,13 @@
 #ifndef ART_COMPILER_OPTIMIZING_GRAPH_VISUALIZER_H_
 #define ART_COMPILER_OPTIMIZING_GRAPH_VISUALIZER_H_
 
+#include <functional>
 #include <ostream>
 
 #include "arch/instruction_set.h"
 #include "base/arena_containers.h"
 #include "base/value_object.h"
+#include "block_namer.h"
 
 namespace art {
 
@@ -101,10 +103,12 @@ class HGraphVisualizer : public ValueObject {
  public:
   HGraphVisualizer(std::ostream* output,
                    HGraph* graph,
-                   const CodeGenerator* codegen);
+                   const CodeGenerator* codegen,
+                   std::optional<std::reference_wrapper<const BlockNamer>> namer = std::nullopt);
 
   void PrintHeader(const char* method_name) const;
   void DumpGraph(const char* pass_name, bool is_after_pass, bool graph_in_bad_state) const;
+  void DumpGraphDebug() const;
   void DumpGraphWithDisassembly() const;
 
   // C1visualizer file format does not support inserting arbitrary metadata into a cfg
@@ -115,9 +119,21 @@ class HGraphVisualizer : public ValueObject {
   static void DumpInstruction(std::ostream* output, HGraph* graph, HInstruction* instruction);
 
  private:
+  class OptionalDefaultNamer final : public BlockNamer {
+   public:
+    explicit OptionalDefaultNamer(std::optional<std::reference_wrapper<const BlockNamer>> inner)
+        : namer_(inner) {}
+
+    std::ostream& PrintName(std::ostream& os, HBasicBlock* blk) const override;
+
+   private:
+    std::optional<std::reference_wrapper<const BlockNamer>> namer_;
+  };
+
   std::ostream* const output_;
   HGraph* const graph_;
   const CodeGenerator* codegen_;
+  OptionalDefaultNamer namer_;
 
   DISALLOW_COPY_AND_ASSIGN(HGraphVisualizer);
 };

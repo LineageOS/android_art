@@ -2014,6 +2014,7 @@ class VerifyClassVisitor : public CompilationVisitor {
         hs.NewHandle(soa.Decode<mirror::ClassLoader>(jclass_loader)));
     Handle<mirror::Class> klass(
         hs.NewHandle(class_linker->FindClass(soa.Self(), descriptor, class_loader)));
+    ClassReference ref(manager_->GetDexFile(), class_def_index);
     verifier::FailureKind failure_kind;
     if (klass == nullptr) {
       CHECK(soa.Self()->IsExceptionPending());
@@ -2038,19 +2039,25 @@ class VerifyClassVisitor : public CompilationVisitor {
                                                log_level_,
                                                sdk_version_,
                                                &error_msg);
-      if (failure_kind == verifier::FailureKind::kHardFailure) {
-        LOG(ERROR) << "Verification failed on class " << PrettyDescriptor(descriptor)
-                   << " because: " << error_msg;
-        manager_->GetCompiler()->SetHadHardVerifierFailure();
-      } else if (failure_kind == verifier::FailureKind::kSoftFailure) {
-        manager_->GetCompiler()->AddSoftVerifierFailure();
-      } else {
-        // Force a soft failure for the VerifierDeps. This is a validity measure, as
-        // the vdex file already records that the class hasn't been resolved. It avoids
-        // trying to do future verification optimizations when processing the vdex file.
-        DCHECK(failure_kind == verifier::FailureKind::kNoFailure ||
-               failure_kind == verifier::FailureKind::kAccessChecksFailure) << failure_kind;
-        failure_kind = verifier::FailureKind::kSoftFailure;
+      switch (failure_kind) {
+        case verifier::FailureKind::kHardFailure: {
+          LOG(ERROR) << "Verification failed on class " << PrettyDescriptor(descriptor)
+                     << " because: " << error_msg;
+          manager_->GetCompiler()->SetHadHardVerifierFailure();
+          break;
+        }
+        case verifier::FailureKind::kSoftFailure: {
+          manager_->GetCompiler()->AddSoftVerifierFailure();
+          break;
+        }
+        case verifier::FailureKind::kAccessChecksFailure: {
+          manager_->GetCompiler()->RecordClassStatus(ref, ClassStatus::kVerifiedNeedsAccessChecks);
+          break;
+        }
+        case verifier::FailureKind::kNoFailure: {
+          manager_->GetCompiler()->RecordClassStatus(ref, ClassStatus::kVerified);
+          break;
+        }
       }
     } else if (&klass->GetDexFile() != &dex_file) {
       // Skip a duplicate class (as the resolved class is from another, earlier dex file).
@@ -2075,7 +2082,6 @@ class VerifyClassVisitor : public CompilationVisitor {
           << klass->PrettyDescriptor() << ": state=" << klass->GetStatus();
 
       // Class has a meaningful status for the compiler now, record it.
-      ClassReference ref(manager_->GetDexFile(), class_def_index);
       ClassStatus status = klass->GetStatus();
       if (status == ClassStatus::kInitialized) {
         // Initialized classes shall be visibly initialized when loaded from the image.

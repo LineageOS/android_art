@@ -18,6 +18,7 @@
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_ARM64_H_
 
 #include "base/bit_field.h"
+#include "class_root.h"
 #include "code_generator.h"
 #include "common_arm64.h"
 #include "dex/dex_file_types.h"
@@ -646,6 +647,7 @@ class CodeGeneratorARM64 : public CodeGenerator {
              vixl::aarch64::CPURegister src,
              const vixl::aarch64::MemOperand& dst);
   void LoadAcquire(HInstruction* instruction,
+                   DataType::Type type,
                    vixl::aarch64::CPURegister dst,
                    const vixl::aarch64::MemOperand& src,
                    bool needs_null_check);
@@ -787,7 +789,9 @@ class CodeGeneratorARM64 : public CodeGenerator {
                                 vixl::aarch64::Register base);
 
   void LoadBootImageAddress(vixl::aarch64::Register reg, uint32_t boot_image_reference);
+  void LoadTypeForBootImageIntrinsic(vixl::aarch64::Register reg, TypeReference type_reference);
   void LoadIntrinsicDeclaringClass(vixl::aarch64::Register reg, HInvoke* invoke);
+  void LoadClassRootForIntrinsic(vixl::aarch64::Register reg, ClassRoot class_root);
 
   void EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* linker_patches) override;
   bool NeedsThunkCode(const linker::LinkerPatch& patch) const override;

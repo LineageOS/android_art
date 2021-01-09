@@ -189,6 +189,11 @@ class ImageSpace : public MemMapSpace {
     return &live_bitmap_;
   }
 
+  // Compute the number of components in the image (contributing jar files).
+  size_t GetComponentCount() const {
+    return GetImageHeader().GetComponentCount();
+  }
+
   void Dump(std::ostream& os) const override;
 
   // Sweeping image spaces is a NOP.
@@ -224,6 +229,9 @@ class ImageSpace : public MemMapSpace {
   // The `image_spaces` must correspond to the head of the `boot_class_path`.
   static std::string GetBootClassPathChecksums(ArrayRef<ImageSpace* const> image_spaces,
                                                ArrayRef<const DexFile* const> boot_class_path);
+
+  // Returns the total number of components (jar files) associated with the image spaces.
+  static size_t GetNumberOfComponents(ArrayRef<gc::space::ImageSpace* const> image_spaces);
 
   // Returns whether the checksums are valid for the given boot class path,
   // image location and ISA (may differ from the ISA of an initialized Runtime).
