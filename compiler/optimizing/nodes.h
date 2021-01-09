@@ -33,6 +33,7 @@
 #include "base/stl_util.h"
 #include "base/transform_array_ref.h"
 #include "art_method.h"
+#include "block_namer.h"
 #include "class_root.h"
 #include "compilation_kind.h"
 #include "data_type.h"
@@ -422,6 +423,9 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
         cha_single_implementation_list_(allocator->Adapter(kArenaAllocCHA)) {
     blocks_.reserve(kDefaultNumberOfBlocks);
   }
+
+  std::ostream& Dump(std::ostream& os,
+                     std::optional<std::reference_wrapper<const BlockNamer>> namer = std::nullopt);
 
   ArenaAllocator* GetAllocator() const { return allocator_; }
   ArenaStack* GetArenaStack() const { return arena_stack_; }
@@ -880,6 +884,10 @@ class HGraph : public ArenaObject<kArenaAllocGraph> {
   ART_FRIEND_TEST(GraphTest, IfSuccessorSimpleJoinBlock1);
   DISALLOW_COPY_AND_ASSIGN(HGraph);
 };
+
+inline std::ostream& operator<<(std::ostream& os, HGraph& graph) {
+  return graph.Dump(os);
+}
 
 class HLoopInformation : public ArenaObject<kArenaAllocLoopInfo> {
  public:
@@ -2112,6 +2120,8 @@ class HEnvironment : public ArenaObject<kArenaAllocEnvironment> {
   DISALLOW_COPY_AND_ASSIGN(HEnvironment);
 };
 
+std::ostream& operator<<(std::ostream& os, const HInstruction& rhs);
+
 class HInstruction : public ArenaObject<kArenaAllocInstruction> {
  public:
 #define DECLARE_KIND(type, super) k##type,
@@ -2146,6 +2156,21 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   virtual ~HInstruction() {}
 
   std::ostream& Dump(std::ostream& os, bool dump_args = false);
+
+  // Helper for dumping without argument information using operator<<
+  struct NoArgsDump {
+    const HInstruction* ins;
+  };
+  NoArgsDump DumpWithoutArgs() const {
+    return NoArgsDump{this};
+  }
+  // Helper for dumping with argument information using operator<<
+  struct ArgsDump {
+    const HInstruction* ins;
+  };
+  ArgsDump DumpWithArgs() const {
+    return ArgsDump{this};
+  }
 
   HInstruction* GetNext() const { return next_; }
   HInstruction* GetPrevious() const { return previous_; }
@@ -2672,6 +2697,10 @@ class HInstruction : public ArenaObject<kArenaAllocInstruction> {
   friend class HInstructionList;
 };
 std::ostream& operator<<(std::ostream& os, HInstruction::InstructionKind rhs);
+std::ostream& operator<<(std::ostream& os, const HInstruction::NoArgsDump rhs);
+std::ostream& operator<<(std::ostream& os, const HInstruction::ArgsDump rhs);
+std::ostream& operator<<(std::ostream& os, const HUseList<HInstruction*>& lst);
+std::ostream& operator<<(std::ostream& os, const HUseList<HEnvironment*>& lst);
 
 // Iterates over the instructions, while preserving the next instruction
 // in case the current instruction gets removed from the list by the user
