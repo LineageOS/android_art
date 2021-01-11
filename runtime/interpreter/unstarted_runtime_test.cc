@@ -42,6 +42,7 @@
 #include "shadow_frame-inl.h"
 #include "thread.h"
 #include "transaction.h"
+#include "unstarted_runtime_list.h"
 
 namespace art {
 namespace interpreter {
@@ -64,34 +65,28 @@ class UnstartedRuntimeTest : public CommonRuntimeTest {
   // test friends.
 
   // Methods that intercept available libcore implementations.
-#define UNSTARTED_DIRECT(Name, SigIgnored)                 \
-  static void Unstarted ## Name(Thread* self,              \
-                                ShadowFrame* shadow_frame, \
-                                JValue* result,            \
-                                size_t arg_offset)         \
-      REQUIRES_SHARED(Locks::mutator_lock_) {        \
+#define UNSTARTED_DIRECT(Name, DescriptorIgnored, NameIgnored, SignatureIgnored)              \
+  static void Unstarted ## Name(Thread* self,                                                 \
+                                ShadowFrame* shadow_frame,                                    \
+                                JValue* result,                                               \
+                                size_t arg_offset)                                            \
+      REQUIRES_SHARED(Locks::mutator_lock_) {                                                 \
     interpreter::UnstartedRuntime::Unstarted ## Name(self, shadow_frame, result, arg_offset); \
   }
-#include "unstarted_runtime_list.h"
   UNSTARTED_RUNTIME_DIRECT_LIST(UNSTARTED_DIRECT)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
 #undef UNSTARTED_DIRECT
 
   // Methods that are native.
-#define UNSTARTED_JNI(Name, SigIgnored)                       \
-  static void UnstartedJNI ## Name(Thread* self,              \
-                                   ArtMethod* method,         \
-                                   mirror::Object* receiver,  \
-                                   uint32_t* args,            \
-                                   JValue* result)            \
-      REQUIRES_SHARED(Locks::mutator_lock_) {           \
+#define UNSTARTED_JNI(Name, DescriptorIgnored, NameIgnored, SignatureIgnored)                  \
+  static void UnstartedJNI ## Name(Thread* self,                                               \
+                                   ArtMethod* method,                                          \
+                                   mirror::Object* receiver,                                   \
+                                   uint32_t* args,                                             \
+                                   JValue* result)                                             \
+      REQUIRES_SHARED(Locks::mutator_lock_) {                                                  \
     interpreter::UnstartedRuntime::UnstartedJNI ## Name(self, method, receiver, args, result); \
   }
-#include "unstarted_runtime_list.h"
   UNSTARTED_RUNTIME_JNI_LIST(UNSTARTED_JNI)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
 #undef UNSTARTED_JNI
 
   UniqueDeoptShadowFramePtr CreateShadowFrame(uint32_t num_vregs,
