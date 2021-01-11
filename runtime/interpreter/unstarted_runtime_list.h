@@ -19,92 +19,89 @@
 
 // Methods that intercept available libcore implementations.
 #define UNSTARTED_RUNTIME_DIRECT_LIST(V)    \
-  V(CharacterToLowerCase, "int java.lang.Character.toLowerCase(int)") \
-  V(CharacterToUpperCase, "int java.lang.Character.toUpperCase(int)") \
-  V(ClassForName, "java.lang.Class java.lang.Class.forName(java.lang.String)") \
-  V(ClassForNameLong, "java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader)") \
-  V(ClassGetPrimitiveClass, "java.lang.Class java.lang.Class.getPrimitiveClass(java.lang.String)") \
-  V(ClassClassForName, "java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader)") \
-  V(ClassNewInstance, "java.lang.Object java.lang.Class.newInstance()") \
-  V(ClassGetDeclaredField, "java.lang.reflect.Field java.lang.Class.getDeclaredField(java.lang.String)") \
-  V(ClassGetDeclaredMethod, "java.lang.reflect.Method java.lang.Class.getDeclaredMethodInternal(java.lang.String, java.lang.Class[])") \
-  V(ClassGetDeclaredConstructor, "java.lang.reflect.Constructor java.lang.Class.getDeclaredConstructorInternal(java.lang.Class[])") \
-  V(ClassGetDeclaringClass, "java.lang.Class java.lang.Class.getDeclaringClass()") \
-  V(ClassGetEnclosingClass, "java.lang.Class java.lang.Class.getEnclosingClass()") \
-  V(ClassGetInnerClassFlags, "int java.lang.Class.getInnerClassFlags(int)") \
-  V(ClassGetSignatureAnnotation, "java.lang.String[] java.lang.Class.getSignatureAnnotation()") \
-  V(ClassIsAnonymousClass, "boolean java.lang.Class.isAnonymousClass()") \
-  V(ClassLoaderGetResourceAsStream, "java.io.InputStream java.lang.ClassLoader.getResourceAsStream(java.lang.String)") \
-  V(ConstructorNewInstance0, "java.lang.Object java.lang.reflect.Constructor.newInstance0(java.lang.Object[])") \
-  V(VmClassLoaderFindLoadedClass, "java.lang.Class java.lang.VMClassLoader.findLoadedClass(java.lang.ClassLoader, java.lang.String)") \
-  V(SystemArraycopy, "void java.lang.System.arraycopy(java.lang.Object, int, java.lang.Object, int, int)") \
-  V(SystemArraycopyByte, "void java.lang.System.arraycopy(byte[], int, byte[], int, int)") \
-  V(SystemArraycopyChar, "void java.lang.System.arraycopy(char[], int, char[], int, int)") \
-  V(SystemArraycopyInt, "void java.lang.System.arraycopy(int[], int, int[], int, int)") \
-  V(SystemGetSecurityManager, "java.lang.SecurityManager java.lang.System.getSecurityManager()") \
-  V(SystemGetProperty, "java.lang.String java.lang.System.getProperty(java.lang.String)") \
-  V(SystemGetPropertyWithDefault, "java.lang.String java.lang.System.getProperty(java.lang.String, java.lang.String)") \
-  V(ThreadLocalGet, "java.lang.Object java.lang.ThreadLocal.get()") \
-  V(MathCeil, "double java.lang.Math.ceil(double)") \
-  V(MathFloor, "double java.lang.Math.floor(double)") \
-  V(MathSin, "double java.lang.Math.sin(double)") \
-  V(MathCos, "double java.lang.Math.cos(double)") \
-  V(MathPow, "double java.lang.Math.pow(double, double)") \
-  V(ObjectHashCode, "int java.lang.Object.hashCode()") \
-  V(DoubleDoubleToRawLongBits, "long java.lang.Double.doubleToRawLongBits(double)") \
-  V(MemoryPeekByte, "byte libcore.io.Memory.peekByte(long)") \
-  V(MemoryPeekShort, "short libcore.io.Memory.peekShortNative(long)") \
-  V(MemoryPeekInt, "int libcore.io.Memory.peekIntNative(long)") \
-  V(MemoryPeekLong, "long libcore.io.Memory.peekLongNative(long)") \
-  V(MemoryPeekByteArray, "void libcore.io.Memory.peekByteArray(long, byte[], int, int)") \
-  V(MethodInvoke, "java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])") \
-  V(ReferenceGetReferent, "java.lang.Object java.lang.ref.Reference.getReferent()") \
-  V(RuntimeAvailableProcessors, "int java.lang.Runtime.availableProcessors()") \
-  V(StringGetCharsNoCheck, "void java.lang.String.getCharsNoCheck(int, int, char[], int)") \
-  V(StringCharAt, "char java.lang.String.charAt(int)") \
-  V(StringDoReplace, "java.lang.String java.lang.String.doReplace(char, char)") \
-  V(StringFactoryNewStringFromChars, "java.lang.String java.lang.StringFactory.newStringFromChars(int, int, char[])") \
-  V(StringFactoryNewStringFromString, "java.lang.String java.lang.StringFactory.newStringFromString(java.lang.String)") \
-  V(StringFastSubstring, "java.lang.String java.lang.String.fastSubstring(int, int)") \
-  V(StringToCharArray, "char[] java.lang.String.toCharArray()") \
-  V(ThreadCurrentThread, "java.lang.Thread java.lang.Thread.currentThread()") \
-  V(ThreadGetNativeState, "int java.lang.Thread.nativeGetStatus(boolean)") \
-  V(UnsafeCompareAndSwapLong, "boolean sun.misc.Unsafe.compareAndSwapLong(java.lang.Object, long, long, long)") \
-  V(UnsafeCompareAndSwapObject, "boolean sun.misc.Unsafe.compareAndSwapObject(java.lang.Object, long, java.lang.Object, java.lang.Object)") \
-  V(UnsafeGetObjectVolatile, "java.lang.Object sun.misc.Unsafe.getObjectVolatile(java.lang.Object, long)") \
-  V(UnsafePutObjectVolatile, "void sun.misc.Unsafe.putObjectVolatile(java.lang.Object, long, java.lang.Object)") \
-  V(UnsafePutOrderedObject, "void sun.misc.Unsafe.putOrderedObject(java.lang.Object, long, java.lang.Object)") \
-  V(IntegerParseInt, "int java.lang.Integer.parseInt(java.lang.String)") \
-  V(LongParseLong, "long java.lang.Long.parseLong(java.lang.String)") \
-  V(SystemIdentityHashCode, "int java.lang.System.identityHashCode(java.lang.Object)")
+  V(CharacterToLowerCase, "Ljava/lang/Character;", "toLowerCase", "(I)I") \
+  V(CharacterToUpperCase, "Ljava/lang/Character;", "toUpperCase", "(I)I") \
+  V(ClassForName, "Ljava/lang/Class;", "forName", "(Ljava/lang/String;)Ljava/lang/Class;") \
+  V(ClassForNameLong, "Ljava/lang/Class;", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;") \
+  V(ClassGetPrimitiveClass, "Ljava/lang/Class;", "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;") \
+  V(ClassClassForName, "Ljava/lang/Class;", "classForName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;") \
+  V(ClassNewInstance, "Ljava/lang/Class;", "newInstance", "()Ljava/lang/Object;") \
+  V(ClassGetDeclaredField, "Ljava/lang/Class;", "getDeclaredField", "(Ljava/lang/String;)Ljava/lang/reflect/Field;") \
+  V(ClassGetDeclaredMethod, "Ljava/lang/Class;", "getDeclaredMethodInternal", "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;") \
+  V(ClassGetDeclaredConstructor, "Ljava/lang/Class;", "getDeclaredConstructorInternal", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;") \
+  V(ClassGetDeclaringClass, "Ljava/lang/Class;", "getDeclaringClass", "()Ljava/lang/Class;") \
+  V(ClassGetEnclosingClass, "Ljava/lang/Class;", "getEnclosingClass", "()Ljava/lang/Class;") \
+  V(ClassGetInnerClassFlags, "Ljava/lang/Class;", "getInnerClassFlags", "(I)I") \
+  V(ClassGetSignatureAnnotation, "Ljava/lang/Class;", "getSignatureAnnotation", "()[Ljava/lang/String;") \
+  V(ClassIsAnonymousClass, "Ljava/lang/Class;", "isAnonymousClass", "()Z") \
+  V(ClassLoaderGetResourceAsStream, "Ljava/lang/ClassLoader;", "getResourceAsStream", "(Ljava/lang/String;)Ljava/io/InputStream;") \
+  V(ConstructorNewInstance0, "Ljava/lang/reflect/Constructor;", "newInstance0", "([Ljava/lang/Object;)Ljava/lang/Object;") \
+  V(VmClassLoaderFindLoadedClass, "Ljava/lang/VMClassLoader;", "findLoadedClass", "(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Class;") \
+  V(SystemArraycopy, "Ljava/lang/System;", "arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V") \
+  V(SystemArraycopyByte, "Ljava/lang/System;", "arraycopy", "([BI[BII)V") \
+  V(SystemArraycopyChar, "Ljava/lang/System;", "arraycopy", "([CI[CII)V") \
+  V(SystemArraycopyInt, "Ljava/lang/System;", "arraycopy", "([II[III)V") \
+  V(SystemGetSecurityManager, "Ljava/lang/System;", "getSecurityManager", "()Ljava/lang/SecurityManager;") \
+  V(SystemGetProperty, "Ljava/lang/System;", "getProperty", "(Ljava/lang/String;)Ljava/lang/String;") \
+  V(SystemGetPropertyWithDefault, "Ljava/lang/System;", "getProperty", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") \
+  V(ThreadLocalGet, "Ljava/lang/ThreadLocal;", "get", "()Ljava/lang/Object;") \
+  V(MathCeil, "Ljava/lang/Math;", "ceil", "(D)D") \
+  V(MathFloor, "Ljava/lang/Math;", "floor", "(D)D") \
+  V(MathSin, "Ljava/lang/Math;", "sin", "(D)D") \
+  V(MathCos, "Ljava/lang/Math;", "cos", "(D)D") \
+  V(MathPow, "Ljava/lang/Math;", "pow", "(DD)D") \
+  V(ObjectHashCode, "Ljava/lang/Object;", "hashCode", "()I") \
+  V(DoubleDoubleToRawLongBits, "Ljava/lang/Double;", "doubleToRawLongBits", "(D)J") \
+  V(MemoryPeekByte, "Llibcore/io/Memory;", "peekByte", "(J)B") \
+  V(MemoryPeekShort, "Llibcore/io/Memory;", "peekShortNative", "(J)S") \
+  V(MemoryPeekInt, "Llibcore/io/Memory;", "peekIntNative", "(J)I") \
+  V(MemoryPeekLong, "Llibcore/io/Memory;", "peekLongNative", "(J)J") \
+  V(MemoryPeekByteArray, "Llibcore/io/Memory;", "peekByteArray", "(J[BII)V") \
+  V(MethodInvoke, "Ljava/lang/reflect/Method;", "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") \
+  V(ReferenceGetReferent, "Ljava/lang/ref/Reference;", "getReferent", "()Ljava/lang/Object;") \
+  V(RuntimeAvailableProcessors, "Ljava/lang/Runtime;", "availableProcessors", "()I") \
+  V(StringGetCharsNoCheck, "Ljava/lang/String;", "getCharsNoCheck", "(II[CI)V") \
+  V(StringCharAt, "Ljava/lang/String;", "charAt", "(I)C") \
+  V(StringDoReplace, "Ljava/lang/String;", "doReplace", "(CC)Ljava/lang/String;") \
+  V(StringFactoryNewStringFromChars, "Ljava/lang/StringFactory;", "newStringFromChars", "(II[C)Ljava/lang/String;") \
+  V(StringFactoryNewStringFromString, "Ljava/lang/StringFactory;", "newStringFromString", "(Ljava/lang/String;)Ljava/lang/String;") \
+  V(StringFastSubstring, "Ljava/lang/String;", "fastSubstring", "(II)Ljava/lang/String;") \
+  V(StringToCharArray, "Ljava/lang/String;", "toCharArray", "()[C") \
+  V(ThreadCurrentThread, "Ljava/lang/Thread;", "currentThread", "()Ljava/lang/Thread;") \
+  V(ThreadGetNativeState, "Ljava/lang/Thread;", "nativeGetStatus", "(Z)I") \
+  V(UnsafeCompareAndSwapLong, "Lsun/misc/Unsafe;", "compareAndSwapLong", "(Ljava/lang/Object;JJJ)Z") \
+  V(UnsafeCompareAndSwapObject, "Lsun/misc/Unsafe;", "compareAndSwapObject", "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") \
+  V(UnsafeGetObjectVolatile, "Lsun/misc/Unsafe;", "getObjectVolatile", "(Ljava/lang/Object;J)Ljava/lang/Object;") \
+  V(UnsafePutObjectVolatile, "Lsun/misc/Unsafe;", "putObjectVolatile", "(Ljava/lang/Object;JLjava/lang/Object;)V") \
+  V(UnsafePutOrderedObject, "Lsun/misc/Unsafe;", "putOrderedObject", "(Ljava/lang/Object;JLjava/lang/Object;)V") \
+  V(IntegerParseInt, "Ljava/lang/Integer;", "parseInt", "(Ljava/lang/String;)I") \
+  V(LongParseLong, "Ljava/lang/Long;", "parseLong", "(Ljava/lang/String;)J") \
+  V(SystemIdentityHashCode, "Ljava/lang/System;", "identityHashCode", "(Ljava/lang/Object;)I")
 
 // Methods that are native.
 #define UNSTARTED_RUNTIME_JNI_LIST(V)           \
-  V(VMRuntimeIs64Bit, "boolean dalvik.system.VMRuntime.is64Bit()") \
-  V(VMRuntimeNewUnpaddedArray, "java.lang.Object dalvik.system.VMRuntime.newUnpaddedArray(java.lang.Class, int)") \
-  V(VMStackGetCallingClassLoader, "java.lang.ClassLoader dalvik.system.VMStack.getCallingClassLoader()") \
-  V(VMStackGetStackClass2, "java.lang.Class dalvik.system.VMStack.getStackClass2()") \
-  V(MathLog, "double java.lang.Math.log(double)") \
-  V(MathExp, "double java.lang.Math.exp(double)") \
-  V(AtomicLongVMSupportsCS8, "boolean java.util.concurrent.atomic.AtomicLong.VMSupportsCS8()") \
-  V(ClassGetNameNative, "java.lang.String java.lang.Class.getNameNative()") \
-  V(DoubleLongBitsToDouble, "double java.lang.Double.longBitsToDouble(long)") \
-  V(FloatFloatToRawIntBits, "int java.lang.Float.floatToRawIntBits(float)") \
-  V(FloatIntBitsToFloat, "float java.lang.Float.intBitsToFloat(int)") \
-  V(ObjectInternalClone, "java.lang.Object java.lang.Object.internalClone()") \
-  V(ObjectNotifyAll, "void java.lang.Object.notifyAll()") \
-  V(StringCompareTo, "int java.lang.String.compareTo(java.lang.String)") \
-  V(StringIntern, "java.lang.String java.lang.String.intern()") \
-  V(ArrayCreateMultiArray, "java.lang.Object java.lang.reflect.Array.createMultiArray(java.lang.Class, int[])") \
-  V(ArrayCreateObjectArray, "java.lang.Object java.lang.reflect.Array.createObjectArray(java.lang.Class, int)") \
-  V(ThrowableNativeFillInStackTrace, "java.lang.Object java.lang.Throwable.nativeFillInStackTrace()") \
-  V(ByteOrderIsLittleEndian, "boolean java.nio.ByteOrder.isLittleEndian()") \
-  V(UnsafeCompareAndSwapInt, "boolean sun.misc.Unsafe.compareAndSwapInt(java.lang.Object, long, int, int)") \
-  V(UnsafeGetIntVolatile, "int sun.misc.Unsafe.getIntVolatile(java.lang.Object, long)") \
-  V(UnsafePutObject, "void sun.misc.Unsafe.putObject(java.lang.Object, long, java.lang.Object)") \
-  V(UnsafeGetArrayBaseOffsetForComponentType, "int sun.misc.Unsafe.getArrayBaseOffsetForComponentType(java.lang.Class)") \
-  V(UnsafeGetArrayIndexScaleForComponentType, "int sun.misc.Unsafe.getArrayIndexScaleForComponentType(java.lang.Class)")
+  V(VMRuntimeIs64Bit, "Ldalvik/system/VMRuntime;", "is64Bit", "()Z") \
+  V(VMRuntimeNewUnpaddedArray, "Ldalvik/system/VMRuntime;", "newUnpaddedArray", "(Ljava/lang/Class;I)Ljava/lang/Object;") \
+  V(VMStackGetCallingClassLoader, "Ldalvik/system/VMStack;", "getCallingClassLoader", "()Ljava/lang/ClassLoader;") \
+  V(VMStackGetStackClass2, "Ldalvik/system/VMStack;", "getStackClass2", "()Ljava/lang/Class;") \
+  V(MathLog, "Ljava/lang/Math;", "log", "(D)D") \
+  V(MathExp, "Ljava/lang/Math;", "exp", "(D)D") \
+  V(AtomicLongVMSupportsCS8, "Ljava/util/concurrent/atomic/AtomicLong;", "VMSupportsCS8", "()Z") \
+  V(ClassGetNameNative, "Ljava/lang/Class;", "getNameNative", "()Ljava/lang/String;") \
+  V(DoubleLongBitsToDouble, "Ljava/lang/Double;", "longBitsToDouble", "(J)D") \
+  V(FloatFloatToRawIntBits, "Ljava/lang/Float;", "floatToRawIntBits", "(F)I") \
+  V(FloatIntBitsToFloat, "Ljava/lang/Float;", "intBitsToFloat", "(I)F") \
+  V(ObjectInternalClone, "Ljava/lang/Object;", "internalClone", "()Ljava/lang/Object;") \
+  V(ObjectNotifyAll, "Ljava/lang/Object;", "notifyAll", "()V") \
+  V(StringCompareTo, "Ljava/lang/String;", "compareTo", "(Ljava/lang/String;)I") \
+  V(StringIntern, "Ljava/lang/String;", "intern", "()Ljava/lang/String;") \
+  V(ArrayCreateMultiArray, "Ljava/lang/reflect/Array;", "createMultiArray", "(Ljava/lang/Class;[I)Ljava/lang/Object;") \
+  V(ArrayCreateObjectArray, "Ljava/lang/reflect/Array;", "createObjectArray", "(Ljava/lang/Class;I)Ljava/lang/Object;") \
+  V(ThrowableNativeFillInStackTrace, "Ljava/lang/Throwable;", "nativeFillInStackTrace", "()Ljava/lang/Object;") \
+  V(UnsafeCompareAndSwapInt, "Lsun/misc/Unsafe;", "compareAndSwapInt", "(Ljava/lang/Object;JII)Z") \
+  V(UnsafeGetIntVolatile, "Lsun/misc/Unsafe;", "getIntVolatile", "(Ljava/lang/Object;J)I") \
+  V(UnsafePutObject, "Lsun/misc/Unsafe;", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V") \
+  V(UnsafeGetArrayBaseOffsetForComponentType, "Lsun/misc/Unsafe;", "getArrayBaseOffsetForComponentType", "(Ljava/lang/Class;)I") \
+  V(UnsafeGetArrayIndexScaleForComponentType, "Lsun/misc/Unsafe;", "getArrayIndexScaleForComponentType", "(Ljava/lang/Class;)I")
 
 #endif  // ART_RUNTIME_INTERPRETER_UNSTARTED_RUNTIME_LIST_H_
-// the guard in this file is just for cpplint
-#undef ART_RUNTIME_INTERPRETER_UNSTARTED_RUNTIME_LIST_H_

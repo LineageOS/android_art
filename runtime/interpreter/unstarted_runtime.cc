@@ -24,7 +24,6 @@
 #include <initializer_list>
 #include <limits>
 #include <locale>
-#include <unordered_map>
 
 #include <android-base/logging.h>
 #include <android-base/stringprintf.h>
@@ -32,6 +31,7 @@
 #include "art_method-inl.h"
 #include "base/casts.h"
 #include "base/enums.h"
+#include "base/hash_map.h"
 #include "base/macros.h"
 #include "base/quasi_atomic.h"
 #include "base/zip_archive.h"
@@ -60,6 +60,7 @@
 #include "reflection.h"
 #include "thread-inl.h"
 #include "transaction.h"
+#include "unstarted_runtime_list.h"
 #include "well_known_classes.h"
 
 namespace art {
@@ -1851,12 +1852,6 @@ void UnstartedRuntime::UnstartedJNIThrowableNativeFillInStackTrace(
   result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace(soa)));
 }
 
-void UnstartedRuntime::UnstartedJNIByteOrderIsLittleEndian(
-    Thread* self ATTRIBUTE_UNUSED, ArtMethod* method ATTRIBUTE_UNUSED,
-    mirror::Object* receiver ATTRIBUTE_UNUSED, uint32_t* args ATTRIBUTE_UNUSED, JValue* result) {
-  result->SetZ(JNI_TRUE);
-}
-
 void UnstartedRuntime::UnstartedJNIUnsafeCompareAndSwapInt(
     Thread* self,
     ArtMethod* method ATTRIBUTE_UNUSED,
@@ -1971,37 +1966,95 @@ using JNIHandler = void(*)(Thread* self,
                            uint32_t* args,
                            JValue* result);
 
-static bool tables_initialized_ = false;
-static std::unordered_map<std::string, InvokeHandler> invoke_handlers_;
-static std::unordered_map<std::string, JNIHandler> jni_handlers_;
+#define ONE_PLUS(ShortNameIgnored, DescriptorIgnored, NameIgnored, SignatureIgnored) 1 +
+static constexpr size_t kInvokeHandlersSize = UNSTARTED_RUNTIME_DIRECT_LIST(ONE_PLUS) 0;
+static constexpr size_t kJniHandlersSize = UNSTARTED_RUNTIME_JNI_LIST(ONE_PLUS) 0;
+#undef ONE_PLUS
 
-void UnstartedRuntime::InitializeInvokeHandlers() {
-#define UNSTARTED_DIRECT(ShortName, Sig) \
-  invoke_handlers_.insert(std::make_pair(Sig, & UnstartedRuntime::Unstarted ## ShortName));
-#include "unstarted_runtime_list.h"
-  UNSTARTED_RUNTIME_DIRECT_LIST(UNSTARTED_DIRECT)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
-#undef UNSTARTED_DIRECT
+// The actual value of `kMinLoadFactor` is irrelevant because the HashMap<>s below
+// are never resized, but we still need to pass a reasonable value to the constructor.
+static constexpr double kMinLoadFactor = 0.5;
+static constexpr double kMaxLoadFactor = 0.7;
+
+constexpr size_t BufferSize(size_t size) {
+  // Note: ceil() is not suitable for constexpr, so cast to size_t and adjust by 1 if needed.
+  const size_t estimate = static_cast<size_t>(size / kMaxLoadFactor);
+  return static_cast<size_t>(estimate * kMaxLoadFactor) == size ? estimate : estimate + 1u;
 }
 
-void UnstartedRuntime::InitializeJNIHandlers() {
-#define UNSTARTED_JNI(ShortName, Sig) \
-  jni_handlers_.insert(std::make_pair(Sig, & UnstartedRuntime::UnstartedJNI ## ShortName));
-#include "unstarted_runtime_list.h"
+static constexpr size_t kInvokeHandlersBufferSize = BufferSize(kInvokeHandlersSize);
+static_assert(
+    static_cast<size_t>(kInvokeHandlersBufferSize * kMaxLoadFactor) == kInvokeHandlersSize);
+static constexpr size_t kJniHandlersBufferSize = BufferSize(kJniHandlersSize);
+static_assert(static_cast<size_t>(kJniHandlersBufferSize * kMaxLoadFactor) == kJniHandlersSize);
+
+static bool tables_initialized_ = false;
+static std::pair<ArtMethod*, InvokeHandler> kInvokeHandlersBuffer[kInvokeHandlersBufferSize];
+static HashMap<ArtMethod*, InvokeHandler> invoke_handlers_(
+    kMinLoadFactor, kMaxLoadFactor, kInvokeHandlersBuffer, kInvokeHandlersBufferSize);
+static std::pair<ArtMethod*, JNIHandler> kJniHandlersBuffer[kJniHandlersBufferSize];
+static HashMap<ArtMethod*, JNIHandler> jni_handlers_(
+    kMinLoadFactor, kMaxLoadFactor, kJniHandlersBuffer, kJniHandlersBufferSize);
+
+static ArtMethod* FindMethod(Thread* self,
+                             ClassLinker* class_linker,
+                             const char* descriptor,
+                             std::string_view name,
+                             std::string_view signature) REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Class> klass = class_linker->FindSystemClass(self, descriptor);
+  DCHECK(klass != nullptr) << descriptor;
+  ArtMethod* method = klass->FindClassMethod(name, signature, class_linker->GetImagePointerSize());
+  DCHECK(method != nullptr) << descriptor << "." << name << signature;
+  return method;
+}
+
+void UnstartedRuntime::InitializeInvokeHandlers(Thread* self) {
+  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+#define UNSTARTED_DIRECT(ShortName, Descriptor, Name, Signature) \
+  { \
+    ArtMethod* method = FindMethod(self, class_linker, Descriptor, Name, Signature); \
+    invoke_handlers_.insert(std::make_pair(method, & UnstartedRuntime::Unstarted ## ShortName)); \
+  }
+  UNSTARTED_RUNTIME_DIRECT_LIST(UNSTARTED_DIRECT)
+#undef UNSTARTED_DIRECT
+  DCHECK_EQ(invoke_handlers_.NumBuckets(), kInvokeHandlersBufferSize);
+}
+
+void UnstartedRuntime::InitializeJNIHandlers(Thread* self) {
+  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+#define UNSTARTED_JNI(ShortName, Descriptor, Name, Signature) \
+  { \
+    ArtMethod* method = FindMethod(self, class_linker, Descriptor, Name, Signature); \
+    jni_handlers_.insert(std::make_pair(method, & UnstartedRuntime::UnstartedJNI ## ShortName)); \
+  }
   UNSTARTED_RUNTIME_JNI_LIST(UNSTARTED_JNI)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
 #undef UNSTARTED_JNI
+  DCHECK_EQ(jni_handlers_.NumBuckets(), kJniHandlersBufferSize);
 }
 
 void UnstartedRuntime::Initialize() {
   CHECK(!tables_initialized_);
 
-  InitializeInvokeHandlers();
-  InitializeJNIHandlers();
+  ScopedObjectAccess soa(Thread::Current());
+  InitializeInvokeHandlers(soa.Self());
+  InitializeJNIHandlers(soa.Self());
 
   tables_initialized_ = true;
+}
+
+void UnstartedRuntime::Reinitialize() {
+  CHECK(tables_initialized_);
+
+  // Note: HashSet::clear() abandons the pre-allocated storage which we need to keep.
+  while (!invoke_handlers_.empty()) {
+    invoke_handlers_.erase(invoke_handlers_.begin());
+  }
+  while (!jni_handlers_.empty()) {
+    jni_handlers_.erase(jni_handlers_.begin());
+  }
+
+  tables_initialized_ = false;
+  Initialize();
 }
 
 void UnstartedRuntime::Invoke(Thread* self, const CodeItemDataAccessor& accessor,
@@ -2010,8 +2063,7 @@ void UnstartedRuntime::Invoke(Thread* self, const CodeItemDataAccessor& accessor
   // problems in core libraries.
   CHECK(tables_initialized_);
 
-  std::string name(ArtMethod::PrettyMethod(shadow_frame->GetMethod()));
-  const auto& iter = invoke_handlers_.find(name);
+  const auto& iter = invoke_handlers_.find(shadow_frame->GetMethod());
   if (iter != invoke_handlers_.end()) {
     // Clear out the result in case it's not zeroed out.
     result->SetL(nullptr);
@@ -2031,15 +2083,14 @@ void UnstartedRuntime::Invoke(Thread* self, const CodeItemDataAccessor& accessor
 // Hand select a number of methods to be run in a not yet started runtime without using JNI.
 void UnstartedRuntime::Jni(Thread* self, ArtMethod* method, mirror::Object* receiver,
                            uint32_t* args, JValue* result) {
-  std::string name(ArtMethod::PrettyMethod(method));
-  const auto& iter = jni_handlers_.find(name);
+  const auto& iter = jni_handlers_.find(method);
   if (iter != jni_handlers_.end()) {
     // Clear out the result in case it's not zeroed out.
     result->SetL(nullptr);
     (*iter->second)(self, method, receiver, args, result);
   } else if (Runtime::Current()->IsActiveTransaction()) {
     AbortTransactionF(self, "Attempt to invoke native method in non-started runtime: %s",
-                      name.c_str());
+                      ArtMethod::PrettyMethod(method).c_str());
   } else {
     LOG(FATAL) << "Calling native method " << ArtMethod::PrettyMethod(method) << " in an unstarted "
         "non-transactional runtime";
