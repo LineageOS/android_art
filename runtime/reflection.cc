@@ -494,18 +494,26 @@ bool InvokeMethodImpl(const ScopedObjectAccessAlreadyRunnable& soa,
 
   // Wrap any exception with "Ljava/lang/reflect/InvocationTargetException;" and return early.
   if (soa.Self()->IsExceptionPending()) {
-    // If we get another exception when we are trying to wrap, then just use that instead.
-    ScopedLocalRef<jthrowable> th(soa.Env(), soa.Env()->ExceptionOccurred());
-    soa.Self()->ClearException();
-    jobject exception_instance =
-        soa.Env()->NewObject(WellKnownClasses::java_lang_reflect_InvocationTargetException,
-                             WellKnownClasses::java_lang_reflect_InvocationTargetException_init,
-                             th.get());
-    if (exception_instance == nullptr) {
-      soa.Self()->AssertPendingException();
-      return false;
+    // To abort a transaction we use a fake exception that should never be caught by the bytecode
+    // and therefore it makes no sense to wrap it.
+    if (Runtime::Current()->IsTransactionAborted()) {
+      DCHECK(soa.Self()->GetException()->GetClass()->DescriptorEquals(
+                  "Ldalvik/system/TransactionAbortError;"))
+          << soa.Self()->GetException()->GetClass()->PrettyDescriptor();
+    } else {
+      // If we get another exception when we are trying to wrap, then just use that instead.
+      ScopedLocalRef<jthrowable> th(soa.Env(), soa.Env()->ExceptionOccurred());
+      soa.Self()->ClearException();
+      jobject exception_instance =
+          soa.Env()->NewObject(WellKnownClasses::java_lang_reflect_InvocationTargetException,
+                               WellKnownClasses::java_lang_reflect_InvocationTargetException_init,
+                               th.get());
+      if (exception_instance == nullptr) {
+        soa.Self()->AssertPendingException();
+        return false;
+      }
+      soa.Env()->Throw(reinterpret_cast<jthrowable>(exception_instance));
     }
-    soa.Env()->Throw(reinterpret_cast<jthrowable>(exception_instance));
     return false;
   }
 
