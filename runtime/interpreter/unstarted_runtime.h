@@ -21,6 +21,7 @@
 
 #include "dex/dex_file.h"
 #include "jvalue.h"
+#include "unstarted_runtime_list.h"
 
 namespace art {
 
@@ -48,6 +49,10 @@ class UnstartedRuntime {
  public:
   static void Initialize();
 
+  // For testing. When we destroy the Runtime and create a new one,
+  // we need to reinitialize maps with new `ArtMethod*` keys.
+  static void Reinitialize();
+
   static void Invoke(Thread* self,
                      const CodeItemDataAccessor& accessor,
                      ShadowFrame* shadow_frame,
@@ -64,30 +69,24 @@ class UnstartedRuntime {
 
  private:
   // Methods that intercept available libcore implementations.
-#define UNSTARTED_DIRECT(ShortName, SigIgnored)                 \
-  static void Unstarted ## ShortName(Thread* self,              \
-                                     ShadowFrame* shadow_frame, \
-                                     JValue* result,            \
-                                     size_t arg_offset)         \
+#define UNSTARTED_DIRECT(ShortName, DescriptorIgnored, NameIgnored, SignatureIgnored) \
+  static void Unstarted ## ShortName(Thread* self,                                    \
+                                     ShadowFrame* shadow_frame,                       \
+                                     JValue* result,                                  \
+                                     size_t arg_offset)                               \
       REQUIRES_SHARED(Locks::mutator_lock_);
-#include "unstarted_runtime_list.h"
   UNSTARTED_RUNTIME_DIRECT_LIST(UNSTARTED_DIRECT)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
 #undef UNSTARTED_DIRECT
 
   // Methods that are native.
-#define UNSTARTED_JNI(ShortName, SigIgnored)                       \
-  static void UnstartedJNI ## ShortName(Thread* self,              \
-                                        ArtMethod* method, \
-                                        mirror::Object* receiver,  \
-                                        uint32_t* args,            \
-                                        JValue* result)            \
+#define UNSTARTED_JNI(ShortName, DescriptorIgnored, NameIgnored, SignatureIgnored) \
+  static void UnstartedJNI ## ShortName(Thread* self,                              \
+                                        ArtMethod* method,                         \
+                                        mirror::Object* receiver,                  \
+                                        uint32_t* args,                            \
+                                        JValue* result)                            \
       REQUIRES_SHARED(Locks::mutator_lock_);
-#include "unstarted_runtime_list.h"
   UNSTARTED_RUNTIME_JNI_LIST(UNSTARTED_JNI)
-#undef UNSTARTED_RUNTIME_DIRECT_LIST
-#undef UNSTARTED_RUNTIME_JNI_LIST
 #undef UNSTARTED_JNI
 
   static void UnstartedClassForNameCommon(Thread* self,
@@ -97,8 +96,8 @@ class UnstartedRuntime {
                                           bool long_form,
                                           const char* caller) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  static void InitializeInvokeHandlers();
-  static void InitializeJNIHandlers();
+  static void InitializeInvokeHandlers(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
+  static void InitializeJNIHandlers(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
 
   friend class UnstartedRuntimeTest;
 
