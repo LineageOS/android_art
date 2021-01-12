@@ -229,6 +229,14 @@ struct VariantMap {
     return GetValuePtr(key);
   }
 
+  // Look up the value from the key and return the value wrapped in a std::optional. If it was not
+  // set in the map, return an empty std::optional.
+  template <typename TValue>
+  std::optional<TValue> GetOptional(const TKey<TValue>& key) const {
+    auto* ptr = Get(key);
+    return (ptr == nullptr) ? std::optional<TValue>{} : std::make_optional(*ptr);
+  }
+
   // Lookup the value from the key. If it was not set in the map, return the default value.
   // The default value is either the key's default, or TValue{} if the key doesn't have a default.
   template <typename TValue>
