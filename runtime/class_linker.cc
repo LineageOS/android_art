@@ -4655,12 +4655,14 @@ verifier::FailureKind ClassLinker::VerifyClass(
       }
     } else {
       CHECK(verifier_failure == verifier::FailureKind::kSoftFailure ||
+            verifier_failure == verifier::FailureKind::kTypeChecksFailure ||
             verifier_failure == verifier::FailureKind::kAccessChecksFailure);
       // Soft failures at compile time should be retried at runtime. Soft
       // failures at runtime will be handled by slow paths in the generated
       // code. Set status accordingly.
       if (Runtime::Current()->IsAotCompiler()) {
-        if (verifier_failure == verifier::FailureKind::kSoftFailure) {
+        if (verifier_failure == verifier::FailureKind::kSoftFailure ||
+            verifier_failure == verifier::FailureKind::kTypeChecksFailure) {
           mirror::Class::SetStatus(klass, ClassStatus::kRetryVerificationAtRuntime, self);
         } else {
           mirror::Class::SetStatus(klass, ClassStatus::kVerifiedNeedsAccessChecks, self);

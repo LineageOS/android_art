@@ -1630,6 +1630,7 @@ bool Redefiner::ClassRedefinition::CheckVerification(const RedefinitionDataIter&
       return true;
     case art::verifier::FailureKind::kSoftFailure:
     case art::verifier::FailureKind::kAccessChecksFailure:
+    case art::verifier::FailureKind::kTypeChecksFailure:
       // Soft failures might require interpreter on some methods. It won't prevent redefinition but
       // it does mean we need to run the verifier again and potentially update method flags after
       // performing the swap.
