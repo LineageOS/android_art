@@ -567,11 +567,12 @@
             "692-vdex-inmem-loader",
             "693-vdex-inmem-loader-evict",
             "944-transform-classloaders",
-            "999-redefine-hiddenapi"
+            "999-redefine-hiddenapi",
+            "2038-hiddenapi-jvmti-ext"
         ],
         "description": [
             "Tests that use custom class loaders or other features not supported ",
-            "by our JVMTI implementation"
+            "by our JVMTI implementation (such as hiddenapi, vdex or bad dex-files)"
         ],
         "variant": "jvmti-stress | redefine-stress"
     },
@@ -1183,7 +1184,8 @@
                   "2012-structural-redefinition-failures-jni-id",
                   "2033-shutdown-mechanics",
                   "2035-structural-native-method",
-                  "2036-structural-subclass-shadow"],
+                  "2036-structural-subclass-shadow",
+                  "2038-hiddenapi-jvmti-ext"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },
