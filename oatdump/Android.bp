@@ -185,11 +185,6 @@ art_cc_binary {
         "libartd-dexlayout_static_defaults",
         "oatdumps-defaults",
     ],
-    target: {
-        linux_glibc_x86_64: {
-            use_clang_lld: true,
-        },
-    },
     static_libs: [
         "libartd-disassembler",
         "libvixld",
