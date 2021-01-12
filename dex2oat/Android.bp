@@ -399,11 +399,6 @@ art_cc_binary {
         "dex2oats-defaults",
     ],
     static_libs: ["libdex2oatd_static"],
-    target: {
-        linux_glibc_x86_64: {
-            use_clang_lld: true,
-        },
-    },
 }
 
 art_cc_library_static {
