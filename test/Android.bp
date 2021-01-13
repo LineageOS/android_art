@@ -462,7 +462,6 @@ art_cc_defaults {
         "1963-add-to-dex-classloader-in-memory/check_memfd_create.cc",
         "2012-structural-redefinition-failures-jni-id/set-jni-id-used.cc",
         "2031-zygote-compiled-frame-deopt/native-wait.cc",
-        "2038-hiddenapi-jvmti-ext/hiddenapi_ext.cc",
     ],
     static_libs: [
         "libz",

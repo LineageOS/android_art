@@ -195,9 +195,15 @@ class PACKED(4) FixedSizeHandleScope : public HandleScope {
   }
 
  private:
+  explicit ALWAYS_INLINE FixedSizeHandleScope(BaseHandleScope* link);
   explicit ALWAYS_INLINE FixedSizeHandleScope(BaseHandleScope* link,
-                                              ObjPtr<mirror::Object> fill_value = nullptr);
+                                              ObjPtr<mirror::Object> fill_value)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
   ALWAYS_INLINE ~FixedSizeHandleScope() {}
+
+  // Helper to set references to null without any mutator-locks.
+  ALWAYS_INLINE void SetReferenceToNull(size_t i);
 
   template<class T>
   ALWAYS_INLINE MutableHandle<T> GetHandle(size_t i) REQUIRES_SHARED(Locks::mutator_lock_) {

@@ -862,6 +862,7 @@ END \name
    // - xINST contains shorty (in callee-save to switch over return value after call).
    // - x0 contains method
    // - x1 contains 'this' pointer for instance method.
+   // - for interface calls, x26 contains the interface method.
    add x9, xINST, #1  // shorty + 1  ; ie skip return arg character
    FETCH w11, 2 // arguments
    .if \is_string_init
@@ -903,10 +904,8 @@ END \name
    bl art_quick_invoke_custom
    .else
       .if \is_interface
-      // Setup hidden argument. As we don't have access to the interface method,
-      // just pass the method from the IMT. If the method is the conflict trampoline,
-      // this will make the stub go to runtime, otherwise the hidden argument is unused.
-      mov ip2, x0
+      // Setup hidden argument.
+      mov ip2, x26
       .endif
       ldr lr, [x0, #ART_METHOD_QUICK_CODE_OFFSET_64]
       blr lr
@@ -1102,6 +1101,7 @@ END \name
    // - xINST contains shorty (in callee-save to switch over return value after call).
    // - x0 contains method
    // - x1 contains 'this' pointer for instance method.
+   // - for interface calls, x26 contains the interface method.
    add x9, xINST, #1  // shorty + 1  ; ie skip return arg character
    FETCH w10, 2 // arguments
    .if \is_string_init
@@ -1154,10 +1154,8 @@ END \name
    bl art_quick_invoke_custom
    .else
       .if \is_interface
-      // Setup hidden argument. As we don't have access to the interface method,
-      // just pass the method from the IMT. If the method is the conflict trampoline,
-      // this will make the stub go to runtime, otherwise the hidden argument is unused.
-      mov ip2, x0
+      // Setup hidden argument.
+      mov ip2, x26
       .endif
       ldr lr, [x0, #ART_METHOD_QUICK_CODE_OFFSET_64]
       blr lr
@@ -1581,27 +1579,6 @@ NterpHandleHotnessOverflow:
 
     // Jump to the compiled code.
     br xFP
-
-NterpHandleInvokeInterfaceOnObjectMethodRange:
-   // First argument is the 'this' pointer.
-   FETCH w1, 2
-   GET_VREG w1, w1
-   // Note: x1 is null, this will be handled by our SIGSEGV handler.
-   ldr w2, [x1, #MIRROR_OBJECT_CLASS_OFFSET]
-   add w2, w2, #MIRROR_CLASS_VTABLE_OFFSET_64
-   ldr x0, [x2, w0, sxtw #3]
-   b NterpCommonInvokeInstanceRange
-
-NterpHandleInvokeInterfaceOnObjectMethod:
-   // First argument is the 'this' pointer.
-   FETCH w1, 2
-   and w1, w1, #0xf
-   GET_VREG w1, w1
-   // Note: x1 is null, this will be handled by our SIGSEGV handler.
-   ldr w2, [x1, #MIRROR_OBJECT_CLASS_OFFSET]
-   add w2, w2, #MIRROR_CLASS_VTABLE_OFFSET_64
-   ldr x0, [x2, w0, sxtw #3]
-   b NterpCommonInvokeInstance
 
 // This is the logical end of ExecuteNterpImpl, where the frame info applies.
 // EndExecuteNterpImpl includes the methods below as we want the runtime to
