@@ -21,6 +21,7 @@
 
 #include <array>
 #include <atomic>
+#include <optional>
 #include <ostream>
 #include <string_view>
 #include <vector>
@@ -58,6 +59,10 @@
 // per metric.
 
 namespace art {
+
+class Runtime;
+struct RuntimeArgumentMap;
+
 namespace metrics {
 
 /**
@@ -340,9 +345,16 @@ class ArtMetrics {
 std::string DatumName(DatumId datum);
 
 struct ReportingConfig {
-  bool dump_to_logcat;
-  // TODO(eholk): this will grow to support other configurations, such as logging to a file, or
-  // statsd. There will also be options for reporting after a period of time, or at certain events.
+  static ReportingConfig FromRuntimeArguments(const RuntimeArgumentMap& args);
+
+  // Causes metrics to be written to the log, which makes them show up in logcat.
+  bool dump_to_logcat{false};
+
+  // If set, provides a file name to enable metrics logging to a file.
+  std::optional<std::string> dump_to_file;
+
+  // Returns whether any options are set that enables metrics reporting.
+  constexpr bool ReportingEnabled() const { return dump_to_logcat || dump_to_file.has_value(); }
 };
 
 // MetricsReporter handles periodically reporting ART metrics.

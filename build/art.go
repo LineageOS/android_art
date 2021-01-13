@@ -305,18 +305,23 @@ func testcasesContent(config android.Config) map[string]string {
 // The 'key' is the file in testcases and 'value' is the path to copy it from.
 // The actual copy will be done in make since soong does not do installations.
 func addTestcasesFile(ctx android.InstallHookContext) {
+	if ctx.Os() != android.BuildOs || ctx.Module().IsSkipInstall() {
+		return
+	}
+
 	testcasesContent := testcasesContent(ctx.Config())
 
 	artTestMutex.Lock()
 	defer artTestMutex.Unlock()
 
-	if ctx.Os().Class == android.Host {
-		src := ctx.SrcPath().String()
-		path := strings.Split(ctx.Path().ToMakePath().String(), "/")
-		// Keep last two parts of the install path (e.g. bin/dex2oat).
-		dst := strings.Join(path[len(path)-2:], "/")
-		testcasesContent[dst] = src
+	src := ctx.SrcPath().String()
+	path := strings.Split(ctx.Path().ToMakePath().String(), "/")
+	// Keep last two parts of the install path (e.g. bin/dex2oat).
+	dst := strings.Join(path[len(path)-2:], "/")
+	if oldSrc, ok := testcasesContent[dst]; ok {
+		ctx.ModuleErrorf("Conflicting sources for %s: %s and %s", dst, oldSrc, src)
 	}
+	testcasesContent[dst] = src
 }
 
 var artTestMutex sync.Mutex

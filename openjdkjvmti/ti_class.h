@@ -93,10 +93,6 @@ class ClassUtil {
   static jvmtiError GetSourceDebugExtension(jvmtiEnv* env,
                                             jclass klass,
                                             char** source_debug_extension_ptr);
-
-  static jvmtiError DisableHiddenApiEnforcementPolicy(jvmtiEnv* env);
-  static jvmtiError GetHiddenApiEnforcementPolicy(jvmtiEnv* env, jint* policy);
-  static jvmtiError SetHiddenApiEnforcementPolicy(jvmtiEnv* env, jint policy);
 };
 
 }  // namespace openjdkjvmti

@@ -44,6 +44,16 @@ inline FixedSizeHandleScope<kNumReferences>::FixedSizeHandleScope(BaseHandleScop
 }
 
 template<size_t kNumReferences>
+inline FixedSizeHandleScope<kNumReferences>::FixedSizeHandleScope(BaseHandleScope* link)
+    : HandleScope(link, kNumReferences) {
+  static_assert(kNumReferences >= 1, "FixedSizeHandleScope must contain at least 1 reference");
+  DCHECK_EQ(&storage_[0], GetReferences());  // TODO: Figure out how to use a compile assert.
+  for (size_t i = 0; i < kNumReferences; ++i) {
+    SetReferenceToNull(i);
+  }
+}
+
+template<size_t kNumReferences>
 inline StackHandleScope<kNumReferences>::StackHandleScope(Thread* self,
                                                           ObjPtr<mirror::Object> fill_value)
     : FixedSizeHandleScope<kNumReferences>(self->GetTopHandleScope(), fill_value),
@@ -56,9 +66,6 @@ template<size_t kNumReferences>
 inline StackHandleScope<kNumReferences>::~StackHandleScope() {
   BaseHandleScope* top_handle_scope = self_->PopHandleScope();
   DCHECK_EQ(top_handle_scope, this);
-  if (kDebugLocking) {
-    Locks::mutator_lock_->AssertSharedHeld(self_);
-  }
 }
 
 inline size_t HandleScope::SizeOf(uint32_t num_references) {
@@ -154,6 +161,11 @@ inline void FixedSizeHandleScope<kNumReferences>::SetReference(size_t i,
   GetReferences()[i].Assign(object);
 }
 
+template<size_t kNumReferences>
+inline void FixedSizeHandleScope<kNumReferences>::SetReferenceToNull(size_t i) {
+  DCHECK_LT(i, kNumReferences);
+  GetReferences()[i].Assign(nullptr);
+}
 // Number of references contained within this handle scope.
 inline uint32_t BaseHandleScope::NumberOfReferences() const {
   return LIKELY(!IsVariableSized())

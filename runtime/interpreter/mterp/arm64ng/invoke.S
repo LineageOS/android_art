@@ -72,7 +72,7 @@
 %def invoke_interface(range=""):
    EXPORT_PC
    // Fast-path which gets the method from thread-local cache.
-   FETCH_FROM_THREAD_CACHE x0, 2f
+   FETCH_FROM_THREAD_CACHE x26, 5f
 1:
    // First argument is the 'this' pointer.
    FETCH w1, 2
@@ -82,26 +82,42 @@
    GET_VREG w1, w1
    // Note: if w1 is null, this will be handled by our SIGSEGV handler.
    ldr w2, [x1, #MIRROR_OBJECT_CLASS_OFFSET]
+   // Test the first two bits of the fetched ArtMethod:
+   // - If the first bit is set, this is a method on j.l.Object
+   // - If the second bit is set, this is a default method.
+   tst w26, #0x3
+   b.ne 3f
+   ldrh w3, [x26, #ART_METHOD_IMT_INDEX_OFFSET]
+2:
    ldr x2, [x2, #MIRROR_CLASS_IMT_PTR_OFFSET_64]
-   ldr x0, [x2, w0, uxtw #3]
+   ldr x0, [x2, w3, uxtw #3]
    .if $range
    b NterpCommonInvokeInterfaceRange
    .else
    b NterpCommonInvokeInterface
    .endif
-2:
+3:
+   tbnz w26, #0, 4f
+   and x26, x26, #-4
+   ldrh w3, [x26, #ART_METHOD_METHOD_INDEX_OFFSET]
+   and w3, w3, #ART_METHOD_IMT_MASK
+   b 2b
+4:
+   lsr w26, w26, #16
+   add w2, w2, #MIRROR_CLASS_VTABLE_OFFSET_64
+   ldr x0, [x2, w26, uxtw #3]
+   .if $range
+   b NterpCommonInvokeInstanceRange
+   .else
+   b NterpCommonInvokeInstance
+   .endif
+5:
    mov x0, xSELF
    ldr x1, [sp]
    mov x2, xPC
    bl nterp_get_method
-   // For j.l.Object interface calls, the high bit is set. Also the method index is 16bits.
-   tbz w0, #31, 1b
-   and w0, w0, #0xffff
-   .if $range
-   b NterpHandleInvokeInterfaceOnObjectMethodRange
-   .else
-   b NterpHandleInvokeInterfaceOnObjectMethod
-   .endif
+   mov x26, x0
+   b 1b
 
 %def op_invoke_interface():
 %  invoke_interface(range="0")

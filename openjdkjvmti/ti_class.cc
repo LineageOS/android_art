@@ -56,7 +56,6 @@
 #include "gc/heap.h"
 #include "gc_root.h"
 #include "handle.h"
-#include "hidden_api.h"
 #include "jni/jni_env_ext-inl.h"
 #include "jni/jni_internal.h"
 #include "mirror/array-alloc-inl.h"
@@ -1135,40 +1134,6 @@ jvmtiError ClassUtil::GetSourceDebugExtension(jvmtiEnv* env,
     return ret;
   }
   *source_debug_extension_ptr = ext_copy.release();
-  return OK;
-}
-
-jvmtiError ClassUtil::DisableHiddenApiEnforcementPolicy(jvmtiEnv* env) {
-  return SetHiddenApiEnforcementPolicy(
-      env, static_cast<jint>(art::hiddenapi::EnforcementPolicy::kDisabled));
-}
-
-jvmtiError ClassUtil::GetHiddenApiEnforcementPolicy(jvmtiEnv* env, jint* policy) {
-  if (env == nullptr) {
-    return ERR(INVALID_ENVIRONMENT);
-  } else if (art::Thread::Current() == nullptr) {
-    return ERR(UNATTACHED_THREAD);
-  } else if (policy == nullptr) {
-    return ERR(NULL_POINTER);
-  }
-  *policy = static_cast<jint>(art::Runtime::Current()->GetHiddenApiEnforcementPolicy());
-  return OK;
-}
-
-jvmtiError ClassUtil::SetHiddenApiEnforcementPolicy(jvmtiEnv* env, jint policy) {
-  if (env == nullptr) {
-    return ERR(INVALID_ENVIRONMENT);
-  } else if (art::Thread::Current() == nullptr) {
-    return ERR(UNATTACHED_THREAD);
-  } else if (policy < static_cast<jint>(art::hiddenapi::EnforcementPolicy::kDisabled) ||
-             policy > static_cast<jint>(art::hiddenapi::EnforcementPolicy::kMax)) {
-    JVMTI_LOG(INFO, env) << "Bad policy: " << policy << ", must be between "
-                         << static_cast<jint>(art::hiddenapi::EnforcementPolicy::kDisabled)
-                         << " and " << static_cast<jint>(art::hiddenapi::EnforcementPolicy::kMax);
-    return ERR(ILLEGAL_ARGUMENT);
-  }
-  art::Runtime::Current()->SetHiddenApiEnforcementPolicy(
-      static_cast<art::hiddenapi::EnforcementPolicy>(policy));
   return OK;
 }
 
