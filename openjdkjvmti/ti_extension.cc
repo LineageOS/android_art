@@ -509,6 +509,58 @@ jvmtiError ExtensionUtil::GetExtensionFunctions(jvmtiEnv* env,
   if (error != ERR(NONE)) {
     return error;
   }
+  // GetHiddenApiEnforcementPolicy
+  error = add_extension(
+      reinterpret_cast<jvmtiExtensionFunction>(ClassUtil::GetHiddenApiEnforcementPolicy),
+      "com.android.art.misc.get_hidden_api_enforcement_policy",
+      "Gets the current hiddenapi enforcement policy. Policy values are defined in"
+      " `frameworks/base/core/java/android/content/pm/ApplicationInfo.java` as the"
+      " HIDDEN_API_ENFORCEMENT_ static fields. See the comments in `art/runtime/hidden_api.h` for"
+      " more information. This should be used with"
+      " `com.android.art.misc.set_hidden_api_enforcement_policy` in order to restore the"
+      " hidden-api state after temporarily toggling it.",
+      {
+        { "policy", JVMTI_KIND_OUT, JVMTI_TYPE_JINT, false },
+      },
+      {
+         ERR(NULL_POINTER),
+      });
+  if (error != ERR(NONE)) {
+    return error;
+  }
+  // SetHiddenApiEnforcementPolicy
+  error = add_extension(
+      reinterpret_cast<jvmtiExtensionFunction>(ClassUtil::SetHiddenApiEnforcementPolicy),
+      "com.android.art.misc.set_hidden_api_enforcement_policy",
+      "Sets the hiddenapi enforcement policy to the given value. Policy values are defined in"
+      " `frameworks/base/core/java/android/content/pm/ApplicationInfo.java` as the"
+      " HIDDEN_API_ENFORCEMENT_ static fields. See the comments in `art/runtime/hidden_api.h` for"
+      " more information. This API should always be used sparingly and in conjunction with"
+      " `com.android.art.misc.get_hidden_api_enforcement_policy` to temporarily toggle"
+      " hidden-api on and off as changes are required.",
+      {
+        { "policy", JVMTI_KIND_IN, JVMTI_TYPE_JINT, false },
+      },
+      {
+         ERR(ILLEGAL_ARGUMENT),
+      });
+  if (error != ERR(NONE)) {
+    return error;
+  }
+  // DisableHiddenApiEnforcementPolicy
+  error = add_extension(
+      reinterpret_cast<jvmtiExtensionFunction>(ClassUtil::DisableHiddenApiEnforcementPolicy),
+      "com.android.art.misc.disable_hidden_api_enforcement_policy",
+      "Sets the hiddenapi enforcement policy to disabled. This API should always be"
+      " used sparingly and in conjunction with"
+      " `com.android.art.misc.get_hidden_api_enforcement_policy` and"
+      " `com.android.art.misc.set_hidden_api_enforcement_policy` to temporarily"
+      " toggle hidden-api on and off as changes are required.",
+      {},
+      {});
+  if (error != ERR(NONE)) {
+    return error;
+  }
 
   // Copy into output buffer.
 
