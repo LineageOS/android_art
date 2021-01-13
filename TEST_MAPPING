@@ -382,12 +382,6 @@
       "name": "art-run-test-2030-long-running-child"
     },
     {
-      "name": "art-run-test-2232-write-metrics-to-log"
-    },
-    {
-      "name": "art-run-test-2234-write-metrics-to-file"
-    },
-    {
       "name": "art-run-test-300-package-override"
     },
     {
