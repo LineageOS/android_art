@@ -166,6 +166,7 @@ inline void FixedSizeHandleScope<kNumReferences>::SetReferenceToNull(size_t i) {
   DCHECK_LT(i, kNumReferences);
   GetReferences()[i].Assign(nullptr);
 }
+
 // Number of references contained within this handle scope.
 inline uint32_t BaseHandleScope::NumberOfReferences() const {
   return LIKELY(!IsVariableSized())
@@ -270,7 +271,6 @@ inline void VariableSizedHandleScope::VisitRoots(Visitor& visitor) {
     cur = reinterpret_cast<LocalScopeType*>(cur->GetLink());
   }
 }
-
 
 }  // namespace art
 
