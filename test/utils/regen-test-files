@@ -434,6 +434,9 @@ cat >>TEST_MAPPING <<EOF
     {
       "name": "BootImageProfileTest"
     },
+    {
+      "name": "ArtServiceTests"
+    },
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
