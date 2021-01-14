@@ -1299,10 +1299,11 @@ END_FUNCTION \name
    .endif
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    // Clear the marker that we put for volatile fields. The x86 memory
    // model doesn't require a barrier.
@@ -1331,10 +1332,11 @@ END_FUNCTION \name
    \store    \rINST_reg, (%rax,%rdx,1)
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    testq MACRO_LITERAL(1), %rax
    je 1b
@@ -1386,10 +1388,11 @@ END_FUNCTION \name
    OP_IPUT_INTERNAL \rINST_reg, \store, \wide
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1419,10 +1422,11 @@ END_FUNCTION \name
    .endif
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1667,22 +1671,22 @@ NterpNewArray:
    jmp 1b
 
 NterpPutObjectInstanceField:
+   movzbq  rINSTbl, %rbp                   # rcx <- BA
+   sarl    $$4, %ebp                       # ebp <- B
+   GET_VREG %ebp, %rbp                     # vB (object we're operating on)
+   andb    $$0xf, rINSTbl                  # rINST <- A
+   GET_VREG rINST, rINSTq                  # rINST <- v[A]
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rax, 2f
 1:
-   movzbq  rINSTbl, %rcx                   # rcx <- BA
-   sarl    $$4, %ecx                       # ecx <- B
-   GET_VREG %ecx, %rcx                     # vB (object we're operating on)
-   testl   %ecx, %ecx                      # is object null?
+   testl   %ebp, %ebp                      # is object null?
    je      common_errNullObject
-   andb    $$0xf, rINSTbl                  # rINST <- A
-   GET_VREG rINST, rINSTq                  # rINST <- v[A]
-   movl rINST, (%rcx,%rax,1)
+   movl rINST, (%rbp,%rax,1)
    testl rINST, rINST
    je 4f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rcx
-   movb %al, (%rax, %rcx, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, %rbp
+   movb %al, (%rax, %rbp, 1)
 4:
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
@@ -1690,24 +1694,19 @@ NterpPutObjectInstanceField:
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq rINSTq, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
-   negl %eax
-   movzbq  rINSTbl, %rcx                   # rcx <- BA
-   sarl    $$4, %ecx                       # ecx <- B
-   GET_VREG %ecx, %rcx                     # vB (object we're operating on)
-   testl   %ecx, %ecx                      # is object null?
+   testl   %ebp, %ebp                      # is object null?
    je      common_errNullObject
-   andb    $$0xf, rINSTbl                  # rINST <- A
-   GET_VREG rINST, rINSTq                  # rINST <- v[A]
-   movl rINST, (%rcx,%rax,1)
+   negl %eax
+   movl rINST, (%rbp,%rax,1)
    testl rINST, rINST
    je 5f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rcx
-   movb %al, (%rcx, %rax, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, %rbp
+   movb %al, (%rbp, %rax, 1)
 5:
    lock addl $$0, (%rsp)
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
@@ -1733,7 +1732,7 @@ NterpGetObjectInstanceField:
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1747,6 +1746,7 @@ NterpGetObjectInstanceField:
    jmp 4b
 
 NterpPutObjectStaticField:
+   GET_VREG %ebp, rINSTq
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rax, 2f
 1:
@@ -1755,9 +1755,8 @@ NterpPutObjectStaticField:
    cmpq $$0, rSELF:THREAD_READ_BARRIER_MARK_REG00_OFFSET
    jne 3f
 5:
-   GET_VREG %ecx, rINSTq
-   movl %ecx, (%eax, %edx, 1)
-   testl %ecx, %ecx
+   movl %ebp, (%eax, %edx, 1)
+   testl %ebp, %ebp
    je 4f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rcx
    shrq $$CARD_TABLE_CARD_SHIFT, %rax
@@ -1765,10 +1764,11 @@ NterpPutObjectStaticField:
 4:
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq %rbp, %rcx
    call nterp_get_static_field
    testq MACRO_LITERAL(1), %rax
    je 1b
@@ -1778,10 +1778,8 @@ NterpPutObjectStaticField:
    cmpq $$0, rSELF:THREAD_READ_BARRIER_MARK_REG00_OFFSET
    jne 7f
 6:
-   movzbl rINSTbl, %ecx
-   GET_VREG %ecx, %rcx
-   movl %ecx, (%eax, %edx, 1)
-   testl %ecx, %ecx
+   movl %ebp, (%eax, %edx, 1)
+   testl %ebp, %ebp
    je 8f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rcx
    shrq $$CARD_TABLE_CARD_SHIFT, %rax
@@ -1812,10 +1810,11 @@ NterpGetObjectStaticField:
    SET_VREG_OBJECT %eax, rINSTq            # fp[A] <- value
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    andq $$-2, %rax
    jmp 1b
