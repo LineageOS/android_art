@@ -1,0 +1,1 @@
+Tests that the JVMTI set/get_hidden_api_enforcement_policy extensions work
