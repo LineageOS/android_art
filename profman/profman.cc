@@ -72,10 +72,8 @@ static std::string CommandLine() {
   return android::base::Join(command, ' ');
 }
 
-static constexpr int kInvalidFd = -1;
-
 static bool FdIsValid(int fd) {
-  return fd != kInvalidFd;
+  return fd != File::kInvalidFd;
 }
 
 static void UsageErrorV(const char* fmt, va_list ap) {
@@ -273,12 +271,12 @@ static void ParseBoolOption(const char* raw_option,
 class ProfMan final {
  public:
   ProfMan() :
-      reference_profile_file_fd_(kInvalidFd),
+      reference_profile_file_fd_(File::kInvalidFd),
       dump_only_(false),
       dump_classes_and_methods_(false),
       generate_boot_image_profile_(false),
       generate_boot_profile_(false),
-      dump_output_to_fd_(kInvalidFd),
+      dump_output_to_fd_(File::kInvalidFd),
       test_profile_num_dex_(kDefaultTestProfileNumDex),
       test_profile_method_percerntage_(kDefaultTestProfileMethodPercentage),
       test_profile_class_percentage_(kDefaultTestProfileClassPercentage),
@@ -706,7 +704,7 @@ class ProfMan final {
       }
     }
     for (const std::string& profile_file : profile_files_) {
-      int ret = DumpOneProfile(kOrdinaryProfile, profile_file, kInvalidFd, &dex_files, &dump);
+      int ret = DumpOneProfile(kOrdinaryProfile, profile_file, File::kInvalidFd, &dex_files, &dump);
       if (ret != 0) {
         return ret;
       }
@@ -725,7 +723,7 @@ class ProfMan final {
     if (!reference_profile_file_.empty()) {
       int ret = DumpOneProfile(kReferenceProfile,
                                reference_profile_file_,
-                               kInvalidFd,
+                               File::kInvalidFd,
                                &dex_files,
                                &dump);
       if (ret != 0) {
@@ -1249,7 +1247,7 @@ class ProfMan final {
       fd = open(reference_profile_file_.c_str(), flags, 0644);
       if (fd < 0) {
         PLOG(ERROR) << "Cannot open " << reference_profile_file_;
-        return kInvalidFd;
+        return File::kInvalidFd;
       }
     }
     return fd;

@@ -338,7 +338,7 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
       }
     }
 
-    bool success_image = writer->Write(kInvalidFd,
+    bool success_image = writer->Write(File::kInvalidFd,
                                        image_filenames,
                                        image_filenames.size());
     ASSERT_TRUE(success_image);
