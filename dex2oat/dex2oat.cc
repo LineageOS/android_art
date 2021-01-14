@@ -2188,10 +2188,14 @@ class Dex2Oat final {
 
         TimingLogger::ScopedTiming t("dex2oat OatFile copy", timings_);
         std::unique_ptr<File>& in = oat_files_[i];
-        std::unique_ptr<File> out(OS::CreateEmptyFile(oat_unstripped_[i].c_str()));
         int64_t in_length = in->GetLength();
         if (in_length < 0) {
           PLOG(ERROR) << "Failed to get the length of oat file: " << in->GetPath();
+          return false;
+        }
+        std::unique_ptr<File> out(OS::CreateEmptyFile(oat_unstripped_[i].c_str()));
+        if (out == nullptr) {
+          PLOG(ERROR) << "Failed to open oat file for writing: " << oat_unstripped_[i];
           return false;
         }
         if (!out->Copy(in.get(), 0, in_length)) {
