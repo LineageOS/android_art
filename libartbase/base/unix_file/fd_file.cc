@@ -179,7 +179,7 @@ void FdFile::Destroy() {
     }
     DCHECK_GE(guard_state_, GuardState::kClosed);
   }
-  if (fd_ != -1) {
+  if (fd_ != kInvalidFd) {
     if (Close() != 0) {
       PLOG(WARNING) << "Failed to close file with fd=" << fd_ << " path=" << file_path_;
     }
@@ -197,7 +197,7 @@ FdFile::FdFile(FdFile&& other) noexcept
   }
 #endif
   other.guard_state_ = GuardState::kClosed;
-  other.fd_ = -1;
+  other.fd_ = kInvalidFd;
 }
 
 FdFile& FdFile::operator=(FdFile&& other) noexcept {
@@ -220,7 +220,7 @@ FdFile& FdFile::operator=(FdFile&& other) noexcept {
   }
 #endif
   other.guard_state_ = GuardState::kClosed;
-  other.fd_ = -1;
+  other.fd_ = kInvalidFd;
   return *this;
 }
 
@@ -230,7 +230,7 @@ FdFile::~FdFile() {
 
 int FdFile::Release() {
   int tmp_fd = fd_;
-  fd_ = -1;
+  fd_ = kInvalidFd;
   guard_state_ = GuardState::kNoCheck;
 #if defined(__BIONIC__)
   if (tmp_fd >= 0) {
@@ -243,7 +243,7 @@ int FdFile::Release() {
 void FdFile::Reset(int fd, bool check_usage) {
   CHECK_NE(fd, fd_);
 
-  if (fd_ != -1) {
+  if (fd_ != kInvalidFd) {
     Destroy();
   }
   fd_ = fd;
@@ -255,7 +255,7 @@ void FdFile::Reset(int fd, bool check_usage) {
 #endif
 
   if (check_usage) {
-    guard_state_ = fd == -1 ? GuardState::kNoCheck : GuardState::kBase;
+    guard_state_ = fd == kInvalidFd ? GuardState::kNoCheck : GuardState::kBase;
   } else {
     guard_state_ = GuardState::kNoCheck;
   }
@@ -290,10 +290,10 @@ bool FdFile::Open(const std::string& path, int flags) {
 
 bool FdFile::Open(const std::string& path, int flags, mode_t mode) {
   static_assert(O_RDONLY == 0, "Readonly flag has unexpected value.");
-  DCHECK_EQ(fd_, -1) << path;
+  DCHECK_EQ(fd_, kInvalidFd) << path;
   read_only_mode_ = ((flags & O_ACCMODE) == O_RDONLY);
   fd_ = TEMP_FAILURE_RETRY(open(path.c_str(), flags, mode));
-  if (fd_ == -1) {
+  if (fd_ == kInvalidFd) {
     return false;
   }
 
@@ -336,7 +336,7 @@ int FdFile::Close() {
   }
 #endif
 
-  fd_ = -1;
+  fd_ = kInvalidFd;
   file_path_ = "";
   return 0;
 }
@@ -409,7 +409,7 @@ bool FdFile::CheckUsage() const {
 }
 
 bool FdFile::IsOpened() const {
-  return fd_ >= 0;
+  return FdFile::IsOpenFd(fd_);
 }
 
 static ssize_t ReadIgnoreOffset(int fd, void *buf, size_t count, off_t offset) {
@@ -640,6 +640,20 @@ int FdFile::Compare(FdFile* other) {
     offset += len;
   }
   return 0;
+}
+
+bool FdFile::IsOpenFd(int fd) {
+  if (fd == kInvalidFd) {
+    return false;
+  }
+  #ifdef _WIN32  // Windows toolchain does not support F_GETFD.
+    return true;
+  #else
+    int saved_errno = errno;
+    bool is_open = (fcntl(fd, F_GETFD) != -1);
+    errno = saved_errno;
+    return is_open;
+  #endif
 }
 
 }  // namespace unix_file
