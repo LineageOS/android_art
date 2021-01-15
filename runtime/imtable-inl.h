@@ -83,12 +83,6 @@ inline void ImTable::GetImtHashComponents(ArtMethod* method,
 }
 
 inline uint32_t ImTable::GetImtIndex(ArtMethod* method) {
-  if (!method->IsAbstract()) {
-    // For default methods, where we cannot store the imt_index, we use the
-    // method_index instead. We mask it with the closest power of two to
-    // simplify the interpreter.
-    return method->GetMethodIndex() & (ImTable::kSizeTruncToPowerOfTwo - 1);
-  }
   uint32_t class_hash, name_hash, signature_hash;
   GetImtHashComponents(method, &class_hash, &name_hash, &signature_hash);
 
