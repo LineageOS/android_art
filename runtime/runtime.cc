@@ -440,9 +440,6 @@ Runtime::~Runtime() {
   delete signal_catcher_;
   signal_catcher_ = nullptr;
 
-  // Shutdown metrics reporting.
-  metrics_reporter_.reset();
-
   // Make sure all other non-daemon threads have terminated, and all daemon threads are suspended.
   // Also wait for daemon threads to quiesce, so that in addition to being "suspended", they
   // no longer access monitor and thread list data structures. We leak user daemon threads
@@ -1068,10 +1065,6 @@ void Runtime::InitNonZygoteOrPostFork(
   // Reset the gc performance data at zygote fork so that the GCs
   // before fork aren't attributed to an app.
   heap_->ResetGcPerformanceInfo();
-
-  if (metrics_reporter_ != nullptr) {
-    metrics_reporter_->MaybeStartBackgroundThread();
-  }
 
   StartSignalCatcher();
 
@@ -1822,7 +1815,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 void Runtime::InitMetrics(const RuntimeArgumentMap& runtime_options) {
   auto metrics_config = metrics::ReportingConfig::FromRuntimeArguments(runtime_options);
   if (metrics_config.ReportingEnabled()) {
-    metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
+    metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, GetMetrics());
   }
 }
 
