@@ -753,10 +753,11 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   bool TryReplacingLoopPhiPlaceholderWithSingleInput(
       PhiPlaceholder phi_placeholder,
       /*inout*/ ArenaBitVector* phi_placeholders_to_materialize);
-  std::optional<PhiPlaceholder> FindLoopPhisToMaterialize(PhiPlaceholder phi_placeholder,
-                                           /*out*/ ArenaBitVector* phi_placeholders_to_materialize,
-                                           DataType::Type type,
-                                           bool can_use_default_or_phi);
+  std::optional<PhiPlaceholder> FindLoopPhisToMaterialize(
+      PhiPlaceholder phi_placeholder,
+      /*out*/ ArenaBitVector* phi_placeholders_to_materialize,
+      DataType::Type type,
+      bool can_use_default_or_phi);
   bool MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeholder_indexes,
                            DataType::Type type,
                            Phase phase);
