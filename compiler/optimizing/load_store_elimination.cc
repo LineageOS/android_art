@@ -1748,7 +1748,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
   // Materialize all predecessors that do not need a loop Phi and determine if all inputs
   // other than loop Phis are the same.
   const ArenaVector<HBasicBlock*>& blocks = GetGraph()->GetBlocks();
-  Value other_value = Value::Invalid();
+  std::optional<Value> other_value = std::nullopt;
   for (size_t phi_placeholder_index : phi_placeholder_indexes) {
     PhiPlaceholder phi_placeholder = GetPhiPlaceholderAt(phi_placeholder_index);
     HBasicBlock* block = blocks[phi_placeholder.GetBlockId()];
@@ -1762,23 +1762,23 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
         value = Replacement(value);
       }
       if (!value.NeedsLoopPhi()) {
-        if (other_value.IsInvalid()) {
+        if (!other_value) {
           // The first other value we found.
           other_value = value;
-        } else if (!other_value.IsUnknown()) {
+        } else if (!other_value->IsInvalid()) {
           // Check if the current `value` differs from the previous `other_value`.
-          if (!value.Equals(other_value)) {
-            other_value = Value::Unknown();
+          if (!value.Equals(*other_value)) {
+            other_value = Value::Invalid();
           }
         }
       }
     }
   }
 
-  DCHECK(other_value.IsValid());
-  if (!other_value.IsUnknown()) {
+  DCHECK(other_value.has_value());
+  if (!other_value->IsInvalid()) {
     HInstruction* replacement =
-        (other_value.IsDefault()) ? GetDefaultValue(type) : other_value.GetInstruction();
+        (other_value->IsDefault()) ? GetDefaultValue(type) : other_value->GetInstruction();
     for (size_t phi_placeholder_index : phi_placeholder_indexes) {
       phi_placeholder_replacements_[phi_placeholder_index] = Value::ForInstruction(replacement);
     }
@@ -1835,12 +1835,17 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     HBasicBlock* block = blocks[phi_placeholder.GetBlockId()];
     size_t idx = phi_placeholder.GetHeapLocation();
     HInstruction* phi = phi_placeholder_replacements_[phi_placeholder_index].GetInstruction();
+    DCHECK(DataType::IsTypeConversionImplicit(type, phi->GetType()))
+        << "type=" << type << " vs phi-type=" << phi->GetType();
     for (size_t i = 0, size = block->GetPredecessors().size(); i != size; ++i) {
       HBasicBlock* predecessor = block->GetPredecessors()[i];
       Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
       HInstruction* input = value.IsDefault() ? GetDefaultValue(type) : value.GetInstruction();
       DCHECK_NE(input->GetType(), DataType::Type::kVoid);
       phi->SetRawInputAt(i, input);
+      DCHECK(DataType::IsTypeConversionImplicit(input->GetType(), phi->GetType()))
+          << " input: " << input->GetType() << value << " phi: " << phi->GetType()
+          << " request: " << type;
     }
   }
   // Add the Phis to their blocks.
