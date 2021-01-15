@@ -1371,7 +1371,7 @@ void UnstartedRuntime::UnstartedStringToCharArray(
 // This allows statically initializing ConcurrentHashMap and SynchronousQueue.
 void UnstartedRuntime::UnstartedReferenceGetReferent(
     Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset) {
-  const ObjPtr<mirror::Reference> ref = down_cast<mirror::Reference*>(
+  const ObjPtr<mirror::Reference> ref = ObjPtr<mirror::Reference>::DownCast(
       shadow_frame->GetVRegReference(arg_offset));
   if (ref == nullptr) {
     AbortTransactionOrFail(self, "Reference.getReferent() with null object");
@@ -1380,6 +1380,22 @@ void UnstartedRuntime::UnstartedReferenceGetReferent(
   const ObjPtr<mirror::Object> referent =
       Runtime::Current()->GetHeap()->GetReferenceProcessor()->GetReferent(self, ref);
   result->SetL(referent);
+}
+
+void UnstartedRuntime::UnstartedReferenceRefersTo(
+    Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset) {
+  // Use the naive implementation that may block and needlessly extend the lifetime
+  // of the referenced object.
+  const ObjPtr<mirror::Reference> ref = ObjPtr<mirror::Reference>::DownCast(
+      shadow_frame->GetVRegReference(arg_offset));
+  if (ref == nullptr) {
+    AbortTransactionOrFail(self, "Reference.refersTo() with null object");
+    return;
+  }
+  const ObjPtr<mirror::Object> referent =
+      Runtime::Current()->GetHeap()->GetReferenceProcessor()->GetReferent(self, ref);
+  const ObjPtr<mirror::Object> o = shadow_frame->GetVRegReference(arg_offset + 1);
+  result->SetZ(o == referent);
 }
 
 // This allows statically initializing ConcurrentHashMap and SynchronousQueue. We use a somewhat

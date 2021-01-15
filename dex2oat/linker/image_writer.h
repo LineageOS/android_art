@@ -31,6 +31,7 @@
 #include "base/bit_utils.h"
 #include "base/dchecked_vector.h"
 #include "base/enums.h"
+#include "base/unix_file/fd_file.h"
 #include "base/hash_map.h"
 #include "base/hash_set.h"
 #include "base/length_prefixed_array.h"
@@ -69,8 +70,6 @@ template<class T> class Handle;
 class ImTable;
 class ImtConflictTable;
 class TimingLogger;
-
-static constexpr int kInvalidFd = -1;
 
 namespace linker {
 
@@ -138,9 +137,9 @@ class ImageWriter final {
     return GetImageInfo(oat_index).oat_file_begin_;
   }
 
-  // If image_fd is not kInvalidFd, then we use that for the image file. Otherwise we open
+  // If image_fd is not File::kInvalidFd, then we use that for the image file. Otherwise we open
   // the names in image_filenames.
-  // If oat_fd is not kInvalidFd, then we use that for the oat file. Otherwise we open
+  // If oat_fd is not File::kInvalidFd, then we use that for the oat file. Otherwise we open
   // the names in oat_filenames.
   bool Write(int image_fd,
              const std::vector<std::string>& image_filenames,

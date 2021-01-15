@@ -387,10 +387,10 @@ class ImageWriter::ImageFileGuard {
 bool ImageWriter::Write(int image_fd,
                         const std::vector<std::string>& image_filenames,
                         size_t component_count) {
-  // If image_fd or oat_fd are not kInvalidFd then we may have empty strings in image_filenames or
-  // oat_filenames.
+  // If image_fd or oat_fd are not File::kInvalidFd then we may have empty strings in
+  // image_filenames or oat_filenames.
   CHECK(!image_filenames.empty());
-  if (image_fd != kInvalidFd) {
+  if (image_fd != File::kInvalidFd) {
     CHECK_EQ(image_filenames.size(), 1u);
   }
   DCHECK(!oat_filenames_.empty());
@@ -428,7 +428,7 @@ bool ImageWriter::Write(int image_fd,
     const std::string& image_filename = image_filenames[i];
     ImageInfo& image_info = GetImageInfo(i);
     ImageFileGuard image_file;
-    if (image_fd != kInvalidFd) {
+    if (image_fd != File::kInvalidFd) {
       // Ignore image_filename, it is supplied only for better diagnostic.
       image_file.reset(new File(image_fd, unix_file::kCheckSafeUsage));
       // Empty the file in case it already exists.
