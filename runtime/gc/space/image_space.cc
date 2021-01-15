@@ -118,16 +118,9 @@ static int32_t ChooseRelocationOffsetDelta() {
 static bool FindImageFilenameImpl(const char* image_location,
                                   const InstructionSet image_isa,
                                   bool* has_system,
-                                  std::string* system_filename,
-                                  bool* dalvik_cache_exists,
-                                  std::string* dalvik_cache,
-                                  bool* is_global_cache,
-                                  bool* has_cache,
-                                  std::string* cache_filename) {
-  DCHECK(dalvik_cache != nullptr);
-
+                                  std::string* system_filename) {
   *has_system = false;
-  *has_cache = false;
+
   // image_location = /system/framework/boot.art
   // system_image_location = /system/framework/<image_isa>/boot.art
   std::string system_image_filename(GetSystemImageFilename(image_location, image_isa));
@@ -136,53 +129,18 @@ static bool FindImageFilenameImpl(const char* image_location,
     *has_system = true;
   }
 
-  bool have_android_data = false;
-  *dalvik_cache_exists = false;
-  GetDalvikCache(GetInstructionSetString(image_isa),
-                 /*create_if_absent=*/ true,
-                 dalvik_cache,
-                 &have_android_data,
-                 dalvik_cache_exists,
-                 is_global_cache);
-
-  if (*dalvik_cache_exists) {
-    DCHECK(have_android_data);
-    // Always set output location even if it does not exist,
-    // so that the caller knows where to create the image.
-    //
-    // image_location = /system/framework/boot.art
-    // *image_filename = /data/dalvik-cache/<image_isa>/system@framework@boot.art
-    std::string error_msg;
-    if (!GetDalvikCacheFilename(image_location,
-                                dalvik_cache->c_str(),
-                                cache_filename,
-                                &error_msg)) {
-      LOG(WARNING) << error_msg;
-      return *has_system;
-    }
-    *has_cache = OS::FileExists(cache_filename->c_str());
-  }
-  return *has_system || *has_cache;
+  return *has_system;
 }
 
 bool ImageSpace::FindImageFilename(const char* image_location,
                                    const InstructionSet image_isa,
                                    std::string* system_filename,
-                                   bool* has_system,
-                                   std::string* cache_filename,
-                                   bool* dalvik_cache_exists,
-                                   bool* has_cache,
-                                   bool* is_global_cache) {
+                                   bool* has_system) {
   std::string dalvik_cache_unused;
   return FindImageFilenameImpl(image_location,
                                image_isa,
                                has_system,
-                               system_filename,
-                               dalvik_cache_exists,
-                               &dalvik_cache_unused,
-                               is_global_cache,
-                               has_cache,
-                               cache_filename);
+                               system_filename);
 }
 
 static bool ReadSpecificImageHeader(File* image_file,
@@ -1461,17 +1419,6 @@ class ImageSpace::BootImageLayout {
     return LoadOrValidateFromSystem(image_isa, oat_checksums, error_msg);
   }
 
-  bool LoadFromDalvikCache(const std::string& dalvik_cache, /*out*/std::string* error_msg) {
-    return LoadOrValidateFromDalvikCache(dalvik_cache, /*oat_checksums=*/ nullptr, error_msg);
-  }
-
-  bool ValidateFromDalvikCache(const std::string& dalvik_cache,
-                               /*inout*/std::string_view* oat_checksums,
-                               /*out*/std::string* error_msg) {
-    DCHECK(oat_checksums != nullptr);
-    return LoadOrValidateFromDalvikCache(dalvik_cache, oat_checksums, error_msg);
-  }
-
   ArrayRef<const ImageChunk> GetChunks() const {
     return ArrayRef<const ImageChunk>(chunks_);
   }
@@ -1567,10 +1514,6 @@ class ImageSpace::BootImageLayout {
   bool LoadOrValidateFromSystem(InstructionSet image_isa,
                                 /*inout*/std::string_view* oat_checksums,
                                 /*out*/std::string* error_msg);
-
-  bool LoadOrValidateFromDalvikCache(const std::string& dalvik_cache,
-                                     /*inout*/std::string_view* oat_checksums,
-                                     /*out*/std::string* error_msg);
 
   const std::string& image_location_;
   ArrayRef<const std::string> boot_class_path_;
@@ -2270,18 +2213,6 @@ bool ImageSpace::BootImageLayout::LoadOrValidateFromSystem(InstructionSet image_
   return LoadOrValidate(filename_fn, oat_checksums, error_msg);
 }
 
-bool ImageSpace::BootImageLayout::LoadOrValidateFromDalvikCache(
-    const std::string& dalvik_cache,
-    /*inout*/std::string_view* oat_checksums,
-    /*out*/std::string* error_msg) {
-  auto filename_fn = [&dalvik_cache](const std::string& location,
-                                     /*out*/std::string* filename,
-                                     /*out*/std::string* err_msg) {
-    return GetDalvikCacheFilename(location.c_str(), dalvik_cache.c_str(), filename, err_msg);
-  };
-  return LoadOrValidate(filename_fn, oat_checksums, error_msg);
-}
-
 class ImageSpace::BootImageLoader {
  public:
   BootImageLoader(const std::vector<std::string>& boot_class_path,
@@ -2298,12 +2229,7 @@ class ImageSpace::BootImageLoader {
         relocate_(relocate),
         executable_(executable),
         is_zygote_(is_zygote),
-        has_system_(false),
-        has_cache_(false),
-        is_global_cache_(true),
-        dalvik_cache_exists_(false),
-        dalvik_cache_(),
-        cache_filename_() {
+        has_system_(false) {
   }
 
   bool IsZygote() const { return is_zygote_; }
@@ -2315,39 +2241,16 @@ class ImageSpace::BootImageLoader {
     bool found_image = FindImageFilenameImpl(image_location.c_str(),
                                              image_isa_,
                                              &has_system_,
-                                             &system_filename,
-                                             &dalvik_cache_exists_,
-                                             &dalvik_cache_,
-                                             &is_global_cache_,
-                                             &has_cache_,
-                                             &cache_filename_);
-    DCHECK(!dalvik_cache_exists_ || !dalvik_cache_.empty());
-    DCHECK_EQ(found_image, has_system_ || has_cache_);
+                                             &system_filename);
+    DCHECK_EQ(found_image, has_system_);
   }
 
   bool HasSystem() const { return has_system_; }
-  bool HasCache() const { return has_cache_; }
-
-  bool DalvikCacheExists() const { return dalvik_cache_exists_; }
-  bool IsGlobalCache() const { return is_global_cache_; }
-
-  const std::string& GetDalvikCache() const {
-    return dalvik_cache_;
-  }
-
-  const std::string& GetCacheFilename() const {
-    return cache_filename_;
-  }
 
   bool LoadFromSystem(size_t extra_reservation_size,
                       /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
                       /*out*/MemMap* extra_reservation,
                       /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  bool LoadFromDalvikCache(size_t extra_reservation_size,
-                           /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
-                           /*out*/MemMap* extra_reservation,
-                           /*out*/std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   bool LoadImage(
@@ -2871,19 +2774,12 @@ class ImageSpace::BootImageLoader {
       return result;
     }
 
-    // Should this be a RDWR lock? This is only a defensive measure, as at
-    // this point the image should exist.
-    // However, only the zygote can write into the global dalvik-cache, so
-    // restrict to zygote processes, or any process that isn't using
-    // /data/dalvik-cache (which we assume to be allowed to write there).
-    const bool rw_lock = is_zygote_ || !is_global_cache_;
-
     // Note that we must not use the file descriptor associated with
     // ScopedFlock::GetFile to Init the image file. We want the file
     // descriptor (and the associated exclusive lock) to be released when
     // we leave Create.
     ScopedFlock image = LockedFile::Open(image_filename.c_str(),
-                                         /*flags=*/ rw_lock ? (O_CREAT | O_RDWR) : O_RDONLY,
+                                         /*flags=*/ O_RDONLY,
                                          /*block=*/ true,
                                          error_msg);
 
@@ -3203,11 +3099,6 @@ class ImageSpace::BootImageLoader {
   const bool executable_;
   const bool is_zygote_;
   bool has_system_;
-  bool has_cache_;
-  bool is_global_cache_;
-  bool dalvik_cache_exists_;
-  std::string dalvik_cache_;
-  std::string cache_filename_;
 };
 
 bool ImageSpace::BootImageLoader::LoadFromSystem(
@@ -3240,36 +3131,6 @@ bool ImageSpace::BootImageLoader::LoadFromSystem(
   return true;
 }
 
-bool ImageSpace::BootImageLoader::LoadFromDalvikCache(
-    size_t extra_reservation_size,
-    /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
-    /*out*/MemMap* extra_reservation,
-    /*out*/std::string* error_msg) {
-  TimingLogger logger(__PRETTY_FUNCTION__, /*precise=*/ true, VLOG_IS_ON(image));
-  DCHECK(DalvikCacheExists());
-
-  BootImageLayout layout(image_location_, boot_class_path_, boot_class_path_locations_);
-  if (!layout.LoadFromDalvikCache(dalvik_cache_, error_msg)) {
-    return false;
-  }
-  if (!LoadImage(layout,
-                 /*validate_oat_file=*/ true,
-                 extra_reservation_size,
-                 &logger,
-                 boot_image_spaces,
-                 extra_reservation,
-                 error_msg)) {
-    return false;
-  }
-
-  if (VLOG_IS_ON(image)) {
-    LOG(INFO) << "ImageSpace::BootImageLoader::LoadFromDalvikCache exiting "
-        << *boot_image_spaces->front();
-    logger.Dump(LOG_STREAM(INFO));
-  }
-  return true;
-}
-
 bool ImageSpace::IsBootClassPathOnDisk(InstructionSet image_isa) {
   Runtime* runtime = Runtime::Current();
   BootImageLayout layout(runtime->GetImageLocation(),
@@ -3281,21 +3142,13 @@ bool ImageSpace::IsBootClassPathOnDisk(InstructionSet image_isa) {
 
   std::string system_filename;
   bool has_system = false;
-  std::string cache_filename;
-  bool has_cache = false;
-  bool dalvik_cache_exists = false;
-  bool is_global_cache = false;
+
   if (FindImageFilename(image_location.c_str(),
                         image_isa,
                         &system_filename,
-                        &has_system,
-                        &cache_filename,
-                        &dalvik_cache_exists,
-                        &has_cache,
-                        &is_global_cache)) {
-    DCHECK(has_system || has_cache);
-    const std::string& filename = (has_system ? system_filename : cache_filename);
-    image_header = ReadSpecificImageHeader(filename.c_str(), &error_msg);
+                        &has_system)) {
+    DCHECK(has_system);
+    image_header = ReadSpecificImageHeader(system_filename.c_str(), &error_msg);
   }
 
   return image_header != nullptr;
@@ -3342,16 +3195,6 @@ bool ImageSpace::LoadBootImage(
                               boot_image_spaces,
                               extra_reservation,
                               &error_msg)) {
-      return true;
-    }
-    error_msgs.push_back(error_msg);
-  }
-
-  if (loader.HasCache()) {
-    if (loader.LoadFromDalvikCache(extra_reservation_size,
-                                   boot_image_spaces,
-                                   extra_reservation,
-                                   &error_msg)) {
       return true;
     }
     error_msgs.push_back(error_msg);
@@ -3605,29 +3448,18 @@ bool ImageSpace::VerifyBootClassPathChecksums(std::string_view oat_checksums,
     std::string primary_image_location = layout.GetPrimaryImageLocation();
     std::string system_filename;
     bool has_system = false;
-    std::string cache_filename;
-    bool has_cache = false;
-    bool dalvik_cache_exists = false;
-    bool is_global_cache = false;
     if (!FindImageFilename(primary_image_location.c_str(),
                            image_isa,
                            &system_filename,
-                           &has_system,
-                           &cache_filename,
-                           &dalvik_cache_exists,
-                           &has_cache,
-                           &is_global_cache)) {
+                           &has_system)) {
       *error_msg = StringPrintf("Unable to find image file for %s and %s",
                                 image_location.c_str(),
                                 GetInstructionSetString(image_isa));
       return false;
     }
 
-    DCHECK(has_system || has_cache);
-    bool image_checksums_ok = has_system
-        ? layout.ValidateFromSystem(image_isa, &oat_checksums, error_msg)
-        : layout.ValidateFromDalvikCache(cache_filename, &oat_checksums, error_msg);
-    if (!image_checksums_ok) {
+    DCHECK(has_system);
+    if (!layout.ValidateFromSystem(image_isa, &oat_checksums, error_msg)) {
       return false;
     }
     bcp_pos = layout.GetNextBcpIndex();
