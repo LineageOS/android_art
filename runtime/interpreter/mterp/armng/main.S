@@ -961,10 +961,6 @@ END \name
    .endif
 
 .Lcall_compiled_code_\suffix:
-   .if \is_interface
-   // Save hidden argument.
-   vmov s16, r4
-   .endif
    GET_SHORTY rINST, \is_interface, \is_polymorphic, \is_custom
    // From this point:
    // - rINST contains shorty (in callee-save to switch over return value after call).
@@ -1026,8 +1022,10 @@ END \name
    bl art_quick_invoke_custom
    .else
       .if \is_interface
-      // Setup hidden argument.
-      vmov ip, s16
+      // Setup hidden argument. As we don't have access to the interface method,
+      // just pass the method from the IMT. If the method is the conflict trampoline,
+      // this will make the stub go to runtime, otherwise the hidden argument is unused.
+      mov ip, r0
       .endif
       ldr lr, [r0, #ART_METHOD_QUICK_CODE_OFFSET_32]
       blx lr
@@ -1162,10 +1160,6 @@ END \name
    .endif
 
 .Lcall_compiled_code_range_\suffix:
-   .if \is_interface
-   // Save hidden argument.
-   vmov s16, r4
-   .endif
    GET_SHORTY rINST, \is_interface, \is_polymorphic, \is_custom
    // From this point:
    // - rINST contains shorty (in callee-save to switch over return value after call).
@@ -1223,8 +1217,10 @@ END \name
    bl art_quick_invoke_custom
    .else
       .if \is_interface
-      // Setup hidden argument.
-      vmov ip, s16
+      // Setup hidden argument. As we don't have access to the interface method,
+      // just pass the method from the IMT. If the method is the conflict trampoline,
+      // this will make the stub go to runtime, otherwise the hidden argument is unused.
+      mov ip, r0
       .endif
       ldr lr, [r0, #ART_METHOD_QUICK_CODE_OFFSET_32]
       blx lr
@@ -1555,6 +1551,26 @@ NterpNewArray:
    bl art_quick_read_barrier_mark_reg00
    b 1b
 
+NterpHandleInvokeInterfaceOnObjectMethodRange:
+   // First argument is the 'this' pointer.
+   FETCH r1, 2
+   GET_VREG r1, r1
+   // Note: if r1 is null, this will be handled by our SIGSEGV handler.
+   ldr r2, [r1, #MIRROR_OBJECT_CLASS_OFFSET]
+   add r2, r2, #MIRROR_CLASS_VTABLE_OFFSET_32
+   ldr r0, [r2, r0, lsl #2]
+   b NterpCommonInvokeInstanceRange
+
+NterpHandleInvokeInterfaceOnObjectMethod:
+   // First argument is the 'this' pointer.
+   FETCH r1, 2
+   and r1, r1, #0xf
+   GET_VREG r1, r1
+   // Note: if r1 is null, this will be handled by our SIGSEGV handler.
+   ldr r2, [r1, #MIRROR_OBJECT_CLASS_OFFSET]
+   add r2, r2, #MIRROR_CLASS_VTABLE_OFFSET_32
+   ldr r0, [r2, r0, lsl #2]
+   b NterpCommonInvokeInstance
 
 NterpHandleHotnessOverflow:
     add r1, rPC, rINST, lsl #1
