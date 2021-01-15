@@ -46,9 +46,23 @@ TEST_F(FdFileTest, Write) {
 
 TEST_F(FdFileTest, UnopenedFile) {
   FdFile file;
-  EXPECT_EQ(-1, file.Fd());
+  EXPECT_EQ(FdFile::kInvalidFd, file.Fd());
   EXPECT_FALSE(file.IsOpened());
   EXPECT_TRUE(file.GetPath().empty());
+}
+
+TEST_F(FdFileTest, IsOpenFd) {
+  art::ScratchFile scratch_file;
+  FdFile* file = scratch_file.GetFile();
+  ASSERT_TRUE(file->IsOpened());
+  EXPECT_GE(file->Fd(), 0);
+  EXPECT_NE(file->Fd(), FdFile::kInvalidFd);
+  EXPECT_TRUE(FdFile::IsOpenFd(file->Fd()));
+  int old_fd = file->Fd();
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->FlushClose(), 0);
+  EXPECT_FALSE(file->IsOpened());
+  EXPECT_FALSE(FdFile::IsOpenFd(old_fd));
 }
 
 TEST_F(FdFileTest, OpenClose) {
@@ -60,7 +74,7 @@ TEST_F(FdFileTest, OpenClose) {
   EXPECT_FALSE(file.ReadOnlyMode());
   EXPECT_EQ(0, file.Flush());
   EXPECT_EQ(0, file.Close());
-  EXPECT_EQ(-1, file.Fd());
+  EXPECT_EQ(FdFile::kInvalidFd, file.Fd());
   EXPECT_FALSE(file.IsOpened());
   FdFile file2(good_path, O_RDONLY, true);
   EXPECT_TRUE(file2.IsOpened());
