@@ -59,6 +59,7 @@
   V(MemoryPeekByteArray, "Llibcore/io/Memory;", "peekByteArray", "(J[BII)V") \
   V(MethodInvoke, "Ljava/lang/reflect/Method;", "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") \
   V(ReferenceGetReferent, "Ljava/lang/ref/Reference;", "getReferent", "()Ljava/lang/Object;") \
+  V(ReferenceRefersTo, "Ljava/lang/ref/Reference;", "refersTo", "(Ljava/lang/Object;)Z") \
   V(RuntimeAvailableProcessors, "Ljava/lang/Runtime;", "availableProcessors", "()I") \
   V(StringGetCharsNoCheck, "Ljava/lang/String;", "getCharsNoCheck", "(II[CI)V") \
   V(StringCharAt, "Ljava/lang/String;", "charAt", "(I)C") \
