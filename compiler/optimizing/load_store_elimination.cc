@@ -16,6 +16,11 @@
 
 #include "load_store_elimination.h"
 
+#include <algorithm>
+#include <optional>
+#include <sstream>
+#include <variant>
+
 #include "base/arena_allocator.h"
 #include "base/arena_bit_vector.h"
 #include "base/array_ref.h"
@@ -759,11 +764,9 @@ class LSEVisitor final : private HGraphDelegateVisitor {
       DataType::Type type,
       bool can_use_default_or_phi);
   bool MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeholder_indexes,
-                           DataType::Type type,
-                           Phase phase);
+                           DataType::Type type);
   bool MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_materialize,
-                           DataType::Type type,
-                           Phase phase);
+                           DataType::Type type);
   std::optional<PhiPlaceholder> TryToMaterializeLoopPhis(PhiPlaceholder phi_placeholder,
                                                          HInstruction* load);
   void ProcessLoopPhiWithUnknownInput(PhiPlaceholder loop_phi_with_unknown_input);
@@ -1058,10 +1061,22 @@ class LSEVisitor final : private HGraphDelegateVisitor {
 
   ScopedArenaVector<HInstruction*> singleton_new_instances_;
 
+  Phase current_phase_;
+
   friend std::ostream& operator<<(std::ostream& os, const Value& v);
+  friend std::ostream& operator<<(std::ostream& os, const Phase& phase);
 
   DISALLOW_COPY_AND_ASSIGN(LSEVisitor);
 };
+
+std::ostream& operator<<(std::ostream& oss, const LSEVisitor::Phase& phase) {
+  switch (phase) {
+    case LSEVisitor::Phase::kLoadElimination:
+      return oss << "kLoadElimination";
+    case LSEVisitor::Phase::kStoreElimination:
+      return oss << "kStoreElimination";
+  }
+}
 
 constexpr bool operator==(const LSEVisitor::PhiPlaceholder& p1,
                           const LSEVisitor::PhiPlaceholder& p2) {
@@ -1132,7 +1147,6 @@ std::ostream& operator<<(std::ostream& os, const LSEVisitor::Value& v) {
   return v.Dump(os);
 }
 
-
 LSEVisitor::LSEVisitor(HGraph* graph,
                        const HeapLocationCollector& heap_location_collector,
                        OptimizingCompilerStats* stats)
@@ -1167,7 +1181,8 @@ LSEVisitor::LSEVisitor(HGraph* graph,
                             /*start_bits=*/ num_phi_placeholders_,
                             /*expandable=*/ false,
                             kArenaAllocLSE),
-      singleton_new_instances_(allocator_.Adapter(kArenaAllocLSE)) {
+      singleton_new_instances_(allocator_.Adapter(kArenaAllocLSE)),
+      current_phase_(Phase::kLoadElimination) {
   // Clear bit vectors.
   phi_placeholders_to_search_for_kept_stores_.ClearAllBits();
   kept_stores_.ClearAllBits();
@@ -1386,7 +1401,8 @@ void LSEVisitor::MaterializeNonLoopPhis(PhiPlaceholder phi_placeholder, DataType
     // And the only way for such merged value to reach a different heap location is through
     // a load at which point we materialize the Phi. Therefore all non-loop Phi placeholders
     // seen here are tied to one heap location.
-    DCHECK(!current_block->IsLoopHeader());
+    DCHECK(!current_block->IsLoopHeader())
+        << current_phi_placeholder << " phase: " << current_phase_;
     DCHECK_EQ(current_phi_placeholder.GetHeapLocation(), idx);
 
     phi_inputs.clear();
@@ -1400,6 +1416,8 @@ void LSEVisitor::MaterializeNonLoopPhis(PhiPlaceholder phi_placeholder, DataType
       } else if (pred_value.IsDefault()) {
         phi_inputs.push_back(GetDefaultValue(type));
       } else {
+        DCHECK(pred_value.IsInstruction()) << pred_value << " block " << current_block->GetBlockId()
+                                           << " pred: " << predecessor->GetBlockId();
         phi_inputs.push_back(pred_value.GetInstruction());
       }
     }
@@ -1743,8 +1761,7 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::FindLoopPhisToMaterialize(
 }
 
 bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeholder_indexes,
-                                     DataType::Type type,
-                                     Phase phase) {
+                                     DataType::Type type) {
   // Materialize all predecessors that do not need a loop Phi and determine if all inputs
   // other than loop Phis are the same.
   const ArenaVector<HBasicBlock*>& blocks = GetGraph()->GetBlocks();
@@ -1757,7 +1774,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     for (HBasicBlock* predecessor : block->GetPredecessors()) {
       Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
       if (value.NeedsNonLoopPhi()) {
-        DCHECK(phase == Phase::kLoadElimination);
+        DCHECK(current_phase_ == Phase::kLoadElimination);
         MaterializeNonLoopPhis(value.GetPhiPlaceholder(), type);
         value = Replacement(value);
       }
@@ -1815,7 +1832,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     }
   }
 
-  if (phase == Phase::kStoreElimination) {
+  if (current_phase_ == Phase::kStoreElimination) {
     // We're not creating Phis during the final store elimination phase.
     return false;
   }
@@ -1872,8 +1889,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
 }
 
 bool LSEVisitor::MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_materialize,
-                                     DataType::Type type,
-                                     Phase phase) {
+                                     DataType::Type type) {
   // Use local allocator to reduce peak memory usage.
   ScopedArenaAllocator allocator(allocator_.GetArenaStack());
 
@@ -1954,8 +1970,8 @@ bool LSEVisitor::MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_m
     for (uint32_t matrix_index : current_dependencies->Indexes()) {
       current_subset.push_back(phi_placeholder_indexes[matrix_index]);
     }
-    if (!MaterializeLoopPhis(current_subset, type, phase)) {
-      DCHECK(phase == Phase::kStoreElimination);
+    if (!MaterializeLoopPhis(current_subset, type)) {
+      DCHECK_EQ(current_phase_, Phase::kStoreElimination);
       // This is the final store elimination phase and we shall not be able to eliminate any
       // stores that depend on the current subset, so mark these Phi placeholders unreplaceable.
       for (uint32_t matrix_index = 0; matrix_index != num_phi_placeholders; ++matrix_index) {
@@ -2007,8 +2023,8 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::TryToMaterializeLoopPhis(
     return loop_phi_with_unknown_input;  // Return failure.
   }
 
-  bool success =
-      MaterializeLoopPhis(phi_placeholders_to_materialize, type, Phase::kLoadElimination);
+  DCHECK_EQ(current_phase_, Phase::kLoadElimination);
+  bool success = MaterializeLoopPhis(phi_placeholders_to_materialize, type);
   DCHECK(success);
 
   // Report success.
@@ -2361,8 +2377,8 @@ void LSEVisitor::FindOldValueForPhiPlaceholder(PhiPlaceholder phi_placeholder,
     return;
   }
 
-  bool success =
-      MaterializeLoopPhis(phi_placeholders_to_materialize, type, Phase::kStoreElimination);
+  DCHECK_EQ(current_phase_, Phase::kStoreElimination);
+  bool success = MaterializeLoopPhis(phi_placeholders_to_materialize, type);
   DCHECK(phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)].IsValid());
   DCHECK_EQ(phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)].IsUnknown(),
             !success);
@@ -2428,10 +2444,11 @@ void LSEVisitor::Run() {
   }
 
   // 2. Process loads that require loop Phis, trying to find/create replacements.
+  current_phase_ = Phase::kLoadElimination;
   ProcessLoadsRequiringLoopPhis();
 
   // 3. Determine which stores to keep and which to eliminate.
-
+  current_phase_ = Phase::kStoreElimination;
   // Finish marking stores for keeping.
   SearchPhiPlaceholdersForKeptStores();
 
