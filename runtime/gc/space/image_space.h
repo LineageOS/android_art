@@ -213,15 +213,11 @@ class ImageSpace : public MemMapSpace {
   static bool FindImageFilename(const char* image_location,
                                 InstructionSet image_isa,
                                 std::string* system_location,
-                                bool* has_system,
-                                std::string* data_location,
-                                bool* dalvik_cache_exists,
-                                bool* has_data,
-                                bool *is_global_cache);
+                                bool* has_system);
 
-  // The leading character in an image checksum part of boot class path checkums.
+  // The leading character in an image checksum part of boot class path checksums.
   static constexpr char kImageChecksumPrefix = 'i';
-  // The leading character in a dex file checksum part of boot class path checkums.
+  // The leading character in a dex file checksum part of boot class path checksums.
   static constexpr char kDexFileChecksumPrefix = 'd';
 
   // Returns the checksums for the boot image, extensions and extra boot class path dex files,
