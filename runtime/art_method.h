@@ -792,7 +792,8 @@ class ArtMethod final {
     // Non-abstract methods: The hotness we measure for this method. Not atomic,
     // as we allow missing increments: if the method is hot, we will see it eventually.
     uint16_t hotness_count_;
-    // Abstract methods: IMT index.
+    // Abstract methods: IMT index (bitwise negated) or zero if it was not cached.
+    // The negation is needed to distinguish zero index and missing cached entry.
     uint16_t imt_index_;
   };
 
