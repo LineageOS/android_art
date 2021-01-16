@@ -384,23 +384,18 @@ extern "C" size_t NterpGetMethod(Thread* self, ArtMethod* caller, uint16_t* dex_
   }
 
   if (invoke_type == kInterface) {
-    size_t result = 0u;
     if (resolved_method->GetDeclaringClass()->IsObjectClass()) {
-      // Set the low bit to notify the interpreter it should do a vtable call.
+      // Don't update the cache and return a value with high bit set to notify the
+      // interpreter it should do a vtable call instead.
       DCHECK_LT(resolved_method->GetMethodIndex(), 0x10000);
-      result = (resolved_method->GetMethodIndex() << 16) | 1U;
+      return resolved_method->GetMethodIndex() | (1U << 31);
     } else {
       DCHECK(resolved_method->GetDeclaringClass()->IsInterface());
-      if (!resolved_method->IsAbstract()) {
-        // Set the second bit to notify the interpreter this is a default
-        // method.
-        result = reinterpret_cast<size_t>(resolved_method) | 2U;
-      } else {
-        result = reinterpret_cast<size_t>(resolved_method);
-      }
+      UpdateCache(self, dex_pc_ptr, resolved_method->GetImtIndex());
+      // TODO: We should pass the resolved method, and have nterp fetch the IMT
+      // index. Unfortunately, this doesn't work for default methods.
+      return resolved_method->GetImtIndex();
     }
-    UpdateCache(self, dex_pc_ptr, result);
-    return result;
   } else if (resolved_method->GetDeclaringClass()->IsStringClass()
              && !resolved_method->IsStatic()
              && resolved_method->IsConstructor()) {
@@ -425,8 +420,7 @@ static ArtField* ResolveFieldWithAccessChecks(Thread* self,
                                               uint16_t field_index,
                                               ArtMethod* caller,
                                               bool is_static,
-                                              bool is_put,
-                                              size_t resolve_field_type)  // Resolve if not zero
+                                              bool is_put)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   if (caller->SkipAccessChecks()) {
     return class_linker->ResolveField(field_index, caller, is_static);
@@ -461,17 +455,10 @@ static ArtField* ResolveFieldWithAccessChecks(Thread* self,
     ThrowIllegalAccessErrorFinalField(caller, resolved_field);
     return nullptr;
   }
-  if (resolve_field_type != 0u && resolved_field->ResolveType() == nullptr) {
-    DCHECK(self->IsExceptionPending());
-    return nullptr;
-  }
   return resolved_field;
 }
 
-extern "C" size_t NterpGetStaticField(Thread* self,
-                                      ArtMethod* caller,
-                                      uint16_t* dex_pc_ptr,
-                                      size_t resolve_field_type)  // Resolve if not zero
+extern "C" size_t NterpGetStaticField(Thread* self, ArtMethod* caller, uint16_t* dex_pc_ptr)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   UpdateHotness(caller);
   const Instruction* inst = Instruction::At(dex_pc_ptr);
@@ -483,8 +470,7 @@ extern "C" size_t NterpGetStaticField(Thread* self,
       field_index,
       caller,
       /* is_static */ true,
-      /* is_put */ IsInstructionSPut(inst->Opcode()),
-      resolve_field_type);
+      /* is_put */ IsInstructionSPut(inst->Opcode()));
 
   if (resolved_field == nullptr) {
     DCHECK(self->IsExceptionPending());
@@ -513,8 +499,7 @@ extern "C" size_t NterpGetStaticField(Thread* self,
 
 extern "C" uint32_t NterpGetInstanceFieldOffset(Thread* self,
                                                 ArtMethod* caller,
-                                                uint16_t* dex_pc_ptr,
-                                                size_t resolve_field_type)  // Resolve if not zero
+                                                uint16_t* dex_pc_ptr)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   UpdateHotness(caller);
   const Instruction* inst = Instruction::At(dex_pc_ptr);
@@ -526,8 +511,7 @@ extern "C" uint32_t NterpGetInstanceFieldOffset(Thread* self,
       field_index,
       caller,
       /* is_static */ false,
-      /* is_put */ IsInstructionIPut(inst->Opcode()),
-      resolve_field_type);
+      /* is_put */ IsInstructionIPut(inst->Opcode()));
   if (resolved_field == nullptr) {
     DCHECK(self->IsExceptionPending());
     return 0;

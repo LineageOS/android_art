@@ -16,6 +16,11 @@
 
 #include "load_store_elimination.h"
 
+#include <algorithm>
+#include <optional>
+#include <sstream>
+#include <variant>
+
 #include "base/arena_allocator.h"
 #include "base/arena_bit_vector.h"
 #include "base/array_ref.h"
@@ -280,7 +285,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
    public:
     enum class ValuelessType {
       kInvalid,
-      kUnknown,
+      kPureUnknown,
       kDefault,
     };
     struct MergedUnknownMarker {
@@ -301,8 +306,8 @@ class LSEVisitor final : private HGraphDelegateVisitor {
     // A heap location can be set to an unknown heap value when:
     // - it is coming from outside the method,
     // - it is killed due to aliasing, or side effects, or merging with an unknown value.
-    static constexpr Value Unknown() {
-      return Value(ValuelessType::kUnknown);
+    static constexpr Value PureUnknown() {
+      return Value(ValuelessType::kPureUnknown);
     }
 
     static constexpr Value MergedUnknown(PhiPlaceholder phi_placeholder) {
@@ -347,7 +352,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
 
     bool IsPureUnknown() const {
       return std::holds_alternative<ValuelessType>(value_) &&
-             GetValuelessType() == ValuelessType::kUnknown;
+             GetValuelessType() == ValuelessType::kPureUnknown;
     }
 
     bool IsUnknown() const {
@@ -650,10 +655,10 @@ class LSEVisitor final : private HGraphDelegateVisitor {
             !heap_values[i].stored_by.IsInstruction() ||
             heap_location_collector_.GetHeapLocation(i)->GetReferenceInfo()->IsPartialSingleton());
         KeepStores(heap_values[i].stored_by);
-        heap_values[i].stored_by = Value::Unknown();
+        heap_values[i].stored_by = Value::PureUnknown();
       } else if (heap_location_collector_.MayAlias(i, loc_index)) {
         KeepStores(heap_values[i].stored_by);
-        heap_values[i].stored_by = Value::Unknown();
+        heap_values[i].stored_by = Value::PureUnknown();
       }
     }
   }
@@ -753,16 +758,15 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   bool TryReplacingLoopPhiPlaceholderWithSingleInput(
       PhiPlaceholder phi_placeholder,
       /*inout*/ ArenaBitVector* phi_placeholders_to_materialize);
-  std::optional<PhiPlaceholder> FindLoopPhisToMaterialize(PhiPlaceholder phi_placeholder,
-                                           /*out*/ ArenaBitVector* phi_placeholders_to_materialize,
-                                           DataType::Type type,
-                                           bool can_use_default_or_phi);
+  std::optional<PhiPlaceholder> FindLoopPhisToMaterialize(
+      PhiPlaceholder phi_placeholder,
+      /*out*/ ArenaBitVector* phi_placeholders_to_materialize,
+      DataType::Type type,
+      bool can_use_default_or_phi);
   bool MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeholder_indexes,
-                           DataType::Type type,
-                           Phase phase);
+                           DataType::Type type);
   bool MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_materialize,
-                           DataType::Type type,
-                           Phase phase);
+                           DataType::Type type);
   std::optional<PhiPlaceholder> TryToMaterializeLoopPhis(PhiPlaceholder phi_placeholder,
                                                          HInstruction* load);
   void ProcessLoopPhiWithUnknownInput(PhiPlaceholder loop_phi_with_unknown_input);
@@ -848,7 +852,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
       }
       if (observable) {
         KeepStores(*stored_by);
-        *stored_by = Value::Unknown();
+        *stored_by = Value::PureUnknown();
       }
     }
   }
@@ -861,7 +865,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
       if (!ref_info->IsSingletonAndRemovable() &&
           !(ref_info->IsPartialSingleton() && IsPartialNoEscape(block, i))) {
         KeepStores(heap_values[i].stored_by);
-        heap_values[i].stored_by = Value::Unknown();
+        heap_values[i].stored_by = Value::PureUnknown();
       }
     }
   }
@@ -906,11 +910,11 @@ class LSEVisitor final : private HGraphDelegateVisitor {
         if (side_effects.DoesAnyRead() || side_effects.DoesAnyWrite()) {
           // Previous stores may become visible (read) and/or impossible for LSE to track (write).
           KeepStores(heap_values[i].stored_by);
-          heap_values[i].stored_by = Value::Unknown();
+          heap_values[i].stored_by = Value::PureUnknown();
         }
         if (side_effects.DoesAnyWrite()) {
           // The value may be clobbered.
-          heap_values[i].value = Value::Unknown();
+          heap_values[i].value = Value::PureUnknown();
         }
       }
     }
@@ -966,11 +970,11 @@ class LSEVisitor final : private HGraphDelegateVisitor {
         if (offset >= mirror::kObjectHeaderSize) {
           // Instance fields except the header fields are set to default heap values.
           heap_values[i].value = Value::Default();
-          heap_values[i].stored_by = Value::Unknown();
+          heap_values[i].stored_by = Value::PureUnknown();
         } else if (MemberOffset(offset) == mirror::Object::ClassOffset()) {
           // The shadow$_klass_ field is special and has an actual value however.
           heap_values[i].value = Value::ForInstruction(new_instance->GetLoadClass());
-          heap_values[i].stored_by = Value::Unknown();
+          heap_values[i].stored_by = Value::PureUnknown();
         }
       }
     }
@@ -999,7 +1003,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
       if (ref == new_array && location->GetIndex() != nullptr) {
         // Array elements are set to default heap values.
         heap_values[i].value = Value::Default();
-        heap_values[i].stored_by = Value::Unknown();
+        heap_values[i].stored_by = Value::PureUnknown();
       }
     }
   }
@@ -1057,10 +1061,22 @@ class LSEVisitor final : private HGraphDelegateVisitor {
 
   ScopedArenaVector<HInstruction*> singleton_new_instances_;
 
+  Phase current_phase_;
+
   friend std::ostream& operator<<(std::ostream& os, const Value& v);
+  friend std::ostream& operator<<(std::ostream& os, const Phase& phase);
 
   DISALLOW_COPY_AND_ASSIGN(LSEVisitor);
 };
+
+std::ostream& operator<<(std::ostream& oss, const LSEVisitor::Phase& phase) {
+  switch (phase) {
+    case LSEVisitor::Phase::kLoadElimination:
+      return oss << "kLoadElimination";
+    case LSEVisitor::Phase::kStoreElimination:
+      return oss << "kStoreElimination";
+  }
+}
 
 constexpr bool operator==(const LSEVisitor::PhiPlaceholder& p1,
                           const LSEVisitor::PhiPlaceholder& p2) {
@@ -1106,8 +1122,8 @@ std::ostream& LSEVisitor::Value::Dump(std::ostream& os) const {
     switch (GetValuelessType()) {
       case ValuelessType::kDefault:
         return os << "Default";
-      case ValuelessType::kUnknown:
-        return os << "Unknown";
+      case ValuelessType::kPureUnknown:
+        return os << "PureUnknown";
       case ValuelessType::kInvalid:
         return os << "Invalid";
     }
@@ -1130,7 +1146,6 @@ std::ostream& LSEVisitor::Value::Dump(std::ostream& os) const {
 std::ostream& operator<<(std::ostream& os, const LSEVisitor::Value& v) {
   return v.Dump(os);
 }
-
 
 LSEVisitor::LSEVisitor(HGraph* graph,
                        const HeapLocationCollector& heap_location_collector,
@@ -1166,7 +1181,8 @@ LSEVisitor::LSEVisitor(HGraph* graph,
                             /*start_bits=*/ num_phi_placeholders_,
                             /*expandable=*/ false,
                             kArenaAllocLSE),
-      singleton_new_instances_(allocator_.Adapter(kArenaAllocLSE)) {
+      singleton_new_instances_(allocator_.Adapter(kArenaAllocLSE)),
+      current_phase_(Phase::kLoadElimination) {
   // Clear bit vectors.
   phi_placeholders_to_search_for_kept_stores_.ClearAllBits();
   kept_stores_.ClearAllBits();
@@ -1211,7 +1227,7 @@ LSEVisitor::Value LSEVisitor::PrepareLoopStoredBy(HBasicBlock* block, size_t idx
   ReferenceInfo* ref_info = heap_location_collector_.GetHeapLocation(idx)->GetReferenceInfo();
   if (ref_info->IsSingleton() &&
       block->GetLoopInformation()->Contains(*ref_info->GetReference()->GetBlock())) {
-    return Value::Unknown();
+    return Value::PureUnknown();
   }
   PhiPlaceholder phi_placeholder = GetPhiPlaceholder(block->GetBlockId(), idx);
   return Value::ForLoopPhiPlaceholder(phi_placeholder);
@@ -1231,7 +1247,7 @@ void LSEVisitor::PrepareLoopRecords(HBasicBlock* block) {
   // Don't eliminate loads in irreducible loops.
   if (block->GetLoopInformation()->IsIrreducible()) {
     heap_values.resize(num_heap_locations,
-                       { /*value=*/ Value::Unknown(), /*stored_by=*/ Value::Unknown() });
+                       {/*value=*/Value::PureUnknown(), /*stored_by=*/Value::PureUnknown()});
     // Also keep the stores before the loop header, including in blocks that were not visited yet.
     for (size_t idx = 0u; idx != num_heap_locations; ++idx) {
       KeepStores(Value::ForLoopPhiPlaceholder(GetPhiPlaceholder(block->GetBlockId(), idx)));
@@ -1292,7 +1308,7 @@ void LSEVisitor::MergePredecessorRecords(HBasicBlock* block) {
   if (block->GetPredecessors().empty()) {
     DCHECK(block->IsEntryBlock());
     heap_values.resize(num_heap_locations,
-                       { /*value=*/ Value::Unknown(), /*stored_by=*/ Value::Unknown() });
+                       {/*value=*/Value::PureUnknown(), /*stored_by=*/Value::PureUnknown()});
     return;
   }
 
@@ -1385,7 +1401,8 @@ void LSEVisitor::MaterializeNonLoopPhis(PhiPlaceholder phi_placeholder, DataType
     // And the only way for such merged value to reach a different heap location is through
     // a load at which point we materialize the Phi. Therefore all non-loop Phi placeholders
     // seen here are tied to one heap location.
-    DCHECK(!current_block->IsLoopHeader());
+    DCHECK(!current_block->IsLoopHeader())
+        << current_phi_placeholder << " phase: " << current_phase_;
     DCHECK_EQ(current_phi_placeholder.GetHeapLocation(), idx);
 
     phi_inputs.clear();
@@ -1399,6 +1416,8 @@ void LSEVisitor::MaterializeNonLoopPhis(PhiPlaceholder phi_placeholder, DataType
       } else if (pred_value.IsDefault()) {
         phi_inputs.push_back(GetDefaultValue(type));
       } else {
+        DCHECK(pred_value.IsInstruction()) << pred_value << " block " << current_block->GetBlockId()
+                                           << " pred: " << predecessor->GetBlockId();
         phi_inputs.push_back(pred_value.GetInstruction());
       }
     }
@@ -1422,7 +1441,7 @@ void LSEVisitor::VisitGetLocation(HInstruction* instruction, size_t idx) {
   loads_and_stores_.push_back({ instruction, idx });
   if ((record.value.IsDefault() || record.value.NeedsNonLoopPhi()) &&
       !IsDefaultOrPhiAllowedForLoad(instruction)) {
-    record.value = Value::Unknown();
+    record.value = Value::PureUnknown();
   }
   if (record.value.IsDefault()) {
     KeepStores(record.stored_by);
@@ -1511,8 +1530,8 @@ void LSEVisitor::VisitSetLocation(HInstruction* instruction, size_t idx, HInstru
     }
     // Kill heap locations that may alias and keep previous stores to these locations.
     KeepStores(heap_values[i].stored_by);
-    heap_values[i].stored_by = Value::Unknown();
-    heap_values[i].value = Value::Unknown();
+    heap_values[i].stored_by = Value::PureUnknown();
+    heap_values[i].value = Value::PureUnknown();
   }
 }
 
@@ -1742,12 +1761,11 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::FindLoopPhisToMaterialize(
 }
 
 bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeholder_indexes,
-                                     DataType::Type type,
-                                     Phase phase) {
+                                     DataType::Type type) {
   // Materialize all predecessors that do not need a loop Phi and determine if all inputs
   // other than loop Phis are the same.
   const ArenaVector<HBasicBlock*>& blocks = GetGraph()->GetBlocks();
-  Value other_value = Value::Invalid();
+  std::optional<Value> other_value = std::nullopt;
   for (size_t phi_placeholder_index : phi_placeholder_indexes) {
     PhiPlaceholder phi_placeholder = GetPhiPlaceholderAt(phi_placeholder_index);
     HBasicBlock* block = blocks[phi_placeholder.GetBlockId()];
@@ -1756,28 +1774,28 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     for (HBasicBlock* predecessor : block->GetPredecessors()) {
       Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
       if (value.NeedsNonLoopPhi()) {
-        DCHECK(phase == Phase::kLoadElimination);
+        DCHECK(current_phase_ == Phase::kLoadElimination);
         MaterializeNonLoopPhis(value.GetPhiPlaceholder(), type);
         value = Replacement(value);
       }
       if (!value.NeedsLoopPhi()) {
-        if (other_value.IsInvalid()) {
+        if (!other_value) {
           // The first other value we found.
           other_value = value;
-        } else if (!other_value.IsUnknown()) {
+        } else if (!other_value->IsInvalid()) {
           // Check if the current `value` differs from the previous `other_value`.
-          if (!value.Equals(other_value)) {
-            other_value = Value::Unknown();
+          if (!value.Equals(*other_value)) {
+            other_value = Value::Invalid();
           }
         }
       }
     }
   }
 
-  DCHECK(other_value.IsValid());
-  if (!other_value.IsUnknown()) {
+  DCHECK(other_value.has_value());
+  if (!other_value->IsInvalid()) {
     HInstruction* replacement =
-        (other_value.IsDefault()) ? GetDefaultValue(type) : other_value.GetInstruction();
+        (other_value->IsDefault()) ? GetDefaultValue(type) : other_value->GetInstruction();
     for (size_t phi_placeholder_index : phi_placeholder_indexes) {
       phi_placeholder_replacements_[phi_placeholder_index] = Value::ForInstruction(replacement);
     }
@@ -1814,7 +1832,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     }
   }
 
-  if (phase == Phase::kStoreElimination) {
+  if (current_phase_ == Phase::kStoreElimination) {
     // We're not creating Phis during the final store elimination phase.
     return false;
   }
@@ -1834,12 +1852,17 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
     HBasicBlock* block = blocks[phi_placeholder.GetBlockId()];
     size_t idx = phi_placeholder.GetHeapLocation();
     HInstruction* phi = phi_placeholder_replacements_[phi_placeholder_index].GetInstruction();
+    DCHECK(DataType::IsTypeConversionImplicit(type, phi->GetType()))
+        << "type=" << type << " vs phi-type=" << phi->GetType();
     for (size_t i = 0, size = block->GetPredecessors().size(); i != size; ++i) {
       HBasicBlock* predecessor = block->GetPredecessors()[i];
       Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
       HInstruction* input = value.IsDefault() ? GetDefaultValue(type) : value.GetInstruction();
       DCHECK_NE(input->GetType(), DataType::Type::kVoid);
       phi->SetRawInputAt(i, input);
+      DCHECK(DataType::IsTypeConversionImplicit(input->GetType(), phi->GetType()))
+          << " input: " << input->GetType() << value << " phi: " << phi->GetType()
+          << " request: " << type;
     }
   }
   // Add the Phis to their blocks.
@@ -1866,8 +1889,7 @@ bool LSEVisitor::MaterializeLoopPhis(const ScopedArenaVector<size_t>& phi_placeh
 }
 
 bool LSEVisitor::MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_materialize,
-                                     DataType::Type type,
-                                     Phase phase) {
+                                     DataType::Type type) {
   // Use local allocator to reduce peak memory usage.
   ScopedArenaAllocator allocator(allocator_.GetArenaStack());
 
@@ -1948,14 +1970,15 @@ bool LSEVisitor::MaterializeLoopPhis(const ArenaBitVector& phi_placeholders_to_m
     for (uint32_t matrix_index : current_dependencies->Indexes()) {
       current_subset.push_back(phi_placeholder_indexes[matrix_index]);
     }
-    if (!MaterializeLoopPhis(current_subset, type, phase)) {
-      DCHECK(phase == Phase::kStoreElimination);
+    if (!MaterializeLoopPhis(current_subset, type)) {
+      DCHECK_EQ(current_phase_, Phase::kStoreElimination);
       // This is the final store elimination phase and we shall not be able to eliminate any
       // stores that depend on the current subset, so mark these Phi placeholders unreplaceable.
       for (uint32_t matrix_index = 0; matrix_index != num_phi_placeholders; ++matrix_index) {
         if (dependencies[matrix_index]->IsBitSet(current_matrix_index)) {
           DCHECK(phi_placeholder_replacements_[phi_placeholder_indexes[matrix_index]].IsInvalid());
-          phi_placeholder_replacements_[phi_placeholder_indexes[matrix_index]] = Value::Unknown();
+          phi_placeholder_replacements_[phi_placeholder_indexes[matrix_index]] =
+              Value::PureUnknown();
         }
       }
       return false;
@@ -2000,8 +2023,8 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::TryToMaterializeLoopPhis(
     return loop_phi_with_unknown_input;  // Return failure.
   }
 
-  bool success =
-      MaterializeLoopPhis(phi_placeholders_to_materialize, type, Phase::kLoadElimination);
+  DCHECK_EQ(current_phase_, Phase::kLoadElimination);
+  bool success = MaterializeLoopPhis(phi_placeholders_to_materialize, type);
   DCHECK(success);
 
   // Report success.
@@ -2119,7 +2142,7 @@ void LSEVisitor::ProcessLoopPhiWithUnknownInput(PhiPlaceholder loop_phi_with_unk
             // propagated as a value to this load) and store the load as the new heap value.
             found_unreplaceable_load = true;
             KeepStores(record.value);
-            record.value = Value::Unknown();
+            record.value = Value::PureUnknown();
             local_heap_values[idx] = Value::ForInstruction(load_or_store);
           } else if (local_heap_values[idx].NeedsLoopPhi()) {
             // The load may still be replaced with a Phi later.
@@ -2348,14 +2371,14 @@ void LSEVisitor::FindOldValueForPhiPlaceholder(PhiPlaceholder phi_placeholder,
                   .size(),
               2u);
     // Mark the unreplacable placeholder as well as the input Phi placeholder as unreplaceable.
-    phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)] = Value::Unknown();
+    phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)] = Value::PureUnknown();
     phi_placeholder_replacements_[PhiPlaceholderIndex(*loop_phi_with_unknown_input)] =
-        Value::Unknown();
+        Value::PureUnknown();
     return;
   }
 
-  bool success =
-      MaterializeLoopPhis(phi_placeholders_to_materialize, type, Phase::kStoreElimination);
+  DCHECK_EQ(current_phase_, Phase::kStoreElimination);
+  bool success = MaterializeLoopPhis(phi_placeholders_to_materialize, type);
   DCHECK(phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)].IsValid());
   DCHECK_EQ(phi_placeholder_replacements_[PhiPlaceholderIndex(phi_placeholder)].IsUnknown(),
             !success);
@@ -2421,10 +2444,11 @@ void LSEVisitor::Run() {
   }
 
   // 2. Process loads that require loop Phis, trying to find/create replacements.
+  current_phase_ = Phase::kLoadElimination;
   ProcessLoadsRequiringLoopPhis();
 
   // 3. Determine which stores to keep and which to eliminate.
-
+  current_phase_ = Phase::kStoreElimination;
   // Finish marking stores for keeping.
   SearchPhiPlaceholdersForKeptStores();
 
