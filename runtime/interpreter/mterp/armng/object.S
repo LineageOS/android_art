@@ -106,7 +106,6 @@
    mov     r0, rSELF
    ldr     r1, [sp]
    mov     r2, rPC
-   mov     r3, #0
    EXPORT_PC
    bl      nterp_get_instance_field_offset
    cmp     r0, #0
@@ -223,26 +222,23 @@
    // It does not matter to which `.L${opcode}_resume` the slow path returns.
 %  slow_path = "nterp_op_iput_helper_" + store + wide + is_object
 %  add_helper(lambda: op_iput_slow_path(store, wide, is_object), slow_path)
-   .if !$wide
-   ubfx    r4, rINST, #8, #4           // r4<- A
-   GET_VREG r4, r4                     // r4 <- v[A]
-   .endif
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE r0, ${slow_path}
 .L${opcode}_resume:
-   lsr     r1, rINST, #12              // r1<- B
-   GET_VREG r1, r1                     // vB (object we're operating on)
-   cmp     r1, #0
+   lsr     r4, rINST, #12              // r2<- B
+   ubfx    r1, rINST, #8, #4           // r1<- A
+   GET_VREG r4, r4                     // vB (object we're operating on)
+   cmp     r4, #0
    beq     common_errNullObject
    .if $wide
-   ubfx    r4, rINST, #8, #4           // r4<- A
-   VREG_INDEX_TO_ADDR r4, r4
-   GET_VREG_WIDE_BY_ADDR r2, r3, r4      // fp[A] <- value
-   add     r1, r1, r0
-   strd    r2, r3, [r1]
+   VREG_INDEX_TO_ADDR r1, r1
+   GET_VREG_WIDE_BY_ADDR r2, r3, r1      // fp[A] <- value
+   add     r4, r4, r0
+   strd    r2, r3, [r4]
    .else
-   $store  r4, [r1, r0]
-   WRITE_BARRIER_IF_OBJECT $is_object, r4, r1, .L${opcode}_skip_write_barrier, r0
+   GET_VREG r1, r1                     // r1 <- v[A]
+   $store  r1, [r4, r0]
+   WRITE_BARRIER_IF_OBJECT $is_object, r1, r4, .L${opcode}_skip_write_barrier, r0
    .endif
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
@@ -252,22 +248,17 @@
    mov     r0, rSELF
    ldr     r1, [sp]
    mov     r2, rPC
-   .if $is_object
-   mov     r3, r4
-   .else
-   mov     r3, #0
-   .endif
    EXPORT_PC
    bl      nterp_get_instance_field_offset
    cmp     r0, #0
    bge     .L${opcode}_resume
    CLEAR_INSTANCE_VOLATILE_MARKER r0
-   .if $wide
-   lsr     r4, rINST, #12              // r4<- B
+   lsr     r4, rINST, #12              // r2<- B
    ubfx    r1, rINST, #8, #4           // r1<- A
    GET_VREG r4, r4                     // vB (object we're operating on)
    cmp     r4, #0
    beq     common_errNullObject
+   .if $wide
    VREG_INDEX_TO_ADDR r1, r1
    GET_VREG_WIDE_BY_ADDR r2, r3, r1
    add     ip, r4, r0
@@ -275,14 +266,11 @@
    ATOMIC_STORE64 ip, r2, r3, r0, r1, .L${opcode}_slow_path_atomic_store
    dmb     ish
    .else
-   lsr     r1, rINST, #12              // r4<- B
-   GET_VREG r1, r1                     // vB (object we're operating on)
-   cmp     r1, #0
-   beq     common_errNullObject
+   GET_VREG r1, r1                     // r1 <- v[A]
    dmb     ish
-   $store  r4, [r1, r0]
+   $store  r1, [r4, r0]
    dmb     ish
-   WRITE_BARRIER_IF_OBJECT $is_object, r4, r1, .L${opcode}_slow_path_skip_write_barrier, r0
+   WRITE_BARRIER_IF_OBJECT $is_object, r1, r4, .L${opcode}_slow_path_skip_write_barrier, r0
    .endif
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
@@ -392,7 +380,6 @@
    mov     r0, rSELF
    ldr     r1, [sp]
    mov     r2, rPC
-   mov     r3, #0
    EXPORT_PC
    bl      nterp_get_static_field
    tst     r0, #1
@@ -452,27 +439,24 @@
    // It does not matter to which `.L${opcode}_resume` the slow path returns.
 %  slow_path = "nterp_op_sput_helper_" + store + wide + is_object
 %  add_helper(lambda: op_sput_slow_path(store, wide, is_object), slow_path)
-   .if !$wide
-   lsr     r4, rINST, #8               // r4 <- A
-   GET_VREG r4, r4                     // r4 <- v[A]
-   .endif
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE r0, ${slow_path}
 .L${opcode}_resume:
    ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
    ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
    cmp     rMR, #0
    bne     .L${opcode}_read_barrier
 .L${opcode}_resume_after_read_barrier:
    .if $wide
-   lsr     r2, rINST, #8               // r2 <- A
    VREG_INDEX_TO_ADDR r2, r2
    GET_VREG_WIDE_BY_ADDR r2, r3, r2    // fp[A] <- value
    add     r0, r0, r1
    strd    r2, r3, [r0]
    .else
-   $store  r4, [r0, r1]
-   WRITE_BARRIER_IF_OBJECT $is_object, r4, r0, .L${opcode}_skip_write_barrier, r1
+   GET_VREG r2, r2                     // r2 <- v[A]
+   $store  r2, [r0, r1]
+   WRITE_BARRIER_IF_OBJECT $is_object, r2, r0, .L${opcode}_skip_write_barrier, r1
    .endif
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
@@ -485,23 +469,18 @@
    mov     r0, rSELF
    ldr     r1, [sp]
    mov     r2, rPC
-   .if $is_object
-   mov     r3, r4
-   .else
-   mov     r3, #0
-   .endif
    EXPORT_PC
    bl      nterp_get_static_field
    tst     r0, #1
    beq     .L${opcode}_resume
    CLEAR_STATIC_VOLATILE_MARKER r0
    ldr     r1, [r0, #ART_FIELD_OFFSET_OFFSET]
+   lsr     r2, rINST, #8               // r2 <- A
    ldr     r0, [r0, #ART_FIELD_DECLARING_CLASS_OFFSET]
    cmp     rMR, #0
    bne     .L${opcode}_slow_path_read_barrier
 .L${opcode}_slow_path_resume_after_read_barrier:
    .if $wide
-   lsr     r2, rINST, #8               // r2 <- A
    VREG_INDEX_TO_ADDR r2, r2
    GET_VREG_WIDE_BY_ADDR r2, r3, r2
    add     ip, r0, r1
@@ -509,10 +488,11 @@
    ATOMIC_STORE64 ip, r2, r3, r0, r1, .L${opcode}_slow_path_atomic_store
    dmb     ish
    .else
+   GET_VREG r2, r2                // r2 <- v[A]
    dmb     ish
-   $store  r4, [r0, r1]
+   $store  r2, [r0, r1]
    dmb     ish
-   WRITE_BARRIER_IF_OBJECT $is_object, r4, r0, .L${opcode}_slow_path_skip_write_barrier, r1
+   WRITE_BARRIER_IF_OBJECT $is_object, r2, r0, .L${opcode}_slow_path_skip_write_barrier, r1
    .endif
    FETCH_ADVANCE_INST 2
    GET_INST_OPCODE ip
