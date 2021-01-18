@@ -23,11 +23,19 @@
 namespace art {
 
 // Wrapper on fork/execv to run a command in a subprocess.
-// Both of these spawn child processes using the environment as it was set when the single instance
+// These spawn child processes using the environment as it was set when the single instance
 // of the runtime (Runtime::Current()) was started.  If no instance of the runtime was started, it
 // will use the current environment settings.
-bool Exec(std::vector<std::string>& arg_vector, std::string* error_msg);
-int ExecAndReturnCode(std::vector<std::string>& arg_vector, std::string* error_msg);
+
+bool Exec(std::vector<std::string>& arg_vector, /*out*/ std::string* error_msg);
+int ExecAndReturnCode(std::vector<std::string>& arg_vector, /*out*/ std::string* error_msg);
+
+// Execute the command specified in `argv_vector` in a subprocess with a timeout.
+// Returns the process exit code on success, -1 otherwise.
+int ExecAndReturnCode(std::vector<std::string>& arg_vector,
+                      time_t timeout_secs,
+                      /*out*/ bool* timed_out,
+                      /*out*/ std::string* error_msg);
 
 }  // namespace art
 
