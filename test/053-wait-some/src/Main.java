@@ -57,15 +57,15 @@ public class Main {
                 boolean showTime = timing;
 
                 if (! timing) {
-                    long epsilon = delay / 10;
-                    if (epsilon > 50) {
-                        epsilon = 50;
-                    }
-
-                    long min = delay - epsilon;
+                    // Allow a random scheduling delay of at least 100 msecs.
+                    final long epsilon = Math.max(delay / 20, 100);
+                    long min = delay - 1;
                     long max = delay + epsilon;
 
                     if (elapsed < min) {
+                        // This can legitimately happen due to premature wake-ups.
+                        // This seems rare and unexpected enough in practice that we should
+                        // still report.
                         System.out.println("  Elapsed time was too short");
                         showTime = true;
                     } else if (elapsed > max) {
