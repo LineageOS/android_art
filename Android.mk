@@ -672,7 +672,8 @@ standalone-apex-files: deapexer \
                        $(RELEASE_ART_APEX) \
                        $(RUNTIME_APEX) \
                        $(CONSCRYPT_APEX) \
-                       $(I18N_APEX)
+                       $(I18N_APEX) \
+                       $(TZDATA_APEX)
 	$(call extract-from-apex,$(RELEASE_ART_APEX),\
 	  $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES))
 	# The Runtime APEX has the Bionic libs in ${LIB}/bionic subdirectories,
@@ -694,6 +695,7 @@ standalone-apex-files: deapexer \
 	  $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS))
 	$(call extract-from-apex,$(I18N_APEX),\
 	  $(PRIVATE_I18N_APEX_DEPENDENCY_LIBS))
+	$(call extract-from-apex,$(TZDATA_APEX),)
 
 ########################################################################
 # Phony target for only building what go/lem requires for pushing ART on /data.
@@ -707,20 +709,6 @@ standalone-apex-files: deapexer \
 #
 # TODO(b/129332183): Remove this when Golem has full support for the
 # ART APEX.
-
-# Also include:
-# - a copy of the time zone data prebuilt files in
-#   /system/etc/tzdata_module/etc/tz and /system/etc/tzdata_module/etc/icu
-#   on target, (see modules `tzdata-art-test-tzdata`,
-#   `tzlookup.xml-art-test-tzdata`, and `tz_version-art-test-tzdata`, and
-#   `icu_overlay-art-test-tzdata`)
-# so that they can be found even if the Time Zone Data APEX is not available,
-# by setting the environment variable `ART_TEST_ANDROID_TZDATA_ROOT`
-# to "/system/etc/tzdata_module" on device. This is a temporary change needed
-# until Golem fully supports the Time Zone Data APEX.
-#
-# TODO(b/129332183): Remove this when Golem has full support for the
-# ART APEX (and TZ Data APEX).
 
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES := \
@@ -737,8 +725,6 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
                         $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
                         $(TARGET_OUT_SHARED_LIBRARIES)/liblz4.so \
                         libartpalette-system \
-                        tzdata-art-test-tzdata tzlookup.xml-art-test-tzdata \
-                        tz_version-art-test-tzdata icu_overlay-art-test-tzdata \
                         standalone-apex-files
 	# remove debug libraries from public.libraries.txt because golem builds
 	# won't have it.
