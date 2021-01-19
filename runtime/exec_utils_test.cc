@@ -16,6 +16,7 @@
 
 #include "exec_utils.h"
 
+#include "android-base/stringprintf.h"
 #include "base/file_utils.h"
 #include "base/memory_tool.h"
 #include "common_runtime_test.h"
@@ -100,6 +101,37 @@ TEST_F(ExecUtilsTest, EnvSnapshotDeletionsAreNotVisible) {
   EXPECT_EQ(0U, error_msg.size()) << error_msg;
   // Restore the variable's value.
   EXPECT_EQ(setenv(kDeletedVariable, save_value, kOverwrite), 0);
+}
+
+static std::vector<std::string> SleepCommand(int sleep_seconds) {
+  std::vector<std::string> command;
+  if (kIsTargetBuild) {
+    command.push_back(GetAndroidRoot() + "/bin/sleep");
+  } else {
+    command.push_back("/bin/sleep");
+  }
+  command.push_back(android::base::StringPrintf("%d", sleep_seconds));
+  return command;
+}
+
+TEST_F(ExecUtilsTest, ExecTimeout) {
+  static constexpr int kSleepSeconds = 5;
+  static constexpr int kWaitSeconds = 1;
+  std::vector<std::string> command = SleepCommand(kSleepSeconds);
+  std::string error_msg;
+  bool timed_out;
+  ASSERT_EQ(ExecAndReturnCode(command, kWaitSeconds, &timed_out, &error_msg), -1);
+  EXPECT_TRUE(timed_out);
+}
+
+TEST_F(ExecUtilsTest, ExecNoTimeout) {
+  static constexpr int kSleepSeconds = 1;
+  static constexpr int kWaitSeconds = 5;
+  std::vector<std::string> command = SleepCommand(kSleepSeconds);
+  std::string error_msg;
+  bool timed_out;
+  ASSERT_EQ(ExecAndReturnCode(command, kWaitSeconds, &timed_out, &error_msg), 0);
+  EXPECT_FALSE(timed_out);
 }
 
 }  // namespace art

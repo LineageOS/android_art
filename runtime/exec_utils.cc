@@ -30,18 +30,22 @@ namespace art {
 
 using android::base::StringPrintf;
 
-int ExecAndReturnCode(std::vector<std::string>& arg_vector, std::string* error_msg) {
-  const std::string command_line(android::base::Join(arg_vector, ' '));
-  CHECK_GE(arg_vector.size(), 1U) << command_line;
+namespace {
 
+std::string ToCommandLine(const std::vector<std::string>& args) {
+  return android::base::Join(args, ' ');
+}
+
+// Fork and execute a command specified in a subprocess.
+// If there is a runtime (Runtime::Current != nullptr) then the subprocess is created with the
+// same environment that existed when the runtime was started.
+// Returns the process id of the child process on success, -1 otherwise.
+pid_t ExecWithoutWait(std::vector<std::string>& arg_vector) {
   // Convert the args to char pointers.
   const char* program = arg_vector[0].c_str();
   std::vector<char*> args;
-  for (size_t i = 0; i < arg_vector.size(); ++i) {
-    const std::string& arg = arg_vector[i];
-    char* arg_str = const_cast<char*>(arg.c_str());
-    CHECK(arg_str != nullptr) << i;
-    args.push_back(arg_str);
+  for (const auto& arg : arg_vector) {
+    args.push_back(const_cast<char*>(arg.c_str()));
   }
   args.push_back(nullptr);
 
@@ -61,38 +65,110 @@ int ExecAndReturnCode(std::vector<std::string>& arg_vector, std::string* error_m
     } else {
       execve(program, &args[0], envp);
     }
-    PLOG(ERROR) << "Failed to execve(" << command_line << ")";
+    PLOG(ERROR) << "Failed to execve(" << ToCommandLine(arg_vector) << ")";
     // _exit to avoid atexit handlers in child.
     _exit(1);
   } else {
-    if (pid == -1) {
-      *error_msg = StringPrintf("Failed to execv(%s) because fork failed: %s",
-                                command_line.c_str(), strerror(errno));
-      return -1;
-    }
-
-    // wait for subprocess to finish
-    int status = -1;
-    pid_t got_pid = TEMP_FAILURE_RETRY(waitpid(pid, &status, 0));
-    if (got_pid != pid) {
-      *error_msg = StringPrintf("Failed after fork for execv(%s) because waitpid failed: "
-                                "wanted %d, got %d: %s",
-                                command_line.c_str(), pid, got_pid, strerror(errno));
-      return -1;
-    }
-    if (WIFEXITED(status)) {
-      return WEXITSTATUS(status);
-    }
-    return -1;
+    return pid;
   }
 }
+
+}  // namespace
+
+int ExecAndReturnCode(std::vector<std::string>& arg_vector, std::string* error_msg) {
+  pid_t pid = ExecWithoutWait(arg_vector);
+  if (pid == -1) {
+    *error_msg = StringPrintf("Failed to execv(%s) because fork failed: %s",
+                              ToCommandLine(arg_vector).c_str(), strerror(errno));
+    return -1;
+  }
+
+  // wait for subprocess to finish
+  int status = -1;
+  pid_t got_pid = TEMP_FAILURE_RETRY(waitpid(pid, &status, 0));
+  if (got_pid != pid) {
+    *error_msg = StringPrintf("Failed after fork for execv(%s) because waitpid failed: "
+                              "wanted %d, got %d: %s",
+                              ToCommandLine(arg_vector).c_str(), pid, got_pid, strerror(errno));
+    return -1;
+  }
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  return -1;
+}
+
+int ExecAndReturnCode(std::vector<std::string>& arg_vector,
+                      time_t timeout_secs,
+                      bool* timed_out,
+                      std::string* error_msg) {
+  *timed_out = false;
+
+  // Start subprocess.
+  pid_t pid = ExecWithoutWait(arg_vector);
+  if (pid == -1) {
+    *error_msg = StringPrintf("Failed to execv(%s) because fork failed: %s",
+                              ToCommandLine(arg_vector).c_str(), strerror(errno));
+    return -1;
+  }
+
+  // Add SIGCHLD to the signal set.
+  sigset_t child_mask, original_mask;
+  sigemptyset(&child_mask);
+  sigaddset(&child_mask, SIGCHLD);
+  if (sigprocmask(SIG_BLOCK, &child_mask, &original_mask) == -1) {
+    *error_msg = StringPrintf("Failed to set sigprocmask(): %s", strerror(errno));
+    return -1;
+  }
+
+  // Wait for a SIGCHLD notification.
+  errno = 0;
+  timespec ts = {timeout_secs, 0};
+  int wait_result = TEMP_FAILURE_RETRY(sigtimedwait(&child_mask, nullptr, &ts));
+  int wait_errno = errno;
+
+  // Restore the original signal set.
+  if (sigprocmask(SIG_SETMASK, &original_mask, nullptr) == -1) {
+    *error_msg = StringPrintf("Fail to restore sigprocmask(): %s", strerror(errno));
+    if (wait_result == 0) {
+      return -1;
+    }
+  }
+
+  // Having restored the signal set, see if we need to terminate the subprocess.
+  if (wait_result == -1) {
+    if (wait_errno == EAGAIN) {
+      *error_msg = "Timed out.";
+      *timed_out = true;
+    } else {
+      *error_msg = StringPrintf("Failed to sigtimedwait(): %s", strerror(errno));
+    }
+    if (kill(pid, SIGKILL) != 0) {
+      PLOG(ERROR) << "Failed to kill() subprocess: ";
+    }
+  }
+
+  // Wait for subprocess to finish.
+  int status = -1;
+  pid_t got_pid = TEMP_FAILURE_RETRY(waitpid(pid, &status, 0));
+  if (got_pid != pid) {
+    *error_msg = StringPrintf("Failed after fork for execv(%s) because waitpid failed: "
+                              "wanted %d, got %d: %s",
+                              ToCommandLine(arg_vector).c_str(), pid, got_pid, strerror(errno));
+    return -1;
+  }
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  return -1;
+}
+
 
 bool Exec(std::vector<std::string>& arg_vector, std::string* error_msg) {
   int status = ExecAndReturnCode(arg_vector, error_msg);
   if (status != 0) {
-    const std::string command_line(android::base::Join(arg_vector, ' '));
     *error_msg = StringPrintf("Failed execv(%s) because non-0 exit status",
-                              command_line.c_str());
+                              ToCommandLine(arg_vector).c_str());
     return false;
   }
   return true;
