@@ -2447,6 +2447,7 @@ extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_metho
   DCHECK(!interface_method->GetDeclaringClass()->IsObjectClass());
   DCHECK(interface_method->GetDeclaringClass()->IsInterface());
   DCHECK(!interface_method->IsRuntimeMethod());
+  DCHECK(!interface_method->IsCopied());
 
   ObjPtr<mirror::Object> obj_this = raw_this_object;
   ObjPtr<mirror::Class> cls = obj_this->GetClass();
