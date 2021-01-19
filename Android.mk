@@ -507,8 +507,15 @@ $(HOST_I18N_DATA): $(TARGET_OUT)/apex/$(I18N_APEX).apex $(HOST_OUT)/bin/deapexer
 	cp -R $(TARGET_OUT)/apex/$(I18N_APEX)/etc/ $(HOST_OUT)/$(I18N_APEX)/
 	touch $@
 
+$(HOST_TZDATA_DATA): $(TARGET_OUT)/apex/$(TZDATA_APEX).apex $(HOST_OUT)/bin/deapexer
+	$(call extract-from-apex,$(TZDATA_APEX))
+	rm -rf $(HOST_OUT)/$(TZDATA_APEX)
+	mkdir -p $(HOST_OUT)/$(TZDATA_APEX)/
+	cp -R $(TARGET_OUT)/apex/$(TZDATA_APEX)/etc/ $(HOST_OUT)/$(TZDATA_APEX)/
+	touch $@
+
 .PHONY: build-art-host
-build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(HOST_I18N_DATA)
+build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(HOST_I18N_DATA) $(HOST_TZDATA_DATA)
 
 .PHONY: build-art-target
 build-art-target: $(TARGET_OUT_EXECUTABLES)/art $(ART_TARGET_DEPENDENCIES) $(TARGET_CORE_IMG_OUTS)
