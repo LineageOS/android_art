@@ -1,0 +1,1 @@
+Regression test checking that we throw NPE on large field offsets.
