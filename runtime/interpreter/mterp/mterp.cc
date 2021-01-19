@@ -661,6 +661,15 @@ NO_INLINE bool MterpFieldAccessSlow(Instruction* inst,
     DCHECK(self->IsExceptionPending());
     return false;
   }
+  constexpr bool kIsPrimitive = (kAccessType & FindFieldFlags::PrimitiveBit) != 0;
+  if (!kIsPrimitive && !kIsRead) {
+    uint16_t vRegA = kIsStatic ? inst->VRegA_21c(inst_data) : inst->VRegA_22c(inst_data);
+    ObjPtr<mirror::Object> value = shadow_frame->GetVRegReference(vRegA);
+    if (value != nullptr && field->ResolveType() == nullptr) {
+      DCHECK(self->IsExceptionPending());
+      return false;
+    }
+  }
   ObjPtr<mirror::Object> obj = kIsStatic
       ? field->GetDeclaringClass().Ptr()
       : shadow_frame->GetVRegReference(inst->VRegB_22c(inst_data));

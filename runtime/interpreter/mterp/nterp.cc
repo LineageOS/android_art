@@ -420,7 +420,8 @@ static ArtField* ResolveFieldWithAccessChecks(Thread* self,
                                               uint16_t field_index,
                                               ArtMethod* caller,
                                               bool is_static,
-                                              bool is_put)
+                                              bool is_put,
+                                              size_t resolve_field_type)  // Resolve if not zero
     REQUIRES_SHARED(Locks::mutator_lock_) {
   if (caller->SkipAccessChecks()) {
     return class_linker->ResolveField(field_index, caller, is_static);
@@ -455,10 +456,17 @@ static ArtField* ResolveFieldWithAccessChecks(Thread* self,
     ThrowIllegalAccessErrorFinalField(caller, resolved_field);
     return nullptr;
   }
+  if (resolve_field_type != 0u && resolved_field->ResolveType() == nullptr) {
+    DCHECK(self->IsExceptionPending());
+    return nullptr;
+  }
   return resolved_field;
 }
 
-extern "C" size_t NterpGetStaticField(Thread* self, ArtMethod* caller, uint16_t* dex_pc_ptr)
+extern "C" size_t NterpGetStaticField(Thread* self,
+                                      ArtMethod* caller,
+                                      uint16_t* dex_pc_ptr,
+                                      size_t resolve_field_type)  // Resolve if not zero
     REQUIRES_SHARED(Locks::mutator_lock_) {
   UpdateHotness(caller);
   const Instruction* inst = Instruction::At(dex_pc_ptr);
@@ -470,7 +478,8 @@ extern "C" size_t NterpGetStaticField(Thread* self, ArtMethod* caller, uint16_t*
       field_index,
       caller,
       /* is_static */ true,
-      /* is_put */ IsInstructionSPut(inst->Opcode()));
+      /* is_put */ IsInstructionSPut(inst->Opcode()),
+      resolve_field_type);
 
   if (resolved_field == nullptr) {
     DCHECK(self->IsExceptionPending());
@@ -499,7 +508,8 @@ extern "C" size_t NterpGetStaticField(Thread* self, ArtMethod* caller, uint16_t*
 
 extern "C" uint32_t NterpGetInstanceFieldOffset(Thread* self,
                                                 ArtMethod* caller,
-                                                uint16_t* dex_pc_ptr)
+                                                uint16_t* dex_pc_ptr,
+                                                size_t resolve_field_type)  // Resolve if not zero
     REQUIRES_SHARED(Locks::mutator_lock_) {
   UpdateHotness(caller);
   const Instruction* inst = Instruction::At(dex_pc_ptr);
@@ -511,7 +521,8 @@ extern "C" uint32_t NterpGetInstanceFieldOffset(Thread* self,
       field_index,
       caller,
       /* is_static */ false,
-      /* is_put */ IsInstructionIPut(inst->Opcode()));
+      /* is_put */ IsInstructionIPut(inst->Opcode()),
+      resolve_field_type);
   if (resolved_field == nullptr) {
     DCHECK(self->IsExceptionPending());
     return 0;
