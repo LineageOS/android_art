@@ -390,7 +390,9 @@ class ImageWriter final {
     std::unique_ptr<InternTable> intern_table_;
 
     // Class table associated with this image for serialization.
-    std::unique_ptr<ClassTable> class_table_;
+    size_t class_table_size_ = 0;
+    std::unique_ptr<ClassTable::ClassSet::value_type[]> class_table_buffer_;
+    std::optional<ClassTable::ClassSet> class_table_;
 
     // Padding offsets to ensure region alignment (if required).
     // Objects need to be added from the recorded offset until the end of the region.

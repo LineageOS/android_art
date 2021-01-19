@@ -238,11 +238,6 @@ class ClassTable {
       REQUIRES(!lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Combines all of the tables into one class set.
-  size_t WriteToMemory(uint8_t* ptr) const
-      REQUIRES(!lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Read a table from ptr and put it at the front of the class set.
   size_t ReadFromMemory(uint8_t* ptr)
       REQUIRES(!lock_)
@@ -269,10 +264,6 @@ class ClassTable {
   }
 
  private:
-  // Only copies classes.
-  void CopyWithoutLocks(const ClassTable& source_table) NO_THREAD_SAFETY_ANALYSIS;
-  void InsertWithoutLocks(ObjPtr<mirror::Class> klass) NO_THREAD_SAFETY_ANALYSIS;
-
   size_t CountDefiningLoaderClasses(ObjPtr<mirror::ClassLoader> defining_loader,
                                     const ClassSet& set) const
       REQUIRES(lock_)

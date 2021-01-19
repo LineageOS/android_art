@@ -90,6 +90,15 @@ using ::art::mirror::String;
 namespace art {
 namespace linker {
 
+// The actual value of `kImageClassTableMinLoadFactor` is irrelevant because image class tables
+// are never resized, but we still need to pass a reasonable value to the constructor.
+constexpr double kImageClassTableMinLoadFactor = 0.5;
+// We use `kImageClassTableMaxLoadFactor` to determine the buffer size for image class tables
+// to make them full. We never insert additional elements to them, so we do not want to waste
+// extra memory. And unlike runtime class tables, we do not want this to depend on runtime
+// properties (see `Runtime::GetHashTableMaxLoadFactor()` checking for low memory mode).
+constexpr double kImageClassTableMaxLoadFactor = 0.7;
+
 static ArrayRef<const uint8_t> MaybeCompressData(ArrayRef<const uint8_t> source,
                                                  ImageHeader::StorageMode image_storage_mode,
                                                  /*out*/ std::vector<uint8_t>* storage) {
@@ -279,27 +288,6 @@ bool ImageWriter::PrepareImageAddressSpace(TimingLogger* timings) {
     TimingLogger::ScopedTiming t("CalculateNewObjectOffsets", timings);
     ScopedObjectAccess soa(self);
     CalculateNewObjectOffsets();
-  }
-
-  // Obtain class count for debugging purposes
-  if (VLOG_IS_ON(compiler) && compiler_options_.IsAppImage()) {
-    ScopedObjectAccess soa(self);
-
-    size_t app_image_class_count  = 0;
-
-    for (ImageInfo& info : image_infos_) {
-      info.class_table_->Visit([&](ObjPtr<mirror::Class> klass)
-                                   REQUIRES_SHARED(Locks::mutator_lock_) {
-        if (!IsInBootImage(klass.Ptr())) {
-          ++app_image_class_count;
-        }
-
-        // Indicate that we would like to continue visiting classes.
-        return true;
-      });
-    }
-
-    VLOG(compiler) << "Dex2Oat:AppImage:classCount = " << app_image_class_count;
   }
 
   // This needs to happen after CalculateNewObjectOffsets since it relies on intern_table_bytes_ and
@@ -1384,11 +1372,6 @@ void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat
         as_klass->GetSFieldsPtr(), as_klass->GetIFieldsPtr(),
     };
     ImageInfo& image_info = GetImageInfo(oat_index);
-    if (!compiler_options_.IsAppImage()) {
-      // Note: Avoid locking to prevent lock order violations from root visiting;
-      // image_info.class_table_ is only accessed from the image writer.
-      image_info.class_table_->InsertWithoutLocks(as_klass);
-    }
     for (LengthPrefixedArray<ArtField>* cur_fields : fields) {
       // Total array length including header.
       if (cur_fields != nullptr) {
@@ -1463,20 +1446,6 @@ void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat
             AssignMethodOffset(imt_method, NativeObjectRelocationType::kRuntimeMethod, oat_index);
           }
         }
-      }
-    }
-  } else if (obj->IsClassLoader()) {
-    // Register the class loader if it has a class table.
-    // The fake boot class loader should not get registered.
-    ObjPtr<mirror::ClassLoader> class_loader = obj->AsClassLoader();
-    if (class_loader->GetClassTable() != nullptr) {
-      DCHECK(compiler_options_.IsAppImage());
-      if (class_loader == GetAppClassLoader()) {
-        ImageInfo& image_info = GetImageInfo(oat_index);
-        // Note: Avoid locking to prevent lock order violations from root visiting;
-        // image_info.class_table_ table is only accessed from the image writer
-        // and class_loader->GetClassTable() is iterated but not modified.
-        image_info.class_table_->CopyWithoutLocks(*class_loader->GetClassTable());
       }
     }
   }
@@ -1627,11 +1596,11 @@ class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
     return true;
   }
 
-  WorkQueue SortAndReleaseClasses()
-      REQUIRES_SHARED(Locks::mutator_lock_) {
+  WorkQueue ProcessCollectedClasses(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_) {
     std::sort(klasses_.begin(), klasses_.end());
 
-    WorkQueue result;
+    ImageWriter* image_writer = image_writer_;
+    WorkQueue work_queue;
     size_t last_dex_file_index = static_cast<size_t>(-1);
     size_t last_oat_index = static_cast<size_t>(-1);
     for (const ClassEntry& entry : klasses_) {
@@ -1640,14 +1609,93 @@ class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
           last_oat_index = GetDefaultOatIndex();  // Primitive type.
         } else {
           uint32_t dex_file_index = entry.dex_file_index - 1u;  // 0 is for primitive types.
-          last_oat_index = image_writer_->GetOatIndexForDexFile(dex_files_[dex_file_index]);
+          last_oat_index = image_writer->GetOatIndexForDexFile(dex_files_[dex_file_index]);
         }
         last_dex_file_index = entry.dex_file_index;
       }
-      result.emplace_back(entry.klass, last_oat_index);
+      // Count the number of classes for class tables.
+      image_writer->image_infos_[last_oat_index].class_table_size_ += 1u;
+      work_queue.emplace_back(entry.klass, last_oat_index);
     }
     klasses_.clear();
-    return result;
+
+    // Prepare image class tables.
+    std::vector<mirror::Class*> boot_image_classes;
+    if (image_writer->compiler_options_.IsAppImage()) {
+      DCHECK_EQ(image_writer->image_infos_.size(), 1u);
+      ImageInfo& image_info = image_writer->image_infos_[0];
+      // Log the non-boot image class count for app image for debugging purposes.
+      VLOG(compiler) << "Dex2Oat:AppImage:classCount = " << image_info.class_table_size_;
+      // Collect boot image classes referenced by app class loader's class table.
+      ClassTable* app_class_table = image_writer->GetAppClassLoader()->GetClassTable();
+      ReaderMutexLock lock(self, app_class_table->lock_);
+      DCHECK_EQ(app_class_table->classes_.size(), 1u);
+      const ClassTable::ClassSet& app_class_set = app_class_table->classes_[0];
+      DCHECK_GE(app_class_set.size(), image_info.class_table_size_);
+      boot_image_classes.reserve(app_class_set.size() - image_info.class_table_size_);
+      for (const ClassTable::TableSlot& slot : app_class_set) {
+        mirror::Class* klass = slot.Read<kWithoutReadBarrier>().Ptr();
+        if (image_writer->IsInBootImage(klass)) {
+          boot_image_classes.push_back(klass);
+        }
+      }
+      DCHECK_EQ(app_class_set.size() - image_info.class_table_size_, boot_image_classes.size());
+      // Increase the app class table size to include referenced boot image classes.
+      image_info.class_table_size_ = app_class_set.size();
+    }
+    for (ImageInfo& image_info : image_writer->image_infos_) {
+      if (image_info.class_table_size_ != 0u) {
+        // Make sure the class table shall be full by allocating a buffer of the right size.
+        size_t buffer_size = static_cast<size_t>(
+            ceil(image_info.class_table_size_ / kImageClassTableMaxLoadFactor));
+        image_info.class_table_buffer_.reset(new ClassTable::TableSlot[buffer_size]);
+        DCHECK(image_info.class_table_buffer_ != nullptr);
+        image_info.class_table_.emplace(kImageClassTableMinLoadFactor,
+                                        kImageClassTableMaxLoadFactor,
+                                        image_info.class_table_buffer_.get(),
+                                        buffer_size);
+      }
+    }
+    for (const auto& pair : work_queue) {
+      ObjPtr<mirror::Class> klass = pair.first->AsClass();
+      size_t oat_index = pair.second;
+      DCHECK(image_writer->image_infos_[oat_index].class_table_.has_value());
+      ClassTable::ClassSet& class_table = *image_writer->image_infos_[oat_index].class_table_;
+      bool inserted = class_table.insert(ClassTable::TableSlot(klass)).second;
+      DCHECK(inserted) << "Class " << klass->PrettyDescriptor()
+          << " (" << klass.Ptr() << ") already inserted";
+    }
+    if (image_writer->compiler_options_.IsAppImage()) {
+      DCHECK_EQ(image_writer->image_infos_.size(), 1u);
+      ImageInfo& image_info = image_writer->image_infos_[0];
+      if (image_info.class_table_size_ != 0u) {
+        // Insert boot image class references to the app class table.
+        // The order of insertion into the app class loader's ClassTable is non-deterministic,
+        // so sort the boot image classes by the boot image address to get deterministic table.
+        std::sort(boot_image_classes.begin(), boot_image_classes.end());
+        DCHECK(image_info.class_table_.has_value());
+        ClassTable::ClassSet& table = *image_info.class_table_;
+        for (mirror::Class* klass : boot_image_classes) {
+          bool inserted = table.insert(ClassTable::TableSlot(klass)).second;
+          DCHECK(inserted) << "Boot image class " << klass->PrettyDescriptor()
+              << " (" << klass << ") already inserted";
+        }
+        DCHECK_EQ(table.size(), image_info.class_table_size_);
+      }
+    }
+    for (ImageInfo& image_info : image_writer->image_infos_) {
+      DCHECK_EQ(image_info.class_table_bytes_, 0u);
+      if (image_info.class_table_size_ != 0u) {
+        DCHECK(image_info.class_table_.has_value());
+        DCHECK_EQ(image_info.class_table_->size(), image_info.class_table_size_);
+        image_info.class_table_bytes_ = image_info.class_table_->WriteToMemory(nullptr);
+        DCHECK_NE(image_info.class_table_bytes_, 0u);
+      } else {
+        DCHECK(!image_info.class_table_.has_value());
+      }
+    }
+
+    return work_queue;
   }
 
  private:
@@ -1807,7 +1855,7 @@ void ImageWriter::LayoutHelper::ProcessDexFileObjects(Thread* self) {
   CollectClassesVisitor visitor(image_writer_);
   class_linker->VisitClasses(&visitor);
   DCHECK(work_queue_.empty());
-  work_queue_ = visitor.SortAndReleaseClasses();
+  work_queue_ = visitor.ProcessCollectedClasses(self);
   for (const std::pair<ObjPtr<mirror::Object>, size_t>& entry : work_queue_) {
     DCHECK(entry.first->IsClass());
     bool assigned = TryAssignBinSlot(entry.first, entry.second);
@@ -2203,13 +2251,6 @@ void ImageWriter::CalculateNewObjectOffsets() {
     CHECK_EQ(intern_table->WeakSize(), 0u) << " should have strong interned all the strings";
     if (intern_table->StrongSize() != 0u) {
       image_info.intern_table_bytes_ = intern_table->WriteToMemory(nullptr);
-    }
-
-    // Calculate the size of the class table.
-    ReaderMutexLock mu(self, *Locks::classlinker_classes_lock_);
-    DCHECK_EQ(image_info.class_table_->NumReferencedZygoteClasses(), 0u);
-    if (image_info.class_table_->NumReferencedNonZygoteClasses() != 0u) {
-      image_info.class_table_bytes_ += image_info.class_table_->WriteToMemory(nullptr);
     }
   }
 
@@ -2625,27 +2666,27 @@ void ImageWriter::CopyAndFixupNativeData(size_t oat_index) {
     const ImageSection& class_table_section = image_header->GetClassTableSection();
     uint8_t* const class_table_memory_ptr =
         image_info.image_.Begin() + class_table_section.Offset();
-    Thread* self = Thread::Current();
-    ReaderMutexLock mu(self, *Locks::classlinker_classes_lock_);
 
-    ClassTable* table = image_info.class_table_.get();
-    CHECK(table != nullptr);
-    const size_t class_table_bytes = table->WriteToMemory(class_table_memory_ptr);
+    DCHECK(image_info.class_table_.has_value());
+    const ClassTable::ClassSet& table = *image_info.class_table_;
+    CHECK_EQ(table.size(), image_info.class_table_size_);
+    const size_t class_table_bytes = table.WriteToMemory(class_table_memory_ptr);
     CHECK_EQ(class_table_bytes, image_info.class_table_bytes_);
+
     // Fixup the pointers in the newly written class table to contain image addresses. See
     // above comment for intern tables.
     ClassTable temp_class_table;
     temp_class_table.ReadFromMemory(class_table_memory_ptr);
-    CHECK_EQ(temp_class_table.NumReferencedZygoteClasses(),
-             table->NumReferencedNonZygoteClasses() + table->NumReferencedZygoteClasses());
+    CHECK_EQ(temp_class_table.NumReferencedZygoteClasses(), table.size());
     UnbufferedRootVisitor visitor(&root_visitor, RootInfo(kRootUnknown));
     temp_class_table.VisitRoots(visitor);
-    // Record relocations. (The root visitor does not get to see the slot addresses.)
-    // Note that the low bits in the slots contain bits of the descriptors' hash codes
-    // but the relocation works fine for these "adjusted" references.
-    ReaderMutexLock lock(self, temp_class_table.lock_);
-    DCHECK(!temp_class_table.classes_.empty());
-    DCHECK(!temp_class_table.classes_[0].empty());  // The ClassSet was inserted at the beginning.
+
+    if (kIsDebugBuild) {
+      ReaderMutexLock lock(Thread::Current(), temp_class_table.lock_);
+      CHECK(!temp_class_table.classes_.empty());
+      // The ClassSet was inserted at the beginning.
+      CHECK_EQ(temp_class_table.classes_[0].size(), table.size());
+    }
   }
 }
 
@@ -3258,7 +3299,7 @@ ImageWriter::ImageWriter(
 
 ImageWriter::ImageInfo::ImageInfo()
     : intern_table_(new InternTable),
-      class_table_(new ClassTable) {}
+      class_table_() {}
 
 template <typename DestType>
 void ImageWriter::CopyAndFixupReference(DestType* dest, ObjPtr<mirror::Object> src) {
