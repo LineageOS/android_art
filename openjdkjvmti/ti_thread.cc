@@ -39,12 +39,13 @@
 #include "base/mutex.h"
 #include "deopt_manager.h"
 #include "events-inl.h"
-#include "gc/system_weak.h"
 #include "gc/collector_type.h"
 #include "gc/gc_cause.h"
 #include "gc/scoped_gc_critical_section.h"
+#include "gc/system_weak.h"
 #include "gc_root-inl.h"
 #include "jni/jni_internal.h"
+#include "metrics/metrics.h"
 #include "mirror/class.h"
 #include "mirror/object-inl.h"
 #include "mirror/string.h"
@@ -123,13 +124,12 @@ struct ThreadCallback : public art::ThreadLifecycleCallback {
     if (!started) {
       // Runtime isn't started. We only expect at most the signal handler or JIT threads to be
       // started here; this includes the perfetto_hprof_listener signal handler thread for
-      // perfetto_hprof.
+      // perfetto_hprof, as well as the metrics background reporting thread.
       if (art::kIsDebugBuild) {
         std::string name;
         self->GetThreadName(name);
-        if (name != "JDWP" &&
-            name != "Signal Catcher" &&
-            name != "perfetto_hprof_listener" &&
+        if (name != "JDWP" && name != "Signal Catcher" && name != "perfetto_hprof_listener" &&
+            name != art::metrics::MetricsReporter::kBackgroundThreadName &&
             !android::base::StartsWith(name, "Jit thread pool") &&
             !android::base::StartsWith(name, "Runtime worker thread")) {
           LOG(FATAL) << "Unexpected thread before start: " << name << " id: "
