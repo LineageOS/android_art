@@ -42,7 +42,7 @@ class HeapTest : public CommonRuntimeTest {
                                      /*reuse=*/ false,
                                      /*reservation=*/ nullptr,
                                      &error_msg);
-    ASSERT_TRUE(reserved_.IsValid()) << error_msg;
+    // There is no guarantee that reserved_ will be valid (due to ASLR). See b/175018342.
     CommonRuntimeTest::SetUp();
   }
 
