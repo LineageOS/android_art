@@ -144,11 +144,16 @@ TEST_F(ClassTableTest, ClassTable) {
   table.Remove(descriptor_x);
   EXPECT_FALSE(table.Contains(h_X.Get()));
 
-  // Test that WriteToMemory and ReadFromMemory work.
+  // Test that reading a class set from memory works.
   table.Insert(h_X.Get());
-  const size_t count = table.WriteToMemory(nullptr);
+  ClassTable::ClassSet temp_set;
+  table.Visit([&temp_set](ObjPtr<mirror::Class> klass) REQUIRES_SHARED(Locks::mutator_lock_) {
+    temp_set.insert(ClassTable::TableSlot(klass));
+    return true;
+  });
+  const size_t count = temp_set.WriteToMemory(nullptr);
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[count]());
-  ASSERT_EQ(table.WriteToMemory(&buffer[0]), count);
+  ASSERT_EQ(temp_set.WriteToMemory(&buffer[0]), count);
   ClassTable table2;
   size_t count2 = table2.ReadFromMemory(&buffer[0]);
   EXPECT_EQ(count, count2);

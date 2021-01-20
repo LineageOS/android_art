@@ -25,13 +25,21 @@ public class Main {
         c.getMethod("storeStaticNull").invoke(null);
         c.getMethod("storeInstanceNull").invoke(null);
 
+        // Storing anything else should throw an exception.
         testStoreObject(c, "storeStaticObject");
         testStoreObject(c, "storeInstanceObject");
+
+        // Loading is OK.
+        c = Class.forName("BadFieldGet");
+        testLoadObject(c, "loadStatic");
     }
 
-    public static void testStoreObject(Class<?> c, String methodName) throws Throwable{
+    public static void testLoadObject(Class<?> c, String methodName) throws Throwable {
+      c.getMethod(methodName).invoke(null);
+    }
+
+    public static void testStoreObject(Class<?> c, String methodName) throws Throwable {
         try {
-          // Storing anything else should throw an exception.
           c.getMethod(methodName).invoke(null);
           throw new Error("Expected NoClassDefFoundError");
         } catch (InvocationTargetException expected) {
@@ -45,5 +53,8 @@ public class Main {
             throw new Error("Unexpected " + e);
           }
         }
+    }
+
+    private static void privateMethod() {
     }
 }
