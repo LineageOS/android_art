@@ -423,10 +423,8 @@ inline uint16_t ArtMethod::GetCounter() {
 }
 
 inline uint32_t ArtMethod::GetImtIndex() {
-  if (LIKELY(IsAbstract() && imt_index_ != 0)) {
-    uint16_t imt_index = ~imt_index_;
-    DCHECK_EQ(imt_index, ImTable::GetImtIndex(this)) << PrettyMethod();
-    return imt_index;
+  if (LIKELY(IsAbstract())) {
+    return imt_index_;
   } else {
     return ImTable::GetImtIndex(this);
   }
@@ -434,7 +432,7 @@ inline uint32_t ArtMethod::GetImtIndex() {
 
 inline void ArtMethod::CalculateAndSetImtIndex() {
   DCHECK(IsAbstract()) << PrettyMethod();
-  imt_index_ = ~ImTable::GetImtIndex(this);
+  imt_index_ = ImTable::GetImtIndex(this);
 }
 
 }  // namespace art
