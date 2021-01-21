@@ -259,6 +259,11 @@
    .endif
    EXPORT_PC
    bl      nterp_get_instance_field_offset
+   .if $is_object
+   // Reload the value as it may have moved.
+   ubfx    r4, rINST, #8, #4           // r4<- A
+   GET_VREG r4, r4                     // r4 <- v[A]
+   .endif
    cmp     r0, #0
    bge     .L${opcode}_resume
    CLEAR_INSTANCE_VOLATILE_MARKER r0
@@ -492,6 +497,11 @@
    .endif
    EXPORT_PC
    bl      nterp_get_static_field
+   .if $is_object
+   // Reload the value as it may have moved.
+   lsr     r4, rINST, #8               // r4 <- A
+   GET_VREG r4, r4                     // r4 <- v[A]
+   .endif
    tst     r0, #1
    beq     .L${opcode}_resume
    CLEAR_STATIC_VOLATILE_MARKER r0
