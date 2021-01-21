@@ -58,7 +58,10 @@ static bool BootImageAOTCanEmbedMethod(ArtMethod* method, const CompilerOptions&
 }
 
 HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenLoadMethod(
-    ArtMethod* callee, bool has_method_id, CodeGenerator* codegen) {
+    ArtMethod* callee,
+    bool has_method_id,
+    bool for_interface_call,
+    CodeGenerator* codegen) {
   if (kIsDebugBuild) {
     ScopedObjectAccess soa(Thread::Current());  // Required for GetDeclaringClass below.
     DCHECK(callee != nullptr);
@@ -83,8 +86,14 @@ HInvokeStaticOrDirect::DispatchInfo HSharpening::SharpenLoadMethod(
   // We don't optimize for debuggable as it would prevent us from obsoleting the method in some
   // situations.
   const CompilerOptions& compiler_options = codegen->GetCompilerOptions();
-  if (callee == codegen->GetGraph()->GetArtMethod() && !codegen->GetGraph()->IsDebuggable()) {
-    // Recursive call.
+  if (callee == codegen->GetGraph()->GetArtMethod() &&
+      !codegen->GetGraph()->IsDebuggable() &&
+      // The runtime expects the canonical interface method being passed as
+      // hidden argument when doing an invokeinterface. Because default methods
+      // can be called through invokevirtual, we may get a copied method if we
+      // load 'recursively'.
+      (!for_interface_call || !callee->IsDefault())) {
+    // Recursive load.
     method_load_kind = MethodLoadKind::kRecursive;
     code_ptr_location = CodePtrLocation::kCallSelf;
   } else if (compiler_options.IsBootImage() || compiler_options.IsBootImageExtension()) {

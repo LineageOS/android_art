@@ -1,0 +1,2 @@
+Regression test for the compiler where we used to pass a copied method as hidden
+argument for invokeinterface, which isn't supported.
