@@ -61,36 +61,37 @@ class SchedulingLatencyVisitorARM : public SchedulingLatencyVisitor {
 
 // We add a second unused parameter to be able to use this macro like the others
 // defined in `nodes.h`.
-#define FOR_EACH_SCHEDULED_ARM_INSTRUCTION(M)    \
-  M(ArrayGet         , unused)                   \
-  M(ArrayLength      , unused)                   \
-  M(ArraySet         , unused)                   \
-  M(Add              , unused)                   \
-  M(Sub              , unused)                   \
-  M(And              , unused)                   \
-  M(Or               , unused)                   \
-  M(Ror              , unused)                   \
-  M(Xor              , unused)                   \
-  M(Shl              , unused)                   \
-  M(Shr              , unused)                   \
-  M(UShr             , unused)                   \
-  M(Mul              , unused)                   \
-  M(Div              , unused)                   \
-  M(Condition        , unused)                   \
-  M(Compare          , unused)                   \
-  M(BoundsCheck      , unused)                   \
-  M(InstanceFieldGet , unused)                   \
-  M(InstanceFieldSet , unused)                   \
-  M(InstanceOf       , unused)                   \
-  M(Invoke           , unused)                   \
-  M(LoadString       , unused)                   \
-  M(NewArray         , unused)                   \
-  M(NewInstance      , unused)                   \
-  M(Rem              , unused)                   \
-  M(StaticFieldGet   , unused)                   \
-  M(StaticFieldSet   , unused)                   \
-  M(SuspendCheck     , unused)                   \
-  M(TypeConversion   , unused)
+#define FOR_EACH_SCHEDULED_ARM_INSTRUCTION(M) \
+  M(ArrayGet, unused)                         \
+  M(ArrayLength, unused)                      \
+  M(ArraySet, unused)                         \
+  M(Add, unused)                              \
+  M(Sub, unused)                              \
+  M(And, unused)                              \
+  M(Or, unused)                               \
+  M(Ror, unused)                              \
+  M(Xor, unused)                              \
+  M(Shl, unused)                              \
+  M(Shr, unused)                              \
+  M(UShr, unused)                             \
+  M(Mul, unused)                              \
+  M(Div, unused)                              \
+  M(Condition, unused)                        \
+  M(Compare, unused)                          \
+  M(BoundsCheck, unused)                      \
+  M(PredicatedInstanceFieldGet, unused)       \
+  M(InstanceFieldGet, unused)                 \
+  M(InstanceFieldSet, unused)                 \
+  M(InstanceOf, unused)                       \
+  M(Invoke, unused)                           \
+  M(LoadString, unused)                       \
+  M(NewArray, unused)                         \
+  M(NewInstance, unused)                      \
+  M(Rem, unused)                              \
+  M(StaticFieldGet, unused)                   \
+  M(StaticFieldSet, unused)                   \
+  M(SuspendCheck, unused)                     \
+  M(TypeConversion, unused)
 
 #define FOR_EACH_SCHEDULED_SHARED_INSTRUCTION(M) \
   M(BitwiseNegatedRight, unused)                 \

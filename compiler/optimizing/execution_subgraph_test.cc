@@ -425,6 +425,150 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop3) {
   ASSERT_TRUE(contents.find(blks.Get("exit")) != contents.end());
 }
 
+//            ┌───────┐       ┌──────────────┐
+//            │ right │ ◀──   │    entry     │
+//            └───────┘       └──────────────┘
+//              │               │
+//              │               │
+//              ▼               ▼
+// ┌────┐     ┌───────┐       ┌──────────────┐
+// │ l2 │ ──▶ │ exit  │  ┌─   │      l1      │   ◀┐
+// └────┘     └───────┘  │    └──────────────┘    │
+//   ▲                   │      │                 │
+//   └───────────────────┘      │                 │
+//                              ▼                 │
+//                            ┌──────────────┐    │  ┌──────────────┐
+//                       ┌─   │    l1loop    │    │  │ l1loop_right │ ◀┐
+//                       │    └──────────────┘    │  └──────────────┘  │
+//                       │      │                 │    │               │
+//                       │      │                 │    │               │
+//                       │      ▼                 │    │               │
+//                       │  ┌−−−−−−−−−−−−−−−−−−┐  │    │               │
+//                       │  ╎     removed      ╎  │    │               │
+//                       │  ╎                  ╎  │    │               │
+//                       │  ╎ ┌──────────────┐ ╎  │    │               │
+//                       │  ╎ │ l1loop_left  │ ╎  │    │               │
+//                       │  ╎ └──────────────┘ ╎  │    │               │
+//                       │  ╎                  ╎  │    │               │
+//                       │  └−−−−−−−−−−−−−−−−−−┘  │    │               │
+//                       │      │                 │    │               │
+//                       │      │                 │    │               │
+//                       │      ▼                 │    │               │
+//                       │    ┌──────────────┐    │    │               │
+//                       │    │ l1loop_merge │   ─┘    │               │
+//                       │    └──────────────┘         │               │
+//                       │      ▲                      │               │
+//                       │      └──────────────────────┘               │
+//                       │                                             │
+//                       │                                             │
+//                       └─────────────────────────────────────────────┘
+
+TEST_F(ExecutionSubgraphTest, PropagationLoop4) {
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "l1"},
+                                                  {"l1", "l2"},
+                                                  {"l1", "l1loop"},
+                                                  {"l1loop", "l1loop_left"},
+                                                  {"l1loop", "l1loop_right"},
+                                                  {"l1loop_left", "l1loop_merge"},
+                                                  {"l1loop_right", "l1loop_merge"},
+                                                  {"l1loop_merge", "l1"},
+                                                  {"l2", "exit"},
+                                                  {"entry", "right"},
+                                                  {"right", "exit"}}));
+  ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
+  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  esg.RemoveBlock(blks.Get("l1loop_left"));
+  esg.Finalize();
+  ASSERT_TRUE(esg.IsValid());
+  ASSERT_TRUE(IsValidSubgraph(esg));
+  std::unordered_set<const HBasicBlock*> contents(esg.ReachableBlocks().begin(),
+                                                  esg.ReachableBlocks().end());
+
+  ASSERT_EQ(contents.size(), 3u);
+
+  // Not present, no path through. If we got to l1 loop then we must merge back
+  // with l1 and l2 so they're bad too.
+  ASSERT_TRUE(contents.find(blks.Get("l1loop")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1loop_left")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1loop_right")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1loop_merge")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l2")) == contents.end());
+
+  // present, path through.
+  ASSERT_TRUE(contents.find(blks.Get("right")) != contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("entry")) != contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("exit")) != contents.end());
+}
+
+// +------------------------------------------------------+
+// |                                                      |
+// |  +--------------+       +-------------+              |
+// |  |    right     | <--   |    entry    |              |
+// |  +--------------+       +-------------+              |
+// |    |                      |                          |
+// |    |                      |                          |
+// |    v                      v                          |
+// |  +--------------+       +--------------------+     +----+
+// +> |     exit     |  +>   |         l1         | --> | l2 |
+//    +--------------+  |    +--------------------+     +----+
+//                      |      |                ^
+//      +---------------+      |                |
+//      |                      v                |
+//    +--------------+       +-------------+    |
+//    | l1loop_right | <--   |   l1loop    |    |
+//    +--------------+       +-------------+    |
+//                             |                |
+//                             |                |
+//                             v                |
+//                         + - - - - - - - - +  |
+//                         '     removed     '  |
+//                         '                 '  |
+//                         ' +-------------+ '  |
+//                         ' | l1loop_left | ' -+
+//                         ' +-------------+ '
+//                         '                 '
+//                         + - - - - - - - - +
+TEST_F(ExecutionSubgraphTest, PropagationLoop5) {
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "l1"},
+                                                  {"l1", "l2"},
+                                                  {"l1", "l1loop"},
+                                                  {"l1loop", "l1loop_left"},
+                                                  {"l1loop", "l1loop_right"},
+                                                  {"l1loop_left", "l1"},
+                                                  {"l1loop_right", "l1"},
+                                                  {"l2", "exit"},
+                                                  {"entry", "right"},
+                                                  {"right", "exit"}}));
+  ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
+  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  esg.RemoveBlock(blks.Get("l1loop_left"));
+  esg.Finalize();
+  ASSERT_TRUE(esg.IsValid());
+  ASSERT_TRUE(IsValidSubgraph(esg));
+  std::unordered_set<const HBasicBlock*> contents(esg.ReachableBlocks().begin(),
+                                                  esg.ReachableBlocks().end());
+
+  ASSERT_EQ(contents.size(), 3u);
+
+  // Not present, no path through. If we got to l1 loop then we must merge back
+  // with l1 and l2 so they're bad too.
+  ASSERT_TRUE(contents.find(blks.Get("l1loop")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1loop_left")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l1loop_right")) == contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("l2")) == contents.end());
+
+  // present, path through.
+  ASSERT_TRUE(contents.find(blks.Get("right")) != contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("entry")) != contents.end());
+  ASSERT_TRUE(contents.find(blks.Get("exit")) != contents.end());
+}
+
 TEST_F(ExecutionSubgraphTest, Invalid) {
   AdjacencyListGraph blks(SetupFromAdjacencyList(
       "entry",

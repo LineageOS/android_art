@@ -16,6 +16,9 @@
 
 #include "load_store_analysis.h"
 
+#include "base/scoped_arena_allocator.h"
+#include "optimizing/escape.h"
+
 namespace art {
 
 // A cap for the number of heap locations to prevent pathological time/space consumption.
@@ -100,14 +103,11 @@ void ReferenceInfo::PrunePartialEscapeWrites() {
       allocator_, graph->GetBlocks().size(), false, kArenaAllocLSA);
   for (const HUseListNode<HInstruction*>& use : reference_->GetUses()) {
     const HInstruction* user = use.GetUser();
-    const bool possible_exclusion =
-        !additional_exclusions.IsBitSet(user->GetBlock()->GetBlockId()) &&
-        subgraph_.ContainsBlock(user->GetBlock());
-    const bool is_written_to =
+    if (!additional_exclusions.IsBitSet(user->GetBlock()->GetBlockId()) &&
+        subgraph_.ContainsBlock(user->GetBlock()) &&
         (user->IsUnresolvedInstanceFieldSet() || user->IsUnresolvedStaticFieldSet() ||
          user->IsInstanceFieldSet() || user->IsStaticFieldSet() || user->IsArraySet()) &&
-        (reference_ == user->InputAt(0));
-    if (possible_exclusion && is_written_to &&
+        (reference_ == user->InputAt(0)) &&
         std::any_of(subgraph_.UnreachableBlocks().begin(),
                     subgraph_.UnreachableBlocks().end(),
                     [&](const HBasicBlock* excluded) -> bool {
@@ -145,6 +145,37 @@ bool HeapLocationCollector::InstructionEligibleForLSERemoval(HInstruction* inst)
                        });
   } else {
     return false;
+  }
+}
+
+void ReferenceInfo::CollectPartialEscapes(HGraph* graph) {
+  ScopedArenaAllocator saa(graph->GetArenaStack());
+  ArenaBitVector seen_instructions(&saa, graph->GetCurrentInstructionId(), false, kArenaAllocLSA);
+  // Get regular escapes.
+  ScopedArenaVector<HInstruction*> additional_escape_vectors(saa.Adapter(kArenaAllocLSA));
+  LambdaEscapeVisitor scan_instructions([&](HInstruction* escape) -> bool {
+    HandleEscape(escape);
+    // LSE can't track heap-locations through Phi and Select instructions so we
+    // need to assume all escapes from these are escapes for the base reference.
+    if ((escape->IsPhi() || escape->IsSelect()) && !seen_instructions.IsBitSet(escape->GetId())) {
+      seen_instructions.SetBit(escape->GetId());
+      additional_escape_vectors.push_back(escape);
+    }
+    return true;
+  });
+  additional_escape_vectors.push_back(reference_);
+  while (!additional_escape_vectors.empty()) {
+    HInstruction* ref = additional_escape_vectors.back();
+    additional_escape_vectors.pop_back();
+    DCHECK(ref == reference_ || ref->IsPhi() || ref->IsSelect()) << *ref;
+    VisitEscapes(ref, scan_instructions);
+  }
+
+  // Mark irreducible loop headers as escaping since they cannot be tracked through.
+  for (HBasicBlock* blk : graph->GetActiveBlocks()) {
+    if (blk->IsLoopHeader() && blk->GetLoopInformation()->IsIrreducible()) {
+      HandleEscape(blk);
+    }
   }
 }
 

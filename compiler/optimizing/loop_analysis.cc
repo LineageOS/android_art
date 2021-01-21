@@ -214,6 +214,9 @@ class X86_64LoopHelper : public ArchDefaultLoopHelper {
         return 3;
       case HInstruction::InstructionKind::kIf:
         return 2;
+      case HInstruction::InstructionKind::kPredicatedInstanceFieldGet:
+        // test + cond-jump + IFieldGet
+        return 4;
       case HInstruction::InstructionKind::kInstanceFieldGet:
         return 2;
       case HInstruction::InstructionKind::kInstanceFieldSet:
