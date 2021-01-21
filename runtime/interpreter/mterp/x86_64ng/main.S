@@ -1667,22 +1667,22 @@ NterpNewArray:
    jmp 1b
 
 NterpPutObjectInstanceField:
-   movzbq  rINSTbl, %rbp                   # rcx <- BA
-   sarl    $$4, %ebp                       # ebp <- B
-   GET_VREG %ebp, %rbp                     # vB (object we're operating on)
-   andb    $$0xf, rINSTbl                  # rINST <- A
-   GET_VREG rINST, rINSTq                  # rINST <- v[A]
+   movl    rINST, %ebp                     # rbp <- BA
+   andl    $$0xf, %ebp                     # rbp <- A
+   GET_VREG %ecx, %rbp                     # ecx <- v[A]
+   sarl    $$4, rINST
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rax, 2f
 1:
-   testl   %ebp, %ebp                      # is object null?
+   GET_VREG rINST, rINSTq                  # vB (object we're operating on)
+   testl   rINST, rINST                    # is object null?
    je      common_errNullObject
-   movl rINST, (%rbp,%rax,1)
-   testl rINST, rINST
+   movl %ecx, (rINSTq,%rax,1)
+   testl %ecx, %ecx
    je 4f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rbp
-   movb %al, (%rax, %rbp, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, rINSTq
+   movb %al, (%rax, rINSTq, 1)
 4:
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
@@ -1690,19 +1690,22 @@ NterpPutObjectInstanceField:
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   movq rINSTq, %rcx
+   // %rcx is already set.
    call nterp_get_instance_field_offset
+   // Reload the value as it may have moved.
+   GET_VREG %ecx, %rbp                     # ecx <- v[A]
    testl %eax, %eax
    jns 1b
-   testl   %ebp, %ebp                      # is object null?
+   GET_VREG rINST, rINSTq                  # vB (object we're operating on)
+   testl   rINST, rINST                    # is object null?
    je      common_errNullObject
    negl %eax
-   movl rINST, (%rbp,%rax,1)
-   testl rINST, rINST
+   movl %ecx, (rINSTq,%rax,1)
+   testl %ecx, %ecx
    je 5f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rbp
-   movb %al, (%rbp, %rax, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, rINSTq
+   movb %al, (%rax, rINSTq, 1)
 5:
    lock addl $$0, (%rsp)
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
@@ -1766,6 +1769,8 @@ NterpPutObjectStaticField:
    movq rPC, %rdx
    movq %rbp, %rcx
    call nterp_get_static_field
+   // Reload the value as it may have moved.
+   GET_VREG %ebp, rINSTq
    testq MACRO_LITERAL(1), %rax
    je 1b
    CLEAR_VOLATILE_MARKER %rax
