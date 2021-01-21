@@ -64,12 +64,18 @@ export DIST_DIR=${DIST_DIR:-${OUT_DIR}/dist}
 # settings.
 export OVERRIDE_TARGET_FLATTEN_APEX=false
 
+# Use same build settings as build_unbundled_mainline_module.sh, for build
+# consistency.
+# TODO(mast): Call out to a common script for building APEXes.
+export TARGET_BUILD_APPS="${MAINLINE_MODULES[*]}"
+export UNBUNDLED_BUILD_SDKS_FROM_SOURCE=true
+export TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT:-"user"}
+export TARGET_BUILD_DENSITY=alldpi
+export TARGET_BUILD_TYPE=release
+
 if [ ! -d frameworks/base ]; then
-  # Configure the build system for the reduced manifest branch. These need to be
-  # passed through the environment since they have to be visible to the Soong
-  # --dumpvars-mode invocations.
+  # Configure the build system for the reduced manifest branch.
   export SOONG_ALLOW_MISSING_DEPENDENCIES=true
-  export TARGET_BUILD_UNBUNDLED=true
 fi
 
 for product in ${MAINLINE_MODULE_PRODUCTS[*]}; do
