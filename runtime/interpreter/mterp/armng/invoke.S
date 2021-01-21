@@ -87,7 +87,7 @@
    // Note: if r1 is null, this will be handled by our SIGSEGV handler.
    ldr r2, [r1, #MIRROR_OBJECT_CLASS_OFFSET]
    ldr r2, [r2, #MIRROR_CLASS_IMT_PTR_OFFSET_32]
-   ldr r0, [r2, r0, uxtw #2]
+   ldr r0, [r2, r0, lsl #2]
    .if $range
    b NterpCommonInvokeInterfaceRange
    .else
@@ -145,7 +145,7 @@
    // Note: if r1 is null, this will be handled by our SIGSEGV handler.
    ldr r0, [r1, #MIRROR_OBJECT_CLASS_OFFSET]
    add r0, r0, #MIRROR_CLASS_VTABLE_OFFSET_32
-   ldr r0, [r0, r2, uxtw #2]
+   ldr r0, [r0, r2, lsl #2]
    b $helper
 2:
    mov r0, rSELF
@@ -173,7 +173,7 @@
    // Note: if r1 is null, this will be handled by our SIGSEGV handler.
    ldr r0, [r1, #MIRROR_OBJECT_CLASS_OFFSET]
    add r0, r0, #MIRROR_CLASS_VTABLE_OFFSET_32
-   ldr r0, [r0, r2, uxtw #2]
+   ldr r0, [r0, r2, lsl #2]
    b $helper
 
 %def op_invoke_virtual_quick():
