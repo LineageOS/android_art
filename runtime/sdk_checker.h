@@ -60,10 +60,15 @@ class SdkChecker {
   // Similar to ShouldDenyAccess(ArtMethod* art_method).
   bool ShouldDenyAccess(const char* type_descriptor) const;
 
+  // Enabled/Disable the checks.
+  void SetEnabled(bool enabled) { enabled_ = enabled; }
+
  private:
   SdkChecker();
 
   std::vector<std::unique_ptr<const DexFile>> sdk_dex_files_;
+
+  bool enabled_;
 };
 
 }  // namespace art
