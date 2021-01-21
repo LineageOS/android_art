@@ -214,8 +214,7 @@ TEST_F(MetricsTest, StreamBackendDumpAllMetrics) {
   metrics.ReportAllMetrics(&backend);
 
   // Make sure the resulting string lists all the counters.
-#define COUNTER(name) \
-  EXPECT_NE(os.str().find(DatumName(DatumId::k##name)), std::string::npos)
+#define COUNTER(name) EXPECT_NE(os.str().find(DatumName(DatumId::k##name)), std::string::npos)
   ART_COUNTERS(COUNTER);
 #undef COUNTER
 
@@ -224,6 +223,41 @@ TEST_F(MetricsTest, StreamBackendDumpAllMetrics) {
   EXPECT_NE(os.str().find(DatumName(DatumId::k##name)), std::string::npos)
   ART_HISTOGRAMS(HISTOGRAM);
 #undef HISTOGRAM
+}
+
+TEST_F(MetricsTest, HistogramPercentileAndConfidenceIntervale) {
+  ArtMetrics metrics;
+
+  // Declare a backend
+  class TestBackend : public TestBackendBase {
+   public:
+    const int64_t high_value = 42000;
+    const int64_t low_value = 1;
+
+    void ReportHistogram(DatumId,
+                         int64_t minimum_value,
+                         int64_t maximum_value,
+                         const std::vector<uint32_t>& buckets) override {
+      const auto cumulative_buckets{CumulativeBuckets(buckets)};
+
+      // The 50th percentile should be below the largest value and above the highest value we added.
+      const int64_t percentile =
+          HistogramPercentile(0.50, minimum_value, maximum_value, cumulative_buckets);
+      EXPECT_LT(percentile, high_value);
+      EXPECT_GT(percentile, low_value);
+
+      // Some basic reasonableness checks for confidence intervals.
+      const auto interval =
+          HistogramConfidenceInterval(0.95, minimum_value, maximum_value, cumulative_buckets);
+      EXPECT_LT(interval.first, interval.second);
+    }
+  } backend;
+
+  // Collect some data
+  metrics.JitMethodCompileTime()->Add(backend.high_value);
+  metrics.JitMethodCompileTime()->Add(backend.low_value);
+
+  metrics.ReportAllMetrics(&backend);
 }
 
 }  // namespace metrics
