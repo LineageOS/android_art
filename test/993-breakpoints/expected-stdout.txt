@@ -634,13 +634,13 @@ Running bcp private static invoke
 			Breakpoint: private static long java.util.Random.seedUniquifier() @ line=<NON-DETERMINISTIC>
 Running bcp private invoke
 	Breaking on []
-		Native invoking: private java.math.BigDecimal java.time.Duration.toSeconds() args: [this: PT336H]
-		Invoking "Duration::toSeconds"
-	Breaking on [private java.math.BigDecimal java.time.Duration.toSeconds() @ <NON-DETERMINISTIC>]
-		Native invoking: private java.math.BigDecimal java.time.Duration.toSeconds() args: [this: PT336H]
-			Breakpoint: private java.math.BigDecimal java.time.Duration.toSeconds() @ line=<NON-DETERMINISTIC>
-		Invoking "Duration::toSeconds"
-			Breakpoint: private java.math.BigDecimal java.time.Duration.toSeconds() @ line=<NON-DETERMINISTIC>
+		Native invoking: private java.math.BigDecimal java.time.Duration.toBigDecimalSeconds() args: [this: PT336H]
+		Invoking "Duration::toBigDecimalSeconds"
+	Breaking on [private java.math.BigDecimal java.time.Duration.toBigDecimalSeconds() @ <NON-DETERMINISTIC>]
+		Native invoking: private java.math.BigDecimal java.time.Duration.toBigDecimalSeconds() args: [this: PT336H]
+			Breakpoint: private java.math.BigDecimal java.time.Duration.toBigDecimalSeconds() @ line=<NON-DETERMINISTIC>
+		Invoking "Duration::toBigDecimalSeconds"
+			Breakpoint: private java.math.BigDecimal java.time.Duration.toBigDecimalSeconds() @ line=<NON-DETERMINISTIC>
 Running bcp invoke
 	Breaking on []
 		Native invoking: public boolean java.util.Optional.isPresent() args: [this: Optional[test]]
