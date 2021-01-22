@@ -1111,6 +1111,7 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
     HInvokeStaticOrDirect::DispatchInfo dispatch_info =
         HSharpening::SharpenLoadMethod(resolved_method,
                                        has_method_id,
+                                       /* for_interface_call= */ false,
                                        code_generator_);
     if (dispatch_info.code_ptr_location == CodePtrLocation::kCallCriticalNative) {
       graph_->SetHasDirectCriticalNativeCall(true);
@@ -1147,8 +1148,11 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
       ScopedObjectAccess soa(Thread::Current());
       DCHECK(resolved_method->GetDeclaringClass()->IsInterface());
     }
-    MethodLoadKind load_kind =
-        HSharpening::SharpenLoadMethod(resolved_method, /* has_method_id= */ true, code_generator_)
+    MethodLoadKind load_kind = HSharpening::SharpenLoadMethod(
+        resolved_method,
+        /* has_method_id= */ true,
+        /* for_interface_call= */ true,
+        code_generator_)
             .method_load_kind;
     invoke = new (allocator_) HInvokeInterface(allocator_,
                                                number_of_arguments,

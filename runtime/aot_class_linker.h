@@ -46,6 +46,7 @@ static bool CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klass, gc::He
   bool DenyAccessBasedOnPublicSdk(ArtField* art_field ATTRIBUTE_UNUSED) const override
       REQUIRES_SHARED(Locks::mutator_lock_);
   bool DenyAccessBasedOnPublicSdk(const char* type_descriptor ATTRIBUTE_UNUSED) const override;
+  void SetEnablePublicSdkChecks(bool enabled) override;
 
  protected:
   // Overridden version of PerformClassVerification allows skipping verification if the class was

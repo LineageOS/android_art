@@ -23,7 +23,7 @@
 
 namespace art {
 
-SdkChecker::SdkChecker() {}
+SdkChecker::SdkChecker() : enabled_(true) {}
 
 SdkChecker* SdkChecker::Create(
     const std::string& public_sdk, std::string* error_msg) {
@@ -47,6 +47,10 @@ SdkChecker* SdkChecker::Create(
 }
 
 bool SdkChecker::ShouldDenyAccess(ArtMethod* art_method) const {
+  if (!enabled_) {
+    return false;
+  }
+
   bool found = false;
   for (const std::unique_ptr<const DexFile>& dex_file : sdk_dex_files_) {
     const dex::TypeId* declaring_type_id =
@@ -89,6 +93,10 @@ bool SdkChecker::ShouldDenyAccess(ArtMethod* art_method) const {
 }
 
 bool SdkChecker::ShouldDenyAccess(ArtField* art_field) const {
+  if (!enabled_) {
+    return false;
+  }
+
   bool found = false;
   for (const std::unique_ptr<const DexFile>& dex_file : sdk_dex_files_) {
     std::string declaring_class;
@@ -123,6 +131,10 @@ bool SdkChecker::ShouldDenyAccess(ArtField* art_field) const {
 }
 
 bool SdkChecker::ShouldDenyAccess(const char* descriptor) const {
+  if (!enabled_) {
+    return false;
+  }
+
   bool found = false;
   for (const std::unique_ptr<const DexFile>& dex_file : sdk_dex_files_) {
     const dex::TypeId* type_id = dex_file->FindTypeId(descriptor);

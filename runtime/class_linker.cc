@@ -9920,6 +9920,12 @@ bool ClassLinker::DenyAccessBasedOnPublicSdk(const char* type_descriptor ATTRIBU
   UNREACHABLE();
 }
 
+void ClassLinker::SetEnablePublicSdkChecks(bool enabled ATTRIBUTE_UNUSED) {
+  // Should not be called on ClassLinker, only on AotClassLinker that overrides this.
+  LOG(FATAL) << "UNREACHABLE";
+  UNREACHABLE();
+}
+
 // Instantiate ClassLinker::ResolveMethod.
 template ArtMethod* ClassLinker::ResolveMethod<ClassLinker::ResolveMode::kCheckICCEAndIAE>(
     uint32_t method_idx,

@@ -268,6 +268,10 @@ bool PrepareForRegisterAllocation::CanMoveClinitCheck(HInstruction* input,
     return false;
   }
 
+  if (user->IsNewInstance() && user->AsNewInstance()->IsPartialMaterialization()) {
+    return false;
+  }
+
   // Now do a thorough environment check that this is really coming from the same instruction in
   // the same inlined graph. Unfortunately, we have to go through the whole environment chain.
   HEnvironment* user_environment = user->GetEnvironment();
@@ -296,8 +300,8 @@ bool PrepareForRegisterAllocation::CanMoveClinitCheck(HInstruction* input,
   if (kIsDebugBuild) {
     for (HInstruction* between = input->GetNext(); between != user; between = between->GetNext()) {
       CHECK(between != nullptr);  // User must be after input in the same block.
-      CHECK(!between->CanThrow());
-      CHECK(!between->HasSideEffects());
+      CHECK(!between->CanThrow()) << *between << " User: " << *user;
+      CHECK(!between->HasSideEffects()) << *between << " User: " << *user;
     }
   }
   return true;

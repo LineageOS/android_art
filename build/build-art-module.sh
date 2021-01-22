@@ -3,34 +3,53 @@
 # This script builds the APEX modules, SDKs and module exports that the ART
 # Module provides.
 
-MAINLINE_MODULES=(
-  com.android.art
-  com.android.art.debug
-)
-
-# The products to build MAINLINE_MODULES for, same as in
-# build/soong/scripts/build-mainline-modules.sh.
-PRODUCTS=(
-  art_module_arm
-  art_module_arm64
-  art_module_x86
-  art_module_x86_64
-)
-
-MODULES_SDK_AND_EXPORTS=(
-  art-module-sdk
-  art-module-host-exports
-  art-module-test-exports
-)
-
-# MAINLINE_MODULE_PRODUCTS can be used to override the list of products.
-if [ -n "${MAINLINE_MODULE_PRODUCTS}" ]; then
-  read -r -a PRODUCTS <<< "${MAINLINE_MODULE_PRODUCTS}"
-fi
-
 if [ ! -e build/make/core/Makefile ]; then
   echo "$0 must be run from the top of the tree"
   exit 1
+fi
+
+skip_module_sdk=
+build_args=()
+for arg; do
+  case "$arg" in
+    --skip-module-sdk) skip_module_sdk=true ;;
+    *) build_args+=("$arg") ;;
+  esac
+  shift
+done
+
+# Take the list of modules from MAINLINE_MODULES.
+if [ -n "${MAINLINE_MODULES}" ]; then
+  read -r -a MAINLINE_MODULES <<< "${MAINLINE_MODULES}"
+else
+  MAINLINE_MODULES=(
+    com.android.art
+    com.android.art.debug
+  )
+fi
+
+# Take the list of products to build the modules for from
+# MAINLINE_MODULE_PRODUCTS.
+if [ -n "${MAINLINE_MODULE_PRODUCTS}" ]; then
+  read -r -a MAINLINE_MODULE_PRODUCTS <<< "${MAINLINE_MODULE_PRODUCTS}"
+else
+  # The default products are the same as in
+  # build/soong/scripts/build-mainline-modules.sh.
+  MAINLINE_MODULE_PRODUCTS=(
+    art_module_arm
+    art_module_arm64
+    art_module_x86
+    art_module_x86_64
+  )
+fi
+
+MODULE_SDKS_AND_EXPORTS=()
+if [ -z "$skip_module_sdk" ]; then
+  MODULE_SDKS_AND_EXPORTS=(
+    art-module-sdk
+    art-module-host-exports
+    art-module-test-exports
+  )
 fi
 
 echo_and_run() {
@@ -41,6 +60,10 @@ echo_and_run() {
 export OUT_DIR=${OUT_DIR:-out}
 export DIST_DIR=${DIST_DIR:-${OUT_DIR}/dist}
 
+# We require .apex files here, so ensure we get them regardless of product
+# settings.
+export OVERRIDE_TARGET_FLATTEN_APEX=false
+
 if [ ! -d frameworks/base ]; then
   # Configure the build system for the reduced manifest branch. These need to be
   # passed through the environment since they have to be visible to the Soong
@@ -49,9 +72,9 @@ if [ ! -d frameworks/base ]; then
   export TARGET_BUILD_UNBUNDLED=true
 fi
 
-for product in ${PRODUCTS[*]}; do
+for product in ${MAINLINE_MODULE_PRODUCTS[*]}; do
   echo_and_run build/soong/soong_ui.bash --make-mode \
-    TARGET_PRODUCT=${product} "$@" ${MAINLINE_MODULES[*]}
+    TARGET_PRODUCT=${product} "${build_args[@]}" ${MAINLINE_MODULES[*]}
 
   vars="$(TARGET_PRODUCT=${product} build/soong/soong_ui.bash --dumpvars-mode \
           --vars="PRODUCT_OUT TARGET_ARCH")"
@@ -66,16 +89,18 @@ for product in ${PRODUCTS[*]}; do
   done
 done
 
-# Create multi-archs SDKs in a different out directory. The multi-arch script
-# uses Soong in --skip-make mode which cannot use the same directory as normal
-# mode with make.
-export OUT_DIR=${OUT_DIR}/aml
+if [ ${#MODULE_SDKS_AND_EXPORTS[*]} -gt 0 ]; then
+  # Create multi-arch SDKs in a different out directory. The multi-arch script
+  # uses Soong in --skip-make mode which cannot use the same directory as normal
+  # mode with make.
+  export OUT_DIR=${OUT_DIR}/aml
 
-# Make build-aml-prebuilts.sh set the source_build Soong config variable true.
-export ENABLE_ART_SOURCE_BUILD=true
+  # Make build-aml-prebuilts.sh set the source_build Soong config variable true.
+  export ENABLE_ART_SOURCE_BUILD=true
 
-echo_and_run build/soong/scripts/build-aml-prebuilts.sh "$@" \
-  ${MODULES_SDK_AND_EXPORTS[*]}
+  echo_and_run build/soong/scripts/build-aml-prebuilts.sh "${build_args[@]}" \
+    ${MODULE_SDKS_AND_EXPORTS[*]}
 
-rm -rf ${DIST_DIR}/mainline-sdks
-echo_and_run cp -r ${OUT_DIR}/soong/mainline-sdks ${DIST_DIR}
+  rm -rf ${DIST_DIR}/mainline-sdks
+  echo_and_run cp -r ${OUT_DIR}/soong/mainline-sdks ${DIST_DIR}
+fi

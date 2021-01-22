@@ -262,4 +262,10 @@ bool AotClassLinker::DenyAccessBasedOnPublicSdk(const char* type_descriptor) con
   return sdk_checker_ != nullptr && sdk_checker_->ShouldDenyAccess(type_descriptor);
 }
 
+void AotClassLinker::SetEnablePublicSdkChecks(bool enabled) {
+  if (sdk_checker_ != nullptr) {
+    sdk_checker_->SetEnabled(enabled);
+  }
+}
+
 }  // namespace art
