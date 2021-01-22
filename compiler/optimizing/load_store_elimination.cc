@@ -967,8 +967,10 @@ class LSEVisitor final : private HGraphDelegateVisitor {
           heap_location_collector_.GetHeapLocation(i)->GetReferenceInfo()->GetReference();
       size_t offset = heap_location_collector_.GetHeapLocation(i)->GetOffset();
       if (ref == new_instance) {
-        if (offset >= mirror::kObjectHeaderSize) {
+        if (offset >= mirror::kObjectHeaderSize ||
+            MemberOffset(offset) == mirror::Object::MonitorOffset()) {
           // Instance fields except the header fields are set to default heap values.
+          // The shadow$_monitor_ field is set to the default value however.
           heap_values[i].value = Value::Default();
           heap_values[i].stored_by = Value::PureUnknown();
         } else if (MemberOffset(offset) == mirror::Object::ClassOffset()) {
