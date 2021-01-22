@@ -22,6 +22,7 @@
 #include "art_method-inl.h"
 #include "base/bit_utils.h"
 #include "base/bit_utils_iterator.h"
+#include "class_root-inl.h"
 #include "class_table.h"
 #include "code_generator_utils.h"
 #include "common_arm.h"
@@ -9449,16 +9450,36 @@ void CodeGeneratorARMVIXL::LoadBootImageAddress(vixl32::Register reg,
   }
 }
 
+void CodeGeneratorARMVIXL::LoadTypeForBootImageIntrinsic(vixl::aarch32::Register reg,
+                                                         TypeReference target_type) {
+  // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
+  DCHECK(GetCompilerOptions().IsBootImage());
+  PcRelativePatchInfo* labels =
+      NewBootImageTypePatch(*target_type.dex_file, target_type.TypeIndex());
+  EmitMovwMovtPlaceholder(labels, reg);
+}
+
 void CodeGeneratorARMVIXL::LoadIntrinsicDeclaringClass(vixl32::Register reg, HInvoke* invoke) {
   DCHECK_NE(invoke->GetIntrinsic(), Intrinsics::kNone);
   if (GetCompilerOptions().IsBootImage()) {
-    // Load the class the same way as for HLoadClass::LoadKind::kBootImageLinkTimePcRelative.
     MethodReference target_method = invoke->GetResolvedMethodReference();
     dex::TypeIndex type_idx = target_method.dex_file->GetMethodId(target_method.index).class_idx_;
-    PcRelativePatchInfo* labels = NewBootImageTypePatch(*target_method.dex_file, type_idx);
-    EmitMovwMovtPlaceholder(labels, reg);
+    LoadTypeForBootImageIntrinsic(reg, TypeReference(target_method.dex_file, type_idx));
   } else {
     uint32_t boot_image_offset = GetBootImageOffsetOfIntrinsicDeclaringClass(invoke);
+    LoadBootImageAddress(reg, boot_image_offset);
+  }
+}
+
+void CodeGeneratorARMVIXL::LoadClassRootForIntrinsic(vixl::aarch32::Register reg,
+                                                     ClassRoot class_root) {
+  if (GetCompilerOptions().IsBootImage()) {
+    ScopedObjectAccess soa(Thread::Current());
+    ObjPtr<mirror::Class> klass = GetClassRoot(class_root);
+    TypeReference target_type(&klass->GetDexFile(), klass->GetDexTypeIndex());
+    LoadTypeForBootImageIntrinsic(reg, target_type);
+  } else {
+    uint32_t boot_image_offset = GetBootImageOffset(class_root);
     LoadBootImageAddress(reg, boot_image_offset);
   }
 }
