@@ -136,19 +136,24 @@ std::string GetIsoDate() {
 #ifdef _WIN32
   time_t now = time(nullptr);
   localtime_s(&tmbuf, &now);
-  tm* ptm = &tmbuf;
   ns = 0;
 #else
-  timespec now;
-  clock_gettime(CLOCK_REALTIME, &now);
-  tm* ptm = localtime_r(&now.tv_sec, &tmbuf);
-  ns = now.tv_nsec;
+  if (__builtin_available(macOS 10.12, *)) {
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    localtime_r(&now.tv_sec, &tmbuf);
+    ns = now.tv_nsec;
+  } else {
+    time_t now = time(nullptr);
+    localtime_r(&now, &tmbuf);
+    ns = 0;
+  }
 #endif
   char zone[16] = {};
-  strftime(zone, sizeof(zone), "%z", ptm);
+  strftime(zone, sizeof(zone), "%z", &tmbuf);
   return StringPrintf("%04d-%02d-%02d %02d:%02d:%02d.%09d%s",
-      ptm->tm_year + 1900, ptm->tm_mon+1, ptm->tm_mday,
-      ptm->tm_hour, ptm->tm_min, ptm->tm_sec, ns, zone);
+      tmbuf.tm_year + 1900, tmbuf.tm_mon+1, tmbuf.tm_mday,
+      tmbuf.tm_hour, tmbuf.tm_min, tmbuf.tm_sec, ns, zone);
 }
 
 uint64_t MilliTime() {
