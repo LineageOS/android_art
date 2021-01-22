@@ -67,6 +67,7 @@ class ReferenceTypePropagation::RTPVisitor : public HGraphDelegateVisitor {
   void VisitLoadException(HLoadException* instr) override;
   void VisitNewArray(HNewArray* instr) override;
   void VisitParameterValue(HParameterValue* instr) override;
+  void VisitPredicatedInstanceFieldGet(HPredicatedInstanceFieldGet* instr) override;
   void VisitInstanceFieldGet(HInstanceFieldGet* instr) override;
   void VisitStaticFieldGet(HStaticFieldGet* instr) override;
   void VisitUnresolvedInstanceFieldGet(HUnresolvedInstanceFieldGet* instr) override;
@@ -313,10 +314,8 @@ static void BoundTypeForClassCheck(HInstruction* check) {
     return;
   }
 
-  HInstanceFieldGet* field_get = (load_class == input_one)
-      ? input_two->AsInstanceFieldGet()
-      : input_one->AsInstanceFieldGet();
-  if (field_get == nullptr) {
+  HInstruction* field_get = (load_class == input_one) ? input_two : input_one;
+  if (!field_get->IsInstanceFieldGet() && !field_get->IsPredicatedInstanceFieldGet()) {
     return;
   }
   HInstruction* receiver = field_get->InputAt(0);
@@ -622,6 +621,11 @@ void ReferenceTypePropagation::RTPVisitor::UpdateFieldAccessTypeInfo(HInstructio
   }
 
   SetClassAsTypeInfo(instr, klass, /* is_exact= */ false);
+}
+
+void ReferenceTypePropagation::RTPVisitor::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* instr) {
+  UpdateFieldAccessTypeInfo(instr, instr->GetFieldInfo());
 }
 
 void ReferenceTypePropagation::RTPVisitor::VisitInstanceFieldGet(HInstanceFieldGet* instr) {
