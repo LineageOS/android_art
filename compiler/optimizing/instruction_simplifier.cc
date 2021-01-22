@@ -23,6 +23,7 @@
 #include "escape.h"
 #include "intrinsics.h"
 #include "mirror/class-inl.h"
+#include "optimizing/nodes.h"
 #include "scoped_thread_state_change-inl.h"
 #include "sharpening.h"
 #include "string_builder_append.h"
@@ -109,6 +110,7 @@ class InstructionSimplifierVisitor : public HGraphDelegateVisitor {
   void VisitInvoke(HInvoke* invoke) override;
   void VisitDeoptimize(HDeoptimize* deoptimize) override;
   void VisitVecMul(HVecMul* instruction) override;
+  void VisitPredicatedInstanceFieldGet(HPredicatedInstanceFieldGet* instruction) override;
 
   bool CanEnsureNotNullAt(HInstruction* instr, HInstruction* at) const;
 
@@ -915,6 +917,42 @@ static HInstruction* AllowInMinMax(IfCondition cmp,
   return nullptr;
 }
 
+// TODO This should really be done by LSE itself since there is significantly
+// more information available there.
+void InstructionSimplifierVisitor::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* pred_get) {
+  HInstruction* target = pred_get->GetTarget();
+  HInstruction* default_val = pred_get->GetDefaultValue();
+  // TODO Technically we could end up with a case where the target isn't a phi
+  // (allowing us to eliminate the instruction and replace with either a
+  // InstanceFieldGet or the default) but due to the ordering of compilation
+  // passes this can't happen in ART.
+  if (!target->IsPhi() || !default_val->IsPhi() || default_val->GetBlock() != target->GetBlock()) {
+    // Already reduced the target or the phi selection will differ between the
+    // target and default.
+    return;
+  }
+  DCHECK_EQ(default_val->InputCount(), target->InputCount());
+  // In the same block both phis only one non-null we can remove the phi from default_val.
+  HInstruction* single_value = nullptr;
+  auto inputs = target->GetInputs();
+  for (auto [input, idx] : ZipCount(MakeIterationRange(inputs))) {
+    if (input->CanBeNull()) {
+      if (single_value == nullptr) {
+        single_value = default_val->InputAt(idx);
+      } else if (single_value != default_val->InputAt(idx) &&
+                !single_value->Equals(default_val->InputAt(idx))) {
+        // Multiple values, can't combine.
+        return;
+      }
+    }
+  }
+  if (single_value->StrictlyDominates(pred_get)) {
+    // Combine all the maybe null values into one.
+    pred_get->ReplaceInput(single_value, 0);
+  }
+}
+
 void InstructionSimplifierVisitor::VisitSelect(HSelect* select) {
   HInstruction* replace_with = nullptr;
   HInstruction* condition = select->GetCondition();
@@ -1097,6 +1135,9 @@ static bool IsTypeConversionLossless(DataType::Type input_type, DataType::Type r
 static inline bool TryReplaceFieldOrArrayGetType(HInstruction* maybe_get, DataType::Type new_type) {
   if (maybe_get->IsInstanceFieldGet()) {
     maybe_get->AsInstanceFieldGet()->SetType(new_type);
+    return true;
+  } else if (maybe_get->IsPredicatedInstanceFieldGet()) {
+    maybe_get->AsPredicatedInstanceFieldGet()->SetType(new_type);
     return true;
   } else if (maybe_get->IsStaticFieldGet()) {
     maybe_get->AsStaticFieldGet()->SetType(new_type);
