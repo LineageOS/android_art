@@ -1311,7 +1311,7 @@ TEST_F(LoadStoreEliminationTest, DefaultShadowClass) {
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
   HInstruction* const_fence = new (GetAllocator()) HConstructorFence(new_inst, 0, GetAllocator());
-  HInstruction* set_field = MakeIFieldSet(new_inst, graph_->GetIntConstant(33), MemberOffset(10));
+  HInstruction* set_field = MakeIFieldSet(new_inst, graph_->GetIntConstant(33), MemberOffset(32));
   HInstruction* get_field =
       MakeIFieldGet(new_inst, DataType::Type::kReference, mirror::Object::ClassOffset());
   HInstruction* return_val = new (GetAllocator()) HReturn(get_field);
@@ -1335,6 +1335,57 @@ TEST_F(LoadStoreEliminationTest, DefaultShadowClass) {
   EXPECT_INS_REMOVED(set_field);
   EXPECT_INS_RETAINED(cls);
   EXPECT_INS_EQ(cls, return_val->InputAt(0));
+}
+
+// Object o = new Obj();
+// // Needed because otherwise we short-circuit LSA since GVN would get almost
+// // everything other than this. Also since this isn't expected to be a very
+// // common pattern (only a single java function, Object.identityHashCode,
+// // ever reads this field) it's not worth changing the LSA logic.
+// o.foo = 3;
+// return o.shadow$_monitor_;
+TEST_F(LoadStoreEliminationTest, DefaultShadowMonitor) {
+  CreateGraph();
+  AdjacencyListGraph blocks(
+      graph_, GetAllocator(), "entry", "exit", {{"entry", "main"}, {"main", "exit"}});
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(main);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* suspend_check = new (GetAllocator()) HSuspendCheck();
+  entry->AddInstruction(suspend_check);
+  entry->AddInstruction(new (GetAllocator()) HGoto());
+  ManuallyBuildEnvFor(suspend_check, {});
+
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* const_fence = new (GetAllocator()) HConstructorFence(new_inst, 0, GetAllocator());
+  HInstruction* set_field = MakeIFieldSet(new_inst, graph_->GetIntConstant(33), MemberOffset(32));
+  HInstruction* get_field =
+      MakeIFieldGet(new_inst, DataType::Type::kInt32, mirror::Object::MonitorOffset());
+  HInstruction* return_val = new (GetAllocator()) HReturn(get_field);
+  main->AddInstruction(cls);
+  main->AddInstruction(new_inst);
+  main->AddInstruction(const_fence);
+  main->AddInstruction(set_field);
+  main->AddInstruction(get_field);
+  main->AddInstruction(return_val);
+  cls->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+  new_inst->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+
+  SetupExit(exit);
+
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_INS_REMOVED(new_inst);
+  EXPECT_INS_REMOVED(const_fence);
+  EXPECT_INS_REMOVED(get_field);
+  EXPECT_INS_REMOVED(set_field);
+  EXPECT_INS_RETAINED(cls);
+  EXPECT_INS_EQ(graph_->GetIntConstant(0), return_val->InputAt(0));
 }
 
 // void DO_CAL() {
@@ -1883,7 +1934,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, switch_val);
   bswitch->AddInstruction(switch_inst);
 
-  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_c1 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c1 = new (GetAllocator()) HGoto();
   case1->AddInstruction(write_c1);
@@ -1891,7 +1942,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   case1->AddInstruction(goto_c1);
   call_c1->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_c2 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c2 = new (GetAllocator()) HGoto();
   case2->AddInstruction(write_c2);
@@ -1899,7 +1950,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   case2->AddInstruction(goto_c2);
   call_c2->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_c3 = new (GetAllocator()) HGoto();
   case3->AddInstruction(write_c3);
   case3->AddInstruction(goto_c3);
@@ -1925,7 +1976,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(write_loop_right);
   loop_if_right->AddInstruction(goto_loop_right);
@@ -1933,7 +1984,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   HInstruction* goto_loop_end = new (GetAllocator()) HGoto();
   loop_end->AddInstruction(goto_loop_end);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -1995,7 +2046,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* read_left = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(16));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
@@ -2071,7 +2122,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(write_left);
@@ -2079,12 +2130,12 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   exit->AddInstruction(read_bottom);
   exit->AddInstruction(return_exit);
@@ -2151,7 +2202,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(write_left);
@@ -2162,12 +2213,12 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
   HInstruction* right_if = new (GetAllocator()) HIf(bool_value_2);
   right_start->AddInstruction(right_if);
 
-  HInstruction* write_right_first = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right_first = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right_first = new (GetAllocator()) HGoto();
   right_first->AddInstruction(write_right_first);
   right_first->AddInstruction(goto_right_first);
 
-  HInstruction* write_right_second = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_right_second = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_right_second = new (GetAllocator()) HGoto();
   right_second->AddInstruction(write_right_second);
   right_second->AddInstruction(goto_right_second);
@@ -2175,7 +2226,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
   HInstruction* goto_right_end = new (GetAllocator()) HGoto();
   right_end->AddInstruction(goto_right_end);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   exit->AddInstruction(read_bottom);
   exit->AddInstruction(return_exit);
@@ -2234,19 +2285,19 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(call_left);
   left->AddInstruction(write_left);
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -2505,7 +2556,7 @@ TEST_F(LoadStoreEliminationTest, PartialPhiPropagation) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(10));
+  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(32));
   HInstruction* if_param0 = new (GetAllocator()) HIf(param0);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -2514,7 +2565,7 @@ TEST_F(LoadStoreEliminationTest, PartialPhiPropagation) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_noescape = MakeIFieldSet(new_inst, c15, MemberOffset(10));
+  HInstruction* store_noescape = MakeIFieldSet(new_inst, c15, MemberOffset(32));
   noescape_route->AddInstruction(store_noescape);
   noescape_route->AddInstruction(new (GetAllocator()) HGoto());
 
@@ -2543,14 +2594,14 @@ TEST_F(LoadStoreEliminationTest, PartialPhiPropagation) {
 
   HPhi* escape_end_phi = MakePhi({left_phi, obj_param});
   HInstruction* read_escape_end =
-      MakeIFieldGet(escape_end_phi, DataType::Type::kInt32, MemberOffset(10));
+      MakeIFieldGet(escape_end_phi, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* goto_escape_end = new (GetAllocator()) HGoto();
   escape_end->AddPhi(escape_end_phi);
   escape_end->AddInstruction(read_escape_end);
   escape_end->AddInstruction(goto_escape_end);
 
   HPhi* return_phi = MakePhi({read_escape_end, c13});
-  HInstruction* read_exit = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_exit = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* add_exit = new (GetAllocator()) HAdd(DataType::Type::kInt32, return_phi, read_exit);
   HInstruction* return_exit = new (GetAllocator()) HReturn(add_exit);
   breturn->AddPhi(return_phi);
@@ -2657,8 +2708,8 @@ TEST_P(OrderDependentTestGroup, PredicatedUse) {
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* store1 = MakeIFieldSet(new_inst1, param_obj1, MemberOffset(10));
-  HInstruction* store2 = MakeIFieldSet(new_inst2, param_obj2, MemberOffset(10));
+  HInstruction* store1 = MakeIFieldSet(new_inst1, param_obj1, MemberOffset(32));
+  HInstruction* store2 = MakeIFieldSet(new_inst2, param_obj2, MemberOffset(32));
   HInstruction* null_const = graph_->GetNullConstant();
   HInstruction* if_inst = new (GetAllocator()) HIf(param1);
   entry->AddInstruction(cls1);
@@ -2679,7 +2730,7 @@ TEST_P(OrderDependentTestGroup, PredicatedUse) {
   new_inst2->CopyEnvironmentFrom(cls1->GetEnvironment());
 
   // This is the escape of new_inst1
-  HInstruction* store_left = MakeIFieldSet(new_inst2, new_inst1, MemberOffset(10));
+  HInstruction* store_left = MakeIFieldSet(new_inst2, new_inst1, MemberOffset(32));
   HInstruction* if_left = new (GetAllocator()) HIf(param2);
   left->AddInstruction(store_left);
   left->AddInstruction(if_left);
@@ -2700,11 +2751,11 @@ TEST_P(OrderDependentTestGroup, PredicatedUse) {
   constexpr uint32_t kRead1DexPc = 10;
   constexpr uint32_t kRead2DexPc = 20;
   HInstruction* read1 =
-      MakeIFieldGet(new_inst1, DataType::Type::kReference, MemberOffset(10), kRead1DexPc);
+      MakeIFieldGet(new_inst1, DataType::Type::kReference, MemberOffset(32), kRead1DexPc);
   read1->SetReferenceTypeInfo(
       ReferenceTypeInfo::CreateUnchecked(graph_->GetHandleCache()->GetObjectClassHandle(), false));
   HInstruction* read2 =
-      MakeIFieldGet(new_inst2, DataType::Type::kReference, MemberOffset(10), kRead2DexPc);
+      MakeIFieldGet(new_inst2, DataType::Type::kReference, MemberOffset(32), kRead2DexPc);
   read2->SetReferenceTypeInfo(
       ReferenceTypeInfo::CreateUnchecked(graph_->GetHandleCache()->GetObjectClassHandle(), false));
   HInstruction* sel_return = new (GetAllocator()) HSelect(param3, read1, read2, 0);
@@ -2822,9 +2873,9 @@ TEST_P(OrderDependentTestGroup, PredicatedEnvUse) {
   HInstruction* cls1 = MakeClassLoad();
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
-  HInstruction* store1 = MakeIFieldSet(new_inst1, c12, MemberOffset(10));
+  HInstruction* store1 = MakeIFieldSet(new_inst1, c12, MemberOffset(32));
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* store2 = MakeIFieldSet(new_inst2, c15, MemberOffset(10));
+  HInstruction* store2 = MakeIFieldSet(new_inst2, c15, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(param1);
   entry->AddInstruction(cls1);
   entry->AddInstruction(cls2);
@@ -2862,8 +2913,8 @@ TEST_P(OrderDependentTestGroup, PredicatedEnvUse) {
 
   right->AddInstruction(new (GetAllocator()) HGoto());
 
-  HInstruction* read1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* read2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* read2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* add_return = new (GetAllocator()) HAdd(DataType::Type::kInt32, read1, read2);
   HInstruction* return_exit = new (GetAllocator()) HReturn(add_return);
   breturn->AddInstruction(read1);
@@ -2964,8 +3015,8 @@ TEST_P(OrderDependentTestGroup, FieldSetOrderEnv) {
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(10));
-  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(10));
+  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(32));
+  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls1);
   entry->AddInstruction(cls2);
@@ -2993,15 +3044,15 @@ TEST_P(OrderDependentTestGroup, FieldSetOrderEnv) {
   call_left1->CopyEnvironmentFrom(cls1->GetEnvironment());
   call_left2->CopyEnvironmentFrom(cls1->GetEnvironment());
 
-  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(10));
-  HInstruction* write_right2 = MakeIFieldSet(new_inst2, c12, MemberOffset(10));
+  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(32));
+  HInstruction* write_right2 = MakeIFieldSet(new_inst2, c12, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right1);
   right->AddInstruction(write_right2);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* combine =
       new (GetAllocator()) HAdd(DataType::Type::kInt32, read_bottom1, read_bottom2);
   HInstruction* return_exit = new (GetAllocator()) HReturn(combine);
@@ -3135,8 +3186,8 @@ TEST_P(OrderDependentTestGroup, MaterializationMovedUse) {
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, param_obj, MemberOffset(10));
-  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, param_obj, MemberOffset(10));
+  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, param_obj, MemberOffset(32));
+  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, param_obj, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(param_1);
   entry->AddInstruction(cls1);
   entry->AddInstruction(cls2);
@@ -3157,7 +3208,7 @@ TEST_P(OrderDependentTestGroup, MaterializationMovedUse) {
 
   early_return->AddInstruction(new (GetAllocator()) HReturnVoid());
 
-  HInstruction* escape_1_set = MakeIFieldSet(new_inst2, new_inst1, MemberOffset(10));
+  HInstruction* escape_1_set = MakeIFieldSet(new_inst2, new_inst1, MemberOffset(32));
   HInstruction* escape_1_if = new (GetAllocator()) HIf(param_2);
   escape_1->AddInstruction(escape_1_set);
   escape_1->AddInstruction(escape_1_if);
@@ -3239,7 +3290,7 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(10));
+  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -3327,7 +3378,7 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(10));
+  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -3345,14 +3396,14 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore) {
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(goto_right);
 
-  HInstruction* a_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* a_reset = MakeIFieldSet(new_inst, c13, MemberOffset(10));
+  HInstruction* a_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* a_reset = MakeIFieldSet(new_inst, c13, MemberOffset(32));
   HInstruction* a_noescape = MakeInvoke(DataType::Type::kVoid, {});
-  HInstruction* b_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* b_reset = MakeIFieldSet(new_inst, c14, MemberOffset(10));
+  HInstruction* b_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* b_reset = MakeIFieldSet(new_inst, c14, MemberOffset(32));
   HInstruction* b_noescape = MakeInvoke(DataType::Type::kVoid, {});
-  HInstruction* c_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* c_reset = MakeIFieldSet(new_inst, c15, MemberOffset(10));
+  HInstruction* c_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* c_reset = MakeIFieldSet(new_inst, c15, MemberOffset(32));
   HInstruction* c_noescape = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* add_1_exit = new (GetAllocator()) HAdd(DataType::Type::kInt32, a_val, b_val);
   HInstruction* add_2_exit = new (GetAllocator()) HAdd(DataType::Type::kInt32, c_val, add_1_exit);
@@ -3497,16 +3548,16 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore2) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(10));
+  HInstruction* store = MakeIFieldSet(new_inst, c12, MemberOffset(32));
 
-  HInstruction* a_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* a_reset = MakeIFieldSet(new_inst, c13, MemberOffset(10));
+  HInstruction* a_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* a_reset = MakeIFieldSet(new_inst, c13, MemberOffset(32));
   HInstruction* a_noescape = MakeInvoke(DataType::Type::kVoid, {});
-  HInstruction* b_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* b_reset = MakeIFieldSet(new_inst, c14, MemberOffset(10));
+  HInstruction* b_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* b_reset = MakeIFieldSet(new_inst, c14, MemberOffset(32));
   HInstruction* b_noescape = MakeInvoke(DataType::Type::kVoid, {});
-  HInstruction* c_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* c_reset = MakeIFieldSet(new_inst, c15, MemberOffset(10));
+  HInstruction* c_val = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* c_reset = MakeIFieldSet(new_inst, c15, MemberOffset(32));
   HInstruction* c_noescape = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
@@ -3537,7 +3588,7 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore2) {
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(goto_right);
 
-  HInstruction* val_exit = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* val_exit = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* add_1_exit = new (GetAllocator()) HAdd(DataType::Type::kInt32, a_val, b_val);
   HInstruction* add_2_exit = new (GetAllocator()) HAdd(DataType::Type::kInt32, c_val, add_1_exit);
   HInstruction* add_3_exit =
@@ -3667,12 +3718,12 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc2) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_left = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* store_left = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left_set->AddInstruction(store_left);
   left_set->AddInstruction(goto_left);
 
-  HInstruction* store_right = MakeIFieldSet(new_inst, c12, MemberOffset(10));
+  HInstruction* store_right = MakeIFieldSet(new_inst, c12, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right_set->AddInstruction(store_right);
   right_set->AddInstruction(goto_right);
@@ -3773,23 +3824,23 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc3) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_one = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* store_one = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* goto_one = new (GetAllocator()) HGoto();
   set_one->AddInstruction(store_one);
   set_one->AddInstruction(goto_one);
 
-  HInstruction* store_two = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* store_two = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_two = new (GetAllocator()) HGoto();
   set_two->AddInstruction(store_two);
   set_two->AddInstruction(goto_two);
 
-  HInstruction* read_early = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_early = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_early = new (GetAllocator()) HReturn(read_early);
   early_return->AddInstruction(read_early);
   early_return->AddInstruction(return_early);
 
   HInstruction* escape_instruction = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* read_escape = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_escape = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_escape = new (GetAllocator()) HReturn(read_escape);
   escape->AddInstruction(escape_instruction);
   escape->AddInstruction(read_escape);
@@ -3897,7 +3948,7 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc4) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_one = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* store_one = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* escape_one = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_one = new (GetAllocator()) HGoto();
   set_one_and_escape->AddInstruction(store_one);
@@ -3908,18 +3959,18 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc4) {
   HInstruction* goto_crit_break = new (GetAllocator()) HGoto();
   set_two_critical_break->AddInstruction(goto_crit_break);
 
-  HInstruction* store_two = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* store_two = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_two = new (GetAllocator()) HGoto();
   set_two->AddInstruction(store_two);
   set_two->AddInstruction(goto_two);
 
-  HInstruction* read_early = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_early = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_early = new (GetAllocator()) HReturn(read_early);
   early_return->AddInstruction(read_early);
   early_return->AddInstruction(return_early);
 
   HInstruction* escape_instruction = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* read_escape = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_escape = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_escape = new (GetAllocator()) HReturn(read_escape);
   escape->AddInstruction(escape_instruction);
   escape->AddInstruction(read_escape);
@@ -4031,7 +4082,7 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc5) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_one = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* store_one = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_one = new (GetAllocator()) HGoto();
   set_one->AddInstruction(store_one);
   set_one->AddInstruction(goto_one);
@@ -4039,9 +4090,9 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc5) {
   HInstruction* goto_crit_break = new (GetAllocator()) HGoto();
   set_two_critical_break->AddInstruction(goto_crit_break);
 
-  HInstruction* get_two = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* get_two = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* add_two = new (GetAllocator()) HAdd(DataType::Type::kInt32, get_two, c4);
-  HInstruction* store_two = MakeIFieldSet(new_inst, add_two, MemberOffset(10));
+  HInstruction* store_two = MakeIFieldSet(new_inst, add_two, MemberOffset(32));
   HInstruction* escape_two = MakeInvoke(DataType::Type::kVoid, {new_inst});
   HInstruction* goto_two = new (GetAllocator()) HGoto();
   set_two_and_escape->AddInstruction(get_two);
@@ -4051,12 +4102,12 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc5) {
   set_two_and_escape->AddInstruction(goto_two);
   escape_two->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* store_noescape = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* store_noescape = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_noescape = new (GetAllocator()) HGoto();
   set_noescape->AddInstruction(store_noescape);
   set_noescape->AddInstruction(goto_noescape);
 
-  HInstruction* read_breturn = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_breturn = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_breturn = new (GetAllocator()) HReturn(read_breturn);
   breturn->AddInstruction(read_breturn);
   breturn->AddInstruction(return_breturn);
@@ -4145,9 +4196,9 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* read_left = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_left = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_left = new (GetAllocator()) HReturn(read_left);
   left->AddInstruction(write_left);
   left->AddInstruction(call_left);
@@ -4155,8 +4206,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
   left->AddInstruction(return_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
-  HInstruction* read_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
+  HInstruction* read_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_right = new (GetAllocator()) HReturn(read_right);
   right->AddInstruction(write_right);
   right->AddInstruction(read_right);
@@ -4239,14 +4290,14 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry_post->AddInstruction(if_inst);
 
-  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
   left_pre->AddInstruction(write_left_pre);
   left_pre->AddInstruction(goto_left_pre);
 
   HInstruction* suspend_left_loop = new (GetAllocator()) HSuspendCheck();
   HInstruction* call_left_loop = MakeInvoke(DataType::Type::kBool, { new_inst });
-  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_left_loop = new (GetAllocator()) HIf(call_left_loop);
   left_loop->AddInstruction(suspend_left_loop);
   left_loop->AddInstruction(call_left_loop);
@@ -4255,13 +4306,13 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
   suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
   call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_left_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_left_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_left_end = new (GetAllocator()) HReturn(read_left_end);
   left_finish->AddInstruction(read_left_end);
   left_finish->AddInstruction(return_left_end);
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
-  HInstruction* read_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
+  HInstruction* read_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_right = new (GetAllocator()) HReturn(read_right);
   right->AddInstruction(write_right);
   right->AddInstruction(read_right);
@@ -4329,14 +4380,14 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(call_left);
   left->AddInstruction(write_left);
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_right = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
@@ -4344,7 +4395,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
   right->AddInstruction(goto_right);
   call_right->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -4406,7 +4457,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* call_entry = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
@@ -4418,9 +4469,9 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
   call_entry->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left_start = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_left_start = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(write_left_start);
   left->AddInstruction(call_left);
@@ -4428,12 +4479,12 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -4518,7 +4569,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry_post->AddInstruction(if_inst);
 
-  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
   left_pre->AddInstruction(write_left_pre);
   left_pre->AddInstruction(goto_left_pre);
@@ -4532,17 +4583,17 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
   suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
   call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_left_loop = new (GetAllocator()) HGoto();
   left_loop_post->AddInstruction(write_left_loop);
   left_loop_post->AddInstruction(goto_left_loop);
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_return = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_return = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_final = new (GetAllocator()) HReturn(read_return);
   return_block->AddInstruction(read_return);
   return_block->AddInstruction(return_final);
@@ -4624,14 +4675,14 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry_post->AddInstruction(if_inst);
 
-  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left_pre = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left_pre = new (GetAllocator()) HGoto();
   left_pre->AddInstruction(write_left_pre);
   left_pre->AddInstruction(goto_left_pre);
 
   HInstruction* suspend_left_loop = new (GetAllocator()) HSuspendCheck();
   HInstruction* call_left_loop = MakeInvoke(DataType::Type::kBool, {});
-  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_left_loop = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_left_loop = new (GetAllocator()) HIf(call_left_loop);
   left_loop->AddInstruction(suspend_left_loop);
   left_loop->AddInstruction(call_left_loop);
@@ -4640,7 +4691,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
   suspend_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
   call_left_loop->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_right = MakeInvoke(DataType::Type::kBool, { new_inst });
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
@@ -4648,7 +4699,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
   right->AddInstruction(goto_right);
   call_right->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_return = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_return = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_final = new (GetAllocator()) HReturn(read_return);
   return_block->AddInstruction(read_return);
   return_block->AddInstruction(return_final);
@@ -4717,7 +4768,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call2_left = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(call_left);
@@ -4727,7 +4778,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
   call2_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_right = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
@@ -4735,7 +4786,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
   right->AddInstruction(goto_right);
   call_right->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -4794,7 +4845,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* call_entry = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
@@ -4807,19 +4858,19 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
   call_entry->CopyEnvironmentFrom(cls->GetEnvironment());
 
   HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
-  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_left = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(call_left);
   left->AddInstruction(write_left);
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -4895,7 +4946,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonBeforeCohort) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   ComparisonInstructions cmp_instructions = GetComparisonInstructions(new_inst);
   HInstruction* if_inst = new (GetAllocator()) HIf(cmp_instructions.cmp_);
   entry->AddInstruction(cls);
@@ -4908,7 +4959,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonBeforeCohort) {
   cmp_instructions.AddEnvironment(cls->GetEnvironment());
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* goto_partial = new (GetAllocator()) HGoto();
   partial->AddInstruction(write_partial);
   partial->AddInstruction(goto_partial);
@@ -4925,12 +4976,12 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonBeforeCohort) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -5024,7 +5075,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortBeforeEscape) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -5042,7 +5093,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortBeforeEscape) {
 
   left_crit_break->AddInstruction(new (GetAllocator()) HGoto());
 
-  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* goto_partial = new (GetAllocator()) HGoto();
   partial->AddInstruction(write_partial);
   partial->AddInstruction(goto_partial);
@@ -5053,12 +5104,12 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortBeforeEscape) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -5153,7 +5204,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -5168,7 +5219,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
@@ -5180,7 +5231,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
   merge->AddInstruction(if_merge);
   cmp_instructions.AddEnvironment(cls->GetEnvironment());
 
-  HInstanceFieldSet* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstanceFieldSet* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* goto_partial = new (GetAllocator()) HGoto();
   partial->AddInstruction(write_partial);
   partial->AddInstruction(goto_partial);
@@ -5188,7 +5239,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
   HInstruction* goto_crit_break = new (GetAllocator()) HGoto();
   critical_break->AddInstruction(goto_crit_break);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -5282,7 +5333,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortAfterEscape) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -5304,7 +5355,7 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortAfterEscape) {
     left->SwapSuccessors();
   }
 
-  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* write_partial = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* goto_partial = new (GetAllocator()) HGoto();
   partial->AddInstruction(write_partial);
   partial->AddInstruction(goto_partial);
@@ -5315,12 +5366,12 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortAfterEscape) {
   HInstruction* goto_left_end = new (GetAllocator()) HGoto();
   left_end->AddInstruction(goto_left_end);
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -5448,12 +5499,12 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore1) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* write_bottom = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_bottom = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturnVoid();
   breturn->AddInstruction(write_bottom);
   breturn->AddInstruction(return_exit);
@@ -5534,7 +5585,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -5549,7 +5600,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
@@ -5559,7 +5610,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
 
   merge_crit_break->AddInstruction(new (GetAllocator()) HGoto());
 
-  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* non_escape_call = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* non_escape_goto = new (GetAllocator()) HGoto();
   non_escape->AddInstruction(write_non_escape);
@@ -5567,7 +5618,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
   non_escape->AddInstruction(non_escape_goto);
   non_escape_call->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_bottom = MakeIFieldSet(new_inst, c4, MemberOffset(10));
+  HInstruction* write_bottom = MakeIFieldSet(new_inst, c4, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturnVoid();
   breturn->AddInstruction(write_bottom);
   breturn->AddInstruction(return_exit);
@@ -5634,7 +5685,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad1) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -5649,12 +5700,12 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad1) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -5738,8 +5789,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad1) {
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(10));
-  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(10));
+  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(32));
+  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls1);
   entry->AddInstruction(cls2);
@@ -5762,15 +5813,15 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad1) {
   call_left1->CopyEnvironmentFrom(cls1->GetEnvironment());
   call_left2->CopyEnvironmentFrom(cls1->GetEnvironment());
 
-  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(10));
-  HInstruction* write_right2 = MakeIFieldSet(new_inst2, c12, MemberOffset(10));
+  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(32));
+  HInstruction* write_right2 = MakeIFieldSet(new_inst2, c12, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right1);
   right->AddInstruction(write_right2);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* combine =
       new (GetAllocator()) HAdd(DataType::Type::kInt32, read_bottom1, read_bottom2);
   HInstruction* return_exit = new (GetAllocator()) HReturn(combine);
@@ -5890,8 +5941,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad2) {
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(10));
-  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(10));
+  HInstruction* write_entry1 = MakeIFieldSet(new_inst1, c3, MemberOffset(32));
+  HInstruction* write_entry2 = MakeIFieldSet(new_inst2, c13, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls1);
   entry->AddInstruction(cls2);
@@ -5906,14 +5957,14 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad2) {
   new_inst2->CopyEnvironmentFrom(cls1->GetEnvironment());
 
   HInstruction* call_left1 = MakeInvoke(DataType::Type::kVoid, { new_inst1 });
-  HInstruction* write_left2 = MakeIFieldSet(new_inst2, c12, MemberOffset(10));
+  HInstruction* write_left2 = MakeIFieldSet(new_inst2, c12, MemberOffset(32));
   HInstruction* goto_left = new (GetAllocator()) HGoto();
   left->AddInstruction(call_left1);
   left->AddInstruction(write_left2);
   left->AddInstruction(goto_left);
   call_left1->CopyEnvironmentFrom(cls1->GetEnvironment());
 
-  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(10));
+  HInstruction* write_right1 = MakeIFieldSet(new_inst1, c2, MemberOffset(32));
   HInstruction* call_right2 = MakeInvoke(DataType::Type::kVoid, { new_inst2 });
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right1);
@@ -5921,8 +5972,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad2) {
   right->AddInstruction(goto_right);
   call_right2->CopyEnvironmentFrom(cls1->GetEnvironment());
 
-  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(10));
-  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom1 = MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* read_bottom2 = MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* combine =
       new (GetAllocator()) HAdd(DataType::Type::kInt32, read_bottom1, read_bottom2);
   HInstruction* return_exit = new (GetAllocator()) HReturn(combine);
@@ -6064,7 +6115,7 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
 
   HInstruction* cls1 = MakeClassLoad();
   HInstruction* new_inst1 = MakeNewInstance(cls1);
-  HInstruction* write1 = MakeIFieldSet(new_inst1, c33, MemberOffset(10));
+  HInstruction* write1 = MakeIFieldSet(new_inst1, c33, MemberOffset(32));
   HInstruction* if_left = new (GetAllocator()) HIf(param2);
   left->AddInstruction(cls1);
   left->AddInstruction(new_inst1);
@@ -6076,14 +6127,14 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
   left_end->AddInstruction(new (GetAllocator()) HGoto());
 
   HInstruction* early_exit_left_read =
-      MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(10));
+      MakeIFieldGet(new_inst1, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* early_exit_left_return = new (GetAllocator()) HReturn(early_exit_left_read);
   left_exit_early->AddInstruction(early_exit_left_read);
   left_exit_early->AddInstruction(early_exit_left_return);
 
   HInstruction* cls2 = MakeClassLoad();
   HInstruction* new_inst2 = MakeNewInstance(cls2);
-  HInstruction* write2 = MakeIFieldSet(new_inst2, c44, MemberOffset(10));
+  HInstruction* write2 = MakeIFieldSet(new_inst2, c44, MemberOffset(32));
   HInstruction* if_right = new (GetAllocator()) HIf(param2);
   right->AddInstruction(cls2);
   right->AddInstruction(new_inst2);
@@ -6095,13 +6146,13 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
   right_end->AddInstruction(new (GetAllocator()) HGoto());
 
   HInstruction* early_exit_right_read =
-      MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(10));
+      MakeIFieldGet(new_inst2, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* early_exit_right_return = new (GetAllocator()) HReturn(early_exit_right_read);
   right_exit_early->AddInstruction(early_exit_right_read);
   right_exit_early->AddInstruction(early_exit_right_return);
 
   HPhi* bottom_phi = MakePhi({new_inst1, new_inst2});
-  HInstruction* read_bottom = MakeIFieldGet(bottom_phi, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(bottom_phi, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddPhi(bottom_phi);
   breturn->AddInstruction(read_bottom);
@@ -6172,7 +6223,7 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad4) {
   GET_BLOCK(left_write_escape);
   GET_BLOCK(right);
 #undef GET_BLOCK
-  MemberOffset foo_offset = MemberOffset(10);
+  MemberOffset foo_offset = MemberOffset(32);
   MemberOffset bar_offset = MemberOffset(20);
   EnsurePredecessorOrder(breturn, {left_write_escape, right});
   HInstruction* c42 = graph_->GetIntConstant(42);
@@ -6289,7 +6340,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -6304,7 +6355,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
@@ -6314,7 +6365,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
 
   crit_break->AddInstruction(new (GetAllocator()) HGoto());
 
-  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* non_escape_call = MakeInvoke(DataType::Type::kVoid, {});
   HInstruction* non_escape_goto = new (GetAllocator()) HGoto();
   non_escape->AddInstruction(write_non_escape);
@@ -6322,7 +6373,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
   non_escape->AddInstruction(non_escape_goto);
   non_escape_call->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -6426,7 +6477,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -6441,7 +6492,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
@@ -6449,7 +6500,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
   HInstruction* merge_if = new (GetAllocator()) HIf(bool_value2);
   merge->AddInstruction(merge_if);
 
-  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_non_escape = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* non_escape_goto = new (GetAllocator()) HGoto();
   non_escape->AddInstruction(write_non_escape);
   non_escape->AddInstruction(non_escape_goto);
@@ -6457,7 +6508,7 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
   crit_break->AddInstruction(new (GetAllocator()) HGoto());
 
   HInstruction* bottom_call = MakeInvoke(DataType::Type::kVoid, {});
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(bottom_call);
   breturn->AddInstruction(read_bottom);
@@ -6594,7 +6645,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
   HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, switch_val);
   bswitch->AddInstruction(switch_inst);
 
-  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_c1 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c1 = new (GetAllocator()) HGoto();
   case1->AddInstruction(write_c1);
@@ -6602,7 +6653,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
   case1->AddInstruction(goto_c1);
   call_c1->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_c2 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c2 = new (GetAllocator()) HGoto();
   case2->AddInstruction(write_c2);
@@ -6610,7 +6661,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
   case2->AddInstruction(goto_c2);
   call_c2->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_c3 = new (GetAllocator()) HGoto();
   case3->AddInstruction(write_c3);
   case3->AddInstruction(goto_c3);
@@ -6633,7 +6684,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(write_loop_right);
   loop_if_right->AddInstruction(goto_loop_right);
@@ -6650,7 +6701,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
   HInstruction* goto_critical_break = new (GetAllocator()) HGoto();
   critical_break->AddInstruction(goto_critical_break);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -6780,7 +6831,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
   HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, switch_val);
   bswitch->AddInstruction(switch_inst);
 
-  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(10));
+  HInstruction* write_c1 = MakeIFieldSet(new_inst, c1, MemberOffset(32));
   HInstruction* call_c1 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c1 = new (GetAllocator()) HGoto();
   case1->AddInstruction(write_c1);
@@ -6788,7 +6839,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
   case1->AddInstruction(goto_c1);
   call_c1->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(10));
+  HInstruction* write_c2 = MakeIFieldSet(new_inst, c2, MemberOffset(32));
   HInstruction* call_c2 = MakeInvoke(DataType::Type::kVoid, { new_inst });
   HInstruction* goto_c2 = new (GetAllocator()) HGoto();
   case2->AddInstruction(write_c2);
@@ -6796,7 +6847,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
   case2->AddInstruction(goto_c2);
   call_c2->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_c3 = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_c3 = new (GetAllocator()) HGoto();
   case3->AddInstruction(write_c3);
   case3->AddInstruction(goto_c3);
@@ -6822,7 +6873,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(write_loop_right);
   loop_if_right->AddInstruction(goto_loop_right);
@@ -6833,7 +6884,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
   HInstruction* goto_critical_break = new (GetAllocator()) HGoto();
   critical_break->AddInstruction(goto_critical_break);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -6940,7 +6991,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis3) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_preheader = new (GetAllocator()) HGoto();
   loop_pre_header->AddInstruction(write_pre_header);
   loop_pre_header->AddInstruction(goto_preheader);
@@ -6963,7 +7014,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis3) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(write_loop_right);
   loop_if_right->AddInstruction(goto_loop_right);
@@ -6983,7 +7034,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis3) {
   HInstruction* goto_no_escape = new (GetAllocator()) HGoto();
   no_escape->AddInstruction(goto_no_escape);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -7099,7 +7150,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis4) {
   HInstruction* goto_no_escape = new (GetAllocator()) HGoto();
   no_escape->AddInstruction(goto_no_escape);
 
-  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_preheader = new (GetAllocator()) HGoto();
   loop_pre_header->AddInstruction(write_pre_header);
   loop_pre_header->AddInstruction(goto_preheader);
@@ -7122,7 +7173,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis4) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, c5, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(write_loop_right);
   loop_if_right->AddInstruction(goto_loop_right);
@@ -7130,7 +7181,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis4) {
   HInstruction* goto_loop_merge = new (GetAllocator()) HGoto();
   loop_merge->AddInstruction(goto_loop_merge);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -7229,7 +7280,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
   ManuallyBuildEnvFor(cls, {});
   new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_pre_header = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* goto_preheader = new (GetAllocator()) HGoto();
   loop_pre_header->AddInstruction(write_pre_header);
   loop_pre_header->AddInstruction(goto_preheader);
@@ -7252,10 +7303,10 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
   HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
   loop_if_left->AddInstruction(goto_loop_left);
 
-  HInstruction* read_loop_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_loop_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* add_loop_right =
       new (GetAllocator()) HAdd(DataType::Type::kInt32, read_loop_right, c5);
-  HInstruction* write_loop_right = MakeIFieldSet(new_inst, add_loop_right, MemberOffset(10));
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, add_loop_right, MemberOffset(32));
   HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
   loop_if_right->AddInstruction(read_loop_right);
   loop_if_right->AddInstruction(add_loop_right);
@@ -7277,7 +7328,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
   HInstruction* goto_no_escape = new (GetAllocator()) HGoto();
   no_escape->AddInstruction(goto_no_escape);
 
-  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
   breturn->AddInstruction(read_bottom);
   breturn->AddInstruction(return_exit);
@@ -7356,7 +7407,7 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -7371,12 +7422,12 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest) {
   left->AddInstruction(goto_left);
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_right = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
 
-  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_end);
   breturn->AddInstruction(read_end);
   breturn->AddInstruction(return_exit);
@@ -7446,7 +7497,7 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest2) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -7462,14 +7513,14 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest2) {
   call_left->CopyEnvironmentFrom(cls->GetEnvironment());
 
   HInstruction* call_right = MakeInvoke(DataType::Type::kInt32, {});
-  HInstruction* write_right = MakeIFieldSet(new_inst, call_right, MemberOffset(10));
+  HInstruction* write_right = MakeIFieldSet(new_inst, call_right, MemberOffset(32));
   HInstruction* goto_right = new (GetAllocator()) HGoto();
   right->AddInstruction(call_right);
   right->AddInstruction(write_right);
   right->AddInstruction(goto_right);
   call_right->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_end);
   breturn->AddInstruction(read_end);
   breturn->AddInstruction(return_exit);
@@ -7553,7 +7604,7 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest3) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, int_val);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -7568,17 +7619,17 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest3) {
   case1->AddInstruction(goto_case1);
   call_case1->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_case2 = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* write_case2 = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_case2 = new (GetAllocator()) HGoto();
   case2->AddInstruction(write_case2);
   case2->AddInstruction(goto_case2);
 
-  HInstruction* write_case3 = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* write_case3 = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_case3 = new (GetAllocator()) HGoto();
   case3->AddInstruction(write_case3);
   case3->AddInstruction(goto_case3);
 
-  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_end);
   breturn->AddInstruction(read_end);
   breturn->AddInstruction(return_exit);
@@ -7660,7 +7711,7 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest4) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(10));
+  HInstruction* write_start = MakeIFieldSet(new_inst, c3, MemberOffset(32));
   HInstruction* switch_inst = new (GetAllocator()) HPackedSwitch(0, 2, int_val);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -7675,17 +7726,17 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest4) {
   case1->AddInstruction(goto_case1);
   call_case1->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* write_case2 = MakeIFieldSet(new_inst, c10, MemberOffset(10));
+  HInstruction* write_case2 = MakeIFieldSet(new_inst, c10, MemberOffset(32));
   HInstruction* goto_case2 = new (GetAllocator()) HGoto();
   case2->AddInstruction(write_case2);
   case2->AddInstruction(goto_case2);
 
-  HInstruction* write_case3 = MakeIFieldSet(new_inst, c20, MemberOffset(10));
+  HInstruction* write_case3 = MakeIFieldSet(new_inst, c20, MemberOffset(32));
   HInstruction* goto_case3 = new (GetAllocator()) HGoto();
   case3->AddInstruction(write_case3);
   case3->AddInstruction(goto_case3);
 
-  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_end);
   breturn->AddInstruction(read_end);
   breturn->AddInstruction(return_exit);
@@ -7799,7 +7850,7 @@ TEST_F(LoadStoreEliminationTest, PartialIrreducibleLoop) {
 
   HInstruction* cls = MakeClassLoad();
   HInstruction* new_inst = MakeNewInstance(cls);
-  HInstruction* write_start = MakeIFieldSet(new_inst, c11, MemberOffset(10));
+  HInstruction* write_start = MakeIFieldSet(new_inst, c11, MemberOffset(32));
   HInstruction* if_inst = new (GetAllocator()) HIf(param1);
   entry->AddInstruction(cls);
   entry->AddInstruction(new_inst);
@@ -7810,7 +7861,7 @@ TEST_F(LoadStoreEliminationTest, PartialIrreducibleLoop) {
 
   left->AddInstruction(new (GetAllocator()) HGoto());
 
-  right->AddInstruction(MakeIFieldSet(new_inst, c33, MemberOffset(10)));
+  right->AddInstruction(MakeIFieldSet(new_inst, c33, MemberOffset(32)));
   right->AddInstruction(new (GetAllocator()) HIf(param2));
 
   right_crit_break_end->AddInstruction(new (GetAllocator()) HGoto());
@@ -7831,8 +7882,8 @@ TEST_F(LoadStoreEliminationTest, PartialIrreducibleLoop) {
   loop_body->AddInstruction(body_if);
   body_invoke->CopyEnvironmentFrom(cls->GetEnvironment());
 
-  HInstruction* left_set = MakeIFieldSet(new_inst, c66, MemberOffset(10));
-  HInstruction* left_goto = MakeIFieldSet(new_inst, c66, MemberOffset(10));
+  HInstruction* left_set = MakeIFieldSet(new_inst, c66, MemberOffset(32));
+  HInstruction* left_goto = MakeIFieldSet(new_inst, c66, MemberOffset(32));
   loop_left->AddInstruction(left_set);
   loop_left->AddInstruction(left_goto);
 
@@ -7840,7 +7891,7 @@ TEST_F(LoadStoreEliminationTest, PartialIrreducibleLoop) {
 
   loop_end->AddInstruction(new (GetAllocator()) HGoto());
 
-  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(10));
+  HInstruction* read_end = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
   HInstruction* return_exit = new (GetAllocator()) HReturn(read_end);
   breturn->AddInstruction(read_end);
   breturn->AddInstruction(return_exit);

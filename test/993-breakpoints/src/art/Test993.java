@@ -377,7 +377,7 @@ public class Test993 {
   public static void runBCPMethodTests(boolean test_BCP_private) throws Exception {
     // The methods we will be breaking on.
     Method bcp_private_method =
-        test_BCP_private ? Duration.class.getDeclaredMethod("toSeconds") : null;
+        test_BCP_private ? Duration.class.getDeclaredMethod("toBigDecimalSeconds") : null;
     Method bcp_virtual_method = Optional.class.getDeclaredMethod("isPresent");
     Method bcp_static_method = Optional.class.getDeclaredMethod("empty");
     Method bcp_private_static_method =
@@ -443,7 +443,7 @@ public class Test993 {
       Runnable[] private_invokes = new Runnable[] {
         new InvokeNativeObject(bcp_private_method, test_duration),
 
-        new InvokeDirect("Duration::toSeconds", () -> { test_duration.multipliedBy(2); }),
+        new InvokeDirect("Duration::toBigDecimalSeconds", () -> { test_duration.multipliedBy(2); }),
       };
       Breakpoint.Manager.BP[] private_breakpoints = new Breakpoint.Manager.BP[] {
         BP(bcp_private_method)
