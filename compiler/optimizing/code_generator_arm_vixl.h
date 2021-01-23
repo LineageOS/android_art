@@ -18,6 +18,7 @@
 #define ART_COMPILER_OPTIMIZING_CODE_GENERATOR_ARM_VIXL_H_
 
 #include "base/enums.h"
+#include "class_root.h"
 #include "code_generator.h"
 #include "common_arm.h"
 #include "dex/string_reference.h"
@@ -638,7 +639,9 @@ class CodeGeneratorARMVIXL : public CodeGenerator {
                                                 Handle<mirror::Class> handle);
 
   void LoadBootImageAddress(vixl::aarch32::Register reg, uint32_t boot_image_reference);
+  void LoadTypeForBootImageIntrinsic(vixl::aarch32::Register reg, TypeReference type_reference);
   void LoadIntrinsicDeclaringClass(vixl::aarch32::Register reg, HInvoke* invoke);
+  void LoadClassRootForIntrinsic(vixl::aarch32::Register reg, ClassRoot class_root);
 
   void EmitLinkerPatches(ArenaVector<linker::LinkerPatch>* linker_patches) override;
   bool NeedsThunkCode(const linker::LinkerPatch& patch) const override;
