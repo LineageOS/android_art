@@ -40,9 +40,6 @@ class Offset {
   constexpr bool operator==(Offset o) const {
     return SizeValue() == o.SizeValue();
   }
-  constexpr bool operator!=(Offset o) const {
-    return !(*this == o);
-  }
 
  protected:
   size_t val_;
