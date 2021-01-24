@@ -1702,7 +1702,6 @@ void CodeGenerator::ValidateInvokeRuntimeWithoutRecordingPcInfo(HInstruction* in
   // PC-related information.
   DCHECK(kUseBakerReadBarrier);
   DCHECK(instruction->IsInstanceFieldGet() ||
-         instruction->IsPredicatedInstanceFieldGet() ||
          instruction->IsStaticFieldGet() ||
          instruction->IsArrayGet() ||
          instruction->IsArraySet() ||

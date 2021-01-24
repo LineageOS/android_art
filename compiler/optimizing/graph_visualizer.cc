@@ -19,7 +19,6 @@
 #include <dlfcn.h>
 
 #include <cctype>
-#include <ios>
 #include <sstream>
 
 #include "android-base/stringprintf.h"
@@ -530,13 +529,6 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     StartAttributeStream("invoke_type") << "InvokePolymorphic";
   }
 
-  void VisitPredicatedInstanceFieldGet(HPredicatedInstanceFieldGet* iget) override {
-    StartAttributeStream("field_name") <<
-        iget->GetFieldInfo().GetDexFile().PrettyField(iget->GetFieldInfo().GetFieldIndex(),
-                                                      /* with type */ false);
-    StartAttributeStream("field_type") << iget->GetFieldType();
-  }
-
   void VisitInstanceFieldGet(HInstanceFieldGet* iget) override {
     StartAttributeStream("field_name") <<
         iget->GetFieldInfo().GetDexFile().PrettyField(iget->GetFieldInfo().GetFieldIndex(),
@@ -549,7 +541,6 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
         iset->GetFieldInfo().GetDexFile().PrettyField(iset->GetFieldInfo().GetFieldIndex(),
                                                       /* with type */ false);
     StartAttributeStream("field_type") << iset->GetFieldType();
-    StartAttributeStream("predicated") << std::boolalpha << iset->GetIsPredicatedSet();
   }
 
   void VisitStaticFieldGet(HStaticFieldGet* sget) override {
