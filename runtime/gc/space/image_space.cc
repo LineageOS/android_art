@@ -2220,19 +2220,15 @@ class ImageSpace::BootImageLoader {
                   const std::string& image_location,
                   InstructionSet image_isa,
                   bool relocate,
-                  bool executable,
-                  bool is_zygote)
+                  bool executable)
       : boot_class_path_(boot_class_path),
         boot_class_path_locations_(boot_class_path_locations),
         image_location_(image_location),
         image_isa_(image_isa),
         relocate_(relocate),
         executable_(executable),
-        is_zygote_(is_zygote),
         has_system_(false) {
   }
-
-  bool IsZygote() const { return is_zygote_; }
 
   void FindImageFiles() {
     BootImageLayout layout(image_location_, boot_class_path_, boot_class_path_locations_);
@@ -3097,7 +3093,6 @@ class ImageSpace::BootImageLoader {
   const InstructionSet image_isa_;
   const bool relocate_;
   const bool executable_;
-  const bool is_zygote_;
   bool has_system_;
 };
 
@@ -3161,7 +3156,6 @@ bool ImageSpace::LoadBootImage(
     const InstructionSet image_isa,
     bool relocate,
     bool executable,
-    bool is_zygote,
     size_t extra_reservation_size,
     /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
     /*out*/MemMap* extra_reservation) {
@@ -3182,8 +3176,7 @@ bool ImageSpace::LoadBootImage(
                          image_location,
                          image_isa,
                          relocate,
-                         executable,
-                         is_zygote);
+                         executable);
   loader.FindImageFiles();
 
   // Collect all the errors.

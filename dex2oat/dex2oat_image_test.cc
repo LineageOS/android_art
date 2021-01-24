@@ -426,7 +426,6 @@ TEST_F(Dex2oatImageTest, TestExtension) {
                                                 kRuntimeISA,
                                                 relocate,
                                                 /*executable=*/ true,
-                                                /*is_zygote=*/ false,
                                                 /*extra_reservation_size=*/ 0u,
                                                 &boot_image_spaces,
                                                 &extra_reservation);
