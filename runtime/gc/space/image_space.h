@@ -128,7 +128,6 @@ class ImageSpace : public MemMapSpace {
       const InstructionSet image_isa,
       bool relocate,
       bool executable,
-      bool is_zygote,
       size_t extra_reservation_size,
       /*out*/std::vector<std::unique_ptr<ImageSpace>>* boot_image_spaces,
       /*out*/MemMap* extra_reservation) REQUIRES_SHARED(Locks::mutator_lock_);

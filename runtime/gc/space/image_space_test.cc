@@ -140,7 +140,6 @@ TEST_F(ImageSpaceTest, StringDeduplication) {
                                      kRuntimeISA,
                                      /*relocate=*/ false,
                                      /*executable=*/ true,
-                                     /*is_zygote=*/ false,
                                      /*extra_reservation_size=*/ 0u,
                                      &boot_image_spaces,
                                      &extra_reservation);
