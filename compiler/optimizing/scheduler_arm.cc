@@ -853,11 +853,6 @@ void SchedulingLatencyVisitorARM::VisitDiv(HDiv* instruction) {
   }
 }
 
-void SchedulingLatencyVisitorARM::VisitPredicatedInstanceFieldGet(
-    HPredicatedInstanceFieldGet* instruction) {
-  HandleFieldGetLatencies(instruction, instruction->GetFieldInfo());
-}
-
 void SchedulingLatencyVisitorARM::VisitInstanceFieldGet(HInstanceFieldGet* instruction) {
   HandleFieldGetLatencies(instruction, instruction->GetFieldInfo());
 }
@@ -918,9 +913,7 @@ void SchedulingLatencyVisitorARM::VisitRem(HRem* instruction) {
 
 void SchedulingLatencyVisitorARM::HandleFieldGetLatencies(HInstruction* instruction,
                                                           const FieldInfo& field_info) {
-  DCHECK(instruction->IsInstanceFieldGet() ||
-         instruction->IsStaticFieldGet() ||
-         instruction->IsPredicatedInstanceFieldGet());
+  DCHECK(instruction->IsInstanceFieldGet() || instruction->IsStaticFieldGet());
   DCHECK(codegen_ != nullptr);
   bool is_volatile = field_info.IsVolatile();
   DataType::Type field_type = field_info.GetFieldType();
