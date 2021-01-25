@@ -142,6 +142,8 @@ void CommonRuntimeTestImpl::FinalizeSetup() {
   if (!unstarted_initialized_) {
     interpreter::UnstartedRuntime::Initialize();
     unstarted_initialized_ = true;
+  } else {
+    interpreter::UnstartedRuntime::Reinitialize();
   }
 
   {

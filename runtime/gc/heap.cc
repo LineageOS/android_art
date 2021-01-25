@@ -420,7 +420,6 @@ Heap::Heap(size_t initial_size,
                                        image_instruction_set,
                                        runtime->ShouldRelocate(),
                                        /*executable=*/ !runtime->IsAotCompiler(),
-                                       is_zygote,
                                        heap_reservation_size,
                                        &boot_image_spaces,
                                        &heap_reservation)) {

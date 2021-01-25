@@ -228,7 +228,7 @@ java_defaults {
     },
     test_suites: [
         "general-tests",
-        "mts",
+        "mts-art",
     ],
     host_required: [
         "art-run-test-checker",
@@ -462,6 +462,7 @@ art_cc_defaults {
         "1963-add-to-dex-classloader-in-memory/check_memfd_create.cc",
         "2012-structural-redefinition-failures-jni-id/set-jni-id-used.cc",
         "2031-zygote-compiled-frame-deopt/native-wait.cc",
+        "2038-hiddenapi-jvmti-ext/hiddenapi_ext.cc",
     ],
     static_libs: [
         "libz",
@@ -1024,7 +1025,7 @@ art_cc_test {
     // It seems that only device-tests build can create a valid apex.
     test_suites: [
         "device-tests",
-        "mts",
+        "mts-art",
     ],
     test_config: "art-gtests-target-install-apex.xml",
 

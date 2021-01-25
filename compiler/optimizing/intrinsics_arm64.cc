@@ -4065,7 +4065,7 @@ static void GenerateVarHandleArrayChecks(HInvoke* invoke,
 
   // Check that the coordinateType0 is an array type. We do not need a read barrier
   // for loading constant reference fields (or chains of them) for comparison with null,
-  // or for finally loading a constant primitive field (primitive type) below.
+  // nor for finally loading a constant primitive field (primitive type) below.
   __ Ldr(temp2, HeapOperand(temp, component_type_offset.Int32Value()));
   codegen->GetAssembler()->MaybeUnpoisonHeapReference(temp2);
   __ Cbz(temp2, slow_path->GetEntryLabel());

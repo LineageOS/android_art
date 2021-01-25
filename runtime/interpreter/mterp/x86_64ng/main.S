@@ -464,7 +464,7 @@ END_FUNCTION \name
 // Uses rax as temporary.
 .macro LOOP_OVER_SHORTY_LOADING_GPRS gpr_reg64, gpr_reg32, inst, shorty, arg_index, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al   // bl := *shorty
+    movb (REG_VAR(shorty)), %al   // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al    // if (al == '\0') goto finished
     je  VAR(finished)
@@ -531,7 +531,7 @@ END_FUNCTION \name
 // Uses rax as temporary.
 .macro LOOP_RANGE_OVER_SHORTY_LOADING_XMMS xmm_reg, shorty, arg_index, stack_index, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al             // bl := *shorty
+    movb (REG_VAR(shorty)), %al             // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al              // if (al == '\0') goto finished
     je VAR(finished)
@@ -605,7 +605,7 @@ END_FUNCTION \name
 // Uses rax as temporary.
 .macro LOOP_RANGE_OVER_SHORTY_LOADING_GPRS gpr_reg64, gpr_reg32, shorty, arg_index, stack_index, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al             // bl := *shorty
+    movb (REG_VAR(shorty)), %al             // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al    // if (al == '\0') goto finished
     je  VAR(finished)
@@ -706,7 +706,7 @@ END_FUNCTION \name
 // Uses rax as temporary.
 .macro LOOP_OVER_SHORTY_STORING_GPRS gpr_reg64, gpr_reg32, shorty, arg_index, regs, refs, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al             // bl := *shorty
+    movb (REG_VAR(shorty)), %al             // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al    // if (al == '\0') goto finished
     je  VAR(finished)
@@ -746,7 +746,7 @@ END_FUNCTION \name
 // (The trade-off is different for passing arguments and receiving them.)
 .macro LOOP_OVER_FPs shorty, arg_index, regs, stack_ptr, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al             // bl := *shorty
+    movb (REG_VAR(shorty)), %al             // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al              // if (al == '\0') goto finished
     je VAR(finished)
@@ -778,7 +778,7 @@ END_FUNCTION \name
 // Uses rax as temporary.
 .macro LOOP_OVER_INTs shorty, arg_index, regs, refs, stack_ptr, finished
 1: // LOOP
-    movb (REG_VAR(shorty)), %al             // bl := *shorty
+    movb (REG_VAR(shorty)), %al             // al := *shorty
     addq MACRO_LITERAL(1), REG_VAR(shorty)  // shorty++
     cmpb MACRO_LITERAL(0), %al    // if (al == '\0') goto finished
     je  VAR(finished)
@@ -1041,10 +1041,11 @@ END_FUNCTION \name
    movq %rax, \dest
 .endm
 
+// Uses r9 as temporary.
 .macro DO_ENTRY_POINT_CHECK call_compiled_code
    // On entry, the method is %rdi, the instance is %rsi
-   leaq ExecuteNterpImpl(%rip), %rax
-   cmpq %rax, ART_METHOD_QUICK_CODE_OFFSET_64(%rdi)
+   leaq ExecuteNterpImpl(%rip), %r9
+   cmpq %r9, ART_METHOD_QUICK_CODE_OFFSET_64(%rdi)
    jne  VAR(call_compiled_code)
 
    movq ART_METHOD_DATA_OFFSET_64(%rdi), %rax
@@ -1084,6 +1085,10 @@ END_FUNCTION \name
    .endif
 
 .Lcall_compiled_code_\suffix:
+   .if \is_interface
+   // Save interface method, used for conflict resolution, in a callee-save register.
+   movq %rax, %xmm12
+   .endif
    GET_SHORTY rINSTq, \is_interface, \is_polymorphic, \is_custom
    // From this point:
    // - rISNTq contains shorty (in callee-save to switch over return value after call).
@@ -1130,10 +1135,7 @@ END_FUNCTION \name
    call SYMBOL(art_quick_invoke_custom)
    .else
       .if \is_interface
-      // Setup hidden argument. As we don't have access to the interface method,
-      // just pass the method from the IMT. If the method is the conflict trampoline,
-      // this will make the stub go to runtime, otherwise the hidden argument is unused.
-      movq %rdi, %rax
+      movq %xmm12, %rax
       .endif
       call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
    .endif
@@ -1180,6 +1182,10 @@ END_FUNCTION \name
    .endif
 
 .Lcall_compiled_code_range_\suffix:
+   .if \is_interface
+   // Save interface method, used for conflict resolution, in a callee-saved register.
+   movq %rax, %xmm12
+   .endif
    GET_SHORTY rINSTq, \is_interface, \is_polymorphic, \is_custom
    // From this point:
    // - rINSTq contains shorty (in callee-save to switch over return value after call).
@@ -1232,10 +1238,8 @@ END_FUNCTION \name
    call SYMBOL(art_quick_invoke_custom)
    .else
      .if \is_interface
-     // Setup hidden argument. As we don't have access to the interface method,
-     // just pass the method from the IMT. If the method is the conflict trampoline,
-     // this will make the stub go to runtime, otherwise the hidden argument is unused.
-     movq %rdi, %rax
+     // Set the hidden argument for conflict resolution.
+     movq %xmm12, %rax
      .endif
      call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
    .endif
@@ -1295,10 +1299,11 @@ END_FUNCTION \name
    .endif
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    // Clear the marker that we put for volatile fields. The x86 memory
    // model doesn't require a barrier.
@@ -1327,10 +1332,11 @@ END_FUNCTION \name
    \store    \rINST_reg, (%rax,%rdx,1)
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    testq MACRO_LITERAL(1), %rax
    je 1b
@@ -1382,10 +1388,11 @@ END_FUNCTION \name
    OP_IPUT_INTERNAL \rINST_reg, \store, \wide
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1415,10 +1422,11 @@ END_FUNCTION \name
    .endif
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1442,17 +1450,40 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     /* Spill callee save regs */
     SPILL_ALL_CALLEE_SAVES
 
+    movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
+
+    // Setup the stack for executing the method.
+    SETUP_STACK_FRAME rPC, rREFS, rREFS32, rFP, CFI_REFS, load_ins=1
+
+    // Setup the parameters
+    testl %r14d, %r14d
+    je .Lxmm_setup_finished
+
+    subq %r14, %rbx
+    salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
+
+    // If the method is not static and there is one argument ('this'), we don't need to fetch the
+    // shorty.
+    testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+    jne .Lsetup_with_shorty
+
+    movl %esi, (rFP, %rbx)
+    movl %esi, (rREFS, %rbx)
+
+    cmpl $$1, %r14d
+    je .Lxmm_setup_finished
+
+.Lsetup_with_shorty:
     // TODO: Get shorty in a better way and remove below
-    PUSH rdi
-    PUSH rsi
-    PUSH rdx
-    PUSH rcx
-    PUSH r8
-    PUSH r9
+    push %rdi
+    push %rsi
+    push %rdx
+    push %rcx
+    push %r8
+    push %r9
 
     // Save xmm registers + alignment.
     subq MACRO_LITERAL(8 * 8 + 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(8 * 8 + 8)
     movq %xmm0, 0(%rsp)
     movq %xmm1, 8(%rsp)
     movq %xmm2, 16(%rsp)
@@ -1476,45 +1507,31 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
     addq MACRO_LITERAL(8 * 8 + 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(-8 * 8 - 8)
 
-    POP r9
-    POP r8
-    POP rcx
-    POP rdx
-    POP rsi
-    POP rdi
+    pop %r9
+    pop %r8
+    pop %rcx
+    pop %rdx
+    pop %rsi
+    pop %rdi
+    // Reload the old stack pointer, which used to be stored in %r11, which is not callee-saved.
+    movq -8(rREFS), %r11
     // TODO: Get shorty in a better way and remove above
 
-    movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
-
-    // Setup the stack for executing the method.
-    SETUP_STACK_FRAME rPC, rREFS, rREFS32, rFP, CFI_REFS, load_ins=1
-
-    // Setup the parameters
-    testl %r14d, %r14d
-    je .Lxmm_setup_finished
-
-    subq %r14, %rbx
-    salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
-
+    movq $$0, %r14
     testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
 
-    // Available: rdi, r10, r14
+    // Available: rdi, r10
     // Note the leaq below don't change the flags.
     leaq 1(%rbp), %r10  // shorty + 1  ; ie skip return arg character
     leaq (rFP, %rbx, 1), %rdi
     leaq (rREFS, %rbx, 1), %rbx
     jne .Lhandle_static_method
-    movl %esi, (%rdi)
-    movl %esi, (%rbx)
     addq $$4, %rdi
     addq $$4, %rbx
     addq $$4, %r11
-    movq $$0, %r14
     jmp .Lcontinue_setup_gprs
 .Lhandle_static_method:
-    movq $$0, %r14
     LOOP_OVER_SHORTY_STORING_GPRS rsi, esi, r10, r14, rdi, rbx, .Lgpr_setup_finished
 .Lcontinue_setup_gprs:
     LOOP_OVER_SHORTY_STORING_GPRS rdx, edx, r10, r14, rdi, rbx, .Lgpr_setup_finished
@@ -1663,22 +1680,22 @@ NterpNewArray:
    jmp 1b
 
 NterpPutObjectInstanceField:
+   movl    rINST, %ebp                     # rbp <- BA
+   andl    $$0xf, %ebp                     # rbp <- A
+   GET_VREG %ecx, %rbp                     # ecx <- v[A]
+   sarl    $$4, rINST
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rax, 2f
 1:
-   movzbq  rINSTbl, %rcx                   # rcx <- BA
-   sarl    $$4, %ecx                       # ecx <- B
-   GET_VREG %ecx, %rcx                     # vB (object we're operating on)
-   testl   %ecx, %ecx                      # is object null?
+   GET_VREG rINST, rINSTq                  # vB (object we're operating on)
+   testl   rINST, rINST                    # is object null?
    je      common_errNullObject
-   andb    $$0xf, rINSTbl                  # rINST <- A
-   GET_VREG rINST, rINSTq                  # rINST <- v[A]
-   movl rINST, (%rcx,%rax,1)
-   testl rINST, rINST
+   movl %ecx, (rINSTq,%rax,1)
+   testl %ecx, %ecx
    je 4f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rcx
-   movb %al, (%rax, %rcx, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, rINSTq
+   movb %al, (%rax, rINSTq, 1)
 4:
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
@@ -1686,24 +1703,22 @@ NterpPutObjectInstanceField:
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   // %rcx is already set.
    call nterp_get_instance_field_offset
+   // Reload the value as it may have moved.
+   GET_VREG %ecx, %rbp                     # ecx <- v[A]
    testl %eax, %eax
    jns 1b
-   negl %eax
-   movzbq  rINSTbl, %rcx                   # rcx <- BA
-   sarl    $$4, %ecx                       # ecx <- B
-   GET_VREG %ecx, %rcx                     # vB (object we're operating on)
-   testl   %ecx, %ecx                      # is object null?
+   GET_VREG rINST, rINSTq                  # vB (object we're operating on)
+   testl   rINST, rINST                    # is object null?
    je      common_errNullObject
-   andb    $$0xf, rINSTbl                  # rINST <- A
-   GET_VREG rINST, rINSTq                  # rINST <- v[A]
-   movl rINST, (%rcx,%rax,1)
-   testl rINST, rINST
+   negl %eax
+   movl %ecx, (rINSTq,%rax,1)
+   testl %ecx, %ecx
    je 5f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rax
-   shrq $$CARD_TABLE_CARD_SHIFT, %rcx
-   movb %al, (%rcx, %rax, 1)
+   shrq $$CARD_TABLE_CARD_SHIFT, rINSTq
+   movb %al, (%rax, rINSTq, 1)
 5:
    lock addl $$0, (%rsp)
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
@@ -1729,7 +1744,7 @@ NterpGetObjectInstanceField:
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_instance_field_offset
    testl %eax, %eax
    jns 1b
@@ -1743,6 +1758,7 @@ NterpGetObjectInstanceField:
    jmp 4b
 
 NterpPutObjectStaticField:
+   GET_VREG %ebp, rINSTq
    // Fast-path which gets the field from thread-local cache.
    FETCH_FROM_THREAD_CACHE %rax, 2f
 1:
@@ -1751,9 +1767,8 @@ NterpPutObjectStaticField:
    cmpq $$0, rSELF:THREAD_READ_BARRIER_MARK_REG00_OFFSET
    jne 3f
 5:
-   GET_VREG %ecx, rINSTq
-   movl %ecx, (%eax, %edx, 1)
-   testl %ecx, %ecx
+   movl %ebp, (%eax, %edx, 1)
+   testl %ebp, %ebp
    je 4f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rcx
    shrq $$CARD_TABLE_CARD_SHIFT, %rax
@@ -1761,11 +1776,14 @@ NterpPutObjectStaticField:
 4:
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq %rbp, %rcx
    call nterp_get_static_field
+   // Reload the value as it may have moved.
+   GET_VREG %ebp, rINSTq
    testq MACRO_LITERAL(1), %rax
    je 1b
    CLEAR_VOLATILE_MARKER %rax
@@ -1774,10 +1792,8 @@ NterpPutObjectStaticField:
    cmpq $$0, rSELF:THREAD_READ_BARRIER_MARK_REG00_OFFSET
    jne 7f
 6:
-   movzbl rINSTbl, %ecx
-   GET_VREG %ecx, %rcx
-   movl %ecx, (%eax, %edx, 1)
-   testl %ecx, %ecx
+   movl %ebp, (%eax, %edx, 1)
+   testl %ebp, %ebp
    je 8f
    movq rSELF:THREAD_CARD_TABLE_OFFSET, %rcx
    shrq $$CARD_TABLE_CARD_SHIFT, %rax
@@ -1808,10 +1824,11 @@ NterpGetObjectStaticField:
    SET_VREG_OBJECT %eax, rINSTq            # fp[A] <- value
    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
 2:
+   EXPORT_PC
    movq rSELF:THREAD_SELF_OFFSET, %rdi
    movq 0(%rsp), %rsi
    movq rPC, %rdx
-   EXPORT_PC
+   movq $$0, %rcx
    call nterp_get_static_field
    andq $$-2, %rax
    jmp 1b
@@ -1983,21 +2000,12 @@ NterpHandleHotnessOverflow:
     jmp *%rbx
 
 NterpHandleInvokeInterfaceOnObjectMethodRange:
-   // First argument is the 'this' pointer.
-   movzwl 4(rPC), %r11d // arguments
-   movl (rFP, %r11, 4), %esi
-   // Note: if esi is null, this will be handled by our SIGSEGV handler.
-   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
+   shrl $$16, %eax
    movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
    jmp NterpCommonInvokeInstanceRange
 
 NterpHandleInvokeInterfaceOnObjectMethod:
-   // First argument is the 'this' pointer.
-   movzwl 4(rPC), %r11d // arguments
-   andq MACRO_LITERAL(0xf), %r11
-   movl (rFP, %r11, 4), %esi
-   // Note: if esi is null, this will be handled by our SIGSEGV handler.
-   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
+   shrl $$16, %eax
    movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
    jmp NterpCommonInvokeInstance
 

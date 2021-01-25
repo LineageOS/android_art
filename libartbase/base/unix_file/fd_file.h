@@ -34,6 +34,8 @@ static constexpr bool kCheckSafeUsage = true;
 // Not thread safe.
 class FdFile : public RandomAccessFile {
  public:
+  static constexpr int kInvalidFd = -1;
+
   FdFile() = default;
   // Creates an FdFile using the given file descriptor.
   // Takes ownership of the file descriptor.
@@ -93,7 +95,13 @@ class FdFile : public RandomAccessFile {
   int Fd() const;
   bool ReadOnlyMode() const;
   bool CheckUsage() const;
+
+  // Check whether the underlying file descriptor refers to an open file.
   bool IsOpened() const;
+
+  // Check whether the numeric value of the underlying file descriptor is valid (Fd() != -1).
+  bool IsValid() const { return fd_ != kInvalidFd; }
+
   const std::string& GetPath() const {
     return file_path_;
   }
@@ -122,18 +130,22 @@ class FdFile : public RandomAccessFile {
   void MarkUnchecked();
 
   // Compare against another file. Returns 0 if the files are equivalent, otherwise returns -1 or 1
-  // depending on if the lenghts are different. If the lengths are the same, the function returns
+  // depending on if the lengths are different. If the lengths are the same, the function returns
   // the difference of the first byte that differs.
   int Compare(FdFile* other);
 
+  // Check that `fd` has a valid value (!= kInvalidFd) and refers to an open file.
+  // On Windows, this call only checks that the value of `fd` is valid .
+  static bool IsOpenFd(int fd);
+
  protected:
-  // If the guard state indicates checking (!=kNoCheck), go to the target state "target". Print the
+  // If the guard state indicates checking (!=kNoCheck), go to the target state `target`. Print the
   // given warning if the current state is or exceeds warn_threshold.
   void moveTo(GuardState target, GuardState warn_threshold, const char* warning);
 
-  // If the guard state indicates checking (<kNoCheck), and is below the target state "target", go
-  // to "target." If the current state is higher (excluding kNoCheck) than the trg state, print the
-  // warning.
+  // If the guard state indicates checking (<kNoCheck), and is below the target state `target`, go
+  // to `target`. If the current state is higher (excluding kNoCheck) than the target state, print
+  // the warning.
   void moveUp(GuardState target, const char* warning);
 
   // Forcefully sets the state to the given one. This can overwrite kNoCheck.
@@ -145,7 +157,7 @@ class FdFile : public RandomAccessFile {
 
   GuardState guard_state_ = GuardState::kClosed;
 
-  // Opens file 'file_path' using 'flags' and 'mode'.
+  // Opens file `file_path` using `flags` and `mode`.
   bool Open(const std::string& file_path, int flags);
   bool Open(const std::string& file_path, int flags, mode_t mode);
 
@@ -155,7 +167,7 @@ class FdFile : public RandomAccessFile {
 
   void Destroy();  // For ~FdFile and operator=(&&).
 
-  int fd_ = -1;
+  int fd_ = kInvalidFd;
   std::string file_path_;
   bool read_only_mode_ = false;
 

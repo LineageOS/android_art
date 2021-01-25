@@ -535,9 +535,9 @@ class Dex2Oat final {
       opened_dex_files_maps_(),
       opened_dex_files_(),
       avoid_storing_invocation_(false),
-      swap_fd_(kInvalidFd),
-      app_image_fd_(kInvalidFd),
-      profile_file_fd_(kInvalidFd),
+      swap_fd_(File::kInvalidFd),
+      app_image_fd_(File::kInvalidFd),
+      profile_file_fd_(File::kInvalidFd),
       timings_(timings),
       force_determinism_(false),
       check_linkage_conditions_(false),
@@ -770,7 +770,7 @@ class Dex2Oat final {
     }
 
     const bool have_profile_file = !profile_file_.empty();
-    const bool have_profile_fd = profile_file_fd_ != kInvalidFd;
+    const bool have_profile_fd = profile_file_fd_ != File::kInvalidFd;
     if (have_profile_file && have_profile_fd) {
       Usage("Profile file should not be specified with both --profile-file-fd and --profile-file");
     }
@@ -1723,7 +1723,7 @@ class Dex2Oat final {
 
   // If we need to keep the oat file open for the image writer.
   bool ShouldKeepOatFileOpen() const {
-    return IsImage() && oat_fd_ != kInvalidFd;
+    return IsImage() && oat_fd_ != File::kInvalidFd;
   }
 
   // Doesn't return the class loader since it's not meant to be used for image compilation.
@@ -2188,10 +2188,14 @@ class Dex2Oat final {
 
         TimingLogger::ScopedTiming t("dex2oat OatFile copy", timings_);
         std::unique_ptr<File>& in = oat_files_[i];
-        std::unique_ptr<File> out(OS::CreateEmptyFile(oat_unstripped_[i].c_str()));
         int64_t in_length = in->GetLength();
         if (in_length < 0) {
           PLOG(ERROR) << "Failed to get the length of oat file: " << in->GetPath();
+          return false;
+        }
+        std::unique_ptr<File> out(OS::CreateEmptyFile(oat_unstripped_[i].c_str()));
+        if (out == nullptr) {
+          PLOG(ERROR) << "Failed to open oat file for writing: " << oat_unstripped_[i];
           return false;
         }
         if (!out->Copy(in.get(), 0, in_length)) {

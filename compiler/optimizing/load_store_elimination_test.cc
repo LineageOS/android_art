@@ -953,7 +953,7 @@ TEST_F(LoadStoreEliminationTest, DefaultShadowClass) {
                                                                    graph_->GetIntConstant(33),
                                                                    nullptr,
                                                                    DataType::Type::kReference,
-                                                                   MemberOffset(10),
+                                                                   MemberOffset(32),
                                                                    false,
                                                                    0,
                                                                    0,
@@ -989,6 +989,86 @@ TEST_F(LoadStoreEliminationTest, DefaultShadowClass) {
   EXPECT_TRUE(IsRemoved(set_field));
   EXPECT_FALSE(IsRemoved(cls));
   EXPECT_EQ(cls, return_val->InputAt(0));
+}
+
+// Object o = new Obj();
+// // Needed because otherwise we short-circuit LSA since GVN would get almost
+// // everything other than this. Also since this isn't expected to be a very
+// // common pattern (only a single java function, Object.identityHashCode,
+// // ever reads this field) it's not worth changing the LSA logic.
+// o.foo = 3;
+// return o.shadow$_monitor_;
+TEST_F(LoadStoreEliminationTest, DefaultShadowMonitor) {
+  CreateGraph();
+  AdjacencyListGraph blocks(
+      graph_, GetAllocator(), "entry", "exit", {{"entry", "main"}, {"main", "exit"}});
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(main);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  HInstruction* suspend_check = new (GetAllocator()) HSuspendCheck();
+  entry->AddInstruction(suspend_check);
+  entry->AddInstruction(new (GetAllocator()) HGoto());
+  ArenaVector<HInstruction*> current_locals({}, GetAllocator()->Adapter(kArenaAllocInstruction));
+  ManuallyBuildEnvFor(suspend_check, &current_locals);
+
+  HInstruction* cls = new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
+                                                      dex::TypeIndex(10),
+                                                      graph_->GetDexFile(),
+                                                      ScopedNullHandle<mirror::Class>(),
+                                                      false,
+                                                      0,
+                                                      false);
+  HInstruction* new_inst =
+      new (GetAllocator()) HNewInstance(cls,
+                                        0,
+                                        dex::TypeIndex(10),
+                                        graph_->GetDexFile(),
+                                        false,
+                                        QuickEntrypointEnum::kQuickAllocObjectInitialized);
+  HInstruction* const_fence = new (GetAllocator()) HConstructorFence(new_inst, 0, GetAllocator());
+  HInstruction* set_field = new (GetAllocator()) HInstanceFieldSet(new_inst,
+                                                                   graph_->GetIntConstant(33),
+                                                                   nullptr,
+                                                                   DataType::Type::kReference,
+                                                                   MemberOffset(32),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* get_field = new (GetAllocator()) HInstanceFieldGet(new_inst,
+                                                                   nullptr,
+                                                                   DataType::Type::kInt32,
+                                                                   mirror::Object::MonitorOffset(),
+                                                                   false,
+                                                                   0,
+                                                                   0,
+                                                                   graph_->GetDexFile(),
+                                                                   0);
+  HInstruction* return_val = new (GetAllocator()) HReturn(get_field);
+  main->AddInstruction(cls);
+  main->AddInstruction(new_inst);
+  main->AddInstruction(const_fence);
+  main->AddInstruction(set_field);
+  main->AddInstruction(get_field);
+  main->AddInstruction(return_val);
+  cls->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+  new_inst->CopyEnvironmentFrom(suspend_check->GetEnvironment());
+
+  exit->AddInstruction(new (GetAllocator()) HExit());
+
+  graph_->ClearDominanceInformation();
+  PerformLSE();
+
+  EXPECT_TRUE(IsRemoved(new_inst));
+  EXPECT_TRUE(IsRemoved(const_fence));
+  EXPECT_TRUE(IsRemoved(get_field));
+  EXPECT_TRUE(IsRemoved(set_field));
+  EXPECT_FALSE(IsRemoved(cls));
+  EXPECT_EQ(graph_->GetIntConstant(0), return_val->InputAt(0));
 }
 
 // void DO_CAL() {
@@ -1639,7 +1719,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
                                                                   c1,
                                                                   nullptr,
                                                                   DataType::Type::kInt32,
-                                                                  MemberOffset(10),
+                                                                  MemberOffset(32),
                                                                   false,
                                                                   0,
                                                                   0,
@@ -1667,7 +1747,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
                                                                   c2,
                                                                   nullptr,
                                                                   DataType::Type::kInt32,
-                                                                  MemberOffset(10),
+                                                                  MemberOffset(32),
                                                                   false,
                                                                   0,
                                                                   0,
@@ -1695,7 +1775,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
                                                                   c3,
                                                                   nullptr,
                                                                   DataType::Type::kInt32,
-                                                                  MemberOffset(10),
+                                                                  MemberOffset(32),
                                                                   false,
                                                                   0,
                                                                   0,
@@ -1750,7 +1830,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
                                                                           c5,
                                                                           nullptr,
                                                                           DataType::Type::kInt32,
-                                                                          MemberOffset(10),
+                                                                          MemberOffset(32),
                                                                           false,
                                                                           0,
                                                                           0,
@@ -1766,7 +1846,7 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -1850,7 +1930,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -1988,7 +2068,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2016,7 +2096,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2029,7 +2109,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2121,7 +2201,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2152,7 +2232,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
                                                                            c2,
                                                                            nullptr,
                                                                            DataType::Type::kInt32,
-                                                                           MemberOffset(10),
+                                                                           MemberOffset(32),
                                                                            false,
                                                                            0,
                                                                            0,
@@ -2166,7 +2246,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
                                                                             c3,
                                                                             nullptr,
                                                                             DataType::Type::kInt32,
-                                                                            MemberOffset(10),
+                                                                            MemberOffset(32),
                                                                             false,
                                                                             0,
                                                                             0,
@@ -2182,7 +2262,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2273,7 +2353,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2290,7 +2370,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2303,7 +2383,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2383,7 +2463,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2403,7 +2483,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
   HInstruction* read_left = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                    nullptr,
                                                                    DataType::Type::kInt32,
-                                                                   MemberOffset(10),
+                                                                   MemberOffset(32),
                                                                    false,
                                                                    0,
                                                                    0,
@@ -2421,7 +2501,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2430,7 +2510,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
   HInstruction* read_right = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2535,7 +2615,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
                                                                         c1,
                                                                         nullptr,
                                                                         DataType::Type::kInt32,
-                                                                        MemberOffset(10),
+                                                                        MemberOffset(32),
                                                                         false,
                                                                         0,
                                                                         0,
@@ -2561,7 +2641,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
                                                                          c3,
                                                                          nullptr,
                                                                          DataType::Type::kInt32,
-                                                                         MemberOffset(10),
+                                                                         MemberOffset(32),
                                                                          false,
                                                                          0,
                                                                          0,
@@ -2579,7 +2659,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
   HInstruction* read_left_end = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                        nullptr,
                                                                        DataType::Type::kInt32,
-                                                                       MemberOffset(10),
+                                                                       MemberOffset(32),
                                                                        false,
                                                                        0,
                                                                        0,
@@ -2593,7 +2673,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2602,7 +2682,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
   HInstruction* read_right = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2702,7 +2782,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2719,7 +2799,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2745,7 +2825,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2827,7 +2907,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
                                                                      c3,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2860,7 +2940,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
                                                                           c5,
                                                                           nullptr,
                                                                           DataType::Type::kInt32,
-                                                                          MemberOffset(10),
+                                                                          MemberOffset(32),
                                                                           false,
                                                                           0,
                                                                           0,
@@ -2881,7 +2961,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -2899,7 +2979,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -2912,7 +2992,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3019,7 +3099,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
                                                                         c1,
                                                                         nullptr,
                                                                         DataType::Type::kInt32,
-                                                                        MemberOffset(10),
+                                                                        MemberOffset(32),
                                                                         false,
                                                                         0,
                                                                         0,
@@ -3053,7 +3133,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
                                                                          c3,
                                                                          nullptr,
                                                                          DataType::Type::kInt32,
-                                                                         MemberOffset(10),
+                                                                         MemberOffset(32),
                                                                          false,
                                                                          0,
                                                                          0,
@@ -3067,7 +3147,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3080,7 +3160,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
   HInstruction* read_return = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3184,7 +3264,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
                                                                         c1,
                                                                         nullptr,
                                                                         DataType::Type::kInt32,
-                                                                        MemberOffset(10),
+                                                                        MemberOffset(32),
                                                                         false,
                                                                         0,
                                                                         0,
@@ -3210,7 +3290,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
                                                                          c3,
                                                                          nullptr,
                                                                          DataType::Type::kInt32,
-                                                                         MemberOffset(10),
+                                                                         MemberOffset(32),
                                                                          false,
                                                                          0,
                                                                          0,
@@ -3228,7 +3308,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3255,7 +3335,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
   HInstruction* read_return = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3356,7 +3436,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -3386,7 +3466,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3412,7 +3492,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3492,7 +3572,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
                                                                      c3,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3536,7 +3616,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
                                                                     c1,
                                                                     nullptr,
                                                                     DataType::Type::kInt32,
-                                                                    MemberOffset(10),
+                                                                    MemberOffset(32),
                                                                     false,
                                                                     0,
                                                                     0,
@@ -3553,7 +3633,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
                                                                      c2,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,
@@ -3566,7 +3646,7 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
   HInstruction* read_bottom = new (GetAllocator()) HInstanceFieldGet(new_inst,
                                                                      nullptr,
                                                                      DataType::Type::kInt32,
-                                                                     MemberOffset(10),
+                                                                     MemberOffset(32),
                                                                      false,
                                                                      0,
                                                                      0,

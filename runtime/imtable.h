@@ -17,6 +17,7 @@
 #ifndef ART_RUNTIME_IMTABLE_H_
 #define ART_RUNTIME_IMTABLE_H_
 
+#include "base/bit_utils.h"
 #include "base/casts.h"
 #include "base/enums.h"
 #include "base/locks.h"
@@ -34,6 +35,10 @@ class ImTable {
   // (non-marker) interfaces.
   // When this value changes, old images become incompatible, so image file version must change too.
   static constexpr size_t kSize = 43;
+  // Default methods cannot store the imt_index, so instead we make its IMT index depend on the
+  // method_index and mask it with the closest power of 2 of kSize - 1. This
+  // is to simplify fetching it in the interpreter.
+  static constexpr size_t kSizeTruncToPowerOfTwo = TruncToPowerOfTwo(kSize);
 
   uint8_t* AddressOfElement(size_t index, PointerSize pointer_size) {
     return reinterpret_cast<uint8_t*>(this) + OffsetOfElement(index, pointer_size);
