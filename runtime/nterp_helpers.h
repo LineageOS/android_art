@@ -26,7 +26,7 @@ class ArtMethod;
 /**
  * The frame size nterp will use for the given method.
  */
-size_t NterpGetFrameSize(ArtMethod* method)
+size_t NterpGetFrameSize(ArtMethod* method, InstructionSet isa = kRuntimeISA)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
 /**
@@ -72,6 +72,13 @@ uint32_t NterpGetVReg(ArtMethod** frame, uint16_t vreg)
  * reference. Return 0 otehrwise.
  */
 uint32_t NterpGetVRegReference(ArtMethod** frame, uint16_t vreg)
+    REQUIRES_SHARED(Locks::mutator_lock_);
+
+/**
+ * Returns whether the given method can run with nterp. The instruction set can
+ * be passed for cross-compilation.
+ */
+bool CanMethodUseNterp(ArtMethod* method, InstructionSet isa = kRuntimeISA)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
 }  // namespace art

@@ -32,8 +32,8 @@ class InstructionSetFeatures;
 class PACKED(4) OatHeader {
  public:
   static constexpr std::array<uint8_t, 4> kOatMagic { { 'o', 'a', 't', '\n' } };
-  // Last oat version changed reason: Remove DexCache arrays.
-  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '8', '9', '\0' } };
+  // Last oat version changed reason: Nterp trampoline.
+  static constexpr std::array<uint8_t, 4> kOatVersion { { '1', '9', '0', '\0' } };
 
   static constexpr const char* kDex2OatCmdLineKey = "dex2oat-cmdline";
   static constexpr const char* kDebuggableKey = "debuggable";
@@ -89,6 +89,9 @@ class PACKED(4) OatHeader {
   const void* GetQuickToInterpreterBridge() const;
   uint32_t GetQuickToInterpreterBridgeOffset() const;
   void SetQuickToInterpreterBridgeOffset(uint32_t offset);
+  const void* GetNterpTrampoline() const;
+  uint32_t GetNterpTrampolineOffset() const;
+  void SetNterpTrampolineOffset(uint32_t offset);
 
   InstructionSet GetInstructionSet() const;
   uint32_t GetInstructionSetFeaturesBitmap() const;
@@ -133,6 +136,7 @@ class PACKED(4) OatHeader {
   uint32_t quick_imt_conflict_trampoline_offset_;
   uint32_t quick_resolution_trampoline_offset_;
   uint32_t quick_to_interpreter_bridge_offset_;
+  uint32_t nterp_trampoline_offset_;
 
   uint32_t key_value_store_size_;
   uint8_t key_value_store_[0];  // note variable width data at end

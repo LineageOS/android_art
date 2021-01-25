@@ -201,6 +201,7 @@ class OatSymbolizer final {
     DO_TRAMPOLINE(QuickImtConflictTrampoline);
     DO_TRAMPOLINE(QuickResolutionTrampoline);
     DO_TRAMPOLINE(QuickToInterpreterBridge);
+    DO_TRAMPOLINE(NterpTrampoline);
     #undef DO_TRAMPOLINE
 
     Walk();
@@ -458,6 +459,8 @@ class OatDumper {
                            GetQuickResolutionTrampolineOffset);
     DUMP_OAT_HEADER_OFFSET("QUICK TO INTERPRETER BRIDGE",
                            GetQuickToInterpreterBridgeOffset);
+    DUMP_OAT_HEADER_OFFSET("NTERP_TRAMPOLINE",
+                           GetNterpTrampolineOffset);
 #undef DUMP_OAT_HEADER_OFFSET
 
     // Print the key-value store.
@@ -2137,6 +2140,7 @@ class ImageDumper {
     ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
     if (class_linker->IsQuickResolutionStub(quick_code) ||
         class_linker->IsQuickToInterpreterBridge(quick_code) ||
+        class_linker->IsNterpTrampoline(quick_code) ||
         class_linker->IsQuickGenericJniStub(quick_code) ||
         class_linker->IsJniDlsymLookupStub(quick_code) ||
         class_linker->IsJniDlsymLookupCriticalStub(quick_code)) {
