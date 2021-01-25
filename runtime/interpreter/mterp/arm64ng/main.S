@@ -383,7 +383,7 @@ END \name
 //
 // Outputs
 // - ip contains the dex registers size
-// - x13 contains the old stack pointer.
+// - x28 contains the old stack pointer.
 // - \code_item is replaced with a pointer to the instructions
 // - if load_ins is 1, w15 contains the ins
 //
@@ -410,10 +410,10 @@ END \name
     add \fp, \refs, ip, lsl #2
 
     // Now setup the stack pointer.
-    mov x13, sp
-    .cfi_def_cfa_register x13
+    mov x28, sp
+    .cfi_def_cfa_register x28
     mov sp, x14
-    str x13, [\refs, #-8]
+    str x28, [\refs, #-8]
     CFI_DEF_CFA_BREG_PLUS_UCONST \cfi_refs, -8, CALLEE_SAVES_SIZE
 
     // Put nulls in reference frame.
@@ -483,14 +483,10 @@ END \name
 .endm
 
 .macro SPILL_ALL_ARGUMENTS
-    INCREASE_FRAME 128
-    // GP arguments.
-    SAVE_TWO_REGS x0, x1, 0
-    SAVE_TWO_REGS x2, x3, 16
-    SAVE_TWO_REGS x4, x5, 32
-    SAVE_TWO_REGS x6, x7, 48
-
-    // FP arguments
+    stp x0, x1, [sp, #-128]!
+    stp x2, x3, [sp, #16]
+    stp x4, x5, [sp, #32]
+    stp x6, x7, [sp, #48]
     stp d0, d1, [sp, #64]
     stp d2, d3, [sp, #80]
     stp d4, d5, [sp, #96]
@@ -498,18 +494,14 @@ END \name
 .endm
 
 .macro RESTORE_ALL_ARGUMENTS
-    // GP arguments.
-    RESTORE_TWO_REGS x0, x1, 0
-    RESTORE_TWO_REGS x2, x3, 16
-    RESTORE_TWO_REGS x4, x5, 32
-    RESTORE_TWO_REGS x6, x7, 48
-
-    // FP arguments
+    ldp x2, x3, [sp, #16]
+    ldp x4, x5, [sp, #32]
+    ldp x6, x7, [sp, #48]
     ldp d0, d1, [sp, #64]
     ldp d2, d3, [sp, #80]
     ldp d4, d5, [sp, #96]
     ldp d6, d7, [sp, #112]
-    DECREASE_FRAME 128
+    ldp x0, x1, [sp], #128
 .endm
 
 // Helper to setup the stack after doing a nterp to nterp call. This will setup:
@@ -1356,16 +1348,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     /* Spill callee save regs */
     SPILL_ALL_CALLEE_SAVES
 
-    // TODO: Get shorty in a better way and remove below
-    SPILL_ALL_ARGUMENTS
-
-    bl NterpGetShorty
-    // Save shorty in callee-save xIBASE.
-    mov xIBASE, x0
-
-    RESTORE_ALL_ARGUMENTS
     ldr xPC, [x0, #ART_METHOD_DATA_OFFSET_64]
-
     // Setup the stack for executing the method.
     SETUP_STACK_FRAME xPC, xREFS, xFP, CFI_REFS, load_ins=1
 
@@ -1373,24 +1356,37 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     cbz w15, .Lxmm_setup_finished
 
     sub ip2, ip, x15
-    lsl x8, ip2, #2 // x8 is now the offset for inputs into the registers array.
+    ldr w26, [x0, #ART_METHOD_ACCESS_FLAGS_OFFSET]
+    lsl x21, ip2, #2 // x21 is now the offset for inputs into the registers array.
 
-    // Setup shorty, pointer to inputs in FP and pointer to inputs in REFS
-    add x9, xIBASE, #1  // shorty + 1  ; ie skip return arg character
-    add x10, xFP, x8
-    add x11, xREFS, x8
+    // If the method is not static and there is one argument ('this'), we don't need to fetch the
+    // shorty.
+    tbnz w26, #ART_METHOD_IS_STATIC_FLAG_BIT, .Lsetup_with_shorty
+    str w1, [xFP, x21]
+    str w1, [xREFS, x21]
+    cmp w15, #1
+    b.eq .Lxmm_setup_finished
 
-    ldr wip, [x0, #ART_METHOD_ACCESS_FLAGS_OFFSET]
-    // TODO: could be TBNZ but we'd need a constant for log2(ART_METHOD_IS_STATIC_FLAG).
-    tst wip, #ART_METHOD_IS_STATIC_FLAG
-    b.ne .Lhandle_static_method
-    str w1, [x10], #4
-    str w1, [x11], #4
-    add x13, x13, #4
+.Lsetup_with_shorty:
+    // TODO: Get shorty in a better way and remove below
+    SPILL_ALL_ARGUMENTS
+    bl NterpGetShorty
+    // Save shorty in callee-save xIBASE.
+    mov xIBASE, x0
+    RESTORE_ALL_ARGUMENTS
+
+    // Setup pointer to inputs in FP and pointer to inputs in REFS
+    add x10, xFP, x21
+    add x11, xREFS, x21
     mov x12, #0
+
+    add x9, xIBASE, #1  // shorty + 1  ; ie skip return arg character
+    tbnz w26, #ART_METHOD_IS_STATIC_FLAG_BIT, .Lhandle_static_method
+    add x10, x10, #4
+    add x11, x11, #4
+    add x28, x28, #4
     b .Lcontinue_setup_gprs
 .Lhandle_static_method:
-    mov x12, #0
     LOOP_OVER_SHORTY_STORING_GPRS x1, w1, x9, x12, x10, x11, .Lgpr_setup_finished
 .Lcontinue_setup_gprs:
     LOOP_OVER_SHORTY_STORING_GPRS x2, w2, x9, x12, x10, x11, .Lgpr_setup_finished
@@ -1399,7 +1395,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     LOOP_OVER_SHORTY_STORING_GPRS x5, w5, x9, x12, x10, x11, .Lgpr_setup_finished
     LOOP_OVER_SHORTY_STORING_GPRS x6, w6, x9, x12, x10, x11, .Lgpr_setup_finished
     LOOP_OVER_SHORTY_STORING_GPRS x7, w7, x9, x12, x10, x11, .Lgpr_setup_finished
-    LOOP_OVER_INTs x9, x12, x10, x11, x13, .Lgpr_setup_finished
+    LOOP_OVER_INTs x9, x12, x10, x11, x28, .Lgpr_setup_finished
 .Lgpr_setup_finished:
     add x9, xIBASE, #1  // shorty + 1  ; ie skip return arg character
     mov x12, #0  // reset counter
@@ -1411,7 +1407,7 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     LOOP_OVER_SHORTY_STORING_FPS d5, s5, x9, x12, x10, .Lxmm_setup_finished
     LOOP_OVER_SHORTY_STORING_FPS d6, s6, x9, x12, x10, .Lxmm_setup_finished
     LOOP_OVER_SHORTY_STORING_FPS d7, s7, x9, x12, x10, .Lxmm_setup_finished
-    LOOP_OVER_FPs x9, x12, x10, x13, .Lxmm_setup_finished
+    LOOP_OVER_FPs x9, x12, x10, x28, .Lxmm_setup_finished
 .Lxmm_setup_finished:
     CFI_DEFINE_DEX_PC_WITH_OFFSET(CFI_TMP, CFI_DEX, 0)
 
