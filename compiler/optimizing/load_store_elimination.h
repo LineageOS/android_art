@@ -25,24 +25,12 @@ class SideEffectsAnalysis;
 
 class LoadStoreElimination : public HOptimization {
  public:
-  // Whether or not we should attempt partial Load-store-elimination which
-  // requires additional blocks and predicated instructions.
-  static constexpr bool kEnablePartialLSE = true;
-
-  // Controls whether to enable VLOG(compiler) logs explaining the transforms taking place.
-  static constexpr bool kVerboseLoggingMode = false;
-
   LoadStoreElimination(HGraph* graph,
                        OptimizingCompilerStats* stats,
                        const char* name = kLoadStoreEliminationPassName)
       : HOptimization(graph, name, stats) {}
 
-  bool Run() override {
-    return Run(kEnablePartialLSE);
-  }
-
-  // Exposed for testing.
-  bool Run(bool enable_partial_lse);
+  bool Run() override;
 
   static constexpr const char* kLoadStoreEliminationPassName = "load_store_elimination";
 
