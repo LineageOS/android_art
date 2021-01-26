@@ -283,12 +283,5 @@
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectWithWildAltNamesCert",
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testWildAltNameOnlyCert"],
   bug: 166619732
-},
-{
-  description: "Test fails on old kernels",
-  result: EXEC_FAILED,
-  modes: [device],
-  names: ["libcore.android.system.OsTest#test_socket_udpGso_setAndGet"],
-  bug: 178257424
 }
 ]
