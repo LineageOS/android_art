@@ -1450,17 +1450,40 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     /* Spill callee save regs */
     SPILL_ALL_CALLEE_SAVES
 
+    movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
+
+    // Setup the stack for executing the method.
+    SETUP_STACK_FRAME rPC, rREFS, rREFS32, rFP, CFI_REFS, load_ins=1
+
+    // Setup the parameters
+    testl %r14d, %r14d
+    je .Lxmm_setup_finished
+
+    subq %r14, %rbx
+    salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
+
+    // If the method is not static and there is one argument ('this'), we don't need to fetch the
+    // shorty.
+    testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+    jne .Lsetup_with_shorty
+
+    movl %esi, (rFP, %rbx)
+    movl %esi, (rREFS, %rbx)
+
+    cmpl $$1, %r14d
+    je .Lxmm_setup_finished
+
+.Lsetup_with_shorty:
     // TODO: Get shorty in a better way and remove below
-    PUSH rdi
-    PUSH rsi
-    PUSH rdx
-    PUSH rcx
-    PUSH r8
-    PUSH r9
+    push %rdi
+    push %rsi
+    push %rdx
+    push %rcx
+    push %r8
+    push %r9
 
     // Save xmm registers + alignment.
     subq MACRO_LITERAL(8 * 8 + 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(8 * 8 + 8)
     movq %xmm0, 0(%rsp)
     movq %xmm1, 8(%rsp)
     movq %xmm2, 16(%rsp)
@@ -1484,45 +1507,31 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     movq 48(%rsp), %xmm6
     movq 56(%rsp), %xmm7
     addq MACRO_LITERAL(8 * 8 + 8), %rsp
-    CFI_ADJUST_CFA_OFFSET(-8 * 8 - 8)
 
-    POP r9
-    POP r8
-    POP rcx
-    POP rdx
-    POP rsi
-    POP rdi
+    pop %r9
+    pop %r8
+    pop %rcx
+    pop %rdx
+    pop %rsi
+    pop %rdi
+    // Reload the old stack pointer, which used to be stored in %r11, which is not callee-saved.
+    movq -8(rREFS), %r11
     // TODO: Get shorty in a better way and remove above
 
-    movq ART_METHOD_DATA_OFFSET_64(%rdi), rPC
-
-    // Setup the stack for executing the method.
-    SETUP_STACK_FRAME rPC, rREFS, rREFS32, rFP, CFI_REFS, load_ins=1
-
-    // Setup the parameters
-    testl %r14d, %r14d
-    je .Lxmm_setup_finished
-
-    subq %r14, %rbx
-    salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
-
+    movq $$0, %r14
     testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
 
-    // Available: rdi, r10, r14
+    // Available: rdi, r10
     // Note the leaq below don't change the flags.
     leaq 1(%rbp), %r10  // shorty + 1  ; ie skip return arg character
     leaq (rFP, %rbx, 1), %rdi
     leaq (rREFS, %rbx, 1), %rbx
     jne .Lhandle_static_method
-    movl %esi, (%rdi)
-    movl %esi, (%rbx)
     addq $$4, %rdi
     addq $$4, %rbx
     addq $$4, %r11
-    movq $$0, %r14
     jmp .Lcontinue_setup_gprs
 .Lhandle_static_method:
-    movq $$0, %r14
     LOOP_OVER_SHORTY_STORING_GPRS rsi, esi, r10, r14, rdi, rbx, .Lgpr_setup_finished
 .Lcontinue_setup_gprs:
     LOOP_OVER_SHORTY_STORING_GPRS rdx, edx, r10, r14, rdi, rbx, .Lgpr_setup_finished
