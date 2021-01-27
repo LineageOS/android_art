@@ -1667,6 +1667,7 @@ void CodeGenerator::ValidateInvokeRuntime(QuickEntrypointEnum entrypoint,
              (kEmitCompilerReadBarrier &&
               !kUseBakerReadBarrier &&
               (instruction->IsInstanceFieldGet() ||
+               instruction->IsPredicatedInstanceFieldGet() ||
                instruction->IsStaticFieldGet() ||
                instruction->IsArrayGet() ||
                instruction->IsLoadClass() ||
@@ -1677,7 +1678,8 @@ void CodeGenerator::ValidateInvokeRuntime(QuickEntrypointEnum entrypoint,
           << "instruction->DebugName()=" << instruction->DebugName()
           << " instruction->GetSideEffects().ToString()="
           << instruction->GetSideEffects().ToString()
-          << " slow_path->GetDescription()=" << slow_path->GetDescription();
+          << " slow_path->GetDescription()=" << slow_path->GetDescription() << std::endl
+          << "Instruction and args: " << instruction->DumpWithArgs();
     }
   } else {
     // The GC side effect is not required for the instruction. But the instruction might still have
@@ -1702,6 +1704,7 @@ void CodeGenerator::ValidateInvokeRuntimeWithoutRecordingPcInfo(HInstruction* in
   // PC-related information.
   DCHECK(kUseBakerReadBarrier);
   DCHECK(instruction->IsInstanceFieldGet() ||
+         instruction->IsPredicatedInstanceFieldGet() ||
          instruction->IsStaticFieldGet() ||
          instruction->IsArrayGet() ||
          instruction->IsArraySet() ||
