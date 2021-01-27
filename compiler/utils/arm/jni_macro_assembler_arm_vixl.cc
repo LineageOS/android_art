@@ -98,7 +98,17 @@ void ArmVIXLJNIMacroAssembler::BuildFrame(size_t frame_size,
       fp_spill_mask |= 1 << reg.AsArm().AsSRegister();
     }
   }
-  if (core_spill_mask != 0u) {
+  if (core_spill_mask == (1u << lr.GetCode()) &&
+      fp_spill_mask == 0u &&
+      frame_size == 2 * kFramePointerSize &&
+      !method_reg.IsRegister()) {
+    // Special case: Only LR to push and one word to skip. Do this with a single
+    // 16-bit PUSH instruction by arbitrarily pushing r3 (without CFI for r3).
+    core_spill_mask |= 1u << r3.GetCode();
+    ___ Push(RegisterList(core_spill_mask));
+    cfi().AdjustCFAOffset(2 * kFramePointerSize);
+    cfi().RelOffset(DWARFReg(lr), kFramePointerSize);
+  } else if (core_spill_mask != 0u) {
     ___ Push(RegisterList(core_spill_mask));
     cfi().AdjustCFAOffset(POPCOUNT(core_spill_mask) * kFramePointerSize);
     cfi().RelOffsetForMany(DWARFReg(r0), 0, core_spill_mask, kFramePointerSize);
@@ -131,7 +141,6 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
                                            ArrayRef<const ManagedRegister> callee_save_regs,
                                            bool may_suspend) {
   CHECK_ALIGNED(frame_size, kAapcsStackAlignment);
-  cfi().RememberState();
 
   // Compute callee saves to pop.
   RegList core_spill_mask = 0u;
@@ -143,6 +152,32 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
       fp_spill_mask |= 1u << reg.AsArm().AsSRegister();
     }
   }
+
+  // Pop LR to PC unless we need to emit some read barrier code just before returning.
+  bool emit_code_before_return =
+      (kEmitCompilerReadBarrier && kUseBakerReadBarrier) &&
+      (may_suspend || (kIsDebugBuild && emit_run_time_checks_in_debug_mode_));
+  if ((core_spill_mask & (1u << lr.GetCode())) != 0u && !emit_code_before_return) {
+    DCHECK_EQ(core_spill_mask & (1u << pc.GetCode()), 0u);
+    core_spill_mask ^= (1u << lr.GetCode()) | (1u << pc.GetCode());
+  }
+
+  // If there are no FP registers to pop and we pop PC, we can avoid emitting any CFI.
+  if (fp_spill_mask == 0u && (core_spill_mask & (1u << pc.GetCode())) != 0u) {
+    if (frame_size == POPCOUNT(core_spill_mask) * kFramePointerSize) {
+      // Just pop all registers and avoid CFI.
+      ___ Pop(RegisterList(core_spill_mask));
+      return;
+    } else if (frame_size == 8u && core_spill_mask == (1u << pc.GetCode())) {
+      // Special case: One word to ignore and one to pop to PC. We are free to clobber the
+      // caller-save register r3 on return, so use a 16-bit POP instruction and avoid CFI.
+      ___ Pop(RegisterList((1u << r3.GetCode()) | (1u << pc.GetCode())));
+      return;
+    }
+  }
+
+  // We shall need to adjust CFI and restore it after the frame exit sequence.
+  cfi().RememberState();
 
   // Decrease frame to start of callee saves.
   size_t pop_values = POPCOUNT(core_spill_mask) + POPCOUNT(fp_spill_mask);
@@ -160,9 +195,24 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
     cfi().RestoreMany(DWARFReg(s0), fp_spill_mask);
   }
 
-  // Pop core callee saves and LR.
+  // Pop core callee saves.
   if (core_spill_mask != 0u) {
-    ___ Pop(RegisterList(core_spill_mask));
+    if (IsPowerOfTwo(core_spill_mask) &&
+        core_spill_mask != (1u << pc.GetCode()) &&
+        WhichPowerOf2(core_spill_mask) >= 8) {
+      // FIXME(vixl): vixl fails to transform a pop with single high register
+      // to a post-index STR (also known as POP encoding T3) and emits the LDMIA
+      // (also known as POP encoding T2) which is UNPREDICTABLE for 1 register.
+      // So we have to explicitly do the transformation here. Bug: 178048807
+      vixl32::Register reg(WhichPowerOf2(core_spill_mask));
+      ___ Ldr(reg, MemOperand(sp, kFramePointerSize, PostIndex));
+    } else {
+      ___ Pop(RegisterList(core_spill_mask));
+    }
+    if ((core_spill_mask & (1u << pc.GetCode())) == 0u) {
+      cfi().AdjustCFAOffset(-kFramePointerSize * POPCOUNT(core_spill_mask));
+      cfi().RestoreMany(DWARFReg(r0), core_spill_mask);
+    }
   }
 
   if (kEmitCompilerReadBarrier && kUseBakerReadBarrier) {
@@ -193,7 +243,9 @@ void ArmVIXLJNIMacroAssembler::RemoveFrame(size_t frame_size,
   }
 
   // Return to LR.
-  ___ Bx(vixl32::lr);
+  if ((core_spill_mask & (1u << pc.GetCode())) == 0u) {
+    ___ Bx(vixl32::lr);
+  }
 
   // The CFI should be restored for any code that follows the exit block.
   cfi().RestoreState();
