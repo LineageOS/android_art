@@ -128,6 +128,7 @@ class CompilerDriver {
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickImtConflictTrampoline() const;
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickResolutionTrampoline() const;
   std::unique_ptr<const std::vector<uint8_t>> CreateQuickToInterpreterBridge() const;
+  std::unique_ptr<const std::vector<uint8_t>> CreateNterpTrampoline() const;
 
   ClassStatus GetClassStatus(const ClassReference& ref) const;
   bool GetCompiledClass(const ClassReference& ref, ClassStatus* status) const;

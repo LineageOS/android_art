@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "base/enums.h"
 #include "base/locks.h"
 
 /*
@@ -31,10 +32,6 @@ bool IsNterpSupported() {
 }
 
 bool CanRuntimeUseNterp() {
-  return false;
-}
-
-bool CanMethodUseNterp(ArtMethod* method ATTRIBUTE_UNUSED) {
   return false;
 }
 
