@@ -193,11 +193,12 @@ def upload_branch(git_root, branch_name):
   check_call(["repo", "upload", "-t", "--br=" + branch_name, git_root])
 
 
-def remove_files(git_root, subpaths):
-  """Removes files in the work tree, and stages the removals in git."""
-  check_call(["git", "rm", "-qrf", "--ignore-unmatch"] + subpaths, cwd=git_root)
-  # Need a plain rm afterwards because git won't remove directories if they have
-  # non-git files in them.
+def remove_files(git_root, subpaths, stage_removals):
+  """Removes files in the work tree, optionally staging them in git."""
+  if stage_removals:
+    check_call(["git", "rm", "-qrf", "--ignore-unmatch"] + subpaths, cwd=git_root)
+  # Need a plain rm afterwards even if git rm was executed, because git won't
+  # remove directories if they have non-git files in them.
   check_call(["rm", "-rf"] + subpaths, cwd=git_root)
 
 
@@ -318,7 +319,7 @@ def main():
     start_branch(branch_name, install_paths_per_root.keys())
 
   for git_root, subpaths in install_paths_per_root.items():
-    remove_files(git_root, subpaths)
+    remove_files(git_root, subpaths, not args.skip_cls)
   for entry in install_entries:
     install_entry(args.build, args.local_dist, entry)
 
