@@ -77,7 +77,8 @@ OatHeader::OatHeader(InstructionSet instruction_set,
       quick_generic_jni_trampoline_offset_(0),
       quick_imt_conflict_trampoline_offset_(0),
       quick_resolution_trampoline_offset_(0),
-      quick_to_interpreter_bridge_offset_(0) {
+      quick_to_interpreter_bridge_offset_(0),
+      nterp_trampoline_offset_(0) {
   // Don't want asserts in header as they would be checked in each file that includes it. But the
   // fields are private, so we check inside a method.
   static_assert(decltype(magic_)().size() == kOatMagic.size(),
@@ -304,6 +305,24 @@ void OatHeader::SetQuickToInterpreterBridgeOffset(uint32_t offset) {
   DCHECK_EQ(quick_to_interpreter_bridge_offset_, 0U) << offset;
 
   quick_to_interpreter_bridge_offset_ = offset;
+}
+
+const void* OatHeader::GetNterpTrampoline() const {
+  return GetTrampoline(*this, GetNterpTrampolineOffset());
+}
+
+uint32_t OatHeader::GetNterpTrampolineOffset() const {
+  DCHECK(IsValid());
+  CHECK_GE(nterp_trampoline_offset_, quick_to_interpreter_bridge_offset_);
+  return nterp_trampoline_offset_;
+}
+
+void OatHeader::SetNterpTrampolineOffset(uint32_t offset) {
+  CHECK(offset == 0 || offset >= quick_to_interpreter_bridge_offset_);
+  DCHECK(IsValid());
+  DCHECK_EQ(nterp_trampoline_offset_, 0U) << offset;
+
+  nterp_trampoline_offset_ = offset;
 }
 
 uint32_t OatHeader::GetKeyValueStoreSize() const {
