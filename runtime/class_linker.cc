@@ -2046,6 +2046,7 @@ bool ClassLinker::AddImageSpace(
   }
 
   if (!runtime->IsAotCompiler()) {
+    ScopedTrace trace("AppImage:UpdateCodeItemAndNterp");
     bool can_use_nterp = interpreter::CanRuntimeUseNterp();
     header.VisitPackedArtMethods([&](ArtMethod& method) REQUIRES_SHARED(Locks::mutator_lock_) {
       // In the image, the `data` pointer field of the ArtMethod contains the code
