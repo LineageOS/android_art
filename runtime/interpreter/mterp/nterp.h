@@ -31,7 +31,6 @@ namespace interpreter {
 void CheckNterpAsmConstants();
 bool IsNterpSupported();
 bool CanRuntimeUseNterp();
-bool CanMethodUseNterp(ArtMethod* method);
 const void* GetNterpEntryPoint();
 
 // The hotness threshold where we trigger JIT compilation or OSR.
