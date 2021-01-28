@@ -165,13 +165,22 @@ class OatFileAssistant {
 
   // Computes the optimization status of the given dex file. The result is
   // returned via the two output parameters.
+  //   - out_odex_location: the location of the (best) odex that will be used
+  //        for loading. See GetBestInfo().
   //   - out_compilation_filter: the level of optimizations (compiler filter)
   //   - out_compilation_reason: the optimization reason. The reason might
   //        be "unknown" if the compiler artifacts were not annotated during optimizations.
+  //   - out_odex_status: a human readable refined status of the validity of the odex file.
+  //        E.g. up-to-date, boot-image-more-recent, apk-more-recent.
   //
   // This method will try to mimic the runtime effect of loading the dex file.
   // For example, if there is no usable oat file, the compiler filter will be set
   // to "run-from-apk".
+  void GetOptimizationStatus(std::string* out_odex_location,
+                             std::string* out_compilation_filter,
+                             std::string* out_compilation_reason,
+                             std::string* out_odex_status);
+
   static void GetOptimizationStatus(const std::string& filename,
                                     InstructionSet isa,
                                     std::string* out_compilation_filter,
