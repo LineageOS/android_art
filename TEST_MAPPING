@@ -775,6 +775,9 @@
       "name": "art-run-test-814-large-field-offsets"
     },
     {
+      "name": "art-run-test-815-invokeinterface-default"
+    },
+    {
       "name": "art-run-test-963-default-range-smali"
     }
   ]
