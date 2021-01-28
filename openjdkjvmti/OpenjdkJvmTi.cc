@@ -1438,6 +1438,13 @@ static jint GetEnvHandler(art::JavaVMExt* vm, /*out*/void** env, jint version) {
     return JNI_OK;
   } else {
     printf("version 0x%x is not valid!", version);
+    if (IsJvmtiVersion(version)) {
+      LOG(ERROR) << "JVMTI Version 0x" << std::hex << version << " requested but the runtime is not"
+                 << " debuggable! Only limited, best effort kArtTiVersion"
+                 << " (0x" << std::hex << kArtTiVersion << ") environments are available. If"
+                 << " possible, rebuild your apk in debuggable mode or start the runtime with"
+                 << " the `-Xcompiler-option --debuggable` flags.";
+    }
     return JNI_EVERSION;
   }
 }
