@@ -100,6 +100,15 @@ constexpr double kImageClassTableMinLoadFactor = 0.5;
 // properties (see `Runtime::GetHashTableMaxLoadFactor()` checking for low memory mode).
 constexpr double kImageClassTableMaxLoadFactor = 0.7;
 
+// The actual value of `kImageInternTableMinLoadFactor` is irrelevant because image intern tables
+// are never resized, but we still need to pass a reasonable value to the constructor.
+constexpr double kImageInternTableMinLoadFactor = 0.5;
+// We use `kImageInternTableMaxLoadFactor` to determine the buffer size for image intern tables
+// to make them full. We never insert additional elements to them, so we do not want to waste
+// extra memory. And unlike runtime intern tables, we do not want this to depend on runtime
+// properties (see `Runtime::GetHashTableMaxLoadFactor()` checking for low memory mode).
+constexpr double kImageInternTableMaxLoadFactor = 0.7;
+
 static ArrayRef<const uint8_t> MaybeCompressData(ArrayRef<const uint8_t> source,
                                                  ImageHeader::StorageMode image_storage_mode,
                                                  /*out*/ std::vector<uint8_t>* storage) {
@@ -1344,23 +1353,7 @@ ObjPtr<ObjectArray<Object>> ImageWriter::CreateImageRoots(
 }
 
 void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat_index) {
-  if (obj->IsString()) {
-    ObjPtr<mirror::String> str = obj->AsString();
-    InternTable* intern_table = Runtime::Current()->GetInternTable();
-    Thread* const self = Thread::Current();
-    if (intern_table->LookupStrong(self, str) == str) {
-      DCHECK(std::none_of(image_infos_.begin(),
-                          image_infos_.end(),
-                          [=](ImageInfo& info) REQUIRES_SHARED(Locks::mutator_lock_) {
-                            return info.intern_table_->LookupStrong(self, str) != nullptr;
-                          }));
-      ObjPtr<mirror::String> interned =
-          GetImageInfo(oat_index).intern_table_->InternStrongImageString(str);
-      DCHECK_EQ(interned, obj);
-    }
-  } else if (obj->IsDexCache()) {
-    DCHECK_EQ(oat_index, GetOatIndexForDexFile(obj->AsDexCache()->GetDexFile()));
-  } else if (obj->IsClass()) {
+  if (obj->IsClass()) {
     // Visit and assign offsets for fields and field arrays.
     ObjPtr<mirror::Class> as_klass = obj->AsClass();
     DCHECK_EQ(oat_index, GetOatIndexForClass(as_klass));
@@ -1449,6 +1442,8 @@ void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat
         }
       }
     }
+  } else if (obj->IsDexCache()) {
+    DCHECK_EQ(oat_index, GetOatIndexForDexFile(obj->AsDexCache()->GetDexFile()));
   }
 }
 
@@ -1523,8 +1518,7 @@ class ImageWriter::LayoutHelper {
 
   void ProcessDexFileObjects(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
   void ProcessRoots(VariableSizedHandleScope* handles) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  void ProcessWorkQueue() REQUIRES_SHARED(Locks::mutator_lock_);
+  void FinalizeInternTables() REQUIRES_SHARED(Locks::mutator_lock_);
 
   void VerifyImageBinSlotsAssigned() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -1547,6 +1541,9 @@ class ImageWriter::LayoutHelper {
   class CollectStringReferenceVisitor;
   class VisitReferencesVisitor;
 
+  void ProcessInterns(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
+  void ProcessWorkQueue() REQUIRES_SHARED(Locks::mutator_lock_);
+
   using WorkQueue = std::deque<std::pair<ObjPtr<mirror::Object>, size_t>>;
 
   void VisitReferences(ObjPtr<mirror::Object> obj, size_t oat_index)
@@ -1563,6 +1560,11 @@ class ImageWriter::LayoutHelper {
   // Objects for individual bins. Indexed by `oat_index` and `bin`.
   // Cannot use ObjPtr<> because of invalidation in Heap::VisitObjects().
   dchecked_vector<dchecked_vector<dchecked_vector<mirror::Object*>>> bin_objects_;
+
+  // Interns that do not have a corresponding StringId in any of the input dex files.
+  // These shall be assigned to individual images based on the `oat_index` that we
+  // see as we visit them during the work queue processing.
+  dchecked_vector<mirror::String*> non_dex_file_interns_;
 };
 
 class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
@@ -1863,27 +1865,11 @@ void ImageWriter::LayoutHelper::ProcessDexFileObjects(Thread* self) {
     DCHECK(assigned);
   }
 
-  // Assign bin slots to strings and dex caches.
+  // Assign bin slots to dex caches.
   for (const DexFile* dex_file : image_writer_->compiler_options_.GetDexFilesForOatFile()) {
     auto it = image_writer_->dex_file_oat_index_map_.find(dex_file);
     DCHECK(it != image_writer_->dex_file_oat_index_map_.end()) << dex_file->GetLocation();
     const size_t oat_index = it->second;
-    // Assign bin slots for strings defined in this dex file in StringId (lexicographical) order.
-    InternTable* const intern_table = runtime->GetInternTable();
-    for (size_t i = 0, count = dex_file->NumStringIds(); i < count; ++i) {
-      uint32_t utf16_length;
-      const char* utf8_data = dex_file->StringDataAndUtf16LengthByIdx(dex::StringIndex(i),
-                                                                      &utf16_length);
-      ObjPtr<mirror::String> string = intern_table->LookupStrong(self, utf16_length, utf8_data);
-      if (string != nullptr && !image_writer_->IsInBootImage(string.Ptr())) {
-        // Try to assign bin slot to this string but do not add it to the work list.
-        // The only reference in a String is its class, processed above for the boot image.
-        bool assigned = TryAssignBinSlot(string, oat_index);
-        DCHECK(assigned ||
-               // We could have seen the same string in an earlier dex file.
-               dex_file != image_writer_->compiler_options_.GetDexFilesForOatFile().front());
-      }
-    }
     // Assign bin slot to this file's dex cache and add it to the end of the work queue.
     ObjPtr<mirror::DexCache> dex_cache = class_linker->FindDexCache(self, *dex_file);
     DCHECK(dex_cache != nullptr);
@@ -1891,6 +1877,10 @@ void ImageWriter::LayoutHelper::ProcessDexFileObjects(Thread* self) {
     DCHECK(assigned);
     work_queue_.emplace_back(dex_cache, oat_index);
   }
+
+  // Assign interns to images depending on the first dex file they appear in.
+  // Record those that do not have a StringId in any dex file.
+  ProcessInterns(self);
 
   // Since classes and dex caches have been assigned to their bins, when we process a class
   // we do not follow through the class references or dex caches, so we correctly process
@@ -1914,6 +1904,159 @@ void ImageWriter::LayoutHelper::ProcessRoots(VariableSizedHandleScope* handles) 
     }
   }
   ProcessWorkQueue();
+}
+
+void ImageWriter::LayoutHelper::ProcessInterns(Thread* self) {
+  // String bins are empty at this point.
+  DCHECK(std::all_of(bin_objects_.begin(),
+                     bin_objects_.end(),
+                     [](const auto& bins) {
+                       return bins[enum_cast<size_t>(Bin::kString)].empty();
+                     }));
+
+  // There is only one non-boot image intern table and it's the last one.
+  InternTable* const intern_table = Runtime::Current()->GetInternTable();
+  MutexLock mu(self, *Locks::intern_table_lock_);
+  DCHECK_EQ(std::count_if(intern_table->strong_interns_.tables_.begin(),
+                          intern_table->strong_interns_.tables_.end(),
+                          [](const InternTable::Table::InternalTable& table) {
+                            return !table.IsBootImage();
+                          }),
+            1);
+  DCHECK(!intern_table->strong_interns_.tables_.back().IsBootImage());
+  const InternTable::UnorderedSet& intern_set = intern_table->strong_interns_.tables_.back().set_;
+
+  // Assign bin slots to all interns with a corresponding StringId in one of the input dex files.
+  ImageWriter* image_writer = image_writer_;
+  for (const DexFile* dex_file : image_writer->compiler_options_.GetDexFilesForOatFile()) {
+    auto it = image_writer->dex_file_oat_index_map_.find(dex_file);
+    DCHECK(it != image_writer->dex_file_oat_index_map_.end()) << dex_file->GetLocation();
+    const size_t oat_index = it->second;
+    // Assign bin slots for strings defined in this dex file in StringId (lexicographical) order.
+    auto& string_bin_objects = bin_objects_[oat_index][enum_cast<size_t>(Bin::kString)];
+    for (size_t i = 0, count = dex_file->NumStringIds(); i != count; ++i) {
+      uint32_t utf16_length;
+      const char* utf8_data = dex_file->StringDataAndUtf16LengthByIdx(dex::StringIndex(i),
+                                                                      &utf16_length);
+      int32_t hash = ComputeUtf16HashFromModifiedUtf8(utf8_data, utf16_length);
+      InternTable::Utf8String utf8_string(utf16_length, utf8_data, hash);
+      auto intern_it = intern_set.find(utf8_string);
+      if (intern_it != intern_set.end()) {
+        mirror::String* string = intern_it->Read<kWithoutReadBarrier>();
+        DCHECK(string != nullptr);
+        DCHECK(!image_writer->IsInBootImage(string));
+        if (!image_writer->IsImageBinSlotAssigned(string)) {
+          Bin bin = image_writer->AssignImageBinSlot(string, oat_index);
+          DCHECK_EQ(bin, Bin::kString);
+          string_bin_objects.push_back(string);
+        } else {
+          // We have already seen this string in a previous dex file.
+          DCHECK(dex_file != image_writer->compiler_options_.GetDexFilesForOatFile().front());
+        }
+      }
+    }
+  }
+
+  // String bins have been filled with dex file interns. Record their numbers in image infos.
+  DCHECK_EQ(bin_objects_.size(), image_writer_->image_infos_.size());
+  size_t total_dex_file_interns = 0u;
+  for (size_t oat_index = 0, size = bin_objects_.size(); oat_index != size; ++oat_index) {
+    size_t num_dex_file_interns = bin_objects_[oat_index][enum_cast<size_t>(Bin::kString)].size();
+    ImageInfo& image_info = image_writer_->GetImageInfo(oat_index);
+    DCHECK_EQ(image_info.intern_table_size_, 0u);
+    image_info.intern_table_size_ = num_dex_file_interns;
+    total_dex_file_interns += num_dex_file_interns;
+  }
+
+  // Collect interns that do not have a corresponding StringId in any of the input dex files.
+  non_dex_file_interns_.reserve(intern_set.size() - total_dex_file_interns);
+  for (const GcRoot<mirror::String>& root : intern_set) {
+    mirror::String* string = root.Read<kWithoutReadBarrier>();
+    if (!image_writer->IsImageBinSlotAssigned(string)) {
+      non_dex_file_interns_.push_back(string);
+    }
+  }
+  DCHECK_EQ(intern_set.size(), total_dex_file_interns + non_dex_file_interns_.size());
+}
+
+void ImageWriter::LayoutHelper::FinalizeInternTables() {
+  // Remove interns that do not have a bin slot assigned. These correspond
+  // to the DexCache locations excluded in VerifyImageBinSlotsAssigned().
+  ImageWriter* image_writer = image_writer_;
+  auto retained_end = std::remove_if(
+      non_dex_file_interns_.begin(),
+      non_dex_file_interns_.end(),
+      [=](mirror::String* string) REQUIRES_SHARED(Locks::mutator_lock_) {
+        return !image_writer->IsImageBinSlotAssigned(string);
+      });
+  non_dex_file_interns_.resize(std::distance(non_dex_file_interns_.begin(), retained_end));
+
+  // Sort `non_dex_file_interns_` based on oat index and bin offset.
+  ArrayRef<mirror::String*> non_dex_file_interns(non_dex_file_interns_);
+  std::sort(non_dex_file_interns.begin(),
+            non_dex_file_interns.end(),
+            [=](mirror::String* lhs, mirror::String* rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
+              size_t lhs_oat_index = image_writer->GetOatIndex(lhs);
+              size_t rhs_oat_index = image_writer->GetOatIndex(rhs);
+              if (lhs_oat_index != rhs_oat_index) {
+                return lhs_oat_index < rhs_oat_index;
+              }
+              BinSlot lhs_bin_slot = image_writer->GetImageBinSlot(lhs, lhs_oat_index);
+              BinSlot rhs_bin_slot = image_writer->GetImageBinSlot(rhs, rhs_oat_index);
+              return lhs_bin_slot < rhs_bin_slot;
+            });
+
+  // Allocate and fill intern tables.
+  size_t ndfi_index = 0u;
+  DCHECK_EQ(bin_objects_.size(), image_writer->image_infos_.size());
+  for (size_t oat_index = 0, size = bin_objects_.size(); oat_index != size; ++oat_index) {
+    // Find the end of `non_dex_file_interns` for this oat file.
+    size_t ndfi_end = ndfi_index;
+    while (ndfi_end != non_dex_file_interns.size() &&
+           image_writer->GetOatIndex(non_dex_file_interns[ndfi_end]) == oat_index) {
+      ++ndfi_end;
+    }
+
+    // Calculate final intern table size.
+    ImageInfo& image_info = image_writer->GetImageInfo(oat_index);
+    DCHECK_EQ(image_info.intern_table_bytes_, 0u);
+    size_t num_dex_file_interns = image_info.intern_table_size_;
+    size_t num_non_dex_file_interns = ndfi_end - ndfi_index;
+    image_info.intern_table_size_ = num_dex_file_interns + num_non_dex_file_interns;
+    if (image_info.intern_table_size_ != 0u) {
+      // Make sure the intern table shall be full by allocating a buffer of the right size.
+      size_t buffer_size = static_cast<size_t>(
+          ceil(image_info.intern_table_size_ / kImageInternTableMaxLoadFactor));
+      image_info.intern_table_buffer_.reset(new GcRoot<mirror::String>[buffer_size]);
+      DCHECK(image_info.intern_table_buffer_ != nullptr);
+      image_info.intern_table_.emplace(kImageInternTableMinLoadFactor,
+                                       kImageInternTableMaxLoadFactor,
+                                       image_info.intern_table_buffer_.get(),
+                                       buffer_size);
+
+      // Fill the intern table. Dex file interns are at the start of the bin_objects[.][kString].
+      InternTable::UnorderedSet& table = *image_info.intern_table_;
+      const auto& oat_file_strings = bin_objects_[oat_index][enum_cast<size_t>(Bin::kString)];
+      DCHECK_LE(num_dex_file_interns, oat_file_strings.size());
+      ArrayRef<mirror::Object* const> dex_file_interns(
+          oat_file_strings.data(), num_dex_file_interns);
+      for (mirror::Object* string : dex_file_interns) {
+        bool inserted = table.insert(GcRoot<mirror::String>(string->AsString())).second;
+        DCHECK(inserted) << "String already inserted: " << string->AsString()->ToModifiedUtf8();
+      }
+      ArrayRef<mirror::String*> current_non_dex_file_interns =
+          non_dex_file_interns.SubArray(ndfi_index, num_non_dex_file_interns);
+      for (mirror::String* string : current_non_dex_file_interns) {
+        bool inserted = table.insert(GcRoot<mirror::String>(string)).second;
+        DCHECK(inserted) << "String already inserted: " << string->ToModifiedUtf8();
+      }
+
+      // Record the intern table size in bytes.
+      image_info.intern_table_bytes_ = table.WriteToMemory(nullptr);
+    }
+
+    ndfi_index = ndfi_end;
+  }
 }
 
 void ImageWriter::LayoutHelper::ProcessWorkQueue() {
@@ -2241,19 +2384,10 @@ void ImageWriter::CalculateNewObjectOffsets() {
   LayoutHelper layout_helper(this);
   layout_helper.ProcessDexFileObjects(self);
   layout_helper.ProcessRoots(&handles);
+  layout_helper.FinalizeInternTables();
 
   // Verify that all objects have assigned image bin slots.
   layout_helper.VerifyImageBinSlotsAssigned();
-
-  // Calculate the sizes of the intern tables, class tables, and fixup tables.
-  for (ImageInfo& image_info : image_infos_) {
-    // Calculate how big the intern table will be after being serialized.
-    InternTable* const intern_table = image_info.intern_table_.get();
-    CHECK_EQ(intern_table->WeakSize(), 0u) << " should have strong interned all the strings";
-    if (intern_table->StrongSize() != 0u) {
-      image_info.intern_table_bytes_ = intern_table->WriteToMemory(nullptr);
-    }
-  }
 
   // Finalize bin slot offsets. This may add padding for regions.
   layout_helper.FinalizeBinSlotOffsets();
@@ -2640,10 +2774,11 @@ void ImageWriter::CopyAndFixupNativeData(size_t oat_index) {
   // Write the intern table into the image.
   if (image_info.intern_table_bytes_ > 0) {
     const ImageSection& intern_table_section = image_header->GetInternedStringsSection();
-    InternTable* const intern_table = image_info.intern_table_.get();
+    DCHECK(image_info.intern_table_.has_value());
+    const InternTable::UnorderedSet& intern_table = *image_info.intern_table_;
     uint8_t* const intern_table_memory_ptr =
         image_info.image_.Begin() + intern_table_section.Offset();
-    const size_t intern_table_bytes = intern_table->WriteToMemory(intern_table_memory_ptr);
+    const size_t intern_table_bytes = intern_table.WriteToMemory(intern_table_memory_ptr);
     CHECK_EQ(intern_table_bytes, image_info.intern_table_bytes_);
     // Fixup the pointers in the newly written intern table to contain image addresses.
     InternTable temp_intern_table;
@@ -2654,13 +2789,17 @@ void ImageWriter::CopyAndFixupNativeData(size_t oat_index) {
     temp_intern_table.AddTableFromMemory(intern_table_memory_ptr,
                                          VoidFunctor(),
                                          /*is_boot_image=*/ false);
-    CHECK_EQ(temp_intern_table.Size(), intern_table->Size());
+    CHECK_EQ(temp_intern_table.Size(), intern_table.size());
     temp_intern_table.VisitRoots(&root_visitor, kVisitRootFlagAllRoots);
-    // Record relocations. (The root visitor does not get to see the slot addresses.)
-    MutexLock lock(Thread::Current(), *Locks::intern_table_lock_);
-    DCHECK(!temp_intern_table.strong_interns_.tables_.empty());
-    DCHECK(!temp_intern_table.strong_interns_.tables_[0].Empty());  // Inserted at the beginning.
+
+    if (kIsDebugBuild) {
+      MutexLock lock(Thread::Current(), *Locks::intern_table_lock_);
+      CHECK(!temp_intern_table.strong_interns_.tables_.empty());
+      // The UnorderedSet was inserted at the beginning.
+      CHECK_EQ(temp_intern_table.strong_interns_.tables_[0].Size(), intern_table.size());
+    }
   }
+
   // Write the class table(s) into the image. class_table_bytes_ may be 0 if there are multiple
   // class loaders. Writing multiple class tables into the image is currently unsupported.
   if (image_info.class_table_bytes_ > 0u) {
@@ -3307,7 +3446,7 @@ ImageWriter::ImageWriter(
 }
 
 ImageWriter::ImageInfo::ImageInfo()
-    : intern_table_(new InternTable),
+    : intern_table_(),
       class_table_() {}
 
 template <typename DestType>
