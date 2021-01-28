@@ -388,7 +388,9 @@ class ImageWriter final {
     std::vector<AppImageReferenceOffsetInfo> string_reference_offsets_;
 
     // Intern table associated with this image for serialization.
-    std::unique_ptr<InternTable> intern_table_;
+    size_t intern_table_size_ = 0;
+    std::unique_ptr<GcRoot<mirror::String>[]> intern_table_buffer_;
+    std::optional<InternTable::UnorderedSet> intern_table_;
 
     // Class table associated with this image for serialization.
     size_t class_table_size_ = 0;
