@@ -18,8 +18,10 @@
 #define ART_COMPILER_OPTIMIZING_OPTIMIZING_UNIT_TEST_H_
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
+#include "base/indenter.h"
 #include "base/malloc_arena_pool.h"
 #include "base/scoped_arena_allocator.h"
 #include "builder.h"
@@ -30,15 +32,15 @@
 #include "dex/standard_dex_file.h"
 #include "driver/dex_compilation_unit.h"
 #include "graph_checker.h"
+#include "gtest/gtest.h"
 #include "handle_scope-inl.h"
+#include "handle_scope.h"
 #include "mirror/class_loader.h"
 #include "mirror/dex_cache.h"
 #include "nodes.h"
 #include "scoped_thread_state_change.h"
 #include "ssa_builder.h"
 #include "ssa_liveness_analysis.h"
-
-#include "gtest/gtest.h"
 
 namespace art {
 
@@ -183,8 +185,8 @@ class OptimizingUnitTestHelper {
     }
   }
 
-  void InitGraph() {
-    CreateGraph();
+  void InitGraph(VariableSizedHandleScope* handles = nullptr) {
+    CreateGraph(handles);
     entry_block_ = AddNewBlock();
     return_block_ = AddNewBlock();
     exit_block_ = AddNewBlock();
@@ -244,6 +246,48 @@ class OptimizingUnitTestHelper {
     environment->CopyFrom(ArrayRef<HInstruction* const>(*current_locals));
     instruction->SetRawEnvironment(environment);
     return environment;
+  }
+
+  void EnsurePredecessorOrder(HBasicBlock* target, std::initializer_list<HBasicBlock*> preds) {
+    // Make sure the given preds and block predecessors have the same blocks.
+    BitVector bv(preds.size(), false, Allocator::GetMallocAllocator());
+    auto preds_and_idx = ZipCount(MakeIterationRange(target->GetPredecessors()));
+    bool correct_preds = preds.size() == target->GetPredecessors().size() &&
+                         std::all_of(preds.begin(), preds.end(), [&](HBasicBlock* pred) {
+                           return std::any_of(preds_and_idx.begin(),
+                                              preds_and_idx.end(),
+                                              // Make sure every target predecessor is used only
+                                              // once.
+                                              [&](std::pair<HBasicBlock*, uint32_t> cur) {
+                                                if (cur.first == pred && !bv.IsBitSet(cur.second)) {
+                                                  bv.SetBit(cur.second);
+                                                  return true;
+                                                } else {
+                                                  return false;
+                                                }
+                                              });
+                         }) &&
+                         bv.NumSetBits() == preds.size();
+    auto dump_list = [](auto it) {
+      std::ostringstream oss;
+      oss << "[";
+      bool first = true;
+      for (HBasicBlock* b : it) {
+        if (!first) {
+          oss << ", ";
+        }
+        first = false;
+        oss << b->GetBlockId();
+      }
+      oss << "]";
+      return oss.str();
+    };
+    ASSERT_TRUE(correct_preds) << "Predecessors of " << target->GetBlockId() << " are "
+                               << dump_list(target->GetPredecessors()) << " not "
+                               << dump_list(preds);
+    if (correct_preds) {
+      std::copy(preds.begin(), preds.end(), target->predecessors_.begin());
+    }
   }
 
  protected:
@@ -342,11 +386,33 @@ class AdjacencyListGraph {
   AdjacencyListGraph& operator=(AdjacencyListGraph&&) = default;
   AdjacencyListGraph& operator=(const AdjacencyListGraph&) = default;
 
+  std::ostream& Dump(std::ostream& os) const {
+    struct Namer : public BlockNamer {
+     public:
+      explicit Namer(const AdjacencyListGraph& alg) : BlockNamer(), alg_(alg) {}
+      std::ostream& PrintName(std::ostream& os, HBasicBlock* blk) const override {
+        if (alg_.HasBlock(blk)) {
+          return os << alg_.GetName(blk) << " (" << blk->GetBlockId() << ")";
+        } else {
+          return os << "<Unnamed B" << blk->GetBlockId() << ">";
+        }
+      }
+
+      const AdjacencyListGraph& alg_;
+    };
+    Namer namer(*this);
+    return graph_->Dump(os, namer);
+  }
+
  private:
   HGraph* graph_;
   SafeMap<const std::string_view, HBasicBlock*> name_to_block_;
   SafeMap<const HBasicBlock*, const std::string_view> block_to_name_;
 };
+
+inline std::ostream& operator<<(std::ostream& oss, const AdjacencyListGraph& alg) {
+  return alg.Dump(oss);
+}
 
 }  // namespace art
 

@@ -492,6 +492,7 @@ class OatWriter {
   std::unique_ptr<const std::vector<uint8_t>> quick_imt_conflict_trampoline_;
   std::unique_ptr<const std::vector<uint8_t>> quick_resolution_trampoline_;
   std::unique_ptr<const std::vector<uint8_t>> quick_to_interpreter_bridge_;
+  std::unique_ptr<const std::vector<uint8_t>> nterp_trampoline_;
 
   // output stats
   uint32_t size_vdex_header_;
@@ -514,6 +515,7 @@ class OatWriter {
   uint32_t size_quick_imt_conflict_trampoline_;
   uint32_t size_quick_resolution_trampoline_;
   uint32_t size_quick_to_interpreter_bridge_;
+  uint32_t size_nterp_trampoline_;
   uint32_t size_trampoline_alignment_;
   uint32_t size_method_header_;
   uint32_t size_code_;

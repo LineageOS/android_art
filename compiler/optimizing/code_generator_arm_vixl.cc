@@ -761,6 +761,7 @@ class ReadBarrierForHeapReferenceSlowPathARMVIXL : public SlowPathCodeARMVIXL {
     DCHECK(locations->CanCall());
     DCHECK(!locations->GetLiveRegisters()->ContainsCoreRegister(reg_out.GetCode()));
     DCHECK(instruction_->IsInstanceFieldGet() ||
+           instruction_->IsPredicatedInstanceFieldGet() ||
            instruction_->IsStaticFieldGet() ||
            instruction_->IsArrayGet() ||
            instruction_->IsInstanceOf() ||
@@ -5733,13 +5734,21 @@ void InstructionCodeGeneratorARMVIXL::HandleFieldSet(HInstruction* instruction,
   LocationSummary* locations = instruction->GetLocations();
   vixl32::Register base = InputRegisterAt(instruction, 0);
   Location value = locations->InAt(1);
+  std::optional<vixl::aarch32::Label> pred_is_null;
 
+  bool is_predicated =
+      instruction->IsInstanceFieldSet() && instruction->AsInstanceFieldSet()->GetIsPredicatedSet();
   bool is_volatile = field_info.IsVolatile();
   bool atomic_ldrd_strd = codegen_->GetInstructionSetFeatures().HasAtomicLdrdAndStrd();
   DataType::Type field_type = field_info.GetFieldType();
   uint32_t offset = field_info.GetFieldOffset().Uint32Value();
   bool needs_write_barrier =
       CodeGenerator::StoreNeedsWriteBarrier(field_type, instruction->InputAt(1));
+
+  if (is_predicated) {
+    pred_is_null.emplace();
+    __ CompareAndBranchIfZero(base, &*pred_is_null, /* is_far_target= */ false);
+  }
 
   if (is_volatile) {
     codegen_->GenerateMemoryBarrier(MemBarrierKind::kAnyStore);
@@ -5844,14 +5853,21 @@ void InstructionCodeGeneratorARMVIXL::HandleFieldSet(HInstruction* instruction,
   if (is_volatile) {
     codegen_->GenerateMemoryBarrier(MemBarrierKind::kAnyAny);
   }
+
+  if (is_predicated) {
+    __ Bind(&*pred_is_null);
+  }
 }
 
 void LocationsBuilderARMVIXL::HandleFieldGet(HInstruction* instruction,
                                              const FieldInfo& field_info) {
-  DCHECK(instruction->IsInstanceFieldGet() || instruction->IsStaticFieldGet());
+  DCHECK(instruction->IsInstanceFieldGet() ||
+         instruction->IsStaticFieldGet() ||
+         instruction->IsPredicatedInstanceFieldGet());
 
   bool object_field_get_with_read_barrier =
       kEmitCompilerReadBarrier && (field_info.GetFieldType() == DataType::Type::kReference);
+  bool is_predicated = instruction->IsPredicatedInstanceFieldGet();
   LocationSummary* locations =
       new (GetGraph()->GetAllocator()) LocationSummary(instruction,
                                                        object_field_get_with_read_barrier
@@ -5860,7 +5876,8 @@ void LocationsBuilderARMVIXL::HandleFieldGet(HInstruction* instruction,
   if (object_field_get_with_read_barrier && kUseBakerReadBarrier) {
     locations->SetCustomSlowPathCallerSaves(RegisterSet::Empty());  // No caller-save registers.
   }
-  locations->SetInAt(0, Location::RequiresRegister());
+  // Input for object receiver.
+  locations->SetInAt(is_predicated ? 1 : 0, Location::RequiresRegister());
 
   bool volatile_for_double = field_info.IsVolatile()
       && (field_info.GetFieldType() == DataType::Type::kFloat64)
@@ -5875,10 +5892,20 @@ void LocationsBuilderARMVIXL::HandleFieldGet(HInstruction* instruction,
       object_field_get_with_read_barrier;
 
   if (DataType::IsFloatingPointType(instruction->GetType())) {
-    locations->SetOut(Location::RequiresFpuRegister());
+    if (is_predicated) {
+      locations->SetInAt(0, Location::RequiresFpuRegister());
+      locations->SetOut(Location::SameAsFirstInput());
+    } else {
+      locations->SetOut(Location::RequiresFpuRegister());
+    }
   } else {
-    locations->SetOut(Location::RequiresRegister(),
-                      (overlap ? Location::kOutputOverlap : Location::kNoOutputOverlap));
+    if (is_predicated) {
+      locations->SetInAt(0, Location::RequiresRegister());
+      locations->SetOut(Location::SameAsFirstInput());
+    } else {
+      locations->SetOut(Location::RequiresRegister(),
+                        (overlap ? Location::kOutputOverlap : Location::kNoOutputOverlap));
+    }
   }
   if (volatile_for_double) {
     // ARM encoding have some additional constraints for ldrexd/strexd:
@@ -5979,10 +6006,13 @@ bool LocationsBuilderARMVIXL::CanEncodeConstantAsImmediate(HConstant* input_cst,
 
 void InstructionCodeGeneratorARMVIXL::HandleFieldGet(HInstruction* instruction,
                                                      const FieldInfo& field_info) {
-  DCHECK(instruction->IsInstanceFieldGet() || instruction->IsStaticFieldGet());
+  DCHECK(instruction->IsInstanceFieldGet() ||
+         instruction->IsStaticFieldGet() ||
+         instruction->IsPredicatedInstanceFieldGet());
 
   LocationSummary* locations = instruction->GetLocations();
-  vixl32::Register base = InputRegisterAt(instruction, 0);
+  uint32_t receiver_input = instruction->IsPredicatedInstanceFieldGet() ? 1 : 0;
+  vixl32::Register base = InputRegisterAt(instruction, receiver_input);
   Location out = locations->Out();
   bool is_volatile = field_info.IsVolatile();
   bool atomic_ldrd_strd = codegen_->GetInstructionSetFeatures().HasAtomicLdrdAndStrd();
@@ -6029,7 +6059,8 @@ void InstructionCodeGeneratorARMVIXL::HandleFieldGet(HInstruction* instruction,
         // If read barriers are enabled, emit read barriers other than
         // Baker's using a slow path (and also unpoison the loaded
         // reference, if heap poisoning is enabled).
-        codegen_->MaybeGenerateReadBarrierSlow(instruction, out, out, locations->InAt(0), offset);
+        codegen_->MaybeGenerateReadBarrierSlow(
+            instruction, out, out, locations->InAt(receiver_input), offset);
       }
       break;
     }
@@ -6098,6 +6129,19 @@ void InstructionCodeGeneratorARMVIXL::VisitInstanceFieldSet(HInstanceFieldSet* i
 
 void LocationsBuilderARMVIXL::VisitInstanceFieldGet(HInstanceFieldGet* instruction) {
   HandleFieldGet(instruction, instruction->GetFieldInfo());
+}
+
+void LocationsBuilderARMVIXL::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* instruction) {
+  HandleFieldGet(instruction, instruction->GetFieldInfo());
+}
+
+void InstructionCodeGeneratorARMVIXL::VisitPredicatedInstanceFieldGet(
+    HPredicatedInstanceFieldGet* instruction) {
+  vixl::aarch32::Label finish;
+  __ CompareAndBranchIfZero(InputRegisterAt(instruction, 1), &finish, false);
+  HandleFieldGet(instruction, instruction->GetFieldInfo());
+  __ Bind(&finish);
 }
 
 void InstructionCodeGeneratorARMVIXL::VisitInstanceFieldGet(HInstanceFieldGet* instruction) {
