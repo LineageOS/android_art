@@ -28,6 +28,7 @@ LIBARTPALETTE_1 {
     PaletteAshmemCreateRegion; # apex
     PaletteAshmemSetProtRegion; # apex
     PaletteGetHooks; # apex
+    PaletteCreateOdrefreshStagingDirectory; # apex
 
   local:
     *;
