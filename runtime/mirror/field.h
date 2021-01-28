@@ -83,7 +83,7 @@ class MANAGED Field : public AccessibleObject {
 
  private:
   // Padding required for matching alignment with the Java peer.
-  uint8_t padding_[2];
+  uint8_t padding_[3];
 
   HeapReference<mirror::Class> declaring_class_;
   HeapReference<mirror::Class> type_;

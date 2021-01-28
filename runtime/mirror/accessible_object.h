@@ -38,8 +38,6 @@ class MANAGED AccessibleObject : public Object {
  private:
   // We only use the field indirectly using the FlagOffset() method.
   uint8_t flag_ ATTRIBUTE_UNUSED;
-  // Padding required for correct alignment of subclasses like Executable, Field, etc.
-  uint8_t padding_[1] ATTRIBUTE_UNUSED;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(AccessibleObject);
 };
