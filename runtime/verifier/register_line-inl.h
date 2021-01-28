@@ -142,7 +142,7 @@ inline bool RegisterLine::VerifyRegisterType(MethodVerifier* verifier, uint32_t 
       // Hard fail for uninitialized types, which don't match anything but themselves.
       fail_type = VERIFY_ERROR_BAD_CLASS_HARD;
     } else if (check_type.IsUnresolvedTypes() || src_type.IsUnresolvedTypes()) {
-      fail_type = VERIFY_ERROR_NO_CLASS;
+      fail_type = VERIFY_ERROR_UNRESOLVED_TYPE_CHECK;
     } else {
       fail_type = VERIFY_ERROR_BAD_CLASS_SOFT;
     }
