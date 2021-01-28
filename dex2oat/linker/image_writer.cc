@@ -72,6 +72,7 @@
 #include "mirror/object_array-alloc-inl.h"
 #include "mirror/object_array-inl.h"
 #include "mirror/string-inl.h"
+#include "nterp_helpers.h"
 #include "oat.h"
 #include "oat_file.h"
 #include "oat_file_manager.h"
@@ -2997,6 +2998,8 @@ const uint8_t* ImageWriter::GetOatAddress(StubType type) const {
         return static_cast<const uint8_t*>(header.GetQuickResolutionTrampoline());
       case StubType::kQuickToInterpreterBridge:
         return static_cast<const uint8_t*>(header.GetQuickToInterpreterBridge());
+      case StubType::kNterpTrampoline:
+        return static_cast<const uint8_t*>(header.GetNterpTrampoline());
       default:
         UNREACHABLE();
     }
@@ -3032,9 +3035,13 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method, const ImageInfo& ima
   if (quick_code == nullptr) {
     // If we don't have code, use generic jni / interpreter bridge.
     // Both perform class initialization check if needed.
-    quick_code = method->IsNative()
-        ? GetOatAddress(StubType::kQuickGenericJNITrampoline)
-        : GetOatAddress(StubType::kQuickToInterpreterBridge);
+    if (method->IsNative()) {
+      quick_code = GetOatAddress(StubType::kQuickGenericJNITrampoline);
+    } else if (CanMethodUseNterp(method, compiler_options_.GetInstructionSet())) {
+      quick_code = GetOatAddress(StubType::kNterpTrampoline);
+    } else {
+      quick_code = GetOatAddress(StubType::kQuickToInterpreterBridge);
+    }
   } else if (NeedsClinitCheckBeforeCall(method) &&
              !method->GetDeclaringClass()->IsVisiblyInitialized()) {
     // If we do have code but the method needs a class initialization check before calling
@@ -3255,6 +3262,8 @@ void ImageWriter::UpdateOatFileHeader(size_t oat_index, const OatHeader& oat_hea
                                  oat_header.GetQuickResolutionTrampolineOffset());
     cur_image_info.SetStubOffset(StubType::kQuickToInterpreterBridge,
                                  oat_header.GetQuickToInterpreterBridgeOffset());
+    cur_image_info.SetStubOffset(StubType::kNterpTrampoline,
+                                 oat_header.GetNterpTrampolineOffset());
   }
 }
 

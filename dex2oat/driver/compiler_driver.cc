@@ -324,6 +324,14 @@ std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateQuickToInterpr
     const {
   CREATE_TRAMPOLINE(QUICK, kQuickAbi, pQuickToInterpreterBridge)
 }
+
+std::unique_ptr<const std::vector<uint8_t>> CompilerDriver::CreateNterpTrampoline()
+    const {
+  // We use QuickToInterpreterBridge to not waste one word in the Thread object.
+  // The Nterp trampoline gets replaced with the nterp entrypoint when loading
+  // an image.
+  CREATE_TRAMPOLINE(QUICK, kQuickAbi, pQuickToInterpreterBridge)
+}
 #undef CREATE_TRAMPOLINE
 
 void CompilerDriver::CompileAll(jobject class_loader,
