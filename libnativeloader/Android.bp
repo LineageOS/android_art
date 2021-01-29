@@ -57,7 +57,7 @@ art_cc_library {
             shared_libs: [
                 "libdl_android",
             ],
-            whole_static_libs: [
+            static_libs: [
                 "PlatformProperties",
             ],
         },
