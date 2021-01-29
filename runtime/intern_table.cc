@@ -307,11 +307,6 @@ void InternTable::SweepInternTableWeaks(IsMarkedVisitor* visitor) {
   weak_interns_.SweepWeaks(visitor);
 }
 
-size_t InternTable::WriteToMemory(uint8_t* ptr) {
-  MutexLock mu(Thread::Current(), *Locks::intern_table_lock_);
-  return strong_interns_.WriteToMemory(ptr);
-}
-
 std::size_t InternTable::StringHashEquals::operator()(const GcRoot<mirror::String>& root) const {
   if (kIsDebugBuild) {
     Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
@@ -356,25 +351,6 @@ bool InternTable::StringHashEquals::operator()(const GcRoot<mirror::String>& a,
     const uint16_t* a_value = a_string->GetValue();
     return CompareModifiedUtf8ToUtf16AsCodePointValues(b.GetUtf8Data(), a_value, a_length) == 0;
   }
-}
-
-size_t InternTable::Table::WriteToMemory(uint8_t* ptr) {
-  if (tables_.empty()) {
-    return 0;
-  }
-  UnorderedSet* table_to_write;
-  UnorderedSet combined;
-  if (tables_.size() > 1) {
-    table_to_write = &combined;
-    for (InternalTable& table : tables_) {
-      for (GcRoot<mirror::String>& string : table.set_) {
-        combined.insert(string);
-      }
-    }
-  } else {
-    table_to_write = &tables_.back().set_;
-  }
-  return table_to_write->WriteToMemory(ptr);
 }
 
 void InternTable::Table::Remove(ObjPtr<mirror::String> s) {

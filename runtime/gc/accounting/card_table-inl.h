@@ -77,47 +77,52 @@ inline size_t CardTable::Scan(ContinuousSpaceBitmap* bitmap,
     ++card_cur;
   }
 
-  uint8_t* aligned_end = card_end -
-      (reinterpret_cast<uintptr_t>(card_end) & (sizeof(uintptr_t) - 1));
+  if (card_cur < card_end) {
+    DCHECK_ALIGNED(card_cur, sizeof(intptr_t));
+    uint8_t* aligned_end = card_end -
+        (reinterpret_cast<uintptr_t>(card_end) & (sizeof(uintptr_t) - 1));
+    DCHECK_LE(card_cur, aligned_end);
 
-  uintptr_t* word_end = reinterpret_cast<uintptr_t*>(aligned_end);
-  for (uintptr_t* word_cur = reinterpret_cast<uintptr_t*>(card_cur); word_cur < word_end;
-      ++word_cur) {
-    while (LIKELY(*word_cur == 0)) {
-      ++word_cur;
-      if (UNLIKELY(word_cur >= word_end)) {
-        goto exit_for;
+    uintptr_t* word_end = reinterpret_cast<uintptr_t*>(aligned_end);
+    for (uintptr_t* word_cur = reinterpret_cast<uintptr_t*>(card_cur); word_cur < word_end;
+        ++word_cur) {
+      while (LIKELY(*word_cur == 0)) {
+        ++word_cur;
+        if (UNLIKELY(word_cur >= word_end)) {
+          goto exit_for;
+        }
+      }
+
+      // Find the first dirty card.
+      uintptr_t start_word = *word_cur;
+      uintptr_t start =
+          reinterpret_cast<uintptr_t>(AddrFromCard(reinterpret_cast<uint8_t*>(word_cur)));
+      // TODO: Investigate if processing continuous runs of dirty cards with
+      // a single bitmap visit is more efficient.
+      for (size_t i = 0; i < sizeof(uintptr_t); ++i) {
+        if (static_cast<uint8_t>(start_word) >= minimum_age) {
+          auto* card = reinterpret_cast<uint8_t*>(word_cur) + i;
+          DCHECK(*card == static_cast<uint8_t>(start_word) || *card == kCardDirty)
+              << "card " << static_cast<size_t>(*card) << " intptr_t " << (start_word & 0xFF);
+          bitmap->VisitMarkedRange(start, start + kCardSize, visitor);
+          ++cards_scanned;
+        }
+        start_word >>= 8;
+        start += kCardSize;
       }
     }
+    exit_for:
 
-    // Find the first dirty card.
-    uintptr_t start_word = *word_cur;
-    uintptr_t start = reinterpret_cast<uintptr_t>(AddrFromCard(reinterpret_cast<uint8_t*>(word_cur)));
-    // TODO: Investigate if processing continuous runs of dirty cards with a single bitmap visit is
-    // more efficient.
-    for (size_t i = 0; i < sizeof(uintptr_t); ++i) {
-      if (static_cast<uint8_t>(start_word) >= minimum_age) {
-        auto* card = reinterpret_cast<uint8_t*>(word_cur) + i;
-        DCHECK(*card == static_cast<uint8_t>(start_word) || *card == kCardDirty)
-            << "card " << static_cast<size_t>(*card) << " intptr_t " << (start_word & 0xFF);
+    // Handle any unaligned cards at the end.
+    card_cur = reinterpret_cast<uint8_t*>(word_end);
+    while (card_cur < card_end) {
+      if (*card_cur >= minimum_age) {
+        uintptr_t start = reinterpret_cast<uintptr_t>(AddrFromCard(card_cur));
         bitmap->VisitMarkedRange(start, start + kCardSize, visitor);
         ++cards_scanned;
       }
-      start_word >>= 8;
-      start += kCardSize;
+      ++card_cur;
     }
-  }
-  exit_for:
-
-  // Handle any unaligned cards at the end.
-  card_cur = reinterpret_cast<uint8_t*>(word_end);
-  while (card_cur < card_end) {
-    if (*card_cur >= minimum_age) {
-      uintptr_t start = reinterpret_cast<uintptr_t>(AddrFromCard(card_cur));
-      bitmap->VisitMarkedRange(start, start + kCardSize, visitor);
-      ++cards_scanned;
-    }
-    ++card_cur;
   }
 
   if (kClearCard) {
