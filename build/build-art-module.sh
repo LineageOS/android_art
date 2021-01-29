@@ -91,17 +91,15 @@ done
 
 if [ ${#MODULE_SDKS_AND_EXPORTS[*]} -gt 0 ]; then
   # Create multi-arch SDKs in a different out directory. The multi-arch script
-  # uses Soong in --skip-kati mode which cannot use the same directory as normal
+  # uses Soong in --skip-make mode which cannot use the same directory as normal
   # mode with make.
   export OUT_DIR=${OUT_DIR}/aml
 
-  # We use force building LLVM components flag (even though we actually don't
-  # compile them) because we don't have bionic host prebuilts
-  # for them.
-  export FORCE_BUILD_LLVM_COMPONENTS=true
+  # Make build-aml-prebuilts.sh set the source_build Soong config variable true.
+  export ENABLE_ART_SOURCE_BUILD=true
 
-  echo_and_run build/soong/soong_ui.bash --make-mode --skip-kati \
-    TARGET_PRODUCT=mainline_sdk "${build_args[@]}" ${MODULE_SDKS_AND_EXPORTS[*]}
+  echo_and_run build/soong/scripts/build-aml-prebuilts.sh "${build_args[@]}" \
+    ${MODULE_SDKS_AND_EXPORTS[*]}
 
   rm -rf ${DIST_DIR}/mainline-sdks
   echo_and_run cp -r ${OUT_DIR}/soong/mainline-sdks ${DIST_DIR}
