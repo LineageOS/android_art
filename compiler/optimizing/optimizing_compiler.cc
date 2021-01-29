@@ -1284,6 +1284,7 @@ bool OptimizingCompiler::JitCompile(Thread* self,
     std::vector<uint8_t> debug_info;
     if (compiler_options.GenerateAnyDebugInfo()) {
       debug::MethodDebugInfo info = {};
+      // Simpleperf relies on art_jni_trampoline to detect jni methods.
       info.custom_name = "art_jni_trampoline";
       info.dex_file = dex_file;
       info.class_def_index = class_def_idx;
