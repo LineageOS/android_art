@@ -485,12 +485,15 @@ struct CheckOffsets {
 
     // Classes have a different size due to padding field. Strings are variable length.
     if (!klass->IsClassClass() && !klass->IsStringClass() && !is_static) {
-      // Currently only required for AccessibleObject since of the padding fields. The class linker
-      // says AccessibleObject is 9 bytes but sizeof(AccessibleObject) is 12 bytes due to padding.
-      // The RoundUp is to get around this case.
+      // The RoundUp is required for some mirror classes that have a gap at the end,
+      // such as AccessibleObject, ByteArrayViewVarHandle and ByteBufferViewVarHandle.
+      // For example, the AccessibleObject has size 9 according to the class linker.
+      // However, the C++ sizeof(AccessibleObject) is 12 bytes due to alignment, even
+      // though members in C++ subclasses are actually starting at offset 9.
+      //
+      // TODO: We could define a subclass with a `uint8_t` member and check its offset instead.
       static constexpr size_t kPackAlignment = 4;
-      size_t expected_size = RoundUp(is_static ? klass->GetClassSize() : klass->GetObjectSize(),
-          kPackAlignment);
+      size_t expected_size = RoundUp(klass->GetObjectSize(), kPackAlignment);
       if (sizeof(T) != expected_size) {
         LOG(ERROR) << "Class size mismatch:"
            << " class=" << class_descriptor

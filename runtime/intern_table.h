@@ -199,11 +199,6 @@ class InternTable {
   void AddNewTable()
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Locks::intern_table_lock_);
 
-  // Write the post zygote intern table to a pointer. Only writes the strong interns since it is
-  // expected that there is no weak interns since this is called from the image writer.
-  size_t WriteToMemory(uint8_t* ptr) REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Locks::intern_table_lock_);
-
   // Change the weak root state. May broadcast to waiters.
   void ChangeWeakRootState(gc::WeakRootState new_state)
       REQUIRES(!Locks::intern_table_lock_);
@@ -236,6 +231,7 @@ class InternTable {
       bool is_boot_image_ = false;
 
       friend class InternTable;
+      friend class linker::ImageWriter;
       friend class Table;
       ART_FRIEND_TEST(InternTableTest, CrossHash);
     };
@@ -263,10 +259,6 @@ class InternTable {
     template <typename Visitor>
     size_t AddTableFromMemory(const uint8_t* ptr, const Visitor& visitor, bool is_boot_image)
         REQUIRES(!Locks::intern_table_lock_) REQUIRES_SHARED(Locks::mutator_lock_);
-    // Write the intern tables to ptr, if there are multiple tables they are combined into a single
-    // one. Returns how many bytes were written.
-    size_t WriteToMemory(uint8_t* ptr)
-        REQUIRES(Locks::intern_table_lock_) REQUIRES_SHARED(Locks::mutator_lock_);
 
    private:
     void SweepWeaks(UnorderedSet* set, IsMarkedVisitor* visitor)

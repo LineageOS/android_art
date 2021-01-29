@@ -304,6 +304,25 @@ static inline IterationRange<FilterNull<InnerIter>> FilterOutNull(IterationRange
   return Filter(inner, NonNullFilter<typename InnerIter::value_type>());
 }
 
+template <typename Val>
+struct SafePrinter  {
+  const Val* val_;
+};
+
+template<typename Val>
+std::ostream& operator<<(std::ostream& os, const SafePrinter<Val>& v) {
+  if (v.val_ == nullptr) {
+    return os << "NULL";
+  } else {
+    return os << *v.val_;
+  }
+}
+
+template<typename Val>
+SafePrinter<Val> SafePrint(const Val* v) {
+  return SafePrinter<Val>{v};
+}
+
 }  // namespace art
 
 #endif  // ART_LIBARTBASE_BASE_STL_UTIL_H_

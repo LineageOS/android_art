@@ -8256,7 +8256,7 @@ class HParallelMove final : public HExpression<0> {
         DCHECK(!destination.OverlapsWith(move.GetDestination()))
             << "Overlapped destination for two moves in a parallel move: "
             << move.GetSource() << " ==> " << move.GetDestination() << " and "
-            << source << " ==> " << destination << " for " << *instruction;
+            << source << " ==> " << destination << " for " << SafePrint(instruction);
       }
     }
     moves_.emplace_back(source, destination, type, instruction);
