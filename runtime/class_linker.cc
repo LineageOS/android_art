@@ -8285,19 +8285,34 @@ bool ClassLinker::LinkInterfaceMethods(
   return true;
 }
 
-bool ClassLinker::LinkInstanceFields(Thread* self, Handle<mirror::Class> klass) {
-  CHECK(klass != nullptr);
-  return LinkFields(self, klass, false, nullptr);
-}
+class ClassLinker::LinkFieldsHelper {
+ public:
+  static bool LinkFields(ClassLinker* class_linker,
+                         Thread* self,
+                         Handle<mirror::Class> klass,
+                         bool is_static,
+                         size_t* class_size)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
-bool ClassLinker::LinkStaticFields(Thread* self, Handle<mirror::Class> klass, size_t* class_size) {
-  CHECK(klass != nullptr);
-  return LinkFields(self, klass, true, class_size);
-}
+ private:
+  enum class FieldTypeOrder : uint16_t;
+  class FieldGaps;
+
+  struct FieldTypeOrderAndIndex {
+    FieldTypeOrder field_type_order;
+    uint16_t field_index;
+  };
+
+  static FieldTypeOrder FieldTypeOrderFromFirstDescriptorCharacter(char first_char);
+
+  template <size_t kSize>
+  static MemberOffset AssignFieldOffset(ArtField* field, MemberOffset field_offset)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+};
 
 // We use the following order of field types for assigning offsets.
 // Some fields can be shuffled forward to fill gaps, see `ClassLinker::LinkFields()`.
-enum class FieldTypeOrder {
+enum class ClassLinker::LinkFieldsHelper::FieldTypeOrder : uint16_t {
   kReference = 0u,
   kLong,
   kDouble,
@@ -8314,11 +8329,9 @@ enum class FieldTypeOrder {
 };
 
 ALWAYS_INLINE
-static FieldTypeOrder FieldTypeOrderFromFirstDescriptorCharacter(char first_char) {
+ClassLinker::LinkFieldsHelper::FieldTypeOrder
+ClassLinker::LinkFieldsHelper::FieldTypeOrderFromFirstDescriptorCharacter(char first_char) {
   switch (first_char) {
-    default:
-      DCHECK(first_char == 'L' || first_char == '[') << first_char;
-      return FieldTypeOrder::kReference;
     case 'J':
       return FieldTypeOrder::kLong;
     case 'D':
@@ -8335,11 +8348,14 @@ static FieldTypeOrder FieldTypeOrderFromFirstDescriptorCharacter(char first_char
       return FieldTypeOrder::kBoolean;
     case 'B':
       return FieldTypeOrder::kByte;
+    default:
+      DCHECK(first_char == 'L' || first_char == '[') << first_char;
+      return FieldTypeOrder::kReference;
   }
 }
 
 // Gaps where we can insert fields in object layout.
-class FieldGaps {
+class ClassLinker::LinkFieldsHelper::FieldGaps {
  public:
   template <uint32_t kSize>
   ALWAYS_INLINE MemberOffset AlignFieldOffset(MemberOffset field_offset) {
@@ -8441,18 +8457,20 @@ class FieldGaps {
 };
 
 template <size_t kSize>
-ALWAYS_INLINE static MemberOffset AssignFieldOffset(ArtField* field, MemberOffset field_offset)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
+ALWAYS_INLINE
+MemberOffset ClassLinker::LinkFieldsHelper::AssignFieldOffset(ArtField* field,
+                                                              MemberOffset field_offset) {
   DCHECK_ALIGNED(field_offset.Uint32Value(), kSize);
   DCHECK_EQ(Primitive::ComponentSize(field->GetTypeAsPrimitiveType()), kSize);
   field->SetOffset(field_offset);
   return MemberOffset(field_offset.Uint32Value() + kSize);
 }
 
-bool ClassLinker::LinkFields(Thread* self,
-                             Handle<mirror::Class> klass,
-                             bool is_static,
-                             size_t* class_size) {
+bool ClassLinker::LinkFieldsHelper::LinkFields(ClassLinker* class_linker,
+                                               Thread* self,
+                                               Handle<mirror::Class> klass,
+                                               bool is_static,
+                                               size_t* class_size) {
   self->AllowThreadSuspension();
   const size_t num_fields = is_static ? klass->NumStaticFields() : klass->NumInstanceFields();
   LengthPrefixedArray<ArtField>* const fields = is_static ? klass->GetSFieldsPtr() :
@@ -8461,7 +8479,8 @@ bool ClassLinker::LinkFields(Thread* self,
   // Initialize field_offset
   MemberOffset field_offset(0);
   if (is_static) {
-    field_offset = klass->GetFirstReferenceStaticFieldOffsetDuringLinking(image_pointer_size_);
+    field_offset = klass->GetFirstReferenceStaticFieldOffsetDuringLinking(
+        class_linker->GetImagePointerSize());
   } else {
     ObjPtr<mirror::Class> super_class = klass->GetSuperClass();
     if (super_class != nullptr) {
@@ -8487,6 +8506,10 @@ bool ClassLinker::LinkFields(Thread* self,
   // 8) All java boolean (8-bit) integer fields, sorted alphabetically.
   // 9) All java byte (8-bit) integer fields, sorted alphabetically.
   //
+  // (References are first to increase the chance of reference visiting
+  // being able to take a fast path using a bitmap of references at the
+  // start of the object, see `Class::reference_instance_offsets_`.)
+  //
   // Once the fields are sorted in this order we will attempt to fill any gaps
   // that might be present in the memory layout of the structure.
   // Note that we shall not fill gaps between the superclass fields.
@@ -8494,82 +8517,89 @@ bool ClassLinker::LinkFields(Thread* self,
   // Collect fields and their "type order index" (see numbered points above).
   const char* old_no_suspend_cause = self->StartAssertNoThreadSuspension(
       "Using plain ArtField references");
-  using Entry = std::pair<ArtField*, FieldTypeOrder>;
-  constexpr size_t kStackBufferEntries = 16;  // Avoid allocations for small number of fields.
-  Entry stack_buffer[kStackBufferEntries];
-  std::vector<Entry> heap_buffer;
-  ArrayRef<Entry> sorted_fields;
+  constexpr size_t kStackBufferEntries = 64;  // Avoid allocations for small number of fields.
+  FieldTypeOrderAndIndex stack_buffer[kStackBufferEntries];
+  std::vector<FieldTypeOrderAndIndex> heap_buffer;
+  ArrayRef<FieldTypeOrderAndIndex> sorted_fields;
   if (num_fields <= kStackBufferEntries) {
-    sorted_fields = ArrayRef<Entry>(stack_buffer, num_fields);
+    sorted_fields = ArrayRef<FieldTypeOrderAndIndex>(stack_buffer, num_fields);
   } else {
     heap_buffer.resize(num_fields);
-    sorted_fields = ArrayRef<Entry>(heap_buffer);
+    sorted_fields = ArrayRef<FieldTypeOrderAndIndex>(heap_buffer);
   }
   size_t num_reference_fields = 0;
   size_t primitive_fields_start = num_fields;
+  DCHECK_LE(num_fields, 1u << 16);
   for (size_t i = 0; i != num_fields; ++i) {
     ArtField* field = &fields->At(i);
     const char* descriptor = field->GetTypeDescriptor();
-    FieldTypeOrder type_order_index = FieldTypeOrderFromFirstDescriptorCharacter(descriptor[0]);
+    FieldTypeOrder field_type_order = FieldTypeOrderFromFirstDescriptorCharacter(descriptor[0]);
+    uint16_t field_index = dchecked_integral_cast<uint16_t>(i);
     // Insert references to the start, other fields to the end.
     DCHECK_LT(num_reference_fields, primitive_fields_start);
-    if (type_order_index == FieldTypeOrder::kReference) {
-      sorted_fields[num_reference_fields] = std::make_pair(field, type_order_index);
+    if (field_type_order == FieldTypeOrder::kReference) {
+      sorted_fields[num_reference_fields] = { field_type_order, field_index };
       ++num_reference_fields;
     } else {
       --primitive_fields_start;
-      sorted_fields[primitive_fields_start] = std::make_pair(field, type_order_index);
+      sorted_fields[primitive_fields_start] = { field_type_order, field_index };
     }
   }
   DCHECK_EQ(num_reference_fields, primitive_fields_start);
 
-  // Reference fields are already sorted.
+  // Reference fields are already sorted by field index (and dex field index).
   DCHECK(std::is_sorted(
       sorted_fields.begin(),
       sorted_fields.begin() + num_reference_fields,
-      [](const Entry& lhs, const Entry& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
-        CHECK_EQ(lhs.first->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
-        CHECK_EQ(rhs.first->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
-        return lhs.first->GetDexFieldIndex() < rhs.first->GetDexFieldIndex();
+      [fields](const auto& lhs, const auto& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
+        ArtField* lhs_field = &fields->At(lhs.field_index);
+        ArtField* rhs_field = &fields->At(rhs.field_index);
+        CHECK_EQ(lhs_field->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
+        CHECK_EQ(rhs_field->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
+        CHECK_EQ(lhs_field->GetDexFieldIndex() < rhs_field->GetDexFieldIndex(),
+                 lhs.field_index < rhs.field_index);
+        return lhs_field->GetDexFieldIndex() < rhs_field->GetDexFieldIndex();
       }));
-  // Primitive fields were stored in reverse order of their dex field index (and addresses).
+  // Primitive fields were stored in reverse order of their field index (and dex field index).
   DCHECK(std::is_sorted(
       sorted_fields.begin() + primitive_fields_start,
       sorted_fields.end(),
-      [](const Entry& lhs, const Entry& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
-        CHECK_NE(lhs.first->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
-        CHECK_NE(rhs.first->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
-        CHECK_EQ(lhs.first->GetDexFieldIndex() > rhs.first->GetDexFieldIndex(),
-                 lhs.first > rhs.first);
-        return lhs.first > rhs.first;
+      [fields](const auto& lhs, const auto& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
+        ArtField* lhs_field = &fields->At(lhs.field_index);
+        ArtField* rhs_field = &fields->At(rhs.field_index);
+        CHECK_NE(lhs_field->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
+        CHECK_NE(rhs_field->GetTypeAsPrimitiveType(), Primitive::kPrimNot);
+        CHECK_EQ(lhs_field->GetDexFieldIndex() > rhs_field->GetDexFieldIndex(),
+                 lhs.field_index > rhs.field_index);
+        return lhs.field_index > rhs.field_index;
       }));
   // Sort the primitive fields by the field type order, then field index.
   std::sort(sorted_fields.begin() + primitive_fields_start,
             sorted_fields.end(),
-            [](const Entry& lhs, const Entry& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
-              if (lhs.second != rhs.second) {
-                return lhs.second < rhs.second;
+            [](const auto& lhs, const auto& rhs) {
+              if (lhs.field_type_order != rhs.field_type_order) {
+                return lhs.field_type_order < rhs.field_type_order;
               } else {
-                DCHECK_EQ(lhs.first->GetDexFieldIndex() < rhs.first->GetDexFieldIndex(),
-                          lhs.first < rhs.first);
-                return lhs.first < rhs.first;
+                return lhs.field_index < rhs.field_index;
               }
             });
   // Primitive fields are now sorted by field size (descending), then type, then field index.
   DCHECK(std::is_sorted(
       sorted_fields.begin() + primitive_fields_start,
       sorted_fields.end(),
-      [](const Entry& lhs, const Entry& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
-        Primitive::Type lhs_type = lhs.first->GetTypeAsPrimitiveType();
+      [fields](const auto& lhs, const auto& rhs) REQUIRES_SHARED(Locks::mutator_lock_) {
+        ArtField* lhs_field = &fields->At(lhs.field_index);
+        ArtField* rhs_field = &fields->At(rhs.field_index);
+        Primitive::Type lhs_type = lhs_field->GetTypeAsPrimitiveType();
         CHECK_NE(lhs_type, Primitive::kPrimNot);
-        Primitive::Type rhs_type = rhs.first->GetTypeAsPrimitiveType();
+        Primitive::Type rhs_type = rhs_field->GetTypeAsPrimitiveType();
         CHECK_NE(rhs_type, Primitive::kPrimNot);
         if (lhs_type != rhs_type) {
           size_t lhs_size = Primitive::ComponentSize(lhs_type);
           size_t rhs_size = Primitive::ComponentSize(rhs_type);
           return (lhs_size != rhs_size) ? (lhs_size > rhs_size) : (lhs_type < rhs_type);
         } else {
-          return lhs.first->GetDexFieldIndex() < rhs.first->GetDexFieldIndex();
+          return lhs_field->GetDexFieldIndex() < rhs_field->GetDexFieldIndex();
         }
       }));
 
@@ -8580,64 +8610,73 @@ bool ClassLinker::LinkFields(Thread* self,
     constexpr size_t kReferenceSize = sizeof(mirror::HeapReference<mirror::Object>);
     field_offset = field_gaps.AlignFieldOffset<kReferenceSize>(field_offset);
     for (; index != num_reference_fields; ++index) {
-      ArtField* field = sorted_fields[index].first;
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       field_offset = AssignFieldOffset<kReferenceSize>(field, field_offset);
     }
   }
   // Process 64-bit fields.
-  if (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast64BitType) {
+  if (index != num_fields &&
+      sorted_fields[index].field_type_order <= FieldTypeOrder::kLast64BitType) {
     field_offset = field_gaps.AlignFieldOffset<8u>(field_offset);
-    while (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast64BitType) {
-      ArtField* field = sorted_fields[index].first;
+    while (index != num_fields &&
+           sorted_fields[index].field_type_order <= FieldTypeOrder::kLast64BitType) {
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       field_offset = AssignFieldOffset<8u>(field, field_offset);
       ++index;
     }
   }
   // Process 32-bit fields.
-  if (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast32BitType) {
+  if (index != num_fields &&
+      sorted_fields[index].field_type_order <= FieldTypeOrder::kLast32BitType) {
     field_offset = field_gaps.AlignFieldOffset<4u>(field_offset);
     if (field_gaps.HasGap<4u>()) {
-      ArtField* field = sorted_fields[index].first;
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       AssignFieldOffset<4u>(field, field_gaps.ReleaseGap<4u>());  // Ignore return value.
       ++index;
       DCHECK(!field_gaps.HasGap<4u>());  // There can be only one gap for a 32-bit field.
     }
-    while (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast32BitType) {
-      ArtField* field = sorted_fields[index].first;
+    while (index != num_fields &&
+           sorted_fields[index].field_type_order <= FieldTypeOrder::kLast32BitType) {
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       field_offset = AssignFieldOffset<4u>(field, field_offset);
       ++index;
     }
   }
   // Process 16-bit fields.
-  if (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast16BitType) {
+  if (index != num_fields &&
+      sorted_fields[index].field_type_order <= FieldTypeOrder::kLast16BitType) {
     field_offset = field_gaps.AlignFieldOffset<2u>(field_offset);
     while (index != num_fields &&
-           sorted_fields[index].second <= FieldTypeOrder::kLast16BitType &&
+           sorted_fields[index].field_type_order <= FieldTypeOrder::kLast16BitType &&
            field_gaps.HasGap<2u>()) {
-      ArtField* field = sorted_fields[index].first;
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       AssignFieldOffset<2u>(field, field_gaps.ReleaseGap<2u>());  // Ignore return value.
       ++index;
     }
-    while (index != num_fields && sorted_fields[index].second <= FieldTypeOrder::kLast16BitType) {
-      ArtField* field = sorted_fields[index].first;
+    while (index != num_fields &&
+           sorted_fields[index].field_type_order <= FieldTypeOrder::kLast16BitType) {
+      ArtField* field = &fields->At(sorted_fields[index].field_index);
       field_offset = AssignFieldOffset<2u>(field, field_offset);
       ++index;
     }
   }
   // Process 8-bit fields.
   for (; index != num_fields && field_gaps.HasGap<1u>(); ++index) {
-    ArtField* field = sorted_fields[index].first;
+    ArtField* field = &fields->At(sorted_fields[index].field_index);
     AssignFieldOffset<1u>(field, field_gaps.ReleaseGap<1u>());  // Ignore return value.
   }
   for (; index != num_fields; ++index) {
-    ArtField* field = sorted_fields[index].first;
+    ArtField* field = &fields->At(sorted_fields[index].field_index);
     field_offset = AssignFieldOffset<1u>(field, field_offset);
   }
 
   self->EndAssertNoThreadSuspension(old_no_suspend_cause);
 
   // We lie to the GC about the java.lang.ref.Reference.referent field, so it doesn't scan it.
-  if (!is_static && klass->DescriptorEquals("Ljava/lang/ref/Reference;")) {
+  DCHECK(!class_linker->init_done_ || !klass->DescriptorEquals("Ljava/lang/ref/Reference;"));
+  if (!is_static &&
+      UNLIKELY(!class_linker->init_done_) &&
+      klass->DescriptorEquals("Ljava/lang/ref/Reference;")) {
     // We know there are no non-reference fields in the Reference classes, and we know
     // that 'referent' is alphabetically last, so this is easy...
     CHECK_EQ(num_reference_fields, num_fields) << klass->PrettyClass();
@@ -8694,7 +8733,7 @@ bool ClassLinker::LinkFields(Thread* self,
     // Make sure that the fields array is ordered by name but all reference
     // offsets are at the beginning as far as alignment allows.
     MemberOffset start_ref_offset = is_static
-        ? klass->GetFirstReferenceStaticFieldOffsetDuringLinking(image_pointer_size_)
+        ? klass->GetFirstReferenceStaticFieldOffsetDuringLinking(class_linker->image_pointer_size_)
         : klass->GetFirstReferenceInstanceFieldOffset();
     MemberOffset end_ref_offset(start_ref_offset.Uint32Value() +
                                 num_reference_fields *
@@ -8736,6 +8775,16 @@ bool ClassLinker::LinkFields(Thread* self,
     CHECK_EQ(current_ref_offset.Uint32Value(), end_ref_offset.Uint32Value());
   }
   return true;
+}
+
+bool ClassLinker::LinkInstanceFields(Thread* self, Handle<mirror::Class> klass) {
+  CHECK(klass != nullptr);
+  return LinkFieldsHelper::LinkFields(this, self, klass, false, nullptr);
+}
+
+bool ClassLinker::LinkStaticFields(Thread* self, Handle<mirror::Class> klass, size_t* class_size) {
+  CHECK(klass != nullptr);
+  return LinkFieldsHelper::LinkFields(this, self, klass, true, class_size);
 }
 
 //  Set the bitmap of reference instance field offsets.

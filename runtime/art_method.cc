@@ -628,7 +628,10 @@ const OatQuickMethodHeader* ArtMethod::GetOatQuickMethodHeader(uintptr_t pc) {
       DCHECK(class_linker->IsQuickGenericJniStub(existing_entry_point) ||
              class_linker->IsQuickResolutionStub(existing_entry_point) ||
              existing_entry_point == GetQuickInstrumentationEntryPoint() ||
-             (jit != nullptr && jit->GetCodeCache()->ContainsPc(existing_entry_point)));
+             (jit != nullptr && jit->GetCodeCache()->ContainsPc(existing_entry_point)))
+          << " entrypoint: " << existing_entry_point
+          << " size: " << OatQuickMethodHeader::FromEntryPoint(existing_entry_point)->GetCodeSize()
+          << " pc: " << reinterpret_cast<const void*>(pc);
       return nullptr;
     }
     // Only for unit tests.
