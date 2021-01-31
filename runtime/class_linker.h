@@ -861,6 +861,7 @@ class ClassLinker {
   virtual bool IsUpdatableBootClassPathDescriptor(const char* descriptor);
 
  private:
+  class LinkFieldsHelper;
   class LinkInterfaceMethodsHelper;
   class MethodTranslation;
   class VisiblyInitializedCallback;
@@ -1216,8 +1217,6 @@ class ClassLinker {
   bool LinkStaticFields(Thread* self, Handle<mirror::Class> klass, size_t* class_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
   bool LinkInstanceFields(Thread* self, Handle<mirror::Class> klass)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  bool LinkFields(Thread* self, Handle<mirror::Class> klass, bool is_static, size_t* class_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void CreateReferenceInstanceOffsets(Handle<mirror::Class> klass)
       REQUIRES_SHARED(Locks::mutator_lock_);
