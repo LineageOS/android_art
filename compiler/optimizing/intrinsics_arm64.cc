@@ -3292,6 +3292,61 @@ void IntrinsicCodeGeneratorARM64::VisitReferenceGetReferent(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderARM64::VisitReferenceRefersTo(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceRefersToLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitReferenceRefersTo(HInvoke* invoke) {
+  LocationSummary* locations = invoke->GetLocations();
+  MacroAssembler* masm = codegen_->GetVIXLAssembler();
+  UseScratchRegisterScope temps(masm);
+
+  Register obj = WRegisterFrom(locations->InAt(0));
+  Register other = WRegisterFrom(locations->InAt(1));
+  Register out = WRegisterFrom(locations->Out());
+  Register tmp = temps.AcquireW();
+
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  uint32_t monitor_offset = mirror::Object::MonitorOffset().Int32Value();
+
+  MemOperand field = HeapOperand(obj, referent_offset);
+  codegen_->LoadAcquire(invoke, DataType::Type::kReference, tmp, field, /*needs_null_check=*/ true);
+
+  __ Cmp(tmp, other);
+
+  if (kEmitCompilerReadBarrier) {
+    DCHECK(kUseBakerReadBarrier);
+
+    vixl::aarch64::Label calculate_result;
+
+    // If the GC is not marking, the comparison result is final.
+    __ Cbz(mr, &calculate_result);
+
+    __ B(&calculate_result, eq);  // ZF set if taken.
+
+    // Check if the loaded reference is null.
+    __ Cbz(tmp, &calculate_result);  // ZF clear if taken.
+
+    // For correct memory visibility, we need a barrier before loading the lock word.
+    codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);
+
+    // Load the lockword and check if it is a forwarding address.
+    static_assert(LockWord::kStateShift == 30u);
+    static_assert(LockWord::kStateForwardingAddress == 3u);
+    __ Ldr(tmp, HeapOperand(tmp, monitor_offset));
+    __ Cmp(tmp, Operand(0xc0000000));
+    __ B(&calculate_result, lo);   // ZF clear if taken.
+
+    // Extract the forwarding address and compare with `other`.
+    __ Cmp(other, Operand(tmp, LSL, LockWord::kForwardingAddressShift));
+
+    __ Bind(&calculate_result);
+  }
+
+  // Convert ZF into the Boolean result.
+  __ Cset(out, eq);
+}
+
 void IntrinsicLocationsBuilderARM64::VisitThreadInterrupted(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke, LocationSummary::kNoCall, kIntrinsified);
