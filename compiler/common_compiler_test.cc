@@ -90,7 +90,9 @@ void CommonCompilerTestImpl::MakeExecutable(ArtMethod* method,
     const void* code_ptr = reinterpret_cast<const uint8_t*>(unaligned_code_ptr) + padding;
     CHECK_EQ(code_ptr, static_cast<const void*>(chunk->data() + (chunk->size() - code_size)));
     MakeExecutable(code_ptr, code.size());
-    const void* method_code = CompiledMethod::CodePointer(code_ptr,
+    // Remove hwasan tag.  This is done in kernel in newer versions.  This supports older kernels.
+    // This is needed to support stack walking, including exception handling.
+    const void* method_code = CompiledMethod::CodePointer(HWASanUntag(code_ptr),
                                                           compiled_method->GetInstructionSet());
     LOG(INFO) << "MakeExecutable " << method->PrettyMethod() << " code=" << method_code;
     method->SetEntryPointFromQuickCompiledCode(method_code);
