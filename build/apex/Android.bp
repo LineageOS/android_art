@@ -226,6 +226,7 @@ apex_defaults {
     defaults: ["com.android.art-defaults"],
     compile_multilib: "both",
     manifest: "manifest-art.json",
+    boot_images: ["art-boot-image"],
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
