@@ -432,8 +432,24 @@ extern "C" size_t MterpFilledNewArray(ShadowFrame* shadow_frame,
                                       Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoFilledNewArray<false, false, false>(inst, *shadow_frame, self,
-                                               shadow_frame->GetResultRegister()) ? 1u : 0u;
+  JValue* result_register = shadow_frame->GetResultRegister();
+  bool res = false;
+  if (shadow_frame->GetMethod()->SkipAccessChecks()) {
+    res = DoFilledNewArray</*is_range=*/false,
+                           /*do_access_check=*/false,
+                           /*transaction_active=*/false>(inst,
+                                                         *shadow_frame,
+                                                         self,
+                                                         result_register);
+  } else {
+    res = DoFilledNewArray</*is_range=*/false,
+                           /*do_access_check=*/true,
+                           /*transaction_active=*/false>(inst,
+                                                         *shadow_frame,
+                                                         self,
+                                                         result_register);
+  }
+  return res ? 1u : 0u;
 }
 
 extern "C" size_t MterpFilledNewArrayRange(ShadowFrame* shadow_frame,
@@ -441,8 +457,24 @@ extern "C" size_t MterpFilledNewArrayRange(ShadowFrame* shadow_frame,
                                            Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoFilledNewArray<true, false, false>(inst, *shadow_frame, self,
-                                              shadow_frame->GetResultRegister()) ? 1u : 0u;
+  JValue* result_register = shadow_frame->GetResultRegister();
+  bool res = false;
+  if (shadow_frame->GetMethod()->SkipAccessChecks()) {
+    res = DoFilledNewArray</*is_range=*/true,
+                           /*do_access_check=*/false,
+                           /*transaction_active=*/false>(inst,
+                                                         *shadow_frame,
+                                                         self,
+                                                         result_register);
+  } else {
+    res = DoFilledNewArray</*is_range=*/true,
+                           /*do_access_check=*/true,
+                           /*transaction_active=*/false>(inst,
+                                                         *shadow_frame,
+                                                         self,
+                                                         result_register);
+  }
+  return res ? 1u : 0u;
 }
 
 extern "C" size_t MterpNewArray(ShadowFrame* shadow_frame,
@@ -451,11 +483,23 @@ extern "C" size_t MterpNewArray(ShadowFrame* shadow_frame,
     REQUIRES_SHARED(Locks::mutator_lock_) {
   const Instruction* inst = Instruction::At(dex_pc_ptr);
   int32_t length = shadow_frame->GetVReg(inst->VRegB_22c(inst_data));
-  ObjPtr<mirror::Object> obj = AllocArrayFromCode</*kAccessCheck=*/ false>(
-      dex::TypeIndex(inst->VRegC_22c()), length, shadow_frame->GetMethod(), self,
-      Runtime::Current()->GetHeap()->GetCurrentAllocator());
+  gc::AllocatorType allocator = Runtime::Current()->GetHeap()->GetCurrentAllocator();
+  ObjPtr<mirror::Object> obj;
+  if (shadow_frame->GetMethod()->SkipAccessChecks()) {
+    obj = AllocArrayFromCode</*kAccessCheck=*/ false>(dex::TypeIndex(inst->VRegC_22c()),
+                                                      length,
+                                                      shadow_frame->GetMethod(),
+                                                      self,
+                                                      allocator);
+  } else {
+    obj = AllocArrayFromCode</*kAccessCheck=*/ true>(dex::TypeIndex(inst->VRegC_22c()),
+                                                     length,
+                                                     shadow_frame->GetMethod(),
+                                                     self,
+                                                     allocator);
+  }
   if (UNLIKELY(obj == nullptr)) {
-      return 0u;
+    return 0u;
   }
   shadow_frame->SetVRegReference(inst->VRegA_22c(inst_data), obj);
   return 1u;
