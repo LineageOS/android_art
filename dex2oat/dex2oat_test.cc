@@ -1351,7 +1351,7 @@ TEST_F(Dex2oatVerifierAbort, HardFail) {
 }
 
 TEST_F(Dex2oatVerifierAbort, SoftFail) {
-  // Use VerifierDepsMulti as it has hard-failing classes.
+  // Use VerifierDepsMulti as it has soft-failing classes.
   std::unique_ptr<const DexFile> dex(OpenTestDexFile("VerifierDepsMulti"));
   std::string out_dir = GetScratchDir();
   const std::string base_oat_name = out_dir + "/base.oat";
