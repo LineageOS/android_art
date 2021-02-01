@@ -1,0 +1,2 @@
+Regression test for mterp which used to not do access checks on array
+allocation opcodes.
