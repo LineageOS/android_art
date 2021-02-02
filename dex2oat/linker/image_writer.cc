@@ -3175,18 +3175,27 @@ const uint8_t* ImageWriter::GetQuickCode(ArtMethod* method, const ImageInfo& ima
     quick_code = GetOatAddressForOffset(quick_oat_code_offset, image_info);
   }
 
+  bool needs_clinit_check = NeedsClinitCheckBeforeCall(method) &&
+      !method->GetDeclaringClass()->IsVisiblyInitialized();
+
   if (quick_code == nullptr) {
-    // If we don't have code, use generic jni / interpreter bridge.
-    // Both perform class initialization check if needed.
+    // If we don't have code, use generic jni / interpreter.
     if (method->IsNative()) {
+      // The generic JNI trampolines performs class initialization check if needed.
       quick_code = GetOatAddress(StubType::kQuickGenericJNITrampoline);
     } else if (CanMethodUseNterp(method, compiler_options_.GetInstructionSet())) {
-      quick_code = GetOatAddress(StubType::kNterpTrampoline);
+      // The nterp trampoline doesn't do initialization checks, so install the
+      // resolution stub if needed.
+      if (needs_clinit_check) {
+        quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
+      } else {
+        quick_code = GetOatAddress(StubType::kNterpTrampoline);
+      }
     } else {
+      // The interpreter brige performs class initialization check if needed.
       quick_code = GetOatAddress(StubType::kQuickToInterpreterBridge);
     }
-  } else if (NeedsClinitCheckBeforeCall(method) &&
-             !method->GetDeclaringClass()->IsVisiblyInitialized()) {
+  } else if (needs_clinit_check) {
     // If we do have code but the method needs a class initialization check before calling
     // that code, install the resolution stub that will perform the check.
     quick_code = GetOatAddress(StubType::kQuickResolutionTrampoline);
