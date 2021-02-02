@@ -38,6 +38,7 @@ NEED_HANDSHAKE_MESSAGE = b"HANDSHAKE:REQD\x00"
 LISTEN_START_MESSAGE   = b"dt_fd_forward:START-LISTEN\x00"
 LISTEN_END_MESSAGE     = b"dt_fd_forward:END-LISTEN\x00"
 ACCEPTED_MESSAGE       = b"dt_fd_forward:ACCEPTED\x00"
+HANDSHAKEN_MESSAGE     = b"dt_fd_forward:HANDSHAKE-COMPLETE\x00"
 CLOSE_MESSAGE          = b"dt_fd_forward:CLOSING\x00"
 
 libc = ctypes.cdll.LoadLibrary("libc.so.6")
@@ -105,6 +106,8 @@ def HandleSockets(host, port, local_sock, finish_event):
           listening = False
         elif buf == ACCEPTED_MESSAGE:
           print("Fds were accepted.")
+        elif buf == HANDSHAKEN_MESSAGE:
+          print("Handshake completed.")
         elif buf == CLOSE_MESSAGE:
           # TODO Dup the fds and send a fake DDMS message like the actual plugin would.
           print("Fds were closed")
