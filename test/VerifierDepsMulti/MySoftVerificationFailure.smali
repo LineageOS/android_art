@@ -17,8 +17,9 @@
 
 .method public final foo()V
   .registers 1
-  sget-object v0, LMySoftVerificationFailure;->error:LUnknownType;
+  sget-object v0, LMySoftVerificationFailure;->error:Ljava/lang/Object;
+  # Throwing a non-exception class is a soft failure.
   throw v0
 .end method
 
-.field public static error:LUnknownType;
+.field public static error:Ljava/lang/Object;

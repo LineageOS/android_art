@@ -5176,6 +5176,7 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
 // The AOT/JIT compiled code is not affected.
 static inline bool CanRuntimeHandleVerificationFailure(uint32_t encountered_failure_types) {
   constexpr uint32_t unresolved_mask =
+      verifier::VerifyError::VERIFY_ERROR_UNRESOLVED_TYPE_CHECK |
       verifier::VerifyError::VERIFY_ERROR_NO_CLASS |
       verifier::VerifyError::VERIFY_ERROR_CLASS_CHANGE |
       verifier::VerifyError::VERIFY_ERROR_INSTANTIATION |
@@ -5250,7 +5251,11 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
         verifier.Dump(LOG_STREAM(INFO));
       }
       if (CanRuntimeHandleVerificationFailure(verifier.encountered_failure_types_)) {
-        result.kind = FailureKind::kAccessChecksFailure;
+        if (verifier.encountered_failure_types_ & VERIFY_ERROR_UNRESOLVED_TYPE_CHECK) {
+          result.kind = FailureKind::kTypeChecksFailure;
+        } else {
+          result.kind = FailureKind::kAccessChecksFailure;
+        }
       } else {
         result.kind = FailureKind::kSoftFailure;
       }
@@ -5538,27 +5543,6 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
       case VERIFY_ERROR_ACCESS_METHOD:
       case VERIFY_ERROR_INSTANTIATION:
       case VERIFY_ERROR_CLASS_CHANGE:
-      case VERIFY_ERROR_FORCE_INTERPRETER:
-      case VERIFY_ERROR_LOCKING:
-        if (IsAotMode() || !can_load_classes_) {
-          if (error != VERIFY_ERROR_ACCESS_CLASS &&
-              error != VERIFY_ERROR_ACCESS_FIELD &&
-              error != VERIFY_ERROR_NO_METHOD &&
-              error != VERIFY_ERROR_ACCESS_METHOD) {
-            // If we're optimistically running verification at compile time, turn NO_xxx,
-            // class change and instantiation errors into soft verification errors so that we
-            // re-verify at runtime. We may fail to find or to agree on access because of not yet
-            // available class loaders, or class loaders that will differ at runtime. In these
-            // cases, we don't want to affect the soundness of the code being compiled. Instead, the
-            // generated code runs "slow paths" that dynamically perform the verification and cause
-            // the behavior to be that akin to an interpreter.
-            error = VERIFY_ERROR_BAD_CLASS_SOFT;
-          }
-        } else {
-          // If we fail again at runtime, mark that this instruction would throw and force this
-          // method to be executed using the interpreter with checks.
-          flags_.have_pending_runtime_throw_failure_ = true;
-        }
         // How to handle runtime failures for instructions that are not flagged kThrow.
         //
         // The verifier may fail before we touch any instruction, for the signature of a method. So
@@ -5581,15 +5565,20 @@ std::ostream& MethodVerifier::Fail(VerifyError error, bool pending_exc) {
         }
         break;
 
-        // Indication that verification should be retried at runtime.
+      case VERIFY_ERROR_FORCE_INTERPRETER:
+      case VERIFY_ERROR_LOCKING:
+        // This will be reported to the runtime as a soft failure.
+        break;
+
+      // Indication that verification should be retried at runtime.
       case VERIFY_ERROR_BAD_CLASS_SOFT:
         if (!allow_soft_failures_) {
           flags_.have_pending_hard_failure_ = true;
         }
         break;
 
-        // Hard verification failures at compile time will still fail at runtime, so the class is
-        // marked as rejected to prevent it from being compiled.
+      // Hard verification failures at compile time will still fail at runtime, so the class is
+      // marked as rejected to prevent it from being compiled.
       case VERIFY_ERROR_BAD_CLASS_HARD: {
         flags_.have_pending_hard_failure_ = true;
         break;
