@@ -26,6 +26,7 @@
 #include "base/dchecked_vector.h"
 #include "base/file_utils.h"
 #include "base/stl_util.h"
+#include "base/systrace.h"
 #include "class_linker.h"
 #include "class_loader_utils.h"
 #include "class_root-inl.h"
@@ -1177,8 +1178,9 @@ bool ClassLoaderContext::CreateInfoFromClassLoader(
 std::unique_ptr<ClassLoaderContext> ClassLoaderContext::CreateContextForClassLoader(
     jobject class_loader,
     jobjectArray dex_elements) {
-  CHECK(class_loader != nullptr);
+  ScopedTrace trace(__FUNCTION__);
 
+  CHECK(class_loader != nullptr);
   ScopedObjectAccess soa(Thread::Current());
   StackHandleScope<2> hs(soa.Self());
   Handle<mirror::ClassLoader> h_class_loader =
@@ -1229,6 +1231,7 @@ ClassLoaderContext::VerificationResult ClassLoaderContext::VerifyClassLoaderCont
     const std::string& context_spec,
     bool verify_names,
     bool verify_checksums) const {
+  ScopedTrace trace(__FUNCTION__);
   if (verify_names || verify_checksums) {
     DCHECK(dex_files_state_ == kDexFilesChecksumsRead || dex_files_state_ == kDexFilesOpened)
         << "dex_files_state_=" << dex_files_state_;
