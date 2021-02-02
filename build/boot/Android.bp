@@ -15,4 +15,11 @@
 boot_image {
     name: "art-boot-image",
     image_name: "art",
+    visibility: [
+        "//art/build/apex",
+    ],
+    apex_available: [
+        "com.android.art",
+        "com.android.art.debug",
+    ],
 }

@@ -300,6 +300,7 @@ void VerifierDeps::MaybeRecordVerificationStatus(const DexFile& dex_file,
         break;
       }
       case verifier::FailureKind::kAccessChecksFailure:
+      case verifier::FailureKind::kTypeChecksFailure:
       case verifier::FailureKind::kNoFailure: {
         thread_deps->RecordClassVerified(dex_file, class_def);
         break;
