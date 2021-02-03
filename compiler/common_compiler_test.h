@@ -50,10 +50,13 @@ class CommonCompilerTestImpl {
   CommonCompilerTestImpl();
   virtual ~CommonCompilerTestImpl();
 
+  // Create an executable copy of the code with given metadata.
+  const void* MakeExecutable(ArrayRef<const uint8_t> code,
+                             ArrayRef<const uint8_t> vmap_table,
+                             InstructionSet instruction_set);
+
   void MakeExecutable(ArtMethod* method, const CompiledMethod* compiled_method)
       REQUIRES_SHARED(Locks::mutator_lock_);
-
-  static void MakeExecutable(const void* code_start, size_t code_length);
 
  protected:
   void SetUp();
@@ -100,8 +103,8 @@ class CommonCompilerTestImpl {
   virtual Runtime* GetRuntime() = 0;
 
  private:
-  // Chunks must not move their storage after being created - use the node-based std::list.
-  std::list<std::vector<uint8_t>> header_code_and_maps_chunks_;
+  class CodeAndMetadata;
+  std::vector<CodeAndMetadata> code_and_metadata_;
 };
 
 template <typename RuntimeBase>
