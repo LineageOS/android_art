@@ -242,4 +242,28 @@ TEST_F(Dex2oatVdexTest, VerifyPublicSdkStubsWithDexFiles) {
       extra_args));
 }
 
+// Check that corrupt vdex files from .dm archives are ignored.
+TEST_F(Dex2oatVdexTest, VerifyCorruptVdexFile) {
+  std::string error_msg;
+
+  // Dex2oatVdexTestDex is the subject app using normal APIs found in the boot classpath.
+  std::unique_ptr<const DexFile> dex_file(OpenTestDexFile("Dex2oatVdexTestDex"));
+
+  // Create the .dm file with the output.
+  // Instead passing the vdex files, pass the actual dex file. This will simulate a vdex corruption.
+  // The compiler should ignore it.
+  std::string dm_file = GetScratchDir() + "/base.dm";
+  CreateDexMetadata(dex_file->GetLocation(), dm_file);
+  std::vector<std::string> extra_args;
+  extra_args.push_back("--dm-file=" + dm_file);
+
+  // Compile the dex file. Despite having a corrupt input .vdex, we should not crash.
+  ASSERT_TRUE(RunDex2oat(
+      dex_file->GetLocation(),
+      GetOdex(dex_file),
+      /*public_sdk=*/ nullptr,
+      /*copy_dex_files=*/ true,
+      extra_args)) << output_;
+}
+
 }  // namespace art
