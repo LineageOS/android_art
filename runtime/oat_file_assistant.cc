@@ -951,34 +951,63 @@ void OatFileAssistant::GetOptimizationStatus(
   // It may not be possible to load an oat file executable (e.g., selinux restrictions). Load
   // non-executable and check the status manually.
   OatFileAssistant oat_file_assistant(filename.c_str(), isa, /*load_executable=*/ false);
-  std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
+  std::string out_odex_location;  // unused
+  std::string out_odex_status;  // unused
+  oat_file_assistant.GetOptimizationStatus(
+      &out_odex_location,
+      out_compilation_filter,
+      out_compilation_reason,
+      &out_odex_status);
+}
+
+void OatFileAssistant::GetOptimizationStatus(
+    std::string* out_odex_location,
+    std::string* out_compilation_filter,
+    std::string* out_compilation_reason,
+    std::string* out_odex_status) {
+  OatFileInfo& oat_file_info = GetBestInfo();
+  const OatFile* oat_file = GetBestInfo().GetFile();
 
   if (oat_file == nullptr) {
+    *out_odex_location = "error";
     *out_compilation_filter = "run-from-apk";
     *out_compilation_reason = "unknown";
+    // This mostly happens when we cannot open the oat file.
+    // Note that it's different than kOatCannotOpen.
+    // TODO: The design of getting the BestInfo is not ideal,
+    // as it's not very clear what's the difference between
+    // a nullptr and kOatcannotOpen. The logic should be revised
+    // and improved.
+    *out_odex_status = "io-error-no-oat";
     return;
   }
 
-  OatStatus status = oat_file_assistant.GivenOatFileStatus(*oat_file);
+  *out_odex_location = oat_file->GetLocation();
+  OatStatus status = oat_file_info.Status();
   const char* reason = oat_file->GetCompilationReason();
   *out_compilation_reason = reason == nullptr ? "unknown" : reason;
   switch (status) {
-    case OatStatus::kOatUpToDate:
+    case kOatUpToDate:
       *out_compilation_filter = CompilerFilter::NameOfFilter(oat_file->GetCompilerFilter());
+      *out_odex_status = "up-to-date";
       return;
 
     case kOatCannotOpen:  // This should never happen, but be robust.
       *out_compilation_filter = "error";
       *out_compilation_reason = "error";
+      // This mostly happens when we cannot open the vdex file,
+      // or the file is corrupt.
+      *out_odex_status = "io-error-or-corruption";
       return;
 
-    // kOatBootImageOutOfDate - The oat file is up to date with respect to the
-    // dex file, but is out of date with respect to the boot image.
     case kOatBootImageOutOfDate:
-      FALLTHROUGH_INTENDED;
-    case kOatDexOutOfDate:
-      DCHECK(oat_file_assistant.HasDexFiles());
       *out_compilation_filter = "run-from-apk-fallback";
+      *out_odex_status = "boot-image-more-recent";
+      return;
+
+    case kOatDexOutOfDate:
+      *out_compilation_filter = "run-from-apk-fallback";
+      *out_odex_status = "apk-more-recent";
       return;
   }
   LOG(FATAL) << "Unreachable";

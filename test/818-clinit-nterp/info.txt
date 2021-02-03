@@ -1,0 +1,2 @@
+Regression test for image creation, which used to install the nterp trampoline
+on methods that required a clinit check.
