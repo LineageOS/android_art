@@ -415,6 +415,16 @@ cat >TEST_MAPPING <<EOF
 {
 EOF
 
+# Mainline presubmits.
+# TODO(rpl): Progressively add more tests to this test group.
+cat >>TEST_MAPPING <<EOF
+  "mainline-presubmit": [
+    {
+      "name": "art-run-test-001-HelloWorld[com.google.android.art.apex]"
+    }
+  ],
+EOF
+
 # Presubmits.
 cat >>TEST_MAPPING <<EOF
   "presubmit": [

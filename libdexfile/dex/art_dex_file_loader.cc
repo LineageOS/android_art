@@ -431,6 +431,10 @@ std::unique_ptr<const DexFile> ArtDexFileLoader::OpenOneDexFileFromZip(
     }
   }
 
+  ScopedTrace map_extract_trace(StringPrintf("Mapped=%s Extracted=%s",
+      map.IsValid() ? "true" : "false",
+      map.IsValid() ? "false" : "true"));  // this is redundant but much easier to read in traces.
+
   if (!map.IsValid()) {
     // Default path for compressed ZIP entries,
     // and fallback for stored ZIP entries.
