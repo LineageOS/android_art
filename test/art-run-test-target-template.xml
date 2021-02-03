@@ -16,6 +16,7 @@
 <!-- Note: This test config for {MODULE} is generated from a template. -->
 <configuration description="Test module config for {MODULE}">
     <option name="test-suite-tag" value="art-target-run-test" />
+    <option name="config-descriptor:metadata" key="mainline-param" value="com.google.android.art.apex" />
 
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />

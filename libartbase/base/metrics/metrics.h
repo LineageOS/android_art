@@ -75,7 +75,7 @@ enum class DatumId {
 #undef ART_COUNTER
 
 #define ART_HISTOGRAM(name, num_buckets, low_value, high_value) k##name,
-      ART_HISTOGRAMS(ART_HISTOGRAM)
+  ART_HISTOGRAMS(ART_HISTOGRAM)
 #undef ART_HISTOGRAM
 };
 
@@ -128,36 +128,6 @@ class MetricsBackend {
                                int64_t minimum_value,
                                int64_t maximum_value,
                                const std::vector<uint32_t>& buckets) = 0;
-
-  ///////////////////////
-  // Utility Functions //
-  ///////////////////////
-  //
-  // The functions below are utility functions that could be helpful for other backends. For
-  // example, these can calculate various statistics about histograms that could be helpful to
-  // report.
-
-  // Returns an array where each entry is the total number of entries up to and including the
-  // current bucket. There is one extra item at the end which is the sum of all of the original
-  // buckets.
-  std::vector<uint32_t> CumulativeBuckets(const std::vector<uint32_t>& buckets) const;
-
-  // Estimates the value that would be at given percentile.
-  //
-  // This assumes that values are uniformly distributed within a bucket, which is probably not
-  // a valid assumption but it's the best we can do with the data we collect.
-  int64_t HistogramPercentile(double percentile,
-                              int64_t minimum_value,
-                              int64_t maximum_value,
-                              const std::vector<uint32_t>& cumulative_buckets) const;
-
-  // Returns a pair of the lower and upper bound of the confidence interval specified by the
-  // interval parameter.
-  std::pair<int64_t, int64_t> HistogramConfidenceInterval(
-      double interval,
-      int64_t minimum_value,
-      int64_t maximum_value,
-      const std::vector<uint32_t>& cumulative_buckets) const;
 
   template <DatumId counter_type>
   friend class MetricsCounter;
