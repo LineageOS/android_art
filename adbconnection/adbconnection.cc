@@ -24,6 +24,7 @@
 #include "android-base/endian.h"
 #include "android-base/stringprintf.h"
 #include "base/file_utils.h"
+#include "base/globals.h"
 #include "base/logging.h"
 #include "base/macros.h"
 #include "base/mutex.h"
@@ -61,6 +62,7 @@ using dt_fd_forward::kListenStartMessage;
 using dt_fd_forward::kListenEndMessage;
 using dt_fd_forward::kAcceptMessage;
 using dt_fd_forward::kCloseMessage;
+using dt_fd_forward::kHandshakeCompleteMessage;
 
 // Messages sent to the transport
 using dt_fd_forward::kPerformHandshakeMessage;
@@ -344,7 +346,7 @@ void AdbConnectionState::SendDdmPacket(uint32_t id,
                                        art::ArrayRef<const uint8_t> data) {
   // Get the write_event early to fail fast.
   ScopedEventFdLock lk(adb_write_event_fd_);
-  if (adb_connection_socket_ == -1) {
+  if (adb_connection_socket_ == -1 || !performed_handshake_) {
     VLOG(jdwp) << "Not sending ddms data of type "
                << StringPrintf("%c%c%c%c",
                                static_cast<char>(type >> 24),
@@ -580,6 +582,10 @@ void AdbConnectionState::RunPollLoop(art::Thread* self) {
           }
         } else if (memcmp(kListenEndMessage, buf, sizeof(kListenEndMessage)) == 0) {
           agent_listening_ = false;
+        } else if (memcmp(kHandshakeCompleteMessage, buf, sizeof(kHandshakeCompleteMessage)) == 0) {
+          if (agent_has_socket_) {
+            performed_handshake_ = true;
+          }
         } else if (memcmp(kCloseMessage, buf, sizeof(kCloseMessage)) == 0) {
           CloseFds();
           agent_has_socket_ = false;
