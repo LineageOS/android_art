@@ -283,12 +283,5 @@
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectWithWildAltNamesCert",
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testWildAltNameOnlyCert"],
   bug: 166619732
-},
-{
-  description: "Doesn't work on old kernels (like on fugu)",
-  result: EXEC_FAILED,
-  modes: [device],
-  bug: 176104885,
-  names: ["libcore.android.system.OsTest#test_socket_setSockoptTimeval_effective"]
 }
 ]
