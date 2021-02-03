@@ -65,6 +65,11 @@ static constexpr char kListenEndMessage[] = "dt_fd_forward:END-LISTEN";
 // fds are closed.
 static constexpr char kAcceptMessage[] = "dt_fd_forward:ACCEPTED";
 
+// This message is sent over the fd associated with the transport when we have
+// completed the handshake. If the handshake was already performed this is sent
+// immediately.
+static constexpr char kHandshakeCompleteMessage[] = "dt_fd_forward:HANDSHAKE-COMPLETE";
+
 // This message is sent over the fd associated with the transport when we are closing the fds. This
 // can be used by the proxy to send additional data on a dup'd fd. The write_lock_fd_ will be held
 // until the other two fds are closed and then it will be released and closed.
