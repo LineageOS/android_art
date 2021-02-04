@@ -21,6 +21,7 @@
 
 namespace art {
 
+class CodeGenerator;
 class InductionVarRange;
 class LoopAnalysis;
 
@@ -132,11 +133,12 @@ class LoopAnalysis : public ValueObject {
 //
 class ArchNoOptsLoopHelper : public ArenaObject<kArenaAllocOptimization> {
  public:
+  explicit ArchNoOptsLoopHelper(const CodeGenerator& codegen) : codegen_(codegen) {}
   virtual ~ArchNoOptsLoopHelper() {}
 
   // Creates an instance of specialised helper for the target or default helper if the target
   // doesn't support loop peeling and unrolling.
-  static ArchNoOptsLoopHelper* Create(InstructionSet isa, ArenaAllocator* allocator);
+  static ArchNoOptsLoopHelper* Create(const CodeGenerator& codegen, ArenaAllocator* allocator);
 
   // Returns whether the loop is not beneficial for loop peeling/unrolling.
   //
@@ -176,6 +178,9 @@ class ArchNoOptsLoopHelper : public ArenaObject<kArenaAllocOptimization> {
                                           uint32_t vector_length ATTRIBUTE_UNUSED) const {
     return LoopAnalysisInfo::kNoUnrollingFactor;
   }
+
+ protected:
+  const CodeGenerator& codegen_;
 };
 
 }  // namespace art

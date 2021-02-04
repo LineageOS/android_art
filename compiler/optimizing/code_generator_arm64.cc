@@ -994,7 +994,7 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
 }
 
 bool CodeGeneratorARM64::ShouldUseSVE() const {
-  return kArm64AllowSVE && GetInstructionSetFeatures().HasSVE();
+  return GetInstructionSetFeatures().HasSVE();
 }
 
 #define __ GetVIXLAssembler()->
@@ -6908,7 +6908,7 @@ void CodeGeneratorARM64::EmitJitRootPatches(uint8_t* code, const uint8_t* roots_
   }
 }
 
-MemOperand InstructionCodeGeneratorARM64::VecNeonAddress(
+MemOperand InstructionCodeGeneratorARM64::VecNEONAddress(
     HVecMemoryOperation* instruction,
     UseScratchRegisterScope* temps_scope,
     size_t size,
@@ -6939,6 +6939,31 @@ MemOperand InstructionCodeGeneratorARM64::VecNeonAddress(
     __ Add(*scratch, base, Operand(WRegisterFrom(index), LSL, shift));
     return HeapOperand(*scratch, offset);
   }
+}
+
+SVEMemOperand InstructionCodeGeneratorARM64::VecSVEAddress(
+    HVecMemoryOperation* instruction,
+    UseScratchRegisterScope* temps_scope,
+    size_t size,
+    bool is_string_char_at,
+    /*out*/ Register* scratch) {
+  LocationSummary* locations = instruction->GetLocations();
+  Register base = InputRegisterAt(instruction, 0);
+  Location index = locations->InAt(1);
+
+  // TODO: Support intermediate address sharing for SVE accesses.
+  DCHECK(!instruction->InputAt(1)->IsIntermediateAddressIndex());
+  DCHECK(!instruction->InputAt(0)->IsIntermediateAddress());
+  DCHECK(!index.IsConstant());
+
+  uint32_t offset = is_string_char_at
+      ? mirror::String::ValueOffset().Uint32Value()
+      : mirror::Array::DataOffset(size).Uint32Value();
+  size_t shift = ComponentSizeShiftWidth(size);
+
+  *scratch = temps_scope->AcquireSameSizeAs(base);
+  __ Add(*scratch, base, offset);
+  return SVEMemOperand(scratch->X(), XRegisterFrom(index), LSL, shift);
 }
 
 #undef __
